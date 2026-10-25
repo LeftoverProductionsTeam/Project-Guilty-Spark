@@ -6,6 +6,8 @@ Recorded 2026-10-25 on Windows x64. Tests are separated from actual game accepta
 
 40 Rust core tests and 7 frontend unit tests pass. Rustfmt, TypeScript checking, and Clippy for the core and desktop targets with warnings denied pass. The browser-preview Playwright test passes against installed Edge. These checks do not establish game compatibility.
 
+The development watcher excludes native sources, Rust outputs, local tools and supplied archives. Inspection of the running Vite watch list found no entries under those directories; the browser check passed after this fix. This prevents native builds from making the web preview watch locked executable outputs.
+
 The Rust core suite covers all five cache-family headers, the actual reordered Demo header, malformed/truncated files, invalid pointers/counts/flags, source preservation/hashing, missing resources, 5,000 randomized header mutations, project roundtrips/backups, SQLite persistence, semantic numeric/reference edits, scenario position/spawn yaw patching, immutable source identity, asset re-ingestion, traversal/device-path rejection, non-default Steam libraries, ownership-safe folder initialization, manifest locking/encoding/backups/preservation, OBJ parsing, and live-protocol capability rejection.
 
 The frontend unit suite covers semantic overlays, numeric validation, scene editing, undo/redo, redo-branch reset, merge of build completion without losing unsaved changes, and vector validation.
