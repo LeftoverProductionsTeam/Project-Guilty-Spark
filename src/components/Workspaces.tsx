@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Bounds, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -21,6 +21,7 @@ import {
 import type { Bootstrap, MapInspection, MeshData, Project, Settings } from '../types';
 import { call } from '../api';
 import { formatNumber } from '../editor';
+import { reconcileSettingsDraft } from '../settings';
 import { Empty, Notice, PageTitle, Pill } from './ui';
 function PreviewMesh({ mesh }: { mesh: MeshData }) {
   const g = useMemo(() => {
@@ -391,6 +392,26 @@ export function Preservation({ project, edit }: { project: Project; edit: (p: Pr
             <code className="checksum">{project.source?.sha256 ?? 'No Halo source cache'}</code>
             <div className="section-label">Original path</div>
             <code className="path-text">{project.source?.originalPath ?? 'Asset workspace'}</code>
+            {project.source?.archive && (
+              <>
+                <div className="section-label">Preserved archive provenance</div>
+                <code className="path-text">{project.source.archive.originalPath}</code>
+                <code className="path-text">{project.source.archive.entryPath}</code>
+                <code className="checksum">{project.source.archive.sha256}</code>
+              </>
+            )}
+            {project.source?.resourceDirectory && (
+              <>
+                <div className="section-label">Source resource directory</div>
+                <code className="path-text">{project.source.resourceDirectory}</code>
+              </>
+            )}
+            {Object.entries(project.source?.resourceSha256 ?? {}).map(([name, hash]) => (
+              <div key={name}>
+                <div className="section-label">{name} SHA-256</div>
+                <code className="checksum">{hash}</code>
+              </div>
+            ))}
           </section>
           <section className="surface restoration-note">
             <Pill tone="amber">Flagship restoration · pending</Pill>
@@ -410,13 +431,20 @@ export function Preferences({
   data,
   onApply,
   onAction,
+  onRuntimes,
 }: {
   data: Bootstrap;
   onApply: (s: Settings) => Promise<void>;
   onAction: (f: () => Promise<unknown>, s?: string) => Promise<void>;
+  onRuntimes: () => void;
 }) {
   const [draft, setDraft] = useState(data.settings);
-  useEffect(() => setDraft(data.settings), [data.settings]);
+  const previousSettings = useRef(data.settings);
+  useEffect(() => {
+    const previous = previousSettings.current;
+    setDraft((current) => reconcileSettingsDraft(current, previous, data.settings));
+    previousSettings.current = data.settings;
+  }, [data.settings]);
   const rows: [keyof Settings, string, string][] = [
     [
       'steamDirectory',
@@ -426,7 +454,7 @@ export function Preferences({
     [
       'mccDirectory',
       'MCC installation',
-      'Folder containing halo1. Guilty Spark creates its own Inbox and Mods subfolders.',
+      'Folder containing halo1. Detection is read-only. An optional MCC Inbox can be created explicitly from the library.',
     ],
     [
       'invaderDirectory',
@@ -442,11 +470,6 @@ export function Preferences({
       'metadataTemplateDirectory',
       'Official Excession metadata',
       'An unpublished Halo1 package configured for the exact scenario. Its map metadata is preserved.',
-    ],
-    [
-      'nativeExecutable',
-      'Native runtime executable',
-      'Launch a user-installed ChupathingyCE / OpenCE executable. Deployment and runtime capabilities are unverified.',
     ],
   ];
   return (
@@ -527,18 +550,14 @@ export function Preferences({
               </p>
             </div>
             <div className="capability-item">
-              <strong>ChupathingyCE / OpenCE</strong>
-              <Pill>External launcher only</Pill>
+              <strong>Native and legacy runtimes</strong>
+              <Pill>Explicit registrations</Pill>
               <p>
-                Separately installed runtimes. Their map families and network versions differ; no engine code
-                is embedded.
+                Use Runtimes &amp; friends to inspect existing installations, read capability evidence and
+                compare peer manifests.
               </p>
-              <button
-                className="small-button"
-                disabled={!data.settings.nativeExecutable}
-                onClick={() => void onAction(() => call('launch_native'))}
-              >
-                Open configured runtime
+              <button className="small-button" onClick={onRuntimes}>
+                Manage runtime adapters
                 <ArrowRight size={13} />
               </button>
             </div>

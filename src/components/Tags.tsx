@@ -1,8 +1,16 @@
 import { useMemo, useState } from 'react';
 import { ArrowDownToLine, ArrowRight, FileCode2, GitBranch, RotateCcw, Search, Sparkles } from 'lucide-react';
 import type { MapInspection, Project, Tag, TagField } from '../types';
-import { classNames, fieldValue, formatNumber, setTagValue, shortPath } from '../editor';
+import {
+  classNames,
+  effectiveReferenceId,
+  fieldValue,
+  formatNumber,
+  setTagValue,
+  shortPath,
+} from '../editor';
 import { Empty, Notice, NumberField, Pill } from './ui';
+import Sound from './Sound';
 export default function Tags({
   project,
   inspection,
@@ -230,17 +238,18 @@ export default function Tags({
                 </div>
               )}
             </div>
+            {selectedTag.class === 'snd!' && (
+              <Sound key={selectedTag.id} projectId={project.id} tagId={selectedTag.id} />
+            )}
             {selectedTag.references.length > 0 && (
               <div className="reference-list">
                 <h3>Referenced tags</h3>
                 {selectedTag.references.map((ref) => {
-                  const f = selectedTag.fields.find((f) => f.offset === ref.offset);
-                  const target = tags.find(
-                    (t) => t.id === (f ? fieldValue(project, selectedTag, f) : ref.targetId),
-                  );
+                  const target = tags.find((t) => t.id === effectiveReferenceId(project, selectedTag, ref));
                   return (
                     <button
                       key={`${ref.offset}-${ref.targetId}`}
+                      disabled={!target}
                       onClick={() => target && setSelected(target.id)}
                     >
                       <GitBranch size={14} />
@@ -281,9 +290,15 @@ export default function Tags({
               </div>
               {selectedTag.references.length > 0 && <div className="graph-trunk" />}
               {selectedTag.references.slice(0, 6).map((ref) => {
-                const target = tags.find((t) => t.id === ref.targetId);
+                const targetId = effectiveReferenceId(project, selectedTag, ref);
+                const target = tags.find((t) => t.id === targetId);
                 return (
-                  <button key={ref.offset} className="graph-target" onClick={() => setSelected(ref.targetId)}>
+                  <button
+                    key={ref.offset}
+                    className="graph-target"
+                    disabled={!target}
+                    onClick={() => setSelected(targetId)}
+                  >
                     <span className="graph-branch" />
                     <Pill>{ref.class}</Pill>
                     <span>{shortPath(target?.path ?? 'unresolved')}</span>

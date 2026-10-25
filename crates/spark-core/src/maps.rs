@@ -4,7 +4,7 @@ use crate::{binary::Reader, invalid, Result, SparkError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    fs::{self, File},
+    fs::File,
     io::{Read, Seek, SeekFrom},
     path::Path,
 };
@@ -236,13 +236,23 @@ pub struct MapInspection {
 }
 
 pub fn hash_file(path: &Path) -> Result<String> {
-    let mut f = File::open(path)?;
+    let f = File::open(path)?;
+    const MAX_HASH_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    if f.metadata()?.len() > MAX_HASH_BYTES {
+        return invalid("File exceeds the 2 GiB hashing safety limit");
+    }
+    let mut f = f.take(MAX_HASH_BYTES + 1);
     let mut hash = Sha256::new();
     let mut buf = [0u8; 65536];
+    let mut total = 0u64;
     loop {
         let n = f.read(&mut buf)?;
         if n == 0 {
             break;
+        }
+        total += n as u64;
+        if total > MAX_HASH_BYTES {
+            return invalid("File grew beyond the 2 GiB hashing safety limit");
         }
         hash.update(&buf[..n]);
     }
@@ -258,11 +268,25 @@ pub fn inspect_header(path: &Path) -> Result<MapHeader> {
 }
 
 pub fn read_cache(path: &Path) -> Result<(MapHeader, Vec<u8>)> {
-    let header = inspect_header(path)?;
-    if header.file_size > MAX_CACHE_BYTES || header.declared_size as u64 > MAX_CACHE_BYTES {
+    let (header, bytes, _) = read_cache_snapshot(path)?;
+    Ok((header, bytes))
+}
+/// Parse and hash the same bounded file snapshot before any working-buffer normalization.
+pub(crate) fn read_cache_snapshot(path: &Path) -> Result<(MapHeader, Vec<u8>, String)> {
+    let file = File::open(path)?;
+    if file.metadata()?.len() > MAX_CACHE_BYTES {
         return invalid(format!("Cache exceeds this reader's {} MiB memory safety limit. Use installed tool adapters for larger maps.",MAX_CACHE_BYTES/1024/1024));
     }
-    let mut bytes = fs::read(path)?;
+    let mut bytes = vec![];
+    file.take(MAX_CACHE_BYTES + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_CACHE_BYTES {
+        return invalid("Cache grew beyond the memory safety limit while reading");
+    }
+    let header = parse_header(&bytes, bytes.len() as u64)?;
+    if header.declared_size as u64 > MAX_CACHE_BYTES {
+        return invalid("Declared cache size exceeds the memory safety limit");
+    }
+    let sha256 = format!("{:x}", Sha256::digest(&bytes));
     if header.legacy_tag_size_repair {
         bytes[0x14..0x18].copy_from_slice(&header.tag_size.to_le_bytes());
     }
@@ -277,7 +301,7 @@ pub fn read_cache(path: &Path) -> Result<(MapHeader, Vec<u8>)> {
         }
         bytes = decoded;
     }
-    Ok((header, bytes))
+    Ok((header, bytes, sha256))
 }
 struct Space {
     begin: usize,
@@ -318,7 +342,7 @@ impl Space {
 }
 
 pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<MapInspection> {
-    let (mut header, bytes) = read_cache(path)?;
+    let (mut header, bytes, sha256) = read_cache_snapshot(path)?;
     header.extended |= path
         .extension()
         .is_some_and(|x| x.eq_ignore_ascii_case("yelo"));
@@ -430,6 +454,17 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
     if failed_fields > 0 {
         diagnostics.push(Diagnostic::warning("UNSUPPORTED_FIELDS",format!("{failed_fields} tags have structures outside the audited schema or unresolved pointers; those tags are inspection-only.")));
     }
+    let legacy_spawners = tags
+        .iter()
+        .filter(|t| {
+            t.references
+                .iter()
+                .any(|r| r.label.contains("legacy object spawner"))
+        })
+        .count();
+    if legacy_spawners > 0 {
+        diagnostics.push(Diagnostic::warning("LEGACY_OBJECT_SPAWNERS", format!("{legacy_spawners} weapon tags instantiate non-projectile objects. Their observed dependencies are read-only; ordinary editing-kit compilers may reject this legacy mechanic and target-runtime behavior is unverified.")));
+    }
     let scenario_id = r.u32(start + 4)?;
     let scenario = tags
         .iter()
@@ -455,6 +490,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             scenario_at,
             (offset, palette, stride, kind),
             &tags,
+            &mut diagnostics,
         ) {
             Ok(mut rows) => objects.append(&mut rows),
             Err(e) => diagnostics.push(Diagnostic::warning(
@@ -463,51 +499,75 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             )),
         }
     }
-    if let Ok((at, n)) = space.block(&r, scenario_at + 0x354, 52, 4096) {
-        for i in 0..n {
-            let p = at + i * 52;
-            objects.push(SceneObject {
-                id: format!("spawn-{i}"),
-                name: format!("Player spawn {} · team {}", i + 1, r.u16(p + 16)?),
-                kind: "Player spawn".into(),
-                tag_id: None,
-                position: vec3(&r, p)?,
-                rotation: [r.f32(p + 12)?, 0.0, 0.0],
-                scale: [1.0; 3],
-                visible: true,
-                source_offset: Some(p),
-                rotation_offset: Some(p + 12),
-                asset_id: None,
-            });
+    match space.block(&r, scenario_at + 0x354, 52, 4096) {
+        Ok((at, n)) => {
+            for i in 0..n {
+                let p = at + i * 52;
+                objects.push(SceneObject {
+                    id: format!("spawn-{i}"),
+                    name: format!("Player spawn {} · team {}", i + 1, r.u16(p + 16)?),
+                    kind: "Player spawn".into(),
+                    tag_id: None,
+                    position: vec3(&r, p)?,
+                    rotation: [r.f32(p + 12)?, 0.0, 0.0],
+                    scale: [1.0; 3],
+                    visible: true,
+                    source_offset: Some(p),
+                    rotation_offset: Some(p + 12),
+                    asset_id: None,
+                });
+            }
         }
+        Err(e) => diagnostics.push(Diagnostic::warning(
+            "PLAYER_SPAWNS_UNREADABLE",
+            format!("Player spawns could not be read: {e}"),
+        )),
     }
     let mut encounters = vec![];
-    if let Ok((at, n)) = space.block(&r, scenario_at + 0x42c, 176, 128) {
-        for i in 0..n {
-            let p = at + i * 176;
-            let mut squads = vec![];
-            if let Ok((s, c)) = space.block(&r, p + 128, 232, 64) {
-                for j in 0..c {
-                    squads.push(r.string(s + j * 232, 32)?);
+    match space.block(&r, scenario_at + 0x42c, 176, 128) {
+        Ok((at, n)) => {
+            for i in 0..n {
+                let p = at + i * 176;
+                let mut squads = vec![];
+                match space.block(&r, p + 128, 232, 64) {
+                    Ok((s, c)) => {
+                        for j in 0..c {
+                            squads.push(r.string(s + j * 232, 32)?);
+                        }
+                    }
+                    Err(e) => diagnostics.push(Diagnostic::warning(
+                        "AI_SQUADS_UNREADABLE",
+                        format!("Encounter {i} squads could not be read: {e}"),
+                    )),
                 }
+                encounters.push(Encounter {
+                    name: r.string(p, 32)?,
+                    squads,
+                    team: r.u16(p + 36)?,
+                });
             }
-            encounters.push(Encounter {
-                name: r.string(p, 32)?,
-                squads,
-                team: r.u16(p + 36)?,
-            });
         }
+        Err(e) => diagnostics.push(Diagnostic::warning(
+            "AI_ENCOUNTERS_UNREADABLE",
+            format!("AI encounters could not be read: {e}"),
+        )),
     }
     let mut scripts = vec![];
-    if let Ok((at, n)) = space.block(&r, scenario_at + 0x49c, 92, 4096) {
-        for i in 0..n {
-            let p = at + i * 92;
-            scripts.push(Script {
-                name: r.string(p, 32)?,
-                script_type: r.u16(p + 32)?,
-                return_type: r.u16(p + 34)?,
-            });
+    match space.block(&r, scenario_at + 0x49c, 92, 4096) {
+        Ok((at, n)) => {
+            for i in 0..n {
+                let p = at + i * 92;
+                scripts.push(Script {
+                    name: r.string(p, 32)?,
+                    script_type: r.u16(p + 32)?,
+                    return_type: r.u16(p + 34)?,
+                });
+            }
         }
+        Err(e) => diagnostics.push(Diagnostic::warning(
+            "SCRIPTS_UNREADABLE",
+            format!("Scripts could not be read: {e}"),
+        )),
     }
     let mesh = match collision_mesh(&r, &space, scenario_at, &tags) {
         Ok(m) => m,
@@ -538,7 +598,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
     diagnostics.push(Diagnostic::warning("RUNTIME_TEST_PENDING","Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability."));
     Ok(MapInspection {
         header,
-        sha256: hash_file(path)?,
+        sha256,
         tags,
         objects,
         mesh,
@@ -625,6 +685,60 @@ fn read_fields(
     let Some(at) = tag.data_offset else {
         return Ok(());
     };
+    // Read-only dependency metadata from Invader's HEK definitions. Actor variants
+    // and item collections can drive AI even when the scenario has no encounters.
+    if tag.class == "actv" {
+        space.pointer(space.address + (at - space.begin) as u32, 568)?;
+        for (offset, label) in [
+            (4, "Actor definition"),
+            (20, "Actor unit"),
+            (36, "Major actor variant"),
+            (100, "Actor weapon"),
+            (448, "Actor equipment"),
+        ] {
+            reference(r, tag, at + offset, label, None, ids)?;
+        }
+    }
+    if tag.class == "itmc" {
+        space.pointer(space.address + (at - space.begin) as u32, 92)?;
+        let (permutations, count) = space.block(r, at, 84, 32)?;
+        for i in 0..count {
+            reference(
+                r,
+                tag,
+                permutations + i * 84 + 36,
+                &format!("Item permutation {}", i + 1),
+                None,
+                ids,
+            )?;
+        }
+    }
+    if ["bipd", "vehi"].contains(&tag.class.as_str()) {
+        space.pointer(space.address + (at - space.begin) as u32, 752)?;
+        reference(r, tag, at + 588, "Spawned actor", None, ids)?;
+        let (seats, count) = space.block(r, at + 740, 284, 16)?;
+        for i in 0..count {
+            reference(
+                r,
+                tag,
+                seats + i * 284 + 248,
+                &format!("Seat {} · built-in actor", i + 1),
+                None,
+                ids,
+            )?;
+        }
+        let (weapons, count) = space.block(r, at + 728, 36, 4)?;
+        for i in 0..count {
+            reference(
+                r,
+                tag,
+                weapons + i * 36,
+                &format!("Unit weapon {}", i + 1),
+                None,
+                ids,
+            )?;
+        }
+    }
     if [
         "weap", "proj", "scen", "bipd", "vehi", "eqip", "mach", "ctrl", "lifi", "garb", "ssce",
     ]
@@ -709,6 +823,19 @@ fn read_fields(
                 Some("proj"),
                 ids,
             )?;
+            if r.fourcc(t + 0x94)? != "proj" {
+                // Historical spawner mods place a different object class in this
+                // slot. Expose the observed dependency without offering an edit
+                // or claiming the target runtime supports that legacy behavior.
+                reference(
+                    r,
+                    tag,
+                    t + 0x94,
+                    &format!("Trigger {} · legacy object spawner (read-only)", i + 1),
+                    None,
+                    ids,
+                )?;
+            }
         }
     }
     if tag.class == "proj" {
@@ -756,6 +883,7 @@ fn placements(
     sc: usize,
     block: (usize, usize, usize, &str),
     tags: &[Tag],
+    diagnostics: &mut Vec<Diagnostic>,
 ) -> Result<Vec<SceneObject>> {
     let (offset, palette, stride, kind) = block;
     let (at, n) = space.block(r, sc + offset, stride, 4096)?;
@@ -764,6 +892,9 @@ fn placements(
     for i in 0..n {
         let p = at + i * stride;
         let idx = r.u16(p)? as usize;
+        if idx >= pn && idx != u16::MAX as usize {
+            diagnostics.push(Diagnostic::warning("INVALID_PLACEMENT_TYPE", format!("{kind} placement {i} has palette index {idx}, outside {pn} entries. Its intended object cannot be established.")));
+        }
         let tid = if idx < pn {
             Some(r.u32(pal + idx * 48 + 12)?)
         } else {
@@ -773,6 +904,19 @@ fn placements(
             .and_then(|id| tags.iter().find(|t| t.id == id))
             .map(|t| t.path.rsplit('\\').next().unwrap_or(&t.path).to_string())
             .unwrap_or_else(|| kind.into());
+        let expected_class = match kind {
+            "Scenery" => "scen",
+            "Biped" => "bipd",
+            "Vehicle" => "vehi",
+            "Equipment" => "eqip",
+            "Weapon" => "weap",
+            _ => "",
+        };
+        if let Some(target) = tid.and_then(|id| tags.iter().find(|t| t.id == id)) {
+            if target.class != expected_class {
+                diagnostics.push(Diagnostic::warning("LEGACY_PLACEMENT_CLASS", format!("{kind} placement {i} references {} tag '{}'. This legacy cross-class placement may be rejected by the target compiler.", target.class, target.path)));
+            }
+        }
         rows.push(SceneObject {
             id: format!("{kind}-{i}"),
             name: format!("{name} · {}", i + 1),

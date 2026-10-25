@@ -33,6 +33,7 @@ export const browserBootstrap: Bootstrap = {
   },
   entries: [],
   dataDirectory: 'Desktop application required',
+  inboxDirectory: 'Desktop application required',
   diagnostics: [
     'Browser preview · Native import, persistence and Steam integration are available in the compiled desktop application.',
   ],

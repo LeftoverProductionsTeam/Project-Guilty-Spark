@@ -12,6 +12,7 @@ uuid.workspace = true
 chrono.workspace = true
 thiserror.workspace = true
 flate2 = "1"
+zip = { version = "=9.1.0", default-features = false, features = ["deflate-flate2"] }
 rusqlite = { version = "0.38", features = ["bundled"] }
 
 [dev-dependencies]

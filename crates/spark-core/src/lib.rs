@@ -1,12 +1,16 @@
+pub mod archive;
 pub mod assets;
+pub mod audio;
 pub mod binary;
 pub mod build;
 pub mod legacy;
 pub mod library;
 pub mod maps;
 pub mod mcc;
+pub mod multiplayer;
 pub mod project;
 pub mod protocol;
+pub mod runtime;
 pub mod steam;
 
 use std::path::Path;

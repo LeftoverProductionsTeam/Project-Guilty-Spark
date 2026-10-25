@@ -2,6 +2,44 @@ mod common;
 use spark_core::{mcc, safe_relative, steam};
 use std::fs;
 #[test]
+fn owned_root_discovery_is_read_only() {
+    let d = tempfile::tempdir().unwrap();
+    assert!(mcc::inspect_managed_root(d.path()).unwrap().is_none());
+    assert!(!d.path().join("halo1").exists());
+    fs::create_dir_all(d.path().join("halo1/maps")).unwrap();
+    let initialized = mcc::initialize(d.path()).unwrap();
+    assert_eq!(
+        mcc::inspect_managed_root(d.path()).unwrap().unwrap().root,
+        initialized.root
+    );
+}
+#[test]
+fn oversized_manifest_is_rejected_before_registration_changes_it() {
+    let d = tempfile::tempdir().unwrap();
+    let manifest = d.path().join("ModManifest.txt");
+    let original = vec![b'x'; 1024 * 1024 + 1];
+    fs::write(&manifest, &original).unwrap();
+    assert!(mcc::manifest_contains(&manifest, d.path()).is_err());
+    assert!(mcc::register_root(&manifest, d.path()).is_err());
+    assert_eq!(fs::read(&manifest).unwrap(), original);
+}
+#[test]
+fn an_empty_owned_receipt_cannot_prove_launch_readiness() {
+    let d = tempfile::tempdir().unwrap();
+    fs::create_dir_all(d.path().join("halo1/maps")).unwrap();
+    let root = mcc::initialize(d.path()).unwrap();
+    let project = spark_core::project::Project::new("receipt test");
+    let package = root.mods.join(&project.id);
+    fs::create_dir(&package).unwrap();
+    let receipt = serde_json::json!({"owner":"ProjectGuiltySpark/v1","projectId":project.id,"buildId":uuid::Uuid::new_v4().to_string(),"projectFingerprint":project.fingerprint().unwrap(),"files":{},"createdAt":"test"});
+    fs::write(
+        package.join(".guilty-spark-owned.json"),
+        serde_json::to_vec(&receipt).unwrap(),
+    )
+    .unwrap();
+    assert!(mcc::verify_package(&root, &project).is_err());
+}
+#[test]
 fn metadata_scenario_basename_controls_package_filename() {
     assert_eq!(
         mcc::package_map_name("levels\\custom\\restoration").unwrap(),

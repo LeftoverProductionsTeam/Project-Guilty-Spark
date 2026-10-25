@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   ArrowLeft,
+  ArrowLeftRight,
   ArrowUpRight,
   BookOpen,
   Box,
@@ -12,6 +13,8 @@ import {
   FolderOpen,
   Hammer,
   Home,
+  Unplug,
+  Server,
   LibraryBig,
   LoaderCircle,
   Plus,
@@ -44,6 +47,9 @@ const Assets = lazy(() => import('./components/Workspaces').then((m) => ({ defau
 const Preferences = lazy(() => import('./components/Workspaces').then((m) => ({ default: m.Preferences })));
 const Preservation = lazy(() => import('./components/Workspaces').then((m) => ({ default: m.Preservation })));
 const Scenario = lazy(() => import('./components/Workspaces').then((m) => ({ default: m.Scenario })));
+const Compare = lazy(() => import('./components/Compare'));
+const Runtimes = lazy(() => import('./components/Runtimes'));
+const LiveLab = lazy(() => import('./components/Runtimes').then((m) => ({ default: m.LiveLab })));
 const nav = [
   { id: 'library', label: 'Map library', icon: LibraryBig },
   { id: 'world', label: 'World editor', icon: Box },
@@ -51,6 +57,9 @@ const nav = [
   { id: 'assets', label: 'Asset workshop', icon: Hammer },
   { id: 'scenario', label: 'AI & scenario', icon: Users },
   { id: 'build', label: 'Build & playtest', icon: ArrowUpRight },
+  { id: 'compare', label: 'Compare variants', icon: ArrowLeftRight },
+  { id: 'runtimes', label: 'Runtimes & friends', icon: Server },
+  { id: 'live', label: 'Live Lab', icon: Unplug },
 ] as const;
 export default function App() {
   const [data, setData] = useState<Bootstrap>(browserBootstrap);
@@ -68,6 +77,10 @@ export default function App() {
   const [newTitle, setNewTitle] = useState('Untitled workshop');
   const [dragging, setDragging] = useState(false);
   const [help, setHelp] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const closingRef = useRef(false);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const buildRequest = useRef(0);
   const current = history.current;
   const historyRef = useRef(history);
   historyRef.current = history;
@@ -82,7 +95,7 @@ export default function App() {
     async (f: () => Promise<unknown>, success?: string) => {
       try {
         const result = await f();
-        if (success) notice(success, 'success');
+        if (success && result !== null) notice(success, 'success');
         else if (typeof result === 'string') notice(result, 'info');
         await refresh();
       } catch (e) {
@@ -92,21 +105,94 @@ export default function App() {
     [notice, refresh],
   );
   const save = useCallback(
-    async (announce = false) => {
+    (announce = false): Promise<void> => {
       const p = historyRef.current.current;
-      if (!p) return;
-      try {
-        await call('save_project', { project: p });
-        if (historyRef.current.current === p) dispatch({ type: 'saved' });
-        if (announce) notice('Project saved. Your original map is unchanged.', 'success');
-        await refresh();
-      } catch (e) {
-        notice(String(e), 'error');
-        throw e;
-      }
+      if (!p) return Promise.resolve();
+      const operation = saveQueue.current.then(async () => {
+        try {
+          await call('save_project', { project: p });
+          if (historyRef.current.current === p) dispatch({ type: 'saved' });
+          if (announce) notice('Project saved. Your original map is unchanged.', 'success');
+          await refresh();
+        } catch (e) {
+          notice(String(e), 'error');
+          throw e;
+        }
+      });
+      saveQueue.current = operation.catch(() => {});
+      return operation;
     },
     [notice, refresh],
   );
+  useEffect(() => {
+    if (!help && !createModal) return;
+    const previous = document.activeElement;
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    const focusable = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]',
+        ) ?? [],
+      );
+    const focus = focusable();
+    if (!dialog?.contains(document.activeElement)) focus[0]?.focus();
+    const trap = (event: KeyboardEvent) => {
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        setHelp(false);
+        setCreateModal(false);
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      if (!items.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = items[0],
+        last = items[items.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last || !dialog?.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', trap);
+    return () => {
+      document.removeEventListener('keydown', trap);
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
+  }, [help, createModal]);
+  useEffect(() => {
+    if (!native) return;
+    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+      event.preventDefault();
+      if (closingRef.current) return;
+      closingRef.current = true;
+      // Commit a focused numeric draft before collecting the final project snapshot.
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      setClosing(true);
+      try {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        await save();
+        await call('close_application');
+      } catch (error) {
+        closingRef.current = false;
+        setClosing(false);
+        notice(
+          `The project could not be saved before closing. The window remains open. ${String(error)}`,
+          'error',
+        );
+      }
+    });
+    return () => {
+      void unlisten.then((stop) => stop());
+    };
+  }, [notice, save]);
   const load = useCallback(
     async (open: OpenProject) => {
       dispatch({ type: 'load', project: open.project });
@@ -168,9 +254,12 @@ export default function App() {
       listen('spark:library-changed', () => {
         void refresh();
         const p = historyRef.current.current;
+        const request = ++buildRequest.current;
         if (p)
           void call<OpenProject>('open_project', { id: p.id })
-            .then((open) => dispatch({ type: 'builds', project: open.project }))
+            .then((open) => {
+              if (request === buildRequest.current) dispatch({ type: 'builds', project: open.project });
+            })
             .catch((e) => notice(String(e), 'error'));
       }),
     );
@@ -206,6 +295,14 @@ export default function App() {
   }, [current, history.dirty, save]);
   useEffect(() => {
     function key(e: KeyboardEvent) {
+      if (closingRef.current) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'Escape') {
+        setCreateModal(false);
+        setHelp(false);
+      }
       if (e.ctrlKey || e.metaKey) {
         if (e.key.toLowerCase() === 's') {
           e.preventDefault();
@@ -336,11 +433,30 @@ export default function App() {
           onNew={() => setCreateModal(true)}
           onOpen={(e) => void openProject(e.id)}
           onInbox={() => void action(() => call('reveal_folder', { kind: 'inbox' }))}
+          onInitializeInbox={() =>
+            void action(async () => {
+              setData(await call<Bootstrap>('initialize_mcc_inbox'));
+            }, 'MCC Inbox initialized.')
+          }
           busy={busy}
         />
       );
     if (workspace === 'settings')
-      return <Preferences data={data} onApply={applySettings} onAction={action} />;
+      return (
+        <Preferences
+          data={data}
+          onApply={applySettings}
+          onAction={action}
+          onRuntimes={() => setWorkspace('runtimes')}
+        />
+      );
+    if (workspace === 'compare')
+      return (
+        <Compare entries={data.entries} currentId={current?.id} dirty={history.dirty} onSave={() => save()} />
+      );
+    if (workspace === 'runtimes')
+      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} />;
+    if (workspace === 'live') return <LiveLab onBuild={() => setWorkspace('build')} />;
     if (!current) return commonEmpty;
     switch (workspace) {
       case 'world':
@@ -386,6 +502,15 @@ export default function App() {
             onStart={() => void startBuild()}
             onAction={action}
             onSettings={() => setWorkspace('settings')}
+            onResources={() =>
+              void action(async () => {
+                const projectId = current.id;
+                await save();
+                const open = await call<OpenProject | null>('choose_project_resources', { projectId });
+                if (open && historyRef.current.current?.id === projectId) await load(open);
+                return open;
+              }, 'Source resource directory updated and source inspection refreshed.')
+            }
             onRefresh={() =>
               void action(async () => {
                 await call('refresh_installation');
@@ -402,277 +527,292 @@ export default function App() {
     }
   }
   return (
-    <div className="application">
-      <header className="app-header">
-        <button className="brand" onClick={() => setWorkspace('library')} aria-label="Guilty Spark home">
-          <img src="/spark.svg" alt="" />
-          <div>
-            <strong>GUILTY SPARK</strong>
-            <span>HALO MODERN EVOLVED</span>
-          </div>
-          <Pill>0.1</Pill>
-        </button>
-        <div className="header-context">
-          <span>LOCAL WORKBENCH</span>
-          <ChevronRight size={12} />
-          <strong>{current?.title ?? 'Map library'}</strong>
-          {current && (
-            <span
-              className={history.dirty ? 'unsaved-dot' : 'saved-dot'}
-              title={history.dirty ? 'Unsaved changes' : 'Saved'}
-            />
-          )}
-        </div>
-        <div className="header-actions">
-          <Pill tone={data.installation.mccPath ? 'green' : 'muted'}>
-            <span className="live-dot" />
-            {data.installation.mccPath ? 'MCC connected' : native ? 'Runtime not found' : 'Browser preview'}
-          </Pill>
-          <IconButton label="Help & shortcuts" onClick={() => setHelp(true)}>
-            <CircleHelp size={18} />
-          </IconButton>
-        </div>
-      </header>
-      <aside className="sidebar">
-        <div className="sidebar-label">WORKSPACES</div>
-        <nav>
-          {nav.map(({ id, label, icon: Icon }) => (
-            <button
-              className={workspace === id ? 'nav-item selected' : 'nav-item'}
-              key={id}
-              onClick={() => setWorkspace(id)}
-            >
-              <Icon size={17} />
-              <span>{label}</span>
-              {id === 'library' && <small>{data.entries.length}</small>}
-              {id === 'build' && activeJob && <span className="live-dot pulse" />}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-project">
-          <div className="sidebar-label">CURRENT PROJECT</div>
-          {current ? (
-            <>
-              <div className="current-project-name">
-                <span className="project-glyph">
-                  <Box size={17} />
-                </span>
-                <span>
-                  <strong>{current.title}</strong>
-                  <small>
-                    {current.source
-                      ? `Cache ${current.source.cacheVersion} · source preserved`
-                      : 'Asset workspace'}
-                  </small>
-                </span>
-              </div>
-              <button
-                className="small-button full"
-                onClick={() =>
-                  void action(async () => {
-                    await save();
-                    return call('export_project', { id: current.id });
-                  }, 'Project descriptor exported. Referenced source and asset files must remain available.')
-                }
-              >
-                <Save size={13} />
-                Export .gsproject
-              </button>
-            </>
-          ) : (
-            <p>
-              No project open.
-              <br />
-              Your next idea starts here.
-            </p>
-          )}
-        </div>
-        <div className="sidebar-bottom">
-          <div className="restoration-card">
+    <>
+      <div className="application" inert={closing || undefined}>
+        <header className="app-header">
+          <button className="brand" onClick={() => setWorkspace('library')} aria-label="Guilty Spark home">
+            <img src="/spark.svg" alt="" />
             <div>
-              <span className="pending-dot" />
-              PRESERVATION TARGET
+              <strong>GUILTY SPARK</strong>
+              <span>HALO MODERN EVOLVED</span>
             </div>
-            <strong>Zombie Apocalypse</strong>
-            <span>Historical restoration · pending</span>
-            <small>Fonzie / Fonzeh · MacGamingMods</small>
-          </div>
-          <button
-            className={workspace === 'preservation' ? 'nav-item selected' : 'nav-item'}
-            onClick={() => setWorkspace('preservation')}
-          >
-            <BookOpen size={17} />
-            <span>Preservation record</span>
+            <Pill>0.2</Pill>
           </button>
-          <button
-            className={workspace === 'settings' ? 'nav-item selected' : 'nav-item'}
-            onClick={() => setWorkspace('settings')}
-          >
-            <Settings2 size={17} />
-            <span>Settings &amp; runtimes</span>
-          </button>
-          <div className="local-only">
-            <ShieldCheck size={13} />
-            Local. Source-safe. Yours.
-          </div>
-        </div>
-      </aside>
-      <main className={`main-content workspace-${workspace}`}>
-        {current && workspace !== 'library' && workspace !== 'settings' && (
-          <div className="editor-bar">
-            <div className="breadcrumb">
-              <button onClick={() => setWorkspace('library')}>Library</button>
-              <ChevronRight size={12} />
-              <span>{current.title}</span>
-              <Pill>{current.source?.engine ?? 'Asset workspace'}</Pill>
-            </div>
-            <div>
-              <IconButton
-                label="Undo (Ctrl+Z)"
-                onClick={() => dispatch({ type: 'undo' })}
-                disabled={!history.past.length}
-              >
-                <Undo2 size={16} />
-              </IconButton>
-              <IconButton
-                label="Redo (Ctrl+Shift+Z)"
-                onClick={() => dispatch({ type: 'redo' })}
-                disabled={!history.future.length}
-              >
-                <Redo2 size={16} />
-              </IconButton>
-              <span className="toolbar-divider" />
-              <button className="small-button" onClick={() => void save(true).catch(() => {})}>
-                <Save size={14} />
-                {history.dirty ? 'Save changes' : 'Saved'}
-              </button>
-            </div>
-          </div>
-        )}
-        {!ready ? (
-          <div className="loading">
-            <LoaderCircle className="spin" size={22} />
-            Connecting to the local workbench…
-          </div>
-        ) : (
-          <Suspense fallback={<div className="loading">Loading workspace…</div>}>{content()}</Suspense>
-        )}
-      </main>
-      <footer className="statusbar">
-        <div>
-          <span className="live-dot" />
-          {busy
-            ? 'Working…'
-            : activeJob
-              ? 'Conversion job running'
-              : history.dirty
-                ? 'Saving project…'
-                : 'Workbench ready'}
-          {!native && <span>· Native services unavailable in browser</span>}
-        </div>
-        <div>
-          {current && (
-            <span>
-              {current.tagEdits.length} tag edits · {current.scene.length} objects
-            </span>
-          )}
-          <span>API v1</span>
-          <span>NO TELEMETRY</span>
-        </div>
-      </footer>
-      {busy && (
-        <div className="busy-indicator">
-          <LoaderCircle className="spin" size={17} />
-          Processing source data…
-        </div>
-      )}
-      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-      {dragging && (
-        <div className="drag-overlay">
-          <UploadGlyph />
-          <h2>Bring a world into your workbench.</h2>
-          <p>Drop Halo .map files or .gsproject descriptors to import.</p>
-        </div>
-      )}
-      {createModal && (
-        <div className="modal-backdrop">
-          <form
-            className="modal"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void create();
-            }}
-          >
-            <button
-              className="modal-close"
-              type="button"
-              onClick={() => setCreateModal(false)}
-              aria-label="Close new workspace"
-            >
-              <X size={18} />
-            </button>
-            <div className="empty-icon">
-              <Plus size={24} />
-            </div>
-            <div className="eyebrow">NEW ASSET WORKSPACE</div>
-            <h2>Make room for an idea.</h2>
-            <p>
-              A persistent scene for your own geometry. Halo maps can be imported as separate source projects.
-            </p>
-            <label>
-              Workspace name
-              <input
-                autoFocus
-                value={newTitle}
-                maxLength={200}
-                onChange={(e) => setNewTitle(e.target.value)}
+          <div className="header-context">
+            <span>LOCAL WORKBENCH</span>
+            <ChevronRight size={12} />
+            <strong>{current?.title ?? 'Map library'}</strong>
+            {current && (
+              <span
+                className={history.dirty ? 'unsaved-dot' : 'saved-dot'}
+                title={history.dirty ? 'Unsaved changes' : 'Saved'}
               />
-            </label>
-            <button className="primary full" disabled={busy || !newTitle.trim()}>
-              Create workspace
-              <ArrowUpRight size={15} />
-            </button>
-          </form>
-        </div>
-      )}
-      {help && (
-        <div className="modal-backdrop">
-          <div className="modal help-modal">
-            <button className="modal-close" onClick={() => setHelp(false)} aria-label="Close help">
-              <X size={18} />
-            </button>
-            <div className="eyebrow">QUICK REFERENCE</div>
-            <h2>A familiar spark of possibility.</h2>
-            <p>
-              Import your own Halo map, inspect its tags and placements, then configure Invader in Settings to
-              build an MCC cache. Excession metadata is required before packaging.
-            </p>
-            <div className="shortcut-list">
-              {[
-                ['Save project', 'Ctrl + S'],
-                ['Undo / redo', 'Ctrl + Z / Ctrl + Shift + Z'],
-                ['Translate / rotate / scale', 'W / E / R'],
-                ['Frame the scene', 'F'],
-                ['Clear selection', 'Esc'],
-              ].map(([label, key]) => (
-                <div key={label}>
-                  <span>{label}</span>
-                  <kbd>{key}</kbd>
+            )}
+          </div>
+          <div className="header-actions">
+            <Pill tone={data.installation.mccPath ? 'green' : 'muted'}>
+              <span className="live-dot" />
+              {data.installation.mccPath ? 'MCC found' : native ? 'Runtime not found' : 'Browser preview'}
+            </Pill>
+            <IconButton label="Help & shortcuts" onClick={() => setHelp(true)}>
+              <CircleHelp size={18} />
+            </IconButton>
+          </div>
+        </header>
+        <aside className="sidebar">
+          <div className="sidebar-label">WORKSPACES</div>
+          <nav>
+            {nav.map(({ id, label, icon: Icon }) => (
+              <button
+                className={workspace === id ? 'nav-item selected' : 'nav-item'}
+                key={id}
+                onClick={() => setWorkspace(id)}
+              >
+                <Icon size={17} />
+                <span>{label}</span>
+                {id === 'library' && <small>{data.entries.length}</small>}
+                {id === 'build' && activeJob && <span className="live-dot pulse" />}
+              </button>
+            ))}
+          </nav>
+          <div className="sidebar-project">
+            <div className="sidebar-label">CURRENT PROJECT</div>
+            {current ? (
+              <>
+                <div className="current-project-name">
+                  <span className="project-glyph">
+                    <Box size={17} />
+                  </span>
+                  <span>
+                    <strong>{current.title}</strong>
+                    <small>
+                      {current.source
+                        ? `Cache ${current.source.cacheVersion} · source preserved`
+                        : 'Asset workspace'}
+                    </small>
+                  </span>
                 </div>
-              ))}
+                <button
+                  className="small-button full"
+                  onClick={() =>
+                    void action(async () => {
+                      await save();
+                      return call('export_project', { id: current.id });
+                    }, 'Project descriptor exported. Referenced source and asset files must remain available.')
+                  }
+                >
+                  <Save size={13} />
+                  Export .gsproject
+                </button>
+              </>
+            ) : (
+              <p>
+                No project open.
+                <br />
+                Your next idea starts here.
+              </p>
+            )}
+          </div>
+          <div className="sidebar-bottom">
+            <div className="restoration-card">
+              <div>
+                <span className="pending-dot" />
+                PRESERVATION TARGET
+              </div>
+              <strong>Zombie Apocalypse</strong>
+              <span>Historical restoration · pending</span>
+              <small>Fonzie / Fonzeh · MacGamingMods</small>
             </div>
-            <p className="subtle">
-              World markers show actual placements; BSP previews show collision geometry. Live editing, AI
-              synchronization, VR, and asset-to-Halo compilation are not connected.
-            </p>
-            <button className="primary full" onClick={() => setHelp(false)}>
-              Back to the workbench
-              <ArrowLeft size={15} />
+            <button
+              className={workspace === 'preservation' ? 'nav-item selected' : 'nav-item'}
+              onClick={() => setWorkspace('preservation')}
+            >
+              <BookOpen size={17} />
+              <span>Preservation record</span>
             </button>
+            <button
+              className={workspace === 'settings' ? 'nav-item selected' : 'nav-item'}
+              onClick={() => setWorkspace('settings')}
+            >
+              <Settings2 size={17} />
+              <span>Settings &amp; tools</span>
+            </button>
+            <div className="local-only">
+              <ShieldCheck size={13} />
+              Local. Source-safe. Yours.
+            </div>
+          </div>
+        </aside>
+        <main className={`main-content workspace-${workspace}`}>
+          {current && workspace !== 'library' && workspace !== 'settings' && (
+            <div className="editor-bar">
+              <div className="breadcrumb">
+                <button onClick={() => setWorkspace('library')}>Library</button>
+                <ChevronRight size={12} />
+                <span>{current.title}</span>
+                <Pill>{current.source?.engine ?? 'Asset workspace'}</Pill>
+              </div>
+              <div>
+                <IconButton
+                  label="Undo (Ctrl+Z)"
+                  onClick={() => dispatch({ type: 'undo' })}
+                  disabled={!history.past.length}
+                >
+                  <Undo2 size={16} />
+                </IconButton>
+                <IconButton
+                  label="Redo (Ctrl+Shift+Z)"
+                  onClick={() => dispatch({ type: 'redo' })}
+                  disabled={!history.future.length}
+                >
+                  <Redo2 size={16} />
+                </IconButton>
+                <span className="toolbar-divider" />
+                <button className="small-button" onClick={() => void save(true).catch(() => {})}>
+                  <Save size={14} />
+                  {history.dirty ? 'Save changes' : 'Saved'}
+                </button>
+              </div>
+            </div>
+          )}
+          {!ready ? (
+            <div className="loading">
+              <LoaderCircle className="spin" size={22} />
+              Connecting to the local workbench…
+            </div>
+          ) : (
+            <Suspense fallback={<div className="loading">Loading workspace…</div>}>{content()}</Suspense>
+          )}
+        </main>
+        <footer className="statusbar">
+          <div>
+            <span className="live-dot" />
+            {busy
+              ? 'Working…'
+              : activeJob
+                ? 'Conversion job running'
+                : history.dirty
+                  ? 'Unsaved project changes'
+                  : 'Workbench ready'}
+            {!native && <span>· Native services unavailable in browser</span>}
+          </div>
+          <div>
+            {current && (
+              <span>
+                {current.tagEdits.length} tag edits · {current.scene.length} objects
+              </span>
+            )}
+            <span>API v1</span>
+            <span>NO TELEMETRY</span>
+          </div>
+        </footer>
+        {busy && (
+          <div className="busy-indicator">
+            <LoaderCircle className="spin" size={17} />
+            Processing source data…
+          </div>
+        )}
+        {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+        {dragging && (
+          <div className="drag-overlay">
+            <UploadGlyph />
+            <h2>Bring a world into your workbench.</h2>
+            <p>Drop Halo .map files, ZIP archives or .gsproject descriptors to import.</p>
+          </div>
+        )}
+        {createModal && (
+          <div className="modal-backdrop">
+            <form
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="new-workspace-title"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void create();
+              }}
+            >
+              <button
+                className="modal-close"
+                type="button"
+                onClick={() => setCreateModal(false)}
+                aria-label="Close new workspace"
+              >
+                <X size={18} />
+              </button>
+              <div className="empty-icon">
+                <Plus size={24} />
+              </div>
+              <div className="eyebrow">NEW ASSET WORKSPACE</div>
+              <h2 id="new-workspace-title">Make room for an idea.</h2>
+              <p>
+                A persistent scene for your own geometry. Halo maps can be imported as separate source
+                projects.
+              </p>
+              <label>
+                Workspace name
+                <input
+                  autoFocus
+                  value={newTitle}
+                  maxLength={200}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                />
+              </label>
+              <button className="primary full" disabled={busy || !newTitle.trim()}>
+                Create workspace
+                <ArrowUpRight size={15} />
+              </button>
+            </form>
+          </div>
+        )}
+        {help && (
+          <div className="modal-backdrop">
+            <div className="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
+              <button className="modal-close" onClick={() => setHelp(false)} aria-label="Close help">
+                <X size={18} />
+              </button>
+              <div className="eyebrow">QUICK REFERENCE</div>
+              <h2 id="help-title">A familiar spark of possibility.</h2>
+              <p>
+                Import your own Halo map, inspect its tags and placements, then configure Invader in Settings
+                to build an MCC cache. Excession metadata is required before packaging.
+              </p>
+              <div className="shortcut-list">
+                {[
+                  ['Save project', 'Ctrl + S'],
+                  ['Undo / redo', 'Ctrl + Z / Ctrl + Shift + Z'],
+                  ['Translate / rotate / scale', 'W / E / R'],
+                  ['Frame the scene', 'F'],
+                  ['Clear selection', 'Esc'],
+                ].map(([label, key]) => (
+                  <div key={label}>
+                    <span>{label}</span>
+                    <kbd>{key}</kbd>
+                  </div>
+                ))}
+              </div>
+              <p className="subtle">
+                World markers show actual placements; BSP previews show collision geometry. Live editing, AI
+                synchronization, VR, and asset-to-Halo compilation are not connected.
+              </p>
+              <button className="primary full" onClick={() => setHelp(false)}>
+                Back to the workbench
+                <ArrowLeft size={15} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {closing && (
+        <div className="modal-backdrop">
+          <div className="modal" role="status">
+            <LoaderCircle className="spin" size={24} />
+            <h2>Saving before closing…</h2>
+            <p>Your project will finish saving before the window closes.</p>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 function UploadGlyph() {

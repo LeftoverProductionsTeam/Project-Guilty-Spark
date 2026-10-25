@@ -32,6 +32,19 @@ pub struct Source {
     pub cache_version: u32,
     pub engine: String,
     pub scenario_path: String,
+    #[serde(default)]
+    pub archive: Option<ArchiveOrigin>,
+    #[serde(default)]
+    pub resource_directory: Option<PathBuf>,
+    #[serde(default)]
+    pub resource_sha256: std::collections::BTreeMap<String, String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveOrigin {
+    pub original_path: PathBuf,
+    pub sha256: String,
+    pub entry_path: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -114,6 +127,17 @@ impl Project {
         }
         Uuid::parse_str(&self.id)
             .map_err(|_| crate::SparkError::Invalid("Project ID is not a UUID".into()))?;
+        if let Some(source) = &self.source {
+            if source.resource_sha256.iter().any(|(name, hash)| {
+                !["bitmaps.map", "sounds.map", "loc.map"].contains(&name.as_str())
+                    || hash.len() != 64
+                    || !hash.bytes().all(|b| b.is_ascii_hexdigit())
+            }) {
+                return invalid(
+                    "Resource identities must use fixed resource filenames and SHA-256 hashes",
+                );
+            }
+        }
         if self.title.trim().is_empty()
             || self.title.len() > 200
             || self.scene.len() > 20000
@@ -156,12 +180,33 @@ impl Project {
         use sha2::{Digest, Sha256};
         let bytes = serde_json::to_vec(&(
             &self.source.as_ref().map(|s| &s.sha256),
+            &self
+                .source
+                .as_ref()
+                .map(|s| (&s.resource_directory, &s.resource_sha256)),
             &self.scene,
             &self.tag_edits,
             &self.assets,
         ))?;
         Ok(format!("{:x}", Sha256::digest(bytes)))
     }
+}
+
+/// Snapshot only fixed resource names. Paths and hashes remain local project provenance.
+pub fn resource_hashes(directory: &Path) -> Result<std::collections::BTreeMap<String, String>> {
+    reject_links(directory)?;
+    let mut hashes = std::collections::BTreeMap::new();
+    for name in ["bitmaps.map", "sounds.map", "loc.map"] {
+        let path = directory.join(name);
+        reject_links(&path)?;
+        if path.is_file() {
+            if fs::metadata(&path)?.len() > 2 * 1024 * 1024 * 1024 {
+                return invalid("Source resource exceeds 2 GiB");
+            }
+            hashes.insert(name.into(), crate::maps::hash_file(&path)?);
+        }
+    }
+    Ok(hashes)
 }
 
 /// Write to a sibling temporary file, fsync, then replace. Keep an exact backup before replacement.
@@ -270,10 +315,11 @@ pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Ve
     let source = project.source.as_ref().ok_or_else(|| {
         crate::SparkError::Invalid("A Halo map is required to build a cache".into())
     })?;
-    if crate::maps::hash_file(&source.preserved_path)? != source.sha256 {
+    let (header, mut bytes, snapshot_sha256) =
+        crate::maps::read_cache_snapshot(&source.preserved_path)?;
+    if snapshot_sha256 != source.sha256 || snapshot_sha256 != inspection.sha256 {
         return invalid("Preserved source checksum changed; build cancelled");
     }
-    let (header, mut bytes) = crate::maps::read_cache(&source.preserved_path)?;
     if header.compressed {
         return invalid(
             "Editing Xbox compressed caches requires an external extraction adapter first",

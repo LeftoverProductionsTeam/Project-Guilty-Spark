@@ -27,6 +27,7 @@ export default function Build({
   onAction,
   onSettings,
   onRefresh,
+  onResources,
 }: {
   project: Project;
   data: Bootstrap;
@@ -38,15 +39,20 @@ export default function Build({
   onAction: (f: () => Promise<unknown>, success?: string) => Promise<void>;
   onSettings: () => void;
   onRefresh: () => void;
+  onResources: () => void;
 }) {
   const [report, setReport] = useState<CompatibilityReport | null>(null);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [template, setTemplate] = useState<TemplateReport | null>(null);
-  const [issue, setIssue] = useState('');
+  const [issues, setIssues] = useState<string[]>([]);
   useEffect(() => {
     let cancelled = false;
     async function fetchReports() {
       if (!native || !project.source) return;
+      setReport(null);
+      setReadiness(null);
+      setTemplate(null);
+      setIssues([]);
       const results = await Promise.allSettled([
         call<CompatibilityReport>('compatibility', { id: project.id }),
         call<Readiness>('launch_readiness', { id: project.id }),
@@ -56,7 +62,12 @@ export default function Build({
       setReport(results[0].status === 'fulfilled' ? results[0].value : null);
       setReadiness(results[1].status === 'fulfilled' ? results[1].value : null);
       setTemplate(results[2].status === 'fulfilled' ? results[2].value : null);
-      setIssue(results[2].status === 'rejected' ? String(results[2].reason) : '');
+      const labels = ['Compatibility check', 'Launch readiness', 'Metadata template'];
+      setIssues(
+        results.flatMap((result, index) =>
+          result.status === 'rejected' ? [`${labels[index]}: ${String(result.reason)}`] : [],
+        ),
+      );
     }
     void fetchReports();
     return () => {
@@ -65,7 +76,9 @@ export default function Build({
   }, [project.id, project.modifiedAt, project.builds.length, data.settings, epoch]);
   const projectLogs = logs.filter((l) => l.projectId === project.id);
   const last = projectLogs.at(-1);
-  const validated = project.builds.filter((b) => b.status === 'validated').at(-1);
+  const validated = dirty
+    ? undefined
+    : project.builds.find((b) => b.id === readiness?.currentValidatedBuildId);
   const steps = [
     ['validate', 'Inspect source'],
     ['extract', 'Extract tags'],
@@ -93,6 +106,25 @@ export default function Build({
       />
       <div className="build-columns">
         <div className="build-main">
+          {issues.map((issue) => (
+            <Notice key={issue}>{issue}</Notice>
+          ))}
+          <section className="surface build-resources">
+            <h3>Source resource directory</h3>
+            <code className="path-text">
+              {project.source?.resourceDirectory ??
+                data.settings.resourceDirectory ??
+                'No source resource directory configured'}
+            </code>
+            <p className="subtle">
+              Select the matching original bitmaps.map, sounds.map and loc.map directory for this project.
+              Unrelated runtime resource sets can change assets or fail extraction.
+            </p>
+            <button disabled={!!activeJob} onClick={onResources}>
+              <FolderOpen size={14} />
+              {dirty ? 'Save & choose source resources…' : 'Choose source resources…'}
+            </button>
+          </section>
           <section className="surface build-target">
             <div className="section-label">Build target</div>
             <div className="target-heading">
@@ -263,13 +295,18 @@ export default function Build({
               Official Excession metadata is preserved, then paired with the validated cache in a dedicated
               mod folder.
             </p>
-            <CheckRow ok={!!validated} label="Validated MCC build" />
+            <CheckRow
+              ok={!!validated}
+              label="Validated build for current edits"
+              detail={
+                dirty ? 'Unsaved edits require a fresh check after saving.' : readiness?.currentBuildMessage
+              }
+            />
             <CheckRow
               ok={!!template?.valid}
               label="Excession metadata template"
               detail={template?.title || 'Exact scenario metadata is required'}
             />
-            {issue && <div className="compact-warning">{issue}</div>}
             {template?.blockers.map((b, i) => (
               <div className="compact-warning" key={i}>
                 {b}
@@ -308,7 +345,7 @@ export default function Build({
             <CheckRow ok={!!readiness?.mccFound} label="MCC located" />
             <CheckRow ok={!!readiness?.halo1Installed} label="Halo 1 installed" />
             <CheckRow ok={!!readiness?.steamAvailable} label="Steam available" />
-            <CheckRow ok={!!readiness?.packageValid} label="Current package verified" />
+            <CheckRow ok={!dirty && !!readiness?.packageValid} label="Current package verified" />
             <div className="mod-mode-note">
               <Pill tone="amber">Anti-cheat disabled required</Pill>
               <p>

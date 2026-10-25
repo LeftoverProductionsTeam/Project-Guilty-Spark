@@ -17,10 +17,82 @@ fn bounds_known_legacy_whole_file_tag_size_without_touching_source() {
     assert_eq!(i.header.tag_size, 0x5000);
     assert!(i.diagnostics.iter().any(|d| d.code == "LEGACY_TAG_SIZE"));
     assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    assert_eq!(i.sha256, maps::hash_file(&path).unwrap());
     let mut mcc = fixture(13);
     let n = mcc.len() as u32;
     put_u32(&mut mcc, 0x14, n);
     assert!(parse_header(&mcc, mcc.len() as u64).is_err());
+}
+#[test]
+fn malformed_scenario_blocks_report_unknown_content_instead_of_silent_absence() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("damaged.map");
+    for (offset, code) in [
+        (0x354, "PLAYER_SPAWNS_UNREADABLE"),
+        (0x42c, "AI_ENCOUNTERS_UNREADABLE"),
+        (0x49c, "SCRIPTS_UNREADABLE"),
+    ] {
+        let mut bytes = fixture(7);
+        put_u32(&mut bytes, 0x1000 + offset, u32::MAX);
+        std::fs::write(&path, bytes).unwrap();
+        let report = maps::inspect_map(&path, None).unwrap();
+        assert!(report.diagnostics.iter().any(|d| d.code == code), "{code}");
+    }
+    let mut bytes = fixture(7);
+    put_u32(&mut bytes, 0x142c, 1);
+    put_u32(&mut bytes, 0x1430, pointer(7, 0x4000));
+    put_u32(&mut bytes, 0x4080, u32::MAX);
+    std::fs::write(&path, bytes).unwrap();
+    let report = maps::inspect_map(&path, None).unwrap();
+    assert!(report
+        .diagnostics
+        .iter()
+        .any(|d| d.code == "AI_SQUADS_UNREADABLE"));
+    assert_eq!(report.encounters.len(), 1);
+}
+#[test]
+fn actor_variant_dependencies_are_read_only_and_validate_real_tag_ids() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("actors.map");
+    let mut bytes = fixture(7);
+    fourcc(&mut bytes, 0x828 + 32, "actv");
+    fourcc(&mut bytes, 0x828 + 64, "bipd");
+    fourcc(&mut bytes, 0x828 + 96, "actr");
+    fourcc(&mut bytes, 0x1804, "actr");
+    put_u32(&mut bytes, 0x1810, 0xe0000003);
+    fourcc(&mut bytes, 0x1814, "bipd");
+    put_u32(&mut bytes, 0x1820, 0xe0000002);
+    std::fs::write(&path, bytes).unwrap();
+    let report = maps::inspect_map(&path, None).unwrap();
+    let variant = &report.tags[1];
+    assert!(variant.fields.is_empty());
+    assert!(variant
+        .references
+        .iter()
+        .any(|r| r.label == "Actor definition" && r.target_id == 0xe0000003));
+    assert!(variant
+        .references
+        .iter()
+        .any(|r| r.label == "Actor unit" && r.target_id == 0xe0000002));
+}
+#[test]
+fn non_projectile_weapon_spawn_is_reported_without_an_editable_reference() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("legacy-spawn.map");
+    let mut bytes = fixture(7);
+    fourcc(&mut bytes, 0x828 + 64, "vehi");
+    fourcc(&mut bytes, 0x2094, "vehi");
+    std::fs::write(&path, bytes).unwrap();
+    let report = maps::inspect_map(&path, None).unwrap();
+    assert!(report.tags[1]
+        .references
+        .iter()
+        .any(|r| r.label.contains("legacy object spawner") && r.target_id == 0xe0000002));
+    assert!(!report.tags[1].fields.iter().any(|f| f.kind == "reference"));
+    assert!(report
+        .diagnostics
+        .iter()
+        .any(|d| d.code == "LEGACY_OBJECT_SPAWNERS"));
 }
 #[test]
 fn legacy_tag_names_preserve_safe_historical_forms_and_reject_traversal() {

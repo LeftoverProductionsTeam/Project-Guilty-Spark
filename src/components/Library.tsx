@@ -13,6 +13,7 @@ import {
   Watch,
 } from 'lucide-react';
 import { useState } from 'react';
+import { native } from '../api';
 import type { Bootstrap, LibraryEntry } from '../types';
 import { formatNumber } from '../editor';
 import { Notice, PageTitle, Pill } from './ui';
@@ -22,6 +23,7 @@ export default function Library({
   onNew,
   onOpen,
   onInbox,
+  onInitializeInbox,
   busy,
 }: {
   data: Bootstrap;
@@ -29,6 +31,7 @@ export default function Library({
   onNew: () => void;
   onOpen: (e: LibraryEntry) => void;
   onInbox: () => void;
+  onInitializeInbox: () => void;
   busy: boolean;
 }) {
   const [query, setQuery] = useState('');
@@ -52,7 +55,7 @@ export default function Library({
             </button>
             <button className="primary" onClick={onImport} disabled={busy}>
               <Upload size={15} />
-              {busy ? 'Inspecting…' : 'Import map'}
+              {busy ? 'Inspecting…' : 'Import map or archive'}
             </button>
           </>
         }
@@ -73,7 +76,7 @@ export default function Library({
             workspace built for discovery.
           </p>
           <button className="hero-link" onClick={onImport} disabled={busy}>
-            Open a .map file
+            Open a .map or ZIP archive
             <ArrowRight size={17} />
           </button>
         </div>
@@ -99,7 +102,7 @@ export default function Library({
       {!data.installation.mccPath && (
         <Notice tone="info">
           {data.diagnostics[0] ??
-            'MCC was not found automatically. Select your installation in Settings to create its safe import Inbox.'}
+            'MCC was not found automatically. The local Inbox can still import maps and archives.'}
         </Notice>
       )}
       <div className="runtime-strip">
@@ -108,9 +111,9 @@ export default function Library({
         </div>
         <div>
           <strong>
-            {data.installation.mccPath ? 'Halo: The Master Chief Collection' : 'Runtime connection'}
+            {data.installation.mccPath ? 'Halo: The Master Chief Collection' : 'Local map library'}
           </strong>
-          <span>{data.installation.mccPath ?? 'Configure a Steam MCC installation in Settings'}</span>
+          <span>{data.installation.mccPath ?? data.inboxDirectory}</span>
         </div>
         <Pill tone={data.installation.halo1Installed ? 'green' : 'muted'}>
           {data.installation.halo1Installed ? (
@@ -119,19 +122,27 @@ export default function Library({
               Halo 1 found
             </>
           ) : (
-            'Not connected'
+            'MCC not found'
           )}
         </Pill>
         <span className="strip-divider" />
         <div className="inbox-state">
           <Watch size={16} />
-          <span>{data.managed ? 'Inbox watching' : 'Inbox unavailable'}</span>
+          <span>{native ? 'Local Inbox' : 'Desktop required'}</span>
         </div>
-        <button className="small-button" onClick={onInbox} disabled={!data.managed}>
+        <button className="small-button" onClick={onInbox} disabled={!native}>
           <FolderOpen size={14} />
           Open Inbox
         </button>
       </div>
+      {data.installation.mccPath && !data.managed && (
+        <div className="mcc-inbox-optin">
+          <span>Optional: create an additional watched import Inbox inside the detected MCC mod folder.</span>
+          <button className="small-button" onClick={onInitializeInbox} disabled={busy}>
+            Create MCC Inbox
+          </button>
+        </div>
+      )}
       <div className="library-toolbar">
         <div className="tabs">
           <button className={filter === 'all' ? 'selected' : ''} onClick={() => setFilter('all')}>
@@ -165,7 +176,7 @@ export default function Library({
               /* Preview caching is optional. */
             }
             return (
-              <button key={entry.id} className="map-card" onClick={() => onOpen(entry)}>
+              <button key={entry.id} className="map-card" disabled={busy} onClick={() => onOpen(entry)}>
                 <div className="map-thumbnail">
                   {preview ? (
                     <img src={preview} alt={`Collision geometry overview of ${entry.title}`} />
@@ -212,7 +223,7 @@ export default function Library({
           <button className="add-map-card" onClick={onImport}>
             <Plus size={26} />
             <strong>Another world awaits</strong>
-            <span>Import a map or project</span>
+            <span>Import a map, ZIP archive or project</span>
           </button>
         </div>
       ) : (
@@ -224,7 +235,7 @@ export default function Library({
           <p>
             {query
               ? 'Try a different title, creator, or engine.'
-              : 'Drop a .map file into this window, browse for one, or place it in your MCC Inbox. Original files are always preserved.'}
+              : 'Drop a .map or ZIP archive into this window, browse for one, or place it in the local Inbox. Original files are always preserved.'}
           </p>
           <button onClick={onImport} disabled={busy}>
             <FolderOpen size={15} />

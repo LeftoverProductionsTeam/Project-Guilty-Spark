@@ -160,7 +160,22 @@ impl Library {
             .into_iter()
             .find(|e| e.sha256.as_deref() == Some(&inspection.sha256))
         {
-            return Ok((self.get(&entry.id)?, inspection));
+            let project = self.get(&entry.id)?;
+            let source = project.source.as_ref().ok_or_else(|| {
+                crate::SparkError::Invalid("Indexed map has no preserved source".into())
+            })?;
+            let mut inspection = maps::inspect_map(
+                &source.preserved_path,
+                source.resource_directory.as_deref().or(resources),
+            )?;
+            inspection.header.extended |= source
+                .original_path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("yelo"));
+            if inspection.sha256 != source.sha256 {
+                return invalid("Preserved source checksum changed");
+            }
+            return Ok((project, inspection));
         }
         let mut p = Project::new(&inspection.header.name.replace('_', " "));
         let dir = self.project_dir(&p.id)?;
@@ -172,7 +187,9 @@ impl Library {
             .write(true)
             .create_new(true)
             .open(&copy)?;
-        std::io::copy(&mut input, &mut output)?;
+        // Bound a concurrently growing source as well as the parser's initial snapshot.
+        use std::io::Read;
+        std::io::copy(&mut input.by_ref().take(768 * 1024 * 1024 + 1), &mut output)?;
         output.sync_all()?;
         drop(output);
         if maps::hash_file(&copy)? != inspection.sha256 {
@@ -180,6 +197,9 @@ impl Library {
                 "Source changed while being imported; retry after the copy is complete",
             );
         }
+        let mut permissions = fs::metadata(&copy)?.permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(&copy, permissions)?;
         p.source = Some(Source {
             original_path: fs::canonicalize(path)?,
             preserved_path: copy,
@@ -187,6 +207,13 @@ impl Library {
             cache_version: inspection.header.version,
             engine: inspection.header.engine.clone(),
             scenario_path: inspection.scenario_path.clone(),
+            archive: None,
+            resource_directory: resources.or(path.parent()).map(Path::to_path_buf),
+            resource_sha256: resources
+                .or(path.parent())
+                .map(project::resource_hashes)
+                .transpose()?
+                .unwrap_or_default(),
         });
         p.scene = inspection.objects.clone();
         self.save(&p, Some(&inspection))?;
@@ -198,7 +225,18 @@ impl Library {
             if maps::hash_file(&src.original_path)? != src.sha256 {
                 return invalid("The project source file is missing or changed; restore the original file before opening this project");
             }
-            self.import_map(&src.original_path, None)?.0
+            if let Some(directory) = &src.resource_directory {
+                let actual = project::resource_hashes(directory)?;
+                if src
+                    .resource_sha256
+                    .iter()
+                    .any(|(name, hash)| actual.get(name) != Some(hash))
+                {
+                    return invalid("Project resources changed; restore them or select resources in the original project before exporting");
+                }
+            }
+            self.import_map(&src.original_path, src.resource_directory.as_deref())?
+                .0
         } else {
             self.create(&incoming.title)?
         };

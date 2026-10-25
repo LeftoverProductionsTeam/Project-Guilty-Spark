@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     fs,
+    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -24,12 +25,49 @@ pub fn package_map_name(scenario: &str) -> Result<String> {
 }
 const ROOT_MARKER: &str = ".guilty-spark-root.json";
 const OWNER: &str = "ProjectGuiltySpark/v1";
+fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>> {
+    reject_links(path)?;
+    let file = fs::File::open(path)?;
+    if file.metadata()?.len() > limit {
+        return invalid(format!(
+            "{} exceeds its {} byte safety limit",
+            path.display(),
+            limit
+        ));
+    }
+    let mut bytes = vec![];
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > limit {
+        return invalid(format!("{} grew beyond its safety limit", path.display()));
+    }
+    Ok(bytes)
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ManagedRoot {
     pub root: PathBuf,
     pub inbox: PathBuf,
     pub mods: PathBuf,
+}
+/// Discovery must not create directories or change a game installation.
+pub fn inspect_managed_root(install: &Path) -> Result<Option<ManagedRoot>> {
+    let root = install.join("halo1/GuiltySpark");
+    reject_links(&root)?;
+    if !root.exists() {
+        return Ok(None);
+    }
+    let marker: Value = serde_json::from_slice(&read_bounded(&root.join(ROOT_MARKER), 16 * 1024)?)?;
+    if marker.get("owner").and_then(Value::as_str) != Some(OWNER) {
+        return invalid("GuiltySpark root belongs to an unknown owner");
+    }
+    let inbox = root.join("Inbox");
+    let mods = root.join("Mods");
+    reject_links(&inbox)?;
+    reject_links(&mods)?;
+    if !inbox.is_dir() || !mods.is_dir() {
+        return invalid("Owned MCC root is incomplete; explicitly initialize it before deployment");
+    }
+    Ok(Some(ManagedRoot { root, inbox, mods }))
 }
 pub fn initialize(install: &Path) -> Result<ManagedRoot> {
     if !install.join("halo1/maps").is_dir() {
@@ -42,7 +80,7 @@ pub fn initialize(install: &Path) -> Result<ManagedRoot> {
         if !marker.is_file() {
             return invalid("halo1/GuiltySpark already exists without an ownership marker. Its contents will not be changed.");
         }
-        let v: Value = serde_json::from_slice(&fs::read(marker)?)?;
+        let v: Value = serde_json::from_slice(&read_bounded(&marker, 16 * 1024)?)?;
         if v.get("owner").and_then(Value::as_str) != Some(OWNER) {
             return invalid("GuiltySpark root belongs to an unknown owner");
         }
@@ -104,7 +142,7 @@ pub fn manifest_contains(manifest: &Path, root: &Path) -> Result<bool> {
     if !manifest.exists() {
         return Ok(false);
     }
-    let (text, _, _) = decode_manifest(&fs::read(manifest)?)?;
+    let (text, _, _) = decode_manifest(&read_bounded(manifest, 1024 * 1024)?)?;
     let path = root.to_string_lossy();
     Ok(text
         .lines()
@@ -128,7 +166,7 @@ pub fn register_root(manifest: &Path, root: &Path) -> Result<Option<PathBuf>> {
     let lock_file=fs::OpenOptions::new().create_new(true).write(true).open(&lock).map_err(|e|SparkError::Invalid(format!("Manifest is locked by another operation ({e}); if the app crashed, remove only .guilty-spark-manifest.lock after closing Guilty Spark")))?;
     let result = (|| {
         let original = if manifest.exists() {
-            fs::read(manifest)?
+            read_bounded(manifest, 1024 * 1024)?
         } else {
             vec![]
         };
@@ -163,7 +201,7 @@ pub fn register_root(manifest: &Path, root: &Path) -> Result<Option<PathBuf>> {
             out
         };
         let current = if manifest.exists() {
-            fs::read(manifest)?
+            read_bounded(manifest, 1024 * 1024)?
         } else {
             vec![]
         };
@@ -171,11 +209,27 @@ pub fn register_root(manifest: &Path, root: &Path) -> Result<Option<PathBuf>> {
             return invalid("ModManifest changed during registration; retry to preserve the other writer's entries");
         }
         let backup = atomic_write(manifest, &bytes, true)?;
-        if !manifest_contains(manifest, root)? {
-            if let Some(ref backup) = backup {
-                atomic_write(manifest, &fs::read(backup)?, false)?;
+        let readback = match read_bounded(manifest, 1024 * 1024) {
+            Ok(readback) => readback,
+            Err(e) => return invalid(format!("Manifest write could not be verified: {e}. Its current state was not overwritten by a blind rollback. Original backup: {backup:?}")),
+        };
+        if readback != bytes {
+            return invalid(format!("Manifest changed after registration. The other writer's bytes were preserved; original backup: {backup:?}"));
+        }
+        let verified = decode_manifest(&readback).map(|(text, _, _)| {
+            text.lines()
+                .any(|line| normalized_path(line) == normalized_path(&value))
+        });
+        if !matches!(verified, Ok(true)) {
+            let restored = if backup.is_some() {
+                atomic_write(manifest, &original, false).map(|_| ())
             } else {
-                fs::remove_file(manifest)?;
+                fs::remove_file(manifest).map_err(SparkError::from)
+            };
+            if let Err(e) = restored {
+                return invalid(format!(
+                    "Manifest verification and rollback failed: {e}. Original backup: {backup:?}"
+                ));
             }
             return invalid("Manifest verification failed; previous configuration restored");
         }
@@ -244,7 +298,8 @@ fn contains_scenario(v: &Value, path: &str) -> bool {
 pub fn inspect_template(root: &Path, scenario: &str, scenario_type: u16) -> Result<TemplateReport> {
     let mut files = vec![];
     gather(root, root, &mut files, 0)?;
-    let info: Value = serde_json::from_slice(&fs::read(root.join("ModInfo.json"))?)?;
+    let info: Value =
+        serde_json::from_slice(&read_bounded(&root.join("ModInfo.json"), 16 * 1024 * 1024)?)?;
     let mut blockers = vec![];
     let engine = info
         .get("Engine")
@@ -300,7 +355,8 @@ pub fn inspect_template(root: &Path, scenario: &str, scenario_type: u16) -> Resu
                 .next()
                 .is_some_and(|c| c.as_os_str().to_string_lossy().eq_ignore_ascii_case(family))
         {
-            let data: Value = serde_json::from_slice(&fs::read(root.join(file))?)?;
+            let data: Value =
+                serde_json::from_slice(&read_bounded(&root.join(file), 16 * 1024 * 1024)?)?;
             matches |= contains_scenario(&data, scenario);
         }
     }
@@ -339,12 +395,39 @@ pub fn package(
     project: &Project,
     build_id: &str,
 ) -> Result<PathBuf> {
+    project.validate()?;
     if crate::steam::is_mcc_running() {
         return invalid("Close MCC before installing local mod content");
     }
     let inspection = maps::inspect_map(map, None)?;
-    if inspection.header.version != 13 {
+    if inspection.header.version != 13
+        || inspection.header.extended
+        || inspection.header.build.contains("synthetic parser fixture")
+    {
         return invalid("Only a validated version-13 MCC cache can enter a local package");
+    }
+    let fingerprint = project.fingerprint()?;
+    let build = project
+        .builds
+        .iter()
+        .find(|b| {
+            b.id == build_id && b.status == "validated" && b.project_fingerprint == fingerprint
+        })
+        .ok_or_else(|| {
+            SparkError::Invalid(
+                "Packaging requires a recorded validated build of the current project".into(),
+            )
+        })?;
+    if build.sha256.as_deref() != Some(&inspection.sha256) {
+        return invalid("Package input does not match the validated build hash");
+    }
+    if project.source.as_ref().is_none_or(|source| {
+        !source
+            .scenario_path
+            .replace('\\', "/")
+            .eq_ignore_ascii_case(&inspection.scenario_path.replace('\\', "/"))
+    }) {
+        return invalid("Package map scenario differs from the source project");
     }
     let report = inspect_template(
         template,
@@ -372,7 +455,7 @@ pub fn package(
         }
         // The only metadata change uses the documented identifier; all map metadata is official-template data.
         let info_path = stage.join("ModInfo.json");
-        let mut info: Value = serde_json::from_slice(&fs::read(&info_path)?)?;
+        let mut info: Value = serde_json::from_slice(&read_bounded(&info_path, 16 * 1024 * 1024)?)?;
         info["ModIdentifier"]["ModGuid"] = serde_json::json!(project.id);
         atomic_write(&info_path, &serde_json::to_vec_pretty(&info)?, false)?;
         let maps_dir = stage.join("maps");
@@ -443,11 +526,41 @@ fn cleanup_staging(stage: &Path) -> Result<()> {
     }
     clear(stage)
 }
+fn package_inventory(root: &Path, at: &Path, out: &mut Vec<String>, depth: usize) -> Result<()> {
+    if depth > 8 || out.len() > 514 {
+        return invalid("Owned package exceeds supported inventory limits");
+    }
+    reject_links(at)?;
+    for entry in fs::read_dir(at)? {
+        let entry = entry?;
+        reject_links(&entry.path())?;
+        if entry.file_type()?.is_dir() {
+            package_inventory(root, &entry.path(), out, depth + 1)?;
+        } else {
+            out.push(
+                entry
+                    .path()
+                    .strip_prefix(root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+                    .to_ascii_lowercase(),
+            );
+            if out.len() > 514 {
+                return invalid("Owned package exceeds supported inventory limits");
+            }
+        }
+    }
+    Ok(())
+}
 pub fn verify_package(root: &ManagedRoot, project: &Project) -> Result<PackageReceipt> {
+    project.validate()?;
     let package = root.mods.join(&project.id);
     reject_links(&package)?;
-    let r: PackageReceipt =
-        serde_json::from_slice(&fs::read(package.join(".guilty-spark-owned.json"))?)?;
+    let r: PackageReceipt = serde_json::from_slice(&read_bounded(
+        &package.join(".guilty-spark-owned.json"),
+        1024 * 1024,
+    )?)?;
     if r.owner != OWNER
         || r.project_id != project.id
         || r.project_fingerprint != project.fingerprint()?
@@ -456,24 +569,103 @@ pub fn verify_package(root: &ManagedRoot, project: &Project) -> Result<PackageRe
             "Package belongs to a different project revision; rebuild it before launching",
         );
     }
+    let source = project
+        .source
+        .as_ref()
+        .ok_or_else(|| SparkError::Invalid("Package project has no source scenario".into()))?;
+    let map_name = package_map_name(&source.scenario_path)?;
+    let map_key = format!("maps/{map_name}").to_ascii_lowercase();
+    let mut normalized = std::collections::BTreeMap::new();
+    if r.files.len() < 2 || r.files.len() > 513 {
+        return invalid(
+            "Package receipt must cover metadata and exactly one map, within supported limits",
+        );
+    }
     for (file, hash) in &r.files {
         let rel = safe_relative(file)?;
+        let key = rel
+            .to_string_lossy()
+            .replace('\\', "/")
+            .to_ascii_lowercase();
+        if normalized.insert(key, hash).is_some()
+            || hash.len() != 64
+            || !hash.bytes().all(|c| c.is_ascii_hexdigit())
+        {
+            return invalid("Package receipt contains duplicate paths or malformed hashes");
+        }
         let path = package.join(rel);
         reject_links(&path)?;
         if maps::hash_file(&path)? != *hash {
             return invalid(format!("Owned package file changed: {file}"));
         }
     }
+    if !normalized.contains_key("modinfo.json") || !normalized.contains_key(&map_key) {
+        return invalid("Package receipt omits required ModInfo.json or the scenario map");
+    }
+    let mut actual = vec![];
+    package_inventory(&package, &package, &mut actual, 0)?;
+    actual.retain(|p| p != ".guilty-spark-owned.json");
+    if actual.len() != normalized.len() || actual.iter().any(|p| !normalized.contains_key(p)) {
+        return invalid("Package files differ from the complete owned receipt");
+    }
+    let build = project
+        .builds
+        .iter()
+        .find(|b| {
+            b.id == r.build_id
+                && b.status == "validated"
+                && b.project_fingerprint == r.project_fingerprint
+        })
+        .ok_or_else(|| {
+            SparkError::Invalid("Package has no validated build for this project revision".into())
+        })?;
+    if build.sha256.as_ref() != normalized.get(&map_key).copied() {
+        return invalid("Packaged map hash does not match the validated build");
+    }
+    let map = maps::inspect_map(&package.join("maps").join(map_name), None)?;
+    if map.header.version != 13
+        || map.header.extended
+        || map.header.build.contains("synthetic parser fixture")
+        || !map
+            .scenario_path
+            .replace('\\', "/")
+            .eq_ignore_ascii_case(&source.scenario_path.replace('\\', "/"))
+    {
+        return invalid("Packaged cache is not the expected MCC scenario");
+    }
+    let metadata = inspect_template(&package, &map.scenario_path, map.header.scenario_type)?;
+    if !metadata.valid {
+        return invalid(metadata.blockers.join("\n"));
+    }
+    for file in metadata.files {
+        if !normalized.contains_key(&file.replace('\\', "/").to_ascii_lowercase()) {
+            return invalid(format!("Package receipt omits metadata file {file}"));
+        }
+    }
+    let info: Value = serde_json::from_slice(&read_bounded(
+        &package.join("ModInfo.json"),
+        16 * 1024 * 1024,
+    )?)?;
+    if info
+        .pointer("/ModIdentifier/ModGuid")
+        .and_then(Value::as_str)
+        != Some(project.id.as_str())
+    {
+        return invalid("Package metadata identifier does not match the project");
+    }
     Ok(r)
 }
 pub fn remove_package(root: &ManagedRoot, project: &Project) -> Result<()> {
+    project.validate()?;
     if crate::steam::is_mcc_running() {
         return invalid("Close MCC before removing a mod package");
     }
     let package = root.mods.join(&project.id);
     reject_links(&package)?;
-    let receipt: PackageReceipt =
-        serde_json::from_slice(&fs::read(package.join(".guilty-spark-owned.json"))?)?;
+    let receipt: PackageReceipt = serde_json::from_slice(&read_bounded(
+        &package.join(".guilty-spark-owned.json"),
+        1024 * 1024,
+    )?)?;
     if receipt.owner != OWNER || receipt.project_id != project.id {
         return invalid("This is not Guilty Spark-owned content");
     }

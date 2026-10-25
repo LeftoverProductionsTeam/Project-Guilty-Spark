@@ -246,14 +246,13 @@ pub fn discover(steam_override: Option<&Path>, mcc_override: Option<&Path>) -> I
     for candidate in candidates {
         if candidate.join("steamapps").is_dir() {
             out.steam_path = Some(candidate.clone());
-            out.steam_executable = if cfg!(windows) {
-                candidate
-                    .join("steam.exe")
-                    .is_file()
-                    .then(|| candidate.join("steam.exe"))
-            } else {
-                Some(PathBuf::from("steam"))
-            };
+            out.steam_executable = find_steam_launcher(&candidate);
+            if out.steam_executable.is_none() {
+                out.diagnostics.push(
+                    "Steam data was found, but no installed Steam launcher file was located."
+                        .into(),
+                );
+            }
             match libraries(&candidate) {
                 Ok(list) => out.libraries = list,
                 Err(e) => out.diagnostics.push(e.to_string()),
@@ -289,11 +288,7 @@ pub fn discover(steam_override: Option<&Path>, mcc_override: Option<&Path>) -> I
         let common = lib.join("steamapps/common");
         if let Ok(entries) = fs::read_dir(common) {
             for e in entries.flatten() {
-                let name = e.file_name().to_string_lossy().to_ascii_lowercase();
-                if name.contains("halo")
-                    && name.contains("editing")
-                    && e.path().join("tool.exe").is_file()
-                {
+                if is_halo1_editing_kit(&e.path()) {
                     out.editing_tools = Some(e.path());
                 }
             }
@@ -310,6 +305,80 @@ pub fn discover(steam_override: Option<&Path>, mcc_override: Option<&Path>) -> I
     }
     out.running = is_mcc_running();
     out
+}
+/// Read-only filename discovery. Finding Steam data alone is not finding a launcher.
+pub fn find_steam_launcher(root: &Path) -> Option<PathBuf> {
+    #[cfg(windows)]
+    let candidates = vec![root.join("steam.exe")];
+    #[cfg(target_os = "macos")]
+    let candidates = {
+        let mut values = vec![PathBuf::from(
+            "/Applications/Steam.app/Contents/MacOS/steam_osx",
+        )];
+        if let Some(home) = std::env::var_os("HOME") {
+            values
+                .push(PathBuf::from(home).join("Applications/Steam.app/Contents/MacOS/steam_osx"));
+        }
+        values
+    };
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    let candidates = {
+        let mut values = vec![root.join("steam.sh"), root.join("steam")];
+        if let Some(paths) = std::env::var_os("PATH") {
+            values.extend(std::env::split_paths(&paths).map(|p| p.join("steam")));
+        }
+        values
+    };
+    candidates.into_iter().find(|p| p.is_file())
+}
+pub fn is_halo1_editing_kit(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_ascii_lowercase();
+    let compact: String = name.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+    matches!(
+        compact.as_str(),
+        "hceek" | "halo1editingkit" | "haloceeditingkit" | "halocombatevolvededitingkit"
+    ) && path.join("tool.exe").is_file()
+}
+/// Read the installed Steam app's build identifier without launching Steam or the game.
+pub fn mcc_build_id(installation: &Installation) -> Result<Option<String>> {
+    let Some(root) = &installation.mcc_path else {
+        return Ok(None);
+    };
+    let Some(steamapps) = root.parent().and_then(Path::parent) else {
+        return Ok(None);
+    };
+    let manifest = steamapps.join("appmanifest_976730.acf");
+    if !manifest.is_file() {
+        return Ok(None);
+    }
+    if fs::metadata(&manifest)?.len() > 4 * 1024 * 1024 {
+        return invalid("Steam app manifest exceeds 4 MiB");
+    }
+    let value = parse_vdf(&fs::read_to_string(manifest)?)?;
+    let Some(state) = value.get("AppState") else {
+        return Ok(None);
+    };
+    if state.get("appid").and_then(Vdf::text) != Some("976730") {
+        return invalid("Steam manifest app ID does not identify MCC");
+    }
+    let Some(folder) = state.get("installdir").and_then(Vdf::text) else {
+        return Ok(None);
+    };
+    let relative = crate::safe_relative(folder)?;
+    if relative.components().count() != 1 || root.file_name() != relative.file_name() {
+        return invalid("Steam manifest does not identify the selected MCC directory");
+    }
+    let Some(build) = state.get("buildid").and_then(Vdf::text) else {
+        return Ok(None);
+    };
+    if build.is_empty() || build.len() > 32 || !build.bytes().all(|c| c.is_ascii_digit()) {
+        return invalid("Invalid Steam build identifier");
+    }
+    Ok(Some(build.into()))
 }
 pub fn launch_steam(installation: &Installation) -> Result<()> {
     let steam = installation.steam_executable.as_ref().ok_or_else(|| {

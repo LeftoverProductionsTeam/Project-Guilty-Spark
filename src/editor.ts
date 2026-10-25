@@ -1,4 +1,4 @@
-import type { Project, Tag, TagField, Vec3 } from './types';
+import type { Project, Tag, TagField, TagReference, Vec3 } from './types';
 export interface HistoryState {
   current: Project | null;
   past: Project[];
@@ -42,12 +42,23 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
       future: state.future.slice(1),
       dirty: true,
     };
-  if (action.type === 'builds')
-    return { ...state, current: { ...state.current, builds: action.project.builds } };
+  if (action.type === 'builds' && action.project.id === state.current.id) {
+    const merge = (p: Project) => ({ ...p, builds: action.project.builds });
+    return {
+      ...state,
+      current: merge(state.current),
+      past: state.past.map(merge),
+      future: state.future.map(merge),
+    };
+  }
   return state;
 }
 export function fieldValue(project: Project, tag: Tag, field: TagField): number {
   return project.tagEdits.find((e) => e.tagId === tag.id && e.fieldKey === field.key)?.value ?? field.value;
+}
+export function effectiveReferenceId(project: Project, tag: Tag, reference: TagReference): number {
+  const field = tag.fields.find((f) => f.kind === 'reference' && f.offset === reference.offset);
+  return field ? fieldValue(project, tag, field) : reference.targetId;
 }
 export function setTagValue(project: Project, tag: Tag, field: TagField, value: number): Project {
   if (!Number.isFinite(value) || value < field.min || value > field.max)

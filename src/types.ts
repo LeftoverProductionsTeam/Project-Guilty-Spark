@@ -1,6 +1,16 @@
 export type Vec3 = [number, number, number];
 export type Workspace =
-  'library' | 'world' | 'tags' | 'assets' | 'scenario' | 'build' | 'preservation' | 'settings';
+  | 'library'
+  | 'world'
+  | 'tags'
+  | 'assets'
+  | 'scenario'
+  | 'build'
+  | 'preservation'
+  | 'settings'
+  | 'compare'
+  | 'runtimes'
+  | 'live';
 export interface Diagnostic {
   severity: string;
   code: string;
@@ -129,6 +139,9 @@ export interface Project {
     cacheVersion: number;
     engine: string;
     scenarioPath: string;
+    archive?: { originalPath: string; sha256: string; entryPath: string } | null;
+    resourceDirectory?: string | null;
+    resourceSha256?: Record<string, string>;
   } | null;
   provenance: Provenance;
   scene: SceneObject[];
@@ -192,6 +205,7 @@ export interface Bootstrap {
   settings: Settings;
   entries: LibraryEntry[];
   dataDirectory: string;
+  inboxDirectory: string;
   diagnostics: string[];
   logs: JobEvent[];
 }
@@ -215,6 +229,8 @@ export interface Readiness {
   running: boolean;
   launchReady: boolean;
   message: string;
+  currentValidatedBuildId: string | null;
+  currentBuildMessage: string;
 }
 export interface TemplateReport {
   valid: boolean;
@@ -229,4 +245,139 @@ export interface AssetResult {
   asset: Asset;
   mesh: MeshData;
   warnings: string[];
+}
+
+export type RuntimeId =
+  | 'mccSteam'
+  | 'chupathingyCe'
+  | 'openCe'
+  | 'haloPc'
+  | 'haloCustomEdition'
+  | 'macRetail'
+  | 'macDemo'
+  | 'haloPcTrial'
+  | 'haloMd'
+  | 'haloXbox';
+export type CapabilityStatus = 'supported' | 'unsupported' | 'unknown';
+export type TestStatus = 'pass' | 'fail' | 'blocked' | 'untested';
+export interface SourceReference {
+  title: string;
+  url: string;
+  revision: string | null;
+}
+export interface CapabilityEvidence {
+  key: string;
+  status: CapabilityStatus;
+  evidence:
+    'application' | 'officialDocumentation' | 'upstreamSource' | 'userDeclaration' | 'localInspection';
+  testStatus: TestStatus;
+  detail: string;
+  sources: SourceReference[];
+}
+export interface MapFamilyCapability extends Omit<CapabilityEvidence, 'key'> {
+  family: string;
+  cacheVersions: number[];
+}
+export interface RuntimeInstallation {
+  registrationId: string;
+  root: string;
+  executable: string | null;
+  dataRoot: string;
+  executableSha256: string | null;
+  version: string | null;
+  networkVersion: string | null;
+  identity: 'steamManifest' | 'userDeclared' | 'unknown';
+  validation: TestStatus;
+  diagnostics: string[];
+}
+export interface RuntimeReport {
+  schemaVersion: number;
+  adapterVersion: number;
+  id: RuntimeId;
+  name: string;
+  hostPlatform: string;
+  installation: RuntimeInstallation | null;
+  capabilities: CapabilityEvidence[];
+  mapFamilies: MapFamilyCapability[];
+  diagnostics: string[];
+}
+export interface RuntimeRegistration {
+  id: string;
+  runtimeId: RuntimeId;
+  root: string;
+  executable: string;
+  dataRoot: string | null;
+  version: string | null;
+  networkVersion: string | null;
+}
+export interface RuntimeInventory {
+  runtimeId: RuntimeId;
+  registrationId: string;
+  maps: {
+    relativePath: string;
+    family: string;
+    cacheVersion: number | null;
+    sha256: string | null;
+    scenarioType: number | null;
+    fileSize: number;
+    valid: boolean;
+    detail: string;
+  }[];
+  resources: { relativePath: string; name: string; sha256: string | null; size: number | null }[];
+  diagnostics: string[];
+}
+export type MultiplayerMode =
+  'mccCoopCampaign' | 'mccCustomMultiplayer' | 'nativeCoop' | 'nativeMultiplayer' | 'legacyMultiplayer';
+export interface PeerManifest {
+  schemaVersion: number;
+  adapterVersion: number;
+  runtimeId: RuntimeId;
+  platform: 'windows' | 'macos' | 'linux' | 'unknown';
+  runtimeBuild: string | null;
+  networkVersion: string | null;
+  executableSha256: string | null;
+  mode: MultiplayerMode;
+  antiCheatDisabled: boolean | null;
+  map: { sha256: string; cacheVersion: number; scenarioType: number };
+  resources: { name: string; sha256: string | null; required: boolean }[];
+  packageSha256: string | null;
+  sourceSha256: string | null;
+  buildToolVersion: string | null;
+  buildVerified: boolean;
+  resourceSetVerified: boolean;
+}
+export interface PeerPreflight {
+  schemaVersion: number;
+  status: 'pass' | 'fail' | 'blocked';
+  scope: 'manifestComparisonOnly';
+  gameplayVerified: false;
+  checks: { key: string; status: 'pass' | 'fail' | 'blocked'; detail: string }[];
+  diagnostics: string[];
+}
+export interface SoundPermutation {
+  pitchRange: number;
+  permutation: number;
+  name: string;
+  format: string;
+  channels: number;
+  sampleRate: number;
+  byteLength: number;
+  embedded: boolean;
+  available: boolean;
+  sha256: string | null;
+  durationSeconds: number | null;
+  reason: string | null;
+}
+export interface SoundInspection {
+  tagId: number;
+  tagPath: string;
+  sourceSha256: string;
+  permutations: SoundPermutation[];
+  warnings: string[];
+}
+export interface AudioPreview {
+  name: string;
+  mime: 'audio/ogg';
+  sha256: string;
+  bytes: number[];
 }

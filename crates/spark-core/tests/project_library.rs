@@ -155,8 +155,42 @@ fn modified_preserved_source_blocks_export() {
     common::write_map(&path, 13);
     let lib = Library::open(&d.path().join("lib")).unwrap();
     let (p, i) = lib.import_map(&path, None).unwrap();
-    std::fs::write(&p.source.as_ref().unwrap().preserved_path, b"altered").unwrap();
+    let preserved = &p.source.as_ref().unwrap().preserved_path;
+    let mut permissions = std::fs::metadata(preserved).unwrap().permissions();
+    assert!(permissions.readonly());
+    // Deliberately defeat the preservation flag to simulate external tampering.
+    #[cfg(windows)]
+    #[allow(clippy::permissions_set_readonly_false)]
+    // Only the Windows read-only attribute is cleared.
+    permissions.set_readonly(false);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        permissions.set_mode(permissions.mode() | 0o200);
+    }
+    std::fs::set_permissions(preserved, permissions).unwrap();
+    std::fs::write(preserved, b"altered").unwrap();
     assert!(project::patched_cache(&p, &i).is_err());
+}
+#[test]
+fn resource_identity_changes_invalidate_project_fingerprint() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("x.map");
+    common::write_map(&path, 7);
+    std::fs::write(d.path().join("sounds.map"), b"original resource").unwrap();
+    let lib = Library::open(&d.path().join("lib")).unwrap();
+    let (mut p, _) = lib.import_map(&path, Some(d.path())).unwrap();
+    let before = p.fingerprint().unwrap();
+    assert_eq!(p.source.as_ref().unwrap().resource_sha256.len(), 1);
+    std::fs::write(d.path().join("sounds.map"), b"replacement resource").unwrap();
+    p.source.as_mut().unwrap().resource_sha256 = project::resource_hashes(d.path()).unwrap();
+    assert_ne!(before, p.fingerprint().unwrap());
+    p.source
+        .as_mut()
+        .unwrap()
+        .resource_sha256
+        .insert("../private".into(), "a".repeat(64));
+    assert!(p.validate().is_err());
 }
 #[test]
 fn duplicated_game_instances_do_not_silently_export() {

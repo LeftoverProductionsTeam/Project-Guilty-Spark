@@ -358,7 +358,7 @@ export default function World({
           if (!fly) setMode('scale');
           break;
         case 'f':
-          setFrame((f) => f + 1);
+          if (!fly) setFrame((f) => f + 1);
           break;
         case 'escape':
           setSelected(null);

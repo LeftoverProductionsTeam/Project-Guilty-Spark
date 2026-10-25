@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { fieldValue, historyReducer, initialHistory, replaceVector, setTagValue } from './editor';
+import {
+  effectiveReferenceId,
+  fieldValue,
+  historyReducer,
+  initialHistory,
+  replaceVector,
+  setTagValue,
+} from './editor';
 import type { Project, Tag } from './types';
 const project: Project = {
   schemaVersion: 1,
@@ -45,6 +52,20 @@ const tag: Tag = {
   ],
 };
 describe('semantic tag overlay', () => {
+  it('resolves graph references through the same edited value as the property inspector', () => {
+    const field = {
+      ...tag.fields[0],
+      key: 'projectile',
+      kind: 'reference' as const,
+      value: 2,
+      targetClass: 'proj',
+    };
+    const weapon = { ...tag, fields: [field] };
+    const reference = { label: 'Projectile', targetId: 2, class: 'proj', offset: field.offset };
+    const edited = setTagValue(project, weapon, field, 3);
+    expect(effectiveReferenceId(edited, weapon, reference)).toBe(3);
+    expect(effectiveReferenceId(project, weapon, reference)).toBe(2);
+  });
   it('stores a typed edit and preserves the source model', () => {
     const p = setTagValue(project, tag, tag.fields[0], 9);
     expect(fieldValue(p, tag, tag.fields[0])).toBe(9);
@@ -61,6 +82,35 @@ describe('semantic tag overlay', () => {
   });
 });
 describe('project history', () => {
+  it('keeps completed build history while undoing an unrelated edit', () => {
+    let state = historyReducer(initialHistory, { type: 'load', project });
+    state = historyReducer(state, {
+      type: 'edit',
+      project: { ...project, title: 'Edited title' },
+      description: 'Rename',
+    });
+    const builds = [
+      {
+        id: 'build-1',
+        timestamp: '',
+        status: 'validated',
+        target: 'mcc',
+        output: null,
+        sha256: null,
+        message: '',
+        projectFingerprint: 'fingerprint',
+      },
+    ];
+    state = historyReducer(state, { type: 'builds', project: { ...project, builds } });
+    state = historyReducer(state, { type: 'undo' });
+    expect(state.current?.title).toBe('test');
+    expect(state.current?.builds).toEqual(builds);
+  });
+  it('ignores a completed build lookup from a project that is no longer open', () => {
+    const state = historyReducer(initialHistory, { type: 'load', project });
+    const result = historyReducer(state, { type: 'builds', project: { ...project, id: 'other-project' } });
+    expect(result).toBe(state);
+  });
   it('undoes and redoes a saved scene transform', () => {
     const p = {
       ...project,

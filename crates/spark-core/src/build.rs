@@ -5,6 +5,7 @@ use crate::{
     safe_relative, Result, SparkError,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     fs,
     io::{BufRead, BufReader},
@@ -48,6 +49,31 @@ pub fn tool_path(tools: &Toolchain, name: &str) -> Option<PathBuf> {
     let path = dir.join(format!("{name}{}", if cfg!(windows) { ".exe" } else { "" }));
     path.is_file().then_some(path)
 }
+fn resource_folder<'a>(source: &'a project::Source, tools: &'a Toolchain) -> Option<&'a Path> {
+    source
+        .resource_directory
+        .as_deref()
+        .or(tools.resource_directory.as_deref())
+        .or_else(|| source.original_path.parent())
+}
+fn validate_resource_snapshot(source: &project::Source, folder: Option<&Path>) -> Result<()> {
+    if source.resource_sha256.is_empty() {
+        return Ok(());
+    }
+    let folder = folder.ok_or_else(|| {
+        SparkError::Invalid("Recorded source resources have no selected folder".into())
+    })?;
+    for (name, expected) in &source.resource_sha256 {
+        if !["bitmaps.map", "sounds.map", "loc.map"].contains(&name.as_str()) {
+            return invalid("Project contains an unsupported resource snapshot entry");
+        }
+        let path = folder.join(name);
+        if !path.is_file() || maps::hash_file(&path)? != *expected {
+            return invalid(format!("Source resource {name} changed or is missing. Choose the source resources again to record their current identity before rebuilding."));
+        }
+    }
+    Ok(())
+}
 pub fn compatibility(
     project: &Project,
     inspection: &MapInspection,
@@ -55,6 +81,14 @@ pub fn compatibility(
 ) -> CompatibilityReport {
     let mut blockers = vec![];
     let mut warnings = vec![];
+    if let Some(source) = &project.source {
+        if let Err(e) = validate_resource_snapshot(source, resource_folder(source, tools)) {
+            blockers.push(e.to_string());
+        }
+        if source.resource_sha256.is_empty() {
+            warnings.push("Source resource identity is unverified for this older project; choose its original resource folder to record hashes.".into());
+        }
+    }
     for name in ["invader-info", "invader-extract", "invader-build"] {
         if tool_path(tools, name).is_none() {
             blockers.push(format!("{name} is not configured. Select a separately installed Invader folder in Settings."));
@@ -68,7 +102,15 @@ pub fn compatibility(
         blockers.push("This is a synthetic parser fixture, not a playable map. It cannot be built or packaged as game content.".into());
     }
     for resource in &inspection.resources {
-        if resource.required && !resource.found {
+        let selected_folder = project
+            .source
+            .as_ref()
+            .and_then(|s| s.resource_directory.as_deref())
+            .or(tools.resource_directory.as_deref());
+        let found = selected_folder.map_or(resource.found, |folder| {
+            folder.join(&resource.name).is_file()
+        });
+        if resource.required && !found {
             blockers.push(format!(
                 "Missing {} from the original source runtime; choose its resource folder",
                 resource.name
@@ -117,6 +159,23 @@ struct Runner<'a> {
     project: &'a str,
     cancel: &'a AtomicBool,
     event: &'a (dyn Fn(JobEvent) + Send + Sync),
+}
+fn copy_verified_source(source: &Path, expected_sha256: &str, output: &Path) -> Result<()> {
+    let file = fs::File::open(source)?;
+    if file.metadata()?.len() > maps::MAX_CACHE_BYTES {
+        return invalid("Source exceeds cache copy safety limit");
+    }
+    let mut bytes = vec![];
+    file.take(maps::MAX_CACHE_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > maps::MAX_CACHE_BYTES
+        || format!("{:x}", Sha256::digest(&bytes)) != expected_sha256
+    {
+        return invalid("Source changed during the validated cache copy");
+    }
+    // New derived files must not inherit a preserved source's read-only attribute.
+    fs::write(output, bytes)?;
+    Ok(())
 }
 pub fn extraction_errors(output: &str) -> Vec<String> {
     output
@@ -177,8 +236,10 @@ impl Runner<'_> {
         let stdout = child.stdout.take().unwrap();
         let stderr = child.stderr.take().unwrap();
         let (tx, rx) = std::sync::mpsc::channel();
+        let incomplete_output = Arc::new(AtomicBool::new(false));
         let reader = |pipe: Box<dyn std::io::Read + Send>,
                       tx: std::sync::mpsc::Sender<(bool, String)>,
+                      incomplete: Arc<AtomicBool>,
                       err| {
             std::thread::spawn(move || {
                 let mut reader = BufReader::new(pipe);
@@ -187,10 +248,17 @@ impl Runner<'_> {
                 loop {
                     data.clear();
                     match reader.by_ref().take(65537).read_until(b'\n', &mut data) {
-                        Ok(0) | Err(_) => break,
+                        Ok(0) => break,
+                        Err(e) => {
+                            incomplete.store(true, Ordering::Relaxed);
+                            let _ = tx
+                                .send((true, format!("Could not read complete tool output: {e}")));
+                            break;
+                        }
                         Ok(_) => {
                             total += data.len();
                             if total > 16 * 1024 * 1024 {
+                                incomplete.store(true, Ordering::Relaxed);
                                 let _ = tx.send((
                                     true,
                                     "Tool output exceeded 16 MiB; remaining output was discarded"
@@ -208,8 +276,18 @@ impl Runner<'_> {
                 }
             })
         };
-        let out_thread = reader(Box::new(stdout), tx.clone(), false);
-        let err_thread = reader(Box::new(stderr), tx.clone(), true);
+        let out_thread = reader(
+            Box::new(stdout),
+            tx.clone(),
+            incomplete_output.clone(),
+            false,
+        );
+        let err_thread = reader(
+            Box::new(stderr),
+            tx.clone(),
+            incomplete_output.clone(),
+            true,
+        );
         drop(tx);
         let start = Instant::now();
         let mut output = String::new();
@@ -250,8 +328,11 @@ impl Runner<'_> {
             }
             std::thread::sleep(Duration::from_millis(50));
         };
-        let _ = out_thread.join();
-        let _ = err_thread.join();
+        let out_failed = out_thread.join().is_err();
+        let err_failed = err_thread.join().is_err();
+        if out_failed || err_failed {
+            incomplete_output.store(true, Ordering::Relaxed);
+        }
         for (err, line) in rx.try_iter() {
             if !err {
                 output.push_str(&line);
@@ -263,6 +344,9 @@ impl Runner<'_> {
             self.emit(phase, line, progress, if err { "tool" } else { "info" });
         }
         result?;
+        if incomplete_output.load(Ordering::Relaxed) {
+            return invalid("External tool output was truncated or unreadable. Validation cannot establish success from incomplete diagnostics; build stopped.");
+        }
         if !errors.is_empty() {
             return invalid(format!("Tag extraction was incomplete ({} errors), even though the tool returned exit code 0. Build stopped before compilation.\n{}\nProvide the source runtime's original resources or editing-kit tags. Stock MCC remastered assets are not recoverable from a map header alone.",errors.len(),errors.iter().take(4).cloned().collect::<Vec<_>>().join("\n")));
         }
@@ -332,7 +416,7 @@ pub fn validate_existing_mcc(
         return invalid("Unsafe source cache filename");
     }
     let output = output_dir.join(filename);
-    fs::copy(&source.preserved_path, &output)?;
+    copy_verified_source(&source.preserved_path, &source.sha256, &output)?;
     if maps::hash_file(&output)? != source.sha256 {
         return invalid("Validated output copy does not match the preserved source");
     }
@@ -406,10 +490,16 @@ pub fn run_build(
             && project.tag_edits.is_empty()
             && project.scene == inspection.objects
         {
-            fs::copy(&source.preserved_path, &input)?;
+            copy_verified_source(&source.preserved_path, &source.sha256, &input)?;
         } else {
             let mut bytes = if project.tag_edits.is_empty() && project.scene == inspection.objects {
-                maps::read_cache(&source.preserved_path)?.1
+                let (_, bytes, sha256) = maps::read_cache_snapshot(&source.preserved_path)?;
+                if sha256 != source.sha256 || sha256 != inspection.sha256 {
+                    return invalid(
+                        "Preserved source or inspection changed before the build snapshot",
+                    );
+                }
+                bytes
             } else {
                 project::patched_cache(project, inspection)?
             };
@@ -440,11 +530,8 @@ pub fn run_build(
         if !["false", "0"].contains(&protected.trim().to_ascii_lowercase().as_str()) {
             return invalid(format!("Source protection check did not return false: {protected}. No extraction was attempted."));
         }
-        let resource_dir = tools
-            .resource_directory
-            .as_deref()
-            .or_else(|| source.original_path.parent())
-            .unwrap_or(&input_dir);
+        let resource_dir = resource_folder(source, tools).unwrap_or(&input_dir);
+        validate_resource_snapshot(source, Some(resource_dir))?;
         runner.run(
             &extract,
             &[
@@ -524,6 +611,7 @@ pub fn run_build(
         if maps::hash_file(&source.preserved_path)? != source.sha256 {
             return invalid("Preserved source integrity changed during build");
         }
+        validate_resource_snapshot(source, Some(resource_dir))?;
         Ok(output)
     })();
     let record = match result {
@@ -570,4 +658,57 @@ pub fn run_build(
         },
     );
     Ok(record)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn derived_copy_does_not_inherit_preserved_readonly_attribute() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source.map");
+        let output = dir.path().join("derived.map");
+        fs::write(&source, b"preserved bytes").unwrap();
+        let original_permissions = fs::metadata(&source).unwrap().permissions();
+        let mut permissions = original_permissions.clone();
+        permissions.set_readonly(true);
+        fs::set_permissions(&source, permissions).unwrap();
+        let hash = maps::hash_file(&source).unwrap();
+        copy_verified_source(&source, &hash, &output).unwrap();
+        assert!(!fs::metadata(&output).unwrap().permissions().readonly());
+        assert!(fs::metadata(&source).unwrap().permissions().readonly());
+        assert_eq!(
+            maps::hash_file(&source).unwrap(),
+            maps::hash_file(&output).unwrap()
+        );
+        fs::set_permissions(&source, original_permissions).unwrap();
+    }
+    #[cfg(windows)]
+    #[test]
+    fn zero_exit_with_truncated_output_never_passes_validation() {
+        let dir = tempfile::tempdir().unwrap();
+        let cancel = AtomicBool::new(false);
+        let runner = Runner {
+            id: "test",
+            project: "test",
+            cancel: &cancel,
+            event: &|_| {},
+        };
+        let result = runner.run(
+            Path::new("powershell.exe"),
+            &[
+                "-NoProfile".into(),
+                "-NonInteractive".into(),
+                "-Command".into(),
+                "[Console]::Out.Write('x' * (16 * 1024 * 1024 + 1))".into(),
+            ],
+            dir.path(),
+            "extract",
+            0,
+        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("truncated or unreadable"));
+    }
 }

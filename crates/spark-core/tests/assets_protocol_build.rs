@@ -102,3 +102,23 @@ fn extraction_zero_exit_does_not_hide_per_tag_failures() {
     )
     .is_empty());
 }
+#[test]
+fn changed_recorded_resource_identity_blocks_the_build() {
+    let d = tempfile::tempdir().unwrap();
+    let map = d.path().join("fixture.map");
+    common::write_map(&map, 6);
+    let sounds = d.path().join("sounds.map");
+    std::fs::write(&sounds, b"original resource identity").unwrap();
+    let lib = Library::open(&d.path().join("lib")).unwrap();
+    let (mut project, inspection) = lib.import_map(&map, Some(d.path())).unwrap();
+    project.source.as_mut().unwrap().resource_sha256.insert(
+        "sounds.map".into(),
+        spark_core::maps::hash_file(&sounds).unwrap(),
+    );
+    std::fs::write(&sounds, b"different resources").unwrap();
+    let report = build::compatibility(&project, &inspection, &Toolchain::default());
+    assert!(report
+        .blockers
+        .iter()
+        .any(|b| b.contains("sounds.map changed or is missing")));
+}
