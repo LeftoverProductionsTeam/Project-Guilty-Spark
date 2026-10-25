@@ -1,0 +1,1 @@
+{ "$schema": "../gen/schemas/desktop-schema.json", "identifier": "main", "description": "Editor window event access; all filesystem and process operations go through validated Rust commands.", "windows": ["main"], "permissions": ["core:default"] }

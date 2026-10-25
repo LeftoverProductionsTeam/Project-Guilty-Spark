@@ -1,0 +1,9 @@
+docs/screenshots/
+dist/
+node_modules/
+.local/
+.toolchain/
+.research/
+target/
+/SAMPLE CODE/
+/Pyros Zombie Apocolypse Mod Versions/

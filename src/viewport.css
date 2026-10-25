@@ -1,0 +1,14 @@
+.bsp-control {
+  position: absolute;
+  right: 12px;
+  top: 14px;
+  max-width: 180px;
+  font:
+    9px Consolas,
+    monospace;
+  padding: 6px 8px;
+  background: #101f29e8;
+  color: #89b6c4;
+  border-color: #34535f;
+  backdrop-filter: blur(5px);
+}

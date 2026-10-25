@@ -1,0 +1,573 @@
+use crate::{
+    invalid,
+    maps::{self, MapInspection},
+    project::{self, BuildRecord, Project},
+    safe_relative, Result, SparkError,
+};
+use serde::{Deserialize, Serialize};
+use std::{
+    fs,
+    io::{BufRead, BufReader},
+    path::{Path, PathBuf},
+    process::Stdio,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Toolchain {
+    pub invader_directory: Option<PathBuf>,
+    pub resource_directory: Option<PathBuf>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompatibilityReport {
+    pub target: String,
+    pub pipeline: String,
+    pub blockers: Vec<String>,
+    pub warnings: Vec<String>,
+    pub ready: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JobEvent {
+    pub job_id: String,
+    pub project_id: String,
+    pub phase: String,
+    pub severity: String,
+    pub message: String,
+    pub progress: u8,
+    pub timestamp: String,
+}
+pub fn tool_path(tools: &Toolchain, name: &str) -> Option<PathBuf> {
+    let dir = tools.invader_directory.as_ref()?;
+    let path = dir.join(format!("{name}{}", if cfg!(windows) { ".exe" } else { "" }));
+    path.is_file().then_some(path)
+}
+pub fn compatibility(
+    project: &Project,
+    inspection: &MapInspection,
+    tools: &Toolchain,
+) -> CompatibilityReport {
+    let mut blockers = vec![];
+    let mut warnings = vec![];
+    for name in ["invader-info", "invader-extract", "invader-build"] {
+        if tool_path(tools, name).is_none() {
+            blockers.push(format!("{name} is not configured. Select a separately installed Invader folder in Settings."));
+        }
+    }
+    if inspection.header.extended {
+        blockers
+            .push("OpenSauce engine extensions cannot be carried into MCC by this pipeline".into());
+    }
+    if inspection.header.build.contains("synthetic parser fixture") {
+        blockers.push("This is a synthetic parser fixture, not a playable map. It cannot be built or packaged as game content.".into());
+    }
+    for resource in &inspection.resources {
+        if resource.required && !resource.found {
+            blockers.push(format!(
+                "Missing {} from the original source runtime; choose its resource folder",
+                resource.name
+            ));
+        }
+    }
+    if inspection.header.compressed
+        && (!project.tag_edits.is_empty() || project.scene != inspection.objects)
+    {
+        blockers.push(
+            "Xbox compressed-cache editing is not implemented; inspect and extract before editing"
+                .into(),
+        );
+    }
+    if let Err(e) = project::validate_edits(project, inspection) {
+        blockers.push(e.to_string());
+    }
+    if project.scene.len() != inspection.objects.len()
+        || project
+            .scene
+            .iter()
+            .any(|o| !inspection.objects.iter().any(|v| v.id == o.id) || o.scale != [1.0; 3])
+    {
+        blockers.push("Editor-only instances, duplication, deletion and per-instance scale cannot be compiled into Halo tags yet".into());
+    }
+    if !project.assets.is_empty() {
+        warnings
+            .push("Workshop assets are preview-only and are not baked into the Halo map".into());
+    }
+    if !inspection.encounters.is_empty() {
+        warnings.push("This map contains AI encounters. Importing it does not add multiplayer AI synchronization to MCC.".into());
+    }
+    warnings.push("A successful extraction/rebuild/CRC check establishes structural validity. MCC load testing is still required; playable is never inferred from the header.".into());
+    CompatibilityReport {
+        target: "MCC Halo 1 · cache 13".into(),
+        pipeline:
+            "Invader extract → audited edits → invader-build -g mcc-cea → tag/index/CRC validation"
+                .into(),
+        ready: blockers.is_empty(),
+        blockers,
+        warnings,
+    }
+}
+struct Runner<'a> {
+    id: &'a str,
+    project: &'a str,
+    cancel: &'a AtomicBool,
+    event: &'a (dyn Fn(JobEvent) + Send + Sync),
+}
+pub fn extraction_errors(output: &str) -> Vec<String> {
+    output
+        .lines()
+        .filter(|line| {
+            let s = line.trim();
+            s.starts_with("ERROR:")
+                || s.starts_with("FATAL ERROR:")
+                || s.starts_with("Failed to extract ")
+        })
+        .map(str::to_string)
+        .collect()
+}
+impl Runner<'_> {
+    fn emit(&self, phase: &str, message: impl Into<String>, progress: u8, severity: &str) {
+        (self.event)(JobEvent {
+            job_id: self.id.into(),
+            project_id: self.project.into(),
+            phase: phase.into(),
+            message: message.into(),
+            severity: severity.into(),
+            progress,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        });
+    }
+    fn run(
+        &self,
+        executable: &Path,
+        args: &[String],
+        cwd: &Path,
+        phase: &str,
+        progress: u8,
+    ) -> Result<String> {
+        if self.cancel.load(Ordering::Relaxed) {
+            return invalid("Build cancelled");
+        }
+        self.emit(
+            phase,
+            format!(
+                "{} {}",
+                executable.file_name().unwrap_or_default().to_string_lossy(),
+                args.iter()
+                    .map(|s| format!("{s:?}"))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            progress,
+            "info",
+        );
+        let mut cmd = crate::steam::command(executable.to_string_lossy().as_ref());
+        let mut child = cmd
+            .args(args)
+            .current_dir(cwd)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        let stdout = child.stdout.take().unwrap();
+        let stderr = child.stderr.take().unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let reader = |pipe: Box<dyn std::io::Read + Send>,
+                      tx: std::sync::mpsc::Sender<(bool, String)>,
+                      err| {
+            std::thread::spawn(move || {
+                let mut reader = BufReader::new(pipe);
+                let mut data = vec![];
+                let mut total = 0usize;
+                loop {
+                    data.clear();
+                    match reader.by_ref().take(65537).read_until(b'\n', &mut data) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {
+                            total += data.len();
+                            if total > 16 * 1024 * 1024 {
+                                let _ = tx.send((
+                                    true,
+                                    "Tool output exceeded 16 MiB; remaining output was discarded"
+                                        .into(),
+                                ));
+                                std::io::copy(&mut reader, &mut std::io::sink()).ok();
+                                break;
+                            }
+                            let line = String::from_utf8_lossy(&data).trim().to_string();
+                            if tx.send((err, line)).is_err() {
+                                break;
+                            }
+                        }
+                    }
+                }
+            })
+        };
+        let out_thread = reader(Box::new(stdout), tx.clone(), false);
+        let err_thread = reader(Box::new(stderr), tx.clone(), true);
+        drop(tx);
+        let start = Instant::now();
+        let mut output = String::new();
+        let mut errors = vec![];
+        let result = loop {
+            for (err, line) in rx.try_iter() {
+                if !err {
+                    output.push_str(&line);
+                    output.push('\n');
+                }
+                if phase == "extract" {
+                    errors.extend(extraction_errors(&line));
+                }
+                self.emit(phase, line, progress, if err { "tool" } else { "info" });
+            }
+            if self.cancel.load(Ordering::Relaxed) || start.elapsed() > Duration::from_secs(600) {
+                let _ = child.kill();
+                let _ = child.wait();
+                break invalid(if self.cancel.load(Ordering::Relaxed) {
+                    "Build cancelled; external tool terminated"
+                } else {
+                    "External tool exceeded its ten-minute timeout"
+                });
+            }
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    break if status.success() {
+                        Ok(())
+                    } else {
+                        invalid(format!(
+                            "{} exited with {status}; inspect the preceding tool diagnostics",
+                            executable.display()
+                        ))
+                    };
+                }
+                Ok(None) => {}
+                Err(e) => break Err(e.into()),
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        let _ = out_thread.join();
+        let _ = err_thread.join();
+        for (err, line) in rx.try_iter() {
+            if !err {
+                output.push_str(&line);
+                output.push('\n');
+            }
+            if phase == "extract" {
+                errors.extend(extraction_errors(&line));
+            }
+            self.emit(phase, line, progress, if err { "tool" } else { "info" });
+        }
+        result?;
+        if !errors.is_empty() {
+            return invalid(format!("Tag extraction was incomplete ({} errors), even though the tool returned exit code 0. Build stopped before compilation.\n{}\nProvide the source runtime's original resources or editing-kit tags. Stock MCC remastered assets are not recoverable from a map header alone.",errors.len(),errors.iter().take(4).cloned().collect::<Vec<_>>().join("\n")));
+        }
+        Ok(output.trim().into())
+    }
+}
+pub fn validate_existing_mcc(
+    project: &Project,
+    inspection: &MapInspection,
+    tools: &Toolchain,
+    jobs_root: &Path,
+    job_id: &str,
+    cancel: Arc<AtomicBool>,
+    on_event: impl Fn(JobEvent) + Send + Sync,
+) -> Result<BuildRecord> {
+    uuid::Uuid::parse_str(job_id).map_err(|_| SparkError::Invalid("Invalid job UUID".into()))?;
+    if inspection.header.version != 13
+        || inspection.header.extended
+        || inspection.header.build.contains("synthetic parser fixture")
+    {
+        return invalid("This operation requires an existing unextended MCC cache, not a legacy map or test fixture");
+    }
+    if !project.tag_edits.is_empty() || project.scene != inspection.objects {
+        return invalid("Project changes require extraction and rebuilding. Existing-cache validation only accepts an unchanged source map.");
+    }
+    let source = project
+        .source
+        .as_ref()
+        .ok_or_else(|| SparkError::Invalid("No source cache".into()))?;
+    if maps::hash_file(&source.preserved_path)? != source.sha256 {
+        return invalid("Preserved source checksum changed");
+    }
+    let info=tool_path(tools,"invader-info").ok_or_else(||SparkError::Invalid("Configure invader-info in Settings to verify the source cache CRC and protection status".into()))?;
+    let dir = jobs_root.join(job_id);
+    crate::reject_links(&dir)?;
+    fs::create_dir_all(&dir)?;
+    let output_dir = dir.join("output");
+    fs::create_dir(&output_dir)?;
+    let runner = Runner {
+        id: job_id,
+        project: &project.id,
+        cancel: &cancel,
+        event: &on_event,
+    };
+    for (check, expected) in [
+        ("is_protected", "0"),
+        ("crc32_mismatched", "0"),
+        ("stub_count", "0"),
+    ] {
+        let result = runner.run(
+            &info,
+            &[
+                "-T".into(),
+                check.into(),
+                source.preserved_path.to_string_lossy().into_owned(),
+            ],
+            &dir,
+            "verify",
+            60,
+        )?;
+        if result.trim() != expected && result.trim() != "false" {
+            return invalid(format!("Existing MCC cache failed {check}: {result}"));
+        }
+    }
+    let filename = safe_relative(&crate::mcc::package_map_name(&inspection.scenario_path)?)?;
+    if filename.components().count() != 1 {
+        return invalid("Unsafe source cache filename");
+    }
+    let output = output_dir.join(filename);
+    fs::copy(&source.preserved_path, &output)?;
+    if maps::hash_file(&output)? != source.sha256 {
+        return invalid("Validated output copy does not match the preserved source");
+    }
+    let record=BuildRecord{id:job_id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"mcc-existing".into(),output:Some(output),sha256:Some(source.sha256.clone()),message:"Existing MCC cache copied unchanged; tag/index, protection, stub and CRC checks passed. No conversion was performed. Target-game load remains pending.".into(),project_fingerprint:project.fingerprint()?};
+    project::atomic_write(
+        &dir.join("receipt.json"),
+        &serde_json::to_vec_pretty(&record)?,
+        false,
+    )?;
+    runner.emit("validated", &record.message, 100, "success");
+    Ok(record)
+}
+use std::io::Read;
+pub fn run_build(
+    project: &Project,
+    inspection: &MapInspection,
+    tools: &Toolchain,
+    jobs_root: &Path,
+    job_id: &str,
+    cancel: Arc<AtomicBool>,
+    on_event: impl Fn(JobEvent) + Send + Sync,
+) -> Result<BuildRecord> {
+    uuid::Uuid::parse_str(job_id)
+        .map_err(|_| SparkError::Invalid("Job ID is not a UUID".into()))?;
+    let report = compatibility(project, inspection, tools);
+    if !report.ready {
+        return invalid(report.blockers.join("\n"));
+    }
+    let source = project
+        .source
+        .as_ref()
+        .ok_or_else(|| SparkError::Invalid("No source cache".into()))?;
+    if maps::hash_file(&source.preserved_path)? != source.sha256 {
+        return invalid("Preserved source checksum changed");
+    }
+    let name = safe_relative(&inspection.header.name)?;
+    if name.components().count() != 1 {
+        return invalid("Cache name is not a single safe filename");
+    }
+    safe_relative(&inspection.scenario_path)?;
+    let dir = jobs_root.join(job_id);
+    crate::reject_links(&dir)?;
+    fs::create_dir_all(&dir)?;
+    let input_dir = dir.join("input");
+    let tag_dir = dir.join("tags");
+    let output_dir = dir.join("output");
+    for p in [&input_dir, &tag_dir, &output_dir] {
+        fs::create_dir(p)?;
+    }
+    let runner = Runner {
+        id: job_id,
+        project: &project.id,
+        cancel: &cancel,
+        event: &on_event,
+    };
+    runner.emit(
+        "validate",
+        "Source SHA-256 verified. Original and stock maps remain read-only.",
+        5,
+        "info",
+    );
+    let result = (|| -> Result<PathBuf> {
+        let info = tool_path(tools, "invader-info").unwrap();
+        let extract = tool_path(tools, "invader-extract").unwrap();
+        let build = tool_path(tools, "invader-build").unwrap();
+        for exe in [&info, &extract, &build] {
+            runner.run(exe, &["-i".into()], &dir, "tools", 8)?;
+        }
+        let input = input_dir.join(format!("{}.map", inspection.header.name));
+        if inspection.header.compressed
+            && project.tag_edits.is_empty()
+            && project.scene == inspection.objects
+        {
+            fs::copy(&source.preserved_path, &input)?;
+        } else {
+            let mut bytes = if project.tag_edits.is_empty() && project.scene == inspection.objects {
+                maps::read_cache(&source.preserved_path)?.1
+            } else {
+                project::patched_cache(project, inspection)?
+            };
+            let repairs = crate::legacy::prepare_extraction(&mut bytes, inspection)?;
+            for repair in &repairs {
+                runner.emit("compatibility", &repair.message, 10, "warning");
+            }
+            if !repairs.is_empty() {
+                project::atomic_write(
+                    &dir.join("compatibility-repairs.json"),
+                    &serde_json::to_vec_pretty(&repairs)?,
+                    false,
+                )?;
+            }
+            fs::write(&input, bytes)?;
+        }
+        let protected = runner.run(
+            &info,
+            &[
+                "-T".into(),
+                "is_protected".into(),
+                input.to_string_lossy().into_owned(),
+            ],
+            &dir,
+            "validate",
+            12,
+        )?;
+        if !["false", "0"].contains(&protected.trim().to_ascii_lowercase().as_str()) {
+            return invalid(format!("Source protection check did not return false: {protected}. No extraction was attempted."));
+        }
+        let resource_dir = tools
+            .resource_directory
+            .as_deref()
+            .or_else(|| source.original_path.parent())
+            .unwrap_or(&input_dir);
+        runner.run(
+            &extract,
+            &[
+                "-t".into(),
+                tag_dir.to_string_lossy().into_owned(),
+                "-m".into(),
+                resource_dir.to_string_lossy().into_owned(),
+                input.to_string_lossy().into_owned(),
+            ],
+            &dir,
+            "extract",
+            25,
+        )?;
+        let scenario_file = tag_dir.join(safe_relative(&format!(
+            "{}.scenario",
+            inspection.scenario_path
+        ))?);
+        if !scenario_file.is_file()
+            && !tag_dir
+                .join(safe_relative(&format!(
+                    "{}.scenario",
+                    inspection.scenario_path.to_ascii_lowercase()
+                ))?)
+                .is_file()
+        {
+            return invalid("Extractor did not produce the indexed scenario; refusing to compile a different map");
+        }
+        runner.run(
+            &build,
+            &[
+                "-g".into(),
+                "mcc-cea".into(),
+                "-t".into(),
+                tag_dir.to_string_lossy().into_owned(),
+                "-m".into(),
+                output_dir.to_string_lossy().into_owned(),
+                "--resource-usage".into(),
+                "none".into(),
+                inspection.scenario_path.clone(),
+            ],
+            &dir,
+            "compile",
+            55,
+        )?;
+        let stem = inspection
+            .scenario_path
+            .rsplit(['\\', '/'])
+            .next()
+            .ok_or_else(|| SparkError::Invalid("Empty scenario name".into()))?;
+        let mut output = output_dir.join(format!("{stem}.map"));
+        if !output.is_file() {
+            output = output_dir.join(format!("{}.map", stem.to_ascii_lowercase()));
+        }
+        let validated = maps::inspect_map(&output, Some(resource_dir))?;
+        if validated.header.version != 13
+            || !validated
+                .scenario_path
+                .replace('\\', "/")
+                .eq_ignore_ascii_case(&inspection.scenario_path.replace('\\', "/"))
+        {
+            return invalid("Build output has the wrong cache version or scenario");
+        }
+        let mismatch = runner.run(
+            &info,
+            &[
+                "-T".into(),
+                "crc32_mismatched".into(),
+                output.to_string_lossy().into_owned(),
+            ],
+            &dir,
+            "verify",
+            90,
+        )?;
+        if !["false", "0"].contains(&mismatch.trim().to_ascii_lowercase().as_str()) {
+            return invalid(format!("Output CRC32 validation failed: {mismatch}"));
+        }
+        if maps::hash_file(&source.preserved_path)? != source.sha256 {
+            return invalid("Preserved source integrity changed during build");
+        }
+        Ok(output)
+    })();
+    let record = match result {
+        Ok(output) => BuildRecord {
+            id: job_id.into(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            status: "validated".into(),
+            target: "mcc-cea".into(),
+            sha256: Some(maps::hash_file(&output)?),
+            output: Some(output),
+            message: "MCC cache rebuilt and structurally validated. In-game load test pending."
+                .into(),
+            project_fingerprint: project.fingerprint()?,
+        },
+        Err(e) => BuildRecord {
+            id: job_id.into(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            status: if cancel.load(Ordering::Relaxed) {
+                "cancelled"
+            } else {
+                "failed"
+            }
+            .into(),
+            target: "mcc-cea".into(),
+            output: None,
+            sha256: None,
+            message: e.to_string(),
+            project_fingerprint: project.fingerprint()?,
+        },
+    };
+    project::atomic_write(
+        &dir.join("receipt.json"),
+        &serde_json::to_vec_pretty(&record)?,
+        false,
+    )?;
+    runner.emit(
+        &record.status,
+        &record.message,
+        100,
+        if record.status == "validated" {
+            "success"
+        } else {
+            "error"
+        },
+    );
+    Ok(record)
+}
