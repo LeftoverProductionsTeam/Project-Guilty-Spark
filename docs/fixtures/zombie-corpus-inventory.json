@@ -111,7 +111,7 @@
     {
       "classification": "historicalSupportingFile",
       "path": "Zombie Apocalypse/Thumbs.db",
-      "readonly": false,
+      "readonly": true,
       "sha256": "440d1e1bbc80ff50c3d11629ee5db335a286f77adea9923c2604405e09c60c8f",
       "size": 8192
     },
@@ -2335,5 +2335,11 @@
     "libraryEntries": 7,
     "gameLaunched": false,
     "archivedExecutableRun": false
+  },
+  "preservationReadback": {
+    "files": 67,
+    "bytesUnchanged": true,
+    "allReadOnly": true,
+    "note": "Final readback includes hidden/system Thumbs.db; only its read-only attribute was added."
   }
 }
