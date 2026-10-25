@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "platform": "windows-x64",
+  "installerExecuted": false,
+  "artifacts": [
+    {
+      "file": "target/release/GuiltySpark.exe",
+      "bytes": 14032896,
+      "sha256": "ac9bd5265578b46690f4eba91462cdf8bd5776647d8f958bb0031cf800454d43"
+    },
+    {
+      "file": "target/release/bundle/nsis/Project Guilty Spark_0.2.0_x64-setup.exe",
+      "bytes": 3692465,
+      "sha256": "48bfb96db2651441205b373cec24b1616b8d52874a83f8a19dc5e96591c7ecc4"
+    }
+  ]
+}

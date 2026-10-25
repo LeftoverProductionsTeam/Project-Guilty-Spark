@@ -4,7 +4,37 @@ Recorded 2026-10-25 on Windows x64. Tests are separated from actual game accepta
 
 ## Automated checks
 
-40 Rust core tests and 7 frontend unit tests pass. Rustfmt, TypeScript checking, and Clippy for the core and desktop targets with warnings denied pass. The browser-preview Playwright test passes against installed Edge. These checks do not establish game compatibility.
+Phase 2: **74 Rust tests** pass (72 core + 2 native readiness tests), **21 frontend unit tests** pass, and **8 Playwright tests** pass (3 browser boundaries/accessibility + 5 synthetic IPC contracts). TypeScript and Clippy across the workspace/all targets with warnings denied pass. Rustfmt is applied. These checks do not establish game compatibility. The audit baseline was independently reproduced before changes with 40 Rust + 7 frontend tests and a fresh native release build.
+
+New tests cover classic ZIP metadata/CRC limits and malicious paths, embedded audio/source/range integrity, runtime registration and inventories, privacy manifest validation, explicit untested AI status, resource identity changes, stale/tampered build readiness, read-only copies, complete package receipts, truncated zero-exit tool output, malformed scenario blocks and semantic comparison. The real corpus runner asserts the known version/tag/placement/triangle counts for every supplied map hash. The generated ZIP fixture is labelled separately from the historical material; no historical ZIP was supplied.
+
+## Phase 2 native release and corpus evidence
+
+Actual Tauri release UI checks used an isolated library under `C:/Users/patri/AppData/Local/Temp/GuiltySpark-phase2/native-final-library`, initially with Steam disconnected. Real APIs and WebView rendering were used; no mock data or game launches were involved.
+
+| Check | Result |
+| --- | --- |
+| Generated ZIP containing the supplied Demo map, UI and two resources, plus an inert executable exclusion fixture | PASS: original ZIP hash/read-only copy preserved; two scenarios imported through the actual local Inbox watcher; executable not extracted |
+| All eight supplied scenario paths | PASS: seven distinct source hashes in one native library; saved/reopened projects and real collision data |
+| Demo viewport | PASS: 2,825 tags, 197 placements, 5,940 collision triangles; screenshot from actual release |
+| Semantic Compare | PASS: Demo versus apocolypse actual tag membership, audited values/references and scenario differences displayed; undecoded coverage stays UNKNOWN |
+| Menu audio | PASS: real intro + two loop permutations decode in WebView at stereo 44.1 kHz, 88.806 / 74.984 / 84.014 seconds; no audio auto-play |
+| Corrupt menu sound | PASS rejection: `sounds/music/zamenumusic` fails Ogg validation and cannot load a preview |
+| Launch readiness / friends preflight | PASS gating: unbuilt Demo cannot launch as a verified package and self-comparison remains BLOCKED |
+| Real focused-draft close | PASS: Windows close request committed acceleration-scale draft 3 before closing; project JSON readback confirmed it; QA edit restored afterward |
+| Read-only Steam/MCC discovery | PASS: installed build ID 19905945; metadata/byte/mtime snapshots of manifest, stock Blood Gulch and all existing owned MCC files unchanged |
+| Installed MCC map inventory | PASS: 30 scenario/header entries and one shared-resource entry read without deployment; valid headers are not gameplay proof |
+| Zero-map ZIP handling | PASS: archive preserved with receipt/import report and visible rejection; no silent success |
+| Faithful conversions | FAIL as reported for all seven unique maps; gameplay sources fail missing resources, menus fail corrupt Ogg during compile |
+| Opt-in recovery experiment | PASS extraction of 2,823 retained tags after explicit missing-audio omission; subsequent compile remains BLOCKED by damaged/mixed-class placements; no playable output |
+| Official Excession schema/package enumeration | BLOCKED: no official exact-scenario template supplied; limited contract/receipt tests are not an official schema test |
+| MCC co-op, native-runtime gameplay and two-computer AI | UNTESTED: no game or second computer used |
+
+Screenshots: [world](screenshots/phase2/native-world.png), [comparison](screenshots/phase2/native-compare.png), [menu audio](screenshots/phase2/native-menu-audio.png), [runtime discovery](screenshots/phase2/native-runtimes.png). Metadata-only [corpus inventory](fixtures/zombie-corpus-inventory.json), [matrix](ZOMBIE_REGRESSION_MATRIX.md), and [recovery evidence](ZOMBIE_AUDIO_AND_SPAWN_EVIDENCE.md) record exact sources and limits. Local detailed QA outputs are in the Phase 2 temporary root; no extracted game bytes are committed.
+
+A final fresh-library corpus inspection repeated all eight source-path checks after resource fingerprint/snapshot changes. SHA-256 and size readback of **all 67 original files** matched the inventory. Original files and managed preserved copies carry read-only flags; no content bytes were rewritten. The final release also restored the isolated close-save test overlay and rechecked manifest blocking/explicit untested AI status.
+
+The following native/MCC results describe the earlier Phase 1 baseline unless explicitly marked Phase 2.
 
 The development watcher excludes native sources, Rust outputs, local tools and supplied archives. Inspection of the running Vite watch list found no entries under those directories; the browser check passed after this fix. This prevents native builds from making the web preview watch locked executable outputs.
 

@@ -36,7 +36,7 @@ The bootstrap does not install global packages or require administrator privileg
 
 Unsigned development builds are produced. No certificates, publishing, auto-update service or uploads are configured.
 
-Windows artifacts built and launched on 2026-10-25:
+Historical Phase 1 artifacts built and launched on 2026-10-25 (superseded by Phase 2 below):
 
 | Artifact                                   | Bytes      | SHA-256                                                            |
 | ------------------------------------------ | ---------- | ------------------------------------------------------------------ |
@@ -45,17 +45,30 @@ Windows artifacts built and launched on 2026-10-25:
 
 The release executable was exercised directly. Installer compilation succeeded; installing/uninstalling the NSIS package was not exercised. These hashes identify this local build, not a reproducible-binary guarantee across different compiler/SDK environments.
 
+Phase 2 release 0.2.0, built and exercised on 2026-10-25:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `target/release/GuiltySpark.exe` | 14,032,896 | `ac9bd5265578b46690f4eba91462cdf8bd5776647d8f958bb0031cf800454d43` |
+| `target/release/bundle/nsis/Project Guilty Spark_0.2.0_x64-setup.exe` | 3,692,465 | `48bfb96db2651441205b373cec24b1616b8d52874a83f8a19dc5e96591c7ecc4` |
+
+The workspace copies were compared byte-for-byte with the C: build outputs. The previous executable remains as `target/release/GuiltySpark-0.1.0.exe`. The 0.2.0 installer was built but not installed. macOS/Linux packages were not built on this Windows host. Machine-readable hashes are in [build-artifacts-0.2.0.json](fixtures/build-artifacts-0.2.0.json).
+
 ## Runtime dependencies
 
-The normal data root comes from Tauri’s per-user application data location. `GUILTY_SPARK_DATA_DIR` is an optional explicit override for isolated tests. On Windows the MCC adapter locates the usual LocalLow manifest and creates only its own `halo1/GuiltySpark` subtree. Existing unknown ownership causes a diagnostic.
+The normal data root comes from Tauri’s per-user application data location. `GUILTY_SPARK_DATA_DIR` is an optional explicit override for isolated tests. Its `Inbox` works independently of Steam. MCC startup discovery is read-only. Only an explicit initialization/deployment action can create the owned `halo1/GuiltySpark` subtree. Existing unknown ownership causes a diagnostic.
 
-The Settings workspace accepts a separate Invader directory, original resource-map directory, optional Steam/MCC overrides, an exact-scenario Excession metadata template, and an optional native runtime executable. Applying these preferences rechecks detection and Inbox watching.
+Settings accepts a separate Invader directory, default resource directory, optional Steam/MCC overrides and an exact-scenario Excession metadata template. Build & Playtest can choose and hash resources for an individual project. Runtimes & friends registers separately installed native executables and data roots; the old untyped executable preference is no longer executed. Applying preferences rechecks detection and Inbox watching without creating game folders.
 
 The optional `node scripts/install-invader.mjs` is a development helper that installs the researched upstream release under `.local/tools/invader`. It is not part of the release bundle. The app itself does not download executables or game assets. `invader-info`, `invader-extract` and `invader-build` are invoked directly with argument arrays and no shell.
 
 An Excession template must be an unpublished Halo1 mod package with metadata for the exact scenario path indexed from the source. The UI reports this path. The appropriate original resource data must be available; resources from a different runtime family are not assumed interchangeable.
 
 ## Developer QA
+
+Phase 2 adds `qa_corpus`, `qa_zip` and `audio_probe` examples. The corpus runner takes the owner-supplied folder and a fresh output folder, optionally an Invader folder; it tests every scenario file without redistributing content. `qa_zip` generates a clearly labelled local fixture from the supplied Demo/UI/resource files. It is not a historical ZIP. `scripts/recovery-audio-experiment.mjs` is a separate opt-in diagnostic experiment, not the default build pipeline; see its evidence report.
+
+On this machine D: had insufficient free space for another Rust target, so Phase 2 used `$env:CARGO_TARGET_DIR="$env:TEMP/GuiltySpark-phase2/target"`. All large QA libraries, extracted tags and generated archives use the same temporary-drive root. The final runnable artifacts are also copied into the usual workspace `target/release` paths. No game assets are included.
 
 `qa_workspace`, `qa_build`, `qa_validate` and `inspect` are Cargo examples. They require explicitly supplied local data and must not be used to claim the flagship acceptance passed. QA records stay under ignored `.local/` folders; restoration extraction jobs can use an explicit temporary root on a drive with enough space.
 

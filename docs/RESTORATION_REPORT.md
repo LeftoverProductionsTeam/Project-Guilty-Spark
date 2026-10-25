@@ -1,5 +1,7 @@
 # Zombie Apocalypse restoration record
 
+This is the Phase 1 record. Phase 2 continues it in [archaeology](ZOMBIE_APOCALYPSE_ARCHAEOLOGY.md), [the regression matrix](ZOMBIE_REGRESSION_MATRIX.md), and [the audio/spawner investigation](ZOMBIE_AUDIO_AND_SPAWN_EVIDENCE.md). The opt-in recovery experiment now reaches compilation after explicitly omitting two absent event sounds, but no valid or playable MCC conversion exists. The default faithful pipeline still fails on those missing resources.
+
 Recorded 2026-10-25 on Windows x64. The owner authorized using **all variants as restoration candidates**. The supplied archive is `Pyros Zombie Apocolypse Mod Versions/`; the original files remain in place. SHA-256 checks before and after the gameplay-map attempts match. No old executable or DLL in the archive was run.
 
 **Result: real import and inspection work; successful MCC conversion and gameplay remain blocked.** No generated cache was marked playable, no package was registered, and MCC was not launched during these tests.

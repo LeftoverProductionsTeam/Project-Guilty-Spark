@@ -1,5 +1,9 @@
 # Third-party licensing and provenance
 
+Phase 2 adds [zip-rs 9.1.0](https://github.com/zip-rs/zip2), MIT, with default features disabled and only Deflate support enabled; the exact version and transitive dependencies are locked in `Cargo.lock`. Local crate metadata and its LICENSE were checked. ZIP preflight, import policy and receipts are original application code.
+
+Runtime source research pins ChupathingyCE/OpenCE/Mimic revisions in [the feasibility report](MCC_MULTIPLAYER_AI_FEASIBILITY.md). No engine/networking source or binary is embedded. Mimic's absence of an explicit license is a reuse blocker; it is not treated as permission to copy. Owner-supplied readme credits are preserved with their uncertainty in [archaeology](ZOMBIE_APOCALYPSE_ARCHAEOLOGY.md).
+
 Guilty Spark’s original code is MIT-licensed. It contains no Microsoft game assets, game executables, SDK binaries, proprietary artwork, or decompiled Halo runtime code.
 
 | Component                                                                                         | Use / licensing                                                                                                                                                                                                                                                                                                    |

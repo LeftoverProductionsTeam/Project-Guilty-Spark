@@ -1,0 +1,2339 @@
+{
+  "schemaVersion": 1,
+  "metadataOnly": true,
+  "sourceRootLabel": "Pyros Zombie Apocolypse Mod Versions",
+  "recordedAt": "2026-10-25T10:07:19.812791600+00:00",
+  "evidence": {
+    "corpusReport": "corpus-results.json",
+    "corpusReportSha256": "0cc33339e26712ec77f8616047feb27298695e2220a3cbe9c6c3eb997646bcd8",
+    "scope": "Actual supplied files and source-safe application/tool tests; no game runtime result"
+  },
+  "fileCount": 67,
+  "totalBytes": 750272565,
+  "classificationCounts": {
+    "historicalSupportingFile": 43,
+    "scenarioCandidate": 8,
+    "untrustedBinaryNotExecuted": 14,
+    "sharedResource": 2
+  },
+  "scenarioPaths": 8,
+  "uniqueMapHashes": 7,
+  "uniqueMccConversionAttempts": 7,
+  "zipSupplied": false,
+  "archivedExecutablesExecuted": false,
+  "gameLaunched": false,
+  "steamModified": false,
+  "files": [
+    {
+      "classification": "historicalSupportingFile",
+      "path": "ZAMD/Read Me!.rtf",
+      "readonly": true,
+      "sha256": "2cc78c44f419cf4729c5d31e24231ade5495be96a710b9b8d3869f3ec07702be",
+      "size": 5681
+    },
+    {
+      "classification": "scenarioCandidate",
+      "path": "ZAMD/ui.map",
+      "readonly": true,
+      "sha256": "45a990410896412bdd961254cac1491beda4bc1d79d1d704caa5c7c2c57e1e04",
+      "size": 49468922
+    },
+    {
+      "classification": "scenarioCandidate",
+      "path": "ZAMD/za_1.map",
+      "readonly": true,
+      "sha256": "2bd5532e977faf388f863ce19ea5e8b7dd6a09e479843923bec2e30688bdc10c",
+      "size": 52164642
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/Desktop.ini",
+      "readonly": true,
+      "sha256": "e9d15d720db2a9d7b9a35d9f8f2879f3f9054db8b277bfdac8bb9611c5097bd7",
+      "size": 216
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/EBUSetup.sem",
+      "readonly": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/Eula.dll",
+      "readonly": true,
+      "sha256": "e28486f9977e9b595b404f496c9c9038a5536755bbbf13c7e23c0f02289589a7",
+      "size": 69722
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/Eula.rtf",
+      "readonly": true,
+      "sha256": "99e273f76502b91e4a04502b99506f1a7920c5c1461b072708639f93b6dd97ef",
+      "size": 359723
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/KSML.xsd",
+      "readonly": true,
+      "sha256": "704e9024e917d7fa18b89938afe0b2c94dbf0e50e67e390159907f60900a1b10",
+      "size": 37009
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/Keystone.dll",
+      "readonly": true,
+      "sha256": "b12f15f94896efc74d03dab6504534ea640fd62909377a4b9c154281a20a1501",
+      "size": 1212416
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/READMEPLEASEMANCMON.rtf",
+      "readonly": true,
+      "sha256": "c7056760056c43e4ca2a14b51f276bc659fbd766ee14f15ca022647db3f2db5e",
+      "size": 1003
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/SETUPENU.DLL",
+      "readonly": true,
+      "sha256": "6308df77f38ca8f4b0d6f767619342dee9829570b0990223da7c6f26e5d7de04",
+      "size": 4734976
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/Strings.dll",
+      "readonly": true,
+      "sha256": "1c5671574520fa8af1215c065ea0681b671c800cacddab47eb1c7df59e5e83b4",
+      "size": 1114112
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/Thumbs.db",
+      "readonly": false,
+      "sha256": "440d1e1bbc80ff50c3d11629ee5db335a286f77adea9923c2604405e09c60c8f",
+      "size": 8192
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/Zombie Apocalypse Icon.ico",
+      "readonly": true,
+      "sha256": "37e4e56f1b8d2b6a4bd3e321d7647d532ec8451b2c59e4fe76a816138bd27914",
+      "size": 370070
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/Zombie Apocalypse.exe",
+      "readonly": true,
+      "sha256": "4875cd296af16e708093d6a956b44ae87cf54e926b5478a44c3ee41af4262d0b",
+      "size": 2785280
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/binkw32.dll",
+      "readonly": true,
+      "sha256": "2d0ae23a6175dc7b635c402a5e7e9542e923c0d1c376a8c5ef876ca0d5959d23",
+      "size": 375808
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/config.txt",
+      "readonly": true,
+      "sha256": "ee6680a182771025a24bbe988e3b18bedaff7d46d4cde0408bd67ccbf1adb0e4",
+      "size": 19291
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/1024editbox.ksml",
+      "readonly": true,
+      "sha256": "54c33516d2fae79224bbfd615091572889eccf85d7d36ddac4d32b1597e3bfb5",
+      "size": 736
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/1024log.ksml",
+      "readonly": true,
+      "sha256": "f564e682e6bac55e95c8e9d47059b4d3a7d590325f68f8717c0bf23e7550f5b5",
+      "size": 652
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/1200editbox.ksml",
+      "readonly": true,
+      "sha256": "695e897fc6b36dc40e9ff2b572ee1a4db792492997aa287208dccc776c6c8631",
+      "size": 742
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/1200log.ksml",
+      "readonly": true,
+      "sha256": "88ce091937f13769055d3d97d0316ac77f485bd467638a80b6f62513a782ccc0",
+      "size": 652
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/480editbox.ksml",
+      "readonly": true,
+      "sha256": "d9128d0d1b0e8920dba2dda03c9de9b916d2b753f1bee60af16107c7a4d05052",
+      "size": 726
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/480log.ksml",
+      "readonly": true,
+      "sha256": "b4ffafd5102fa62b91776d24eecf249c049e2ce03cb6ae7db0c908b881d6a8d2",
+      "size": 648
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/576editbox.ksml",
+      "readonly": true,
+      "sha256": "372920ef9b55aa57489dc0483f67a0b15b2f31bfeb8ba0665b186b6bdd561259",
+      "size": 730
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/576log.ksml",
+      "readonly": true,
+      "sha256": "1840f0497bfb74fcbac4661b6b3bfeb90bd5c3f2cd0ae7813f512d8f85309bc9",
+      "size": 650
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/600editbox.ksml",
+      "readonly": true,
+      "sha256": "61b10a49e7427bb75d8b63eeca7a6c5f4ef2b869e7bdb061531b448360c5403d",
+      "size": 730
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/600log.ksml",
+      "readonly": true,
+      "sha256": "c8c88bd442cfb32451ca1e65d4a9133800dd354c95ba6ddd7352be4f47c88b77",
+      "size": 650
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/720editbox.ksml",
+      "readonly": true,
+      "sha256": "4acee6029e8ed5fa6a2e431d3c307ed847786749f4792ce031a94cd0a3089595",
+      "size": 734
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/720log.ksml",
+      "readonly": true,
+      "sha256": "c40e6f0772b873b765fca1e572df892b034a872559f01cbc5d693c241b417b84",
+      "size": 652
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/768editbox.ksml",
+      "readonly": true,
+      "sha256": "b58d3ec69a507936f07ec9696c9b3a29d1a2384b3565565626195f50f1a77946",
+      "size": 734
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/768log.ksml",
+      "readonly": true,
+      "sha256": "597fb7723bd928c463a7c3131347ebd7634ca021f647069c76db5f07bdb45e8a",
+      "size": 652
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/864editbox.ksml",
+      "readonly": true,
+      "sha256": "00e141ce088002e11445a748b4dc440b801da79ccb282945b944ead725cf47ad",
+      "size": 734
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/864log.ksml",
+      "readonly": true,
+      "sha256": "717d6bba2bc7173e3e07493a39646a3b6100720d0b6509825e49f584d86f764a",
+      "size": 652
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/900editbox.ksml",
+      "readonly": true,
+      "sha256": "f1dc92f625a6979d94c903ae7cc4460c9a463cb4ddae22cd854a307f7c441829",
+      "size": 736
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/900log.ksml",
+      "readonly": true,
+      "sha256": "cc2973dc55ac7f9b9e4bf9fa1165f6207a2655eb7bd3927f6f44c4e1835927d2",
+      "size": 652
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/960editbox.ksml",
+      "readonly": true,
+      "sha256": "dadb7e870690f3dbc053f399d7f23f21d9b2dcbde1baeb651eda4d99cc03bbdc",
+      "size": 734
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/960log.ksml",
+      "readonly": true,
+      "sha256": "8b77443dd959cbcea8904599557ee54c9431f7da26a847df4dfd8f1ca818d4c0",
+      "size": 652
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox1024.PNG",
+      "readonly": true,
+      "sha256": "1fe72fb3c2e9df8b29b9fcb7b58aadd463b9d3c10364584968474c35eacd3c35",
+      "size": 720
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox1200.PNG",
+      "readonly": true,
+      "sha256": "542ce7dbb6cfc90626db2f3739ac5ff991f17d19e4d645d6d81ded547e6b76ed",
+      "size": 1010
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox480.PNG",
+      "readonly": true,
+      "sha256": "2fb4ba7e797a5e7317d5f19a80de2f427f2c7ea857f89796bad4d0f177c6f5cd",
+      "size": 539
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox576.PNG",
+      "readonly": true,
+      "sha256": "4807d62e04f3e3800f3c9cdcf5e6d6939c1e35f8c86a0114f005f8001fc94631",
+      "size": 611
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox600.PNG",
+      "readonly": true,
+      "sha256": "4807d62e04f3e3800f3c9cdcf5e6d6939c1e35f8c86a0114f005f8001fc94631",
+      "size": 611
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox720.PNG",
+      "readonly": true,
+      "sha256": "ec63086b78c5fec6c6cc8acd17bf38b6f7d1a8bbee29cde54594ebd82df6ba27",
+      "size": 691
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox768.PNG",
+      "readonly": true,
+      "sha256": "e1232c9296488a12ff9bc3b9f9fafbb44827bc919e0579dbd403e66af4565f0c",
+      "size": 692
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox864.PNG",
+      "readonly": true,
+      "sha256": "ec63086b78c5fec6c6cc8acd17bf38b6f7d1a8bbee29cde54594ebd82df6ba27",
+      "size": 691
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox900.PNG",
+      "readonly": true,
+      "sha256": "62f64dd7d2380eb774d5a8068109744adab0a1ded055d66356c72631c0e265d8",
+      "size": 730
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/content/Gallery/editbox960.PNG",
+      "readonly": true,
+      "sha256": "243fa1d1e18782fbee218e1077a7204d964c68cf4eea2eba815a3bdec42ffad9",
+      "size": 713
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/controls/Controls.dll",
+      "readonly": true,
+      "sha256": "ab96837c2886a701a79179be6f98b5ae53e4972ef5403592ce625514767af646",
+      "size": 512000
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/controls/controls.ini",
+      "readonly": true,
+      "sha256": "2be1579f5ecfdd6978903cd7dca60f30ca70ca5e10aa3136186e2eccd38e3fc6",
+      "size": 2872
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/ksimeui.dll",
+      "readonly": true,
+      "sha256": "ae238ebbb61a363a86fb20cd1cb7e07df2f6d2e07e456bdf1f0b75a79e7cc81c",
+      "size": 151552
+    },
+    {
+      "classification": "sharedResource",
+      "path": "Zombie Apocalypse/maps/bitmaps.map",
+      "readonly": true,
+      "sha256": "5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea",
+      "size": 82697130
+    },
+    {
+      "classification": "scenarioCandidate",
+      "path": "Zombie Apocalypse/maps/bloodgulch.map",
+      "readonly": true,
+      "sha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "size": 52164642
+    },
+    {
+      "classification": "sharedResource",
+      "path": "Zombie Apocalypse/maps/sounds.map",
+      "readonly": true,
+      "sha256": "9426e8d19b662eeb5a6c516951e080758d8f77a0ee41f52bdf0ed0a929245a59",
+      "size": 79916792
+    },
+    {
+      "classification": "scenarioCandidate",
+      "path": "Zombie Apocalypse/maps/ui.map",
+      "readonly": true,
+      "sha256": "8e4345f1529adeab4441ee639d54b7d5f1ec3672e2a0f2b368f749ec85b1ff9b",
+      "size": 49468922
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/msvcr71.dll",
+      "readonly": true,
+      "sha256": "8094af5ee310714caebccaeee7769ffb08048503ba478b879edfef5f1a24fefe",
+      "size": 348160
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/ogg.dll",
+      "readonly": true,
+      "sha256": "428183893fd6c2e6933d3b55fa498ee9178e5d152d93596a61e4dd1c4a6a47b9",
+      "size": 12288
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/shaders/fx.bin",
+      "readonly": true,
+      "sha256": "b4c7c106673c196adec439e57dc39518b802ff08f67793db425188e39a4f53d1",
+      "size": 1017261
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/shaders/vsh.bin",
+      "readonly": true,
+      "sha256": "46fbca39b8a1ab4b5beb8c2fc5d9c9eb2be0ce2a68cd4ab29b9e9751e4ae325b",
+      "size": 38201
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/vorbis.dll",
+      "readonly": true,
+      "sha256": "c1644d294d97456bf2c82a3fc573ab1dbe15d4b930e03018eec24dc764caf993",
+      "size": 1024000
+    },
+    {
+      "classification": "untrustedBinaryNotExecuted",
+      "path": "Zombie Apocalypse/vorbisfile.dll",
+      "readonly": true,
+      "sha256": "831edb6f7a6fa7bba81f2783931d26cbdb79cb65ddc91dfa0a6199d079bd8e4c",
+      "size": 20992
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie Apocalypse/xiph_license.txt",
+      "readonly": true,
+      "sha256": "502e3f12fcc715c718ebc36621c0b556824a014da757a8f51c82511b812c0b67",
+      "size": 1549
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie ApocalypsePC/.DS_Store",
+      "readonly": true,
+      "sha256": "d65165279105ca6773180500688df4bdc69a2c7b771752f0a46ef120b7fd8ec3",
+      "size": 6148
+    },
+    {
+      "classification": "historicalSupportingFile",
+      "path": "Zombie ApocalypsePC/Read Me!.rtf",
+      "readonly": true,
+      "sha256": "2cc78c44f419cf4729c5d31e24231ade5495be96a710b9b8d3869f3ec07702be",
+      "size": 5681
+    },
+    {
+      "classification": "scenarioCandidate",
+      "path": "Zombie ApocalypsePC/bloodgulch.map",
+      "readonly": true,
+      "sha256": "0ba3e6c8c1fb7d1a692aed1598a32d1b85b2c0ca669b85e372d317a93d7aebb7",
+      "size": 52164642
+    },
+    {
+      "classification": "scenarioCandidate",
+      "path": "Zombie ApocalypsePC/ui.map",
+      "readonly": true,
+      "sha256": "35667fadbbec931c780d73d7d28be74550111d8308cf173ccb052c84084dc709",
+      "size": 49468922
+    },
+    {
+      "classification": "scenarioCandidate",
+      "path": "apocolypse_1/apocolypse_1.map",
+      "readonly": true,
+      "sha256": "745efe81e4c07c0d43e55dae51b432e1d48d0719eb7ac4c0c249a7135170c697",
+      "size": 134251446
+    },
+    {
+      "classification": "scenarioCandidate",
+      "path": "apocolypse_1.map",
+      "readonly": true,
+      "sha256": "745efe81e4c07c0d43e55dae51b432e1d48d0719eb7ac4c0c249a7135170c697",
+      "size": 134251446
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S1",
+      "path": "ZAMD/ui.map",
+      "sha256": "45a990410896412bdd961254cac1491beda4bc1d79d1d704caa5c7c2c57e1e04",
+      "header": {
+        "build": "01.00.00.0576",
+        "compressed": false,
+        "crc32": 0,
+        "declaredSize": 49468922,
+        "demoLayout": false,
+        "engine": "Halo PC / Mac / HaloMD",
+        "extended": false,
+        "fileSize": 49468922,
+        "flags": 0,
+        "legacyTagSizeRepair": true,
+        "name": "beavercreek",
+        "scenarioType": 2,
+        "tagOffset": 46405818,
+        "tagSize": 3063104,
+        "version": 7
+      },
+      "scenario": "levels\\ui\\ui",
+      "tags": 1534,
+      "classes": {
+        "DeLa": 811,
+        "Soul": 1,
+        "antr": 1,
+        "bitm": 279,
+        "coll": 1,
+        "colo": 4,
+        "deca": 7,
+        "devc": 23,
+        "effe": 33,
+        "eqip": 2,
+        "font": 6,
+        "garb": 3,
+        "grhi": 2,
+        "hmt ": 1,
+        "hud#": 1,
+        "hudg": 1,
+        "jpt!": 5,
+        "lens": 4,
+        "ligh": 7,
+        "lsnd": 2,
+        "matg": 1,
+        "metr": 2,
+        "mod2": 8,
+        "mply": 1,
+        "part": 37,
+        "pctl": 2,
+        "pphy": 19,
+        "proj": 2,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 1,
+        "scex": 1,
+        "schi": 16,
+        "scnr": 1,
+        "senv": 11,
+        "sky ": 1,
+        "snd!": 45,
+        "snde": 1,
+        "soso": 12,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 1,
+        "ustr": 168,
+        "vcky": 1,
+        "wind": 1,
+        "wphi": 1
+      },
+      "objects": 1,
+      "collisionVertices": 2830,
+      "collisionTriangles": 5940,
+      "encounters": [],
+      "scripts": [
+        {
+          "name": "ring_loop",
+          "returnType": 4,
+          "scriptType": 2
+        }
+      ],
+      "auditedFieldCount": 28,
+      "decodedReferences": {
+        "count": 11,
+        "unresolvedCount": 0,
+        "scope": "Audited schema subset only; not a full dependency or raw-payload validation"
+      },
+      "resources": [
+        {
+          "found": true,
+          "name": "bitmaps.map",
+          "reason": "Referenced by source cache",
+          "required": true
+        },
+        {
+          "found": true,
+          "name": "sounds.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": false,
+          "name": "loc.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        }
+      ],
+      "resourceScope": "Availability checked using supplied Demo resources; found does not imply compatible resources for every variant",
+      "diagnostics": [
+        {
+          "code": "LEGACY_TAG_SIZE",
+          "message": "The legacy header declares whole-file length as tag-data length. Inspection bounds it to the actual remaining bytes; a build normalizes only its working copy before full extraction and recompilation. This is not MCC conversion.",
+          "severity": "warning"
+        },
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "tests": {
+        "collisionMeshBounds": "PASS",
+        "dependencyCompleteness": "BLOCKED",
+        "formatHeaderTags": "PASS",
+        "gameplay": "UNTESTED",
+        "preservedCopyReadonly": "PASS",
+        "projectSaveReload": "PASS",
+        "sourceImmutability": "PASS",
+        "twoComputerAi": "UNTESTED"
+      },
+      "mccConversion": {
+        "status": "FAIL",
+        "scope": "tool pipeline only; no game launch",
+        "target": "mcc-cea",
+        "attemptId": "090296c9-1619-4d76-ba10-368e5ba4efab",
+        "recordedAt": "2026-10-25T10:05:48.704186900+00:00",
+        "stage": "compilation",
+        "extractionErrors": null,
+        "diagnostics": [
+          "Invalid ogg vorbis input",
+          "Failed to compile tag sounds\\music\\zamenumusic.sound",
+          "Failed to compile tag weapons\\frag grenade\\effects\\dirt reflection.effect",
+          "Failed to compile tag scenery\\halo\\halo.scenery",
+          "Failed to compile tag levels\\ui\\ui.scenario"
+        ],
+        "outputProduced": false
+      },
+      "runtimeRegression": [
+        {
+          "runtimeId": "mccSteam",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "No validated converted map or deployed package"
+        },
+        {
+          "runtimeId": "chupathingyCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "openCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloPc",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloCustomEdition",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "macRetail",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "macDemo",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloPcTrial",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloMd",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloXbox",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "path": "ZAMD/za_1.map",
+      "sha256": "2bd5532e977faf388f863ce19ea5e8b7dd6a09e479843923bec2e30688bdc10c",
+      "header": {
+        "build": "01.00.00.0576",
+        "compressed": false,
+        "crc32": 0,
+        "declaredSize": 52164642,
+        "demoLayout": false,
+        "engine": "Halo PC / Mac / HaloMD",
+        "extended": false,
+        "fileSize": 52164642,
+        "flags": 0,
+        "legacyTagSizeRepair": true,
+        "name": "za_1",
+        "scenarioType": 1,
+        "tagOffset": 43640641,
+        "tagSize": 8524001,
+        "version": 7
+      },
+      "scenario": "Fonzie's Zombie Apocalypse",
+      "tags": 2825,
+      "classes": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actr": 6,
+        "actv": 8,
+        "ant!": 1,
+        "antr": 21,
+        "bipd": 7,
+        "bitm": 454,
+        "coll": 41,
+        "colo": 4,
+        "cont": 2,
+        "deca": 25,
+        "devc": 23,
+        "effe": 181,
+        "eqip": 7,
+        "flag": 1,
+        "font": 4,
+        "foot": 7,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 10,
+        "jpt!": 44,
+        "lens": 10,
+        "ligh": 20,
+        "lsnd": 9,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 2,
+        "mod2": 68,
+        "part": 89,
+        "pctl": 5,
+        "phys": 2,
+        "pphy": 40,
+        "proj": 8,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 35,
+        "scex": 5,
+        "schi": 42,
+        "scnr": 1,
+        "senv": 18,
+        "sgla": 4,
+        "sky ": 1,
+        "smet": 2,
+        "snd!": 1082,
+        "snde": 1,
+        "soso": 109,
+        "spla": 1,
+        "ssce": 1,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 4,
+        "udlg": 9,
+        "ustr": 52,
+        "vehi": 4,
+        "weap": 12,
+        "wind": 1,
+        "wphi": 5
+      },
+      "objects": 197,
+      "collisionVertices": 2830,
+      "collisionTriangles": 5940,
+      "encounters": [],
+      "scripts": [],
+      "auditedFieldCount": 247,
+      "decodedReferences": {
+        "count": 205,
+        "unresolvedCount": 0,
+        "scope": "Audited schema subset only; not a full dependency or raw-payload validation"
+      },
+      "resources": [
+        {
+          "found": true,
+          "name": "bitmaps.map",
+          "reason": "Referenced by source cache",
+          "required": true
+        },
+        {
+          "found": true,
+          "name": "sounds.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": false,
+          "name": "loc.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        }
+      ],
+      "resourceScope": "Availability checked using supplied Demo resources; found does not imply compatible resources for every variant",
+      "diagnostics": [
+        {
+          "code": "LEGACY_TAG_SIZE",
+          "message": "The legacy header declares whole-file length as tag-data length. Inspection bounds it to the actual remaining bytes; a build normalizes only its working copy before full extraction and recompilation. This is not MCC conversion.",
+          "severity": "warning"
+        },
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "tests": {
+        "collisionMeshBounds": "PASS",
+        "dependencyCompleteness": "BLOCKED",
+        "formatHeaderTags": "PASS",
+        "gameplay": "UNTESTED",
+        "preservedCopyReadonly": "PASS",
+        "projectSaveReload": "PASS",
+        "sourceImmutability": "PASS",
+        "twoComputerAi": "UNTESTED"
+      },
+      "mccConversion": {
+        "status": "FAIL",
+        "scope": "tool pipeline only; no game launch",
+        "target": "mcc-cea",
+        "attemptId": "07fff38d-374a-46f9-a182-4c5a9c038e0b",
+        "recordedAt": "2026-10-25T10:05:59.172526500+00:00",
+        "stage": "extraction",
+        "extractionErrors": 237,
+        "diagnostics": [
+          "ERROR: Failed to extract scenery\\rocks\\boulder\\bitmaps\\boulder.bitmap: data is",
+          "ERROR: Failed to extract",
+          "ERROR: Failed to extract",
+          "ERROR: Failed to extract levels\\b30\\bitmaps\\detail cliff rock smooth.bitmap:"
+        ],
+        "outputProduced": false
+      },
+      "runtimeRegression": [
+        {
+          "runtimeId": "mccSteam",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "No validated converted map or deployed package"
+        },
+        {
+          "runtimeId": "chupathingyCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "openCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloPc",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloCustomEdition",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "macRetail",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "macDemo",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloPcTrial",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloMd",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloXbox",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "path": "Zombie Apocalypse/maps/bloodgulch.map",
+      "sha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "header": {
+        "build": "01.00.00.0576",
+        "compressed": false,
+        "crc32": 3890252834,
+        "declaredSize": 52164642,
+        "demoLayout": true,
+        "engine": "Halo Demo / Trial",
+        "extended": false,
+        "fileSize": 52164642,
+        "flags": 0,
+        "legacyTagSizeRepair": false,
+        "name": "bloodgulch",
+        "scenarioType": 1,
+        "tagOffset": 43640641,
+        "tagSize": 8524001,
+        "version": 6
+      },
+      "scenario": "Fonzie's Zombie Apocalypse",
+      "tags": 2825,
+      "classes": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actr": 6,
+        "actv": 8,
+        "ant!": 1,
+        "antr": 21,
+        "bipd": 7,
+        "bitm": 454,
+        "coll": 41,
+        "colo": 4,
+        "cont": 2,
+        "deca": 25,
+        "devc": 23,
+        "effe": 181,
+        "eqip": 7,
+        "flag": 1,
+        "font": 4,
+        "foot": 7,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 10,
+        "jpt!": 44,
+        "lens": 10,
+        "ligh": 20,
+        "lsnd": 9,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 2,
+        "mod2": 68,
+        "part": 89,
+        "pctl": 5,
+        "phys": 2,
+        "pphy": 40,
+        "proj": 8,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 35,
+        "scex": 5,
+        "schi": 42,
+        "scnr": 1,
+        "senv": 18,
+        "sgla": 4,
+        "sky ": 1,
+        "smet": 2,
+        "snd!": 1082,
+        "snde": 1,
+        "soso": 109,
+        "spla": 1,
+        "ssce": 1,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 4,
+        "udlg": 9,
+        "ustr": 52,
+        "vehi": 4,
+        "weap": 12,
+        "wind": 1,
+        "wphi": 5
+      },
+      "objects": 197,
+      "collisionVertices": 2830,
+      "collisionTriangles": 5940,
+      "encounters": [],
+      "scripts": [],
+      "auditedFieldCount": 247,
+      "decodedReferences": {
+        "count": 205,
+        "unresolvedCount": 0,
+        "scope": "Audited schema subset only; not a full dependency or raw-payload validation"
+      },
+      "resources": [
+        {
+          "found": true,
+          "name": "bitmaps.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": true,
+          "name": "sounds.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": false,
+          "name": "loc.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        }
+      ],
+      "resourceScope": "Availability checked using supplied Demo resources; found does not imply compatible resources for every variant",
+      "diagnostics": [
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "tests": {
+        "collisionMeshBounds": "PASS",
+        "dependencyCompleteness": "BLOCKED",
+        "formatHeaderTags": "PASS",
+        "gameplay": "UNTESTED",
+        "preservedCopyReadonly": "PASS",
+        "projectSaveReload": "PASS",
+        "sourceImmutability": "PASS",
+        "twoComputerAi": "UNTESTED"
+      },
+      "mccConversion": {
+        "status": "FAIL",
+        "scope": "tool pipeline only; no game launch",
+        "target": "mcc-cea",
+        "attemptId": "d7c4d1ba-02dc-41c5-913a-5cc83a43df06",
+        "recordedAt": "2026-10-25T10:06:11.945638700+00:00",
+        "stage": "extraction",
+        "extractionErrors": 2,
+        "diagnostics": [
+          "ERROR: Failed to extract sound\\dialog\\multiplayer1\\scorpion.sound: data is out",
+          "ERROR: Failed to extract sound\\dialog\\multiplayer1\\hill_occupied.sound: data is"
+        ],
+        "outputProduced": false
+      },
+      "runtimeRegression": [
+        {
+          "runtimeId": "mccSteam",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "No validated converted map or deployed package"
+        },
+        {
+          "runtimeId": "chupathingyCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "openCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloPc",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloCustomEdition",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "macRetail",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "macDemo",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloPcTrial",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloMd",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloXbox",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "path": "Zombie Apocalypse/maps/ui.map",
+      "sha256": "8e4345f1529adeab4441ee639d54b7d5f1ec3672e2a0f2b368f749ec85b1ff9b",
+      "header": {
+        "build": "01.00.00.0576",
+        "compressed": false,
+        "crc32": 1186053447,
+        "declaredSize": 49468922,
+        "demoLayout": true,
+        "engine": "Halo Demo / Trial",
+        "extended": false,
+        "fileSize": 49468922,
+        "flags": 0,
+        "legacyTagSizeRepair": false,
+        "name": "ui",
+        "scenarioType": 2,
+        "tagOffset": 46405818,
+        "tagSize": 3063104,
+        "version": 6
+      },
+      "scenario": "levels\\ui\\ui",
+      "tags": 1534,
+      "classes": {
+        "DeLa": 811,
+        "Soul": 1,
+        "antr": 1,
+        "bitm": 279,
+        "coll": 1,
+        "colo": 4,
+        "deca": 7,
+        "devc": 23,
+        "effe": 33,
+        "eqip": 2,
+        "font": 6,
+        "garb": 3,
+        "grhi": 2,
+        "hmt ": 1,
+        "hud#": 1,
+        "hudg": 1,
+        "jpt!": 5,
+        "lens": 4,
+        "ligh": 7,
+        "lsnd": 2,
+        "matg": 1,
+        "metr": 2,
+        "mod2": 8,
+        "mply": 1,
+        "part": 37,
+        "pctl": 2,
+        "pphy": 19,
+        "proj": 2,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 1,
+        "scex": 1,
+        "schi": 16,
+        "scnr": 1,
+        "senv": 11,
+        "sky ": 1,
+        "snd!": 45,
+        "snde": 1,
+        "soso": 12,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 1,
+        "ustr": 168,
+        "vcky": 1,
+        "wind": 1,
+        "wphi": 1
+      },
+      "objects": 1,
+      "collisionVertices": 2830,
+      "collisionTriangles": 5940,
+      "encounters": [],
+      "scripts": [
+        {
+          "name": "ring_loop",
+          "returnType": 4,
+          "scriptType": 2
+        }
+      ],
+      "auditedFieldCount": 28,
+      "decodedReferences": {
+        "count": 11,
+        "unresolvedCount": 0,
+        "scope": "Audited schema subset only; not a full dependency or raw-payload validation"
+      },
+      "resources": [
+        {
+          "found": true,
+          "name": "bitmaps.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": true,
+          "name": "sounds.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": false,
+          "name": "loc.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        }
+      ],
+      "resourceScope": "Availability checked using supplied Demo resources; found does not imply compatible resources for every variant",
+      "diagnostics": [
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "tests": {
+        "collisionMeshBounds": "PASS",
+        "dependencyCompleteness": "BLOCKED",
+        "formatHeaderTags": "PASS",
+        "gameplay": "UNTESTED",
+        "preservedCopyReadonly": "PASS",
+        "projectSaveReload": "PASS",
+        "sourceImmutability": "PASS",
+        "twoComputerAi": "UNTESTED"
+      },
+      "mccConversion": {
+        "status": "FAIL",
+        "scope": "tool pipeline only; no game launch",
+        "target": "mcc-cea",
+        "attemptId": "4f1c48e1-cff7-4554-b927-7fd51265e782",
+        "recordedAt": "2026-10-25T10:06:22.390386700+00:00",
+        "stage": "compilation",
+        "extractionErrors": null,
+        "diagnostics": [
+          "Invalid ogg vorbis input",
+          "Failed to compile tag sounds\\music\\zamenumusic.sound",
+          "Failed to compile tag weapons\\frag grenade\\effects\\dirt reflection.effect",
+          "Failed to compile tag scenery\\halo\\halo.scenery",
+          "Failed to compile tag levels\\ui\\ui.scenario"
+        ],
+        "outputProduced": false
+      },
+      "runtimeRegression": [
+        {
+          "runtimeId": "mccSteam",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "No validated converted map or deployed package"
+        },
+        {
+          "runtimeId": "chupathingyCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "openCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloPc",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloCustomEdition",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "macRetail",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "macDemo",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloPcTrial",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloMd",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloXbox",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        }
+      ]
+    },
+    {
+      "id": "S5",
+      "path": "Zombie ApocalypsePC/bloodgulch.map",
+      "sha256": "0ba3e6c8c1fb7d1a692aed1598a32d1b85b2c0ca669b85e372d317a93d7aebb7",
+      "header": {
+        "build": "01.00.00.0576",
+        "compressed": false,
+        "crc32": 0,
+        "declaredSize": 52164642,
+        "demoLayout": false,
+        "engine": "Halo PC / Mac / HaloMD",
+        "extended": false,
+        "fileSize": 52164642,
+        "flags": 0,
+        "legacyTagSizeRepair": true,
+        "name": "bloodgulch",
+        "scenarioType": 1,
+        "tagOffset": 43640641,
+        "tagSize": 8524001,
+        "version": 7
+      },
+      "scenario": "Fonzie's Zombie Apocalypse",
+      "tags": 2825,
+      "classes": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actr": 6,
+        "actv": 8,
+        "ant!": 1,
+        "antr": 21,
+        "bipd": 7,
+        "bitm": 454,
+        "coll": 41,
+        "colo": 4,
+        "cont": 2,
+        "deca": 25,
+        "devc": 23,
+        "effe": 181,
+        "eqip": 7,
+        "flag": 1,
+        "font": 4,
+        "foot": 7,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 10,
+        "jpt!": 44,
+        "lens": 10,
+        "ligh": 20,
+        "lsnd": 9,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 2,
+        "mod2": 68,
+        "part": 89,
+        "pctl": 5,
+        "phys": 2,
+        "pphy": 40,
+        "proj": 8,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 35,
+        "scex": 5,
+        "schi": 42,
+        "scnr": 1,
+        "senv": 18,
+        "sgla": 4,
+        "sky ": 1,
+        "smet": 2,
+        "snd!": 1082,
+        "snde": 1,
+        "soso": 109,
+        "spla": 1,
+        "ssce": 1,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 4,
+        "udlg": 9,
+        "ustr": 52,
+        "vehi": 4,
+        "weap": 12,
+        "wind": 1,
+        "wphi": 5
+      },
+      "objects": 197,
+      "collisionVertices": 2830,
+      "collisionTriangles": 5940,
+      "encounters": [],
+      "scripts": [],
+      "auditedFieldCount": 247,
+      "decodedReferences": {
+        "count": 205,
+        "unresolvedCount": 0,
+        "scope": "Audited schema subset only; not a full dependency or raw-payload validation"
+      },
+      "resources": [
+        {
+          "found": true,
+          "name": "bitmaps.map",
+          "reason": "Referenced by source cache",
+          "required": true
+        },
+        {
+          "found": true,
+          "name": "sounds.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": false,
+          "name": "loc.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        }
+      ],
+      "resourceScope": "Availability checked using supplied Demo resources; found does not imply compatible resources for every variant",
+      "diagnostics": [
+        {
+          "code": "LEGACY_TAG_SIZE",
+          "message": "The legacy header declares whole-file length as tag-data length. Inspection bounds it to the actual remaining bytes; a build normalizes only its working copy before full extraction and recompilation. This is not MCC conversion.",
+          "severity": "warning"
+        },
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "tests": {
+        "collisionMeshBounds": "PASS",
+        "dependencyCompleteness": "BLOCKED",
+        "formatHeaderTags": "PASS",
+        "gameplay": "UNTESTED",
+        "preservedCopyReadonly": "PASS",
+        "projectSaveReload": "PASS",
+        "sourceImmutability": "PASS",
+        "twoComputerAi": "UNTESTED"
+      },
+      "mccConversion": {
+        "status": "FAIL",
+        "scope": "tool pipeline only; no game launch",
+        "target": "mcc-cea",
+        "attemptId": "f4d79335-fa1c-4d59-8de5-febe5bbc6ede",
+        "recordedAt": "2026-10-25T10:06:32.955053300+00:00",
+        "stage": "extraction",
+        "extractionErrors": 237,
+        "diagnostics": [
+          "ERROR: Failed to extract scenery\\rocks\\boulder\\bitmaps\\boulder.bitmap: data is",
+          "ERROR: Failed to extract",
+          "ERROR: Failed to extract",
+          "ERROR: Failed to extract levels\\b30\\bitmaps\\detail cliff rock smooth.bitmap:"
+        ],
+        "outputProduced": false
+      },
+      "runtimeRegression": [
+        {
+          "runtimeId": "mccSteam",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "No validated converted map or deployed package"
+        },
+        {
+          "runtimeId": "chupathingyCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "openCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloPc",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloCustomEdition",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "macRetail",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "macDemo",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloPcTrial",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloMd",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloXbox",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        }
+      ]
+    },
+    {
+      "id": "S6",
+      "path": "Zombie ApocalypsePC/ui.map",
+      "sha256": "35667fadbbec931c780d73d7d28be74550111d8308cf173ccb052c84084dc709",
+      "header": {
+        "build": "01.00.00.0576",
+        "compressed": false,
+        "crc32": 0,
+        "declaredSize": 49468922,
+        "demoLayout": false,
+        "engine": "Halo PC / Mac / HaloMD",
+        "extended": false,
+        "fileSize": 49468922,
+        "flags": 0,
+        "legacyTagSizeRepair": true,
+        "name": "beavercreek",
+        "scenarioType": 2,
+        "tagOffset": 46405818,
+        "tagSize": 3063104,
+        "version": 7
+      },
+      "scenario": "levels\\ui\\ui",
+      "tags": 1534,
+      "classes": {
+        "DeLa": 811,
+        "Soul": 1,
+        "antr": 1,
+        "bitm": 279,
+        "coll": 1,
+        "colo": 4,
+        "deca": 7,
+        "devc": 23,
+        "effe": 33,
+        "eqip": 2,
+        "font": 6,
+        "garb": 3,
+        "grhi": 2,
+        "hmt ": 1,
+        "hud#": 1,
+        "hudg": 1,
+        "jpt!": 5,
+        "lens": 4,
+        "ligh": 7,
+        "lsnd": 2,
+        "matg": 1,
+        "metr": 2,
+        "mod2": 8,
+        "mply": 1,
+        "part": 37,
+        "pctl": 2,
+        "pphy": 19,
+        "proj": 2,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 1,
+        "scex": 1,
+        "schi": 16,
+        "scnr": 1,
+        "senv": 11,
+        "sky ": 1,
+        "snd!": 45,
+        "snde": 1,
+        "soso": 12,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 1,
+        "ustr": 168,
+        "vcky": 1,
+        "wind": 1,
+        "wphi": 1
+      },
+      "objects": 1,
+      "collisionVertices": 2830,
+      "collisionTriangles": 5940,
+      "encounters": [],
+      "scripts": [
+        {
+          "name": "ring_loop",
+          "returnType": 4,
+          "scriptType": 2
+        }
+      ],
+      "auditedFieldCount": 28,
+      "decodedReferences": {
+        "count": 11,
+        "unresolvedCount": 0,
+        "scope": "Audited schema subset only; not a full dependency or raw-payload validation"
+      },
+      "resources": [
+        {
+          "found": true,
+          "name": "bitmaps.map",
+          "reason": "Referenced by source cache",
+          "required": true
+        },
+        {
+          "found": true,
+          "name": "sounds.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": false,
+          "name": "loc.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        }
+      ],
+      "resourceScope": "Availability checked using supplied Demo resources; found does not imply compatible resources for every variant",
+      "diagnostics": [
+        {
+          "code": "LEGACY_TAG_SIZE",
+          "message": "The legacy header declares whole-file length as tag-data length. Inspection bounds it to the actual remaining bytes; a build normalizes only its working copy before full extraction and recompilation. This is not MCC conversion.",
+          "severity": "warning"
+        },
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "tests": {
+        "collisionMeshBounds": "PASS",
+        "dependencyCompleteness": "BLOCKED",
+        "formatHeaderTags": "PASS",
+        "gameplay": "UNTESTED",
+        "preservedCopyReadonly": "PASS",
+        "projectSaveReload": "PASS",
+        "sourceImmutability": "PASS",
+        "twoComputerAi": "UNTESTED"
+      },
+      "mccConversion": {
+        "status": "FAIL",
+        "scope": "tool pipeline only; no game launch",
+        "target": "mcc-cea",
+        "attemptId": "7fefda98-7aa7-405f-9c75-2dd829da6a9d",
+        "recordedAt": "2026-10-25T10:06:42.246236100+00:00",
+        "stage": "compilation",
+        "extractionErrors": null,
+        "diagnostics": [
+          "Invalid ogg vorbis input",
+          "Failed to compile tag sounds\\music\\zamenumusic.sound",
+          "Failed to compile tag weapons\\frag grenade\\effects\\dirt reflection.effect",
+          "Failed to compile tag scenery\\halo\\halo.scenery",
+          "Failed to compile tag levels\\ui\\ui.scenario"
+        ],
+        "outputProduced": false
+      },
+      "runtimeRegression": [
+        {
+          "runtimeId": "mccSteam",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "No validated converted map or deployed package"
+        },
+        {
+          "runtimeId": "chupathingyCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "openCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloPc",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloCustomEdition",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "macRetail",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "macDemo",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloPcTrial",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloMd",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloXbox",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        }
+      ]
+    },
+    {
+      "id": "S7",
+      "path": "apocolypse_1/apocolypse_1.map",
+      "sha256": "745efe81e4c07c0d43e55dae51b432e1d48d0719eb7ac4c0c249a7135170c697",
+      "header": {
+        "build": "01.00.00.0609",
+        "compressed": false,
+        "crc32": 0,
+        "declaredSize": 134251446,
+        "demoLayout": false,
+        "engine": "Halo PC / Mac / HaloMD",
+        "extended": false,
+        "fileSize": 134251446,
+        "flags": 0,
+        "legacyTagSizeRepair": false,
+        "name": "apocolypse_1",
+        "scenarioType": 1,
+        "tagOffset": 126190723,
+        "tagSize": 8060723,
+        "version": 7
+      },
+      "scenario": "altis\\levels\\bigass\\bigassv2,072",
+      "tags": 2717,
+      "classes": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actr": 3,
+        "actv": 5,
+        "ant!": 5,
+        "antr": 33,
+        "bipd": 4,
+        "bitm": 604,
+        "coll": 53,
+        "colo": 1,
+        "cont": 9,
+        "ctrl": 1,
+        "deca": 27,
+        "devc": 23,
+        "dobc": 5,
+        "effe": 259,
+        "eqip": 13,
+        "flag": 1,
+        "font": 3,
+        "foot": 7,
+        "garb": 3,
+        "grhi": 2,
+        "hmt ": 1,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 13,
+        "jpt!": 64,
+        "lens": 27,
+        "ligh": 34,
+        "lsnd": 27,
+        "mach": 4,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 11,
+        "mod2": 87,
+        "part": 104,
+        "pctl": 9,
+        "phys": 8,
+        "pphy": 46,
+        "proj": 21,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 29,
+        "scex": 9,
+        "schi": 52,
+        "scnr": 1,
+        "senv": 25,
+        "sgla": 11,
+        "sky ": 2,
+        "smet": 3,
+        "snd!": 418,
+        "snde": 2,
+        "soso": 143,
+        "spla": 2,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 8,
+        "udlg": 3,
+        "unhi": 6,
+        "ustr": 100,
+        "vehi": 11,
+        "weap": 18,
+        "wind": 2,
+        "wphi": 18
+      },
+      "objects": 339,
+      "collisionVertices": 16189,
+      "collisionTriangles": 33092,
+      "encounters": [],
+      "scripts": [
+        {
+          "name": "respawn_example",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "setup",
+          "returnType": 4,
+          "scriptType": 0
+        },
+        {
+          "name": "respawn_example2",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "scorpion_destruction",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "scorpion_destruction2",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "lift",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "lift2",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "garage_door",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "breakables",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "server",
+          "returnType": 4,
+          "scriptType": 0
+        },
+        {
+          "name": "client",
+          "returnType": 4,
+          "scriptType": 2
+        }
+      ],
+      "auditedFieldCount": 421,
+      "decodedReferences": {
+        "count": 219,
+        "unresolvedCount": 0,
+        "scope": "Audited schema subset only; not a full dependency or raw-payload validation"
+      },
+      "resources": [
+        {
+          "found": true,
+          "name": "bitmaps.map",
+          "reason": "Referenced by source cache",
+          "required": true
+        },
+        {
+          "found": true,
+          "name": "sounds.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": false,
+          "name": "loc.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        }
+      ],
+      "resourceScope": "Availability checked using supplied Demo resources; found does not imply compatible resources for every variant",
+      "diagnostics": [
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "tests": {
+        "collisionMeshBounds": "PASS",
+        "dependencyCompleteness": "BLOCKED",
+        "formatHeaderTags": "PASS",
+        "gameplay": "UNTESTED",
+        "preservedCopyReadonly": "PASS",
+        "projectSaveReload": "PASS",
+        "sourceImmutability": "PASS",
+        "twoComputerAi": "UNTESTED"
+      },
+      "mccConversion": {
+        "status": "FAIL",
+        "scope": "tool pipeline only; no game launch",
+        "target": "mcc-cea",
+        "attemptId": "a3ff6ad9-d39f-456b-b8fc-0dadf1575412",
+        "recordedAt": "2026-10-25T10:07:05.337152500+00:00",
+        "stage": "extraction",
+        "extractionErrors": 196,
+        "diagnostics": [
+          "ERROR: Failed to extract sky\\sky_timberland\\bitmaps\\timberland_sky_dusk.bitmap:",
+          "ERROR: Failed to extract",
+          "ERROR: Failed to extract",
+          "ERROR: Failed to extract"
+        ],
+        "outputProduced": false
+      },
+      "runtimeRegression": [
+        {
+          "runtimeId": "mccSteam",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "No validated converted map or deployed package"
+        },
+        {
+          "runtimeId": "chupathingyCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "openCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloPc",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloCustomEdition",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "macRetail",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "macDemo",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloPcTrial",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloMd",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloXbox",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        }
+      ]
+    },
+    {
+      "id": "S8",
+      "path": "apocolypse_1.map",
+      "sha256": "745efe81e4c07c0d43e55dae51b432e1d48d0719eb7ac4c0c249a7135170c697",
+      "header": {
+        "build": "01.00.00.0609",
+        "compressed": false,
+        "crc32": 0,
+        "declaredSize": 134251446,
+        "demoLayout": false,
+        "engine": "Halo PC / Mac / HaloMD",
+        "extended": false,
+        "fileSize": 134251446,
+        "flags": 0,
+        "legacyTagSizeRepair": false,
+        "name": "apocolypse_1",
+        "scenarioType": 1,
+        "tagOffset": 126190723,
+        "tagSize": 8060723,
+        "version": 7
+      },
+      "scenario": "altis\\levels\\bigass\\bigassv2,072",
+      "tags": 2717,
+      "classes": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actr": 3,
+        "actv": 5,
+        "ant!": 5,
+        "antr": 33,
+        "bipd": 4,
+        "bitm": 604,
+        "coll": 53,
+        "colo": 1,
+        "cont": 9,
+        "ctrl": 1,
+        "deca": 27,
+        "devc": 23,
+        "dobc": 5,
+        "effe": 259,
+        "eqip": 13,
+        "flag": 1,
+        "font": 3,
+        "foot": 7,
+        "garb": 3,
+        "grhi": 2,
+        "hmt ": 1,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 13,
+        "jpt!": 64,
+        "lens": 27,
+        "ligh": 34,
+        "lsnd": 27,
+        "mach": 4,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 11,
+        "mod2": 87,
+        "part": 104,
+        "pctl": 9,
+        "phys": 8,
+        "pphy": 46,
+        "proj": 21,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 29,
+        "scex": 9,
+        "schi": 52,
+        "scnr": 1,
+        "senv": 25,
+        "sgla": 11,
+        "sky ": 2,
+        "smet": 3,
+        "snd!": 418,
+        "snde": 2,
+        "soso": 143,
+        "spla": 2,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 8,
+        "udlg": 3,
+        "unhi": 6,
+        "ustr": 100,
+        "vehi": 11,
+        "weap": 18,
+        "wind": 2,
+        "wphi": 18
+      },
+      "objects": 339,
+      "collisionVertices": 16189,
+      "collisionTriangles": 33092,
+      "encounters": [],
+      "scripts": [
+        {
+          "name": "respawn_example",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "setup",
+          "returnType": 4,
+          "scriptType": 0
+        },
+        {
+          "name": "respawn_example2",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "scorpion_destruction",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "scorpion_destruction2",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "lift",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "lift2",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "garage_door",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "breakables",
+          "returnType": 4,
+          "scriptType": 2
+        },
+        {
+          "name": "server",
+          "returnType": 4,
+          "scriptType": 0
+        },
+        {
+          "name": "client",
+          "returnType": 4,
+          "scriptType": 2
+        }
+      ],
+      "auditedFieldCount": 421,
+      "decodedReferences": {
+        "count": 219,
+        "unresolvedCount": 0,
+        "scope": "Audited schema subset only; not a full dependency or raw-payload validation"
+      },
+      "resources": [
+        {
+          "found": true,
+          "name": "bitmaps.map",
+          "reason": "Referenced by source cache",
+          "required": true
+        },
+        {
+          "found": true,
+          "name": "sounds.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        },
+        {
+          "found": false,
+          "name": "loc.map",
+          "reason": "Not proven necessary by tag index; the extraction tool checks raw-data dependencies",
+          "required": false
+        }
+      ],
+      "resourceScope": "Availability checked using supplied Demo resources; found does not imply compatible resources for every variant",
+      "diagnostics": [
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "tests": {
+        "collisionMeshBounds": "PASS",
+        "dependencyCompleteness": "BLOCKED",
+        "formatHeaderTags": "PASS",
+        "gameplay": "UNTESTED",
+        "preservedCopyReadonly": "PASS",
+        "projectSaveReload": "PASS",
+        "sourceImmutability": "PASS",
+        "twoComputerAi": "UNTESTED"
+      },
+      "mccConversion": {
+        "status": "FAIL",
+        "scope": "tool pipeline only; no game launch",
+        "target": "mcc-cea",
+        "attemptId": "a3ff6ad9-d39f-456b-b8fc-0dadf1575412",
+        "recordedAt": "2026-10-25T10:07:05.337152500+00:00",
+        "stage": "extraction",
+        "extractionErrors": 196,
+        "diagnostics": [
+          "ERROR: Failed to extract sky\\sky_timberland\\bitmaps\\timberland_sky_dusk.bitmap:",
+          "ERROR: Failed to extract",
+          "ERROR: Failed to extract",
+          "ERROR: Failed to extract"
+        ],
+        "outputProduced": false
+      },
+      "runtimeRegression": [
+        {
+          "runtimeId": "mccSteam",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "No validated converted map or deployed package"
+        },
+        {
+          "runtimeId": "chupathingyCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "openCe",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloPc",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "haloCustomEdition",
+          "status": "UNTESTED",
+          "scope": "target gameplay",
+          "reason": "No separately installed target runtime was exercised"
+        },
+        {
+          "runtimeId": "macRetail",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "macDemo",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloPcTrial",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloMd",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        },
+        {
+          "runtimeId": "haloXbox",
+          "status": "BLOCKED",
+          "scope": "target gameplay",
+          "reason": "Preservation descriptor only; no executable integration"
+        }
+      ]
+    }
+  ],
+  "generatedZipRegression": {
+    "kind": "generatedOwnerCorpusZipNotHistorical",
+    "status": "PASS",
+    "archiveSha256": "73224d850f41d341688e812894eca784e7aa29b2004c1fea6efcd91e7e43d3b5",
+    "entries": 6,
+    "scenarios": 2,
+    "sourceHashPreserved": true,
+    "executableExtracted": false,
+    "scope": "Newly generated test ZIP containing copies of real supplied maps/resources; not a historical supplied ZIP"
+  },
+  "nativeApplicationRegression": {
+    "scope": "Fresh Guilty Spark desktop application, not a game runtime",
+    "zipInbox": {
+      "status": "PASS",
+      "entries": 2,
+      "diagnostics": [
+        "Classic ZIP inventory only; no entry was executed. Map validity is checked during selected extraction/import.",
+        "blocked-execution-fixture.exe: Executable inventoried only; extraction and execution are prohibited.",
+        "ZIP preserved: 6 entries inventoried; 2 supported scenario(s) imported. Executables and DLLs were not extracted or run."
+      ]
+    },
+    "libraryEntries": 7,
+    "gameLaunched": false,
+    "archivedExecutableRun": false
+  }
+}

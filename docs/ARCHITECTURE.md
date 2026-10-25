@@ -21,7 +21,13 @@ flowchart TB
   Output --> MCC[Owned package + official metadata template]
   MCC --> Manifest[Transactional ModManifest registration]
   MCC --> Steam[Normal Steam launch workflow]
-  API --> Native[User-installed runtime launcher]
+  API --> Adapters[Versioned runtime adapters + evidence]
+  Adapters --> Native[Explicit registered runtime launch]
+  Adapters --> Inventory[Read-only installation and map inventory]
+  API --> ZIP[Bounded ZIP inventory and preservation]
+  ZIP --> Import
+  API --> Audio[Verified embedded Ogg preview]
+  API --> Peers[Privacy-allowlisted manifest comparison]
   Native -. future bridge .-> Protocol[Version / session / map / capability validation]
 ```
 
@@ -38,19 +44,25 @@ flowchart TB
 | Scenario / AI               | `maps.rs` index extraction and `Workspaces.tsx`; source inspection only                                                    |
 | Build system                | `build.rs`; explicit executable names, argument arrays, process polling/cancellation, output caps, timeouts and receipts   |
 | MCC adapter                 | `steam.rs`, `mcc.rs`; library discovery, owned roots, template checks, packaging and manifest transactions                 |
-| Native adapter              | External executable launch only; no assumed argument conventions, network compatibility or content deployment              |
+| Runtime adapters            | `runtime.rs`; versioned trait, ten profiles, read-only registration/inventory, evidence/test status, explicit argument-free launch plans |
+| Archive preservation        | `archive.rs`; bounded classic ZIP central/local validation, selective data extraction, immutable originals, receipts and native import reports |
+| Audio inspection            | `audio.rs`; source-bound sound ranges, complete Ogg/Vorbis/CRC checks, bounded bytes; `Sound.tsx` creates revocable Blob previews |
+| Semantic comparison         | `src/compare.ts`; class/path identity, resolved references, audited fields, placements and collision data; explicit unknown coverage |
+| Friends preflight           | `multiplayer.rs`; strict versioned privacy allowlist and local manifest comparison; no transport or gameplay attestation |
 | Live protocol               | `protocol.rs`; a pure command-validation model with tests; no transport or runtime bridge                                  |
 | Diagnostics                 | Structured Rust errors and JSONL build logs, compatibility/readiness reports and UI status                                 |
 
 ## Data ownership and editing
 
-The `.gsproject` schema stores source path/hash/family, preserved copy location, scene instances, asset metadata, audited tag edits, provenance, history and build records. Imported descriptors re-ingest referenced OBJ files and verify their hashes. Missing/changed references cause an error. The descriptor is not a portable archive of game resources.
+The `.gsproject` schema stores source path/hash/family, preserved copy location, optional archive origin, selected resource folder and resource hashes, scene instances, asset metadata, audited tag edits, provenance, history and build records. Additive source fields deserialize with defaults for older projects. Build fingerprints now include resource provenance, intentionally invalidating earlier receipts. Source/resource checks occur before extraction; source cache parsing and hashing use the same bounded snapshot. Imported descriptors re-ingest referenced OBJ files and verify their hashes. The descriptor is not a portable archive of game resources.
 
 The source cache is inspected again before build. Numeric fields must remain finite and within the audited range. References must point to a tag of the expected class in that cache. Offsets are re-derived in Rust rather than accepted from the renderer. Patches are applied only to a job-local copy, then extracted and rebuilt through Invader.
 
 Halo placements retain actual data offsets internally, but export resolves them against the original inspection. Additional instances, deletion and per-instance scale require reflexive reconstruction and are blocked for game builds. Workshop edits persist independently.
 
 ## Filesystem transactions
+
+The local Inbox exists independently from Steam. Startup/configuration only discovers an already owned MCC root; it never creates game folders. Explicit initialization, package installation/removal and launch remain separate actions. Missing optional tool paths do not prevent local Inbox startup. ZIP extraction commits a new owned directory; native full-parser results are retained separately from the extraction receipt. Archive/import operations never execute members.
 
 Project/config writes use a new sibling temporary file, flush, and rename, with an exact backup before replacement. Manifest registration preserves encoding (UTF-8/BOM or UTF-16LE) and existing lines, checks for concurrent changes, and uses an exclusive Guilty Spark lock. Registration verification failure restores the backup. Package installation stages in an owned root, then renames into place. Failure to register removes only the new owned package.
 
