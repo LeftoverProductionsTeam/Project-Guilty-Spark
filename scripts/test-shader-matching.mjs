@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { matchLocalShaderTextures } from '../src/shaderTextureMatching.ts';
+const shader={id:10,class:'senv',path:'levels/test/shaders/stone',references:[{class:'bitm',label:'Base map',targetId:15}]};
+const bitm={id:15,class:'bitm',path:'levels/test/bitmaps/stone_base',references:[]};
+const fallback={id:20,class:'senv',path:'levels/test/shaders/metal',references:[]};
+const inspection={tags:[shader,bitm,fallback]};
+let result=matchLocalShaderTextures(inspection,[10,20],[{name:'stone_base.dds',size:500},{name:'metal.png',size:800}]);
+assert.equal(result.assignments.length,2);
+assert.deepEqual(result.assignments.map(x=>x.method),['bitmap-dependency','shader-basename']);
+result=matchLocalShaderTextures(inspection,[10],[{name:'stone.dds',size:200}]);
+assert.equal(result.assignments.length,0); // never fall back to shader if known bitmap differs
+result=matchLocalShaderTextures(inspection,[10],[{name:'stone_base.dds',size:200},{name:'stone_base.png',size:200}]);
+assert.equal(result.assignments.length,0);assert.match(result.skipped[0].reason,/Ambiguous/);
+result=matchLocalShaderTextures({tags:[{...shader,references:[{class:'bitm',label:'Detail map',targetId:15},{class:'bitm',label:'Second map',targetId:16}]},bitm,{id:16,class:'bitm',path:'elsewhere',references:[]}]},[10],[{name:'stone_base.dds',size:200}]);
+assert.equal(result.assignments.length,0);
+assert.match(result.skipped[0].reason,/base map/);
+result=matchLocalShaderTextures({tags:[{...shader,references:[{class:'bitm',label:'Bump map',targetId:15}]} ,bitm]},[10],[{name:'stone_base.dds',size:200}]);
+assert.equal(result.assignments.length,0);
+assert.throws(()=>matchLocalShaderTextures(inspection,[10],Array(257).fill({name:'x.dds',size:1})),/256/);
+assert.equal(matchLocalShaderTextures(inspection,[10],[{name:'stone_base.dds',size:0}]).assignments.length,0);
+result=matchLocalShaderTextures(inspection,[10],[{name:'stone_base.dds',size:200,webkitRelativePath:'local/levels/test/bitmaps/stone_base.dds'}]);
+assert.equal(result.assignments[0].expectedPath,'levels/test/bitmaps/stone_base');
+// Two identical basenames in different imported tag folders must not share one guessed file.
+const duplicateBitmap={...bitm,id:16,path:'different/path/stone_base'};
+result=matchLocalShaderTextures({tags:[shader,bitm,duplicateBitmap]},[10],[{name:'stone_base.dds',size:200}]);
+assert.equal(result.assignments.length,0);
+assert.match(result.skipped[0].reason,/Shared basename/);
+result=matchLocalShaderTextures({tags:[shader,bitm,duplicateBitmap]},[10],[{name:'stone_base.dds',size:200,webkitRelativePath:'mine/levels/test/bitmaps/stone_base.dds'}]);
+assert.equal(result.assignments.length,1);
+const duplicateShader={...fallback,id:22,path:'other/place/metal'};
+result=matchLocalShaderTextures({tags:[...inspection.tags,duplicateShader]},[20,22],[{name:'metal.png',size:200}]);
+assert.equal(result.assignments.length,0);
+console.log('PASS: exact base bitmap matching, no bumped/detail texture confusion and safe duplicate basename rejection');

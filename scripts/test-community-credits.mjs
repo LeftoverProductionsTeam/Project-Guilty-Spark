@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { COMMUNITY_CREDITS,decodeCommunitySuggestions,validateCommunitySuggestion,exportCommunitySuggestions } from '../src/communityCredits.ts';
+assert.ok(COMMUNITY_CREDITS.length>=7);
+assert.equal(new Set(COMMUNITY_CREDITS.map(i=>i.id)).size,COMMUNITY_CREDITS.length);
+for(const item of COMMUNITY_CREDITS)assert.ok(item.url.startsWith('https://')&&item.verification==='source-verified');
+const item=validateCommunitySuggestion({name:'Classic modder',contribution:'Shared a tutorial and a working project.',url:'https://example.com/archive'});
+assert.equal(item.verification,'user-suggested');
+assert.deepEqual(decodeCommunitySuggestions(JSON.stringify([item,item])),[item]);
+assert.equal(decodeCommunitySuggestions('{invalid').length,0);
+assert.equal(decodeCommunitySuggestions(JSON.stringify([{name:'X',contribution:'Nothing',url:'javascript:alert(1)'}])).length,0);
+for(const url of ['http://example.com','https://127.0.0.1/tools','javascript:alert(1)','https://user:pass@example.com'])assert.throws(()=>validateCommunitySuggestion({name:'Good Name',contribution:'Documented a piece of Halo history.',url}));
+assert.ok(exportCommunitySuggestions([item]).includes('Unverified community'));
+console.log(`PASS: ${COMMUNITY_CREDITS.length} documented credits; suggestions bounded, sourced and local`);

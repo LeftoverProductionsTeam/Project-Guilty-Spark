@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {COMMUNITY_MAP_SOURCES, describeCommunityDownload, filterCommunityMapSources, isCuratedCommunityUrl} from '../src/communityMapSources.ts';
+assert.ok(COMMUNITY_MAP_SOURCES.length>=5);
+assert.equal(new Set(COMMUNITY_MAP_SOURCES.map(x=>x.id)).size,COMMUNITY_MAP_SOURCES.length);
+for(const source of COMMUNITY_MAP_SOURCES){
+  assert.ok(isCuratedCommunityUrl(source.url),`Archive link must be an exact, authored HTTPS address: ${source.id}`);
+  assert.ok(source.summary.length>20 && source.caveat.length>35);
+  assert.ok(source.audience);
+}
+assert.equal(COMMUNITY_MAP_SOURCES.find(x=>x.id==='halomods-ce')?.url,'https://www.halomods.info/viewforum.php?f=17');
+assert.equal(COMMUNITY_MAP_SOURCES.find(x=>x.id==='halomods-pc')?.url,'https://www.halomods.info/viewforum.php?f=1');
+assert.equal(COMMUNITY_MAP_SOURCES.find(x=>x.id==='halomods-ce')?.catalog,false);
+assert.equal(filterCommunityMapSources('halomods','halo-ce').length,1);
+assert.ok(filterCommunityMapSources('Mac', 'halo-demo').length>=1);
+assert.equal(filterCommunityMapSources('unfindable nonsense').length,0);
+for(const bad of ['http://www.halomods.info/viewforum.php?f=17','https://halomods.info.evil.test/','https://evil.test/?goto=https://www.halomods.info/viewforum.php?f=17','file:///tmp/map','javascript:alert(1)','https://www.halomods.info/viewforum.php?f=16'])assert.equal(isCuratedCommunityUrl(bad),false);
+assert.equal(describeCommunityDownload('cool.MAP').kind,'map');
+assert.equal(describeCommunityDownload('source.yelo').kind,'map');
+assert.equal(describeCommunityDownload('safe.zip').kind,'zip');
+assert.equal(describeCommunityDownload('mod.PPF').kind,'patch');
+assert.equal(describeCommunityDownload('payload.7z').kind,'unsupported-archive');
+for(const bad of ['.exe','.msi','.ps1','.sh','.cmd'])assert.equal(describeCommunityDownload('map.zip'+bad).kind,'blocked-executable');
+assert.equal(describeCommunityDownload('game.map/launcher.bat').kind,'blocked-executable');
+const ui=readFileSync('src/components/CommunityMaps.tsx','utf8');
+for(const fragment of ['target="_blank"','rel="noopener noreferrer"','isCuratedCommunityUrl(source.url)','onImport','disabled={!native || busy}', 'Copy link','navigator.clipboard.writeText', 'filterCommunityMapSources'])assert.ok(ui.includes(fragment),`Missing browser/download safeguard: ${fragment}`);
+for(const fragment of ['fetch(', 'window.location', 'download=', 'eval(', 'shell.open'])assert.equal(ui.includes(fragment),false,`Unexpected unsafe download or navigation method ${fragment}`);
+const app=readFileSync('src/App.tsx','utf8');
+assert.ok(app.includes("workspace === 'map-finder'"));
+assert.ok(app.includes('<CommunityMaps onImport={()=>void importFiles()}'));
+assert.ok(app.includes("{ id: 'map-finder', label: 'Community maps'"));
+const importer=readFileSync('src-tauri/src/app.rs','utf8');
+assert.ok(importer.includes('archive::import_archive'));
+assert.ok(importer.includes('ext == "map" || ext == "yelo"'));
+assert.ok(importer.includes('"zip"'));
+console.log('C30 curated community map sources, safe local import and UI integration verified');

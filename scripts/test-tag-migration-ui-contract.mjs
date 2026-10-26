@@ -1,0 +1,20 @@
+/** Verify integration remains a read-only, user-selected operation, not a hidden native import. */
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=(name)=>readFileSync(new URL(`../${name}`,import.meta.url),'utf8');
+const tags=read('src/components/Tags.tsx');
+const panel=read('src/components/TagMigrationReviewPanel.tsx');
+const core=read('src/tagMigrationReview.ts');
+const academy=read('src/tutorialAcademy.ts');
+const lab=read('src/components/LegacyWorkflowLab.tsx');
+assert.match(tags,/<TagMigrationReviewPanel/);
+assert.match(panel,/type="file"/);
+assert.match(panel,/file\.size>524288/);
+assert.match(panel,/reviewTagMigration\(contents,project,inspection\)/);
+assert.match(panel,/exportTagMigrationReview\(report\)/);
+assert.doesNotMatch(panel,/\bcall\(|\binvoke\(|\bfetch\(|\bspawn\(/);
+assert.doesNotMatch(core,/\bwriteFile\b|\bremoveFile\b|\bspawn\(|\binvoke\(|\bfetch\(/);
+assert.match(core,/safeToOverwriteDestination:false/);
+assert.match(academy,/id:'tagPorting'/);
+assert.match(lab,/Cross-map Tag Migration Preview/);
+console.log('PASS: Tag Migration Preview mounted in real Tags UI, explicit bounded file picker, readonly planner/export, educational link, no native import execution');

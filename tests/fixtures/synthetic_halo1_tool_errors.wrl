@@ -1,0 +1,21 @@
+#VRML 1.0 ascii
+# SYNTHETIC sample for the Guilty Spark WRL overlay. NOT compiled game evidence.
+Separator {
+  Coordinate3 { point [
+    100.000000 0.000000 0.000000,
+    200.000000 0.000000 0.000000
+  ] }
+  MaterialBinding { value PER_VERTEX }
+  Material { diffuseColor [1.000000 0.000000 0.000000, 1.000000 0.000000 0.000000] transparency [0.000000] }
+  IndexedLineSet { coordIndex [0,1,-1] }
+}
+Separator {
+  Coordinate3 { point [
+    0.000000 0.000000 100.000000,
+    200.000000 0.000000 100.000000,
+    100.000000 200.000000 100.000000
+  ] }
+  MaterialBinding { value PER_FACE }
+  Material { diffuseColor [0.000000 1.000000 0.000000] transparency [0.000000] }
+  IndexedFaceSet { coordIndex [0,1,2,-1] }
+}

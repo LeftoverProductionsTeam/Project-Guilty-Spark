@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "name": "GuiltySpark-C32-0.3.1.exe",
+      "bytes": 17025536,
+      "sha256": "31f39b6bb72ca98445ac2f36654a5070e6a62e89e09eba25919de4bdf3dd0360",
+      "nativeBuildVerified": true,
+      "installerExecuted": false
+    },
+    {
+      "name": "Project Guilty Spark_0.3.1_x64-setup.exe",
+      "bytes": 4452964,
+      "sha256": "6dbf9f5d21ac99c262bd79822d171c0ede7586272bcd475f7d68976fd89b471b",
+      "nativeBuildVerified": true,
+      "installerExecuted": false
+    }
+  ]
+}

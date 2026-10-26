@@ -7,6 +7,7 @@ import type {
   PeerManifest,
   PeerPreflight,
   Project,
+  Settings,
   RuntimeId,
   RuntimeInstallation,
   RuntimeInventory,
@@ -14,6 +15,8 @@ import type {
   RuntimeReport,
 } from '../types';
 import { Empty, Notice, PageTitle, Pill } from './ui';
+import { offeredTools, toolchainHint } from '../toolchainProfiles';
+import '../onboarding.css';
 
 const editable = new Set<RuntimeId>(['chupathingyCe', 'openCe', 'haloPc', 'haloCustomEdition']);
 const labels: Record<string, string> = {
@@ -72,13 +75,19 @@ export default function Runtimes({
   project,
   dirty,
   onSave,
+  settings,
+  onSettings,
+  onOpenWorkspace,
 }: {
   project: Project | null;
   dirty: boolean;
   onSave: () => Promise<void>;
+  settings: Settings;
+  onSettings: () => void;
+  onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge') => void;
 }) {
   const [reports, setReports] = useState<RuntimeReport[]>([]);
-  const [selected, setSelected] = useState<RuntimeId>('mccSteam');
+  const [selected, setSelected] = useState<RuntimeId>(project?.quickForge?.runtimeId ?? 'mccSteam');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<'runtime' | 'friends'>('runtime');
@@ -116,6 +125,7 @@ export default function Runtimes({
           </button>
         }
       />
+      <Notice tone="info">Using Eschaton, HMT, SwordEdit, SparkEdit or other historical editors? Open <strong>Modding Academy → Legacy Workflow Lab</strong> to see native/Wine runtime candidates and register an installed copy to launch beside Spark. Detection is not proof of compatibility.</Notice>
       {!native && (
         <Notice tone="info">
           Runtime discovery and file hashing require the desktop application. Browser preview has no runtime
@@ -154,7 +164,10 @@ export default function Runtimes({
       )}
       {report &&
         (tab === 'runtime' ? (
-          <RuntimeDetails key={selected} report={report} onRegistered={setReports} />
+          <>
+            <RuntimeDetails key={selected} report={report} onRegistered={setReports} />
+            <ToolchainShelf runtime={selected} settings={settings} onSettings={onSettings} onOpenWorkspace={onOpenWorkspace} />
+          </>
         ) : (
           <Friends
             key={`${selected}:${project?.id ?? ''}`}
@@ -733,20 +746,20 @@ function ManifestSummary({ title, manifest }: { title: string; manifest: PeerMan
   );
 }
 
-export function LiveLab({ onBuild }: { onBuild: () => void }) {
+export function LiveLab({ onBuild, onQuickForge }: { onBuild: () => void; onQuickForge: () => void }) {
   return (
     <div className="analysis-page">
       <PageTitle
         eyebrow="LIVE LAB / BRIDGE STATUS"
-        title="Live editing needs a verified bridge"
-        description="The workbench currently edits saved project overlays and rebuilds caches."
+        title="Live source editing & engine bridge"
+        description="QuickForge now rebuilds and simulates source triangles during editing. A game-process bridge is a separate, unverified capability."
       />
       <section className="analysis-card live-status">
         <Unplug size={30} />
         <div>
-          <h2>Disconnected · no live bridge implemented</h2>
+          <h2>Engine bridge disconnected · editor sandbox available</h2>
           <p>
-            Runtime discovery and opening a game process do not establish an editor connection. No telemetry,
+            A live source mesh preview is available in QuickForge, including collision-driven walk testing. Runtime discovery and opening a game process do not establish an editor connection. No engine telemetry,
             command acknowledgement, live property mutation, spawning, AI dispatch or VR session is available.
           </p>
         </div>
@@ -759,6 +772,7 @@ export function LiveLab({ onBuild }: { onBuild: () => void }) {
           <li>Save the project and run the configured extraction / rebuild pipeline.</li>
           <li>Review validation and packaging results before manually testing in the intended runtime.</li>
         </ol>
+        <button className="small-button" title="Open QuickForge: edit source geometry and immediately walk the regenerated triangles." onClick={onQuickForge}>Open live source editor</button>
         <button className="primary" onClick={onBuild}>
           Open Build &amp; playtest
         </button>
@@ -769,4 +783,76 @@ export function LiveLab({ onBuild }: { onBuild: () => void }) {
       </section>
     </div>
   );
+}
+
+interface ToolchainToolState { id:string; available:boolean; executable:string|null; launchMode:'externalGui'|'integratedCli';detail:string }
+interface ToolchainProbe { toolId:string;sha256:string;byteSize:number;mode:string;executed:boolean;exitCode:number|null;output:string;message:string }
+/** Each runtime has a separate allowed list; an installed executable is not
+ * permission to run it or proof of that tool's target cache compatibility. */
+function ToolchainShelf({runtime,settings,onSettings,onOpenWorkspace}:{runtime:RuntimeId;settings:Settings;onSettings:()=>void;onOpenWorkspace:(target:'tags'|'build'|'quickforge')=>void}) {
+  const [inventory,setInventory]=useState<ToolchainToolState[]>([]);
+  const [status,setStatus]=useState('');
+  const [error,setError]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [consent,setConsent]=useState(false);
+  const [probeResult,setProbeResult]=useState<ToolchainProbe|null>(null);
+  const choices=offeredTools(runtime,settings);
+  useEffect(()=>{
+    let active=true;
+    setInventory([]);setStatus('');setError('');setConsent(false);setProbeResult(null);
+    if(!native)return;
+    void call<ToolchainToolState[]>('toolchain_inventory',{runtimeId:runtime})
+      .then(items=>{if(active)setInventory(items);})
+      .catch(e=>{if(active)setError(String(e));});
+    return ()=>{active=false;};
+  },[runtime,settings.hekFlavor,settings.hekDirectory,settings.invaderDirectory]);
+  async function inspectTool(id:string, runInfo=false){
+    setBusy(true);setError('');setStatus('');setProbeResult(null);
+    try{setProbeResult(await call<ToolchainProbe>('probe_toolchain_tool',{runtimeId:runtime,toolId:id,runInfo}));}
+    catch(e){setError(String(e));}
+    finally{setBusy(false);}
+  }
+  async function launch(id:string){
+    setBusy(true);setError('');setStatus('');
+    try {setStatus(await call<string>('launch_toolchain_tool',{runtimeId:runtime,toolId:id,confirmSourceMutation:consent}));}
+    catch(e){setError(String(e));}
+    finally{setBusy(false);}
+  }
+  return <section className="analysis-card gs-tool-shelf">
+    <div className="section-heading"><h2>Compatible editing tools</h2><Pill>Per-runtime selection</Pill></div>
+    <p className="subtle">Choose each tool per Halo runtime. Audited command-line tools run as managed jobs and expose their output <strong>inside Spark</strong>. Native Windows GUI editors can be opened <strong>beside Spark</strong>; reparenting a separate app's window is not a supported editing bridge. No executable is bundled or auto-launched.</p>
+    <Notice tone="info">{toolchainHint(runtime,settings.hekFlavor)}</Notice>
+    <button className="small-button" type="button" title="Set the exact folder and distinguish classic HEK from MCC H1A Editing Kit before starting native tools." onClick={onSettings}>Configure installed tool paths</button>
+    {choices.length===0 ? <p className="subtle">No compatible tool launcher is enabled for the selected profile.</p> : <div className="gs-tool-grid">
+      {choices.map(choice=>{
+        const detection=inventory.find(item=>item.id===choice.id);
+        return <div key={choice.id} className="gs-tool-card" title={`${choice.purpose} ${choice.caveat}`}>
+          <strong>{choice.label}</strong>
+          <p>{choice.purpose}</p><small>{choice.caveat}</small>
+          <div><Pill tone={detection?.available?'green':'muted'}>{detection?.available?'Executable found':'Not verified locally'}</Pill><Pill>{choice.mode==='externalGui'?'Separate app':'Managed CLI'}</Pill></div>
+          <div className="gs-tool-actions">
+            <button className="small-button" disabled={!detection?.available||busy} onClick={()=>void inspectTool(choice.id)} title={`Read the installed ${choice.label} executable identity and SHA-256 without executing any process`}>Inspect in Spark</button>
+            {choice.mode==='integratedCli'&&choice.group==='invader'&&
+              <button className="small-button" disabled={!detection?.available||busy} onClick={()=>void inspectTool(choice.id,true)} title="Run only Invader's documented -i information operation, with a five-second timeout and bounded output">Run safe info (-i)</button>}
+            {choice.mode==='externalGui'&&<button className="small-button" disabled={!detection?.available||!consent||busy} onClick={()=>void launch(choice.id)} title={`Open ${choice.label} as a separately installed native GUI process. It is not embedded or connected to the live source mesh.`}>Open GUI beside Spark</button>}
+            {choice.mode==='integratedCli'&&<button className="small-button" onClick={()=>onOpenWorkspace(choice.id==='invaderExtract'?'tags':'quickforge')} title={`Navigate to the managed ${choice.id==='invaderExtract'?'tag extraction':'source build'} workflow; this does not execute it`}>Open managed workflow</button>}
+          </div>
+        </div>;
+      })}
+    </div>}
+    <label className="toggle-setting" title="Explicit consent for separately installed GUI tools. Some tools may edit tag files in their own working folders.">
+      <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
+      I understand a launched external editor can modify my configured working tag files.
+    </label>
+    {probeResult&&<section className="gs-tool-inspection" aria-live="polite" aria-label="Integrated tool inspection result">
+      <h3>Integrated tool console · {probeResult.toolId}</h3>
+      <p>{probeResult.message}</p>
+      <p>SHA-256: <code>{probeResult.sha256}</code></p>
+      <p>Binary bytes: {probeResult.byteSize.toLocaleString()} · Process invoked: {probeResult.executed?'Yes, -i only':'No'} {probeResult.executed?`· Exit code: ${probeResult.exitCode??'unknown'}`:''}</p>
+      {probeResult.executed&&<pre className="gs-tool-output">{probeResult.output||'(No output)'}</pre>}
+    </section>}
+    {status&&<Notice tone="info">{status}</Notice>}
+    {error&&<Notice>{error}</Notice>}
+    <p className="subtle">Tool/Invader builds and tag extraction use gated managed workflows. The integrated console is limited to identity inspection and Invader -i, not an unrestricted shell. Native GUI hosting, hot reload into Halo, and Halo-engine collision are not implemented.</p>
+  </section>;
 }

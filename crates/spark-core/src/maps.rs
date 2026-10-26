@@ -165,6 +165,11 @@ pub struct Tag {
     pub external: bool,
     pub fields: Vec<TagField>,
     pub references: Vec<TagReference>,
+    /// Classic PC shader base/diffuse bitmap provenance for read-only previews.
+    /// Known values: resolved, missing, invalid, unavailable. Old project caches
+    /// without this field are still readable (None).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_bitmap_status: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -188,15 +193,45 @@ pub struct MeshPart {
     pub index_start: usize,
     pub index_count: usize,
 }
+/// Source shader identities for BSP triangle ranges; not decoded textures.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeshMaterialRange {
+    pub shader_tag_id: u32,
+    pub bsp_index: usize,
+    pub lightmap_index: usize,
+    /// Actual bitmap page index in the BSP lightmap block, -1 when unlit.
+    #[serde(default)]
+    pub lightmap_page: i32,
+    /// The bounded raw stream provided real secondary UVs, not default coordinates.
+    #[serde(default)]
+    pub has_lightmap_uvs: bool,
+    /// The compiled sbsp header references the bitmap tag containing its
+    /// lightmap pages. This is candidate provenance only; callers must match
+    /// it against a real bitm tag ID in the inspected cache before reading.
+    #[serde(default)]
+    pub lightmap_bitmap_tag_id: Option<u32>,
+    pub index_start: usize,
+    pub index_count: usize,
+}
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MeshData {
     pub positions: Vec<f32>,
     pub indices: Vec<u32>,
+    #[serde(default)]
+    pub normals: Vec<f32>,
+    #[serde(default)]
+    pub uvs: Vec<f32>,
+    /// Second UV channel sourced from the compiled BSP uncompressed lightmap stream.
+    #[serde(default)]
+    pub lightmap_uvs: Vec<f32>,
     pub label: String,
     pub source: String,
     #[serde(default)]
     pub parts: Vec<MeshPart>,
+    #[serde(default)]
+    pub material_ranges: Vec<MeshMaterialRange>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -228,6 +263,10 @@ pub struct MapInspection {
     pub tags: Vec<Tag>,
     pub objects: Vec<SceneObject>,
     pub mesh: MeshData,
+    #[serde(default)]
+    pub render_mesh: Option<MeshData>,
+    #[serde(default)]
+    pub model_meshes: std::collections::HashMap<u32, MeshData>,
     pub encounters: Vec<Encounter>,
     pub scripts: Vec<Script>,
     pub resources: Vec<Resource>,
@@ -430,6 +469,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
         } else {
             Some(space.pointer(r.u32(at + 20)?, 1)?)
         };
+        let shader_class = matches!(class.as_str(), "senv" | "soso");
         tags.push(Tag {
             id,
             index: i,
@@ -439,16 +479,23 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             external,
             fields: vec![],
             references: vec![],
+            primary_bitmap_status: if shader_class {
+                Some("unavailable".into())
+            } else { None },
         });
     }
     let tag_ids: std::collections::HashMap<u32, String> =
         tags.iter().map(|t| (t.id, t.class.clone())).collect();
     let mut failed_fields = 0;
     for tag in &mut tags {
-        if read_fields(&r, &space, tag, &tag_ids).is_err() {
+        if read_fields(&r, &space, tag, &tag_ids, header.version).is_err() {
             failed_fields += 1;
             tag.fields.clear();
             tag.references.clear();
+            // A failed tag read must NEVER enable basename shader guessing.
+            if matches!(tag.class.as_str(), "senv" | "soso") {
+                tag.primary_bitmap_status = Some("invalid".into());
+            }
         }
     }
     if failed_fields > 0 {
@@ -576,6 +623,19 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             MeshData::default()
         }
     };
+    // Read-only render preview is independent of the existing collision mesh.
+    // Unsupported or malformed render data never invalidates source inspection.
+    let render_mesh = match crate::render::bsp_render_geometry(&bytes, &header, scenario_at) {
+        Ok(mesh) => Some(mesh),
+        Err(e) => {
+            diagnostics.push(Diagnostic::warning("BSP_RENDER_UNAVAILABLE", format!("Render surfaces unavailable: {e}. Only the actual collision geometry can be previewed.")));
+            None
+        }
+    };
+    let (model_meshes, model_notes) = crate::render::static_object_models(&bytes, &header, &tags, &objects);
+    for note in model_notes {
+        diagnostics.push(Diagnostic::warning("MODEL_RENDER_UNAVAILABLE", note));
+    }
     let folder = resource_directory
         .or_else(|| path.parent())
         .unwrap_or(Path::new("."));
@@ -602,6 +662,8 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
         tags,
         objects,
         mesh,
+        render_mesh,
+        model_meshes,
         encounters,
         scripts,
         resources,
@@ -676,15 +738,81 @@ fn reference(
     }
     Ok(())
 }
+/// Read-only classic Halo shader dependency discovery. The byte offsets are
+/// independently calculated from the published shader structures, not copied
+/// from third-party parser code. See docs/CONTINUATION_16_ENGINEERING.md.
+/// In compiled caches, TagDependency is 16 bytes, with class at +0 and datum
+/// at +12. Only a matching bitmap tag in THIS cache is trusted.
+///
+/// Layout: shader parent 40 bytes. senv base=0x88, details=0xB8/0xCC/0xFC,
+/// bump=0x128. soso diffuse=0xA4, multipurpose=0xBC, detail=0xDC.
+/// Other maps remain unsupported rather than guessed.
+fn shader_bitmap_references(
+    r: &Reader,
+    space: &Space,
+    tag: &mut Tag,
+    ids: &std::collections::HashMap<u32, String>,
+    at: usize,
+) -> Result<()> {
+    let (body_len, bitmap_refs): (usize, &[(usize, &str)]) = match tag.class.as_str() {
+        "senv" => (836, &[
+            (0x88, "Base map"),
+            (0xB8, "Primary detail map"),
+            (0xCC, "Secondary detail map"),
+            (0xFC, "Micro detail map"),
+            (0x128, "Bump map"),
+        ]),
+        "soso" => (440, &[
+            (0xA4, "Diffuse map"),
+            (0xBC, "Multipurpose map"),
+            (0xDC, "Detail map"),
+        ]),
+        _ => return Ok(()),
+    };
+    // Check the entire known structure before reading any individual field.
+    r.bytes(at, body_len)?;
+    if at < space.begin || at.checked_add(body_len).is_none_or(|end| end > space.end) {
+        return invalid("Shader metadata escapes its bounded cache tag region");
+    }
+    let mut primary_status = "missing";
+    for (index, (offset, label)) in bitmap_refs.iter().enumerate() {
+        let field_at = at.checked_add(*offset).ok_or_else(|| {
+            SparkError::Invalid("Shader bitmap reference address overflow".into())
+        })?;
+        let datum = r.u32(field_at + 12)?;
+        if datum == u32::MAX { continue; }
+        let class = r.fourcc(field_at)?;
+        if class != "bitm" || ids.get(&datum).is_none_or(|c| c != "bitm") {
+            if index == 0 { primary_status = "invalid"; }
+            continue;
+        }
+        tag.references.push(TagReference {
+            label: (*label).into(), target_id: datum,
+            class: "bitm".into(), offset: field_at,
+        });
+        // Do not create editable TagField records: source-only attribution
+        // must not silently turn shader metadata into a writable operation.
+        if index == 0 { primary_status = "resolved"; }
+    }
+    tag.primary_bitmap_status = Some(primary_status.into());
+    Ok(())
+}
+
 fn read_fields(
     r: &Reader,
     space: &Space,
     tag: &mut Tag,
     ids: &std::collections::HashMap<u32, String>,
+    version: u32,
 ) -> Result<()> {
     let Some(at) = tag.data_offset else {
         return Ok(());
     };
+    // Only the classic PC/CE and Demo cache layout has independently checked
+    // field offsets. Do not claim to parse Xbox, MCC, or extended shader formats.
+    if matches!(tag.class.as_str(), "senv" | "soso") && matches!(version, 6 | 7 | 609) {
+        shader_bitmap_references(r, space, tag, ids, at)?;
+    }
     // Read-only dependency metadata from Invader's HEK definitions. Actor variants
     // and item collections can drive AI even when the scenario has no encounters.
     if tag.class == "actv" {
@@ -1044,4 +1172,89 @@ pub fn read_range(path: &Path, offset: u64, len: usize) -> Result<Vec<u8>> {
     let mut b = vec![0; len];
     f.read_exact(&mut b)?;
     Ok(b)
+}
+
+#[cfg(test)]
+mod shader_dependency_tests {
+    use super::*;
+    fn shader_fixture(class: &str) -> Tag {
+        Tag {
+            id: 1,
+            index: 0,
+            class: class.into(),
+            path: "test/shaders/fixture".into(),
+            data_offset: Some(64),
+            external: false,
+            fields: vec![],
+            references: vec![],
+            primary_bitmap_status: Some("unavailable".into()),
+        }
+    }
+    fn install_ref(bytes: &mut [u8], field: usize, datum: u32, class: &[u8; 4]) {
+        // FourCC on disk is byte-reversed by the cache Reader.
+        bytes[field..field + 4].copy_from_slice(class);
+        bytes[field + 12..field + 16].copy_from_slice(&datum.to_le_bytes());
+    }
+    #[test]
+    fn classic_environment_base_is_distinct_from_detail_and_bump() {
+        let mut bytes = vec![0xff; 1200];
+        install_ref(&mut bytes, 64 + 0x88, 44, b"mtib");
+        install_ref(&mut bytes, 64 + 0xB8, 45, b"mtib");
+        install_ref(&mut bytes, 64 + 0x128, 46, b"mtib");
+        let ids = std::collections::HashMap::from([
+            (44, "bitm".to_string()),
+            (45, "bitm".to_string()),
+            (46, "bitm".to_string()),
+        ]);
+        let region = Space {begin: 0, end: bytes.len(), address: 0};
+        let mut tag = shader_fixture("senv");
+        shader_bitmap_references(&Reader(&bytes), &region, &mut tag, &ids, 64).unwrap();
+        assert_eq!(tag.primary_bitmap_status.as_deref(), Some("resolved"));
+        assert_eq!(tag.references.len(), 3);
+        assert_eq!(tag.references[0].target_id, 44);
+        assert_eq!(tag.references[0].label, "Base map");
+        assert_eq!(tag.references[1].label, "Primary detail map");
+        assert_eq!(tag.references[2].label, "Bump map");
+        assert!(tag.fields.is_empty(), "preview metadata must not become writable fields");
+    }
+    #[test]
+    fn model_shader_uses_diffuse_not_multipurpose() {
+        let mut bytes = vec![0xff; 1200];
+        install_ref(&mut bytes, 64 + 0xA4, 88, b"mtib");
+        install_ref(&mut bytes, 64 + 0xBC, 89, b"mtib");
+        let ids = std::collections::HashMap::from([
+            (88, "bitm".to_string()),
+            (89, "bitm".to_string()),
+        ]);
+        let region = Space {begin: 0, end: bytes.len(), address: 0};
+        let mut tag = shader_fixture("soso");
+        shader_bitmap_references(&Reader(&bytes), &region, &mut tag, &ids, 64).unwrap();
+        assert_eq!(tag.primary_bitmap_status.as_deref(), Some("resolved"));
+        assert_eq!(tag.references.len(), 2);
+        assert_eq!(tag.references[0].label, "Diffuse map");
+        assert_eq!(tag.references[1].label, "Multipurpose map");
+    }
+    #[test]
+    fn shader_bitmap_id_mismatch_is_not_resolved() {
+        let mut bytes = vec![0xff; 1200];
+        install_ref(&mut bytes, 64 + 0x88, 17, b"mtib");
+        let region = Space {begin: 0, end: bytes.len(), address: 0};
+        let mut tag = shader_fixture("senv");
+        let wrong_class = std::collections::HashMap::from([(17, "snd!".to_string())]);
+        shader_bitmap_references(&Reader(&bytes), &region, &mut tag, &wrong_class, 64).unwrap();
+        assert_eq!(tag.primary_bitmap_status.as_deref(), Some("invalid"));
+        assert!(tag.references.is_empty());
+        let mut empty_tag = shader_fixture("senv");
+        shader_bitmap_references(&Reader(&vec![0xff; 1200]), &region, &mut empty_tag, &wrong_class, 64).unwrap();
+        assert_eq!(empty_tag.primary_bitmap_status.as_deref(), Some("missing"));
+    }
+    #[test]
+    fn shader_data_cannot_escape_the_tag_region() {
+        let bytes = vec![0xff; 1200];
+        let too_short = Space {begin: 0, end: 128, address: 0};
+        let mut tag = shader_fixture("senv");
+        assert!(shader_bitmap_references(&Reader(&bytes), &too_short, &mut tag,
+            &std::collections::HashMap::new(), 64).is_err());
+        assert!(tag.references.is_empty());
+    }
 }

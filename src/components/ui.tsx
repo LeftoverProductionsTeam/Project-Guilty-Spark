@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AlertTriangle, Check, ChevronRight, X } from 'lucide-react';
 export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?: string }) {
@@ -171,4 +171,29 @@ export function Breadcrumb({ section, title }: { section: string; title: string 
       <span>{title}</span>
     </div>
   );
+}
+
+/**
+ * Hover, keyboard focus and touch-accessible help. Escape hides the popup
+ * without moving focus; focusing or hovering again reopens it.
+ */
+export function HelpTip({help}:{help:string}) {
+  const id = useId();
+  const [hovered,setHovered] = useState(false);
+  const [focused,setFocused] = useState(false);
+  const [dismissed,setDismissed] = useState(false);
+  const visible = (hovered || focused) && !dismissed;
+  return <span className={`gs-help-wrapper ${visible ? 'is-visible' : ''}`}
+    onMouseEnter={()=>{setHovered(true);setDismissed(false);}}
+    onMouseLeave={()=>setHovered(false)}>
+    <button type="button" className="gs-helptip" aria-label="Explain this field"
+      aria-describedby={visible ? id : undefined}
+      onFocus={()=>{setFocused(true);setDismissed(false);}}
+      onBlur={()=>{setFocused(false);setDismissed(false);}}
+      onClick={()=>setDismissed(false)}
+      onKeyDown={event=>{
+        if(event.key === 'Escape') {event.preventDefault();event.stopPropagation();setDismissed(true);}
+      }}>?</button>
+    <span id={id} role="tooltip" aria-hidden={!visible} className="gs-help-bubble">{help}</span>
+  </span>;
 }

@@ -1,7 +1,26 @@
 import { test, expect } from '@playwright/test';
+test('workspace search keeps focus bounded and navigates with the keyboard', async ({ page }) => {
+  await page.goto('/');
+  const launcher=page.getByRole('button',{name:/Find tools/});
+  await launcher.click();
+  const search=page.getByRole('textbox',{name:'Search workspaces'});
+  await expect(search).toBeFocused();
+  await search.fill('zzzz-no-workspace');
+  await search.press('ArrowUp');await search.press('Enter');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByText('No workspace matches.',{exact:false})).toBeVisible();
+  await search.fill('QuickForge');await search.press('Enter');
+  await expect(page.getByRole('heading',{name:'Make a place to play.'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Create editable map',exact:true})).toBeDisabled();
+  await launcher.click();await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(launcher).toBeFocused();
+});
 test('browser preview states native boundaries and navigates workspaces', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('Browser preview', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Make a Halo world. Know what the engine needs.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Map library', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.' })).toBeVisible();
   await page.getByRole('button', { name: 'Tag editor', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Choose a world to work on' })).toBeVisible();
@@ -24,7 +43,7 @@ test('preservation and runtime workspaces disclose unavailable evidence without 
   await expect(page.getByRole('button', { name: 'Refresh reports', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Live Lab', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'Disconnected · no live bridge implemented' }),
+    page.getByRole('heading', { name: 'Engine bridge disconnected · editor sandbox available' }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: /Connect|Spawn|Dispatch/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Open Build & playtest', exact: true }).click();

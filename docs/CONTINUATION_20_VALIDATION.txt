@@ -1,0 +1,23 @@
+Project Guilty Spark C20 — local verification log (2026-10-26)
+
+Original Library Continuation 19 recovered in unmodified form and checked
+against its published SHA256. Source archive expanded into a separate working
+folder without touching an installed Halo game or prior source tree.
+
+Baseline offline Node test suite: PASS.
+C20 offline Node test suite: PASS.
+New JS tests: exact-source bitmap batch protocol / no reordered, guessed,
+unpinned, oversized, malformed, or conflicting resource outputs: PASS.
+C19 material planner regression updated for 24-slot cap: PASS.
+OwnedBitmapBatch.ts, ownedBitmapPreview.ts and ownedMaterialBatch.ts:
+TypeScript typecheck (TS 5.8.3, moduleResolution=bundler): PASS.
+All 81 src/scripts TS/TSX files: syntax transpilation PASS.
+
+NOT EXECUTED HERE:
+- Cargo / rustc / rustfmt (no Rust toolchain available)
+- Full npm dependency install / frontend and Windows Tauri build
+- Real licensed Halo source cache / shared resource read
+- Any Halo Tool, engine game launch, multiplayer, gameplay or compiled BSP
+
+The native Rust code is source-reviewed, with synthetic tests added but not
+executed. A source ZIP is not a runnable or release-certified application.

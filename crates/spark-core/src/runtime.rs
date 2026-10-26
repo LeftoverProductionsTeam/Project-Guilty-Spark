@@ -84,6 +84,111 @@ pub struct SourceReference {
     pub url: String,
     pub revision: Option<String>,
 }
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum HostingAction {
+    TestSolo,
+    HostLan,
+    HostPrivateOnline,
+    JoinFriend,
+    DedicatedServer,
+}
+
+/// Read-only instructions, never a launch/deploy/network command.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostingPlan {
+    pub runtime_id: RuntimeId,
+    pub action: HostingAction,
+    pub status: SupportStatus,
+    pub evidence: EvidenceKind,
+    pub test_status: TestStatus,
+    pub automatic: bool,
+    pub title: String,
+    pub steps: Vec<String>,
+    pub limitations: Vec<String>,
+    pub sources: Vec<SourceReference>,
+}
+
+pub fn hosting_plan(runtime_id: RuntimeId, action: HostingAction) -> HostingPlan {
+    use HostingAction::*;
+    let mut plan = HostingPlan {
+        runtime_id, action, status: SupportStatus::Unknown, evidence: EvidenceKind::Application,
+        test_status: TestStatus::Untested, automatic: false, title: format!("{} — manual hosting guidance", runtime_id.name()),
+        steps: vec![], sources: vec![], limitations: vec![
+            "No runtime session or two-computer gameplay was tested. Manifest agreement proves matching declarations only.".into(),
+            "Guilty Spark Firefight JSON is an offline authoring format; no runtime Firefight bridge or generated game scripts exist.".into(),
+            "A successful export, generic runtime launch or source-level capability does not prove a compiled map is playable.".into(),
+        ],
+    };
+    if runtime_id.is_native() {
+        let (repo, revision) = if runtime_id == RuntimeId::ChupathingyCe {
+            (
+                "ChupathingyCE/chupathingyce",
+                "d7fafc81f824886d7fccd58fcf954691df6c6901",
+            )
+        } else {
+            (
+                "OpenCommunityEdition/OpenCE",
+                "7fb941b0b205edb1f7ecbb0aa6c2d7f5b884732d",
+            )
+        };
+        plan.evidence = EvidenceKind::UpstreamSource;
+        plan.sources.push(SourceReference {
+            title: "Pinned runtime menus and network settings".into(),
+            url: format!("https://github.com/{repo}/blob/{revision}/port/linux/README.md"),
+            revision: Some(revision.into()),
+        });
+        plan.status = SupportStatus::Supported;
+        plan.steps.push("Open your separately installed runtime. Verify its build, network version, map family and required resource hashes with your peer.".into());
+        match action {
+            TestSolo => plan.steps.push("Choose the campaign in the runtime menu, or use a multiplayer lobby's documented Start With One Player setting. Select an already compiled, compatible map.".into()),
+            HostLan => plan.steps.push("Use the runtime's Multiplayer / System Link menus on the same local network. Choose the compatible map and have the other computer join the visible lobby.".into()),
+            HostPrivateOnline => {
+                plan.steps.push("Use Multiplayer > Create Game > Internet. Choose the map; set LISTING to PRIVATE in Server Setup before starting.".into());
+                plan.steps.push("Share the runtime-generated invite privately. Guilty Spark does not read, generate, copy or distribute invite tokens.".into());
+            },
+            JoinFriend => plan.steps.push("Use the runtime's documented invite-link interface, then its join/system-link lobby. Check the installed version's clipboard setting before relying on clipboard joins.".into()),
+            DedicatedServer => {
+                plan.steps.clear();
+                if runtime_id == RuntimeId::ChupathingyCe {
+                    plan.sources.push(SourceReference {title:"Pinned Linux dedicated-server setup".into(),url:format!("https://github.com/{repo}/blob/{revision}/server/README.md"),revision:Some(revision.into())});
+                    plan.steps.push("Follow the dedicated-server README for its separate Linux server binary, external legally obtained map/resource data and playlist.".into());
+                    plan.steps.push("The documented entry point is HALO_DEDICATED pointing at a playlist, with HALO_DATA_ROOT selecting data. Check HALO_DEDICATED_PUBLIC before hosting; public listing is the upstream default.".into());
+                    plan.limitations.push("The Windows desktop adapter does not install, configure or launch the Linux dedicated server. No Firefight playlist/compiler integration has been verified.".into());
+                } else {
+                    plan.status=SupportStatus::Unknown;
+                    plan.steps.push("No pinned OpenCE dedicated-server launch interface was verified in this audit. Consult the exact installed release's documentation.".into());
+                }
+            }
+        }
+        plan.limitations.push("Upstream menu/network support is separate from local installation validation. Native runtime interoperability depends on exact builds and content families.".into());
+        plan.limitations.push("Invites are private access tokens. Review the runtime's listing and map-sharing settings yourself before hosting copyrighted or private content.".into());
+    } else if runtime_id == RuntimeId::MccSteam {
+        plan.evidence = EvidenceKind::OfficialDocumentation;
+        plan.sources = source(runtime_id);
+        plan.sources.push(SourceReference {title:"Official MCC co-op mode limits".into(),url:"https://support.halowaypoint.com/hc/en-us/articles/4403583912084-What-Is-the-Difference-between-Co-op-Firefight-and-Spartan-Ops-in-Halo-The-Master-Chief-Collection-MCC".into(),revision:None});
+        plan.sources.push(SourceReference {title:"Official MCC lobby and friend invitations".into(),url:"https://support.halowaypoint.com/hc/en-us/articles/4401928876692-Quick-Start-Guide-for-Halo-The-Master-Chief-Collection-MCC".into(),revision:None});
+        match action {
+            TestSolo|HostPrivateOnline|JoinFriend => {
+                plan.status=SupportStatus::Supported;
+                plan.steps.push("Both players need the same validated MCC build and custom campaign package. Launch MCC from Steam using its anti-cheat-disabled option for mods.".into());
+                if action != TestSolo { plan.steps.push("Use MCC's roster/friend invitation controls to join the same private lobby. Select the Halo: Combat Evolved custom campaign entry in the game menus.".into()); }
+                else {plan.steps.push("Choose the installed Halo: Combat Evolved campaign mod in MCC's game menus and test it alone first.".into());}
+            },
+            HostLan|DedicatedServer => plan.steps.push("This adapter has no verified automated MCC LAN or dedicated-server interface for custom Halo1 campaign Firefight. Use the documented private-lobby campaign workflow where available.".into()),
+        }
+        plan.limitations.push("Official Halo: Combat Evolved MCC campaign co-op is limited to two players. This does not establish arbitrary multiplayer-map AI synchronization.".into());
+        plan.limitations.push("The recovered zombie source currently has unresolved conversion errors; no playable MCC zombie package or Firefight integration has been demonstrated.".into());
+    } else {
+        if !runtime_id.allows_registration() {
+            plan.status = SupportStatus::Unsupported;
+        }
+        plan.steps.push("This profile has no verified hosting adapter. Preservation and map inspection do not imply executable, multiplayer or Firefight support.".into());
+    }
+    plan
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CapabilityEvidence {

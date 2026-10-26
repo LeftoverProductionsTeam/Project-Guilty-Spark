@@ -114,7 +114,7 @@ impl Library {
                 .source
                 .as_ref()
                 .map(|s| s.engine.clone())
-                .unwrap_or("Asset workshop".into()),
+                .unwrap_or_else(|| if project.quick_forge.is_some() { "QuickForge".into() } else { "Asset workshop".into() }),
             version: project.source.as_ref().map(|s| s.cache_version),
             sha256: project.source.as_ref().map(|s| s.sha256.clone()),
             modified_at: project.modified_at.clone(),
@@ -123,7 +123,7 @@ impl Library {
                 .map(|i| i.tags.len())
                 .or(previous.as_ref().map(|p| p.tag_count))
                 .unwrap_or(0),
-            object_count: project.scene.len(),
+            object_count: project.quick_forge.as_ref().map_or(project.scene.len(), |q| q.geometry.len() + q.placements.len() + q.spawns.len() + q.objectives.len()),
             status: project
                 .builds
                 .last()
@@ -244,6 +244,8 @@ impl Library {
         p.provenance = incoming.provenance;
         p.scene = incoming.scene;
         p.tag_edits = incoming.tag_edits;
+        p.quick_forge = incoming.quick_forge;
+        p.firefight = incoming.firefight;
         p.history = incoming.history;
         // Re-ingest referenced OBJ files with integrity checks; never trust a descriptor's compiled mesh or receipt paths.
         p.assets.clear();

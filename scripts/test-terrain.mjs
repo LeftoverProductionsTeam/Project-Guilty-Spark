@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { sculptTerrain, terrainVertexHeight } from '../src/terrain.ts';
+const make=()=>({id:'tile',name:'Tile',kind:'terrain',position:[0,0,0],rotation:[0,0,0],dimensions:[12,12,3],materialId:'surface',visible:true,locked:false,steps:8,heights:Array(81).fill(0)});
+let a=make();a=sculptTerrain(a,4,4,2,1,'raise');
+assert.equal(terrainVertexHeight(a,4,4),1);
+assert.equal(terrainVertexHeight(a,0,0),0);
+assert.equal(terrainVertexHeight(make(),4,4),0);
+a=sculptTerrain(a,4,4,0,0.4,'lower');assert.equal(terrainVertexHeight(a,4,4),0.6);
+a=sculptTerrain(a,4,4,3,1,'smooth');assert.notEqual(terrainVertexHeight(a,4,4),0.6);
+a=sculptTerrain(a,4,4,3,1,'flatten');assert.ok(a.heights.every(Number.isFinite));
+assert.throws(()=>sculptTerrain(a,100,0,1,1,'raise'),/bounds/);
+assert.throws(()=>sculptTerrain({...a,locked:true},1,1,1,1,'raise'),/unlocked/);
+a=sculptTerrain(make(),4,4,0,16,'lower');assert.equal(terrainVertexHeight(a,4,4),-2.9);
+console.log('PASS: terrain raise/lower/flatten/smooth, persistence shape, bounds, locked safeguards');

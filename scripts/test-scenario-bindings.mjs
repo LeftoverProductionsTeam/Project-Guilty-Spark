@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { inspectScenarioBindings } from '../src/scenarioBindings.ts';
+const exports=[{dependencies:['ai_encounter:test/grunts','ai_encounter:test/elites','trigger_volume:entrance','cutscene_camera_point:wide','ai_encounter:missing'],generatedOnly:true}];
+const inspected={encounters:[{name:'test',squads:['grunts']} ]};
+let results=inspectScenarioBindings(exports,inspected);
+assert.deepEqual(results.map(r=>r.status),['presentInImportedCache','absentInImportedCache','notInspectable','notInspectable','absentInImportedCache']);
+assert.ok(results[0].detail.includes('editable scenario'));
+results=inspectScenarioBindings(exports,null);
+assert.equal(results.length,5);assert.ok(results.every(r=>r.status==='notInspectable'));
+results=inspectScenarioBindings([{dependencies:['ai_encounter:test/grunts','ai_encounter:test/grunts']}],inspected);
+assert.equal(results.length,1);
+console.log('PASS: preview dependency evidence, squad validation, duplicate suppression, no compiled-game claims');

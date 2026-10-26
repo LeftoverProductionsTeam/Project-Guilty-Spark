@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {auditQuickForgeMesh} from '../src/haloMeshIntegrity.ts';
+const triangle={positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2]};
+assert.deepEqual(auditQuickForgeMesh(triangle).duplicateFaces,0);
+const duplicate={positions:[...triangle.positions,0,1,0,1,0,0,0,0,0],indices:[0,1,2,3,4,5]};
+assert.equal(auditQuickForgeMesh(duplicate).duplicateFaces,1);
+assert.deepEqual(auditQuickForgeMesh(duplicate).exampleDuplicateTriangles,[1]);
+assert.equal(auditQuickForgeMesh({positions:[0,0,0,.0001,0,0,0,1,0],indices:[0,1,2]}).shortEdges,1);
+assert.equal(auditQuickForgeMesh(triangle).shortEdges,0);
+assert.throws(()=>auditQuickForgeMesh({positions:[Infinity,0,0],indices:[0,1,2]}));
+assert.throws(()=>auditQuickForgeMesh({positions:[0,0,0],indices:[0,1,2]}));
+console.log('QuickForge independent duplicate-face and short-edge audit: PASS');

@@ -154,11 +154,11 @@ pub fn compatibility(
         warnings,
     }
 }
-struct Runner<'a> {
-    id: &'a str,
-    project: &'a str,
-    cancel: &'a AtomicBool,
-    event: &'a (dyn Fn(JobEvent) + Send + Sync),
+pub(crate) struct Runner<'a> {
+    pub(crate) id: &'a str,
+    pub(crate) project: &'a str,
+    pub(crate) cancel: &'a AtomicBool,
+    pub(crate) event: &'a (dyn Fn(JobEvent) + Send + Sync),
 }
 fn copy_verified_source(source: &Path, expected_sha256: &str, output: &Path) -> Result<()> {
     let file = fs::File::open(source)?;
@@ -201,7 +201,7 @@ impl Runner<'_> {
             timestamp: chrono::Utc::now().to_rfc3339(),
         });
     }
-    fn run(
+    pub(crate) fn run(
         &self,
         executable: &Path,
         args: &[String],
@@ -290,6 +290,14 @@ impl Runner<'_> {
         );
         drop(tx);
         let start = Instant::now();
+        // Halo Tool structure import can destroy or partially replace BSP tag
+        // fields when interrupted. Our job workspace is isolated, but even a
+        // staged BSP must not be treated as safe to terminate mid-write.
+        // A requested cancellation/soft timeout is honored *between* write
+        // phases, after the current native process exits by itself.
+        let protected_write_phase = matches!(phase, "structure" | "lightmaps" | "scenario");
+        let mut deferred_cancel = false;
+        let mut deferred_timeout = false;
         let mut output = String::new();
         let mut errors = vec![];
         let result = loop {
@@ -303,18 +311,33 @@ impl Runner<'_> {
                 }
                 self.emit(phase, line, progress, if err { "tool" } else { "info" });
             }
-            if self.cancel.load(Ordering::Relaxed) || start.elapsed() > Duration::from_secs(600) {
+            let cancel_requested = self.cancel.load(Ordering::Relaxed);
+            let soft_timed_out = start.elapsed() > Duration::from_secs(600);
+            if protected_write_phase {
+                if cancel_requested && !deferred_cancel {
+                    deferred_cancel = true;
+                    self.emit(phase, "Cancellation deferred: Halo tag-writing tool must finish naturally. Remaining build stages will be skipped; do not kill Tool externally.".to_string(), progress, "warning");
+                }
+                if soft_timed_out && !deferred_timeout {
+                    deferred_timeout = true;
+                    self.emit(phase, "Ten-minute soft limit reached during tag writing. Waiting for Tool to finish naturally; remaining stages will be skipped.".to_string(), progress, "warning");
+                }
+            } else if cancel_requested || soft_timed_out {
                 let _ = child.kill();
                 let _ = child.wait();
-                break invalid(if self.cancel.load(Ordering::Relaxed) {
-                    "Build cancelled; external tool terminated"
+                break invalid(if cancel_requested {
+                    "Build cancelled; non-structure external tool terminated"
                 } else {
                     "External tool exceeded its ten-minute timeout"
                 });
             }
             match child.try_wait() {
                 Ok(Some(status)) => {
-                    break if status.success() {
+                    break if protected_write_phase && (deferred_cancel || self.cancel.load(Ordering::Relaxed)) {
+                        invalid("Cancellation honored after native tag write completed; remaining build stages skipped")
+                    } else if protected_write_phase && deferred_timeout {
+                        invalid("Native tag writer completed after soft timeout. Inspect isolated outputs before retrying")
+                    } else if status.success() {
                         Ok(())
                     } else {
                         invalid(format!(

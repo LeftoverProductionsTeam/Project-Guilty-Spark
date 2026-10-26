@@ -53,6 +53,15 @@ pub struct PeerManifest {
     pub build_tool_version: Option<String>,
     pub build_verified: bool,
     pub resource_set_verified: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gameplay: Option<PeerGameplay>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PeerGameplay {
+    pub game_mode: String,
+    pub expected_players: u8,
+    pub configuration_sha256: Option<String>,
 }
 /// All flags are local evidence or peer declarations, never remote attestation.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -96,6 +105,14 @@ fn valid_hash(value: &str) -> bool {
             .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
 }
 pub fn validate_manifest(manifest: &PeerManifest) -> Result<()> {
+    if let Some(gameplay) = &manifest.gameplay {
+        if !["slayer","teamSlayer","ctf","king","oddball","race","firefight","zombie"].contains(&gameplay.game_mode.as_str())
+            || !(1..=16).contains(&gameplay.expected_players)
+            || (manifest.mode == SessionMode::MccCoopCampaign && gameplay.expected_players > 2)
+            || gameplay.configuration_sha256.as_deref().is_some_and(|h|!valid_hash(h)) {
+            return invalid("Invalid game mode, player count or gameplay configuration SHA-256");
+        }
+    }
     if manifest.schema_version != MANIFEST_SCHEMA_VERSION {
         return invalid("Unsupported peer-manifest schema version");
     }
@@ -190,6 +207,7 @@ pub fn create_manifest(
         build_tool_version: context.build_tool_version,
         build_verified: context.build_verified,
         resource_set_verified: context.resource_set_verified,
+        gameplay: None,
     };
     if inspection.header.build.contains("synthetic parser fixture") {
         manifest.build_verified = false;
@@ -305,6 +323,9 @@ pub fn compare(local: &PeerManifest, peer: &PeerManifest) -> Result<PeerPrefligh
         local.mode,
         SessionMode::MccCoopCampaign | SessionMode::NativeCoop
     );
+    if local.gameplay.is_some() || peer.gameplay.is_some() {
+        checks.push(check("gameplayConfiguration", if local.gameplay == peer.gameplay {Pass} else {Fail}, "Declared game mode, expected player count and gameplay configuration identity must match. This does not attest a running wave director."));
+    }
     checks.push(check("scenarioMode", if local.map.scenario_type == if campaign { 0 } else { 1 } && peer.map.scenario_type == if campaign { 0 } else { 1 } { Pass } else { Fail },
         "Scenario type must match the selected campaign or multiplayer mode; a matching type is not evidence of correct authored mechanics."));
     if local.runtime_id.is_native() || peer.runtime_id.is_native() {

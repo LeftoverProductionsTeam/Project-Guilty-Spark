@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { createSourceCollisionWorld, resolveSourceBody, stepSourceWalk } from '../src/liveCollision.ts';
+const make=(tris)=>({positions:tris.flatMap(t=>t.flat()),indices:tris.flatMap((_,i)=>[3*i,3*i+1,3*i+2])});
+const floor= [[[-5,-5,0],[5,-5,0],[5,5,0]],[[-5,-5,0],[5,5,0],[-5,5,0]]];
+const wall=[[[-2,1,0],[2,1,0],[2,1,3]],[[-2,1,0],[2,1,3],[-2,1,3]]];
+const world=createSourceCollisionWorld(make([...floor,...wall]));
+assert.equal(world.triangleCount,4);
+assert.equal(world.gameCollisionCompiled,false);
+let state={feet:[0,0,0.9],verticalSpeed:0,grounded:false,contacts:0};
+for(let i=0;i<90;i++) state=stepSourceWalk(world,state,[0,0,0],1/60);
+assert.ok(Math.abs(state.feet[2])<.018,`grounded at z=${state.feet[2]}`);
+assert.equal(state.grounded,true);
+for(let i=0;i<75;i++) state=stepSourceWalk(world,state,[0,4,0],1/60);
+assert.ok(state.feet[1]<0.76,`wall blocked movement y=${state.feet[1]}`);
+assert.ok(state.feet[1]>.55,'approached wall');
+// Sloped terrain: a continuous source ramp must support a player at different heights.
+const slope=[[[-5,-5,0],[5,-5,2],[5,5,2]],[[-5,-5,0],[5,5,2],[-5,5,0]]];
+const terrain=createSourceCollisionWorld(make(slope));
+let hill={feet:[0,0,2.5],verticalSpeed:0,grounded:false,contacts:0};
+for(let i=0;i<90;i++) hill=stepSourceWalk(terrain,hill,[0,0,0],1/60);
+assert.ok(hill.feet[2]>.95&&hill.feet[2]<1.2,`sculpted terrain height ${hill.feet[2]}`);
+// Cave shell wall: standing inside corridor must not pass through side wall.
+const caveWall=createSourceCollisionWorld(make([...floor,[[ -1,-5,0],[-1,5,0],[-1,5,3]],[[-1,-5,0],[-1,5,3],[-1,-5,3]]]));
+let cave={feet:[0,0,0],verticalSpeed:0,grounded:false,contacts:0};
+for(let i=0;i<60;i++) cave=stepSourceWalk(caveWall,cave,[-4,0,0],1/60);
+assert.ok(cave.feet[0]>-.72,`cave wall blocked ${cave.feet[0]}`);
+assert.throws(()=>createSourceCollisionWorld({positions:[0,0,0],indices:[5,0,1]}),/Invalid source collision triangle index/);
+assert.throws(()=>createSourceCollisionWorld({positions:[0,0,0,1,0,0,2,0,0],indices:[0,1,2]}),/Degenerate triangle/);
+assert.throws(()=>stepSourceWalk(world,state,[100,0,0],1/60),/sandbox limits/);
+console.log('PASS: real source triangle ground, sculpted slopes, walls, cave walls, bounds and safety');

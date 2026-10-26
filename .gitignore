@@ -1,19 +1,21 @@
 node_modules/
-dist/
 target/
+dist/
+*.tsbuildinfo
+*.log
+.cache/
+.DS_Store
 .toolchain/
 .research/
 .local/
 test-results/
 playwright-report/
-*.log
 *.gsproject.bak*
-.DS_Store
-*.tsbuildinfo
 *.map
 *.yelo
 /Pyros Zombie Apocolypse Mod Versions/
 /SAMPLE CODE/
-/src-tauri/gen/schemas/
+/src-tauri/gen/
 /src-tauri/icons/android/
 /src-tauri/icons/ios/
+/releases/

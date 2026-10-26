@@ -12,3 +12,21 @@
   border-color: #34535f;
   backdrop-filter: blur(5px);
 }
+
+/* Read-only local DDS/PNG shader assignment; not a compiled Halo material. */
+.material-lens-assignment { display:flex; flex-direction:column; padding:7px; gap:5px; border-bottom:1px solid rgba(140,160,180,.18); }
+.material-lens-assignment > button { text-align:left; }
+.shader-file-pick { font-size:12px; overflow-wrap:anywhere; display:flex; flex-direction:column; gap:4px; }
+.shader-file-pick input { max-width:100%; font-size:11px; }
+
+/* Editor convention: translation gizmo axes are always red X, green Y, blue Z. */
+.gs-axis-x {color:#ff6e6e!important}
+.gs-axis-y {color:#70e39b!important}
+.gs-axis-z {color:#73baff!important}
+
+/* Keep material actions in the inspector's scroll flow. Flex shrinking the
+   material section let its contents overlap the following empty-state panel. */
+.world-layout > .inspector { overflow-y:auto; }
+.world-layout > .inspector > .material-lens,
+.world-layout > .inspector > .inspector-placeholder,
+.world-layout > .inspector > .gs-world-environment-panel { flex-shrink:0; }

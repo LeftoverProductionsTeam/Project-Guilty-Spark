@@ -162,7 +162,7 @@ export default function Build({
                     onClick={() =>
                       void onAction(
                         () => call('cancel_build', { jobId: activeJob }),
-                        'Cancellation requested. The active converter will be terminated.',
+                        'Cancellation requested. Write-sensitive compilation may defer stopping until a safe boundary; watch the job status.',
                       )
                     }
                   >

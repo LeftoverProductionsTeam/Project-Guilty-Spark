@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 async function mockDesktop(page: Page) {
   await page.addInitScript(() => {
+    localStorage.setItem('guilty-spark-first-run-seen-v1', 'yes');
     const w = window as any;
     const settings = {
       steamDirectory: null,

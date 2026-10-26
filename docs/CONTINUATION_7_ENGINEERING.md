@@ -1,0 +1,44 @@
+# Project Guilty Spark - Continuation 7: Live Authoring, Source Collision, and Toolchain Safety
+
+Date: 2026-10-26. Exact baseline: `Project_Guilty_Spark_07_Halo_Modding_Brain_Continuation_6_SOURCE.zip`. This is a full source-code continuation, not an installer or a claim that all ten historical phases are finished.
+
+## Code changes with inspectable evidence
+
+1. **Immediate source collision walk preview** - `src/liveCollision.ts`, `src/components/ForgeViewport.tsx`, `src/components/QuickForge.tsx`. A deterministic bounded spatial index of triangles from `quickforge_preview` resolves a player-shaped body against source floors, sloped terrain, walls and cave surfaces, with gravity and WASD movement. First-person Source collision can be disabled. The mesh is regenerated when QuickForge edits change the source. This is an editor **simulation** only, not Halo engine collision or networked runtime execution. Degenerate, out-of-bounds or over-budget mesh data is rejected.
+2. **Terrain border source stitching** - `crates/spark-core/src/quickforge.rs`, `src/terrainJoinAnalysis.ts`, `src/snapGeometry.ts`. Exact adjacent, unrotated, equal-dimension and equal-step terrain tiles at the same elevation may match when *every shared boundary vertex height agrees*. The source generator omits both duplicate internal perimeter walls, preserving a closed shared source shell. Three-way ambiguities or mismatched borders fail closed. `TERRAIN_SOURCE_SEAM` is an informational warning. Adjacent terrain snapping is optional via **Mesh Snap (M)**, independent of **Grid Snap (G)**. Existing exact cave-rim source joining and source brush face alignment remain available. Room-to-cave BSP CSG remains unimplemented.
+3. **Kit-aware tool selection** - `src/toolchainProfiles.ts`, `src/components/Runtimes.tsx`, `src/components/Workspaces.tsx` and native `src-tauri/src/app.rs`. The editor separates classic HEK from MCC/H1A Editing Kit using an explicit preference. The Runtimes tool shelf displays capability, installed executable status and required consent. Explicitly requested native GUI launches can open a separately installed Sapien, Guerilla, Invader Qt, or H1A standalone next to Guilty Spark. CLI tools remain under managed actions; no arbitrary command execution or shell input is permitted. The native bridge restricts executables to known filenames in configured directories, rejects filesystem links, and requires opt-in. It does not inject into a game or provide an embedded Sapien engine.
+4. **Correct Tool flags by generation** - `crates/spark-core/src/forge_build.rs`. Classic HEK does not support the newer H1A custom path switches, so its Tool invocation relies on the *isolated working directory's* `data/` and `tags/` source trees. H1A uses explicit `-data_dir`, `-tags_dir`, and `-game_root_dir` overrides. An unset/mismatched kit flavor blocks a game-build attempt. OpenCE/ChupathingyCE builds remain blocked until version-specific Tool and game validation; source export stays available. Added Rust tests for CLI argument policy, not executed here.
+5. **Task-based Modding Academy and help** - `src/tutorialAcademy.ts`, `src/components/Academy.tsx`, `src/academy.css`, `src/components/ui.tsx`, and `src/App.tsx`. Nine distinct lessons cover preserving original maps; original arena; sculpting/connecting terrain; real cave-seam constraints; Rocket Pistol tag dependencies; cross-map assets; First Contact; Firefight/Zombie Apocalypse; and runtime/multiplayer/legacy. Lessons have actual workspace navigation, explanations and conservative saved-state checkpoints. Game tests and unimplemented operations cannot be auto-awarded as complete. Tooltips and glossary define UI actions, Halo tags/BSP/JMS, compiled-vs-source collision, portals/PVS, Grid/Mesh Snap, and Tag Test.
+6. **UI clarity** - Contextual hover/keyboard-focus help in QuickForge and its palettes; separate camera, mesh and grid controls, explicit simulation labels, source seam counts, cross-map transfer descriptions, safe OBJ/JMS and actual .tag extraction tooltips. Asset Workshop and Tag Browser continue to separate actual file data from identity-only manifests.
+
+## Important limits and known issues
+
+- `Source collision` shares regenerated QuickForge source triangles, but is an approximate bounded body/surface simulator. It lacks Halo's original collision BSP implementation, collision material properties, moving objects, accurate crouching/jumping/steps, AI pathfinding, physics and live game process integration.
+- Imported, compiled Halo cache BSPs are still **read-only**. You cannot surgically extend a compiled map in-place with correct collision, portals/PVS/lightmaps or create a game-ready cave entrance merely by snapping meshes.
+- Cave-to-cave and exact terrain-to-terrain source joins are not automatically a game-ready world. Export and compile against the correct licensed kit; use Tool's WRL geometry diagnostics. Do not treat matching AABBs or nonzero snap distances as proof of a weld.
+- Native toolchain commands and new Rust geometry tests have **not** been compiled or run against the installed Windows tools in this environment. No Windows/Rust compiler or Halo installation was available. Launcher exact filename, command layout and runtime behavior need owner tests. GUI tools launched beside the editor may edit files the owner opens in them: use an isolated working tag tree, never stock source data.
+- Halo scripts from Creator Studio remain source-only until the target scenario has matching objects/encounters and scripts compile. In *classic HEK*, scripts must be compiled into the scenario via Sapien. H1A automatically compiles them when loading/building supported scenarios. Neither is done automatically by this release.
+- Authentic bitmap/shader/lightmap/water/sky decoding from installed Halo resources, compile-to-play of arbitrary edited BSP/terrain/caves, complete campaign content, engine Firefight/Zombie Apocalypse and multiplayer AI replication are still unfinished.
+- No anti-cheat, installed maps, system networking, firewall settings, executables or original historical archives are modified by the new code. The source ZIP contains no Halo art/audio or third-party tools.
+
+## Evidence in this environment
+
+- `npm run test:offline`: **19 groups passed**, including the previous 15 groups and new `test-live-collision.mjs`, `test-toolchain-profiles.mjs`, `test-academy.mjs`, `test-terrain-joins.mjs`.
+- Standalone strict TypeScript check: new core modules `liveCollision.ts`, `toolchainProfiles.ts`, `tutorialAcademy.ts`, `terrainJoinAnalysis.ts`, `snapGeometry.ts` passed.
+- All current `src/**/*.{ts,tsx}` source parsed with zero TS syntax diagnostics. **This is not a complete React/Vite typecheck or a functioning application build**.
+- New Rust regression tests for terrain joins in `crates/spark-core/tests/terrain_caves.rs` and HEK CLI flag generation in `forge_build.rs`: code added; **not executed** here.
+- Full `cargo test`, `pnpm install`, Tauri Windows app launch, GPU/viewport QA, actual Tool/Invader operations, Halo gameplay and 2+ player network tests: **NOT RUN**.
+- For first owner action, see `CONTINUATION_7_TEST_CARD.md`.
+
+## Near-term engineering order
+
+1. Run **Rust compilation** on a licensed/compatible Windows development machine. Fix any genuine compiler errors in `quickforge.rs`, `forge_build.rs`, `app.rs` without weakening geometry and source-preservation gates.
+2. Verify **live source walk** on a clean original arena, adjoining equal-height terrain tiles, edited slopes, and matching tunnel pairs. Confirm no phantom collision and no unsafe source writes.
+3. Verify installed classic HEK vs MCC/H1A native tool inventory and explicit external GUI launch. Validate Tool paths in separate job directories; verify command help/version before building source.
+4. Complete authentic Halo shader, bitmap and lightmap extraction with resource-cache addressing; test real user-owned map assets and visual comparisons.
+5. Implement validated **editable source reconstruction** of imported BSP, BSP/room-cave Boolean cuts, closed topology, exact portals, correct collision and runtime lightmaps; repeat Tool/WRL tests until Halo loads the result.
+6. Integrate real scenario object creation, AI navigation, scripted campaign triggers, waves and checkpoints; prove First Contact and Zombie Apocalypse inside the chosen engine.
+7. Engineer version-specific multiplayer AI networking/hosting if supported, share/rollback, and perform real two-client private playtests. Keep MCC and native CE capabilities separate.
+8. Finish authentic Halo CE local-resource Theme Forge, tutorial Rocket Pistol project, and Mac Demo/G4 compatibility/export proofs.
+
+The source preserves earlier original 92-requirement reconstruction and ten-phase matrix. No previous request is silently treated as completed.

@@ -1,0 +1,73 @@
+.gs-academy-layout {display:grid;grid-template-columns:minmax(220px,285px) minmax(0,1fr);gap:18px;align-items:start}
+.gs-academy-lessons {display:flex;flex-direction:column;gap:8px}
+.gs-lesson-item {display:flex;flex-direction:column;gap:7px;text-align:left;padding:13px;border-radius:9px;background:rgba(100,160,190,.06);border:1px solid rgba(160,195,210,.17);color:inherit}
+.gs-lesson-item.active {border-color:rgba(155,236,205,.65);background:rgba(112,196,163,.11)}
+.gs-lesson-heading {display:flex;gap:8px;align-items:center}.gs-lesson-item small {opacity:.72}
+.gs-academy-body {min-width:0}.gs-lesson-intro {padding:16px;border-radius:10px;background:rgba(90,140,166,.08);margin-bottom:16px}
+.gs-lesson-intro h2 {margin:8px 0}.gs-lesson-steps {list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.gs-lesson-step {padding:16px;border-radius:10px;border:1px solid rgba(160,193,209,.2);background:rgba(65,116,135,.065)}
+.gs-lesson-step-heading {display:flex;align-items:center;gap:9px}.gs-lesson-step-heading h3 {margin:0;flex:1}
+.gs-step-index {width:25px;height:25px;border-radius:50%;background:rgba(133,196,180,.18);display:grid;place-items:center;font-size:12px;font-weight:700}
+.gs-lesson-step p {margin:9px 0}.gs-step-footer {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}.gs-step-footer button {margin-left:auto;display:flex;align-items:center;gap:5px}
+.gs-step-footer .subtle {display:flex;gap:5px;align-items:center}.gs-lesson-source {margin-top:16px;padding:15px;border:1px solid rgba(150,170,188,.25);border-radius:9px}.gs-lesson-source summary {cursor:pointer;display:flex;align-items:center;gap:7px}
+@media (max-width:880px){.gs-academy-layout{grid-template-columns:1fr}.gs-academy-lessons{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}}
+
+.gs-academy-glossary { display:grid; grid-template-columns: minmax(110px,28%) 1fr; gap: 0.6rem 1rem; margin: 0.8rem 0 0; font-size: 0.875rem; }
+.gs-academy-glossary dt { font-weight: 700; }
+.gs-academy-glossary dd { margin:0; color:var(--text-secondary,var(--fg-muted,#a9bdc3)); line-height:1.5; }
+@media (max-width:560px) {.gs-academy-glossary{grid-template-columns:1fr;gap:.2rem;}.gs-academy-glossary dd{margin-bottom:.6rem}}
+
+/* A modern, restrained Halo-inspired workflow atlas: original content only. */
+.gs-legacy-lab {margin:18px 0 22px;min-width:0}
+.gs-legacy-lab .section-heading {display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.gs-legacy-lab .section-heading h2,.gs-legacy-lab .section-heading h3 {display:flex;align-items:center;gap:9px;margin:0}
+.gs-legacy-lab p {line-height:1.55}
+.gs-legacy-picker {display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:16px 0}
+.gs-legacy-picker button {padding:12px;text-align:left;min-height:58px;border-radius:9px;border:1px solid rgba(157,195,218,.24);background:rgba(32,83,106,.17);color:inherit;font:inherit;font-size:.88rem;font-weight:600;cursor:pointer}
+.gs-legacy-picker button.selected {border-color:rgba(153,231,209,.8);background:linear-gradient(115deg,rgba(60,135,148,.28),rgba(76,175,151,.16))}
+.gs-legacy-picker button:focus-visible {outline:2px solid var(--accent,#9fdfc7);outline-offset:3px}
+.gs-legacy-details {padding:16px;border:1px solid rgba(138,187,203,.25);border-radius:10px;background:rgba(35,89,105,.1)}
+.gs-legacy-summary {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.gs-legacy-summary>div {padding:14px;border-left:3px solid rgba(133,199,214,.55);background:rgba(56,103,125,.11);border-radius:5px}
+.gs-legacy-summary h3 {margin:6px 0}.gs-legacy-summary p {margin:7px 0 0}
+.gs-legacy-overline {font-size:.73rem;font-weight:800;letter-spacing:.1em;color:var(--text-secondary,#acc5cd)}
+.gs-legacy-warning {display:flex;align-items:start;gap:8px;border-left:3px solid rgba(208,169,99,.7);padding:9px 12px;background:rgba(150,110,40,.09)}
+.gs-legacy-checks {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.gs-legacy-check {display:flex;align-items:start;gap:9px;padding:10px;border:1px solid rgba(143,181,197,.2);border-radius:7px}
+.gs-legacy-check>div {flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.gs-legacy-check small {font-size:.79rem;line-height:1.4;opacity:.77}
+.gs-legacy-check>.pill {white-space:nowrap}
+.gs-legacy-actions {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:15px}
+.gs-legacy-actions a {display:inline-flex;align-items:center;gap:5px}
+.gs-legacy-details code {overflow-wrap:anywhere}
+@media (max-width:760px){.gs-legacy-summary,.gs-legacy-checks{grid-template-columns:1fr}}
+
+/* C28: opt-in classic companions within the existing Academy workbench. */
+.gs-companions {margin-top:22px;padding:18px;border:1px solid rgba(144,204,207,.35);border-radius:10px;background:linear-gradient(130deg,rgba(38,91,107,.18),rgba(39,60,69,.1))}
+.gs-companions .section-heading {display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.gs-companions .section-heading h3 {margin:0;font-size:1.08rem}
+.gs-companion-runtimes {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:13px 0}
+.gs-companion-runtime {display:flex;align-items:start;flex-direction:column;gap:8px;border:1px solid rgba(135,168,190,.24);padding:12px;border-radius:8px;background:rgba(26,56,76,.17)}
+.gs-companion-runtime small {color:#adc4ce;line-height:1.55}
+.gs-companion-catalog {display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:8px}
+.gs-companion-catalog button {color:inherit;min-height:66px;padding:10px;background:rgba(25,70,91,.2);border:1px solid rgba(125,178,192,.25);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;cursor:pointer}
+.gs-companion-catalog button.selected {border-color:rgba(155,230,197,.9);box-shadow:inset 0 0 0 1px rgba(155,230,197,.15)}
+.gs-companion-catalog button span:first-child {display:flex;flex-direction:column;gap:5px}
+.gs-companion-catalog small {font-size:.77rem;color:#a5bac4}
+.gs-companion-picker {display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:10px 0}
+.gs-companion-picker label {display:flex;flex-direction:column;gap:6px;min-width:240px}
+.gs-companion-register {padding:14px;margin-top:14px;border-radius:8px;border:1px solid rgba(126,175,187,.25)}
+.gs-companion-register p {margin:0 0 10px}
+.gs-companion-register small {color:#a8c0cc}
+.gs-companion-registered {margin-top:18px}
+.gs-companion-row {display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 0;border-top:1px solid rgba(145,185,200,.22)}
+.gs-companion-row>div {flex:1;min-width:190px;display:flex;flex-direction:column;gap:5px}
+.gs-companion-row small,.gs-companion-row .subtle {font-size:.78rem;color:#b1c8cf}
+.gs-companion-confirm {border-left:3px solid #8ac4b0;padding:11px;background:rgba(61,125,98,.12)}
+.gs-companions .subtle svg {vertical-align:middle}
+@media(max-width:760px){.gs-companion-runtimes{grid-template-columns:1fr}}
+
+.gs-legacy-migration-bridge {margin:18px 0;padding:14px 16px;border:1px solid rgba(142,196,172,.32);border-radius:9px;background:linear-gradient(140deg,rgba(26,64,65,.28),rgba(15,29,37,.45))}
+.gs-legacy-migration-bridge strong {color:#c4ebe0}
+.gs-legacy-migration-bridge p {color:#aac4c5;line-height:1.65}
+.gs-legacy-migration-bridge button {display:inline-flex;align-items:center;gap:8px}

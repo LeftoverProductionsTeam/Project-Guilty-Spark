@@ -1,0 +1,289 @@
+//! Bounded, read-only Halo 1 shared-resource index inspection.
+//!
+//! The classic resource-map header is 16 bytes; its 12-byte entries point at
+//! path strings (relative to the path table) and opaque resource data. Published
+//! format references disagree on the bitmap map's numeric *type* code (0/1).
+//! We accept those two observed codes for INDEX INSPECTION, but require an
+//! explicitly named, user-selected, SHA-256-pinned `bitmaps.map`, an exact tag
+//! path, and an enclosing resource entry before exposing any raw bitmap bytes.
+//! No offsets are inferred from tag IDs or fuzzy filenames. MCC ipaks and
+//! external *tag metadata* are not covered by this reader.
+use crate::{invalid, reject_links, Result, SparkError};
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::{Read, Seek, SeekFrom}, path::Path};
+use sha2::{Digest, Sha256};
+
+const MAX_RESOURCE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const MAX_RESOURCES: usize = 65_535;
+const MAX_PATH_BYTES: u64 = 240;
+
+#[derive(Clone, Debug)]
+pub struct ResourceEntry {
+    pub path: String,
+    pub data_offset: u64,
+    pub data_size: u64,
+}
+#[derive(Clone, Debug)]
+pub struct ResourceIndex {
+    pub kind_code: u32,
+    pub file_size: u64,
+    pub entries: Vec<ResourceEntry>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceMapAudit {
+    pub kind_code: u32,
+    pub resource_count: usize,
+    pub exact_bitmap_path_matches: usize,
+    pub missing_bitmap_path_matches: usize,
+    pub ambiguous_bitmap_paths: usize,
+    pub resource_sha256: String,
+    pub warning: String,
+}
+
+fn u32_at(bytes: &[u8], at: usize) -> Result<u32> {
+    let value = bytes.get(at..at + 4)
+        .ok_or_else(|| SparkError::Invalid("Truncated shared-resource index".into()))?;
+    Ok(u32::from_le_bytes(value.try_into().unwrap()))
+}
+fn read_exact_at(file: &mut File, at: u64, out: &mut [u8]) -> Result<()> {
+    file.seek(SeekFrom::Start(at))?;
+    file.read_exact(out)?;
+    Ok(())
+}
+fn checked_end(at: u64, size: u64, limit: u64) -> Result<()> {
+    if at.checked_add(size).is_none_or(|end| end > limit) {
+        return invalid("Shared-resource offset or length escapes its file");
+    }
+    Ok(())
+}
+/// No case-sensitive filesystem assumption: Halo paths are logical, delimited
+/// by backslashes. Reject unsafe path components rather than normalizing them.
+fn normalize_path(value: &str) -> Result<String> {
+    crate::safe_relative(value)?;
+    Ok(value.replace('/', "\\").to_ascii_lowercase())
+}
+
+/// Validate every entry and string before returning the index. The input is
+/// ALWAYS an already-opened, non-link, exact `bitmaps.map` file.
+fn parse_index(file: &mut File, len: u64) -> Result<ResourceIndex> {
+    if !(16..=MAX_RESOURCE_BYTES).contains(&len) { return invalid("Unsupported shared-resource file length"); }
+    let mut hdr = [0u8; 16];
+    read_exact_at(file, 0, &mut hdr)?;
+    let kind = u32_at(&hdr, 0)?;
+    // Both 0 and 1 appear in independent historical references. Neither is
+    // treated as proof of pixel format or as authority to bypass path checks.
+    if kind != 0 && kind != 1 { return invalid("Not a recognized classic bitmap resource-map header"); }
+    let paths = u32_at(&hdr, 4)? as u64;
+    let index_offset = u32_at(&hdr, 8)? as u64;
+    let count = u32_at(&hdr, 12)? as usize;
+    if count == 0 || count > MAX_RESOURCES { return invalid("Shared-resource count is empty or excessive"); }
+    let index_size = (count as u64).checked_mul(12)
+        .ok_or_else(|| SparkError::Invalid("Shared-resource index length overflow".into()))?;
+    if paths < 16 || index_offset < 16 { return invalid("Shared-resource table overlaps header"); }
+    checked_end(index_offset, index_size, len)?;
+    if paths >= len { return invalid("Shared-resource path table is outside the file"); }
+    let mut array = vec![0u8; index_size as usize];
+    read_exact_at(file, index_offset, &mut array)?;
+    let mut entries = Vec::with_capacity(count);
+    for i in 0..count {
+        let at = i * 12;
+        let path_rel = u32_at(&array, at)? as u64;
+        let data_size = u32_at(&array, at + 4)? as u64;
+        let data_offset = u32_at(&array, at + 8)? as u64;
+        if data_size == 0 { return invalid("Shared-resource entry has no data"); }
+        checked_end(data_offset, data_size, len)?;
+        // Raw data may legitimately be located before the index; never allow
+        // it to refer into the index or its header.
+        if data_offset < 16 ||
+            (data_offset < index_offset + index_size && data_offset + data_size > index_offset) {
+            return invalid("Shared-resource data overlaps the header/index");
+        }
+        let path_at = paths.checked_add(path_rel)
+            .ok_or_else(|| SparkError::Invalid("Shared-resource path pointer overflow".into()))?;
+        if path_at < 16 || path_at >= len ||
+            (path_at >= index_offset && path_at < index_offset + index_size) {
+            return invalid("Shared-resource path pointer overlaps header/index or escapes file");
+        }
+        let available = (len - path_at).min(MAX_PATH_BYTES + 1) as usize;
+        let mut buf = vec![0u8; available];
+        read_exact_at(file, path_at, &mut buf)?;
+        let end = buf.iter().position(|b| *b == 0)
+            .ok_or_else(|| SparkError::Invalid("Unterminated or oversized shared-resource path".into()))?;
+        let raw_path = std::str::from_utf8(&buf[..end])
+            .map_err(|_| SparkError::Invalid("Non-UTF8 shared-resource path".into()))?;
+        let path = normalize_path(raw_path)?;
+        entries.push(ResourceEntry {path, data_offset, data_size});
+    }
+    Ok(ResourceIndex { kind_code: kind, file_size: len, entries })
+}
+
+fn verify_handle_hash(file: &mut File, expected_sha256: &str) -> Result<()> {
+    let mut hasher = Sha256::new();
+    file.seek(SeekFrom::Start(0))?;
+    let mut buf = [0u8; 65536];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 { break; }
+        hasher.update(&buf[..n]);
+    }
+    if format!("{:x}",hasher.finalize()) != expected_sha256.to_ascii_lowercase() {
+        return invalid("bitmaps.map differs from this project's recorded SHA-256");
+    }
+    Ok(())
+}
+
+/// Borrow one file for its SHA check and subsequent range reads; an additional
+/// SHA pass after reading detects a modified resource during extraction.
+pub fn open_verified(path: &Path, expected_sha256: &str) -> Result<(File, ResourceIndex)> {
+    if !matches!(path.file_name().and_then(|n| n.to_str()), Some(n) if n.eq_ignore_ascii_case("bitmaps.map")) {
+        return invalid("Select the exact bitmaps.map file, not a different resource map");
+    }
+    if expected_sha256.len() != 64 || !expected_sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return invalid("An explicit recorded resource SHA-256 is required");
+    }
+    reject_links(path)?;
+    let mut file = File::open(path)?;
+    let meta = file.metadata()?;
+    if !meta.is_file() || !(16..=MAX_RESOURCE_BYTES).contains(&meta.len()) {
+        return invalid("The pinned bitmap resource is not a regular bounded file");
+    }
+    let len = meta.len();
+    verify_handle_hash(&mut file, expected_sha256)?;
+    let index = parse_index(&mut file, len)?;
+    verify_handle_hash(&mut file, expected_sha256)?;
+    Ok((file, index))
+}
+impl ResourceIndex {
+    fn exact(&self, requested: &str) -> Result<&ResourceEntry> {
+        let name = normalize_path(requested)?;
+        let mut found = self.entries.iter().filter(|e| e.path == name);
+        let first = found.next().ok_or_else(|| SparkError::Invalid(
+            "No exact bitmap tag path in the selected resource index; fuzzy matching refused".into()))?;
+        if found.next().is_some() { return invalid("Multiple shared-resource entries use the same bitmap path"); }
+        Ok(first)
+    }
+    fn count_exact(&self, name: &str) -> usize {
+        normalize_path(name).map(|p| self.entries.iter().filter(|e| e.path == p).count()).unwrap_or(0)
+    }
+}
+
+pub fn audit(path: &Path, expected_sha256: &str, bitmap_paths: &[String]) -> Result<ResourceMapAudit> {
+    let (_file, index) = open_verified(path, expected_sha256)?;
+    let mut exact = 0;
+    let mut missing = 0;
+    let mut ambiguous = 0;
+    for path in bitmap_paths {
+        match index.count_exact(path) {
+            1 => exact += 1,
+            0 => missing += 1,
+            _ => ambiguous += 1,
+        }
+    }
+    Ok(ResourceMapAudit {
+        kind_code: index.kind_code,
+        resource_count: index.entries.len(),
+        exact_bitmap_path_matches: exact,
+        missing_bitmap_path_matches: missing,
+        ambiguous_bitmap_paths: ambiguous,
+        resource_sha256: expected_sha256.to_ascii_lowercase(),
+        warning: "Index audit only. Exact path matches are not decoded textures; resource-map type codes vary across historical references. External tag metadata, MCC ipaks and unverified pixel offsets remain unsupported.".into(),
+    })
+}
+
+/// Re-check an already-open, pinned resource handle after a group of reads.
+/// No new path is followed and no data is returned until this check succeeds.
+pub(crate) fn verify_open_handle_hash(file: &mut File, sha256: &str) -> Result<()> {
+    verify_handle_hash(file, sha256)
+}
+
+/// Read from an already verified handle and index. The *caller* must verify the
+/// same handle's SHA-256 again after ALL reads, before exposing any results.
+/// This lets a whole preview batch share one bounded index and hash pass.
+pub(crate) fn read_external_top_mip_from_verified(
+    file: &mut File,
+    index: &ResourceIndex,
+    tag_path: &str,
+    raw_offset: u64,
+    declared_size: u64,
+    top_mip_size: usize,
+) -> Result<Vec<u8>> {
+    if top_mip_size == 0 || top_mip_size > 16 * 1024 * 1024 || declared_size < top_mip_size as u64 {
+        return invalid("Invalid or oversized external bitmap mipmap");
+    }
+    let entry = index.exact(tag_path)?;
+    let entry_end = entry.data_offset.checked_add(entry.data_size)
+        .ok_or_else(|| SparkError::Invalid("External resource span overflow".into()))?;
+    if raw_offset < entry.data_offset ||
+        raw_offset.checked_add(top_mip_size as u64).is_none_or(|end| end > entry_end || end > index.file_size) ||
+        raw_offset.checked_add(declared_size).is_none_or(|end| end > entry_end) {
+        return invalid("Pixel range not proven to belong to the exact bitmap resource entry");
+    }
+    let mut bytes = vec![0u8; top_mip_size];
+    read_exact_at(file, raw_offset, &mut bytes)?;
+    Ok(bytes)
+}
+
+/// Returns one precisely bounded top-mip byte range only when its raw offset
+/// is demonstrably inside a unique resource entry with the exact tag path.
+/// Other external layouts are deliberately unsupported. Nothing is persisted.
+pub fn read_external_top_mip(path: &Path, expected_sha256: &str, tag_path: &str, raw_offset: u64, declared_size: u64, top_mip_size: usize) -> Result<Vec<u8>> {
+    let (mut file, index) = open_verified(path, expected_sha256)?;
+    let pixels = read_external_top_mip_from_verified(
+        &mut file, &index, tag_path, raw_offset, declared_size, top_mip_size,
+    )?;
+    // Prevent a concurrent source-file change from creating an apparently
+    // verified image after a valid initial SHA read.
+    verify_open_handle_hash(&mut file, expected_sha256)?;
+    Ok(pixels)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    fn fixture() -> (tempfile::NamedTempFile, String) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bitmaps.map");
+        let mut bytes = vec![0u8; 0x500];
+        let put = |b: &mut [u8], at: usize, x: u32| b[at..at+4].copy_from_slice(&x.to_le_bytes());
+        put(&mut bytes,0,0); put(&mut bytes,4,0x100); put(&mut bytes,8,0x40); put(&mut bytes,12,1);
+        put(&mut bytes,0x40,0);put(&mut bytes,0x44,64);put(&mut bytes,0x48,0x300);
+        bytes[0x100..0x100+18].copy_from_slice(b"test\\wall\\albedo\0\0");
+        bytes[0x300..0x340].fill(0x5a);
+        let mut f = File::create(&path).unwrap();f.write_all(&bytes).unwrap();f.sync_all().unwrap();
+        let sha = format!("{:x}",Sha256::digest(&bytes));
+        // Keep the directory alive while returning a NamedTempFile-like handle.
+        let copy = tempfile::NamedTempFile::new().unwrap();
+        std::fs::copy(&path,copy.path()).unwrap();
+        (copy,sha)
+    }
+    #[test] fn bounded_index_and_verified_exact_span() {
+        let (tmp,sha) = fixture();
+        // The parser fixture has a neutral temp basename; rename within a
+        // dedicated temp directory for the strict resource identity check.
+        let dir = tempfile::tempdir().unwrap();
+        let path=dir.path().join("bitmaps.map");std::fs::copy(tmp.path(),&path).unwrap();
+        let (_,index)=open_verified(&path,&sha).unwrap();
+        assert_eq!(index.entries.len(),1);
+        let bytes=read_external_top_mip(&path,&sha,"TEST/wall/albedo",0x300,64,16).unwrap();
+        assert_eq!(bytes,vec![0x5a;16]);
+        assert!(read_external_top_mip(&path,&sha,"test/wall/other",0x300,64,16).is_err());
+        assert!(read_external_top_mip(&path,&sha,"test/wall/albedo",0x2ff,64,16).is_err());
+        assert!(open_verified(&path,&"0".repeat(64)).is_err());
+    }
+    #[test] fn malformed_index_and_traversal_fail_closed() {
+        let (tmp,_sha)=fixture();
+        let mut file=File::open(tmp.path()).unwrap();
+        let len=file.metadata().unwrap().len();
+        assert_eq!(parse_index(&mut file,len).unwrap().entries[0].path,"test\\wall\\albedo");
+        let mut bytes=std::fs::read(tmp.path()).unwrap();
+        bytes[0x100..0x105].copy_from_slice(b"../x\0");
+        let mut file=tempfile::NamedTempFile::new().unwrap();file.write_all(&bytes).unwrap();
+        assert!(parse_index(file.as_file_mut(), bytes.len() as u64).is_err());
+        let mut bytes=std::fs::read(tmp.path()).unwrap();
+        bytes[0x48..0x4c].copy_from_slice(&0xffff_fff0u32.to_le_bytes());
+        let mut file=tempfile::NamedTempFile::new().unwrap();file.write_all(&bytes).unwrap();
+        assert!(parse_index(file.as_file_mut(), bytes.len() as u64).is_err());
+    }
+}

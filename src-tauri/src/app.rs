@@ -1,7 +1,7 @@
 use notify::Watcher;
 use serde::{Deserialize, Serialize};
 use spark_core::{
-    self as core, archive, assets, audio,
+    self as core, archive, assets, audio, quickforge, forge_build, firefight, tag_exchange,
     build::{self, JobEvent, Toolchain},
     library::{Library, LibraryEntry},
     maps::{self, MapInspection, MeshData},
@@ -19,7 +19,9 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
-    time::Duration,
+    time::{Duration, Instant},
+    io::Read,
+    process::Stdio,
 };
 use tauri::{Emitter, Manager, State};
 type Reply<T> = std::result::Result<T, String>;
@@ -35,6 +37,10 @@ struct Settings {
     resource_directory: Option<PathBuf>,
     metadata_template_directory: Option<PathBuf>,
     native_executable: Option<PathBuf>,
+    hek_directory: Option<PathBuf>,
+    /// Explicit family selector prevents invoking classic HEK against MCC tags.
+    hek_flavor: Option<String>,
+    hek_tags_directory: Option<PathBuf>,
     auto_build: bool,
 }
 impl Default for Settings {
@@ -46,6 +52,9 @@ impl Default for Settings {
             resource_directory: None,
             metadata_template_directory: None,
             native_executable: None,
+            hek_directory: None,
+            hek_flavor: None,
+            hek_tags_directory: None,
             auto_build: true,
         }
     }
@@ -191,6 +200,85 @@ fn inspect(state: &AppState, p: &Project) -> Reply<Arc<MapInspection>> {
     lock(&state.inspections)?.insert(p.id.clone(), i.clone());
     Ok(i)
 }
+/// Extract only a selected internal bitmap's top mip from a preserved cache.
+/// The source SHA is checked against the inspection and a fresh read; source
+/// maps and resource maps are never written to or silently read elsewhere.
+#[tauri::command]
+async fn preview_owned_cache_bitmap(
+    app: tauri::AppHandle,
+    project_id: String,
+    bitmap_tag_id: u32,
+    image_index: usize,
+) -> Reply<core::bitmap_preview::OwnedBitmapPreview> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
+        let inspection = inspect(&state, &project)?;
+        // Resource-map access requires a per-project explicitly selected
+        // directory and its recorded hash; global preferences are not trusted
+        // for copyrighted shared pixels. Internal bitmap reads need neither.
+        let pinned = source.resource_directory.as_ref().and_then(|folder| {
+            source.resource_sha256.get("bitmaps.map")
+                .map(|hash| (folder.join("bitmaps.map"), hash.as_str()))
+        });
+        let resource_args = pinned.as_ref().map(|(path, hash)| (path.as_path(), *hash));
+        core::bitmap_preview::preview_owned_bitmap_with_resources(
+            &source.preserved_path, &source.sha256, &inspection,
+            bitmap_tag_id, image_index, resource_args,
+        ).map_err(error)
+    }).await.map_err(error)?
+}
+
+/// Bounded, read-only material batch. The native reader hashes one immutable
+/// cache snapshot and at most one exact per-project bitmaps.map resource file.
+/// It does not write maps or follow arbitrary client-supplied file paths.
+#[tauri::command]
+async fn preview_owned_cache_bitmap_batch(
+    app: tauri::AppHandle,
+    project_id: String,
+    requests: Vec<core::bitmap_preview::OwnedBitmapRequest>,
+) -> Reply<core::bitmap_preview::OwnedBitmapBatch> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
+        let inspection = inspect(&state, &project)?;
+        let pinned = source.resource_directory.as_ref().and_then(|folder| {
+            source.resource_sha256.get("bitmaps.map")
+                .map(|hash| (folder.join("bitmaps.map"), hash.as_str()))
+        });
+        let resource_args = pinned.as_ref().map(|(path, hash)| (path.as_path(), *hash));
+        core::bitmap_preview::preview_owned_bitmap_batch_with_resources(
+            &source.preserved_path, &source.sha256, &inspection, &requests, resource_args,
+        ).map_err(error)
+    }).await.map_err(error)?
+}
+
+/// Audit only the selected, SHA-pinned classic bitmap resource INDEX. The
+/// response contains counts and hashes, not game pixels or local file paths.
+#[tauri::command]
+async fn audit_owned_bitmap_resources(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Reply<core::resource_map::ResourceMapAudit> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
+        if !matches!(source.cache_version, 7 | 609) {
+            return Err("Classic PC/Custom Edition resources only; MCC ipaks and Demo resources are unsupported".into());
+        }
+        let folder = source.resource_directory.as_ref().ok_or("Choose source resources for this project in Build first")?;
+        let sha = source.resource_sha256.get("bitmaps.map")
+            .ok_or("bitmaps.map was not SHA-256 pinned when source resources were selected")?;
+        let inspected = inspect(&state, &project)?;
+        let names: Vec<String> = inspected.tags.iter().filter(|tag| tag.class == "bitm")
+            .map(|tag| tag.path.clone()).collect();
+        core::resource_map::audit(&folder.join("bitmaps.map"), sha, &names).map_err(error)
+    }).await.map_err(error)?
+}
+
 #[tauri::command]
 fn bootstrap(state: State<AppState>) -> Reply<Bootstrap> {
     Ok(Bootstrap {
@@ -224,12 +312,141 @@ async fn open_project(app: tauri::AppHandle, id: String) -> Reply<OpenProject> {
     .map_err(error)?
 }
 #[tauri::command]
+fn create_quickforge_project(state: State<AppState>, title: String, template: String, target: Option<runtime::RuntimeId>) -> Reply<OpenProject> {
+    let mut document = quickforge::create_arena(&title, &template).map_err(error)?;
+    if let Some(target) = target { document.runtime_id = target; }
+    let mut project = Project::new(&title);
+    project.provenance.description = "Original geometry authored in Guilty Spark QuickForge. Base-game assets are not bundled.".into();
+    project.quick_forge = Some(document);
+    lock(&state.library)?.save(&project, None).map_err(error)?;
+    Ok(OpenProject { project, inspection: None })
+}
+#[tauri::command]
+async fn quickforge_validate(document: quickforge::QuickForgeDocument) -> Reply<quickforge::GeometryReport> {
+    tauri::async_runtime::spawn_blocking(move || quickforge::validate(&document).map_err(error)).await.map_err(error)?
+}
+#[tauri::command]
+async fn quickforge_preview(document: quickforge::QuickForgeDocument) -> Reply<quickforge::ForgeMesh> {
+    tauri::async_runtime::spawn_blocking(move || quickforge::preview_mesh(&document).map_err(error)).await.map_err(error)?
+}
+fn forge_provenance_blockers(state: &AppState, project: &Project) -> Vec<String> {
+    let mut blockers = vec![];
+    let Some(document) = project.quick_forge.as_ref() else {return vec!["No QuickForge document".into()]};
+    for placement in &document.placements {
+        let Some(source_id) = placement.source_project_id.as_ref() else {continue};
+        let result=(||->Reply<()> {
+            let source_project = lock(&state.library)?.get(source_id).map_err(error)?;
+            let source=source_project.source.as_ref().ok_or("Asset provenance must reference an imported map")?;
+            if placement.source_sha256.as_ref()!=Some(&source.sha256) || maps::hash_file(&source.preserved_path).map_err(error)?!=source.sha256 {return Err("Referenced asset source changed or has no matching SHA-256".into());}
+            let inspected=inspect(state,&source_project)?;
+            if !inspected.tags.iter().any(|tag|Some(tag.id)==placement.tag_id && tag.class==placement.tag_class && tag.path.replace('\\',"/").eq_ignore_ascii_case(&placement.tag_path.replace('\\',"/"))){return Err(format!("Asset reference {} does not match the preserved source tag",placement.name));}
+            Ok(())
+        })();
+        if let Err(e)=result {blockers.push(e);}
+    }
+    blockers.sort();blockers.dedup();blockers
+}
+fn forge_tools(state: &AppState) -> Reply<forge_build::ForgeToolchain> {
+    let settings=lock(&state.settings)?.clone();
+    Ok(forge_build::ForgeToolchain{hek_directory:settings.hek_directory.or(lock(&state.installation)?.editing_tools.clone()),hek_tags_directory:settings.hek_tags_directory,invader_directory:settings.invader_directory,hek_flavor:settings.hek_flavor})
+}
+fn verify_compiler_location(state:&AppState, tools:&forge_build::ForgeToolchain)->Reply<()> {
+    // A user-selected compiler may not come from an imported mod archive or Inbox.
+    for directory in [&tools.hek_directory,&tools.invader_directory].into_iter().flatten() {
+        core::reject_links(directory).map_err(error)?;
+        let candidate=directory.canonicalize().map_err(error)?;
+        let mut protected=vec![state.root.join("Inbox"),state.root.join("archives"),state.root.join("projects")];
+        let lib=lock(&state.library)?;
+        for entry in lib.list().map_err(error)? {
+            if let Some(source)=lib.get(&entry.id).map_err(error)?.source {
+                if let Some(parent)=source.original_path.parent(){protected.push(parent.into());}
+                if let Some(parent)=source.original_path.parent().filter(|p|p.file_name().is_some_and(|n|n.eq_ignore_ascii_case("maps"))) {if let Some(package)=parent.parent(){protected.push(package.into());}}
+                if let Some(archive)=source.archive {if let Some(parent)=archive.original_path.parent(){protected.push(parent.into());}}
+            }
+        }
+        for path in protected {if path.exists() && candidate.starts_with(path.canonicalize().map_err(error)?){return Err("Compilers must be separately installed tools, outside imported archives, source maps and Inbox folders".into());}}
+    }
+    Ok(())
+}
+fn save_forge_receipt(state:&AppState, receipt:&forge_build::QuickForgeBuildReceipt)->Reply<()> {
+    let lib=lock(&state.library)?;
+    lib.set_setting(&format!("quickforge.receipt.{}",receipt.project_id),receipt).map_err(error)?;
+    if let Some(record)=&receipt.build {let mut project=lib.get(&receipt.project_id).map_err(error)?;project.builds.push(record.clone());project.modified_at=chrono::Utc::now().to_rfc3339();lib.save(&project,None).map_err(error)?;}
+    Ok(())
+}
+#[tauri::command]
+async fn quickforge_export(app:tauri::AppHandle,project_id:String)->Reply<forge_build::QuickForgeBuildReceipt> {
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let receipt=forge_build::run_job(&project,&forge_tools(&state)?,&state.root.join("jobs"),&uuid::Uuid::new_v4().to_string(),true,forge_provenance_blockers(&state,&project),Arc::new(AtomicBool::new(false)),|e|event(&app,e)).map_err(error)?;
+        save_forge_receipt(&state,&receipt)?;Ok(receipt)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+fn quickforge_build(app:tauri::AppHandle,project_id:String)->Reply<String> {
+    let state=app.state::<AppState>();
+    let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+    let tools=forge_tools(&state)?;verify_compiler_location(&state,&tools)?;
+    let blockers=forge_provenance_blockers(&state,&project);
+    let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
+    let mut jobs=lock(&state.jobs)?;if !jobs.is_empty(){return Err("Another build is already running".into());}jobs.insert(job_id.clone(),cancel.clone());drop(jobs);
+    let jobs_root=state.root.join("jobs");let returned=job_id.clone();
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        let result=forge_build::run_job(&project,&tools,&jobs_root,&job_id,false,blockers,cancel,|e|event(&app,e)).map_err(error).and_then(|receipt|save_forge_receipt(&state,&receipt));
+        if let Err(message)=result {event(&app,JobEvent{job_id:job_id.clone(),project_id:project_id.clone(),phase:"failed".into(),severity:"error".into(),message,progress:100,timestamp:chrono::Utc::now().to_rfc3339()});}
+        if let Ok(mut jobs)=state.jobs.lock(){jobs.remove(&job_id);}
+        let _=app.emit("spark:library-changed",());
+    });Ok(returned)
+}
+#[tauri::command]
+fn quickforge_build_report(state:State<AppState>,project_id:String)->Reply<Option<forge_build::QuickForgeBuildReceipt>> {
+    let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+    let receipt:Option<forge_build::QuickForgeBuildReceipt>=lock(&state.library)?.setting(&format!("quickforge.receipt.{project_id}")).map_err(error)?;
+    // A prior receipt is useful evidence but must never describe current edits as built.
+    Ok(receipt.map(|mut r|{if r.project_fingerprint!=project.fingerprint().unwrap_or_default(){r.warnings.push("This receipt is for an earlier project revision; export or build the current saved edits.".into());}r}))
+}
+#[tauri::command]
 fn create_project(state: State<AppState>, title: String) -> Reply<OpenProject> {
     let p = lock(&state.library)?.create(&title).map_err(error)?;
     Ok(OpenProject {
         project: p,
         inspection: None,
     })
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct FirefightCatalog {
+    default_config:firefight::FirefightConfig,
+    enemies:Vec<firefight::EnemyType>,
+    presets:Vec<firefight::FirefightPreset>,
+}
+#[tauri::command]
+async fn firefight_catalog(app:tauri::AppHandle,source_project_id:String)->Reply<FirefightCatalog> {
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let p=lock(&state.library)?.get(&source_project_id).map_err(error)?;let i=inspect(&state,&p)?;
+        let source=p.source.as_ref().ok_or("Choose a preserved source map")?;
+        if maps::hash_file(&source.preserved_path).map_err(error)?!=source.sha256{return Err("Preserved source changed".into());}
+        let mut defaults=firefight::default_config();defaults.source_sha256=Some(i.sha256.clone());
+        Ok(FirefightCatalog{default_config:defaults,enemies:firefight::available_enemies(&i),presets:firefight::presets(&i)})
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn firefight_validate(app:tauri::AppHandle,config:firefight::FirefightConfig,source_project_id:Option<String>)->Reply<firefight::ValidationReport> {
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        let source=if let Some(id)=source_project_id{Some(id)}else{lock(&state.library)?.list().map_err(error)?.into_iter().find(|entry|entry.sha256.is_some()&&entry.sha256==config.source_sha256).map(|e|e.id)};
+        if let Some(id)=source {let p=lock(&state.library)?.get(&id).map_err(error)?;let i=inspect(&state,&p)?;
+            if let Some(source)=&p.source{if maps::hash_file(&source.preserved_path).map_err(error)?!=source.sha256{return Err("Preserved source changed".into());}}
+            Ok(firefight::validate_assets(&config,&i))
+        } else {
+            Ok(firefight::ValidationReport{valid:false,source_matches:false,missing_actor_variants:config.enemies.iter().map(|e|e.actor_variant_path.clone()).collect(),missing_equipment:config.starting_equipment.clone(),runtime_integrated:false,diagnostics:vec!["Select an imported source map with matching SHA-256 to verify actual actor variants. A configuration preview cannot verify game behavior.".into()]})
+        }
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn firefight_preview(config:firefight::FirefightConfig,completed_waves:u16)->Reply<firefight::SimulationReport> {
+    tauri::async_runtime::spawn_blocking(move||firefight::preview(&config,completed_waves).map_err(error)).await.map_err(error)?
 }
 fn import_one(state: &AppState, path: &Path) -> Reply<OpenProject> {
     let ext = path
@@ -420,6 +637,8 @@ async fn choose_setting_path(key: String) -> Reply<Option<PathBuf>> {
         "invaderDirectory",
         "resourceDirectory",
         "metadataTemplateDirectory",
+        "hekDirectory",
+        "hekTagsDirectory",
     ]
     .contains(&key.as_str())
     {
@@ -464,12 +683,17 @@ async fn choose_project_resources(
     .map_err(error)?
 }
 fn configure(app: &tauri::AppHandle, state: &AppState, settings: Settings) -> Reply<()> {
+    if settings.hek_flavor.as_deref().is_some_and(|v| !matches!(v, "legacyHek" | "h1aEk")) {
+        return Err("Select a known official Halo 1 Editing Kit family".into());
+    }
     for p in [
         &settings.steam_directory,
         &settings.mcc_directory,
         &settings.invader_directory,
         &settings.resource_directory,
         &settings.metadata_template_directory,
+        &settings.hek_directory,
+        &settings.hek_tags_directory,
     ]
     .into_iter()
     .flatten()
@@ -513,6 +737,58 @@ fn save_settings(
 ) -> Reply<Bootstrap> {
     configure(&app, &state, settings)?;
     bootstrap(state)
+}
+#[tauri::command]
+async fn extract_selected_tag_tree(app: tauri::AppHandle, project_id: String, tag_id: u32) -> Reply<tag_exchange::TagExtractReceipt> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let inspection = inspect(&state, &project)?;
+        let tools = project_tools(&state, &project)?;
+        let job_id = uuid::Uuid::new_v4().to_string();
+        let cancel = Arc::new(AtomicBool::new(false));
+        {
+            let mut jobs = lock(&state.jobs)?;
+            if !jobs.is_empty() { return Err("A build or extraction is already running".into()); }
+            jobs.insert(job_id.clone(),cancel.clone());
+        }
+        let result = tag_exchange::extract_selected_tag(
+            &project, &inspection, &tools, &state.root, &job_id, tag_id, cancel,
+            |e| event(&app,e),
+        ).map_err(error);
+        if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&job_id); }
+        result
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn list_tag_exchanges(app: tauri::AppHandle) -> Reply<Vec<tag_exchange::TagExchangeSummary>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        tag_exchange::list_exchanges(&state.root).map_err(error)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn stage_tag_exchange_into_project(app: tauri::AppHandle, project_id: String, source_job_id: String) -> Reply<tag_exchange::TagImportReceipt> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        let target=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let job_id=uuid::Uuid::new_v4().to_string();
+        let busy=Arc::new(AtomicBool::new(false));
+        {
+            let mut jobs=lock(&state.jobs)?;
+            if !jobs.is_empty() {return Err("A build, extraction or staging job is already running".into());}
+            jobs.insert(job_id.clone(),busy);
+        }
+        let result=tag_exchange::stage_into_project(&target,&state.root,&source_job_id,&job_id).map_err(error);
+        if let Ok(mut jobs)=state.jobs.lock() {jobs.remove(&job_id);}
+        result
+    }).await.map_err(error)?
+}
+#[tauri::command]
+fn cache_invader_installation(state: State<AppState>, source_directory: String) -> Reply<String> {
+    // Explicit user-triggered local copy. No downloads or executables are run.
+    let target = crate::tool_cache::cache_invader(Path::new(&source_directory), &state.root)?;
+    Ok(target.to_string_lossy().into_owned())
 }
 #[tauri::command]
 fn refresh_installation(app: tauri::AppHandle, state: State<AppState>) -> Reply<Bootstrap> {
@@ -771,12 +1047,12 @@ fn asset_mesh(state: State<AppState>, id: String, asset_id: String) -> Reply<Mes
 #[tauri::command]
 fn inspect_template(state: State<AppState>, id: String) -> Reply<mcc::TemplateReport> {
     let p = lock(&state.library)?.get(&id).map_err(error)?;
-    let i = inspect(&state, &p)?;
+    let (scenario,scenario_type) = if p.quick_forge.is_some() {(p.scenario_path().map_err(error)?,1)} else {let i=inspect(&state,&p)?;(i.scenario_path.clone(),i.header.scenario_type)};
     let template = lock(&state.settings)?
         .metadata_template_directory
         .clone()
         .ok_or("Choose an unpublished Excession metadata template folder in Settings")?;
-    mcc::inspect_template(&template, &i.scenario_path, i.header.scenario_type).map_err(error)
+    mcc::inspect_template(&template, &scenario, scenario_type).map_err(error)
 }
 #[tauri::command]
 fn install_package(state: State<AppState>, id: String, build_id: String) -> Reply<PathBuf> {
@@ -889,6 +1165,22 @@ fn reveal_folder(state: State<AppState>, kind: String, id: Option<String>) -> Re
         "project" => lock(&state.library)?
             .project_dir(&id.ok_or("Missing project ID")?)
             .map_err(error)?,
+        "tagExchange" => {
+            let job_id = id.ok_or("Missing tag extraction ID")?;
+            uuid::Uuid::parse_str(&job_id).map_err(error)?;
+            let path=state.root.join("tag-exchanges").join(job_id).join("tags");
+            core::reject_links(&path).map_err(error)?;
+            path
+        },
+        "tagImport" => {
+            let ids=id.ok_or("Missing staged tag import IDs")?;
+            let (project_id,job_id)=ids.split_once(':').ok_or("Expected target project and import job IDs")?;
+            uuid::Uuid::parse_str(project_id).map_err(error)?;
+            uuid::Uuid::parse_str(job_id).map_err(error)?;
+            let path=state.root.join("tag-imports").join(project_id).join(job_id).join("tags");
+            core::reject_links(&path).map_err(error)?;
+            path
+        },
         _ => return Err("Unknown folder shortcut".into()),
     };
     if !path.is_dir() {
@@ -1038,6 +1330,180 @@ fn initialize_mcc_inbox(app: tauri::AppHandle, state: State<AppState>) -> Reply<
     start_watcher(&app, &state)?;
     bootstrap(state)
 }
+// Only exact, known tool executable filenames are eligible; no shell, arbitrary
+// arguments or user-provided executable path can be launched via this API.
+#[derive(Clone, Copy)]
+struct ToolChoice { id: &'static str, filename: &'static str, group: &'static str, gui: bool }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ToolchainTool {
+    id: String,
+    available: bool,
+    executable: Option<PathBuf>,
+    launch_mode: String,
+    detail: String,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ToolchainProbe {
+    tool_id: String,
+    sha256: String,
+    byte_size: u64,
+    mode: String,
+    executed: bool,
+    exit_code: Option<i32>,
+    output: String,
+    message: String,
+}
+fn probe_pipe<R: Read + Send + 'static>(mut stream: R) -> std::thread::JoinHandle<String> {
+    std::thread::spawn(move || {
+        // Drain even if output is long so a child cannot deadlock on a full pipe.
+        // Only retain the first 12 KiB for UI display.
+        let mut stored = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            match stream.read(&mut chunk) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    let room = 12_288usize.saturating_sub(stored.len());
+                    stored.extend_from_slice(&chunk[..n.min(room)]);
+                }
+            }
+        }
+        String::from_utf8_lossy(&stored).to_string()
+    })
+}
+fn bounded_invader_info(file: &Path) -> Reply<(Option<i32>, String)> {
+    // -i is Invader's documented read-only information/version operation.
+    // There are no arbitrary user arguments, flags, paths or shell invocations.
+    let mut child = std::process::Command::new(file)
+        .arg("-i")
+        .current_dir(file.parent().ok_or("Missing tool directory")?)
+        .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped())
+        .spawn().map_err(error)?;
+    let stdout = probe_pipe(child.stdout.take().ok_or("Missing tool stdout")?);
+    let stderr = probe_pipe(child.stderr.take().ok_or("Missing tool stderr")?);
+    let start = Instant::now();
+    let status = loop {
+        if let Some(status) = child.try_wait().map_err(error)? { break status; }
+        if start.elapsed() >= Duration::from_secs(5) {
+            let _ = child.kill();
+            let _ = child.wait();
+            // Join draining readers after termination so no background process remains.
+            let _ = stdout.join(); let _ = stderr.join();
+            return Err("Invader -i timed out; the diagnostic process was terminated".into());
+        }
+        std::thread::sleep(Duration::from_millis(30));
+    };
+    let stdout = stdout.join().map_err(|_| "Info output thread failed")?;
+    let stderr = stderr.join().map_err(|_| "Info error thread failed")?;
+    Ok((status.code(),format!("{}\n{}",stdout,stderr).trim().to_owned()))
+}
+/// Read-only file identity for every configured tool; for the Invader CLI only,
+/// optionally run the documented -i information switch in a bounded console.
+/// GUI editors remain native separate processes, never silently re-parented.
+#[tauri::command]
+async fn probe_toolchain_tool(app: tauri::AppHandle, runtime_id: String, tool_id: String, run_info: bool) -> Reply<ToolchainProbe> {
+    // Hashing a 256 MiB executable or waiting for `-i` may take seconds. Run
+    // outside the Tauri UI thread; preserve the exact same allowlist and limits.
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        probe_toolchain_tool_blocking(state, runtime_id, tool_id, run_info)
+    }).await.map_err(error)?
+}
+fn probe_toolchain_tool_blocking(state: State<AppState>, runtime_id: String, tool_id: String, run_info: bool) -> Reply<ToolchainProbe> {
+    if !cfg!(target_os="windows") {return Err("Native tool inspection requires the Windows desktop build".into());}
+    let settings=lock(&state.settings)?.clone();
+    let choice=allowed_toolchain(&runtime_id,settings.hek_flavor.as_deref()).into_iter()
+        .find(|choice|choice.id==tool_id).ok_or("Tool is not allowed for this selected runtime/profile")?;
+    let file=known_tool_file(&settings,choice)?.ok_or("Executable not found in configured tool folder")?;
+    let size=fs::metadata(&file).map_err(error)?.len();
+    if size>256*1024*1024 {return Err("Executable larger than supported 256 MiB audit limit".into());}
+    let hash=maps::hash_file(&file).map_err(error)?;
+    let can_info=!choice.gui && choice.group=="invader";
+    if run_info && !can_info {return Err("Only compatible Invader CLI -i probes can execute in the embedded console".into());}
+    let (exit_code,output,executed)=if run_info {
+        let (code,text)=bounded_invader_info(&file)?;(code,text,true)
+    }else{(None,String::new(),false)};
+    Ok(ToolchainProbe{tool_id,sha256:hash,byte_size:size,
+        mode:if choice.gui{"externalGui".into()}else{"integratedCli".into()},
+        executed,exit_code,output,
+        message:if executed{"Only Invader -i was executed. No content-build, tag-modification or map command ran. Tool version and target compatibility still require validation.".into()}
+            else{"Read-only executable hash and size. No tool process executed.".into()}})
+}
+fn allowed_toolchain(runtime_id: &str, flavor: Option<&str>) -> Vec<ToolChoice> {
+    let official = [
+        ToolChoice { id:"sapien", filename:"sapien.exe", group:"official", gui:true },
+        ToolChoice { id:"guerilla", filename:"guerilla.exe", group:"official", gui:true },
+        ToolChoice { id:"haloTool", filename:"tool.exe", group:"official", gui:false },
+    ];
+    let invader = [
+        ToolChoice { id:"invaderEditor", filename:"invader-edit-qt.exe", group:"invader", gui:true },
+        ToolChoice { id:"invaderExtract", filename:"invader-extract.exe", group:"invader", gui:false },
+        ToolChoice { id:"invaderInfo", filename:"invader-info.exe", group:"invader", gui:false },
+    ];
+    match runtime_id {
+        "mccSteam" if flavor == Some("h1aEk") => {
+            let mut tools = official.to_vec();
+            tools.push(ToolChoice { id:"tagTest", filename:"halo_tag_test.exe", group:"official", gui:true });
+            tools
+        }
+        "haloCustomEdition" => {
+            let mut tools=Vec::new();
+            if flavor==Some("legacyHek") {tools.extend(official);}
+            tools.extend(invader);
+            tools.push(ToolChoice {id:"invaderBuild",filename:"invader-build.exe",group:"invader",gui:false});
+            tools
+        }
+        "haloPc" | "haloPcTrial" | "openCe" | "chupathingyCe" => invader.to_vec(),
+        _ => vec![],
+    }
+}
+fn known_tool_file(settings:&Settings, choice:ToolChoice)->Reply<Option<PathBuf>> {
+    let root = if choice.group=="official" { settings.hek_directory.as_ref() }
+        else { settings.invader_directory.as_ref() };
+    let Some(root)=root else {return Ok(None)};
+    // Refuse symlinked directories, reparse points, junctions or executable aliases.
+    core::reject_links(root).map_err(error)?;
+    let file=root.join(choice.filename);
+    if !file.is_file() {return Ok(None)};
+    core::reject_links(&file).map_err(error)?;
+    let canonical_root=fs::canonicalize(root).map_err(error)?;
+    if file.parent()!=Some(root.as_path()) {return Err("Tool is not located in configured tool directory".into());}
+    let canonical_file=fs::canonicalize(&file).map_err(error)?;
+    if canonical_file.parent()!=Some(canonical_root.as_path()) {return Err("Tool escaped configured tool directory".into());}
+    if fs::metadata(&file).map_err(error)?.len()==0 {return Err("Tool executable is empty".into());}
+    Ok(Some(canonical_file))
+}
+#[tauri::command]
+fn toolchain_inventory(state:State<AppState>,runtime_id:String)->Reply<Vec<ToolchainTool>> {
+    let settings=lock(&state.settings)?.clone();
+    allowed_toolchain(&runtime_id,settings.hek_flavor.as_deref()).into_iter().map(|choice|{
+        let (file,detail)=match known_tool_file(&settings,choice) {
+            Ok(Some(path)) => (Some(path),"Exact installed executable found. Version/runtime compatibility still requires owner testing.".to_string()),
+            Ok(None) => (None,"Executable not found in configured tool folder.".to_string()),
+            Err(reason) => (None,format!("Executable rejected: {reason}")),
+        };
+        Ok(ToolchainTool { id:choice.id.into(), available:cfg!(target_os="windows") && file.is_some(),executable:file,
+            launch_mode:if choice.gui {"externalGui".into()} else {"integratedCli".into()},detail })
+    }).collect()
+}
+#[tauri::command]
+fn launch_toolchain_tool(state:State<AppState>,runtime_id:String,tool_id:String,confirm_source_mutation:bool)->Reply<String> {
+    if !cfg!(target_os="windows") {return Err("External Halo tool launching is currently supported only on Windows".into());}
+    if !confirm_source_mutation {return Err("Confirm that the selected tool may write to its configured working tag directory".into());}
+    let settings=lock(&state.settings)?.clone();
+    let choice=allowed_toolchain(&runtime_id,settings.hek_flavor.as_deref()).into_iter()
+        .find(|choice|choice.id==tool_id).ok_or("Tool is not enabled for this runtime/profile")?;
+    if !choice.gui {return Err("CLI tools must run through an audited Guilty Spark workflow, not a bare terminal".into());}
+    let file=known_tool_file(&settings,choice)?.ok_or("Executable is not installed in the configured tool directory")?;
+    let dir=file.parent().ok_or("No working directory for tool")?;
+    // This explicitly launches a separately installed GUI. It is not an embedded
+    // game/editor bridge, does not alter a running Halo process, and never uses a shell.
+    let child=std::process::Command::new(&file).current_dir(dir).spawn().map_err(error)?;
+    Ok(format!("Launched {} beside Guilty Spark (PID {}). No scenario opened or game process modified.",choice.id,child.id()))
+}
+
 fn runtime_reports(state: &AppState) -> Reply<Vec<runtime::RuntimeReport>> {
     let registrations: Vec<runtime::RuntimeRegistration> = lock(&state.library)?
         .setting("runtimeRegistrations")
@@ -1049,6 +1515,10 @@ async fn runtime_report(app: tauri::AppHandle) -> Reply<Vec<runtime::RuntimeRepo
     tauri::async_runtime::spawn_blocking(move || runtime_reports(&app.state::<AppState>()))
         .await
         .map_err(error)?
+}
+#[tauri::command]
+fn runtime_hosting_plan(runtime_id:runtime::RuntimeId,action:runtime::HostingAction)->runtime::HostingPlan {
+    runtime::hosting_plan(runtime_id,action)
 }
 #[tauri::command]
 async fn inspect_runtime_registration(
@@ -1142,6 +1612,63 @@ async fn launch_registered_runtime(
         Ok(plan.warnings.join(" "))
     }).await.map_err(error)?
 }
+// User-owned legacy programs stay outside Spark's map/tag build pipeline.
+// The private library records exact executable hashes and canonical paths;
+// the frontend sees only names and compatibility *candidates*.
+#[tauri::command]
+async fn legacy_companion_dashboard(app: tauri::AppHandle) -> Reply<crate::legacy_companions::Dashboard> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        let regs:Vec<crate::legacy_companions::Registration>=lock(&state.library)?.setting("legacyCompanions").map_err(error)?;
+        Ok(crate::legacy_companions::dashboard(&regs,&state.root))
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn choose_legacy_companion_path(format: String) -> Reply<Option<PathBuf>> {
+    let dialog=rfd::AsyncFileDialog::new().set_title("Choose an already installed historical Halo tool (never your game .map)");
+    match format.as_str() {
+        "windows-pe" => Ok(dialog.add_filter("Windows application", &["exe"]).pick_file().await.map(|file|file.path().to_path_buf())),
+        "mac-app" => Ok(dialog.pick_folder().await.map(|folder|folder.path().to_path_buf())),
+        _ => Err("Choose a supported companion application format".into()),
+    }
+}
+#[tauri::command]
+async fn register_legacy_companion(app: tauri::AppHandle, tool_id: String, format: String, path: PathBuf) -> Reply<crate::legacy_companions::Dashboard> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        let library=lock(&state.library)?;
+        let mut regs:Vec<crate::legacy_companions::Registration>=library.setting("legacyCompanions").map_err(error)?;
+        crate::legacy_companions::register(&tool_id,&format,path,&state.root,&mut regs)?;
+        library.set_setting("legacyCompanions",&regs).map_err(error)?;
+        Ok(crate::legacy_companions::dashboard(&regs,&state.root))
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn unregister_legacy_companion(app: tauri::AppHandle, registration_id: String) -> Reply<crate::legacy_companions::Dashboard> {
+    uuid::Uuid::parse_str(&registration_id).map_err(error)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        let library=lock(&state.library)?;
+        let mut regs:Vec<crate::legacy_companions::Registration>=library.setting("legacyCompanions").map_err(error)?;
+        let before=regs.len();
+        regs.retain(|r|r.id!=registration_id);
+        if regs.len()==before {return Err("Companion registration was not found".into());}
+        library.set_setting("legacyCompanions",&regs).map_err(error)?;
+        Ok(crate::legacy_companions::dashboard(&regs,&state.root))
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn launch_legacy_companion(app: tauri::AppHandle, registration_id: String, confirm_external_launch: bool) -> Reply<String> {
+    if !confirm_external_launch {return Err("External launch requires a separate confirmation".into());}
+    uuid::Uuid::parse_str(&registration_id).map_err(error)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        let regs:Vec<crate::legacy_companions::Registration>=lock(&state.library)?.setting("legacyCompanions").map_err(error)?;
+        let reg=regs.iter().find(|r|r.id==registration_id).ok_or("Registered companion not found")?;
+        crate::legacy_companions::launch(reg,&state.root,confirm_external_launch)
+    }).await.map_err(error)?
+}
+
 #[tauri::command]
 async fn inspect_sound(
     app: tauri::AppHandle,
@@ -1235,13 +1762,13 @@ async fn create_peer_manifest(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let p = lock(&state.library)?.get(&project_id).map_err(error)?;
-        let source = p.source.as_ref().ok_or("Choose an imported map project")?;
+        let source = p.source.as_ref();
         let reports = runtime_reports(&state)?;
         let installed = reports
             .into_iter()
             .find(|r| r.id == runtime_id)
             .and_then(|r| r.installation);
-        let build = if runtime_id == runtime::RuntimeId::MccSteam {
+        let build = if runtime_id == runtime::RuntimeId::MccSteam || p.quick_forge.is_some() {
             current_build(&state, &p).ok()
         } else {
             None
@@ -1249,11 +1776,12 @@ async fn create_peer_manifest(
         let inspection = if let Some(record) = &build {
             maps::inspect_map(record.output.as_ref().unwrap(), None).map_err(error)?
         } else {
+            if source.is_none() {return Err("Build this QuickForge project successfully before creating a map manifest".into());}
             (*inspect(&state, &p)?).clone()
         };
         let resources = project_tools(&state, &p)?
             .resource_directory
-            .or_else(|| source.original_path.parent().map(Path::to_path_buf));
+            .or_else(|| source.and_then(|s|s.original_path.parent().map(Path::to_path_buf)));
         let resource_ids = if build.is_some() && inspection.resources.iter().all(|r| !r.required) {
             ["bitmaps.map", "sounds.map", "loc.map"]
                 .into_iter()
@@ -1300,13 +1828,19 @@ async fn create_peer_manifest(
                 None
             },
             package_sha256,
-            source_sha256: Some(source.sha256.clone()),
+            source_sha256: source.map(|s|s.sha256.clone()),
             build_tool_version: None,
             build_verified: build.is_some(),
             resource_set_verified: build.is_some()
                 && inspection.resources.iter().all(|r| !r.required),
         };
-        multiplayer::create_manifest(&inspection, context, resource_ids).map_err(error)
+        let mut manifest=multiplayer::create_manifest(&inspection, context, resource_ids).map_err(error)?;
+        if let Some(document)=&p.quick_forge {
+            use sha2::{Digest,Sha256};
+            manifest.gameplay=Some(multiplayer::PeerGameplay{game_mode:document.game_mode.clone(),expected_players:p.firefight.as_ref().map_or(4,|f|f.player_count),configuration_sha256:p.firefight.as_ref().map(|f|serde_json::to_vec(f).map(|bytes|format!("{:x}",Sha256::digest(bytes)))).transpose().map_err(error)?});
+            multiplayer::validate_manifest(&manifest).map_err(error)?;
+        }
+        Ok(manifest)
     })
     .await
     .map_err(error)?
@@ -1349,9 +1883,25 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            preview_owned_cache_bitmap,
+            preview_owned_cache_bitmap_batch,
+            audit_owned_bitmap_resources,
+            cache_invader_installation,
+            extract_selected_tag_tree,
+            list_tag_exchanges,
+            stage_tag_exchange_into_project,
             bootstrap,
             open_project,
             create_project,
+            create_quickforge_project,
+            quickforge_validate,
+            quickforge_preview,
+            quickforge_export,
+            quickforge_build,
+            quickforge_build_report,
+            firefight_catalog,
+            firefight_validate,
+            firefight_preview,
             import_paths,
             import_dialog,
             save_project,
@@ -1375,6 +1925,15 @@ pub fn run() {
             close_application,
             initialize_mcc_inbox,
             runtime_report,
+            legacy_companion_dashboard,
+            choose_legacy_companion_path,
+            register_legacy_companion,
+            unregister_legacy_companion,
+            launch_legacy_companion,
+            toolchain_inventory,
+            probe_toolchain_tool,
+            launch_toolchain_tool,
+            runtime_hosting_plan,
             inspect_runtime_registration,
             register_runtime,
             runtime_inventory,

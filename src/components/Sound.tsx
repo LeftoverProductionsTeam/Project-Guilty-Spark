@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Volume2 } from 'lucide-react';
 import { call } from '../api';
 import type { AudioPreview, SoundInspection, SoundPermutation } from '../types';
+import type { CueName, LocalCueReference } from '../interfacePreferences';
 import { Notice, Pill } from './ui';
 
-export default function Sound({ projectId, tagId }: { projectId: string; tagId: number }) {
+export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: { projectId: string; tagId: number; sourceHash?: string; onAssign?: (cue: CueName, ref: LocalCueReference) => void }) {
   const [inspection, setInspection] = useState<SoundInspection | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -91,6 +92,16 @@ export default function Sound({ projectId, tagId }: { projectId: string; tagId: 
           <button disabled={!p.available || busy} onClick={() => void preview(p)}>
             Load preview
           </button>
+          {onAssign && p.available && p.embedded && <div className="sound-assign">
+            <small>Assign local cue:</small>
+            {([['select', 'Navigate'], ['confirm', 'Confirm'], ['warning', 'Warning']] as const).map(([cue, label]) => (
+              <button key={cue} type="button" className="small-button" onClick={() => onAssign(cue, {
+                projectId, tagId, pitchRange: p.pitchRange, permutation: p.permutation,
+                sourceHash, label: `${p.name || `Tag ${tagId}`} (${label})`,
+              })}>{label}</button>
+            ))}
+          </div>}
+
         </div>
       ))}
       {inspection && !inspection.permutations.length && <p>No bounded sound permutations were decoded.</p>}

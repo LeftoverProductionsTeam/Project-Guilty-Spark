@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { exportMeshJms } from '../src/haloJms.ts';
+const triangle={positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2],normals:[0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,0,1],parts:[{name:'paint/stone',indexStart:0,indexCount:3}],label:'a',source:'obj'};
+const jms=exportMeshJms(triangle);
+assert.equal(jms.vertices,3); assert.equal(jms.triangles,1);
+assert.deepEqual(jms.materials,['paint_stone']);
+const lines=jms.text.trim().split('\n');
+assert.equal(lines[0],'8200'); assert.equal(lines[2],'1');
+assert.equal(lines[8],'1'); assert.equal(lines[9],'paint_stone');
+assert.equal(lines[10],'<none>'); assert.equal(lines[13],'__unnamed');
+assert.equal(lines[14],'3'); assert.equal(lines[16],'0.000000\t0.000000\t0.000000');
+assert.equal(lines[24],'100.000000\t0.000000\t0.000000');
+assert.equal(lines.at(-3),'0'); assert.equal(lines.at(-2),'0'); assert.equal(lines.at(-1),'0\t1\t2');
+assert.throws(()=>exportMeshJms(triangle,'bsp-candidate'),/open boundary/);
+assert.match(exportMeshJms({...triangle,normals:[]}).warnings.join(' '),/recomputed/);
+assert.throws(()=>exportMeshJms({...triangle,indices:[0,0,2]}),/degenerate/);
+assert.throws(()=>exportMeshJms({...triangle,parts:[{name:'stone',indexStart:1,indexCount:3}]}),/material part|ranges/);
+console.log('PASS: bounded Halo JMS 8200 material/source export, 100x coordinate conversion, topology gates');

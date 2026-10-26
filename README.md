@@ -1,4 +1,104 @@
+# Continuation 32 — Windows build verified (0.3.1)
+
+Your Continuation 31 source was preserved and repaired in place. C32 fixes native/frontend compilation, Windows palette dragging, unsafe outside-room drops, material-inspector overlap, shader-name ambiguity and tag-transfer integrity checks. The original workspaces and historical requirements remain intact.
+
+**First manual test: open `releases/GuiltySpark-C32-0.3.1.exe`.** Expect `0.3.1 · C32` in the header. The cumulative source archive is supplied separately under `releases/` with SHA-256 checksums.
+
+Current verification: **154 Rust tests, 41 frontend tests, 59 offline scripts and 9 browser tests pass**. The native Windows application was built, opened and exercised with actual owner maps and an original five-mode arena. This establishes editor/source behavior; **Halo Tool compilation, playable-map loading and multiplayer remain unverified**. No kit was discovered. World-material preview refusals and one intermittent 3D-label cleanup error remain open.
+
+Read the [C32 engineering report](docs/CONTINUATION_32_ENGINEERING.md), [living requirements ledger](docs/MASTER_FEATURE_LEDGER.md), [test card](docs/CONTINUATION_32_TEST_CARD.md) and [machine-readable evidence](docs/fixtures/continuation32-verification.json). Earlier continuation notes below retain their historical evidence and limitations.
+
+---
+
+# Project Guilty Spark — 07 Halo Modding Brain — Continuation 31 (SOURCE ONLY)
+
+**Current release: Continuation 31 (2026-10-26).** Built on the exact SHA-256-pinned C30 source. Adds a collapsed-by-default, **evidence-aware Field Guide** in all 19 workspaces, descriptive help for available vs unproven operations, keyboard/touch/escape-aware tooltips, better Ctrl/Cmd+K intent search, and a source-to-engine lesson inspired by HMT/Eschaton/SwordEdit/Tool's iterative build process. Owner-owned Halo bitmaps, optional legacy companions and Community Maps archive discovery remain as before.
+
+**No Halo map compiler, playable .map, compiled EXE, stock game assets, bundled third-party tool or automatic remote map download is provided in this source ZIP.** No native Windows/Rust build, actual Halo Tool compile or in-game gameplay was completed in this release. Always keep original game sources and past ZIP releases separate; build only in isolated, authorized workspaces.
+
+See [C31 engineering](docs/CONTINUATION_31_ENGINEERING.md), [original Halo lore and UI design](docs/CONTINUATION_31_ORIGINAL_HALO_LORE_AND_DESIGN.md), [remaining requirements](docs/CONTINUATION_31_REQUIREMENT_TRACE.md), and [Windows test card](docs/CONTINUATION_31_TEST_CARD.md).
+
+---
+
+# Historical Continuation 30 notes (superseded by C31)
+
+# Project Guilty Spark — 07 Halo Modding Brain — Continuation 30 (SOURCE ONLY)
+
+**Current release: Continuation 30 (2026-10-26).** Cumulative source based on the exact, SHA-256-verified Continuation 29 release. This pass adds **Community Maps** for HaloMods Classic (correct Halo CE/PC download categories), HaloMaps, CE3 and HaloMD archive discovery; a distinct browser-download → guarded local import workflow; a Ctrl+K searchable workbench switcher; keyboard-visible, accessible tooltips; Library/onboarding improvements, and extended original modding lore. The archive contains **no remote map download service, EXE, playable Halo map, copied game assets or bundled third-party tools**.
+
+Browse/archive links are externally maintained and may be unavailable; local file integrity and target edition still must be checked. Native Windows/Rust/Tauri execution, external link behavior, live Halo Tool builds, BSP collision/portals and gameplay remain **unverified**. Do not overwrite earlier versions or installed game maps.
+
+See [C30 engineering](docs/CONTINUATION_30_ENGINEERING.md), [Halo modding lore and usability](docs/CONTINUATION_30_ORIGINAL_HALO_LORE_AND_USABILITY.md), [remaining requirements](docs/CONTINUATION_30_REQUIREMENT_TRACE.md) and [Windows test card](docs/CONTINUATION_30_TEST_CARD.md).
+
+---
+
+# Historical Continuation 29 notes (superseded by C30)
+
+# Project Guilty Spark — 07 Halo Modding Brain — Continuation 29 (SOURCE ONLY)
+
+**Current release: Continuation 29 (2026-10-26).** A complete cumulative source continuation of SHA-256-verified Continuation 28. **New:** bounded, read-only Cross-map Tag Migration Preview integrated in Tags, strict source manifest validation, class/path matching instead of nonportable cache IDs, conflict/missing dependency diagnostics, path-free review export, a new original-Eschaton transplant Academy lesson, and expanded original Halo modding lore research. Existing QuickForge, Halo bitmap-inspired theme, Tag Lineage Inspector and optional Legacy Companion Tools remain intact.
+
+**No native EXE, ready-to-play map, Halo art/audio, source tag bytes, external legacy programs or automatic cache patching is included.** The migration review is metadata-only; matching tag names do not establish identical bytes or compilable dependencies. Native Windows/Tauri, Halo Tool, full BSP/collision/portal restoration and gameplay still need testing. Extract to a new empty folder and preserve original maps.
+
+See [C29 engineering](docs/CONTINUATION_29_ENGINEERING.md), [original lore/philosophy](docs/CONTINUATION_29_ORIGINAL_HALO_LORE_AND_PHILOSOPHY.md), [remaining requirements](docs/CONTINUATION_29_REQUIREMENT_TRACE.md), and [Windows test card](docs/CONTINUATION_29_TEST_CARD.md).
+
+---
+
+# Historical Continuation 28 notes (superseded by C29)
+
+# Project Guilty Spark — 07 Halo Modding Brain — Continuation 28 (SOURCE ONLY)
+
+**Current release: Continuation 28 (2026-10-26).** Complete cumulative source built from the SHA-256-verified Continuation 27 archive. The optional **Legacy Companion Tools** panel in Modding Academy catalogs original Halo editors (Eschaton, HMT, SwordEdit, SparkEdit, Guerilla, Sapien and more), detects **runtime candidates** (Windows, Wine in standard locations, future macOS), remembers user-selected binary fingerprints, and requires a separate confirmation to launch a separately installed application alongside Spark. It does not automatically download tools, search the user's entire disk, launch apps, pass original maps or claim old-program compatibility. Windows remains the current packaged target; native Mac/Wine behavior is untested.
+
+The existing **Tag Lineage Inspector** is now integrated into Tags and a tag-reference export with over 256 indexed dependencies is refused rather than silently truncated. The earlier modern Halo-style UI, owner-supplied bitmap header preview, geometry, build safety, scenario, historical research and 92-requirement reconstruction are preserved.
+
+**This ZIP contains only source**, no compiled Windows executable, playable Halo map, third-party tools, copyrighted artwork or audio. Do not overwrite your prior project/game files. Read [C28 engineering](docs/CONTINUATION_28_ENGINEERING.md), [original lore and optional companion design](docs/CONTINUATION_28_ORIGINAL_HALO_LORE_AND_COMPANIONS.md), [missing feature requirements](docs/CONTINUATION_28_REQUIREMENT_TRACE.md) and [Windows test card](docs/CONTINUATION_28_TEST_CARD.md). Rust/Tauri and real Halo gameplay need testing on a Windows owner installation; Node tests alone cannot establish native correctness.
+
+---
+
+# Historical Continuation 27 notes (superseded by C28)
+
+# Project Guilty Spark - 07 Halo Modding Brain - Continuation 27 (SOURCE ONLY)
+
+**Current release: Continuation 27 (2026-10-26).** This full-source continuation of the verified C26 ZIP adds a **Legacy Workflow Lab** integrated into Modding Academy, connecting Eschaton, HMT, SparkEdit/SwordEdit, log mods, BSP/tunnel work, Halo UI art and Zombie Apocalypse to the workbench's real, read-only source evidence. Users can navigate to the correct editor, see source-hash and inspection checks, and export a private path-free workflow plan. Research and named credits have been updated with verified original-community sources.
+
+**This ZIP contains no prebuilt Windows EXE, compiler-ready Halo game map, modified stock map, third-party binaries or Halo copyrighted art/audio.** The historical workflows do not promise collision repair, cross-engine compatibility or gameplay proof. Windows/Rust/HEK tests remain open. Extract into a NEW empty folder. Start with [original modding lore](docs/CONTINUATION_27_ORIGINAL_HALO_LORE.md), [C27 engineering](docs/CONTINUATION_27_ENGINEERING.md), [current requirement trace](docs/CONTINUATION_27_REQUIREMENT_TRACE.md), and [C27 test card](docs/CONTINUATION_27_TEST_CARD.md).
+
+---
+
+# Historical Continuation 26 notes (superseded by C27)
+
+**Earlier release: Continuation 26.** Recovered and checksum-verified from C25. Source-only seam correction, read-only collision/build error triage, precision-guarded OBJ/JMS interchange, independent OBJ output verification, and opt-in **source-pinned user-owned Halo bitmap header art** are new. Game assets are never bundled or written into the project. **No compiled Halo BSP, genuine playable Halo map, Windows EXE, universal collision repair, or generic binary tag/BSP roundtrip is included.** The Windows/native Rust/Halo Tool acceptance gate is still open. Start with [C26 engineering details](docs/CONTINUATION_26_ENGINEERING.md), [complete requirement trace](docs/CONTINUATION_26_REQUIREMENT_TRACE.md) and [C26 test card](docs/CONTINUATION_26_TEST_CARD.md). Extract into an empty folder; preserve previous versions and installed game assets untouched.
+
+---
+
+# Project Guilty Spark — 07 Halo Modding Brain / Continuation 25
+
+> **HISTORICAL RELEASE: Continuation 25 (2026-10-26), COMPLETE SOURCE ONLY.** This ZIP contains **no** compiled Windows EXE, installer, playable Halo cache, copyrighted Halo art or bundled Halo Editing Kit/Invader binaries. Extract into a fresh folder and use a separately installed, verified toolchain. Original maps and installed games stay untouched. **A source preflight, an imported compiler log and a WRL overlay do not prove a valid BSP or gameplay.**
+
+**C25 improvement:** Halo Tool text logs now become stale after QuickForge source edits, just as WRL overlays do. QuickForge can export a **sanitized compiler triage JSON** tied to the current source hash (by the user's file association), with bounded error codes and WRL totals but without paths, raw logs or map assets. All real Tool/native/gameplay acceptance gates remain OPEN.
+
+Start with [C25 engineering notes](docs/CONTINUATION_25_ENGINEERING.md), [recovered requirements and missing features](docs/CONTINUATION_25_REQUIREMENT_TRACE.md), and the [Windows test card](docs/CONTINUATION_25_TEST_CARD.md). The detailed historical README below documents earlier work; older claims about locally built EXEs and an old test PC **do not apply to this source ZIP**.
+
+---
+
+## Continuation 23: source-shell topology and safer BSP preflight (source-only)
+
+- **BSP source topology** in QuickForge → Geometry & Build now analyzes the source mesh's geometric edge graph: boundary leaks, non-manifold edges, inconsistent face winding, degenerate triangles, separate and edge-closed candidate shells. It handles flat-shaded duplicate vertex IDs without changing authored vertices. Hard structural faults block source JMS export; open edges warn because documented Halo material exceptions exist.
+- Select the editable brush associated with a representative problem triangle or export a **SHA-256-bound, coordinate-free BSP source review JSON**. The exporter does not include game files or declare compiled collision, portals, PVS or gameplay verified.
+- **Source quality only:** the earliest playable Test Arena, full shader/bitmap recovery, BSP rebuild/portals/lightmaps, zombie/Firefight/First Contact and multiplayer AI all still require real installed editing kits, compiled maps and gameplay tests.
+- See [C23 engineering notes](docs/CONTINUATION_23_ENGINEERING.md), [C23 test card](docs/CONTINUATION_23_TEST_CARD.md), and [continuing prompt/feature trace](docs/CONTINUATION_23_REQUIREMENT_TRACE.md). This is a **full SOURCE ZIP, not an executable or playable map**.
+
+## Continuation 22: safer native write cancellation and Halo CE spawning (source-only)
+
+- The five-mode Test Arena now authors **32 editable starts (16 per CTF team)**, four Race vehicle start netgame markers, and all prior flags, hills, checkpoint and teleporter entries. The historic 16/team recommendation is NOT a mandatory engine limit; 32 points in an editor are not collision/game proof.
+- QuickForge's **Spawn layout · source review** offers a bounded, non-executable JSON audit of CTF wrong-base starts, missing team coverage, close start points, and cross-team spawn pressure. This is source-only; `Sapien`, `Tool` and live two-client tests are still required.
+- Native Runner treats `structure`, `scenario`, and `lightmaps` as **non-interruptible write-sensitive phases**: UI cancellation and the ten-minute soft limit defer later work until the tool exits naturally, rather than killing it mid-write. This prevents one known corruption trigger, not OS crashes or Tool bugs. A hung writer may remain running; never force-close it without safeguarding the isolated workspace.
+- [Online research gap audit](docs/ONLINE_RESEARCH_GAP_AUDIT_C22.md) distinguishes real tag/BSP build and netcode gates from preview-only features; 92 reconstructed creator requirements remain tracked. **No Rust/Tauri/native Halo tests could run in this environment.**
+
 # Project Guilty Spark
+
+> **HISTORICAL C23 NOTE (superseded by the C25 source release): 07 Halo Modding Brain / Continuation 23 — SOURCE ONLY (2026-10-26).** The historical README below describes earlier Windows build/testing, but this cumulative archive does **not** contain a compiled `GuiltySpark.exe`, playable Halo `.map`, installer, Halo art, or an automatic setup program. Its new Five-mode Test Arena is editable SOURCE, and its material/engine QA reports are diagnostic. Read [C23 engineering notes](docs/CONTINUATION_23_ENGINEERING.md), [the online gap audit](docs/ONLINE_RESEARCH_GAP_AUDIT_C22.md), [the prompt/feature ledger](docs/PROMPT_AND_FEATURE_RECONCILIATION_C21.md) and [the C23 test card](docs/CONTINUATION_23_TEST_CARD.md). Begin by extracting into a clean directory, not by following the historical EXE instruction in an older local build.
 
 **Halo Modern Evolved · desktop workbench 0.2.0**
 
@@ -10,7 +110,7 @@ A running Tauri 2 / Rust / React application for preserving and inspecting Halo 
 
 ## Open the application
 
-**First manual instruction: open `target/release/GuiltySpark.exe`.**
+**Historical earlier Windows build instruction only:** `target/release/GuiltySpark.exe` is **NOT INCLUDED** in Continuation 25. Do not assume this source-only archive provides an executable; build and verify separately.
 
 The build also produces a Windows installer under `target/release/bundle/nsis/` when packaging succeeds. The app uses the installed WebView2 runtime. Normal use does not require administrator privileges.
 
@@ -63,3 +163,184 @@ pnpm desktop
 The optional `scripts/bootstrap-rust.mjs` installs Rust only under `.toolchain/`, without changing system PATH. `node scripts/cargo.mjs ...` and `node scripts/desktop.mjs ...` use that installation when present. The optional Invader development installer writes a separate tool copy under `.local/tools/`; that tool is not bundled or redistributed by the release build.
 
 No telemetry, automatic publishing, process memory modification, stock map replacement, executable patching, or anti-cheat configuration changes are performed by Guilty Spark.
+
+## 07 Halo Modding Brain continuation (source-only)
+
+This snapshot also includes a **Material Lens**, opt-in Interface Studio and project-backed **Creator Studio** for mission beats, cinematic keyframes, stock Halo CE dedicated server configuration drafts and manually reported playtest evidence. None of those authoring plans imply a compiled playable map or a live server. The old Halo game data remains read-only.
+
+See [`docs/07_HALO_MODDING_BRAIN_HANDOFF.md`](docs/07_HALO_MODDING_BRAIN_HANDOFF.md) for verified scope, blocked features and owner tests. Run the dependency-free baseline smoke test with `npm run test:offline` (Node 22+, TypeScript strip-types support).
+
+
+## 07 Halo Modding Brain — Source continuation 2 (October 25/26, 2026)
+
+This source snapshot continues the prior 07-brain ZIP. Added a strictly bounded DXT1/3/5 DDS decoder, opt-in local shader texture assignment in the 3D BSP preview, QuickForge sculptable heightfields and hollow source cave tubes, Halo CE `.hsc` source-only mission/cinematic/finite-wave exporters, and a deterministic single-click ZIP of the generated HSC/dependency files. `npm run test:offline` now runs the combined new offline suites.
+
+**Not a verified playable Halo release.** Automatic game-cache texture/lightmap/sky decoding, compiled-BSP editing/CSG, playable First Contact, multiplayer and in-engine AI/Zombie Apocalypse are not complete. Rust and app full builds have not been run in this environment. Please read [`docs/PHASE_01_TO_10_ACCEPTANCE.md`](docs/PHASE_01_TO_10_ACCEPTANCE.md) and [`docs/CONTINUATION_2_CHANGELOG.md`](docs/CONTINUATION_2_CHANGELOG.md) before attempting any source build.
+
+
+## Continuation 3 - legacy forum gap review and authoring safeguards
+
+This full-source snapshot uses **Continuation 2** as its baseline. It adds opt-in exact-match local shader image batches, cave-mouth alignment diagnostics, scenario AI encounter/squad binding preflight, and corrected dormant H1 mission/Firefight script activation and shader-material refresh. Also included: [historical forum findings and the ten-phase unfinished work](docs/LEGACY_FORUM_RESEARCH_AND_GAP_RECONCILIATION.md) and [continuation 3 release truth](docs/CONTINUATION_3_CHANGELOG.md). `npm run test:offline` includes the additional regression suites. No original Halo caches, game binaries or copyrighted art are packaged. **Not a completed ten-phase gameplay product or Windows installer.**
+
+
+## Continuation 4 — engineering source, not a 10-phase completion claim
+
+This snapshot builds on Continuation 3 with exact QuickForge cave-to-cave **source mesh** seams (not room CSG or game-ready caves), bounded 32-bit DDS decode and DDS-to-uncompressed RGBA TIFF preparation, and a safe HCEEK singleplayer `.hsc` **source-tree** ZIP. It adds a fail-closed cave gameplay-build blocker and expanded offline tests. **This is not a playable Zombie Apocalypse or 2-client multiplayer build.** Do not replace stock game files or bypass anti-cheat.
+
+Read [`docs/CONTINUATION_4_ENGINEERING.md`](docs/CONTINUATION_4_ENGINEERING.md) and [`docs/CONTINUATION_4_FIRST_TEST.md`](docs/CONTINUATION_4_FIRST_TEST.md) before testing. The complete feature-gap matrix is in [`docs/PHASE_01_TO_10_ACCEPTANCE.md`](docs/PHASE_01_TO_10_ACCEPTANCE.md). The package keeps its `0.3.0` developer version because release-level Windows, engine and platform acceptance has not occurred.
+
+## Continuation 5 — optional snapping and safe map interchange
+
+This complete source ZIP builds on **Continuation 4**. In QuickForge, grid snapping (G) and authored source-mesh snapping (M) are **independently toggleable**. Exact cave-tunnel rims can align to trigger the previously implemented source-cap seam; rectangular source-brush faces align for editing only and are **not automatically welded**. In Tag Browser and QuickForge, reference/dependency JSON exchanges are accepted only from the exact preserved source cache by SHA-256/version/class/path/ID. These are **not extracted tag binaries**. World and Asset Workshop now provide read-only real indexed OBJ geometry downloads with UV/normals/material-ID groups, suitable for import into another Asset Workshop. No Halo installation files are modified.
+
+`npm run test:offline` runs thirteen suites including these new features; **this does not validate a Windows/Tauri build, Rust compilation, compiled gameplay or networking**. See [`docs/CONTINUATION_5_ENGINEERING.md`](docs/CONTINUATION_5_ENGINEERING.md) and [`docs/PHASE_01_TO_10_ACCEPTANCE.md`](docs/PHASE_01_TO_10_ACCEPTANCE.md). The package retains its original developer version pending engine acceptance.
+
+
+## Continuation 6 — mesh assembly and real tag exchange staging
+
+Built directly from the delivered **Continuation 5** source ZIP.  Asset Workshop now supports explicit face/vertex alignment of two OBJ meshes, optional validated welding of *open* boundary seams, visual preview, and real OBJ/JMS 8200 source export.  QuickForge's independent G (grid) and M (mesh) placement snapping toggles remain available.  Tag Browser now includes opt-in **actual Invader `.tag` extraction** and isolated, checksum-verified **staged import between compatible maps**; extracted tags are **not** automatically merged, compiled or installed.  This is a developer source snapshot only: Rust, Windows/Tauri and game runtime verification remain outstanding, and **all ten Codex phases are NOT complete**.
+
+Start with [`docs/CONTINUATION_6_ENGINEERING.md`](docs/CONTINUATION_6_ENGINEERING.md) and the ten-phase matrix. Never replace stock Halo map files.
+
+## Continuation 7 - source walk sandbox, terrain seams, native tools, Modding Academy
+
+Built on exact Continuation 6 ZIP. QuickForge now supports First-person **source collision simulation** based on regenerating world triangles (not Halo physics), optional source-mesh alignment of equal-height terrain tile borders in addition to exact cave-rim joining, independent Grid Snap (G) and Mesh Snap (M), and bounded validation. A nine-lesson Modding Academy with contextual help and glossary explains the actual Halo workflow. Runtimes has an explicit legacy HEK vs H1A kit choice, native external tool inventory/consented GUI launch and CLI managed-only routing. The QuickForge build runner now avoids applying H1A content-path switches to classic HEK; mismatched runtime/tool choices are blocked. No third-party executables or Halo assets are bundled.
+
+For *this* continuation's actual verification and unimplemented features, read [`docs/CONTINUATION_7_ENGINEERING.md`](docs/CONTINUATION_7_ENGINEERING.md), [`docs/HALO_MODDING_PHILOSOPHY_AND_ACADEMY.md`](docs/HALO_MODDING_PHILOSOPHY_AND_ACADEMY.md) and [`docs/CONTINUATION_7_TEST_CARD.md`](docs/CONTINUATION_7_TEST_CARD.md). Offline checks: `npm run test:offline`. **The complete ten-phase game editor is not yet finished or engine-tested.**
+
+## Continuation 8 — RMB editor flight, XYZ handles and fail-closed source export
+
+Based on the exact Continuation 7 source ZIP. QuickForge and World Editor now share **hold right mouse + move to look; hold RMB + WASD to fly; R/F up/down; Shift boost**, including when orbit mode is active. Selected editable objects expose the existing Three.js **red X / green Y / blue Z** translation gizmo with new axis legends/tooltips. First-person walk retains its separate source-mesh collision sandbox. A new export preflight refuses **stale** Rust validation reports, malformed source buffers and invalid identities; mesh OBJ export now rejects corrupt UV/normal arrays and repeated-index triangles. The Modding Academy includes a tenth guided lesson.
+
+Run `npm run test:offline` and consult [`docs/CONTINUATION_8_ENGINEERING.md`](docs/CONTINUATION_8_ENGINEERING.md) and [`docs/CONTINUATION_8_TEST_CARD.md`](docs/CONTINUATION_8_TEST_CARD.md). This **is not** a completed ten-phase Halo modding suite, native game live editor or verified playable map builder. Do not overwrite game installations.
+
+## Continuation 9 — compiler diagnostics and collision integrity (source only)
+
+- QuickForge can now import **Halo 1 Tool VRML 1.0 `.wrl` error geometry** and display colored problem edges/faces directly in the editor viewport. Frame the errors, toggle visibility or source-coordinate scaling, and import an optional Tool `.log`/`.txt` for conservative diagnostic explanations. Old evidence becomes stale when geometry changes.
+- A second source-triangle audit blocks exact duplicate solid faces and warns about unusually short collision edges before JMS export. The native Rust geometry validator includes the equivalent duplicate-face gate (native build/test still pending).
+- Academy adds a hands-on Tool WRL debugging lesson and glossary guidance. Synthetic fixtures under `tests/fixtures/` allow a UI smoke test without proprietary content.
+
+Read [`docs/CONTINUATION_9_ENGINEERING.md`](docs/CONTINUATION_9_ENGINEERING.md) for implementation details, safety, exact UI steps, unverified dependencies, and links to original HEK/c20 documentation. **This source-only continuation does not complete the ten Codex phases or establish playable Halo BSP/campaign/multiplayer behavior.**
+
+
+## Continuation 10 — tool integration, historical community, first-run, lightmaps
+
+This source-only continuation adds a new **Start Here** goal-based tour (five paths),
+**Community Thanks** with curated linked credits and private nominations,
+and accessible descriptions and hover hints across the 18 workspaces.
+
+**Runtimes** includes tool selection per target and bounded integrated inspection:
+Windows can SHA-256-audit a configured supported executable without running it;
+Invader's documented `-i` credits/version information can run in an embedded
+bounded-output console when the user explicitly requests it. Existing managed
+Invader extraction and Tool/Invader build workflows still run from the respective
+Tag/QuickForge/Build workspaces. Sapien, Guerilla, Invader Qt and H1A standalone
+remain **separate GUI processes** launched only with explicit consent; they are
+not secretly reparented into Spark or connected to an in-game live-edit API.
+
+The classic PC-family read-only render parser now attempts to preserve **real
+secondary BSP lightmap UVs**, independently bounded by the material data stream.
+World Editor can preview *user-selected* local lightmap-page images, including
+exact filename batch pairing. It does not yet automatically decode authentic
+Halo bitmap resources, replicate full shader/radiosity effects, edit cache BSPs,
+or claim playable game-engine collision.
+
+See `docs/CONTINUATION_10_ENGINEERING.md` and
+`docs/COMMUNITY_RESEARCH_AND_CREDITS.md`; run `npm run test:offline` with Node 22+.
+Do not substitute offline tests for Rust compilation, a real Halo Tool build, or
+a two-machine gameplay/network test. `package.json` stays at 0.3.0 because this
+continuation has not earned a compiled Windows release version.
+
+## Continuation 11 - BSP lightmap safety / Modding Academy
+
+The next source continuation builds on Continuation 10 without replacing existing functionality. Local lightmap image previews are now **BSP-specific** (`bsp_0_page_0.png` is separate from `bsp_1_page_0.png`), and page-only image names are rejected when ambiguous. Shader matching refuses ambiguous tag basenames and bump/detail-only references. The Academy has a new practical lightmap lesson. See [`docs/CONTINUATION_11_ENGINEERING.md`](docs/CONTINUATION_11_ENGINEERING.md) before testing.
+
+This is still **source code, not a tested Windows game build**. The automatic Halo bitmap extraction, compiled BSP/collision/portals, First Contact, in-engine Firefight/Zombie Apocalypse and multiplayer goals remain unfinished. The source map is never edited to enable texture previews.
+
+
+### Continuation 12 — scenario integrity and live environment authoring
+
+`QuickForge > Properties > Materials & world settings > Environment lighting & fog` now saves bounded sun/ambient/fog preview intent with the project. `World Editor > Inspector > Environment` previews locally for the current session. Real Halo sky/fog tags and radiosity are **not** modified by these sliders. Native QuickForge source export also stages and verifies output before publishing it. See [`docs/CONTINUATION_12_ENGINEERING.md`](docs/CONTINUATION_12_ENGINEERING.md) and [`docs/LEGACY_SCENARIO_FAILURES.md`](docs/LEGACY_SCENARIO_FAILURES.md). The original ten Codex phases remain a roadmap, **not a completed feature set**.
+
+## Continuation 13 — private multiplayer and original tutorial writers
+
+Creator Studio now includes a **Multiplayer Session Setup / Game Type Workshop**. Select the stock Halo Custom Edition runtime, scan a registered installation for hashed version-609 multiplayer maps, choose a stock gametype or save a **design-only** custom variant, and export a review-only `init.txt`, session JSON or private session ZIP. No RCON passwords, native game files, map binaries, server startup or network configuration changes are made. Native game-type designs must be manually created in Halo CE and marked as user declarations; changing rules invalidates that declaration. Zombie Apocalypse remains a design, not synchronized multiplayer AI.
+
+Modding Academy links to **actual named historical tutorial writers** from CE3 and Halo Maps, while keeping original-authored tutorials distinct from Guilty Spark's lesson text. Read [Continuation 13 engineering details](docs/CONTINUATION_13_ENGINEERING.md) and [original forum tutorial attribution](docs/ORIGINAL_FORUM_TUTORIAL_AUTHORS.md). The project remains incomplete pending native compilation, authentic resource decoding and Halo gameplay tests.
+
+## Continuation 14 — Blam multiplayer game-type authoring and King hill placement
+
+QuickForge's scenario palette supports the five classic Halo CE modes: **Slayer, CTF, Oddball, King of the Hill, and Race**. Drag the **Add four-corner hill** tool onto the 3D map, move its individual hill corner markers with the XYZ gizmo, and optionally show the translucent convex hull preview. A native source-export guard blocks the Halo engine's dangerous two-marker hill configuration, invalid hill polygons, duplicate flag/ball/race IDs and nonsequential numbered objectives. The editor also checks source player-start eligibility and documents how to test the five game types in a real Halo runtime. The Academy includes a credited, guided lesson with original HEK and Xzzy material linked separately.
+
+Read [Continuation 14 engineering](docs/CONTINUATION_14_ENGINEERING.md) and the [Blam CE multiplayer field guide](docs/BLAM_H1_MULTIPLAYER_SCENARIO_FIELD_GUIDE.md). This is **source authoring**, not a compiled Windows app or a validated playable Halo map. No original Halo cache, system installation, custom game-type binary, server or firewall is modified by these changes. Most original Codex phase goals remain open as documented in `docs/REMAINING_WORK.md`.
+
+## Continuation 15 — Blam netgame marker completeness and source safety
+
+QuickForge now supports Race vehicle starting markers and paired teleporter entrance/exit channels, with independent route overlays and native CE scenario-plan type mapping. Improved CTF spawn eligibility and Race checkpoint gap repair reduce common multiplayer authoring failures. See [Continuation 15 engineering](docs/CONTINUATION_15_ENGINEERING.md) and the [Halo CE multiplayer field guide](docs/BLAM_H1_MULTIPLAYER_SCENARIO_FIELD_GUIDE.md). This is a **source-only** continuation; Windows/Rust and game-runtime validation remain required.
+
+
+## Continuation 16 - verified shader-to-bitmap tag provenance
+
+For classic Halo Demo, PC and Custom Edition cache inspection, `shader_environment`
+base-map and `shader_model` diffuse-map dependencies are now looked up by **actual
+bitmap tag datum/class**, not guessed filenames. Details, bump and multipurpose
+channels are recorded separately. World Editor's Material Lens can export a
+read-only JSON Material Audit and safely pair user-selected images by exact
+primary bitmap identity. This does not yet decode bitmap pixels from `.map` or
+`bitmaps.map`, emulate Halo shaders or prove a playable BSP.
+
+Start with `docs/CONTINUATION_16_ENGINEERING.md` for new coverage, limitations,
+original authors' format references, tests and next acceptance gates.
+
+## Continuation 17 — verified internal bitmap-pixel preview (source-only)
+
+World Editor > Material Lens now offers an opt-in **Preview bitmap from map (internal)**
+action for supported classic Demo/PC/Custom Edition shaders whose primary bitmap ID
+is verified. The native reader checks the preserved source SHA-256, selects only a
+bounded first-mipmap image and feeds the existing DXT/32-bit DDS decoder into a
+**temporary** Three.js texture. It does not alter any Halo `.map` or `.tag` file.
+
+This first native path does **not** read external `bitmaps.map` resources, MCC,
+3D/cube/sprite formats, other pixel encodings, shader blending or game radiosity.
+Manual local-image previews remain available. See
+[`docs/CONTINUATION_17_ENGINEERING.md`](docs/CONTINUATION_17_ENGINEERING.md).
+Rust compilation, original-cache tests and in-game visual comparison are still
+required, and the ten original Codex phases are still incomplete.
+
+## Continuation 18 — classic shared bitmap resource audit and guarded top-mip bridge
+
+The World Editor can validate a project-selected original `bitmaps.map` resource index against its recorded SHA-256 and report exact matching bitmap paths without copying assets. Its native first-mip preview supports one **strictly proven** external-raw range when classic PC/CE `bitm` metadata remains internal, the resource name is unique, and the byte range lies wholly inside that exact indexed resource. External tag bodies, ambiguous entries, unsupported formats and MCC ipaks fail closed. No game/resource file is written. See [`docs/CONTINUATION_18_ENGINEERING.md`](docs/CONTINUATION_18_ENGINEERING.md). Full Rust compilation and real-Halo resource validation are still required.
+
+
+## Continuation 19 — exact BSP lightmap identity and bounded automatic previews
+
+World Editor > Material Lens can now preview the next **six verified** source-cache
+shader diffuse images or BSP-specific lightmap pages with a button. The classic
+`sbsp` lightmap tag dependency is extracted read-only from each BSP header, and
+its page numbers are validated against the *same BSP* and a matching actual
+`bitm` tag. Distinct BSPs may use the same page index without sharing an
+unrelated texture. Manual images always win; invalid, external-metadata and
+unsupported assets fail closed. Cancel discards any in-flight result, and
+switching projects invalidates the queue. All operations are read-only; no
+source textures or local paths enter saved projects or release archives.
+
+This adds **preview functionality**, not finished Halo shader emulation. The
+original engine's radiosity, portals, BSP collision and gameplay builds remain
+unverified. Read [`docs/CONTINUATION_19_ENGINEERING.md`](docs/CONTINUATION_19_ENGINEERING.md)
+and run `npm run test:offline` / `cargo test -p spark-core` where installed.
+
+## Continuation 20 — read-only 24-image classic material preview batch
+
+C20 is built **on the exact C19 complete source**, not a replacement prototype. World Editor > Material Lens adds **Auto-preview verified materials** in one native read-only request for up to 24 exact shader base-map or BSP-scoped lightmap top-mip candidates. This avoids repeated map/resource scans, hash-verifies any selected original `bitmaps.map` at index opening and again after the batch using the same file handle, fails closed on unknown/ambiguous layouts and never writes a map or persists copyrighted pixels. Client-side order, pin and 16 MiB raw / 64 MiB RGBA budgets also guard against untrusted responses. Existing manual textures are never intentionally overwritten; cancellation discards late results. Both dedicated preview buttons remain.
+
+**Reality check:** offline Node regression tests passed; Rust/Cargo and Windows/Tauri/gameplay were NOT available to execute here. This ZIP is **full source, not a compiled app or playable Halo map**. Read `docs/CONTINUATION_20_ENGINEERING.md`, `docs/CONTINUATION_20_TEST_CARD.md` and `docs/07_HALO_MODDING_BRAIN_HANDOFF.md`. Always unpack into a NEW folder. Do not overwrite a previous working tree or installed Halo files.
+
+
+### Continuation 24 — bounded T-junction and WRL source-brush diagnostics (2026-10-26)
+
+- QuickForge's existing source-only edge graph now also screens for vertices strictly inside an authored edge (possible T-junctions), using sorted-axis candidate windows and a strict 2,000,000-comparison ceiling. Incomplete scans visibly say **INCOMPLETE**; a zero-count partial scan is never presented as proof of valid BSP geometry. Findings are warnings rather than automatic repairs or compiler outcomes.
+- A user-imported Halo 1 Tool `.wrl` can now be **approximately** associated with current editable brush bounds, with sampled primitives, overlap/ambiguity refusal, and a click-to-select candidate brush. The bridge does not touch a map/tag, assume a WRL has a verifiable hash, or claim which triangle Halo Tool rejected. Import fresh WRL evidence after each edit.
+- The privacy-limited BSP source report is now version 2 and records candidate T-junction counts, capped triangle examples and whether its scan completed. Original URLs, tag contents, source positions, and installed game files are not serialized.
+- Still not shipped as playable: valid compiled BSP collision/portals/PVS, lightmaps, First Contact, Firefight/Zombies gameplay, synchronized online AI, signed release binaries. A real Windows Rust/Tauri+Halo Tool / Invader build and in-game evidence are required.
+
+See `docs/CONTINUATION_24_ENGINEERING.md`, `docs/CONTINUATION_24_REQUIREMENT_TRACE.md` and `docs/CONTINUATION_24_TEST_CARD.md`.

@@ -421,12 +421,10 @@ pub fn package(
     if build.sha256.as_deref() != Some(&inspection.sha256) {
         return invalid("Package input does not match the validated build hash");
     }
-    if project.source.as_ref().is_none_or(|source| {
-        !source
-            .scenario_path
+    if !project.scenario_path()?
             .replace('\\', "/")
             .eq_ignore_ascii_case(&inspection.scenario_path.replace('\\', "/"))
-    }) {
+    {
         return invalid("Package map scenario differs from the source project");
     }
     let report = inspect_template(
@@ -569,11 +567,8 @@ pub fn verify_package(root: &ManagedRoot, project: &Project) -> Result<PackageRe
             "Package belongs to a different project revision; rebuild it before launching",
         );
     }
-    let source = project
-        .source
-        .as_ref()
-        .ok_or_else(|| SparkError::Invalid("Package project has no source scenario".into()))?;
-    let map_name = package_map_name(&source.scenario_path)?;
+    let scenario_path = project.scenario_path()?;
+    let map_name = package_map_name(&scenario_path)?;
     let map_key = format!("maps/{map_name}").to_ascii_lowercase();
     let mut normalized = std::collections::BTreeMap::new();
     if r.files.len() < 2 || r.files.len() > 513 {
@@ -629,7 +624,7 @@ pub fn verify_package(root: &ManagedRoot, project: &Project) -> Result<PackageRe
         || !map
             .scenario_path
             .replace('\\', "/")
-            .eq_ignore_ascii_case(&source.scenario_path.replace('\\', "/"))
+            .eq_ignore_ascii_case(&scenario_path.replace('\\', "/"))
     {
         return invalid("Packaged cache is not the expected MCC scenario");
     }

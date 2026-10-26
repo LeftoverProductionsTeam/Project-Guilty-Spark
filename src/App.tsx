@@ -6,18 +6,26 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   BookOpen,
+  GraduationCap,
+  Compass,
+  Heart,
   Box,
   ChevronRight,
   CircleHelp,
   FileCode2,
   FolderOpen,
+  Globe2,
+  Search,
   Hammer,
+  Layers3,
+  Flame,
   Home,
   Unplug,
   Server,
   LibraryBig,
   LoaderCircle,
   Plus,
+  Palette,
   Redo2,
   Save,
   Settings2,
@@ -33,13 +41,25 @@ import type {
   MeshData,
   OpenProject,
   Project,
+  RuntimeId,
   Settings,
   Workspace,
 } from './types';
 import { browserBootstrap, call, native } from './api';
+import { applyInterfacePreferences, readInterfacePreferences, saveInterfacePreferences } from './interfacePreferences';
+import type { CueName, LocalCueReference } from './interfacePreferences';
+import { UiCuePlayer } from './uiCuePlayer';
+import { pinOwnedInterfaceBitmap, matchesOwnedInterfaceBitmap, decodeBoundedInterfaceBitmap } from './ownedInterfaceBitmap';
+import type { OwnedBitmapPreview } from './ownedBitmapPreview';
 import { historyReducer, initialHistory, thumbnail } from './editor';
+import { firstVisitWorkspace, markFirstVisitSeen, WORKSPACE_TOOLTIPS } from './firstRun';
 import { Empty, IconButton, Pill, Toast } from './components/ui';
 import Library from './components/Library';
+import CommunityMaps from './components/CommunityMaps';
+import WorkspaceFinder from './components/WorkspaceFinder';
+import WorkbenchGuide from './components/WorkbenchGuide';
+import { WORKBENCH_GUIDES } from './workbenchGuide';
+import type { WorkspaceFinderItem } from './workspaceFinder';
 import Tags from './components/Tags';
 import Build from './components/Build';
 const World = lazy(() => import('./components/World'));
@@ -50,8 +70,21 @@ const Scenario = lazy(() => import('./components/Workspaces').then((m) => ({ def
 const Compare = lazy(() => import('./components/Compare'));
 const Runtimes = lazy(() => import('./components/Runtimes'));
 const LiveLab = lazy(() => import('./components/Runtimes').then((m) => ({ default: m.LiveLab })));
+const QuickForge = lazy(() => import('./components/QuickForge'));
+const Firefight = lazy(() => import('./components/Firefight'));
+const InterfaceStudio = lazy(() => import('./components/InterfaceStudio'));
+const CreatorStudio = lazy(() => import('./components/CreatorStudio'));
+const Academy = lazy(() => import('./components/Academy'));
+const GettingStarted = lazy(() => import('./components/GettingStarted'));
+const CommunityThanks = lazy(() => import('./components/CommunityThanks'));
 const nav = [
+  { id: 'get-started', label: 'Start here', icon: Compass },
   { id: 'library', label: 'Map library', icon: LibraryBig },
+  { id: 'map-finder', label: 'Community maps', icon: Globe2 },
+  { id: 'quickforge', label: 'QuickForge', icon: Layers3 },
+  { id: 'academy', label: 'Modding Academy', icon: GraduationCap },
+  { id: 'community', label: 'Community Thanks', icon: Heart },
+  { id: 'firefight', label: 'Firefight rules', icon: Flame },
   { id: 'world', label: 'World editor', icon: Box },
   { id: 'tags', label: 'Tag editor', icon: FileCode2 },
   { id: 'assets', label: 'Asset workshop', icon: Hammer },
@@ -60,14 +93,35 @@ const nav = [
   { id: 'compare', label: 'Compare variants', icon: ArrowLeftRight },
   { id: 'runtimes', label: 'Runtimes & friends', icon: Server },
   { id: 'live', label: 'Live Lab', icon: Unplug },
+  { id: 'interface', label: 'Interface Studio', icon: Palette },
+  { id: 'creator', label: 'Creator Studio', icon: BookOpen },
 ] as const;
+const finderItems: readonly WorkspaceFinderItem[] = [
+  ...nav.map(({id,label}) => ({id,label,help:WORKSPACE_TOOLTIPS[id] ?? '',keywords:`${WORKBENCH_GUIDES[id].can} ${WORKBENCH_GUIDES[id].cannot} ${WORKBENCH_GUIDES[id].tip}`})),
+  {id:'preservation',label:'Preservation record',help:WORKSPACE_TOOLTIPS.preservation ?? '',keywords:WORKBENCH_GUIDES.preservation.tip},
+  {id:'settings',label:'Settings & tools',help:WORKSPACE_TOOLTIPS.settings ?? '',keywords:WORKBENCH_GUIDES.settings.tip},
+];
 export default function App() {
   const [data, setData] = useState<Bootstrap>(browserBootstrap);
   const [ready, setReady] = useState(!native);
   const [history, dispatch] = useReducer(historyReducer, initialHistory);
   const [inspection, setInspection] = useState<OpenProject['inspection']>(null);
   const [meshes, setMeshes] = useState<Record<string, MeshData>>({});
-  const [workspace, setWorkspace] = useState<Workspace>('library');
+  const [workspace, setWorkspace] = useState<Workspace>(firstVisitWorkspace);
+  const [focusTagId, setFocusTagId] = useState<number | null>(null);
+  const [interfacePreferences, setInterfacePreferences] = useState(readInterfacePreferences);
+  const interfacePreferencesRef = useRef(interfacePreferences);
+  interfacePreferencesRef.current = interfacePreferences;
+  const audioPlayer = useRef<UiCuePlayer | null>(null);
+  const playInterfaceCue = useCallback((cue: CueName) => {
+    if (!audioPlayer.current) audioPlayer.current = new UiCuePlayer();
+    void audioPlayer.current.play(cue, interfacePreferencesRef.current);
+  }, []);
+  useEffect(() => {
+    saveInterfacePreferences(interfacePreferences);
+    applyInterfacePreferences(interfacePreferences, document.documentElement);
+  }, [interfacePreferences]);
+  useEffect(() => () => { audioPlayer.current?.dispose(); audioPlayer.current = null; }, []);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: string } | null>(null);
   const [logs, setLogs] = useState<JobEvent[]>([]);
@@ -77,14 +131,64 @@ export default function App() {
   const [newTitle, setNewTitle] = useState('Untitled workshop');
   const [dragging, setDragging] = useState(false);
   const [help, setHelp] = useState(false);
+  const [showFinder, setShowFinder] = useState(false);
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const buildRequest = useRef(0);
   const current = history.current;
+  const [ownedHeaderArt,setOwnedHeaderArt] = useState<{url:string;tagId:number}|null>(null);
+  const [ownedHeaderLoading,setOwnedHeaderLoading] = useState(false);
+  const [ownedHeaderStatus,setOwnedHeaderStatus] = useState('No local Halo bitmap selected.');
+  const bitmapPreference=interfacePreferences.bitmap;
+  // The profile persists only a tag ID + project + SHA. The bitmap is decoded
+  // from a local, exact-source preserved map after opening that project, then
+  // held in a revocable, memory-only blob URL. No copied game image is saved.
+  useEffect(() => {
+    let disposed=false;
+    let ownedUrl:string|null=null;
+    setOwnedHeaderArt(null);
+    setOwnedHeaderLoading(false);
+    if(!bitmapPreference) {setOwnedHeaderStatus('No local Halo bitmap selected.');return;}
+    if(!matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection)) {
+      setOwnedHeaderStatus('Open the exact Halo source map to restore this local artwork.');return;
+    }
+    if(!native){setOwnedHeaderStatus('Game-owned artwork requires the desktop app.');return;}
+    const selected=bitmapPreference;
+    setOwnedHeaderLoading(true);
+    setOwnedHeaderStatus('Reading verified local bitmap…');
+    void (async()=>{
+      try {
+        const response=await call<OwnedBitmapPreview>('preview_owned_cache_bitmap',{
+          projectId:selected.projectId,bitmapTagId:selected.bitmapTagId,imageIndex:0,
+        });
+        if(disposed)return;
+        const image=decodeBoundedInterfaceBitmap(response,selected,
+          current?.source?.resourceSha256?.['bitmaps.map'] ?? null);
+        const canvas=document.createElement('canvas');
+        canvas.width=image.width;canvas.height=image.height;
+        const ctx=canvas.getContext('2d');
+        if(!ctx)throw new Error('Local WebView canvas is unavailable');
+        ctx.putImageData(new ImageData(new Uint8ClampedArray(image.pixels),image.width,image.height),0,0);
+        const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Could not encode local bitmap preview')),'image/png'));
+        if(disposed)return;
+        ownedUrl=URL.createObjectURL(blob);
+        setOwnedHeaderArt({url:ownedUrl,tagId:selected.bitmapTagId});
+        setOwnedHeaderStatus(`Verified local bitmap #${selected.bitmapTagId} · ${image.width} × ${image.height}. Header art is memory-only.`);
+      } catch(error) {
+        if(!disposed)setOwnedHeaderStatus(`Bitmap preview unavailable: ${String(error)}`);
+      } finally{if(!disposed)setOwnedHeaderLoading(false);}
+    })();
+    return()=>{disposed=true;if(ownedUrl)URL.revokeObjectURL(ownedUrl);};
+  },[bitmapPreference,current?.id,current?.source?.sha256,inspection?.sha256,
+     current?.source?.resourceSha256?.['bitmaps.map']]);
   const historyRef = useRef(history);
   historyRef.current = history;
-  const notice = useCallback((message: string, tone = 'info') => setToast({ message, tone }), []);
+  const notice = useCallback((message: string, tone = 'info') => {
+    setToast({ message, tone });
+    if (tone === 'success') playInterfaceCue('confirm');
+    else if (tone === 'error') playInterfaceCue('warning');
+  }, [playInterfaceCue]);
   const refresh = useCallback(async () => {
     if (!native) return;
     const next = await call<Bootstrap>('bootstrap');
@@ -302,17 +406,26 @@ export default function App() {
       if (e.key === 'Escape') {
         setCreateModal(false);
         setHelp(false);
+        setShowFinder(false);
       }
       if (e.ctrlKey || e.metaKey) {
+        if (e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          // Avoid placing another dialog over modal confirmation or help.
+          setShowFinder(open => !open && !createModal && !help);
+          return;
+        }
         if (e.key.toLowerCase() === 's') {
           e.preventDefault();
           void save(true).catch(() => {});
         }
         if (e.key.toLowerCase() === 'z') {
+          if(e.target instanceof Element && e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
           e.preventDefault();
           dispatch({ type: e.shiftKey ? 'redo' : 'undo' });
         }
         if (e.key.toLowerCase() === 'y') {
+          if(e.target instanceof Element && e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
           e.preventDefault();
           dispatch({ type: 'redo' });
         }
@@ -320,7 +433,7 @@ export default function App() {
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [save]);
+  }, [save,help,createModal]);
   function edit(project: Project, description: string) {
     dispatch({ type: 'edit', project, description });
   }
@@ -334,7 +447,7 @@ export default function App() {
       );
       if (imported.length) {
         await load(imported[0]);
-        setWorkspace(imported[0].inspection?.mesh.positions.length ? 'world' : 'tags');
+        setWorkspace(imported[0].project.quickForge ? 'quickforge' : imported[0].inspection?.mesh.positions.length ? 'world' : 'tags');
         notice(
           `${imported.length} project${imported.length === 1 ? '' : 's'} imported. Source data preserved.`,
           'success',
@@ -348,12 +461,14 @@ export default function App() {
       setBusy(false);
     }
   }
-  async function openProject(id: string) {
+  async function openProject(id: string, stayInWorkspace?: Workspace) {
+    setFocusTagId(null);
     setBusy(true);
     try {
       if (historyRef.current.dirty) await save();
-      await load(await call<OpenProject>('open_project', { id }));
-      setWorkspace('world');
+      const open = await call<OpenProject>('open_project', { id });
+      await load(open);
+      setWorkspace(stayInWorkspace ?? (open.project.quickForge ? 'quickforge' : 'world'));
     } catch (e) {
       notice(String(e), 'error');
     } finally {
@@ -374,6 +489,21 @@ export default function App() {
     } finally {
       setBusy(false);
     }
+  }
+  async function createQuickForge(title: string, template: string, target: RuntimeId) {
+    setBusy(true);
+    try {
+      if (historyRef.current.dirty) await save();
+      const open = await call<OpenProject>('create_quickforge_project', { title, template, target });
+      await load(open); setWorkspace('quickforge'); await refresh();
+    } finally { setBusy(false); }
+  }
+  async function buildQuickForge() {
+    const project = historyRef.current.current;
+    if (!project?.quickForge) return;
+    await save();
+    const jobId = await call<string>('quickforge_build', { projectId: project.id });
+    setActiveJob(jobId);
   }
   async function importAsset() {
     if (!current) return;
@@ -425,12 +555,17 @@ export default function App() {
     </Empty>
   );
   function content() {
+    if (workspace === 'get-started') return <GettingStarted data={data} project={current} navigate={target => {markFirstVisitSeen();setWorkspace(target);}}/>;
+    if (workspace === 'community') return <CommunityThanks/>;
+    if (workspace === 'map-finder') return <CommunityMaps onImport={()=>void importFiles()} onLibrary={()=>setWorkspace('library')} busy={busy}/>;
     if (workspace === 'library')
       return (
         <Library
           data={data}
           onImport={() => void importFiles()}
           onNew={() => setCreateModal(true)}
+          onNewMap={() => setWorkspace('quickforge')}
+          onFindMaps={() => setWorkspace('map-finder')}
           onOpen={(e) => void openProject(e.id)}
           onInbox={() => void action(() => call('reveal_folder', { kind: 'inbox' }))}
           onInitializeInbox={() =>
@@ -441,6 +576,24 @@ export default function App() {
           busy={busy}
         />
       );
+    if (workspace === 'interface') return <InterfaceStudio
+      preferences={interfacePreferences} onChange={setInterfacePreferences} onPreview={playInterfaceCue}
+      bitmapTags={matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection) || (!bitmapPreference && !!current?.source && !!inspection && inspection.sha256.toLowerCase()===current.source.sha256.toLowerCase())
+        ? (inspection?.tags.filter(tag=>tag.class==='bitm').map(tag=>({id:tag.id,path:tag.path})) ?? [])
+        : (current?.source && inspection?.sha256.toLowerCase()===current.source.sha256.toLowerCase()
+          ? (inspection?.tags.filter(tag=>tag.class==='bitm').map(tag=>({id:tag.id,path:tag.path})) ?? []) : [])}
+      bitmapStatus={ownedHeaderStatus} bitmapLoading={ownedHeaderLoading} bitmapActive={!!ownedHeaderArt}
+      onChooseBitmap={(id)=>{try{
+        if(!current || !inspection)throw new Error('Import/open a preserved Halo map before choosing an interface bitmap');
+        const pinned=pinOwnedInterfaceBitmap(current,inspection,id);
+        setInterfacePreferences(previous=>({...previous,bitmap:pinned}));
+      }catch(error){notice(String(error),'error');}}}
+      onClearBitmap={()=>setInterfacePreferences(previous=>({...previous,bitmap:null}))}
+      canBrowseSounds={!!inspection?.tags.some((tag) => tag.class === 'snd!')}
+      onOpenTags={() => {
+        setFocusTagId(inspection?.tags.find((tag) => tag.class === 'snd!')?.id ?? null);
+        setWorkspace('tags');
+      }} />;
     if (workspace === 'settings')
       return (
         <Preferences
@@ -450,15 +603,19 @@ export default function App() {
           onRuntimes={() => setWorkspace('runtimes')}
         />
       );
+    if (workspace === 'quickforge') return <QuickForge key={current?.id ?? 'new'} project={current} data={data} edit={edit} onCreate={createQuickForge} onSave={() => save()} onBuild={buildQuickForge} onRuntimes={() => setWorkspace('runtimes')} onSettings={() => setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch} dirty={history.dirty} />;
     if (workspace === 'compare')
       return (
         <Compare entries={data.entries} currentId={current?.id} dirty={history.dirty} onSave={() => save()} />
       );
     if (workspace === 'runtimes')
-      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} />;
-    if (workspace === 'live') return <LiveLab onBuild={() => setWorkspace('build')} />;
+      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} settings={data.settings} onSettings={() => setWorkspace('settings')} onOpenWorkspace={setWorkspace} />;
+    if (workspace === 'academy') return <Academy project={current} inspection={inspection} settings={data.settings} navigate={setWorkspace} />;
+    if (workspace === 'live') return <LiveLab onBuild={() => setWorkspace('build')} onQuickForge={() => setWorkspace('quickforge')} />;
     if (!current) return commonEmpty;
     switch (workspace) {
+      case 'firefight': return <Firefight key={current.id} project={current} entries={data.entries} edit={edit} />;
+      case 'creator': return <CreatorStudio project={current} inspection={inspection} edit={edit} notify={notice} onOpenRuntimes={() => setWorkspace('runtimes')} />;
       case 'world':
         return (
           <Suspense fallback={<div className="loading">Loading world editor…</div>}>
@@ -469,12 +626,19 @@ export default function App() {
               assetMeshes={meshes}
               edit={edit}
               notify={notice}
+              onOpenTag={(tagId) => { setFocusTagId(tagId); setWorkspace('tags'); }}
             />
           </Suspense>
         );
       case 'tags':
         return (
-          <Tags key={current.id} project={current} inspection={inspection} edit={edit} notify={notice} />
+          <Tags key={current.id} project={current} inspection={inspection} entries={data.entries}
+            onSelectMap={(id) => { void openProject(id, 'tags'); }} edit={edit} notify={notice}
+            focusTagId={focusTagId}
+            onAssignSound={(cue: CueName, ref: LocalCueReference) => {
+              setInterfacePreferences((previous) => ({ ...previous, cues: { ...previous.cues, [cue]: ref } }));
+              notice(`Assigned ${cue} sound locally. Enable UI audio in Interface Studio to hear it.`, 'success');
+            }} />
         );
       case 'assets':
         return (
@@ -491,7 +655,7 @@ export default function App() {
       case 'preservation':
         return <Preservation project={current} edit={edit} />;
       case 'build':
-        return current.source ? (
+        return current.quickForge ? <QuickForge key={current.id} project={current} data={data} edit={edit} onCreate={createQuickForge} onSave={() => save()} onBuild={buildQuickForge} onRuntimes={() => setWorkspace('runtimes')} onSettings={() => setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch} dirty={history.dirty} /> : current.source ? (
           <Build
             project={current}
             data={data}
@@ -529,14 +693,16 @@ export default function App() {
   return (
     <>
       <div className="application" inert={closing || undefined}>
-        <header className="app-header">
+        <header className="app-header" style={ownedHeaderArt && matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection)
+          ? { backgroundImage: `linear-gradient(90deg,rgba(7,17,26,.96) 0%,rgba(9,24,35,.9) 44%,rgba(8,22,33,.58) 100%),url("${ownedHeaderArt.url}")`,backgroundSize:'cover',backgroundPosition:'center' }
+          : undefined}>
           <button className="brand" onClick={() => setWorkspace('library')} aria-label="Guilty Spark home">
             <img src="/spark.svg" alt="" />
             <div>
               <strong>GUILTY SPARK</strong>
               <span>HALO MODERN EVOLVED</span>
             </div>
-            <Pill>0.2</Pill>
+            <Pill>0.3.1 · C32</Pill>
           </button>
           <div className="header-context">
             <span>LOCAL WORKBENCH</span>
@@ -554,6 +720,7 @@ export default function App() {
               <span className="live-dot" />
               {data.installation.mccPath ? 'MCC found' : native ? 'Runtime not found' : 'Browser preview'}
             </Pill>
+            <button className="gs-header-find" title="Search all Spark tools and workspaces (Ctrl+K)" onClick={()=>{setHelp(false);setCreateModal(false);setShowFinder(true);}}><Search size={15}/>Find tools <kbd>Ctrl K</kbd></button>
             <IconButton label="Help & shortcuts" onClick={() => setHelp(true)}>
               <CircleHelp size={18} />
             </IconButton>
@@ -566,7 +733,10 @@ export default function App() {
               <button
                 className={workspace === id ? 'nav-item selected' : 'nav-item'}
                 key={id}
-                onClick={() => setWorkspace(id)}
+                title={WORKSPACE_TOOLTIPS[id]}
+                aria-label={label}
+                aria-description={WORKSPACE_TOOLTIPS[id]}
+                onClick={() => {markFirstVisitSeen(); setWorkspace(id); playInterfaceCue('select'); }}
               >
                 <Icon size={17} />
                 <span>{label}</span>
@@ -644,7 +814,7 @@ export default function App() {
           </div>
         </aside>
         <main className={`main-content workspace-${workspace}`}>
-          {current && workspace !== 'library' && workspace !== 'settings' && (
+          {current && !['library','settings','community','get-started'].includes(workspace) && (
             <div className="editor-bar">
               <div className="breadcrumb">
                 <button onClick={() => setWorkspace('library')}>Library</button>
@@ -675,6 +845,13 @@ export default function App() {
               </div>
             </div>
           )}
+          {ready && <WorkbenchGuide key={workspace} workspace={workspace}
+            evidence={{ desktop:native, project:!!current, source:!!current?.source,
+              inspectedSource:!!current?.source && !!inspection && inspection.sha256.toLowerCase()===current.source.sha256.toLowerCase(),
+              forge:!!current?.quickForge,
+              toolFolder:!!data.settings.hekDirectory || !!data.settings.invaderDirectory,
+              unsaved:history.dirty, runningJob:!!activeJob }}
+            onNavigate={target=>{markFirstVisitSeen();setWorkspace(target);playInterfaceCue('select');}} />}
           {!ready ? (
             <div className="loading">
               <LoaderCircle className="spin" size={22} />
@@ -720,6 +897,7 @@ export default function App() {
             <p>Drop Halo .map files, ZIP archives or .gsproject descriptors to import.</p>
           </div>
         )}
+        {showFinder && !help && !createModal && <WorkspaceFinder items={finderItems} onNavigate={target=>{markFirstVisitSeen();setWorkspace(target);}} onClose={()=>setShowFinder(false)}/>}
         {createModal && (
           <div className="modal-backdrop">
             <form
@@ -779,10 +957,14 @@ export default function App() {
               </p>
               <div className="shortcut-list">
                 {[
+                  ['Find tools, BSP help or community maps', 'Ctrl + K'],
+                  ['Context-aware field guide', 'Why / what next at top of workspace'],
+                  ['Dismiss help tooltip', 'Esc while focused'],
                   ['Save project', 'Ctrl + S'],
                   ['Undo / redo', 'Ctrl + Z / Ctrl + Shift + Z'],
-                  ['Translate / rotate / scale', 'W / E / R'],
-                  ['Frame the scene', 'F'],
+                  ['Move / rotate / scale', 'W / E / R'],
+                  ['Fly camera', 'Hold RMB + WASD; R/F up/down'],
+                  ['Grid / mesh snap', 'G / M'],
                   ['Clear selection', 'Esc'],
                 ].map(([label, key]) => (
                   <div key={label}>
@@ -792,8 +974,7 @@ export default function App() {
                 ))}
               </div>
               <p className="subtle">
-                World markers show actual placements; BSP previews show collision geometry. Live editing, AI
-                synchronization, VR, and asset-to-Halo compilation are not connected.
+                QuickForge refreshes editable source meshes and simulated collision. Compiled Halo collision, portals, AI synchronization and live engine editing remain separate and require real runtime testing.
               </p>
               <button className="primary full" onClick={() => setHelp(false)}>
                 Back to the workbench

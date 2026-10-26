@@ -1,0 +1,14 @@
+.gs-multiplayer-workbench { display: grid; gap: 16px; }
+.gs-multiplayer-workbench .section-heading h2 { display: flex; align-items: center; gap: 8px; }
+.gs-match-row { display: grid; grid-template-columns: 3em minmax(130px,1fr) minmax(130px,1fr) auto; align-items: end; gap: 12px; margin: 12px 0; }
+.gs-match-row strong { align-self:center; }
+.gs-match-row label { min-width: 0; }
+.gs-match-row label input { width: 100%; }
+.gs-gametype { border: 1px solid var(--border, #45515e); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+.gs-gametype summary { display: flex; flex-wrap: wrap; gap: 10px; align-items:center; cursor: pointer; }
+.gs-gametype summary::marker { color: #9dacb7; }
+.gs-gametype[open] > :not(summary) { margin-top: 12px; }
+.gs-rule-switches { display:flex; flex-wrap:wrap; align-items:center; gap: 20px; }
+.gs-session-finding { display: flex; align-items:flex-start; gap: 10px; margin: 8px 0; line-height: 1.5; }
+.gs-session-finding strong { font-size: .9em; }
+@media (max-width:720px) { .gs-match-row { grid-template-columns:1fr 1fr; } .gs-match-row>strong {grid-column: 1 / -1;} }

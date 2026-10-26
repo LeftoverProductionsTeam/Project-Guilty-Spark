@@ -7,6 +7,7 @@ import {
   AudioLines,
   Box,
   Code2,
+  Copy,
   FolderOpen,
   Globe2,
   Info,
@@ -21,14 +22,32 @@ import {
 import type { Bootstrap, MapInspection, MeshData, Project, Settings } from '../types';
 import { call } from '../api';
 import { formatNumber } from '../editor';
+import { exportMeshObj } from '../haloObj';
+import { exportMeshJms } from '../haloJms';
+import { assembleSourceMeshes } from '../meshAssembly';
+import type { MeshAssembly, MeshSnapMode, FaceDirection } from '../meshAssembly';
+import { downloadLocalText } from '../exportHelpers';
 import { reconcileSettingsDraft } from '../settings';
 import { Empty, Notice, PageTitle, Pill } from './ui';
 function PreviewMesh({ mesh }: { mesh: MeshData }) {
   const g = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(mesh.positions, 3));
+    if (mesh.uvs?.length === (mesh.positions.length / 3) * 2) {
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(mesh.uvs ?? [], 2));
+    }
+    if (mesh.normals?.length === mesh.positions.length) {
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(mesh.normals ?? [], 3));
+    } else {
+      g.computeVertexNormals();
+    }
     g.setIndex(mesh.indices);
-    g.computeVertexNormals();
+    for (const part of mesh.parts ?? []) {
+      // Preserve real material-group boundaries for future texture assignment.
+      if (part.indexStart >= 0 && part.indexCount > 0 && part.indexStart + part.indexCount <= mesh.indices.length) {
+        g.addGroup(part.indexStart, part.indexCount, 0);
+      }
+    }
     return g;
   }, [mesh]);
   useEffect(() => () => g.dispose(), [g]);
@@ -50,8 +69,40 @@ export function Assets({
   onWorld: () => void;
 }) {
   const [chosen, setChosen] = useState<string | null>(project.assets[0]?.id ?? null);
+  const [exchangeFeedback, setExchangeFeedback] = useState('');
+  const [movingAssetId,setMovingAssetId] = useState('');
+  const [alignMode,setAlignMode] = useState<MeshSnapMode>('face');
+  const [alignFace,setAlignFace] = useState<FaceDirection>('x+');
+  const [targetVertex,setTargetVertex] = useState(0);
+  const [movingVertex,setMovingVertex] = useState(0);
+  const [weldSeams,setWeldSeams] = useState(false);
+  const [assembly,setAssembly] = useState<{targetId:string;movingId:string;result:MeshAssembly}|null>(null);
+  const [assemblyError,setAssemblyError] = useState('');
   const asset = project.assets.find((a) => a.id === chosen) ?? project.assets.at(-1);
   const mesh = asset ? meshes[asset.id] : undefined;
+  const compatible = project.assets.filter(a=>a.id!==asset?.id && !!meshes[a.id]);
+  const movingAsset = compatible.find(a=>a.id===movingAssetId);
+  const displayedAssembly = assembly && assembly.targetId === asset?.id && assembly.movingId === movingAssetId
+    ? assembly.result : null;
+  function calculateAssembly() {
+    try {
+      if (!asset || !mesh || !movingAsset) throw new Error('Choose two imported meshes with available geometry');
+      const result=assembleSourceMeshes(mesh,meshes[movingAsset.id],{
+        mode:alignMode,face:alignFace,targetVertex,movingVertex,
+      },weldSeams);
+      setAssembly({targetId:asset.id,movingId:movingAsset.id,result});
+      setAssemblyError('');
+    } catch(error) {
+      setAssembly(null);setAssemblyError(String(error));
+    }
+  }
+  function saveJms(source:MeshData,label:string,kind:'model'|'bsp-candidate') {
+    try {
+      const result=exportMeshJms(source,kind);
+      downloadLocalText(`${label.replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,48)}.jms`,result.text,'text/plain');
+      setExchangeFeedback(`Saved JMS 8200 source (${result.triangles} triangles, ${result.materials.length} materials). Not a compiled Halo tag or verified map.`);
+    } catch(error) {setExchangeFeedback(`JMS export rejected: ${String(error)}`);}
+  }
   return (
     <div className="workshop-page">
       <PageTitle
@@ -64,7 +115,7 @@ export function Assets({
               <Box size={15} />
               Place in scene
             </button>
-            <button className="primary" onClick={onImport}>
+            <button className="primary" title="Import an OBJ geometry source file. UVs, normals and material groups are preserved where supported; this is not a compiled Halo .tag." onClick={onImport}>
               <Upload size={15} />
               Import OBJ
             </button>
@@ -72,8 +123,8 @@ export function Assets({
         }
       />
       <Notice tone="info">
-        OBJ mesh ingestion and previews are implemented. UV presence and material names are indexed. Halo
-        render/collision tag generation, glTF, textures, animation and audio decoding are not implemented.
+        OBJ import now preserves vertex normals, UV seams and material-group boundaries in the preview mesh.
+        External MTL textures, Halo render/collision tag generation, glTF, animation and audio decoding are not implemented.
       </Notice>
       {project.assets.length ? (
         <div className="asset-layout">
@@ -82,7 +133,7 @@ export function Assets({
               <button
                 key={a.id}
                 className={a.id === asset?.id ? 'asset-item selected' : 'asset-item'}
-                onClick={() => setChosen(a.id)}
+                onClick={() => {setChosen(a.id);setAssembly(null);setAssemblyError('');}}
               >
                 <Box size={21} />
                 <span>
@@ -100,14 +151,14 @@ export function Assets({
                 <ambientLight intensity={1.6} />
                 <directionalLight position={[10, -10, 20]} intensity={2} />
                 <Bounds fit clip observe margin={1.5}>
-                  <PreviewMesh mesh={mesh} />
+                  <PreviewMesh mesh={displayedAssembly?.mesh ?? mesh} />
                 </Bounds>
                 <OrbitControls makeDefault />
               </Canvas>
             ) : (
               <div className="loading">Loading geometry…</div>
             )}
-            <span className="asset-preview-label">Imported geometry · drag to orbit</span>
+            <span className="asset-preview-label">{displayedAssembly ? 'Source mesh assembly · not compiled BSP' : 'Imported geometry'} · drag to orbit</span>
           </div>
           <div className="surface asset-details">
             <div className="section-label">Mesh inspection</div>
@@ -118,13 +169,81 @@ export function Assets({
               <dt>Triangles</dt>
               <dd>{formatNumber(asset?.triangles ?? 0)}</dd>
               <dt>UV data</dt>
-              <dd>{asset?.hasUvs ? 'Present · indexed only' : 'Not found'}</dd>
+              <dd>{asset?.hasUvs ? 'Preserved in preview geometry' : 'Not found'}</dd>
               <dt>Materials</dt>
               <dd>{asset?.materials.length ?? 0} named</dd>
             </dl>
             {asset?.materials.map((m) => (
               <Pill key={m}>{m}</Pill>
             ))}
+            <div className="section-label">Geometry exchange</div>
+            <button type="button" className="small-button" disabled={!mesh || !asset} title="Save the selected imported mesh as source OBJ for use in another compatible project. Shader bitmaps and collision are not copied." onClick={() => {
+              try {
+                if (!asset || !mesh) throw new Error('Select an imported source asset');
+                const result=exportMeshObj(mesh,asset.name);
+                downloadLocalText(`gs_asset_${asset.id.slice(0,8)}.obj`,result.text);
+                setExchangeFeedback(`Exported ${result.triangles} indexed triangles as source OBJ. No Halo tag binaries were included.`);
+              } catch (error) { setExchangeFeedback(`OBJ export rejected: ${String(error)}`); }
+            }}>Export selected mesh OBJ</button>
+            <button type="button" className="small-button" disabled={!mesh || !asset} title="Save JMS 8200 source geometry. Run the actual target Halo compiler to produce tags and verified collision."
+              onClick={() => { if(asset && mesh) saveJms(mesh,`gs_asset_${asset.id.slice(0,8)}`,'model'); }}>
+              Export selected mesh JMS source
+            </button>
+            {exchangeFeedback && <p className="subtle" role="status">{exchangeFeedback}</p>}
+            <p className="subtle">Wavefront geometry only. Import the OBJ into another Guilty Spark project with Import OBJ; shader tags and Halo collision data are not extracted.</p>
+            <div className="section-label">Mesh-to-mesh snap &amp; seam welding</div>
+            <p className="subtle">Select two user-imported source meshes. Face snapping is optional and explicit; welding only accepts matching, opposite-facing <strong>open</strong> edges with compatible UVs/normals.</p>
+            <div className="mesh-assembly-controls">
+              <label>Moving mesh
+                <select aria-label="Moving source mesh" value={movingAssetId} onChange={e=>{setMovingAssetId(e.target.value);setAssembly(null);setAssemblyError('');}}>
+                  <option value="">Choose a second asset</option>
+                  {compatible.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </label>
+              <label>Alignment
+                <select aria-label="Mesh snap mode" value={alignMode} onChange={e=>{setAlignMode(e.target.value as MeshSnapMode);setAssembly(null);}}>
+                  <option value="face">Snap bounding faces</option>
+                  <option value="vertex">Snap exact vertex coordinates</option>
+                </select>
+              </label>
+              {alignMode==='face' ? <label>Target face
+                <select aria-label="Target mesh face" value={alignFace} onChange={e=>{setAlignFace(e.target.value as FaceDirection);setAssembly(null);}}>
+                  {(['x+','x-','y+','y-','z+','z-'] as FaceDirection[]).map(face=><option key={face} value={face}>{face}</option>)}
+                </select>
+              </label> : <>
+                <label>Target vertex index
+                  <input type="number" aria-label="Target vertex index" min={0} step={1} value={targetVertex}
+                    onChange={e=>{setTargetVertex(Number(e.target.value));setAssembly(null);}} />
+                </label>
+                <label>Moving vertex index
+                  <input type="number" aria-label="Moving vertex index" min={0} step={1} value={movingVertex}
+                    onChange={e=>{setMovingVertex(Number(e.target.value));setAssembly(null);}} />
+                </label>
+              </>}
+              <label className="mesh-assembly-check"><input type="checkbox" aria-label="Weld matching open boundary edges"
+                checked={weldSeams} title="Opt-in welding requires matching open boundary edges and compatible normals and UVs; closed BSP solids cannot be unioned safely by this tool." onChange={e=>{setWeldSeams(e.target.checked);setAssembly(null);}} />
+                Weld compatible open seams (optional)</label>
+              <button type="button" className="small-button" title="Compute an in-memory mesh alignment and optional seam weld, with topology reports before any export. No original file is changed." disabled={!mesh||!movingAsset} onClick={calculateAssembly}>
+                Preview aligned source
+              </button>
+            </div>
+            {assemblyError && <p className="mesh-assembly-error" role="alert">{assemblyError}</p>}
+            {displayedAssembly && <div className="mesh-assembly-result" role="status">
+              <p>{displayedAssembly.alignment.description}. Shift: {displayedAssembly.alignment.translation.map(v=>v.toFixed(3)).join(', ')}.</p>
+              <p>{displayedAssembly.topology.triangles} triangles · {displayedAssembly.topology.boundaryEdges} open edges · {displayedAssembly.weldedEdges} seam edges joined</p>
+              <div className="mesh-assembly-actions">
+                <button className="small-button" onClick={()=>{
+                  try {
+                    const obj=exportMeshObj(displayedAssembly.mesh,`gs_joined_${asset?.name??'mesh'}`);
+                    downloadLocalText('gs_aligned_meshes.obj',obj.text);
+                    setExchangeFeedback(`Exported aligned OBJ (${obj.triangles} triangles). Source geometry only.`);
+                  } catch(error){setExchangeFeedback(`Assembly OBJ export rejected: ${String(error)}`);}
+                }}>Export aligned OBJ</button>
+                <button className="small-button" onClick={()=>saveJms(displayedAssembly.mesh,'gs_aligned_meshes','model')}>Export aligned JMS source</button>
+                <button className="small-button" onClick={()=>saveJms(displayedAssembly.mesh,'gs_bsp_candidate','bsp-candidate')}>Export sealed BSP JMS candidate</button>
+              </div>
+              {displayedAssembly.warnings.map((w,i)=><p key={i} className="subtle">{w}</p>)}
+            </div>}
             <div className="section-label">Integrity</div>
             <code className="checksum">{asset?.sha256}</code>
             <p className="subtle">
@@ -135,7 +254,7 @@ export function Assets({
       ) : (
         <Empty icon={<Box size={32} />} title="Your geometry belongs here">
           Import a Wavefront OBJ to inspect its mesh, place it in a 3D scene, and save your work.
-          <button className="primary" onClick={onImport}>
+          <button className="primary" title="Import an OBJ geometry source file. UVs, normals and material groups are preserved where supported; this is not a compiled Halo .tag." onClick={onImport}>
             <Plus size={15} />
             Import your first mesh
           </button>
@@ -446,6 +565,8 @@ export function Preferences({
     previousSettings.current = data.settings;
   }, [data.settings]);
   const rows: [keyof Settings, string, string][] = [
+    ['hekDirectory', 'Halo Editing Kit tool directory', 'A separately installed compatible Halo Tool executable for original QuickForge BSP compilation.'],
+    ['hekTagsDirectory', 'Halo source tag directory', 'A complete, legal tag tree containing the shaders, sky and asset dependencies referenced by QuickForge.'],
     [
       'steamDirectory',
       'Steam installation',
@@ -518,6 +639,37 @@ export function Preferences({
               </div>
             </div>
           ))}
+          <div className="setting-row">
+            <label htmlFor="gs-hek-flavor">Official Halo 1 Editing Kit flavor</label>
+            <p>Choose what the configured Halo Editing Kit folder actually contains. Classic HEK is for Halo Custom Edition; H1A is for MCC. Wrong-family tools are never offered for launch.</p>
+            <select id="gs-hek-flavor" aria-label="Official Editing Kit family" title="Select the exact installed Halo tool generation to prevent using legacy executables with MCC data." value={draft.hekFlavor ?? ''} onChange={e=>setDraft({...draft,hekFlavor:(e.target.value||null) as Settings['hekFlavor']})}>
+              <option value="">Unverified / not selected</option>
+              <option value="legacyHek">Classic HEK · Halo Custom Edition</option>
+              <option value="h1aEk">H1A Editing Kit · MCC Halo CE</option>
+            </select>
+          </div>
+          <div className="setting-row">
+            <label>Optional Invader offline tool cache</label>
+            <p>
+              Make a verified local copy of the three Invader CLI executables and adjacent DLLs
+              from a directory you installed yourself. Nothing is downloaded, executed or
+              redistributed. Confirm that your copy's license permits personal caching.
+              Review the generated path and click Apply preferences to use it.
+            </p>
+            <button
+              className="small-button"
+              disabled={!draft.invaderDirectory}
+              onClick={() => void onAction(async () => {
+                const sourceDirectory = draft.invaderDirectory;
+                if (!sourceDirectory) return;
+                const chosen = await call<string>('cache_invader_installation', { sourceDirectory });
+                setDraft((current) => ({ ...current, invaderDirectory: chosen }));
+              })}
+            >
+              <Copy size={14} />
+              Cache Invader locally (optional)
+            </button>
+          </div>
           <label className="toggle-setting">
             <input
               type="checkbox"

@@ -1,6 +1,12 @@
+import type { QuickForgeDocument } from './forge';
+import type { FirefightConfig } from './firefight';
+import type { CreatorStudioDocument } from './creatorStudio';
 export type Vec3 = [number, number, number];
 export type Workspace =
   | 'library'
+  | 'map-finder'
+  | 'get-started'
+  | 'community'
   | 'world'
   | 'tags'
   | 'assets'
@@ -10,7 +16,12 @@ export type Workspace =
   | 'settings'
   | 'compare'
   | 'runtimes'
-  | 'live';
+  | 'live'
+  | 'quickforge'
+  | 'firefight'
+  | 'interface'
+  | 'creator'
+  | 'academy';
 export interface Diagnostic {
   severity: string;
   code: string;
@@ -59,6 +70,8 @@ export interface Tag {
   external: boolean;
   fields: TagField[];
   references: TagReference[];
+  /** Read-only classic shader base/diffuse map attribution from the source cache. */
+  primaryBitmapStatus?: 'resolved' | 'missing' | 'invalid' | 'unavailable' | null;
 }
 export interface SceneObject {
   id: string;
@@ -76,9 +89,15 @@ export interface SceneObject {
 export interface MeshData {
   positions: number[];
   indices: number[];
+  normals?: number[];
+  uvs?: number[];
+  /** Only real read-only BSP lightmap UVs; unverified/missing data is zero-filled. */
+  lightmapUvs?: number[];
   label: string;
   source: string;
   parts?: { name: string; indexStart: number; indexCount: number }[];
+  /** Actual shader-tag provenance for untextured BSP spans. */
+  materialRanges?: { shaderTagId: number; bspIndex: number; lightmapIndex: number; lightmapPage?: number; hasLightmapUvs?: boolean; lightmapBitmapTagId?: number | null; indexStart: number; indexCount: number }[];
 }
 export interface MapInspection {
   header: MapHeader;
@@ -86,6 +105,8 @@ export interface MapInspection {
   tags: Tag[];
   objects: SceneObject[];
   mesh: MeshData;
+  renderMesh?: MeshData | null;
+  modelMeshes?: Record<string, MeshData>;
   encounters: { name: string; squads: string[]; team: number }[];
   scripts: { name: string; scriptType: number; returnType: number }[];
   resources: { name: string; required: boolean; found: boolean; reason: string }[];
@@ -127,6 +148,9 @@ export interface BuildRecord {
   projectFingerprint: string;
 }
 export interface Project {
+  quickForge?: QuickForgeDocument | null;
+  firefight?: FirefightConfig | null;
+  studio?: CreatorStudioDocument | null;
   schemaVersion: number;
   id: string;
   title: string;
@@ -165,6 +189,10 @@ export interface LibraryEntry {
   scenarioType: number | null;
 }
 export interface Settings {
+  hekDirectory?: string | null;
+  /** Explicit confirmation of which official Halo 1 toolchain owns hekDirectory. */
+  hekFlavor?: 'legacyHek' | 'h1aEk' | null;
+  hekTagsDirectory?: string | null;
   steamDirectory: string | null;
   mccDirectory: string | null;
   invaderDirectory: string | null;

@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {exactTerrainJoins,terrainSnapCandidates,describeTerrainJoins} from '../src/terrainJoinAnalysis.ts';
+import {snapBrushToAuthoredMesh} from '../src/snapGeometry.ts';
+const tile=(id,x,y=0)=>({id,name:id,kind:'terrain',position:[x,y,0],rotation:[0,0,0],dimensions:[12,12,3],steps:8,heights:Array(81).fill(0),visible:true,locked:false,materialId:'earth'});
+let a=tile('a',-6),b=tile('b',6.45);
+assert.equal(exactTerrainJoins([a,b]).length,0);
+assert.deepEqual(terrainSnapCandidates(b,a,0.6)[0]?.position,[6,0,0]);
+let snap=snapBrushToAuthoredMesh(b,[a,b],0.6);assert.equal(snap?.kind,'terrain-edge');assert.deepEqual(snap?.position,[6,0,0]);
+assert.equal(exactTerrainJoins([a,{...b,position:[6,0,0]}]).length,1);
+assert.match(describeTerrainJoins({geometry:[a,{...b,position:[6,0,0]}]}),/1 exact terrain-source seam/);
+b.heights[0]=1;assert.equal(snapBrushToAuthoredMesh(b,[a,b],0.6),null,'height mismatch must refuse weld');
+b.heights[0]=0;b.rotation=[0,0,.05];assert.equal(snapBrushToAuthoredMesh(b,[a,b],0.6),null,'tilted terrain cannot safely join');
+b.rotation=[0,0,0];b.steps=9;assert.equal(snapBrushToAuthoredMesh(b,[a,b],0.6),null,'different tessellation');
+b.steps=8;b.heights=[];assert.equal(snapBrushToAuthoredMesh(b,[a,b],0.6)?.kind,'terrain-edge','legacy terrain can use zero default heights');
+const center=tile('c',-6,12);assert.equal(exactTerrainJoins([a,{...b,position:[6,0,0]},center]).length,2);
+assert.equal(snapBrushToAuthoredMesh(b,[a,{...a,id:'duplicate'},b],.6),null,'ambiguous seam must fail');
+assert.equal(exactTerrainJoins([a,{...b,position:[6,0,0]},{...b,id:'duplicate',position:[6,0,0]}]).length,0);
+console.log('PASS: exact terrain full-edge joins, optional snap, mismatch and ambiguity checks');

@@ -1,0 +1,63 @@
+Project Guilty Spark — Continuation 32 cumulative source comparison
+BASELINE: Continuation 31
+OBSERVED_BASELINE_ZIP_SHA256: 757bec2a554b1c35141ecd0efbffc8cee05c3aae54663accb581b748b2f09dce
+BASELINE_SOURCE_MANIFEST_SHA256: 76595d0618ca7720a456beccd833b80b3aadf231dfe3d03c1371c600d5c4cbcd
+BASELINE_FILES_HASH_VERIFIED: 429
+Comparison excludes the two regenerated checksum manifests.
+ADDED_COUNT: 25
+MODIFIED_COUNT: 21
+UNCHANGED_COUNT: 408
+REMOVED_COUNT: 0
+
+ADDED FILES
+.gitattributes
+.prettierignore
+.prettierrc.json
+crates/spark-core/examples/verify_source_archive.rs
+crates/spark-core/tests/material_bindings.rs
+docs/CONTINUATION_32_ENGINEERING.md
+docs/CONTINUATION_32_TEST_CARD.md
+docs/FIREFIGHT_ENGINE.md
+docs/MASTER_FEATURE_LEDGER.csv
+docs/MASTER_FEATURE_LEDGER.md
+docs/MULTIPLAYER_HOSTING.md
+docs/PHASE3_TEST_RESULTS.md
+docs/QUICKFORGE_BSP_PIPELINE.md
+docs/RUNTIME_CAPABILITIES.md
+docs/fixtures/build-artifacts-0.3.1.json
+docs/fixtures/continuation32-verification.json
+docs/screenshots/continuation32/native-arena-final.png
+docs/screenshots/continuation32/native-five-mode-arena.png
+docs/screenshots/continuation32/native-tag-edit.png
+docs/screenshots/continuation32/native-world-initial.png
+docs/screenshots/continuation32/native-world-verified-materials.png
+examples/Guilty Spark Five-Mode Test Arena.gsproject
+scripts/package-source.mjs
+scripts/update-feature-ledger.mjs
+src/forgePlacement.test.ts
+
+MODIFIED FILES
+.gitignore
+Cargo.lock
+Cargo.toml
+README.md
+SOURCE_DIFF_FROM_PREVIOUS.txt
+crates/spark-core/src/forge_build.rs
+crates/spark-core/src/quickforge.rs
+crates/spark-core/src/tag_exchange.rs
+crates/spark-core/tests/terrain_caves.rs
+docs/REMAINING_WORK.md
+package.json
+src-tauri/tauri.conf.json
+src/App.tsx
+src/components/ForgeViewport.tsx
+src/components/QuickForge.tsx
+src/components/World.tsx
+src/forge.ts
+src/renderView.test.ts
+src/viewport.css
+tests/ui/browser.spec.ts
+tests/ui/native-contract.spec.ts
+
+REMOVED FILES
+(none)

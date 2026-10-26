@@ -1,0 +1,1026 @@
+{
+  "schemaVersion": 1,
+  "id": "3a030eb6-3f06-4f3a-a629-e55bae8456c1",
+  "title": "Guilty Spark Five-Mode Test Arena",
+  "createdAt": "2026-10-26T21:43:43.683768800+00:00",
+  "modifiedAt": "2026-10-26T21:43:43.683768800+00:00",
+  "source": null,
+  "provenance": {
+    "creator": "Project Guilty Spark",
+    "community": "",
+    "releaseYear": null,
+    "description": "Original geometry and five-mode source markers created and reopened in the native editor. No Halo tags, game assets or playable cache are bundled. Select legal shaders, sky and an Editing Kit before compilation.",
+    "sourceUrl": "",
+    "permissions": ""
+  },
+  "scene": [],
+  "assets": [],
+  "tagEdits": [],
+  "history": [],
+  "builds": [],
+  "quickForge": {
+    "schemaVersion": 1,
+    "name": "Guilty Spark Five-Mode Test Arena",
+    "template": "guiltySparkTestArena",
+    "runtimeId": "haloCustomEdition",
+    "gameMode": "slayer",
+    "geometry": [
+      {
+        "id": "arena-room",
+        "name": "Arena shell",
+        "kind": "room",
+        "position": [
+          0,
+          0,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "dimensions": [
+          24,
+          32,
+          8
+        ],
+        "materialId": "surface",
+        "visible": true,
+        "locked": false,
+        "steps": 4,
+        "heights": []
+      },
+      {
+        "id": "ramp",
+        "name": "Central ramp",
+        "kind": "ramp",
+        "position": [
+          0,
+          2,
+          1.02
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "dimensions": [
+          3,
+          6,
+          2
+        ],
+        "materialId": "surface",
+        "visible": true,
+        "locked": false,
+        "steps": 4,
+        "heights": []
+      },
+      {
+        "id": "cover-0",
+        "name": "Cover 1",
+        "kind": "box",
+        "position": [
+          -5,
+          -4,
+          0.77
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "dimensions": [
+          2,
+          2,
+          1.5
+        ],
+        "materialId": "surface",
+        "visible": true,
+        "locked": false,
+        "steps": 4,
+        "heights": []
+      },
+      {
+        "id": "cover-1",
+        "name": "Cover 2",
+        "kind": "box",
+        "position": [
+          5,
+          4,
+          0.77
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "dimensions": [
+          2,
+          2,
+          1.5
+        ],
+        "materialId": "surface",
+        "visible": true,
+        "locked": false,
+        "steps": 4,
+        "heights": []
+      },
+      {
+        "id": "cover-2",
+        "name": "Cover 3",
+        "kind": "box",
+        "position": [
+          -5,
+          7,
+          0.77
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "dimensions": [
+          2,
+          2,
+          1.5
+        ],
+        "materialId": "surface",
+        "visible": true,
+        "locked": false,
+        "steps": 4,
+        "heights": []
+      },
+      {
+        "id": "cover-3",
+        "name": "Cover 4",
+        "kind": "box",
+        "position": [
+          5,
+          -7,
+          0.77
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "dimensions": [
+          2,
+          2,
+          1.5
+        ],
+        "materialId": "surface",
+        "visible": true,
+        "locked": false,
+        "steps": 4,
+        "heights": []
+      }
+    ],
+    "materials": [
+      {
+        "id": "surface",
+        "name": "quickforge_surface",
+        "shaderPath": null,
+        "color": [
+          0.25,
+          0.38,
+          0.48
+        ]
+      }
+    ],
+    "placements": [],
+    "spawns": [
+      {
+        "id": "test-start-team-0-0",
+        "name": "Team 0 start 1",
+        "position": [
+          -9,
+          -12,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-1",
+        "name": "Team 0 start 2",
+        "position": [
+          -3,
+          -12,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-2",
+        "name": "Team 0 start 3",
+        "position": [
+          3,
+          -12,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-3",
+        "name": "Team 0 start 4",
+        "position": [
+          9,
+          -12,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-4",
+        "name": "Team 0 start 5",
+        "position": [
+          -9,
+          -9,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-5",
+        "name": "Team 0 start 6",
+        "position": [
+          -3,
+          -9,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-6",
+        "name": "Team 0 start 7",
+        "position": [
+          3,
+          -9,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-7",
+        "name": "Team 0 start 8",
+        "position": [
+          9,
+          -9,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-8",
+        "name": "Team 0 start 9",
+        "position": [
+          -9,
+          -6,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-9",
+        "name": "Team 0 start 10",
+        "position": [
+          -3,
+          -6,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-10",
+        "name": "Team 0 start 11",
+        "position": [
+          3,
+          -6,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-11",
+        "name": "Team 0 start 12",
+        "position": [
+          9,
+          -6,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-12",
+        "name": "Team 0 start 13",
+        "position": [
+          -9,
+          -3,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-13",
+        "name": "Team 0 start 14",
+        "position": [
+          -3,
+          -3,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-14",
+        "name": "Team 0 start 15",
+        "position": [
+          3,
+          -3,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-0-15",
+        "name": "Team 0 start 16",
+        "position": [
+          9,
+          -3,
+          0.1
+        ],
+        "facing": 1.5707964,
+        "team": 0,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-0",
+        "name": "Team 1 start 1",
+        "position": [
+          -9,
+          3,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-1",
+        "name": "Team 1 start 2",
+        "position": [
+          -3,
+          3,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-2",
+        "name": "Team 1 start 3",
+        "position": [
+          3,
+          3,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-3",
+        "name": "Team 1 start 4",
+        "position": [
+          9,
+          3,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-4",
+        "name": "Team 1 start 5",
+        "position": [
+          -9,
+          6,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-5",
+        "name": "Team 1 start 6",
+        "position": [
+          -3,
+          6,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-6",
+        "name": "Team 1 start 7",
+        "position": [
+          3,
+          6,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-7",
+        "name": "Team 1 start 8",
+        "position": [
+          9,
+          6,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-8",
+        "name": "Team 1 start 9",
+        "position": [
+          -9,
+          9,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-9",
+        "name": "Team 1 start 10",
+        "position": [
+          -3,
+          9,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-10",
+        "name": "Team 1 start 11",
+        "position": [
+          3,
+          9,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-11",
+        "name": "Team 1 start 12",
+        "position": [
+          9,
+          9,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-12",
+        "name": "Team 1 start 13",
+        "position": [
+          -9,
+          12,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-13",
+        "name": "Team 1 start 14",
+        "position": [
+          -3,
+          12,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-14",
+        "name": "Team 1 start 15",
+        "position": [
+          3,
+          12,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-start-team-1-15",
+        "name": "Team 1 start 16",
+        "position": [
+          9,
+          12,
+          0.1
+        ],
+        "facing": -1.5707964,
+        "team": 1,
+        "gameModes": [
+          "allGames"
+        ],
+        "visible": true,
+        "locked": false
+      }
+    ],
+    "objectives": [
+      {
+        "id": "test-ctf-red",
+        "name": "test ctf red",
+        "kind": "ctfFlag",
+        "position": [
+          0,
+          -10.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-ctf-blue",
+        "name": "test ctf blue",
+        "kind": "ctfFlag",
+        "position": [
+          0,
+          10.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 1,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-hill-0-0",
+        "name": "test hill 0 0",
+        "kind": "hill",
+        "position": [
+          -1.5,
+          -4.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-hill-0-1",
+        "name": "test hill 0 1",
+        "kind": "hill",
+        "position": [
+          1.5,
+          -4.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 1,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-hill-0-2",
+        "name": "test hill 0 2",
+        "kind": "hill",
+        "position": [
+          1.5,
+          -1.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 2,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-hill-0-3",
+        "name": "test hill 0 3",
+        "kind": "hill",
+        "position": [
+          -1.5,
+          -1.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 3,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-hill-1-0",
+        "name": "test hill 1 0",
+        "kind": "hill",
+        "position": [
+          -1.5,
+          6.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 1,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-hill-1-1",
+        "name": "test hill 1 1",
+        "kind": "hill",
+        "position": [
+          1.5,
+          6.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 1,
+        "sequence": 1,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-hill-1-2",
+        "name": "test hill 1 2",
+        "kind": "hill",
+        "position": [
+          1.5,
+          9.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 1,
+        "sequence": 2,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-hill-1-3",
+        "name": "test hill 1 3",
+        "kind": "hill",
+        "position": [
+          -1.5,
+          9.5,
+          0.15
+        ],
+        "facing": 0,
+        "team": 1,
+        "sequence": 3,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-oddball-0",
+        "name": "test oddball 0",
+        "kind": "oddball",
+        "position": [
+          0,
+          -7,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-race-0",
+        "name": "test race 0",
+        "kind": "raceCheckpoint",
+        "position": [
+          -8,
+          -8,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-race-1",
+        "name": "test race 1",
+        "kind": "raceCheckpoint",
+        "position": [
+          -8,
+          8,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 1,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-race-2",
+        "name": "test race 2",
+        "kind": "raceCheckpoint",
+        "position": [
+          8,
+          8,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 2,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-race-3",
+        "name": "test race 3",
+        "kind": "raceCheckpoint",
+        "position": [
+          8,
+          -8,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 3,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-race-vehicle-0",
+        "name": "test race vehicle 0",
+        "kind": "raceVehicle",
+        "position": [
+          -8,
+          -10,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-race-vehicle-1",
+        "name": "test race vehicle 1",
+        "kind": "raceVehicle",
+        "position": [
+          -6,
+          -10,
+          0.15
+        ],
+        "facing": 0,
+        "team": 1,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-race-vehicle-2",
+        "name": "test race vehicle 2",
+        "kind": "raceVehicle",
+        "position": [
+          6,
+          10,
+          0.15
+        ],
+        "facing": 0,
+        "team": 2,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-race-vehicle-3",
+        "name": "test race vehicle 3",
+        "kind": "raceVehicle",
+        "position": [
+          8,
+          10,
+          0.15
+        ],
+        "facing": 0,
+        "team": 3,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-teleport-in",
+        "name": "test teleport in",
+        "kind": "teleportFrom",
+        "position": [
+          -9,
+          0,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "test-teleport-out",
+        "name": "test teleport out",
+        "kind": "teleportTo",
+        "position": [
+          9,
+          0,
+          0.15
+        ],
+        "facing": 0,
+        "team": 0,
+        "sequence": 0,
+        "visible": true,
+        "locked": false
+      }
+    ],
+    "skyPath": null,
+    "buildQuality": "draft"
+  }
+}

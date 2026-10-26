@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {inspectLightmapPages,lightmapPageKey,materialLightmapKey} from '../src/haloLightmap.ts';
+const source={positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2],lightmapUvs:[0,0,.5,0,0,.5],
+ materialRanges:[{shaderTagId:42,bspIndex:0,lightmapIndex:1,lightmapPage:3,hasLightmapUvs:true,indexStart:0,indexCount:3}]};
+assert.deepEqual(inspectLightmapPages(source),[{key:'bsp0:page3',bspIndex:0,page:3,materials:1,triangles:1,bspIndices:[0],withRealUvs:true}]);
+assert.equal(inspectLightmapPages({...source,lightmapUvs:[]})[0].withRealUvs,false);
+assert.equal(inspectLightmapPages({...source,lightmapUvs:[Infinity]})[0].withRealUvs,false);
+assert.equal(inspectLightmapPages({...source,materialRanges:[{...source.materialRanges[0],lightmapPage:-1}]}).length,0);
+assert.equal(inspectLightmapPages({...source,materialRanges:[{...source.materialRanges[0],indexCount:4}]}).length,0);
+assert.deepEqual(inspectLightmapPages(null),[]);
+assert.equal(lightmapPageKey(1,0),'bsp1:page0');
+assert.throws(()=>lightmapPageKey(-1,0),/bounded/);
+assert.throws(()=>lightmapPageKey(0,Infinity),/bounded/);
+const two={...source,indices:[0,1,2,0,2,1],materialRanges:[source.materialRanges[0],{...source.materialRanges[0],bspIndex:1,indexStart:3}]};
+assert.deepEqual(inspectLightmapPages(two).map(x=>x.key),['bsp0:page3','bsp1:page3']);
+assert.equal(materialLightmapKey(source.materialRanges[0],true,{'bsp0:page3':true}),'bsp0:page3');
+assert.equal(materialLightmapKey({...source.materialRanges[0],bspIndex:1},true,{'bsp0:page3':true}),null);
+assert.equal(materialLightmapKey(source.materialRanges[0],false,{'bsp0:page3':true}),null);
+assert.equal(materialLightmapKey({...source.materialRanges[0],hasLightmapUvs:false},true,{'bsp0:page3':true}),null);
+console.log('PASS: independent per-BSP lightmap keys, bounded page provenance and read-only UV coverage');

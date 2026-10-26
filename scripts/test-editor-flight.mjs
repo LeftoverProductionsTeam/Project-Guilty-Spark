@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { flightAnglesFromDirection, lookFlight, directionForFlight, flightVelocity, MAX_FLIGHT_PITCH, flightKey } from '../src/editorFlight.ts';
+const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
+const a=flightAnglesFromDirection([1,0,0]);near(a.yaw,0);near(a.pitch,0);
+const f=directionForFlight(a);near(f[0],1);near(f[1],0);near(f[2],0);
+const move=flightVelocity(a,new Set(['KeyW','KeyD']));near(Math.hypot(...move),12);assert.ok(move[0]>0&&move[1]<0);
+near(flightVelocity(a,new Set(['KeyW','ShiftLeft']))[0],36);
+assert.equal(flightVelocity(a,new Set()).join(','),'0,0,0');
+assert.equal(flightVelocity(a,new Set(['KeyR']))[2],12);
+assert.equal(flightVelocity(a,new Set(['KeyF']))[2],-12);
+assert.ok(Math.abs(lookFlight(a,0,1e9).pitch)<=MAX_FLIGHT_PITCH);
+assert.ok(Math.abs(lookFlight(a,0,-1e9).pitch)<=MAX_FLIGHT_PITCH);
+near(lookFlight(a,100,0).yaw,-.24);
+assert.throws(()=>flightAnglesFromDirection([0,0,0]),/zero/);
+assert.throws(()=>flightVelocity(a,new Set(),Infinity),/speed/);
+assert.ok(flightKey('KeyS')&&!flightKey('Delete'));
+console.log('PASS: RMB camera flight vectors, diagonals, vertical motion, boost, pitch clamp and input bounds');

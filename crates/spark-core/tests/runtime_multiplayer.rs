@@ -34,7 +34,17 @@ fn peer() -> PeerManifest {
         build_tool_version: Some("invader-test".into()),
         build_verified: true,
         resource_set_verified: true,
+        gameplay: None,
     }
+}
+#[test]
+fn gameplay_identity_and_player_limits_are_compared_without_a_network_claim() {
+    let mut local=peer();local.gameplay=Some(PeerGameplay{game_mode:"firefight".into(),expected_players:4,configuration_sha256:Some(hash('e'))});
+    let mut remote=local.clone();remote.gameplay.as_mut().unwrap().configuration_sha256=Some(hash('f'));
+    let report=compare(&local,&remote).unwrap();assert_eq!(report.status,TestStatus::Fail);assert!(!report.gameplay_verified);
+    remote=local.clone();remote.gameplay.as_mut().unwrap().expected_players=3;assert_eq!(compare(&local,&remote).unwrap().status,TestStatus::Fail);
+    local.runtime_id=RuntimeId::MccSteam;local.mode=SessionMode::MccCoopCampaign;
+    assert!(validate_manifest(&local).is_err());
 }
 fn registration(root: &std::path::Path) -> RuntimeRegistration {
     let executable = root.join(if cfg!(windows) { "halo.exe" } else { "halo" });

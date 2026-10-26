@@ -1,0 +1,27 @@
+Continuation 21 / 07 Halo Modding Brain — actual validation evidence (2026-10-26)
+
+Baseline: Continuation 20 full-source ZIP
+Baseline SHA256: 63f5218c15cf6313e15d97227ceda3e7a2ce1cfddd2349c04f623355a8b35ac2
+
+PASS: npm run test:offline (Node 22.16.0, experimental TS type stripping)
+      39 PASS result lines; zero failed processes.
+PASS: Strict global TypeScript compiler (no external frontend dependencies):
+      tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck src/bspRenderAudit.ts src/haloModeTestPlan.ts src/tutorialAcademy.ts
+PASS: TypeScript transpileModule syntax check on src/components/World.tsx,
+      src/components/QuickForge.tsx, src/components/CreatorStudio.tsx
+PASS: New synthetic bounded BSP audit tests: malformed buffers, shader-tag
+      mismatches, page conflicts, UVs, unassigned/degenerate triangles,
+      >128 findings (accurate summary), fail-closed on untrusted inputs.
+PASS: New manual five-mode QA plan tests: NOT-RUN truthfulness,
+      source-only scope, per-mode labels, duplicate-case idempotency and
+      preservation of owner evidence.
+PASS: Academy tests: exact template observable state, new source-only lessons.
+
+NOT RUN: cargo test / rustc compile (Cargo/rustc unavailable).
+NOT RUN: npm/pnpm full app build (project node_modules unavailable; pnpm absent).
+NOT RUN: Windows Tauri UI execution, Halo Tool/Sapien, invader-edit execution,
+         Halo game loading, original bitmap resources, collision and BSP compile.
+NOT RUN: real two-client multiplayer, Zombie Apocalypse, Firefight/AI campaign.
+
+All testing operated on copied source inside /mnt/data. Source artifacts include
+no actual Halo game assets. This is not a playable build or a certification.

@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "release": "Continuation 32 / 0.3.1",
+  "baseline": {
+    "source": "Continuation 31",
+    "zipSha256": "757bec2a554b1c35141ecd0efbffc8cee05c3aae54663accb581b748b2f09dce",
+    "manifestSha256": "76595d0618ca7720a456beccd833b80b3aadf231dfe3d03c1371c600d5c4cbcd",
+    "manifestEntries": 429,
+    "matchedSourceFiles": 429,
+    "zipFullReextraction": "NOT RUN: input ZIP was no longer available at its observed location when independent verification was attempted"
+  },
+  "tests": {
+    "rustPassed": 154,
+    "frontendPassed": 41,
+    "offlineScriptsPassed": 59,
+    "browserPassed": 9,
+    "nativeBuild": "PASS",
+    "nativeStartup": "PASS",
+    "nativePointerDrag": "PASS",
+    "nativeCancelledDrag": "PASS",
+    "nativeTagEdit": "PASS; restored",
+    "sourceExport": "exported",
+    "gameBuild": "blocked",
+    "gameplay": "NOT RUN",
+    "multiplayer": "NOT RUN"
+  },
+  "realMap": {
+    "sha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+    "renderTriangles": 5503,
+    "modelTypes": 31,
+    "materialPreviewAdded": 0,
+    "materialPreviewRefused": 24,
+    "selectedExtractedTag": "weapons\\pistol\\bullet.damage_effect",
+    "extractedTagChecksumMatched": true
+  },
+  "knownNativeErrors": [
+    "NotFoundError: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node."
+  ],
+  "originals": {
+    "files": 67,
+    "unchanged": true,
+    "readonly": true,
+    "archivedBinariesExecuted": false
+  },
+  "gameplayVerified": false,
+  "multiplayerVerified": false,
+  "c31FilesChanged": [
+    {
+      "file": ".gitignore",
+      "status": "modified"
+    },
+    {
+      "file": "Cargo.lock",
+      "status": "modified"
+    },
+    {
+      "file": "Cargo.toml",
+      "status": "modified"
+    },
+    {
+      "file": "README.md",
+      "status": "modified"
+    },
+    {
+      "file": "SOURCE_DIFF_FROM_PREVIOUS.txt",
+      "status": "modified"
+    },
+    {
+      "file": "crates/spark-core/src/forge_build.rs",
+      "status": "modified"
+    },
+    {
+      "file": "crates/spark-core/src/quickforge.rs",
+      "status": "modified"
+    },
+    {
+      "file": "crates/spark-core/src/tag_exchange.rs",
+      "status": "modified"
+    },
+    {
+      "file": "crates/spark-core/tests/terrain_caves.rs",
+      "status": "modified"
+    },
+    {
+      "file": "docs/REMAINING_WORK.md",
+      "status": "modified"
+    },
+    {
+      "file": "package.json",
+      "status": "modified"
+    },
+    {
+      "file": "src/App.tsx",
+      "status": "modified"
+    },
+    {
+      "file": "src/components/ForgeViewport.tsx",
+      "status": "modified"
+    },
+    {
+      "file": "src/components/QuickForge.tsx",
+      "status": "modified"
+    },
+    {
+      "file": "src/components/World.tsx",
+      "status": "modified"
+    },
+    {
+      "file": "src/forge.ts",
+      "status": "modified"
+    },
+    {
+      "file": "src/renderView.test.ts",
+      "status": "modified"
+    },
+    {
+      "file": "src/viewport.css",
+      "status": "modified"
+    },
+    {
+      "file": "src-tauri/tauri.conf.json",
+      "status": "modified"
+    },
+    {
+      "file": "tests/ui/browser.spec.ts",
+      "status": "modified"
+    },
+    {
+      "file": "tests/ui/native-contract.spec.ts",
+      "status": "modified"
+    }
+  ]
+}

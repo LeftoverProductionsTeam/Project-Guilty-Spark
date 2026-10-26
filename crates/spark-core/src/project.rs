@@ -100,8 +100,20 @@ pub struct Project {
     pub tag_edits: Vec<TagEdit>,
     pub history: Vec<HistoryEntry>,
     pub builds: Vec<BuildRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quick_forge: Option<crate::quickforge::QuickForgeDocument>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub firefight: Option<crate::firefight::FirefightConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub studio: Option<crate::creative::CreatorStudio>,
 }
 impl Project {
+    pub fn scenario_path(&self) -> Result<String> {
+        if let Some(document) = &self.quick_forge {
+            return crate::quickforge::scenario_path(document);
+        }
+        self.source.as_ref().map(|s|s.scenario_path.clone()).ok_or_else(||crate::SparkError::Invalid("Project has no game scenario".into()))
+    }
     pub fn new(title: &str) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
@@ -117,6 +129,9 @@ impl Project {
             tag_edits: vec![],
             history: vec![],
             builds: vec![],
+            quick_forge: None,
+            firefight: None,
+            studio: None,
         }
     }
     pub fn validate(&self) -> Result<()> {
@@ -127,6 +142,17 @@ impl Project {
         }
         Uuid::parse_str(&self.id)
             .map_err(|_| crate::SparkError::Invalid("Project ID is not a UUID".into()))?;
+        // Incomplete geometry is valid authoring state; bounded shape/schema validation
+        // happens independently from compiler readiness so a user can save repairs.
+        if let Some(document) = &self.quick_forge {
+            crate::quickforge::validate_document(document)?;
+        }
+        if let Some(config) = &self.firefight {
+            crate::firefight::validate_document(config)?;
+        }
+        if let Some(studio) = &self.studio {
+            studio.validate()?;
+        }
         if let Some(source) = &self.source {
             if source.resource_sha256.iter().any(|(name, hash)| {
                 !["bitmaps.map", "sounds.map", "loc.map"].contains(&name.as_str())
@@ -187,6 +213,10 @@ impl Project {
             &self.scene,
             &self.tag_edits,
             &self.assets,
+            &self.quick_forge,
+            &self.firefight,
+            // Creator Studio is source-only authoring and QA metadata, not compiled
+            // cache input. Keep old build fingerprint compatibility across upgrades.
         ))?;
         Ok(format!("{:x}", Sha256::digest(bytes)))
     }

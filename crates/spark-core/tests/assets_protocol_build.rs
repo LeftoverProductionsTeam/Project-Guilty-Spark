@@ -16,6 +16,31 @@ fn obj_ingests_negative_indices_materials_and_uv_presence() {
     assert!(a.warnings.iter().any(|w| w.contains("fan-triangulated")));
 }
 #[test]
+fn obj_preserves_texture_seams_normals_and_material_parts() {
+    let text = "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\n\
+vt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\nvt 0.5 0.5\n\
+vn 0 0 1\nusemtl stone\nf 1/1/1 2/2/1 3/3/1\n\
+usemtl grass\nf 1/5/1 3/3/1 4/4/1";
+    let result = assets::parse_obj(text).unwrap();
+    assert_eq!(result.mesh.indices, [0, 1, 2, 3, 2, 4]);
+    assert_eq!(result.mesh.positions.len(), 15); // UV seam creates distinct vertex
+    assert_eq!(result.mesh.normals.len(), result.mesh.positions.len());
+    assert_eq!(result.mesh.uvs.len(), 10);
+    assert_eq!(&result.mesh.uvs[6..8], &[0.5, 0.5]);
+    assert_eq!(result.mesh.parts.len(), 2);
+    assert_eq!(result.mesh.parts[0].name, "stone");
+    assert_eq!(result.mesh.parts[0].index_count, 3);
+    assert_eq!(result.mesh.parts[1].name, "grass");
+    assert_eq!(result.mesh.parts[1].index_start, 3);
+}
+#[test]
+fn obj_generates_normals_and_rejects_bad_texture_indices() {
+    let result = assets::parse_obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3").unwrap();
+    assert_eq!(result.mesh.normals, [0.,0.,1., 0.,0.,1., 0.,0.,1.]);
+    assert!(result.mesh.uvs.is_empty());
+    assert!(assets::parse_obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nf 1/2 2/1 3/1").is_err());
+}
+#[test]
 fn obj_rejects_bad_indices_nonfinite_and_degenerate_faces() {
     for obj in [
         "v nan 0 0\nf 1 1 1",

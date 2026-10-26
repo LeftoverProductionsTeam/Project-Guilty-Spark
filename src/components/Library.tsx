@@ -5,6 +5,7 @@ import {
   Check,
   ChevronRight,
   FolderOpen,
+  Globe2,
   HardDrive,
   Plus,
   Search,
@@ -21,6 +22,8 @@ export default function Library({
   data,
   onImport,
   onNew,
+  onNewMap,
+  onFindMaps,
   onOpen,
   onInbox,
   onInitializeInbox,
@@ -29,6 +32,8 @@ export default function Library({
   data: Bootstrap;
   onImport: () => void;
   onNew: () => void;
+  onNewMap: () => void;
+  onFindMaps: () => void;
   onOpen: (e: LibraryEntry) => void;
   onInbox: () => void;
   onInitializeInbox: () => void;
@@ -49,6 +54,8 @@ export default function Library({
         description="Discover, restore, and make something wonderfully unexpected."
         actions={
           <>
+            <button onClick={onFindMaps} title="Browse verified community archive homepages; download only in your browser"><Globe2 size={15} />Find community maps</button>
+            <button onClick={onNewMap}><Box size={15} />Create a map</button>
             <button onClick={onNew}>
               <Plus size={15} />
               New workspace
@@ -75,10 +82,10 @@ export default function Library({
             From your first projectile swap to the next great restoration. Bring your Halo maps into a
             workspace built for discovery.
           </p>
-          <button className="hero-link" onClick={onImport} disabled={busy}>
-            Open a .map or ZIP archive
-            <ArrowRight size={17} />
-          </button>
+          <div className="gs-hero-actions">
+            <button className="hero-link" onClick={onImport} disabled={busy}>Open a .map or ZIP archive <ArrowRight size={17} /></button>
+            <button className="gs-hero-secondary" onClick={onFindMaps} title="Browse old HaloMods and current Halo map archives in an external browser">Find classic maps <Globe2 size={17}/></button>
+          </div>
         </div>
         <div className="hero-art" aria-hidden="true">
           <div className="orbital orbit-one" />
@@ -237,10 +244,10 @@ export default function Library({
               ? 'Try a different title, creator, or engine.'
               : 'Drop a .map or ZIP archive into this window, browse for one, or place it in the local Inbox. Original files are always preserved.'}
           </p>
-          <button onClick={onImport} disabled={busy}>
-            <FolderOpen size={15} />
-            {busy ? 'Reading cache…' : 'Browse maps'}
-          </button>
+          <div className="gs-empty-map-actions">
+            <button onClick={onImport} disabled={busy}><FolderOpen size={15} />{busy ? 'Reading cache…' : 'Browse local maps'}</button>
+            <button onClick={onFindMaps}><Globe2 size={15}/>Find maps online</button>
+          </div>
           <div className="supported-formats">
             <span>Xbox 5</span>
             <span>Demo 6</span>

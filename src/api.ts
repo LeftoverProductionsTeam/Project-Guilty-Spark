@@ -26,6 +26,7 @@ export const browserBootstrap: Bootstrap = {
     steamDirectory: null,
     mccDirectory: null,
     invaderDirectory: null,
+    hekFlavor: null,
     resourceDirectory: null,
     metadataTemplateDirectory: null,
     nativeExecutable: null,
