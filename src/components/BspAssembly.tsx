@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import { useMapState } from '../mapSession';
 import type { LibraryEntry, Project, Vec3 } from '../types';
-import { assemblySignature, transformAssembly } from '../bspAssembly';
+import { assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport } from '../bspAssembly';
 import { NumberField } from './ui';
 import '../bspAssembly.css';
@@ -28,64 +28,91 @@ export default function BspAssembly({
       'bsp.donor',
       project.bspAssembly?.donorProjectId ?? candidates[0]?.id ?? '',
     );
-  const [options, setOptions] = useState<BspOption[]>([]),
+  const [sectionList, setSectionList] = useState<{ donor: string; values: BspOption[] } | null>(null),
+    [optionsError, setOptionsError] = useState(''),
     [index, setIndex] = useMapState(project.id, 'bsp.section', project.bspAssembly?.donorBspIndex ?? 0),
     [draft, setDraft] = useMapState<Plan | null>(project.id, 'bsp.draft', () => project.bspAssembly ?? null),
     [appliedSource, setAppliedSource] = useMapState(
       project.id,
       'bsp.applied',
-      JSON.stringify(project.bspAssembly ?? null),
+      assemblySignature(project.bspAssembly ?? null),
     ),
+    [entrancePivot, setEntrancePivot] = useMapState(project.id, 'bsp.entrancePivot', false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [report, setReport] = useState<AssemblyReport | null>(null);
-  const latest = useRef({ projectId: project.id, signature: assemblySignature(draft) });
-  latest.current = { projectId: project.id, signature: assemblySignature(draft) };
+  const operation = useRef(0),
+    mounted = useRef(false);
+  const latest = useRef({ projectId: project.id, signature: assemblySignature(draft), donor, index });
+  latest.current = { projectId: project.id, signature: assemblySignature(draft), donor, index };
+  const options = sectionList?.donor === donor ? sectionList.values : [];
+  const loadingOptions = native && open && !!donor && sectionList?.donor !== donor && !optionsError;
+  const selectionMatches = !!draft && draft.donorProjectId === donor && draft.donorBspIndex === index;
   useEffect(() => {
-    const signature = JSON.stringify(project.bspAssembly ?? null);
-    if (signature !== appliedSource) {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      operation.current++;
+    };
+  }, []);
+  useEffect(() => {
+    const signature = assemblySignature(project.bspAssembly ?? null);
+    let previous = appliedSource;
+    try {
+      previous = assemblySignature(JSON.parse(appliedSource));
+    } catch {
+      /* Replace an invalid saved identity. */
+    }
+    if (signature !== previous) {
       setDraft(project.bspAssembly ?? null);
-      setAppliedSource(signature);
       setReport(null);
     }
+    if (signature !== appliedSource) setAppliedSource(signature);
   }, [project.bspAssembly, appliedSource]);
   useEffect(() => {
     let cancelled = false;
-    setOptions([]);
+    setSectionList(null);
+    setOptionsError('');
     if (native && open && donor)
       void call<BspOption[]>('bsp_assembly_options', { projectId: donor }).then(
         (value) => {
           if (!cancelled) {
-            setOptions(value);
+            setSectionList({ donor, values: value });
             if (!value.some((p) => p.index === index)) setIndex(value[0]?.index ?? 0);
           }
         },
         (e) => {
-          if (!cancelled) setError(String(e));
+          if (!cancelled) setOptionsError(String(e));
         },
       );
     return () => {
       cancelled = true;
     };
   }, [donor, open]);
-  async function perform(action: () => Promise<void>) {
+  async function perform(action: (current: () => boolean) => Promise<void>) {
+    const request = ++operation.current,
+      owner = project.id;
+    const signature = latest.current.signature;
+    const current = () =>
+      mounted.current && operation.current === request && latest.current.projectId === owner;
     setBusy(true);
     setError('');
     try {
-      await action();
+      await action(current);
     } catch (e) {
-      setError(String(e));
+      if (current() && latest.current.signature === signature) setError(String(e));
     } finally {
-      setBusy(false);
+      if (current()) setBusy(false);
     }
   }
   const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
   function update(change: Partial<Plan>) {
     if (draft) {
       const next = { ...draft, ...change };
-      latest.current = { projectId: project.id, signature: assemblySignature(next) };
+      latest.current = { ...latest.current, signature: assemblySignature(next) };
       setDraft(next);
       setReport(null);
+      setError('');
     }
   }
   function vector(value: Vec3, onChange: (v: Vec3) => void, label: string) {
@@ -127,7 +154,11 @@ export default function BspAssembly({
               <select
                 aria-label="BSP donor map"
                 value={donor}
-                onChange={(e) => setDonor(e.target.value)}
+                onChange={(e) => {
+                  setDonor(e.target.value);
+                  setIndex(0);
+                  setError('');
+                }}
                 disabled={busy}
               >
                 <option value="">Choose an imported map</option>
@@ -146,6 +177,11 @@ export default function BspAssembly({
                 onChange={(e) => setIndex(Number(e.target.value))}
                 disabled={busy || !options.length}
               >
+                {!options.length && (
+                  <option value={index}>
+                    {loadingOptions ? 'Loading BSP sections…' : 'No sections available'}
+                  </option>
+                )}
                 {options.map((p) => (
                   <option key={p.index} value={p.index}>
                     {p.name}
@@ -154,25 +190,76 @@ export default function BspAssembly({
               </select>
             </label>
             <button
-              disabled={!native || busy || !donor || !options.length}
+              disabled={!native || busy || !donor || !options.some((option) => option.index === index)}
               onClick={() =>
-                void perform(async () => {
+                void perform(async (current) => {
+                  const request = { ...latest.current };
+                  const matches = () =>
+                    current() &&
+                    latest.current.signature === request.signature &&
+                    latest.current.donor === request.donor &&
+                    latest.current.index === request.index;
                   await onSave();
+                  if (!matches()) return;
                   const plan = await call<Plan>('plan_bsp_assembly', {
                     projectId: project.id,
                     donorProjectId: donor,
                     donorBspIndex: index,
                   });
-                  setDraft(plan);
-                  setReport(null);
+                  if (matches()) {
+                    setDraft(plan);
+                    setReport(null);
+                  }
                 })
               }
             >
               {busy ? 'Working…' : 'Plan connected tunnel'}
             </button>
           </div>
+          {optionsError && (
+            <p role="alert" className="bsp-error">
+              Could not inspect the selected donor: {optionsError}
+            </p>
+          )}
           {draft && (
             <>
+              <div className="bsp-draft-heading">
+                <strong>Connection draft · {draft.donorTitle}</strong>
+                <span>
+                  {draft.tunnelPoints
+                    .slice(1)
+                    .reduce(
+                      (total, point, i) =>
+                        total + Math.hypot(...point.map((v, k) => v - draft.tunnelPoints[i][k])),
+                      0,
+                    )
+                    .toFixed(1)}{' '}
+                  world units · {draft.tunnelPoints.length - 2} bends
+                </span>
+              </div>
+              {!selectionMatches && (
+                <div className="bsp-selection-warning" role="status">
+                  <p>
+                    This draft connects {draft.donorTitle}. Plan the selected map and section to replace it,
+                    or return to this draft.
+                  </p>
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      setDonor(draft.donorProjectId);
+                      setIndex(draft.donorBspIndex);
+                    }}
+                  >
+                    Return to current draft
+                  </button>
+                </div>
+              )}
+              <ol className="bsp-workflow" aria-label="Connection steps">
+                <li data-done={selectionMatches}>1 · Plan</li>
+                <li data-done={applied && selectionMatches}>2 · Apply</li>
+                <li data-done={!!report && selectionMatches}>3 · Check source</li>
+                <li>4 · Build &amp; test in Halo</li>
+              </ol>
               <p>
                 Position <strong>{draft.donorTitle}</strong> relative to this map. Coordinates use Halo world
                 units; Z is up. Moving the section also moves its tunnel mouth.
@@ -191,7 +278,13 @@ export default function BspAssembly({
                     max={360}
                     step={1}
                     label="BSP section yaw"
-                    onCommit={(v) => update(transformAssembly(draft, draft.translation, v))}
+                    onCommit={(v) =>
+                      update(
+                        entrancePivot
+                          ? rotateAssemblyAtEntrance(draft, v)
+                          : transformAssembly(draft, draft.translation, v),
+                      )
+                    }
                   />
                 </label>
                 <label>
@@ -217,20 +310,30 @@ export default function BspAssembly({
                   />
                 </label>
               </div>
-              <label>
-                <input
-                  type="checkbox"
-                  aria-label="Include donor scenery"
-                  checked={draft.includeDonorScenery ?? false}
-                  disabled={busy}
-                  onChange={(e) => update({ includeDonorScenery: e.target.checked })}
-                />{' '}
-                Include donor source scenery (single-BSP maps)
-              </label>
+              <div className="bsp-toggles">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={entrancePivot}
+                    onChange={(e) => setEntrancePivot(e.target.checked)}
+                  />{' '}
+                  Rotate around tunnel entrance
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    aria-label="Include donor scenery"
+                    checked={draft.includeDonorScenery ?? false}
+                    disabled={busy}
+                    onChange={(e) => update({ includeDonorScenery: e.target.checked })}
+                  />{' '}
+                  Include donor source scenery (single-BSP maps)
+                </label>
+              </div>
               <p>
-                Retain the donor’s scenery models and placement settings in the compiled map. Scenery
-                follows the section transform; matching editable tags are required. Donor weapons,
-                vehicles, objectives, scripts and named-object bindings are separate.
+                Retain the donor’s scenery models and placement settings in the compiled map. Scenery follows
+                the section transform; matching editable tags are required. Donor weapons, vehicles,
+                objectives, scripts and named-object bindings are separate.
               </p>
               <div className="bsp-waypoints">
                 {draft.tunnelPoints.map((point, i) => (
@@ -263,10 +366,22 @@ export default function BspAssembly({
                     value={draft.donorTagsDirectory}
                     onChange={(e) => update({ donorTagsDirectory: e.target.value })}
                   />
-                  <button type="button" disabled={!native || busy} onClick={()=>void perform(async()=>{
-                    const folder=await call<string|null>('choose_setting_path',{key:'hekTagsDirectory'});
-                    if(folder)update({donorTagsDirectory:folder});
-                  })}>Browse donor tags</button>
+                  <button
+                    type="button"
+                    disabled={!native || busy}
+                    onClick={() =>
+                      void perform(async (current) => {
+                        const signature = assemblySignature(draft);
+                        const folder = await call<string | null>('choose_setting_path', {
+                          key: 'hekTagsDirectory',
+                        });
+                        if (folder && current() && latest.current.signature === signature)
+                          update({ donorTagsDirectory: folder });
+                      })
+                    }
+                  >
+                    Browse donor tags
+                  </button>
                 </label>
                 <label>
                   Tunnel shader
@@ -295,7 +410,7 @@ export default function BspAssembly({
                   Add tunnel bend
                 </button>
                 <button
-                  disabled={busy || applied}
+                  disabled={busy || applied || !selectionMatches}
                   onClick={() =>
                     onEdit({ ...project, bspAssembly: draft }, 'Connect imported BSP with a tunnel')
                   }
@@ -303,14 +418,19 @@ export default function BspAssembly({
                   Apply connection
                 </button>
                 <button
-                  disabled={busy || !applied || !project.bspAssembly}
+                  disabled={busy || !applied || !project.bspAssembly || !selectionMatches}
                   onClick={() =>
-                    void perform(async () => {
+                    void perform(async (current) => {
                       const request = { projectId: project.id, signature: assemblySignature(draft) };
                       await onSave();
-                      const matches = () => latest.current.projectId === request.projectId && latest.current.signature === request.signature;
+                      const matches = () =>
+                        current() &&
+                        latest.current.projectId === request.projectId &&
+                        latest.current.signature === request.signature;
                       if (!matches()) return;
-                      const checked = await call<AssemblyReport>('preview_bsp_assembly', { projectId: project.id });
+                      const checked = await call<AssemblyReport>('preview_bsp_assembly', {
+                        projectId: project.id,
+                      });
                       if (matches()) setReport(checked);
                     })
                   }
@@ -318,11 +438,12 @@ export default function BspAssembly({
                   Check tunnel clearance
                 </button>
                 <button
-                  disabled={busy || !applied || !project.bspAssembly}
+                  disabled={busy || !applied || !project.bspAssembly || !selectionMatches}
                   onClick={() =>
-                    void perform(async () => {
+                    void perform(async (current) => {
+                      const signature = assemblySignature(draft);
                       await onSave();
-                      onBuild();
+                      if (current() && latest.current.signature === signature) onBuild();
                     })
                   }
                 >
@@ -334,13 +455,28 @@ export default function BspAssembly({
                 >
                   Remove connection
                 </button>
+                {!applied && project.bspAssembly && (
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      const saved = project.bspAssembly!;
+                      setDraft(saved);
+                      setDonor(saved.donorProjectId);
+                      setIndex(saved.donorBspIndex);
+                      setReport(null);
+                      setError('');
+                    }}
+                  >
+                    Reset draft to applied connection
+                  </button>
+                )}
               </div>
               {!applied && (
                 <p role="status">
                   Apply these settings before checking or building. Ctrl+Z restores the previous connection.
                 </p>
               )}
-              {report && (
+              {report && selectionMatches && (
                 <div role="status">
                   <strong>
                     Source clearance checked at {report.walkSamples} points ·{' '}

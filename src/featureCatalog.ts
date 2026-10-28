@@ -179,7 +179,8 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     [
       'Choose New QuickForge map in the Level Editor.',
       'Add brushes, starts and objectives; inspect the walk collision preview.',
-      'For an imported map, open Connect another map’s BSP; choose a donor, check the path and apply the connection.',
+      'For an imported map, open Connect another map’s BSP; plan with a donor, apply the draft, then check source clearance.',
+      'Rotate around tunnel entrance keeps the tunnel mouth fixed; Return to current draft and Reset draft preserve a clear editing path.',
       'Enable Include donor source scenery for a single-BSP donor when you want its scenery retained in the compiled world.',
       'Build with the matching Halo Tool and test the compiled collision in game.',
     ],

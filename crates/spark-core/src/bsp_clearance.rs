@@ -198,22 +198,23 @@ pub(crate) fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<us
     let mut scratch = vec![];
     let mut samples = 0;
     let mut previous: Option<f64> = None;
-    for pair in assembly.tunnel_points.windows(2) {
+    for (segment, pair) in assembly.tunnel_points.windows(2).enumerate() {
         let (a, b) = (pair[0].map(f64::from), pair[1].map(f64::from));
         let d = sub(b, a);
         let steps = (dot(d, d).sqrt() / 0.25).ceil() as usize;
         for step in 0..=steps {
             let p = add(a, mul(d, step as f64 / steps as f64));
-            let z=index.floor(p,&mut scratch).ok_or_else(||SparkError::Invalid(format!("Tunnel floor is not continuous near {:.2}, {:.2}, {:.2}; adjust its floor points",p[0],p[1],p[2])))?;
+            let z=index.floor(p,&mut scratch).ok_or_else(||SparkError::Invalid(format!("Tunnel floor is not continuous in segment {} near {:.2}, {:.2}, {:.2}; adjust its floor points",segment + 1,p[0],p[1],p[2])))?;
             if previous.is_some_and(|old| (z - old).abs() > 0.12) {
-                return invalid(
-                    "Tunnel floor has a step higher than 0.12 world units; add a ramp waypoint",
-                );
+                return invalid(format!(
+                    "Tunnel floor has a step higher than 0.12 world units in segment {} near {:.2}, {:.2}, {:.2}; add a ramp waypoint",
+                    segment + 1, p[0], p[1], z,
+                ));
             }
             previous = Some(z);
             for height in [0.20, 0.36, 0.52] {
                 if !index.clear([p[0], p[1], z + height], 0.18, &mut scratch) {
-                    return invalid("The connection contains a wall, narrow edge or insufficient biped head clearance; adjust the tunnel path");
+                    return invalid(format!("The connection contains a wall, narrow edge or insufficient biped head clearance in segment {} near {:.2}, {:.2}, {:.2}; adjust the tunnel path", segment + 1, p[0], p[1], z));
                 }
             }
             samples += 1;
@@ -305,10 +306,8 @@ mod tests {
             &mut m,
             [[5., -1., 0.], [5., 1., 0.], [5., 1., 1.6], [5., -1., 1.6]],
         );
-        assert!(verify_route(&m, &plan())
-            .unwrap_err()
-            .to_string()
-            .contains("clearance"));
+        let error = verify_route(&m, &plan()).unwrap_err().to_string();
+        assert!(error.contains("clearance in segment 1 near 5.00, 0.00, 0.00"), "{error}");
     }
     #[test]
     fn capsule_checks_head_and_sides_instead_of_only_the_camera() {

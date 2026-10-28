@@ -33,10 +33,16 @@ export function assemblySignature(plan: BspAssembly | null): string {
   const ordered = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(ordered);
     if (value && typeof value === 'object')
-      return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, ordered(item)]));
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, item]) => [key, ordered(item)]),
+      );
     return value;
   };
-  return JSON.stringify(ordered(plan ? { ...plan, includeDonorScenery: plan.includeDonorScenery ?? false } : null));
+  return JSON.stringify(
+    ordered(plan ? { ...plan, includeDonorScenery: plan.includeDonorScenery ?? false } : null),
+  );
 }
 /** Move the imported section and keep its tunnel mouth attached. */
 export function transformAssembly(plan: BspAssembly, translation: Vec3, yawDegrees: number): BspAssembly {
@@ -56,4 +62,18 @@ export function transformAssembly(plan: BspAssembly, translation: Vec3, yawDegre
     yawDegrees,
     tunnelPoints: plan.tunnelPoints.map((p, i) => (i === plan.tunnelPoints.length - 1 ? end : p)),
   };
+}
+/** Turn the donor around its entrance without moving the authored tunnel route. */
+export function rotateAssemblyAtEntrance(plan: BspAssembly, yawDegrees: number): BspAssembly {
+  const mouth = plan.tunnelPoints.at(-1)!;
+  const relative = mouth.map((v, i) => v - plan.translation[i]) as Vec3;
+  const angle = ((yawDegrees - plan.yawDegrees) * Math.PI) / 180;
+  const c = Math.cos(angle),
+    s = Math.sin(angle);
+  const translation: Vec3 = [
+    mouth[0] - c * relative[0] + s * relative[1],
+    mouth[1] - s * relative[0] - c * relative[1],
+    plan.translation[2],
+  ];
+  return { ...plan, translation, yawDegrees };
 }

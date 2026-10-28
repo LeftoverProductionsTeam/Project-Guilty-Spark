@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-28T13:03:51.975Z",
+  "platform": "Windows x64",
+  "projectVersion": "0.4.0",
+  "tests": {
+    "rust": 239,
+    "frontend": 91,
+    "offlineScripts": 59,
+    "browser": 21
+  },
+  "restoration": {
+    "files": 67,
+    "unchanged": true,
+    "readonly": true
+  },
+  "artifacts": [
+    {
+      "file": "releases/GuiltySpark-C33-0.4.0-world-challenges-r2.exe",
+      "sha256": "fcd0c0b24ba86e04ca2b51ff4dd91f95f4d18c96bbdccd7235afa3e14cff4093",
+      "bytes": 22885888
+    },
+    {
+      "file": "releases/Project Guilty Spark_0.4.0_world-challenges-r2_x64-setup.exe",
+      "sha256": "0a58abc7fd731b2358e370326eab5fd88c3cb7d282cc5b7547ede88807c26070",
+      "bytes": 6030551
+    }
+  ],
+  "sourceArchive": {
+    "file": "releases/Project_Guilty_Spark_Continuation_33_World_Challenges_SOURCE.zip",
+    "verification": "External .sha256 and .verification.json sidecars bind the packaged bytes to the local merge"
+  },
+  "scope": "Rotated four-map native compilation, repeated route checks and connection-workflow polish",
+  "case": {
+    "name": "Timberland + Sidewinder + Blood Gulch + Battle Creek",
+    "jobId": "4b92ea28-077e-4d5d-989b-5008d008330c",
+    "projectFingerprint": "215bba8cc288aade7e48153f60817905c46151d48f729a2c331883ccdaa2abae",
+    "sourceSha256": "695f0ba3aa197d5c4f7add77102acbca992b3fe233d83a8ea3e82c80df702891",
+    "donorSourceSha256": "893ed257ae92bbd000406cebeba403d5adb258a558e45df47a6368227be0c46c",
+    "outputSha256": "64ae4255ed968dd50a51de7400119d7366aa567f00e893fd99c84095498d1d2b",
+    "outputBytes": 122558199,
+    "bspSha256": "9e9f7c0c38f44ec897359bdfbf40eeecc187b8cd7c6428d0d343b9c3fa5da829",
+    "jmsSha256": "0bed463c9ce5eaa74ff486310e4903f5f852290f75d3260e1c24f83d1762b769",
+    "manifestSha256": "7d0d19735318ae2ff3fda6e9fe4db131a2c7bd9c491f5d46828423be5c9d4faa",
+    "sourceGeometry": {
+      "donorScenery": 30,
+      "generatedUvFaces": 8,
+      "inputTriangles": 25116,
+      "outputTriangles": 49622,
+      "portalCount": 2,
+      "walkSamples": 356,
+      "warnings": [
+        "This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.",
+        "UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.",
+        "A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances."
+      ]
+    },
+    "compiledCollisionTriangles": 25112,
+    "yawDegrees": 90,
+    "tunnelLengthWorldUnits": 88.55822340647376,
+    "baseScenery": 257,
+    "donorScenery": 30,
+    "compiledScenery": 287,
+    "donorModelTypes": 7,
+    "stagedModelReferenceCorrections": 6,
+    "nativeDesktop": {
+      "checks": [
+        "Native source preview identifies source-bound Battle Creek scenery placements",
+        "Moving the donor invalidates the previous clearance result",
+        "Fixed-entrance rotation preserves the tunnel mouth and Reset restores the applied 90-degree connection",
+        "Compiled revision inherits its matching editable tags and a clear nonduplicated title",
+        "All compiled Battle Creek scenery placements resolve real source models",
+        "Compiled connected map loads actual scenery, embedded materials and lightmaps in the native viewer",
+        "Owned original Battle Creek MCC texture packs finish loading before the matched source view"
+      ],
+      "errors": [],
+      "status": "PASS"
+    },
+    "compiledRoutes": [
+      {
+        "donorTitle": "sidewinder",
+        "projectFileSha256": "b4494e9d5eb6df096fc0dc57acdf0604e3e69c96c2b36ee128b01a9bfad5c92f",
+        "projectTitle": "Timberland + Sidewinder · donor scenery",
+        "walkSamples": 423
+      },
+      {
+        "donorTitle": "Blood Gulch",
+        "projectFileSha256": "956802363232f7b6a79c6ff7a698bf2083016002dc316f521be82b6d1d68d052",
+        "projectTitle": "Timberland + Sidewinder + Blood Gulch",
+        "walkSamples": 440
+      },
+      {
+        "donorTitle": "Battle Creek",
+        "projectFileSha256": "a7432acb22c83ea0201e074a5b1fcf670bc6d1073b18b6f7961f6cb7f633bb27",
+        "projectTitle": "Timberland + Sidewinder + Blood Gulch + Battle Creek",
+        "walkSamples": 356
+      }
+    ],
+    "sdkTagsetLoad": "PASS",
+    "sdkLogSha256": "c5fd1e1adecb53ece9b9311e80aac997da4303c759475e1397bfc1c5097a707a",
+    "manualWalkthrough": "NOT_RUN",
+    "retailMccCacheLoad": "NOT_RUN",
+    "visualReview": {
+      "compiledView": "four-map-entrance-native.png",
+      "sourceView": "battle-creek-original-entrance-native.png",
+      "camera": "Authored spawn floor plus 0.65 world units, looking toward the map centre",
+      "inEngineParity": "NOT_VERIFIED"
+    }
+  },
+  "workflow": {
+    "fixedEntranceRotation": true,
+    "donorDraftMismatchGuard": true,
+    "legacyUnappliedDraftsPreserved": true,
+    "latePlansAndClearanceErrorsIgnored": true,
+    "connectionStepsAndReset": true
+  },
+  "limits": [
+    "Compiled BSP route sampling excludes scenery collision and player physics",
+    "Manual traversal of all three tunnels and retail MCC cache loading remain untested",
+    "Donor weapons, vehicles, starts, objectives, scripts, named bindings and encounters are not transplanted",
+    "Material/lightmap previews do not establish complete engine rendering parity",
+    "Full atmosphere/audio transplantation and runtime BSP replacement remain separate work"
+  ]
+}

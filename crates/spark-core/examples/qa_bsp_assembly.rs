@@ -3,6 +3,40 @@ use spark_core::{bsp_assembly, library::Library, maps, Result};
 use std::{fs, path::Path, sync::atomic::AtomicBool};
 fn main() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
+    if a.len() >= 4 && a[1] == "--verify-cache" {
+        if a.len() > 19 {
+            return Err(spark_core::SparkError::Invalid("Choose at most 16 connection projects".into()));
+        }
+        let file = Path::new(&a[2]);
+        let mut projects = vec![];
+        let mut plans = vec![];
+        for source in &a[3..] {
+            let p = spark_core::project::load_project(Path::new(source))?;
+            let plan = p.bsp_assembly.as_ref().ok_or_else(|| {
+                spark_core::SparkError::Invalid(format!("{} has no connection route", p.title))
+            })?;
+            plans.push(plan.clone());
+            projects.push(p);
+        }
+        let report = bsp_assembly::verify_compiled_routes(file, &plans)?;
+        let mut routes = vec![];
+        for ((p, source), samples) in projects.iter().zip(&a[3..]).zip(report.walk_samples) {
+            routes.push(serde_json::json!({
+                "projectTitle": p.title,
+                "projectFileSha256": maps::hash_file(Path::new(source))?,
+                "donorTitle": p.bsp_assembly.as_ref().unwrap().donor_title,
+                "walkSamples": samples,
+            }));
+        }
+        println!("{}", serde_json::json!({
+            "cacheSha256": report.cache_sha256,
+            "collisionTriangles": report.collision_triangles,
+            "routes": routes,
+            "status": "PASS",
+            "scope": "BSP collision route sampling only; scenery and player physics need in-game testing",
+        }));
+        return Ok(());
+    }
     if a.len() == 4 && a[1] == "--check" {
         let p = spark_core::project::load_project(Path::new(&a[2]))?;
         let source = p.source.as_ref().unwrap();
@@ -20,6 +54,7 @@ fn main() -> Result<()> {
     }
     if a.len() != 6 {
         eprintln!("qa_bsp_assembly <base.map> <donor.map> <donor BSP index> <donor tags> <fresh output directory>");
+        eprintln!("qa_bsp_assembly --verify-cache <compiled.map> <connection-project.gsproject> [...]");
         std::process::exit(2);
     }
     let out = Path::new(&a[5]);

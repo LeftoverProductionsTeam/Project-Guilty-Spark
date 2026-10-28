@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assemblySignature, transformAssembly } from './bspAssembly';
+import { assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from './bspAssembly';
 import type { BspAssembly } from './bspAssembly';
 const plan: BspAssembly = {
   schemaVersion: 1,
@@ -28,7 +28,9 @@ const plan: BspAssembly = {
 };
 describe('BSP assembly transforms', () => {
   it('treats old omitted scenery options and reordered IPC keys as the same plan', () => {
-    const reordered = Object.fromEntries(Object.entries({ ...plan, includeDonorScenery: false }).reverse()) as unknown as BspAssembly;
+    const reordered = Object.fromEntries(
+      Object.entries({ ...plan, includeDonorScenery: false }).reverse(),
+    ) as unknown as BspAssembly;
     expect(assemblySignature(reordered)).toBe(assemblySignature(plan));
   });
   it('changes semantic identity for scenery and donor transforms', () => {
@@ -49,5 +51,17 @@ describe('BSP assembly transforms', () => {
     for (let i = 0; i < 4; i++) moved = transformAssembly(moved, plan.translation, moved.yawDegrees + 90);
     expect(moved.tunnelPoints.at(-1)![0]).toBeCloseTo(25, 10);
     expect(moved.tunnelPoints.at(-1)![1]).toBeCloseTo(0, 10);
+  });
+  it('rotates the donor around its entrance while preserving every tunnel point', () => {
+    const rotated = rotateAssemblyAtEntrance(plan, 90);
+    expect(rotated.translation[0]).toBeCloseTo(25);
+    expect(rotated.translation[1]).toBeCloseTo(-5);
+    expect(rotated.translation[2]).toBe(0);
+    expect(rotated.tunnelPoints).toEqual(plan.tunnelPoints);
+    const mouth = transformAssembly(rotated, rotated.translation, 0).tunnelPoints.at(-1)!;
+    expect(mouth[0]).toBeCloseTo(30);
+    expect(mouth[1]).toBeCloseTo(-5);
+    const restored = rotateAssemblyAtEntrance(rotated, 0);
+    restored.translation.forEach((v, i) => expect(v).toBeCloseTo(plan.translation[i], 10));
   });
 });

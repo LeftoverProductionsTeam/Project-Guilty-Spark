@@ -865,6 +865,34 @@ pub fn plan(
 pub fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<usize> {
     crate::bsp_clearance::verify_route(mesh, assembly)
 }
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledRouteReport {
+    pub cache_sha256: String,
+    pub collision_triangles: usize,
+    pub walk_samples: Vec<usize>,
+}
+/// Recheck earlier connections after extending a world. Routes must use the
+/// compiled world's coordinates; BSP checks do not include scenery or physics.
+pub fn verify_compiled_routes(path: &Path, routes: &[BspAssembly]) -> Result<CompiledRouteReport> {
+    if routes.is_empty() || routes.len() > 16 {
+        return invalid("Choose 1-16 connection routes to check in the compiled cache");
+    }
+    for route in routes { route.validate()?; }
+    let inspection = maps::inspect_map(path, path.parent())?;
+    let (collision, _) = maps::collision_source(path, &inspection)?;
+    let mut walk_samples = Vec::with_capacity(routes.len());
+    for (index, route) in routes.iter().enumerate() {
+        walk_samples.push(verify_route(&collision, route).map_err(|error| {
+            SparkError::Invalid(format!("Connection {} ({}): {error}", index + 1, route.donor_title))
+        })?);
+    }
+    Ok(CompiledRouteReport {
+        cache_sha256: inspection.sha256,
+        collision_triangles: collision.indices.len() / 3,
+        walk_samples,
+    })
+}
 fn playable_anchor(
     mesh: &MeshData,
     faces: &[CollisionFace],
