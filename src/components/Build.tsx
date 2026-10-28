@@ -16,6 +16,7 @@ import {
 import type { Bootstrap, CompatibilityReport, JobEvent, Project, Readiness, TemplateReport } from '../types';
 import { call, native } from '../api';
 import { CheckRow, Notice, PageTitle, Pill } from './ui';
+import BuildTargets from './BuildTargets';
 export default function Build({
   project,
   data,
@@ -28,6 +29,8 @@ export default function Build({
   onSettings,
   onRefresh,
   onResources,
+  onOpenCompiled,
+  edit,
 }: {
   project: Project;
   data: Bootstrap;
@@ -40,11 +43,14 @@ export default function Build({
   onSettings: () => void;
   onRefresh: () => void;
   onResources: () => void;
+  onOpenCompiled: (buildId:string) => void;
+  edit:(project:Project,description:string)=>void;
 }) {
   const [report, setReport] = useState<CompatibilityReport | null>(null);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [template, setTemplate] = useState<TemplateReport | null>(null);
   const [issues, setIssues] = useState<string[]>([]);
+  const [preparing,setPreparing]=useState(false);
   useEffect(() => {
     let cancelled = false;
     async function fetchReports() {
@@ -73,7 +79,7 @@ export default function Build({
     return () => {
       cancelled = true;
     };
-  }, [project.id, project.modifiedAt, project.builds.length, data.settings, epoch]);
+  }, [project.id, project.modifiedAt, project.builds.length,project.conversionProfile,project.activeBuildTarget,project.buildTargets,dirty, data.settings, epoch]);
   const projectLogs = logs.filter((l) => l.projectId === project.id);
   const last = projectLogs.at(-1);
   const validated = dirty
@@ -93,19 +99,28 @@ export default function Build({
         description="A traceable pipeline. A separate package. Your installation protected."
         actions={
           <>
+            {validated && <button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>Open compiled map</button>}
             <button onClick={onRefresh}>
               <RefreshCw size={14} />
               Refresh checks
             </button>
             <button className="primary" onClick={onStart} disabled={!report?.ready || !!activeJob}>
               <Hammer size={15} />
-              {dirty ? 'Save & build MCC cache' : 'Build MCC cache'}
+              {dirty ? 'Save & convert to MCC' : 'Convert map to MCC'}
             </button>
           </>
         }
       />
       <div className="build-columns">
         <div className="build-main">
+          <section className="surface build-conversion"><h3>Map conversion · CE / PC / Demo to MCC Halo 1</h3>
+            <p>Extract the original map’s custom tags, layer them over a verified copy of your legal MCC SDK tags, and compile a native MCC cache. Source maps and SDK master tags stay unchanged. The game load is a separate check.</p>
+            <BuildTargets project={project} defaults={data.settings} onChange={next=>edit(next,'Configure map conversion target')}/>
+            <button disabled={!native||preparing||!!activeJob} onClick={()=>{setPreparing(true);void onAction(async()=>{await call('prepare_mcc_conversion_tools',{projectId:project.id});onRefresh();},'MCC tools and editable tags are prepared. Your choices are saved.').finally(()=>setPreparing(false));}}>{preparing?'Preparing installed MCC tools…':'Prepare installed MCC tools'}</button>
+            <p className="subtle">If the SDK is not installed: Steam → Library → include Tools → Halo: CE Mod Tools - MCC. Preparation extracts its bundled tags into Spark’s local cache and remembers the folders.</p>
+            {project.source?.sha256==='b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d'&&<label>Zombie Apocalypse conversion profile<select aria-label="Zombie Apocalypse conversion profile" value={project.conversionProfile??'faithful'} onChange={e=>edit({...project,conversionProfile:e.target.value as Project['conversionProfile']},'Choose Zombie Apocalypse conversion profile')}><option value="faithful">Faithful · require the two original missing custom audio cues</option><option value="zombie-recovery">Recovery edition · omit two unavailable cues and disable one corrupt placement</option></select></label>}
+            {project.conversionProfile==='zombie-recovery'&&<Notice>The recovery edition retains the actual vehicle-based zombie spawners and valid mixed-class placements. Two missing custom sounds and the corrupt first placement are recorded as omissions. Runtime behavior still needs testing.</Notice>}
+          </section>
           {issues.map((issue) => (
             <Notice key={issue}>{issue}</Notice>
           ))}
@@ -133,7 +148,7 @@ export default function Build({
               </div>
               <div>
                 <h2>Halo 1 · The Master Chief Collection</h2>
-                <p>Cache version 13 · Invader extraction and compilation</p>
+                <p>Cache version 13 · {report?.pipeline??'Verified extraction and target compilation'}</p>
               </div>
               <Pill tone={report?.ready ? 'green' : 'amber'}>
                 {report?.ready ? 'Ready to build' : 'Dependencies required'}
@@ -173,7 +188,7 @@ export default function Build({
               </>
             )}
           </section>
-          {project.source?.cacheVersion === 13 && (
+          {project.source?.cacheVersion === 13 && !project.bspAssembly && !project.animationAssignments?.length && !project.studio?.engineMachinima?.enabled && (!project.conversionProfile || project.conversionProfile === 'faithful') && (
             <div className="surface">
               <div className="section-heading">
                 <h3>Already built for MCC?</h3>

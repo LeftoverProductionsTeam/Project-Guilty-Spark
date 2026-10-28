@@ -10,6 +10,9 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [clip, setClip] = useState<{ url: string; name: string; sha256: string } | null>(null);
+  const [playing,setPlaying]=useState(false),[repeat,setRepeat]=useState(false),[volume,setVolume]=useState(0.5);
+  const [clock,setClock]=useState({position:0,duration:0});
+  const player=useRef<HTMLAudioElement>(null);
   const request = useRef(0);
   const url = useRef<string | null>(null);
   useEffect(() => {
@@ -53,7 +56,11 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
         permutation: permutation.permutation,
       });
       if (request.current !== token) return;
-      const blob = new Blob([new Uint8Array(result.bytes)], { type: result.mime });
+      if(sourceHash&&result.sourceSha256!==sourceHash)throw new Error('Sound source changed; reopen this map.');
+      const bytes=new Uint8Array(result.bytes);
+      const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
+      if(digest!==result.sha256||!['audio/ogg','audio/wav'].includes(result.mime)||bytes.length>16*1024*1024)throw new Error('Sound playback payload failed verification.');
+      const blob = new Blob([bytes], { type: result.mime });
       const objectUrl = URL.createObjectURL(blob);
       url.current = objectUrl;
       setClip({ url: objectUrl, name: result.name, sha256: result.sha256 });
@@ -70,8 +77,8 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
         Source sound permutations
       </h3>
       <p className="subtle">
-        Preview uses actual embedded, validated Ogg/Vorbis data. Unsupported codecs and unavailable external
-        samples remain explicit. Audio does not start automatically.
+        Play original Vorbis or decoded PCM / Xbox ADPCM from this map. Shared samples use the project's verified sounds.map.
+        Connect its original resources folder in the map library if samples are missing.
       </p>
       {busy && <p role="status">Reading bounded audio data…</p>}
       {error && <Notice>{error}</Notice>}
@@ -88,7 +95,7 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
             </small>
             {p.reason && <p>{p.reason}</p>}
           </div>
-          <Pill tone={p.available ? 'green' : 'muted'}>{p.embedded ? 'Embedded' : 'External'}</Pill>
+          <Pill tone={p.available ? 'green' : 'muted'}>{p.embedded ? 'Map sample' : p.available?'Verified sounds.map':'Needs sounds.map'}</Pill>
           <button disabled={!p.available || busy} onClick={() => void preview(p)}>
             Load preview
           </button>
@@ -108,10 +115,13 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
       {clip && (
         <div className="sound-player">
           <strong>{clip.name}</strong>
-          <audio
-            controls
+          <audio ref={player}
             preload="metadata"
             src={clip.url}
+            loop={repeat}
+            onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)}
+            onTimeUpdate={event=>setClock({position:event.currentTarget.currentTime,duration:event.currentTarget.duration||0})}
+            onLoadedMetadata={event=>{event.currentTarget.volume=volume;setClock({position:0,duration:event.currentTarget.duration});}}
             onError={() =>
               setError(
                 'The webview could not decode this source audio. Container validation is not a playback guarantee.',
@@ -120,6 +130,13 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
           >
             Audio playback is unavailable in this webview.
           </audio>
+          <div className="analysis-actions">
+            <button className="small-button" onClick={()=>{if(!player.current)return;if(playing)player.current.pause();else void player.current.play().catch(e=>setError(`Playback failed: ${String(e)}`));}}>{playing?'Pause sample':'Play sample'}</button>
+            <button className="small-button" onClick={()=>{if(player.current){player.current.pause();player.current.currentTime=0;}}}>Stop sample</button>
+            <span>{clock.position.toFixed(1)} / {clock.duration.toFixed(1)} s</span>
+          </div>
+          <label><input type="checkbox" checked={repeat} onChange={event=>setRepeat(event.target.checked)}/> Repeat this sample</label>
+          <label className="field-label">Preview volume<input aria-label="Sound preview volume" type="range" min="0" max="1" step="0.01" value={volume} onChange={event=>{const value=Number(event.target.value);setVolume(value);if(player.current)player.current.volume=value;}}/></label>
           <small>
             SHA-256 <code>{clip.sha256}</code>
           </small>

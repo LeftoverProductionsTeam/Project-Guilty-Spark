@@ -24,6 +24,7 @@ fn main() -> spark_core::Result<()> {
     let tools = Toolchain {
         invader_directory: Some(std::fs::canonicalize(&a[3])?),
         resource_directory: resources,
+        ..Default::default()
     };
     let id = uuid::Uuid::new_v4().to_string();
     let log = Mutex::new(

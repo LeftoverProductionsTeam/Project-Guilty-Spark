@@ -41,12 +41,17 @@ test('preservation and runtime workspaces disclose unavailable evidence without 
     page.getByText('Runtime discovery and file hashing require the desktop application.'),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Refresh reports', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Live Lab', exact: true }).click();
+  await page.getByRole('button', { name: 'Level editor', exact: true }).click();
+  await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');
   await expect(
-    page.getByRole('heading', { name: 'Engine bridge disconnected · editor sandbox available' }),
+    page.getByRole('heading', { name: 'Live Halo 1 objects · MCC' }),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: /Connect|Spawn|Dispatch/ })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Open Build & playtest', exact: true }).click();
+  const connect=page.getByRole('button', { name: 'Connect current Halo 1 session',exact:true });
+  await expect(connect).toBeDisabled();
+  await page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();
+  await expect(connect).toBeDisabled();
+  await expect(page.getByRole('button', { name: /Spawn|Dispatch/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Build & playtest', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Choose a world to work on' })).toBeVisible();
 });
 test('help modal traps focus and restores it after Escape', async ({ page }) => {
@@ -60,4 +65,33 @@ test('help modal traps focus and restores it after Escape', async ({ page }) => 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(help).toBeFocused();
+});
+
+test('Dark Glow saves custom colors and keeps text white on dark surfaces',async({page})=>{
+  await page.goto('/');
+  await page.getByRole('button',{name:'Interface Studio',exact:true}).click();
+  await page.locator('.interface-theme-dark-glow').click();
+  await expect(page.locator('html')).toHaveAttribute('data-gs-theme','dark-glow');
+  const choose=async(label:string,color:string)=>page.getByLabel(label,{exact:true}).evaluate((element,value)=>{
+    const input=element as HTMLInputElement;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,value);
+    input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
+  },color);
+  await choose('Primary glow color','#ff5d9c');await choose('Secondary glow color','#83ffcd');
+  const strength=page.getByRole('slider',{name:'Glow strength',exact:true});await strength.focus();await strength.press('End');
+  await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--gs-glow-primary').trim())).toBe('#ff5d9c');
+  await expect(page.locator('.analysis-card').first()).toHaveCSS('background-color','rgb(16, 23, 37)');
+  await expect(page.getByRole('heading',{name:'Make the workbench yours.'})).toHaveCSS('color','rgb(255, 255, 255)');
+  await expect(page.getByRole('button',{name:'Restore defaults',exact:true})).toHaveCSS('color','rgb(255, 255, 255)');
+  await choose('Primary glow color','#ffffff');
+  await expect(page.getByRole('button',{name:'Restore defaults',exact:true})).toHaveCSS('color','rgb(255, 255, 255)');
+  await expect(page.locator('.analysis-card').first()).toHaveCSS('background-color','rgb(16, 23, 37)');
+  await choose('Primary glow color','#ff5d9c');await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-gs-theme','dark-glow');
+  await page.getByRole('button',{name:'Interface Studio',exact:true}).click();
+  await expect(page.getByLabel('Primary glow color',{exact:true})).toHaveValue('#ff5d9c');
+  await expect(page.getByLabel('Secondary glow color',{exact:true})).toHaveValue('#83ffcd');
+  await expect(page.getByRole('slider',{name:'Glow strength',exact:true})).toHaveValue('100');
+  await strength.focus();await strength.press('Home');
+  await expect.poll(()=>page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--gs-glow-percent').trim())).toBe('0%');
 });

@@ -8,6 +8,9 @@ use std::{
     io::{Read, Seek, SeekFrom},
     path::Path,
 };
+#[path = "map_decals.rs"]
+mod decals;
+pub use decals::SceneDecal;
 
 pub const MAX_CACHE_BYTES: u64 = 768 * 1024 * 1024;
 pub const MAX_TAGS: usize = 65_535;
@@ -113,7 +116,9 @@ pub fn parse_header(bytes: &[u8], actual_size: u64) -> Result<MapHeader> {
     if name.is_empty() {
         return invalid("Cache scenario name is empty");
     }
-    let extended = bytes.windows(4).any(|w| w == b"yelo" || w == b"oley");
+    // OpenSauce's marker belongs to the classic cache header. Searching model,
+    // bitmap or sound payload bytes falsely classified stock MCC campaign maps.
+    let extended = matches!(version,7|609) && bytes[..2048].windows(4).any(|w|w==b"yelo"||w==b"oley");
     Ok(MapHeader {
         version,
         engine: engine.into(),
@@ -170,7 +175,27 @@ pub struct Tag {
     /// without this field are still readable (None).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_bitmap_status: Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub shader_preview:Option<ShaderPreview>,
 }
+#[derive(Clone,Debug,Default,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ShaderPreview {
+    #[serde(default)] pub multipurpose_xbox:bool,
+    #[serde(default)] pub bump_scale:f32,
+    pub alpha_test:bool,pub two_sided:bool,pub uv_scale:[f32;2],
+    #[serde(default)] pub kind:String,
+    #[serde(default)] pub shader_type:u16,
+    #[serde(default)] pub detail_function:u16,
+    #[serde(default)] pub micro_detail_function:u16,
+    #[serde(default)] pub detail_scales:[f32;3],
+    #[serde(default)] pub framebuffer_blend:u16,
+    #[serde(default)] pub layers:Vec<ShaderLayer>,
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ShaderLayer {pub bitmap_tag_id:u32,pub uv_scale:[f32;2],pub uv_offset:[f32;2],pub rotation:f32,
+    pub color_function:u16,pub alpha_function:u16}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SceneObject {
@@ -217,6 +242,8 @@ pub struct MeshMaterialRange {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MeshData {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub rig:Option<ModelRig>,
     pub positions: Vec<f32>,
     pub indices: Vec<u32>,
     #[serde(default)]
@@ -233,6 +260,12 @@ pub struct MeshData {
     #[serde(default)]
     pub material_ranges: Vec<MeshMaterialRange>,
 }
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ModelBone{pub name:String,pub parent:i16,pub position:[f32;3],pub rotation:[f32;4]}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ModelRig{pub checksum:u32,pub nodes:Vec<ModelBone>,pub indices:Vec<u16>,pub weights:Vec<f32>}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Encounter {
@@ -259,9 +292,14 @@ pub struct Resource {
 #[serde(rename_all = "camelCase")]
 pub struct MapInspection {
     pub header: MapHeader,
+    /// Tag-data checksum, distinct from the cache-header CRC used by the game loader.
+    #[serde(default)]
+    pub tag_checksum: Option<u32>,
     pub sha256: String,
     pub tags: Vec<Tag>,
     pub objects: Vec<SceneObject>,
+    #[serde(default)]
+    pub decals: Vec<SceneDecal>,
     pub mesh: MeshData,
     #[serde(default)]
     pub render_mesh: Option<MeshData>,
@@ -469,7 +507,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
         } else {
             Some(space.pointer(r.u32(at + 20)?, 1)?)
         };
-        let shader_class = matches!(class.as_str(), "senv" | "soso");
+        let shader_class = matches!(class.as_str(), "senv" | "soso" | "schi" | "scex");
         tags.push(Tag {
             id,
             index: i,
@@ -477,6 +515,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             path: name,
             data_offset,
             external,
+            shader_preview:None,
             fields: vec![],
             references: vec![],
             primary_bitmap_status: if shader_class {
@@ -492,6 +531,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             failed_fields += 1;
             tag.fields.clear();
             tag.references.clear();
+            tag.shader_preview=None;
             // A failed tag read must NEVER enable basename shader guessing.
             if matches!(tag.class.as_str(), "senv" | "soso") {
                 tag.primary_bitmap_status = Some("invalid".into());
@@ -571,6 +611,19 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
         )),
     }
     let mut encounters = vec![];
+    // Multiplayer pickups live in a different scenario block from ordinary
+    // placed equipment. Each references an item collection, not a model.
+    match space.block(&r,scenario_at+0x384,144,200){
+        Ok((table,count))=>for index in 0..count {
+            let row=table+index*144;let datum=r.u32(row+92)?;
+            let Some(collection)=tags.iter().find(|t|t.id==datum&&t.class=="itmc")else{continue};
+            if r.fourcc(row+80)?!="itmc"{continue;}
+            objects.push(SceneObject{id:format!("netgame-equipment-{index}"),name:format!("{} · pickup {}",collection.path.rsplit('\\').next().unwrap_or(&collection.path),index+1),
+                kind:"Netgame item".into(),tag_id:Some(datum),position:vec3(&r,row+64)?,rotation:[r.f32(row+76)?,0.,0.],scale:[1.;3],visible:true,
+                source_offset:Some(row+64),rotation_offset:Some(row+76),asset_id:None});
+        },
+        Err(error)=>diagnostics.push(Diagnostic::warning("NETGAME_ITEMS_UNREADABLE",error.to_string())),
+    }
     match space.block(&r, scenario_at + 0x42c, 176, 128) {
         Ok((at, n)) => {
             for i in 0..n {
@@ -616,6 +669,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             format!("Scripts could not be read: {e}"),
         )),
     }
+    let decals = decals::inspect(&r, &space, scenario_at, &tags, header.version, &mut diagnostics);
     let mesh = match collision_mesh(&r, &space, scenario_at, &tags) {
         Ok(m) => m,
         Err(e) => {
@@ -657,10 +711,12 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
     }
     diagnostics.push(Diagnostic::warning("RUNTIME_TEST_PENDING","Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability."));
     Ok(MapInspection {
+        tag_checksum:Some(r.u32(start+8)?),
         header,
         sha256,
         tags,
         objects,
+        decals,
         mesh,
         render_mesh,
         model_meshes,
@@ -795,7 +851,49 @@ fn shader_bitmap_references(
         if index == 0 { primary_status = "resolved"; }
     }
     tag.primary_bitmap_status = Some(primary_status.into());
+    if primary_status!="resolved"{tag.shader_preview=None;return Ok(());}
+    let flags=r.u16(at+40)?;
+    let uv_scale=if tag.class=="soso" {
+        let u=r.f32(at+0x9c)?;let v=r.f32(at+0xa0)?;
+        if !u.is_finite() || !v.is_finite() || u.abs()>1024. || v.abs()>1024. {return invalid("Unsupported model shader UV scale");}
+        [if u==0.{1.}else{u},if v==0.{1.}else{v}]
+    }else{[1.,1.]};
+    tag.shader_preview=Some(ShaderPreview{alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
+        multipurpose_xbox:tag.class=="soso"&&flags&64!=0,bump_scale:if tag.class=="senv"{r.f32(at+0x124).ok().filter(|v|v.abs()<=1024.&&*v!=0.).unwrap_or(1.)}else{1.},
+        two_sided:tag.class=="senv"||flags&2!=0,uv_scale,
+        kind:if tag.class=="senv"{"environment"}else{"model"}.into(),
+        shader_type:if tag.class=="senv"{r.u16(at+0x2a)?}else{0},
+        detail_function:if tag.references.iter().any(|v|matches!(v.label.as_str(),"Primary detail map"|"Detail map")){r.u16(at+if tag.class=="senv"{0xb0}else{0xd4})?}else{0},
+        micro_detail_function:if tag.references.iter().any(|v|v.label=="Micro detail map"){r.u16(at+0xf4)?}else{0},
+        detail_scales:if tag.class=="senv"{[
+            if tag.references.iter().any(|v|v.label=="Primary detail map"){shader_scale(r,at+0xb4)?}else{1.},
+            if tag.references.iter().any(|v|v.label=="Secondary detail map"){shader_scale(r,at+0xc8)?}else{1.},
+            if tag.references.iter().any(|v|v.label=="Micro detail map"){shader_scale(r,at+0xf8)?}else{1.}]}
+            else{[if tag.references.iter().any(|v|v.label=="Detail map"){shader_scale(r,at+0xd8)?}else{1.},1.,1.]},..Default::default()});
     Ok(())
+}
+fn shader_scale(r:&Reader,at:usize)->Result<f32>{let v=r.f32(at)?;if v.abs()>1024.{return invalid("Shader UV scale exceeds supported range");}Ok(if v==0.{1.}else{v})}
+fn chicago_bitmap_references(r:&Reader,space:&Space,tag:&mut Tag,ids:&std::collections::HashMap<u32,String>,at:usize)->Result<()> {
+    let body=if tag.class=="schi"{108}else{120};
+    if at<space.begin||at.checked_add(body).is_none_or(|end|end>space.end){return invalid("Chicago shader body escapes tag region");}
+    r.bytes(at,body)?;
+    if r.u16(at+0x2a)?!=0 {return invalid("Chicago cube-map stages need a distinct decoder");}
+    let block=if tag.class=="scex"&&r.u32(at+0x54)?==0 {at+0x60}else{at+0x54};
+    let count=r.u32(block)? as usize;if count==0||count>4{return invalid("Chicago map count outside supported 1–4 stages");}
+    let table=space.pointer(r.u32(block+4)?,count*220)?;
+    if table.checked_add(count*220).is_none_or(|end|end>space.end){return invalid("Chicago stage array escapes tag region");}
+    r.bytes(table,count*220)?;
+    let mut layers=vec![];
+    for index in 0..count {let p=table+index*220;let reference=p+0x6c;let datum=r.u32(reference+12)?;
+        if r.fourcc(reference)?!="bitm"||ids.get(&datum).is_none_or(|c|c!="bitm"){return invalid("Chicago bitmap stage has invalid class or datum");}
+        let color_function=r.u16(p+0x2c)?;let alpha_function=r.u16(p+0x2e)?;
+        if color_function>12||alpha_function>12{return invalid("Chicago colour/alpha function is unsupported");}
+        layers.push(ShaderLayer{bitmap_tag_id:datum,uv_scale:[shader_scale(r,p+0x54)?,shader_scale(r,p+0x58)?],
+            uv_offset:[r.f32(p+0x5c)?,r.f32(p+0x60)?],rotation:r.f32(p+0x64)?,color_function,alpha_function});
+        tag.references.push(TagReference{label:if index==0{"Base map".into()}else{format!("Chicago layer {index}")},target_id:datum,class:"bitm".into(),offset:reference});
+    }
+    tag.primary_bitmap_status=Some("resolved".into());tag.shader_preview=Some(ShaderPreview{kind:"chicago".into(),
+        alpha_test:r.bytes(at+0x29,1)?[0]&1!=0,uv_scale:[1.,1.],two_sided:r.bytes(at+0x29,1)?[0]&4!=0,framebuffer_blend:r.u16(at+0x2c)?,layers,..Default::default()});Ok(())
 }
 
 fn read_fields(
@@ -808,11 +906,36 @@ fn read_fields(
     let Some(at) = tag.data_offset else {
         return Ok(());
     };
-    // Only the classic PC/CE and Demo cache layout has independently checked
-    // field offsets. Do not claim to parse Xbox, MCC, or extended shader formats.
-    if matches!(tag.class.as_str(), "senv" | "soso") && matches!(version, 6 | 7 | 609) {
+    if matches!(version,6|7|609)&&tag.class=="snd!" {
+        space.pointer(space.address+(at-space.begin)as u32,164)?;
+        for (offset,key,label,max,unit) in [(8,"sound-min-distance","Minimum audible distance",20000.,"world units"),
+            (12,"sound-max-distance","Maximum audible distance",20000.,"world units"),
+            (16,"sound-skip-fraction","Skip fraction",1.,""),(20,"sound-pitch-min","Minimum playback pitch",16.,"rate"),
+            (24,"sound-pitch-max","Maximum playback pitch",16.,"rate"),(36,"sound-outer-gain","Outer cone gain",1.,""),
+            (40,"sound-random-gain","Random gain modifier",1.,"")] {
+            numeric(r,tag,at+offset,key,label,max,unit)?;
+        }
+        reference(r,tag,at+112,"Promotion sound",Some("snd!"),ids)?;
+    }
+    if matches!(version,6|7|609)&&tag.class=="lsnd" {
+        space.pointer(space.address+(at-space.begin)as u32,84)?;
+        let (tracks,count)=space.block(r,at+60,160,4)?;
+        for index in 0..count {let track=tracks+index*160;
+            for (offset,key,label,max) in [(4,"gain","Gain",1.),(8,"fade-in","Fade in duration",600.),(12,"fade-out","Fade out duration",600.)]{
+                numeric(r,tag,track+offset,&format!("loop-{index}-{key}"),&format!("Track {} · {label}",index+1),max,if offset==4{""}else{"seconds"})?;
+            }
+            for (offset,label) in [(48,"Start"),(64,"Loop"),(80,"End"),(128,"Alternate loop"),(144,"Alternate end")]{
+                reference(r,tag,track+offset,&format!("Track {} · {label}",index+1),Some("snd!"),ids)?;
+            }
+        }
+        let (details,count)=space.block(r,at+72,104,32)?;
+        for index in 0..count {reference(r,tag,details+index*104,&format!("Detail sound {}",index+1),Some("snd!"),ids)?;}
+    }
+    // PC-derived layouts, including the verified MCC v13 classic shader bodies.
+    if matches!(tag.class.as_str(), "senv" | "soso") && matches!(version, 6 | 7 | 13 | 609) {
         shader_bitmap_references(r, space, tag, ids, at)?;
     }
+    if matches!(tag.class.as_str(),"schi"|"scex")&&matches!(version,6|7|13|609){chicago_bitmap_references(r,space,tag,ids,at)?;}
     // Read-only dependency metadata from Invader's HEK definitions. Actor variants
     // and item collections can drive AI even when the scenario has no encounters.
     if tag.class == "actv" {
@@ -1061,7 +1184,37 @@ fn placements(
     }
     Ok(rows)
 }
+#[derive(Clone,Debug)]
+pub(crate) struct CollisionFace { pub shader:Option<u32>,pub flags:u8,pub normal:[f32;3] }
+// Collision surfaces can be concave. A fan creates overlapping source faces;
+// use a bounded planar ear clipping pass when recovering editable geometry.
+fn source_polygon_triangles(poly:&[u32],positions:&[f32])->Result<Vec<[u32;3]>>{
+    if poly.len()<3{return Ok(vec![]);}let p:Vec<[f64;3]>=poly.iter().map(|v|std::array::from_fn(|k|positions[*v as usize*3+k] as f64)).collect();let mut normal=[0.;3];for n in 0..p.len(){let(a,b)=(p[n],p[(n+1)%p.len()]);normal[0]+=(a[1]-b[1])*(a[2]+b[2]);normal[1]+=(a[2]-b[2])*(a[0]+b[0]);normal[2]+=(a[0]-b[0])*(a[1]+b[1]);}
+    let drop=(0..3).max_by(|a,b|normal[*a].abs().total_cmp(&normal[*b].abs())).unwrap();if normal[drop].abs()<1e-12{return Ok(vec![]);}let axes:Vec<_>=(0..3).filter(|v|*v!=drop).collect();let q:Vec<[f64;2]>=p.iter().map(|p|[p[axes[0]],p[axes[1]]]).collect();let cross=|a:[f64;2],b:[f64;2],c:[f64;2]|(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);let area=(0..q.len()).map(|i|q[i][0]*q[(i+1)%q.len()][1]-q[(i+1)%q.len()][0]*q[i][1]).sum::<f64>();let sign=area.signum();let mut remaining:Vec<_>=(0..poly.len()).collect();let mut out=vec![];
+    while remaining.len()>3{let mut found=false;for at in 0..remaining.len(){let a=remaining[(at+remaining.len()-1)%remaining.len()];let b=remaining[at];let c=remaining[(at+1)%remaining.len()];if cross(q[a],q[b],q[c])*sign<=1e-12{continue;}if remaining.iter().copied().filter(|v|*v!=a&&*v!=b&&*v!=c).any(|p|cross(q[a],q[b],q[p])*sign>=-1e-12&&cross(q[b],q[c],q[p])*sign>=-1e-12&&cross(q[c],q[a],q[p])*sign>=-1e-12){continue;}out.push([poly[a],poly[b],poly[c]]);remaining.remove(at);found=true;break;}if !found{return invalid("Collision polygon cannot be triangulated without overlapping source faces");}}
+    if remaining.len()==3&&cross(q[remaining[0]],q[remaining[1]],q[remaining[2]]).abs()>1e-12{out.push([poly[remaining[0]],poly[remaining[1]],poly[remaining[2]]]);}Ok(out)
+}
+fn source_active_surfaces(r:&Reader,space:&Space,root:usize,surfaces:usize)->Result<Vec<bool>>{
+    let (nodes,nodes_count)=space.block(r,root,12,262144)?;let(leaves,leaf_count)=space.block(r,root+0x18,8,262144)?;let(references,ref_count)=space.block(r,root+0x24,8,262144)?;let(nodes2d,count2d)=space.block(r,root+0x30,20,262144)?;
+    let mut active=vec![false;surfaces];let mut visited=vec![false;nodes_count];let mut leaves_seen=vec![false;leaf_count];let mut nodes2d_seen=vec![false;count2d];let mut stack=vec![if nodes_count==0{0x80000000}else{0}];let mut references_to_walk=vec![];
+    while let Some(child)=stack.pop(){if child==u32::MAX{continue;}if child&0x80000000!=0{let index=(child&0x7fffffff) as usize;if index>=leaf_count{return invalid("Source BSP3D leaf index is invalid");}if leaves_seen[index]{continue;}leaves_seen[index]=true;let row=leaves+index*8;let count=r.u16(row+2)? as usize;if count==0{continue;}let first=r.u32(row+4)? as usize;if first.checked_add(count).is_none_or(|end|end>ref_count){return invalid("Source BSP2D reference range is invalid");}for index in first..first+count{references_to_walk.push(r.u32(references+index*8+4)?);}}else{let index=child as usize;if index>=nodes_count{return invalid("Source BSP3D node index is invalid");}if visited[index]{continue;}visited[index]=true;stack.push(r.u32(nodes+index*12+4)?);stack.push(r.u32(nodes+index*12+8)?);}}
+    while let Some(child)=references_to_walk.pop(){if child==u32::MAX{continue;}if child&0x80000000!=0{let index=(child&0x7fffffff) as usize;if index>=surfaces{return invalid("Source BSP2D surface index is invalid");}active[index]=true;}else{let index=child as usize;if index>=count2d{return invalid("Source BSP2D node index is invalid");}if nodes2d_seen[index]{continue;}nodes2d_seen[index]=true;references_to_walk.push(r.u32(nodes2d+index*20+12)?);references_to_walk.push(r.u32(nodes2d+index*20+16)?);}}
+    Ok(active)
+}
+pub(crate) fn collision_source(path:&Path,inspection:&MapInspection)->Result<(MeshData,Vec<CollisionFace>)>{
+    let (header,bytes,hash)=read_cache_snapshot(path)?;
+    if hash!=inspection.sha256{return invalid("BSP source changed after inspection");}
+    let r=Reader(&bytes);let start=header.tag_offset as usize;let array=r.u32(start)?;
+    let address=match header.version{5=>0x803a6000,6=>0x4bf10000,13=>array.checked_sub(0x28).ok_or_else(||SparkError::Invalid("Invalid MCC index".into()))?,_=>0x40440000};
+    let space=Space{begin:start,end:start+header.tag_size as usize,address};
+    let sc=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;
+    let mut faces=vec![];let mesh=collision_mesh_record(&r,&space,sc,&inspection.tags,Some(&mut faces))?;Ok((mesh,faces))
+}
+pub(crate) fn render_bsp_source(path:&Path,inspection:&MapInspection,index:usize)->Result<MeshData>{let(header,bytes,hash)=read_cache_snapshot(path)?;if hash!=inspection.sha256{return invalid("BSP source changed after inspection");}let scenario=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;crate::render::bsp_render_geometry_selected(&bytes,&header,scenario,Some(index))}
 fn collision_mesh(r: &Reader, space: &Space, sc: usize, tags: &[Tag]) -> Result<MeshData> {
+    collision_mesh_record(r,space,sc,tags,None)
+}
+fn collision_mesh_record(r: &Reader, space: &Space, sc: usize, tags: &[Tag],mut records:Option<&mut Vec<CollisionFace>>) -> Result<MeshData> {
     let (bsps, count) = space.block(r, sc + 0x5a4, 32, 16)?;
     let mut mesh = MeshData {
         label: "Imported BSP collision geometry".into(),
@@ -1084,10 +1237,14 @@ fn collision_mesh(r: &Reader, space: &Space, sc: usize, tags: &[Tag]) -> Result<
             address,
         };
         let bsp = bsp_space.pointer(r.u32(begin)?, 648)?;
+        let mut material_ids=vec![];
+        if records.is_some(){let (at,n)=bsp_space.block(r,bsp+0xa4,20,512)?;for m in 0..n{material_ids.push(r.u32(at+m*20+12)?);}}
         let (blocks, bn) = bsp_space.block(r, bsp + 0xb0, 96, 16)?;
         for b in 0..bn {
             let root = blocks + b * 96;
+            let(planes,plane_count)=if records.is_some(){bsp_space.block(r,root+0xc,16,262144)?}else{(0,0)};
             let (surfaces, sn) = bsp_space.block(r, root + 0x3c, 12, 131072)?;
+            let active=if records.is_some(){Some(source_active_surfaces(r,&bsp_space,root,sn)?)}else{None};
             let (edges, en) = bsp_space.block(r, root + 0x48, 24, 262144)?;
             let (vertices, vn) = bsp_space.block(r, root + 0x54, 16, 131072)?;
             if mesh.positions.len() / 3 + vn > 500000 {
@@ -1099,6 +1256,7 @@ fn collision_mesh(r: &Reader, space: &Space, sc: usize, tags: &[Tag]) -> Result<
                     .extend_from_slice(&vec3(r, vertices + v * 16)?);
             }
             for s in 0..sn {
+                if active.as_ref().is_some_and(|used|!used[s]){continue;}
                 let first = r.u32(surfaces + s * 12 + 4)? as usize;
                 let mut edge = first;
                 let mut poly = vec![];
@@ -1124,9 +1282,10 @@ fn collision_mesh(r: &Reader, space: &Space, sc: usize, tags: &[Tag]) -> Result<
                 if edge != first {
                     return invalid("Collision surface did not form a bounded closed polygon");
                 }
-                for v in 1..poly.len().saturating_sub(1) {
-                    mesh.indices
-                        .extend_from_slice(&[poly[0], poly[v], poly[v + 1]]);
+                let triangles=if records.is_some(){source_polygon_triangles(&poly,&mesh.positions)?}else{(1..poly.len().saturating_sub(1)).map(|v|[poly[0],poly[v],poly[v+1]]).collect()};
+                for triangle in triangles {
+                    mesh.indices.extend_from_slice(&triangle);
+                    if let Some(rows)=records.as_deref_mut(){let material=r.u16(surfaces+s*12+10)?;let shader=if material==u16::MAX{None}else{Some(*material_ids.get(material as usize).ok_or_else(||SparkError::Invalid("BSP collision material index is invalid".into()))?)};let plane=r.u32(surfaces+s*12)?;let index=(plane&0x7fffffff) as usize;if index>=plane_count{return invalid("BSP collision surface plane is invalid");}let mut normal=vec3(r,planes+index*16)?;if plane&0x80000000!=0{normal=normal.map(|v|-v);}rows.push(CollisionFace{shader,flags:r.bytes(surfaces+s*12+8,1)?[0],normal});}
                 }
                 if mesh.indices.len() > 3000000 {
                     return invalid("Collision mesh triangle limit exceeded");
@@ -1177,6 +1336,20 @@ pub fn read_range(path: &Path, offset: u64, len: usize) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod shader_dependency_tests {
     use super::*;
+    #[test]
+    fn recovered_concave_collision_preserves_area_and_winding() {
+        let positions = [0.,0.,0.,2.,0.,0.,2.,1.,0.,1.,1.,0.,1.,2.,0.,0.,2.,0.];
+        for polygon in [vec![2,3,4,5,0,1],vec![1,0,5,4,3,2]] {
+            let triangles = source_polygon_triangles(&polygon,&positions).unwrap();
+            assert_eq!(triangles.len(),4);
+            let areas: Vec<_> = triangles.iter().map(|t| {
+                let p:Vec<_> = t.iter().map(|i| &positions[*i as usize*3..*i as usize*3+2]).collect();
+                ((p[1][0]-p[0][0])*(p[2][1]-p[0][1])-(p[1][1]-p[0][1])*(p[2][0]-p[0][0]))/2.
+            }).collect();
+            assert!(areas.iter().all(|a| a.signum()==areas[0].signum()));
+            assert!((areas.iter().sum::<f32>().abs()-3.).abs()<1e-6);
+        }
+    }
     fn shader_fixture(class: &str) -> Tag {
         Tag {
             id: 1,
@@ -1187,7 +1360,7 @@ mod shader_dependency_tests {
             external: false,
             fields: vec![],
             references: vec![],
-            primary_bitmap_status: Some("unavailable".into()),
+            primary_bitmap_status:Some("unavailable".into()),shader_preview:None,
         }
     }
     fn install_ref(bytes: &mut [u8], field: usize, datum: u32, class: &[u8; 4]) {
@@ -1207,6 +1380,7 @@ mod shader_dependency_tests {
             (46, "bitm".to_string()),
         ]);
         let region = Space {begin: 0, end: bytes.len(), address: 0};
+        bytes[64+0xb4..64+0xb8].copy_from_slice(&1f32.to_le_bytes());
         let mut tag = shader_fixture("senv");
         shader_bitmap_references(&Reader(&bytes), &region, &mut tag, &ids, 64).unwrap();
         assert_eq!(tag.primary_bitmap_status.as_deref(), Some("resolved"));
@@ -1227,6 +1401,7 @@ mod shader_dependency_tests {
             (89, "bitm".to_string()),
         ]);
         let region = Space {begin: 0, end: bytes.len(), address: 0};
+        bytes[0x40+0x9c..0x40+0xa4].copy_from_slice(&[0,0,128,63,0,0,128,63]);
         let mut tag = shader_fixture("soso");
         shader_bitmap_references(&Reader(&bytes), &region, &mut tag, &ids, 64).unwrap();
         assert_eq!(tag.primary_bitmap_status.as_deref(), Some("resolved"));
@@ -1256,5 +1431,29 @@ mod shader_dependency_tests {
         assert!(shader_bitmap_references(&Reader(&bytes), &too_short, &mut tag,
             &std::collections::HashMap::new(), 64).is_err());
         assert!(tag.references.is_empty());
+    }
+    #[test]
+    fn chicago_stages_keep_exact_image_id_and_uv_transform() {
+        let mut bytes=vec![0u8;1200];
+        bytes[64+0x54..64+0x58].copy_from_slice(&2u32.to_le_bytes());
+        bytes[64+0x58..64+0x5c].copy_from_slice(&512u32.to_le_bytes());
+        bytes[64+0x29]=5;
+        for (index,id) in [44u32,45].into_iter().enumerate(){
+            let at=512+index*220;install_ref(&mut bytes,at+0x6c,id,b"mtib");
+            bytes[at+0x54..at+0x58].copy_from_slice(&(if index==0{1f32}else{6f32}).to_le_bytes());
+            bytes[at+0x58..at+0x5c].copy_from_slice(&2f32.to_le_bytes());
+        }
+        let ids=std::collections::HashMap::from([(44,"bitm".into()),(45,"bitm".into())]);
+        let region=Space{begin:0,end:1200,address:0};let mut tag=shader_fixture("schi");
+        chicago_bitmap_references(&Reader(&bytes),&region,&mut tag,&ids,64).unwrap();
+        let metadata=tag.shader_preview.unwrap();assert_eq!(metadata.layers.len(),2);
+        assert_eq!(metadata.layers[1].bitmap_tag_id,45);assert_eq!(metadata.layers[1].uv_scale,[6.,2.]);
+        assert!(metadata.alpha_test&&metadata.two_sided);
+        // An unsupported array size or stage datum cannot authorize a bitmap.
+        bytes[64+0x54..64+0x58].copy_from_slice(&5u32.to_le_bytes());
+        assert!(chicago_bitmap_references(&Reader(&bytes),&region,&mut shader_fixture("schi"),&ids,64).is_err());
+        bytes[64+0x54..64+0x58].copy_from_slice(&2u32.to_le_bytes());
+        install_ref(&mut bytes,512+0x6c,99,b"mtib");
+        assert!(chicago_bitmap_references(&Reader(&bytes),&region,&mut shader_fixture("schi"),&ids,64).is_err());
     }
 }

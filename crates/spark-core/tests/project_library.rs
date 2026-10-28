@@ -22,6 +22,10 @@ fn imports_deduplicates_and_preserves_source() {
     );
 }
 #[test]
+fn canonical_library_paths_keep_the_same_managed_source_when_reopened(){
+    let d=tempfile::tempdir().unwrap();let input=d.path().join("input.map");common::write_map(&input,6);let root=d.path().join("library");std::fs::create_dir_all(&root).unwrap();let canonical=std::fs::canonicalize(&root).unwrap();let first=Library::open(&canonical).unwrap();let(mut p,_)=first.import_map(&input,None).unwrap();drop(first);let reopened=Library::open(&root).unwrap();p.title="Same owned source, new title".into();reopened.save(&p,None).unwrap();assert_eq!(reopened.get(&p.id).unwrap().title,p.title);assert_eq!(maps::hash_file(&input).unwrap(),p.source.unwrap().sha256);
+}
+#[test]
 fn project_roundtrip_and_backup() {
     let d = tempfile::tempdir().unwrap();
     let p = project::Project::new("Restoration");

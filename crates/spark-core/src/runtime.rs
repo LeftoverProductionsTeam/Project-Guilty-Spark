@@ -398,7 +398,7 @@ fn descriptor(id: RuntimeId) -> RuntimeReport {
             if id.is_native() { "Upstream actor replication exists separately from co-op scripts. This map and two-computer gameplay are untested." }
             else if id == RuntimeId::MccSteam { "Campaign co-op and arbitrary multiplayer AI are separate. No supported MCC multiplayer AI bridge is implemented." }
             else { "No arbitrary multiplayer AI synchronization is integrated for this profile." }, source(id)),
-        capability("liveEditing", Unsupported, Application, "No attached runtime bridge or live transport is implemented.", vec![]),
+        capability("liveEditing", if id==RuntimeId::MccSteam{Unknown}else{Unsupported}, Application, if id==RuntimeId::MccSteam{"Experimental exact-build MCC Halo 1 object-position transport is implemented. Runtime rendering, collision relinking, broader editing and multiplayer acceptance require separate tests."}else{"No enabled live adapter profile for this runtime."}, vec![]),
         capability("vr", Unknown, Application, "No OpenXR runtime integration or gameplay test is implemented.", vec![]),
         capability("installMod", if id == RuntimeId::MccSteam { Supported } else { Unsupported }, Application, "Only MCC owned local-package creation is implemented. It requires validated output and an exact Excession template; game enumeration remains untested.", vec![]),
         capability("registerMod", if id == RuntimeId::MccSteam { Supported } else { Unsupported }, Application, "Only explicit MCC owned-root manifest registration is implemented; discovery never changes it.", vec![]),

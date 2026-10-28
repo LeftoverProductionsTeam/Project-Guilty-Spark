@@ -23,6 +23,8 @@ use std::{
 pub struct Toolchain {
     pub invader_directory: Option<PathBuf>,
     pub resource_directory: Option<PathBuf>,
+    pub h1a_directory: Option<PathBuf>,
+    pub base_tags_directory: Option<PathBuf>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -50,6 +52,10 @@ pub fn tool_path(tools: &Toolchain, name: &str) -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 fn resource_folder<'a>(source: &'a project::Source, tools: &'a Toolchain) -> Option<&'a Path> {
+    // Saber packs provide viewer pixels, not Invader's classic resource maps.
+    if source.cache_version==13 && source.resource_sha256.contains_key("mcc-textures") {
+        return source.original_path.parent();
+    }
     source
         .resource_directory
         .as_deref()
@@ -58,6 +64,14 @@ fn resource_folder<'a>(source: &'a project::Source, tools: &'a Toolchain) -> Opt
 }
 fn validate_resource_snapshot(source: &project::Source, folder: Option<&Path>) -> Result<()> {
     if source.resource_sha256.is_empty() {
+        return Ok(());
+    }
+    if source.cache_version==13 && source.resource_sha256.contains_key("mcc-textures") {
+        let directory=source.resource_directory.as_deref().ok_or_else(||SparkError::Invalid("MCC texture pack directory is missing".into()))?;
+        let name=maps::inspect_header(&source.preserved_path)?.name;
+        if crate::mcc_textures::pin(directory,&name)?!=source.resource_sha256 {
+            return invalid("MCC texture resources changed or are missing; reconnect the source appearance before rebuilding");
+        }
         return Ok(());
     }
     let folder = folder.ok_or_else(|| {
@@ -89,7 +103,26 @@ pub fn compatibility(
             warnings.push("Source resource identity is unverified for this older project; choose its original resource folder to record hashes.".into());
         }
     }
-    for name in ["invader-info", "invader-extract", "invader-build"] {
+    let native=tools.h1a_directory.is_some();
+    if project.bsp_assembly.is_some(){
+        if !native{blockers.push("Connected BSP assemblies require the MCC H1A compiler".into());}
+        for name in ["invader-dependency","invader-refactor"]{if tool_path(tools,name).is_none(){blockers.push(format!("{name} is required to namespace imported BSP materials"));}}
+        warnings.push("BSP assembly rebuilds a derived world and regenerates lightmaps. Review imported geometry, per-cluster atmosphere/audio and campaign-only content, then perform a player walkthrough.".into());
+    }
+    if native {
+        if crate::conversion::native_tool(tools).is_none(){blockers.push("The selected MCC H1A Tool is missing".into());}
+        if tools.base_tags_directory.as_ref().is_none_or(|p|!p.join("globals/globals.globals").is_file()){
+            blockers.push("Select the legal, extracted MCC SDK tags folder for native conversion".into());
+        }
+        warnings.push("Conversion layers extracted custom tags over a verified copy of the selected MCC SDK tagset. All writes stay in a fresh job; the source and SDK masters remain unchanged.".into());
+        if crate::conversion::is_yoyorast_v1(&inspection.sha256){warnings.push("Yoyorast V1 uses the tested MCC stock-shader and multiplayer UI adaptation. Every changed derived tag is recorded in conversion-manifest.json.".into());}
+    }
+    if project.conversion_profile.as_deref()==Some("zombie-recovery"){
+        if inspection.sha256!=crate::legacy::ZOMBIE_DEMO_SHA256{blockers.push("The Zombie recovery profile only accepts the exact audited Demo source".into());}
+        if !native{blockers.push("The Zombie recovery edition requires the native MCC H1A compiler".into());}
+        warnings.push("Recovery edition: two unavailable custom event sounds are omitted and the corrupt first scenery placement is disabled. The original mod and its vehicle-based zombie spawners are preserved. This is not a faithful audio restoration.".into());
+    }
+    for name in ["invader-info", "invader-extract", if native{"invader-edit"}else{"invader-build"}] {
         if tool_path(tools, name).is_none() {
             blockers.push(format!("{name} is not configured. Select a separately installed Invader folder in Settings."));
         }
@@ -110,7 +143,7 @@ pub fn compatibility(
         let found = selected_folder.map_or(resource.found, |folder| {
             folder.join(&resource.name).is_file()
         });
-        if resource.required && !found {
+        if resource.required && !found && !(native&&inspection.header.version==609) {
             blockers.push(format!(
                 "Missing {} from the original source runtime; choose its resource folder",
                 resource.name
@@ -146,9 +179,7 @@ pub fn compatibility(
     warnings.push("A successful extraction/rebuild/CRC check establishes structural validity. MCC load testing is still required; playable is never inferred from the header.".into());
     CompatibilityReport {
         target: "MCC Halo 1 · cache 13".into(),
-        pipeline:
-            "Invader extract → audited edits → invader-build -g mcc-cea → tag/index/CRC validation"
-                .into(),
+        pipeline:if native{"Verified SDK copy → source tag extraction → explicit compatibility profile → MCC H1A Tool → tag/index/CRC validation".into()}else{"Invader extract → audited edits → invader-build -g mcc-cea → tag/index/CRC validation".into()},
         ready: blockers.is_empty(),
         blockers,
         warnings,
@@ -190,7 +221,7 @@ pub fn extraction_errors(output: &str) -> Vec<String> {
         .collect()
 }
 impl Runner<'_> {
-    fn emit(&self, phase: &str, message: impl Into<String>, progress: u8, severity: &str) {
+    pub(crate) fn emit(&self, phase: &str, message: impl Into<String>, progress: u8, severity: &str) {
         (self.event)(JobEvent {
             job_id: self.id.into(),
             project_id: self.project.into(),
@@ -226,6 +257,12 @@ impl Runner<'_> {
             "info",
         );
         let mut cmd = crate::steam::command(executable.to_string_lossy().as_ref());
+        #[cfg(windows)]
+        let native_alias = if executable.file_name().is_some_and(|s|s.to_string_lossy().eq_ignore_ascii_case("tool.exe")) && args.iter().any(|s|s=="-tags_dir") {
+            Some(crate::native_workspace::Alias::new(cwd)?)
+        } else {None};
+        #[cfg(windows)]
+        let cwd = native_alias.as_ref().map_or(cwd,|a|a.path());
         let mut child = cmd
             .args(args)
             .current_dir(cwd)
@@ -295,13 +332,15 @@ impl Runner<'_> {
         // staged BSP must not be treated as safe to terminate mid-write.
         // A requested cancellation/soft timeout is honored *between* write
         // phases, after the current native process exits by itself.
-        let protected_write_phase = matches!(phase, "structure" | "lightmaps" | "scenario");
+        let protected_write_phase = matches!(phase, "structure" | "lightmaps" | "scenario" | "bsp-structure" | "bsp-lightmaps");
         let mut deferred_cancel = false;
         let mut deferred_timeout = false;
         let mut output = String::new();
         let mut errors = vec![];
         let result = loop {
+            let mut interactive_shader=false;
             for (err, line) in rx.try_iter() {
+                if protected_write_phase&&line.to_ascii_lowercase().contains("choose a type for the shader") {interactive_shader=true;}
                 if !err {
                     output.push_str(&line);
                     output.push('\n');
@@ -309,8 +348,14 @@ impl Runner<'_> {
                 if phase == "extract" {
                     errors.extend(extraction_errors(&line));
                 }
-                self.emit(phase, line, progress, if err { "tool" } else { "info" });
+                if phase!="bsp-index"||err||!line.bytes().all(|b|b.is_ascii_digit()){
+                    self.emit(phase, line, progress, if err { "tool" } else { "info" });
+                }
             }
+            // Tool loops forever on EOF at this prompt. It is waiting for
+            // input, rather than writing a tag. Reject the owned job instead
+            // of inventing an empty shader or leaving an unbounded process.
+            if interactive_shader{let _=child.kill();let _=child.wait();break invalid("Halo Tool could not resolve a material and requested an interactive shader type. The isolated job was stopped; repair its shader binding before rebuilding");}
             let cancel_requested = self.cancel.load(Ordering::Relaxed);
             let soft_timed_out = start.elapsed() > Duration::from_secs(600);
             if protected_write_phase {
@@ -392,7 +437,11 @@ pub fn validate_existing_mcc(
     {
         return invalid("This operation requires an existing unextended MCC cache, not a legacy map or test fixture");
     }
-    if !project.tag_edits.is_empty() || project.scene != inspection.objects {
+    if !project.tag_edits.is_empty() || project.scene != inspection.objects
+        || project.bsp_assembly.is_some() || !project.animation_assignments.is_empty()
+        || project.studio.as_ref().and_then(|s|s.engine_machinima.as_ref()).is_some_and(|take|take.enabled)
+        || project.conversion_profile.as_deref().is_some_and(|profile|profile!="faithful")
+    {
         return invalid("Project changes require extraction and rebuilding. Existing-cache validation only accepts an unchanged source map.");
     }
     let source = project
@@ -504,8 +553,9 @@ pub fn run_build(
     let result = (|| -> Result<PathBuf> {
         let info = tool_path(tools, "invader-info").unwrap();
         let extract = tool_path(tools, "invader-extract").unwrap();
-        let build = tool_path(tools, "invader-build").unwrap();
-        for exe in [&info, &extract, &build] {
+        let native=crate::conversion::native_tool(tools);
+        let build = tool_path(tools, "invader-build");
+        for exe in [&info, &extract].into_iter().chain(build.as_ref().filter(|_|native.is_none())) {
             runner.run(exe, &["-i".into()], &dir, "tools", 8)?;
         }
         let input = input_dir.join(format!("{}.map", inspection.header.name));
@@ -526,7 +576,8 @@ pub fn run_build(
             } else {
                 project::patched_cache(project, inspection)?
             };
-            let repairs = crate::legacy::prepare_extraction(&mut bytes, inspection)?;
+            let mut repairs = crate::legacy::prepare_extraction(&mut bytes, inspection)?;
+            if project.conversion_profile.as_deref()==Some("zombie-recovery"){repairs.extend(crate::legacy::prepare_zombie_recovery(&mut bytes,inspection)?);}
             for repair in &repairs {
                 runner.emit("compatibility", &repair.message, 10, "warning");
             }
@@ -553,17 +604,41 @@ pub fn run_build(
         if !["false", "0"].contains(&protected.trim().to_ascii_lowercase().as_str()) {
             return invalid(format!("Source protection check did not return false: {protected}. No extraction was attempted."));
         }
-        let resource_dir = resource_folder(source, tools).unwrap_or(&input_dir);
+        let resource_root=fs::canonicalize(resource_folder(source, tools).unwrap_or(&input_dir))?;
+        let resource_dir=resource_root.as_path();
         validate_resource_snapshot(source, Some(resource_dir))?;
+        if native.is_some(){
+            runner.emit("dependencies","Copying and hashing the selected legal SDK tags into this job",15,"info");
+            let hashes=crate::forge_build::stage_tags(tools.base_tags_directory.as_ref().ok_or_else(||SparkError::Invalid("MCC SDK tags missing".into()))?,&dir.join("sdk-tags"),&cancel)?;
+            // Keep one writable tag tree. SDK hashes are retained separately;
+            // extracted source tags replace the staged copies via -O.
+            fs::remove_dir(&tag_dir)?;
+            fs::rename(dir.join("sdk-tags"),&tag_dir)?;
+            project::atomic_write(&dir.join("input-sdk-tags.json"),&serde_json::to_vec_pretty(&hashes)?,false)?;
+        }
+        let mut extraction=vec!["-t".into(),tag_dir.to_string_lossy().into_owned(),"-m".into(),resource_dir.to_string_lossy().into_owned()];
+        if native.is_some(){
+            extraction.push("-O".into());
+            if (inspection.header.version==609&&!resource_dir.join("bitmaps.map").is_file())||(inspection.header.version==13&&project.bsp_assembly.is_some()){
+                if inspection.header.version==13{
+                    let scenario=tag_dir.join(safe_relative(&format!("{}.scenario",inspection.scenario_path))?);
+                    if !scenario.is_file(){return invalid("MCC BSP rebuilding needs matching editable destination tags. Select the tagset that contains this scenario; shared MCC resources cannot be reconstructed from a cache header");}
+                    runner.emit("bsp-resources","Using the selected matching editable tagset for MCC shared resource tags; source geometry and extracted local tags retain their own identities",23,"warning");
+                    let mut reused=std::collections::BTreeMap::new();
+                    for tag in inspection.tags.iter().filter(|t|matches!(t.class.as_str(),"bitm"|"snd!")){
+                        let extension=if tag.class=="bitm"{"bitmap"}else{"sound"};let relative=format!("{}.{extension}",tag.path);let file=tag_dir.join(safe_relative(&relative)?);core_check_reused_tag(&file,&relative)?;reused.insert(relative,maps::hash_file(&file)?);
+                    }
+                    project::atomic_write(&dir.join("bsp-shared-resources.json"),&serde_json::to_vec_pretty(&reused)?,false)?;
+                    extraction.extend(["-e".into(),"*.bitmap".into(),"-e".into(),"*.sound".into()]);
+                }
+                extraction.push("-G".into());
+            }
+        }
+        if project.conversion_profile.as_deref()==Some("zombie-recovery"){for name in ["sound\\dialog\\multiplayer1\\scorpion.sound","sound\\dialog\\multiplayer1\\hill_occupied.sound"]{extraction.extend(["-e".into(),name.into()]);}}
+        extraction.push(input.to_string_lossy().into_owned());
         runner.run(
             &extract,
-            &[
-                "-t".into(),
-                tag_dir.to_string_lossy().into_owned(),
-                "-m".into(),
-                resource_dir.to_string_lossy().into_owned(),
-                input.to_string_lossy().into_owned(),
-            ],
+            &extraction,
             &dir,
             "extract",
             25,
@@ -582,8 +657,8 @@ pub fn run_build(
         {
             return invalid("Extractor did not produce the indexed scenario; refusing to compile a different map");
         }
-        runner.run(
-            &build,
+        if native.is_some(){crate::conversion::compile_native(project,inspection,tools,&runner,&dir,&tag_dir,&output_dir)?;}else{runner.run(
+            build.as_ref().ok_or_else(||SparkError::Invalid("Invader builder missing".into()))?,
             &[
                 "-g".into(),
                 "mcc-cea".into(),
@@ -598,7 +673,7 @@ pub fn run_build(
             &dir,
             "compile",
             55,
-        )?;
+        )?;}
         let stem = inspection
             .scenario_path
             .rsplit(['\\', '/'])
@@ -609,6 +684,15 @@ pub fn run_build(
             output = output_dir.join(format!("{}.map", stem.to_ascii_lowercase()));
         }
         let validated = maps::inspect_map(&output, Some(resource_dir))?;
+        if let Some(assembly)=&project.bsp_assembly{
+            let (compiled_collision,compiled_faces)=maps::collision_source(&output,&validated)?;
+            let manifest:serde_json::Value=serde_json::from_slice(&fs::read(dir.join("bsp-assembly.json"))?)?;
+            let materials:Vec<crate::bsp_assembly::AssemblyMaterial>=serde_json::from_value(manifest.get("materials").cloned().ok_or_else(||SparkError::Invalid("Assembly material receipt missing".into()))?)?;
+            let expected:std::collections::BTreeMap<_,_>=materials.iter().filter(|m|m.collision_only).map(|m|(m.name.as_str(),m.flags&15)).collect();
+            for face in &compiled_faces{if let Some(id)=face.shader{let tag=validated.tags.iter().find(|t|t.id==id).ok_or_else(||SparkError::Invalid("Compiled collision shader is not indexed".into()))?;let name=tag.path.rsplit(['\\','/']).next().unwrap_or("");if expected.get(name).copied()!=Some(face.flags&15){return invalid("MCC cache collision surface flags differ from their source identities; output was not accepted");}}}
+            let samples=crate::bsp_assembly::verify_route(&compiled_collision,assembly)?;
+            runner.emit("bsp-clearance",&format!("Compiled collision checked at {samples} tunnel floor/clearance samples; manual walkthrough pending"),92,"success");
+        }
         if validated.header.version != 13
             || !validated
                 .scenario_path
@@ -616,6 +700,9 @@ pub fn run_build(
                 .eq_ignore_ascii_case(&inspection.scenario_path.replace('\\', "/"))
         {
             return invalid("Build output has the wrong cache version or scenario");
+        }
+        if inspection.scripts.iter().any(|script|!validated.scripts.iter().any(|s|s.name==script.name)){
+            return invalid("Target compilation lost an original scenario script; recover its source before converting. This output is not accepted");
         }
         let mismatch = runner.run(
             &info,
@@ -631,6 +718,7 @@ pub fn run_build(
         if !["false", "0"].contains(&mismatch.trim().to_ascii_lowercase().as_str()) {
             return invalid(format!("Output CRC32 validation failed: {mismatch}"));
         }
+        for kind in ["is_protected","stub_count"]{let value=runner.run(&info,&["-T".into(),kind.into(),output.to_string_lossy().into_owned()],&dir,"verify",93)?;if !["false","0"].contains(&value.trim().to_ascii_lowercase().as_str()){return invalid(format!("Output {kind} validation failed: {value}"));}}
         if maps::hash_file(&source.preserved_path)? != source.sha256 {
             return invalid("Preserved source integrity changed during build");
         }
@@ -645,8 +733,7 @@ pub fn run_build(
             target: "mcc-cea".into(),
             sha256: Some(maps::hash_file(&output)?),
             output: Some(output),
-            message: "MCC cache rebuilt and structurally validated. In-game load test pending."
-                .into(),
+            message: if project.conversion_profile.as_deref()==Some("zombie-recovery"){"Zombie Apocalypse recovery edition compiled as MCC cache 13. Two custom audio cues are unavailable and one corrupt placement is disabled; valid placements and vehicle spawners remain. Game load and behavior require testing."}else{"MCC cache rebuilt and structurally validated. In-game load test pending."}.into(),
             project_fingerprint: project.fingerprint()?,
         },
         Err(e) => BuildRecord {
@@ -683,9 +770,25 @@ pub fn run_build(
     Ok(record)
 }
 
+fn core_check_reused_tag(file:&Path,relative:&str)->Result<()>{crate::reject_links(file)?;if !file.is_file(){return invalid(format!("The selected editable tagset does not contain {relative}. MCC BSP assembly requires matching editable images and sounds; no replacement was substituted"));}Ok(())}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
+    #[test]
+    fn unresolved_native_shader_prompt_stops_instead_of_looping_on_eof() {
+        let dir = tempfile::tempdir().unwrap();
+        let cancel = AtomicBool::new(false);
+        let runner = Runner { id:"shader-prompt-test",project:"test",cancel:&cancel,event:&|_|{} };
+        let start = Instant::now();
+        let result = runner.run(Path::new("powershell.exe"), &[
+            "-NoProfile".into(),"-NonInteractive".into(),"-Command".into(),
+            "while ($true) { [Console]::Out.WriteLine('choose a type for the shader'); Start-Sleep -Milliseconds 20 }".into()
+        ],dir.path(),"bsp-structure",0);
+        assert!(result.unwrap_err().to_string().contains("interactive shader type"));
+        assert!(start.elapsed()<Duration::from_secs(15));
+    }
     #[test]
     fn derived_copy_does_not_inherit_preserved_readonly_attribute() {
         let dir = tempfile::tempdir().unwrap();

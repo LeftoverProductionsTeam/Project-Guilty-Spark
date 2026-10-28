@@ -47,7 +47,7 @@ fn extension(class:&str)->Result<&'static str>{
 fn tag_query(path:&str,class:&str)->Result<(String,PathBuf)>{
     let ext=extension(class)?;
     let tag_path=safe_relative(path)?;
-    let path=tag_path.to_string_lossy().replace('/',"\\");
+    let path=tag_path.to_string_lossy().replace('/',"\\").to_ascii_lowercase();
     let query=format!("{path}.{ext}");
     let expected=safe_relative(&query)?;
     Ok((query,expected))
@@ -108,6 +108,9 @@ pub fn extract_selected_tag(
     reject_links(&source.preserved_path)?;
     if maps::hash_file(&source.preserved_path)?!=source.sha256{return invalid("Preserved source cache changed; extraction blocked");}
     let tag=inspection.tags.iter().find(|t|t.id==tag_id).ok_or_else(||SparkError::Invalid("Selected source tag ID is missing".into()))?;
+    if inspection.tags.iter().filter(|candidate|candidate.class==tag.class&&candidate.path.replace('\\',"/").eq_ignore_ascii_case(&tag.path.replace('\\',"/"))).count()!=1{
+        return invalid("Selected tag has an ambiguous case-insensitive path and class; recursive extraction refused");
+    }
     let (query,expected)=tag_query(&tag.path,&tag.class)?;
     let executable=build::tool_path(tools,"invader-extract").ok_or_else(||SparkError::Invalid("Configure an installed Invader folder in Settings before extracting real tags".into()))?;
     let info=build::tool_path(tools,"invader-info").ok_or_else(||SparkError::Invalid("invader-info is required to verify cache protection".into()))?;

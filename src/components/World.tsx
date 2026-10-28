@@ -1,6 +1,6 @@
 import { Component, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import type { ReactNode,MutableRefObject } from 'react';
+import { Canvas, useThree,useFrame } from '@react-three/fiber';
 import {
   OrbitControls,
   TransformControls,
@@ -21,7 +21,19 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
-import type { MapInspection, MeshData, Project, SceneObject, Vec3 } from '../types';
+import type { MapInspection, MeshData, Project, SceneObject, Vec3,ShaderPreview } from '../types';
+import {createHaloMaterial,extraTextureKey,updateHaloMaterial} from '../haloMaterial';
+import {configureSourceTexture} from '../sourceTexture';
+import {playerStartCamera} from '../sourceCamera';
+import {sourceSpartan} from '../sourceSpartan';
+import SceneEnvironment from './SceneEnvironment';
+import SceneEffects from './SceneEffects';
+import RenderFeatures from './RenderFeatures';
+import {useMapState} from '../mapSession';
+import ViewportSession,{hasViewportSession} from './ViewportSession';
+import {renderFeatures} from '../renderFeatures';
+import MapDecals from './MapDecals';
+import {decalTextureRequests} from '../mapDecals';
 import { formatNumber, replaceVector } from '../editor';
 import { hasRenderGeometry, resolveBspMesh, resolveObjectMesh, shaderForTriangle, shaderLegend } from '../renderView';
 import { createPreviewEvidence } from '../qaEvidence';
@@ -33,6 +45,12 @@ import { MAX_OWNED_PREVIEWS_PER_CLICK, planOwnedMaterialPreviews } from '../owne
 import type { OwnedMaterialPreviewTask } from '../ownedMaterialBatch';
 import {bitmapImageKey, decodeOwnedBitmapBatch, uniqueBitmapTargets, MAX_NATIVE_BATCH_RGBA_BYTES} from '../ownedBitmapBatch';
 import type {OwnedBitmapBatchResponse} from '../ownedBitmapBatch';
+import {summarizeTextureFailures} from '../textureDiagnostics';
+import type {TextureFailure} from '../textureDiagnostics';
+import HaloTextures from './HaloTextures';
+import MapSounds from './MapSounds';
+import ViewportTelemetry from './ViewportTelemetry';
+import type {OpenProject} from '../types';
 import type { OwnedBitmapPreview } from '../ownedBitmapPreview';
 import { verifyResourceAudit } from '../resourceAudit';
 import type { ResourceMapAudit } from '../resourceAudit';
@@ -51,9 +69,37 @@ import { DEFAULT_ENVIRONMENT, sunlightPosition, toHex } from '../environment';
 import type { EditorEnvironment } from '../environment';
 import { HelpTip, IconButton, Notice, NumberField, Pill } from './ui';
 
-function matchesClassicBitmapRuntime(version: number) { return version === 7 || version === 609; }
+function matchesClassicBitmapRuntime(version: number) { return [6,7,609].includes(version); }
+type ExtraTask={kind:'detail';shaderTagId:number;bitmapTagId:number;imageIndex:0;role:string;key:string};
+type DecalTask=ReturnType<typeof decalTextureRequests>[number];
+type MaterialTask=OwnedMaterialPreviewTask|ExtraTask|DecalTask;
+interface SourceAppearance {sourceSha256:string;skyTagId:number|null;skyPath:string|null;environment:EditorEnvironment|null;fogMaximumDensity:number;skyMesh:MeshData|null;warnings:string[]}
+function planWorldMaterialPreviews(inspection:MapInspection,_mesh:MeshData|null|undefined,shaders:ReadonlySet<number>,lightmaps:ReadonlySet<string>,sky?:MeshData|null,extras:ReadonlySet<string>=new Set(),features?:Project['renderFeatures']) {
+  const plan=planOwnedMaterialPreviews(inspection,inspection.renderMesh,shaders,lightmaps);
+  const seen=new Set(plan.shaderTasks.map(t=>t.shaderTagId));
+  for(const model of [...Object.values(inspection.modelMeshes??{}).slice(0,256),...(sky?[sky]:[])]) {
+    const modelPlan=planOwnedMaterialPreviews(inspection,model,shaders,new Set());
+    for(const task of modelPlan.shaderTasks)if(!seen.has(task.shaderTagId)){seen.add(task.shaderTagId);plan.shaderTasks.push(task);}
+  }
+  const ids=new Set([...(inspection.renderMesh?.materialRanges??[]),...Object.values(inspection.modelMeshes??{}).flatMap(m=>m.materialRanges??[]),...(sky?.materialRanges??[])].map(r=>r.shaderTagId));
+  const detailTasks:ExtraTask[]=[];
+  for(const tag of inspection.tags.filter(t=>ids.has(t.id)&&t.shaderPreview)){
+    const roles:Record<string,string>={'Primary detail map':'primaryDetail','Detail map':'primaryDetail','Secondary detail map':'secondaryDetail','Micro detail map':'microDetail'};
+    const enhanced=renderFeatures(features);
+    if(tag.class==='senv'&&(tag.shaderPreview?.alphaTest||(enhanced.enabled&&enhanced.normalMaps)))roles['Bump map']='normalMap';
+    if(tag.class==='soso'&&enhanced.enabled&&(enhanced.specular||enhanced.selfIllumination))roles['Multipurpose map']='multipurpose';
+    for(const ref of tag.references){const role=roles[ref.label]??(/^Chicago layer [1-3]$/.test(ref.label)?`layer${ref.label.at(-1)}`:null);if(!role)continue;
+      const key=extraTextureKey(tag.id,role),bitmap=inspection.tags.find(t=>t.id===ref.targetId);
+      if(!extras.has(key)&&bitmap?.class==='bitm'&&!bitmap.external)detailTasks.push({kind:'detail',shaderTagId:tag.id,bitmapTagId:bitmap.id,imageIndex:0,role,key});
+    }
+  }
+  return {...plan,detailTasks:[...detailTasks,...decalTextureRequests(inspection,extras)]};
+}
 const EMPTY_SHADER_TEXTURES: Record<number, THREE.Texture> = {};
 const EMPTY_LIGHTMAP_TEXTURES: Record<string, THREE.Texture> = {};
+const MAX_WORLD_TEXTURE_BYTES=256*1024*1024;
+function previewTextureBytes(texture:THREE.Texture){const image=texture.image as {width?:number;height?:number}|undefined;
+  const raw=texture.userData.rgbaBytes??((image?.width??0)*(image?.height??0)*4);return Math.ceil(raw*(texture.generateMipmaps?4/3:1));}
 
 export class ViewportBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
   state = { error: false };
@@ -74,7 +120,7 @@ export class ViewportBoundary extends Component<{ children: ReactNode }, { error
     );
   }
 }
-function Mesh({
+export function Mesh({
   data,
   wireframe = false,
   flatShading = false,
@@ -83,6 +129,7 @@ function Mesh({
   shaderTextures = EMPTY_SHADER_TEXTURES,
   lightmapTextures = EMPTY_LIGHTMAP_TEXTURES,
   onShaderClick,
+  shaderMetadata={},extraTextures={},sky=false,
 }: {
   data: MeshData;
   wireframe?: boolean;
@@ -92,6 +139,9 @@ function Mesh({
   shaderTextures?: Record<number, THREE.Texture>;
   lightmapTextures?: Record<string, THREE.Texture>;
   onShaderClick?: (tagId: number) => void;
+  shaderMetadata?:Record<number,ShaderPreview>;
+  extraTextures?:Record<string,THREE.Texture>;
+  sky?:boolean;
 }) {
   const legend = useMemo(() => (materialLens || Object.keys(shaderTextures).length || Object.keys(lightmapTextures).length) ? shaderLegend(data) : [], [data, materialLens, shaderTextures, lightmapTextures]);
   const hasSecondUvs = !!data.lightmapUvs && data.lightmapUvs.length === data.positions.length / 3 * 2 &&
@@ -108,13 +158,17 @@ function Mesh({
       const tag = Number(tagText);
       const entry = legend.find(item => item.tagId===tag);
       const lightMap = lightPageKey ? lightmapTextures[lightPageKey] ?? null : null;
+      if(shaderTextures[tag]&&!materialLens&&!wireframe){const extra:Record<string,THREE.Texture>={};
+        for(const [key,texture] of Object.entries(extraTextures))if(key.startsWith(`${tag}:`))extra[key.slice(key.indexOf(':')+1)]=texture;
+        return createHaloMaterial(shaderTextures[tag],lightMap,shaderMetadata[tag],extra,sky);}
       return new THREE.MeshStandardMaterial({
         color: shaderTextures[tag] || lightMap ? '#ffffff' : materialLens ? entry?.color ?? '#8c9292' : '#8c9292',
         map:shaderTextures[tag] ?? null, lightMap, lightMapIntensity:1,
+        alphaTest:shaderTextures[tag]?.userData.alphaTest?0.5:0,
         side:THREE.DoubleSide, roughness:0.85,
       });
     }),
-  ] : null, [legend, materialKeys, shaderTextures, lightmapTextures, materialLens]);
+  ] : null, [legend, materialKeys, shaderTextures, lightmapTextures, materialLens,shaderMetadata,extraTextures,sky,wireframe]);
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
@@ -132,7 +186,7 @@ function Mesh({
       // older renderer integrations. These are original cached UVs.
       g.setAttribute('uv1', new THREE.Float32BufferAttribute(data.lightmapUvs, 2));
       g.setAttribute('uv2', new THREE.Float32BufferAttribute(data.lightmapUvs, 2));
-    }
+    }else g.setAttribute('uv1',new THREE.Float32BufferAttribute(new Float32Array(data.positions.length/3*2),2));
     if (legend.length && data.materialRanges?.length) {
       const materialIndex = new Map(materialKeys.map((key, i) => [key, i + 1]));
       let next = 0;
@@ -150,7 +204,8 @@ function Mesh({
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => materials?.forEach((material) => material.dispose()), [materials]);
   return (
-    <mesh geometry={geometry} material={materials ?? undefined} onClick={(event) => {
+    <mesh geometry={geometry} material={materials ?? undefined} frustumCulled={!sky}
+      onBeforeRender={(_renderer,scene,camera,_geometry,material)=>updateHaloMaterial(material,scene,camera)} raycast={sky?()=>null:undefined} onClick={(event) => {
       if (!onShaderClick || !materialLens || event.faceIndex == null) return;
       const tagId = shaderForTriangle(data, event.faceIndex);
       if (tagId === null) return;
@@ -185,43 +240,60 @@ function ObjectVisual({
   selected,
   size,
   wireframe,
+  shaderTextures,
+  shaderMetadata,extraTextures,
 }: {
   object: SceneObject;
   asset?: MeshData;
   selected: boolean;
   size: number;
   wireframe: boolean;
+  shaderTextures?:Record<number,THREE.Texture>;
+  shaderMetadata?:Record<number,ShaderPreview>;extraTextures?:Record<string,THREE.Texture>;
 }) {
-  if (asset) return <Mesh data={asset} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} />;
-  return (
-    <>
-      <mesh>
-        <octahedronGeometry args={[size, 0]} />
-        <meshBasicMaterial
-          color={selected ? '#ceffef' : (colors[object.kind] ?? '#93a7b9')}
-          wireframe={!selected}
-        />
-      </mesh>
-      {selected && (
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[size * 1.8, size * 0.035, 6, 32]} />
-          <meshBasicMaterial color="#72e3c0" />
-        </mesh>
-      )}
-    </>
-  );
+  if (asset) return <Mesh data={asset} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
+  return null;
 }
 function FrameCamera({
   mesh,
   objects,
   frame,
+  playerView,
+  startId,
+  focus,
+  director=false,
+  sessionId,
 }: {
   mesh: MeshData | null;
   objects: SceneObject[];
   frame: number;
+  playerView: boolean;
+  startId: string;
+  focus?:SceneObject|null;
+  director?:boolean;
+  sessionId?:string;
 }) {
   const { camera, controls } = useThree();
+  const request=useRef({frame,playerView,startId});
   useEffect(() => {
+    const previous=request.current;request.current={frame,playerView,startId};
+    if(sessionId&&previous.frame===frame&&previous.playerView===playerView&&previous.startId===startId&&hasViewportSession(sessionId,director?'machinima':'world',camera.type))return;
+    const start = objects.find(o => o.id === startId && o.kind === 'Player spawn') ?? objects.find(o => o.kind === 'Player spawn');
+    const orbit = controls as unknown as { target?: THREE.Vector3; update?: () => void; enableDamping?:boolean };
+    // Clear a previous orbit gesture before teleporting to an authored camera.
+    const damping=orbit?.enableDamping;
+    if(orbit){orbit.enableDamping=false;orbit.update?.();orbit.enableDamping=damping;}
+    if (playerView && start && camera instanceof THREE.PerspectiveCamera) {
+      const pose = playerStartCamera(start);
+      camera.up.set(0, 0, 1);
+      camera.position.fromArray(pose.position);
+      if(director){camera.position.add(new THREE.Vector3(-Math.cos(start.rotation[0])*4,-Math.sin(start.rotation[0])*4,2));pose.target=[start.position[0],start.position[1],start.position[2]+1];}
+      camera.lookAt(new THREE.Vector3(...pose.target));
+      orbit?.target?.fromArray(pose.target);
+      orbit?.update?.();
+      return;
+    }
+    if(!playerView&&frame>0&&focus){const center=new THREE.Vector3(...focus.position).add(new THREE.Vector3(0,0,.3));const size=Math.max(...focus.scale)*(focus.kind==='Vehicle'?5:1.8);camera.up.set(0,0,1);camera.position.copy(center).add(new THREE.Vector3(size,-size,size*.7));camera.lookAt(center);orbit?.target?.copy(center);orbit?.update?.();return;}
     const box = new THREE.Box3();
     if (mesh?.positions.length) {
       const p = mesh.positions;
@@ -242,11 +314,14 @@ function FrameCamera({
       camera.zoom = Math.max(0.1, 600 / size);
       camera.updateProjectionMatrix();
     }
-    const orbit = controls as unknown as { target?: THREE.Vector3; update?: () => void };
     orbit?.target?.copy(center);
     orbit?.update?.();
-  }, [camera, controls, mesh, frame]);
+  }, [camera, controls, mesh, frame, playerView, startId]);
   return null;
+}
+function SkyGeometry({data,shaderTextures,shaderMetadata,extraTextures}:{data:MeshData;shaderTextures:Record<number,THREE.Texture>;shaderMetadata:Record<number,ShaderPreview>;extraTextures:Record<string,THREE.Texture>}){
+  const group=useRef<THREE.Group>(null);const {camera}=useThree();useFrame(()=>{group.current?.position.copy(camera.position);});
+  return <group ref={group}><Mesh data={data} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures} sky/></group>;
 }
 function Scene({
   project,
@@ -266,7 +341,11 @@ function Scene({
   ortho,
   fly,
   frame,
+  playerView,startId,
   environment,
+  sourceAppearance,extraTextures,
+  onSceneDragStart,onSceneDragEnd,
+  cinematic=false,cameraLocked=false,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -285,17 +364,27 @@ function Scene({
   ortho: boolean;
   fly: boolean;
   frame: number;
+  playerView:boolean;startId:string;
   environment: EditorEnvironment;
+  sourceAppearance:SourceAppearance|null;extraTextures:Record<string,THREE.Texture>;
+  onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
+  cinematic?:boolean;cameraLocked?:boolean;
 }) {
   const group = useRef<THREE.Group>(null);
   const chosen = project.scene.find((o) => o.id === selected);
   const all = project.scene.filter((o) => o.visible);
   const markerSize = inspection ? 0.22 : 0.15;
+  const shaderMetadata=useMemo(()=>Object.fromEntries((inspection?.tags??[]).filter(t=>t.shaderPreview).map(t=>[t.id,t.shaderPreview!])),[inspection]);
+  const spartan=sourceSpartan(inspection),spawnModel=spartan?inspection?.modelMeshes?.[spartan.id]:undefined;
+  const cameraStartId=startId||project.scene.find(o=>o.kind==='Player spawn')?.id;
   return (
     <>
+      <ViewportTelemetry/>
+      {!cinematic&&<SceneEffects settings={project.renderFeatures}/>}
       {ortho ? (
         <OrthographicCamera
           makeDefault
+          userData={{gsEditorCamera:true}}
           position={[10, -10, 10]}
           near={0.01}
           far={100000}
@@ -305,6 +394,7 @@ function Scene({
       ) : (
         <PerspectiveCamera
           makeDefault
+          userData={{gsEditorCamera:true}}
           position={[10, -10, 10]}
           near={0.05}
           far={100000}
@@ -312,15 +402,8 @@ function Scene({
           fov={55}
         />
       )}
-      {environment.previewEnabled ? <>
-        <ambientLight intensity={environment.ambientIntensity} color={toHex(environment.ambientColor)} />
-        <directionalLight position={sunlightPosition(environment)} intensity={environment.sunIntensity} color={toHex(environment.sunColor)} />
-        {environment.fogEnabled && <fog attach="fog" args={[toHex(environment.fogColor),environment.fogNear,environment.fogFar]} />}
-      </> : <>
-        <ambientLight intensity={1.4} />
-        <directionalLight position={[50,-20,80]} intensity={2.1} />
-        <hemisphereLight args={['#b4d9f3','#19222b',1.5]} />
-      </>}
+      <SceneEnvironment value={environment} maximumFogDensity={project.worldEnvironment?1:sourceAppearance?.fogMaximumDensity??1} overrideLighting={!!project.worldEnvironment}/>
+      {sourceAppearance?.skyMesh&&viewMode==='render'&&<SkyGeometry data={sourceAppearance.skyMesh} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>}
       {grid && (
         <gridHelper
           args={[200, 100, '#354854', '#1b2b35']}
@@ -331,6 +414,7 @@ function Scene({
       {previewMesh?.positions.length ? (
         <Mesh
           data={previewMesh}
+          shaderMetadata={shaderMetadata} extraTextures={extraTextures}
           wireframe={viewMode === 'wireframe'}
           flatShading={viewMode === 'solid'}
           color={viewMode === 'collision' ? '#526e79' : '#8c9292'}
@@ -340,8 +424,9 @@ function Scene({
           onShaderClick={onOpenTag}
         />
       ) : null}
+      {viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
       {all
-        .filter((o) => o.id !== selected)
+        .filter((o) => o.id !== selected&&!(playerView&&o.id===cameraStartId&&o.kind==='Player spawn'))
         .map((o) => (
           <group
             key={o.id}
@@ -354,30 +439,40 @@ function Scene({
             }}
           >
             <ObjectVisual
+              shaderMetadata={shaderMetadata} extraTextures={extraTextures}
               object={o}
-              asset={resolveObjectMesh(inspection, o.tagId, o.assetId, assetMeshes)}
+              asset={o.kind==='Player spawn'?spawnModel:resolveObjectMesh(inspection, o.tagId, o.assetId, assetMeshes)}
               selected={false}
               size={markerSize}
               wireframe={viewMode === 'wireframe'}
+              shaderTextures={viewMode==='render'?shaderTextures:EMPTY_SHADER_TEXTURES}
             />
           </group>
         ))}
       {chosen?.visible && (
+        <>
+          <group ref={group} position={chosen.position} rotation={[chosen.rotation[2],chosen.rotation[1],chosen.rotation[0],'ZYX']} scale={chosen.scale}>
+            <ObjectVisual shaderMetadata={shaderMetadata} extraTextures={extraTextures} object={chosen}
+              asset={chosen.kind==='Player spawn'?spawnModel:resolveObjectMesh(inspection,chosen.tagId,chosen.assetId,assetMeshes)}
+              selected size={markerSize} wireframe={viewMode==='wireframe'} shaderTextures={viewMode==='render'?shaderTextures:EMPTY_SHADER_TEXTURES}/>
+          </group>
         <TransformControls
+          object={group as MutableRefObject<THREE.Group>}
           mode={mode}
           enabled={!fly}
-          showX showY showZ
+          showX={mode!=='rotate'||!['Player spawn','Netgame item'].includes(chosen.kind)} showY={mode!=='rotate'||!['Player spawn','Netgame item'].includes(chosen.kind)} showZ
           space={mode === 'translate' ? 'world' : 'local'}
           translationSnap={snap ? 0.5 : null}
           rotationSnap={snap ? Math.PI / 12 : null}
           scaleSnap={snap ? 0.1 : null}
+          onMouseDown={()=>onSceneDragStart?.()}
           onMouseUp={() => {
             if (group.current) {
               const g = group.current;
               const unchanged = g.position.distanceTo(new THREE.Vector3(...chosen.position)) < 1e-6
                 && g.scale.distanceTo(new THREE.Vector3(...chosen.scale)) < 1e-6
                 && g.quaternion.angleTo(new THREE.Quaternion().setFromEuler(new THREE.Euler(chosen.rotation[2], chosen.rotation[1], chosen.rotation[0], 'ZYX'))) < 1e-6;
-              if (unchanged) return;
+              if (unchanged) {onSceneDragEnd?.();return;}
               onTransform({
                 ...chosen,
                 position: g.position.toArray() as Vec3,
@@ -385,34 +480,23 @@ function Scene({
                 scale: g.scale.toArray() as Vec3,
               });
             }
+            onSceneDragEnd?.();
           }}
-        >
-          <group
-            ref={group}
-            position={chosen.position}
-            rotation={[chosen.rotation[2], chosen.rotation[1], chosen.rotation[0], 'ZYX']}
-            scale={chosen.scale}
-          >
-            <ObjectVisual
-              object={chosen}
-              asset={resolveObjectMesh(inspection, chosen.tagId, chosen.assetId, assetMeshes)}
-              selected
-              size={markerSize}
-              wireframe={viewMode === 'wireframe'}
-            />
-          </group>
-        </TransformControls>
+        />
+        </>
       )}
-      {fly ? (
+      {cinematic ? (!cameraLocked&&<RightMouseFly speed={15}/>) : fly ? (
         <RightMouseFly speed={15} />
       ) : (
-        <OrbitControls makeDefault enablePan={false} enableDamping dampingFactor={0.1} />
+        <OrbitControls makeDefault enablePan mouseButtons={{LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.PAN,RIGHT:undefined}} enableDamping dampingFactor={0.1} />
       )}
-      {!fly && <RightMouseFly speed={15} />}
+      {!cinematic&&!fly && <RightMouseFly speed={15} />}
       <FrameCamera
         mesh={previewMesh ?? Object.values(assetMeshes)[0] ?? null}
         objects={project.scene}
         frame={frame}
+        playerView={playerView} startId={startId} director={cinematic} sessionId={project.id}
+        focus={chosen}
       />
     </>
   );
@@ -424,6 +508,10 @@ export default function World({
   edit,
   notify,
   onOpenTag,
+  onResourcesConnected,
+  onBeforeResources,
+  selectedId,onSelectObject,viewportChildren,onSceneDragStart,onSceneDragEnd,
+  cinematic=false,cameraLocked=false,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -431,23 +519,38 @@ export default function World({
   edit: (p: Project, description: string) => void;
   notify: (m: string) => void;
   onOpenTag?: (tagId: number) => void;
+  onResourcesConnected?: (open: OpenProject) => Promise<void>;
+  onBeforeResources?: () => Promise<void>;
+  selectedId?:string|null;onSelectObject?:(id:string|null)=>void;viewportChildren?:React.ReactNode;onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
+  cinematic?:boolean;cameraLocked?:boolean;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [mode, setMode] = useState<'translate' | 'rotate' | 'scale'>('translate');
-  const [snap, setSnap] = useState(false);
-  const [grid, setGrid] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('smooth');
-  const [ortho, setOrtho] = useState(false);
-  const [fly, setFly] = useState(false);
+  const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
+  const selected=selectedId!==undefined?selectedId:localSelected;
+  const setSelected=(id:string|null)=>{setLocalSelected(id);onSelectObject?.(id);};
+  const [query, setQuery] = useMapState(project.id,'world.query','');
+  const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(project.id,'world.mode','translate');
+  const [snap, setSnap] = useMapState(project.id,'world.snap',false);
+  const [grid, setGrid] = useMapState(project.id,'world.grid',false);
+  const [viewMode, setViewMode] = useMapState<ViewMode>(project.id,'world.view',hasRenderGeometry(inspection)?'render':'smooth');
+  const [ortho, setOrtho] = useMapState(project.id,'world.ortho',false);
+  const [fly, setFly] = useMapState(project.id,'world.fly',false);
   const [frame, setFrame] = useState(0);
-  const [bsp, setBsp] = useState(0);
+  const [playerView,setPlayerView]=useMapState(project.id,'world.playerView',true);
+  const [startId,setStartId]=useMapState(project.id,'world.start','');
+  const [bsp, setBsp] = useMapState(project.id,'world.bsp',0);
   const [exportModelId, setExportModelId] = useState('');
-  const [environment, setEnvironment] = useState<EditorEnvironment>(() => structuredClone(DEFAULT_ENVIRONMENT));
+  const [environment, setEnvironment] = useState<EditorEnvironment>(() => project.worldEnvironment??structuredClone(DEFAULT_ENVIRONMENT));
+  const [sourceAppearance,setSourceAppearance]=useState<SourceAppearance|null>(null);
+  const overrideRef=useRef(project.worldEnvironment);overrideRef.current=project.worldEnvironment;
+  useEffect(()=>{let live=true;setSourceAppearance(null);if(native&&inspection)void call<SourceAppearance>('inspect_source_appearance',{projectId:project.id}).then(value=>{if(live&&value.sourceSha256===inspection.sha256){setSourceAppearance(value);setEnvironment(overrideRef.current??value.environment??structuredClone(DEFAULT_ENVIRONMENT));}}).catch(()=>{});return()=>{live=false;};},[project.id,inspection?.sha256]);
   const [shaderTextures, setShaderTextures] = useState<Record<number, THREE.Texture>>({});
   const [loadingOwnedBitmap, setLoadingOwnedBitmap] = useState<Record<number, boolean>>({});
   const [resourceAudit, setResourceAudit] = useState<ResourceMapAudit | null>(null);
   const [auditingResources, setAuditingResources] = useState(false);
+  const [textureFailures,setTextureFailures] = useState<TextureFailure[]>([]);
+  const [automaticTextures,setAutomaticTextures]=useState(true);
+  const automaticAttempts=useRef(new Set<string>());
+  const automaticScope=useRef('');
   const bitmapRequests = useRef(new Set<number>());
   const autoPreviewEpoch = useRef(0);
   const autoPreviewBusy = useRef(false);
@@ -457,14 +560,25 @@ export default function World({
   } | null>(null);
   const [textureNames, setTextureNames] = useState<Record<number, string>>({});
   const [lightmapTextures,setLightmapTextures] = useState<Record<string, THREE.Texture>>({});
+  const [extraTextures,setExtraTextures]=useState<Record<string,THREE.Texture>>({});
+  const extrasRef=useRef(extraTextures);extrasRef.current=extraTextures;
+  const residentTextures=useRef(new Set<THREE.Texture>());
+  useEffect(()=>()=>{Object.values(extrasRef.current).forEach(t=>t.dispose());},[]);
   const [lightmapNames,setLightmapNames] = useState<Record<string, string>>({});
   const lightmapsRef = useRef(lightmapTextures);
   lightmapsRef.current=lightmapTextures;
   useEffect(() => () => {Object.values(lightmapsRef.current).forEach(t=>t.dispose());}, []);
   const texturesRef = useRef(shaderTextures);
   texturesRef.current = shaderTextures;
+  function withinTextureBudget(texture:THREE.Texture,replaced?:THREE.Texture,queued:THREE.Texture[]=[]){
+    const all=[...new Set([...residentTextures.current,...Object.values(texturesRef.current),...Object.values(lightmapsRef.current),...Object.values(extrasRef.current),...queued])].filter(t=>t!==replaced&&t!==texture);
+    if(all.reduce((sum,t)=>sum+previewTextureBytes(t),0)+previewTextureBytes(texture)>MAX_WORLD_TEXTURE_BYTES){
+      texture.dispose();throw new Error('The 256 MiB resident texture budget is full. Remove an image or use smaller previews.');
+    }
+    residentTextures.current.add(texture);texture.addEventListener('dispose',()=>residentTextures.current.delete(texture));
+  }
   useEffect(() => () => { Object.values(texturesRef.current).forEach(t => t.dispose()); }, []);
-  useEffect(() => { setResourceAudit(null); }, [project.id, inspection?.sha256, project.source?.resourceSha256?.['bitmaps.map']]);
+  useEffect(() => { setResourceAudit(null); }, [project.id, inspection?.sha256, (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map'])]);
   /** Preview a matching classic bitmap using verified internal cache data or
    * strictly indexed external pixels from the user's explicitly pinned file. */
   async function previewInternalBitmap(shaderTagId: number, bitmapTagId: number) {
@@ -482,13 +596,15 @@ export default function World({
       });
       const image = decodeOwnedBitmapPreview(response, {
         bitmapTagId, sourceSha256,
-        resourceSha256: project.source?.resourceSha256?.['bitmaps.map'] ?? null,
+        resourceSha256: (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null,
       });
       const texture = new THREE.DataTexture(image.pixels, image.width, image.height, THREE.RGBAFormat);
-      texture.needsUpdate = true;
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      configureSourceTexture(texture,'shader');
+      const metadata=inspection.tags.find(t=>t.id===shaderTagId)?.shaderPreview;
+      if(metadata){texture.userData.alphaTest=metadata.alphaTest;texture.repeat.set(...metadata.uvScale);}
+      texture.userData.rgbaBytes=image.pixels.byteLength;
       texture.name = `Read-only Halo cache bitmap ${image.format} #${bitmapTagId}`;
+      withinTextureBudget(texture,texturesRef.current[shaderTagId]);
       if (currentInspectionRef.current !== sourceSha256 || currentProjectRef.current !== expectedProjectId) {
         texture.dispose(); notify('Source project or cache changed during bitmap extraction; preview discarded.'); return;
       }
@@ -510,25 +626,29 @@ export default function World({
    * pinned shared-resource index serve up to 24 distinct bitmap images.
    * Per-image refusals never invent textures. Manual images always win.
    */
-  async function previewVerifiedMaterialBatch(kind: 'shader' | 'lightmap' | 'both') {
+  async function previewVerifiedMaterialBatch(kind: 'shader' | 'lightmap' | 'both',automatic=false) {
     if (!inspection || !native || autoPreviewBusy.current || !inspection.renderMesh) return;
     const source = inspection.sha256;
     const projectAtStart = project.id;
-    const recordedResource = project.source?.resourceSha256?.['bitmaps.map'] ?? null;
-    let tasks: OwnedMaterialPreviewTask[];
+    const recordedResource = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
+    let tasks: MaterialTask[];
     try {
-      const plan = planOwnedMaterialPreviews(inspection, inspection.renderMesh,
-        new Set(Object.keys(shaderTextures).map(Number)),new Set(Object.keys(lightmapTextures)));
+      const plan = planWorldMaterialPreviews(inspection, inspection.renderMesh,
+        new Set(Object.keys(shaderTextures).map(Number)),new Set(Object.keys(lightmapTextures)),sourceAppearance?.skyMesh,new Set(Object.keys(extraTextures)),project.renderFeatures);
       const planned = kind === 'shader' ? plan.shaderTasks : kind === 'lightmap' ? plan.lightmapTasks :
-        [...plan.shaderTasks, ...plan.lightmapTasks];
+        [...plan.shaderTasks.filter(t=>inspection.renderMesh!.materialRanges?.some(r=>r.shaderTagId===t.shaderTagId)), ...plan.lightmapTasks, ...plan.shaderTasks.filter(t=>!inspection.renderMesh!.materialRanges?.some(r=>r.shaderTagId===t.shaderTagId)),...plan.detailTasks];
       tasks = planned.filter(task => task.kind !== 'shader' || !bitmapRequests.current.has(task.shaderTagId))
+        .filter(task=>!automatic||!automaticAttempts.current.has(task.key))
         .slice(0,MAX_OWNED_PREVIEWS_PER_CLICK);
     } catch (error) { notify(`Automatic material planning refused: ${String(error)}`); return; }
     if (!tasks.length) {notify(`No additional verified ${kind} images are eligible for direct cache preview.`);return;}
+    tasks.forEach(task=>automaticAttempts.current.add(task.key));
     const epoch = ++autoPreviewEpoch.current;
     autoPreviewBusy.current = true;
     setAutoPreviewLocked(true);
     let done=0,failed=0;
+    const failures:TextureFailure[]=[];
+    if(!automatic)setTextureFailures([]);
     const reservedShaderIds = tasks.filter(t=>t.kind==='shader').map(t=>t.shaderTagId);
     reservedShaderIds.forEach(id=>bitmapRequests.current.add(id));
     if(reservedShaderIds.length) setLoadingOwnedBitmap(old=>{
@@ -537,9 +657,11 @@ export default function World({
     setAutoPreviewProgress({kind,done,total:tasks.length,failed,active:true});
     const shaderLoaded=new Map<number,{texture:THREE.Texture;label:string}>();
     const lightmapLoaded=new Map<string,{texture:THREE.Texture;label:string}>();
+    const extraLoaded=new Map<string,{texture:THREE.Texture;label:string}>();
     const discard=()=>{
       for(const item of shaderLoaded.values())item.texture.dispose();
       for(const item of lightmapLoaded.values())item.texture.dispose();
+      for(const item of extraLoaded.values())item.texture.dispose();
       shaderLoaded.clear();lightmapLoaded.clear();
     };
     const isCurrent=()=>epoch===autoPreviewEpoch.current &&
@@ -559,10 +681,11 @@ export default function World({
       for(const task of tasks){
         if(!isCurrent()){discard();return;}
         const found=decoded.get(bitmapImageKey(task.bitmapTagId,task.imageIndex));
-        if (!found?.image) {failed++;continue;}
+        if (!found?.image) {failed++;failures.push({bitmapTagId:task.bitmapTagId,imageIndex:task.imageIndex,
+          code:found?.errorCode??'verification-failed',reason:found?.error??'No image returned'});continue;}
         const image=found.image;
         const byteCount=image.pixels.byteLength;
-        if (byteCount > MAX_NATIVE_BATCH_RGBA_BYTES-textureBytes) {failed++;continue;}
+        if (byteCount > MAX_NATIVE_BATCH_RGBA_BYTES-textureBytes) {failed++;failures.push({bitmapTagId:task.bitmapTagId,imageIndex:task.imageIndex,code:'budget-exceeded',reason:'Decoded textures exceed the 64 MiB operation budget'});continue;}
         if (task.kind==='shader' && (texturesRef.current[task.shaderTagId] || shaderLoaded.has(task.shaderTagId))) {
           failed++;continue;
         }
@@ -570,15 +693,17 @@ export default function World({
           failed++;continue;
         }
         const texture = new THREE.DataTexture(image.pixels,image.width,image.height,THREE.RGBAFormat);
-        texture.needsUpdate=true;
-        texture.colorSpace=THREE.SRGBColorSpace;
-        texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+        configureSourceTexture(texture,task.kind);
+        try{withinTextureBudget(texture);}catch(e){failed++;failures.push({bitmapTagId:task.bitmapTagId,imageIndex:task.imageIndex,code:'budget-exceeded',reason:String(e)});continue;}
+        if(task.kind==='shader') {const metadata=inspection.tags.find(t=>t.id===task.shaderTagId)?.shaderPreview;
+          if(metadata){texture.userData.alphaTest=metadata.alphaTest;texture.repeat.set(...metadata.uvScale);}}
+        texture.userData.rgbaBytes=byteCount;
         texture.name=`Verified Halo ${task.kind} bitmap ${task.bitmapTagId} image ${task.imageIndex}`;
-        if(task.kind==='lightmap')texture.channel=1;
         const label=`Read-only ${found.sourceKind==='verified-resource'?'verified resource':'cache'} `+
           `#${task.bitmapTagId} image ${task.imageIndex} (${image.format})`;
         if(task.kind==='shader')shaderLoaded.set(task.shaderTagId,{texture,label});
-        else lightmapLoaded.set(task.key,{texture,label});
+        else if(task.kind==='lightmap')lightmapLoaded.set(task.key,{texture,label});
+        else extraLoaded.set(task.key,{texture,label});
         textureBytes+=byteCount;
         done++;
       }
@@ -615,9 +740,10 @@ export default function World({
           return next;
         });
       }
+      if(extraLoaded.size)setExtraTextures(previous=>({...previous,...Object.fromEntries([...extraLoaded].map(([key,item])=>[key,item.texture]))}));
       if(done)setViewMode('render');
-      notify(`Verified ${kind} previews: ${done} assigned, ${failed} refused, already set, or over budget. `+
-        `Further eligible images can be loaded with another click. Shader/radiosity parity still needs Halo runtime testing.`);
+      setTextureFailures(previous=>automatic?[...new Map([...previous,...failures].map(f=>[`${f.bitmapTagId}:${f.imageIndex}:${f.code}`,f])).values()]:failures);
+      if(!automatic)notify(`${done} texture slots loaded${failures.length ? `; ${summarizeTextureFailures(failures)}` : ''}. More images can be loaded with another click.`);
     } catch(error) {
       discard();
       if(isCurrent())notify(`Verified material batch refused: ${String(error)}. No original Halo files changed.`);
@@ -651,7 +777,7 @@ export default function World({
     setResourceAudit(null);
     const expectedProject = project.id;
     const expectedMap = inspection?.sha256;
-    const expectedResource = project.source.resourceSha256?.['bitmaps.map'];
+    const expectedResource = (project.source.resourceSha256?.['mcc-textures']??project.source.resourceSha256?.['bitmaps.map']);
     try {
       const report = await call<ResourceMapAudit>('audit_owned_bitmap_resources',{projectId:expectedProject});
       if (expectedProject !== currentProjectRef.current || expectedMap !== currentInspectionRef.current ||
@@ -669,13 +795,14 @@ export default function World({
     const projectIdAtStart = project.id;
     try {
       const texture = await loadUserShaderTexture(file);
+      withinTextureBudget(texture,texturesRef.current[tagId]);
       if (!sourceHash || sourceHash !== currentInspectionRef.current || projectIdAtStart !== currentProjectRef.current) {
         texture.dispose(); notify('Source project or map changed during texture decoding; assignment discarded.'); return;
       }
       setShaderTextures(old => { old[tagId]?.dispose(); return {...old, [tagId]:texture}; });
       setTextureNames(old => ({...old, [tagId]:file.name}));
       setViewMode('render');
-      notify(`Local texture attached to shader #${tagId}. Game shader effects/lightmaps are still unimplemented.`);
+      notify(`Local texture attached to shader #${tagId}. Full Halo shader effects remain approximate.`);
     } catch (e) { notify(`Cannot load local texture: ${String(e)}`); }
   }
 
@@ -694,6 +821,7 @@ export default function World({
         texture.dispose(); notify('Source project or map changed during lightmap decoding; assignment discarded.'); return;
       }
       // This is a local preview, not a reproduction of Halo radiosity or shader blending.
+      withinTextureBudget(texture,lightmapsRef.current[key]);
       texture.channel = 1;
       setLightmapTextures(old => {old[key]?.dispose();return {...old,[key]:texture};});
       setLightmapNames(old => ({...old,[key]:file.name}));
@@ -721,6 +849,7 @@ export default function World({
         try {
           const texture = await loadUserShaderTexture(files[assignment.fileIndex]);
           texture.channel = 1;
+          withinTextureBudget(texture,lightmapsRef.current[assignment.key],Object.values(loaded));
           loaded[assignment.key] = texture;
           names[assignment.key] = assignment.filename;
         } catch { failures++; }
@@ -780,7 +909,9 @@ export default function World({
       let failures = 0;
       for (const match of matches.assignments) {
         try {
-          loaded[match.shaderTagId] = await loadUserShaderTexture(files[match.fileIndex]);
+          const texture=await loadUserShaderTexture(files[match.fileIndex]);
+          withinTextureBudget(texture,texturesRef.current[match.shaderTagId],Object.values(loaded));
+          loaded[match.shaderTagId]=texture;
           names[match.shaderTagId] = files[match.fileIndex].name;
         } catch { failures++; }
       }
@@ -802,8 +933,8 @@ export default function World({
   currentInspectionRef.current = inspection?.sha256;
   const currentProjectRef = useRef(project.id);
   currentProjectRef.current = project.id;
-  const currentResourceRef = useRef(project.source?.resourceSha256?.['bitmaps.map'] ?? null);
-  currentResourceRef.current = project.source?.resourceSha256?.['bitmaps.map'] ?? null;
+  const currentResourceRef = useRef((project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null);
+  currentResourceRef.current = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
   const chosen = project.scene.find((o) => o.id === selected);
   const renderAvailable = hasRenderGeometry(inspection);
   useEffect(() => {
@@ -816,7 +947,9 @@ export default function World({
     setTextureNames({});
     setLightmapTextures(previous=>{Object.values(previous).forEach(t=>t.dispose());return {};});
     setLightmapNames({});
-  }, [inspection?.sha256, renderAvailable, project.id, project.source?.resourceSha256?.['bitmaps.map']]);
+    setExtraTextures(previous=>{Object.values(previous).forEach(t=>t.dispose());return {};});
+    setTextureFailures([]);
+  }, [inspection?.sha256, renderAvailable, project.id, (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map'])]);
   const previewMesh = useMemo(
     () => resolveBspMesh(inspection, viewMode, bsp),
     [inspection, viewMode, bsp],
@@ -825,10 +958,17 @@ export default function World({
   const availableLightmapPages = useMemo(() => inspectLightmapPages(previewMesh), [previewMesh]);
   const ownedPreviewPlan = useMemo(() => {
     if (!inspection?.renderMesh) return null;
-    try {return planOwnedMaterialPreviews(inspection, inspection.renderMesh,
-      new Set(Object.keys(shaderTextures).map(Number)), new Set(Object.keys(lightmapTextures)));}
+    try {return planWorldMaterialPreviews(inspection, inspection.renderMesh,
+      new Set(Object.keys(shaderTextures).map(Number)), new Set(Object.keys(lightmapTextures)),sourceAppearance?.skyMesh,new Set(Object.keys(extraTextures)),project.renderFeatures);}
     catch {return null;}
-  }, [inspection,shaderTextures,lightmapTextures]);
+  }, [inspection,shaderTextures,lightmapTextures,extraTextures,sourceAppearance,project.renderFeatures]);
+  useEffect(()=>{
+    const scope=`${project.id}:${inspection?.sha256}:${(project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map'])??''}`;
+    if(automaticScope.current!==scope){automaticScope.current=scope;automaticAttempts.current.clear();}
+    if(!native||!automaticTextures||autoPreviewLocked||!ownedPreviewPlan||!inspection?.renderMesh)return;
+    const remaining=[...ownedPreviewPlan.shaderTasks,...ownedPreviewPlan.lightmapTasks,...ownedPreviewPlan.detailTasks].some(t=>!automaticAttempts.current.has(t.key));
+    if(!remaining)return;let live=true;queueMicrotask(()=>{if(live)void previewVerifiedMaterialBatch('both',true);});return()=>{live=false;};
+  },[project.id,inspection?.sha256,project.source?.resourceSha256,automaticTextures,ownedPreviewPlan,autoPreviewLocked]);
   const materialAudit = useMemo(() => {
     if(!inspection || !previewMesh?.materialRanges?.length) return null;
     try { return buildMaterialAudit(inspection, previewMesh); }
@@ -904,7 +1044,7 @@ export default function World({
           if (!fly) setMode('scale');
           break;
         case 'f':
-          if (!fly) setFrame((f) => f + 1);
+          if (!fly) {setPlayerView(false);setFrame((f) => f + 1);}
           break;
         case 'escape':
           setSelected(null);
@@ -915,7 +1055,10 @@ export default function World({
     return () => window.removeEventListener('keydown', key);
   }, [fly]);
   return (
-    <div className="world-layout">
+    <div className="world-layout" data-source-shaders={Object.keys(shaderTextures).length} data-source-lightmaps={Object.keys(lightmapTextures).length}
+      data-source-details={Object.keys(extraTextures).length} data-sky-triangles={(sourceAppearance?.skyMesh?.indices.length??0)/3}
+      data-material-loading={!!autoPreviewProgress?.active}
+      data-pending-materials={ownedPreviewPlan?[...ownedPreviewPlan.shaderTasks,...ownedPreviewPlan.lightmapTasks,...ownedPreviewPlan.detailTasks].filter(t=>!automaticAttempts.current.has(t.key)).length:0}>
       <aside className="panel hierarchy">
         <div className="panel-heading">
           <strong>Scene hierarchy</strong>
@@ -967,7 +1110,7 @@ export default function World({
         </div>
         <div className="panel-foot">
           {Object.keys(inspection?.modelMeshes ?? {}).length} native model types in static/bind-pose preview.
-          Unresolved objects use diagnostic markers. Textures and animated rigs are not yet supported.
+          Game objects use their source models. Unavailable models are not drawn; select their hierarchy entry to inspect the dependency. Skeletal animation remains unavailable.
           {inspection && <button
             type="button" className="small-button full"
             onClick={() => {
@@ -1025,6 +1168,9 @@ export default function World({
             <Grid2X2 size={16} />
           </IconButton>
           <span className="toolbar-spacer" />
+          {project.scene.some(o=>o.kind==='Player spawn')&&<select aria-label="View from player start" value={playerView?(startId||project.scene.find(o=>o.kind==='Player spawn')!.id):''} onChange={event=>{
+            setStartId(event.target.value);setOrtho(false);setPlayerView(!!event.target.value);setFrame(f=>f+1);
+          }}><option value="">Map overview</option>{project.scene.filter(o=>o.kind==='Player spawn').map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>}
           <select
             aria-label="Camera projection"
             value={ortho ? 'ortho' : 'perspective'}
@@ -1049,7 +1195,7 @@ export default function World({
             <option value="materials" disabled={!renderAvailable}>Material Lens · debug shader IDs</option>
           </select>
           <HelpTip help="Select a placed object to see the translation gizmo. Red X, green Y, blue Z arrows move it on one world axis. W moves, E rotates, R scales. Hold RMB to look around, RMB+WASD to fly; changes are staged in the project, not written into original Halo caches." />
-          <IconButton label="Frame scene (F)" onClick={() => setFrame((f) => f + 1)}>
+          <IconButton label="Frame scene (F)" onClick={() => {setPlayerView(false);setFrame((f) => f + 1);}}>
             <Focus size={17} />
           </IconButton>
         </div>
@@ -1061,7 +1207,7 @@ export default function World({
                 gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
                 onPointerMissed={(event) => { if (event.button === 0 && event.type === 'click') setSelected(null); }}
               >
-                <color attach="background" args={[environment.previewEnabled ? toHex(environment.skyColor) : '#101820']} />
+
                 <Scene
                   {...{
                     project,
@@ -1076,7 +1222,10 @@ export default function World({
                     ortho,
                     fly,
                     frame,
-                    environment,
+                    playerView,startId,
+                    environment,sourceAppearance,extraTextures,
+                    onSceneDragStart,onSceneDragEnd,
+                    cinematic,cameraLocked,
                   }}
                   inspection={inspection}
                   onTransform={update}
@@ -1084,6 +1233,8 @@ export default function World({
                   shaderTextures={shaderTextures}
                   lightmapTextures={lightmapTextures}
                 />
+                <ViewportSession id={project.id} channel={cinematic?'machinima':'world'} paused={cameraLocked} requiresControls={!cinematic&&!fly}/>
+                {viewportChildren}
               </Canvas>
             </Suspense>
           </ViewportBoundary>
@@ -1127,27 +1278,35 @@ export default function World({
           <span>{formatNumber((previewMesh?.indices.length ?? 0) / 3)} visible triangles</span>
           <span>{Object.keys(inspection?.modelMeshes ?? {}).length} object model types resolved</span>
           <span>{project.scene.length} objects</span>
+          {!!inspection?.decals?.length&&<span>{inspection.decals.length} authored decals</span>}
           <span>Halo coordinates · Z up</span>
           <Pill tone="blue">Editor preview</Pill>
         </div>
       </section>
       <aside className="panel inspector">
+        <RenderFeatures project={project} edit={edit}/>
         <div className="panel-heading">
           <strong>Inspector</strong>
           {chosen && <Pill>{chosen.kind}</Pill>}
         </div>
+        {inspection&&<MapSounds key={project.source?.resourceSha256?.['sounds.map']} projectId={project.id} inspection={inspection} onOpenTag={onOpenTag} onResources={()=>void (async()=>{
+          try{await onBeforeResources?.();const open=await call<OpenProject|null>('choose_project_resources',{projectId:project.id});if(open)await onResourcesConnected?.(open);}catch(error){notify(String(error));}
+        })()}/>}
         <details className="gs-world-environment-panel">
           <summary title="Temporary local fog, sun and ambient preview for comparing your owned map. Never modifies or exports a compiled Halo map.">Environment · preview sun, ambient &amp; fog</summary>
-          <EnvironmentControls value={environment} onChange={setEnvironment}/>
+          <p>{project.worldEnvironment?'Saved editor override':sourceAppearance?.skyPath?`Map sky: ${sourceAppearance.skyPath}`:'Reading the map’s authored environment…'}</p>
+          <EnvironmentControls value={environment} persisted onChange={next=>{setEnvironment(next);edit({...project,worldEnvironment:next},'Change world lighting and fog');}}/>
+          {project.worldEnvironment&&<button className="small-button" onClick={()=>{setEnvironment(sourceAppearance?.environment??structuredClone(DEFAULT_ENVIRONMENT));edit({...project,worldEnvironment:null},'Use map-authored environment');}}>Use map lighting and fog</button>}
         </details>
         {!chosen && (viewMode === 'materials' || viewMode === 'render') && materials.length > 0 && (
           <div className="material-lens">
-            <p>Shader IDs originate from this map. The desktop editor can preview supported internal top mipmaps and, on classic PC/CE, some external raw pixels if the selected bitmaps.map is SHA-256 pinned and the index uniquely proves their byte range. External tag bodies, ambiguous entries, MCC ipaks and full engine shader effects remain unsupported. No original map or resource file is modified.</p>
+            <p>Shader IDs originate from this map. Internal mipmaps and exact pixels from pinned classic resources or MCC texture packs are loaded read-only. Missing entries and unsupported formats remain explicit. Engine shader effects and animation can still differ from gameplay.</p>
+            {inspection?.header.version===13&&<div className="gs-resource-audit"><p>{project.source?.resourceSha256?.['mcc-textures']?'MCC texture bundle pinned · exact imeta / ipak entries · original pixels':'Connect the installed MCC texture packs to load external map materials.'}</p><button className="small-button" disabled={autoPreviewLocked} onClick={()=>void(async()=>{try{await onBeforeResources?.();const opened=await call<OpenProject>('connect_mcc_texture_resources',{projectId:project.id});if(onResourcesConnected)await onResourcesConnected(opened);else notify('MCC resources reconnected. Reopen this map to refresh its texture identity.');}catch(e){notify(String(e));}})()}>Reconnect MCC texture packs</button></div>}
             {native && inspection && matchesClassicBitmapRuntime(inspection.header.version) && <div className="gs-resource-audit" role="status">
-              <button type="button" className="small-button" disabled={auditingResources || !project.source?.resourceSha256?.['bitmaps.map']}
+              <button type="button" className="small-button" disabled={auditingResources || !(project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map'])}
                 title="Checks the original project-selected bitmaps.map hash, bounded header, index paths and resource offsets. Does not extract, copy, or alter textures. Select resources in Build first."
                 onClick={() => void checkResourceIndex()}>{auditingResources ? 'Checking original resource index…' : 'Verify selected bitmaps.map index'}</button>
-              {!project.source?.resourceSha256?.['bitmaps.map'] && <small>Use Build → Choose source resources to select and hash the matching bitmaps.map first.</small>}
+              {!(project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) && <small>Use Build → Choose source resources to select and hash the matching bitmaps.map first.</small>}
               {resourceAudit && <div><small>{resourceAudit.resourceCount} indexed resources · {resourceAudit.exactBitmapPathMatches} exact bitmap paths · {resourceAudit.missingBitmapPathMatches} unmatched · {resourceAudit.ambiguousBitmapPaths} duplicate paths</small><small>{resourceAudit.warning}</small></div>}
             </div>}
             <label className="shader-file-pick">Convert an owned local DDS texture to an uncompressed Halo Editing Kit TIFF source (.tif; no game writes)
@@ -1156,6 +1315,7 @@ export default function World({
             </label>
             <strong>{materials.length} unique shader tags in visible BSP</strong>
             {native && inspection?.renderMesh && <div className="gs-owned-material-batch" role="status">
+              <label><input type="checkbox" checked={automaticTextures} onChange={e=>setAutomaticTextures(e.target.checked)}/> Load map appearance automatically</label>
               <p title="One read-only SHA-verified cache snapshot per click and, if necessary, one exact pinned bitmaps.map index. Bounded output and decoded textures; nothing written to a Halo installation.">
                 Verified classic materials · one batch, up to {MAX_OWNED_PREVIEWS_PER_CLICK} image slots
               </p>
@@ -1174,7 +1334,7 @@ export default function World({
                 </button>
                 <button type="button" className="small-button"
                   title="Auto-preview both exact diffuse maps and BSP-local lightmap pages using one source-verified batch. Halo lighting and shader blends remain approximate."
-                  disabled={autoPreviewLocked || !(ownedPreviewPlan?.shaderTasks.length || ownedPreviewPlan?.lightmapTasks.length)}
+                  disabled={autoPreviewLocked || !(ownedPreviewPlan?.shaderTasks.length || ownedPreviewPlan?.lightmapTasks.length || ownedPreviewPlan?.detailTasks.length)}
                   onClick={() => void previewVerifiedMaterialBatch('both')}>
                   Auto-preview verified materials
                 </button>
@@ -1183,10 +1343,17 @@ export default function World({
                   onClick={cancelAutoPreview}>Cancel queued previews</button>}
               </div>
               <small>{autoPreviewProgress
-                ? `${autoPreviewProgress.kind}: ${autoPreviewProgress.done}/${autoPreviewProgress.total} added, ${autoPreviewProgress.failed} refused${autoPreviewProgress.active?' · working':' · finished'}`
+                ? `${autoPreviewProgress.done}/${autoPreviewProgress.total} texture slots loaded${autoPreviewProgress.active?' · loading':' · finished'}${textureFailures.length ? ` · ${summarizeTextureFailures(textureFailures)}`:''}`
                 : autoPreviewLocked ? 'Finishing the canceled read-only native batch before another may start.'
                 : 'Exact source tag IDs only. Unavailable and unsupported formats are skipped, never replaced with guessed images.'}</small>
             </div>}
+            {native && <HaloTextures project={project} onConnected={onResourcesConnected} onBeforeConnect={onBeforeResources} notify={notify}/>}
+            {textureFailures.length>0 && <details className="forge-tool-diagnostics"><summary>View texture details · Advanced Diagnostics</summary>
+              <p>{summarizeTextureFailures(textureFailures)}</p>
+              <button className="small-button" disabled={autoPreviewLocked} onClick={()=>void previewVerifiedMaterialBatch('both')}>Try again</button>
+              <button className="small-button" onClick={()=>downloadLocalText('halo-texture-diagnostics.json',JSON.stringify({sourceSha256:inspection?.sha256,resourceSha256:(project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']),failures:textureFailures},null,2),'application/json')}>Save diagnostics</button>
+              <ul>{textureFailures.map((item,i)=><li key={i}><code>{item.bitmapTagId}:{item.imageIndex} · {item.code}</code> {item.reason}</li>)}</ul>
+            </details>}
             {materialAudit && <div className="gs-material-audit" role="status">
               <p title="Bounded native cache-reader lookup of shader_environment base maps and shader_model diffuse maps. Does not extract pixel data or render game shaders.">
                 Bitmap references: {materialAudit.summary.resolved} exact primary maps, {materialAudit.summary.missing} empty,
@@ -1258,6 +1425,7 @@ export default function World({
                         <small title="The cache reader validates each primary bitmap datum against the original source tag table. You can still manually preview a texture for unsupported shaders.">
                           {tag?.primaryBitmapStatus==='resolved' && bitmapTag ? `Primary bitmap: ${bitmapTag.path}` :
                             tag?.primaryBitmapStatus ? `Primary bitmap: ${tag.primaryBitmapStatus} (manual preview only)` :
+                            tag&&!['senv','soso'].includes(tag.class)?`Automatic ${tag.class} shader blending is unsupported; use a local exported image`:
                             'Primary bitmap: legacy/unverified (filename matching is not authoritative)'}
                         </small></span>
                     </button>
@@ -1285,6 +1453,7 @@ export default function World({
         )}
         {chosen ? (
           <div className="inspector-body">
+            {chosen.tagId!==null&&!resolveObjectMesh(inspection,chosen.tagId,chosen.assetId,assetMeshes)&&<Notice tone="warning">This source model is unavailable in the current reader. Its item is not drawn. The placement remains editable in the hierarchy.</Notice>}
             <label className="field-label">
               Object name
               <input value={chosen.name} onChange={(e) => update({ ...chosen, name: e.target.value })} />
@@ -1310,6 +1479,7 @@ export default function World({
                             property === 'rotation' ? Number(((value * 180) / Math.PI).toFixed(3)) : value
                           }
                           label={`${property} ${i}`}
+                          disabled={property==='rotation'&&i>0&&['Player spawn','Netgame item'].includes(chosen.kind)}
                           min={property === 'scale' ? 0.001 : -1e6}
                           onCommit={(v) => {
                             try {

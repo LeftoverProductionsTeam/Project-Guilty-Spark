@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-28T00:53:52.162Z",
+  "platform": "Windows x64",
+  "projectVersion": "0.4.0",
+  "scope": "C32 + C33 cumulative reclamation; historical fixtures remain unchanged",
+  "tests": {
+    "rust": 227,
+    "frontend": 88,
+    "offlineScripts": 59,
+    "browser": 16,
+    "nativePolish": 9,
+    "nativeEngineTake": 3,
+    "nativeCompiledMap": 2
+  },
+  "restoration": {
+    "files": 67,
+    "unchanged": true,
+    "readonly": true,
+    "archivedBinariesExecuted": false
+  },
+  "bsp": {
+    "case": "Timberland + Sidewinder",
+    "jobId": "5953d037-68ce-40fb-93f9-dbcb6d088921",
+    "projectFingerprint": "637634e346d0069d06278a67d3d031f887e18995a604a458b0ee213ee54ffb5b",
+    "baseSourceSha256": "f8159236d04fc525ce3b74dcd3923a316da88c523f847672f5320caad40fc7e6",
+    "donorSourceSha256": "c599cd3eda13976002594c3793cf672def1a264bb466164fd846b3d872dce8e5",
+    "cacheSha256": "12ea7f6965ccbf7a390f25d2daeffb80f2a9d604bfdc9f5c7ec5646ca1d212a2",
+    "cacheBytes": 104018045,
+    "bspSha256": "21543091174344feff8fb08dbcac950f94b6ab619d723653c5dcf3097fa1adb2",
+    "jmsSha256": "563c40d9c96d175ef0e1fbfae9bb66f9a08fdefb021571033dabc0c7468100c9",
+    "report": {
+      "generatedUvFaces": 1428,
+      "inputTriangles": 18760,
+      "outputTriangles": 32105,
+      "portalCount": 2,
+      "walkSamples": 423,
+      "warnings": [
+        "This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Campaign scripts, encounters and objects are not imported.",
+        "UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.",
+        "A compiled clearance test and successful boot do not replace a manual player walkthrough."
+      ]
+    },
+    "tunnelPoints": [
+      [
+        38.811767578125,
+        34.44912338256836,
+        -21.075042829581236
+      ],
+      [
+        144.11968994140625,
+        34.44912338256836,
+        -21.075042829581236
+      ]
+    ],
+    "tunnelShader": "levels\\test\\timberland\\shaders\\timberland_metal_plate_floor",
+    "relocatedProps": [
+      {
+        "id": "Scenery-19",
+        "name": "mp_tree_pine_tall · 20",
+        "from": [
+          37.506725,
+          35.67495,
+          -21.33508
+        ],
+        "to": [
+          25.506725000000003,
+          35.67495,
+          -19.623231764174115
+        ]
+      },
+      {
+        "id": "Scenery-166",
+        "name": "mp_boulder_granite_large_01 · 167",
+        "from": [
+          37.812973,
+          32.95193,
+          -21.199036
+        ],
+        "to": [
+          25.812973,
+          32.95193,
+          -19.57578991894356
+        ]
+      }
+    ],
+    "restoredCollisionSurfaces": 11582,
+    "compiledGeometry": {
+      "sourceTriangles": 7160,
+      "compiledCollisionTriangles": 16196,
+      "compiledRenderTriangles": 15909
+    },
+    "renderer": {
+      "data-source-shaders": "137",
+      "data-source-lightmaps": "5",
+      "data-source-details": "67",
+      "data-sky-triangles": "190",
+      "data-material-loading": "false",
+      "data-pending-materials": "0"
+    },
+    "sdkTagsetLoad": "PASS",
+    "retailMccCacheLoad": "NOT_RUN",
+    "manualWalkthrough": "NOT_RUN",
+    "engineLogSha256": "ec5070d2985625b060474eb594943d9bf5d35f23c7f1a5d9d93c2626758c6092"
+  },
+  "nativeTake": {
+    "checks": [
+      "Native UI validates the current build receipt and launches the owned tag workspace at 1920x1080",
+      "MCC Standalone loads Yoyorast and executes HUD-off camera controls with player input enabled",
+      "Game custom_animation returns success for the real 19-bone Spartan action"
+    ],
+    "status": "PASS",
+    "retailCameraHooks": "NOT_IMPLEMENTED",
+    "humanActorMovementAndObsCapture": "NOT_RUN"
+  },
+  "nativePolish": {
+    "checks": [
+      "Native onboarding remembers Halo, MCC kit, legal tags and Invader and does not repeat after reload",
+      "Searchable 29-workflow feature guide is reachable without a project",
+      "One native viewer renders Zombie Apocalypse textures, lightmaps and all eight base decals",
+      "Enhanced normal/specular/bloom/color pipeline runs in native WebGL and source rendering restores",
+      "Workspace switches preserve the map’s actual viewport camera and tag search",
+      "Converted MCC Yoyorast loads embedded textures and lightmaps with no installed texture pack pin",
+      "Native drag-drop IPC imports a real-rig clip, selects the 19-bone Spartan and supports play, pause and scrubbing",
+      "Compatible custom animation assignment persists in the current map",
+      "Map tabs resume the selected map’s own last workspace while retaining both documents"
+    ],
+    "errors": [],
+    "status": "PASS"
+  },
+  "retainedConversions": [
+    {
+      "case": "code-yoyo1",
+      "jobId": "87c7e7c7-df47-49b4-9984-00f46885dd2c",
+      "status": "validated",
+      "outputSha256": "e6b6a439bfb690dd413604355fc041ffe692b704af0ea15d9e4f94b316269c51"
+    },
+    {
+      "case": "code-bigass",
+      "jobId": "ccd00b98-247a-4883-9eac-893bf9712d96",
+      "status": "validated",
+      "outputSha256": "1f05d7385cc6455ae638b20a18e0cb691339a00d4342a56ab08ed4890a284fa4"
+    },
+    {
+      "case": "code-zombie",
+      "jobId": "ee77e06c-354e-4b16-9502-8650550d1251",
+      "status": "validated",
+      "outputSha256": "50f653c605274b2b82e3bf1bcae1baf02108aff792501f176ff74ffcb07b09d1"
+    }
+  ],
+  "cleanup": {
+    "removedGeneratedBytes": 16906360831,
+    "recoveryCopiesRetained": true,
+    "regressionSuitesRetained": true,
+    "originalsAndFrozenReleasesRetained": true
+  },
+  "dependencyNotices": {
+    "packages": 622,
+    "unknownLicenseMetadata": 0
+  },
+  "artifacts": [
+    {
+      "file": "releases/GuiltySpark-C33-0.4.0-reclamation.exe",
+      "sha256": "d3583f2b0e4b6d7cb1fe92b89a6ba2352373a61f593d4c41c6badf555ca69dc8",
+      "bytes": 22642688
+    },
+    {
+      "file": "releases/Project Guilty Spark_0.4.0_reclamation_x64-setup.exe",
+      "sha256": "6737ec256d1ea3c3e56c1a2bcfddb529a8e3f61d8b707566cf213ada0daf9377",
+      "bytes": 5982713
+    }
+  ],
+  "sourceArchive": {
+    "file": "releases/Project_Guilty_Spark_Continuation_33_Reclamation_SOURCE.zip",
+    "sha256": "See the external .sha256 sidecar and .verification.json receipt; the archive cannot hash itself inside its own manifest",
+    "excluded": [
+      "owned maps and SDK/tag content",
+      "local QA and research",
+      "toolchains and dependencies",
+      "runtime binaries and credentials"
+    ]
+  },
+  "limits": [
+    "Manual tunnel traversal and retail MCC cache loading remain pending",
+    "Donor object populations, campaign scripts/encounters and per-cluster weather/audio are not transplanted",
+    "General runtime spawning/deletion/rotation/BSP replacement and game-peer replication remain unsupported",
+    "Complete game shader/spatial-audio parity and restored Zombie Apocalypse gameplay remain unverified"
+  ]
+}

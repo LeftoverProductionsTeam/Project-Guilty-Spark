@@ -9,6 +9,7 @@ const themes: { id: ThemeName; title: string; description: string }[] = [
   { id: 'unsc', title: 'UNSC / MJOLNIR', description: 'Muted armor olive, tactical amber and utilitarian steel' },
   { id: 'covenant', title: 'Covenant Plasma', description: 'Deep purple, indigo and controlled plasma highlights' },
   { id: 'forerunner', title: 'Guilty Spark / Forerunner', description: 'Cool teal, blue-black and ancient geometric framing' },
+  { id: 'dark-glow', title: 'Dark Glow', description: 'Deep charcoal, white text and your own luminous accent colors' },
 ];
 const eventLabels: Record<CueName, string> = { select: 'Menu navigation', confirm: 'Confirm / save', warning: 'Warning / error' };
 
@@ -34,7 +35,7 @@ export default function InterfaceStudio({
   return <div className="analysis-page interface-studio">
     <PageTitle eyebrow="INTERFACE STUDIO · LOCAL PROFILE"
       title="Make the workbench yours."
-      description="Four original Halo CE-inspired palettes, quiet-by-default controls and optional sounds from Halo maps you supplied. Nothing is uploaded or packaged with the app."
+      description="Choose an original palette, customize Dark Glow, and optionally use sounds from Halo maps you supplied. Your appearance stays on this device."
       actions={<button onClick={() => onChange({ ...DEFAULT_INTERFACE, cues: {} })}><RotateCcw size={14}/> Restore defaults</button>}/>
     <section className="analysis-card">
       <h2><Palette size={19}/> Visual identity</h2>
@@ -52,6 +53,33 @@ export default function InterfaceStudio({
         onChange={(event) => onChange({ ...preferences, reducedMotion: event.target.checked })}/>
         Reduced motion and interface transitions</label>
       <Notice tone="info">The palettes are original Halo-inspired UI styles. Your own verified game bitmaps can optionally decorate the header, while nine-slice layouts, sprite atlases and exact Halo menu reproduction remain separate work.</Notice>
+    </section>
+    <section className="analysis-card gs-glow-workshop" aria-label="Dark Glow colors">
+      <h2><Palette size={19}/> Dark Glow</h2>
+      <p>Choose your glow colors. Surfaces stay dark and text stays white.</p>
+      {preferences.theme!=='dark-glow'&&<button type="button" className="primary" onClick={()=>onChange({...preferences,theme:'dark-glow'})}>Use Dark Glow</button>}
+      <div className="gs-glow-color-grid">
+        <label>Primary glow <input type="color" aria-label="Primary glow color" value={preferences.glowPrimary} onChange={e=>onChange({...preferences,glowPrimary:e.target.value})}/><code>{preferences.glowPrimary.toUpperCase()}</code></label>
+        <label>Secondary glow <input type="color" aria-label="Secondary glow color" value={preferences.glowSecondary} onChange={e=>onChange({...preferences,glowSecondary:e.target.value})}/><code>{preferences.glowSecondary.toUpperCase()}</code></label>
+      </div>
+      <label className="interface-volume">Glow strength · {Math.round(preferences.glowIntensity*100)}%
+        <input type="range" aria-label="Glow strength" min="0" max="100" step="1" value={Math.round(preferences.glowIntensity*100)} onChange={e=>onChange({...preferences,glowIntensity:Number(e.target.value)/100})}/>
+      </label>
+      <div className="gs-glow-preview" aria-label="Glow color preview"><span>PRIMARY</span><span>SECONDARY</span><p>White text. Dark surfaces. Your colors.</p></div>
+      <button type="button" onClick={()=>onChange({...preferences,glowPrimary:DEFAULT_INTERFACE.glowPrimary,glowSecondary:DEFAULT_INTERFACE.glowSecondary,glowIntensity:DEFAULT_INTERFACE.glowIntensity})}>Reset glow colors</button>
+    </section>
+    <section className="analysis-card gs-window-appearance">
+      <h2>Window glass</h2>
+      <p>Adjust the whole window, including its controls, panels, text and viewport.</p>
+      <label>Window transparency · {Math.round((1-preferences.windowOpacity)*100)}%
+        <input aria-label="Whole window transparency" type="range" min="0" max="90" step="1" value={Math.round((1-preferences.windowOpacity)*100)} onChange={e=>onChange({...preferences,windowOpacity:1-Number(e.target.value)/100})}/>
+      </label>
+      <label>Window tint <input aria-label="Whole window tint" type="color" value={preferences.windowTint} onChange={e=>onChange({...preferences,windowTint:e.target.value})}/></label>
+      <label>Tint strength · {Math.round(preferences.windowTintStrength*100)}%
+        <input aria-label="Window tint strength" type="range" min="0" max="50" step="1" value={Math.round(preferences.windowTintStrength*100)} onChange={e=>onChange({...preferences,windowTintStrength:Number(e.target.value)/100})}/>
+      </label>
+      <button onClick={()=>onChange({...preferences,windowOpacity:1,windowTintStrength:0})}>Reset window glass</button>
+      <small>Ctrl+Alt+O restores full opacity and clears the tint. These settings stay on this device.</small>
     </section>
     <section className="analysis-card interface-bitmap-workshop">
       <h2><ImageIcon size={19}/> Local Halo bitmap · workbench header</h2>

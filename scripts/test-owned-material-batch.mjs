@@ -33,6 +33,8 @@ report=planOwnedMaterialPreviews(inspection,{...mesh,materialRanges:[...mesh.mat
   {...mesh.materialRanges[2],lightmapBitmapTagId:999},mesh.materialRanges[3]]});
 assert(!report.lightmapTasks.some(t=>t.key==='bsp1:page0'));
 report=planOwnedMaterialPreviews({...inspection,header:{...inspection.header,version:13}},mesh);
+assert(report.shaderTasks.length>0,'MCC uses the verified PC-derived shader layout');
+report=planOwnedMaterialPreviews({...inspection,header:{...inspection.header,version:5}},mesh);
 assert.equal(report.shaderTasks.length+report.lightmapTasks.length,0);
 assert.throws(()=>planOwnedMaterialPreviews({...inspection,sha256:'bad'},mesh),/SHA-256/);
 assert.throws(()=>planOwnedMaterialPreviews({...inspection,tags:[...inspection.tags,inspection.tags[0]]},mesh),/Duplicate tag/);

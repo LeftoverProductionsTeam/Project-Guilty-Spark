@@ -1,10 +1,68 @@
+# Project Guilty Spark
+
+**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 33** is a prerelease; compiler and game acceptance remain separate from editor previews.
+
+> Project Guilty Spark stands on more than twenty years of research, experimentation, documentation, tools, discoveries, and shared knowledge from the Halo modding community. This project would not exist without the people who explored the Blam engine, created the original editors, reverse-engineered file formats, preserved old maps, documented workflows, and helped generations of modders learn.
+
+[Community credits](COMMUNITY_CREDITS.md) · [Get started](docs/GETTING_STARTED.md) · [Build on Windows](docs/BUILD_WINDOWS.md) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Report a problem](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/issues/new/choose)
+
+## What works today
+
+- Preserve owned maps, inspect real classic tag data, stage supported field/placement edits, and compare variants.
+- Render actual classic/MCC BSP geometry, object models, source materials, detail layers, lightmaps, decals, sky and atmospheric fog. Textures stream from verified owned resources, including supported MCC texture packs. Open a player-start view or use the map overview.
+- Browse map sounds in World or Tag editor. Preview verified embedded/shared Vorbis and PCM/Xbox ADPCM with local playback controls. Sound events and spatial mixing still need engine work.
+- Author original QuickForge geometry and game-mode source; retain separate MCC/CE target configurations; use managed isolated compiler jobs and explicit compatibility gates.
+- Connect games separately from editing kits; inspect tool files; keep manual/periodic/pre-build project snapshots and preview a restore.
+- Use the curved native window, custom window controls, middle-button pan and world-axis translation of rotated Forge selections.
+- Keep each map's camera, active workspace, tag selection, editor settings and build targets while moving between tools. The searchable Features page explains the available workflows and their limits.
+- Drop supported Halo animation sources onto compatible bipeds; rehearse their real skeletons and compile an SDK camera/actor take with a clean game HUD and player input enabled.
+
+![Connect Your Halo Games in the native Windows application](docs/screenshots/continuation33/native-connect-games.png)
+
+## Experimental and unverified
+
+C33 adds an [experimental MCC live adapter and two-editor private sessions](docs/LIVE_ADAPTER.md). The running Blood Gulch session verified object moves/restoration and shared vehicle scaling with contact spheres, mass, inertia and suspension coupled. The owner confirmed correct 2× Warthog tires and driving after the suspension fix. Other vehicle types and two-computer replication still need game acceptance. The original room compiled with H1A Tool and passed cache checks. Remembered Halo/tool onboarding, a how-to/glossary and whole-window transparency/tint are included.
+
+The [workspace extension](docs/LIVE_EDITOR_WORKSPACES.md) unifies World Edit, QuickForge and Live mode; adds multiple map tabs/windows, source-linked asset transfers, a Machinima workspace and Dark Glow. MCC v13 render vertices, models, verified texture packs, lightmaps and authored sky lighting/fog now load through the shared renderer. Live dragging, resizing and keyboard undo operate on existing game objects.
+
+The editor is not a replacement Halo engine. Complete shader/animation parity, arbitrary runtime spawning or BSP replacement, arbitrary binary tag/map conversion, rebuilt Zombie Apocalypse gameplay, Firefight engine behavior and multiplayer AI synchronization remain incomplete. Co-op, expanded player counts, split-screen, VR, PowerPC export and native Mac/Linux acceptance remain roadmap work. An exported source file, a simulated wave or a passed parser test is not proof of game loading.
+
+See [edition compatibility](docs/COMPATIBILITY_MATRIX.md), the [C33 engineering/test report](docs/CONTINUATION_33_ENGINEERING.md) and [Reclamation and workflow polish](docs/RECLAMATION_AND_WORKFLOW_POLISH.md) for measured results and limitations. Earlier requirements remain in the [full ledger](docs/MASTER_FEATURE_LEDGER.md).
+
+## Install or build
+
+Follow [Windows prerequisites and build instructions](docs/BUILD_WINDOWS.md). Public releases, when published by the maintainer, appear in [GitHub Releases](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases). C33 local artifact verification is not a claim that a public release or pull request exists.
+
+~~~powershell
+pnpm install --frozen-lockfile
+pnpm check
+pnpm test
+node scripts/cargo.mjs test --workspace --locked
+node scripts/desktop.mjs build
+~~~
+
+## Connect your own Halo files
+
+Start here → **Connect Your Halo Games** distinguishes an installed game from its authoring kit. MCC does not include Map Builder automatically: install the separate free [Halo: CE Mod Tools - MCC](https://store.steampowered.com/app/1532190/) via Steam Library → Tools, then select the kit generation and legal editable tags. [Microsoft's overview](https://learn.microsoft.com/en-us/halo-master-chief-collection/general/overview-tools) explains the supplied extraction workflow.
+
+Import an owned map and open Level Editor. If needed, **Locate Halo Textures** accepts its original bitmaps.map or resource folder and checks exact image provenance. Internal images need no shared file. Supported MCC packs load through the dedicated reader; matching local kit/source DDS or image exports remain available as a fallback. Read [Getting Started](docs/GETTING_STARTED.md) before compiling.
+
+## Join the work
+
+Beginners can help with documentation, attribution, keyboard usability and minimal synthetic reproducers. Use the issue templates for bugs, map/render/BSP compatibility, tools, research, history or usability. Read [conduct](CODE_OF_CONDUCT.md), [support](SUPPORT.md), [security reporting](SECURITY.md) and the [asset policy](docs/ASSET_AND_COPYRIGHT_POLICY.md). Do not upload proprietary maps/tags/textures, tool binaries, credentials or private paths/logs.
+
+Original code is [MIT](LICENSE). Dependencies and documentation keep their own terms: [third-party notices](THIRD_PARTY_NOTICES.md). Halo names and content belong to their rights holders. This is an unofficial community project, unaffiliated with Microsoft, Xbox, Halo Studios/343 Industries, Bungie or Gearbox.
+
+<details>
+<summary>Historical continuation notes — preserved development record</summary>
+
 # Continuation 32 — Windows build verified (0.3.1)
 
 Your Continuation 31 source was preserved and repaired in place. C32 fixes native/frontend compilation, Windows palette dragging, unsafe outside-room drops, material-inspector overlap, shader-name ambiguity and tag-transfer integrity checks. The original workspaces and historical requirements remain intact.
 
 **First manual test: open `releases/GuiltySpark-C32-0.3.1.exe`.** Expect `0.3.1 · C32` in the header. The cumulative source archive is supplied separately under `releases/` with SHA-256 checksums.
 
-Current verification: **154 Rust tests, 41 frontend tests, 59 offline scripts and 9 browser tests pass**. The native Windows application was built, opened and exercised with actual owner maps and an original five-mode arena. This establishes editor/source behavior; **Halo Tool compilation, playable-map loading and multiplayer remain unverified**. No kit was discovered. World-material preview refusals and one intermittent 3D-label cleanup error remain open.
+Historical C32 verification: **154 Rust tests, 41 frontend tests, 59 offline scripts and 9 browser tests passed** at that checkpoint. Its kit discovery, compiler and label-cleanup gaps were investigated during C33; current results are in the [C33 test card](docs/CONTINUATION_33_TEST_CARD.md).
 
 Read the [C32 engineering report](docs/CONTINUATION_32_ENGINEERING.md), [living requirements ledger](docs/MASTER_FEATURE_LEDGER.md), [test card](docs/CONTINUATION_32_TEST_CARD.md) and [machine-readable evidence](docs/fixtures/continuation32-verification.json). Earlier continuation notes below retain their historical evidence and limitations.
 
@@ -344,3 +402,6 @@ C20 is built **on the exact C19 complete source**, not a replacement prototype. 
 - Still not shipped as playable: valid compiled BSP collision/portals/PVS, lightmaps, First Contact, Firefight/Zombies gameplay, synchronized online AI, signed release binaries. A real Windows Rust/Tauri+Halo Tool / Invader build and in-game evidence are required.
 
 See `docs/CONTINUATION_24_ENGINEERING.md`, `docs/CONTINUATION_24_REQUIREMENT_TRACE.md` and `docs/CONTINUATION_24_TEST_CARD.md`.
+
+
+</details>

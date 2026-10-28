@@ -51,10 +51,13 @@ export const STARTER_PATHS:readonly StarterPath[]=[
   ]},
 ];
 export const WORKSPACE_TOOLTIPS:Partial<Record<Workspace,string>>={
+  features:'Browse Spark capabilities, short how-to guides and tool requirements. Open maps and their undo histories stay in place.',
+  'how-to':'Follow task guides and search the Halo glossary. Your saved Halo and tools remain connected between launches.',
   'get-started':'A beginner-safe tour of the available paths, dependencies and limitations.',
   library:'Import owned maps and open saved projects. Preserves originals and source hashes.',
   'map-finder':'Find original HaloMods, HaloMaps, CE3 and HaloMD community map downloads. Browser downloads are opt-in; import local files separately.',
-  quickforge:'Build editable source brushes, terrain and caves. Run live preview collision; export JMS after validation.',
+  quickforge:'One Level Editor automatically follows the source document or its matching live MCC map. Source geometry still needs compilation.',
+  machinima:'Direct cameras, actor rehearsals and frame/video captures; compile native cameras with HUD controls for in-engine OBS recording.',
   academy:'Guided, evidence-aware Halo lessons, with clear labels for work requiring real engine tests.',
   community:'Historical references and the living community Thanks page. Local nominations are not published.',
   firefight:'Compose AI-wave rules; requires a real Halo scenario and script compilation for gameplay.',
@@ -65,7 +68,7 @@ export const WORKSPACE_TOOLTIPS:Partial<Record<Workspace,string>>={
   build:'Build and QA through configured Halo tools, with receipts. No automatic game-playable guarantee.',
   compare:'Compare map variants and differences against preserved sources.',
   runtimes:'Select a runtime, inspect compatible tool identities, launch GUI editors beside Spark or use managed CLI workflows.',
-  live:'Test the limited live preview and inspect what remains disconnected from Halo gameplay.',
+  live:'Connect MCC Halo 1, load its matching source map and move or resize real existing objects with shared undo.',
   interface:'Configure local themes, UI sounds and accessibility preferences.',
   creator:'Author missions, cinematics, private multiplayer sessions, custom game type designs and playtest records.',
   preservation:'Track sources and creator attribution to preserve Halo community history.',

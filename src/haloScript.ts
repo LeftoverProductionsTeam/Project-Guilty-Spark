@@ -78,7 +78,7 @@ export function exportHaloCeCinematic(studio:CreatorStudioDocument): ScriptExpor
   const deps:string[]=[],lines=heading('Cinematic Director');
   lines.push('(script static void gs_cinematic','  (cinematic_start)','  (camera_control true)','  (cinematic_show_letterbox true)');
   studio.shots.forEach((shot,i)=>{
-    const ref=ensureName(shot.cameraMarker,`Shot ${i+1} cutscene camera point`);
+    const ref=ensureName(shot.cameraMarker??undefined,`Shot ${i+1} cutscene camera point`);
     deps.push(`cutscene_camera_point:${ref}`);
     lines.push(`  ; ${i+1}: ${safeComment(shot.name)} | ${safeComment(shot.subtitle)}`);
     lines.push(`  ; Source camera XYZ=${shot.cameraPosition.join(',')} lookAt=${shot.lookAt.join(',')} FOV=${shot.fov} (place marker in Sapien)`);

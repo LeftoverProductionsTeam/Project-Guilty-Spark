@@ -1,0 +1,34 @@
+name: "Rendering problem"
+description: "Textures, UVs, lighting or model preview problems"
+title: "[Rendering problem] "
+body:
+  - type: markdown
+    attributes:
+      value: "Thank you for helping. Do not upload game maps/tags/textures, tool binaries, credentials, personal paths or private logs. Synthetic examples and path-free diagnostics are welcome."
+  - type: input
+    id: version
+    attributes:
+      label: Spark version or commit
+      placeholder: "0.4.0 / Continuation 33"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: "What looks wrong, and which preview mode?"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result, actual result and supporting evidence
+      description: "For compatibility reports, include the Halo edition/build, host OS and selected tool generation. Clearly label not-run tests."
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before submitting
+      options:
+        - label: "I removed secrets, private paths/logs and proprietary game/tool files."
+          required: true

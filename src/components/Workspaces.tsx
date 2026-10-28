@@ -1,3 +1,4 @@
+import ProjectSnapshots from './ProjectSnapshots';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Bounds, OrbitControls } from '@react-three/drei';
@@ -20,7 +21,7 @@ import {
   Waypoints,
 } from 'lucide-react';
 import type { Bootstrap, MapInspection, MeshData, Project, Settings } from '../types';
-import { call } from '../api';
+import { call, native } from '../api';
 import { formatNumber } from '../editor';
 import { exportMeshObj } from '../haloObj';
 import { exportMeshJms } from '../haloJms';
@@ -28,7 +29,7 @@ import { assembleSourceMeshes } from '../meshAssembly';
 import type { MeshAssembly, MeshSnapMode, FaceDirection } from '../meshAssembly';
 import { downloadLocalText } from '../exportHelpers';
 import { reconcileSettingsDraft } from '../settings';
-import { Empty, Notice, PageTitle, Pill } from './ui';
+import { Empty, Notice, NumberField, PageTitle, Pill } from './ui';
 function PreviewMesh({ mesh }: { mesh: MeshData }) {
   const g = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -383,7 +384,7 @@ export function Scenario({ inspection, onWorld }: { inspection: MapInspection | 
     </div>
   );
 }
-export function Preservation({ project, edit }: { project: Project; edit: (p: Project, d: string) => void }) {
+export function Preservation({ project, edit,onBeforeSave,onRestore }: { project: Project; edit: (p: Project, d: string) => void;onBeforeSave:()=>Promise<void>;onRestore:(p:import('../types').OpenProject)=>Promise<void> }) {
   const v = project.provenance;
   return (
     <div className="preservation-page">
@@ -393,6 +394,7 @@ export function Preservation({ project, edit }: { project: Project; edit: (p: Pr
         description="A record of the creator, community, source, and permission to preserve their work."
       />
       <div className="preservation-columns">
+        <ProjectSnapshots project={project} onBeforeSave={onBeforeSave} onRestore={onRestore}/>
         <section className="surface metadata-form">
           <div className="section-heading">
             <h3>Archive record</h3>
@@ -551,13 +553,21 @@ export function Preferences({
   onApply,
   onAction,
   onRuntimes,
+  undoLimit=100,onUndoLimit,
 }: {
   data: Bootstrap;
   onApply: (s: Settings) => Promise<void>;
   onAction: (f: () => Promise<unknown>, s?: string) => Promise<void>;
   onRuntimes: () => void;
+  undoLimit?:number;onUndoLimit?:(limit:number)=>void;
 }) {
   const [draft, setDraft] = useState(data.settings);
+  const [pathChecks,setPathChecks]=useState<Record<string,string>>({});
+  async function checkPath(key:keyof Settings,value:string){
+    setPathChecks(old=>({...old,[key]:'Checking folder…'}));
+    try{const result=await call<string>('validate_setting_path',{key,path:value});setPathChecks(old=>({...old,[key]:result}));}
+    catch(e){setPathChecks(old=>({...old,[key]:String(e)}));}
+  }
   const previousSettings = useRef(data.settings);
   useEffect(() => {
     const previous = previousSettings.current;
@@ -565,8 +575,8 @@ export function Preferences({
     previousSettings.current = data.settings;
   }, [data.settings]);
   const rows: [keyof Settings, string, string][] = [
-    ['hekDirectory', 'Halo Editing Kit tool directory', 'A separately installed compatible Halo Tool executable for original QuickForge BSP compilation.'],
-    ['hekTagsDirectory', 'Halo source tag directory', 'A complete, legal tag tree containing the shaders, sky and asset dependencies referenced by QuickForge.'],
+    ['hekDirectory', 'Map Builder', 'The Halo editing program that turns your level into a playable map. Select the kit folder containing tool.exe, e.g. SteamLibrary\\steamapps\\common\\HCEEK.'],
+    ['hekTagsDirectory', 'Editable Halo Tags', 'Game data describing weapons, vehicles, textures and level settings. Choose a legal editable tags folder, e.g. HaloProjects\\MyTagset\\tags.'],
     [
       'steamDirectory',
       'Steam installation',
@@ -584,7 +594,7 @@ export function Preferences({
     ],
     [
       'resourceDirectory',
-      'Original resource maps',
+      'Halo Textures and shared sounds',
       'The source runtime’s bitmaps.map, sounds.map and loc.map. Do not substitute unrelated engine resources.',
     ],
     [
@@ -600,7 +610,7 @@ export function Preferences({
         title="A workbench that knows its limits."
         description="Connect installed tools and runtimes. All paths and integrations stay local."
         actions={
-          <button className="primary" onClick={() => void onApply(draft)}>
+          <button className="primary" onClick={() => void onApply(draft).catch(()=>{})}>
             Apply preferences
           </button>
         }
@@ -623,13 +633,13 @@ export function Preferences({
                         ? (data.installation.mccPath ?? 'Auto-detect')
                         : 'Choose an installed folder or executable'
                   }
-                  onChange={(e) => setDraft({ ...draft, [key]: e.target.value || null })}
+                  onChange={(e) => {setDraft({ ...draft, [key]: e.target.value || null });setPathChecks(old=>({...old,[key]:'Not checked'}));}}
                 />
                 <button
                   onClick={() =>
                     void onAction(async () => {
                       const chosen = await call<string | null>('choose_setting_path', { key });
-                      if (chosen) setDraft((d) => ({ ...d, [key]: chosen }));
+                      if (chosen) {setDraft((d) => ({ ...d, [key]: chosen }));await checkPath(key,chosen);}
                     })
                   }
                 >
@@ -637,6 +647,8 @@ export function Preferences({
                   Browse
                 </button>
               </div>
+              <button className="small-button" disabled={!native||!draft[key]} onClick={()=>void checkPath(key,String(draft[key]))}>Check folder</button>
+              <small role="status">{pathChecks[key]??'Not checked in this session. Folder selection alone does not prove compatibility.'}</small>
             </div>
           ))}
           <div className="setting-row">
@@ -681,7 +693,14 @@ export function Preferences({
               <small>Missing tools or source resources produce a clear build blocker.</small>
             </span>
           </label>
-          <button className="primary" onClick={() => void onApply(draft)}>
+          <div className="setting-row"><label>Undo history</label><p>Retain up to this many editor actions per open project. Default: 100. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes. Saved snapshots are managed separately.</p>
+            <NumberField label="Undo history limit" value={undoLimit} min={1} max={1000} step={1} onCommit={value=>{if(Number.isInteger(value))onUndoLimit?.(value);}}/>
+          </div>
+          <div className="setting-row"><label>Periodic project snapshots</label><p>Keep versioned project edits and an automatic safety snapshot before builds. Original maps are preserved separately.</p>
+            <label>Interval in minutes<input type="number" min={1} max={1440} value={draft.snapshotIntervalMinutes??10} onChange={e=>setDraft({...draft,snapshotIntervalMinutes:Number(e.target.value)})}/></label>
+            <label>Snapshots to retain<input type="number" min={1} max={100} value={draft.snapshotRetention??20} onChange={e=>setDraft({...draft,snapshotRetention:Number(e.target.value)})}/></label>
+            <p>Open the current project’s Preservation record to preview and confirm a restore.</p></div>
+          <button className="primary" onClick={() => void onApply(draft).catch(()=>{})}>
             Apply preferences
           </button>
         </section>

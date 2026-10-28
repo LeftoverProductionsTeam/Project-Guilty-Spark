@@ -1,4 +1,9 @@
+import BuildTargets from './BuildTargets';
+import RenderFeatures from './RenderFeatures';
+import LiveForge from './LiveForge';
+import ForgeCollaboration from './ForgeCollaboration';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {useMapState} from '../mapSession';
 import {
   Box,
   Copy,
@@ -23,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { Bootstrap, JobEvent, OpenProject, Project, RuntimeId, Vec3 } from '../types';
 import { call, native } from '../api';
+import {sourceSpartan} from '../sourceSpartan';
 import {
   brushNames,
   catalogAssets,
@@ -131,11 +137,13 @@ interface Props {
   project: Project | null;
   data: Bootstrap;
   edit: (project: Project, description: string) => void;
+  onSharedDocument: (document:QuickForgeDocument)=>void;
   onCreate: (title: string, template: string, target: RuntimeId) => Promise<void>;
   onSave: () => Promise<void>;
   onBuild: () => Promise<void>;
   onRuntimes: () => void;
   onSettings: () => void;
+  onLive?:()=>void;
   notify: (message: string, tone?: string) => void;
   logs: JobEvent[];
   activeJob: string | null;
@@ -147,6 +155,7 @@ export default function QuickForge(props: Props) {
   if (!props.project?.quickForge || wizard)
     return (
       <NewMapWizard
+        preferredHalo={props.data.settings.preferredHalo}
         onCreate={async (...args) => {
           await props.onCreate(...args);
           setWizard(false);
@@ -164,10 +173,10 @@ export default function QuickForge(props: Props) {
     />
   );
 }
-function NewMapWizard({ onCreate, onCancel }: { onCreate: Props['onCreate']; onCancel?: () => void }) {
+function NewMapWizard({ onCreate, onCancel,preferredHalo }: { onCreate: Props['onCreate']; onCancel?: () => void;preferredHalo?:RuntimeId|null }) {
   const [title, setTitle] = useState('Guilty Spark Test Arena'),
     [template, setTemplate] = useState('guiltySparkTestArena'),
-    [target, setTarget] = useState<RuntimeId>('haloCustomEdition');
+    [target, setTarget] = useState<RuntimeId>(preferredHalo&&forgeTargets[preferredHalo]?preferredHalo:'mccSteam');
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   return (
@@ -257,25 +266,26 @@ function NewMapWizard({ onCreate, onCancel }: { onCreate: Props['onCreate']; onC
 }
 function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocument; onNew: () => void }) {
   const { project, document: doc, data, edit, notify } = props;
-  const [selected, setSelected] = useState<string[]>([]),
-    [selectedZone, setSelectedZone] = useState<string | null>(null);
-  const [mode, setMode] = useState<'translate' | 'rotate' | 'scale'>('translate'),
-    [snap, setSnap] = useState(0.5),
-    [gridSnap, setGridSnap] = useState(true),
-    [meshSnap, setMeshSnap] = useState(false),
-    [grid, setGrid] = useState(true),
-    [wireframe, setWireframe] = useState(false),
-    [showHillAreas, setShowHillAreas] = useState(true),
-    [showGameRoutes, setShowGameRoutes] = useState(true),
-    [walkCollision, setWalkCollision] = useState(true),
-    [cutaway, setCutaway] = useState(true),
-    [cameraMode, setCameraMode] = useState<ForgeCamera>('orbit'),
+  const [selected, setSelected] = useMapState<string[]>(project.id,'forge.selection',[]),
+    [selectedZone, setSelectedZone] = useMapState<string | null>(project.id,'forge.zone',null);
+  const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(project.id,'forge.mode','translate'),
+    [snap, setSnap] = useMapState(project.id,'forge.snap',0.5),
+    [gridSnap, setGridSnap] = useMapState(project.id,'forge.gridSnap',true),
+    [meshSnap, setMeshSnap] = useMapState(project.id,'forge.meshSnap',false),
+    [grid, setGrid] = useMapState(project.id,'forge.grid',true),
+    [wireframe, setWireframe] = useMapState(project.id,'forge.wireframe',false),
+    [showHillAreas, setShowHillAreas] = useMapState(project.id,'forge.hills',true),
+    [showGameRoutes, setShowGameRoutes] = useMapState(project.id,'forge.routes',true),
+    [walkCollision, setWalkCollision] = useMapState(project.id,'forge.collision',true),
+    [cutaway, setCutaway] = useMapState(project.id,'forge.cutaway',true),
+    [cameraMode, setCameraMode] = useMapState<ForgeCamera>(project.id,'forge.cameraMode','orbit'),
     [frame, setFrame] = useState(0);
-  const [tab, setTab] = useState<'palette' | 'properties' | 'firefight'>('palette');
-  const [query, setQuery] = useState(''),
-    [category, setCategory] = useState('all');
+  const [tab, setTab] = useMapState<'palette' | 'properties' | 'firefight'>(project.id,'forge.inspector','palette');
+  const [actorId,setActorId]=useState('');
+  const [query, setQuery] = useMapState(project.id,'forge.query',''),
+    [category, setCategory] = useMapState(project.id,'forge.category','all');
   const sources = data.entries.filter((entry) => entry.version !== null);
-  const [sourceId, setSourceId] = useState(sources[0]?.id ?? ''),
+  const [sourceId, setSourceId] = useMapState(project.id,'forge.assetSource',sources[0]?.id ?? ''),
     [assets, setAssets] = useState<ForgeAsset[]>([]),
     [assetError, setAssetError] = useState('');
   const [sourceOpen, setSourceOpen] = useState<OpenProject | null>(null);
@@ -343,6 +353,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     return()=>{pointerDrag.current=null;window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',clear);window.removeEventListener('keydown',cancel);};
   },[]);
   const nodes = useMemo(() => forgeNodes(doc), [doc]);
+  const spawnModelSource=useMemo(()=>{const biped=sourceSpartan(sourceOpen?.inspection);const asset=biped&&sourceOpen?catalogAssets(sourceOpen).find(asset=>asset.tagId===biped.id):null;
+    return asset?{...placeAsset(asset,[0,0,0]),id:'spawn-preview'}:null;},[sourceOpen]);
   const caveReview = useMemo(() => analyzeCaveJoins(doc), [doc]);
   const caveSafety = useMemo(() => {
     try { return {result:auditCaveExtensions(doc),error:''}; }
@@ -897,6 +909,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
           </div>
         </aside>
         <section className="forge-center">
+          <ForgeCollaboration projectId={project.id} document={doc} entries={data.entries} onShared={props.onSharedDocument} onSave={props.onSave}/>
+          {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
+          <LiveForge project={project} document={doc} selected={selected}/>
           <div className="forge-toolbar">
             <IconButton
               label="Translate (W)"
@@ -947,7 +962,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
               <option value="orbit">Orbit</option>
               <option value="fly">Free fly</option>
               <option value="walk">First person</option>
+              <option value="machinima">Machinima director</option>
             </select>
+            {cameraMode==='machinima'&&<select aria-label="Machinima actor starting point" value={actorId||doc.spawns[0]?.id||''} onChange={event=>setActorId(event.target.value)}>{doc.spawns.map(spawn=><option key={spawn.id} value={spawn.id}>{spawn.name}</option>)}</select>}
             {cameraMode === 'walk' && <label title="Walk uses source triangle surfaces for bounded body collision and gravity. Changes are rebuilt during editing; this is not compiled Halo collision.">
               <input type="checkbox" checked={walkCollision} onChange={e=>setWalkCollision(e.target.checked)}/>
               Source collision
@@ -1007,6 +1024,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             }}
           >
             <ForgeViewport
+              sessionId={project.id}
+              renderFeatures={project.renderFeatures}
               document={doc}
               showHillAreas={showHillAreas}
               showGameRoutes={showGameRoutes}
@@ -1039,6 +1058,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
               wireframe={wireframe}
               cutaway={cutaway}
               cameraMode={cameraMode}
+              spawnModelSource={spawnModelSource??undefined}
+              actorId={actorId}
               walkCollision={walkCollision}
               wrlOverlay={wrlStale ? null : wrlParse.value}
               showWrlOverlay={wrlVisible && !wrlStale}
@@ -1080,7 +1101,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
               <br />
               G: grid snap · M: mesh snap. Mesh snapping moves source geometry only; it never recompiles collision or portals.
               <br />
-              Halo tags use labelled reference markers; model previews are unavailable.
+              Halo placements load their actual world models from the preserved source map. Unavailable model dependencies appear in the viewport status.
             </div>
           </div>
         </section>
@@ -1097,6 +1118,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             </button>
           </div>
           <div className="forge-inspector-scroll">
+            <RenderFeatures project={project} edit={props.edit}/>
             {tab === 'palette' && (
               <>
                 <div className="forge-panel-heading">
@@ -1295,7 +1317,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                       <span>
                         <strong>{asset.name}</strong>
                         <small>{asset.path}</small>
-                        <em>Cache {asset.cacheVersion} · model preview unavailable</em>
+                        <em>Cache {asset.cacheVersion} · source world model</em>
                       </span>
                     </button>
                   ))}
@@ -1377,12 +1399,14 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         )}
         {(expandedBuild || !!geometryError || !!buildError) && (
           <div className="forge-build-content">
+            {project&&<BuildTargets project={project} defaults={data.settings} onChange={p=>props.edit(p,'Configure engine build targets')}/> }
             <div>
               <div className="forge-build-config">
                 <label>
                   Runtime target
                   <select
                     aria-label="Build runtime target"
+                    disabled={!!project?.activeBuildTarget}
                     value={doc.runtimeId}
                     onChange={(e) =>
                       commit(

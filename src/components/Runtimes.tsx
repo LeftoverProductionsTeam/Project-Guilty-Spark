@@ -1,3 +1,4 @@
+import LiveObjectInspector from './LiveObjectInspector';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FolderOpen, RefreshCw, Server, ShieldCheck, Upload, Download, Unplug } from 'lucide-react';
 import { call, native } from '../api';
@@ -17,6 +18,7 @@ import type {
 import { Empty, Notice, PageTitle, Pill } from './ui';
 import { offeredTools, toolchainHint } from '../toolchainProfiles';
 import '../onboarding.css';
+import CompatibilityTable from './CompatibilityTable';
 
 const editable = new Set<RuntimeId>(['chupathingyCe', 'openCe', 'haloPc', 'haloCustomEdition']);
 const labels: Record<string, string> = {
@@ -133,6 +135,7 @@ export default function Runtimes({
         </Notice>
       )}
       {error && <Notice>{error}</Notice>}
+      <CompatibilityTable/>
       <div className="tabs workspace-tabs">
         <button className={tab === 'runtime' ? 'selected' : ''} onClick={() => setTab('runtime')}>
           Runtime adapters
@@ -752,19 +755,9 @@ export function LiveLab({ onBuild, onQuickForge }: { onBuild: () => void; onQuic
       <PageTitle
         eyebrow="LIVE LAB / BRIDGE STATUS"
         title="Live source editing & engine bridge"
-        description="QuickForge now rebuilds and simulates source triangles during editing. A game-process bridge is a separate, unverified capability."
+        description="Connect the supported MCC Halo 1 build for live object position and size controls, or use QuickForge for shared source editing."
       />
-      <section className="analysis-card live-status">
-        <Unplug size={30} />
-        <div>
-          <h2>Engine bridge disconnected · editor sandbox available</h2>
-          <p>
-            A live source mesh preview is available in QuickForge, including collision-driven walk testing. Runtime discovery and opening a game process do not establish an editor connection. No engine telemetry,
-            command acknowledgement, live property mutation, spawning, AI dispatch or VR session is available.
-          </p>
-        </div>
-        <Pill tone="amber">Blocked</Pill>
-      </section>
+      <LiveObjectInspector/>
       <section className="analysis-card">
         <h2>Available workflow</h2>
         <ol className="workflow-steps">

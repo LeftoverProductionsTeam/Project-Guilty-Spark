@@ -16,6 +16,7 @@ export interface OwnedBitmapBatchItem {
   imageIndex: number;
   preview?: OwnedBitmapPreview | null;
   error?: string | null;
+  errorCode?: string | null;
 }
 export interface OwnedBitmapBatchResponse {
   sourceSha256: string;
@@ -28,6 +29,7 @@ export interface VerifiedBatchImage {
   image: DdsImage | null;
   sourceKind: 'internal-cache' | 'verified-resource' | null;
   error: string | null;
+  errorCode?: string | null;
 }
 export function bitmapImageKey(bitmapTagId:number,imageIndex:number) {
   if (!Number.isSafeInteger(bitmapTagId) || bitmapTagId < 0 || bitmapTagId > 0xffffffff ||
@@ -107,7 +109,7 @@ export function decodeOwnedBitmapBatch(response: OwnedBitmapBatchResponse,
         sourceKind:actual.preview.sourceKind??'internal-cache',error:null});
     } else {
       result.set(key,{bitmapTagId:wanted.bitmapTagId,imageIndex:wanted.imageIndex??0,
-        image:null,sourceKind:null,error:actual.error??'Unsupported bitmap'});
+        image:null,sourceKind:null,error:actual.error??'Unsupported bitmap',errorCode:actual.errorCode??'verification-failed'});
     }
   }
   return result;

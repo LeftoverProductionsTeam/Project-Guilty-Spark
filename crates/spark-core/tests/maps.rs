@@ -131,6 +131,16 @@ fn detects_all_families_by_header_not_filename() {
     }
 }
 #[test]
+fn opensauce_signature_is_scoped_to_a_classic_header() {
+    for version in [7,13,609] {
+        let mut bytes=fixture(version);
+        bytes[0xc00..0xc04].copy_from_slice(b"yelo");
+        assert!(!parse_header(&bytes,bytes.len() as u64).unwrap().extended);
+        bytes[0x200..0x204].copy_from_slice(b"oley");
+        assert_eq!(parse_header(&bytes,bytes.len() as u64).unwrap().extended,version!=13);
+    }
+}
+#[test]
 fn rejects_truncated_and_false_magic() {
     for n in [0, 16, 2047] {
         assert!(parse_header(&vec![0; n], n as u64).is_err());

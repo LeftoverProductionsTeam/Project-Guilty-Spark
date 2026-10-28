@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "continuation": 33,
+  "extension": "live-editor-workspaces",
+  "version": "0.4.0",
+  "verifiedAt": "2026-10-27T16:09:34.102Z",
+  "platform": "Windows x64",
+  "automated": {
+    "rust": {
+      "passed": 196,
+      "groups": 23
+    },
+    "frontend": {
+      "passed": 75,
+      "files": 14
+    },
+    "offline": {
+      "passed": 59
+    },
+    "browser": {
+      "passed": 12
+    }
+  },
+  "native": {
+    "passed": 11,
+    "checks": [
+      "Real MCC render BSP, source models, diffuse textures and all 15 lightmap pages",
+      "RMB + WASD free flight over the connected map",
+      "Actual 3D live axis drag and Ctrl+Z readback",
+      "Live uniform resize and Ctrl+Z restoration",
+      "Native camera keyframe, preview and depth-of-field playback",
+      "Native PNG export from the rendered viewport",
+      "Native silent WebM recording and export",
+      "Two maps open simultaneously in document tabs",
+      "Cross-map real pistol model transfer, undo and redo",
+      "Independent frameless native map window with document handoff",
+      "Closing second window preserves the first"
+    ],
+    "javascriptErrors": [],
+    "runtime": {
+      "pid": 4600,
+      "scenario": "levels/test/bloodgulch/bloodgulch",
+      "objects": 140
+    },
+    "materials": {
+      "shaders": 128,
+      "lightmaps": 15,
+      "details": 60,
+      "pending": 0,
+      "text": "5,503 visible triangles\n68 object model types resolved\n111 objects\nHalo coordinates · Z up\nEditor preview"
+    },
+    "remainingTexture": {
+      "tagPath": "weapons/gravity rifle/bitmaps/gravity rifle",
+      "status": "Exact key absent in map imeta; explicitly unavailable; no replacement pixels"
+    },
+    "otherWindow": {
+      "label": "editor-87a14a7f-aab8-4b92-80ca-61eafede29f2",
+      "controls": true
+    },
+    "allTestMovesAndSizesRestored": true,
+    "gameFilesWritten": false
+  },
+  "preservation": {
+    "files": 67,
+    "unchanged": true,
+    "readOnly": true,
+    "archivedBinariesExecuted": false
+  },
+  "artifacts": [
+    {
+      "path": "releases/GuiltySpark-C33-0.4.0-workspaces.exe",
+      "bytes": 19591168,
+      "sha256": "30e4904bc423fc4f1dbf38d8afb6784c64634aca04a9f6943d8981cdf371f63a"
+    },
+    {
+      "path": "releases/Project Guilty Spark_0.4.0_workspaces_x64-setup.exe",
+      "bytes": 5254498,
+      "sha256": "7ddefe14e4681cbc9890c6118455e60214b0475cbc07be468848ad5ea0474bea"
+    }
+  ],
+  "sourceArchive": "releases/Project_Guilty_Spark_Continuation_33_Live_Workspaces_SOURCE.zip",
+  "remaining": [
+    "Arbitrary live object creation/deletion/rotation and BSP cutting/replacement",
+    "In-game camera and skeletal acting hooks",
+    "Peer replication between two Halo clients",
+    "Complete renderer shader/reflection/particle parity",
+    "Gravity Rifle prototype texture absent from Blood Gulch imeta",
+    "Cross-process document locking; current window leases are per application process",
+    "Compiled-cache cross-map tag merging requires extraction, staging and rebuild",
+    "Other engine gates retained in the original C33 report"
+  ]
+}

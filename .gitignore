@@ -19,3 +19,5 @@ playwright-report/
 /src-tauri/icons/android/
 /src-tauri/icons/ios/
 /releases/
+/reports/
+/gamestate.txt

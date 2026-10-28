@@ -2,7 +2,7 @@
  *  Does not scan, decrypt, or modify game caches. Only the top mip is decoded.
  *  DXT1/3/5 correspond to BC1/2/3. Original resource attribution remains local.
  */
-export type DdsFormat = 'DXT1' | 'DXT3' | 'DXT5' | 'BGRA8' | 'RGBA8';
+export type DdsFormat = 'DXT1' | 'DXT3' | 'DXT5' | 'BGRA8' | 'RGBA8' | 'R5G6B5' | 'A8' | 'Y8' | 'A8Y8';
 export interface DdsImage { width: number; height: number; format: DdsFormat; pixels: Uint8Array }
 const LIMIT = 4096;
 const MAX_BYTES = 96 * 1024 * 1024;
@@ -50,6 +50,29 @@ export function decodeHaloDds(data: ArrayBuffer): DdsImage {
     throw new Error('DDS dimensions exceed preview safety limits');
   const format = fourcc(v,84);
   const flags=v.getUint32(80,true);
+  if(flags===0x2||flags===0x20000||flags===0x20001){
+    const format:DdsFormat=flags===0x2?'A8':flags===0x20000?'Y8':'A8Y8',stride=format==='A8Y8'?2:1;
+    const alpha=v.getUint32(104,true),red=v.getUint32(92,true);
+    if(v.getUint32(88,true)!==stride*8||red!==(format==='A8'?0:0xff)||alpha!==(format==='A8'?0xff:format==='A8Y8'?0xff00:0)||v.getUint32(96,true)||v.getUint32(100,true))
+      throw new Error('Unsupported luminance/alpha DDS masks');
+    const pitch=v.getUint32(20,true)||width*stride;if(pitch<width*stride||pitch>width*stride+65536||128+pitch*height>data.byteLength)throw new Error('Luminance/alpha top mip truncated');
+    const pixels=new Uint8Array(width*height*4);for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+      const at=128+y*pitch+x*stride,lum=format==='A8'?255:v.getUint8(at),a=format==='A8'?v.getUint8(at):format==='A8Y8'?v.getUint8(at+1):255;
+      pixels.set([lum,lum,lum,a],(y*width+x)*4);
+    }return {width,height,format,pixels};
+  }
+  if ((flags & 0x40) && !(flags & 0x4) && v.getUint32(88,true)===16) {
+    if (v.getUint32(92,true)!==0xf800 || v.getUint32(96,true)!==0x07e0 ||
+        v.getUint32(100,true)!==0x001f || v.getUint32(104,true)!==0)
+      throw new Error('Unsupported 16-bit DDS masks');
+    const pitch=v.getUint32(20,true)||width*2;
+    if(pitch<width*2 || pitch>width*2+65536 || 128+pitch*height>data.byteLength)
+      throw new Error('RGB565 top mip truncated or has invalid row pitch');
+    const pixels=new Uint8Array(width*height*4);
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++)
+      pixels.set([...rgb565(v.getUint16(128+y*pitch+x*2,true)),255],(y*width+x)*4);
+    return {width,height,format:'R5G6B5',pixels};
+  }
   if ((flags & 0x40) && v.getUint32(88,true)===32 && !(flags & 0x4)) {
     const red=v.getUint32(92,true),green=v.getUint32(96,true),blue=v.getUint32(100,true),alpha=v.getUint32(104,true);
     const bgra=red===0x00ff0000 && green===0x0000ff00 && blue===0x000000ff;

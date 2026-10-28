@@ -1,9 +1,13 @@
 import type { Project, Tag, TagField, TagReference, Vec3 } from './types';
+import {DEFAULT_HISTORY_LIMIT,validHistoryLimit} from './historyPreferences';
+import {mergeForge,portableForge} from './forgeSession';
+import type {QuickForgeDocument} from './forge';
 export interface HistoryState {
   current: Project | null;
   past: Project[];
   future: Project[];
   dirty: boolean;
+  limit:number;
 }
 export type HistoryAction =
   | { type: 'load'; project: Project }
@@ -11,13 +15,32 @@ export type HistoryAction =
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'saved' }
-  | { type: 'builds'; project: Project };
-export const initialHistory: HistoryState = { current: null, past: [], future: [], dirty: false };
+  | { type: 'forge-remote';projectId:string;document:QuickForgeDocument }
+  | { type: 'builds'; project: Project }
+  | { type: 'assets'; project: Project }
+  | { type: 'history-limit'; limit:number };
+
+export const initialHistory: HistoryState = { current: null, past: [], future: [], dirty: false,limit:DEFAULT_HISTORY_LIMIT };
 export function historyReducer(state: HistoryState, action: HistoryAction): HistoryState {
-  if (action.type === 'load') return { current: action.project, past: [], future: [], dirty: false };
+  if(action.type==='history-limit')return validHistoryLimit(action.limit)?{...state,limit:action.limit,past:state.past.slice(-action.limit),future:state.future.slice(0,action.limit)}:state;
+  if (action.type === 'load') return { current: action.project, past: [], future: [], dirty: false,limit:state.limit };
   if (action.type === 'saved') return { ...state, dirty: false };
   if (!state.current) return state;
+  if(action.type==='forge-remote'){
+    if(action.projectId!==state.current.id||!state.current.quickForge)return state;
+    const before=portableForge(state.current.quickForge),incoming=portableForge(action.document);
+    if(JSON.stringify(before)===JSON.stringify(incoming))return state;
+    const update=(p:Project)=>({...p,quickForge:p.quickForge?mergeForge(before,incoming,p.quickForge,true):p.quickForge});
+    const current={...state.current,quickForge:action.document,modifiedAt:new Date().toISOString()};
+    const differs=(p:Project)=>JSON.stringify(p.quickForge)!==JSON.stringify(current.quickForge);
+    // Apply only the incoming properties across undo snapshots. Undo can then
+    // reverse our own edit without restoring stale values from the other editor.
+    return {...state,current,past:state.past.map(update).filter(differs),future:state.future.map(update).filter(differs),dirty:true};
+  }
   if (action.type === 'edit') {
+    if(action.project.id!==state.current.id)return state;
+    const content=(p:Project)=>JSON.stringify({...p,modifiedAt:'',history:[]});
+    if(content(action.project)===content(state.current))return state;
     const p = {
       ...action.project,
       modifiedAt: new Date().toISOString(),
@@ -26,7 +49,7 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
         { id: crypto.randomUUID(), timestamp: new Date().toISOString(), description: action.description },
       ].slice(-2000),
     };
-    return { current: p, past: [...state.past, state.current].slice(-100), future: [], dirty: true };
+    return { current: p, past: [...state.past, state.current].slice(-state.limit), future: [], dirty: true,limit:state.limit };
   }
   if (action.type === 'undo' && state.past.length)
     return {
@@ -34,16 +57,18 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
       past: state.past.slice(0, -1),
       future: [state.current, ...state.future],
       dirty: true,
+      limit:state.limit,
     };
   if (action.type === 'redo' && state.future.length)
     return {
       current: state.future[0],
-      past: [...state.past, state.current],
+      past: [...state.past, state.current].slice(-state.limit),
       future: state.future.slice(1),
       dirty: true,
+      limit:state.limit,
     };
-  if (action.type === 'builds' && action.project.id === state.current.id) {
-    const merge = (p: Project) => ({ ...p, builds: action.project.builds });
+  if ((action.type === 'builds'||action.type==='assets') && action.project.id === state.current.id) {
+    const merge = (p: Project) => action.type==='assets'?({ ...p, assets:action.project.assets }):({ ...p, builds: action.project.builds });
     return {
       ...state,
       current: merge(state.current),

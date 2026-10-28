@@ -13,6 +13,7 @@ async function mockDesktop(page: Page) {
       metadataTemplateDirectory: null,
       nativeExecutable: null,
       autoBuild: false,
+      ...JSON.parse(localStorage.getItem('spark-test-settings')??'{}'),
     };
     const make = (id: string, title: string, value: number) => ({
       project: {
@@ -139,6 +140,8 @@ async function mockDesktop(page: Page) {
     const mock = (w.__sparkMock = {
       calls: [] as any[],
       failSave: false,
+      failSettings: false,
+      delayOpen: 0,
       saved: null as any,
       emit: async (event: string) => {
         for (const [id, item] of events)
@@ -163,7 +166,12 @@ async function mockDesktop(page: Page) {
         }
         if (command === 'plugin:event|unlisten') return null;
         if (command === 'bootstrap') return structuredClone(bootstrap);
-        if (command === 'open_project') return structuredClone(projects[args.id]);
+        if (command === 'open_project') {if(mock.delayOpen){const delay=mock.delayOpen;mock.delayOpen=0;await new Promise(resolve=>setTimeout(resolve,delay));}return structuredClone(projects[args.id]);}
+        if (command === 'claim_project_document' || command === 'release_project_document') return null;
+        if (command === 'auto_connect_classic_textures') return null;
+        if (command === 'bsp_assembly_options') return [{index:0,name:'Synthetic campaign interior',triangles:12}];
+        if (command === 'plan_bsp_assembly') return {schemaVersion:1,donorProjectId:args.donorProjectId,donorTitle:projects[args.donorProjectId].project.title,donorSource:structuredClone(projects[args.donorProjectId].project.source),donorTagsDirectory:'C:/synthetic/tags',donorBspIndex:args.donorBspIndex,translation:[20,0,0],yawDegrees:0,tunnelPoints:[[0,0,0],[20,0,0]],tunnelWidth:2,tunnelHeight:1.6,tunnelShaderPath:'synthetic/stone'};
+        if (command === 'preview_bsp_assembly') {if(!projects[args.projectId].project.bspAssembly)throw new Error('Assembly was not saved');return {inputTriangles:24,outputTriangles:36,generatedUvFaces:0,walkSamples:42,portalCount:2,warnings:['Synthetic clearance only; no game was run.']};}
         if (command === 'save_project') {
           if (mock.failSave) throw new Error('Synthetic save failure');
           mock.saved = structuredClone(args.project);
@@ -173,9 +181,12 @@ async function mockDesktop(page: Page) {
         if (command === 'close_application') return null;
         if (command === 'choose_setting_path') return 'C:/synthetic/selected';
         if (command === 'save_settings') {
+          if(mock.failSettings)throw new Error('Synthetic settings write failed');
           Object.assign(settings, args.settings);
+          localStorage.setItem('spark-test-settings',JSON.stringify(settings));
           return structuredClone(bootstrap);
         }
+        if(command==='halo_setup_report')return {schemaVersion:1,runtimes:[],kits:[],mccInstalled:false,invaderConfigured:false};
         if (command === 'export_project' || command === 'choose_project_resources') return null;
         if (command === 'compatibility') throw new Error('Synthetic compatibility error');
         if (command === 'launch_readiness') throw new Error('Synthetic readiness error');
@@ -246,11 +257,67 @@ async function openFixture(page: Page) {
   await page.getByRole('button', { name: 'Tag editor', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
+
+test('live Ctrl+Z waits for an in-flight game receipt and then supports redo',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
+    const object={datum:12,tagDatum:7,kind:0,scale:1,tagPath:'synthetic/biped',position:[1,2,3],velocity:[0,0,0],forward:[1,0,0],up:[0,0,1],parentDatum:4294967295,player:true};
+    let connected=false;w.__liveReceipt={pending:false,object,calls:0};
+    const status=()=>structuredClone({pid:3,activeVehiclePhysics:false,activeSharedScales:false,scaleKeeperError:null,snapshot:{profile:'synthetic',identity:{scenario:'test/map',checksum:123,tagCount:1,scenarioDatum:7},objects:[object]},detail:'Synthetic receipt timing test'});
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='live_mcc_connect'){connected=true;return status();}
+      if(command==='live_mcc_sample'){if(!connected)throw new Error('No test session');return status();}
+      if(command==='live_mcc_move_object'){w.__liveReceipt.pending=true;w.__liveReceipt.calls++;object.position=[...args.operation.position];await new Promise(resolve=>setTimeout(resolve,250));w.__liveReceipt.pending=false;return [{datum:12,applied:true,observedPosition:[...object.position],message:'Synthetic acknowledged move'}];}
+      return original(command,args);
+    };
+  });
+  await page.getByRole('button',{name:'Level editor',exact:true}).click();await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');await page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();await page.getByRole('button',{name:'Connect current Halo 1 session',exact:true}).click();await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');
+  const x=page.getByRole('spinbutton',{name:'Live position X',exact:true});await x.fill('4');await x.press('Tab');await page.getByRole('button',{name:'Apply live object position',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.pending)).toBe(true);await page.keyboard.press('Control+z');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.object.position[0])).toBe(1);await expect(page.getByRole('button',{name:'Redo live edit (Ctrl+Y)',exact:true})).toBeEnabled();await page.keyboard.press('Control+y');await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.object.position[0])).toBe(4);await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.calls)).toBe(3);
+});
+
+test('numeric-field Ctrl+Z and both redo shortcuts survive autosave; history limit persists',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('24');await field.press('Tab');
+  await expect(field).toHaveValue('24');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(24);
+  await field.focus();await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');
+  await field.focus();await page.keyboard.press('Control+y');await expect(field).toHaveValue('24');
+  await field.focus();await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');
+  await field.focus();await page.keyboard.press('Control+Shift+z');await expect(field).toHaveValue('24');
+  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();const limit=page.getByRole('spinbutton',{name:'Undo history limit',exact:true});await expect(limit).toHaveValue('100');
+  await limit.fill('150');await limit.press('Tab');await expect.poll(()=>page.evaluate(()=>localStorage.getItem('guilty-spark-undo-limit-v1'))).toBe('150');
+  await page.reload();await page.getByRole('button',{name:'Settings & tools',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Undo history limit',exact:true})).toHaveValue('150');
+});
+test('onboarding keeps a failed save on its step and remembers completed Halo and tool choices',async({page})=>{
+  await mockDesktop(page);await page.goto('/');await page.getByRole('button',{name:'Start here',exact:true}).click();
+  await page.evaluate(()=>(window as any).__sparkMock.failSettings=true);
+  await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.locator('.gs-first-setup').getByRole('alert')).toContainText('settings write failed');await expect(page.getByRole('heading',{name:'Which Halo are you working with?',exact:true})).toBeVisible();
+  await page.evaluate(()=>(window as any).__sparkMock.failSettings=false);await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
+  await page.getByRole('textbox',{name:'Setup Map Builder folder',exact:true}).fill('C:/owned/HCEEK');await page.getByRole('combobox',{name:'Setup editing kit generation',exact:true}).selectOption('h1aEk');await page.getByRole('textbox',{name:'Setup Editable Halo Tags folder',exact:true}).fill('C:/owned/working-tags');await page.getByRole('button',{name:'Save setup & open help',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'How-to & Glossary',exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();await page.getByRole('button',{name:'Start here',exact:true}).click();await expect(page.getByRole('heading',{name:'Your workbench is ready',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Change Halo or tools',exact:true}).click();await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.getByRole('textbox',{name:'Setup Editable Halo Tags folder',exact:true})).toHaveValue('C:/owned/working-tags');
+});
+test('feature search preserves multiple open maps and each map undo history',async({page})=>{
+  await mockDesktop(page);await openFixture(page);const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('24');await velocity.press('Tab');
+  await page.getByRole('button',{name:'Map library',exact:true}).click();await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await page.getByRole('button',{name:'Tag editor',exact:true}).click();
+  await page.getByRole('button',{name:'Features & workflows',exact:true}).click();await expect(page.getByRole('heading',{name:'What can Spark do?',exact:true})).toBeVisible();await expect(page.locator('.feature-map-context')).toContainText('Synthetic candidate');await expect(page.locator('.feature-map-context')).toContainText('2 open maps');
+  await page.getByRole('searchbox',{name:'Find a Spark feature',exact:true}).fill('multiple maps');await expect(page.getByRole('heading',{name:'Multiple maps & windows',exact:true})).toBeVisible();await page.getByRole('searchbox',{name:'Find a Spark feature',exact:true}).fill('zzzz-unavailable');await expect(page.getByText('No features match this search.',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Show all features',exact:true}).click();
+  await page.getByRole('tab',{name:/Synthetic baseline/}).click();await page.getByRole('button',{name:'Tag editor',exact:true}).click();await expect(velocity).toHaveValue('24');await velocity.focus();await page.keyboard.press('Control+z');await expect(velocity).toHaveValue('10');await page.getByRole('tab',{name:/Synthetic candidate/}).click();await expect(velocity).toHaveValue('25');
+});
+test('maps retain independent tag views, tool profiles and last workspace; a late load respects navigation',async({page})=>{
+  await mockDesktop(page);await openFixture(page);const search=page.getByRole('textbox',{name:'Search tags',exact:true});await search.fill('test');await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
+  await page.locator('.gs-map-tools>summary').click();await page.locator('.gs-map-tools .gs-build-targets>summary').click();await page.locator('.gs-map-tools').getByRole('button',{name:'Add MCC target',exact:true}).click();const aFields=page.locator('.gs-map-tools fieldset').getByRole('textbox');await aFields.nth(0).fill('Map A kit');await aFields.nth(1).fill('C:/MapA/HCEEK');await aFields.nth(2).fill('C:/MapA/tags');
+  await page.getByRole('button',{name:'Map library',exact:true}).click();await page.evaluate(()=>(window as any).__sparkMock.delayOpen=600);await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await page.getByRole('button',{name:'Features & workflows',exact:true}).click();await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toBeVisible();await expect(page.getByRole('heading',{name:'What can Spark do?',exact:true})).toBeVisible();await expect(page.locator('.gs-map-tools')).toContainText('default tools');
+  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await expect(search).toHaveValue('');await search.fill('candidate');
+  await page.getByRole('tab',{name:/Synthetic baseline/}).click();await expect(search).toHaveValue('test');await expect(page.getByRole('combobox',{name:'Filter tag class',exact:true})).toHaveValue('weap');await expect(page.locator('.gs-map-tools fieldset').getByRole('textbox').nth(0)).toHaveValue('Map A kit');await expect(page.locator('.gs-map-tools fieldset').getByRole('textbox').nth(2)).toHaveValue('C:/MapA/tags');
+  await page.getByRole('button',{name:'Level editor',exact:true}).click();await page.getByRole('tab',{name:/Synthetic candidate/}).click();await expect(search).toHaveValue('candidate');await page.getByRole('tab',{name:/Synthetic baseline/}).click();await expect(page.getByRole('combobox',{name:'Editing target',exact:true})).toBeVisible();
+});
 test('settings Browse survives a bootstrap refresh without erasing other drafts', async ({ page }) => {
   await mockDesktop(page);
   await page.getByRole('button', { name: 'Settings & tools', exact: true }).click();
   await page
-    .getByRole('textbox', { name: 'Original resource maps', exact: true })
+    .getByRole('textbox', { name: 'Halo Textures and shared sounds', exact: true })
     .fill('C:/synthetic/resources');
   await page
     .locator('.setting-row')
@@ -260,7 +327,7 @@ test('settings Browse survives a bootstrap refresh without erasing other drafts'
   await expect(page.getByRole('textbox', { name: 'Steam installation' })).toHaveValue(
     'C:/synthetic/selected',
   );
-  await expect(page.getByRole('textbox', { name: 'Original resource maps', exact: true })).toHaveValue(
+  await expect(page.getByRole('textbox', { name: 'Halo Textures and shared sounds', exact: true })).toHaveValue(
     'C:/synthetic/resources',
   );
   await page.getByRole('button', { name: 'Apply preferences', exact: true }).first().click();
@@ -334,6 +401,10 @@ test('close guard commits focused fields and stays open after a save failure', a
         (window as any).__sparkMock.calls.filter((call: any) => call.command === 'close_application').length,
     ),
   ).toBe(1);
+});
+test('BSP connection drafts survive tool switches and applied connections undo per map',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await page.locator('.sidebar').getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.bsp-assembly>summary').click();await page.getByRole('button',{name:'Plan connected tunnel',exact:true}).click();const width=page.getByRole('spinbutton',{name:'Tunnel width',exact:true});await width.fill('4');await width.press('Tab');await page.locator('.sidebar').getByRole('button',{name:'Features & workflows',exact:true}).click();await page.locator('.sidebar').getByRole('button',{name:'Level editor',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');await page.getByRole('button',{name:'Apply connection',exact:true}).click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.keyboard.press('Control+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.keyboard.press('Control+Shift+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Check tunnel clearance',exact:true}).click();await expect(page.locator('.bsp-assembly')).toContainText('42 points');expect(await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.tunnelWidth)).toBe(4);
+  await page.locator('.sidebar').getByRole('button',{name:'Map library',exact:true}).click();await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await page.locator('.sidebar').getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.bsp-assembly>summary').click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');
 });
 test('friends preflight surfaces blocked proof without a network success claim', async ({ page }) => {
   await mockDesktop(page);

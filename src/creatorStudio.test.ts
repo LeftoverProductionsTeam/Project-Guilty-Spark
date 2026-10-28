@@ -47,4 +47,5 @@ describe('Project-integrated Creator Studio', () => {
     doc.missions.push({id:'a',title:'Start',objective:'Go',trigger:'manual',encounterName:''});
     expect(validateCreatorStudio(doc).length).toBeGreaterThan(0);
   });
+  it('accepts the native optional camera-marker null on save/reopen',()=>{const doc=emptyCreatorStudio();doc.shots.push({id:'native',name:'Shot',durationMs:3000,cameraPosition:[1,2,3],lookAt:[0,0,0],fov:60,subtitle:'',cameraMarker:null});expect(validateCreatorStudio(doc)).toEqual([]);});
 });

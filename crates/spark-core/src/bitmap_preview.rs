@@ -2,7 +2,8 @@
 //! data. The source map is hashed as one immutable snapshot; no tag or pixel
 //! byte is ever modified. A narrowly verified bitmaps.map resource range can
 //! supply external raw pixels if its index proves exact provenance; external
-//! tag metadata, swizzled, cube/3D, MCC and protected formats fail closed.
+//! tag metadata, swizzled, cube/3D and protected formats fail closed. Supported
+//! MCC texture packs use the separate hash-pinned MCC reader in this module.
 //! See docs/CONTINUATION_20_ENGINEERING.md and c20 H1 bitmap/map field guides.
 use crate::{binary::Reader, invalid, maps::{self, MapHeader, MapInspection}, Result, SparkError};
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,65 @@ const MAX_TOP_MIP_BYTES: usize = 16 * 1024 * 1024;
 const MAX_IMAGES_PER_TAG: usize = 2048;
 const MAX_BATCH_REQUESTS: usize = 24;
 const MAX_BATCH_RAW_BYTES: usize = 16 * 1024 * 1024;
+
+/// Keep reader reasons, without exposing OS errors or host paths to a report.
+fn bitmap_failure(error: &SparkError) -> (&'static str, String) {
+    let SparkError::Invalid(reason) = error else {
+        return ("resource-unavailable", "The selected file could not be read; check that it is still available".into());
+    };
+    if reason.contains("Symbolic links") || reason.contains("Reparse points") {
+        return ("verification-failed", "Resource links or junctions are unsupported; select the original regular file".into());
+    }
+    let code = if reason.contains("pinned bitmaps.map") || reason.contains("Choose and hash") {
+        "missing-resource"
+    } else if reason.contains("pixel format") { "unsupported-format"
+    } else if reason.contains("Swizzled") || reason.contains("2D single") || reason.contains("external metadata") || reason.contains("tag-body provenance") {
+        "unsupported-layout"
+    } else if reason.contains("limit") || reason.contains("exceed") { "budget-exceeded"
+    } else if reason.contains("exact bitmap") || reason.contains("Pixel range") || reason.contains("Multiple shared-resource") {
+        "resource-mismatch"
+    } else { "verification-failed" };
+    (code, reason.chars().take(200).collect())
+}
+/// MCC top mips use the exact map-imeta entry and one identical pack entry.
+/// Pack dimensions/encoding are authoritative; stock bitmap tag metadata can differ.
+pub fn preview_mcc_bitmap_batch(path:&Path,expected:&str,inspection:&MapInspection,requests:&[OwnedBitmapRequest],directory:&Path,hashes:&std::collections::BTreeMap<String,String>)->Result<OwnedBitmapBatch>{
+    if requests.is_empty()||requests.len()>MAX_BATCH_REQUESTS{return invalid("MCC preview requires 1 to 24 bitmap requests");}
+    let(header,bytes,actual)=maps::read_cache_snapshot(path)?;if header.version!=13||actual!=expected||actual!=inspection.sha256{return invalid("MCC bitmap source snapshot changed");}
+    let mut bundle:Option<crate::mcc_textures::TextureBundle>=None;
+    let r=Reader(&bytes);let start=header.tag_offset as usize;let end=start+header.tag_size as usize;let base=r.u32(start)?.checked_sub(40).ok_or_else(||SparkError::Invalid("Invalid MCC tag base".into()))?;
+    let mut seen=HashSet::new();let mut spent=0;let mut items=vec![];
+    for request in requests{if request.image_index>=MAX_IMAGES_PER_TAG||!seen.insert((request.bitmap_tag_id,request.image_index)){return invalid("MCC bitmap requests must be unique and bounded");}
+        let attempt=(||->Result<OwnedBitmapPreview>{let tag=inspection.tags.iter().find(|t|t.id==request.bitmap_tag_id&&t.class=="bitm"&&!t.external).ok_or_else(||SparkError::Invalid("MCC bitmap tag identity is unavailable".into()))?;
+            let at=tag.data_offset.ok_or_else(||SparkError::Invalid("MCC bitmap body unavailable".into()))?;if at<start||at.checked_add(108).is_none_or(|e|e>end){return invalid("MCC bitmap body escapes source tag region");}let count=r.u32(at+96)? as usize;if count>MAX_IMAGES_PER_TAG||request.image_index>=count{return invalid("MCC bitmap image index exceeds source collection");}
+            let pointer=r.u32(at+100)?.checked_sub(base).ok_or_else(||SparkError::Invalid("Invalid MCC bitmap collection pointer".into()))? as usize;let table=start+pointer;if table.checked_add(count*48).is_none_or(|e|e>end){return invalid("MCC bitmap collection escapes its source region");}
+            if r.u16(table+request.image_index*48+14)?&0x100==0 {
+                let meta=read_top_mip_metadata(&bytes,&header,at,request.image_index)?;if spent+meta.size>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}let(_,_,_,pixels)=checked_top_mip(&bytes,&header,at,request.image_index)?;spent+=meta.size;
+                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"internal-cache".into(),resource_sha256:None});
+            }
+            let key=crate::mcc_textures::texture_key(&tag.path,request.image_index)?;
+            if inspection.tags.iter().filter(|t|t.class=="bitm"&&t.id!=tag.id).any(|t|crate::mcc_textures::texture_key(&t.path,request.image_index).ok().as_deref()==Some(&key)){return invalid("MCC canonical bitmap key has a source tag collision");}
+            if bundle.is_none(){bundle=Some(crate::mcc_textures::TextureBundle::open(directory,hashes,&header.name)?);}
+            let bundle=bundle.as_mut().ok_or_else(||SparkError::Invalid("MCC texture bundle unavailable".into()))?;
+            let mip=bundle.top_mip(&key)?;let next=spent+mip.pixels.len();if next>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}spent=next;
+            Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,width:mip.width,height:mip.height,format:mip.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(mip.width,mip.height,mip.format,&mip.pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())})
+        })();let(preview,error,error_code)=match attempt{Ok(p)=>(Some(p),None,None),Err(e)=>{let(code,reason)=bitmap_failure(&e);(None,Some(reason),Some(code.into()))}};items.push(OwnedBitmapBatchItem{bitmap_tag_id:request.bitmap_tag_id,image_index:request.image_index,preview,error,error_code});
+    }Ok(OwnedBitmapBatch{source_sha256:actual,resource_sha256:bundle.map(|b|b.sha256),items})
+}
+
+/// Self-contained H1A builds have embedded images and need no installed pack.
+pub fn mcc_uses_external_bitmaps(path:&Path,expected:&str,inspection:&MapInspection)->Result<bool>{
+    let(header,bytes,hash)=maps::read_cache_snapshot(path)?;
+    if header.version!=13||hash!=expected||hash!=inspection.sha256{return invalid("MCC bitmap source snapshot changed");}
+    let region=TagRegion::from_header(&bytes,&header)?;let r=Reader(&bytes);
+    for tag in inspection.tags.iter().filter(|t|t.class=="bitm"){
+        if tag.external{return Ok(true);}
+        let at=tag.data_offset.ok_or_else(||SparkError::Invalid("MCC bitmap body unavailable".into()))?;region.contains(at,108)?;
+        let count=r.u32(at+96)? as usize;if count>MAX_IMAGES_PER_TAG{return invalid("MCC bitmap collection exceeds its limit");}
+        if count==0{continue;}let table=region.pointer(r.u32(at+100)?,count*48)?;
+        for n in 0..count{if r.u16(table+n*48+14)?&0x100!=0{return Ok(true);}}
+    }Ok(false)
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +111,8 @@ pub struct OwnedBitmapBatchItem {
     pub image_index: usize,
     pub preview: Option<OwnedBitmapPreview>,
     pub error: Option<String>,
+    /// Stable category for friendly summaries; the exact bounded reason is retained.
+    pub error_code: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -60,6 +122,58 @@ pub struct OwnedBitmapBatch {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resource_sha256: Option<String>,
     pub items: Vec<OwnedBitmapBatchItem>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BitmapResourceCompatibility {
+    pub cache_generation: u32,
+    pub resource_sha256: String,
+    pub verified_images: usize,
+    pub missing_or_mismatched_images: usize,
+    pub unsupported_images: usize,
+    pub internal_images: usize,
+}
+
+/// A resource has no embedded game-version number. Compatibility is proven
+/// per image by the source's generation-specific index key AND exact byte span.
+/// No pixels are read or retained while inspecting a resource candidate.
+pub fn verify_resource_for_source(path: &Path, expected_sha256: &str, inspection: &MapInspection,
+    resource: &Path, resource_sha256: &str) -> Result<BitmapResourceCompatibility> {
+    let (header, bytes, hash) = maps::read_cache_snapshot(path)?;
+    if hash != expected_sha256 || hash != inspection.sha256 || !matches!(header.version,6|7|609) {
+        return invalid("Source changed or uses a resource generation outside the classic bitmap reader");
+    }
+    let (mut file,index) = crate::resource_map::open_verified(resource,resource_sha256)?;
+    let mut report = BitmapResourceCompatibility {cache_generation:header.version,
+        resource_sha256:resource_sha256.into(),verified_images:0,missing_or_mismatched_images:0,
+        unsupported_images:0,internal_images:0};
+    let mut checked = 0;
+    let region = TagRegion::from_header(&bytes,&header)?;
+    for tag in inspection.tags.iter().filter(|t| t.class == "bitm" && !t.external) {
+        let Some(at) = tag.data_offset else {continue};
+        if region.contains(at,108).is_err() {report.unsupported_images+=1;continue;}
+        let count = Reader(&bytes).u32(at+0x60)? as usize;
+        if count>MAX_IMAGES_PER_TAG {report.unsupported_images+=1;continue;}
+        checked+=count;
+        if checked>16_384 {return invalid("Bitmap resource verification exceeds the image-count limit");}
+        for image_index in 0..count {
+            match read_top_mip_metadata(&bytes,&header,at,image_index) {
+                Ok(m) if m.external => {
+                    if crate::resource_map::prove_external_image_range(&index,&tag.path,m.raw_offset as u64,
+                        m.declared_size as u64,m.size,header.version,image_index).is_ok() {report.verified_images+=1;}
+                    else {report.missing_or_mismatched_images+=1;}
+                },
+                Ok(_) => report.internal_images+=1,
+                Err(_) => report.unsupported_images+=1,
+            }
+        }
+    }
+    crate::resource_map::verify_open_handle_hash(&mut file,resource_sha256)?;
+    if report.verified_images == 0 {
+        return invalid("This resource file proves no external image ranges for the selected map. Choose that map's original bitmaps.map; self-contained maps do not need it");
+    }
+    Ok(report)
 }
 
 #[derive(Clone, Copy)]
@@ -77,6 +191,7 @@ impl TagRegion {
         let memory_address = match h.version {
             6 => 0x4bf1_0000,
             7 | 609 => 0x4044_0000,
+            13 => Reader(bytes).u32(start)?.checked_sub(40).ok_or_else(||SparkError::Invalid("Invalid MCC bitmap tag base".into()))?,
             _ => return invalid("Automatic bitmap previews support only classic Demo/PC/CE caches"),
         };
         Ok(Self { start, end, memory_address })
@@ -137,9 +252,13 @@ fn read_top_mip_metadata(bytes: &[u8], header: &MapHeader, tag_data: usize, inde
     if depth != 1 || kind != 0 { return invalid("Only 2D single-slice classic bitmap images are currently previewable"); }
     if (flags & 0x8) != 0 { return invalid("Swizzled bitmap pixels cannot be decoded by the linear DDS preview path"); }
     let (format, block, stride) = match encoding {
+        0 => ("A8",false,1usize),
+        1 => ("Y8",false,1usize),
+        3 => ("A8Y8",false,2usize),
         14 => ("DXT1", true, 8usize),
         15 => ("DXT3", true, 16usize),
         16 => ("DXT5", true, 16usize),
+        6 => ("R5G6B5", false, 2usize),
         10 => ("BGRX8", false, 4usize),
         11 => ("BGRA8", false, 4usize),
         _ => return invalid(format!("Bitmap pixel format {encoding} is not yet supported for automatic preview")),
@@ -176,11 +295,23 @@ fn dds_top_mip(width: u16, height: u16, format: &str, pixels: &[u8]) -> Result<V
     set(&mut dds, 8, if compressed {0x81007} else {0x100f});
     set(&mut dds, 12, height.into());
     set(&mut dds, 16, width.into());
-    set(&mut dds, 20, if compressed {pixels.len() as u32} else {u32::from(width) * 4});
+    let pixel_stride=match format {"A8"|"Y8"=>1,"R5G6B5"|"A8Y8"=>2,_=>4};
+    set(&mut dds, 20, if compressed {pixels.len() as u32} else {u32::from(width) * pixel_stride});
     set(&mut dds, 76, 32);
     if compressed {
         set(&mut dds, 80, 4);
         dds[84..88].copy_from_slice(format.as_bytes());
+    } else if matches!(format,"A8"|"Y8"|"A8Y8") {
+        set(&mut dds,80,match format {"A8"=>0x2,"Y8"=>0x20000,_=>0x20001});
+        set(&mut dds,88,if format=="A8Y8"{16}else{8});
+        set(&mut dds,92,if format=="A8"{0}else{0xff});
+        set(&mut dds,104,match format {"A8"=>0xff,"A8Y8"=>0xff00,_=>0});
+    } else if format == "R5G6B5" {
+        set(&mut dds, 80, 0x40);
+        set(&mut dds, 88, 16);
+        set(&mut dds, 92, 0xf800);
+        set(&mut dds, 96, 0x07e0);
+        set(&mut dds, 100, 0x001f);
     } else if matches!(format, "BGRA8" | "BGRX8") {
         set(&mut dds, 80, 0x40 | if format == "BGRA8" {1} else {0});
         set(&mut dds, 88, 32);
@@ -235,14 +366,11 @@ pub fn preview_owned_bitmap_with_resources(
     let at = tag.data_offset.ok_or_else(|| SparkError::Invalid("Bitmap tag has no internal data pointer".into()))?;
     let meta = read_top_mip_metadata(&bytes, &header, at, image_index)?;
     let (pixels, source_kind, resource_sha256) = if meta.external {
-        if !matches!(header.version, 7 | 609) {
-            return invalid("External bitmap-resource preview is limited to classic PC/Custom Edition caches");
-        }
         let (resource_path, pinned_hash) = resources.ok_or_else(|| SparkError::Invalid(
             "Choose and hash the original bitmaps.map resource folder for this project before previewing external pixels".into()))?;
-        let pixels = crate::resource_map::read_external_top_mip(
+        let pixels = crate::resource_map::read_external_image_top_mip(
             resource_path, pinned_hash, &tag.path,
-            meta.raw_offset as u64, meta.declared_size as u64, meta.size,
+            meta.raw_offset as u64, meta.declared_size as u64, meta.size, header.version, image_index,
         )?;
         (pixels, "verified-resource", Some(pinned_hash.to_ascii_lowercase()))
     } else {
@@ -285,12 +413,12 @@ pub fn preview_owned_bitmap_batch_with_resources(
     let (header, bytes, snapshot_hash) = maps::read_cache_snapshot(path)?;
     if snapshot_hash != expected_sha256 || inspection.header.version != header.version ||
         inspection.header.tag_offset != header.tag_offset ||
-        inspection.header.tag_size != header.tag_size || !matches!(header.version, 6 | 7 | 609) {
+        inspection.header.tag_size != header.tag_size || !matches!(header.version, 6 | 7 | 13 | 609) {
         return invalid("Original cache snapshot changed or is an unsupported engine version");
     }
     let mut spent = 0usize;
     let mut resource_snapshot: Option<(File, crate::resource_map::ResourceIndex)> = None;
-    let mut resource_failed = false;
+    let mut resource_failure: Option<String> = None;
     let mut items = Vec::with_capacity(requests.len());
     for request in requests {
         let attempt = (|| -> Result<OwnedBitmapPreview> {
@@ -306,22 +434,19 @@ pub fn preview_owned_bitmap_batch_with_resources(
                 return invalid("Combined decoded bitmap top mips exceed the 16 MiB batch limit");
             }
             let (pixels, source_kind, resource_sha256) = if meta.external {
-                if !matches!(header.version, 7 | 609) {
-                    return invalid("External resources unsupported outside PC/CE");
-                }
                 let (resource_path, pinned) = resources.ok_or_else(|| SparkError::Invalid(
                     "Explicit project-pinned bitmaps.map required for external pixels".into()))?;
-                if resource_snapshot.is_none() && !resource_failed {
+                if resource_snapshot.is_none() && resource_failure.is_none() {
                     match crate::resource_map::open_verified(resource_path, pinned) {
                         Ok(open) => resource_snapshot = Some(open),
-                        Err(_) => resource_failed = true,
+                        Err(e) => resource_failure = Some(bitmap_failure(&e).1),
                     }
                 }
                 let (file, index) = resource_snapshot.as_mut().ok_or_else(|| SparkError::Invalid(
-                    "Selected resource index could not be SHA-256 verified".into()))?;
+                    resource_failure.clone().unwrap_or_else(|| "Selected resource index could not be SHA-256 verified".into())))?;
                 let data = crate::resource_map::read_external_top_mip_from_verified(
                     file, index, &tag.path, meta.raw_offset as u64,
-                    meta.declared_size as u64, meta.size,
+                    meta.declared_size as u64, meta.size, header.version, request.image_index,
                 )?;
                 (data, "verified-resource", Some(pinned.to_ascii_lowercase()))
             } else {
@@ -343,17 +468,16 @@ pub fn preview_owned_bitmap_batch_with_resources(
                 resource_sha256,
             })
         })();
-        let (preview, error) = match attempt {
-            Ok(value) => (Some(value), None),
-            // No host paths, tag strings or OS errors in client-side per-item
-            // messages. The author can audit the original source separately.
-            Err(_) => (None, Some("Bitmap image not available in the verified classic preview subset".into())),
+        let (preview, error, error_code) = match attempt {
+            Ok(value) => (Some(value), None, None),
+            Err(e) => { let (code, reason) = bitmap_failure(&e); (None, Some(reason), Some(code.into())) },
         };
         items.push(OwnedBitmapBatchItem {
             bitmap_tag_id: request.bitmap_tag_id,
             image_index: request.image_index,
             preview,
             error,
+            error_code,
         });
     }
     if let Some((file, _)) = resource_snapshot.as_mut() {
@@ -390,6 +514,24 @@ mod tests {
         let dds=dds_top_mip(w,h,f,&p).unwrap();
         assert_eq!(&dds[..4],b"DDS ");assert_eq!(&dds[84..88],b"DXT3");
         assert_eq!(dds.len(),144);
+    }
+    #[test] fn self_contained_mcc_images_need_no_installed_pack(){
+        use crate::maps::{MapInspection,Tag,MeshData};
+        let(mut bytes,mut header)=fixture(15,0);header.version=13;
+        let put=|b:&mut[u8],at:usize,v:u32|b[at..at+4].copy_from_slice(&v.to_le_bytes());
+        bytes[..4].copy_from_slice(b"daeh");bytes[0x7fc..0x800].copy_from_slice(b"toof");put(&mut bytes,4,13);let size=bytes.len()as u32;put(&mut bytes,8,size);put(&mut bytes,0x10,0x800);put(&mut bytes,0x14,0x400);put(&mut bytes,0x800,0x40440028);bytes[0x20..0x28].copy_from_slice(b"fixture\0");bytes[0x40..0x4a].copy_from_slice(b"synthetic\0");bytes[0x60..0x62].copy_from_slice(&1u16.to_le_bytes());
+        let file=tempfile::NamedTempFile::new().unwrap();std::fs::write(file.path(),bytes).unwrap();let sha=maps::hash_file(file.path()).unwrap();let i=MapInspection{header,sha256:sha.clone(),tag_checksum:None,decals:vec![],tags:vec![Tag{id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
+        assert!(!mcc_uses_external_bitmaps(file.path(),&sha,&i).unwrap());let batch=preview_mcc_bitmap_batch(file.path(),&sha,&i,&[OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:0}],Path::new("no-installed-packs"),&Default::default()).unwrap();assert_eq!(batch.resource_sha256,None);assert_eq!(batch.items[0].preview.as_ref().unwrap().source_kind,"internal-cache");
+    }
+    #[test] fn alpha_and_luminance_dds_preserve_channel_layout() {
+        for (format,name,stride,flags,red,alpha) in [(0,"A8",1,2,0,0xff),(1,"Y8",1,0x20000,0xff,0),(3,"A8Y8",2,0x20001,0xff,0xff00)] {
+            let (mut bytes,header)=fixture(format,0);
+            bytes[0x980+28..0x980+32].copy_from_slice(&(16u32*stride).to_le_bytes());
+            let (w,h,f,p)=checked_top_mip(&bytes,&header,0x900,0).unwrap();
+            assert_eq!((w,h,f,p.len()),(4,4,name,16*stride as usize));
+            let dds=dds_top_mip(w,h,f,&p).unwrap();
+            let r=Reader(&dds);assert_eq!(r.u32(80).unwrap(),flags);assert_eq!(r.u32(92).unwrap(),red);assert_eq!(r.u32(104).unwrap(),alpha);
+        }
     }
     #[test] fn bounded_bgra_top_mip_and_alpha_masks() {
         let (mut bytes, header) = fixture(11,0);
@@ -438,10 +580,10 @@ mod tests {
         let mut writer = file.reopen().unwrap();
         writer.write_all(&bytes).unwrap();
         writer.sync_all().unwrap();
-        let inspection = MapInspection {
+        let inspection = MapInspection { tag_checksum:None, decals:vec![],
             header, sha256:expected.clone(),
             tags:vec![Tag{id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),
-                data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None}],
+                data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],
             objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),
             encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"test".into(),
         };
@@ -478,10 +620,10 @@ mod tests {
         let expected=format!("{:x}",Sha256::digest(&cache));
         let cache_file=tempfile::NamedTempFile::new().unwrap();
         cache_file.reopen().unwrap().write_all(&cache).unwrap();
-        let inspection = MapInspection {
+        let inspection = MapInspection { tag_checksum:None, decals:vec![],
             header,sha256:expected.clone(),tags:vec![Tag {
                 id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),
-                data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,
+                data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None,
             }],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),
             encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into(),
         };
@@ -489,11 +631,11 @@ mod tests {
         let resource_path=dir.path().join("bitmaps.map");
         let mut resource=vec![0u8;0x500];
         let set32=|bytes:&mut [u8],at:usize,v:u32|bytes[at..at+4].copy_from_slice(&v.to_le_bytes());
-        set32(&mut resource,0,0);set32(&mut resource,4,0x100);
+        set32(&mut resource,0,1);set32(&mut resource,4,0x100);
         set32(&mut resource,8,0x40);set32(&mut resource,12,1);
         set32(&mut resource,0x40,0);set32(&mut resource,0x44,64);
         set32(&mut resource,0x48,0x300);
-        resource[0x100..0x10c].copy_from_slice(b"test\\bitmap\0");
+        resource[0x100..0x10e].copy_from_slice(b"test\\bitmap_0\0");
         resource[0x300..0x310].fill(0x42);
         std::fs::write(&resource_path,&resource).unwrap();
         let resource_hash=format!("{:x}",Sha256::digest(&resource));
@@ -544,10 +686,10 @@ mod tests {
         let expected=format!("{:x}",Sha256::digest(&bytes));
         let map=tempfile::NamedTempFile::new().unwrap();
         std::fs::write(map.path(),&bytes).unwrap();
-        let inspected=MapInspection {
+        let inspected=MapInspection { tag_checksum:None, decals:vec![],
             header,sha256:expected.clone(),tags:vec![Tag {
                 id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),
-                data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,
+                data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None,
             }],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),
             encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into(),
         };
@@ -555,9 +697,11 @@ mod tests {
         let path=dir.path().join("bitmaps.map");
         let mut resource=vec![0u8;0x500];
         let put=|b:&mut [u8],at:usize,v:u32|b[at..at+4].copy_from_slice(&v.to_le_bytes());
-        put(&mut resource,0,0);put(&mut resource,4,0x100);put(&mut resource,8,0x40);put(&mut resource,12,1);
-        put(&mut resource,0x40,0);put(&mut resource,0x44,64);put(&mut resource,0x48,0x300);
-        resource[0x100..0x10c].copy_from_slice(b"test\\bitmap\0");
+        put(&mut resource,0,1);put(&mut resource,4,0x100);put(&mut resource,8,0x40);put(&mut resource,12,2);
+        put(&mut resource,0x40,0);put(&mut resource,0x44,16);put(&mut resource,0x48,0x300);
+        resource[0x100..0x10e].copy_from_slice(b"test\\bitmap_0\0");
+        put(&mut resource,0x4c,14);put(&mut resource,0x50,16);put(&mut resource,0x54,0x310);
+        resource[0x10e..0x11c].copy_from_slice(b"test\\bitmap_1\0");
         resource[0x300..0x310].fill(0x51);
         resource[0x310..0x320].fill(0x62);
         std::fs::write(&path,&resource).unwrap();
@@ -599,11 +743,11 @@ mod tests {
         let expected = format!("{:x}", Sha256::digest(&bytes));
         let file = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(file.path(), &bytes).unwrap();
-        let inspected = MapInspection {
+        let inspected = MapInspection { tag_checksum:None, decals:vec![],
             header, sha256: expected.clone(), tags: vec![Tag {
                 id: 0x1234, index: 0, class: "bitm".into(), path: "test/bitmap".into(),
                 data_offset: Some(0x900), external: false, fields: vec![], references: vec![],
-                primary_bitmap_status: None,
+                primary_bitmap_status:None,shader_preview:None,
             }], objects:vec![], mesh:MeshData::default(), render_mesh:None,
             model_meshes:Default::default(), encounters:vec![], scripts:vec![],
             resources:vec![], diagnostics:vec![], scenario_path:"test".into(),
