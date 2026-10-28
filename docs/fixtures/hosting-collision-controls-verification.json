@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-28",
+  "baselineCommit": "f217feb24902ed2be2aab289481f8ed94e1f24cf",
+  "branch": "codex/continuation-33-hosting-collision",
+  "status": "PASS for listed checks; engine gaps remain open",
+  "tests": {
+    "rust": 254,
+    "frontend": 91,
+    "offlineScripts": 59,
+    "browser": 26,
+    "nativeWorkflow": 6,
+    "nativeTwoProcessSessions": 4
+  },
+  "nativeWorkflow": {
+    "checks": [
+      "Real native first-run Continue to tools resolves and displays the tool screen.",
+      "Completing setup persists the Halo choice and opens help.",
+      "Interface Studio opens inside Settings; standalone sidebar entry is absent.",
+      "Navigation and repaint remain responsive during native game/tool discovery.",
+      "Explicit optional Steam module selection validates pinned files and initializes app 480.",
+      "Native read-only MCC inventory follows the equipped pistol without enabling unverified gameplay writes."
+    ],
+    "timings": {
+      "continueToToolsMs": 141.49619999999982,
+      "discoveryMs": 376.9225999999999
+    },
+    "limits": [
+      "No game memory write, game-peer replication, live spawn or BSP replacement is certified by this test."
+    ],
+    "inventory": [
+      {
+        "slot": 0,
+        "tagPath": "weapons/plasma pistol/plasma pistol",
+        "equipped": false
+      },
+      {
+        "slot": 1,
+        "tagPath": "weapons/pistol/pistol",
+        "equipped": true
+      }
+    ],
+    "status": "PASS"
+  },
+  "nativeSessions": {
+    "checks": [
+      "A private invite joins a second native Spark process.",
+      "A guest edit receives a revision acknowledgement and reaches the native host.",
+      "Another open map cannot read private session contents or stop the active host.",
+      "Scoped guest and host leave operations release the native session."
+    ],
+    "scope": "two native Spark processes over TCP loopback; not two-PC game replication",
+    "status": "PASS"
+  },
+  "steamSdkLoopback": {
+    "appId": 480,
+    "bytes": 4194304,
+    "elapsedMs": 6.3972,
+    "packets": 69,
+    "scope": "local SDK socket pair; remote two-account relay remains untested",
+    "sha256": "a117210941a0b00dcb2d8577e680d84b6fa0eaf760d2afc654c953b9859d54fa",
+    "status": "PASS"
+  },
+  "steamModule": {
+    "appId": 480,
+    "sdkVersion": "1.64",
+    "testMode": true,
+    "files": [
+      {
+        "name": "SparkSteamBridge.exe",
+        "sha256": "1e031871332878b6d1786ac7f129a684d2d4f0b4e7e70e2d994c499ccb02cdd7",
+        "bytes": 2127872
+      },
+      {
+        "name": "steam_api64.dll",
+        "sha256": "eb17909a76668cf9ae0b92a618a34a50f6c73d3a6787cb4dd8ce36a8b10bfb75",
+        "bytes": 317080
+      }
+    ],
+    "remoteTwoAccountRelay": "not tested"
+  },
+  "dogleg": {
+    "status": "PASS",
+    "cacheSha256": "5b0103b63b91add77116fc11f1bdb5f8d3cb51a115c4ad24b7e8fb6d41fbd541",
+    "collisionTriangles": 25144,
+    "walkSamples": [
+      423,
+      440,
+      394
+    ],
+    "nativeCompile": "validated",
+    "manualWalkthrough": "not performed",
+    "retailMccLoad": "not performed"
+  },
+  "routeBatchTiming": {
+    "runs": 3,
+    "routesPerRun": 12,
+    "profile": "debug QA process; not viewport FPS",
+    "baselineMedianMs": 7249.8382,
+    "finalMedianMs": 5143.9301,
+    "improvementPercent": 29.047656539424572
+  },
+  "preservation": {
+    "originals": 67,
+    "unchanged": true,
+    "readOnly": true
+  },
+  "artifacts": [
+    {
+      "file": "releases/GuiltySpark-C33-0.4.0-hosting-workflows-r1.exe",
+      "sha256": "67999badd51527ce54a640ef58dda71c7fd895bb84d8a48f977649809b0d0629",
+      "bytes": 23533056
+    },
+    {
+      "file": "releases/Project Guilty Spark_0.4.0_hosting-workflows-r1_x64-setup.exe",
+      "sha256": "ba7b17ef78a68ec3e00c31c7c443d226521c50ba9886318b954babdfd979d260",
+      "bytes": 6154587
+    }
+  ],
+  "unfinished": [
+    "MCC sprint, paired weapon firing and red-reticle sword lunge",
+    "Arbitrary live spawning and BSP replacement",
+    "Game-peer replication and full in-game modding",
+    "Complete renderer and spatial/event audio parity",
+    "User-reported pistol relocation visibility/collision relinking"
+  ]
+}

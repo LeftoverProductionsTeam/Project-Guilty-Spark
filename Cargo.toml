@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/spark-core", "src-tauri"]
+members = ["crates/spark-core", "crates/spark-steam-bridge", "src-tauri"]
 resolver = "2"
 
 [workspace.package]

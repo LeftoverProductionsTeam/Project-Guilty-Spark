@@ -10,6 +10,10 @@ The exact declared license expressions, versions and collected license texts are
 
 WebView2 and OS/native prerequisites retain Microsoft/platform terms. System GTK/WebKit frameworks on Linux are not declared MIT by this project. Platform build recipes do not imply those frameworks are redistributed inside the Windows package.
 
+## Optional Steam test module
+
+The separately built Spacewar test helper uses [steamworks-rs 0.13.0](https://github.com/Noxime/steamworks-rs), steamworks-sys 0.13.0 and paste 1.0.15 under their MIT/Apache-2.0 terms; their collected notices are included in the dependency inventory. The optional `steam_api64.dll` is Valve's Steamworks SDK 1.64 runtime and retains Valve's terms. It is not covered by Spark's MIT license. See Valve's [Spacewar SDK example and redistributable runtime instructions](https://partner.steamgames.com/doc/sdk/api/example). The main Spark executable does not embed or load this DLL; it starts the explicitly selected, separately verified helper only for a requested Steam operation. App ID 480 is a development/test identity, not a registered production Spark identity.
+
 ## Optional tools and research
 
 Invader is an optional separate GPL-3.0 tool installation; no Invader binary or source is embedded in this release. H1A/HEK, Guerilla, Sapien, Standalone, OpenSauce, MEK/Reclaimer and other companions retain their own licenses and are not bundled. Decompiled SAMPLE CODE and historical archive executables were not incorporated or executed.

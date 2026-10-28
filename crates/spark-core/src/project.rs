@@ -103,6 +103,8 @@ pub struct EngineBuildTarget {
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub gameplay_controls:Option<crate::gameplay::Controls>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub bsp_assembly:Option<crate::bsp_assembly::BspAssembly>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub animations:Vec<crate::animations::AnimationAsset>,
@@ -155,6 +157,7 @@ impl Project {
             created_at: now.clone(),
             modified_at: now,
             source: None,
+            gameplay_controls:None,
             bsp_assembly:None,
             conversion_profile:None,
             render_features:None,
@@ -183,6 +186,7 @@ impl Project {
         next.active_build_target=Some(id);next.validate()?;*self=next;Ok(true)
     }
     pub fn validate(&self) -> Result<()> {
+        if let Some(controls)=&self.gameplay_controls{controls.validate()?;}
         if let Some(assembly)=&self.bsp_assembly{assembly.validate()?;if self.source.is_none()||self.quick_forge.is_some(){return invalid("A BSP assembly needs a preserved destination map");}}
         if let Some(features)=&self.render_features{features.validate()?;}
         if self.animations.len()>128||self.animation_assignments.len()>128{return invalid("Animation library exceeds 128 assets or assignments");}

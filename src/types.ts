@@ -168,6 +168,7 @@ export interface EngineBuildTarget {
   invaderDirectory:string|null;ceCompatibleTagset:boolean;openSauce:boolean;
 }
 export interface Project {
+  gameplayControls?:import('./gameplay').GameplayControls|null;
   bspAssembly?:import('./bspAssembly').BspAssembly|null;
   animations?:import('./animation').AnimationAsset[];
   animationAssignments?:import('./animation').AnimationAssignment[];
@@ -218,6 +219,8 @@ export interface LibraryEntry {
   scenarioType: number | null;
 }
 export interface Settings {
+  steamBridgeDirectory?: string | null;
+  steamBridgeManifestSha256?: string | null;
   preferredHalo?:RuntimeId|null;
   onboardingCompleted?:boolean;
   snapshotIntervalMinutes?: number;

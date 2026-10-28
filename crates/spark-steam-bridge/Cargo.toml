@@ -1,0 +1,18 @@
+[package]
+name = "spark-steam-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+spark-core = { path = "../spark-core" }
+
+[target.'cfg(windows)'.dependencies]
+steamworks = {version="=0.13.0",features=["raw-bindings"]}
+
+[[bin]]
+name = "SparkSteamBridge"
+path = "src/main.rs"

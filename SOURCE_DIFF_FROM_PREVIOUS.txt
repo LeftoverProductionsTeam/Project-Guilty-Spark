@@ -1,30 +1,60 @@
-Project Guilty Spark - Four-map challenge and connection-workflow source comparison
-BASELINE: Frozen C33 Worlds Polish source archive
-OBSERVED_BASELINE_ZIP_SHA256: de10b23cf2caaca3e9c5caea528c67d4d14c52144d12788188258c6590ff8a58
-BASELINE_FILES_HASH_VERIFIED: 991
-Comparison excludes the two regenerated checksum manifests.
-ADDED_COUNT: 2
-MODIFIED_COUNT: 13
-UNCHANGED_COUNT: 978
+Project Guilty Spark - Hosting, collision, onboarding and controls source comparison
+BASELINE: Frozen C33 World Challenges source archive
+OBSERVED_BASELINE_ZIP_SHA256: 33a754b2f5c3d516adc9003b69049b09643c100981d8f9fba1a6637cdcfcb1c8
+BASELINE_FILES_HASH_VERIFIED: 993
+Comparison excludes checksum manifests and this comparison report.
+ADDED_COUNT: 20
+MODIFIED_COUNT: 25
+UNCHANGED_COUNT: 967
 REMOVED_COUNT: 0
 
 ADDED FILES
-docs/FOUR_MAP_CHALLENGE.md
-docs/fixtures/four-map-challenge-verification.json
+crates/spark-core/src/gameplay.rs
+crates/spark-core/src/session_frames.rs
+crates/spark-core/src/session_invite.rs
+crates/spark-steam-bridge/Cargo.toml
+crates/spark-steam-bridge/src/loopback.rs
+crates/spark-steam-bridge/src/main.rs
+crates/spark-steam-bridge/src/windows.rs
+docs/HOSTING_COLLISION_AND_CONTROLS.md
+docs/fixtures/hosting-collision-controls-verification.json
+docs/licenses/49bbe9114e49214df2ccc324cb3ac8d1d1aa1c3a0947f94c286765e86647b32e.txt
+docs/licenses/4bd159d9ac5b4f3b5470b30dd9f8e9aede2a15463b900736a8d29ce62842c5c7.txt
+scripts/build-steam-bridge.mjs
+src-tauri/src/shared_editing.rs
+src-tauri/src/steam_bridge.rs
+src/components/GameplayControls.tsx
+src/components/HostingWorkspace.tsx
+src/components/SettingsPanel.tsx
+src/components/SteamSessionTools.tsx
+src/gameplay.ts
+src/hosting.css
 
 MODIFIED FILES
+Cargo.lock
+Cargo.toml
 README.md
-ROADMAP.md
-crates/spark-core/examples/qa_bsp_assembly.rs
+THIRD_PARTY_NOTICES.md
 crates/spark-core/src/bsp_assembly.rs
 crates/spark-core/src/bsp_clearance.rs
-docs/GETTING_STARTED.md
+crates/spark-core/src/forge_session.rs
+crates/spark-core/src/lib.rs
+crates/spark-core/src/live_adapter.rs
+crates/spark-core/src/live_adapter_tests.rs
+crates/spark-core/src/project.rs
+crates/spark-core/src/runtime.rs
+docs/DEPENDENCY_LICENSES.json
 docs/GITHUB_HANDOFF.md
-src/bspAssembly.css
-src/bspAssembly.test.ts
-src/bspAssembly.ts
-src/components/BspAssembly.tsx
-src/featureCatalog.ts
+src-tauri/src/app.rs
+src-tauri/src/live_mcc.rs
+src-tauri/src/main.rs
+src/App.tsx
+src/components/ForgeCollaboration.tsx
+src/components/Runtimes.tsx
+src/components/StartupSetup.tsx
+src/styles.css
+src/types.ts
+tests/ui/browser.spec.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES

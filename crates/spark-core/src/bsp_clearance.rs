@@ -78,6 +78,7 @@ impl Node {
 }
 struct Index {
     triangles: Vec<Tri>,
+    planes: Vec<(V, f64)>,
     root: Node,
 }
 impl Index {
@@ -109,7 +110,8 @@ impl Index {
             })
             .collect();
         let root = Node::build(&triangles, (0..triangles.len()).collect());
-        Ok(Self { triangles, root })
+        let planes = triangles.iter().map(|p| { let n = cross(sub(p[1],p[0]),sub(p[2],p[0])); (n,dot(n,n)) }).collect();
+        Ok(Self { triangles, planes, root })
     }
     fn floor(&self, at: V, scratch: &mut Vec<usize>) -> Option<f64> {
         scratch.clear();
@@ -137,18 +139,59 @@ impl Index {
         }
         best
     }
-    fn clear(&self, point: V, radius: f64, scratch: &mut Vec<usize>) -> bool {
+    fn clear_segment(&self, a: V, b: V, radius: f64, scratch: &mut Vec<usize>) -> bool {
         scratch.clear();
         self.root.query(
-            point.map(|v| v - radius),
-            point.map(|v| v + radius),
+            std::array::from_fn(|k| a[k].min(b[k]) - radius),
+            std::array::from_fn(|k| a[k].max(b[k]) + radius),
             scratch,
         );
         scratch.iter().all(|id| {
-            let delta = sub(point, closest(point, self.triangles[*id]));
-            dot(delta, delta) >= (radius - 0.002).powi(2)
+            let (n, length_squared) = self.planes[*id];
+            let da = dot(n, sub(a, self.triangles[*id][0]));
+            let db = dot(n, sub(b, self.triangles[*id][0]));
+            // Plane distance is a conservative lower bound. Most floor/wall
+            // candidates can avoid the exact segment/triangle region tests.
+            if length_squared > 1e-20 && da * db > 0.
+                && (da * da).min(db * db) >= (radius - 0.002).powi(2) * length_squared { return true; }
+            segment_triangle_distance(a, b, self.triangles[*id]) >= (radius - 0.002).powi(2)
         })
     }
+}
+fn segment_distance(a: V, b: V, c: V, d: V) -> f64 {
+    let u = sub(b, a); let v = sub(d, c); let r = sub(a, c);
+    let aa = dot(u, u); let ee = dot(v, v); let ff = dot(v, r);
+    let (s, t) = if aa <= 1e-20 && ee <= 1e-20 { (0., 0.) }
+    else if aa <= 1e-20 { (0., (ff / ee).clamp(0., 1.)) }
+    else {
+        let cc = dot(u, r);
+        if ee <= 1e-20 { ((-cc / aa).clamp(0., 1.), 0.) }
+        else {
+            let bb = dot(u, v); let denominator = aa * ee - bb * bb;
+            let mut s = if denominator > 1e-20 { ((bb * ff - cc * ee) / denominator).clamp(0., 1.) } else { 0. };
+            let mut t = (bb * s + ff) / ee;
+            if t < 0. { t = 0.; s = (-cc / aa).clamp(0., 1.); }
+            else if t > 1. { t = 1.; s = ((bb - cc) / aa).clamp(0., 1.); }
+            (s, t)
+        }
+    };
+    let delta = sub(add(a, mul(u, s)), add(c, mul(v, t)));
+    dot(delta, delta)
+}
+fn segment_triangle_distance(a: V, b: V, triangle: Tri) -> f64 {
+    let direction = sub(b, a);
+    let n = cross(sub(triangle[1], triangle[0]), sub(triangle[2], triangle[0]));
+    let denominator = dot(n, direction);
+    if denominator.abs() > 1e-20 {
+        let t = dot(n, sub(triangle[0], a)) / denominator;
+        if (0. ..=1.).contains(&t) {
+            let p = add(a, mul(direction, t)); let delta = sub(p, closest(p, triangle));
+            if dot(delta, delta) < 1e-16 { return 0.; }
+        }
+    }
+    let distance = |p| { let delta = sub(p, closest(p, triangle)); dot(delta, delta) };
+    (0..3).map(|k| segment_distance(a, b, triangle[k], triangle[(k + 1) % 3]))
+        .fold(distance(a).min(distance(b)), f64::min)
 }
 // Closest-point region tests include edges and vertices, so a thin obstacle at
 // a triangle seam cannot disappear from a plane-only clearance test.
@@ -192,12 +235,15 @@ fn closest(p: V, t: Tri) -> V {
     }
     add(a, add(mul(ab, vb / denominator), mul(ac, vc / denominator)))
 }
-pub(crate) fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<usize> {
+pub(crate) struct RouteChecker { index: Index }
+impl RouteChecker {
+    pub(crate) fn new(mesh: &MeshData) -> Result<Self> { Ok(Self { index: Index::new(mesh)? }) }
+    pub(crate) fn verify(&self, assembly: &BspAssembly) -> Result<usize> {
     assembly.validate()?;
-    let index = Index::new(mesh)?;
+    let index = &self.index;
     let mut scratch = vec![];
     let mut samples = 0;
-    let mut previous: Option<f64> = None;
+    let mut previous: Option<(V, f64)> = None;
     for (segment, pair) in assembly.tunnel_points.windows(2).enumerate() {
         let (a, b) = (pair[0].map(f64::from), pair[1].map(f64::from));
         let d = sub(b, a);
@@ -205,22 +251,38 @@ pub(crate) fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<us
         for step in 0..=steps {
             let p = add(a, mul(d, step as f64 / steps as f64));
             let z=index.floor(p,&mut scratch).ok_or_else(||SparkError::Invalid(format!("Tunnel floor is not continuous in segment {} near {:.2}, {:.2}, {:.2}; adjust its floor points",segment + 1,p[0],p[1],p[2])))?;
-            if previous.is_some_and(|old| (z - old).abs() > 0.12) {
+            if previous.is_some_and(|(_, old)| (z - old).abs() > 0.12) {
                 return invalid(format!(
                     "Tunnel floor has a step higher than 0.12 world units in segment {} near {:.2}, {:.2}, {:.2}; add a ramp waypoint",
                     segment + 1, p[0], p[1], z,
                 ));
             }
-            previous = Some(z);
             for height in [0.20, 0.36, 0.52] {
-                if !index.clear([p[0], p[1], z + height], 0.18, &mut scratch) {
+                let (old, old_floor) = previous.unwrap_or((p, z));
+                // A permitted small step lifts the body before it advances.
+                // Check that lift, the full horizontal sweep and the descent;
+                // interpolating through a curb would reject a walkable step.
+                let raised = z.max(old_floor) + height;
+                let from = [old[0], old[1], old_floor + height];
+                let high_from = [old[0], old[1], raised];
+                let high_to = [p[0], p[1], raised];
+                let to = [p[0], p[1], z + height];
+                if (old_floor + height < raised - 1e-10 && !index.clear_segment(from, high_from, 0.18, &mut scratch))
+                    || !index.clear_segment(high_from, high_to, 0.18, &mut scratch)
+                    || (z + height < raised - 1e-10 && !index.clear_segment(high_to, to, 0.18, &mut scratch)) {
                     return invalid(format!("The connection contains a wall, narrow edge or insufficient biped head clearance in segment {} near {:.2}, {:.2}, {:.2}; adjust the tunnel path", segment + 1, p[0], p[1], z));
                 }
             }
+            previous = Some((p, z));
             samples += 1;
         }
     }
     Ok(samples)
+    }
+}
+pub(crate) fn verify_route(mesh: &MeshData, assembly: &BspAssembly) -> Result<usize> {
+    assembly.validate()?;
+    RouteChecker::new(mesh)?.verify(assembly)
 }
 #[cfg(test)]
 mod tests {
@@ -313,6 +375,30 @@ mod tests {
     fn capsule_checks_head_and_sides_instead_of_only_the_camera() {
         assert!(verify_route(&corridor(2., 0.65), &plan()).is_err());
         assert!(verify_route(&corridor(0.30, 1.6), &plan()).is_err());
+    }
+    #[test]
+    fn a_thin_shoulder_obstacle_between_samples_blocks_both_directions() {
+        let mut mesh = corridor(2., 1.6);
+        quad(&mut mesh, [
+            [1.125, 0.17, 0.05], [1.125, 0.18, 0.05],
+            [1.125, 0.18, 0.65], [1.125, 0.17, 0.65],
+        ]);
+        let mut route = plan();
+        assert!(verify_route(&mesh, &route).is_err(), "A shoulder obstacle between samples must block the route");
+        route.tunnel_points.reverse();
+        assert!(verify_route(&mesh, &route).is_err());
+    }
+    #[test]
+    fn a_small_curb_allows_lifting_and_lowering_without_sweeping_through_its_edge() {
+        let mut mesh = corridor(2., 1.6);
+        mesh.indices.drain(0..6);
+        quad(&mut mesh, [[0.,-1.,0.],[1.125,-1.,0.],[1.125,1.,0.],[0.,1.,0.]]);
+        quad(&mut mesh, [[1.125,-1.,0.064],[10.,-1.,0.064],[10.,1.,0.064],[1.125,1.,0.064]]);
+        quad(&mut mesh, [[1.125,-1.,0.],[1.125,1.,0.],[1.125,1.,0.064],[1.125,-1.,0.064]]);
+        let mut route = plan();
+        assert!(verify_route(&mesh, &route).is_ok());
+        route.tunnel_points.reverse();
+        assert!(verify_route(&mesh, &route).is_ok());
     }
     #[test]
     fn missing_floor_and_invalid_collision_never_pass() {

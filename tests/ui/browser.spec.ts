@@ -1,4 +1,18 @@
 import { test, expect } from '@playwright/test';
+test('sidebar keeps every workspace visible in tall and short windows', async ({ page }) => {
+  for (const size of [{width:1280,height:944},{width:1280,height:768},{width:1024,height:640}]) {
+    await page.setViewportSize(size);await page.goto('/');
+    const sidebar=page.locator('.sidebar');
+    await expect(sidebar.getByRole('navigation',{name:'Workspaces'})).toBeVisible();
+    const overflow=await sidebar.evaluate(element=>{
+      const box=element.getBoundingClientRect();
+      return {extra:element.scrollHeight-element.clientHeight,clipped:[...element.querySelectorAll('.nav-item')].filter(item=>{const r=item.getBoundingClientRect();return r.top<box.top-1||r.bottom>box.bottom+1;}).map(item=>item.textContent)};
+    });
+    expect(overflow,`${size.width}x${size.height}`).toEqual({extra:0,clipped:[]});
+    await expect(sidebar.getByRole('button',{name:'Community Thanks',exact:true})).toBeVisible();
+    await expect(sidebar.getByRole('button',{name:'Settings & tools',exact:true})).toBeVisible();
+  }
+});
 test('workspace search keeps focus bounded and navigates with the keyboard', async ({ page }) => {
   await page.goto('/');
   const launcher=page.getByRole('button',{name:/Find tools/});
@@ -69,7 +83,8 @@ test('help modal traps focus and restores it after Escape', async ({ page }) => 
 
 test('Dark Glow saves custom colors and keeps text white on dark surfaces',async({page})=>{
   await page.goto('/');
-  await page.getByRole('button',{name:'Interface Studio',exact:true}).click();
+  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();
+  await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
   await page.locator('.interface-theme-dark-glow').click();
   await expect(page.locator('html')).toHaveAttribute('data-gs-theme','dark-glow');
   const choose=async(label:string,color:string)=>page.getByLabel(label,{exact:true}).evaluate((element,value)=>{
@@ -88,7 +103,8 @@ test('Dark Glow saves custom colors and keeps text white on dark surfaces',async
   await expect(page.locator('.analysis-card').first()).toHaveCSS('background-color','rgb(16, 23, 37)');
   await choose('Primary glow color','#ff5d9c');await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-gs-theme','dark-glow');
-  await page.getByRole('button',{name:'Interface Studio',exact:true}).click();
+  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();
+  await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
   await expect(page.getByLabel('Primary glow color',{exact:true})).toHaveValue('#ff5d9c');
   await expect(page.getByLabel('Secondary glow color',{exact:true})).toHaveValue('#83ffcd');
   await expect(page.getByRole('slider',{name:'Glow strength',exact:true})).toHaveValue('100');

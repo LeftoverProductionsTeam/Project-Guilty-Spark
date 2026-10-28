@@ -94,6 +94,22 @@ fn operation() -> MoveObject {
     }
 }
 #[test]
+fn gameplay_inventory_distinguishes_equipped_and_stowed_slots_without_writes() {
+    let m=fixture();let id=identity(&m,BASE).unwrap().0;
+    m.put(OBJECT,&vec![0;1024]);m.put(OBJECT+0x70,&0u16.to_le_bytes());
+    m.put(0x60000038+3,&[0]);m.put(OBJECT+0x2d8,&[255;16]);
+    let datum=0x30001u32;let weapon=OBJECT+4096;
+    m.put(0x60000038+12,&[3,0,0,2,0,0,0,0,0,16,0,0]);
+    m.put(weapon,&0x10001u32.to_le_bytes());m.put(weapon+0x70,&2u16.to_le_bytes());
+    m.put(weapon+0xd8,&0x20000u32.to_le_bytes());
+    m.put(OBJECT+0xd4,&datum.to_le_bytes());m.put(OBJECT+0x2dc,&datum.to_le_bytes());
+    let inventory=gameplay_inventory(&m,BASE,&id).unwrap();
+    assert_eq!(inventory.weapons.len(),1);assert_eq!(inventory.weapons[0].slot,1);assert!(inventory.weapons[0].equipped);
+    assert!(inventory.read_only&&!inventory.input_hooks_ready&&m.writes.borrow().is_empty());
+    m.put(weapon+0xd8,&u32::MAX.to_le_bytes());
+    assert!(gameplay_inventory(&m,BASE,&id).is_err());assert!(m.writes.borrow().is_empty());
+}
+#[test]
 fn binds_exact_map_object_and_confirms_real_readback() {
     let m = fixture();
     let s = snapshot(&m, BASE).unwrap();

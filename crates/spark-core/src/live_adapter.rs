@@ -105,6 +105,30 @@ pub struct Snapshot {
     pub player_datum: u32,
     pub objects: Vec<LiveObject>,
 }
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct InventoryWeapon {pub slot:u8,pub datum:u32,pub tag_path:String,pub equipped:bool}
+#[derive(Clone,Debug,Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct GameplayInventory {pub player_datum:u32,pub weapons:Vec<InventoryWeapon>,pub read_only:bool,pub input_hooks_ready:bool,pub detail:String}
+pub fn gameplay_inventory(m:&impl Memory,base:u64,expected:&MapIdentity)->Result<GameplayInventory> {
+    let(id,table)=identity(m,base)?;if &id!=expected{return invalid("Loaded map changed; reconnect before inspecting inventory");}
+    let controls=pointer(m,base+0x2D9CD90)?;let player=u32_at(m,controls+4)?;
+    let(body,kind)=object_address(m,&id,player)?;if kind!=0{return invalid("Load a living on-foot Halo 1 player before inspecting inventory");}
+    // Verified against two native captures on this exact executable/module pair.
+    // The equipped reference differs from a stowed weapon's inventory slot.
+    let equipped=u32_at(m,body+0xd4)?;let mut weapons=vec![];
+    for slot in 0..4u8 {
+        let datum=u32_at(m,body+0x2d8+u64::from(slot)*4)?;if datum==u32::MAX{continue;}
+        let(weapon,kind)=object_address(m,&id,datum)?;if kind!=2{return invalid("Inventory contains a non-weapon object; no gameplay hook was enabled");}
+        let selected=equipped==datum;
+        if selected&&u32_at(m,weapon+0xd8)?!=player{return invalid("Equipped weapon changed while inspecting inventory; retry");}
+        weapons.push(InventoryWeapon{slot,datum,tag_path:tag_name(m,id.header,table,id.tag_count,u32_at(m,weapon)?)?,equipped:selected});
+    }
+    if equipped!=u32::MAX&&!weapons.iter().any(|w|w.equipped){return invalid("Equipped weapon is outside the verified inventory; retry after switching finishes");}
+    if identity(m,base)?.0!=id||u32_at(m,controls+4)?!=player||u32_at(m,body+0xd4)?!=equipped{return invalid("Player, inventory or loaded map changed during inspection; retry");}
+    Ok(GameplayInventory{player_datum:player,weapons,read_only:true,input_hooks_ready:false,detail:"Inventory references are read-only. Sprint, dual-wield firing and red-reticle sword targeting still need verified game input/target hooks and matching first-person assets. No gameplay input was written.".into()})
+}
 fn identity(m: &impl Memory, base: u64) -> Result<(MapIdentity, u64)> {
     let header = pointer(m, base + 0x2D9CE10)?;
     if m.read(header + 0x24, 4)? != b"sgat" {

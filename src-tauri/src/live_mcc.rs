@@ -381,6 +381,9 @@ mod windows {
             .vehicle_active();
         Ok(Status{pid:s.pid,snapshot,experimental:true,active_vehicle_physics:vehicle_active,active_shared_scales:s.active_physics(),scale_keeper_error:s.scales.error.lock().map_err(|_|spark_core::SparkError::Invalid("Scale keeper lock failed".into()))?.clone(),detail:"Experimental MCC Halo 1 adapter: object positions and uniform scale with readback. World items share their authored size tag. Vehicles couple shared contact spheres, suspension, mass and inertia; park and exit matching vehicles first. Driving and peer replication require game checks.".into()})
     }
+    pub fn gameplay_inventory(s:&Session)->Result<live::GameplayInventory> {
+        let _edit=EditLock::acquire(s)?;live::gameplay_inventory(&guarded(s,false)?,s.base,&s.identity)
+    }
     pub fn moves(s: &Session, moves: &[live::MoveObject]) -> Result<Vec<live::MoveReceipt>> {
         let _edit = EditLock::acquire(s)?;
         live::move_objects(&guarded(s, true)?, s.base, &s.identity, moves)
@@ -506,7 +509,9 @@ mod windows {
     }
 }
 #[cfg(windows)]
-pub use windows::{connect, disconnect, moves, sample, scale, scale_info};
+pub use windows::{connect, disconnect, moves, sample, scale, scale_info,gameplay_inventory};
+#[cfg(not(windows))]
+pub fn gameplay_inventory(_: &Session)->Result<live::GameplayInventory>{invalid("Live MCC gameplay inspection requires Windows")}
 #[cfg(not(windows))]
 pub fn connect(_: &Path, _: bool) -> Result<Session> {
     invalid("The MCC live process adapter requires Windows")

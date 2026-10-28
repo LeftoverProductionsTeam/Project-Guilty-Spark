@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import type { Bootstrap, RuntimeId, Settings, Workspace } from '../types';
 import ConnectGames from './ConnectGames';
 const halos: { id: RuntimeId; name: string; description: string }[] = [
@@ -47,18 +47,20 @@ export default function StartupSetup({
     [draft, setDraft] = useState(data.settings),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const mounted=useRef(true);useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   async function save(settings: Settings, next: number) {
     setBusy(true);
     setError('');
     try {
       await onApply(settings);
+      if(!mounted.current)return;
       setDraft(settings);
       setStep(next);
       if (settings.onboardingCompleted) navigate('how-to');
     } catch (error) {
-      setError(String(error));
+      if(mounted.current)setError(String(error));
     } finally {
-      setBusy(false);
+      if(mounted.current)setBusy(false);
     }
   }
   if (step === 2)
@@ -115,7 +117,7 @@ export default function StartupSetup({
               void save({ ...data.settings, preferredHalo: choice, onboardingCompleted: false }, 1)
             }
           >
-            Continue to tools
+            {busy?'Saving Halo choice…':'Continue to tools'}
           </button>
         </section>
       ) : (
@@ -153,6 +155,7 @@ export default function StartupSetup({
           </div>
         </>
       )}
+      {busy&&<p role="status">Saving your selection. You can still use the sidebar while setup finishes.</p>}
       {error && <p role="alert">{error}</p>}
     </section>
   );

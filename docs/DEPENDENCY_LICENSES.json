@@ -2208,6 +2208,16 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "paste",
+      "version": "1.0.15",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3.txt",
+        "docs/licenses/62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "percent-encoding",
       "version": "2.3.2",
       "license": "MIT OR Apache-2.0",
@@ -2975,6 +2985,23 @@
         "docs/licenses/b9290e9d37bc53272ff4f3fb392c1762169fc0a8b797d164803049c81eacb48c.txt",
         "docs/licenses/c1ff532091cac33bdecedf7268ff4f9bc3ddcffba494249fb723033e9e782f1a.txt",
         "docs/licenses/e3ba223bb1423f0aad8c3dfce0fe3148db48926d41e6fbc3afbbf5ff9e1c89cb.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "steamworks-sys",
+      "version": "0.13.0",
+      "license": "MIT / Apache-2.0",
+      "notices": []
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "steamworks",
+      "version": "0.13.0",
+      "license": "MIT / Apache-2.0",
+      "notices": [
+        "docs/licenses/49bbe9114e49214df2ccc324cb3ac8d1d1aa1c3a0947f94c286765e86647b32e.txt",
+        "docs/licenses/4bd159d9ac5b4f3b5470b30dd9f8e9aede2a15463b900736a8d29ce62842c5c7.txt"
       ]
     },
     {
