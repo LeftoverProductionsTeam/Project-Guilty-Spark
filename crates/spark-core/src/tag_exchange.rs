@@ -26,7 +26,7 @@ pub struct TagExtractReceipt {
     pub total_bytes:u64,
     pub notice:String,
 }
-fn extension(class:&str)->Result<&'static str>{
+pub(crate) fn extension(class:&str)->Result<&'static str>{
     match class {
         "scnr"=>Ok("scenario"),"sbsp"=>Ok("scenario_structure_bsp"),
         "weap"=>Ok("weapon"),"proj"=>Ok("projectile"),"bipd"=>Ok("biped"),
@@ -41,6 +41,23 @@ fn extension(class:&str)->Result<&'static str>{
         "mach"=>Ok("device_machine"),"ctrl"=>Ok("device_control"),
         "lifi"=>Ok("device_light_fixture"),"matg"=>Ok("globals"),
         "trak"=>Ok("camera_track"),"coll"=>Ok("model_collision_geometry"),
+        "DeLa"=>Ok("ui_widget_definition"),"Soul"=>Ok("ui_widget_collection"),
+        "tagc"=>Ok("tag_collection"),"ustr"=>Ok("unicode_string_list"),"str#"=>Ok("string_list"),
+        "font"=>Ok("font"),"hmt "=>Ok("hud_message_text"),"hud#"=>Ok("hud_number"),
+        "hudg"=>Ok("hud_globals"),"wphi"=>Ok("weapon_hud_interface"),
+        "unhi"=>Ok("unit_hud_interface"),"grhi"=>Ok("grenade_hud_interface"),
+        "vcky"=>Ok("virtual_keyboard"),"mply"=>Ok("multiplayer_scenario_description"),
+        "sotr"=>Ok("shader_transparent_generic"),
+        "spla"=>Ok("shader_transparent_plasma"),"swat"=>Ok("shader_transparent_water"),
+        "sgla"=>Ok("shader_transparent_glass"),"smet"=>Ok("shader_transparent_meter"),
+        "fog "=>Ok("fog"),"ssce"=>Ok("sound_scenery"),"snde"=>Ok("sound_environment"),
+        "ligh"=>Ok("light"),"lens"=>Ok("lens_flare"),"deca"=>Ok("decal"),
+        "phys"=>Ok("physics"),"pphy"=>Ok("point_physics"),"part"=>Ok("particle"),
+        "pctl"=>Ok("particle_system"),"rain"=>Ok("weather_particle_system"),
+        "wind"=>Ok("wind"),"cont"=>Ok("contrail"),"flag"=>Ok("flag"),"elec"=>Ok("lightning"),
+        "ant!"=>Ok("antenna"),"glw!"=>Ok("glow"),"cdmg"=>Ok("continuous_damage_effect"),
+        "udlg"=>Ok("dialogue"),"foot"=>Ok("material_effects"),"boom"=>Ok("spheroid"),
+        "dobc"=>Ok("detail_object_collection"),"plac"=>Ok("placeholder"),
         _=>invalid(format!("Invader tag class {class:?} needs a verified extension mapping before extraction"))
     }
 }

@@ -104,6 +104,12 @@ pub fn compatibility(
         }
     }
     let native=tools.h1a_directory.is_some();
+    if !project.tag_duplicates.is_empty(){
+        if !native{blockers.push("Tag duplication requires the native MCC H1A compiler; enable the installed MCC editing kit".into());}
+        for name in ["invader-refactor","invader-dependency"]{if tool_path(tools,name).is_none(){blockers.push(format!("{name} is required for verified tag duplication"));}}
+        if let Err(e)=crate::tag_duplicates::validate_source(project,inspection){blockers.push(e.to_string());}
+        warnings.push("Tag duplicates are rebuilt from editable tags with a new path. Only the selected referencing tag is redirected; dependencies remain shared. Campaign/UI game-load acceptance is still required.".into());
+    }
     if let Some(assembly)=&project.bsp_assembly{
         if !native{blockers.push("Connected BSP assemblies require the MCC H1A compiler".into());}
         if !assembly.donor_tags_directory.is_dir(){blockers.push("Choose the donor's matching editable tags folder before starting a connected-map build".into());}
@@ -124,6 +130,11 @@ pub fn compatibility(
         }
         warnings.push("Conversion layers extracted custom tags over a verified copy of the selected MCC SDK tagset. All writes stay in a fresh job; the source and SDK masters remain unchanged.".into());
         if crate::conversion::is_yoyorast_v1(&inspection.sha256){warnings.push("Yoyorast V1 uses the tested MCC stock-shader and multiplayer UI adaptation. Every changed derived tag is recorded in conversion-manifest.json.".into());}
+    }
+    if !project.powerups.is_empty(){
+        if !native{blockers.push("Custom power-up conversion requires the native MCC H1A compiler and invader-edit".into());}
+        if inspection.header.scenario_type!=1{blockers.push("Custom power-up pickups require a multiplayer scenario".into());}
+        warnings.push("Custom power-ups generate native equipment and item-collection tags in this build. Native pickup/effect behavior needs target-game testing.".into());
     }
     if project.conversion_profile.as_deref()==Some("zombie-recovery"){
         if inspection.sha256!=crate::legacy::ZOMBIE_DEMO_SHA256{blockers.push("The Zombie recovery profile only accepts the exact audited Demo source".into());}
@@ -449,8 +460,8 @@ pub fn validate_existing_mcc(
     {
         return invalid("This operation requires an existing unextended MCC cache, not a legacy map or test fixture");
     }
-    if !project.tag_edits.is_empty() || project.scene != inspection.objects
-        || project.bsp_assembly.is_some() || !project.animation_assignments.is_empty()
+    if !project.tag_duplicates.is_empty() || !project.tag_edits.is_empty() || project.scene != inspection.objects
+        || project.bsp_assembly.is_some() || !project.animation_assignments.is_empty() || !project.powerups.is_empty()
         || project.studio.as_ref().and_then(|s|s.engine_machinima.as_ref()).is_some_and(|take|take.enabled)
         || project.conversion_profile.as_deref().is_some_and(|profile|profile!="faithful")
     {
@@ -566,6 +577,7 @@ pub fn run_build(
         let info = tool_path(tools, "invader-info").unwrap();
         let extract = tool_path(tools, "invader-extract").unwrap();
         let native=crate::conversion::native_tool(tools);
+        if !project.powerups.is_empty()&&native.is_none(){return invalid("Custom power-up conversion requires the native MCC H1A compiler and invader-edit; select the installed MCC tools before rebuilding");}
         let build = tool_path(tools, "invader-build");
         for exe in [&info, &extract].into_iter().chain(build.as_ref().filter(|_|native.is_none())) {
             runner.run(exe, &["-i".into()], &dir, "tools", 8)?;
@@ -631,16 +643,16 @@ pub fn run_build(
         let mut extraction=vec!["-t".into(),tag_dir.to_string_lossy().into_owned(),"-m".into(),resource_dir.to_string_lossy().into_owned()];
         if native.is_some(){
             extraction.push("-O".into());
-            if (inspection.header.version==609&&!resource_dir.join("bitmaps.map").is_file())||(inspection.header.version==13&&project.bsp_assembly.is_some()){
+            if (inspection.header.version==609&&!resource_dir.join("bitmaps.map").is_file())||inspection.header.version==13{
                 if inspection.header.version==13{
                     let scenario=tag_dir.join(safe_relative(&format!("{}.scenario",inspection.scenario_path))?);
-                    if !scenario.is_file(){return invalid("MCC BSP rebuilding needs matching editable destination tags. Select the tagset that contains this scenario; shared MCC resources cannot be reconstructed from a cache header");}
-                    runner.emit("bsp-resources","Using the selected matching editable tagset for MCC shared resource tags; source geometry and extracted local tags retain their own identities",23,"warning");
+                    if !scenario.is_file(){return invalid("Rebuilding this MCC map needs matching editable scenario tags. Select the tagset that created this map; shared MCC resources cannot be reconstructed from a cache header");}
+                    runner.emit("mcc-resources","Using the selected matching editable tagset for MCC bitmap/sound resources; extracted local tags retain their own identities. Campaign and UI scenario types are preserved",23,"warning");
                     let mut reused=std::collections::BTreeMap::new();
                     for tag in inspection.tags.iter().filter(|t|matches!(t.class.as_str(),"bitm"|"snd!")){
                         let extension=if tag.class=="bitm"{"bitmap"}else{"sound"};let relative=format!("{}.{extension}",tag.path);let file=tag_dir.join(safe_relative(&relative)?);core_check_reused_tag(&file,&relative)?;reused.insert(relative,maps::hash_file(&file)?);
                     }
-                    project::atomic_write(&dir.join("bsp-shared-resources.json"),&serde_json::to_vec_pretty(&reused)?,false)?;
+                    project::atomic_write(&dir.join("mcc-shared-resources.json"),&serde_json::to_vec_pretty(&reused)?,false)?;
                     extraction.extend(["-e".into(),"*.bitmap".into(),"-e".into(),"*.sound".into()]);
                 }
                 extraction.push("-G".into());
@@ -696,6 +708,8 @@ pub fn run_build(
             output = output_dir.join(format!("{}.map", stem.to_ascii_lowercase()));
         }
         let validated = maps::inspect_map(&output, Some(resource_dir))?;
+        crate::tag_duplicates::verify_compiled(project,inspection,&validated)?;
+        crate::powerups::verify_compiled(project,&validated,&dir)?;
         if let Some(assembly)=&project.bsp_assembly{
             let (compiled_collision,compiled_faces)=maps::collision_source(&output,&validated)?;
             let manifest:serde_json::Value=serde_json::from_slice(&fs::read(dir.join("bsp-assembly.json"))?)?;

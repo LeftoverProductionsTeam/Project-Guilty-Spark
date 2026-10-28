@@ -102,6 +102,12 @@ pub struct EngineBuildTarget {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub tag_duplicates:Vec<crate::tag_duplicates::TagDuplicate>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub audio_preview:Option<crate::audio_preview::SoundScene>,
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub powerups:Vec<crate::powerups::Powerup>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub gameplay_controls:Option<crate::gameplay::Controls>,
     #[serde(default,skip_serializing_if="Option::is_none")]
@@ -151,6 +157,9 @@ impl Project {
     pub fn new(title: &str) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
+            tag_duplicates:vec![],
+            audio_preview:None,
+            powerups:vec![],
             schema_version: PROJECT_VERSION,
             id: Uuid::new_v4().to_string(),
             title: title.into(),
@@ -186,6 +195,12 @@ impl Project {
         next.active_build_target=Some(id);next.validate()?;*self=next;Ok(true)
     }
     pub fn validate(&self) -> Result<()> {
+        crate::tag_duplicates::validate(&self.tag_duplicates)?;
+        if !self.tag_duplicates.is_empty()&&(self.source.is_none()||self.quick_forge.is_some()){
+            return invalid("Tag duplication requires a preserved source map; build and open a QuickForge cache before duplicating its tags");
+        }
+        if let Some(audio)=&self.audio_preview{audio.validate()?;}
+        crate::powerups::validate(&self.powerups)?;
         if let Some(controls)=&self.gameplay_controls{controls.validate()?;}
         if let Some(assembly)=&self.bsp_assembly{assembly.validate()?;if self.source.is_none()||self.quick_forge.is_some(){return invalid("A BSP assembly needs a preserved destination map");}}
         if let Some(features)=&self.render_features{features.validate()?;}
@@ -308,9 +323,9 @@ impl Project {
         };
         let camera=self.studio.as_ref().and_then(|s|s.engine_machinima.as_ref().filter(|o|o.enabled).map(|o|(o,&s.shots)));
         let profile=self.conversion_profile.as_deref().filter(|p|*p!="faithful");
-        if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none(){return Ok(base);}
+        if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none()&&self.powerups.is_empty()&&self.tag_duplicates.is_empty(){return Ok(base);}
         let used:Vec<_>=self.animations.iter().filter(|asset|self.animation_assignments.iter().any(|a|a.asset_id==asset.id)).collect();
-        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}Ok(format!("{:x}",hash.finalize()))
+        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}if !self.powerups.is_empty(){hash.update(b"custom-powerups-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.powerups)?));}if !self.tag_duplicates.is_empty(){hash.update(b"tag-duplicates-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_duplicates)?));}Ok(format!("{:x}",hash.finalize()))
     }
 }
 
@@ -426,7 +441,8 @@ pub fn validate_edits(project: &Project, inspection: &MapInspection) -> Result<(
                 .value
                 .as_f64()
                 .ok_or_else(|| crate::SparkError::Invalid("Field must be numeric".into()))?;
-            if !value.is_finite() || value < field.min || value > field.max {
+            if !value.is_finite() || value < field.min || value > field.max ||
+                (matches!(field.kind.as_str(),"i16"|"u16"|"i32")&&value.fract()!=0.) {
                 return invalid(format!(
                     "{} must be between {} and {}",
                     field.label, field.min, field.max
@@ -434,6 +450,7 @@ pub fn validate_edits(project: &Project, inspection: &MapInspection) -> Result<(
             }
         }
     }
+    crate::maps::validate_ui_layout(project,inspection)?;
     Ok(())
 }
 pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Vec<u8>> {
@@ -487,8 +504,11 @@ pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Ve
             let path_ptr = crate::binary::Reader(&bytes).u32(table + target.index * 32 + 16)?;
             bytes[f.offset + 4..f.offset + 8].copy_from_slice(&path_ptr.to_le_bytes());
         } else {
-            bytes[f.offset..f.offset + 4]
-                .copy_from_slice(&(edit.value.as_f64().unwrap() as f32).to_le_bytes());
+            let value=edit.value.as_f64().unwrap();
+            let encoded=match f.kind.as_str(){"i16"=>(value as i16).to_le_bytes().to_vec(),
+                "u16"=>(value as u16).to_le_bytes().to_vec(),"i32"=>(value as i32).to_le_bytes().to_vec(),
+                "f32"=>(value as f32).to_le_bytes().to_vec(),_=>return invalid("Unsupported editable field encoding")};
+            bytes[f.offset..f.offset+encoded.len()].copy_from_slice(&encoded);
         }
     }
     for object in &project.scene {

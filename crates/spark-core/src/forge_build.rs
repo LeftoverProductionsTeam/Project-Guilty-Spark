@@ -267,6 +267,7 @@ pub fn run_job(
             }
         }
         let output_dir=directory.join("output");fs::create_dir(&output_dir)?;
+        crate::powerups::prepare(project,&sources.scenario_path,workspace,&stage,&invader(tools,"invader-edit").unwrap(),&runner)?;
         let output=output_dir.join(format!("{}.map",sources.bsp_name));
         if document.runtime_id==RuntimeId::MccSteam {
             crate::engine_machinima::prepare(project,&sources.scenario_path,workspace,&invader(tools,"invader-edit").unwrap(),&runner,0)?;
@@ -282,6 +283,7 @@ pub fn run_job(
             runner.run(&invader(tools,"invader-build").unwrap(),&["-g".into(),engine.into(),"-t".into(),stage.to_string_lossy().into_owned(),"-m".into(),output_dir.to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),sources.scenario_path.clone()],workspace,"compile",82)?;
         }
         let inspected=maps::inspect_map(&output,None)?;
+        crate::powerups::verify_compiled(project,&inspected,workspace)?;
         if inspected.header.version!=version || !inspected.scenario_path.replace('\\',"/").eq_ignore_ascii_case(&sources.scenario_path.replace('\\',"/")) || inspected.header.scenario_type!=1 || inspected.mesh.indices.is_empty() {return invalid("Compiled map has wrong engine/scenario/type or no collision BSP");}
         for check in ["crc32_mismatched","is_protected","stub_count"] {
             let value=runner.run(&invader(tools,"invader-info").unwrap(),&["-T".into(),check.into(),output.to_string_lossy().into_owned()],workspace,"verify",94)?;

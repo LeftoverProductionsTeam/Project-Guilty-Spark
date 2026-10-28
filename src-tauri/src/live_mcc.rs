@@ -14,17 +14,34 @@ pub struct ScaleSession {
     error: Mutex<Option<String>>,
     keeper_started: AtomicBool,
 }
+#[derive(Default)]
+struct NativeSprintData {enabled:bool,config:live::sprint::Config,state:live::sprint::State,error:Option<String>}
+#[derive(Default)]
+pub struct NativeSprintSession {data:Mutex<NativeSprintData>,started:AtomicBool}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeSprintStatus {pub enabled:bool,pub sprinting:bool,pub restore_pending:bool,pub config:live::sprint::Config,pub observed:Option<live::sprint::Info>,pub error:Option<String>,pub detail:String}
+#[derive(Default)]
+struct NativeCameraData {enabled:bool,config:live::camera::Config,state:live::camera::State,error:Option<String>,shortcut:live::camera::Shortcut,shortcut_latch:live::camera::ShortcutLatch}
+#[derive(Default)]
+pub struct NativeCameraSession {data:Mutex<NativeCameraData>,started:AtomicBool}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeCameraStatus {pub enabled:bool,pub active:bool,pub restore_pending:bool,pub config:live::camera::Config,pub shortcut:live::camera::Shortcut,pub observed:Option<live::camera::Info>,pub error:Option<String>,pub detail:String}
 #[derive(Clone)]
 pub struct Session {
+    closed: Arc<AtomicBool>,
     pub pid: u32,
     pub base: u64,
     pub created: u64,
     pub root: PathBuf,
     pub identity: live::MapIdentity,
     pub scales: Arc<ScaleSession>,
+    pub sprint:Arc<NativeSprintSession>,
+    pub camera:Arc<NativeCameraSession>,
 }
 impl Session {
-    pub fn active_physics(&self) -> bool {
+    fn scales_active(&self)->bool {
         self.scales
             .state
             .lock()
@@ -54,6 +71,10 @@ mod windows {
             Threading::*,
         },
     };
+    mod sprint_control {include!("live_sprint_native.rs");}
+    pub use sprint_control::{sprint_configure,sprint_status};
+    mod camera_control {include!("live_camera_native.rs");}
+    pub use camera_control::{camera_configure,camera_status,camera_shortcut,camera_toggle};
     pub struct Process(HANDLE);
     impl Drop for Process {
         fn drop(&mut self) {
@@ -345,16 +366,20 @@ mod windows {
         }
         let snapshot = live::snapshot(&process, base)?;
         let session = Session {
+            closed:Arc::new(AtomicBool::new(false)),
             pid,
             base,
             created: created(process.0)?,
             root: root.to_owned(),
             identity: snapshot.identity,
             scales: Arc::new(ScaleSession::default()),
+            sprint:Arc::new(NativeSprintSession::default()),
+            camera:Arc::new(NativeCameraSession::default()),
         };
         Ok(session)
     }
     fn guarded(s: &Session, writable: bool) -> Result<Process> {
+        if s.closed.load(Ordering::Acquire){return invalid("This live session is disconnected; reconnect before editing");}
         check_anticheat()?;
         let p = open(s.pid, writable)?;
         if created(p.0)? != s.created
@@ -379,7 +404,7 @@ mod windows {
             .lock()
             .map_err(|_| spark_core::SparkError::Invalid("Scale state lock failed".into()))?
             .vehicle_active();
-        Ok(Status{pid:s.pid,snapshot,experimental:true,active_vehicle_physics:vehicle_active,active_shared_scales:s.active_physics(),scale_keeper_error:s.scales.error.lock().map_err(|_|spark_core::SparkError::Invalid("Scale keeper lock failed".into()))?.clone(),detail:"Experimental MCC Halo 1 adapter: object positions and uniform scale with readback. World items share their authored size tag. Vehicles couple shared contact spheres, suspension, mass and inertia; park and exit matching vehicles first. Driving and peer replication require game checks.".into()})
+        Ok(Status{pid:s.pid,snapshot,experimental:true,active_vehicle_physics:vehicle_active,active_shared_scales:s.scales_active(),scale_keeper_error:s.scales.error.lock().map_err(|_|spark_core::SparkError::Invalid("Scale keeper lock failed".into()))?.clone(),detail:"Experimental MCC Halo 1 adapter: object positions and uniform scale with readback. World items share their authored size tag. Vehicles couple shared contact spheres, suspension, mass and inertia; park and exit matching vehicles first. Driving and peer replication require game checks.".into()})
     }
     pub fn gameplay_inventory(s:&Session)->Result<live::GameplayInventory> {
         let _edit=EditLock::acquire(s)?;live::gameplay_inventory(&guarded(s,false)?,s.base,&s.identity)
@@ -425,20 +450,28 @@ mod windows {
             return;
         }
         let weak = Arc::downgrade(&s.scales);
+        let sprint_weak=Arc::downgrade(&s.sprint);
+        let camera_weak=Arc::downgrade(&s.camera);
+        let closed=s.closed.clone();
         let (pid, base, created, root, identity) =
             (s.pid, s.base, s.created, s.root.clone(), s.identity.clone());
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_millis(300));
             let Some(scales) = weak.upgrade() else { break };
+            let Some(sprint)=sprint_weak.upgrade()else{break};
+            let Some(camera)=camera_weak.upgrade()else{break};
             let session = Session {
+                closed:closed.clone(),
                 pid,
                 base,
                 created,
                 root: root.clone(),
                 identity: identity.clone(),
                 scales,
+                sprint,
+                camera,
             };
-            if !session.active_physics() {
+            if !session.scales_active() {
                 continue;
             }
             let result = (|| -> Result<()> {
@@ -467,6 +500,10 @@ mod windows {
     }
     pub fn disconnect(s: &Session) -> Result<()> {
         let _edit = EditLock::acquire(s)?;
+        if s.closed.load(Ordering::Acquire){return Ok(());}
+        let result=(||->Result<()>{
+        sprint_control::restore_locked(s)?;
+        camera_control::restore_locked(s)?;
         let mut state = s
             .scales
             .state
@@ -488,11 +525,31 @@ mod windows {
         }
         let _paused = PausedThreads::acquire(s.pid)?;
         scaling::reset(&process, s.base, &s.identity, &mut state)
+        })();
+        if result.is_ok(){s.closed.store(true,Ordering::Release);}
+        result
     }
     #[cfg(test)]
     mod tests {
         use super::*;
         use live::Memory;
+        #[test]
+        #[ignore="Requires the owner's running reviewed MCC Halo 1 session in official mods mode"]
+        fn native_camera_disconnect_rejects_a_stale_session(){
+            let root=std::env::var_os("SPARK_MCC_TEST_ROOT").expect("Set SPARK_MCC_TEST_ROOT to the installed MCC root");
+            let session=connect(Path::new(&root),true).unwrap();
+            struct Restore<'a>(&'a Session);impl Drop for Restore<'_>{fn drop(&mut self){let _=disconnect(self.0);}}
+            let _restore=Restore(&session);
+            let original=live::camera::info(&open(session.pid,false).unwrap(),session.base,&session.identity).unwrap();
+            assert!(original.available,"Load a map with a living armed player first");
+            assert!(camera_toggle(&session,Some(Default::default())).unwrap().active);
+            disconnect(&session).unwrap();
+            assert!(camera_toggle(&session,Some(Default::default())).is_err(),"A captured old session must not write after disconnect");
+            assert!(camera_shortcut(&session,Default::default()).is_err());
+            let restored=live::camera::info(&open(session.pid,false).unwrap(),session.base,&session.identity).unwrap();
+            assert_eq!(restored.weapon_third_person,original.weapon_third_person);
+            disconnect(&session).unwrap(); // Idempotent and no second restoration.
+        }
         #[test]
         fn transport_reads_current_process_without_remote_code() {
             let values = [1.0f32, 2., 3.];
@@ -509,7 +566,19 @@ mod windows {
     }
 }
 #[cfg(windows)]
-pub use windows::{connect, disconnect, moves, sample, scale, scale_info,gameplay_inventory};
+pub use windows::{connect, disconnect, moves, sample, scale, scale_info,gameplay_inventory,sprint_configure,sprint_status,camera_configure,camera_status,camera_shortcut,camera_toggle};
+#[cfg(not(windows))]
+pub fn camera_status(_: &Session)->Result<NativeCameraStatus>{invalid("Native MCC third-person camera requires Windows")}
+#[cfg(not(windows))]
+pub fn camera_configure(_: &Session,_:bool,_:live::camera::Config)->Result<NativeCameraStatus>{invalid("Native MCC third-person camera requires Windows")}
+#[cfg(not(windows))]
+pub fn camera_shortcut(_: &Session,_:live::camera::Shortcut)->Result<NativeCameraStatus>{invalid("Native MCC camera shortcuts require Windows")}
+#[cfg(not(windows))]
+pub fn camera_toggle(_: &Session,_:Option<live::camera::Config>)->Result<NativeCameraStatus>{invalid("Native MCC camera toggle requires Windows")}
+#[cfg(not(windows))]
+pub fn sprint_status(_: &Session)->Result<NativeSprintStatus>{invalid("Native MCC sprint requires Windows")}
+#[cfg(not(windows))]
+pub fn sprint_configure(_: &Session,_:bool,_:live::sprint::Config)->Result<NativeSprintStatus>{invalid("Native MCC sprint requires Windows")}
 #[cfg(not(windows))]
 pub fn gameplay_inventory(_: &Session)->Result<live::GameplayInventory>{invalid("Live MCC gameplay inspection requires Windows")}
 #[cfg(not(windows))]

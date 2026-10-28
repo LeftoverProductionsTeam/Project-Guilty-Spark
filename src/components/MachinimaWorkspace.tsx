@@ -28,6 +28,7 @@ import { downloadLocalText } from '../exportHelpers';
 import { Notice, NumberField } from './ui';
 import MachinimaRig from './MachinimaRig';
 import RenderFeatures from './RenderFeatures';
+import NativeCameraControls from './NativeCameraControls';
 import type { DirectorBridge, DirectorTransport } from './MachinimaRig';
 import type { ForgeSnapshot } from './ForgeViewport';
 import '../machinima.css';
@@ -287,6 +288,7 @@ export default function MachinimaWorkspace({
         </div>
       </header>
       <details className="engine-machinima-controls"><summary>In-engine recording · native cameras, HUD off, your actor stays controllable</summary>
+        <NativeCameraControls/>
         <p>Build a private MCC map variant with these camera points. In Halo, toggle your flashlight to start/stop the take. Movement and actions remain enabled while the game camera is detached. Record the Halo window with OBS Game Capture at the game’s full resolution.</p>
         <label><input type="checkbox" checked={!!studio.engineMachinima?.enabled} onChange={e=>edit({...project,studio:{...studio,engineMachinima:{enabled:e.target.checked,playback:studio.engineMachinima?.playback??'fixed',cameraId:shot?.id??null,autoStart:studio.engineMachinima?.autoStart??false}}},'Configure game-native machinima take')}/>Include native engine camera controls in the next MCC build</label>
         {studio.engineMachinima?.enabled&&<>

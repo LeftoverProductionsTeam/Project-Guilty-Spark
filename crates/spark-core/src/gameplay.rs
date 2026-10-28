@@ -18,14 +18,14 @@ impl Default for Controls {
         Self {
             sprint: false,
             sprint_key: "ShiftLeft".into(),
-            sprint_multiplier: 1.5,
+            sprint_multiplier: 1.75,
             dual_wield: false,
             dual_wield_key: "KeyQ".into(),
             sword_lunge: false,
         }
     }
 }
-fn key(value: &str) -> bool {
+pub fn keyboard_key(value: &str) -> bool {
     matches!(
         value,
         "ShiftLeft"
@@ -40,8 +40,8 @@ fn key(value: &str) -> bool {
 }
 impl Controls {
     pub fn validate(&self) -> Result<()> {
-        if !key(&self.sprint_key)
-            || !key(&self.dual_wield_key)
+        if !keyboard_key(&self.sprint_key)
+            || !keyboard_key(&self.dual_wield_key)
             || self.sprint_key == self.dual_wield_key
         {
             return invalid("Choose two different keyboard keys for sprint and dual wield");

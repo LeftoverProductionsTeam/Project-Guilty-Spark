@@ -52,7 +52,7 @@ export interface TagField {
   key: string;
   label: string;
   offset: number;
-  kind: 'f32' | 'reference';
+  kind: 'f32' | 'reference' | 'i16' | 'u16' | 'i32';
   value: number;
   min: number;
   max: number;
@@ -168,6 +168,9 @@ export interface EngineBuildTarget {
   invaderDirectory:string|null;ceCompatibleTagset:boolean;openSauce:boolean;
 }
 export interface Project {
+  tagDuplicates?: import('./tagDuplicates').TagDuplicate[];
+  audioPreview?:import('./spatialAudio').SoundScene|null;
+  powerups?:import('./powerups').CustomPowerup[];
   gameplayControls?:import('./gameplay').GameplayControls|null;
   bspAssembly?:import('./bspAssembly').BspAssembly|null;
   animations?:import('./animation').AnimationAsset[];
@@ -219,6 +222,7 @@ export interface LibraryEntry {
   scenarioType: number | null;
 }
 export interface Settings {
+  nativeCameraShortcut?: {enabled:boolean;key:string};
   steamBridgeDirectory?: string | null;
   steamBridgeManifestSha256?: string | null;
   preferredHalo?:RuntimeId|null;
@@ -422,6 +426,8 @@ export interface SoundPermutation {
   pitchRange: number;
   permutation: number;
   name: string;
+  nextPermutation?: number | null;
+  chainStart?: boolean;
   format: string;
   channels: number;
   sampleRate: number;

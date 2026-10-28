@@ -10,6 +10,8 @@ use std::{
 };
 #[path = "map_decals.rs"]
 mod decals;
+#[path = "ui_tags.rs"]
+mod ui_tags;
 pub use decals::SceneDecal;
 
 pub const MAX_CACHE_BYTES: u64 = 768 * 1024 * 1024;
@@ -570,6 +572,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
         (0x240, 0x24c, 120, "Vehicle"),
         (0x258, 0x264, 40, "Equipment"),
         (0x270, 0x27c, 92, "Weapon"),
+        (0x2dc, 0x2e8, 40, "Sound scenery"),
     ] {
         match placements(
             &r,
@@ -906,7 +909,10 @@ fn read_fields(
     let Some(at) = tag.data_offset else {
         return Ok(());
     };
-    if matches!(version,6|7|609)&&tag.class=="snd!" {
+    if matches!(version,6|7|13|609) && matches!(tag.class.as_str(),"DeLa"|"tagc"|"Soul") {
+        ui_tags::read(r,space,tag,ids)?;
+    }
+    if matches!(version,6|7|13|609)&&tag.class=="snd!" {
         space.pointer(space.address+(at-space.begin)as u32,164)?;
         for (offset,key,label,max,unit) in [(8,"sound-min-distance","Minimum audible distance",20000.,"world units"),
             (12,"sound-max-distance","Maximum audible distance",20000.,"world units"),
@@ -917,7 +923,7 @@ fn read_fields(
         }
         reference(r,tag,at+112,"Promotion sound",Some("snd!"),ids)?;
     }
-    if matches!(version,6|7|609)&&tag.class=="lsnd" {
+    if matches!(version,6|7|13|609)&&tag.class=="lsnd" {
         space.pointer(space.address+(at-space.begin)as u32,84)?;
         let (tracks,count)=space.block(r,at+60,160,4)?;
         for index in 0..count {let track=tracks+index*160;
@@ -1024,6 +1030,10 @@ fn read_fields(
         ] {
             reference(r, tag, at + o, label, None, ids)?;
         }
+        // Object attachments include the actual looping sounds used by placed
+        // sound-scenery emitters. Keep tag identity instead of name guessing.
+        let (attachments,count)=space.block(r,at+0x140,72,8)?;
+        for i in 0..count{reference(r,tag,attachments+i*72,&format!("Attachment {}",i+1),None,ids)?;}
     }
     if tag.class == "weap" {
         space.pointer(space.address + (at - space.begin) as u32, 0x508)?;
@@ -1344,6 +1354,9 @@ pub fn read_range(path: &Path, offset: u64, len: usize) -> Result<Vec<u8>> {
     let mut b = vec![0; len];
     f.read_exact(&mut b)?;
     Ok(b)
+}
+pub(crate) fn validate_ui_layout(project:&crate::project::Project,inspection:&MapInspection)->Result<()> {
+    ui_tags::validate_layout(project,inspection)
 }
 
 #[cfg(test)]

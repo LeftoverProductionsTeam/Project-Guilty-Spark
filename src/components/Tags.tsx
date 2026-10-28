@@ -13,6 +13,7 @@ import { Empty, Notice, NumberField, Pill } from './ui';
 import Sound from './Sound';
 import TagLineageInspector from './TagLineageInspector';
 import TagMigrationReviewPanel from './TagMigrationReviewPanel';
+import TagDuplicatePanel from './TagDuplicatePanel';
 import type { CueName, LocalCueReference } from '../interfacePreferences';
 import { createTagExchangeBundle } from '../haloExchange';
 import { downloadLocalText } from '../exportHelpers';
@@ -204,6 +205,10 @@ export default function Tags({
         <div className="panel-foot">{shown.length} matching · indexed from cache</div>
       </aside>
       <section className="tag-detail">
+        {inspection.header.scenarioType===2&&<Notice>
+          Interface map · browse its actual widgets, HUD definitions, fonts, strings and bitmap dependencies here.
+          Widget links are followed one at a time, including cyclic collections. Game event handlers remain engine-controlled.
+        </Notice>}
         {selectedTag ? (
           <>
             <div className="tag-detail-heading">
@@ -285,6 +290,7 @@ export default function Tags({
                 </div>}
               </div>
             </div>
+            <TagDuplicatePanel key={`${project.id}:${selectedTag.id}`} project={project} inspection={inspection} source={selectedTag} edit={edit} />
             {projectile && rocket && (
               <div className="preset-bar">
                 <div>
@@ -346,6 +352,7 @@ export default function Tags({
                             value={value}
                             min={f.min}
                             max={f.max}
+                            step={f.kind === 'f32' ? undefined : 1}
                             onCommit={(v) => change(selectedTag, f, v)}
                           />
                         )}

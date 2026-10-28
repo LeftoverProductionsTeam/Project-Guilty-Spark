@@ -6,6 +6,8 @@ import {readHistoryLimit} from '../historyPreferences';
 import {isEditingText} from '../editorFlight';
 import type {Vec3} from '../types';
 import LiveScaleControls,{type ScaleChange,type ScaleObject,type ScaleReceipt} from './LiveScaleControls';
+import NativeSprintControls from './NativeSprintControls';
+import NativeCameraControls from './NativeCameraControls';
 export interface LiveObjectState extends ScaleObject {tagPath:string;position:Vec3;velocity:Vec3;forward:Vec3;up:Vec3;parentDatum:number;player:boolean}
 export interface LiveStatus {pid:number;activeVehiclePhysics:boolean;activeSharedScales:boolean;scaleKeeperError:string|null;snapshot:{profile:string;identity:{scenario:string;checksum:number;tagCount:number;scenarioDatum:number};objects:LiveObjectState[]};detail:string}
 type Status=LiveStatus;
@@ -47,6 +49,8 @@ export default function LiveObjectInspector({viewport,presentation='sidebar',con
   const inspector=<section className="analysis-card live-object-inspector"><h2>Live Halo 1 objects · MCC</h2><p>Move and resize actual objects in the current game. Vehicle size includes coupled contact geometry, mass and inertia.</p>
     {!status?<><label><input type="checkbox" checked={mods} onChange={e=>setMods(e.target.checked)}/> I launched MCC using Anti-Cheat Disabled in Steam</label><button disabled={!native||!mods||busy} onClick={()=>void perform(async()=>{const s=await call<Status>('live_mcc_connect',{modsMode:mods});setStatus(s);setHistory({past:[],future:[]});setMessage('Connected to the loaded game map.');})}>Connect current Halo 1 session</button></>:<>
       <p role="status">{status.snapshot.identity.scenario} · {status.snapshot.objects.length} live objects · PID {status.pid}</p>
+      <NativeSprintControls/>
+      <NativeCameraControls/>
       {status.activeSharedScales&&<Notice tone="info">Shared sizes are temporary. Keep Spark open while using them. Park and exit affected vehicles before undoing, disconnecting or closing Spark; original item sizes and vehicle physics are restored on disconnect.</Notice>}
       {status.scaleKeeperError&&<Notice tone="error">{status.scaleKeeperError}</Notice>}
       <input type="search" aria-label="Find live Halo object" value={query} onChange={e=>setQuery(e.target.value)} placeholder="warthog, cyborg, scenery…"/>

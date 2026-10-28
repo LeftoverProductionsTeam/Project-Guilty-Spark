@@ -109,6 +109,122 @@ fn gameplay_inventory_distinguishes_equipped_and_stowed_slots_without_writes() {
     m.put(weapon+0xd8,&u32::MAX.to_le_bytes());
     assert!(gameplay_inventory(&m,BASE,&id).is_err());assert!(m.writes.borrow().is_empty());
 }
+fn sprint_fixture()->(Mock,MapIdentity,u64){
+    let m=fixture();let id=identity(&m,BASE).unwrap().0;
+    m.put(OBJECT+0x70,&0u16.to_le_bytes());m.put(0x60000038+3,&[0]);
+    m.put(OBJECT+0x1f8,&0x30000u32.to_le_bytes());m.put(OBJECT+0x1d8,&0u32.to_le_bytes());
+    m.put(OBJECT+0x9c,&1f32.to_le_bytes());m.put(OBJECT+0x258,&1f32.to_le_bytes());
+    let table=0x72000000u64;let record=table+0x38;m.put(BASE+0x1c40480,&table.to_le_bytes());
+    m.put(table,b"players\0");m.put(table+0x20,&16u16.to_le_bytes());m.put(table+0x22,&0xc20u16.to_le_bytes());m.put(table+0x34,&0x38u32.to_le_bytes());
+    m.put(record,&3u16.to_le_bytes());m.put(record+0x64,&0x20000u32.to_le_bytes());m.put(record+0xd4,&1.2f32.to_le_bytes());
+    m.put(BASE+0x2b6f5e4,&1000u32.to_le_bytes());m.put(BASE+0x2e9f7ed,&[1]);m.put(BASE+0x2e9f7ec,&[1]);(m,id,record)
+}
+#[test]
+fn native_sprint_uses_the_authored_player_multiplier_without_compounding_and_restores_exactly(){
+    let(m,id,record)=sprint_fixture();let mut state=sprint::State::default();let config=sprint::Config::default();
+    assert!(sprint::needs_update(&m,BASE,&id,&state,&config,true).unwrap());
+    sprint::tick(&m,BASE,&id,&mut state,&config,true).unwrap();
+    let expected=1.2f32*config.multiplier;assert_eq!(u32_at(&m,record+0xd4).unwrap(),expected.to_bits());
+    assert!(!sprint::needs_update(&m,BASE,&id,&state,&config,true).unwrap());
+    sprint::tick(&m,BASE,&id,&mut state,&config,true).unwrap();assert_eq!(m.writes.borrow().len(),1);
+    sprint::tick(&m,BASE,&id,&mut state,&config,false).unwrap();assert_eq!(u32_at(&m,record+0xd4).unwrap(),1.2f32.to_bits());assert!(!state.active());
+    assert!(m.writes.borrow().iter().all(|at|*at==record+0xd4));
+}
+#[test]
+fn native_sprint_releases_for_reload_crouch_vehicle_and_death_without_velocity_writes(){
+    for (at,bytes)in[(OBJECT+0x1d8,0x400u32.to_le_bytes()),(OBJECT+0x1d8,1u32.to_le_bytes()),(OBJECT+0xd8,7u32.to_le_bytes()),(OBJECT+0x9c,0f32.to_le_bytes())]{
+        let(m,id,record)=sprint_fixture();let mut state=sprint::State::default();let config=sprint::Config::default();sprint::tick(&m,BASE,&id,&mut state,&config,true).unwrap();
+        m.put(at,&bytes);sprint::tick(&m,BASE,&id,&mut state,&config,true).unwrap();assert_eq!(u32_at(&m,record+0xd4).unwrap(),1.2f32.to_bits());assert!(!state.active());
+        assert!(m.writes.borrow().iter().all(|at|*at==record+0xd4));
+    }
+}
+#[test]
+fn native_sprint_refuses_layout_salt_changes_and_restores_after_a_failed_write(){
+    let(mut m,id,record)=sprint_fixture();let mut state=sprint::State::default();let config=sprint::Config::default();
+    m.ignore_writes=true;assert!(sprint::tick(&m,BASE,&id,&mut state,&config,true).is_err());assert!(!state.active());assert_eq!(u32_at(&m,record+0xd4).unwrap(),1.2f32.to_bits());
+    m.ignore_writes=false;m.writes.borrow_mut().clear();m.put(record,&4u16.to_le_bytes());assert!(sprint::tick(&m,BASE,&id,&mut state,&config,true).is_err());assert!(m.writes.borrow().is_empty());
+}
+#[test]
+fn native_sprint_handles_the_exact_decay_observed_in_the_real_trial_and_still_restores(){
+    let(m,id,record)=sprint_fixture();m.put(record+0xd4,&1f32.to_le_bytes());let mut state=sprint::State::default();let config=sprint::Config{hotkey:"ShiftLeft".into(),multiplier:1.5};
+    sprint::tick(&m,BASE,&id,&mut state,&config,true).unwrap();
+    m.put(BASE+0x2b6f5e4,&1003u32.to_le_bytes());m.put(record+0xd4,&1.499666690826416f32.to_le_bytes());
+    assert!(sprint::needs_update(&m,BASE,&id,&state,&config,true).unwrap());
+    sprint::tick(&m,BASE,&id,&mut state,&config,true).unwrap();assert_eq!(u32_at(&m,record+0xd4).unwrap(),1.5f32.to_bits());
+    m.put(BASE+0x2b6f5e4,&1006u32.to_le_bytes());m.put(record+0xd4,&1.499666690826416f32.to_le_bytes());
+    sprint::tick(&m,BASE,&id,&mut state,&config,false).unwrap();assert_eq!(u32_at(&m,record+0xd4).unwrap(),1f32.to_bits());assert!(!state.active());
+}
+const CAMERA_UNIT:u64=HEADER+0x4000;
+const CAMERA_WEAPON:u64=HEADER+0x5000;
+const CAMERA_TRACK:u64=HEADER+0x6000;
+const CAMERA_POINTS:u64=HEADER+0x8000;
+const CAMERA_WEAPON_2:u64=HEADER+0x9000;
+fn camera_fixture()->(Mock,MapIdentity){
+    let m=fixture();m.put(HEADER+12,&5u32.to_le_bytes());
+    for(index,class,offset)in[(1u32,*b"bipd",0x4000u32),(2,*b"weap",0x5000),(3,*b"trak",0x6000),(4,*b"weap",0x9000)]{
+        let entry=TABLE+u64::from(index)*32;m.put(entry,&u32::from_be_bytes(class).to_le_bytes());m.put(entry+12,&(0x10000+index).to_le_bytes());m.put(entry+20,&(0x50000000+offset).to_le_bytes());
+    }
+    m.put(OBJECT+0x70,&0u16.to_le_bytes());m.put(0x60000038+3,&[0]);m.put(OBJECT+0x9c,&1f32.to_le_bytes());m.put(OBJECT+0xd4,&0x30001u32.to_le_bytes());
+    m.put(0x60000038+12,&[3,0,0,2,0,0,0,0,0,16,0,0]);m.put(OBJECT+4096,&0x10002u32.to_le_bytes());m.put(OBJECT+4096+0x70,&2u16.to_le_bytes());m.put(OBJECT+4096+0xd8,&0x20000u32.to_le_bytes());
+    m.put(CAMERA_UNIT+0x1f4,&1u32.to_le_bytes());m.put(CAMERA_UNIT+0x1f8,&0x50007000u32.to_le_bytes());m.put(HEADER+0x7000,&u32::from_be_bytes(*b"trak").to_le_bytes());m.put(HEADER+0x700c,&0x10003u32.to_le_bytes());
+    m.put(CAMERA_TRACK+4,&4u32.to_le_bytes());m.put(CAMERA_TRACK+8,&0x50008000u32.to_le_bytes());m.put(CAMERA_POINTS,&[0;240]);
+    for i in 0..4u64 {m.put(CAMERA_POINTS+i*60,&[-1f32,0.,0.5].iter().flat_map(|v|v.to_le_bytes()).collect::<Vec<_>>());m.put(CAMERA_POINTS+i*60+24,&1f32.to_le_bytes());}
+    m.put(CAMERA_WEAPON+0x308,&0x21u32.to_le_bytes());m.put(CAMERA_WEAPON_2+0x308,&0x81u32.to_le_bytes());
+    m.put(BASE+0x2d9bdd4,&[0;0x38]);m.put(BASE+0x2d9bdd4+0x20,&1f32.to_le_bytes());m.put(BASE+0x2d9bdd4+0x34,&1f32.to_le_bytes());
+    let id=identity(&m,BASE).unwrap().0;(m,id)
+}
+#[test]
+fn native_camera_edits_positions_without_compounding_or_changing_authored_rotations(){
+    let(m,id)=camera_fixture();let mut state=camera::State::default();let config=camera::Config::default();
+    let rotations=m.read(CAMERA_POINTS+12,16).unwrap();assert!(camera::info(&m,BASE,&id).unwrap().available);assert!(m.writes.borrow().is_empty());
+    camera::apply(&m,BASE,&id,&mut state,Some(&config)).unwrap();assert!(state.engaged());assert!(!camera::needs_update(&m,BASE,&id,&state,&config).unwrap());
+    assert_eq!(vec3(&m,CAMERA_POINTS).unwrap(),[-1.4,-0.3,0.65]);assert_eq!(u32_at(&m,CAMERA_WEAPON+0x308).unwrap(),0x21|(1<<17));assert_eq!(m.read(CAMERA_POINTS+12,16).unwrap(),rotations);
+    let next=camera::Config{back:0.75,right:-0.25,up:0.3};camera::apply(&m,BASE,&id,&mut state,Some(&next)).unwrap();assert_eq!(vec3(&m,CAMERA_POINTS).unwrap(),[-1.75,0.25,0.8]);
+    // Unrelated flag changes made by the engine must survive restoration.
+    m.put(CAMERA_WEAPON+0x308,&(0x25u32|(1<<17)).to_le_bytes());camera::apply(&m,BASE,&id,&mut state,None).unwrap();
+    assert_eq!(u32_at(&m,CAMERA_WEAPON+0x308).unwrap(),0x25);assert_eq!(vec3(&m,CAMERA_POINTS).unwrap(),[-1.,0.,0.5]);assert!(!state.active());
+}
+#[test]
+fn native_camera_follows_weapon_switches_and_restores_both_weapon_definitions(){
+    let(m,id)=camera_fixture();let mut state=camera::State::default();let config=camera::Config::default();camera::apply(&m,BASE,&id,&mut state,Some(&config)).unwrap();
+    m.put(OBJECT+4096,&0x10004u32.to_le_bytes());assert!(camera::needs_update(&m,BASE,&id,&state,&config).unwrap());camera::apply(&m,BASE,&id,&mut state,Some(&config)).unwrap();
+    assert_eq!(u32_at(&m,CAMERA_WEAPON+0x308).unwrap(),0x21);assert_eq!(u32_at(&m,CAMERA_WEAPON_2+0x308).unwrap(),0x81|(1<<17));assert_eq!(vec3(&m,CAMERA_POINTS).unwrap(),[-1.4,-0.3,0.65]);
+    camera::apply(&m,BASE,&id,&mut state,None).unwrap();assert_eq!(u32_at(&m,CAMERA_WEAPON_2+0x308).unwrap(),0x81);
+}
+#[test]
+fn native_camera_restores_for_vehicle_entry_and_death_then_can_reapply(){
+    for(at,bytes)in[(OBJECT+0xd8,7u32.to_le_bytes()),(OBJECT+0x9c,0f32.to_le_bytes())]{
+        let(m,id)=camera_fixture();let mut state=camera::State::default();let config=camera::Config::default();camera::apply(&m,BASE,&id,&mut state,Some(&config)).unwrap();m.put(at,&bytes);
+        assert!(camera::needs_update(&m,BASE,&id,&state,&config).unwrap());camera::apply(&m,BASE,&id,&mut state,Some(&config)).unwrap();assert!(!state.active());assert_eq!(vec3(&m,CAMERA_POINTS).unwrap(),[-1.,0.,0.5]);
+        m.put(OBJECT+0xd8,&u32::MAX.to_le_bytes());m.put(OBJECT+0x9c,&1f32.to_le_bytes());camera::apply(&m,BASE,&id,&mut state,Some(&config)).unwrap();assert!(state.engaged());
+    }
+}
+#[test]
+fn native_camera_refuses_bad_layouts_and_foreign_camera_changes_without_writes(){
+    let(m,id)=camera_fixture();let mut state=camera::State::default();let config=camera::Config::default();m.put(CAMERA_TRACK+4,&17u32.to_le_bytes());
+    assert!(camera::apply(&m,BASE,&id,&mut state,Some(&config)).is_err());assert!(m.writes.borrow().is_empty());
+    m.put(CAMERA_TRACK+4,&4u32.to_le_bytes());camera::apply(&m,BASE,&id,&mut state,Some(&config)).unwrap();m.writes.borrow_mut().clear();m.put(CAMERA_POINTS,&3f32.to_le_bytes());
+    assert!(camera::apply(&m,BASE,&id,&mut state,None).is_err());assert!(state.active());assert!(m.writes.borrow().is_empty());assert_eq!(vec3(&m,CAMERA_POINTS).unwrap()[0],3.);
+}
+#[test]
+fn native_camera_retires_its_journal_on_map_change_without_restoring_old_addresses(){
+    let(m,id)=camera_fixture();let mut state=camera::State::default();camera::apply(&m,BASE,&id,&mut state,Some(&camera::Config::default())).unwrap();m.writes.borrow_mut().clear();m.put(HEADER+8,&999u32.to_le_bytes());
+    camera::apply(&m,BASE,&id,&mut state,None).unwrap();assert!(!state.active());assert!(m.writes.borrow().is_empty());
+    assert!(camera::needs_update(&m,BASE,&id,&state,&camera::Config::default()).is_err());
+    assert!(camera::apply(&m,BASE,&id,&mut state,Some(&camera::Config::default())).is_err());
+    assert!(!state.active());assert!(m.writes.borrow().is_empty());
+}
+#[test]
+fn native_camera_rolls_back_a_partial_write_and_preserves_preexisting_third_person(){
+    struct Partial {inner:Mock,calls:RefCell<usize>}
+    impl Memory for Partial {
+        fn read(&self,p:u64,n:usize)->Result<Vec<u8>>{self.inner.read(p,n)}
+        fn write(&self,p:u64,b:&[u8])->Result<()>{let mut calls=self.calls.borrow_mut();*calls+=1;if *calls==2 {self.inner.put(p,&b[..2]);return invalid("Simulated partial write");}self.inner.write(p,b)}
+    }
+    let(m,id)=camera_fixture();m.put(CAMERA_WEAPON+0x308,&(0x21u32|(1<<17)).to_le_bytes());let partial=Partial{inner:m,calls:RefCell::new(0)};let mut state=camera::State::default();
+    assert!(camera::apply(&partial,BASE,&id,&mut state,Some(&camera::Config::default())).is_err());assert!(!state.active());assert_eq!(vec3(&partial,CAMERA_POINTS).unwrap(),[-1.,0.,0.5]);
+    camera::apply(&partial,BASE,&id,&mut state,Some(&camera::Config::default())).unwrap();camera::apply(&partial,BASE,&id,&mut state,None).unwrap();assert_eq!(u32_at(&partial,CAMERA_WEAPON+0x308).unwrap(),0x21|(1<<17));
+}
 #[test]
 fn binds_exact_map_object_and_confirms_real_readback() {
     let m = fixture();

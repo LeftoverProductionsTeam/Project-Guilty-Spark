@@ -11,8 +11,8 @@ const FILTERS: {value: CommunityMapFilter; label: string}[] = [
   {value: 'halo-md', label: 'HaloMD'},
 ];
 
-export default function CommunityMaps({onImport, onLibrary, busy}: {
-  onImport: () => void; onLibrary: () => void; busy: boolean;
+export default function CommunityMaps({onImport, onImportConvert, currentMapTitle, onConvertCurrent, onLibrary, busy}: {
+  onImport: () => void; onImportConvert: () => void; currentMapTitle: string|null; onConvertCurrent: () => void; onLibrary: () => void; busy: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [audience, setAudience] = useState<CommunityMapFilter>('all');
@@ -23,14 +23,15 @@ export default function CommunityMaps({onImport, onLibrary, busy}: {
   return <div className="analysis-page gs-map-discovery">
     <PageTitle eyebrow="HALO MODDING ARCHIVES / CREATE • PRESERVE • SHARE"
       title="Discover community maps. Preserve your favorites."
-      description="Browse researched archive homepages, choose a download in your browser, then import a local copy into Spark. A Halo cache is not the same as editable source tags."
+      description="Download a Custom Edition map from an archive, then import and convert it to MCC Halo 1 inside Spark. Conversion checks explain missing resources and unsupported features."
       actions={<><button className="small-button" onClick={onLibrary}><FolderOpen size={16}/> Your map library</button>
-        <button className="primary" onClick={onImport} disabled={!native || busy}><ArrowDownToLine size={16}/>{busy?'Importing…':'Import downloaded map'}</button></>}/>
+        <button className="primary" onClick={onImportConvert} disabled={!native || busy}><ArrowDownToLine size={16}/>{busy?'Importing…':'Import & convert to MCC'}</button></>}/>
     <Notice tone="info">This is a curated directory, <strong>not</strong> a live inventory or a built-in downloader. Source links open outside Spark and downloads are initiated in your browser. No auto-installs, scraping, executable launches or replacement of game maps.</Notice>
     <div className="gs-download-steps" aria-label="Download and import steps">
       <div><b>01</b><strong>Find a map</strong><p>Open an archive below. Confirm its author, edition, required resources and permission.</p></div>
       <div><b>02</b><strong>Download yourself</strong><p>Use the author or archive download link in your browser. Keep the original package.</p></div>
       <div><b>03</b><strong>Inspect in Spark</strong><p>Choose Import downloaded map. Spark preserves, hashes and validates supported files.</p></div>
+      <div><b>04</b><strong>Convert to MCC</strong><p>Choose Import &amp; convert to MCC. Prepare installed MCC tools, resolve the compatibility report, then build and playtest the separate MCC package.</p></div>
     </div>
     <section className="analysis-card gs-map-sources" aria-label="Community map archives">
       <div className="gs-section-tools"><div><div className="eyebrow">ARCHIVE NAVIGATOR</div><h2>Historic and active community catalogs</h2></div>
@@ -66,7 +67,8 @@ export default function CommunityMaps({onImport, onLibrary, busy}: {
       <label htmlFor="gs-map-file-name">Optional: enter a downloaded filename to see the next step</label>
       <input id="gs-map-file-name" value={filename} onChange={e=>setFilename(e.target.value)} maxLength={180} placeholder="example: classic_arena.zip or bloodgulch.map"/>
       {extensionAdvice ? <div className={`gs-file-advice gs-file-${extensionAdvice.kind}`} role="status"><ShieldCheck size={16}/><p>{extensionAdvice.guidance}</p></div> : <p className="subtle">Supported native import: <code>.map</code>, <code>.yelo</code> and supported <code>.zip</code> archives. Spark also imports its own <code>.gsproject</code> descriptors, but they are not downloaded maps.</p>}
-      <div className="gs-map-download-actions"><button onClick={onImport} disabled={!native || busy} className="primary"><ArrowDownToLine size={16}/>Import downloaded file</button><button onClick={onLibrary}>View preserved projects</button></div>
+      <div className="gs-map-download-actions"><button onClick={onImport} disabled={!native || busy}><ArrowDownToLine size={16}/>Import downloaded map</button><button onClick={onConvertCurrent} disabled={!currentMapTitle||busy} title={currentMapTitle?`Open MCC conversion for ${currentMapTitle}`:'Open or import a map first'}>Convert open map to MCC</button><button onClick={onLibrary}>View preserved projects</button></div>
+      {currentMapTitle&&<p className="subtle">Open map: {currentMapTitle}. Conversion runs from Build &amp; playtest and keeps its own resources, targets and logs.</p>}
       <p className="subtle">Halo CE, Halo PC, Demo/Mac, HaloMD, Xbox and MCC caches are not interchangeable merely because the extension says <code>.map</code>. Archives can have missing shared resources; inspect errors and check the author's release notes before attempting a build.</p>
     </section>
   </div>;
