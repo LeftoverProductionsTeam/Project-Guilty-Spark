@@ -148,7 +148,11 @@ pub fn libraries(steam: &Path) -> Result<Vec<PathBuf>> {
     Ok(out)
 }
 pub fn mcc_in_library(library: &Path) -> Result<Option<PathBuf>> {
-    let manifest = library.join("steamapps/appmanifest_976730.acf");
+    app_in_library(library,"976730")
+}
+pub fn app_in_library(library:&Path,appid:&str)->Result<Option<PathBuf>> {
+    if !appid.bytes().all(|b|b.is_ascii_digit()) {return invalid("Invalid Steam application ID");}
+    let manifest = library.join(format!("steamapps/appmanifest_{appid}.acf"));
     if !manifest.is_file() {
         return Ok(None);
     }
@@ -156,7 +160,7 @@ pub fn mcc_in_library(library: &Path) -> Result<Option<PathBuf>> {
     let state = v
         .get("AppState")
         .ok_or_else(|| crate::SparkError::Invalid("Missing AppState".into()))?;
-    if state.get("appid").and_then(Vdf::text) != Some("976730") {
+    if state.get("appid").and_then(Vdf::text) != Some(appid) {
         return invalid("Steam app manifest has the wrong app ID");
     }
     let name = state
@@ -285,6 +289,7 @@ pub fn discover(steam_override: Option<&Path>, mcc_override: Option<&Path>) -> I
         .as_ref()
         .is_some_and(|p| p.join("halo1/maps").is_dir());
     for lib in &out.libraries {
+        if let Ok(Some(kit))=app_in_library(lib,"1532190") {out.editing_tools=Some(kit);continue;}
         let common = lib.join("steamapps/common");
         if let Ok(entries) = fs::read_dir(common) {
             for e in entries.flatten() {

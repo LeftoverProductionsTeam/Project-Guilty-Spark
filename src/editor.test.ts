@@ -82,6 +82,30 @@ describe('semantic tag overlay', () => {
   });
 });
 describe('project history', () => {
+  it('defaults to 100 retained undo actions and preserves that bound through redo',()=>{
+    let state=historyReducer(initialHistory,{type:'load',project});
+    expect(state.limit).toBe(100);
+    for(let i=1;i<=105;i++)state=historyReducer(state,{type:'edit',project:{...state.current!,title:`Edit ${i}`},description:'Rename'});
+    expect(state.past).toHaveLength(100);
+    for(let i=0;i<100;i++)state=historyReducer(state,{type:'undo'});
+    expect(state.current?.title).toBe('Edit 5');expect(state.future).toHaveLength(100);
+    for(let i=0;i<100;i++)state=historyReducer(state,{type:'redo'});
+    expect(state.past).toHaveLength(100);expect(state.current?.title).toBe('Edit 105');
+  });
+  it('applies a user limit to both history directions and keeps it across project opens',()=>{
+    let state=historyReducer(initialHistory,{type:'history-limit',limit:150});state=historyReducer(state,{type:'load',project});
+    for(let i=1;i<=125;i++)state=historyReducer(state,{type:'edit',project:{...state.current!,title:`Edit ${i}`},description:'Rename'});
+    expect(state.past).toHaveLength(125);state=historyReducer(state,{type:'history-limit',limit:3});expect(state.past).toHaveLength(3);
+    for(let i=0;i<3;i++)state=historyReducer(state,{type:'undo'});expect(state.current?.title).toBe('Edit 122');
+    state=historyReducer(state,{type:'history-limit',limit:1});expect(state.future).toHaveLength(1);
+    state=historyReducer(state,{type:'load',project});expect(state.limit).toBe(1);
+    expect(historyReducer(state,{type:'history-limit',limit:0})).toBe(state);
+  });
+  it('does not consume undo or erase redo for an unchanged gizmo edit',()=>{
+    let state=historyReducer(initialHistory,{type:'load',project});state=historyReducer(state,{type:'edit',project:{...project,title:'A'},description:'Rename'});
+    state=historyReducer(state,{type:'undo'});const unchanged=historyReducer(state,{type:'edit',project:{...state.current!},description:'Move'});
+    expect(unchanged).toBe(state);expect(unchanged.future).toHaveLength(1);
+  });
   it('keeps completed build history while undoing an unrelated edit', () => {
     let state = historyReducer(initialHistory, { type: 'load', project });
     state = historyReducer(state, {

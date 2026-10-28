@@ -1,0 +1,6 @@
+import {COMPATIBILITY_REVISION,RUNTIME_COMPATIBILITY} from '../runtimeCompatibility';
+export default function CompatibilityTable(){return <details className="analysis-card gs-compatibility"><summary>Engine compatibility table · {COMPATIBILITY_REVISION}</summary>
+  <p>Map binaries are engine-specific. File inspection, compilation, game loading and multiplayer are separate evidence gates. The supported editor subset is narrower than each game’s full feature set.</p>
+  <div style={{overflowX:'auto'}}><table><thead><tr><th>Runtime</th><th>Map format</th><th>Tags & scripts</th><th>Builders</th><th>Resources</th><th>Shaders & lightmaps</th><th>Runtime evidence</th></tr></thead><tbody>{RUNTIME_COMPATIBILITY.map(r=><tr key={r.name}><th>{r.name}</th><td>{r.maps}</td><td>{r.tags}</td><td>{r.builder}</td><td>{r.resources}</td><td>{r.render}</td><td>{r.play}</td></tr>)}</tbody></table></div>
+  <p>Sources: <a href="https://c20.reclaimers.net/h1/h1-ek/" target="_blank" rel="noopener noreferrer">H1 editing kits</a> · <a href="https://c20.reclaimers.net/h1/maps/" target="_blank" rel="noopener noreferrer">cache/resource formats</a>. Detailed verification is recorded in the C33 engineering report.</p>
+</details>}

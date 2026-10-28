@@ -1,22 +1,31 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react';
+import SceneEnvironment from './SceneEnvironment';
+import SceneEffects from './SceneEffects';
+import ViewportLabel from './ViewportLabel';
+import ViewportTelemetry from './ViewportTelemetry';
+import { Suspense, useEffect, useMemo, useRef,useState } from 'react';
+import MachinimaActor from './MachinimaActor';
+import ViewportSession from './ViewportSession';
+import type {RehearsalFrame} from './MachinimaActor';
+import {downloadLocalText} from '../exportHelpers';
 import type { MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   Edges,
-  Html,
   OrbitControls,
   PerspectiveCamera,
   PointerLockControls,
   TransformControls,
 } from '@react-three/drei';
 import * as THREE from 'three';
-import type { ForgeBrush, ForgeMesh, ForgeNode, QuickForgeDocument } from '../forge';
+import type { ForgeBrush, ForgeMesh, ForgeNode, ForgePlacement,QuickForgeDocument } from '../forge';
 import { forgeNodes, nodeRotation, transformForgeNode } from '../forge';
 import { hillAreas, raceCoursePoints, teleporterLinks } from '../haloGametypeScenario';
 import type { SpawnZone } from '../firefight';
 import type { Vec3 } from '../types';
 import { environmentValue, sunlightPosition, toHex } from '../environment';
-import { ViewportBoundary } from './World';
+import { ViewportBoundary,Mesh } from './World';
+import {forgeModelKey,useOwnedForgeModels} from '../useOwnedForgeModels';
+import type {OwnedModelView} from '../useOwnedForgeModels';
 import RightMouseFly from './RightMouseFly';
 import { createSourceCollisionWorld, resolveSourceBody, stepSourceWalk, WALK_EYE_HEIGHT } from '../liveCollision';
 import type { WalkState } from '../liveCollision';
@@ -26,8 +35,17 @@ export interface ForgeSnapshot {
   mesh: ForgeMesh;
   document: QuickForgeDocument;
 }
-export type ForgeCamera = 'orbit' | 'fly' | 'walk';
+export type ForgeCamera = 'orbit' | 'fly' | 'walk' | 'machinima';
 export interface ForgeViewportProps {
+  sessionId?:string;
+  actorAnimation?:import('../animation').AnimationPreview|null;
+  renderFeatures?:import('../renderFeatures').RenderFeatures|null;
+  ownedModels?:Record<string,OwnedModelView>;
+  spawnModelSource?:ForgePlacement;
+  actorId?:string;
+  recording?:boolean;
+  rehearsalTake?:MutableRefObject<RehearsalFrame[]>;
+  selectionGuard?:MutableRefObject<number>;
   document: QuickForgeDocument;
   snapshot: ForgeSnapshot | null;
   selected: string[];
@@ -56,6 +74,9 @@ export interface ForgeViewportProps {
   wrlOverlay?: WrlDiagnostics | null;
   showWrlOverlay?: boolean;
   focusWrlOverlay?: boolean;
+  viewportChildren?:React.ReactNode;
+  cameraLocked?:boolean;
+  cinema?:boolean;
 }
 function brushGeometry(snapshot: ForgeSnapshot, brush: ForgeBrush, cutaway: boolean): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
@@ -103,6 +124,7 @@ function NodeVisual({
   wireframe,
   cutaway,
   error,
+  ownedModel,
 }: {
   node: ForgeNode;
   snapshot: ForgeSnapshot | null;
@@ -111,6 +133,7 @@ function NodeVisual({
   wireframe: boolean;
   cutaway: boolean;
   error: boolean;
+  ownedModel?:OwnedModelView;
 }) {
   const original = snapshot?.document.geometry.find((b) => b.id === node.value.id);
   const geometry = useMemo(
@@ -140,8 +163,8 @@ function NodeVisual({
       </mesh>
     );
   }
-  const spawn = node.type === 'spawn',
-    objective = node.type === 'objective';
+  if(node.type==='placement'||node.type==='spawn')return ownedModel?<Mesh data={ownedModel.mesh} shaderTextures={ownedModel.shaderTextures} shaderMetadata={ownedModel.shaderMetadata} extraTextures={ownedModel.extraTextures} wireframe={wireframe}/>:null;
+  const spawn = false, objective = node.type === 'objective';
   const color = error
     ? '#ff9d8d'
     : selected
@@ -157,10 +180,6 @@ function NodeVisual({
         <torusGeometry args={[spawn ? 0.45 : 0.32, 0.035, 6, 24]} />
         <meshBasicMaterial color={color} />
       </mesh>
-      <mesh position={[0, 0, 0.6]}>
-        <octahedronGeometry args={[0.18, 0]} />
-        <meshBasicMaterial color={color} wireframe={!selected} />
-      </mesh>
       <mesh position={[0, 0, 0.3]}>
         <boxGeometry args={[0.025, 0.025, 0.5]} />
         <meshBasicMaterial color={color} />
@@ -172,12 +191,7 @@ function NodeVisual({
         </mesh>
       )}
       {selected && (
-        <Html center position={[0, 0, 1.1]} style={{ pointerEvents: 'none' }}>
-          <span className="forge-world-label">
-            {node.value.name || (spawn ? 'Player start' : 'Objective')}
-            {node.type === 'placement' && <small>Tag reference · {node.value.tagClass}</small>}
-          </span>
-        </Html>
+        <ViewportLabel position={[0,0,1.1]} text={node.value.name || (spawn ? "Player start" : "Objective")}/>
       )}
     </group>
   );
@@ -207,9 +221,7 @@ function HillRegions({objectives}:{objectives:QuickForgeDocument['objectives']})
       <lineLoop geometry={a.border} raycast={()=>null} renderOrder={5}>
         <lineBasicMaterial color="#82fce4" depthWrite={false}/>
       </lineLoop>
-      <Html center position={[a.center.x,a.center.y,a.center.z+0.45]} style={{pointerEvents:'none'}}>
-        <span className="forge-zone-label">King hill {a.id} · source-only</span>
-      </Html>
+      <ViewportLabel position={[a.center.x,a.center.y,a.center.z+0.45]} text={`King hill ${a.id} · source guide`}/>
     </group>)}
   </group>;
 }
@@ -239,9 +251,7 @@ function NetgameRoutes({objectives}:{objectives:QuickForgeDocument['objectives']
       <lineSegments geometry={line.geometry} raycast={()=>null} renderOrder={6}>
         <lineBasicMaterial color={line.color} depthTest={false} transparent opacity={0.8} depthWrite={false}/>
       </lineSegments>
-      <Html center position={line.midpoint} style={{pointerEvents:'none'}}>
-        <span className="forge-zone-label">{line.label} · source guide</span>
-      </Html>
+      <ViewportLabel position={line.midpoint} text={`${line.label} · source guide`}/>
     </group>)}
   </group>;
 }
@@ -401,13 +411,16 @@ function ForgeScene(props: ForgeViewportProps) {
   const zoneGroup = useRef<THREE.Group>(null);
   const nodes = forgeNodes(doc).filter((node) => node.value.visible);
   const chosen = nodes.filter((node) => selected.includes(node.value.id) && !node.value.locked);
-  const origin = chosen
+  const selectionBasis=chosen.map(node=>[node.value.id,...node.value.position,...nodeRotation(node)].join(':')).join('|');
+  // Keep the gizmo's declarative basis stable while preview/material state
+  // changes. New Vector3/Euler props would reset an in-progress native drag.
+  const origin = useMemo(()=>chosen
     .reduce((point, node) => point.add(new THREE.Vector3(...node.value.position)), new THREE.Vector3())
-    .divideScalar(chosen.length || 1);
-  const base = new THREE.Quaternion().setFromEuler(
+    .divideScalar(chosen.length || 1),[selectionBasis]);
+  const base = useMemo(()=>new THREE.Quaternion().setFromEuler(
     new THREE.Euler(...(chosen.length === 1 ? nodeRotation(chosen[0]) : ([0, 0, 0] as Vec3)), 'XYZ'),
-  );
-  const baseRotation = new THREE.Euler().setFromQuaternion(base, 'XYZ');
+  ),[selectionBasis]);
+  const baseRotation = useMemo(()=>new THREE.Euler().setFromQuaternion(base, 'XYZ'),[base]);
   useEffect(() => {
     props.dropPoint.current = (x, y) => {
       const rect = gl.domElement.getBoundingClientRect();
@@ -430,6 +443,7 @@ function ForgeScene(props: ForgeViewportProps) {
     };
   }, [camera, gl, scene, props.dropPoint]);
   function visual(node: ForgeNode, anchored = false) {
+    if(cameraMode==='machinima'&&node.type==='spawn')return null;
     const pos = new THREE.Vector3(...node.value.position),
       rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...nodeRotation(node), 'XYZ'));
     if (anchored) {
@@ -444,6 +458,7 @@ function ForgeScene(props: ForgeViewportProps) {
         rotation={euler}
         onClick={(event) => {
           event.stopPropagation();
+          if(performance.now()<(props.selectionGuard?.current??0))return;
           onSelect(node.value.id, event.shiftKey || event.ctrlKey || event.metaKey);
         }}
       >
@@ -455,6 +470,7 @@ function ForgeScene(props: ForgeViewportProps) {
           wireframe={wireframe}
           cutaway={cutaway}
           error={errors.has(node.value.id)}
+          ownedModel={node.type==='placement'?props.ownedModels?.[forgeModelKey(node.value)]:node.type==='spawn'&&props.spawnModelSource?props.ownedModels?.[forgeModelKey(props.spawnModelSource)]:undefined}
         />
       </group>
     );
@@ -467,26 +483,16 @@ function ForgeScene(props: ForgeViewportProps) {
     <>
       <PerspectiveCamera
         makeDefault
+        userData={{gsEditorCamera:true}}
         up={[0, 0, 1]}
         near={0.03}
         far={20000}
         fov={55}
         position={[25, -30, 25]}
       />
-      {(() => {
-        const env = environmentValue(doc.environment);
-        return env.previewEnabled ? <>
-          <ambientLight color={toHex(env.ambientColor)} intensity={env.ambientIntensity} />
-          <directionalLight color={toHex(env.sunColor)} position={sunlightPosition(env)} intensity={env.sunIntensity} />
-          <color attach="background" args={[toHex(env.skyColor)]} />
-          {env.fogEnabled && <fog attach="fog" args={[toHex(env.fogColor), env.fogNear, env.fogFar]} />}
-        </> : <>
-          <ambientLight intensity={0.75} />
-          <hemisphereLight args={['#c2e2ff', '#14252b', 1.5]} />
-          <directionalLight position={[30, -20, 50]} intensity={2.2} />
-          <color attach="background" args={['#0d1922']} />
-        </>;
-      })()}
+      <ViewportTelemetry/>
+      <SceneEnvironment value={environmentValue(doc.environment)} overrideLighting/>
+      {!props.cinema&&<SceneEffects settings={props.renderFeatures}/>}
       {props.grid && (
         <gridHelper
           args={[200, 200, '#55747b', '#24434c']}
@@ -497,17 +503,26 @@ function ForgeScene(props: ForgeViewportProps) {
       {props.showHillAreas && <HillRegions objectives={doc.objectives} />}
       {props.showGameRoutes && <NetgameRoutes objectives={doc.objectives} />}
       {nodes.filter((node) => !chosen.includes(node)).map((node) => visual(node))}
+      {cameraMode==='machinima'&&props.spawnModelSource&&props.rehearsalTake&&(()=>{const actor=doc.spawns.find(s=>s.id===props.actorId)??doc.spawns[0],model=props.ownedModels?.[forgeModelKey(props.spawnModelSource!)];
+        return actor&&model?<MachinimaActor actor={actor} model={model} sessionId={props.sessionId} animation={props.actorAnimation} snapshot={snapshot} recording={!!props.recording} take={props.rehearsalTake!} onError={props.onError}/>:null;})()}
       {chosen.length > 0 && (
+        <>
+          <group ref={group} position={origin} rotation={baseRotation}>
+            {chosen.map((node)=>visual(node,true))}
+          </group>
         <TransformControls
+          object={group as MutableRefObject<THREE.Group>}
           mode={mode}
           enabled={transformable}
-          space={chosen.length === 1 ? 'local' : 'world'}
+          space={mode==='translate'?'world':chosen.length===1?'local':'world'}
           showX={mode !== 'rotate' || chosen.every((n) => n.type === 'brush' || n.type === 'placement')}
           showY={mode !== 'rotate' || chosen.every((n) => n.type === 'brush' || n.type === 'placement')}
           translationSnap={snap || null}
           rotationSnap={snap ? Math.PI / 12 : null}
           scaleSnap={snap ? 0.1 : null}
+          onMouseDown={()=>{if(props.selectionGuard)props.selectionGuard.current=Infinity;}}
           onMouseUp={() => {
+            if(props.selectionGuard)props.selectionGuard.current=performance.now()+250;
             if (!group.current) return;
             try {
             const target = group.current;
@@ -536,11 +551,8 @@ function ForgeScene(props: ForgeViewportProps) {
             target.scale.set(1, 1, 1);
             } catch (error) { props.onError(String(error)); group.current.position.copy(origin); group.current.rotation.copy(baseRotation); group.current.scale.set(1, 1, 1); }
           }}
-        >
-          <group ref={group} position={origin} rotation={baseRotation}>
-            {chosen.map((node) => visual(node, true))}
-          </group>
-        </TransformControls>
+        />
+        </>
       )}
       {props.zones
         .filter((zone) => zone.enabled)
@@ -550,11 +562,9 @@ function ForgeScene(props: ForgeViewportProps) {
               <torusGeometry args={[zone.radius, 0.04, 6, 48]} />
               <meshBasicMaterial color="#e2a374" />
             </mesh>
-            <Html center position={[0, 0, 0.6]} style={{ pointerEvents: 'none' }}>
-              <span className="forge-zone-label">AI zone · {zone.id.slice(0, 8)}</span>
-            </Html>
+            <ViewportLabel position={[0,0,0.6]} text={`AI zone · ${zone.id.slice(0,8)}`}/>
           </group>;
-          return zone.id === props.selectedZone ? <TransformControls key={zone.id} mode="translate" enabled={cameraMode === 'orbit'} translationSnap={snap || null} onMouseUp={() => { if (zoneGroup.current) props.onZoneMove(zone.id, zoneGroup.current.position.toArray() as Vec3); }}><group ref={zoneGroup} position={zone.position}>{visual}</group></TransformControls> : <group key={zone.id} position={zone.position}>{visual}</group>;
+          return zone.id === props.selectedZone ? <TransformControls key={zone.id} object={zoneGroup as MutableRefObject<THREE.Group>} mode="translate" enabled={cameraMode === 'orbit'} translationSnap={snap || null} onMouseUp={() => { if (zoneGroup.current) props.onZoneMove(zone.id, zoneGroup.current.position.toArray() as Vec3); }}><group ref={zoneGroup} position={zone.position}>{visual}</group></TransformControls> : <group key={zone.id} position={zone.position}>{visual}</group>;
         })}
       {props.showWrlOverlay && props.wrlOverlay && <WrlErrorOverlay diagnostics={props.wrlOverlay} />}
       {ghost && (
@@ -569,32 +579,54 @@ function ForgeScene(props: ForgeViewportProps) {
           </mesh>
         </group>
       )}
-      {cameraMode === 'orbit' ? (
-        <OrbitControls makeDefault enableDamping enablePan={false} dampingFactor={0.12} />
-      ) : cameraMode === 'fly' ? (
+      {!props.cameraLocked&&(cameraMode === 'orbit' ? (
+        <OrbitControls makeDefault enableDamping enablePan mouseButtons={{LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.PAN,RIGHT:undefined}} dampingFactor={0.12} />
+      ) : cameraMode === 'fly'||cameraMode==='machinima' ? (
         <RightMouseFly speed={12} />
       ) : (
 <WalkCamera document={doc} snapshot={snapshot} collisionEnabled={props.walkCollision} onError={props.onError} />
-      )}
-      {cameraMode === 'orbit' && <RightMouseFly speed={12} />}
+      ))}
+      {!props.cameraLocked&&cameraMode === 'orbit' && <RightMouseFly speed={12} />}
       <CameraFrame document={doc} frame={props.frame} mode={cameraMode} diagnosticBounds={props.focusWrlOverlay ? props.wrlOverlay?.bounds : null} />
     </>
   );
 }
 export default function ForgeViewport(props: ForgeViewportProps) {
+  const selectionGuard=useRef(0);
+  const {models,failures}=useOwnedForgeModels([...props.document.placements,...(props.spawnModelSource?[props.spawnModelSource]:[])]);
+  const [recording,setRecording]=useState(false),take=useRef<RehearsalFrame[]>([]);
+  useEffect(()=>{if(props.cameraMode!=='machinima')setRecording(false);},[props.cameraMode]);
+  const missing=Object.keys(failures).length;
   return (
+    <>
     <ViewportBoundary>
       <Canvas
         dpr={[1, 1.5]}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, preserveDrawingBuffer:!!props.cinema }}
         onPointerMissed={(event) => {
-          if (event.type === 'click' && event.button === 0) props.onSelect(null, false);
+          if (event.type === 'click' && event.button === 0&&performance.now()>=selectionGuard.current) props.onSelect(null, false);
         }}
       >
         <Suspense fallback={null}>
-          <ForgeScene {...props} />
+          <ForgeScene {...props} ownedModels={models} recording={recording} rehearsalTake={take} selectionGuard={selectionGuard}/>
+          {props.sessionId&&<ViewportSession id={props.sessionId} channel={props.cinema?'machinima':'forge'} paused={props.cameraLocked} ready={!!props.snapshot} requiresControls={props.cameraMode==='orbit'}/>}
+          {props.viewportChildren}
         </Suspense>
       </Canvas>
     </ViewportBoundary>
+    {props.cameraMode==='machinima'&&<div className="forge-director-controls">
+      <strong>Director rehearsal · source preview</strong>
+      <span>Camera: hold RMB + WASD, R/F · Actor: arrows, Q/E turn · Shift speeds up</span>
+      {!props.spawnModelSource?<span>Connect a map containing a Spartan model to rehearse.</span>:<>
+        <button className="small-button" onClick={()=>setRecording(!recording)}>{recording?'Stop rehearsal recording':'Record rehearsal'}</button>
+        <button className="small-button" disabled={recording} onClick={()=>{if(!take.current.length){props.onError('Record a rehearsal before exporting it.');return;}downloadLocalText('spark-director-rehearsal.json',JSON.stringify({schemaVersion:1,kind:'editorRehearsal',gamePlaybackVerified:false,sourceSha256:props.spawnModelSource?.sourceSha256,frames:take.current},null,2),'application/json');}}>Export rehearsal</button>
+      </>}
+      <small>Bind-pose model rehearsal. Live Halo acting and animation require a verified runtime adapter.</small>
+    </div>}
+    {missing>0&&<details className="forge-model-status"><summary>{missing} model dependencies unavailable</summary>
+      {Object.entries(failures).map(([key,reason])=><p key={key}>{props.document.placements.find(p=>forgeModelKey(p)===key)?.name}: {reason}</p>)}</details>}
+    <span className="forge-model-evidence" data-model-types={Object.keys(models).length} data-model-triangles={Object.values(models).reduce((n,m)=>n+m.mesh.indices.length/3,0)}
+      data-placement-models={props.document.placements.filter(p=>models[forgeModelKey(p)]).length} data-spartan-triangles={props.spawnModelSource?(models[forgeModelKey(props.spawnModelSource)]?.mesh.indices.length??0)/3:0} aria-hidden="true"/>
+    </>
   );
 }

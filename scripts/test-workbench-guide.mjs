@@ -46,4 +46,4 @@ const css=readFileSync('src/styles.css','utf8');
 assert.ok(css.includes('.gs-workbench-guide')&&css.includes('.gs-help-wrapper.is-visible .gs-help-bubble'));
 const finder=readFileSync('src/components/WorkspaceFinder.tsx','utf8');
 assert.ok(finder.includes('Math.max(0,results.length-1)')&&finder.includes('aria-live="polite"')&&finder.includes('activeIndex'));
-console.log('C31 field-guide evidence gates, 19 workspace contexts, focus/Escape tooltips and safe navigation passed');
+console.log('C31 field-guide evidence gates, 20 workspace contexts, focus/Escape tooltips and safe navigation passed');

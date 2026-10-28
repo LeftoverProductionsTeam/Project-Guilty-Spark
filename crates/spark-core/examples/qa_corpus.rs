@@ -40,6 +40,7 @@ fn main() -> Result<()> {
     let tools = build::Toolchain {
         invader_directory: args.get(3).map(PathBuf::from),
         resource_directory: Some(resources.clone()),
+        ..Default::default()
     };
     let mut paths = vec![];
     files(&corpus, &mut paths)?;

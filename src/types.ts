@@ -2,10 +2,13 @@ import type { QuickForgeDocument } from './forge';
 import type { FirefightConfig } from './firefight';
 import type { CreatorStudioDocument } from './creatorStudio';
 export type Vec3 = [number, number, number];
+export interface ModelRig{checksum:number;nodes:{name:string;parent:number;position:[number,number,number];rotation:[number,number,number,number]}[];indices:number[];weights:number[]}
 export type Workspace =
   | 'library'
   | 'map-finder'
   | 'get-started'
+  | 'features'
+  | 'how-to'
   | 'community'
   | 'world'
   | 'tags'
@@ -21,6 +24,7 @@ export type Workspace =
   | 'firefight'
   | 'interface'
   | 'creator'
+  | 'machinima'
   | 'academy';
 export interface Diagnostic {
   severity: string;
@@ -72,7 +76,11 @@ export interface Tag {
   references: TagReference[];
   /** Read-only classic shader base/diffuse map attribution from the source cache. */
   primaryBitmapStatus?: 'resolved' | 'missing' | 'invalid' | 'unavailable' | null;
+  shaderPreview?:ShaderPreview|null;
 }
+export interface ShaderLayer {bitmapTagId:number;uvScale:[number,number];uvOffset:[number,number];rotation:number;colorFunction:number;alphaFunction:number}
+export interface ShaderPreview {alphaTest:boolean;twoSided:boolean;uvScale:[number,number];kind?:string;shaderType?:number;detailFunction?:number;multipurposeXbox?:boolean;bumpScale?:number;
+  microDetailFunction?:number;detailScales?:[number,number,number];framebufferBlend?:number;layers?:ShaderLayer[]}
 export interface SceneObject {
   id: string;
   name: string;
@@ -87,6 +95,7 @@ export interface SceneObject {
   assetId: string | null;
 }
 export interface MeshData {
+  rig?:ModelRig|null;
   positions: number[];
   indices: number[];
   normals?: number[];
@@ -101,9 +110,11 @@ export interface MeshData {
 }
 export interface MapInspection {
   header: MapHeader;
+  tagChecksum?:number|null;
   sha256: string;
   tags: Tag[];
   objects: SceneObject[];
+  decals?: SceneDecal[];
   mesh: MeshData;
   renderMesh?: MeshData | null;
   modelMeshes?: Record<string, MeshData>;
@@ -112,6 +123,10 @@ export interface MapInspection {
   resources: { name: string; required: boolean; found: boolean; reason: string }[];
   diagnostics: Diagnostic[];
   scenarioPath: string;
+}
+export interface SceneDecal {
+  id:string;decalTagId:number;bitmapTagId:number;position:Vec3;yaw:number;pitch:number;bspIndex:number|null;
+  radius:number;intensity:number;color:Vec3;flags:number;kind:number;layer:number;blend:number;chainIndex:number;
 }
 export interface Provenance {
   creator: string;
@@ -147,7 +162,21 @@ export interface BuildRecord {
   message: string;
   projectFingerprint: string;
 }
+export interface EngineBuildTarget {
+  id:string;name:string;runtimeId:RuntimeId;builder:'h1a-tool'|'invader-mcc'|'invader-ce'|'unsupported';
+  hekDirectory:string|null;hekFlavor:'h1aEk'|'legacyHek'|null;tagsDirectory:string|null;
+  invaderDirectory:string|null;ceCompatibleTagset:boolean;openSauce:boolean;
+}
 export interface Project {
+  bspAssembly?:import('./bspAssembly').BspAssembly|null;
+  animations?:import('./animation').AnimationAsset[];
+  animationAssignments?:import('./animation').AnimationAssignment[];
+  renderFeatures?:import('./renderFeatures').RenderFeatures|null;
+  conversionProfile?:'faithful'|'zombie-recovery'|null;
+  sourceSceneVersion?:number;
+  worldEnvironment?:import('./environment').EditorEnvironment|null;
+  buildTargets?:EngineBuildTarget[];
+  activeBuildTarget?:string|null;
   quickForge?: QuickForgeDocument | null;
   firefight?: FirefightConfig | null;
   studio?: CreatorStudioDocument | null;
@@ -189,6 +218,10 @@ export interface LibraryEntry {
   scenarioType: number | null;
 }
 export interface Settings {
+  preferredHalo?:RuntimeId|null;
+  onboardingCompleted?:boolean;
+  snapshotIntervalMinutes?: number;
+  snapshotRetention?: number;
   hekDirectory?: string | null;
   /** Explicit confirmation of which official Halo 1 toolchain owns hekDirectory. */
   hekFlavor?: 'legacyHek' | 'h1aEk' | null;
@@ -405,7 +438,9 @@ export interface SoundInspection {
 }
 export interface AudioPreview {
   name: string;
-  mime: 'audio/ogg';
+  mime: 'audio/ogg' | 'audio/wav';
   sha256: string;
   bytes: number[];
+  sourceSha256:string;
+  sourceSampleSha256:string;
 }

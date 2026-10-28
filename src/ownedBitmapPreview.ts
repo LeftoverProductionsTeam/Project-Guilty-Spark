@@ -22,7 +22,7 @@ export interface OwnedBitmapTarget {
   resourceSha256?: string | null;
 }
 const MAX_PREVIEW_BASE64 = 23 * 1024 * 1024; // 16 MiB top mip plus DDS header, base64 expansion
-const SUPPORTED_FORMATS = new Set(['DXT1', 'DXT3', 'DXT5', 'BGRA8', 'BGRX8']);
+const SUPPORTED_FORMATS = new Set(['DXT1', 'DXT3', 'DXT5', 'BGRA8', 'BGRX8', 'R5G6B5','A8','Y8','A8Y8']);
 
 /** Validate *both* tag and source identity before revealing any returned pixel buffer. */
 export function decodeOwnedBitmapPreview(preview: OwnedBitmapPreview, target: OwnedBitmapTarget) {

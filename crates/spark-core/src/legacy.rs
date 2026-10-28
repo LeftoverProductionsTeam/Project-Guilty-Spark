@@ -1,6 +1,7 @@
 //! Narrow, evidence-backed compatibility fixes on job-local buffers only.
 use crate::{binary::Reader, invalid, maps::MapInspection, Result};
 use serde::{Deserialize, Serialize};
+pub const ZOMBIE_DEMO_SHA256:&str="b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d";
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Repair {
@@ -59,4 +60,21 @@ pub fn prepare_extraction(bytes: &mut [u8], inspection: &MapInspection) -> Resul
         repairs.push(Repair{code:"UNUSED_SCRIPT_CAPACITY".into(),message:format!("Normalized unused script-table capacity 0xCACA to {capacity}; source has zero scripts and zero globals. Original map bytes are preserved."),offset:at+32,original:declared as u32,replacement:capacity as u32});
     }
     Ok(repairs)
+}
+/// Explicit recovery edition only. All preconditions are checked before any
+/// change; no missing audio is substituted and no valid zombie object is removed.
+pub fn prepare_zombie_recovery(bytes:&mut [u8],inspection:&MapInspection)->Result<Vec<Repair>>{
+    if inspection.sha256!=ZOMBIE_DEMO_SHA256||inspection.header.version!=6{return invalid("Recovery only accepts the exact audited Zombie Apocalypse Demo source");}
+    let r=Reader(bytes);let mut patches=vec![];
+    for (at,expected) in [(49_227_018usize,0xe6be054au32),(49_227_274,0xe6ce055a)]{
+        if r.fourcc(at)?!="snd!"||r.u32(at+12)?!=expected{return invalid("Audited unavailable event sound reference changed");}
+        for (offset,replacement) in [(at+4,0),(at+8,0),(at+12,u32::MAX)]{patches.push(Repair{code:"RECOVERY_MISSING_EVENT_AUDIO".into(),message:"Recovery edition omits one missing custom event sound dependency; no replacement audio".into(),offset,original:r.u32(offset)?,replacement});}
+    }
+    let scenario=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||crate::SparkError::Invalid("Recovery scenario missing".into()))?;
+    if r.u32(scenario+0x204)?!=0||r.u32(scenario+0x210)?==0{return invalid("Recovery object-name or scenery layout changed");}
+    let delta=r.u32(scenario+0x214)?.checked_sub(0x4bf10000).ok_or_else(||crate::SparkError::Invalid("Recovery scenery pointer invalid".into()))? as usize;
+    let at=(inspection.header.tag_offset as usize).checked_add(delta).ok_or_else(||crate::SparkError::Invalid("Recovery scenery overflow".into()))?;
+    if at+72>inspection.header.tag_offset as usize+inspection.header.tag_size as usize||r.u16(at)?!=10704||r.u16(at+2)?!=5984{return invalid("The audited corrupt first scenery row changed; no placement was disabled");}
+    patches.push(Repair{code:"RECOVERY_CORRUPT_SCENERY".into(),message:"Disable the first corrupt scenery record (type 10704, name 5984); its intended identity is not recoverable. Valid mixed-class placements and vehicle spawners remain".into(),offset:at,original:r.u32(at)?,replacement:u32::MAX});
+    for patch in &patches{bytes[patch.offset..patch.offset+4].copy_from_slice(&patch.replacement.to_le_bytes());}Ok(patches)
 }

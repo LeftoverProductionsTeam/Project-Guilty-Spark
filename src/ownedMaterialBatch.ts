@@ -37,7 +37,7 @@ export function planOwnedMaterialPreviews(
   if (!/^[a-f0-9]{64}$/i.test(inspection.sha256)) throw new Error('An inspected source SHA-256 is required');
   const result: OwnedMaterialPreviewPlan = {shaderTasks:[], lightmapTasks:[], skipped:[],sourceSha256:inspection.sha256};
   if (!mesh?.materialRanges?.length) return result;
-  if (![6,7,609].includes(inspection.header.version)) {
+  if (![6,7,13,609].includes(inspection.header.version)) {
     result.skipped.push({key:'runtime',reason:'Automatic classic cache previews are not supported by this runtime'});
     return result;
   }

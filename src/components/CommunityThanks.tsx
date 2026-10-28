@@ -28,6 +28,7 @@ export default function CommunityThanks(){
       <p>From the Halo Demo and MacGamingMods experiments to Halo Maps, HaloMods, Custom Edition, Invader, the MEK, c20 and MCC's Editing Kits: countless people documented the hard parts. Every unnamed tutorial writer, bug reporter, map creator and fellow player deserves thanks too.</p>
       <p><strong>This register is not exhaustive.</strong> It credits verifiable projects and contributors without guessing historical identities. The nomination list is private to your machine until you choose to export it; it is not publicly submitted or automatically treated as verified.</p>
     </section>
+    <p><a href="https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/blob/master/COMMUNITY_CREDITS.md" target="_blank" rel="noopener noreferrer">Full community credits and provenance</a></p>
     <section className="analysis-card"><div className="section-heading"><h2>Documented foundations</h2><Pill tone="green"><ShieldCheck size={12}/> Reference-linked</Pill></div>
       <label>Search credits and research <input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Tool, creator or contribution" aria-label="Search community credits" /></label>
       <div className="gs-credits-grid">{verified.map(entry=><article className="gs-credit" key={entry.id}>

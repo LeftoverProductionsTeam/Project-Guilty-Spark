@@ -87,7 +87,31 @@ pub struct BuildRecord {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct EngineBuildTarget {
+    pub id:String,
+    pub name:String,
+    pub runtime_id:crate::runtime::RuntimeId,
+    pub builder:String,
+    pub hek_directory:Option<PathBuf>,
+    pub hek_flavor:Option<String>,
+    pub tags_directory:Option<PathBuf>,
+    pub invader_directory:Option<PathBuf>,
+    #[serde(default)] pub ce_compatible_tagset:bool,
+    #[serde(default)] pub open_sauce:bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Project {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub bsp_assembly:Option<crate::bsp_assembly::BspAssembly>,
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub animations:Vec<crate::animations::AnimationAsset>,
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub animation_assignments:Vec<crate::animations::AnimationAssignment>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub render_features:Option<crate::render_features::RenderFeatures>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub conversion_profile:Option<String>,
     pub schema_version: u32,
     pub id: String,
     pub title: String,
@@ -106,6 +130,14 @@ pub struct Project {
     pub firefight: Option<crate::firefight::FirefightConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub studio: Option<crate::creative::CreatorStudio>,
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub build_targets:Vec<EngineBuildTarget>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub active_build_target:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub world_environment:Option<crate::quickforge::EditorEnvironment>,
+    #[serde(default)]
+    pub source_scene_version:u32,
 }
 impl Project {
     pub fn scenario_path(&self) -> Result<String> {
@@ -123,6 +155,10 @@ impl Project {
             created_at: now.clone(),
             modified_at: now,
             source: None,
+            bsp_assembly:None,
+            conversion_profile:None,
+            render_features:None,
+            animations:vec![],animation_assignments:vec![],
             provenance: Provenance::default(),
             scene: vec![],
             assets: vec![],
@@ -132,9 +168,38 @@ impl Project {
             quick_forge: None,
             firefight: None,
             studio: None,
+            build_targets:vec![],active_build_target:None,
+            world_environment:None,
+            source_scene_version:1,
         }
     }
     pub fn validate(&self) -> Result<()> {
+        if let Some(assembly)=&self.bsp_assembly{assembly.validate()?;if self.source.is_none()||self.quick_forge.is_some(){return invalid("A BSP assembly needs a preserved destination map");}}
+        if let Some(features)=&self.render_features{features.validate()?;}
+        if self.animations.len()>128||self.animation_assignments.len()>128{return invalid("Animation library exceeds 128 assets or assignments");}
+        let mut animation_ids=std::collections::HashSet::new();for asset in &self.animations{asset.validate()?;if !animation_ids.insert(&asset.id){return invalid("Duplicate animation asset");}}
+        for binding in &self.animation_assignments{uuid::Uuid::parse_str(&binding.id).map_err(|_|crate::SparkError::Invalid("Invalid animation assignment".into()))?;if !animation_ids.contains(&binding.asset_id)||!matches!(binding.mode.as_str(),"custom"|"replace-graph")||binding.source_sha256.len()!=64||binding.target_tag_path.len()>256||crate::safe_relative(&binding.target_tag_path).is_err(){return invalid("Invalid animation assignment or missing source asset");}}
+        if self.conversion_profile.as_deref().is_some_and(|p|!matches!(p,"faithful"|"zombie-recovery")){return invalid("Unknown map conversion profile");}
+        if let Some(environment)=&self.world_environment {environment.validate()?;}
+        if self.build_targets.len()>16 {return invalid("At most 16 engine build targets per project");}
+        let mut target_ids=std::collections::HashSet::new();
+        for target in &self.build_targets {
+            Uuid::parse_str(&target.id).map_err(|_|crate::SparkError::Invalid("Invalid build target ID".into()))?;
+            if !target_ids.insert(&target.id) || target.name.is_empty() || target.name.len()>100 ||
+                !["h1a-tool","invader-mcc","invader-ce","unsupported"].contains(&target.builder.as_str()) ||
+                target.hek_flavor.as_deref().is_some_and(|f|!matches!(f,"legacyHek"|"h1aEk")) {
+                return invalid("Invalid or duplicate engine build target");
+            }
+            if target.open_sauce && target.runtime_id!=crate::runtime::RuntimeId::HaloCustomEdition {
+                return invalid("OpenSauce belongs to legacy Custom Edition, not MCC or other runtimes");
+            }
+        }
+        if let Some(id)=self.active_build_target.as_ref() {
+            let target=self.build_targets.iter().find(|t| &t.id==id).ok_or_else(||crate::SparkError::Invalid("Active engine build target is missing".into()))?;
+            if self.quick_forge.as_ref().is_some_and(|d|d.runtime_id!=target.runtime_id) {
+                return invalid("QuickForge runtime differs from the active engine build target");
+            }
+        }
         if self.schema_version != PROJECT_VERSION {
             return invalid(
                 "This project schema is not supported. The original project has not been modified.",
@@ -155,7 +220,9 @@ impl Project {
         }
         if let Some(source) = &self.source {
             if source.resource_sha256.iter().any(|(name, hash)| {
-                !["bitmaps.map", "sounds.map", "loc.map"].contains(&name.as_str())
+                !(["bitmaps.map", "sounds.map", "loc.map"].contains(&name.as_str())
+                    || (source.cache_version==13&&(["common.ipak","inplace1.ipak","inplace2.ipak","mcc-textures"].contains(&name.as_str())
+                        || name.strip_suffix(".imeta").is_some_and(|n|!n.is_empty()&&n.len()<=64&&n.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_'||b==b'-')))))
                     || hash.len() != 64
                     || !hash.bytes().all(|b| b.is_ascii_hexdigit())
             }) {
@@ -204,7 +271,7 @@ impl Project {
     }
     pub fn fingerprint(&self) -> Result<String> {
         use sha2::{Digest, Sha256};
-        let bytes = serde_json::to_vec(&(
+        let bytes = fingerprint_json(serde_json::to_vec(&(
             &self.source.as_ref().map(|s| &s.sha256),
             &self
                 .source
@@ -215,12 +282,28 @@ impl Project {
             &self.assets,
             &self.quick_forge,
             &self.firefight,
-            // Creator Studio is source-only authoring and QA metadata, not compiled
-            // cache input. Keep old build fingerprint compatibility across upgrades.
-        ))?;
-        Ok(format!("{:x}", Sha256::digest(bytes)))
+            // Keep historical hashes when no new native inputs are enabled.
+        ))?);
+        let base=if self.active_build_target.is_none() {
+            format!("{:x}", Sha256::digest(bytes))
+        } else {
+            let mut hash=Sha256::new();hash.update(bytes);
+            let active=self.build_targets.iter().find(|t|Some(&t.id)==self.active_build_target.as_ref())
+                .ok_or_else(||crate::SparkError::Invalid("Active engine build target missing".into()))?;
+            hash.update(serde_json::to_vec(active)?);
+            format!("{:x}",hash.finalize())
+        };
+        let camera=self.studio.as_ref().and_then(|s|s.engine_machinima.as_ref().filter(|o|o.enabled).map(|o|(o,&s.shots)));
+        let profile=self.conversion_profile.as_deref().filter(|p|*p!="faithful");
+        if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none(){return Ok(base);}
+        let used:Vec<_>=self.animations.iter().filter(|asset|self.animation_assignments.iter().any(|a|a.asset_id==asset.id)).collect();
+        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}Ok(format!("{:x}",hash.finalize()))
     }
 }
+
+// JavaScript serializes -0 as 0. Normalize only numeric zero tokens so an
+// unchanged UI round trip cannot invalidate a native build receipt.
+fn fingerprint_json(bytes:Vec<u8>)->Vec<u8>{let mut out=Vec::with_capacity(bytes.len());let(mut i,mut quoted,mut escaped)=(0,false,false);while i<bytes.len(){let b=bytes[i];if quoted{out.push(b);if escaped{escaped=false;}else if b==b'\\'{escaped=true;}else if b==b'"'{quoted=false;}i+=1;continue;}if b==b'"'{quoted=true;}if bytes[i..].starts_with(b"-0.0")&&bytes.get(i+4).is_none_or(|b|b",]} \r\n\t".contains(b)){out.extend_from_slice(b"0.0");i+=4;}else{out.push(b);i+=1;}}out}
 
 /// Snapshot only fixed resource names. Paths and hashes remain local project provenance.
 pub fn resource_hashes(directory: &Path) -> Result<std::collections::BTreeMap<String, String>> {
@@ -407,7 +490,8 @@ pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Ve
                 }
             }
             if let Some(at) = original.rotation_offset {
-                if original.kind == "Player spawn" {
+                if matches!(original.kind.as_str(),"Player spawn"|"Netgame item") {
+                    if object.rotation[1]!=0.||object.rotation[2]!=0.{return invalid("This source placement supports yaw only; pitch and roll must remain zero");}
                     bytes[at..at + 4].copy_from_slice(&object.rotation[0].to_le_bytes());
                 } else {
                     for i in 0..3 {

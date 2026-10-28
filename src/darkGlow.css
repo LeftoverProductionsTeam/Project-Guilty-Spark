@@ -1,0 +1,186 @@
+/* Trim and bloom are editable; text and surface luminance stay independent. */
+:root[data-gs-theme='dark-glow'] {
+  --bg: #070a12;
+  --panel: #0c111c;
+  --surface: #101725;
+  --line: #354155;
+  --border: #354155;
+  --text: #ffffff;
+  --muted: #ffffff;
+  --accent: var(--gs-glow-primary, #57dfff);
+  --cyan: var(--gs-glow-secondary, #bb83ff);
+  --amber: #ffce85;
+  --gs-glow: color-mix(in srgb, var(--accent) var(--gs-glow-percent, 23%), transparent);
+  --gs-glow-alt: color-mix(in srgb, var(--cyan) var(--gs-glow-percent, 23%), transparent);
+  color: #fff;
+  color-scheme: dark;
+  background: var(--bg);
+}
+/* Older lazy workspaces set text colors locally. This scoped rule keeps their
+   labels, notices, inputs and action buttons white without changing other themes. */
+:root[data-gs-theme='dark-glow'] .application,
+:root[data-gs-theme='dark-glow'] .application * {
+  color: #fff !important;
+}
+:root[data-gs-theme='dark-glow'] .application {
+  background:
+    radial-gradient(ellipse at 0 0, color-mix(in srgb, var(--accent) 5%, transparent), transparent 55%),
+    var(--bg);
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 0 0 1px var(--gs-glow-alt),
+    0 0 var(--gs-glow-blur, 14px) var(--gs-glow);
+}
+:root[data-gs-theme='dark-glow'] :is(.app-header, .sidebar, .statusbar) {
+  background: var(--panel);
+  border-color: var(--line);
+}
+:root[data-gs-theme='dark-glow'] .app-header {
+  box-shadow:
+    inset 0 -1px 0 var(--accent),
+    0 0 var(--gs-glow-blur, 14px) var(--gs-glow);
+}
+:root[data-gs-theme='dark-glow'] .sidebar {
+  border-radius: 0 26px 0 0;
+}
+:root[data-gs-theme='dark-glow'] :is(.surface, .analysis-card, .panel) {
+  background: var(--surface);
+  border-color: var(--line);
+  border-radius: 18px 8px 20px 8px;
+  box-shadow:
+    inset 0 1px 0 var(--gs-glow-alt),
+    0 0 var(--gs-glow-blur, 14px) var(--gs-glow);
+}
+:root[data-gs-theme='dark-glow'] :is(button, input, textarea, select, option) {
+  background: #111b2b !important;
+  border-color: #44536a;
+}
+:root[data-gs-theme='dark-glow']
+  :is(
+    button.primary,
+    button.selected,
+    button.active,
+    button[aria-pressed='true'],
+    button[aria-selected='true'],
+    .nav-item.selected
+  ) {
+  background: linear-gradient(110deg, color-mix(in srgb, var(--accent) 10%, #101725), #111a29) !important;
+  border-color: var(--accent);
+  box-shadow:
+    inset 2px 0 var(--accent),
+    0 0 var(--gs-glow-blur, 14px) var(--gs-glow);
+}
+:root[data-gs-theme='dark-glow'] button:hover:not(:disabled) {
+  background: #1b2940 !important;
+  border-color: var(--cyan);
+  box-shadow: 0 0 var(--gs-glow-blur, 14px) var(--gs-glow-alt);
+}
+:root[data-gs-theme='dark-glow'] :is(button, input, select, textarea, a, [tabindex]):focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+:root[data-gs-theme='dark-glow'] :is(button, input, select, textarea):disabled {
+  opacity: 1;
+  background: #101522;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+:root[data-gs-theme='dark-glow'] ::placeholder {
+  color: #fff;
+  opacity: 0.8;
+}
+:root[data-gs-theme='dark-glow'] :is(input[type='range'], input[type='checkbox'], input[type='radio']) {
+  accent-color: var(--accent);
+}
+:root[data-gs-theme='dark-glow'] .gs-window-button {
+  background: #111b2b !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 var(--gs-glow-blur, 14px) var(--gs-glow);
+}
+:root[data-gs-theme='dark-glow'] .gs-window-button:hover {
+  background: #1b2940 !important;
+  border-color: var(--cyan) !important;
+}
+:root[data-gs-theme='dark-glow'] :is(.pill, .notice, .badge) {
+  background: #152134;
+  border-color: var(--line);
+}
+:root[data-gs-theme='dark-glow'] .notice {
+  border-left-color: var(--cyan);
+}
+:root[data-gs-theme='dark-glow'] :is(.notice.error, .notice-danger, .notice-error, .pill.red) {
+  border-color: #ff9aaf;
+}
+:root[data-gs-theme='dark-glow'] :is(.notice.warn, .notice-warning, .pill.amber) {
+  border-color: #ffd38b;
+}
+:root[data-gs-theme='dark-glow']
+  :is(.gs-help-bubble, .gs-finder-dialog, .modal, .modal-card, .context-menu, [role='dialog']) {
+  background: #101725;
+  border-color: var(--cyan);
+}
+:root[data-gs-theme='dark-glow'] :is(.subtle, small, button:disabled) {
+  opacity: 1;
+}
+.interface-theme-dark-glow .interface-swatch {
+  background: linear-gradient(
+    115deg,
+    #070a12 40%,
+    var(--gs-glow-primary, #57dfff) 40%,
+    var(--gs-glow-secondary, #bb83ff) 85%
+  );
+}
+.gs-glow-color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.gs-glow-color-grid label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.gs-glow-color-grid input[type='color'] {
+  width: 56px;
+  height: 38px;
+  padding: 3px;
+  cursor: pointer;
+}
+.gs-glow-color-grid code {
+  font-size: 12px;
+}
+.gs-glow-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 22px 0;
+  padding: 20px;
+  border-radius: 18px 8px;
+  background: #090e18;
+  color: #fff;
+}
+.gs-glow-preview span {
+  padding: 12px 18px;
+  border: 1px solid var(--gs-glow-primary, #57dfff);
+  border-radius: 12px 4px;
+  box-shadow: 0 0 var(--gs-glow-blur, 14px)
+    color-mix(in srgb, var(--gs-glow-primary, #57dfff) var(--gs-glow-percent, 23%), transparent);
+}
+.gs-glow-preview span:nth-child(2) {
+  border-color: var(--gs-glow-secondary, #bb83ff);
+  box-shadow: 0 0 var(--gs-glow-blur, 14px)
+    color-mix(in srgb, var(--gs-glow-secondary, #bb83ff) var(--gs-glow-percent, 23%), transparent);
+}
+.gs-glow-preview p {
+  flex-basis: 100%;
+  margin: 0;
+  color: #fff;
+}
+@media (max-width: 720px) {
+  .gs-glow-color-grid {
+    grid-template-columns: 1fr;
+  }
+}

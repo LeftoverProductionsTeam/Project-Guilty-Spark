@@ -16,7 +16,14 @@ pub struct CreatorStudio {
     pub shots: Vec<CameraShot>,
     pub server: ServerPlan,
     pub playtests: Vec<PlaytestRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub machinima: Option<MachinimaSettings>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub engine_machinima:Option<EngineMachinima>,
 }
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct EngineMachinima{pub enabled:bool,pub playback:String,#[serde(default)]pub camera_id:Option<String>,#[serde(default)]pub auto_start:bool}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MissionBeat {
@@ -42,6 +49,25 @@ pub struct CameraShot {
     pub subtitle: String,
     #[serde(default)]
     pub camera_marker: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roll: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub easing: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MachinimaSettings {
+    pub fps: u32,
+    pub aspect: String,
+    pub thirds: bool,
+    pub safe_frame: bool,
+    pub center: bool,
+    pub show_path: bool,
+    pub loop_playback: bool,
+    pub speed: f32,
+    pub depth_of_field: bool,
+    pub focus_distance: f32,
+    pub blur: f32,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -114,6 +140,10 @@ fn variant_token(s: &str) -> bool {
 
 impl CreatorStudio {
     pub fn validate(&self) -> Result<()> {
+        if let Some(engine)=&self.engine_machinima{
+            if !["fixed","sequence"].contains(&engine.playback.as_str())||engine.camera_id.as_ref().is_some_and(|id|!valid_id(id)){return invalid("Invalid game-native machinima settings");}
+            if engine.enabled&&(self.shots.is_empty()||self.shots.len()>64||engine.camera_id.as_ref().is_some_and(|id|!self.shots.iter().any(|s|&s.id==id))){return invalid("An engine take needs 1–64 camera keys and an existing selected camera");}
+        }
         if self.schema_version != STUDIO_SCHEMA_VERSION
             || self.missions.len() > 128 || self.shots.len() > 256
             || self.playtests.len() > 500 || self.server.rotation.len() > 128 || self.server.game_types.len() > 64
@@ -121,6 +151,14 @@ impl CreatorStudio {
             return invalid("Unsupported Creator Studio version or collection limit");
         }
         let mut ids = HashSet::new();
+        if let Some(m) = &self.machinima {
+            if ![24, 30, 60].contains(&m.fps)
+                || !["16:9", "2.39:1", "1:1", "9:16"].contains(&m.aspect.as_str())
+                || !m.speed.is_finite() || !(0.25..=2.0).contains(&m.speed)
+                || !m.focus_distance.is_finite() || !(0.1..=4096.0).contains(&m.focus_distance)
+                || !m.blur.is_finite() || !(0.0..=1.0).contains(&m.blur)
+            { return invalid("Invalid Machinima lens or playback settings"); }
+        }
         for beat in &self.missions {
             if !valid_id(&beat.id) || !ids.insert(&beat.id)
                 || !bounded(&beat.title, 120) || !bounded(&beat.objective, 2048)
@@ -135,6 +173,8 @@ impl CreatorStudio {
                 || !bounded(&shot.name, 120) || !bounded(&shot.subtitle, 2048)
                 || !(100..=600_000).contains(&shot.duration_ms)
                 || !(10.0..=140.0).contains(&shot.fov)
+                || shot.roll.is_some_and(|n| !n.is_finite() || n.abs()>180.0)
+                || shot.easing.as_deref().is_some_and(|s| !["linear", "smooth", "cut"].contains(&s))
                 || !shot.camera_position.iter().chain(shot.look_at.iter())
                     .all(|n| n.is_finite() && n.abs() <= 4096.0)
                 || shot.camera_marker.as_deref().is_some_and(|s| !s.is_empty() && !script_ident(s))
@@ -183,7 +223,7 @@ mod tests {
     use super::*;
     fn studio() -> CreatorStudio {
         CreatorStudio {
-            schema_version: 1, missions: vec![], shots: vec![], playtests: vec![],
+            schema_version: 1, missions: vec![], shots: vec![], playtests: vec![], machinima: None,engine_machinima:None,
             server: ServerPlan { name: "LAN Test".into(), runtime: "haloCustomEdition".into(),
                 max_players: 8, public_listing: false, rotation: vec![], game_types: vec![] },
         }

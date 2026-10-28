@@ -1,9 +1,9 @@
 //! Bounded, read-only Halo 1 shared-resource index inspection.
 //!
 //! The classic resource-map header is 16 bytes; its 12-byte entries point at
-//! path strings (relative to the path table) and opaque resource data. Published
-//! format references disagree on the bitmap map's numeric *type* code (0/1).
-//! We accept those two observed codes for INDEX INSPECTION, but require an
+//! path strings (relative to the path table) and opaque resource data. Bitmap
+//! resource maps use type 1. Demo/PC image keys end in _<index>; CE pixel keys
+//! end in __pixels. We require an
 //! explicitly named, user-selected, SHA-256-pinned `bitmaps.map`, an exact tag
 //! path, and an enclosing resource entry before exposing any raw bitmap bytes.
 //! No offsets are inferred from tag IDs or fuzzy filenames. MCC ipaks and
@@ -66,14 +66,12 @@ fn normalize_path(value: &str) -> Result<String> {
 
 /// Validate every entry and string before returning the index. The input is
 /// ALWAYS an already-opened, non-link, exact `bitmaps.map` file.
-fn parse_index(file: &mut File, len: u64) -> Result<ResourceIndex> {
+fn parse_index_kind(file: &mut File, len: u64,expected_kind:u32) -> Result<ResourceIndex> {
     if !(16..=MAX_RESOURCE_BYTES).contains(&len) { return invalid("Unsupported shared-resource file length"); }
     let mut hdr = [0u8; 16];
     read_exact_at(file, 0, &mut hdr)?;
     let kind = u32_at(&hdr, 0)?;
-    // Both 0 and 1 appear in independent historical references. Neither is
-    // treated as proof of pixel format or as authority to bypass path checks.
-    if kind != 0 && kind != 1 { return invalid("Not a recognized classic bitmap resource-map header"); }
+    if kind != expected_kind { return invalid("Classic resource-map type differs from the selected resource kind"); }
     let paths = u32_at(&hdr, 4)? as u64;
     let index_offset = u32_at(&hdr, 8)? as u64;
     let count = u32_at(&hdr, 12)? as usize;
@@ -117,6 +115,8 @@ fn parse_index(file: &mut File, len: u64) -> Result<ResourceIndex> {
     }
     Ok(ResourceIndex { kind_code: kind, file_size: len, entries })
 }
+#[cfg(test)]
+fn parse_index(file:&mut File,len:u64)->Result<ResourceIndex>{parse_index_kind(file,len,1)}
 
 fn verify_handle_hash(file: &mut File, expected_sha256: &str) -> Result<()> {
     let mut hasher = Sha256::new();
@@ -128,7 +128,7 @@ fn verify_handle_hash(file: &mut File, expected_sha256: &str) -> Result<()> {
         hasher.update(&buf[..n]);
     }
     if format!("{:x}",hasher.finalize()) != expected_sha256.to_ascii_lowercase() {
-        return invalid("bitmaps.map differs from this project's recorded SHA-256");
+        return invalid("Resource map differs from this project's recorded SHA-256");
     }
     Ok(())
 }
@@ -136,8 +136,14 @@ fn verify_handle_hash(file: &mut File, expected_sha256: &str) -> Result<()> {
 /// Borrow one file for its SHA check and subsequent range reads; an additional
 /// SHA pass after reading detects a modified resource during extraction.
 pub fn open_verified(path: &Path, expected_sha256: &str) -> Result<(File, ResourceIndex)> {
-    if !matches!(path.file_name().and_then(|n| n.to_str()), Some(n) if n.eq_ignore_ascii_case("bitmaps.map")) {
-        return invalid("Select the exact bitmaps.map file, not a different resource map");
+    open_verified_kind(path,expected_sha256,"bitmaps.map",1)
+}
+pub fn open_verified_sound(path:&Path,expected_sha256:&str)->Result<(File,ResourceIndex)>{
+    open_verified_kind(path,expected_sha256,"sounds.map",2)
+}
+fn open_verified_kind(path:&Path,expected_sha256:&str,name:&str,kind:u32)->Result<(File,ResourceIndex)>{
+    if !matches!(path.file_name().and_then(|n| n.to_str()), Some(n) if n.eq_ignore_ascii_case(name)) {
+        return invalid(format!("Select the exact {name} file, not a different resource map"));
     }
     if expected_sha256.len() != 64 || !expected_sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
         return invalid("An explicit recorded resource SHA-256 is required");
@@ -150,7 +156,7 @@ pub fn open_verified(path: &Path, expected_sha256: &str) -> Result<(File, Resour
     }
     let len = meta.len();
     verify_handle_hash(&mut file, expected_sha256)?;
-    let index = parse_index(&mut file, len)?;
+    let index = parse_index_kind(&mut file, len,kind)?;
     verify_handle_hash(&mut file, expected_sha256)?;
     Ok((file, index))
 }
@@ -159,13 +165,20 @@ impl ResourceIndex {
         let name = normalize_path(requested)?;
         let mut found = self.entries.iter().filter(|e| e.path == name);
         let first = found.next().ok_or_else(|| SparkError::Invalid(
-            "No exact bitmap tag path in the selected resource index; fuzzy matching refused".into()))?;
-        if found.next().is_some() { return invalid("Multiple shared-resource entries use the same bitmap path"); }
+            "No exact tag/image path in the selected resource index; fuzzy matching refused".into()))?;
+        if found.next().is_some() { return invalid("Multiple shared-resource entries use the same tag/image path"); }
         Ok(first)
     }
     fn count_exact(&self, name: &str) -> usize {
         normalize_path(name).map(|p| self.entries.iter().filter(|e| e.path == p).count()).unwrap_or(0)
     }
+}
+pub(crate) fn read_external_sound_from_verified(file:&mut File,index:&ResourceIndex,tag:&str,pitch:usize,permutation:usize,generation:u32,offset:u64,length:usize)->Result<Vec<u8>>{
+    if index.kind_code!=2||length==0||length>16*1024*1024{return invalid("Unsupported or oversized sound resource span");}
+    let key=match generation{6|7=>format!("{tag}__{pitch}__{permutation}"),609=>format!("{tag}__samples"),_=>return invalid("Unsupported sound resource generation")};
+    let entry=index.exact(&key)?;let end=offset.checked_add(length as u64).ok_or_else(||SparkError::Invalid("Sound span overflow".into()))?;
+    if offset<entry.data_offset||end>entry.data_offset+entry.data_size||end>index.file_size{return invalid("Sound range does not belong to its exact indexed permutation");}
+    let mut bytes=vec![0u8;length];read_exact_at(file,offset,&mut bytes)?;Ok(bytes)
 }
 
 pub fn audit(path: &Path, expected_sha256: &str, bitmap_paths: &[String]) -> Result<ResourceMapAudit> {
@@ -187,7 +200,7 @@ pub fn audit(path: &Path, expected_sha256: &str, bitmap_paths: &[String]) -> Res
         missing_bitmap_path_matches: missing,
         ambiguous_bitmap_paths: ambiguous,
         resource_sha256: expected_sha256.to_ascii_lowercase(),
-        warning: "Index audit only. Exact path matches are not decoded textures; resource-map type codes vary across historical references. External tag metadata, MCC ipaks and unverified pixel offsets remain unsupported.".into(),
+        warning: "Index audit only. Pixel previews additionally require the generation-specific image key and bounded raw span. External tag metadata and MCC ipaks remain unsupported.".into(),
     })
 }
 
@@ -207,11 +220,30 @@ pub(crate) fn read_external_top_mip_from_verified(
     raw_offset: u64,
     declared_size: u64,
     top_mip_size: usize,
+    generation: u32,
+    image_index: usize,
 ) -> Result<Vec<u8>> {
+    prove_external_image_range(index, tag_path, raw_offset, declared_size, top_mip_size, generation, image_index)?;
+    let mut bytes = vec![0u8; top_mip_size];
+    read_exact_at(file, raw_offset, &mut bytes)?;
+    Ok(bytes)
+}
+
+pub(crate) fn prove_external_image_range(index: &ResourceIndex, tag_path: &str,
+    raw_offset: u64, declared_size: u64, top_mip_size: usize, generation: u32, image_index: usize) -> Result<()> {
     if top_mip_size == 0 || top_mip_size > 16 * 1024 * 1024 || declared_size < top_mip_size as u64 {
         return invalid("Invalid or oversized external bitmap mipmap");
     }
-    let entry = index.exact(tag_path)?;
+    // Gearbox retail/Demo indexes each image as <tag>_<image>, while CE
+    // groups the tag's images in <tag>__pixels. These are format-defined keys,
+    // never filename guesses. See Invader resource.cpp and C33 research notes.
+    let key = match generation {
+        6 | 7 => format!("{tag_path}_{image_index}"),
+        609 => format!("{tag_path}__pixels"),
+        0 => tag_path.to_owned(), // explicit low-level span API, not auto discovery
+        _ => return invalid("Unsupported resource-map generation; MCC ipaks need a separate reader"),
+    };
+    let entry = index.exact(&key)?;
     let entry_end = entry.data_offset.checked_add(entry.data_size)
         .ok_or_else(|| SparkError::Invalid("External resource span overflow".into()))?;
     if raw_offset < entry.data_offset ||
@@ -219,18 +251,20 @@ pub(crate) fn read_external_top_mip_from_verified(
         raw_offset.checked_add(declared_size).is_none_or(|end| end > entry_end) {
         return invalid("Pixel range not proven to belong to the exact bitmap resource entry");
     }
-    let mut bytes = vec![0u8; top_mip_size];
-    read_exact_at(file, raw_offset, &mut bytes)?;
-    Ok(bytes)
+    Ok(())
 }
 
 /// Returns one precisely bounded top-mip byte range only when its raw offset
 /// is demonstrably inside a unique resource entry with the exact tag path.
 /// Other external layouts are deliberately unsupported. Nothing is persisted.
 pub fn read_external_top_mip(path: &Path, expected_sha256: &str, tag_path: &str, raw_offset: u64, declared_size: u64, top_mip_size: usize) -> Result<Vec<u8>> {
+    read_external_image_top_mip(path, expected_sha256, tag_path, raw_offset, declared_size, top_mip_size, 0, 0)
+}
+
+pub fn read_external_image_top_mip(path: &Path, expected_sha256: &str, tag_path: &str, raw_offset: u64, declared_size: u64, top_mip_size: usize, generation: u32, image_index: usize) -> Result<Vec<u8>> {
     let (mut file, index) = open_verified(path, expected_sha256)?;
     let pixels = read_external_top_mip_from_verified(
-        &mut file, &index, tag_path, raw_offset, declared_size, top_mip_size,
+        &mut file, &index, tag_path, raw_offset, declared_size, top_mip_size, generation, image_index,
     )?;
     // Prevent a concurrent source-file change from creating an apparently
     // verified image after a valid initial SHA read.
@@ -247,7 +281,7 @@ mod tests {
         let path = dir.path().join("bitmaps.map");
         let mut bytes = vec![0u8; 0x500];
         let put = |b: &mut [u8], at: usize, x: u32| b[at..at+4].copy_from_slice(&x.to_le_bytes());
-        put(&mut bytes,0,0); put(&mut bytes,4,0x100); put(&mut bytes,8,0x40); put(&mut bytes,12,1);
+        put(&mut bytes,0,1); put(&mut bytes,4,0x100); put(&mut bytes,8,0x40); put(&mut bytes,12,1);
         put(&mut bytes,0x40,0);put(&mut bytes,0x44,64);put(&mut bytes,0x48,0x300);
         bytes[0x100..0x100+18].copy_from_slice(b"test\\wall\\albedo\0\0");
         bytes[0x300..0x340].fill(0x5a);

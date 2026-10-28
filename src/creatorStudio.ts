@@ -4,6 +4,7 @@
  * Halo CE server commands are exported ONLY as a validated, user-reviewed
  * plaintext draft. The other runtime families deliberately have no exporter.
  */
+import {validMachinimaSettings} from './machinima.ts';
 export interface MissionBeat {
   id: string;
   title: string;
@@ -21,7 +22,10 @@ export interface CameraShot {
   lookAt: [number, number, number];
   fov: number;
   subtitle: string;
-  cameraMarker?: string;
+  cameraMarker?: string|null;
+  /** Editor camera interpolation; HaloScript export still uses named markers. */
+  roll?: number;
+  easing?: 'linear' | 'smooth' | 'cut';
 }
 export type ServerRuntime = 'haloCustomEdition' | 'haloPC' | 'haloDemo' | 'mcc' | 'openCE' | 'chupathingyCE';
 export interface GameTypeDesign {
@@ -62,11 +66,13 @@ export interface PlaytestRecord {
   manuallyReported: boolean;
 }
 export interface CreatorStudioDocument {
+  engineMachinima?:{enabled:boolean;playback:'fixed'|'sequence';cameraId?:string|null;autoStart:boolean}|null;
   schemaVersion: 1;
   missions: MissionBeat[];
   shots: CameraShot[];
   server: ServerPlan;
   playtests: PlaytestRecord[];
+  machinima?: import('./machinima').MachinimaSettings;
 }
 export function emptyCreatorStudio(): CreatorStudioDocument {
   return {
@@ -86,8 +92,10 @@ const safeText = (s: string, max: number) => typeof s === 'string' && s.length <
 const boundedPos = (v: number[]) => Array.isArray(v) && v.length === 3 && v.every(n => Number.isFinite(n) && Math.abs(n) <= 4096);
 /** Validates the exact schema persisted in the Rust project. */
 export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
+  if(doc.engineMachinima){const e=doc.engineMachinima;if(typeof e.enabled!=='boolean'||!['fixed','sequence'].includes(e.playback)||typeof e.autoStart!=='boolean'||(e.cameraId!=null&&!doc.shots?.some(s=>s.id===e.cameraId))||(e.enabled&&(!doc.shots?.length||doc.shots.length>64)))return ['Invalid game-native machinima take: choose 1–64 camera keys and an existing selected camera'];}
   const failures: string[] = [];
   if (!doc || doc.schemaVersion !== 1) return ['Unsupported Creator Studio schema'];
+  if (doc.machinima !== undefined && !validMachinimaSettings(doc.machinima)) return ['Invalid Machinima lens or playback settings'];
   if (!Array.isArray(doc.missions) || !Array.isArray(doc.shots) || !Array.isArray(doc.playtests) || !doc.server) return ['Missing Studio collection'];
   if (doc.missions.length > 128 || doc.shots.length > 256 || doc.playtests.length > 500 || !Array.isArray(doc.server.rotation) || doc.server.rotation.length > 128)
     return ['Creator Studio collection exceeds safe limits'];
@@ -106,8 +114,10 @@ export function validateCreatorStudio(doc: CreatorStudioDocument): string[] {
     if (!unique(shot.id) || !safeText(shot.name, 120) || !safeText(shot.subtitle, 2048) ||
       !Number.isInteger(shot.durationMs) || shot.durationMs < 100 || shot.durationMs > 600000 ||
       !Number.isFinite(shot.fov) || shot.fov < 10 || shot.fov > 140 ||
+      (shot.roll !== undefined && (!Number.isFinite(shot.roll) || Math.abs(shot.roll)>180)) ||
+      (shot.easing !== undefined && !['linear','smooth','cut'].includes(shot.easing)) ||
       !boundedPos(shot.cameraPosition) || !boundedPos(shot.lookAt) ||
-      (shot.cameraMarker !== undefined && shot.cameraMarker !== '' && !scriptIdent.test(shot.cameraMarker))) failures.push(`Invalid camera shot ${shot.id?.slice(0, 40) ?? '(unknown)'}`);
+      (shot.cameraMarker != null && shot.cameraMarker !== '' && !scriptIdent.test(shot.cameraMarker))) failures.push(`Invalid camera shot ${shot.id?.slice(0, 40) ?? '(unknown)'}`);
   }
   const s = doc.server;
   if (!safeText(s.name, 63) || !s.name.trim() || s.name.includes('"') || s.name.includes('\\') || !runtimes.has(s.runtime) ||

@@ -42,6 +42,10 @@ struct Settings {
     hek_flavor: Option<String>,
     hek_tags_directory: Option<PathBuf>,
     auto_build: bool,
+    preferred_halo:Option<runtime::RuntimeId>,
+    onboarding_completed:bool,
+    snapshot_interval_minutes:u32,
+    snapshot_retention:usize,
 }
 impl Default for Settings {
     fn default() -> Self {
@@ -56,6 +60,10 @@ impl Default for Settings {
             hek_flavor: None,
             hek_tags_directory: None,
             auto_build: true,
+            preferred_halo:None,
+            onboarding_completed:false,
+            snapshot_interval_minutes:10,
+            snapshot_retention:20,
         }
     }
 }
@@ -64,6 +72,8 @@ impl Settings {
         Toolchain {
             invader_directory: self.invader_directory.clone(),
             resource_directory: self.resource_directory.clone(),
+            h1a_directory:if self.hek_flavor.as_deref()==Some("h1aEk"){self.hek_directory.clone()}else{None},
+            base_tags_directory:if self.hek_flavor.as_deref()==Some("h1aEk"){self.hek_tags_directory.clone().or_else(||self.hek_directory.as_ref().map(|p|p.join("tags")))}else{None},
         }
     }
 }
@@ -78,6 +88,9 @@ struct AppState {
     jobs: Mutex<HashMap<String, Arc<AtomicBool>>>,
     logs: Mutex<Vec<JobEvent>>,
     diagnostics: Mutex<Vec<String>>,
+    live_mcc: Mutex<Option<crate::live_mcc::Session>>,
+    forge_session: Mutex<Option<(String,core::forge_session::Peer)>>,
+    document_owners: Mutex<HashMap<String,String>>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -102,8 +115,13 @@ fn lock<T>(m: &Mutex<T>) -> Reply<std::sync::MutexGuard<'_, T>> {
     m.lock()
         .map_err(|_| "Application state lock was interrupted; restart Guilty Spark".into())
 }
-fn project_tools(state: &AppState, project: &Project) -> Reply<Toolchain> {
+fn editing_tools(state: &AppState, project: &Project) -> Reply<Toolchain> {
     let mut tools = lock(&state.settings)?.tools();
+    if let Some(id)=&project.active_build_target{
+        let target=project.build_targets.iter().find(|t|&t.id==id).ok_or("Selected conversion target is missing")?;
+        tools.h1a_directory=if target.hek_flavor.as_deref()==Some("h1aEk"){target.hek_directory.clone()}else{None};tools.base_tags_directory=target.tags_directory.clone();
+        tools.invader_directory=target.invader_directory.clone().or(tools.invader_directory);
+    }
     if let Some(resources) = project
         .source
         .as_ref()
@@ -112,6 +130,10 @@ fn project_tools(state: &AppState, project: &Project) -> Reply<Toolchain> {
         tools.resource_directory = Some(resources);
     }
     Ok(tools)
+}
+fn project_tools(state:&AppState,project:&Project)->Reply<Toolchain>{
+    if let Some(target)=project.active_build_target.as_ref().and_then(|id|project.build_targets.iter().find(|t|&t.id==id)){if target.runtime_id!=runtime::RuntimeId::MccSteam||target.builder!="h1a-tool"||target.hek_flavor.as_deref()!=Some("h1aEk"){return Err("Imported map conversion currently targets MCC using H1A Tool. CE source authoring has its own QuickForge target.".into());}}
+    editing_tools(state,project)
 }
 fn bounded_read(path: &Path, limit: u64) -> Reply<Vec<u8>> {
     use std::io::Read;
@@ -150,12 +172,31 @@ fn verified_build(state: &AppState, project: &Project, id: &str) -> Reply<BuildR
     }
     let output = record.output.as_ref().ok_or("Build has no output")?;
     core::reject_links(output).map_err(error)?;
-    if output.parent() != Some(dir.join("output").as_path())
+    if output.parent().map(fs::canonicalize).transpose().map_err(error)?
+        != Some(fs::canonicalize(dir.join("output")).map_err(error)?)
         || Some(maps::hash_file(output).map_err(error)?) != record.sha256
     {
         return Err("Build output integrity failed".into());
     }
     Ok(record)
+}
+#[tauri::command]
+async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)->Reply<OpenProject>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let library=lock(&state.library)?;
+        let source=library.get(&project_id).map_err(error)?;let build=verified_build(&state,&source,&build_id)?;
+        let entries=library.list().map_err(error)?;
+        let existed=entries.iter().any(|e|e.sha256.as_deref()==build.sha256.as_deref());
+        let(mut project,inspection)=library.import_map(build.output.as_ref().ok_or("Build output is missing")?,None).map_err(error)?;
+        if !existed{
+            let mut base=if let Some(assembly)=&source.bsp_assembly{format!("{} + {} · compiled",source.title,assembly.donor_title)}else{format!("{} · compiled",source.title)};
+            while base.len()>180{base.pop();}
+            let mut title=base.clone();let mut ordinal=2;
+            while entries.iter().any(|e|e.title==title){title=format!("{base} ({ordinal})");ordinal+=1;}
+            project.title=title;library.save(&project,Some(&inspection)).map_err(error)?;
+        }
+        Ok(OpenProject{project,inspection:Some(inspection)})
+    }).await.map_err(error)?
 }
 fn current_build(state: &AppState, project: &Project) -> Reply<BuildRecord> {
     let mut message = "No validated build of the current saved project is available".to_string();
@@ -204,6 +245,26 @@ fn inspect(state: &AppState, p: &Project) -> Reply<Arc<MapInspection>> {
 /// The source SHA is checked against the inspection and a fresh read; source
 /// maps and resource maps are never written to or silently read elsewhere.
 #[tauri::command]
+async fn inspect_source_appearance(app:tauri::AppHandle,project_id:String)->Reply<core::appearance::SourceAppearance>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source=p.source.as_ref().ok_or("Project has no preserved Halo source")?;let inspection=inspect(&state,&p)?;
+        core::appearance::inspect(&source.preserved_path,&source.sha256,&inspection).map_err(error)
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
+async fn bsp_assembly_options(app:tauri::AppHandle,project_id:String)->Reply<Vec<serde_json::Value>>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;let i=inspect(&state,&p)?;Ok(i.mesh.parts.iter().enumerate().map(|(index,p)|serde_json::json!({"index":index,"name":p.name,"triangles":p.index_count/3})).collect())}).await.map_err(error)?
+}
+#[tauri::command]
+async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize)->Reply<core::bsp_assembly::BspAssembly>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let base=lock(&state.library)?.get(&project_id).map_err(error)?;let donor=lock(&state.library)?.get(&donor_project_id).map_err(error)?;let tags=editing_tools(&state,&donor)?.base_tags_directory.ok_or("Select matching editable tags for the donor map in Map tools & tags")?;let i=inspect(&state,&base)?;let j=inspect(&state,&donor)?;core::bsp_assembly::plan(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String)->Reply<core::bsp_assembly::AssemblyReport>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;let i=inspect(&state,&p)?;core::bsp_assembly::generate_project(&p,&i,&AtomicBool::new(false)).map(|g|g.report).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
 async fn preview_owned_cache_bitmap(
     app: tauri::AppHandle,
     project_id: String,
@@ -215,6 +276,11 @@ async fn preview_owned_cache_bitmap(
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
         let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
         let inspection = inspect(&state, &project)?;
+        if inspection.header.version==13&&source.resource_sha256.contains_key("mcc-textures") {
+            let folder=source.resource_directory.as_deref().ok_or("MCC texture directory is missing")?;let request=core::bitmap_preview::OwnedBitmapRequest{bitmap_tag_id,image_index};
+            let batch=core::bitmap_preview::preview_mcc_bitmap_batch(&source.preserved_path,&source.sha256,&inspection,&[request],folder,&source.resource_sha256).map_err(error)?;
+            let item=batch.items.into_iter().next().ok_or("MCC bitmap response missing")?;return item.preview.ok_or_else(||item.error.unwrap_or_else(||"MCC bitmap unavailable".into()));
+        }
         // Resource-map access requires a per-project explicitly selected
         // directory and its recorded hash; global preferences are not trusted
         // for copyrighted shared pixels. Internal bitmap reads need neither.
@@ -244,6 +310,9 @@ async fn preview_owned_cache_bitmap_batch(
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
         let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
         let inspection = inspect(&state, &project)?;
+        if inspection.header.version==13&&source.resource_sha256.contains_key("mcc-textures") {
+            return core::bitmap_preview::preview_mcc_bitmap_batch(&source.preserved_path,&source.sha256,&inspection,&requests,source.resource_directory.as_deref().ok_or("MCC texture directory is missing")?,&source.resource_sha256).map_err(error);
+        }
         let pinned = source.resource_directory.as_ref().and_then(|folder| {
             source.resource_sha256.get("bitmaps.map")
                 .map(|hash| (folder.join("bitmaps.map"), hash.as_str()))
@@ -266,15 +335,15 @@ async fn audit_owned_bitmap_resources(
         let state = app.state::<AppState>();
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
         let source = project.source.as_ref().ok_or("Project has no preserved Halo map")?;
-        if !matches!(source.cache_version, 7 | 609) {
-            return Err("Classic PC/Custom Edition resources only; MCC ipaks and Demo resources are unsupported".into());
+        if !matches!(source.cache_version, 6 | 7 | 609) {
+            return Err("MCC ipaks need a separate reader; use supported local editing-kit source images".into());
         }
         let folder = source.resource_directory.as_ref().ok_or("Choose source resources for this project in Build first")?;
         let sha = source.resource_sha256.get("bitmaps.map")
             .ok_or("bitmaps.map was not SHA-256 pinned when source resources were selected")?;
         let inspected = inspect(&state, &project)?;
         let names: Vec<String> = inspected.tags.iter().filter(|tag| tag.class == "bitm")
-            .map(|tag| tag.path.clone()).collect();
+            .map(|tag| if source.cache_version == 609 {format!("{}__pixels",tag.path)} else {format!("{}_0",tag.path)}).collect();
         core::resource_map::audit(&folder.join("bitmaps.map"), sha, &names).map_err(error)
     }).await.map_err(error)?
 }
@@ -297,12 +366,20 @@ fn bootstrap(state: State<AppState>) -> Reply<Bootstrap> {
 async fn open_project(app: tauri::AppHandle, id: String) -> Reply<OpenProject> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
-        let p = lock(&state.library)?.get(&id).map_err(error)?;
+        let mut p = lock(&state.library)?.get(&id).map_err(error)?;
         let i = if p.source.is_some() {
             Some((*inspect(&state, &p)?).clone())
         } else {
             None
         };
+        if p.source_scene_version==0 {
+            if let Some(inspection)=&i {
+                snapshot_project_state(&state,&p,"before-upgrade")?;
+                let additions:Vec<_>=inspection.objects.iter().filter(|object|object.id.starts_with("netgame-equipment-")&&!p.scene.iter().any(|old|old.id==object.id)).cloned().collect();
+                p.scene.extend(additions);p.source_scene_version=1;
+                lock(&state.library)?.save(&p,Some(inspection)).map_err(error)?;
+            }
+        }
         Ok(OpenProject {
             project: p,
             inspection: i,
@@ -310,6 +387,19 @@ async fn open_project(app: tauri::AppHandle, id: String) -> Reply<OpenProject> {
     })
     .await
     .map_err(error)?
+}
+#[tauri::command]
+async fn connect_mcc_texture_resources(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<OpenProject>{
+    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;let i=inspect(&state,&p)?;
+        if i.header.version!=13{return Err("MCC texture packs require an MCC Halo 1 cache".into());}
+        let source=p.source.as_ref().ok_or("Missing preserved map source")?;
+        if !core::bitmap_preview::mcc_uses_external_bitmaps(&source.preserved_path,&source.sha256,&i).map_err(error)?{return Ok(OpenProject{project:p,inspection:Some((*i).clone())});}
+        let root=lock(&state.installation)?.mcc_path.clone().ok_or("Locate your MCC installation before connecting its texture packs")?;let directory=root.join("halo1/prebuild/paks");
+        let hashes=core::mcc_textures::pin(&directory,&i.header.name).map_err(error)?;
+        let library=lock(&state.library)?;p=library.get(&project_id).map_err(error)?;check_document_owner(&state,&project_id,&owner)?;
+        let source=p.source.as_mut().ok_or("Missing preserved map source")?;if source.sha256!=i.sha256{return Err("Map source changed while connecting texture packs".into());}source.resource_directory=Some(directory);source.resource_sha256=hashes;library.save(&p,None).map_err(error)?;
+        Ok(OpenProject{project:p,inspection:Some((*i).clone())})
+    }).await.map_err(error)?
 }
 #[tauri::command]
 fn create_quickforge_project(state: State<AppState>, title: String, template: String, target: Option<runtime::RuntimeId>) -> Reply<OpenProject> {
@@ -378,7 +468,7 @@ fn save_forge_receipt(state:&AppState, receipt:&forge_build::QuickForgeBuildRece
 async fn quickforge_export(app:tauri::AppHandle,project_id:String)->Reply<forge_build::QuickForgeBuildReceipt> {
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
-        let receipt=forge_build::run_job(&project,&forge_tools(&state)?,&state.root.join("jobs"),&uuid::Uuid::new_v4().to_string(),true,forge_provenance_blockers(&state,&project),Arc::new(AtomicBool::new(false)),|e|event(&app,e)).map_err(error)?;
+        let receipt=forge_build::run_job(&project,&forge_build::tools_for_target(&project,forge_tools(&state)?).map_err(error)?,&state.root.join("jobs"),&uuid::Uuid::new_v4().to_string(),true,forge_provenance_blockers(&state,&project),Arc::new(AtomicBool::new(false)),|e|event(&app,e)).map_err(error)?;
         save_forge_receipt(&state,&receipt)?;Ok(receipt)
     }).await.map_err(error)?
 }
@@ -386,7 +476,8 @@ async fn quickforge_export(app:tauri::AppHandle,project_id:String)->Reply<forge_
 fn quickforge_build(app:tauri::AppHandle,project_id:String)->Reply<String> {
     let state=app.state::<AppState>();
     let project=lock(&state.library)?.get(&project_id).map_err(error)?;
-    let tools=forge_tools(&state)?;verify_compiler_location(&state,&tools)?;
+    snapshot_project_state(&state,&project,"before-build")?;
+    let tools=forge_build::tools_for_target(&project,forge_tools(&state)?).map_err(error)?;verify_compiler_location(&state,&tools)?;
     let blockers=forge_provenance_blockers(&state,&project);
     let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
     let mut jobs=lock(&state.jobs)?;if !jobs.is_empty(){return Err("Another build is already running".into());}jobs.insert(job_id.clone(),cancel.clone());drop(jobs);
@@ -573,7 +664,42 @@ async fn import_dialog(app: tauri::AppHandle) -> Reply<Vec<OpenProject>> {
     }
 }
 #[tauri::command]
-fn save_project(state: State<AppState>, mut project: Project) -> Reply<LibraryEntry> {
+fn list_project_snapshots(state:State<AppState>,project_id:String)->Reply<Vec<core::snapshots::SnapshotInfo>> {
+    let lib=lock(&state.library)?;let _=lib.get(&project_id).map_err(error)?;
+    core::snapshots::list(&lib.project_dir(&project_id).map_err(error)?).map_err(error)
+}
+fn snapshot_project_state(state:&AppState,p:&Project,reason:&str)->Reply<core::snapshots::SnapshotInfo> {
+    let retention=lock(&state.settings)?.snapshot_retention;
+    let dir=lock(&state.library)?.project_dir(&p.id).map_err(error)?;
+    core::snapshots::create(&dir,p,reason,retention).map_err(error)
+}
+#[tauri::command]
+fn create_project_snapshot(state:State<AppState>,project_id:String,reason:String)->Reply<core::snapshots::SnapshotInfo> {
+    let p=lock(&state.library)?.get(&project_id).map_err(error)?;
+    snapshot_project_state(&state,&p,&reason)
+}
+#[tauri::command]
+fn preview_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:String,sha256:String)->Reply<Project> {
+    let lib=lock(&state.library)?;let p=lib.get(&project_id).map_err(error)?;
+    core::snapshots::preview(&lib.project_dir(&project_id).map_err(error)?,&p,&snapshot_id,&sha256).map_err(error)
+}
+#[tauri::command]
+fn restore_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:String,sha256:String,confirmed:bool)->Reply<OpenProject> {
+    if !confirmed {return Err("Preview and confirm the project snapshot before restoring".into());}
+    let lib=lock(&state.library)?;let current=lib.get(&project_id).map_err(error)?;
+    let dir=lib.project_dir(&project_id).map_err(error)?;
+    let mut restored=core::snapshots::preview(&dir,&current,&snapshot_id,&sha256).map_err(error)?;
+    core::snapshots::create(&dir,&current,"before-restore",lock(&state.settings)?.snapshot_retention).map_err(error)?;
+    restored.modified_at=chrono::Utc::now().to_rfc3339();restored.builds=current.builds;
+    lib.save(&restored,None).map_err(error)?;drop(lib);
+    lock(&state.inspections)?.remove(&project_id);
+    let inspection=if restored.source.is_some(){Some((*inspect(&state,&restored)?).clone())}else{None};
+    Ok(OpenProject{project:restored,inspection})
+}
+
+#[tauri::command]
+fn save_project(state: State<AppState>, window:tauri::WebviewWindow, mut project: Project) -> Reply<LibraryEntry> {
+    check_document_owner(&state,&project.id,window.label())?;
     let existing = lock(&state.library)?.get(&project.id).map_err(error)?;
     project.source = existing.source;
     project.assets = existing.assets;
@@ -623,6 +749,36 @@ async fn export_project(app: tauri::AppHandle, id: String) -> Reply<Option<PathB
     }
 }
 #[tauri::command]
+async fn validate_setting_path(key:String,path:PathBuf)->Reply<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if !path.is_absolute() || !path.is_dir(){return Err("Choose an existing absolute folder path".into());}
+        core::reject_links(&path).map_err(error)?;
+        match key.as_str() {
+            "hekDirectory"=>{
+                let report=core::connections::inspect_kit(&path,"unconfirmed",None).map_err(error)?;
+                let tool=report.tools.iter().find(|t|t.name=="tool.exe").ok_or("Tool check unavailable")?;
+                Ok(format!("Map Builder: {}. Select its generation and check the full kit in Start here.",tool.state))
+            },
+            "hekTagsDirectory"=>Ok(core::connections::inspect_kit(path.parent().unwrap_or(&path),"unconfirmed",Some(&path)).map_err(error)?.editable_tags),
+            "resourceDirectory"=>{
+                let file=path.join("bitmaps.map");
+                if !file.is_file(){return Ok("No classic bitmaps.map found. MCC ipak resources require a separate reader; supported source images can be matched in World.".into());}
+                let hash=maps::hash_file(&file).map_err(error)?;
+                let (_,index)=core::resource_map::open_verified(&file,&hash).map_err(error)?;
+                Ok(format!("Classic resource index checked: {} entries. Connect it to an open map to verify image compatibility.",index.entries.len()))
+            },
+            "steamDirectory"=>{let libs=steam::libraries(&path).map_err(error)?;
+                if !path.join("steamapps").is_dir(){return Err("This folder has no Steam steamapps directory".into());}
+                Ok(format!("Steam folder structure checked; {} library roots read",libs.len()))},
+            "mccDirectory"=>if path.join("halo1/maps").is_dir(){Ok("Halo 1 map folder found. Game installation and runtime tests remain separate.".into())}else{Err("This folder does not contain halo1/maps".into())},
+            "invaderDirectory"=>if path.join(if cfg!(windows){"invader-build.exe"}else{"invader-build"}).is_file(){Ok("Invader builder file found. Check SHA/version in Runtimes & friends; it has not been run by this folder check.".into())}else{Err("No invader-build executable found in this folder".into())},
+            "metadataTemplateDirectory"=>Ok("Folder available. Build preflight checks its Excession scenario/package metadata before use.".into()),
+            _=>Err("Unknown path preference".into()),
+        }
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
 async fn choose_setting_path(key: String) -> Reply<Option<PathBuf>> {
     if key == "nativeExecutable" {
         return Ok(rfd::AsyncFileDialog::new()
@@ -650,6 +806,97 @@ async fn choose_setting_path(key: String) -> Reply<Option<PathBuf>> {
         .await
         .map(|f| f.path().into()))
 }
+#[tauri::command]
+async fn halo_setup_report(app:tauri::AppHandle)->Reply<serde_json::Value> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        let settings=lock(&state.settings)?.clone();
+        let installation=steam::discover(settings.steam_directory.as_deref(),settings.mcc_directory.as_deref());
+        let registrations:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+        let runtimes=runtime::report(&installation,&registrations).map_err(error)?;
+        let mut kits=vec![];
+        if let Some(root)=settings.hek_directory.as_ref() {
+            kits.push(core::connections::inspect_kit(root,settings.hek_flavor.as_deref().unwrap_or("unconfirmed"),settings.hek_tags_directory.as_deref()).map_err(error)?);
+        }
+        if let Some(root)=installation.editing_tools.as_ref().filter(|r|settings.hek_directory.as_ref()!=Some(*r)) {
+            kits.push(core::connections::inspect_kit(root,"h1aEk (discovered; select to configure)",None).map_err(error)?);
+        }
+        Ok(serde_json::json!({"schemaVersion":1,"runtimes":runtimes,"kits":kits,
+            "editingKitSteamAppId":"1532190","mccInstalled":installation.mcc_path.is_some(),
+            "invaderConfigured":settings.invader_directory.is_some()}))
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
+async fn bitmap_resource_candidates(app:tauri::AppHandle,project_id:String)->Reply<Vec<serde_json::Value>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let settings=lock(&state.settings)?.clone();
+        let installed=lock(&state.installation)?.clone();
+        let mut roots:Vec<(PathBuf,&str)>=vec![];
+        if let Some(s)=project.source.as_ref() {
+            if let Some(p)=&s.resource_directory {roots.push((p.clone(),"Previously selected resources"));}
+            if let Some(p)=s.original_path.parent(){roots.push((p.to_path_buf(),"Beside the original map"));}
+        }
+        if let Some(p)=settings.resource_directory {roots.push((p,"Configured resource folder"));}
+        if let Some(p)=installed.mcc_path {roots.push((p.join("halo1/maps"),"Detected MCC legacy compatibility resources; ipak is separate"));}
+        let registrations:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+        for r in registrations {roots.push((r.root.join("maps"),"Registered Halo installation"));
+            if let Some(p)=r.data_root {roots.push((p.join("maps"),"Registered runtime data"));}}
+        let mut seen=std::collections::HashSet::new();
+        Ok(roots.into_iter().filter_map(|(root,reason)|{let file=root.join("bitmaps.map");
+            (file.is_file()&&seen.insert(file.clone())).then(||serde_json::json!({"path":file,"reason":reason}))}).collect())
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
+async fn connect_halo_textures(app:tauri::AppHandle,project_id:String,mode:String,path:String)->Reply<Option<OpenProject>> {
+    let chosen=match mode.as_str() {
+        "file"=>rfd::AsyncFileDialog::new().set_title("Locate Halo Textures — original bitmaps.map")
+            .add_filter("Halo bitmap resources",&["map"]).pick_file().await.map(|f|f.path().to_path_buf()),
+        "folder"=>rfd::AsyncFileDialog::new().set_title("Choose the original Halo resources folder")
+            .pick_folder().await.map(|f|f.path().to_path_buf()),
+        "path"=>Some(PathBuf::from(path)),
+        _=>return Err("Unknown Halo Textures selection mode".into()),
+    };
+    let Some(chosen)=chosen else{return Ok(None)};
+    tauri::async_runtime::spawn_blocking(move || {
+        core::reject_links(&chosen).map_err(error)?;
+        let file=if chosen.is_dir(){chosen.join("bitmaps.map")}else{chosen};
+        if !file.is_absolute(){return Err("Choose an absolute path to your original bitmaps.map".into());}
+        let folder=file.parent().ok_or("Resource folder unavailable")?.to_path_buf();
+        let state=app.state::<AppState>();
+        let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let before=serde_json::to_vec(&p).map_err(error)?;
+        let s=p.source.as_ref().ok_or("Open a Halo map before connecting its shared textures")?;
+        let inspected=inspect(&state,&p)?;
+        let hash=maps::hash_file(&file).map_err(error)?;
+        core::bitmap_preview::verify_resource_for_source(&s.preserved_path,&s.sha256,&inspected,&file,&hash).map_err(error)?;
+        let hashes=project::resource_hashes(&folder).map_err(error)?;
+        if hashes.get("bitmaps.map")!=Some(&hash){return Err("Resource changed during verification; try again".into());}
+        let lib=lock(&state.library)?;
+        if serde_json::to_vec(&lib.get(&project_id).map_err(error)?).map_err(error)?!=before {
+            return Err("Project changed while verifying textures; try again".into());
+        }
+        let source=p.source.as_mut().ok_or("Source disappeared")?;
+        source.resource_directory=Some(folder);source.resource_sha256=hashes;
+        p.modified_at=chrono::Utc::now().to_rfc3339();
+        lib.save(&p,Some(&inspected)).map_err(error)?;
+        lock(&state.inspections)?.remove(&project_id);
+        Ok(Some(OpenProject{project:p,inspection:Some((*inspected).clone())}))
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn auto_connect_classic_textures(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<Option<OpenProject>>{
+    let candidates={let state=app.state::<AppState>();check_document_owner(&state,&project_id,window.label())?;let lib=lock(&state.library)?;let project=lib.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("No map source")?;
+        if ![6,7,609].contains(&source.cache_version)||source.resource_sha256.contains_key("bitmaps.map"){return Ok(None);}
+        let mut roots=vec![];if let Some(dir)=&source.resource_directory{roots.push(dir.clone());}if let Some(dir)=source.original_path.parent(){roots.push(dir.to_path_buf());}
+        for entry in lib.list().map_err(error)?{if entry.sha256.as_deref()!=Some(source.sha256.as_str())||entry.id==project_id{continue;}if let Ok(other)=lib.get(&entry.id){if let Some(s)=other.source{if let Some(dir)=s.resource_directory{roots.push(dir);}if let Some(dir)=s.original_path.parent(){roots.push(dir.to_path_buf());}}}}
+        if let Some(dir)=lock(&state.settings)?.resource_directory.clone(){roots.push(dir);}let mut seen=std::collections::HashSet::new();roots.into_iter().map(|dir|dir.join("bitmaps.map")).filter(|file|file.is_file()&&seen.insert(file.clone())).take(12).collect::<Vec<_>>()};
+    for file in candidates{if let Ok(Some(open))=connect_halo_textures(app.clone(),project_id.clone(),"path".into(),file.to_string_lossy().into_owned()).await{return Ok(Some(open));}}Ok(None)
+}
+
 #[tauri::command]
 async fn choose_project_resources(
     app: tauri::AppHandle,
@@ -683,6 +930,9 @@ async fn choose_project_resources(
     .map_err(error)?
 }
 fn configure(app: &tauri::AppHandle, state: &AppState, settings: Settings) -> Reply<()> {
+    if !(1..=1440).contains(&settings.snapshot_interval_minutes) || !(1..=100).contains(&settings.snapshot_retention) {
+        return Err("Snapshot interval must be 1–1440 minutes and retention 1–100".into());
+    }
     if settings.hek_flavor.as_deref().is_some_and(|v| !matches!(v, "legacyHek" | "h1aEk")) {
         return Err("Select a known official Halo 1 Editing Kit family".into());
     }
@@ -744,7 +994,7 @@ async fn extract_selected_tag_tree(app: tauri::AppHandle, project_id: String, ta
         let state = app.state::<AppState>();
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
         let inspection = inspect(&state, &project)?;
-        let tools = project_tools(&state, &project)?;
+        let tools = editing_tools(&state, &project)?;
         let job_id = uuid::Uuid::new_v4().to_string();
         let cancel = Arc::new(AtomicBool::new(false));
         {
@@ -802,6 +1052,20 @@ fn compatibility(state: State<AppState>, id: String) -> Reply<build::Compatibili
     let i = inspect(&state, &p)?;
     Ok(build::compatibility(&p, &i, &project_tools(&state, &p)?))
 }
+#[tauri::command]
+async fn prepare_mcc_conversion_tools(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:Option<String>)->Reply<String>{
+    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();if let Some(project)=&project_id{check_document_owner(&state,project,&owner)?;}
+        let mut settings=lock(&state.settings)?.clone();
+        let kit=settings.hek_directory.clone().filter(|p|p.join("HCEEK.7z").is_file()).or(lock(&state.installation)?.editing_tools.clone()).ok_or("Install Halo: CE Mod Tools - MCC using Steam Library → Tools, then refresh discovery")?;
+        let existing=settings.hek_tags_directory.clone().filter(|p|settings.hek_flavor.as_deref()==Some("h1aEk")&&p.join("globals/globals.globals").is_file());
+        let tags=if let Some(tags)=existing{tags}else{let id=uuid::Uuid::new_v4().to_string();let project=project_id.as_deref().unwrap_or("setup");match core::conversion::prepare_sdk_tags(&kit,&state.root.join("sdk-cache").join(&id),project,&id,|e|event(&app,e)){
+            Ok(tags)=>tags,Err(failure)=>{event(&app,JobEvent{job_id:id,project_id:project.into(),phase:"sdk-failed".into(),message:failure.to_string(),progress:100,severity:"error".into(),timestamp:chrono::Utc::now().to_rfc3339()});return Err(error(failure));}
+        }};
+        settings.hek_directory=Some(kit);settings.hek_flavor=Some("h1aEk".into());settings.hek_tags_directory=Some(tags.clone());
+        configure(&app,&state,settings)?;Ok(tags.to_string_lossy().into_owned())
+    }).await.map_err(error)?
+}
 fn event(app: &tauri::AppHandle, e: JobEvent) {
     let state = app.state::<AppState>();
     if let Ok(mut logs) = state.logs.lock() {
@@ -828,6 +1092,7 @@ fn event(app: &tauri::AppHandle, e: JobEvent) {
 fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     let state = app.state::<AppState>();
     let project = lock(&state.library)?.get(&id).map_err(error)?;
+    snapshot_project_state(&state,&project,"before-build")?;
     let inspection = inspect(&state, &project)?;
     let tools = project_tools(&state, &project)?;
     let report = build::compatibility(&project, &inspection, &tools);
@@ -957,6 +1222,11 @@ struct AssetResult {
     warnings: Vec<String>,
 }
 #[tauri::command]
+async fn copy_project_asset(app:tauri::AppHandle,window:tauri::WebviewWindow,source_id:String,asset_id:String,target_id:String)->Reply<AssetResult> {
+    let owner=window.label().to_string();
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();check_document_owner(&state,&target_id,&owner)?;let lib=lock(&state.library)?;let(project,asset,imported)=core::asset_transfer::copy_obj(&lib,&source_id,&asset_id,&target_id).map_err(error)?;Ok(AssetResult{project,asset,mesh:imported.mesh,warnings:imported.warnings})}).await.map_err(error)?
+}
+#[tauri::command]
 async fn import_asset(app: tauri::AppHandle, id: String) -> Reply<Option<AssetResult>> {
     let file = rfd::AsyncFileDialog::new()
         .set_title("Import OBJ geometry into the Asset Workshop")
@@ -1027,6 +1297,21 @@ async fn import_asset(app: tauri::AppHandle, id: String) -> Reply<Option<AssetRe
     })
     .await
     .map_err(error)?
+}
+#[tauri::command]
+async fn import_animation_sources(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,paths:Option<Vec<PathBuf>>)->Reply<Vec<core::animations::AnimationAsset>>{
+    let paths=if let Some(paths)=paths{paths}else{let Some(files)=rfd::AsyncFileDialog::new().set_title("Import Halo animations or an FBX animation").add_filter("Halo animations",&["jma","jmm","jmo","jmr","jmt","jmz","fbx","model_animations"]).pick_files().await else{return Ok(vec![])};files.into_iter().map(|f|f.path().to_path_buf()).collect()};
+    if paths.is_empty()||paths.len()>16{return Err("Import between 1 and 16 animation files at a time".into());}let owner=window.label().to_string();
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;let (project,root)={let lib=lock(&state.library)?;(lib.get(&project_id).map_err(error)?,lib.project_dir(&project_id).map_err(error)?)};
+        if project.animations.len()+paths.len()>128{return Err("This project's animation library is full (128 assets)".into());}let tools=editing_tools(&state,&project)?;let mut imported=vec![];
+        for path in paths{imported.push(core::animations::import_owned(&root,&path,&tools,&project_id,|e|event(&app,e)).map_err(error)?);}Ok(imported)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn preview_animation_clip(app:tauri::AppHandle,project_id:String,asset:core::animations::AnimationAsset)->Reply<core::animations::AnimationClip>{
+    tauri::async_runtime::spawn_blocking(move||{asset.validate().map_err(error)?;let state=app.state::<AppState>();let root=lock(&state.library)?.project_dir(&project_id).map_err(error)?;let folder=fs::canonicalize(root.join("animations").join(&asset.id)).map_err(error)?;let data=fs::canonicalize(&asset.data_path).map_err(error)?;
+        if data.parent()!=Some(folder.as_path()){return Err("Animation preview must belong to this project's imported library".into());}core::animations::verified_clip(&asset).map_err(error)
+    }).await.map_err(error)?
 }
 #[tauri::command]
 fn asset_mesh(state: State<AppState>, id: String, asset_id: String) -> Reply<MeshData> {
@@ -1156,6 +1441,22 @@ fn launch_mcc(state: State<AppState>, id: String) -> Reply<String> {
 fn launch_native(state: State<AppState>) -> Reply<String> {
     let _ = state;
     Err("Register and inspect a separately installed runtime in Runtimes before opening it. The legacy executable preference is no longer executed.".into())
+}
+#[tauri::command]
+fn launch_engine_take(state:State<AppState>,window:tauri::WebviewWindow,project_id:String,build_id:String,resolution:String)->Reply<String>{
+    check_document_owner(&state,&project_id,window.label())?;let p=lock(&state.library)?.get(&project_id).map_err(error)?;let _build=verified_build(&state,&p,&build_id)?;
+    let job=state.root.join("jobs").join(&build_id);let metadata:serde_json::Value=serde_json::from_slice(&bounded_read(&job.join("engine-machinima.json"),1024*1024)?).map_err(error)?;
+    if metadata.get("schemaVersion").and_then(|v|v.as_u64())!=Some(2){return Err("Rebuild this take with the current recording controls before launching; older diagnostic scripts can display console text".into());}
+    let scenario=p.scenario_path().map_err(error)?;if metadata.get("scenario").and_then(|v|v.as_str())!=Some(scenario.as_str())||metadata.get("projectFingerprint").and_then(|v|v.as_str())!=Some(p.fingerprint().map_err(error)?.as_str()){return Err("This build does not contain the current native camera take. Save and rebuild it first".into());}
+    let scenario_file=job.join("tags").join(core::safe_relative(&format!("{scenario}.scenario")).map_err(error)?);core::reject_links(&scenario_file).map_err(error)?;
+    if metadata.get("scenarioSha256").and_then(|v|v.as_str())!=Some(maps::hash_file(&scenario_file).map_err(error)?.as_str()){return Err("The take's scenario tags changed after compilation. Rebuild before launching".into());}
+    let tools=project_tools(&state,&p)?;let kit=tools.h1a_directory.ok_or("Select Halo: CE Mod Tools - MCC before launching a native take")?;let exe=kit.join("halo_tag_test.exe");core::reject_links(&exe).map_err(error)?;if !exe.is_file(){return Err("MCC Standalone (halo_tag_test.exe) is missing from the selected editing kit".into());}
+    let size=match resolution.as_str(){"1080p"=>(1920,1080),"1440p"=>(2560,1440),"4k"=>(3840,2160),"desktop"=>{let monitor=window.current_monitor().map_err(error)?.ok_or("Monitor resolution unavailable; choose a capture resolution")?;(monitor.size().width,monitor.size().height)},_=>return Err("Choose desktop, 1080p, 1440p or 4k capture resolution".into())};
+    if size.0<640||size.1<480||size.0>7680||size.1>4320{return Err("Native capture resolution must be between 640×480 and 7680×4320".into());}
+    let init=job.join("spark-engine-take-init.txt");let variant=if p.source.as_ref().is_some_and(|s|s.cache_version>0){"game_variant slayer\r\n"}else{""};project::atomic_write(&init,format!("; Spark native take. Flashlight toggles camera and HUD.\r\n{variant}map_name \"{scenario}\"\r\n").as_bytes(),false).map_err(error)?;
+    let mut command=std::process::Command::new(&exe);command.current_dir(&kit).args(["-window","-vidmode",&format!("{},{}",size.0,size.1),"-tags_dir"]).arg(job.join("tags")).arg("-data_dir").arg(job.join("data")).arg("-exec").arg(&init).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    #[cfg(windows)]{use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);}
+    let child=command.spawn().map_err(error)?;Ok(format!("MCC Standalone take launched at {}×{} (process {}). Toggle your flashlight for camera/HUD controls; record the game window with OBS. Retail MCC load and actor movement still require acceptance.",size.0,size.1,child.id()))
 }
 #[tauri::command]
 fn reveal_folder(state: State<AppState>, kind: String, id: Option<String>) -> Reply<()> {
@@ -1311,11 +1612,37 @@ fn start_watcher(app: &tauri::AppHandle, state: &AppState) -> Reply<()> {
     Ok(())
 }
 #[tauri::command]
-fn close_application(app: tauri::AppHandle) -> Reply<()> {
-    app.get_webview_window("main")
-        .ok_or("Main window unavailable")?
-        .destroy()
-        .map_err(error)
+async fn close_application(app: tauri::AppHandle,window:tauri::WebviewWindow) -> Reply<()> {
+    if app.webview_windows().len()==1 {
+        let closing=app.clone();tauri::async_runtime::spawn_blocking(move||{let state=closing.state::<AppState>();let mut live=lock(&state.live_mcc)?;if let Some(session)=live.as_ref(){crate::live_mcc::disconnect(session).map_err(error)?;}*live=None;Ok::<(),String>(())}).await.map_err(error)??;
+    }
+    lock(&app.state::<AppState>().document_owners)?.retain(|_,owner|owner!=window.label());
+    window.destroy().map_err(error)
+}
+fn check_document_owner(state:&AppState,id:&str,label:&str)->Reply<()> {
+    if lock(&state.document_owners)?.get(id).is_some_and(|owner|owner!=label){return Err("This map is being edited in another Spark window. Close it there before editing it here.".into());}Ok(())
+}
+#[tauri::command]
+fn claim_project_document(state:State<AppState>,window:tauri::WebviewWindow,id:String)->Reply<()> {
+    let _=lock(&state.library)?.get(&id).map_err(error)?;
+    let mut owners=lock(&state.document_owners)?;
+    if owners.get(&id).is_some_and(|owner|owner!=window.label()){return Err("This map is already open for editing in another Spark window.".into());}
+    owners.insert(id,window.label().into());Ok(())
+}
+#[tauri::command]
+fn release_project_document(state:State<AppState>,window:tauri::WebviewWindow,id:String)->Reply<()> {
+    let mut owners=lock(&state.document_owners)?;if owners.get(&id).is_some_and(|owner|owner==window.label()){owners.remove(&id);}Ok(())
+}
+#[tauri::command]
+async fn open_project_window(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Reply<String> {
+    let state=app.state::<AppState>();let project=lock(&state.library)?.get(&id).map_err(error)?;
+    check_document_owner(&state,&id,window.label())?;
+    let label=format!("editor-{}",uuid::Uuid::new_v4());
+    let url=tauri::WebviewUrl::App(format!("index.html?project={}",project.id).into());
+    // Only a registered UUID project may select the local app page. No arbitrary URL or script.
+    if uuid::Uuid::parse_str(&project.id).is_err(){return Err("Invalid project identity".into());}
+    let child=tauri::WebviewWindowBuilder::new(&app,&label,url).title(format!("{} · Project Guilty Spark",project.title)).inner_size(1440.,900.).min_inner_size(1000.,640.).decorations(false).transparent(true).shadow(true).theme(Some(tauri::Theme::Dark)).build().map_err(error)?;
+    lock(&state.document_owners)?.insert(id,child.label().into());Ok(label)
 }
 #[tauri::command]
 fn initialize_mcc_inbox(app: tauri::AppHandle, state: State<AppState>) -> Reply<Bootstrap> {
@@ -1679,10 +2006,33 @@ async fn inspect_sound(
         let state = app.state::<AppState>();
         let p = lock(&state.library)?.get(&project_id).map_err(error)?;
         let s = p.source.ok_or("Project has no source map")?;
-        audio::inspect_sound(&s.preserved_path, &s.sha256, tag_id).map_err(error)
+        let resource=s.resource_directory.as_ref().map(|p|p.join("sounds.map"));
+        let pinned=resource.as_ref().zip(s.resource_sha256.get("sounds.map")).map(|(p,h)|(p.as_path(),h.as_str()));
+        audio::inspect_sound_with_resources(&s.preserved_path, &s.sha256, tag_id,pinned).map_err(error)
     })
     .await
     .map_err(error)?
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all="camelCase")]
+struct OwnedModelPreview {
+    source_sha256:String,resource_sha256:Option<String>,object_tag_id:u32,model_tag_id:u32,
+    mesh:maps::MeshData,tags:Vec<maps::Tag>,
+}
+#[tauri::command]
+async fn preview_owned_object_model(app:tauri::AppHandle,project_id:String,tag_id:u32,source_sha256:String)->Reply<OwnedModelPreview>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source=project.source.as_ref().ok_or("Model source has no preserved map")?;
+        if source.sha256!=source_sha256{return Err("Model reference source SHA-256 differs from the project".into());}
+        let inspection=inspect(&state,&project)?;
+        let (model_id,mesh)=core::render::preview_owned_object_model(&source.preserved_path,&source.sha256,&inspection,tag_id).map_err(error)?;
+        let mut ids:std::collections::HashSet<u32>=mesh.material_ranges.iter().map(|r|r.shader_tag_id).collect();
+        for shader in inspection.tags.iter().filter(|t|ids.contains(&t.id)).collect::<Vec<_>>(){for reference in &shader.references{ids.insert(reference.target_id);}}
+        let tags=inspection.tags.iter().filter(|t|ids.contains(&t.id)).cloned().collect();
+        Ok(OwnedModelPreview{source_sha256:source.sha256.clone(),resource_sha256:source.resource_sha256.get("mcc-textures").or_else(||source.resource_sha256.get("bitmaps.map")).cloned(),object_tag_id:tag_id,model_tag_id:model_id,mesh,tags})
+    }).await.map_err(error)?
 }
 #[tauri::command]
 async fn preview_sound(
@@ -1696,12 +2046,15 @@ async fn preview_sound(
         let state = app.state::<AppState>();
         let p = lock(&state.library)?.get(&project_id).map_err(error)?;
         let s = p.source.ok_or("Project has no source map")?;
-        audio::preview_sound(
+        let resource=s.resource_directory.as_ref().map(|p|p.join("sounds.map"));
+        let pinned=resource.as_ref().zip(s.resource_sha256.get("sounds.map")).map(|(p,h)|(p.as_path(),h.as_str()));
+        audio::preview_sound_with_resources(
             &s.preserved_path,
             &s.sha256,
             tag_id,
             pitch_range,
             permutation,
+            pinned,
         )
         .map_err(error)
     })
@@ -1845,6 +2198,87 @@ async fn create_peer_manifest(
     .await
     .map_err(error)?
 }
+#[tauri::command]
+async fn live_mcc_connect(app:tauri::AppHandle,mods_mode:bool)->Reply<crate::live_mcc::Status>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let root=lock(&state.installation)?.mcc_path.clone().ok_or("Connect the Steam MCC installation in Start here first")?;
+        let mut slot=lock(&state.live_mcc)?;if let Some(existing)=slot.as_ref(){if let Ok(status)=crate::live_mcc::sample(existing){return Ok(status);}crate::live_mcc::disconnect(existing).map_err(error)?;}
+        let session=crate::live_mcc::connect(&root,mods_mode).map_err(error)?;let status=crate::live_mcc::sample(&session).map_err(error)?;*slot=Some(session);Ok(status)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_sample(app:tauri::AppHandle)->Reply<crate::live_mcc::Status>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Live adapter is disconnected")?;
+        let status=crate::live_mcc::sample(&session).map_err(error);if status.is_err()&&!session.active_physics(){*lock(&state.live_mcc)?=None;}status
+    }).await.map_err(error)?
+}
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+struct LiveBinding {placement_id:String,datum:u32,tag_datum:u32,expected_position:[f32;3]}
+#[tauri::command]
+async fn live_mcc_apply(app:tauri::AppHandle,project_id:String,document:quickforge::QuickForgeDocument,bindings:Vec<LiveBinding>)->Reply<Vec<core::live_adapter::MoveReceipt>>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;
+        if p.quick_forge.is_none()||document.runtime_id!=runtime::RuntimeId::MccSteam{return Err("Choose an MCC QuickForge project for live updates".into());}quickforge::validate_document(&document).map_err(error)?;
+        let session=lock(&state.live_mcc)?.clone().ok_or("Live adapter is disconnected")?;
+        if !session.identity.scenario.eq_ignore_ascii_case(&quickforge::scenario_path(&document).map_err(error)?.replace('\\',"/")){return Err("Loaded Halo scenario does not match this QuickForge map. Build and load this project's map before binding live objects.".into());}
+        let snapshot=crate::live_mcc::sample(&session).map_err(error)?;
+        let mut moves=vec![];for binding in bindings {let placement=document.placements.iter().find(|p|p.id==binding.placement_id).ok_or("Bound placement was removed")?;
+            let object=snapshot.snapshot.objects.iter().find(|o|o.datum==binding.datum&&o.tag_datum==binding.tag_datum).ok_or("Bound live object disappeared or respawned")?;
+            let class=match object.kind{0=>"bipd",1=>"vehi",2=>"weap",3=>"eqip",6=>"scen",_=>""};
+            if !object.tag_path.eq_ignore_ascii_case(&placement.tag_path.replace('\\',"/"))||placement.tag_class!=class{return Err("Live object tag/class does not match this placement; item collections must bind their actual spawned weapon separately".into());}
+            moves.push(core::live_adapter::MoveObject{datum:object.datum,tag_datum:object.tag_datum,expected_position:binding.expected_position,position:placement.position});
+        }
+        crate::live_mcc::moves(&session,&moves).map_err(error)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_disconnect(app:tauri::AppHandle)->Reply<()>{tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let mut slot=lock(&state.live_mcc)?;if let Some(session)=slot.as_ref(){crate::live_mcc::disconnect(session).map_err(error)?;}*slot=None;Ok(())}).await.map_err(error)?}
+#[tauri::command]
+async fn live_mcc_move_object(app:tauri::AppHandle,operation:core::live_adapter::MoveObject)->Reply<Vec<core::live_adapter::MoveReceipt>>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the live Halo adapter first")?;
+        crate::live_mcc::moves(&session,&[operation]).map_err(error)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_scale_info(app:tauri::AppHandle,datum:u32)->Reply<core::live_adapter::scaling::ScaleInfo>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the live Halo adapter first")?;crate::live_mcc::scale_info(&session,datum).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_scale_object(app:tauri::AppHandle,operation:core::live_adapter::scaling::ScaleOperation)->Reply<core::live_adapter::scaling::ScaleReceipt>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the live Halo adapter first")?;crate::live_mcc::scale(&session,&operation).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_import_map(app:tauri::AppHandle)->Reply<OpenProject>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the live Halo adapter first")?;let sample=crate::live_mcc::sample(&session).map_err(error)?;let name=sample.snapshot.identity.scenario.rsplit('/').next().ok_or("Live scenario has no map name")?;
+        if name.is_empty()||name.len()>64||!name.bytes().all(|c|c.is_ascii_alphanumeric()||c==b'_'||c==b'-'){return Err("Live map name is not supported for automatic lookup".into());}let path=session.root.join("halo1/maps").join(format!("{name}.map"));
+        let mut opened=import_file(&state,&path)?;if opened.len()!=1{return Err("Expected one preserved live map".into());}let result=opened.remove(0);let identity=&sample.snapshot.identity;
+        if result.inspection.as_ref().is_none_or(|i|i.tag_checksum!=Some(identity.checksum)||i.tags.len()!=identity.tag_count as usize||i.scenario_path.replace('\\',"/")!=identity.scenario){return Err("The preserved cache does not match the live tag checksum, tag count and scenario. Import the exact loaded map manually before enabling live gizmos.".into());}
+        if crate::live_mcc::sample(&session).map_err(error)?.snapshot.identity!=sample.snapshot.identity{return Err("Map changed during preservation; reconnect before editing".into());}Ok(result)
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
+fn forge_session_host(state:State<AppState>,project_id:String,document:quickforge::QuickForgeDocument,lan:bool)->Reply<serde_json::Value>{
+    let p=lock(&state.library)?.get(&project_id).map_err(error)?;if p.quick_forge.is_none(){return Err("Open a QuickForge project first".into());}
+    let mut session=lock(&state.forge_session)?;if session.is_some(){return Err("Leave the current shared session before hosting another".into());}
+    snapshot_project_state(&state,&p,"before-shared-session")?;
+    let host=core::forge_session::Host::start(document,lan).map_err(error)?;let peer=core::forge_session::Peer::Host(host.clone());let view=peer.poll().map_err(error)?;
+    let result=serde_json::json!({"view":view,"endpoint":host.endpoint.to_string(),"key":host.key()});*session=Some((project_id,peer));Ok(result)
+}
+#[tauri::command]
+async fn forge_session_join(app:tauri::AppHandle,project_id:String,endpoint:String,key:String)->Reply<core::forge_session::View>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;if p.quick_forge.is_none(){return Err("Open a QuickForge project before joining".into());}
+        let mut session=lock(&state.forge_session)?;if session.is_some(){return Err("Leave the current shared session before joining another".into());}snapshot_project_state(&state,&p,"before-shared-session")?;
+        let (guest,view)=core::forge_session::Guest::join(&endpoint,&key).map_err(error)?;*session=Some((project_id,core::forge_session::Peer::Guest(guest)));Ok(view)
+    }).await.map_err(error)?
+}
+fn forge_session_peer(state:&AppState,project_id:&str)->Reply<core::forge_session::Peer>{lock(&state.forge_session)?.as_ref().filter(|(id,_)|id==project_id).map(|(_,peer)|peer.clone()).ok_or("This project has no shared session".into())}
+#[tauri::command]
+async fn forge_session_poll(app:tauri::AppHandle,project_id:String)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||forge_session_peer(&app.state::<AppState>(),&project_id)?.poll().map_err(error)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_session_update(app:tauri::AppHandle,project_id:String,revision:u64,document:quickforge::QuickForgeDocument)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||forge_session_peer(&app.state::<AppState>(),&project_id)?.propose(revision,document).map_err(error)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_session_leave(app:tauri::AppHandle)->Reply<()>{tauri::async_runtime::spawn_blocking(move||{if let Some((_,peer))=lock(&app.state::<AppState>().forge_session)?.take(){peer.leave();}Ok(())}).await.map_err(error)?}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -1868,6 +2302,9 @@ pub fn run() {
                 jobs: Mutex::new(HashMap::new()),
                 logs: Mutex::new(vec![]),
                 diagnostics: Mutex::new(vec![]),
+                live_mcc: Mutex::new(None),
+                forge_session: Mutex::new(None),
+                document_owners: Mutex::new(HashMap::new()),
             });
             if let Err(e) = configure(app.handle(), &app.state::<AppState>(), settings) {
                 if let Ok(mut d) = app.state::<AppState>().diagnostics.lock() {
@@ -1882,8 +2319,29 @@ pub fn run() {
             }
             Ok(())
         })
+        .on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){if let Some(state)=window.app_handle().try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=window.label());}}}})
         .invoke_handler(tauri::generate_handler![
+            bsp_assembly_options,
+            plan_bsp_assembly,
+            preview_bsp_assembly,
+            claim_project_document,
+            release_project_document,
+            open_project_window,
+            live_mcc_connect,
+            live_mcc_sample,
+            live_mcc_apply,
+            live_mcc_disconnect,
+            live_mcc_move_object,
+            live_mcc_scale_info,
+            live_mcc_scale_object,
+            live_mcc_import_map,
+            forge_session_host,
+            forge_session_join,
+            forge_session_poll,
+            forge_session_update,
+            forge_session_leave,
             preview_owned_cache_bitmap,
+            inspect_source_appearance,
             preview_owned_cache_bitmap_batch,
             audit_owned_bitmap_resources,
             cache_invader_installation,
@@ -1892,6 +2350,7 @@ pub fn run() {
             stage_tag_exchange_into_project,
             bootstrap,
             open_project,
+            connect_mcc_texture_resources,
             create_project,
             create_quickforge_project,
             quickforge_validate,
@@ -1903,18 +2362,32 @@ pub fn run() {
             firefight_validate,
             firefight_preview,
             import_paths,
+            open_built_map,
             import_dialog,
             save_project,
+            list_project_snapshots,
+            create_project_snapshot,
+            preview_project_snapshot,
+            restore_project_snapshot,
             export_project,
             choose_setting_path,
+            validate_setting_path,
             choose_project_resources,
+            bitmap_resource_candidates,
+            halo_setup_report,
+            connect_halo_textures,
+            auto_connect_classic_textures,
             save_settings,
             refresh_installation,
             compatibility,
             start_build,
+            prepare_mcc_conversion_tools,
             validate_existing,
             cancel_build,
             import_asset,
+            import_animation_sources,
+            preview_animation_clip,
+            copy_project_asset,
             asset_mesh,
             inspect_template,
             install_package,
@@ -1922,6 +2395,7 @@ pub fn run() {
             launch_readiness,
             launch_mcc,
             launch_native,
+            launch_engine_take,
             close_application,
             initialize_mcc_inbox,
             runtime_report,
@@ -1940,6 +2414,7 @@ pub fn run() {
             choose_runtime_path,
             launch_registered_runtime,
             inspect_sound,
+            preview_owned_object_model,
             preview_sound,
             compare_peer_manifest,
             choose_peer_manifest,
@@ -1994,6 +2469,9 @@ mod readiness_tests {
             jobs: Mutex::new(HashMap::new()),
             logs: Mutex::new(vec![]),
             diagnostics: Mutex::new(vec![]),
+            live_mcc: Mutex::new(None),
+            forge_session: Mutex::new(None),
+            document_owners:Mutex::new(HashMap::new()),
         };
         (temp, state, p, record)
     }
@@ -2027,5 +2505,18 @@ mod readiness_tests {
         .unwrap();
         assert!(current_build(&state, &p).is_err());
         assert!(verified_build(&state, &p, &record.id).is_err());
+    }
+    #[test]
+    fn readiness_accepts_canonical_owned_output_and_rejects_other_directory() {
+        let (_temp, state, p, mut record) = fixture();
+        record.output = Some(fs::canonicalize(record.output.as_ref().unwrap()).unwrap());
+        let receipt=state.root.join("jobs").join(&record.id).join("receipt.json");
+        fs::write(&receipt,serde_json::to_vec(&record).unwrap()).unwrap();
+        assert_eq!(current_build(&state,&p).unwrap().id,record.id);
+        let elsewhere=state.root.join("same-content.map");
+        fs::copy(record.output.as_ref().unwrap(),&elsewhere).unwrap();
+        record.output=Some(elsewhere);
+        fs::write(&receipt,serde_json::to_vec(&record).unwrap()).unwrap();
+        assert!(current_build(&state,&p).is_err());
     }
 }

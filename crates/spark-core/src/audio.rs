@@ -1,6 +1,5 @@
-//! Read-only, bounded preview of embedded legacy Vorbis audio. No decoder or
-//! resource substitution is inferred from a filename. The browser decodes audio
-//! only after complete Ogg container and Vorbis header validation here.
+//! Read-only classic sound playback from preserved maps and exact, pinned
+//! sounds.map entries. Vorbis remains original; PCM/ADPCM converts to WAV.
 use crate::{binary::Reader, invalid, maps, Result, SparkError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -39,15 +38,18 @@ pub struct AudioPreview {
     pub mime: String,
     pub sha256: String,
     pub bytes: Vec<u8>,
+    pub source_sha256:String,
+    pub source_sample_sha256:String,
 }
 
 struct SoundData {
     report: SoundInspection,
     bytes: Vec<u8>,
     ranges: Vec<(usize, usize)>,
+    external:std::collections::BTreeMap<usize,Vec<u8>>,
 }
 
-fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<SoundData> {
+fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(&Path,&str)>) -> Result<SoundData> {
     let (header, bytes, sha256) = maps::read_cache_snapshot(path)?;
     if sha256 != expected_sha256 {
         return invalid("Audio source checksum differs from the preserved project source");
@@ -112,6 +114,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<SoundDa
             report,
             bytes,
             ranges: vec![],
+            external:Default::default(),
         });
     }
     let at = pointer(r.u32(tag + 20)?, 164)?;
@@ -135,6 +138,8 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<SoundDa
         pointer(r.u32(at + 156)?, pitch_count * 72)?
     };
     let mut ranges = vec![];
+    let mut external=std::collections::BTreeMap::new();
+    let mut resource=resources.map(|(p,h)|crate::resource_map::open_verified_sound(p,h)).transpose();
     let mut inspected_sample_bytes = 0usize;
     for pitch_range in 0..pitch_count {
         let pitch = pitches + pitch_range * 72;
@@ -175,12 +180,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<SoundDa
                 reason: None,
             };
             let validation = (|| -> Result<(String, f64)> {
-                if flags != 0 {
-                    return invalid("Samples reference an external resource cache; no replacement audio was selected");
-                }
-                if codec != 3 {
-                    return invalid("Preview decoding is only implemented for embedded Ogg Vorbis");
-                }
+                if flags>1{return invalid("Unsupported sound raw-data flags");}
                 if length == 0 || length > MAX_PREVIEW_BYTES {
                     return invalid("Audio preview must be between 1 byte and 16 MiB");
                 }
@@ -190,16 +190,21 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<SoundDa
                         "This sound exceeds the 64 MiB aggregate preview inspection budget",
                     );
                 }
-                if offset < 2048 {
+                if flags==0&&offset < 2048 {
                     return invalid("Audio sample range overlaps the cache header");
                 }
-                let samples = r.bytes(offset, length)?;
-                let (actual_channels, actual_rate, duration) = validate_vorbis(samples)?;
-                if actual_channels != channels || actual_rate != sample_rate {
-                    return invalid(
-                        "Vorbis identification disagrees with the sound tag's rate or channels",
-                    );
-                }
+                let owned;
+                let samples=if flags==1 {
+                    let pair=resource.as_mut().map_err(|_|SparkError::Invalid("Pinned sounds.map could not be verified".into()))?
+                        .as_mut().ok_or_else(||SparkError::Invalid("Samples need an external resource: connect the original sounds.map in the project's resources folder".into()))?;
+                    owned=crate::resource_map::read_external_sound_from_verified(&mut pair.0,&pair.1,&report.tag_path,pitch_range,permutation,header.version,offset as u64,length)?;
+                    owned.as_slice()
+                }else{r.bytes(offset,length)?};
+                let duration=if codec==3 {
+                    let (actual_channels,actual_rate,duration)=validate_vorbis(samples)?;
+                    if actual_channels!=channels||actual_rate!=sample_rate{return invalid("Vorbis identification disagrees with the sound tag's rate or channels");}duration
+                }else{crate::audio_pcm::frame_count(samples,codec,channels)? as f64/sample_rate as f64};
+                if flags==1{external.insert(ranges.len(),samples.to_vec());}
                 Ok((format!("{:x}", Sha256::digest(samples)), duration))
             })();
             match validation {
@@ -214,16 +219,21 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<SoundDa
             report.permutations.push(item);
         }
     }
-    report.warnings.push("Preview validates complete Ogg pages, checksums and Vorbis headers. Browser decode and target-game playback remain separate checks.".into());
+    if let Ok(Some((file,_)))=&mut resource {crate::resource_map::verify_open_handle_hash(file,resources.unwrap().1)?;}
+    report.warnings.push("Source samples are SHA-256 checked. Shared samples require an exact sounds.map permutation span. Playback does not simulate game sound classes, scripts, spatial mixing or looping-track transitions.".into());
     Ok(SoundData {
         report,
         bytes,
         ranges,
+        external,
     })
 }
 
 pub fn inspect_sound(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<SoundInspection> {
-    Ok(sound_data(path, expected_sha256, tag_id)?.report)
+    inspect_sound_with_resources(path,expected_sha256,tag_id,None)
+}
+pub fn inspect_sound_with_resources(path:&Path,expected_sha256:&str,tag_id:u32,resources:Option<(&Path,&str)>)->Result<SoundInspection>{
+    Ok(sound_data(path,expected_sha256,tag_id,resources)?.report)
 }
 pub fn preview_sound(
     path: &Path,
@@ -232,7 +242,10 @@ pub fn preview_sound(
     pitch_range: usize,
     permutation: usize,
 ) -> Result<AudioPreview> {
-    let data = sound_data(path, expected_sha256, tag_id)?;
+    preview_sound_with_resources(path,expected_sha256,tag_id,pitch_range,permutation,None)
+}
+pub fn preview_sound_with_resources(path:&Path,expected_sha256:&str,tag_id:u32,pitch_range:usize,permutation:usize,resources:Option<(&Path,&str)>)->Result<AudioPreview>{
+    let data = sound_data(path, expected_sha256, tag_id,resources)?;
     let index = data
         .report
         .permutations
@@ -244,11 +257,15 @@ pub fn preview_sound(
         return invalid(item.reason.as_deref().unwrap_or("Audio is unavailable"));
     }
     let (offset, length) = data.ranges[index];
+    let samples=if item.embedded {Reader(&data.bytes).bytes(offset,length)?}else{
+        data.external.get(&index).ok_or_else(||SparkError::Invalid("Verified external sound data unavailable".into()))?.as_slice()};
+    let (mime,bytes)=if item.format=="Ogg Vorbis" {("audio/ogg",samples.to_vec())}else{
+        ("audio/wav",crate::audio_pcm::wave(samples,if item.format=="PCM"{0}else{1},item.channels,item.sample_rate)?)};
     Ok(AudioPreview {
         name: item.name.clone(),
-        mime: "audio/ogg".into(),
-        sha256: item.sha256.clone().unwrap(),
-        bytes: data.bytes[offset..offset + length].to_vec(),
+        mime: mime.into(),
+        sha256:format!("{:x}",Sha256::digest(&bytes)),bytes,
+        source_sha256:data.report.source_sha256.clone(),source_sample_sha256:item.sha256.clone().unwrap(),
     })
 }
 
@@ -421,5 +438,42 @@ mod tests {
         let mut chained = bytes.clone();
         chained.extend(&bytes);
         assert!(validate_vorbis(&chained).is_err());
+    }
+    fn sound_fixture(external:bool)->Vec<u8>{
+        let mut bytes=vec![0u8;0x2000];
+        let set=|b:&mut[u8],at:usize,n:u32|b[at..at+4].copy_from_slice(&n.to_le_bytes());
+        bytes[..4].copy_from_slice(b"daeh");bytes[0x7fc..0x800].copy_from_slice(b"toof");
+        set(&mut bytes,4,7);set(&mut bytes,8,0x2000);set(&mut bytes,16,0x800);set(&mut bytes,20,0x800);
+        bytes[0x20..0x26].copy_from_slice(b"sound\0");bytes[0x40..0x4a].copy_from_slice(b"synthetic\0");
+        set(&mut bytes,0x800,0x40440080);set(&mut bytes,0x80c,1);set(&mut bytes,0x824,0x74616773);
+        bytes[0x880..0x884].copy_from_slice(b"!dns");set(&mut bytes,0x88c,0x1234);
+        set(&mut bytes,0x890,0x40440100);set(&mut bytes,0x894,0x40440180);
+        bytes[0x900..0x90b].copy_from_slice(b"test\\sound\0");
+        set(&mut bytes,0x980+152,1);set(&mut bytes,0x980+156,0x40440300);
+        set(&mut bytes,0xb00+60,1);set(&mut bytes,0xb00+64,0x40440380);
+        bytes[0xb80..0xb85].copy_from_slice(b"clip\0");bytes[0xb80+40..0xb80+42].copy_from_slice(&1u16.to_le_bytes());
+        set(&mut bytes,0xb80+64,36);set(&mut bytes,0xb80+68,u32::from(external));
+        set(&mut bytes,0xb80+72,if external{0x300}else{0x1100});
+        bytes[0x1100..0x1102].copy_from_slice(&1000i16.to_le_bytes());bytes
+    }
+    #[test]fn embedded_xbox_sample_converts_without_changing_source(){
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("source.map");let bytes=sound_fixture(false);std::fs::write(&path,&bytes).unwrap();
+        let hash=format!("{:x}",Sha256::digest(&bytes));let report=inspect_sound(&path,&hash,0x1234).unwrap();
+        assert!(report.permutations[0].available);let preview=preview_sound(&path,&hash,0x1234,0,0).unwrap();
+        assert_eq!(preview.mime,"audio/wav");assert_eq!(preview.bytes.len(),172);assert_eq!(preview.source_sha256,hash);
+        assert_eq!(&preview.bytes[44..46],&1000i16.to_le_bytes());assert_eq!(std::fs::read(&path).unwrap(),bytes);
+        assert!(preview_sound(&path,&"f".repeat(64),0x1234,0,0).is_err());
+    }
+    #[test]fn shared_samples_require_kind_hash_and_exact_permutation_span(){
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("source.map");let bytes=sound_fixture(true);std::fs::write(&path,&bytes).unwrap();
+        let hash=format!("{:x}",Sha256::digest(&bytes));let resource=dir.path().join("sounds.map");let mut raw=vec![0u8;0x400];
+        let set=|b:&mut[u8],at:usize,n:u32|b[at..at+4].copy_from_slice(&n.to_le_bytes());
+        set(&mut raw,0,2);set(&mut raw,4,0x100);set(&mut raw,8,0x40);set(&mut raw,12,1);set(&mut raw,0x44,36);set(&mut raw,0x48,0x300);
+        raw[0x100..0x111].copy_from_slice(b"test\\sound__0__0\0");std::fs::write(&resource,&raw).unwrap();
+        let pinned=format!("{:x}",Sha256::digest(&raw));assert!(!inspect_sound(&path,&hash,0x1234).unwrap().permutations[0].available);
+        let preview=preview_sound_with_resources(&path,&hash,0x1234,0,0,Some((&resource,&pinned))).unwrap();assert_eq!(preview.bytes.len(),172);
+        assert!(preview_sound_with_resources(&path,&hash,0x1234,0,0,Some((&resource,&"0".repeat(64)))).is_err());
+        raw[0x10e]=b'1';std::fs::write(&resource,&raw).unwrap();let changed=format!("{:x}",Sha256::digest(&raw));
+        assert!(preview_sound_with_resources(&path,&hash,0x1234,0,0,Some((&resource,&changed))).is_err());
     }
 }

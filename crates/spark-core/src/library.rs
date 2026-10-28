@@ -102,7 +102,8 @@ impl Library {
             }
         }
         if let Some(source) = &project.source {
-            if source.preserved_path != dir.join("source.map") {
+            crate::reject_links(&source.preserved_path)?;crate::reject_links(&dir.join("source.map"))?;
+            if fs::canonicalize(&source.preserved_path)? != fs::canonicalize(dir.join("source.map"))? {
                 return invalid("Source must be the managed preserved copy");
             }
         }
@@ -226,7 +227,9 @@ impl Library {
                 return invalid("The project source file is missing or changed; restore the original file before opening this project");
             }
             if let Some(directory) = &src.resource_directory {
-                let actual = project::resource_hashes(directory)?;
+                let actual = if src.cache_version==13&&src.resource_sha256.contains_key("mcc-textures") {
+                    let header=maps::inspect_header(&src.original_path)?;crate::mcc_textures::pin(directory,&header.name)?
+                }else{project::resource_hashes(directory)?};
                 if src
                     .resource_sha256
                     .iter()
@@ -235,8 +238,8 @@ impl Library {
                     return invalid("Project resources changed; restore them or select resources in the original project before exporting");
                 }
             }
-            self.import_map(&src.original_path, src.resource_directory.as_deref())?
-                .0
+            let mut imported=self.import_map(&src.original_path, src.resource_directory.as_deref())?.0;
+            if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();}imported
         } else {
             self.create(&incoming.title)?
         };

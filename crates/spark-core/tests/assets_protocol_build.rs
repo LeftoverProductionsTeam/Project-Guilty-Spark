@@ -98,6 +98,19 @@ fn synthetic_fixtures_and_missing_tools_never_become_playable() {
     assert!(report.blockers.iter().any(|b| b.contains("invader-build")));
 }
 #[test]
+fn mcc_viewer_pack_pins_do_not_become_unsupported_classic_build_resources() {
+    let d=tempfile::tempdir().unwrap();let path=d.path().join("fixture.map");common::write_map(&path,13);
+    let lib=Library::open(&d.path().join("lib")).unwrap();let(mut p,i)=lib.import_map(&path,None).unwrap();
+    let packs=d.path().join("packs");std::fs::create_dir(&packs).unwrap();
+    std::fs::write(packs.join("fixture.imeta"),b"bounded synthetic pin fixture").unwrap();std::fs::write(packs.join("common.ipak"),b"synthetic pixels").unwrap();
+    let source=p.source.as_mut().unwrap();source.resource_directory=Some(packs.clone());source.resource_sha256=spark_core::mcc_textures::pin(&packs,"fixture").unwrap();
+    let report=build::compatibility(&p,&i,&Toolchain::default());
+    assert!(report.blockers.iter().all(|s|!s.contains("resource")),"A verified viewer pin must not be rejected as a classic resource-map key: {:?}",report.blockers);
+    assert!(!report.ready,"A synthetic map still needs real tools and acceptance");
+    std::fs::write(packs.join("common.ipak"),b"changed pixels").unwrap();
+    let report=build::compatibility(&p,&i,&Toolchain::default());assert!(report.blockers.iter().any(|s|s.contains("MCC texture resources changed")));
+}
+#[test]
 fn header_changes_are_not_accepted_as_conversion() {
     let mut bytes = common::fixture(6);
     common::put_u32(&mut bytes, 4, 13);

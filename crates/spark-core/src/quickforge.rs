@@ -72,7 +72,7 @@ impl Default for EditorEnvironment {
     } }
 }
 impl EditorEnvironment {
-    fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> Result<()> {
         for rgb in [self.sky_color,self.ambient_color,self.sun_color,self.fog_color] {
             if rgb.iter().any(|c| !c.is_finite() || !(0.0..=1.0).contains(c)) {
                 return invalid("Environment RGB colors must be finite within 0..1");

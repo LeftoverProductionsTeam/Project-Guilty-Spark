@@ -14,6 +14,23 @@ pub struct ForgeToolchain {
     /// content-path flags, unlike the H1A/MCC Editing Kit.
     pub hek_flavor: Option<String>,
 }
+pub fn tools_for_target(project:&Project,fallback:ForgeToolchain)->Result<ForgeToolchain> {
+    let Some(id)=&project.active_build_target else{return Ok(fallback)};
+    let profile=project.build_targets.iter().find(|p|&p.id==id)
+        .ok_or_else(||SparkError::Invalid("Active build target missing".into()))?;
+    if profile.open_sauce {return invalid("OpenSauce .yelo compilation is not integrated. Use a separate CE/OpenSauce toolchain; MCC cannot load it");}
+    let expected=match profile.runtime_id {RuntimeId::MccSteam=>"h1a-tool",RuntimeId::HaloCustomEdition=>"invader-ce",
+        _=>return invalid("This runtime has no verified integrated builder; retain its configuration and export source for research")};
+    if profile.builder!=expected {return invalid("Selected builder produces the wrong engine output");}
+    if profile.runtime_id==RuntimeId::MccSteam && profile.hek_flavor.as_deref()!=Some("h1aEk") {
+        return invalid("MCC source compilation requires the H1A editing kit");
+    }
+    if profile.runtime_id==RuntimeId::HaloCustomEdition && !profile.ce_compatible_tagset {
+        return invalid("Confirm a Custom Edition base tagset and review incompatible MCC fields/scripts before building CE. No fields are silently stripped");
+    }
+    Ok(ForgeToolchain{hek_directory:profile.hek_directory.clone(),hek_tags_directory:profile.tags_directory.clone(),
+        invader_directory:profile.invader_directory.clone(),hek_flavor:profile.hek_flavor.clone()})
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct QuickForgeBuildReceipt {
@@ -35,11 +52,13 @@ pub struct QuickForgeBuildReceipt {
 fn halo_tool_prefix(flavor:Option<&str>,workspace:&Path,stage:&Path)->Result<Vec<String>> {
     match flavor {
         Some("legacyHek")=>Ok(vec![]),
-        Some("h1aEk")=>Ok(vec![
-            "-data_dir".into(),workspace.join("data").to_string_lossy().into_owned(),
-            "-tags_dir".into(),stage.to_string_lossy().into_owned(),
-            "-game_root_dir".into(),workspace.to_string_lossy().into_owned(),
-        ]),
+        Some("h1aEk")=>{
+            if stage!=workspace.join("tags"){return invalid("H1A tags must be scoped to this compiler workspace");}
+            // Tool retains a short internal filename buffer. Relative content
+            // roots avoid its observed absolute-path assertion, while Runner
+            // still starts exclusively inside the isolated workspace.
+            Ok(vec!["-data_dir".into(),"data".into(),"-tags_dir".into(),"tags".into(),"-game_root_dir".into(),".".into()])
+        },
         _=>invalid("Unknown Halo Tool generation; configure classic HEK or H1A explicitly"),
     }
 }
@@ -47,7 +66,7 @@ fn tool_file(tools: &ForgeToolchain) -> Option<PathBuf> {
     tools.hek_directory.as_ref().map(|p|p.join(if cfg!(windows){"tool.exe"}else{"tool"})).filter(|p|p.is_file())
 }
 fn invader(tools:&ForgeToolchain,name:&str)->Option<PathBuf> {
-    build::tool_path(&build::Toolchain{invader_directory:tools.invader_directory.clone(),resource_directory:None},name)
+    build::tool_path(&build::Toolchain{invader_directory:tools.invader_directory.clone(),..Default::default()},name)
 }
 fn target(runtime: RuntimeId)->Result<(&'static str,u32)> {
     match runtime {
@@ -93,7 +112,7 @@ pub fn audit_material_bindings(document:&quickforge::QuickForgeDocument,files:im
 }
 /// Bounded copy of owner-selected editable tags, never hardlinks into an installation.
 /// Hashes cover every input copied so a later build can be compared meaningfully.
-fn stage_tags(source:&Path,destination:&Path,cancel:&AtomicBool)->Result<BTreeMap<String,String>> {
+pub(crate) fn stage_tags(source:&Path,destination:&Path,cancel:&AtomicBool)->Result<BTreeMap<String,String>> {
     crate::reject_links(source)?;
     if !source.is_dir(){return invalid("Select an extracted HCEEK tags directory, not compiled .map files");}
     let source=source.canonicalize()?;
@@ -159,8 +178,10 @@ pub fn run_job(
         match document.runtime_id {
             RuntimeId::MccSteam if tools.hek_flavor.as_deref()!=Some("h1aEk") =>
                 receipt.blockers.push("MCC/H1A builds require an explicitly selected H1A Editing Kit, not classic HEK. Configure the kit generation in Settings.".into()),
-            RuntimeId::HaloCustomEdition if tools.hek_flavor.as_deref()!=Some("legacyHek") =>
-                receipt.blockers.push("Custom Edition builds require explicitly selected classic HEK. Set the kit generation in Settings; classic Tool uses local workspace paths, not H1A -data_dir flags.".into()),
+            RuntimeId::HaloCustomEdition if tools.hek_flavor.as_deref()!=Some("legacyHek") &&
+                !(tools.hek_flavor.as_deref()==Some("h1aEk") && project.active_build_target.as_ref().is_some_and(|id|
+                    project.build_targets.iter().any(|p|&p.id==id&&p.ce_compatible_tagset))) =>
+                receipt.blockers.push("CE requires classic HEK or an explicitly reviewed H1A authoring profile with a CE base tagset. Invader must build gbx-custom output.".into()),
             RuntimeId::OpenCe|RuntimeId::ChupathingyCe =>
                 receipt.blockers.push("OpenCE / ChupathingyCE target-specific structure and runtime output have not been verified. Export sources and validate with the actual runtime before enabling compilation.".into()),
             _ => (),
@@ -168,7 +189,7 @@ pub fn run_job(
         if tool.is_none(){receipt.blockers.push("Halo 1 Editing Kit Tool is missing. Select the separately installed matching HEK or H1A kit folder in Settings.".into());}
         let tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
         if tags.as_ref().is_none_or(|p|!p.is_dir()){receipt.blockers.push("Legal editable base tags are missing. Select the extracted HCEEK tags folder in Settings.".into());}
-        for name in ["invader-edit","invader-build","invader-info"] {if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
+        for name in ["invader-edit","invader-build","invader-info"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
         if let Some(tags)=tags.as_ref().filter(|p|p.is_dir()) {
             for dependency in &sources.dependencies {
                 match dependency_path(tags,&dependency.tag_path,&dependency.tag_class) {
@@ -181,7 +202,9 @@ pub fn run_job(
         }
         if !receipt.blockers.is_empty(){receipt.status="blocked".into();return Ok(());}
         let (engine,version)=engine.unwrap(); let tool=tool.unwrap();
-        for (name,path) in [("haloTool",tool.clone()),("invaderEdit",invader(tools,"invader-edit").unwrap()),("invaderBuild",invader(tools,"invader-build").unwrap()),("invaderInfo",invader(tools,"invader-info").unwrap())] {
+        let mut executables=vec![("haloTool",tool.clone()),("invaderEdit",invader(tools,"invader-edit").unwrap()),("invaderInfo",invader(tools,"invader-info").unwrap())];
+        if document.runtime_id!=RuntimeId::MccSteam{executables.push(("invaderBuild",invader(tools,"invader-build").unwrap()));}
+        for (name,path) in executables {
             crate::reject_links(&path)?;receipt.tool_identities.insert(name.into(),maps::hash_file(&path)?);
         }
         emit("dependencies","Copying and hashing owner-selected tags into an isolated job".into(),15,"info");
@@ -214,15 +237,27 @@ pub fn run_job(
             };
             args.extend(command.args.clone());
             let output=runner.run(&executable,&args,workspace,&command.phase,(25+index*45/sources.commands.len().max(1)) as u8)?;
-            if output.lines().any(|line|line.to_ascii_lowercase().contains("### error")){return invalid(format!("{} reported a compiler error",command.phase));}
+            if let Some(line)=output.lines().find(|line|{let text=line.to_ascii_lowercase();text.contains("### error")||text.contains("exception halt")||text.contains("exception_breakpoint")}){return invalid(format!("{} compiler rejected the source: {}",command.phase,line.chars().take(400).collect::<String>()));}
             for expected in &command.expected_outputs {
                 let file=workspace.join(safe_relative(expected)?);crate::reject_links(&file)?;
                 if !file.is_file() || fs::metadata(file)?.len()<64{return invalid(format!("{} did not produce a complete expected tag: {expected}",command.phase));}
             }
         }
         let output_dir=directory.join("output");fs::create_dir(&output_dir)?;
-        runner.run(&invader(tools,"invader-build").unwrap(),&["-g".into(),engine.into(),"-t".into(),stage.to_string_lossy().into_owned(),"-m".into(),output_dir.to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),sources.scenario_path.clone()],workspace,"compile",82)?;
         let output=output_dir.join(format!("{}.map",sources.bsp_name));
+        if document.runtime_id==RuntimeId::MccSteam {
+            crate::engine_machinima::prepare(project,&sources.scenario_path,workspace,&invader(tools,"invader-edit").unwrap(),&runner,0)?;
+            // H1A native tags include model classes/fields which Invader's
+            // classic input parser cannot compile. Use the matching SDK Tool.
+            let mut args=halo_tool_prefix(tools.hek_flavor.as_deref(),workspace,&stage)?;
+            args.extend(["build-cache-file".into(),sources.scenario_path.clone(),"classic".into(),"none".into()]);
+            let log=runner.run(&tool,&args,workspace,"compile",82)?;
+            if !log.to_ascii_lowercase().contains("successfully built cache file."){return invalid("H1A Tool did not confirm cache compilation; inspect its log");}
+            let compiled=workspace.join("maps").join(format!("{}.map",sources.bsp_name));crate::reject_links(&compiled)?;
+            fs::copy(compiled,&output)?;
+        }else{
+            runner.run(&invader(tools,"invader-build").unwrap(),&["-g".into(),engine.into(),"-t".into(),stage.to_string_lossy().into_owned(),"-m".into(),output_dir.to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),sources.scenario_path.clone()],workspace,"compile",82)?;
+        }
         let inspected=maps::inspect_map(&output,None)?;
         if inspected.header.version!=version || !inspected.scenario_path.replace('\\',"/").eq_ignore_ascii_case(&sources.scenario_path.replace('\\',"/")) || inspected.header.scenario_type!=1 || inspected.mesh.indices.is_empty() {return invalid("Compiled map has wrong engine/scenario/type or no collision BSP");}
         for check in ["crc32_mismatched","is_protected","stub_count"] {
@@ -267,6 +302,7 @@ mod tool_generation_tests {
         assert_eq!(args[0],"-data_dir");
         assert_eq!(args[2],"-tags_dir");
         assert_eq!(args[4],"-game_root_dir");
-        assert!(args[1].contains("isolated_halo_job"));
+        assert_eq!((&args[1],&args[3],&args[5]),(&"data".to_string(),&"tags".to_string(),&".".to_string()));
+        assert!(halo_tool_prefix(Some("h1aEk"),cwd,Path::new("/different/tags")).is_err());
     }
 }

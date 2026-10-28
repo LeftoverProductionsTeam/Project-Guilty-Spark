@@ -27,7 +27,7 @@ export interface MaterialAudit {
 }
 const primaryLabel = /^(?:base map|base texture|diffuse map|diffuse texture|primary map|albedo map|bitmap)$/i;
 function shaderState(tag:Tag|undefined, bitmap:Tag|undefined, primaryCount:number):MaterialBindingState {
-  if(!tag || !['senv','soso'].includes(tag.class)) return 'invalid';
+  if(!tag || !['senv','soso'].includes(tag.class)&&!(['schi','scex'].includes(tag.class)&&tag.shaderPreview?.kind==='chicago')) return 'invalid';
   const status=tag.primaryBitmapStatus;
   if(status==='missing'||status==='unavailable'||status==='invalid')return status;
   if(status==='resolved')return primaryCount===1&&bitmap?.class==='bitm'?'resolved':'invalid';

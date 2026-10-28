@@ -17,6 +17,7 @@ import type { CueName, LocalCueReference } from '../interfacePreferences';
 import { createTagExchangeBundle } from '../haloExchange';
 import { downloadLocalText } from '../exportHelpers';
 import { call, native } from '../api';
+import {useMapState} from '../mapSession';
 export default function Tags({
   project,
   inspection,
@@ -25,7 +26,9 @@ export default function Tags({
   edit,
   notify,
   focusTagId,
+  onFocusHandled,
   onAssignSound,
+  onResources,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -34,15 +37,17 @@ export default function Tags({
   edit: (p: Project, d: string) => void;
   notify: (m: string) => void;
   focusTagId?: number | null;
+  onFocusHandled?:()=>void;
   onAssignSound?: (cue: CueName, ref: LocalCueReference) => void;
+  onResources?:()=>void;
 }) {
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [selected, setSelected] = useState<number | null>(
+  const [query, setQuery] = useMapState(project.id,'tags.query','');
+  const [filter, setFilter] = useMapState(project.id,'tags.filter','all');
+  const [selected, setSelected] = useMapState<number | null>(project.id,'tags.selection',
     inspection?.tags.find((t) => t.class === 'weap')?.id ?? inspection?.tags[0]?.id ?? null,
   );
-  const [limit, setLimit] = useState(300);
-  const [advanced, setAdvanced] = useState(false);
+  const [limit, setLimit] = useMapState(project.id,'tags.limit',300);
+  const [advanced, setAdvanced] = useMapState(project.id,'tags.advanced',false);
   const [extractingTag,setExtractingTag] = useState<number|null>(null);
   const [exchangeJobs,setExchangeJobs] = useState<{
     jobId:string;sourceProjectId:string;sourceEngine:string;sourceVersion:number;
@@ -75,6 +80,7 @@ export default function Tags({
   useEffect(() => {
     if (focusTagId !== null && focusTagId !== undefined && inspection?.tags.some((tag) => tag.id === focusTagId)) {
       navigateToTag(focusTagId);
+      onFocusHandled?.();
     }
   // Navigation is keyed to the explicitly requested tag or imported source, not every list render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -382,7 +388,7 @@ export default function Tags({
               )}
             </div>
             {selectedTag.class === 'snd!' && (
-              <Sound key={selectedTag.id} projectId={project.id} tagId={selectedTag.id} sourceHash={project.source?.sha256 ?? ''} onAssign={onAssignSound} />
+              <>{onResources&&<button className="small-button" onClick={onResources}>Locate Halo Sounds folder</button>}<Sound key={`${selectedTag.id}:${project.source?.resourceSha256?.['sounds.map']}`} projectId={project.id} tagId={selectedTag.id} sourceHash={project.source?.sha256 ?? ''} onAssign={onAssignSound} /></>
             )}
             {selectedTag.references.length > 0 && (
               <div className="reference-list">

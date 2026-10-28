@@ -17,6 +17,8 @@
 | Invader / SnowyMouse & Vaporeon | Open-source Halo 1 toolkit, asset processing, tag and cache builders | https://c20.reclaimers.net/h1/community-tools/invader/ |
 | MEK / MosesOfEgypt & gbMichelle | Refinery, Mozzarilla and alternative tag-extraction/editing methods | https://c20.reclaimers.net/h1/community-tools/mek/ |
 | The Reclaimers Library (c20) | Current schema references and tutorial documentation | https://c20.reclaimers.net/ |
+| Gravemind2401 / Reclaimer | Published MCC texture container and chunk layout research consulted for the independent reader | https://github.com/Gravemind2401/Reclaimer |
+| Zatarita / SeT | Public Saber ipak/imeta format research | https://github.com/Zatarita/SeT |
 | Halo Maps, HaloMods and early forums | Map sharing, tutorials, old utilities and community experiments | https://www.halomaps.org/ |
 | MacGamingMods, Halo Demo modders and Fonzie/Fonzeh | Preservation and experimentation with Halo's Mac and Demo editions | https://macgamingmods.com/ |
 | Everyone who taught and helped another modder | Independent tutorials, community support, debugging, oral knowledge and credits in the maps themselves | https://c20.reclaimers.net/h1/guides/ |

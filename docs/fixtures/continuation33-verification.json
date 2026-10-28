@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "continuation": 33,
+  "version": "0.4.0",
+  "verifiedAt": "2026-10-27T13:50:44.311Z",
+  "platform": "Windows x64",
+  "baseCommit": "ff14c9c2e1d7f6d997fea31435be28582e5dca36",
+  "automated": {
+    "rust": {
+      "passed": 190,
+      "groups": 20
+    },
+    "frontend": {
+      "passed": 61,
+      "files": 11
+    },
+    "offline": {
+      "passed": 59
+    },
+    "browser": {
+      "passed": 10
+    }
+  },
+  "native": {
+    "tests": [
+      {
+        "name": "Rotated Cover 1 moves along world X using the real native gizmo",
+        "status": "PASS"
+      },
+      {
+        "name": "Source weapon and Spartan spawn previews use actual owned models",
+        "status": "PASS"
+      },
+      {
+        "name": "Machinima rehearsal moves the source Spartan independently of its camera",
+        "status": "PASS"
+      },
+      {
+        "name": "MCC adapter refuses unconfirmed mode and reads the actual BloodGulch session",
+        "status": "PASS"
+      },
+      {
+        "name": "First boot saves Halo and tool choices then opens a searchable glossary without asking next boot",
+        "status": "PASS"
+      },
+      {
+        "name": "Two native Spark instances exchange source moves and preserve per-editor undo",
+        "status": "PASS"
+      },
+      {
+        "name": "Whole-window transparency and tint persist across a native reload",
+        "status": "PASS"
+      },
+      {
+        "name": "Live Lab applies and undoes a real MCC object move through its native UI",
+        "status": "PASS"
+      },
+      {
+        "name": "Live item size UI, Ctrl+Z/redo, restoration and shared vehicle scope",
+        "status": "PASS"
+      }
+    ],
+    "itemSizes": [
+      {
+        "kind": 2,
+        "tagPath": "weapons/shotgun/shotgun",
+        "original": 1.7,
+        "small": 0.5,
+        "big": 2,
+        "undo": true,
+        "redo": true,
+        "restored": true
+      },
+      {
+        "kind": 3,
+        "tagPath": "weapons/frag grenade/frag grenade",
+        "original": 1.75,
+        "small": 0.5,
+        "big": 2,
+        "undo": true,
+        "redo": true,
+        "restored": true
+      }
+    ],
+    "sharedItemScope": true,
+    "sharedVehicleScope": true,
+    "keyboardUndoRedo": true
+  },
+  "preservation": {
+    "files": 67,
+    "unchanged": true,
+    "readOnly": true,
+    "archivedBinariesExecuted": false
+  },
+  "runtime": {
+    "mcc": {
+      "profile": "mcc-steam-halo1-1.3528.0.0",
+      "scenario": "levels/test/bloodgulch/bloodgulch",
+      "tags": 2425,
+      "objectsAtInspection": 142,
+      "positionWriteReadbackAndRestore": true,
+      "worldItemSizes": [
+        0.5,
+        2
+      ],
+      "worldItemKeyboardUndoRedoAndRestore": true,
+      "vehicleScale": {
+        "sharedWarthogs": 12,
+        "contactSpheres": 15,
+        "suspensionChannels": 4,
+        "large": 2,
+        "largeOwnerConfirmedTiresAndDriving": true,
+        "small": 0.5,
+        "smallReadbackAndRestore": true,
+        "smallOwnerDrivingResult": "NOT RECEIVED; restored before final UI checks",
+        "originalPhysicsAndZeroSentinelsRestored": true
+      },
+      "peerReplication": "NOT VERIFIED"
+    }
+  },
+  "compiler": {
+    "kit": "HCEEK 2023.07.17.176677.1-QFE1",
+    "originalRoomStructureLightmapsCache": "PASS",
+    "cacheSha256": "db4b32895e81c96543593fcc734fb021ceda09fbae47d6ed095415d66fefd57b",
+    "containedTunnelProbe": {
+      "surfaces": 108,
+      "nodes": 46,
+      "leaves": 20,
+      "applicationGeneralCsg": "BLOCKED"
+    }
+  },
+  "recursiveTags": {
+    "files": 255,
+    "bytes": 7829983,
+    "operation": "EXTRACTED AND STAGED; NOT BINARY-MERGED",
+    "damagedPistolDependency": "REFUSED"
+  },
+  "artifacts": [
+    {
+      "path": "releases/GuiltySpark-C33-0.4.0.exe",
+      "bytes": 19250176,
+      "sha256": "fe68196b858e0f7b8d72d6af6e3ed8d43a689cfe11c6267801439ed70c6071c1"
+    },
+    {
+      "path": "releases/Project Guilty Spark_0.4.0_x64-setup.exe",
+      "bytes": 5162132,
+      "sha256": "526135e68cffc9ca4e4828defdd37b613ea193a24411cb29f1269af218410c79"
+    }
+  ],
+  "remaining": [
+    "Small Warthog manual handling acceptance",
+    "Other vehicle type visual/handling acceptance",
+    "Two-computer Halo replication",
+    "Full map shader/sky/PVS parity and MCC ipak resources",
+    "Animated in-game machinima/free camera",
+    "General BSP CSG and AI navigation",
+    "Binary tag/map merge and cross-engine conversion",
+    "Spatial game sound events",
+    "Firefight/Zombie playable restoration",
+    "CE/Chimera runtime adapter",
+    "Native Mac/Linux acceptance"
+  ]
+}
