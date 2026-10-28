@@ -8,7 +8,7 @@
 
 ## What works today
 
-The latest [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes the onboarding save path, compacts the sidebar, moves Interface Studio into Settings, retains shared editor sessions and adds a separately built Spacewar test module. A four-map dogleg tunnel passes native compilation and compiled collision checks. Gameplay control presets include independent left/right mouse routing; live sprint, paired firing and sword lunge still require verified engine hooks.
+The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes the onboarding save path, compacts the sidebar, moves Interface Studio into Settings, retains shared editor sessions and adds a separately built Spacewar test module. A four-map dogleg tunnel passes native compilation and compiled collision checks. The [native gameplay, tag and audio pass](docs/NATIVE_GAMEPLAY_AND_AUDIO.md) adds working MCC Shift sprint, an editable shoulder camera with a dedicated first/third-person button and saved F6 shortcut, native power-up recipes, spatial sound rehearsal with linked segments, safe campaign tag duplication through rebuilding, and audited UI-widget fields. Dual-wield firing, player sword/lunge, third-person aim correction and complete rendering/audio parity remain open; compiler checks alone do not establish game loading.
 
 - Preserve owned maps, inspect real classic tag data, stage supported field/placement edits, and compare variants.
 - Render actual classic/MCC BSP geometry, object models, source materials, detail layers, lightmaps, decals, sky and atmospheric fog. Textures stream from verified owned resources, including supported MCC texture packs. Open a player-start view or use the map overview.
@@ -225,7 +225,7 @@ pnpm desktop
 
 The optional `scripts/bootstrap-rust.mjs` installs Rust only under `.toolchain/`, without changing system PATH. `node scripts/cargo.mjs ...` and `node scripts/desktop.mjs ...` use that installation when present. The optional Invader development installer writes a separate tool copy under `.local/tools/`; that tool is not bundled or redistributed by the release build.
 
-No telemetry, automatic publishing, process memory modification, stock map replacement, executable patching, or anti-cheat configuration changes are performed by Guilty Spark.
+Spark sends no automatic usage analytics or public uploads. The opt-in MCC adapter changes reviewed, temporary game data for supported live controls; source maps, installed maps and SDK master tags remain outside its output paths. It does not patch executable code or modify anti-cheat configuration. See [native gameplay and audio status](docs/NATIVE_GAMEPLAY_AND_AUDIO.md) for current acceptance results and open limits.
 
 ## 07 Halo Modding Brain continuation (source-only)
 

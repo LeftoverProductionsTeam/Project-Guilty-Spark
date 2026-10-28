@@ -12,6 +12,9 @@ pub struct SoundPermutation {
     pub pitch_range: usize,
     pub permutation: usize,
     pub name: String,
+    /// Some sounds are split into linked chunks. Indices are local to a pitch range.
+    pub next_permutation: Option<usize>,
+    pub chain_start: bool,
     pub format: String,
     pub channels: u8,
     pub sample_rate: u32,
@@ -54,17 +57,13 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
     if sha256 != expected_sha256 {
         return invalid("Audio source checksum differs from the preserved project source");
     }
-    if ![6, 7, 609].contains(&header.version) || header.extended {
-        return invalid("Embedded audio preview currently supports unextended Demo, PC/Mac/MD and Custom Edition cache layouts");
+    if ![6, 7, 609,13].contains(&header.version) || header.extended {
+        return invalid("Audio preview requires an unextended classic or MCC Halo 1 cache with supported sound metadata");
     }
     let r = Reader(&bytes);
     let start = header.tag_offset as usize;
     let end = start + header.tag_size as usize;
-    let base = if header.version == 6 {
-        0x4bf10000
-    } else {
-        0x40440000
-    };
+    let base = match header.version {6=>0x4bf10000,13=>r.u32(start)?.checked_sub(0x28).ok_or_else(||SparkError::Invalid("Invalid MCC sound tag index".into()))?,_=>0x40440000};
     let pointer = |value: u32, size: usize| -> Result<usize> {
         let offset =
             start
@@ -152,9 +151,14 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
         } else {
             pointer(r.u32(pitch + 64)?, count * 124)?
         };
+        let actual_count = r.u16(pitch + 44)? as usize;
+        if actual_count > count {
+            return invalid("Sound's root permutation count exceeds its pitch range");
+        }
         for permutation in 0..count {
             let perm = permutations + permutation * 124;
             let codec = r.u16(perm + 40)?;
+            let next = r.u16(perm + 42)?;
             let length = r.u32(perm + 64)? as usize;
             let flags = r.u32(perm + 68)?;
             let offset = r.u32(perm + 72)? as usize;
@@ -162,6 +166,8 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
                 pitch_range,
                 permutation,
                 name: r.string(perm, 32)?,
+                next_permutation: (next != u16::MAX).then_some(next as usize),
+                chain_start: actual_count == 0 || permutation < actual_count,
                 format: match codec {
                     0 => "PCM",
                     1 => "Xbox ADPCM",
@@ -220,7 +226,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
         }
     }
     if let Ok(Some((file,_)))=&mut resource {crate::resource_map::verify_open_handle_hash(file,resources.unwrap().1)?;}
-    report.warnings.push("Source samples are SHA-256 checked. Shared samples require an exact sounds.map permutation span. Playback does not simulate game sound classes, scripts, spatial mixing or looping-track transitions.".into());
+    report.warnings.push("Source samples are SHA-256 checked. Shared samples require an exact sounds.map permutation span. Individual sample playback does not apply native sound classes, scripts, acoustic clusters or looping-track transitions. The spatial mixer can follow linked sample segments.".into());
     Ok(SoundData {
         report,
         bytes,
@@ -463,6 +469,29 @@ mod tests {
         assert_eq!(preview.mime,"audio/wav");assert_eq!(preview.bytes.len(),172);assert_eq!(preview.source_sha256,hash);
         assert_eq!(&preview.bytes[44..46],&1000i16.to_le_bytes());assert_eq!(std::fs::read(&path).unwrap(),bytes);
         assert!(preview_sound(&path,&"f".repeat(64),0x1234,0,0).is_err());
+    }
+    #[test]fn linked_permutation_metadata_keeps_roots_and_chunks_distinct(){
+        let mut bytes=sound_fixture(false);
+        bytes[0xb00+44..0xb00+46].copy_from_slice(&1u16.to_le_bytes());
+        bytes[0xb00+60..0xb00+64].copy_from_slice(&2u32.to_le_bytes());
+        let second=bytes[0xb80..0xb80+124].to_vec();
+        bytes[0xb80+124..0xb80+248].copy_from_slice(&second);
+        bytes[0xb80+42..0xb80+44].copy_from_slice(&1u16.to_le_bytes());
+        bytes[0xb80+124+42..0xb80+124+44].copy_from_slice(&u16::MAX.to_le_bytes());
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("linked.map");std::fs::write(&path,&bytes).unwrap();
+        let hash=format!("{:x}",Sha256::digest(&bytes));let report=inspect_sound(&path,&hash,0x1234).unwrap();
+        assert!(report.permutations.iter().all(|p|p.available));
+        assert!(report.permutations[0].chain_start);assert_eq!(report.permutations[0].next_permutation,Some(1));
+        assert!(!report.permutations[1].chain_start);assert_eq!(report.permutations[1].next_permutation,None);
+        assert_eq!(std::fs::read(&path).unwrap(),bytes);
+        bytes[0xb00+44..0xb00+46].copy_from_slice(&3u16.to_le_bytes());std::fs::write(&path,&bytes).unwrap();
+        let hash=format!("{:x}",Sha256::digest(&bytes));assert!(inspect_sound(&path,&hash,0x1234).is_err());
+    }
+    #[test]fn mcc_audio_uses_the_map_specific_tag_base_and_preserves_verified_samples(){
+        let mut bytes=sound_fixture(false);let set=|b:&mut[u8],at:usize,n:u32|b[at..at+4].copy_from_slice(&n.to_le_bytes());let base=0x52000000;
+        let entry=bytes[0x880..0x8a0].to_vec();bytes[0x828..0x848].copy_from_slice(&entry);set(&mut bytes,4,13);set(&mut bytes,0x800,base+0x28);set(&mut bytes,0x838,base+0x100);set(&mut bytes,0x83c,base+0x180);set(&mut bytes,0x980+156,base+0x300);set(&mut bytes,0xb00+64,base+0x380);
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("mcc.map");std::fs::write(&path,&bytes).unwrap();let hash=format!("{:x}",Sha256::digest(&bytes));let sound=inspect_sound(&path,&hash,0x1234).unwrap();assert!(sound.permutations[0].available);let clip=preview_sound(&path,&hash,0x1234,0,0).unwrap();assert_eq!(&clip.bytes[44..46],&1000i16.to_le_bytes());assert_eq!(std::fs::read(&path).unwrap(),bytes);
+        set(&mut bytes,0x980+156,0x40440300);std::fs::write(&path,&bytes).unwrap();let hash=format!("{:x}",Sha256::digest(&bytes));assert!(inspect_sound(&path,&hash,0x1234).is_err());
     }
     #[test]fn shared_samples_require_kind_hash_and_exact_permutation_span(){
         let dir=tempfile::tempdir().unwrap();let path=dir.path().join("source.map");let bytes=sound_fixture(true);std::fs::write(&path,&bytes).unwrap();

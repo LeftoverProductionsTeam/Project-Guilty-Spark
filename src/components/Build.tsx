@@ -188,7 +188,7 @@ export default function Build({
               </>
             )}
           </section>
-          {project.source?.cacheVersion === 13 && !project.bspAssembly && !project.animationAssignments?.length && !project.studio?.engineMachinima?.enabled && (!project.conversionProfile || project.conversionProfile === 'faithful') && (
+          {project.source?.cacheVersion === 13 && !project.bspAssembly && !project.animationAssignments?.length && !project.powerups?.length && !project.tagDuplicates?.length && !project.studio?.engineMachinima?.enabled && (!project.conversionProfile || project.conversionProfile === 'faithful') && (
             <div className="surface">
               <div className="section-heading">
                 <h3>Already built for MCC?</h3>

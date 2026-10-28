@@ -9,7 +9,7 @@ export interface GameplayControls {
 export const DEFAULT_GAMEPLAY_CONTROLS: GameplayControls = {
   sprint: false,
   sprintKey: 'ShiftLeft',
-  sprintMultiplier: 1.5,
+  sprintMultiplier: 1.75,
   dualWield: false,
   dualWieldKey: 'KeyQ',
   swordLunge: false,

@@ -1,6 +1,7 @@
 import BuildTargets from './BuildTargets';
 import RenderFeatures from './RenderFeatures';
 import LiveForge from './LiveForge';
+import MapSounds from './MapSounds';
 import ForgeCollaboration from './ForgeCollaboration';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {useMapState} from '../mapSession';
@@ -280,7 +281,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [cutaway, setCutaway] = useMapState(project.id,'forge.cutaway',true),
     [cameraMode, setCameraMode] = useMapState<ForgeCamera>(project.id,'forge.cameraMode','orbit'),
     [frame, setFrame] = useState(0);
-  const [tab, setTab] = useMapState<'palette' | 'properties' | 'firefight'>(project.id,'forge.inspector','palette');
+  const [tab, setTab] = useMapState<'palette' | 'properties' | 'firefight' | 'sound'>(project.id,'forge.inspector','palette');
   const [actorId,setActorId]=useState('');
   const [query, setQuery] = useMapState(project.id,'forge.query',''),
     [category, setCategory] = useMapState(project.id,'forge.category','all');
@@ -1116,9 +1117,11 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             <button className={tab === 'firefight' ? 'selected' : ''} onClick={() => setTab('firefight')}>
               Firefight
             </button>
+            <button className={tab === 'sound' ? 'selected' : ''} onClick={() => setTab('sound')}>Sound</button>
           </div>
           <div className="forge-inspector-scroll">
             <RenderFeatures project={project} edit={props.edit}/>
+            {tab==='sound'&&<><label>Sound source map<select aria-label="QuickForge sound source map" value={sourceId} onChange={e=>setSourceId(e.target.value)}><option value="">Choose an imported source map</option>{sources.map(source=><option key={source.id} value={source.id}>{source.title}</option>)}</select></label>{sourceOpen?.inspection?<MapSounds key={sourceOpen.project.id} project={project} edit={props.edit} projectId={sourceOpen.project.id} inspection={sourceOpen.inspection}/>:<p>Open an imported map as a sound source. Emitter positions belong to this QuickForge map; original audio stays in its preserved source project.</p>}</>}
             {tab === 'palette' && (
               <>
                 <div className="forge-panel-heading">

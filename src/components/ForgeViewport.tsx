@@ -2,6 +2,7 @@ import SceneEnvironment from './SceneEnvironment';
 import SceneEffects from './SceneEffects';
 import ViewportLabel from './ViewportLabel';
 import ViewportTelemetry from './ViewportTelemetry';
+import SpatialAudioListener from './SpatialAudioListener';
 import { Suspense, useEffect, useMemo, useRef,useState } from 'react';
 import MachinimaActor from './MachinimaActor';
 import ViewportSession from './ViewportSession';
@@ -491,6 +492,7 @@ function ForgeScene(props: ForgeViewportProps) {
         position={[25, -30, 25]}
       />
       <ViewportTelemetry/>
+      {props.sessionId&&<SpatialAudioListener mapId={props.sessionId}/>}
       <SceneEnvironment value={environmentValue(doc.environment)} overrideLighting/>
       {!props.cinema&&<SceneEffects settings={props.renderFeatures}/>}
       {props.grid && (

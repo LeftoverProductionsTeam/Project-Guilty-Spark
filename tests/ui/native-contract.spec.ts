@@ -143,12 +143,15 @@ async function mockDesktop(page: Page) {
     const events = new Map<number, { event: string; handler: number }>();
     let sequence = 0;
     const mock = (w.__sparkMock = {
+      projects,
       calls: [] as any[],
       failSave: false,
       failSettings: false,
       delayOpen: 0,
       saved: null as any,
       session:null as any,
+      sprint:{enabled:false,sprinting:false,config:{hotkey:'ShiftLeft',multiplier:1.75},observed:{playerDatum:1,multiplier:1,canSprint:false,reason:'Move forward to sprint'},error:null,detail:'Synthetic native sprint state'} as any,
+      camera:{enabled:false,active:false,restorePending:false,shortcut:{enabled:true,key:'F6'},config:{back:.4,right:.3,up:.15},observed:{available:true,reason:'Native on-foot camera available',weaponThirdPerson:false,trackCount:1},error:null,detail:'Synthetic native camera state'} as any,
       emit: async (event: string) => {
         for (const [id, item] of events)
           if (item.event === event) await callbacks.get(item.handler)?.({ id, event, payload: null });
@@ -195,6 +198,12 @@ async function mockDesktop(page: Page) {
         }
         if(command==='quickforge_preview')return {positions:[],normals:[],uvs:[],indices:[],parts:[]};
         if(command==='quickforge_validate')return {valid:true,issues:[],vertices:0,triangles:0,closedComponents:0,sourceSha256:'a'.repeat(64)};
+        if(command==='live_mcc_sprint_status')return structuredClone(mock.sprint);
+        if(command==='live_mcc_sprint_configure'){mock.sprint={...mock.sprint,enabled:args.enabled,sprinting:false,config:args.config};return structuredClone(mock.sprint);}
+        if(command==='live_mcc_camera_status')return structuredClone(mock.camera);
+        if(command==='live_mcc_camera_toggle'){const enabled=!mock.camera.enabled;mock.camera={...mock.camera,enabled,active:enabled,config:enabled?(args.config??mock.camera.config):mock.camera.config,observed:{...mock.camera.observed,weaponThirdPerson:enabled}};return structuredClone(mock.camera);}
+        if(command==='live_mcc_camera_shortcut'){mock.camera={...mock.camera,shortcut:args.shortcut};return structuredClone(mock.camera);}
+        if(command==='live_mcc_camera_configure'){mock.camera={...mock.camera,enabled:args.enabled,active:args.enabled,config:args.config,observed:{...mock.camera.observed,weaponThirdPerson:args.enabled}};return structuredClone(mock.camera);}
         if(command==='forge_session_status')return structuredClone(mock.session);
         if(command==='forge_session_host'){
           const view={sessionId:'11111111-1111-4111-8111-111111111111',revision:0,document:args.document,peers:1,lastAuthor:'host',detail:'Synthetic source session'};
@@ -284,6 +293,37 @@ async function openFixture(page: Page) {
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
 
+test('campaign tag duplicates stay map-owned and undoable, and UI maps expose their own tags',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const projects=(window as any).__sparkMock.projects, a=projects.a.inspection;
+    a.header.scenarioType=0;
+    a.tags.push({id:2,index:1,class:'scnr',path:'levels/a10/a10',dataOffset:24,external:false,
+      fields:[],references:[{label:'Campaign weapon',targetId:1,class:'weap',offset:40}]});
+    projects.b.inspection.header.scenarioType=2;
+    projects.b.inspection.tags.push({id:3,index:1,class:'DeLa',path:'ui/test_widget',dataOffset:48,
+      external:false,fields:[],references:[]});
+  });
+  await openFixture(page);
+  await page.locator('.tag-duplicate-panel>summary').click();
+  await expect(page.getByRole('combobox',{name:'Duplicate referencing tag',exact:true})).toHaveValue('2');
+  await page.getByRole('textbox',{name:'Duplicate tag path',exact:true}).fill('spark/campaign/pistol_copy');
+  await page.getByRole('button',{name:'Queue tag duplicate for rebuild',exact:true}).click();
+  await expect(page.locator('.tag-duplicate-panel>summary')).toContainText('1 queued');
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('.tag-duplicate-panel>summary')).toContainText('0 queued');
+  await page.keyboard.press('Control+Shift+z');
+  await expect(page.locator('.tag-duplicate-panel>summary')).toContainText('1 queued');
+  await page.getByRole('combobox',{name:'Select Halo map',exact:true}).selectOption('b');
+  await expect(page.getByText('Interface map · browse its actual widgets', {exact:false})).toBeVisible();
+  await expect(page.locator('.tag-duplicate-panel>summary')).toContainText('0 queued');
+  await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('DeLa');
+  await page.locator('.tag-row').click();
+  await expect(page.getByRole('heading',{name:'test_widget',exact:true})).toBeVisible();
+  await page.getByRole('combobox',{name:'Select Halo map',exact:true}).selectOption('a');
+  await expect(page.locator('.tag-duplicate-panel>summary')).toContainText('1 queued');
+});
+
 test('an open map still leaves every sidebar tool visible in a short window',async({page})=>{
   await page.setViewportSize({width:1024,height:640});await mockDesktop(page);await openFixture(page);
   await expect(page.locator('.sidebar').getByRole('button',{name:'Interface Studio',exact:true})).toHaveCount(0);
@@ -317,6 +357,80 @@ test('hosting uses the selected map and gameplay presets retain fixed left and r
   await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();
   await expect(page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true})).toHaveValue('KeyV');
   await expect(page.getByText('Changing a preset does not enable them in the running game.',{exact:false})).toBeVisible();
+});
+
+test('native camera position edits persist across tools and restore through the adapter',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
+  const camera=page.locator('.native-camera-controls');await camera.locator('summary').click();
+  await camera.getByRole('button',{name:'Enable third-person camera',exact:true}).click();await expect(camera.getByText('Third-person camera active',{exact:false})).toBeVisible();
+  await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).fill('-0.45');await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).press('Enter');await camera.getByRole('button',{name:'Apply camera position',exact:true}).click();
+  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();await camera.locator('summary').click();
+  await expect(camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true})).toHaveValue('-0.45');
+  await camera.getByRole('button',{name:'Restore original camera',exact:true}).click();await expect(camera.getByText('Original camera selected',{exact:false})).toBeVisible();
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='live_mcc_camera_configure'));expect(calls.map((c:any)=>c.args.enabled)).toEqual([true,true,false]);expect(calls[1].args.config.right).toBe(-.45);
+});
+
+test('the dedicated camera button toggles without opening settings and uses current native state',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();
+  await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
+  const camera=page.locator('.native-camera-controls'),button=camera.getByRole('button',{name:'Toggle in-game third person',exact:true});
+  await expect(camera.locator('details')).not.toHaveAttribute('open','');
+  await expect(button).toHaveText('Switch to third person');await button.click();
+  await expect(button).toHaveText('Switch to first person');await expect(button).toHaveAttribute('aria-pressed','true');
+  await button.click();await expect(button).toHaveText('Switch to third person');
+  // The engine shortcut changed mode between UI polls. The command must toggle
+  // the native state atomically rather than invert the old rendered status.
+  await page.evaluate(()=>{(window as any).__sparkMock.camera.enabled=true;});
+  await button.click();await expect(button).toHaveText('Switch to third person');
+  await camera.locator('summary').click();
+  await camera.getByRole('combobox',{name:'In-game camera shortcut',exact:true}).selectOption('F7');
+  await expect(camera.getByText('F7 · toggle in MCC',{exact:true})).toBeVisible();
+  await camera.getByRole('checkbox',{name:'Enable in-game camera shortcut',exact:true}).uncheck();
+  await expect(camera.getByText('F7 · toggle in MCC',{exact:true})).toHaveCount(0);
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);
+  expect(calls.filter((c:any)=>c.command==='live_mcc_camera_toggle')).toHaveLength(3);
+  expect(calls.filter((c:any)=>c.command==='live_mcc_camera_configure')).toHaveLength(0);
+});
+
+test('custom power-ups retain their tool tab, use map undo and require a rebuild',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Creator Studio',exact:true}).click();await page.getByRole('tab',{name:'Custom power-ups',exact:true}).click();
+  await page.getByRole('button',{name:'Add custom power-up',exact:true}).click();const duration=page.getByRole('spinbutton',{name:'Power-up duration (seconds)',exact:true});await duration.fill('120');await duration.press('Enter');
+  await page.getByRole('combobox',{name:'Power-up effect',exact:true}).selectOption('overshield');await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Creator Studio',exact:true}).click();
+  await expect(page.getByRole('tab',{name:'Custom power-ups',exact:true})).toHaveAttribute('aria-selected','true');await expect(duration).toHaveValue('120');await expect(page.getByRole('combobox',{name:'Power-up effect',exact:true})).toHaveValue('overshield');
+  await page.getByRole('button',{name:'Remove power-up',exact:true}).click();await expect(page.getByRole('combobox',{name:'Custom power-up',exact:true})).toHaveCount(0);await page.keyboard.press('Control+z');await expect(page.getByRole('combobox',{name:'Custom power-up',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Build map with power-ups',exact:true}).click();await expect(page.getByRole('heading',{name:'From archive to in-game.',exact:true})).toBeVisible();
+});
+
+test('downloaded maps can open directly in the MCC conversion flow',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>command==='import_dialog'?[await original('open_project',{id:'b'})]:original(command,args);});
+  await page.getByRole('button',{name:'Community maps',exact:true}).click();await page.getByRole('button',{name:'Import & convert to MCC',exact:true}).click();await expect(page.getByRole('heading',{name:'From archive to in-game.',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Map conversion · CE / PC / Demo to MCC Halo 1',exact:true})).toBeVisible();
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((c:any)=>c.command==='compatibility'&&c.args.id==='b')).toBe(true);expect(calls.some((c:any)=>c.command==='start_build')).toBe(false);
+});
+
+test('map sound events save with the map and stop their audio context on tool changes',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(async()=>{
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke,open=await original('open_project',{id:'a'});
+    open.inspection.tags.push({id:999,index:1,class:'snd!',path:'sound/test_wind',dataOffset:4,external:false,fields:[],references:[]});
+    const frames=4410,bytes=new Uint8Array(44+frames*2),view=new DataView(bytes.buffer),text=(at:number,value:string)=>[...value].forEach((c,i)=>bytes[at+i]=c.charCodeAt(0));text(0,'RIFF');view.setUint32(4,bytes.length-8,true);text(8,'WAVEfmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,22050,true);view.setUint32(28,44100,true);view.setUint16(32,2,true);view.setUint16(34,16,true);text(36,'data');view.setUint32(40,frames*2,true);
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join(''),sampleHash='c'.repeat(64);
+    const RealAudio=window.AudioContext;w.__soundContexts=[];w.AudioContext=class extends RealAudio{constructor(){super();w.__soundContexts.push(this);}};
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='open_project'&&args.id==='a'){const actual=await original(command,args);return {...actual,inspection:open.inspection};}
+      if(command==='inspect_sound'&&args.tagId===999)return {tagId:999,tagPath:'sound/test_wind',sourceSha256:'a'.repeat(64),warnings:[],permutations:[{pitchRange:0,permutation:0,name:'Verified silent test WAV',format:'PCM',channels:1,sampleRate:22050,byteLength:frames*2,embedded:true,available:true,sha256:sampleHash,durationSeconds:.2,reason:null}]};
+      if(command==='preview_sound'&&args.tagId===999)return {name:'Verified silent test WAV',mime:'audio/wav',sha256:hash,bytes:Array.from(bytes),sourceSha256:'a'.repeat(64),sourceSampleSha256:sampleHash};
+      return original(command,args);
+    };
+  });
+  await openFixture(page);await page.getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.gs-map-sounds>summary').click();await page.getByRole('combobox',{name:'Map sound tag',exact:true}).selectOption('999');
+  await page.getByRole('button',{name:'Add selected sound emitter',exact:true}).click();const mixer=page.getByRole('region',{name:'Spatial sound rehearsal',exact:true});
+  await expect(page.getByRole('combobox',{name:'Map sound emitter',exact:true})).toBeVisible();await page.getByRole('spinbutton',{name:'Map sound master volume',exact:true}).fill('0');await page.getByRole('spinbutton',{name:'Map sound master volume',exact:true}).press('Enter');
+  await page.getByRole('button',{name:'Start sound scene',exact:true}).click();await expect(mixer.getByRole('status')).toContainText('1/24 voices');
+  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__soundContexts.every((c:AudioContext)=>c.state==='closed'))).toBe(true);
+  await page.getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.gs-map-sounds>summary').click();await expect(page.getByRole('combobox',{name:'Map sound emitter',exact:true})).toBeVisible();await expect(page.getByRole('spinbutton',{name:'Map sound master volume',exact:true})).toHaveValue('0');
 });
 test('shared QuickForge survives tool changes and pauses a divergent local draft on restore',async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]})));

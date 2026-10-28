@@ -2,7 +2,11 @@
 
 Continue the existing project; no restoration sources were replaced. The requested merge target is local **master**. The owner will push; no remote push, pull request or repository-setting change is part of this handoff.
 
-Latest extension: [hosting, collision and controls](HOSTING_COLLISION_AND_CONTROLS.md). Compact the sidebar, place Interface Studio in Settings, fix the synchronous onboarding-save path, retain shared sessions across tools, add private map-bound invites and an explicitly optional Spacewar test module. Strengthen continuous collision clearance and join bent tunnel caps, with a new compiled four-map dogleg challenge. Save per-map gameplay presets with independent left/right mouse routing; actual MCC sprint, paired firing and sword lunge remain unfinished, as do arbitrary spawning/BSP replacement, game-peer replication and complete rendering/audio parity.
+Extensions: [hosting, collision and controls](HOSTING_COLLISION_AND_CONTROLS.md), then [native gameplay, campaign/UI tags and audio](NATIVE_GAMEPLAY_AND_AUDIO.md). Compact the sidebar, place Interface Studio in Settings, fix the synchronous onboarding-save path, retain shared sessions across tools, add private map-bound invites and an explicitly optional Spacewar test module. Strengthen continuous collision clearance and join bent tunnel caps, with a new compiled four-map dogleg challenge.
+
+Native Shift sprint now works in MCC; its default is increased to 1.75×. Add an editable native shoulder camera, a dedicated first/third-person toggle and a saved F6 shortcut preference. Restore journals on disconnect and reject queued edits from retired sessions. Add native custom power-up recipes, bounded spatial sound rehearsal with verified linked segments, downloaded-map conversion navigation and campaign tag duplication through an isolated compiler job. Expand UI/HUD extraction classes and widget editing, and preserve campaign/UI scenario types. Remove the redundant telemetry footer label.
+
+Dual-wield firing, usable player sword/lunge, proportional sprint animation, third-person aim correction, arbitrary live spawning/BSP replacement, game-peer replication and complete rendering/audio parity remain open. Power-up effects and rebuilt campaign/UI game loading are not yet accepted. The README/status refresh is local; no remote publication was performed.
 
 Suggested title:
 
@@ -11,6 +15,8 @@ Suggested title:
 Suggested description:
 
 Continue Project Guilty Spark in place with the C32 Windows/build repairs and C33 resource, editor and engine work. Preserve the restoration corpus, recover real models/textures/lightmaps/decals and map-sound previews, correct Forge transforms, and add configurable undo, remembered onboarding, a searchable feature/how-to guide, custom window controls and Dark Glow/glass themes.
+
+Add verified native Shift sprint and an editable shoulder camera with a one-click first/third-person switch and configurable F6 shortcut. Persist shortcut preferences, restore temporary camera data, and retire disconnected sessions so old queued actions cannot write afterward. Author custom native power-ups and audition map sounds with spatial buses, bounded voices and verified linked sample segments. Route downloaded CE maps into compatibility/build checks. Rebuild independent campaign tags through selected owner dependencies, add audited UI-widget fields and UI/HUD extraction mappings, and preserve scenario type during compilation.
 
 Unify World Edit, QuickForge and existing-object live editing in one adaptive Level Editor. Keep independent map tabs/windows, camera and tool/tag context, undo histories and build targets; transfer source-linked assets between maps. Retain guarded MCC object movement and shared item/vehicle resizing, including the owner-confirmed 2× Warthog tire/driving correction. Private editor sessions synchronize QuickForge source; game peer replication remains a separate gate.
 
@@ -26,7 +32,7 @@ Extend the challenge to Timberland + Sidewinder + Blood Gulch + a rotated Battle
 
 Remove superseded viewer branches, an unused collision index and obsolete QA probes after reference/replacement/recovery checks. Reclaim generated caches and copied tag trees from failed experiments. Keep the regression suites, frozen releases, legal SDK baseline and all restoration originals.
 
-Validation and exact limits: [Reclamation and workflow polish](RECLAMATION_AND_WORKFLOW_POLISH.md), its linked verification fixture, [C32 record](CONTINUATION_32_ENGINEERING.md) and the frozen [C33 record](CONTINUATION_33_ENGINEERING.md). Current results supersede older acceptance gaps only for the operations explicitly tested. General live spawning/BSP replacement, game peer replication, universal renderer parity and rebuilt Zombie Apocalypse gameplay are not claimed.
+Validation and exact limits: [native gameplay and audio](NATIVE_GAMEPLAY_AND_AUDIO.md), [Reclamation and workflow polish](RECLAMATION_AND_WORKFLOW_POLISH.md), its linked verification fixture, [C32 record](CONTINUATION_32_ENGINEERING.md) and the frozen [C33 record](CONTINUATION_33_ENGINEERING.md). Native acceptance includes the owner's sprint/camera trial, exact camera restoration, six compiled power-up variants, actual MCC sound playback, an A10 tag duplicate with original script names, and UI-cache compilation. Compiler/CRC checks do not establish game loading, mission progression or game-peer replication. Current results supersede older acceptance gaps only for the operations explicitly tested.
 
 Before pushing, review the merge and working tree:
 
@@ -41,7 +47,7 @@ git push origin master
 If desired, retain the source branch remotely as well:
 
 ~~~powershell
-git push -u origin codex/continuation-33-hosting-collision
+git push -u origin codex/continuation-33-native-gameplay
 ~~~
 
 Confirm remote CI after your push. Local executables, installers, source ZIPs and verification receipts are under releases with distinct hosting-workflows filenames; earlier world-challenges releases are retained. The optional Steam module is packaged separately. Owned maps, SDK/tag content, local QA data and credentials are excluded from source packaging.

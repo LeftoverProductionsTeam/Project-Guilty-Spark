@@ -32,6 +32,7 @@ fn error(e: impl std::fmt::Display) -> String {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 struct Settings {
+    native_camera_shortcut:core::live_adapter::camera::Shortcut,
     steam_directory: Option<PathBuf>,
     mcc_directory: Option<PathBuf>,
     invader_directory: Option<PathBuf>,
@@ -53,6 +54,7 @@ struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            native_camera_shortcut:Default::default(),
             steam_directory: None,
             mcc_directory: None,
             invader_directory: None,
@@ -960,9 +962,12 @@ async fn choose_project_resources(
     .await
     .map_err(error)?
 }
-fn configure(app: &tauri::AppHandle, state: &AppState, settings: Settings) -> Reply<()> {
+fn configure(app: &tauri::AppHandle, state: &AppState, mut settings: Settings) -> Reply<()> {
     let _update=lock(&state.settings_write)?;
     let previous=lock(&state.settings)?.clone();
+    // This preference has its own live command. An older Settings form must
+    // not overwrite a shortcut changed while that form was open.
+    settings.native_camera_shortcut=previous.native_camera_shortcut.clone();
     let discovery_changed=previous.steam_directory!=settings.steam_directory||previous.mcc_directory!=settings.mcc_directory||lock(&state.watcher)?.is_none();
     if !(1..=1440).contains(&settings.snapshot_interval_minutes) || !(1..=100).contains(&settings.snapshot_retention) {
         return Err("Snapshot interval must be 1–1440 minutes and retention 1–100".into());
@@ -2243,18 +2248,54 @@ async fn create_peer_manifest(
 async fn live_mcc_connect(app:tauri::AppHandle,mods_mode:bool)->Reply<crate::live_mcc::Status>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let root=lock(&state.installation)?.mcc_path.clone().ok_or("Connect the Steam MCC installation in Start here first")?;
         let mut slot=lock(&state.live_mcc)?;if let Some(existing)=slot.as_ref(){if let Ok(status)=crate::live_mcc::sample(existing){return Ok(status);}crate::live_mcc::disconnect(existing).map_err(error)?;}
-        let session=crate::live_mcc::connect(&root,mods_mode).map_err(error)?;let status=crate::live_mcc::sample(&session).map_err(error)?;*slot=Some(session);Ok(status)
+        let session=crate::live_mcc::connect(&root,mods_mode).map_err(error)?;
+        let shortcut=lock(&state.settings)?.native_camera_shortcut.clone();
+        crate::live_mcc::camera_shortcut(&session,shortcut).map_err(error)?;
+        let status=crate::live_mcc::sample(&session).map_err(error);*slot=Some(session);status
     }).await.map_err(error)?
 }
 #[tauri::command]
 async fn live_mcc_sample(app:tauri::AppHandle)->Reply<crate::live_mcc::Status>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Live adapter is disconnected")?;
-        let status=crate::live_mcc::sample(&session).map_err(error);if status.is_err()&&!session.active_physics(){*lock(&state.live_mcc)?=None;}status
+        // Keep the owning session until explicit disconnect/reconnect can stop
+        // its controllers and restore their journals. A transient read failure
+        // must not orphan a keeper that is about to apply an edit.
+        crate::live_mcc::sample(&session).map_err(error)
     }).await.map_err(error)?
 }
 #[tauri::command]
 async fn live_mcc_gameplay_inventory(app:tauri::AppHandle)->Reply<core::live_adapter::GameplayInventory>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the running Halo 1 map in Level editor → Live mode first")?;crate::live_mcc::gameplay_inventory(&session).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_sprint_status(app:tauri::AppHandle)->Reply<crate::live_mcc::NativeSprintStatus>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect MCC in Level editor → Live mode first")?;crate::live_mcc::sprint_status(&session).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_sprint_configure(app:tauri::AppHandle,enabled:bool,config:core::live_adapter::sprint::Config)->Reply<crate::live_mcc::NativeSprintStatus>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect MCC in Level editor → Live mode first")?;crate::live_mcc::sprint_configure(&session,enabled,config).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_camera_status(app:tauri::AppHandle)->Reply<crate::live_mcc::NativeCameraStatus>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect MCC in Level editor → Live mode first")?;crate::live_mcc::camera_status(&session).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_camera_configure(app:tauri::AppHandle,enabled:bool,config:core::live_adapter::camera::Config)->Reply<crate::live_mcc::NativeCameraStatus>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect MCC in Level editor → Live mode first")?;crate::live_mcc::camera_configure(&session,enabled,config).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_camera_shortcut(app:tauri::AppHandle,shortcut:core::live_adapter::camera::Shortcut)->Reply<crate::live_mcc::NativeCameraStatus>{
+    shortcut.function_key().map_err(error)?;
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect MCC in Level editor → Live mode first")?;
+        {let _update=lock(&state.settings_write)?;let mut settings=lock(&state.settings)?.clone();
+            settings.native_camera_shortcut=shortcut.clone();lock(&state.library)?.set_setting("preferences",&settings).map_err(error)?;
+            *lock(&state.settings)?=settings;}
+        crate::live_mcc::camera_shortcut(&session,shortcut).map_err(error)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_camera_toggle(app:tauri::AppHandle,config:Option<core::live_adapter::camera::Config>)->Reply<crate::live_mcc::NativeCameraStatus>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect MCC in Level editor → Live mode first")?;crate::live_mcc::camera_toggle(&session,config).map_err(error)}).await.map_err(error)?
 }
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -2391,6 +2432,12 @@ pub fn run() {
             live_mcc_connect,
             live_mcc_sample,
             live_mcc_gameplay_inventory,
+            live_mcc_sprint_status,
+            live_mcc_sprint_configure,
+            live_mcc_camera_status,
+            live_mcc_camera_configure,
+            live_mcc_camera_shortcut,
+            live_mcc_camera_toggle,
             live_mcc_apply,
             live_mcc_disconnect,
             live_mcc_move_object,

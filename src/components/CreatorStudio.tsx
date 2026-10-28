@@ -15,8 +15,10 @@ import { inspectScenarioBindings } from '../scenarioBindings';
 import MultiplayerWorkbench from './MultiplayerWorkbench';
 import {makeFiveModeTestPlan, seedFiveModePlaytests} from '../haloModeTestPlan';
 import {forgeTargets} from '../forge';
+import PowerupStudio from './PowerupStudio';
+import {useMapState} from '../mapSession';
 
-type Pane = 'mission' | 'cinematic' | 'server' | 'playtest';
+type Pane = 'mission' | 'cinematic' | 'powerups' | 'server' | 'playtest';
 function freshId(): string { return crypto.randomUUID(); }
 function safeDownload(filename: string, contents: string, mime = 'text/plain;charset=utf-8'): void {
   const url = URL.createObjectURL(new Blob([contents], { type: mime }));
@@ -40,14 +42,15 @@ function VectorEditor({ title, value, onChange }: {
 }
 
 /** Project-backed design tools; none of these controls execute commands in a game. */
-export default function CreatorStudio({ project, inspection, edit, notify, onOpenRuntimes }: {
+export default function CreatorStudio({ project, inspection, edit, notify, onOpenRuntimes, onBuild }: {
   project: Project;
   inspection: MapInspection | null;
   edit: (next: Project, description: string) => void;
   notify: (message: string, tone?: string) => void;
   onOpenRuntimes: () => void;
+  onBuild: () => void;
 }) {
-  const [pane, setPane] = useState<Pane>('mission');
+  const [pane, setPane] = useMapState<Pane>(project.id,'creator-studio-pane','mission');
   const [scriptActivation,setScriptActivation]=useState<Activation>('none');
   const [error, setError] = useState('');
   const studio = project.studio ?? emptyCreatorStudio();
@@ -164,12 +167,14 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       {([
         ['mission', 'Mission director', Flag],
         ['cinematic', 'Cinematic timeline', Film],
+        ['powerups', 'Custom power-ups', Plus],
         ['server', 'Halo server', Server],
         ['playtest', 'Playtest lab', ClipboardCheck],
       ] as const).map(([id, label, Icon]) =>
         <button key={id} role="tab" aria-selected={pane === id} className={pane === id ? 'active' : ''} type="button" onClick={() => setPane(id)}><Icon size={16}/>{label}</button>)}
     </div>
     {error && <Notice>{error}</Notice>}
+    {pane==='powerups'&&<PowerupStudio project={project} inspection={inspection} edit={edit} onBuild={onBuild}/>}
     {pane === 'mission' && <section className="analysis-card">
       <div className="studio-heading"><div><h2><Flag size={18}/> Mission director</h2><p>Ordered objectives and scenario triggers with a Halo CE .hsc source generator. Every trigger must exist in your editable scenario.</p></div>
         <button className="primary" type="button" disabled={studio.missions.length >= 128} onClick={() => change({ ...studio,

@@ -1,8 +1,9 @@
 import {useMemo,useState} from 'react';
-import type {MapInspection} from '../types';
+import type {MapInspection,Project} from '../types';
 import Sound from './Sound';
+import SoundMixer from './SoundMixer';
 
-export default function MapSounds({projectId,inspection,onOpenTag,onResources}:{projectId:string;inspection:MapInspection;onOpenTag?:(id:number)=>void;onResources?:()=>void}){
+export default function MapSounds({projectId,inspection,project,edit,onOpenTag,onResources}:{projectId:string;inspection:MapInspection;project:Project;edit:(p:Project,description:string)=>void;onOpenTag?:(id:number)=>void;onResources?:()=>void}){
   const [query,setQuery]=useState(''),[selected,setSelected]=useState('');
   const sounds=useMemo(()=>inspection.tags.filter(t=>t.class==='snd!'),[inspection]);
   const choices=sounds.filter(t=>t.path.toLowerCase().includes(query.toLowerCase())).slice(0,100);
@@ -15,7 +16,8 @@ export default function MapSounds({projectId,inspection,onOpenTag,onResources}:{
       {selected&&!choices.some(t=>String(t.id)===selected)&&<option value={selected}>{sounds.find(t=>String(t.id)===selected)?.path}</option>}
       {choices.map(tag=><option key={tag.id} value={tag.id}>{tag.path}</option>)}
     </select>
-    <p className="subtle">Showing up to 100 matches. Preview a sample here or open its source tag to edit supported fields. World sound emitters and the game's event mixer still need implementation.</p>
+    <p className="subtle">Showing up to 100 matches. Select a sound to inspect its samples or add a positional emitter below.</p>
+    <SoundMixer project={project} inspection={inspection} sourceProjectId={projectId} tagId={selected?Number(selected):null} edit={edit}/>
     {selected&&<><button className="small-button" disabled={!onOpenTag} onClick={()=>onOpenTag?.(Number(selected))}>Open sound tag</button>
       <Sound key={selected} projectId={projectId} tagId={Number(selected)} sourceHash={inspection.sha256}/></>}
   </details>;

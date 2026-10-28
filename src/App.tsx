@@ -39,6 +39,7 @@ import type {
   AssetResult,
   Bootstrap,
   JobEvent,
+  MapInspection,
   MeshData,
   OpenProject,
   Project,
@@ -115,7 +116,7 @@ const nav = [
   { id: 'machinima', label: 'Machinima', icon: Clapperboard },
 ] as const;
 const mapWorkspaces:Workspace[]=['world','quickforge','live','tags','assets','scenario','build','firefight','creator','machinima','preservation'];
-function rememberedWorkspace(project:Project):Workspace{const stored=readMapSession<Workspace>(project.id,'workspace',project.quickForge?'quickforge':'world');return mapWorkspaces.includes(stored)?stored:project.quickForge?'quickforge':'world';}
+function rememberedWorkspace(project:Project,inspection?:MapInspection|null):Workspace{const fallback:Workspace=project.quickForge?'quickforge':inspection?.header.scenarioType===2?'tags':'world';const stored=readMapSession<Workspace>(project.id,'workspace',fallback);return mapWorkspaces.includes(stored)?stored:fallback;}
 const navGroups = [["Level Editor",["quickforge"]],["Tags & Assets",["tags","assets","compare"]],["Gameplay Creator",["machinima","scenario","firefight","creator"]],["Projects & Testing",["library","build","runtimes"]],["Learn & Community",["get-started","features","how-to","academy","map-finder","community"]]] as const;
 const finderItems: readonly WorkspaceFinderItem[] = [
   {id:'quickforge',label:'QuickForge',help:'Open the map viewer. QuickForge tools follow the open document.',keywords:'level editor geometry brushes tunnels forge'},
@@ -393,7 +394,7 @@ export default function App() {
     };
   }, [notice]);
   const initialWindowProject=useRef(false);
-  useEffect(()=>{const id=new URLSearchParams(location.search).get('project');if(!native||!ready||!id||initialWindowProject.current)return;initialWindowProject.current=true;if(!/^[0-9a-f-]{36}$/i.test(id)){notice('Invalid map window identity.','error');return;}void call<OpenProject>('open_project',{id}).then(async open=>{await load(open);setWorkspace(rememberedWorkspace(open.project));}).catch(e=>notice(String(e),'error'));},[ready,load,notice]);
+  useEffect(()=>{const id=new URLSearchParams(location.search).get('project');if(!native||!ready||!id||initialWindowProject.current)return;initialWindowProject.current=true;if(!/^[0-9a-f-]{36}$/i.test(id)){notice('Invalid map window identity.','error');return;}void call<OpenProject>('open_project',{id}).then(async open=>{await load(open);setWorkspace(rememberedWorkspace(open.project,open.inspection));}).catch(e=>notice(String(e),'error'));},[ready,load,notice]);
   useEffect(() => {
     if (!native) return;
     const unsubs: Promise<() => void>[] = [];
@@ -496,7 +497,7 @@ export default function App() {
   function edit(project: Project, description: string) {
     dispatch({ type: 'edit', project, description });
   }
-  async function importFiles(paths?: string[]) {
+  async function importFiles(paths?: string[], destination?: 'build') {
     setBusy(true);
     try {
       if (historyRef.current.dirty) await save();
@@ -507,9 +508,9 @@ export default function App() {
       if (imported.length) {
         for(const open of imported)await load(open);
         dispatchDocument({type:'select',id:imported[0].project.id});
-        setWorkspace(imported[0].project.quickForge ? 'quickforge' : imported[0].inspection?.mesh.positions.length ? 'world' : 'tags');
+        setWorkspace(destination && imported[0].project.source ? destination : imported[0].project.quickForge ? 'quickforge' : imported[0].inspection?.header.scenarioType===2 ? 'tags' : imported[0].inspection?.mesh.positions.length ? 'world' : 'tags');
         notice(
-          `${imported.length} project${imported.length === 1 ? '' : 's'} imported. Source data preserved.`,
+          `${imported.length} project${imported.length === 1 ? '' : 's'} imported. Source data preserved.${destination && imported[0].project.source ? ' Review the MCC conversion checks and prepare the installed tools.' : ''}`,
           'success',
         );
         await refresh();
@@ -529,20 +530,20 @@ export default function App() {
   }
   async function openProject(id: string, stayInWorkspace?: Workspace) {
     const requestedFrom=workspaceRef.current;
-    const existing=documentsRef.current.documents.find(d=>d.id===id);if(existing){dispatchDocument({type:'select',id});setWorkspace(stayInWorkspace??rememberedWorkspace(existing.history.current!));return;}
+    const existing=documentsRef.current.documents.find(d=>d.id===id);if(existing){dispatchDocument({type:'select',id});setWorkspace(stayInWorkspace??rememberedWorkspace(existing.history.current!,existing.inspection));return;}
     setBusy(true);
     try {
       if (historyRef.current.dirty) await save();
       const open = await call<OpenProject>('open_project', { id });
       await load(open);
-      if(workspaceRef.current===requestedFrom)setWorkspace(stayInWorkspace ?? rememberedWorkspace(open.project));
+      if(workspaceRef.current===requestedFrom)setWorkspace(stayInWorkspace ?? rememberedWorkspace(open.project,open.inspection));
     } catch (e) {
       notice(String(e), 'error');
     } finally {
       setBusy(false);
     }
   }
-  function selectMap(id:string){if(document.activeElement instanceof HTMLElement)document.activeElement.blur();requestAnimationFrame(()=>{const map=documentsRef.current.documents.find(d=>d.id===id);dispatchDocument({type:'select',id});if(map?.history.current)setWorkspace(rememberedWorkspace(map.history.current));});}
+  function selectMap(id:string){if(document.activeElement instanceof HTMLElement)document.activeElement.blur();requestAnimationFrame(()=>{const map=documentsRef.current.documents.find(d=>d.id===id);dispatchDocument({type:'select',id});if(map?.history.current)setWorkspace(rememberedWorkspace(map.history.current,map.inspection));});}
   async function closeMap(id:string,separateWindow=false){
     if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
     setBusy(true);try{await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id);window.dispatchEvent(new Event('gs:save-viewport-context'));if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call('open_project_window',{id});}else if(native)await call('release_project_document',{id});const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});}catch(e){notice(String(e),'error');}finally{setBusy(false);}
@@ -646,7 +647,7 @@ export default function App() {
     if (workspace === 'get-started') return <GettingStarted data={data} project={current} onApply={applySettings} navigate={target => {markFirstVisitSeen();setWorkspace(target);}}/>;
     if (workspace === 'features') return <Features project={current} openMaps={documents.documents.length} navigate={setWorkspace}/>;
     if (workspace === 'community') return <CommunityThanks/>;
-    if (workspace === 'map-finder') return <CommunityMaps onImport={()=>void importFiles()} onLibrary={()=>setWorkspace('library')} busy={busy}/>;
+    if (workspace === 'map-finder') return <CommunityMaps onImport={()=>void importFiles()} onImportConvert={()=>void importFiles(undefined,'build')} currentMapTitle={current?.source?current.title:null} onConvertCurrent={()=>setWorkspace('build')} onLibrary={()=>setWorkspace('library')} busy={busy}/>;
     if (workspace === 'library')
       return (
         <Library
@@ -703,7 +704,7 @@ export default function App() {
     if (!current) return commonEmpty;
     switch (workspace) {
       case 'firefight': return <Firefight key={current.id} project={current} entries={data.entries} edit={edit} />;
-      case 'creator': return <CreatorStudio project={current} inspection={inspection} edit={edit} notify={notice} onOpenRuntimes={() => setWorkspace('runtimes')} />;
+      case 'creator': return <CreatorStudio project={current} inspection={inspection} edit={edit} notify={notice} onOpenRuntimes={() => setWorkspace('runtimes')} onBuild={()=>setWorkspace('build')}/>;
       case 'machinima': return <MachinimaWorkspace key={current.id} project={current} inspection={inspection} assetMeshes={meshes} data={data} edit={edit} notify={notice} onResourcesConnected={applyResourceMetadata} onSave={save} onLive={()=>setWorkspace('live')} onEditor={()=>setWorkspace('quickforge')} onBuild={()=>setWorkspace('build')}/>;
       case 'tags':
         return (
@@ -963,7 +964,6 @@ export default function App() {
               </span>
             )}
             <span>API v1</span>
-            <span>NO TELEMETRY</span>
           </div>
         </footer>
         {busy && (

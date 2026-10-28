@@ -50,6 +50,7 @@ import {summarizeTextureFailures} from '../textureDiagnostics';
 import type {TextureFailure} from '../textureDiagnostics';
 import HaloTextures from './HaloTextures';
 import MapSounds from './MapSounds';
+import SpatialAudioListener from './SpatialAudioListener';
 import ViewportTelemetry from './ViewportTelemetry';
 import type {OpenProject} from '../types';
 import type { OwnedBitmapPreview } from '../ownedBitmapPreview';
@@ -381,6 +382,7 @@ function Scene({
   return (
     <>
       <ViewportTelemetry/>
+      <SpatialAudioListener mapId={project.id}/>
       {!cinematic&&<SceneEffects settings={project.renderFeatures}/>}
       {ortho ? (
         <OrthographicCamera
@@ -1291,7 +1293,7 @@ export default function World({
           <strong>Inspector</strong>
           {chosen && <Pill>{chosen.kind}</Pill>}
         </div>
-        {inspection&&<MapSounds key={project.source?.resourceSha256?.['sounds.map']} projectId={project.id} inspection={inspection} onOpenTag={onOpenTag} onResources={()=>void (async()=>{
+        {inspection&&<MapSounds key={project.source?.resourceSha256?.['sounds.map']} projectId={project.id} project={project} edit={edit} inspection={inspection} onOpenTag={onOpenTag} onResources={()=>void (async()=>{
           try{await onBeforeResources?.();const open=await call<OpenProject|null>('choose_project_resources',{projectId:project.id});if(open)await onResourcesConnected?.(open);}catch(error){notify(String(error));}
         })()}/>}
         <details className="gs-world-environment-panel">

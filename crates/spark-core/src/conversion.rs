@@ -189,8 +189,10 @@ pub(crate) fn compile_native(
     )?;
     fs::create_dir_all(workspace.join("data"))?;
     fs::create_dir_all(workspace.join("maps"))?;
+    crate::tag_duplicates::prepare(project,inspection,tools,workspace,tags,runner)?;
     crate::bsp_compile::prepare_native(project,inspection,tools,runner,workspace,tags)?;
     crate::animations::prepare_native(project, inspection, tools, workspace, runner)?;
+    if !project.powerups.is_empty(){crate::powerups::prepare(project,&inspection.scenario_path,workspace,tags,&crate::build::tool_path(tools,"invader-edit").ok_or_else(||SparkError::Invalid("Custom power-ups require invader-edit".into()))?,runner)?;}
     if project
         .studio
         .as_ref()

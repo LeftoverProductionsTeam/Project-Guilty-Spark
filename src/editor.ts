@@ -88,6 +88,8 @@ export function effectiveReferenceId(project: Project, tag: Tag, reference: TagR
 export function setTagValue(project: Project, tag: Tag, field: TagField, value: number): Project {
   if (!Number.isFinite(value) || value < field.min || value > field.max)
     throw new Error(`${field.label} must be between ${field.min} and ${field.max}`);
+  if (['i16','u16','i32','reference'].includes(field.kind) && !Number.isInteger(value))
+    throw new Error(`${field.label} must be a whole number`);
   const edits = project.tagEdits.filter((e) => e.tagId !== tag.id || e.fieldKey !== field.key);
   if (value !== field.value) edits.push({ tagId: tag.id, fieldKey: field.key, value });
   return { ...project, tagEdits: edits };
@@ -106,6 +108,10 @@ export const classNames: Record<string, string> = {
   scnr: 'Scenario',
   sbsp: 'Structure BSP',
   bitm: 'Bitmap',
+  DeLa: 'UI widget', Soul: 'UI widget collection', tagc: 'Tag collection',
+  ustr: 'Unicode strings', 'str#': 'Strings', font: 'Font',
+  hudg: 'HUD globals', wphi: 'Weapon HUD', unhi: 'Unit HUD', grhi: 'Grenade HUD',
+  'hud#': 'HUD numbers', 'hmt ': 'HUD messages', vcky: 'Virtual keyboard',
   'snd!': 'Sound',
   bipd: 'Biped',
   vehi: 'Vehicle',

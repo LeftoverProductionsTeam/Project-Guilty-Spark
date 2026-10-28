@@ -8,6 +8,10 @@ pub const EXE_SHA256: &str = "be70d6dcd1a884f10ceb342a7a2dcb35ee0fa43181b66a1d19
 pub const PROFILE: &str = "mcc-steam-halo1-1.3528.0.0";
 #[path = "live_scaling.rs"]
 pub mod scaling;
+#[path="live_sprint.rs"]
+pub mod sprint;
+#[path = "live_camera.rs"]
+pub mod camera;
 #[cfg(test)]
 #[path = "live_adapter_tests.rs"]
 mod tests;

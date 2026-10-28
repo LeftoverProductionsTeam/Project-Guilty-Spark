@@ -3,6 +3,8 @@ import { call, native } from '../api';
 import { DEFAULT_GAMEPLAY_CONTROLS, GAMEPLAY_KEYS, type GameplayControls as Controls } from '../gameplay';
 import type { Project } from '../types';
 import { Notice, NumberField } from './ui';
+import NativeSprintControls from './NativeSprintControls';
+import NativeCameraControls from './NativeCameraControls';
 interface Inventory {
   readOnly: boolean;
   inputHooksReady: boolean;
@@ -32,9 +34,11 @@ export default function GameplayControls({
   return (
     <section className="analysis-card gameplay-controls" aria-label="Gameplay control presets">
       <h2>Gameplay controls</h2>
+      <NativeSprintControls/>
+      <NativeCameraControls/>
       <Notice tone="info">
-        Control presets are saved with each map. This build can inspect the connected player's inventory; live
-        sprint, dual wield and sword lunge are awaiting verified MCC input and targeting hooks. Changing a
+        Control presets are saved with each map. The native sprint controller above changes the connected
+        player's movement speed; animation acceptance is still pending. Dual wield and sword lunge need additional engine hooks and first-person assets. Changing a
         preset does not enable them in the running game.
       </Notice>
       {project ? (
