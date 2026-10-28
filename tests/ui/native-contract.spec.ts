@@ -101,6 +101,8 @@ async function mockDesktop(page: Page) {
       b: make('b', 'Synthetic candidate', 25),
       c: make('c', 'Synthetic third donor', 30),
     };
+    const forgeFixture=localStorage.getItem('spark-test-forge');
+    if(forgeFixture)projects.a.project.quickForge=JSON.parse(forgeFixture);
     const appliedBsp = localStorage.getItem('spark-test-applied-bsp');
     if (appliedBsp) projects.a.project.bspAssembly = JSON.parse(appliedBsp);
     const bootstrap = {
@@ -146,6 +148,7 @@ async function mockDesktop(page: Page) {
       failSettings: false,
       delayOpen: 0,
       saved: null as any,
+      session:null as any,
       emit: async (event: string) => {
         for (const [id, item] of events)
           if (item.event === event) await callbacks.get(item.handler)?.({ id, event, payload: null });
@@ -190,6 +193,17 @@ async function mockDesktop(page: Page) {
           projects[args.project.id].project = structuredClone(args.project);
           return null;
         }
+        if(command==='quickforge_preview')return {positions:[],normals:[],uvs:[],indices:[],parts:[]};
+        if(command==='quickforge_validate')return {valid:true,issues:[],vertices:0,triangles:0,closedComponents:0,sourceSha256:'a'.repeat(64)};
+        if(command==='forge_session_status')return structuredClone(mock.session);
+        if(command==='forge_session_host'){
+          const view={sessionId:'11111111-1111-4111-8111-111111111111',revision:0,document:args.document,peers:1,lastAuthor:'host',detail:'Synthetic source session'};
+          mock.session={projectId:args.projectId,projectTitle:projects[args.projectId].project.title,sessionId:view.sessionId,role:'host',transport:args.transport,endpoint:'127.0.0.1:32145',key:'a'.repeat(32),view,lan:args.lan};return structuredClone(mock.session);
+        }
+        if(command==='forge_session_poll'||command==='forge_session_resume')return structuredClone(mock.session.view);
+        if(command==='forge_session_leave'){mock.session=null;return null;}
+        if(command==='steam_module_status'||command==='choose_steam_module')return {configured:false,appId:480,testMode:true,cancelled:command==='choose_steam_module',detail:'Choose the optional module to enable Steam test transport.'};
+        if(command==='runtime_hosting_plan')return {mapTitle:args.projectId?projects[args.projectId].project.title:null,scenarioType:1,cacheVersion:7,plan:{title:'Synthetic MCC Custom Games guide',status:'documented',testStatus:'notRun',automatic:false,steps:['Use Halo CE Custom Games for this multiplayer map.'],limitations:['Two physical game clients were not tested.'],sources:[]}};
         if (command === 'close_application') return null;
         if (command === 'choose_setting_path') return 'C:/synthetic/selected';
         if (command === 'save_settings') {
@@ -269,6 +283,55 @@ async function openFixture(page: Page) {
   await page.getByRole('button', { name: 'Tag editor', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
+
+test('an open map still leaves every sidebar tool visible in a short window',async({page})=>{
+  await page.setViewportSize({width:1024,height:640});await mockDesktop(page);await openFixture(page);
+  await expect(page.locator('.sidebar').getByRole('button',{name:'Interface Studio',exact:true})).toHaveCount(0);
+  expect(await page.locator('.sidebar').evaluate(element=>element.scrollHeight-element.clientHeight)).toBe(0);
+  await expect(page.getByRole('button',{name:'Export .gsproject',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Make the workbench yours.',exact:true})).toBeVisible();
+  await expect(page.locator('.sidebar').getByRole('button',{name:'Settings & tools',exact:true})).toHaveClass(/selected/);
+});
+test('slow onboarding saves keep navigation available and do not steal a later route',async({page})=>{
+  await mockDesktop(page);await page.getByRole('button',{name:'Start here',exact:true}).click();
+  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='save_settings'?new Promise((resolve,reject)=>{w.__finishSetup=()=>original(command,args).then(resolve,reject);}):original(command,args);});
+  await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Saving Halo choice…',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Map library',exact:true}).click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await page.evaluate(()=>(window as any).__finishSetup());
+  await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Start here',exact:true}).click();await expect(page.getByRole('heading',{name:'Your editing tools',exact:true})).toBeVisible();
+});
+test('hosting uses the selected map and gameplay presets retain fixed left and right gun controls',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();
+  await page.getByRole('button',{name:'Hosting & servers',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Synthetic MCC Custom Games guide',exact:true})).toBeVisible();
+  await expect(page.getByText('Use Halo CE Custom Games for this multiplayer map.',{exact:true})).toBeVisible();
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='runtime_hosting_plan'));expect(calls.at(-1).args.projectId).toBe('a');
+  await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
+  await page.getByRole('checkbox',{name:'Request dual wield support',exact:true}).check();
+  await page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true}).selectOption('KeyV');
+  await expect(page.getByText('Left gun · independent primary trigger',{exact:true})).toBeVisible();
+  await expect(page.getByText('Right gun · independent secondary trigger',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();
+  await expect(page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true})).toHaveValue('KeyV');
+  await expect(page.getByText('Changing a preset does not enable them in the running game.',{exact:false})).toBeVisible();
+});
+test('shared QuickForge survives tool changes and pauses a divergent local draft on restore',async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]})));
+  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Level editor',exact:true}).click();
+  const sharing=page.locator('details.forge-live-panel').filter({has:page.locator('summary').filter({hasText:'Shared QuickForge'})});await sharing.locator('summary').first().click();
+  await page.getByRole('button',{name:'Host editing session',exact:true}).click();await expect(page.getByRole('button',{name:'Leave session',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Tag editor',exact:true}).click();
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='forge_session_leave').length)).toBe(0);
+  await page.evaluate(()=>{(window as any).__sparkMock.session.view.document.name='Another editor changed the name';});
+  await page.getByRole('button',{name:'Level editor',exact:true}).click();await sharing.locator('summary').first().click();
+  await expect(page.getByText('Paused · local draft retained',{exact:false})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Export local draft',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Leave session',exact:true}).click();
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='forge_session_leave'));expect(calls).toHaveLength(1);expect(calls[0].args).toEqual({projectId:'a',sessionId:'11111111-1111-4111-8111-111111111111'});
+});
 
 test('live Ctrl+Z waits for an in-flight game receipt and then supports redo',async({page})=>{
   await mockDesktop(page);

@@ -2,9 +2,11 @@
 
 Continue the existing project; no restoration sources were replaced. The requested merge target is local **master**. The owner will push; no remote push, pull request or repository-setting change is part of this handoff.
 
+Latest extension: [hosting, collision and controls](HOSTING_COLLISION_AND_CONTROLS.md). Compact the sidebar, place Interface Studio in Settings, fix the synchronous onboarding-save path, retain shared sessions across tools, add private map-bound invites and an explicitly optional Spacewar test module. Strengthen continuous collision clearance and join bent tunnel caps, with a new compiled four-map dogleg challenge. Save per-map gameplay presets with independent left/right mouse routing; actual MCC sprint, paired firing and sword lunge remain unfinished, as do arbitrary spawning/BSP replacement, game-peer replication and complete rendering/audio parity.
+
 Suggested title:
 
-**feat: unify C32–C33 editor workflows and native MCC builds**
+**feat: unify C32–C33 editor workflows, hosting and native MCC tooling**
 
 Suggested description:
 
@@ -39,7 +41,7 @@ git push origin master
 If desired, retain the source branch remotely as well:
 
 ~~~powershell
-git push -u origin codex/continuation-33-world-challenges
+git push -u origin codex/continuation-33-hosting-collision
 ~~~
 
-Confirm remote CI after your push. Local executables, installers, source ZIPs and verification receipts are under releases with distinct world-challenges filenames. Owned maps, SDK/tag content, local QA data and credentials are excluded from source packaging.
+Confirm remote CI after your push. Local executables, installers, source ZIPs and verification receipts are under releases with distinct hosting-workflows filenames; earlier world-challenges releases are retained. The optional Steam module is packaged separately. Owned maps, SDK/tag content, local QA data and credentials are excluded from source packaging.

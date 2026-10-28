@@ -24,6 +24,7 @@ use std::{
     process::Stdio,
 };
 use tauri::{Emitter, Manager, State};
+#[path="shared_editing.rs"] mod shared_editing;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -37,6 +38,8 @@ struct Settings {
     resource_directory: Option<PathBuf>,
     metadata_template_directory: Option<PathBuf>,
     native_executable: Option<PathBuf>,
+    steam_bridge_directory: Option<PathBuf>,
+    steam_bridge_manifest_sha256: Option<String>,
     hek_directory: Option<PathBuf>,
     /// Explicit family selector prevents invoking classic HEK against MCC tags.
     hek_flavor: Option<String>,
@@ -56,6 +59,8 @@ impl Default for Settings {
             resource_directory: None,
             metadata_template_directory: None,
             native_executable: None,
+            steam_bridge_directory: None,
+            steam_bridge_manifest_sha256: None,
             hek_directory: None,
             hek_flavor: None,
             hek_tags_directory: None,
@@ -81,6 +86,7 @@ struct AppState {
     root: PathBuf,
     library: Mutex<Library>,
     settings: Mutex<Settings>,
+    settings_write:Mutex<()>,
     installation: Mutex<Installation>,
     managed: Mutex<Option<ManagedRoot>>,
     watcher: Mutex<Option<notify::RecommendedWatcher>>,
@@ -89,7 +95,7 @@ struct AppState {
     logs: Mutex<Vec<JobEvent>>,
     diagnostics: Mutex<Vec<String>>,
     live_mcc: Mutex<Option<crate::live_mcc::Session>>,
-    forge_session: Mutex<Option<(String,core::forge_session::Peer)>>,
+    forge_session: Mutex<Option<shared_editing::Session>>,
     document_owners: Mutex<HashMap<String,String>>,
 }
 #[derive(Serialize)]
@@ -364,16 +370,27 @@ async fn audit_owned_bitmap_resources(
 
 #[tauri::command]
 fn bootstrap(state: State<AppState>) -> Reply<Bootstrap> {
+    bootstrap_state(&state)
+}
+fn bootstrap_state(state:&AppState)->Reply<Bootstrap> {
+    // Drop each guard before acquiring another: background discovery/imports
+    // must not create a lock-order cycle with this UI snapshot.
+    let installation=lock(&state.installation)?.clone();
+    let managed=lock(&state.managed)?.clone();
+    let settings=lock(&state.settings)?.clone();
+    let entries=lock(&state.library)?.list().map_err(error)?;
+    let diagnostics=lock(&state.diagnostics)?.clone();
+    let logs=lock(&state.logs)?.clone();
     Ok(Bootstrap {
         api_version: 1,
-        installation: lock(&state.installation)?.clone(),
-        managed: lock(&state.managed)?.clone(),
-        settings: lock(&state.settings)?.clone(),
-        entries: lock(&state.library)?.list().map_err(error)?,
+        installation,
+        managed,
+        settings,
+        entries,
         data_directory: state.root.clone(),
         inbox_directory: state.root.join("Inbox"),
-        diagnostics: lock(&state.diagnostics)?.clone(),
-        logs: lock(&state.logs)?.clone(),
+        diagnostics,
+        logs,
     })
 }
 #[tauri::command]
@@ -944,24 +961,26 @@ async fn choose_project_resources(
     .map_err(error)?
 }
 fn configure(app: &tauri::AppHandle, state: &AppState, settings: Settings) -> Reply<()> {
+    let _update=lock(&state.settings_write)?;
+    let previous=lock(&state.settings)?.clone();
+    let discovery_changed=previous.steam_directory!=settings.steam_directory||previous.mcc_directory!=settings.mcc_directory||lock(&state.watcher)?.is_none();
     if !(1..=1440).contains(&settings.snapshot_interval_minutes) || !(1..=100).contains(&settings.snapshot_retention) {
         return Err("Snapshot interval must be 1–1440 minutes and retention 1–100".into());
     }
     if settings.hek_flavor.as_deref().is_some_and(|v| !matches!(v, "legacyHek" | "h1aEk")) {
         return Err("Select a known official Halo 1 Editing Kit family".into());
     }
-    for p in [
-        &settings.steam_directory,
-        &settings.mcc_directory,
-        &settings.invader_directory,
-        &settings.resource_directory,
-        &settings.metadata_template_directory,
-        &settings.hek_directory,
-        &settings.hek_tags_directory,
+    for (before,next) in [
+        (&previous.steam_directory,&settings.steam_directory),
+        (&previous.mcc_directory,&settings.mcc_directory),
+        (&previous.invader_directory,&settings.invader_directory),
+        (&previous.resource_directory,&settings.resource_directory),
+        (&previous.metadata_template_directory,&settings.metadata_template_directory),
+        (&previous.hek_directory,&settings.hek_directory),
+        (&previous.hek_tags_directory,&settings.hek_tags_directory),
     ]
-    .into_iter()
-    .flatten()
     {
+        if before==next{continue;}let Some(p)=next else{continue};
         if !p.is_absolute() || !p.is_dir() {
             return Err(format!("Folder is unavailable: {}", p.display()));
         }
@@ -970,7 +989,10 @@ fn configure(app: &tauri::AppHandle, state: &AppState, settings: Settings) -> Re
         .set_setting("preferences", &settings)
         .map_err(error)?;
     *lock(&state.settings)? = settings.clone();
-    lock(&state.inspections)?.clear();
+    if previous.resource_directory!=settings.resource_directory{lock(&state.inspections)?.clear();}
+    // Choosing a Halo or changing editor preferences does not require dropping
+    // native watchers and rediscovering all game installations.
+    if !discovery_changed{return Ok(());}
     let installation = steam::discover(
         settings.steam_directory.as_deref(),
         settings.mcc_directory.as_deref(),
@@ -994,13 +1016,13 @@ fn configure(app: &tauri::AppHandle, state: &AppState, settings: Settings) -> Re
     Ok(())
 }
 #[tauri::command]
-fn save_settings(
+async fn save_settings(
     app: tauri::AppHandle,
-    state: State<AppState>,
     settings: Settings,
 ) -> Reply<Bootstrap> {
-    configure(&app, &state, settings)?;
-    bootstrap(state)
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();configure(&app,&state,settings)?;bootstrap_state(&state)
+    }).await.map_err(error)?
 }
 #[tauri::command]
 async fn extract_selected_tag_tree(app: tauri::AppHandle, project_id: String, tag_id: u32) -> Reply<tag_exchange::TagExtractReceipt> {
@@ -1858,8 +1880,13 @@ async fn runtime_report(app: tauri::AppHandle) -> Reply<Vec<runtime::RuntimeRepo
         .map_err(error)?
 }
 #[tauri::command]
-fn runtime_hosting_plan(runtime_id:runtime::RuntimeId,action:runtime::HostingAction)->runtime::HostingPlan {
-    runtime::hosting_plan(runtime_id,action)
+async fn runtime_hosting_plan(app:tauri::AppHandle,runtime_id:runtime::RuntimeId,action:runtime::HostingAction,project_id:Option<String>)->Reply<serde_json::Value> {
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let project=project_id.map(|id|lock(&state.library)?.get(&id).map_err(error)).transpose()?;
+        let scenario_type=if let Some(project)=&project{if project.quick_forge.is_some(){Some(1)}else if project.source.is_some(){Some(inspect(&state,project)?.header.scenario_type)}else{None}}else{None};
+        let plan=runtime::hosting_plan_for(runtime_id,action,scenario_type);
+        Ok(serde_json::json!({"plan":plan,"mapTitle":project.as_ref().map(|p|&p.title),"scenarioType":scenario_type,"cacheVersion":project.as_ref().and_then(|p|p.source.as_ref().map(|s|s.cache_version))}))
+    }).await.map_err(error)?
 }
 #[tauri::command]
 async fn inspect_runtime_registration(
@@ -2225,6 +2252,10 @@ async fn live_mcc_sample(app:tauri::AppHandle)->Reply<crate::live_mcc::Status>{
         let status=crate::live_mcc::sample(&session).map_err(error);if status.is_err()&&!session.active_physics(){*lock(&state.live_mcc)?=None;}status
     }).await.map_err(error)?
 }
+#[tauri::command]
+async fn live_mcc_gameplay_inventory(app:tauri::AppHandle)->Reply<core::live_adapter::GameplayInventory>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the running Halo 1 map in Level editor → Live mode first")?;crate::live_mcc::gameplay_inventory(&session).map_err(error)}).await.map_err(error)?
+}
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 struct LiveBinding {placement_id:String,datum:u32,tag_datum:u32,expected_position:[f32;3]}
@@ -2271,27 +2302,42 @@ async fn live_mcc_import_map(app:tauri::AppHandle)->Reply<OpenProject>{
 }
 
 #[tauri::command]
-fn forge_session_host(state:State<AppState>,project_id:String,document:quickforge::QuickForgeDocument,lan:bool)->Reply<serde_json::Value>{
-    let p=lock(&state.library)?.get(&project_id).map_err(error)?;if p.quick_forge.is_none(){return Err("Open a QuickForge project first".into());}
-    let mut session=lock(&state.forge_session)?;if session.is_some(){return Err("Leave the current shared session before hosting another".into());}
-    snapshot_project_state(&state,&p,"before-shared-session")?;
-    let host=core::forge_session::Host::start(document,lan).map_err(error)?;let peer=core::forge_session::Peer::Host(host.clone());let view=peer.poll().map_err(error)?;
-    let result=serde_json::json!({"view":view,"endpoint":host.endpoint.to_string(),"key":host.key()});*session=Some((project_id,peer));Ok(result)
+async fn forge_session_host(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,document:quickforge::QuickForgeDocument,lan:bool,transport:Option<core::session_invite::Transport>,link_game:Option<bool>)->Reply<shared_editing::Info>{
+    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::host(&app.state::<AppState>(),&owner,project_id,document,lan,transport.unwrap_or(core::session_invite::Transport::Lan),link_game.unwrap_or(false))).await.map_err(error)?
 }
 #[tauri::command]
-async fn forge_session_join(app:tauri::AppHandle,project_id:String,endpoint:String,key:String)->Reply<core::forge_session::View>{
-    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;if p.quick_forge.is_none(){return Err("Open a QuickForge project before joining".into());}
-        let mut session=lock(&state.forge_session)?;if session.is_some(){return Err("Leave the current shared session before joining another".into());}snapshot_project_state(&state,&p,"before-shared-session")?;
-        let (guest,view)=core::forge_session::Guest::join(&endpoint,&key).map_err(error)?;*session=Some((project_id,core::forge_session::Peer::Guest(guest)));Ok(view)
-    }).await.map_err(error)?
+async fn forge_session_status(app:tauri::AppHandle,project_id:String)->Reply<Option<shared_editing::Info>>{tauri::async_runtime::spawn_blocking(move||shared_editing::status(&app.state::<AppState>(),&project_id)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_session_join(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,endpoint:String,key:String,transport:Option<core::session_invite::Transport>,invite:Option<String>)->Reply<core::forge_session::View>{
+    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::join(&app.state::<AppState>(),&owner,project_id,endpoint,key,transport.unwrap_or(core::session_invite::Transport::Lan),invite)).await.map_err(error)?
 }
-fn forge_session_peer(state:&AppState,project_id:&str)->Reply<core::forge_session::Peer>{lock(&state.forge_session)?.as_ref().filter(|(id,_)|id==project_id).map(|(_,peer)|peer.clone()).ok_or("This project has no shared session".into())}
 #[tauri::command]
-async fn forge_session_poll(app:tauri::AppHandle,project_id:String)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||forge_session_peer(&app.state::<AppState>(),&project_id)?.poll().map_err(error)).await.map_err(error)?}
+async fn forge_session_poll(app:tauri::AppHandle,project_id:String,session_id:Option<String>)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||shared_editing::poll(&app.state::<AppState>(),&project_id,session_id.as_deref(),false)).await.map_err(error)?}
 #[tauri::command]
-async fn forge_session_update(app:tauri::AppHandle,project_id:String,revision:u64,document:quickforge::QuickForgeDocument)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||forge_session_peer(&app.state::<AppState>(),&project_id)?.propose(revision,document).map_err(error)).await.map_err(error)?}
+async fn forge_session_resume(app:tauri::AppHandle,project_id:String,session_id:String)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||shared_editing::poll(&app.state::<AppState>(),&project_id,Some(&session_id),true)).await.map_err(error)?}
 #[tauri::command]
-async fn forge_session_leave(app:tauri::AppHandle)->Reply<()>{tauri::async_runtime::spawn_blocking(move||{if let Some((_,peer))=lock(&app.state::<AppState>().forge_session)?.take(){peer.leave();}Ok(())}).await.map_err(error)?}
+async fn forge_session_update(app:tauri::AppHandle,project_id:String,session_id:String,revision:u64,document:quickforge::QuickForgeDocument)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||shared_editing::update(&app.state::<AppState>(),&project_id,&session_id,revision,document)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_session_leave(app:tauri::AppHandle,project_id:String,session_id:String)->Reply<()>{tauri::async_runtime::spawn_blocking(move||shared_editing::leave(&app.state::<AppState>(),&project_id,&session_id)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_session_invite(app:tauri::AppHandle,project_id:String,session_id:String,address:Option<String>)->Reply<String>{tauri::async_runtime::spawn_blocking(move||shared_editing::invite(&app.state::<AppState>(),&project_id,&session_id,address)).await.map_err(error)?}
+#[tauri::command]
+fn forge_session_parse_invite(text:String)->Reply<core::session_invite::Invite>{core::session_invite::Invite::decode(&text).map_err(error)}
+#[tauri::command]
+fn steam_module_status(state:State<AppState>)->serde_json::Value {
+    let result=(||->Reply<bool>{let settings=lock(&state.settings)?.clone();if let(Some(folder),Some(hash))=(settings.steam_bridge_directory,settings.steam_bridge_manifest_sha256){crate::steam_bridge::validate(&folder,Some(&hash))?;Ok(true)}else{Ok(false)}})();
+    match result{Ok(configured)=>serde_json::json!({"configured":configured,"appId":480,"testMode":true,"detail":if configured{"Optional Spacewar module verified; connect explicitly to test Steam"}else{"Choose the optional Steam test module folder to enable Spacewar"}}),Err(detail)=>serde_json::json!({"configured":false,"appId":480,"testMode":true,"detail":detail})}
+}
+#[tauri::command]
+async fn choose_steam_module(app:tauri::AppHandle,path:Option<PathBuf>)->Reply<serde_json::Value>{
+    let path=if let Some(path)=path{path}else{let Some(folder)=rfd::AsyncFileDialog::new().set_title("Choose the optional Spark Spacewar module folder").pick_folder().await else{return Ok(serde_json::json!({"cancelled":true}));};folder.path().to_path_buf()};
+    tauri::async_runtime::spawn_blocking(move||{let(folder,hash)=crate::steam_bridge::validate(&path,None)?;let state=app.state::<AppState>();let mut settings=lock(&state.settings)?.clone();settings.steam_bridge_directory=Some(folder);settings.steam_bridge_manifest_sha256=Some(hash);configure(&app,&state,settings)?;Ok(steam_module_status(state))}).await.map_err(error)?
+}
+#[tauri::command]
+async fn steam_session_probe(app:tauri::AppHandle)->Reply<crate::steam_bridge::Ready>{tauri::async_runtime::spawn_blocking(move||{
+    let state=app.state::<AppState>();let settings=lock(&state.settings)?.clone();let folder=settings.steam_bridge_directory.ok_or("Choose the optional Spacewar module first")?;let hash=settings.steam_bridge_manifest_sha256.ok_or("Review the selected Steam module first")?;
+    let bridge=crate::steam_bridge::Bridge::start(&folder,&hash,&["--probe".into()])?;Ok(bridge.ready.clone())
+}).await.map_err(error)?}
 
 pub fn run() {
     tauri::Builder::default()
@@ -2309,6 +2355,7 @@ pub fn run() {
                 root,
                 library: Mutex::new(library),
                 settings: Mutex::new(settings.clone()),
+                settings_write:Mutex::new(()),
                 installation: Mutex::new(installation),
                 managed: Mutex::new(None),
                 watcher: Mutex::new(None),
@@ -2343,12 +2390,20 @@ pub fn run() {
             open_project_window,
             live_mcc_connect,
             live_mcc_sample,
+            live_mcc_gameplay_inventory,
             live_mcc_apply,
             live_mcc_disconnect,
             live_mcc_move_object,
             live_mcc_scale_info,
             live_mcc_scale_object,
             live_mcc_import_map,
+            forge_session_status,
+            forge_session_resume,
+            forge_session_invite,
+            forge_session_parse_invite,
+            steam_module_status,
+            choose_steam_module,
+            steam_session_probe,
             forge_session_host,
             forge_session_join,
             forge_session_poll,
@@ -2476,6 +2531,7 @@ mod readiness_tests {
             root: temp.path().into(),
             library: Mutex::new(library),
             settings: Mutex::new(Settings::default()),
+            settings_write:Mutex::new(()),
             installation: Mutex::new(Installation::default()),
             managed: Mutex::new(None),
             watcher: Mutex::new(None),

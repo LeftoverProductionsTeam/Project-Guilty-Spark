@@ -8,6 +8,8 @@
 
 ## What works today
 
+The latest [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes the onboarding save path, compacts the sidebar, moves Interface Studio into Settings, retains shared editor sessions and adds a separately built Spacewar test module. A four-map dogleg tunnel passes native compilation and compiled collision checks. Gameplay control presets include independent left/right mouse routing; live sprint, paired firing and sword lunge still require verified engine hooks.
+
 - Preserve owned maps, inspect real classic tag data, stage supported field/placement edits, and compare variants.
 - Render actual classic/MCC BSP geometry, object models, source materials, detail layers, lightmaps, decals, sky and atmospheric fog. Textures stream from verified owned resources, including supported MCC texture packs. Open a player-start view or use the map overview.
 - Browse map sounds in World or Tag editor. Preview verified embedded/shared Vorbis and PCM/Xbox ADPCM with local playback controls. Sound events and spatial mixing still need engine work.

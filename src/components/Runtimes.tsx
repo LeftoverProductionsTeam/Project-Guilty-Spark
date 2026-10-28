@@ -19,6 +19,9 @@ import { Empty, Notice, PageTitle, Pill } from './ui';
 import { offeredTools, toolchainHint } from '../toolchainProfiles';
 import '../onboarding.css';
 import CompatibilityTable from './CompatibilityTable';
+import HostingWorkspace from './HostingWorkspace';
+import GameplayControls from './GameplayControls';
+import {useMapState} from '../mapSession';
 
 const editable = new Set<RuntimeId>(['chupathingyCe', 'openCe', 'haloPc', 'haloCustomEdition']);
 const labels: Record<string, string> = {
@@ -80,19 +83,21 @@ export default function Runtimes({
   settings,
   onSettings,
   onOpenWorkspace,
+  edit,
 }: {
   project: Project | null;
   dirty: boolean;
   onSave: () => Promise<void>;
   settings: Settings;
   onSettings: () => void;
-  onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge') => void;
+  onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge' | 'creator') => void;
+  edit:(project:Project,description:string)=>void;
 }) {
   const [reports, setReports] = useState<RuntimeReport[]>([]);
-  const [selected, setSelected] = useState<RuntimeId>(project?.quickForge?.runtimeId ?? 'mccSteam');
+  const [selected, setSelected] = useMapState<RuntimeId>(project?.id??'global','hosting.runtime',project?.quickForge?.runtimeId ?? settings.preferredHalo ?? 'mccSteam');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<'runtime' | 'friends'>('runtime');
+  const [tab, setTab] = useMapState<'runtime'|'friends'|'hosting'|'gameplay'>(project?.id??'global','hosting.tab','runtime');
   const alive = useRef(true);
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -135,7 +140,6 @@ export default function Runtimes({
         </Notice>
       )}
       {error && <Notice>{error}</Notice>}
-      <CompatibilityTable/>
       <div className="tabs workspace-tabs">
         <button className={tab === 'runtime' ? 'selected' : ''} onClick={() => setTab('runtime')}>
           Runtime adapters
@@ -143,6 +147,8 @@ export default function Runtimes({
         <button className={tab === 'friends' ? 'selected' : ''} onClick={() => setTab('friends')}>
           Friends preflight
         </button>
+        <button className={tab === 'hosting' ? 'selected' : ''} onClick={() => setTab('hosting')}>Hosting &amp; servers</button>
+        <button className={tab === 'gameplay' ? 'selected' : ''} onClick={() => setTab('gameplay')}>Gameplay controls</button>
       </div>
       {loading && !reports.length && (
         <div className="loading" role="status">
@@ -165,12 +171,16 @@ export default function Runtimes({
           </select>
         </label>
       )}
-      {report &&
+      {tab==='gameplay'&&<GameplayControls key={project?.id??'global'} project={project} edit={edit} onEditor={()=>onOpenWorkspace('quickforge')}/>}
+      {report && tab!=='gameplay' &&
         (tab === 'runtime' ? (
           <>
+            <CompatibilityTable/>
             <RuntimeDetails key={selected} report={report} onRegistered={setReports} />
             <ToolchainShelf runtime={selected} settings={settings} onSettings={onSettings} onOpenWorkspace={onOpenWorkspace} />
           </>
+        ) : tab === 'hosting' ? (
+          <HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/>
         ) : (
           <Friends
             key={`${selected}:${project?.id ?? ''}`}

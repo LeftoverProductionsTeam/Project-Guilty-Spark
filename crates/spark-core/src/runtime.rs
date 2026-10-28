@@ -112,6 +112,9 @@ pub struct HostingPlan {
 }
 
 pub fn hosting_plan(runtime_id: RuntimeId, action: HostingAction) -> HostingPlan {
+    hosting_plan_for(runtime_id,action,None)
+}
+pub fn hosting_plan_for(runtime_id: RuntimeId, action: HostingAction, scenario_type: Option<u16>) -> HostingPlan {
     use HostingAction::*;
     let mut plan = HostingPlan {
         runtime_id, action, status: SupportStatus::Unknown, evidence: EvidenceKind::Application,
@@ -170,14 +173,21 @@ pub fn hosting_plan(runtime_id: RuntimeId, action: HostingAction) -> HostingPlan
         plan.sources = source(runtime_id);
         plan.sources.push(SourceReference {title:"Official MCC co-op mode limits".into(),url:"https://support.halowaypoint.com/hc/en-us/articles/4403583912084-What-Is-the-Difference-between-Co-op-Firefight-and-Spartan-Ops-in-Halo-The-Master-Chief-Collection-MCC".into(),revision:None});
         plan.sources.push(SourceReference {title:"Official MCC lobby and friend invitations".into(),url:"https://support.halowaypoint.com/hc/en-us/articles/4401928876692-Quick-Start-Guide-for-Halo-The-Master-Chief-Collection-MCC".into(),revision:None});
+        plan.sources.push(SourceReference {title:"Official MCC modded Custom Games and EAC-disabled launch".into(),url:"https://support.halowaypoint.com/hc/en-us/articles/360037475251-How-to-Launch-Halo-The-Master-Chief-Collection-with-Easy-Anti-Cheat-EAC-Disabled".into(),revision:None});
         match action {
             TestSolo|HostPrivateOnline|JoinFriend => {
                 plan.status=SupportStatus::Supported;
-                plan.steps.push("Both players need the same validated MCC build and custom campaign package. Launch MCC from Steam using its anti-cheat-disabled option for mods.".into());
-                if action != TestSolo { plan.steps.push("Use MCC's roster/friend invitation controls to join the same private lobby. Select the Halo: Combat Evolved custom campaign entry in the game menus.".into()); }
-                else {plan.steps.push("Choose the installed Halo: Combat Evolved campaign mod in MCC's game menus and test it alone first.".into());}
+                plan.steps.push("Use matching MCC builds and the same validated mod/map package on every computer. For modded content, launch MCC from Steam using Anti-Cheat Disabled (Mods and Limited Services).".into());
+                if action != TestSolo { plan.steps.push("Use MCC's roster/friend invitation controls to join the same private lobby.".into()); }
+                match scenario_type {
+                    Some(1)=>plan.steps.push("Choose Halo: Combat Evolved in Custom Games, select the installed multiplayer map and compatible game variant, then start the private match.".into()),
+                    Some(0)=>plan.steps.push("Select the installed Halo: Combat Evolved campaign mod and mission in MCC's campaign menus.".into()),
+                    Some(2)=>{plan.status=SupportStatus::Unsupported;plan.steps.push("The current source is a user-interface cache, not a playable campaign or multiplayer level. Choose a gameplay map.".into());},
+                    _=>plan.steps.push("Choose Custom Games for a multiplayer map, or Campaign for a campaign mission. Confirm the intended content type before starting.".into()),
+                }
             },
-            HostLan|DedicatedServer => plan.steps.push("This adapter has no verified automated MCC LAN or dedicated-server interface for custom Halo1 campaign Firefight. Use the documented private-lobby campaign workflow where available.".into()),
+            HostLan=>plan.steps.push("Configure local networking with the installed MCC version's documented lobby/network controls. Spark has no verified automated LAN-lobby setup; test the exact map and both clients independently.".into()),
+            DedicatedServer=>plan.steps.push("Spark has no verified self-hosted MCC dedicated-server launcher. Use the private Custom Games lobby workflow for multiplayer maps; service-managed MCC servers are a separate interface.".into()),
         }
         plan.limitations.push("Official Halo: Combat Evolved MCC campaign co-op is limited to two players. This does not establish arbitrary multiplayer-map AI synchronization.".into());
         plan.limitations.push("The recovered zombie source currently has unresolved conversion errors; no playable MCC zombie package or Firefight integration has been demonstrated.".into());
@@ -198,6 +208,19 @@ pub struct CapabilityEvidence {
     pub test_status: TestStatus,
     pub detail: String,
     pub sources: Vec<SourceReference>,
+}
+#[cfg(test)] mod hosting_context_tests {
+    use super::*;
+    #[test] fn multiplayer_and_campaign_guides_use_their_actual_menu_context(){
+        let multiplayer=hosting_plan_for(RuntimeId::MccSteam,HostingAction::HostPrivateOnline,Some(1));
+        assert!(multiplayer.steps.iter().any(|step|step.contains("Custom Games")));
+        assert!(!multiplayer.steps.iter().any(|step|step.contains("campaign mod and mission")));
+        let campaign=hosting_plan_for(RuntimeId::MccSteam,HostingAction::TestSolo,Some(0));
+        assert!(campaign.steps.iter().any(|step|step.contains("campaign mod and mission")));
+        let ui=hosting_plan_for(RuntimeId::MccSteam,HostingAction::TestSolo,Some(2));
+        assert_eq!(ui.status,SupportStatus::Unsupported);
+        assert!(!multiplayer.automatic);
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

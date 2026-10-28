@@ -56,6 +56,7 @@ import { initialHistory, thumbnail } from './editor';
 import type {HistoryAction} from './editor';
 import {activeDocument,documentReducer,emptyMapDocuments} from './mapDocuments';
 import MapTabs from './components/MapTabs';
+import SettingsPanel from './components/SettingsPanel';
 import MapTools from './components/MapTools';
 import WorkspaceSession from './components/WorkspaceSession';
 import {readMapSession,writeMapSession,useMapState} from './mapSession';
@@ -115,7 +116,7 @@ const nav = [
 ] as const;
 const mapWorkspaces:Workspace[]=['world','quickforge','live','tags','assets','scenario','build','firefight','creator','machinima','preservation'];
 function rememberedWorkspace(project:Project):Workspace{const stored=readMapSession<Workspace>(project.id,'workspace',project.quickForge?'quickforge':'world');return mapWorkspaces.includes(stored)?stored:project.quickForge?'quickforge':'world';}
-const navGroups = [["Level Editor",["quickforge"]],["Tags & Assets",["tags","assets","compare","interface"]],["Gameplay Creator",["machinima","scenario","firefight","creator"]],["Projects & Testing",["library","build","runtimes"]],["Learn & Community",["get-started","features","how-to","academy","map-finder","community"]]] as const;
+const navGroups = [["Level Editor",["quickforge"]],["Tags & Assets",["tags","assets","compare"]],["Gameplay Creator",["machinima","scenario","firefight","creator"]],["Projects & Testing",["library","build","runtimes"]],["Learn & Community",["get-started","features","how-to","academy","map-finder","community"]]] as const;
 const finderItems: readonly WorkspaceFinderItem[] = [
   {id:'quickforge',label:'QuickForge',help:'Open the map viewer. QuickForge tools follow the open document.',keywords:'level editor geometry brushes tunnels forge'},
   ...nav.map(({id,label}) => ({id,label,help:WORKSPACE_TOOLTIPS[id] ?? '',keywords:`${WORKBENCH_GUIDES[id].can} ${WORKBENCH_GUIDES[id].cannot} ${WORKBENCH_GUIDES[id].tip}`})),
@@ -615,7 +616,7 @@ export default function App() {
     try {
       const d = await call<Bootstrap>('save_settings', { settings });
       setData(d);
-      notice('Preferences saved. Runtime detection and Inbox watching refreshed.','success');
+      notice('Preferences saved.','success');
     } catch(error) {notice(String(error),'error');throw error;}
   }
   const commonEmpty = (
@@ -664,7 +665,7 @@ export default function App() {
           busy={busy}
         />
       );
-    if (workspace === 'interface') return <InterfaceStudio
+    if (workspace === 'interface') return <SettingsPanel tab="interface" onTab={tab=>setWorkspace(tab==='interface'?'interface':'settings')}><InterfaceStudio
       preferences={interfacePreferences} onChange={setInterfacePreferences} onPreview={playInterfaceCue}
       bitmapTags={matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection) || (!bitmapPreference && !!current?.source && !!inspection && inspection.sha256.toLowerCase()===current.source.sha256.toLowerCase())
         ? (inspection?.tags.filter(tag=>tag.class==='bitm').map(tag=>({id:tag.id,path:tag.path})) ?? [])
@@ -681,23 +682,23 @@ export default function App() {
       onOpenTags={() => {
         setFocusTagId(inspection?.tags.find((tag) => tag.class === 'snd!')?.id ?? null);
         setWorkspace('tags');
-      }} />;
+      }} /></SettingsPanel>;
     if (workspace === 'settings')
       return (
-        <Preferences
+        <SettingsPanel tab="tools" onTab={tab=>setWorkspace(tab==='interface'?'interface':'settings')}><Preferences
           data={data}
           undoLimit={history.limit} onUndoLimit={limit=>dispatch({type:'history-limit',limit})}
           onApply={applySettings}
           onAction={action}
           onRuntimes={() => setWorkspace('runtimes')}
-        />
+        /></SettingsPanel>
       );
     if (workspace === 'compare')
       return (
         <Compare entries={data.entries} currentId={current?.id} dirty={history.dirty} onSave={() => save()} />
       );
     if (workspace === 'runtimes')
-      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} settings={data.settings} onSettings={() => setWorkspace('settings')} onOpenWorkspace={setWorkspace} />;
+      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} settings={data.settings} onSettings={() => setWorkspace('settings')} onOpenWorkspace={setWorkspace} edit={edit} />;
     if (workspace === 'academy') return <Academy project={current} inspection={inspection} settings={data.settings} navigate={setWorkspace} />;
     if (!current) return commonEmpty;
     switch (workspace) {
@@ -809,7 +810,7 @@ export default function App() {
         </header>
         <aside className="sidebar">
           <div className="sidebar-label">WORKSPACES</div>
-          <nav>
+          <nav aria-label="Workspaces">
             {navGroups.map(([group,ids])=><div className="gs-nav-group" key={group}><div className="sidebar-label">{group}</div>{nav.filter(item=>(ids as readonly string[]).includes(item.id)).map(({ id, label, icon: Icon }) => (
               <button
                 className={workspace === id || (id==='quickforge'&&(workspace==='world'||workspace==='live')) ? 'nav-item selected' : 'nav-item'}
@@ -835,7 +836,7 @@ export default function App() {
                     <Box size={17} />
                   </span>
                   <span>
-                    <strong>{current.title}</strong>
+                    <strong title={current.title}>{current.title}</strong>
                     <small>
                       {current.source
                         ? `Cache ${current.source.cacheVersion} · source preserved`
@@ -845,6 +846,8 @@ export default function App() {
                 </div>
                 <button
                   className="small-button full"
+                  aria-label="Export .gsproject"
+                  title="Save and export this project's descriptor"
                   onClick={() =>
                     void action(async () => {
                       await save();
@@ -853,15 +856,11 @@ export default function App() {
                   }
                 >
                   <Save size={13} />
-                  Export .gsproject
+                  <span className="sidebar-export-label">Export .gsproject</span>
                 </button>
               </>
             ) : (
-              <p>
-                No project open.
-                <br />
-                Your next idea starts here.
-              </p>
+              <p>No project open.</p>
             )}
           </div>
           <div className="sidebar-bottom">
@@ -882,7 +881,7 @@ export default function App() {
               <span>Preservation record</span>
             </button>
             <button
-              className={workspace === 'settings' ? 'nav-item selected' : 'nav-item'}
+              className={workspace === 'settings'||workspace==='interface' ? 'nav-item selected' : 'nav-item'}
               onClick={() => setWorkspace('settings')}
             >
               <Settings2 size={17} />

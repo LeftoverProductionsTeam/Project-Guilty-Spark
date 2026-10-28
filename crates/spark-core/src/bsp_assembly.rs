@@ -355,20 +355,27 @@ fn source_solid(
     gl.merge();
     checked(Manifold::from_mesh_gl64_robust(&gl), "Source BSP import")
 }
-fn tunnel_solid(a: V, b: V, width: f64, height: f64, material: usize) -> Result<Manifold> {
-    let d = sub(b, a);
-    let length = d[0].hypot(d[1]);
-    let side = [-d[1] / length * width / 2., d[0] / length * width / 2., 0.];
+fn tunnel_sides(points: &[V], width: f64) -> Result<Vec<V>> {
+    let sides=points.windows(2).map(|pair| {let d=sub(pair[1],pair[0]);let length=d[0].hypot(d[1]);[-d[1]/length,d[0]/length,0.]}).collect::<Vec<_>>();
+    let mut result=vec![mul(sides[0],width/2.)];
+    for pair in sides.windows(2) {
+        let direction=add(pair[0],pair[1]);let denominator=dot(direction,pair[0]);
+        if denominator<0.125 {return invalid("Tunnel bend is too sharp; spread the turn over additional floor points");}
+        result.push(mul(direction,width/2./denominator));
+    }
+    result.push(mul(*sides.last().unwrap(),width/2.));Ok(result)
+}
+fn tunnel_solid(a: V, b: V, side_a: V, side_b: V, height: f64, material: usize) -> Result<Manifold> {
     let up = [0., 0., height];
     let p = [
-        sub(a, side),
-        add(a, side),
-        add(b, side),
-        sub(b, side),
-        add(sub(a, side), up),
-        add(add(a, side), up),
-        add(add(b, side), up),
-        add(sub(b, side), up),
+        sub(a, side_a),
+        add(a, side_a),
+        add(b, side_b),
+        sub(b, side_b),
+        add(sub(a, side_a), up),
+        add(add(a, side_a), up),
+        add(add(b, side_b), up),
+        add(sub(b, side_b), up),
     ];
     let mut gl = MeshGL64 {
         num_prop: 5,
@@ -492,11 +499,13 @@ pub fn generate(
         });
         let result = (|| {
             let mut combined = left;
-            for pair in assembly.tunnel_points.windows(2) {
+            let sides=tunnel_sides(&assembly.tunnel_points,assembly.tunnel_width as f64)?;
+            for (index,pair) in assembly.tunnel_points.windows(2).enumerate() {
                 let passage = tunnel_solid(
                     pair[0].map(f64::from),
                     pair[1].map(f64::from),
-                    assembly.tunnel_width as f64,
+                    sides[index],
+                    sides[index+1],
                     assembly.tunnel_height as f64,
                     tunnel_material,
                 )?;
@@ -881,9 +890,10 @@ pub fn verify_compiled_routes(path: &Path, routes: &[BspAssembly]) -> Result<Com
     for route in routes { route.validate()?; }
     let inspection = maps::inspect_map(path, path.parent())?;
     let (collision, _) = maps::collision_source(path, &inspection)?;
+    let checker = crate::bsp_clearance::RouteChecker::new(&collision)?;
     let mut walk_samples = Vec::with_capacity(routes.len());
     for (index, route) in routes.iter().enumerate() {
-        walk_samples.push(verify_route(&collision, route).map_err(|error| {
+        walk_samples.push(checker.verify(route).map_err(|error| {
             SparkError::Invalid(format!("Connection {} ({}): {error}", index + 1, route.donor_title))
         })?);
     }
@@ -1112,7 +1122,8 @@ mod tests {
     fn tunnel_keeps_floor_orientation_and_material_across_long_spans() {
         let a = [53.893385569254555, 38.31026649475098, -14.04014778137207];
         let b = [204.56627702713013, a[1], a[2]];
-        let body = tunnel_solid(a, b, 2., 1.6, 0).unwrap();
+        let sides = tunnel_sides(&[a,b],2.).unwrap();
+        let body = tunnel_solid(a, b, sides[0], sides[1], 1.6, 0).unwrap();
         assert!(body.volume() > 400.);
         let source = body.get_mesh_gl64(-1);
         for t in source.tri_verts.chunks_exact(3) {
@@ -1148,6 +1159,21 @@ mod tests {
             .iter()
             .flat_map(|t| t.iter())
             .all(|id| (vertex(&mesh, *id)[2] - a[2]).abs() < 1e-5));
+    }
+
+    #[test]
+    fn tunnel_bends_share_a_cap_without_a_collision_wedge() {
+        let points=[[0.,0.,0.],[5.,0.,0.],[10.,5.,0.],[15.,5.,0.]];
+        let sides=tunnel_sides(&points,2.).unwrap();
+        let mut joined=tunnel_solid(points[0],points[1],sides[0],sides[1],1.6,0).unwrap();
+        let mut separate=joined.volume();
+        for i in 1..points.len()-1 {
+            let next=tunnel_solid(points[i],points[i+1],sides[i],sides[i+1],1.6,0).unwrap();
+            separate+=next.volume();joined=joined.union(&next);
+        }
+        assert_eq!(joined.decompose().len(),1,"All tunnel sections must form one connected solid");
+        assert!((joined.volume()-separate).abs()<1e-5,"Matching bend caps must meet without a gap or overlapping wedge");
+        assert!(tunnel_sides(&[[0.,0.,0.],[5.,0.,0.],[0.,0.01,0.]],2.).is_err());
     }
 
     #[test]
