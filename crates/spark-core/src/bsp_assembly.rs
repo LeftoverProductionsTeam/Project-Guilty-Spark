@@ -15,7 +15,7 @@ use manifold_rust::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap,BTreeSet},
     fmt::Write,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
@@ -34,6 +34,8 @@ pub struct BspAssembly {
     /// Explicit matching editable tags for donor materials and their dependencies.
     pub donor_tags_directory: PathBuf,
     pub donor_bsp_index: usize,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub include_donor_scenery: bool,
     pub translation: [f64; 3],
     pub yaw_degrees: f64,
     /// Floor centre points, in the destination map's native Z-up world units.
@@ -42,6 +44,7 @@ pub struct BspAssembly {
     pub tunnel_height: f32,
     pub tunnel_shader_path: String,
 }
+fn is_false(value: &bool) -> bool { !*value }
 impl BspAssembly {
     pub fn validate(&self) -> Result<()> {
         if self.schema_version != 1 || self.donor_bsp_index > 15 || self.donor_title.len() > 256 {
@@ -117,6 +120,8 @@ pub struct AssemblyReport {
     pub generated_uv_faces: usize,
     pub walk_samples: usize,
     pub portal_count: usize,
+    #[serde(default)]
+    pub donor_scenery: usize,
     pub warnings: Vec<String>,
 }
 pub struct AssemblyGeometry {
@@ -204,6 +209,27 @@ fn render_triangles(i: &MapInspection, index: usize) -> BTreeMap<u32, Vec<Render
     }
     out
 }
+fn render_shader_aliases(tags: &[maps::Tag], used: &BTreeSet<u32>) -> BTreeMap<u32,u32> {
+    let references=|tag:&maps::Tag|{
+        let mut values=tag.references.iter().map(|r|(r.label.clone(),r.class.clone(),r.target_id)).collect::<Vec<_>>();values.sort();values
+    };
+    let mut aliases=BTreeMap::new();
+    for tag in tags.iter().filter(|t|!used.contains(&t.id)) {
+        let path=tag.path.replace('\\',"/");
+        let Some((parent,name))=path.rsplit_once('/') else {continue};
+        let Some(material)=name.strip_prefix("pgs") else {continue};
+        let generated=material.split_once('m').is_some_and(|(hash,index)|hash.len()==8&&hash.bytes().all(|c|c.is_ascii_hexdigit())&&index.strip_suffix('x').is_some_and(|v|!v.is_empty()&&v.bytes().all(|c|c.is_ascii_digit())))
+            || material.strip_prefix("tunnel").and_then(|v|v.strip_suffix('x')).is_some_and(|v|v.len()==8&&v.bytes().all(|c|c.is_ascii_hexdigit()));
+        if !generated || !parent.ends_with("/materials") || !parent.rsplit('/').nth(1).is_some_and(|p|p.starts_with("gsbsp_")) || tag.shader_preview.is_none() {continue;}
+        let target=format!("{parent}/{}",&name[1..]);
+        if let Some(render)=tags.iter().find(|t|used.contains(&t.id)&&t.class==tag.class&&t.path.replace('\\',"/").eq_ignore_ascii_case(&target)) {
+            if serde_json::to_value(&tag.shader_preview).ok()==serde_json::to_value(&render.shader_preview).ok() && references(tag)==references(render) {
+                aliases.insert(tag.id,render.id);
+            }
+        }
+    }
+    aliases
+}
 fn bary(p: V, t: &RenderTri) -> Option<[f64; 3]> {
     let a = sub(t.p[1], t.p[0]);
     let b = sub(t.p[2], t.p[0]);
@@ -238,6 +264,7 @@ fn source_solid(
         return invalid("A selected BSP exceeds 100000 collision triangles");
     }
     let renders = render_triangles(i, index);
+    let render_aliases=render_shader_aliases(&i.tags,&renders.keys().copied().collect());
     let mut slots = BTreeMap::new();
     let mut gl = MeshGL64 {
         num_prop: 5,
@@ -278,7 +305,7 @@ fn source_solid(
         let center = mul(add(add(p[0], p[1]), p[2]), 1. / 3.);
         let chosen = face
             .shader
-            .and_then(|id| renders.get(&id))
+            .and_then(|id| renders.get(render_aliases.get(&id).unwrap_or(&id)))
             .and_then(|rows| {
                 rows.iter()
                     .filter(|t| {
@@ -387,6 +414,7 @@ pub fn generate(
             "OpenSauce BSP extensions need a compatible source conversion before MCC assembly",
         );
     }
+    let donor_scenery = crate::bsp_scenery::plan(assembly, &donor)?.len();
     let (base_mesh, base_faces) = maps::collision_source(base_path, base)?;
     let (donor_mesh, donor_faces) =
         maps::collision_source(&assembly.donor_source.preserved_path, &donor)?;
@@ -554,7 +582,7 @@ pub fn generate(
         &base_mesh,
         &donor_mesh,
     )?;
-    Ok(AssemblyGeometry{report:AssemblyReport{input_triangles:base_mesh.indices.len()/3+donor_mesh.parts[assembly.donor_bsp_index].index_count/3,output_triangles:mesh.indices.len()/3,generated_uv_faces,walk_samples,portal_count,warnings:vec!["This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Campaign scripts, encounters and objects are not imported.".into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough.".into()]},mesh,materials,triangle_materials})
+    Ok(AssemblyGeometry{report:AssemblyReport{input_triangles:base_mesh.indices.len()/3+donor_mesh.parts[assembly.donor_bsp_index].index_count/3,output_triangles:mesh.indices.len()/3,generated_uv_faces,walk_samples,portal_count,donor_scenery,warnings:vec!["This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.".into(),"UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.".into(),"A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances.".into()]},mesh,materials,triangle_materials})
 }
 fn add_portals(
     mesh: &mut MeshData,
@@ -823,6 +851,7 @@ pub fn plan(
         donor_source,
         donor_tags_directory: tags,
         donor_bsp_index: index,
+        include_donor_scenery: false,
         translation,
         yaw_degrees: 0.,
         tunnel_points: vec![start, add(end, translation)],
@@ -884,7 +913,10 @@ fn playable_anchor(
         }
         if let Some((point, face)) = floor {
             let delta = sub(point, fallback.0);
-            candidates.push((point, face, dot(delta, delta)));
+            // A rebuilt world can retain starts only in its original section.
+            // Do not send a new connection back across an entire donor map.
+            let distance=dot(delta,delta);
+            if distance<=32.*32. { candidates.push((point, face, distance)); }
         }
     }
     Ok(candidates
@@ -1131,6 +1163,28 @@ mod tests {
             anchor(&mesh, &faces, 0, false).unwrap().0[0] > 5.,
             "Sky boundaries cannot be map entrances"
         );
+    }
+    #[test]
+    fn chained_world_ignores_starts_remote_from_the_selected_edge() {
+        let mut mesh=MeshData::default();
+        for x in [0.,200.] {
+            let at=(mesh.positions.len()/3) as u32;
+            mesh.positions.extend([x,-1.,0.,x+2.,-1.,0.,x+1.,1.,0.]);
+            mesh.indices.extend([at,at+1,at+2]);
+        }
+        mesh.parts.push(maps::MeshPart{name:"joined world".into(),index_start:0,index_count:6});
+        let faces=vec![CollisionFace{shader:Some(1),flags:0,normal:[0.,0.,1.]};2];
+        let entrance=playable_anchor(&mesh,&faces,0,true,&[[1.,0.,0.05]]).unwrap();
+        assert!(entrance.0[0]>199.,"Inherited starts in a remote map must not pull a new tunnel across the joined world");
+    }
+    #[test]
+    fn rebuilt_collision_materials_reuse_only_equivalent_render_uv_sources() {
+        let physical=maps::Tag{id:1,index:0,class:"senv".into(),path:"gsbsp_12345678_0/materials/pgsabcdef01m2x".into(),data_offset:None,external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:Some(maps::ShaderPreview::default())};
+        let mut render=physical.clone();render.id=2;render.path=render.path.replace("/pgs","/gs");
+        let used=BTreeSet::from([2]);
+        assert_eq!(render_shader_aliases(&[physical.clone(),render.clone()],&used).get(&1),Some(&2));
+        render.shader_preview.as_mut().unwrap().uv_scale=[4.,4.];
+        assert!(render_shader_aliases(&[physical,render],&used).is_empty(),"Different shader mappings must never share projected UVs");
     }
 
     #[test]

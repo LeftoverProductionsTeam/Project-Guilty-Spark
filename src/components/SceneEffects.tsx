@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { createVisualPipeline } from '../visualPipeline';
 import { renderFeatures } from '../renderFeatures';
@@ -14,6 +14,13 @@ export default function SceneEffects({ settings }: { settings?: RenderFeatures |
   useEffect(() => {
     pipeline?.resize(size.width, size.height, viewport.dpr, profile.quality);
   }, [pipeline, size.width, size.height, viewport.dpr, profile.quality]);
+  const signature=JSON.stringify(profile);
+  useLayoutEffect(()=>{
+    scene.userData.gsRenderFeatures=profile;
+    scene.userData.gsLinearOutput=!!pipeline;
+    gl.domElement.dataset.gsRenderFeatures=signature;
+    pipeline?.update(profile);
+  },[scene,gl,pipeline,signature]);
   useEffect(
     () => () => {
       delete scene.userData.gsRenderFeatures;
@@ -23,11 +30,7 @@ export default function SceneEffects({ settings }: { settings?: RenderFeatures |
     [scene, gl],
   );
   useFrame(() => {
-    scene.userData.gsRenderFeatures = profile;
-    scene.userData.gsLinearOutput = !!pipeline;
-    gl.domElement.dataset.gsRenderFeatures = JSON.stringify(profile);
     if (pipeline) {
-      pipeline.update(profile);
       pipeline.composer.render();
     } else gl.render(scene, camera);
   }, 1);

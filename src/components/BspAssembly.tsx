@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import { useMapState } from '../mapSession';
 import type { LibraryEntry, Project, Vec3 } from '../types';
-import { transformAssembly } from '../bspAssembly';
+import { assemblySignature, transformAssembly } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport } from '../bspAssembly';
 import { NumberField } from './ui';
 import '../bspAssembly.css';
@@ -39,6 +39,8 @@ export default function BspAssembly({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [report, setReport] = useState<AssemblyReport | null>(null);
+  const latest = useRef({ projectId: project.id, signature: assemblySignature(draft) });
+  latest.current = { projectId: project.id, signature: assemblySignature(draft) };
   useEffect(() => {
     const signature = JSON.stringify(project.bspAssembly ?? null);
     if (signature !== appliedSource) {
@@ -77,10 +79,12 @@ export default function BspAssembly({
       setBusy(false);
     }
   }
-  const applied = JSON.stringify(draft) === JSON.stringify(project.bspAssembly ?? null);
+  const applied = assemblySignature(draft) === assemblySignature(project.bspAssembly ?? null);
   function update(change: Partial<Plan>) {
     if (draft) {
-      setDraft({ ...draft, ...change });
+      const next = { ...draft, ...change };
+      latest.current = { projectId: project.id, signature: assemblySignature(next) };
+      setDraft(next);
       setReport(null);
     }
   }
@@ -176,7 +180,7 @@ export default function BspAssembly({
               <div className="bsp-settings">
                 {vector(
                   draft.translation,
-                  (v) => setDraft(transformAssembly(draft, v, draft.yawDegrees)),
+                  (v) => update(transformAssembly(draft, v, draft.yawDegrees)),
                   'Section position',
                 )}
                 <label>
@@ -187,7 +191,7 @@ export default function BspAssembly({
                     max={360}
                     step={1}
                     label="BSP section yaw"
-                    onCommit={(v) => setDraft(transformAssembly(draft, draft.translation, v))}
+                    onCommit={(v) => update(transformAssembly(draft, draft.translation, v))}
                   />
                 </label>
                 <label>
@@ -213,6 +217,21 @@ export default function BspAssembly({
                   />
                 </label>
               </div>
+              <label>
+                <input
+                  type="checkbox"
+                  aria-label="Include donor scenery"
+                  checked={draft.includeDonorScenery ?? false}
+                  disabled={busy}
+                  onChange={(e) => update({ includeDonorScenery: e.target.checked })}
+                />{' '}
+                Include donor source scenery (single-BSP maps)
+              </label>
+              <p>
+                Retain the donor’s scenery models and placement settings in the compiled map. Scenery
+                follows the section transform; matching editable tags are required. Donor weapons,
+                vehicles, objectives, scripts and named-object bindings are separate.
+              </p>
               <div className="bsp-waypoints">
                 {draft.tunnelPoints.map((point, i) => (
                   <div key={i}>
@@ -244,6 +263,10 @@ export default function BspAssembly({
                     value={draft.donorTagsDirectory}
                     onChange={(e) => update({ donorTagsDirectory: e.target.value })}
                   />
+                  <button type="button" disabled={!native || busy} onClick={()=>void perform(async()=>{
+                    const folder=await call<string|null>('choose_setting_path',{key:'hekTagsDirectory'});
+                    if(folder)update({donorTagsDirectory:folder});
+                  })}>Browse donor tags</button>
                 </label>
                 <label>
                   Tunnel shader
@@ -283,10 +306,12 @@ export default function BspAssembly({
                   disabled={busy || !applied || !project.bspAssembly}
                   onClick={() =>
                     void perform(async () => {
+                      const request = { projectId: project.id, signature: assemblySignature(draft) };
                       await onSave();
-                      setReport(
-                        await call<AssemblyReport>('preview_bsp_assembly', { projectId: project.id }),
-                      );
+                      const matches = () => latest.current.projectId === request.projectId && latest.current.signature === request.signature;
+                      if (!matches()) return;
+                      const checked = await call<AssemblyReport>('preview_bsp_assembly', { projectId: project.id });
+                      if (matches()) setReport(checked);
                     })
                   }
                 >
@@ -321,6 +346,9 @@ export default function BspAssembly({
                     Source clearance checked at {report.walkSamples} points ·{' '}
                     {report.outputTriangles.toLocaleString()} triangles.
                   </strong>
+                  {(report.donorScenery ?? 0) > 0 && (
+                    <p>{report.donorScenery} donor scenery placements will be retained in the build.</p>
+                  )}
                   <p>Build next to check the compiled collision, then walk the tunnel in Halo.</p>
                   {report.warnings.map((w) => (
                     <p key={w}>{w}</p>

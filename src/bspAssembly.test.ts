@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { transformAssembly } from './bspAssembly';
+import { assemblySignature, transformAssembly } from './bspAssembly';
 import type { BspAssembly } from './bspAssembly';
 const plan: BspAssembly = {
   schemaVersion: 1,
@@ -27,6 +27,14 @@ const plan: BspAssembly = {
   tunnelShaderPath: 'fixture/stone',
 };
 describe('BSP assembly transforms', () => {
+  it('treats old omitted scenery options and reordered IPC keys as the same plan', () => {
+    const reordered = Object.fromEntries(Object.entries({ ...plan, includeDonorScenery: false }).reverse()) as unknown as BspAssembly;
+    expect(assemblySignature(reordered)).toBe(assemblySignature(plan));
+  });
+  it('changes semantic identity for scenery and donor transforms', () => {
+    expect(assemblySignature({ ...plan, includeDonorScenery: true })).not.toBe(assemblySignature(plan));
+    expect(assemblySignature(transformAssembly(plan, [30, 0, 0], 0))).not.toBe(assemblySignature(plan));
+  });
   it('moves the donor mouth while preserving the destination and authored bends', () => {
     const moved = transformAssembly(plan, [30, 10, 2], 90);
     expect(moved.tunnelPoints[0]).toEqual([0, 0, 0]);

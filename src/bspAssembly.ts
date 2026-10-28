@@ -6,6 +6,7 @@ export interface BspAssembly {
   donorSource: NonNullable<Project['source']>;
   donorTagsDirectory: string;
   donorBspIndex: number;
+  includeDonorScenery?: boolean;
   translation: Vec3;
   yawDegrees: number;
   tunnelPoints: Vec3[];
@@ -24,7 +25,18 @@ export interface AssemblyReport {
   generatedUvFaces: number;
   walkSamples: number;
   portalCount: number;
+  donorScenery?: number;
   warnings: string[];
+}
+/** Semantic identity across IPC object-key ordering and old omitted options. */
+export function assemblySignature(plan: BspAssembly | null): string {
+  const ordered = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(ordered);
+    if (value && typeof value === 'object')
+      return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, ordered(item)]));
+    return value;
+  };
+  return JSON.stringify(ordered(plan ? { ...plan, includeDonorScenery: plan.includeDonorScenery ?? false } : null));
 }
 /** Move the imported section and keep its tunnel mouth attached. */
 export function transformAssembly(plan: BspAssembly, translation: Vec3, yawDegrees: number): BspAssembly {

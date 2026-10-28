@@ -112,12 +112,18 @@ pub fn audit_material_bindings(document:&quickforge::QuickForgeDocument,files:im
 }
 /// Bounded copy of owner-selected editable tags, never hardlinks into an installation.
 /// Hashes cover every input copied so a later build can be compared meaningfully.
-pub(crate) fn stage_tags(source:&Path,destination:&Path,cancel:&AtomicBool)->Result<BTreeMap<String,String>> {
+pub(crate) fn stage_tags(source:&Path,destination:&Path,cancel:&AtomicBool,mut progress:impl FnMut(usize,usize,u64,u64))->Result<BTreeMap<String,String>> {
     crate::reject_links(source)?;
     if !source.is_dir(){return invalid("Select an extracted HCEEK tags directory, not compiled .map files");}
     let source=source.canonicalize()?;
     let destination_absolute=std::path::absolute(destination)?;
-    if destination_absolute.starts_with(&source){return invalid("Build staging cannot be inside the source tags directory");}
+    // Compare canonical existing ancestors so Windows verbatim paths and normal
+    // paths cannot bypass the source/destination containment guard.
+    let mut ancestor=destination_absolute.as_path();let mut missing=vec![];
+    while !ancestor.exists() {missing.push(ancestor.file_name().ok_or_else(||SparkError::Invalid("Invalid staging destination".into()))?.to_os_string());ancestor=ancestor.parent().ok_or_else(||SparkError::Invalid("Staging destination has no existing parent".into()))?;}
+    crate::reject_links(ancestor)?;
+    let mut canonical_destination=ancestor.canonicalize()?;for name in missing.into_iter().rev(){canonical_destination.push(name);}
+    if canonical_destination.starts_with(&source){return invalid("Build staging cannot be inside the source tags directory");}
     if destination.exists() {
         crate::reject_links(destination)?;
         if fs::read_dir(destination)?.next().is_some(){return invalid("Tag staging destination must be empty");}
@@ -137,18 +143,35 @@ pub(crate) fn stage_tags(source:&Path,destination:&Path,cancel:&AtomicBool)->Res
             if metadata.len()>2*1024*1024*1024 || bytes>16*1024*1024*1024 || files.len()>=200000 {return invalid("Tag staging exceeds limits: 2 GiB/file, 16 GiB total, 200000 files");}
             let relative=path.strip_prefix(&source).map_err(|_|SparkError::Invalid("Tag escaped source root".into()))?.to_path_buf();
             safe_relative(&relative.to_string_lossy())?;
-            files.push((path,relative));
+            files.push((path,relative,metadata.len()));
         }
     }
-    let mut hashes=BTreeMap::new();
-    for (path,relative) in files {
+    let mut hashes=BTreeMap::new();let total=files.len();let mut copied=0u64;let mut last=Instant::now();let mut buffer=vec![0u8;1024*1024];
+    progress(0,total,0,bytes);
+    for (index,(path,relative,expected_size)) in files.into_iter().enumerate() {
         if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
         let output=destination.join(&relative); crate::reject_links(&output)?;
         fs::create_dir_all(output.parent().unwrap())?;
-        let hash=maps::hash_file(&path)?; fs::copy(&path,&output)?;
+        use std::io::{Read,Write};use sha2::{Digest,Sha256};
+        // Hash the exact bytes while copying; a second source hash and output
+        // readback retain the consistency check without an extra source pass.
+        let mut input=fs::File::open(&path)?;let mut target=fs::OpenOptions::new().write(true).create_new(true).open(&output)?;
+        let mut digest=Sha256::new();let mut count=0u64;
+        loop {
+            if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
+            let read=input.read(&mut buffer)?;if read==0 {break;}
+            count=count.checked_add(read as u64).ok_or_else(||SparkError::Invalid("Tag copy size overflow".into()))?;
+            if count>expected_size {return invalid("Source tag size changed while staging");}
+            target.write_all(&buffer[..read])?;digest.update(&buffer[..read]);
+        }
+        drop(target);drop(input);
+        if count!=expected_size {return invalid("Source tag size changed while staging");}
+        let hash=format!("{:x}",digest.finalize());
         #[cfg(windows)]{let mut p=fs::metadata(&output)?.permissions();p.set_readonly(false);fs::set_permissions(&output,p)?;}
         if maps::hash_file(&output)?!=hash || maps::hash_file(&path)?!=hash{return invalid("Source tags changed while staging");}
         hashes.insert(relative.to_string_lossy().replace('\\',"/"),hash);
+        copied+=count;
+        if last.elapsed().as_millis()>=500 || index+1==total {progress(index+1,total,copied,bytes);last=Instant::now();}
     }
     Ok(hashes)
 }
@@ -209,7 +232,7 @@ pub fn run_job(
         }
         emit("dependencies","Copying and hashing owner-selected tags into an isolated job".into(),15,"info");
         let workspace=&sources.directory;let stage=workspace.join("tags");
-        let hashes=stage_tags(tags.as_ref().unwrap(),&stage,&cancel)?;
+        let hashes=stage_tags(tags.as_ref().unwrap(),&stage,&cancel,|done,total,bytes,total_bytes|emit("tag-staging",format!("Prepared {done}/{total} tags · {}/{} MiB",bytes/(1024*1024),total_bytes/(1024*1024)),(15+done*8/total.max(1)) as u8,"info"))?;
         project::atomic_write(&directory.join("input-tags.json"),&serde_json::to_vec_pretty(&hashes)?,false)?;
         let material_blockers=audit_material_bindings(document,hashes.keys())?;
         if !material_blockers.is_empty(){receipt.blockers.extend(material_blockers);receipt.status="blocked".into();return Ok(());}
@@ -286,6 +309,31 @@ pub fn run_job(
 #[cfg(test)]
 mod tool_generation_tests {
     use super::*;
+    #[test]
+    fn staging_verifies_copied_bytes_preserves_sources_and_reports_completion() {
+        let root=tempfile::tempdir().unwrap();let source=root.path().join("source");fs::create_dir(&source).unwrap();
+        fs::create_dir(source.join("nested")).unwrap();fs::write(source.join("nested/fixture.bitmap"),b"synthetic bitmap bytes").unwrap();fs::write(source.join("fixture.scenery"),b"synthetic scenery bytes").unwrap();
+        let mut progress=vec![];let destination=root.path().join("staged");
+        let hashes=stage_tags(&source,&destination,&AtomicBool::new(false),|a,b,c,d|progress.push((a,b,c,d))).unwrap();
+        assert_eq!(hashes.len(),2);
+        for (file,hash) in &hashes {assert_eq!(&maps::hash_file(&source.join(file)).unwrap(),hash);assert_eq!(&maps::hash_file(&destination.join(file)).unwrap(),hash);}
+        let complete=progress.last().unwrap();assert_eq!((complete.0,complete.1),(2,2));assert_eq!(complete.2,complete.3);
+        assert!(stage_tags(&source,&destination,&AtomicBool::new(false),|_,_,_,_|{}).is_err(),"A nonempty staging destination cannot be overwritten");
+    }
+    #[test]
+    fn staging_inside_source_is_rejected_before_creating_a_directory() {
+        let root=tempfile::tempdir().unwrap();let source=root.path().join("source");fs::create_dir(&source).unwrap();
+        let nested=source.join("staged");
+        assert!(stage_tags(&source,&nested,&AtomicBool::new(false),|_,_,_,_|{}).is_err());
+        assert!(!nested.exists(),"Canonical Windows prefixes must not permit writes inside the source tree");
+    }
+    #[test]
+    fn staging_cancellation_does_not_copy_or_change_source_files() {
+        let root=tempfile::tempdir().unwrap();let source=root.path().join("source");fs::create_dir(&source).unwrap();fs::write(source.join("fixture.bitmap"),b"owned synthetic source").unwrap();
+        let cancel=AtomicBool::new(false);let destination=root.path().join("staged");
+        assert!(stage_tags(&source,&destination,&cancel,|_,_,_,_|cancel.store(true,Ordering::Relaxed)).is_err());
+        assert_eq!(fs::read(source.join("fixture.bitmap")).unwrap(),b"owned synthetic source");assert_eq!(fs::read_dir(destination).unwrap().count(),0);
+    }
     #[test]
     fn classic_hek_does_not_receive_h1a_path_flags() {
         let cwd=Path::new("/tmp/isolated_halo_job");

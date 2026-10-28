@@ -243,6 +243,7 @@ mod tests {
             },
             donor_tags_directory: "fixture-tags".into(),
             donor_bsp_index: 0,
+            include_donor_scenery: false,
             translation: [0.; 3],
             yaw_degrees: 0.,
             tunnel_points: vec![[0.5, 0., 0.], [9.5, 0., 0.]],

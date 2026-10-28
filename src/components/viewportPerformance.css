@@ -1,0 +1,4 @@
+.viewport-performance { position:relative; color:var(--text-primary,#e9f5fa); margin-left:auto; }
+.viewport-performance > summary { cursor:pointer; color:var(--accent,#65d9fa); white-space:nowrap; }
+.viewport-performance-popover { position:absolute; z-index:20; right:0; bottom:24px; width:280px; padding:14px 18px; border:1px solid var(--border,#294859); border-radius:20px 20px 5px 20px; background:var(--panel,#101c28); box-shadow:0 8px 28px #0008; display:grid; gap:8px; font-size:11px; line-height:1.5; }
+.viewport-performance-popover small { opacity:.75; }

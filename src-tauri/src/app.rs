@@ -183,17 +183,31 @@ fn verified_build(state: &AppState, project: &Project, id: &str) -> Reply<BuildR
 #[tauri::command]
 async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)->Reply<OpenProject>{
     tauri::async_runtime::spawn_blocking(move||{
-        let state=app.state::<AppState>();let library=lock(&state.library)?;
-        let source=library.get(&project_id).map_err(error)?;let build=verified_build(&state,&source,&build_id)?;
+        let state=app.state::<AppState>();
+        let source=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let build=verified_build(&state,&source,&build_id)?;
+        let inherited_tools=project_tools(&state,&source).ok();
+        let library=lock(&state.library)?;
         let entries=library.list().map_err(error)?;
         let existed=entries.iter().any(|e|e.sha256.as_deref()==build.sha256.as_deref());
         let(mut project,inspection)=library.import_map(build.output.as_ref().ok_or("Build output is missing")?,None).map_err(error)?;
         if !existed{
-            let mut base=if let Some(assembly)=&source.bsp_assembly{format!("{} + {} · compiled",source.title,assembly.donor_title)}else{format!("{} · compiled",source.title)};
+            let label=|value:&str|value.chars().filter(|c|c.is_alphanumeric()).flat_map(char::to_lowercase).collect::<String>();
+            let mut base=if let Some(assembly)=&source.bsp_assembly{
+                if label(&source.title).contains(&label(&assembly.donor_title)){format!("{} · compiled",source.title)}else{format!("{} + {} · compiled",source.title,assembly.donor_title)}
+            }else{format!("{} · compiled",source.title)};
             while base.len()>180{base.pop();}
             let mut title=base.clone();let mut ordinal=2;
             while entries.iter().any(|e|e.title==title){title=format!("{base} ({ordinal})");ordinal+=1;}
-            project.title=title;library.save(&project,Some(&inspection)).map_err(error)?;
+            project.title=title;
+            if build.target=="mcc-cea" && inspection.header.version==13 {
+                let tags=state.root.join("jobs").join(&build_id).join("tags");
+                if tags.is_dir() && tags.join(core::safe_relative(&format!("{}.scenario",inspection.scenario_path)).map_err(error)?).is_file() {
+                    core::reject_links(&tags).map_err(error)?;
+                    if let Some(tools)=inherited_tools {if let Some(kit)=tools.h1a_directory {project.bind_compiled_mcc_tags(kit,tags,tools.invader_directory).map_err(error)?;}}
+                }
+            }
+            library.save(&project,Some(&inspection)).map_err(error)?;
         }
         Ok(OpenProject{project,inspection:Some(inspection)})
     }).await.map_err(error)?

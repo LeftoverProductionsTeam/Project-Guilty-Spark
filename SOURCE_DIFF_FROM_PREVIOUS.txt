@@ -1,167 +1,45 @@
-Project Guilty Spark - C32/C33 reclamation cumulative source comparison
-BASELINE: Original Continuation 33 release
-OBSERVED_BASELINE_ZIP_SHA256: 4bae4d4ea7b9aa5325e79a9630ec6dc8adafb48c14685a2798e70cb709d79bb7
-BASELINE_FILES_HASH_VERIFIED: 909
+Project Guilty Spark - Worlds, performance and workflow source comparison
+BASELINE: Frozen C33 Reclamation source archive
+OBSERVED_BASELINE_ZIP_SHA256: 7241fc9e093cf5a84cbb90e23ba220a748cd8fd6c27214d672534ae2a869c97e
+BASELINE_FILES_HASH_VERIFIED: 984
 Comparison excludes the two regenerated checksum manifests.
-ADDED_COUNT: 75
-MODIFIED_COUNT: 77
-UNCHANGED_COUNT: 832
+ADDED_COUNT: 7
+MODIFIED_COUNT: 23
+UNCHANGED_COUNT: 961
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/examples/inspect_map_visuals.rs
-crates/spark-core/examples/qa_animation_take.rs
-crates/spark-core/examples/qa_bsp_assembly.rs
-crates/spark-core/examples/qa_bsp_mesh.rs
-crates/spark-core/examples/qa_build_project.rs
-crates/spark-core/examples/qa_convert.rs
-crates/spark-core/src/animations.rs
-crates/spark-core/src/asset_transfer.rs
+crates/spark-core/src/bsp_scenery.rs
+docs/DONOR_SCENERY.md
+docs/THREE_MAP_WORLD_AND_PERFORMANCE.md
+docs/fixtures/donor-scenery-verification.json
+docs/fixtures/three-map-performance-verification.json
+src/components/ViewportPerformance.tsx
+src/components/viewportPerformance.css
+
+MODIFIED FILES
+README.md
+ROADMAP.md
+SOURCE_DIFF_FROM_PREVIOUS.txt
 crates/spark-core/src/bsp_assembly.rs
 crates/spark-core/src/bsp_clearance.rs
 crates/spark-core/src/bsp_compile.rs
-crates/spark-core/src/bsp_triangulate.rs
-crates/spark-core/src/conversion.rs
-crates/spark-core/src/engine_machinima.rs
-crates/spark-core/src/map_decals.rs
-crates/spark-core/src/mcc_textures.rs
-crates/spark-core/src/native_workspace.rs
-crates/spark-core/src/render_features.rs
-crates/spark-core/tests/asset_transfer.rs
-crates/spark-core/tests/map_decals.rs
-crates/spark-core/tests/mcc_render.rs
-crates/spark-core/tests/mcc_textures.rs
-crates/spark-core/tests/native_machinima.rs
-docs/LIVE_EDITOR_WORKSPACES.md
-docs/RECLAMATION_AND_WORKFLOW_POLISH.md
-docs/fixtures/reclamation-verification.json
-docs/fixtures/workspaces-extension-verification.json
-docs/licenses/13ce2fb7da9c6c3a5a16e86877a604e80237f076b9258115d8f0444127f6a281.txt
-docs/licenses/98b52ccf20010b67d8fd3bdf151f50ecdfc01f25d6de190e015dd436d9f7ea0b.txt
-docs/licenses/beb8e42e9d6b4284e03304d05a81a0755200a965fc8d0a5e0aea1e84cf805d6e.txt
-docs/licenses/ea084a2373ebc1f0902c09266e7bf25a05ab3814c1805bb017ffa7308f90c061.txt
-docs/screenshots/dark-glow/native-interface.png
-docs/screenshots/workspaces/native-machinima.png
-docs/screenshots/workspaces/native-map-asset-transfer.png
-docs/screenshots/workspaces/native-mcc-live-textured.png
-src/animation.test.ts
-src/animation.ts
-src/bspAssembly.css
-src/bspAssembly.test.ts
-src/bspAssembly.ts
-src/components/AnimatedBiped.tsx
-src/components/AnimationStudio.tsx
-src/components/AssetTransfer.tsx
-src/components/BspAssembly.tsx
-src/components/Features.tsx
-src/components/LevelEditorWorkspace.tsx
-src/components/LiveEditor.tsx
-src/components/MachinimaCast.tsx
-src/components/MachinimaRig.tsx
-src/components/MachinimaWorkspace.tsx
-src/components/MapDecals.tsx
-src/components/MapTabs.tsx
-src/components/MapTools.tsx
-src/components/RenderFeatures.tsx
-src/components/SceneEffects.tsx
-src/components/ViewportSession.tsx
-src/components/WorkspaceSession.tsx
-src/darkGlow.css
-src/featureCatalog.ts
-src/features.css
-src/liveScene.test.ts
-src/liveScene.ts
-src/machinima.css
-src/machinima.test.ts
-src/machinima.ts
-src/machinimaCapture.ts
-src/mapDecals.test.ts
-src/mapDecals.ts
-src/mapDocuments.test.ts
-src/mapDocuments.ts
-src/mapSession.ts
-src/mapTools.css
-src/renderFeatures.test.ts
-src/renderFeatures.ts
-src/visualPipeline.ts
-
-MODIFIED FILES
-.gitattributes
-.gitignore
-Cargo.lock
-README.md
-SOURCE_DIFF_FROM_PREVIOUS.txt
-crates/spark-core/Cargo.toml
-crates/spark-core/examples/qa_build.rs
-crates/spark-core/examples/qa_corpus.rs
-crates/spark-core/examples/qa_validate.rs
-crates/spark-core/examples/verify_tag_exchange.rs
-crates/spark-core/src/appearance.rs
-crates/spark-core/src/bitmap_preview.rs
 crates/spark-core/src/build.rs
-crates/spark-core/src/creative.rs
 crates/spark-core/src/forge_build.rs
-crates/spark-core/src/legacy.rs
 crates/spark-core/src/lib.rs
-crates/spark-core/src/library.rs
-crates/spark-core/src/live_adapter.rs
-crates/spark-core/src/live_adapter_tests.rs
-crates/spark-core/src/live_scaling.rs
 crates/spark-core/src/maps.rs
+crates/spark-core/src/native_workspace.rs
 crates/spark-core/src/project.rs
-crates/spark-core/src/render.rs
-crates/spark-core/tests/assets_protocol_build.rs
-crates/spark-core/tests/maps.rs
-crates/spark-core/tests/project_library.rs
-docs/COMMUNITY_RESEARCH_AND_CREDITS.md
-docs/DEPENDENCY_LICENSES.json
 docs/GETTING_STARTED.md
 docs/GITHUB_HANDOFF.md
-docs/MASTER_FEATURE_LEDGER.csv
-docs/MASTER_FEATURE_LEDGER.md
-docs/PHASE3_10_FEATURE_TRACEABILITY.csv
-docs/STANDALONE_WORKFLOW.md
-scripts/test-owned-material-batch.mjs
-scripts/update-feature-ledger.mjs
-src-tauri/capabilities/main.json
-src-tauri/gen/schemas/capabilities.json
 src-tauri/src/app.rs
-src/App.tsx
-src/collisionSpatial.test.ts
-src/components/Build.tsx
-src/components/BuildTargets.tsx
-src/components/ConnectGames.tsx
-src/components/ForgeViewport.tsx
-src/components/GettingStarted.tsx
-src/components/HaloTextures.tsx
-src/components/HowTo.tsx
-src/components/InterfaceStudio.tsx
-src/components/LiveObjectInspector.tsx
-src/components/LiveScaleControls.tsx
-src/components/MachinimaActor.tsx
-src/components/QuickForge.tsx
-src/components/StartupSetup.tsx
-src/components/Tags.tsx
+src/bspAssembly.test.ts
+src/bspAssembly.ts
+src/components/BspAssembly.tsx
+src/components/SceneEffects.tsx
 src/components/ViewportTelemetry.tsx
-src/components/Workspaces.tsx
 src/components/World.tsx
-src/creatorStudio.test.ts
-src/creatorStudio.ts
-src/editor.ts
-src/firstRun.ts
-src/haloMaterial.ts
-src/haloScript.ts
-src/interfacePreferences.test.ts
-src/interfacePreferences.ts
-src/liveCollision.ts
-src/main.tsx
-src/ownedMaterialBatch.ts
-src/sourceTexture.ts
-src/styles.css
-src/types.ts
-src/useOwnedForgeModels.ts
-src/workbenchGuide.ts
-tests/ui/browser.spec.ts
+src/featureCatalog.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES

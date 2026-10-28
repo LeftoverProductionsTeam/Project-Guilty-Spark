@@ -18,6 +18,10 @@ Halo and tool choices are remembered after onboarding. **Features** offers searc
 
 In an imported map's Level Editor, **Connect another map’s BSP** selects another preserved map and one of its sections. Choose matching editable donor tags, adjust the transform and tunnel floor points, check source clearance, then apply and build. Native topology, lightmaps, compiled collision and cache checks must pass. A manual walk in Standalone and a retail MCC cache test remain separate acceptance steps. Runtime BSP replacement is unavailable.
 
+For a single-BSP donor, **Include donor source scenery** retains its scenery models and placement settings in the compiled world. Check the reported count and inspect the actual output with **Open compiled map**. Donor gameplay objects and scripts are separate; see [donor scenery](DONOR_SCENERY.md) for supported settings and limits.
+
+To extend a completed connection, open its compiled map and add another donor there. Newly imported MCC outputs keep a tool profile pointing to their own editable build tags. Use **Browse donor tags** for the new donor. The Level Editor status bar's **Viewport performance** panel helps inspect the cost of a larger world; [three-map workflow details](THREE_MAP_WORLD_AND_PERFORMANCE.md) distinguish editor, compiler and game acceptance.
+
 For animation, drop a supported JMA/JMM-family source into Machinima, select a matching biped and rehearse its actual skeleton. Assign a custom action or a complete compatible animation graph and rebuild for engine changes. Native recording uses the SDK take controls: choose a camera, build, launch the take, and record the game window in OBS. See [Standalone workflow](STANDALONE_WORKFLOW.md).
 
 Complete game shader parity, arbitrary cross-engine conversion and universal game acceptance remain incomplete. Legal source images can be matched without bundling their bytes in project exports. Read [compatibility](COMPATIBILITY_MATRIX.md) before building.

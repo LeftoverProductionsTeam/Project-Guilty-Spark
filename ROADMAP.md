@@ -5,7 +5,7 @@ The [living requirements ledger](docs/MASTER_FEATURE_LEDGER.md) retains the orig
 ## Next verification gates
 
 1. Compare the actual textured Demo scene against the same original mod in its real game. Extend supported detail/blending/sky paths with version-specific fixtures.
-2. Connect a legal complete H1A/CE kit and base tagset. Compile the smallest original arena in an isolated job, then test collision, Slayer and the five-mode fixture in the correct engine.
+2. Complete manual traversal, game-mode and retail MCC acceptance for the native arena and connected Timberland–Sidewinder builds. Installed kit/tag integration, native collision/lightmap compilation and SDK loading already have measured cases; see [current acceptance](docs/RECLAMATION_AND_WORKFLOW_POLISH.md) and [donor scenery](docs/DONOR_SCENERY.md).
 3. Verify two-client play, hosting and engine-specific AI synchronization independently. A network design or source simulator is not multiplayer acceptance.
 4. Restore Zombie Apocalypse's original dependency/weapon/vehicle mechanisms without silently replacing them; preserve First Contact campaign and cinematic goals.
 
