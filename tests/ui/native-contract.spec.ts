@@ -99,7 +99,10 @@ async function mockDesktop(page: Page) {
     const projects: Record<string, any> = {
       a: make('a', 'Synthetic baseline', 10),
       b: make('b', 'Synthetic candidate', 25),
+      c: make('c', 'Synthetic third donor', 30),
     };
+    const appliedBsp = localStorage.getItem('spark-test-applied-bsp');
+    if (appliedBsp) projects.a.project.bspAssembly = JSON.parse(appliedBsp);
     const bootstrap = {
       apiVersion: 1,
       installation: {
@@ -170,11 +173,15 @@ async function mockDesktop(page: Page) {
         if (command === 'claim_project_document' || command === 'release_project_document') return null;
         if (command === 'auto_connect_classic_textures') return null;
         if (command === 'bsp_assembly_options') return [{index:0,name:'Synthetic campaign interior',triangles:12}];
-        if (command === 'plan_bsp_assembly') return {schemaVersion:1,donorProjectId:args.donorProjectId,donorTitle:projects[args.donorProjectId].project.title,donorSource:structuredClone(projects[args.donorProjectId].project.source),donorTagsDirectory:'C:/synthetic/tags',donorBspIndex:args.donorBspIndex,translation:[20,0,0],yawDegrees:0,tunnelPoints:[[0,0,0],[20,0,0]],tunnelWidth:2,tunnelHeight:1.6,tunnelShaderPath:'synthetic/stone'};
+        if (command === 'plan_bsp_assembly') {
+          const plan = {schemaVersion:1,donorProjectId:args.donorProjectId,donorTitle:projects[args.donorProjectId].project.title,donorSource:structuredClone(projects[args.donorProjectId].project.source),donorTagsDirectory:'C:/synthetic/tags',donorBspIndex:args.donorBspIndex,translation:[20,0,0],yawDegrees:0,tunnelPoints:[[0,0,0],[20,0,0]],tunnelWidth:2,tunnelHeight:1.6,tunnelShaderPath:'synthetic/stone'};
+          if(w.__sparkMock.deferBspPlan) return new Promise(resolve=>{w.__sparkMock.finishBspPlan=()=>resolve(plan);});
+          return plan;
+        }
         if (command === 'preview_bsp_assembly') {
           if(!projects[args.projectId].project.bspAssembly)throw new Error('Assembly was not saved');
           const report={inputTriangles:24,outputTriangles:36,generatedUvFaces:0,walkSamples:42,portalCount:2,donorScenery:projects[args.projectId].project.bspAssembly.includeDonorScenery?3:0,warnings:['Synthetic clearance only; no game was run.']};
-          if(w.__sparkMock.deferBspPreview) return new Promise(resolve=>{w.__sparkMock.finishBspPreview=()=>resolve(report);});
+          if(w.__sparkMock.deferBspPreview) return new Promise((resolve,reject)=>{w.__sparkMock.finishBspPreview=(success=true)=>success?resolve(report):reject(new Error('Synthetic stale clearance failure'));});
           return report;
         }
         if (command === 'save_project') {
@@ -445,7 +452,109 @@ test('donor scenery participates in undo and changing a BSP transform clears sta
   await page.evaluate(() => (window as any).__sparkMock.finishBspPreview());
   await expect(page.getByRole('button', { name: 'Apply connection', exact: true })).toBeEnabled();
   await expect(checked).toHaveCount(0);
+  await page.getByRole('button', { name: 'Apply connection', exact: true }).click();
+  await page.evaluate(() => { delete (window as any).__sparkMock.finishBspPreview; });
+  await page.getByRole('button', { name: 'Check tunnel clearance', exact: true }).click();
+  await page.waitForFunction(() => !!(window as any).__sparkMock.finishBspPreview);
+  await page.getByRole('spinbutton', { name: 'Section position X', exact: true }).fill('23');
+  await page.getByRole('spinbutton', { name: 'Section position X', exact: true }).press('Tab');
+  await page.evaluate(() => (window as any).__sparkMock.finishBspPreview(false));
+  await expect(page.getByRole('button', { name: 'Apply connection', exact: true })).toBeEnabled();
+  await expect(page.locator('.bsp-assembly').getByRole('alert')).toHaveCount(0);
 });
+test('BSP donor choices do not silently replace a draft and entrance rotation preserves its mouth', async ({ page }) => {
+  await mockDesktop(page);
+  await openFixture(page);
+  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
+  await page.locator('.bsp-assembly>summary').click();
+  await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
+  const width = page.getByRole('spinbutton', { name: 'Tunnel width', exact: true });
+  await width.fill('4'); await width.press('Tab');
+  await page.getByRole('button', { name: 'Apply connection', exact: true }).click();
+  await page.getByRole('button', { name: 'Check tunnel clearance', exact: true }).click();
+  await expect(page.locator('.bsp-workflow')).toContainText('Check source');
+  await page.getByRole('combobox', { name: 'BSP donor map' }).selectOption('c');
+  await expect(page.locator('.bsp-selection-warning')).toContainText('This draft connects Synthetic candidate');
+  await expect(page.getByRole('button', { name: 'Check tunnel clearance', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Build & playtest connection', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Return to current draft', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'BSP donor map' })).toHaveValue('b');
+  await expect(width).toHaveValue('4');
+  const mouth = page.getByRole('spinbutton', { name: 'Imported floor X', exact: true });
+  await mouth.fill('25'); await mouth.press('Tab');
+  await page.getByRole('checkbox', { name: 'Rotate around tunnel entrance', exact: true }).check();
+  const yaw = page.getByRole('spinbutton', { name: 'BSP section yaw', exact: true });
+  await yaw.fill('90'); await yaw.press('Tab');
+  await expect(mouth).toHaveValue('25');
+  await expect(page.getByRole('spinbutton', { name: 'Imported floor Y', exact: true })).toHaveValue('0');
+  await expect(page.getByRole('spinbutton', { name: 'Section position X', exact: true })).toHaveValue('25');
+  await expect(page.getByRole('spinbutton', { name: 'Section position Y', exact: true })).toHaveValue('-5');
+  await page.getByRole('button', { name: 'Reset draft to applied connection', exact: true }).click();
+  await expect(yaw).toHaveValue('0');
+  await expect(mouth).toHaveValue('20');
+  await expect(width).toHaveValue('4');
+  await page.getByRole('combobox', { name: 'BSP donor map' }).selectOption('c');
+  await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
+  await expect(page.locator('.bsp-draft-heading')).toContainText('Synthetic third donor');
+  await expect(page.getByRole('button', { name: 'Apply connection', exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).__sparkMock.saved.bspAssembly.donorProjectId)).toBe('b');
+});
+
+test('legacy connection identities preserve an unapplied draft after upgrading', async ({ page }) => {
+  await mockDesktop(page); await openFixture(page);
+  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
+  await page.locator('.bsp-assembly>summary').click();
+  await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply connection', exact: true }).click();
+  await page.getByRole('button', { name: 'Check tunnel clearance', exact: true }).click();
+  const width = page.getByRole('spinbutton', { name: 'Tunnel width', exact: true });
+  await width.fill('6'); await width.press('Tab');
+  await page.evaluate(() => {
+    const saved = (window as any).__sparkMock.saved.bspAssembly;
+    const key = 'guilty-spark-map-session-v1:a';
+    const state = JSON.parse(localStorage.getItem(key)!);
+    state['bsp.applied'] = JSON.stringify(saved);
+    localStorage.setItem(key, JSON.stringify(state));
+    localStorage.setItem('spark-test-applied-bsp', JSON.stringify(saved));
+  });
+  await page.reload();
+  await page.locator('.sidebar').getByRole('button', { name: 'Map library', exact: true }).click();
+  await openFixture(page);
+  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
+  await expect(width).toHaveValue('6');
+  await expect(page.getByRole('button', { name: 'Apply connection', exact: true })).toBeEnabled();
+});
+
+test('a delayed BSP plan cannot resurrect a draft after leaving the workspace', async ({ page }) => {
+  await mockDesktop(page); await openFixture(page);
+  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
+  await page.locator('.bsp-assembly>summary').click();
+  await page.evaluate(() => { (window as any).__sparkMock.deferBspPlan = true; });
+  await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
+  await page.waitForFunction(() => !!(window as any).__sparkMock.finishBspPlan);
+  await page.locator('.sidebar').getByRole('button', { name: 'Features & workflows', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'What can Spark do?', exact: true })).toBeVisible();
+  await page.evaluate(() => (window as any).__sparkMock.finishBspPlan());
+  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
+  await expect(page.locator('.bsp-draft-heading')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Plan connected tunnel', exact: true })).toBeEnabled();
+});
+
+test('a delayed replacement plan cannot overwrite edits made while it runs', async ({ page }) => {
+  await mockDesktop(page); await openFixture(page);
+  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
+  await page.locator('.bsp-assembly>summary').click();
+  await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
+  await page.evaluate(() => { (window as any).__sparkMock.deferBspPlan = true; });
+  await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
+  await page.waitForFunction(() => !!(window as any).__sparkMock.finishBspPlan);
+  const width = page.getByRole('spinbutton', { name: 'Tunnel width', exact: true });
+  await width.fill('5'); await width.press('Tab');
+  await page.evaluate(() => (window as any).__sparkMock.finishBspPlan());
+  await expect(page.getByRole('button', { name: 'Plan connected tunnel', exact: true })).toBeEnabled();
+  await expect(width).toHaveValue('5');
+});
+
 test('friends preflight surfaces blocked proof without a network success claim', async ({ page }) => {
   await mockDesktop(page);
   await openFixture(page);

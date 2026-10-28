@@ -1,44 +1,29 @@
-Project Guilty Spark - Worlds, performance and workflow source comparison
-BASELINE: Frozen C33 Reclamation source archive
-OBSERVED_BASELINE_ZIP_SHA256: 7241fc9e093cf5a84cbb90e23ba220a748cd8fd6c27214d672534ae2a869c97e
-BASELINE_FILES_HASH_VERIFIED: 984
+Project Guilty Spark - Four-map challenge and connection-workflow source comparison
+BASELINE: Frozen C33 Worlds Polish source archive
+OBSERVED_BASELINE_ZIP_SHA256: de10b23cf2caaca3e9c5caea528c67d4d14c52144d12788188258c6590ff8a58
+BASELINE_FILES_HASH_VERIFIED: 991
 Comparison excludes the two regenerated checksum manifests.
-ADDED_COUNT: 7
-MODIFIED_COUNT: 23
-UNCHANGED_COUNT: 961
+ADDED_COUNT: 2
+MODIFIED_COUNT: 13
+UNCHANGED_COUNT: 978
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/src/bsp_scenery.rs
-docs/DONOR_SCENERY.md
-docs/THREE_MAP_WORLD_AND_PERFORMANCE.md
-docs/fixtures/donor-scenery-verification.json
-docs/fixtures/three-map-performance-verification.json
-src/components/ViewportPerformance.tsx
-src/components/viewportPerformance.css
+docs/FOUR_MAP_CHALLENGE.md
+docs/fixtures/four-map-challenge-verification.json
 
 MODIFIED FILES
 README.md
 ROADMAP.md
-SOURCE_DIFF_FROM_PREVIOUS.txt
+crates/spark-core/examples/qa_bsp_assembly.rs
 crates/spark-core/src/bsp_assembly.rs
 crates/spark-core/src/bsp_clearance.rs
-crates/spark-core/src/bsp_compile.rs
-crates/spark-core/src/build.rs
-crates/spark-core/src/forge_build.rs
-crates/spark-core/src/lib.rs
-crates/spark-core/src/maps.rs
-crates/spark-core/src/native_workspace.rs
-crates/spark-core/src/project.rs
 docs/GETTING_STARTED.md
 docs/GITHUB_HANDOFF.md
-src-tauri/src/app.rs
+src/bspAssembly.css
 src/bspAssembly.test.ts
 src/bspAssembly.ts
 src/components/BspAssembly.tsx
-src/components/SceneEffects.tsx
-src/components/ViewportTelemetry.tsx
-src/components/World.tsx
 src/featureCatalog.ts
 tests/ui/native-contract.spec.ts
 

@@ -78,3 +78,48 @@
 .bsp-error {
   color: #ffaaa7;
 }
+.bsp-draft-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  margin-top: 14px;
+  color: var(--text);
+}
+.bsp-draft-heading span {
+  font-size: 12px;
+}
+.bsp-selection-warning {
+  border-inline-start: 3px solid var(--accent);
+  padding: 0 12px 8px;
+  margin: 12px 0;
+}
+.bsp-workflow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  font-size: 11px;
+}
+.bsp-workflow li {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 5px 10px;
+}
+.bsp-workflow li[data-done='true'] {
+  border-color: var(--accent);
+}
+.bsp-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 22px;
+  margin: 10px 0;
+}
+.bsp-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}

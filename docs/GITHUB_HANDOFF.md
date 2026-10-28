@@ -20,6 +20,8 @@ Retain optional scenery from single-BSP donors with transformed placements, orig
 
 Extend the connected-world workflow to a separate Timberland + Sidewinder + Blood Gulch project. Preserve UVs across generated shader aliases, keep new entrances local to the selected edge, and inherit matching build tags for new compiled revisions. Reduce per-frame diagnostics and redundant SDK reads, expose optional viewport metrics, report staging progress, and catch missing tagsets before copying a large SDK tree. [Three-map and performance evidence](THREE_MAP_WORLD_AND_PERFORMANCE.md).
 
+Extend the challenge to Timberland + Sidewinder + Blood Gulch + a rotated Battle Creek, retaining 287 scenery placements and rechecking all three routes in the final compiled collision. Add fixed-entrance rotation, explicit donor/draft context, reset/return controls and coordinate-bearing clearance errors. Preserve older unapplied drafts and ignore delayed plans or failures after context changes. [Four-map results and limits](FOUR_MAP_CHALLENGE.md).
+
 Remove superseded viewer branches, an unused collision index and obsolete QA probes after reference/replacement/recovery checks. Reclaim generated caches and copied tag trees from failed experiments. Keep the regression suites, frozen releases, legal SDK baseline and all restoration originals.
 
 Validation and exact limits: [Reclamation and workflow polish](RECLAMATION_AND_WORKFLOW_POLISH.md), its linked verification fixture, [C32 record](CONTINUATION_32_ENGINEERING.md) and the frozen [C33 record](CONTINUATION_33_ENGINEERING.md). Current results supersede older acceptance gaps only for the operations explicitly tested. General live spawning/BSP replacement, game peer replication, universal renderer parity and rebuilt Zombie Apocalypse gameplay are not claimed.
@@ -37,7 +39,7 @@ git push origin master
 If desired, retain the source branch remotely as well:
 
 ~~~powershell
-git push -u origin codex/continuation-33-donor-scenery
+git push -u origin codex/continuation-33-world-challenges
 ~~~
 
-Confirm remote CI after your push. Local executables, installers, source ZIPs and verification receipts are under releases with distinct worlds-polish filenames. Owned maps, SDK/tag content, local QA data and credentials are excluded from source packaging.
+Confirm remote CI after your push. Local executables, installers, source ZIPs and verification receipts are under releases with distinct world-challenges filenames. Owned maps, SDK/tag content, local QA data and credentials are excluded from source packaging.
