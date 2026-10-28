@@ -12,6 +12,8 @@
 - Render actual classic/MCC BSP geometry, object models, source materials, detail layers, lightmaps, decals, sky and atmospheric fog. Textures stream from verified owned resources, including supported MCC texture packs. Open a player-start view or use the map overview.
 - Browse map sounds in World or Tag editor. Preview verified embedded/shared Vorbis and PCM/Xbox ADPCM with local playback controls. Sound events and spatial mixing still need engine work.
 - Author original QuickForge geometry and game-mode source; retain separate MCC/CE target configurations; use managed isolated compiler jobs and explicit compatibility gates.
+- Connect compatible BSPs with a rebuilt tunnel, native collision, portals and lightmaps. Optionally retain single-BSP [donor scenery](docs/DONOR_SCENERY.md) with source-bound model dependencies and compiled placement readback.
+- Continue from compiled revisions with matching per-map tags, inspect optional viewport performance metrics, and review the [three-map/performance pass](docs/THREE_MAP_WORLD_AND_PERFORMANCE.md).
 - Connect games separately from editing kits; inspect tool files; keep manual/periodic/pre-build project snapshots and preview a restore.
 - Use the curved native window, custom window controls, middle-button pan and world-axis translation of rotated Forge selections.
 - Keep each map's camera, active workspace, tag selection, editor settings and build targets while moving between tools. The searchable Features page explains the available workflows and their limits.

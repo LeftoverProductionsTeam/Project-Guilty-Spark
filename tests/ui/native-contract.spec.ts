@@ -171,7 +171,12 @@ async function mockDesktop(page: Page) {
         if (command === 'auto_connect_classic_textures') return null;
         if (command === 'bsp_assembly_options') return [{index:0,name:'Synthetic campaign interior',triangles:12}];
         if (command === 'plan_bsp_assembly') return {schemaVersion:1,donorProjectId:args.donorProjectId,donorTitle:projects[args.donorProjectId].project.title,donorSource:structuredClone(projects[args.donorProjectId].project.source),donorTagsDirectory:'C:/synthetic/tags',donorBspIndex:args.donorBspIndex,translation:[20,0,0],yawDegrees:0,tunnelPoints:[[0,0,0],[20,0,0]],tunnelWidth:2,tunnelHeight:1.6,tunnelShaderPath:'synthetic/stone'};
-        if (command === 'preview_bsp_assembly') {if(!projects[args.projectId].project.bspAssembly)throw new Error('Assembly was not saved');return {inputTriangles:24,outputTriangles:36,generatedUvFaces:0,walkSamples:42,portalCount:2,warnings:['Synthetic clearance only; no game was run.']};}
+        if (command === 'preview_bsp_assembly') {
+          if(!projects[args.projectId].project.bspAssembly)throw new Error('Assembly was not saved');
+          const report={inputTriangles:24,outputTriangles:36,generatedUvFaces:0,walkSamples:42,portalCount:2,donorScenery:projects[args.projectId].project.bspAssembly.includeDonorScenery?3:0,warnings:['Synthetic clearance only; no game was run.']};
+          if(w.__sparkMock.deferBspPreview) return new Promise(resolve=>{w.__sparkMock.finishBspPreview=()=>resolve(report);});
+          return report;
+        }
         if (command === 'save_project') {
           if (mock.failSave) throw new Error('Synthetic save failure');
           mock.saved = structuredClone(args.project);
@@ -405,6 +410,41 @@ test('close guard commits focused fields and stays open after a save failure', a
 test('BSP connection drafts survive tool switches and applied connections undo per map',async({page})=>{
   await mockDesktop(page);await openFixture(page);await page.locator('.sidebar').getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.bsp-assembly>summary').click();await page.getByRole('button',{name:'Plan connected tunnel',exact:true}).click();const width=page.getByRole('spinbutton',{name:'Tunnel width',exact:true});await width.fill('4');await width.press('Tab');await page.locator('.sidebar').getByRole('button',{name:'Features & workflows',exact:true}).click();await page.locator('.sidebar').getByRole('button',{name:'Level editor',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');await page.getByRole('button',{name:'Apply connection',exact:true}).click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.keyboard.press('Control+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.keyboard.press('Control+Shift+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Check tunnel clearance',exact:true}).click();await expect(page.locator('.bsp-assembly')).toContainText('42 points');expect(await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.tunnelWidth)).toBe(4);
   await page.locator('.sidebar').getByRole('button',{name:'Map library',exact:true}).click();await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await page.locator('.sidebar').getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.bsp-assembly>summary').click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');
+});
+test('donor scenery participates in undo and changing a BSP transform clears stale clearance', async ({ page }) => {
+  await mockDesktop(page);
+  await openFixture(page);
+  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
+  await page.locator('.bsp-assembly>summary').click();
+  await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
+  const scenery = page.getByRole('checkbox', { name: 'Include donor scenery', exact: true });
+  await expect(scenery).not.toBeChecked();
+  await scenery.check();
+  await page.getByRole('button', { name: 'Apply connection', exact: true }).click();
+  await page.getByRole('button', { name: 'Check tunnel clearance', exact: true }).click();
+  await expect(page.locator('.bsp-assembly')).toContainText('3 donor scenery placements');
+  const checked = page.locator('.bsp-assembly').getByText(/Source clearance checked at/);
+  await page.getByRole('spinbutton', { name: 'BSP section yaw', exact: true }).fill('90');
+  await page.getByRole('spinbutton', { name: 'BSP section yaw', exact: true }).press('Tab');
+  await expect(checked).toHaveCount(0);
+  await page.getByRole('button', { name: 'Apply connection', exact: true }).click();
+  await page.getByRole('button', { name: 'Check tunnel clearance', exact: true }).click();
+  await expect(checked).toBeVisible();
+  await page.getByRole('spinbutton', { name: 'Section position X', exact: true }).fill('21');
+  await page.getByRole('spinbutton', { name: 'Section position X', exact: true }).press('Tab');
+  await expect(checked).toHaveCount(0);
+  await scenery.uncheck();
+  await page.getByRole('button', { name: 'Apply connection', exact: true }).click();
+  await page.keyboard.press('Control+z');
+  await expect(scenery).toBeChecked();
+  await page.evaluate(() => { (window as any).__sparkMock.deferBspPreview = true; });
+  await page.getByRole('button', { name: 'Check tunnel clearance', exact: true }).click();
+  await page.waitForFunction(() => !!(window as any).__sparkMock.finishBspPreview);
+  await page.getByRole('spinbutton', { name: 'Section position X', exact: true }).fill('22');
+  await page.getByRole('spinbutton', { name: 'Section position X', exact: true }).press('Tab');
+  await page.evaluate(() => (window as any).__sparkMock.finishBspPreview());
+  await expect(page.getByRole('button', { name: 'Apply connection', exact: true })).toBeEnabled();
+  await expect(checked).toHaveCount(0);
 });
 test('friends preflight surfaces blocked proof without a network success claim', async ({ page }) => {
   await mockDesktop(page);

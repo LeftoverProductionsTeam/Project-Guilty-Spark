@@ -49,16 +49,38 @@ fn bsp_tag(i: &MapInspection, index: usize) -> Result<String> {
         .map(|t| t.path.clone())
         .ok_or_else(|| SparkError::Invalid("Selected BSP tag identity is unavailable".into()))
 }
+struct NamespacedDependencies {
+    hashes: BTreeMap<String, String>,
+    model_reference_changes: Vec<serde_json::Value>,
+}
+fn dependency_paths(output: &str) -> Result<Vec<String>> {
+    output.lines().map(str::trim).filter(|s|!s.is_empty()).map(|line|{
+        if let Some(path)=line.strip_suffix(" [BROKEN]") {
+            return invalid(format!("BSP source dependency is broken: {path}. Supply matching editable tags before rebuilding"));
+        }
+        safe_relative(line)?;Ok(line.replace('\\',"/"))
+    }).collect()
+}
+#[cfg(test)]
+#[test]
+fn broken_dependencies_report_the_actual_tag_before_filesystem_staging() {
+    let error = dependency_paths("scenery/rock.scenery\nscenery/rock.model [BROKEN]\n")
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("scenery/rock.model"));
+    assert!(error.contains("matching editable tags"));
+}
 fn namespace_materials(
     source: &Path,
     bsp: &str,
     source_index: usize,
     geometry: &AssemblyGeometry,
+    scenery: &[crate::bsp_scenery::Placement],
     tools: &Toolchain,
     runner: &Runner,
     workspace: &Path,
     destination: &Path,
-) -> Result<BTreeMap<String, String>> {
+) -> Result<NamespacedDependencies> {
     crate::reject_links(source)?;
     if !source.is_dir() {
         return invalid(
@@ -72,6 +94,88 @@ fn namespace_materials(
     // consistently. Its cwd is the owned job, so keep these paths relative.
     let working_arg = format!("bsp-dependencies-{source_index}");
     fs::create_dir(&working)?;
+    let mut prepared = BTreeMap::new();
+    let mut model_reference_changes = vec![];
+    let mut prepared_bytes = 0u64;
+    for row in scenery {
+        let relative = format!("{}.scenery", row.tag_path.replace('\\', "/"));
+        if prepared.contains_key(&relative) {
+            continue;
+        }
+        let input = source.join(safe_relative(&relative)?);
+        crate::reject_links(&input)?;
+        let size = fs::metadata(&input)?.len();
+        prepared_bytes = prepared_bytes
+            .checked_add(size)
+            .ok_or_else(|| SparkError::Invalid("Scenery staging size overflow".into()))?;
+        if size > 128 * 1024 * 1024 || prepared_bytes > 1024 * 1024 * 1024 {
+            return invalid("Scenery dependency staging exceeds its file or total byte budget");
+        }
+        let source_hash = maps::hash_file(&input)?;
+        let output = working.join(safe_relative(&relative)?);
+        fs::create_dir_all(output.parent().unwrap())?;
+        fs::copy(&input, &output)?;
+        let mut permissions = fs::metadata(&output)?.permissions();
+        permissions.set_readonly(false);
+        fs::set_permissions(&output, permissions)?;
+        let edit = find_tool(tools, "invader-edit")?;
+        let observed = runner.run(
+            &edit,
+            &[
+                "-t".into(),
+                working_arg.clone(),
+                "-G".into(),
+                "model".into(),
+                relative.clone(),
+            ],
+            workspace,
+            "bsp-scenery-model",
+            39,
+        )?;
+        let reference = crate::bsp_scenery::model_reference(&row.model_path, &observed)?;
+        let model = source.join(safe_relative(&reference)?);
+        crate::reject_links(&model)?;
+        if !model.is_file() {
+            return invalid(format!("Donor source GBX model is missing: {reference}"));
+        }
+        if !observed.trim().eq_ignore_ascii_case(&reference) {
+            runner.run(
+                &edit,
+                &[
+                    "-t".into(),
+                    working_arg.clone(),
+                    "-S".into(),
+                    "model".into(),
+                    reference.clone(),
+                    relative.clone(),
+                ],
+                workspace,
+                "bsp-scenery-model",
+                39,
+            )?;
+            let readback = runner.run(
+                &edit,
+                &[
+                    "-t".into(),
+                    working_arg.clone(),
+                    "-G".into(),
+                    "model".into(),
+                    relative.clone(),
+                ],
+                workspace,
+                "bsp-scenery-model-check",
+                39,
+            )?;
+            if !readback.trim().eq_ignore_ascii_case(&reference) {
+                return invalid("Prepared scenery model reference readback failed");
+            }
+            model_reference_changes.push(serde_json::json!({"tag":relative,"beforeReference":observed.trim(),"afterReference":reference,"sourceSha256":source_hash,"preparedTagSha256":maps::hash_file(&output)?}));
+        }
+        if maps::hash_file(&input)? != source_hash {
+            return invalid("Donor scenery source changed while preparing its model reference");
+        }
+        prepared.insert(relative, (source_hash, maps::hash_file(&output)?));
+    }
     let mut required = BTreeSet::new();
     let mut roots = vec![format!("{bsp}.scenario_structure_bsp")];
     for m in geometry
@@ -83,30 +187,35 @@ fn namespace_materials(
             roots.push(format!("{path}.{}", extension(class)?));
         }
     }
+    roots.extend(scenery.iter().map(|p| format!("{}.scenery", p.tag_path)));
+    roots.sort();
+    roots.dedup();
+    let bsp_root = format!("{bsp}.scenario_structure_bsp");
     // One recursive BSP inventory normally covers every source shader. Only the
     // user-selected tunnel material may need an additional recursive traversal.
     let output = runner.run(
         &dependency,
         &[
             "-t".into(),
+            working_arg.clone(),
+            "-t".into(),
             source.to_string_lossy().into_owned(),
             "-r".into(),
-            roots[0].clone(),
+            bsp_root,
         ],
         workspace,
         "bsp-dependencies",
         40,
     )?;
-    for line in output.lines().map(str::trim).filter(|s| !s.is_empty()) {
-        safe_relative(line)?;
-        required.insert(line.replace('\\', "/"));
-    }
+    required.extend(dependency_paths(&output)?);
     for root in roots {
         let root = root.replace('\\', "/");
         if !required.contains(&root) {
             let output = runner.run(
                 &dependency,
                 &[
+                    "-t".into(),
+                    working_arg.clone(),
                     "-t".into(),
                     source.to_string_lossy().into_owned(),
                     "-r".into(),
@@ -116,10 +225,7 @@ fn namespace_materials(
                 "bsp-dependencies",
                 40,
             )?;
-            for line in output.lines().map(str::trim).filter(|s| !s.is_empty()) {
-                safe_relative(line)?;
-                required.insert(line.replace('\\', "/"));
-            }
+            required.extend(dependency_paths(&output)?);
             required.insert(root);
         }
     }
@@ -141,8 +247,16 @@ fn namespace_materials(
         let hash = maps::hash_file(&input)?;
         let output = working.join(safe_relative(&relative)?);
         fs::create_dir_all(output.parent().unwrap())?;
-        fs::copy(&input, &output)?;
-        if maps::hash_file(&input)? != hash || maps::hash_file(&output)? != hash {
+        let expected = if let Some((source_hash, prepared_hash)) = prepared.get(&relative) {
+            if *source_hash != hash {
+                return invalid("Scenery source changed during dependency staging");
+            }
+            prepared_hash.clone()
+        } else {
+            fs::copy(&input, &output)?;
+            hash.clone()
+        };
+        if maps::hash_file(&input)? != hash || maps::hash_file(&output)? != expected {
             return invalid("BSP dependency changed during staging");
         }
         let mut permissions = fs::metadata(&output)?.permissions();
@@ -213,6 +327,37 @@ fn namespace_materials(
             }
         }
     }
+    // Native rename tools can exit successfully after skipping long paths.
+    // Check each input's expected destination before accepting the namespace.
+    for relative in hashes.keys() {
+        let material = geometry
+            .materials
+            .iter()
+            .filter(|m| m.source == source_index)
+            .find(|m| {
+                if let (Some(path), Some(class)) = (&m.shader_path, &m.shader_class) {
+                    extension(class).is_ok_and(|ext| {
+                        format!("{path}.{ext}")
+                            .replace('\\', "/")
+                            .eq_ignore_ascii_case(relative)
+                    })
+                } else {
+                    false
+                }
+            });
+        let target = if let Some(m) = material {
+            format!(
+                "{namespace}/materials/{}.{}",
+                m.name,
+                extension(m.shader_class.as_ref().unwrap())?
+            )
+        } else {
+            format!("{namespace}/{relative}")
+        };
+        if !working.join(safe_relative(&target)?).is_file() {
+            return invalid(format!("BSP dependency did not reach its namespace: {relative}. The rename output is incomplete; no map was accepted"));
+        }
+    }
     let root = working.join(&namespace);
     let mut stack = vec![root.clone()];
     while let Some(folder) = stack.pop() {
@@ -233,10 +378,141 @@ fn namespace_materials(
                 return invalid("BSP dependency would overwrite a destination tag");
             }
             fs::create_dir_all(output.parent().unwrap())?;
-            fs::copy(path, output)?;
+            let hash = maps::hash_file(&path)?;
+            fs::copy(&path, &output)?;
+            if maps::hash_file(&path)? != hash || maps::hash_file(&output)? != hash {
+                return invalid("Namespaced dependency changed while copying into the native job");
+            }
         }
     }
-    Ok(hashes)
+    Ok(NamespacedDependencies {
+        hashes,
+        model_reference_changes,
+    })
+}
+fn append_scenery(
+    rows: &[crate::bsp_scenery::Placement],
+    base: &MapInspection,
+    edit: &Path,
+    runner: &Runner,
+    workspace: &Path,
+    tags: &Path,
+) -> Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let scenario = format!("{}.scenario", base.scenario_path);
+    let counts = runner.run(
+        edit,
+        &[
+            "-t".into(),
+            tags.to_string_lossy().into_owned(),
+            "-C".into(),
+            "scenery".into(),
+            "-C".into(),
+            "scenery_palette".into(),
+            scenario.clone(),
+        ],
+        workspace,
+        "bsp-scenery-check",
+        51,
+    )?;
+    let counts: Vec<usize> = counts
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            s.parse()
+                .map_err(|_| SparkError::Invalid("Native scenery count was not an integer".into()))
+        })
+        .collect::<Result<_>>()?;
+    let base_count = base.objects.iter().filter(|o| o.kind == "Scenery").count();
+    if counts.len() != 2 || counts[0] != base_count || counts[0] + rows.len() > 4096 {
+        return invalid("Destination scenery count differs from its preserved source or exceeds the import budget");
+    }
+    let namespace = format!("gsbsp_{}_1", &runner.id[..8]);
+    let mut palette = BTreeMap::new();
+    for row in rows {
+        if palette.contains_key(&row.tag_path) {
+            continue;
+        }
+        let index = counts[1] + palette.len();
+        if index > 32766 {
+            return invalid("Scenery palette exceeds the signed placement-index limit");
+        }
+        let reference = format!("{namespace}\\{}.scenery", row.tag_path.replace('/', "\\"));
+        if !tags.join(safe_relative(&reference)?).is_file() {
+            return invalid("Namespaced donor scenery dependency is missing");
+        }
+        runner.run(
+            edit,
+            &[
+                "-t".into(),
+                tags.to_string_lossy().into_owned(),
+                "-I".into(),
+                "scenery_palette".into(),
+                "1".into(),
+                "end".into(),
+                "-S".into(),
+                format!("scenery_palette[{index}].name"),
+                reference,
+                scenario.clone(),
+            ],
+            workspace,
+            "bsp-scenery-palette",
+            52,
+        )?;
+        palette.insert(row.tag_path.clone(), index);
+    }
+    let vector = |v: [f32; 3]| v.map(|n| format!("{n:.9}")).join(",");
+    for (index, row) in rows.iter().enumerate() {
+        let prefix = format!("scenery[{}]", base_count + index);
+        let mut args = vec![
+            "-t".into(),
+            tags.to_string_lossy().into_owned(),
+            "-I".into(),
+            "scenery".into(),
+            "1".into(),
+            "end".into(),
+        ];
+        let mut set =
+            |key: &str, value: String| args.extend(["-S".into(), format!("{prefix}.{key}"), value]);
+        set("type", palette[&row.tag_path].to_string());
+        set("name", "-1".into());
+        set("position", vector(row.position));
+        // Setters use native radians even though Invader prints degrees.
+        set("rotation", vector(row.rotation));
+        set("desired_permutation", row.permutation.to_string());
+        for (bit, name) in ["automatically", "on_easy", "on_normal", "on_hard"]
+            .iter()
+            .enumerate()
+        {
+            set(
+                &format!("not_placed.{name}"),
+                ((row.not_placed >> bit) & 1).to_string(),
+            );
+        }
+        args.push(scenario.clone());
+        runner.run(edit, &args, workspace, "bsp-scenery", 52)?;
+    }
+    let count = runner.run(
+        edit,
+        &[
+            "-t".into(),
+            tags.to_string_lossy().into_owned(),
+            "-C".into(),
+            "scenery".into(),
+            scenario,
+        ],
+        workspace,
+        "bsp-scenery-readback",
+        52,
+    )?;
+    if count.trim().parse::<usize>().ok() != Some(base_count + rows.len()) {
+        return invalid("Native scenery count readback failed");
+    }
+    runner.emit("bsp-scenery",&format!("Retained {} donor scenery placements; compiled tag, transform and flag readback is required",rows.len()),52,"info");
+    Ok(())
 }
 fn native_step(
     tool: &Path,
@@ -400,11 +676,13 @@ pub fn prepare_native(
         &assembly.donor_source.preserved_path,
         assembly.donor_source.resource_directory.as_deref(),
     )?;
+    let scenery = crate::bsp_scenery::plan(assembly, &donor)?;
     let base_hashes = namespace_materials(
         tags,
         &bsp_tag(inspection, 0)?,
         0,
         &geometry,
+        &[],
         tools,
         runner,
         workspace,
@@ -415,6 +693,7 @@ pub fn prepare_native(
         &bsp_tag(&donor, assembly.donor_bsp_index)?,
         1,
         &geometry,
+        &scenery,
         tools,
         runner,
         workspace,
@@ -492,6 +771,7 @@ pub fn prepare_native(
     {
         return invalid("Scenario did not bind exactly one rebuilt BSP");
     }
+    append_scenery(&scenery, inspection, &edit, runner, workspace, tags)?;
     native_step(
         &tool,
         runner,
@@ -509,7 +789,7 @@ pub fn prepare_native(
     project::atomic_write(
         &workspace.join("bsp-assembly.json"),
         &serde_json::to_vec_pretty(
-            &serde_json::json!({"schemaVersion":1,"projectFingerprint":project.fingerprint()?,"baseSourceSha256":inspection.sha256,"donorSourceSha256":donor.sha256,"baseBsp":bsp_tag(inspection,0)?,"donorBsp":bsp_tag(&donor,assembly.donor_bsp_index)?,"compiledBsp":bsp,"jmsSha256":maps::hash_file(&source)?,"bspSha256":maps::hash_file(&compiled)?,"restoredCollisionSurfaces":restored_flags,"report":geometry.report,"materials":geometry.materials,"inputTagHashes":{"base":base_hashes,"donor":donor_hashes},"gameLoad":"pending","manualWalkthrough":"pending"}),
+            &serde_json::json!({"schemaVersion":1,"projectFingerprint":project.fingerprint()?,"baseSourceSha256":inspection.sha256,"donorSourceSha256":donor.sha256,"baseBsp":bsp_tag(inspection,0)?,"donorBsp":bsp_tag(&donor,assembly.donor_bsp_index)?,"compiledBsp":bsp,"jmsSha256":maps::hash_file(&source)?,"bspSha256":maps::hash_file(&compiled)?,"restoredCollisionSurfaces":restored_flags,"report":geometry.report,"materials":geometry.materials,"donorScenery":scenery,"modelReferenceChanges":donor_hashes.model_reference_changes,"inputTagHashes":{"base":base_hashes.hashes,"donor":donor_hashes.hashes},"gameLoad":"pending","manualWalkthrough":"pending"}),
         )?,
         false,
     )?;

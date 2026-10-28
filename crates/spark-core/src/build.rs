@@ -104,8 +104,16 @@ pub fn compatibility(
         }
     }
     let native=tools.h1a_directory.is_some();
-    if project.bsp_assembly.is_some(){
+    if let Some(assembly)=&project.bsp_assembly{
         if !native{blockers.push("Connected BSP assemblies require the MCC H1A compiler".into());}
+        if !assembly.donor_tags_directory.is_dir(){blockers.push("Choose the donor's matching editable tags folder before starting a connected-map build".into());}
+        if inspection.mesh.parts.len()!=1 {blockers.push("A connected-map destination must contain one BSP; existing destination sections cannot be discarded".into());}
+        if inspection.header.version==13 {
+            for tag in inspection.tags.iter().filter(|t|t.class=="sbsp"&&inspection.mesh.parts.iter().any(|p|t.path.rsplit(['\\','/']).next().is_some_and(|name|name.eq_ignore_ascii_case(&p.name)))) {
+                let exists=safe_relative(&format!("{}.scenario_structure_bsp",tag.path)).ok().is_some_and(|relative|tools.base_tags_directory.as_ref().is_some_and(|root|root.join(relative).is_file()));
+                if !exists {blockers.push(format!("Matching editable BSP is missing: {}. Use the tags from the build that created this map; stock SDK tags cannot replace a compiled revision",tag.path));}
+            }
+        }
         for name in ["invader-dependency","invader-refactor"]{if tool_path(tools,name).is_none(){blockers.push(format!("{name} is required to namespace imported BSP materials"));}}
         warnings.push("BSP assembly rebuilds a derived world and regenerates lightmaps. Review imported geometry, per-cluster atmosphere/audio and campaign-only content, then perform a player walkthrough.".into());
     }
@@ -258,7 +266,11 @@ impl Runner<'_> {
         );
         let mut cmd = crate::steam::command(executable.to_string_lossy().as_ref());
         #[cfg(windows)]
-        let native_alias = if executable.file_name().is_some_and(|s|s.to_string_lossy().eq_ignore_ascii_case("tool.exe")) && args.iter().any(|s|s=="-tags_dir") {
+        let native_alias = if executable.file_name().is_some_and(|s|{
+            let name=s.to_string_lossy();
+            (name.eq_ignore_ascii_case("tool.exe") && args.iter().any(|s|s=="-tags_dir"))
+                || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"))
+        }) {
             Some(crate::native_workspace::Alias::new(cwd)?)
         } else {None};
         #[cfg(windows)]
@@ -609,7 +621,7 @@ pub fn run_build(
         validate_resource_snapshot(source, Some(resource_dir))?;
         if native.is_some(){
             runner.emit("dependencies","Copying and hashing the selected legal SDK tags into this job",15,"info");
-            let hashes=crate::forge_build::stage_tags(tools.base_tags_directory.as_ref().ok_or_else(||SparkError::Invalid("MCC SDK tags missing".into()))?,&dir.join("sdk-tags"),&cancel)?;
+            let hashes=crate::forge_build::stage_tags(tools.base_tags_directory.as_ref().ok_or_else(||SparkError::Invalid("MCC SDK tags missing".into()))?,&dir.join("sdk-tags"),&cancel,|done,total,bytes,total_bytes|runner.emit("tag-staging",&format!("Prepared {done}/{total} tags · {}/{} MiB",bytes/(1024*1024),total_bytes/(1024*1024)),(15+done*8/total.max(1)) as u8,"info"))?;
             // Keep one writable tag tree. SDK hashes are retained separately;
             // extracted source tags replace the staged copies via -O.
             fs::remove_dir(&tag_dir)?;
@@ -691,6 +703,11 @@ pub fn run_build(
             let expected:std::collections::BTreeMap<_,_>=materials.iter().filter(|m|m.collision_only).map(|m|(m.name.as_str(),m.flags&15)).collect();
             for face in &compiled_faces{if let Some(id)=face.shader{let tag=validated.tags.iter().find(|t|t.id==id).ok_or_else(||SparkError::Invalid("Compiled collision shader is not indexed".into()))?;let name=tag.path.rsplit(['\\','/']).next().unwrap_or("");if expected.get(name).copied()!=Some(face.flags&15){return invalid("MCC cache collision surface flags differ from their source identities; output was not accepted");}}}
             let samples=crate::bsp_assembly::verify_route(&compiled_collision,assembly)?;
+            if assembly.include_donor_scenery {
+                let scenery:Vec<crate::bsp_scenery::Placement>=serde_json::from_value(manifest.get("donorScenery").cloned().ok_or_else(||SparkError::Invalid("Donor scenery receipt is missing".into()))?)?;
+                crate::bsp_scenery::verify_compiled(inspection,&validated,&output,&scenery,&format!("gsbsp_{}_1",&runner.id[..8]))?;
+                runner.emit("bsp-scenery-readback",&format!("{} donor scenery tags, transforms, permutations and placement flags verified in the compiled cache",scenery.len()),92,"success");
+            }
             runner.emit("bsp-clearance",&format!("Compiled collision checked at {samples} tunnel floor/clearance samples; manual walkthrough pending"),92,"success");
         }
         if validated.header.version != 13

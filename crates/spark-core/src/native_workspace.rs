@@ -1,4 +1,4 @@
-//! Short, temporary DOS alias for legacy Halo Tool filename buffers. Only the
+//! Short, temporary DOS alias for native compiler and rename filename buffers. Only the
 //! exact mapping created here is removed. The owned job remains the data root.
 #[cfg(windows)]
 mod windows {
@@ -65,7 +65,7 @@ mod windows {
                 }
                 return Ok(alias);
             }
-            invalid("Halo Tool needs a free temporary drive letter P-Z to avoid its filename limit; close an unused mapping and retry")
+            invalid("Native Halo tools need a free temporary drive letter P-Z to avoid filename limits; close an unused mapping and retry")
         }
         pub(crate) fn path(&self) -> &Path {
             &self.path

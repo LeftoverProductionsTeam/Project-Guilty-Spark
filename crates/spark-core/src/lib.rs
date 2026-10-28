@@ -8,6 +8,7 @@ pub mod binary;
 pub mod bitmap_preview;
 pub mod bsp_assembly;
 mod bsp_compile;
+mod bsp_scenery;
 mod bsp_clearance;
 mod bsp_triangulate;
 pub mod build;

@@ -31,6 +31,7 @@ import SceneEffects from './SceneEffects';
 import RenderFeatures from './RenderFeatures';
 import {useMapState} from '../mapSession';
 import ViewportSession,{hasViewportSession} from './ViewportSession';
+import ViewportPerformance from './ViewportPerformance';
 import {renderFeatures} from '../renderFeatures';
 import MapDecals from './MapDecals';
 import {decalTextureRequests} from '../mapDecals';
@@ -1280,6 +1281,7 @@ export default function World({
           <span>{project.scene.length} objects</span>
           {!!inspection?.decals?.length&&<span>{inspection.decals.length} authored decals</span>}
           <span>Halo coordinates · Z up</span>
+          <ViewportPerformance projectId={project.id}/>
           <Pill tone="blue">Editor preview</Pill>
         </div>
       </section>

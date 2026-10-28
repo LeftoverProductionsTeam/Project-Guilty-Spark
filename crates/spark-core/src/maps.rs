@@ -1210,6 +1210,19 @@ pub(crate) fn collision_source(path:&Path,inspection:&MapInspection)->Result<(Me
     let sc=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;
     let mut faces=vec![];let mesh=collision_mesh_record(&r,&space,sc,&inspection.tags,Some(&mut faces))?;Ok((mesh,faces))
 }
+pub(crate) fn scenery_parameters(path: &Path, inspection: &MapInspection) -> Result<std::collections::BTreeMap<String, (u16, i16)>> {
+    let (_, bytes, hash) = read_cache_snapshot(path)?;
+    if hash != inspection.sha256 { return invalid("Scenery source changed after inspection"); }
+    let r = Reader(&bytes);
+    let mut parameters = std::collections::BTreeMap::new();
+    for object in inspection.objects.iter().filter(|o| o.kind == "Scenery") {
+        let position = object.source_offset.ok_or_else(|| SparkError::Invalid("Scenery has no source placement record".into()))?;
+        let flags = position.checked_sub(4).ok_or_else(|| SparkError::Invalid("Invalid scenery placement offset".into()))?;
+        if vec3(&r, position)? != object.position { return invalid("Scenery source position differs from its inspection"); }
+        parameters.insert(object.id.clone(), (r.u16(flags)?, r.u16(flags + 2)? as i16));
+    }
+    Ok(parameters)
+}
 pub(crate) fn render_bsp_source(path:&Path,inspection:&MapInspection,index:usize)->Result<MeshData>{let(header,bytes,hash)=read_cache_snapshot(path)?;if hash!=inspection.sha256{return invalid("BSP source changed after inspection");}let scenario=inspection.tags.iter().find(|t|t.class=="scnr"&&t.path==inspection.scenario_path).and_then(|t|t.data_offset).ok_or_else(||SparkError::Invalid("BSP scenario is unavailable".into()))? as usize;crate::render::bsp_render_geometry_selected(&bytes,&header,scenario,Some(index))}
 fn collision_mesh(r: &Reader, space: &Space, sc: usize, tags: &[Tag]) -> Result<MeshData> {
     collision_mesh_record(r,space,sc,tags,None)

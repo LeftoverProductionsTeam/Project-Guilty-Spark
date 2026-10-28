@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-28T04:48:26.093Z",
+  "platform": "Windows x64",
+  "projectVersion": "0.4.0",
+  "tests": {
+    "rust": 239,
+    "frontend": 90,
+    "offlineScripts": 59,
+    "browser": 17
+  },
+  "restoration": {
+    "files": 67,
+    "unchanged": true,
+    "readonly": true
+  },
+  "artifacts": [
+    {
+      "file": "releases/GuiltySpark-C33-0.4.0-worlds-polish.exe",
+      "sha256": "fdcc8faf6b941510b1d62e6d5113bbf39a342f9b5a1b4d2547ee0b83b9a6521d",
+      "bytes": 22881792
+    },
+    {
+      "file": "releases/Project Guilty Spark_0.4.0_worlds-polish_x64-setup.exe",
+      "sha256": "9a06e477cc4cf818cee791905cf23726df517d15ff53814cd971a7944ca93777",
+      "bytes": 6031745
+    }
+  ],
+  "sourceArchive": {
+    "file": "releases/Project_Guilty_Spark_Continuation_33_Worlds_Polish_SOURCE.zip",
+    "sha256": "See the external .sha256 sidecar and .verification.json receipt; the archive does not hash itself"
+  },
+  "limits": [
+    "SDK tagset loading is separate from retail MCC cache loading",
+    "Manual traversal and scenery collision at both tunnels remain untested",
+    "Donor starts, weapons, vehicles, objectives, scripts and encounters are not transplanted",
+    "Game-peer replication and complete shader/spatial-audio parity remain unsupported or incomplete"
+  ],
+  "scope": "Optional source scenery in connected BSP builds",
+  "case": {
+    "name": "Timberland + Sidewinder with donor scenery",
+    "jobId": "5b18c55c-5371-42af-9d22-b71e7461fa7f",
+    "projectFingerprint": "d52e11696c545d42e7be2465874bd758eaf3acca7462ff9a434322693674aed3",
+    "sourceSha256": "f8159236d04fc525ce3b74dcd3923a316da88c523f847672f5320caad40fc7e6",
+    "donorSourceSha256": "c599cd3eda13976002594c3793cf672def1a264bb466164fd846b3d872dce8e5",
+    "outputSha256": "da5237f49c136a8cb9ae4ca3106bebb3e05e4b7c34f416488d9e69c6c61340a7",
+    "outputBytes": 106149026,
+    "bspSha256": "7ff913664acdf7b5ff9e0fc9d2c80d3ad0678aa847109a5925d4260ef3a4c1ad",
+    "jmsSha256": "563c40d9c96d175ef0e1fbfae9bb66f9a08fdefb021571033dabc0c7468100c9",
+    "geometry": {
+      "donorScenery": 42,
+      "generatedUvFaces": 1428,
+      "inputTriangles": 18760,
+      "outputTriangles": 32105,
+      "portalCount": 2,
+      "walkSamples": 423,
+      "warnings": [
+        "This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.",
+        "UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.",
+        "A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances."
+      ]
+    },
+    "scenery": {
+      "base": 168,
+      "donor": 42,
+      "compiled": 210,
+      "models": [
+        {
+          "path": "gsbsp_5b18c55c_1\\scenery\\rocks\\b40_snowrocks\\snowrock",
+          "vertices": 32,
+          "triangles": 56
+        },
+        {
+          "path": "gsbsp_5b18c55c_1\\levels\\test\\icefields\\scenery\\mp_tree_pine_snow_tall\\mp_tree_pine_snow_tall",
+          "vertices": 711,
+          "triangles": 463
+        },
+        {
+          "path": "gsbsp_5b18c55c_1\\scenery\\teleporter_shield\\teleporter",
+          "vertices": 10,
+          "triangles": 8
+        },
+        {
+          "path": "gsbsp_5b18c55c_1\\scenery\\small beacon\\small red beacon",
+          "vertices": 286,
+          "triangles": 230
+        },
+        {
+          "path": "gsbsp_5b18c55c_1\\scenery\\small beacon\\small blue beacon",
+          "vertices": 286,
+          "triangles": 230
+        },
+        {
+          "path": "gsbsp_5b18c55c_1\\levels\\test\\icefields\\scenery\\mp_tree_pine_snow_small\\mp_tree_pine_snow_small",
+          "vertices": 390,
+          "triangles": 249
+        },
+        {
+          "path": "gsbsp_5b18c55c_1\\scenery\\rocks\\b40_snowrocksmall\\snowrocksmall",
+          "vertices": 49,
+          "triangles": 84
+        },
+        {
+          "path": "gsbsp_5b18c55c_1\\scenery\\flag_base\\flag_base",
+          "vertices": 184,
+          "triangles": 124
+        },
+        {
+          "path": "gsbsp_5b18c55c_1\\levels\\test\\timberland\\scenery\\mp_beacon_blue\\mp_beacon_blue",
+          "vertices": 163,
+          "triangles": 142
+        },
+        {
+          "path": "gsbsp_5b18c55c_1\\levels\\test\\timberland\\scenery\\mp_beacon_red\\mp_beacon_red",
+          "vertices": 163,
+          "triangles": 142
+        }
+      ],
+      "modelReferenceChanges": [
+        {
+          "afterReference": "scenery\\rocks\\b40_snowrocks\\snowrock.gbxmodel",
+          "beforeReference": "scenery\\rocks\\b40_snowrocks\\snowrock.model",
+          "preparedTagSha256": "aca07be5036eca43d814daa3144297bc4929ba4995a746b438741576d36d1b41",
+          "sourceSha256": "e0ef56125b861e4541930ea3810e0da039e6f382df240bfd8adcc09b15a5fbf1",
+          "tag": "scenery/rocks/b40_snowrocks/snowrock.scenery"
+        },
+        {
+          "afterReference": "scenery\\teleporter_shield\\teleporter_shield.gbxmodel",
+          "beforeReference": "scenery\\teleporter_shield\\teleporter_shield.model",
+          "preparedTagSha256": "e00766883aa7c42df9187fece57a121b1154a75d047f6cffcbafab36cc186a38",
+          "sourceSha256": "566518ff21786dd3fb8f980ab83500fe4e7e91a2d7b85b2e9cde82808a50e991",
+          "tag": "scenery/teleporter_shield/teleporter.scenery"
+        },
+        {
+          "afterReference": "scenery\\small beacon\\small beacon.gbxmodel",
+          "beforeReference": "scenery\\small beacon\\small beacon.model",
+          "preparedTagSha256": "a9392a7832a7c0f64ff1880fc9130f91c1a5837524000d5a71e9208dd43c186c",
+          "sourceSha256": "3fd868256b49337f0183371e305fbcefe424bc2af06c8106a726fe9d62e7a189",
+          "tag": "scenery/small beacon/small red beacon.scenery"
+        },
+        {
+          "afterReference": "scenery\\small beacon\\small blue beacon.gbxmodel",
+          "beforeReference": "scenery\\small beacon\\small blue beacon.model",
+          "preparedTagSha256": "786b37fb192998e7a7d6fedd5c205fa64192183812bc423200e6860c532e021c",
+          "sourceSha256": "d41158f6952b5b31549810545f61eb8f479d9972a9a368578133ffd65225ebaf",
+          "tag": "scenery/small beacon/small blue beacon.scenery"
+        },
+        {
+          "afterReference": "scenery\\rocks\\b40_snowrocksmall\\snowrocksmall.gbxmodel",
+          "beforeReference": "scenery\\rocks\\b40_snowrocksmall\\snowrocksmall.model",
+          "preparedTagSha256": "7e654037f175dbe3d0064acea3e51a286d00bddfda10e2806619b149471657ce",
+          "sourceSha256": "2111c58d2df6c58cf9b0dba5e10bf604b766996cff6d9ce6685123af05c22c69",
+          "tag": "scenery/rocks/b40_snowrocksmall/snowrocksmall.scenery"
+        },
+        {
+          "afterReference": "scenery\\flag_base\\flag_base.gbxmodel",
+          "beforeReference": "scenery\\flag_base\\flag_base.model",
+          "preparedTagSha256": "28bb64eca51ebbb96e128b2257b5667b5d478a99d8822425c2765d8696929f25",
+          "sourceSha256": "cc6642ccb6915e855a31a34b745310dab00470a0b076b249411a114e39f1ca27",
+          "tag": "scenery/flag_base/flag_base.scenery"
+        },
+        {
+          "afterReference": "levels\\test\\timberland\\scenery\\mp_beacon_blue\\mp_beacon_blue.gbxmodel",
+          "beforeReference": "levels\\test\\timberland\\scenery\\mp_beacon_blue\\mp_beacon_blue.model",
+          "preparedTagSha256": "b6c90f248848f1e1fec351c6f0909afaf1046dbe1b73e3c5f5fb579ae2e216de",
+          "sourceSha256": "fdeb06983bcb5cb8a1405d64a18162d5400125b98ea9ac5a339328af77d5a9c9",
+          "tag": "levels/test/timberland/scenery/mp_beacon_blue/mp_beacon_blue.scenery"
+        },
+        {
+          "afterReference": "levels\\test\\timberland\\scenery\\mp_beacon_red\\mp_beacon_red.gbxmodel",
+          "beforeReference": "levels\\test\\timberland\\scenery\\mp_beacon_red\\mp_beacon_red.model",
+          "preparedTagSha256": "1863a75aad342633da0355886b7a39307d063862aa37310990a80dfaeb14ff9d",
+          "sourceSha256": "ab32d6a02a306ccee5488569600e8448f234b4dd5757754a86ee150f362cdbed",
+          "tag": "levels/test/timberland/scenery/mp_beacon_red/mp_beacon_red.scenery"
+        }
+      ]
+    },
+    "renderer": {
+      "data-source-shaders": "146",
+      "data-source-lightmaps": "5",
+      "data-source-details": "74",
+      "data-sky-triangles": "190",
+      "data-material-loading": "false",
+      "data-pending-materials": "0"
+    },
+    "nativeChecks": [
+      "Native source preview identifies 42 source-bound donor scenery placements",
+      "Moving the donor invalidates the previous clearance result",
+      "All 42 compiled donor scenery placements resolve real source models",
+      "Compiled connected map loads actual scenery, embedded materials and lightmaps in the native viewer"
+    ],
+    "sdkTagsetLoad": "PASS",
+    "engineLogSha256": "d8c63f415811aa2ad8e06c44c946ace1e34771771df1ec4b8ddc0f2196a5fe99",
+    "manualWalkthrough": "NOT_RUN",
+    "retailMccCacheLoad": "NOT_RUN"
+  }
+}

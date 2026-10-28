@@ -1,0 +1,364 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-28T04:48:26.093Z",
+  "platform": "Windows x64",
+  "projectVersion": "0.4.0",
+  "tests": {
+    "rust": 239,
+    "frontend": 90,
+    "offlineScripts": 59,
+    "browser": 17
+  },
+  "restoration": {
+    "files": 67,
+    "unchanged": true,
+    "readonly": true
+  },
+  "artifacts": [
+    {
+      "file": "releases/GuiltySpark-C33-0.4.0-worlds-polish.exe",
+      "sha256": "fdcc8faf6b941510b1d62e6d5113bbf39a342f9b5a1b4d2547ee0b83b9a6521d",
+      "bytes": 22881792
+    },
+    {
+      "file": "releases/Project Guilty Spark_0.4.0_worlds-polish_x64-setup.exe",
+      "sha256": "9a06e477cc4cf818cee791905cf23726df517d15ff53814cd971a7944ca93777",
+      "bytes": 6031745
+    }
+  ],
+  "sourceArchive": {
+    "file": "releases/Project_Guilty_Spark_Continuation_33_Worlds_Polish_SOURCE.zip",
+    "sha256": "See the external .sha256 sidecar and .verification.json receipt; the archive does not hash itself"
+  },
+  "limits": [
+    "SDK tagset loading is separate from retail MCC cache loading",
+    "Manual traversal and scenery collision at both tunnels remain untested",
+    "Donor starts, weapons, vehicles, objectives, scripts and encounters are not transplanted",
+    "Game-peer replication and complete shader/spatial-audio parity remain unsupported or incomplete"
+  ],
+  "scope": "Three-map chaining, performance diagnostics and workflow polish",
+  "case": {
+    "name": "Timberland + Sidewinder + Blood Gulch",
+    "jobId": "03996a76-fd0c-4d2c-a9dc-415ab18e5afe",
+    "projectFingerprint": "6a2bcf8da89c52c9b44dcb2bc6965e4dddf1e2c3f0930a0e4832889d1255ada4",
+    "sourceSha256": "da5237f49c136a8cb9ae4ca3106bebb3e05e4b7c34f416488d9e69c6c61340a7",
+    "donorSourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+    "outputSha256": "695f0ba3aa197d5c4f7add77102acbca992b3fe233d83a8ea3e82c80df702891",
+    "outputBytes": 114735003,
+    "bspSha256": "59bbf76eeb894d6e3cd27b9818cc99d97b240e9bbd926ec2eb02394da7acf901",
+    "jmsSha256": "a625b17b78817c28d0248c65af25bfbb087839003077c592b90e3f40b08df0fe",
+    "geometry": {
+      "donorScenery": 47,
+      "generatedUvFaces": 270,
+      "inputTriangles": 22136,
+      "outputTriangles": 43148,
+      "portalCount": 2,
+      "walkSamples": 440,
+      "warnings": [
+        "This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.",
+        "UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.",
+        "A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances."
+      ]
+    },
+    "scenery": {
+      "base": 210,
+      "donor": 47,
+      "compiled": 257,
+      "models": [
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\rocks\\boulder\\boulder",
+          "vertices": 20,
+          "triangles": 31
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\rocks\\boulder_crouch\\boulder_crouch",
+          "vertices": 49,
+          "triangles": 84
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\rocks\\boulder_doublewide\\boulder_doublewide",
+          "vertices": 56,
+          "triangles": 98
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\rocks\\boulder_large_grey\\boulder_large_grey",
+          "vertices": 32,
+          "triangles": 56
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\plants\\plant fern\\plant fern",
+          "vertices": 49,
+          "triangles": 42
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\plants\\plant_broadleaf_short\\plant_broadleaf_short",
+          "vertices": 490,
+          "triangles": 392
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\shrubs\\shrub_large\\shrub_large",
+          "vertices": 105,
+          "triangles": 63
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\trees\\tree_desert_whitebark\\tree_desert_whitebark",
+          "vertices": 425,
+          "triangles": 451
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\trees\\tree_desert_dead\\tree_desert_dead",
+          "vertices": 317,
+          "triangles": 350
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\teleporter_base\\teleporter_base",
+          "vertices": 346,
+          "triangles": 184
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\small beacon\\small red beacon",
+          "vertices": 286,
+          "triangles": 230
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\small beacon\\small blue beacon",
+          "vertices": 286,
+          "triangles": 230
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\floor_arrow\\floor_arrow",
+          "vertices": 19,
+          "triangles": 19
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\rocks\\a50_rock_large\\a50_rock_large",
+          "vertices": 187,
+          "triangles": 222
+        },
+        {
+          "path": "gsbsp_03996a76_1\\scenery\\flag_base\\flag_base",
+          "vertices": 184,
+          "triangles": 124
+        }
+      ],
+      "modelReferenceChanges": [
+        {
+          "afterReference": "scenery\\rocks\\boulder\\boulder.gbxmodel",
+          "beforeReference": "scenery\\rocks\\boulder\\boulder.model",
+          "preparedTagSha256": "14ce65a6f68da1d7570d0a4e315969fee685b9c2c691388777f514a8fdb296e6",
+          "sourceSha256": "4628d9e21433d417d833d74eef3e49fe2a6af3caa8742c0b5fc2ae06b273680c",
+          "tag": "scenery/rocks/boulder/boulder.scenery"
+        },
+        {
+          "afterReference": "scenery\\rocks\\boulder_crouch\\boulder_crouch.gbxmodel",
+          "beforeReference": "scenery\\rocks\\boulder_crouch\\boulder_crouch.model",
+          "preparedTagSha256": "fdb028299de39dad303ed74d1af3d8ea999315c8dd04a6b14a9588c98b18930a",
+          "sourceSha256": "f4a2259d44cd6bdbe07403010f706e0ad51eb7d917f6b9c449fe8116a8da4a68",
+          "tag": "scenery/rocks/boulder_crouch/boulder_crouch.scenery"
+        },
+        {
+          "afterReference": "scenery\\rocks\\boulder_doublewide\\boulder_doublewide.gbxmodel",
+          "beforeReference": "scenery\\rocks\\boulder_doublewide\\boulder_doublewide.model",
+          "preparedTagSha256": "710ff560f89f513e0c8b57281b0d8f65323c9efd776aa12b83a0ce0fc9678769",
+          "sourceSha256": "b6d113d7952db5057cb2a6c89135acd6f1df344d5952c1e82341c1134ae2e6d2",
+          "tag": "scenery/rocks/boulder_doublewide/boulder_doublewide.scenery"
+        },
+        {
+          "afterReference": "scenery\\rocks\\boulder_large_grey\\boulder_large_grey.gbxmodel",
+          "beforeReference": "scenery\\rocks\\boulder_large_grey\\boulder_large_grey.model",
+          "preparedTagSha256": "ae933ba5fbaa02d1b98b521ee62dd5d5f7ca401aabf73224d1d2a808a31bf2f4",
+          "sourceSha256": "76ef12a54781114718ceb4ea09b173b780deed93874808cb2884e2b5218f335b",
+          "tag": "scenery/rocks/boulder_large_grey/boulder_large_grey.scenery"
+        },
+        {
+          "afterReference": "scenery\\plants\\plant fern\\plant fern.gbxmodel",
+          "beforeReference": "scenery\\plants\\plant fern\\plant fern.model",
+          "preparedTagSha256": "47a7d2ad29f54967b70f12a53c0e0b28983c78f971338da192287858348888ff",
+          "sourceSha256": "33e78fb19228b2eecce1f8a4159325d5d756bec8f5ec5c0845c9dd4db75b5971",
+          "tag": "scenery/plants/plant fern/plant fern.scenery"
+        },
+        {
+          "afterReference": "scenery\\plants\\plant_broadleaf_short\\plant_broadleaf_short.gbxmodel",
+          "beforeReference": "scenery\\plants\\plant_broadleaf_short\\plant_broadleaf_short.model",
+          "preparedTagSha256": "494673ca0139c0a2f5cc64634511266b8230d712f6549ed6424bfb968ee88e18",
+          "sourceSha256": "1a521544100491e3783a5d5302eea06e668d8db41790b3645c1dd51923f96613",
+          "tag": "scenery/plants/plant_broadleaf_short/plant_broadleaf_short.scenery"
+        },
+        {
+          "afterReference": "scenery\\shrubs\\shrub_large\\shrub_large.gbxmodel",
+          "beforeReference": "scenery\\shrubs\\shrub_large\\shrub_large.model",
+          "preparedTagSha256": "11058bc9ca0b8d200fa4a8648d7fca216ddc9f07bccc7256aa1ff4bc36010825",
+          "sourceSha256": "d12b9f37fff6074bfa7150bb69d21163831ea28ee7306b10975d1047f8afad7d",
+          "tag": "scenery/shrubs/shrub_large/shrub_large.scenery"
+        },
+        {
+          "afterReference": "scenery\\trees\\tree_desert_whitebark\\tree_desert_whitebark.gbxmodel",
+          "beforeReference": "scenery\\trees\\tree_desert_whitebark\\tree_desert_whitebark.model",
+          "preparedTagSha256": "2b0f0f7f3e17d69ef9f6e2bdce3cc69649b450d2fde4f0f6707519362f299074",
+          "sourceSha256": "6431747bbc8068095210fae3792d2afffaaa90235b6f7e96863f1af32b71c302",
+          "tag": "scenery/trees/tree_desert_whitebark/tree_desert_whitebark.scenery"
+        },
+        {
+          "afterReference": "scenery\\trees\\tree_desert_dead\\tree_desert_dead.gbxmodel",
+          "beforeReference": "scenery\\trees\\tree_desert_dead\\tree_desert_dead.model",
+          "preparedTagSha256": "6f60f75bfa1afd763ef372f9f8da0d1bca94a9314c47b60d00cacd66f68ff769",
+          "sourceSha256": "00ea0a45b55ebffc4e8636d038ae4fe6d6273a8e2292c28ccf1df8a3f9b07d2c",
+          "tag": "scenery/trees/tree_desert_dead/tree_desert_dead.scenery"
+        },
+        {
+          "afterReference": "scenery\\small beacon\\small beacon.gbxmodel",
+          "beforeReference": "scenery\\small beacon\\small beacon.model",
+          "preparedTagSha256": "a9392a7832a7c0f64ff1880fc9130f91c1a5837524000d5a71e9208dd43c186c",
+          "sourceSha256": "3fd868256b49337f0183371e305fbcefe424bc2af06c8106a726fe9d62e7a189",
+          "tag": "scenery/small beacon/small red beacon.scenery"
+        },
+        {
+          "afterReference": "scenery\\small beacon\\small blue beacon.gbxmodel",
+          "beforeReference": "scenery\\small beacon\\small blue beacon.model",
+          "preparedTagSha256": "786b37fb192998e7a7d6fedd5c205fa64192183812bc423200e6860c532e021c",
+          "sourceSha256": "d41158f6952b5b31549810545f61eb8f479d9972a9a368578133ffd65225ebaf",
+          "tag": "scenery/small beacon/small blue beacon.scenery"
+        },
+        {
+          "afterReference": "scenery\\floor_arrow\\floor_arrow.gbxmodel",
+          "beforeReference": "scenery\\floor_arrow\\floor_arrow.model",
+          "preparedTagSha256": "d7b66b95577f21714f72535e59e0e274f467a94c1503be5f0ed197c3b20733ce",
+          "sourceSha256": "1542f369a022711d5efe70d228bd250c1677b8ac241c758fcf6858650814c5bb",
+          "tag": "scenery/floor_arrow/floor_arrow.scenery"
+        },
+        {
+          "afterReference": "scenery\\rocks\\a50_rock_large\\a50_rock_large.gbxmodel",
+          "beforeReference": "scenery\\rocks\\a50_rock_large\\a50_rock_large.model",
+          "preparedTagSha256": "33a4f9b9152b3245b638ffad5b47a07ac224d249e66243ce24bc01d006bc39ac",
+          "sourceSha256": "747db3c5e50c094d8aad7d462a1d18f957acc7496303626628937485402aa684",
+          "tag": "scenery/rocks/a50_rock_large/a50_rock_large.scenery"
+        },
+        {
+          "afterReference": "scenery\\flag_base\\flag_base.gbxmodel",
+          "beforeReference": "scenery\\flag_base\\flag_base.model",
+          "preparedTagSha256": "28bb64eca51ebbb96e128b2257b5667b5d478a99d8822425c2765d8696929f25",
+          "sourceSha256": "cc6642ccb6915e855a31a34b745310dab00470a0b076b249411a114e39f1ca27",
+          "tag": "scenery/flag_base/flag_base.scenery"
+        }
+      ]
+    },
+    "renderer": {
+      "data-source-shaders": "176",
+      "data-source-lightmaps": "5",
+      "data-source-details": "102",
+      "data-sky-triangles": "190",
+      "data-material-loading": "false",
+      "data-pending-materials": "0"
+    },
+    "nativeChecks": [
+      "Native source preview identifies source-bound Blood Gulch scenery placements",
+      "Moving the donor invalidates the previous clearance result",
+      "Compiled revision inherits its matching editable tags and a clear nonduplicated title",
+      "All compiled Blood Gulch scenery placements resolve real source models",
+      "Compiled connected map loads actual scenery, embedded materials and lightmaps in the native viewer"
+    ],
+    "sdkTagsetLoad": "PASS",
+    "engineLogSha256": "4bd79ced8f6659ddca0f9a156ae71545495985ff78f8086d9963026c33ee23e2",
+    "manualWalkthrough": "NOT_RUN",
+    "retailMccCacheLoad": "NOT_RUN"
+  },
+  "viewportPerformance": {
+    "method": "Three sequential six-second samples on the same native two-map scene and selected transform gizmo; compiler and SDK game idle",
+    "baseline": {
+      "samples": [
+        {
+          "frames": 555,
+          "meanFrameMs": 10.829369369369369,
+          "p95FrameMs": 11,
+          "writes": {
+            "data-gs-gizmo": 555,
+            "data-gs-render-features": 555,
+            "data-gs-camera-pose": 23
+          },
+          "scriptMs": 3333.952,
+          "taskMs": 3425.021,
+          "heapBytes": 49426936
+        },
+        {
+          "frames": 553,
+          "meanFrameMs": 10.845388788340538,
+          "p95FrameMs": 11,
+          "writes": {
+            "data-gs-gizmo": 553,
+            "data-gs-camera-pose": 24,
+            "data-gs-render-features": 553
+          },
+          "scriptMs": 3253.209,
+          "taskMs": 3326.67,
+          "heapBytes": 70437328
+        },
+        {
+          "frames": 553,
+          "meanFrameMs": 10.850090415891646,
+          "p95FrameMs": 11,
+          "writes": {
+            "data-gs-gizmo": 553,
+            "data-gs-render-features": 553,
+            "data-gs-camera-pose": 23
+          },
+          "scriptMs": 3230.6620000000007,
+          "taskMs": 3314.0910000000003,
+          "heapBytes": 48394192
+        }
+      ],
+      "medianScriptMs": 3253.209,
+      "medianFrameMs": 10.845388788340538
+    },
+    "after": {
+      "samples": [
+        {
+          "frames": 554,
+          "meanFrameMs": 10.840613718433069,
+          "p95FrameMs": 11,
+          "writes": {
+            "data-gs-performance": 24,
+            "data-gs-camera-pose": 24
+          },
+          "scriptMs": 3322.489,
+          "taskMs": 3409.816,
+          "heapBytes": 51494252
+        },
+        {
+          "frames": 553,
+          "meanFrameMs": 10.85189873422033,
+          "p95FrameMs": 11,
+          "writes": {
+            "data-gs-performance": 23,
+            "data-gs-camera-pose": 23
+          },
+          "scriptMs": 3194.7060000000006,
+          "taskMs": 3265.889,
+          "heapBytes": 72144500
+        },
+        {
+          "frames": 553,
+          "meanFrameMs": 10.853345388766872,
+          "p95FrameMs": 11,
+          "writes": {
+            "data-gs-performance": 24,
+            "data-gs-camera-pose": 23
+          },
+          "scriptMs": 3204.180999999999,
+          "taskMs": 3286.963,
+          "heapBytes": 44995004
+        }
+      ],
+      "medianScriptMs": 3204.180999999999,
+      "medianFrameMs": 10.85189873422033,
+      "performancePanel": "92 FPS · 10.9 ms/frame\n1,017 draw calls · 266,901 triangles\n377 geometries · 197 textures\nRecent editor samples. Draw counts describe the last GL pass; postprocessing can use more passes."
+    },
+    "interpretation": "About 92 FPS retained; unchanged gizmo/effect diagnostic writes eliminated. The roughly 1.5 percent script-time difference is within local measurement noise, not a claimed CPU/FPS gain.",
+    "overlappingCompilerTrialExcluded": true
+  },
+  "tagStaging": {
+    "durationSeconds": 189.449,
+    "completion": "Prepared 11759/11759 tags · 1783/1783 MiB",
+    "change": "Hash while copying, then verify source and destination; reuse a bounded buffer and report progress",
+    "speedupClaimed": false
+  }
+}

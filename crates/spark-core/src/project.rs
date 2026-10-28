@@ -173,6 +173,15 @@ impl Project {
             source_scene_version:1,
         }
     }
+    /// New compiled revisions use their own exact editable tags. Never replace
+    /// a user's existing per-map tool configuration.
+    pub fn bind_compiled_mcc_tags(&mut self,kit:PathBuf,tags:PathBuf,invader:Option<PathBuf>)->Result<bool> {
+        if !self.build_targets.is_empty() || self.active_build_target.is_some() {return Ok(false);}
+        let id=Uuid::new_v4().to_string();
+        let mut next=self.clone();
+        next.build_targets.push(EngineBuildTarget{id:id.clone(),name:"Compiled MCC revision".into(),runtime_id:crate::runtime::RuntimeId::MccSteam,builder:"h1a-tool".into(),hek_directory:Some(kit),hek_flavor:Some("h1aEk".into()),tags_directory:Some(tags),invader_directory:invader,ce_compatible_tagset:false,open_sauce:false});
+        next.active_build_target=Some(id);next.validate()?;*self=next;Ok(true)
+    }
     pub fn validate(&self) -> Result<()> {
         if let Some(assembly)=&self.bsp_assembly{assembly.validate()?;if self.source.is_none()||self.quick_forge.is_some(){return invalid("A BSP assembly needs a preserved destination map");}}
         if let Some(features)=&self.render_features{features.validate()?;}
@@ -508,4 +517,24 @@ pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Ve
         return invalid("Removing Halo scenario instances requires rebuilding reflexive arrays; this operation is editor-only until that adapter is implemented");
     }
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod compiled_revision_tests {
+    use super::*;
+    #[test]
+    fn compiled_revision_links_its_own_tags_and_matching_kit() {
+        let mut p=Project::new("Synthetic compiled map");
+        assert!(p.bind_compiled_mcc_tags("synthetic/sdk".into(),"synthetic/job/tags".into(),Some("synthetic/invader".into())).unwrap());
+        let t=&p.build_targets[0];assert_eq!(p.active_build_target.as_ref(),Some(&t.id));
+        assert_eq!(t.tags_directory.as_deref(),Some(Path::new("synthetic/job/tags")));
+        assert_eq!(t.hek_flavor.as_deref(),Some("h1aEk"));assert_eq!(t.builder,"h1a-tool");
+    }
+    #[test]
+    fn compiled_tag_binding_preserves_existing_user_tool_choices() {
+        let mut p=Project::new("Synthetic compiled map");p.bind_compiled_mcc_tags("synthetic/sdk".into(),"synthetic/user-tags".into(),None).unwrap();
+        p.build_targets[0].name="My authored tool profile".into();let before=serde_json::to_value(&p).unwrap();
+        assert!(!p.bind_compiled_mcc_tags("other/sdk".into(),"other/tags".into(),None).unwrap());
+        assert_eq!(serde_json::to_value(p).unwrap(),before);
+    }
 }
