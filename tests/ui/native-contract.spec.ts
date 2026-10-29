@@ -320,18 +320,24 @@ async function openFixture(page: Page) {
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
 
-test('C35 drawers return viewport space, remember each workspace and support focus mode',async({page})=>{
+test('C35 drawers remember each workspace and fullscreen preserves editing tools',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await mockDesktop(page);
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  const viewport=page.getByTestId('viewport');await expect(viewport).toBeVisible();
  await expect(page.locator('.gs-navigation-drawer')).toBeHidden();const original=await viewport.boundingBox();
  await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();
  const overlaid=await viewport.boundingBox();expect(overlaid!.width).toBeCloseTo(original!.width,0);
- await page.getByLabel('Inspector position').selectOption('float');await page.getByLabel('Inspector size').fill('430');
+ await page.getByLabel('Inspector drawer options',{exact:true}).click();await page.getByLabel('Inspector position').selectOption('float');await page.getByLabel('Inspector size').fill('430');
+ await page.getByLabel('Inspector drawer options',{exact:true}).click();
  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,"Tag editor");await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,"Level editor");await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.getByLabel('Inspector position')).toHaveValue('float');
- await page.getByRole('button',{name:'Focus mode',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();const focused=await viewport.boundingBox();expect(focused!.height).toBeGreaterThan(original!.height+85);expect(focused!.width).toBeGreaterThan(1200);
- await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Focus mode',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Fullscreen editing',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
+ await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.getByRole('tablist',{name:'Open maps',exact:true})).toBeVisible();await expect(page.locator('.viewport-toolbar')).toBeVisible();await expect(page.locator('.runtime-dock')).toBeVisible();
+ const full=await viewport.boundingBox();expect(full!.height).toBeGreaterThan(original!.height+8);
+ const windowButtons=await page.getByRole('group',{name:'Window controls',exact:true}).boundingBox();expect(windowButtons!.y).toBeLessThanOrEqual(6);
+ await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
+ await page.keyboard.press('Escape');await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','false');await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Close Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();
 });
 
@@ -381,12 +387,46 @@ test('C35 empty Level editor asks for an editing context without assuming an ins
  for(const label of['Open a Halo map','Create a new Halo level','Connect to a running Halo game'])await expect(page.getByRole('button',{name:label,exact:true})).toBeVisible();
 });
 
-test('the top bar is thin by default, collapses from its own edge and has no Window launcher',async({page})=>{
+test('one compact header contains map tabs and lowered reachable window actions',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
- const viewport=page.getByTestId('viewport'),header=page.locator('#gs-window-header');await expect(header).toBeVisible();expect((await header.boundingBox())!.height).toBeLessThanOrEqual(33);await expect(page.getByRole('button',{name:'Window',exact:true})).toHaveCount(0);const before=await viewport.boundingBox();
- await page.getByRole('button',{name:'Collapse top bar',exact:true}).click();await expect(header).toBeHidden();expect((await viewport.boundingBox())!.height).toBeGreaterThan(before!.height+25);await expect(page.getByRole('button',{name:'Show top bar',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Show top bar',exact:true}).click();await expect(header).toBeVisible();expect(await viewport.boundingBox()).toEqual(before);await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);await expect(header.getByRole('button',{name:/Find tools/})).toBeVisible();
- await page.keyboard.press('Control+Shift+Backslash');await expect(header).toBeHidden();await page.keyboard.press('Control+Shift+Backslash');await expect(header).toBeVisible();
+ const header=page.locator('#gs-window-header');await expect(header).toBeVisible();expect((await header.boundingBox())!.height).toBeLessThanOrEqual(40);
+ await expect(header.getByRole('tablist',{name:'Open maps',exact:true})).toBeVisible();await expect(page.locator('.main-content > .map-tab-bar')).toHaveCount(0);
+ for(const label of ['Window','Focus mode','Collapse top bar','Show top bar'])await expect(page.getByRole('button',{name:label,exact:true})).toHaveCount(0);
+ const controls=await page.getByRole('group',{name:'Window controls',exact:true}).boundingBox();const headerBox=await header.boundingBox();expect(Math.abs((controls!.y+controls!.height/2)-(headerBox!.y+headerBox!.height/2))).toBeLessThanOrEqual(1);expect(controls!.height).toBeLessThanOrEqual(28);await page.getByRole('button',{name:'Close window',exact:true}).click({trial:true});
+ await expect(header.getByRole('button',{name:/Find tools/})).toBeVisible();
+});
+
+test('narrow workspaces expose every drawer and Escape closes its options before the drawer',async({page})=>{
+ await page.setViewportSize({width:880,height:720});await mockDesktop(page);
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ const viewport=page.getByTestId('viewport'),before=await viewport.boundingBox();
+ await page.getByLabel('More workspace drawers',{exact:true}).click();
+ await page.getByRole('menuitemcheckbox',{name:'Object tags',exact:true}).click();
+ const drawer=page.getByRole('region',{name:'Object tags panel',exact:true});await expect(drawer).toBeVisible();expect(await viewport.boundingBox()).toEqual(before);
+ await page.getByLabel('Object tags drawer options',{exact:true}).click();await expect(page.getByLabel('Object tags position',{exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(page.getByLabel('Object tags position',{exact:true})).toBeHidden();await expect(drawer).toBeVisible();
+ await page.keyboard.press('Escape');await expect(drawer).toBeHidden();expect(await viewport.boundingBox()).toEqual(before);
+});
+
+test('tag classes expand their matching tags and keep the selected editor when folded',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ const group=page.getByRole('button',{name:/class \(weap\)/});await expect(group).toHaveAttribute('aria-expanded','true');
+ await expect(page.getByLabel('Velocity',{exact:true})).toBeVisible();
+ await group.click();await expect(group).toHaveAttribute('aria-expanded','false');await expect(page.getByLabel('Velocity',{exact:true})).toBeVisible();
+ await group.click();await expect(page.getByRole('group',{name:'Weapon tags',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Collapse all classes',exact:true}).click();await expect(page.locator('.tag-row')).toHaveCount(0);
+ await page.getByLabel('Search tags',{exact:true}).fill('test');await expect(group).toHaveAttribute('aria-expanded','true');await expect(page.locator('.tag-row')).toHaveCount(1);
+ await page.locator('.tag-row').click();await expect(page.getByLabel('Velocity',{exact:true})).toHaveValue('10');
+ await page.getByText('Complete native tag editing',{exact:true}).click();await expect(page.getByRole('button',{name:'Open native tag editor',exact:true})).toBeVisible();
+});
+
+test('switching tags never leaves a duplicate panel from the previous tag',async({page})=>{
+ await mockDesktop(page);await page.evaluate(()=>{const tags=(window as any).__sparkMock.projects.a.inspection.tags,tag=structuredClone(tags[0]);tag.id=501;tag.index=501;tag.path='weapons/alternate';tags.push(tag);});await openFixture(page);
+ await expect(page.locator('.tag-duplicate-panel')).toHaveCount(1);
+ await page.locator('.tag-row').filter({has:page.getByText('alternate',{exact:true})}).click();
+ await expect(page.locator('.tag-duplicate-panel')).toHaveCount(1);await expect(page.getByLabel('Duplicate tag path',{exact:true})).toHaveValue('weapons/alternate_copy');
+ await page.locator('.tag-row').filter({has:page.getByText('test',{exact:true})}).click();
+ await expect(page.locator('.tag-duplicate-panel')).toHaveCount(1);await expect(page.getByLabel('Duplicate tag path',{exact:true})).not.toHaveValue('weapons/alternate_copy');
 });
 
 test('C35 F11 uses native fullscreen and Escape closes navigation before restoring editing',async({page})=>{
@@ -394,7 +434,7 @@ test('C35 F11 uses native fullscreen and Escape closes navigation before restori
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  const viewport=page.getByTestId('viewport');await expect(viewport).toBeVisible();const original=await viewport.boundingBox(),normalStrip=await page.getByRole('navigation',{name:'Workspace panels',exact:true}).boundingBox();
  await page.keyboard.press('F11');await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
- const full=await viewport.boundingBox();expect(full!.width).toBeGreaterThan(1240);expect(full!.height).toBeGreaterThan(650);expect(full!.height).toBeGreaterThan(original!.height);const fullStrip=await page.getByRole('navigation',{name:'Workspace panels',exact:true}).boundingBox();expect(fullStrip!.height).toBeLessThan(normalStrip!.height);expect(fullStrip!.height).toBeLessThanOrEqual(32);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();await expect(page.getByRole('button',{name:'Exit fullscreen',exact:true})).toBeInViewport();
+ const full=await viewport.boundingBox();expect(full!.width).toBeGreaterThan(1240);expect(full!.height).toBeGreaterThan(original!.height);const fullStrip=await page.getByRole('navigation',{name:'Workspace panels',exact:true}).boundingBox();expect(fullStrip!.height).toBeLessThan(normalStrip!.height);expect(fullStrip!.height).toBeLessThanOrEqual(32);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();await expect(page.getByRole('button',{name:'Exit fullscreen',exact:true})).toBeInViewport();await expect(page.getByRole('tablist',{name:'Open maps'})).toBeVisible();await expect(page.locator('.viewport-toolbar')).toBeVisible();await expect(page.locator('.runtime-dock')).toBeVisible();
  await page.mouse.move(100,2);await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
  await page.keyboard.press('Control+Backslash');await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
  await page.keyboard.press('Escape');await expect(page.locator('.gs-navigation-drawer')).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
@@ -428,10 +468,9 @@ test('fullscreen from maximized restores the original mode and keeps mouse windo
  await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
  expect(await page.evaluate(()=>(window as any).__sparkMock.maximized)).toBe(false);
  await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();
- await page.getByRole('button',{name:'Show top bar',exact:true}).click();
+ await expect(page.locator('#gs-window-header')).toBeVisible();
  await expect(page.locator('#gs-window-header')).toBeVisible();
  await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);
- await page.keyboard.press('Escape');await expect(page.locator('#gs-window-header')).toBeHidden();
  await page.getByRole('button',{name:'Exit fullscreen',exact:true}).click();
  await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','false');
  expect(await page.evaluate(()=>(window as any).__sparkMock.maximized)).toBe(true);

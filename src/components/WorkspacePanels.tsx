@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, PanelLeftClose, PanelRightOpen, Scan, X, RotateCcw } from 'lucide-react';
+import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { useMapState } from '../mapSession';
 import { useWindowFullscreen } from '../useWindowFullscreen';
 import { WindowControls } from './WindowFrame';
@@ -16,7 +16,6 @@ interface Descriptor {
 interface ContextValue {
   host: HTMLDivElement | null;
   panels: Record<string, PanelPlacement>;
-  focus: boolean;
   peek: string | null;
   register: (d: Descriptor) => () => void;
   update: (id: string, p: Partial<PanelPlacement>) => void;
@@ -46,18 +45,26 @@ export default function WorkspacePanels({
   }));
   const layout = useMemo(() => cleanLayout(raw), [raw]);
   const { fullscreen, change: changeFullscreen, error: windowError } = useWindowFullscreen();
-  const focus = layout.focus || fullscreen;
   const [peek, setPeek] = useState<string | null>(null);
   const [frameError, setFrameError] = useState('');
-  useEffect(() => setPeek(null), [focus, fullscreen, id, workspace]);
+  const [windowHost,setWindowHost]=useState<HTMLElement|null>(null);
+  useEffect(()=>setWindowHost(document.getElementById('gs-window-actions')),[]);
+  const panelButtons = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  useEffect(() => setPeek(null), [id, workspace]);
   const [descriptors, setDescriptors] = useState<Descriptor[]>([]),
     [host, setHost] = useState<HTMLDivElement | null>(null),
     [counts, setCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const element=panelButtons.current;if(!element)return;
+    const measure=()=>setOverflowing(element.scrollWidth>element.clientWidth+2);
+    measure();const observer=new ResizeObserver(measure);observer.observe(element);
+    return()=>observer.disconnect();
+  },[descriptors]);
   const context = useMemo<ContextValue>(
     () => ({
       host,
       panels: layout.panels,
-      focus,
       peek,
       register: (d) => {
         setDescriptors((previous) => (previous.some((p) => p.id === d.id) ? previous : [...previous, d]));
@@ -71,7 +78,7 @@ export default function WorkspacePanels({
       },
       update: (panel, patch) => {
         if (patch.open === false) setPeek((old) => (old === panel ? null : old));
-        if (patch.open === true && !focus) setPeek(panel);
+        if (patch.open === true) setPeek(panel);
         setRaw((old) => changePanel(cleanLayout(old), panel, patch));
       },
       attention: (panel, count) =>
@@ -81,20 +88,17 @@ export default function WorkspacePanels({
         setRaw((old) => changePanel(cleanLayout(old), panel, { open: true }));
       },
     }),
-    [host, layout, focus, peek, setRaw],
+    [host, layout, peek, setRaw],
   );
-  async function leaveFocus() {
-    if (fullscreen) await changeFullscreen(false);
-    setRaw((old) => ({ ...cleanLayout(old), focus: false }));
-  }
   useEffect(() => {
-    document.documentElement.dataset.gsFocusMode = String(focus);
+    // Retire old saved Focus layouts; fullscreen keeps tabs and editing tools.
+    delete document.documentElement.dataset.gsFocusMode;
     document.documentElement.dataset.gsFullscreen = String(fullscreen);
     return () => {
       delete document.documentElement.dataset.gsFocusMode;
       delete document.documentElement.dataset.gsFullscreen;
     };
-  }, [focus, fullscreen]);
+  }, [fullscreen]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
@@ -103,39 +107,38 @@ export default function WorkspacePanels({
         void changeFullscreen();
       }
       if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) {
+        const menu=document.querySelector<HTMLDetailsElement>('.gs-panel-options[open],.gs-panel-overflow[open],.gs-layout-menu[open]');
+        if(menu){e.preventDefault();menu.open=false;menu.querySelector<HTMLElement>('summary')?.focus();return;}
         const panel =
           peek ??
-          (!focus
-            ? Object.entries(layout.panels)
+          (Object.entries(layout.panels)
                 .filter(([, value]) => value.open)
-                .at(-1)?.[0]
-            : null);
+                .at(-1)?.[0]);
         if (panel) {
           e.preventDefault();
           setPeek(null);
-          if (!focus) setRaw((old) => changePanel(cleanLayout(old), panel, { open: false }));
+          setRaw((old) => changePanel(cleanLayout(old), panel, { open: false }));
           const label = descriptors.find((value) => value.id === panel)?.label;
           Array.from(document.querySelectorAll<HTMLButtonElement>('.gs-panel-buttons button'))
             .find((button) => button.getAttribute('aria-label') === `Toggle ${label}`)
             ?.focus();
-        } else if (focus) {
+        } else if (fullscreen) {
           e.preventDefault();
-          void leaveFocus();
+          void changeFullscreen(false);
         }
       }
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [focus, fullscreen, peek, changeFullscreen, setRaw, layout.panels, descriptors]);
+  }, [fullscreen, peek, changeFullscreen, setRaw, layout.panels, descriptors]);
   const padding = { left: 0, right: 0, bottom: 0 };
-  if (!focus)
     for (const placement of Object.values(layout.panels))
       if (placement.open && placement.pinned && placement.dock !== 'float')
         padding[placement.dock] =
           placement.dock === 'bottom' ? Math.min(placement.height, 360) : Math.min(placement.width, 440);
   return (
     <Context.Provider value={context}>
-      <div className="gs-workspace-shell" data-focus={focus} data-fullscreen={fullscreen}>
+      <div className="gs-workspace-shell" data-fullscreen={fullscreen}>
         <nav className="gs-workspace-tools" aria-label="Workspace panels">
           <button
             className="gs-navigation-toggle"
@@ -156,26 +159,26 @@ export default function WorkspacePanels({
             {fullscreen ? 'Exit fullscreen · F11' : 'Fullscreen · F11'}
           </button>
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
-          <div className="gs-panel-buttons">
+          <div className="gs-panel-buttons" ref={panelButtons}>
             {descriptors.map((panel) => (
               <button
                 key={panel.id}
                 type="button"
                 aria-label={`Toggle ${panel.label}`}
-                aria-expanded={(!focus || peek === panel.id) && !!layout.panels[panel.id]?.open}
+                aria-expanded={!!layout.panels[panel.id]?.open}
                 onClick={() => {
-                  if (focus) {
-                    setPeek((old) => (old === panel.id ? null : panel.id));
-                    context.update(panel.id, { open: true });
-                  } else context.update(panel.id, { open: !layout.panels[panel.id]?.open });
+                  context.update(panel.id, { open: !layout.panels[panel.id]?.open });
                 }}
               >
-                <PanelRightOpen size={13} />
                 {panel.label}
                 {counts[panel.id] > 0 && <span className="gs-panel-count">{counts[panel.id]}</span>}
               </button>
             ))}
           </div>
+          {overflowing&&<details className="gs-panel-overflow">
+            <summary aria-label="More workspace drawers" title="All workspace drawers">More</summary>
+            <div role="menu" aria-label="Workspace drawers">{descriptors.map(panel=><button key={panel.id} role="menuitemcheckbox" aria-checked={!!layout.panels[panel.id]?.open} onClick={event=>{context.reveal(panel.id);event.currentTarget.closest('details')?.removeAttribute('open');}}>{panel.label}</button>)}</div>
+          </details>}
           <div className="gs-layout-actions">
             {actions}
             <details className="gs-layout-menu">
@@ -188,7 +191,6 @@ export default function WorkspacePanels({
                       checked={!!layout.panels[panel.id]?.open}
                       onChange={(e) => {
                         context.update(panel.id, { open: e.target.checked });
-                        if (focus) setPeek(e.target.checked ? panel.id : null);
                       }}
                     />
                     {panel.label}
@@ -205,22 +207,12 @@ export default function WorkspacePanels({
                 </button>
               </div>
             </details>
-            <button
-              type="button"
-              aria-pressed={focus}
-              onClick={() =>
-                focus ? void leaveFocus() : setRaw((old) => ({ ...cleanLayout(old), focus: true }))
-              }
-            >
-              <Scan size={13} />
-              {focus ? 'Exit focus · Esc' : 'Focus mode'}
-            </button>
           </div>
-          <WindowControls
+          {windowHost&&createPortal(<WindowControls
             notify={setFrameError}
             fullscreen={fullscreen}
             onExitFullscreen={() => changeFullscreen(false)}
-          />
+          />,windowHost)}
         </nav>
         <div
           className="gs-workspace-content"
@@ -291,8 +283,9 @@ export function WorkspacePanel({
             context.update(id, { width, height });
         }
       }}
-      hidden={(context.focus && context.peek !== id) || !placement.open}
+      hidden={!placement.open}
       className="gs-workspace-panel"
+      data-panel-id={id}
       data-dock={placement.dock}
       style={styles}
       aria-label={`${label} panel`}
@@ -326,10 +319,8 @@ export function WorkspacePanel({
           <PanelLeftClose size={15} />
           {label}
         </span>
-        <button aria-label={`Close ${label}`} onClick={() => context.update(id, { open: false })}>
-          <X size={15} />
-        </button>
-      </header>
+        <details className="gs-panel-options">
+          <summary aria-label={`${label} drawer options`} title="Drawer position, size and pinning"><SlidersHorizontal size={14}/></summary>
       <div className="gs-panel-placement">
         <select
           aria-label={`${label} position`}
@@ -365,6 +356,11 @@ export function WorkspacePanel({
           />
         </label>
       </div>
+        </details>
+        <button aria-label={`Close ${label}`} onClick={() => context.update(id, { open: false })}>
+          <X size={15} />
+        </button>
+      </header>
       <div className="gs-panel-content">{children}</div>
     </section>,
     context.host,

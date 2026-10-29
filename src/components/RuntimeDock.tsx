@@ -177,6 +177,7 @@ export default function RuntimeDock({
     writeMapSession(id, 'hosting.tab', tab);
     onNavigate('runtimes');
   }
+  useEffect(()=>{const request=(event:Event)=>{const detail=(event as CustomEvent<{projectId:string;actionId:string}>).detail;if(detail?.projectId!==project?.id||detail.actionId!=='editTags')return;setDetails(true);if(working||busy){setError('Wait for the active operation before preparing a native editor.');return;}const action=report?.actions.find(action=>action.id==='editTags');if(action)void act(action);};window.addEventListener('guilty-spark-runtime-tool',request);return()=>window.removeEventListener('guilty-spark-runtime-tool',request);},[project?.id,report,dirty,working,busy]);
   async function act(action: RuntimeDockAction) {
     setError('');
     setNotice('');

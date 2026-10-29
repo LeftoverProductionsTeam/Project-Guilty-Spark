@@ -209,12 +209,9 @@ try {
   const topBar = page.locator('#gs-window-header');
   await expect(topBar).toBeVisible();
   const topHeight = (await topBar.boundingBox()).height;
-  expect(topHeight).toBeLessThanOrEqual(33);
-  await page.getByRole('button', { name: 'Collapse top bar', exact: true }).click();
-  await expect(topBar).toBeHidden();
-  await page.getByRole('button', { name: 'Show top bar', exact: true }).click();
-  await expect(topBar).toBeVisible();
-  receipt.checks.topBar = { height: topHeight, noWindowLauncher: true, collapseAndReveal: true };
+  expect(topHeight).toBeLessThanOrEqual(40);
+  await expect(topBar.getByRole('tablist',{name:'Open maps',exact:true})).toBeVisible();
+  receipt.checks.topBar = { height: topHeight, noWindowLauncher: true, combinedMapTabs: true };
   const ambience = await call('inspect_map_ambience', { projectId: ambient.project.id });
   await fs.writeFile(path.join(output, 'native-ambience-tree.json'), JSON.stringify(ambience));
   const bsp = ambience.bsps[0];

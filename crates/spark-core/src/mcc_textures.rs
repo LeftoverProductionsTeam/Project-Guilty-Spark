@@ -136,8 +136,20 @@ pub fn pin(directory: &Path, name: &str) -> Result<BTreeMap<String, String>> {
     {
         return invalid("Matching MCC imeta and texture packs were not found");
     }
+    // Some classic shaders still reference Xbox-era images absent from imeta.
+    // Those exact original image spans live in MCC's own shared bitmap map.
+    if let Some(shared) = shared_bitmaps_path(directory) {
+        if shared.is_file() {
+            crate::reject_links(&shared)?;
+            if fs::metadata(&shared)?.len() > 2 * 1024 * 1024 * 1024 { return invalid("MCC shared bitmaps exceed 2 GiB"); }
+            hashes.insert("mcc-shared-bitmaps.map".into(),maps::hash_file(&shared)?);
+        }
+    }
     hashes.insert("mcc-textures".into(), bundle_id(&hashes)?);
     Ok(hashes)
+}
+pub(crate) fn shared_bitmaps_path(directory: &Path) -> Option<PathBuf> {
+    Some(directory.parent()?.parent()?.join("maps/bitmaps.map"))
 }
 #[derive(Clone)]
 struct Chunk {
@@ -327,6 +339,11 @@ pub struct TopMip {
     pub pixels: Vec<u8>,
 }
 impl TextureBundle {
+    pub fn contains_key(&self, key: &str) -> Result<bool> {
+        match self.entries.iter().filter(|e|e.name==key).count() {
+            0 => Ok(false), 1 => Ok(true), _ => invalid("Ambiguous duplicate MCC texture key"),
+        }
+    }
     pub fn open(directory: &Path, hashes: &BTreeMap<String, String>, name: &str) -> Result<Self> {
         let name = map_name(name)?;
         let sha = bundle_id(hashes)?;

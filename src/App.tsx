@@ -12,8 +12,6 @@ import {
   Heart,
   Box,
   ChevronRight,
-  ChevronUp,
-  ChevronDown,
   CircleHelp,
   FileCode2,
   FolderOpen,
@@ -148,26 +146,11 @@ export default function App() {
   const inspection=activeMap?.inspection??null,meshes=activeMap?.meshes??{};
   const [workspace, setWorkspace] = useState<Workspace>(firstVisitWorkspace);
   const[sidebarOpen,setSidebarOpen]=useMapState('global','chrome.sidebar',false);
-  const[headerOpen,setHeaderOpen]=useMapState('global','chrome.compact-header',true);
-  const[headerPeek,setHeaderPeek]=useState(false);
-  const toggleNavigation=()=>{setHeaderPeek(false);setSidebarOpen(open=>!open);};
-  const collapseHeader=()=>{setHeaderOpen(false);setHeaderPeek(false);};
-  const showHeader=()=>{if(document.documentElement.dataset.gsFocusMode==='true')setHeaderPeek(true);else setHeaderOpen(true);};
-  useEffect(()=>{
-    if(!sidebarOpen&&!headerPeek)return;
-    const dismiss=(event:globalThis.PointerEvent)=>{
-      const target=event.target as HTMLElement;
-      if(target.closest('#gs-workspace-navigation,#gs-window-header,.gs-navigation-toggle,.gs-header-reveal'))return;
-      setSidebarOpen(false);setHeaderPeek(false);
-    };
-    document.addEventListener('pointerdown',dismiss,true);
-    return()=>document.removeEventListener('pointerdown',dismiss,true);
-  },[sidebarOpen,headerPeek,setSidebarOpen]);
-  useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='F11')setHeaderPeek(false);if(event.key==='Escape'&&(sidebarOpen||headerPeek)&&!document.querySelector('[role="dialog"]')){event.preventDefault();event.stopImmediatePropagation();if(sidebarOpen){setSidebarOpen(false);document.querySelector<HTMLButtonElement>('.gs-navigation-toggle')?.focus();}else{setHeaderPeek(false);document.querySelector<HTMLButtonElement>('.gs-header-reveal')?.focus();}}else if((event.ctrlKey||event.metaKey)&&event.code==='Backslash'&&!event.altKey){event.preventDefault();event.stopImmediatePropagation();if(event.shiftKey){setSidebarOpen(false);if(document.documentElement.dataset.gsFocusMode==='true')setHeaderPeek(open=>!open);else setHeaderOpen(open=>!open);}else{setHeaderPeek(false);setSidebarOpen(open=>!open);}}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[sidebarOpen,headerPeek,setSidebarOpen,setHeaderOpen]);
+  const toggleNavigation=()=>setSidebarOpen(open=>!open);
+  useEffect(()=>{if(!sidebarOpen)return;const dismiss=(event:globalThis.PointerEvent)=>{if((event.target as HTMLElement).closest('#gs-workspace-navigation,.gs-navigation-toggle'))return;setSidebarOpen(false);};document.addEventListener('pointerdown',dismiss,true);return()=>document.removeEventListener('pointerdown',dismiss,true);},[sidebarOpen,setSidebarOpen]);
+  useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape'&&sidebarOpen&&!document.querySelector('[role="dialog"]')){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(false);document.querySelector<HTMLButtonElement>('.gs-navigation-toggle')?.focus();}else if((event.ctrlKey||event.metaKey)&&event.code==='Backslash'&&!event.altKey&&!event.shiftKey){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(open=>!open);}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[sidebarOpen,setSidebarOpen]);
   const [settingsTab,setSettingsTab]=useState<'tools'|'dependencies'>('tools');
   const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
-  const headerWorkspace=useRef(workspace);
-  useEffect(()=>{if(headerWorkspace.current!==workspace){headerWorkspace.current=workspace;setHeaderPeek(false);}},[workspace]);
   const bootRouteHandled=useRef(false);
   useEffect(()=>{if(!ready||bootRouteHandled.current)return;bootRouteHandled.current=true;if(data.settings.onboardingCompleted){markFirstVisitSeen();if(workspace==='get-started')setWorkspace('library');}},[ready,data.settings.onboardingCompleted]);
   const [focusTagId, setFocusTagId] = useMapState<number | null>(activeMap?.id??'no-map','tags.focus',null);
@@ -391,7 +374,7 @@ export default function App() {
       if(native)await call('claim_project_document',{id:open.project.id});
       dispatchDocument({type:'open',open});
       if(native&&open.project.source){const version=open.project.source.cacheVersion;
-        const command=[6,7,609].includes(version)&&!open.project.source.resourceSha256?.['bitmaps.map']?'auto_connect_classic_textures':version===13&&!open.project.source.resourceSha256?.['mcc-textures']?'connect_mcc_texture_resources':null;
+        const command=[6,7,609].includes(version)&&!open.project.source.resourceSha256?.['bitmaps.map']?'auto_connect_classic_textures':version===13&&(!open.project.source.resourceSha256?.['mcc-textures']||!open.project.source.resourceSha256?.['mcc-shared-bitmaps.map'])?'connect_mcc_texture_resources':null;
         if(command)void call<OpenProject|null>(command,{projectId:open.project.id}).then(result=>{if(result)dispatchDocument({type:'resources',project:result.project});}).catch(e=>{if(version===13)notice('MCC texture resources: '+String(e),'error');});
       }
       if (open.inspection) {
@@ -842,6 +825,7 @@ export default function App() {
       case 'tags':
         return (
           <Tags key={current.id} project={current} inspection={inspection} entries={data.entries}
+            onNativeEditor={()=>window.dispatchEvent(new CustomEvent('guilty-spark-runtime-tool',{detail:{projectId:current.id,actionId:'editTags'}}))}
             onSelectMap={(id) => { void openProject(id, 'tags'); }} edit={edit} notify={notice}
             focusTagId={focusTagId} onFocusHandled={()=>setFocusTagId(null)}
             onResources={()=>void action(async()=>{const id=current.id;await save();const open=await call<OpenProject|null>('choose_project_resources',{projectId:id});if(open)await applyResourceMetadata(open);return open;},'Map resources connected; sound samples are verified when opened.')}
@@ -907,9 +891,8 @@ export default function App() {
   return (
     <>
       <div className="gs-window-content">
-      <div className="application gs-drawers" data-header-open={headerOpen} inert={closing || undefined}>
-        <button className="gs-header-reveal" data-collapsed={!headerOpen} aria-label="Show top bar" title="Show top bar (Ctrl+Shift+\\)" onClick={showHeader}><ChevronDown size={12}/></button>
-        <header id="gs-window-header" className="app-header gs-compact-header" data-peek={headerPeek} hidden={!headerOpen&&!headerPeek} onPointerDown={event=>void dragWindow(event).catch(e=>notice(String(e),'error'))}
+      <div className="application gs-drawers" inert={closing || undefined}>
+        <header id="gs-window-header" className="app-header gs-compact-header" onPointerDown={event=>void dragWindow(event).catch(e=>notice(String(e),'error'))}
           onDoubleClick={event=>{if(!(event.target as HTMLElement).closest('button,a,input,select'))void maximizeWindow().catch(e=>notice(String(e),'error'));}}
           style={ownedHeaderArt && matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection)
           ? { backgroundImage: `linear-gradient(90deg,rgba(7,17,26,.96) 0%,rgba(9,24,35,.9) 44%,rgba(8,22,33,.58) 100%),url("${ownedHeaderArt.url}")`,backgroundSize:'cover',backgroundPosition:'center' }
@@ -922,7 +905,7 @@ export default function App() {
             </div>
             <Pill>0.4.0 · C35 dev</Pill>
           </button>
-          <div className="header-context">
+          {documents.documents.length?<MapTabs state={documents} disabled={busy||closing} onSelect={selectMap} onClose={id=>void closeMap(id)} onWindow={id=>void closeMap(id,true)} onAssets={()=>setAssetTransferOpen(v=>!v)}/>:<div className="header-context">
             <span>LOCAL WORKBENCH</span>
             <ChevronRight size={12} />
             <strong>{current?.title ?? nav.find(item=>item.id===workspace)?.label ?? 'Guilty Spark'}</strong>
@@ -932,7 +915,7 @@ export default function App() {
                 title={history.dirty ? 'Unsaved changes' : 'Saved'}
               />
             )}
-          </div>
+          </div>}
           <div className="header-actions">
             <Pill tone={data.installation.mccPath ? 'green' : 'muted'}>
               <span className="live-dot" />
@@ -943,7 +926,7 @@ export default function App() {
               <CircleHelp size={18} />
             </IconButton>
           </div>
-          <IconButton label="Collapse top bar" onClick={collapseHeader}><ChevronUp size={17}/></IconButton>
+          <div id="gs-window-actions" className="gs-window-actions" />
         </header>
         <aside id="gs-workspace-navigation" className="sidebar gs-navigation-drawer" aria-label="Workspace navigation" hidden={!sidebarOpen} onClickCapture={e=>{if((e.target as HTMLElement).closest('.nav-item'))setSidebarOpen(false);}}>
           <div className="sidebar-label">WORKSPACES</div>
@@ -1031,7 +1014,6 @@ export default function App() {
           </div>
         </aside>
         <main className={`main-content workspace-${workspace}`}>
-          <MapTabs state={documents} disabled={busy||closing} onSelect={selectMap} onClose={id=>void closeMap(id)} onWindow={id=>void closeMap(id,true)} onAssets={()=>setAssetTransferOpen(v=>!v)}/>
           <EditorAudioProvider project={current} inspection={inspection} active={!closing&&['world','quickforge','live','tags','assets','scenario','creator','firefight','build','preservation'].includes(workspace)} resourceScope={JSON.stringify(documents.documents.map(document=>[document.id,document.history.current?.source?.resourceSha256]))}>
           <WorkspacePanels onNavigationToggle={toggleNavigation} navigationOpen={sidebarOpen} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace} actions={<>{current&&<EditorSoundControls projectId={current.id}/>}<IconButton label="Undo (Ctrl+Z)" onClick={()=>applyHistory('undo')} disabled={!history.past.length}><Undo2 size={14}/></IconButton><IconButton label="Redo (Ctrl+Y / Ctrl+Shift+Z)" onClick={()=>applyHistory('redo')} disabled={!history.future.length}><Redo2 size={14}/></IconButton></>}>
           {current&&<WorkspacePanel id="project-setup" label="Project setup"><MapTools key={current.id} project={current} settings={data.settings} edit={edit}/></WorkspacePanel>}

@@ -69,7 +69,7 @@ export default function LevelEditorWorkspace({
             : creating || project?.quickForge
               ? 'QuickForge source'
               : project?.source
-                ? 'Source map'
+                ? `Source map · ${inspection?.header.engine??'Halo'}`
                 : 'New map'}
         </span>
         <label>

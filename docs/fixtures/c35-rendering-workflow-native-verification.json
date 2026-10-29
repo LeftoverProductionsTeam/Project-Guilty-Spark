@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "kind": "C35-r11-native-editor-rendering-and-workflow",
+  "baselineCommit": "5bbbcd7e925b7f67d6d6fced3ebec86de739ab1b",
+  "appSha256": "9e9aeb2cb1ff06d7a33eaff28270c7bafeb549121e4e66804d55c733412db245",
+  "validation": {
+    "rustPassed": 464,
+    "rustOptInIgnored": 5,
+    "frontendPassed": 206,
+    "frontendFiles": 43,
+    "browserPassed": 75,
+    "offlinePassed": 59,
+    "typescript": true,
+    "vite": true,
+    "releaseBuild": true,
+    "nsisBuild": true
+  },
+  "maps": [
+    {
+      "source": "Original Zombie Apocalypse Demo Blood Gulch",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceDecals": 8,
+      "assignedSourceShaders": 132,
+      "assignedLightmaps": 15,
+      "assignedDetails": 59,
+      "pendingMaterials": 0,
+      "materials": [
+        {
+          "tagId": 3793485992,
+          "class": "scex",
+          "path": "scenery\\teleporter_shield\\shaders\\teleporter_shield",
+          "kind": "chicago",
+          "layers": 4,
+          "registerStages": 0,
+          "assignedToViewport": true
+        },
+        {
+          "tagId": 3913942998,
+          "class": "schi",
+          "path": "levels\\test\\bloodgulch\\shaders\\cap_moss01b",
+          "kind": "chicago",
+          "layers": 1,
+          "registerStages": 0,
+          "assignedToViewport": true
+        }
+      ],
+      "previewImages": [
+        {
+          "id": 3867149580,
+          "ok": true,
+          "error": null
+        },
+        {
+          "id": 3866952969,
+          "ok": true,
+          "error": null
+        },
+        {
+          "id": 3793551529,
+          "ok": true,
+          "error": null
+        },
+        {
+          "id": 3793617066,
+          "ok": true,
+          "error": null
+        },
+        {
+          "id": 3915843571,
+          "ok": true,
+          "error": null
+        }
+      ],
+      "closeupRunPassed": true,
+      "sourceUnchanged": true
+    },
+    {
+      "source": "MCC Blood Gulch v13",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceDecals": 8,
+      "assignedSourceShaders": 151,
+      "assignedLightmaps": 15,
+      "assignedDetails": 83,
+      "pendingMaterials": 0,
+      "materials": [
+        {
+          "tagId": 3788570717,
+          "class": "sotr",
+          "path": "scenery\\teleporter_shield\\shaders\\teleporter_shield",
+          "kind": "generic",
+          "layers": 4,
+          "registerStages": 7,
+          "assignedToViewport": true
+        },
+        {
+          "tagId": 3940616555,
+          "class": "sotr",
+          "path": "levels\\test\\bloodgulch\\shaders\\cap_moss01b",
+          "kind": "generic",
+          "layers": 1,
+          "registerStages": 0,
+          "assignedToViewport": true
+        }
+      ],
+      "previewImages": [
+        {
+          "id": 3886220847,
+          "ok": true,
+          "error": null
+        },
+        {
+          "id": 3885827625,
+          "ok": true,
+          "error": null
+        },
+        {
+          "id": 3788636254,
+          "ok": true,
+          "error": null
+        },
+        {
+          "id": 3788701791,
+          "ok": true,
+          "error": null
+        },
+        {
+          "id": 3788767328,
+          "ok": true,
+          "error": null
+        },
+        {
+          "id": 3940682092,
+          "ok": true,
+          "error": null
+        }
+      ],
+      "closeupRunPassed": true,
+      "sourceUnchanged": true
+    }
+  ],
+  "window": {
+    "headerBounds": {
+      "normal": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 40
+      },
+      "fullscreen": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 34
+      }
+    },
+    "controls": {
+      "normal": {
+        "x": 1818,
+        "y": 5.5,
+        "width": 96,
+        "height": 28
+      },
+      "combinedHeader": {
+        "x": 1818,
+        "y": 5.5,
+        "width": 96,
+        "height": 28
+      },
+      "fullscreen": {
+        "x": 1818,
+        "y": 3.5,
+        "width": 96,
+        "height": 26
+      }
+    },
+    "controlAlignmentTolerancePixels": 1,
+    "oneWindowCloseControl": true,
+    "closePointerTargetTrialPassed": true,
+    "oneFullscreenMode": true,
+    "openMapTabsVisibleInFullscreen": true,
+    "maximizeFullscreenRestore": true
+  },
+  "tags": {
+    "classes": 59,
+    "weaponTags": 20,
+    "editableFields": 7,
+    "oneDuplicatePanelAfterChangingTag": true,
+    "fieldsFirst": true,
+    "objectTagDrawerFitsContent": true,
+    "arbitraryFieldSchemasComplete": false
+  },
+  "viewportAndAudio": {
+    "mode": "R11 WebView2 OfflineAudioContext with native source bytes",
+    "inputs": [
+      {
+        "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102"
+      },
+      {
+        "sha256": "893ed257ae92bbd000406cebeba403d5adb258a558e45df47a6368227be0c46c"
+      },
+      {
+        "sha256": "e6e2ffff238bcb7509e2c0574fde52e4d4c291e1ac4e9d21fc7228de1a5fddad"
+      }
+    ],
+    "inputsUnchanged": true,
+    "customImport": {
+      "soundSha256": "a95f7cc55905a62859be0bf24535227e43c501b2ed25e5ae11725d3ab00fb094",
+      "modelSha256": "a5ef04f55cfb16ec7d18c6e0d264b2237d9e09a529cb69e0174e594f8025eec8",
+      "channels": 1,
+      "sampleRate": 48000,
+      "durationSeconds": 1
+    },
+    "sourceModelGeometry": {
+      "objectTagId": 3834446617,
+      "modelTagId": 3834512154,
+      "triangles": 787
+    },
+    "viewportEditing": {
+      "crossMapPointerDrop": true,
+      "sourceTagId": 3834446617,
+      "sourceSha256": "893ed257ae92bbd000406cebeba403d5adb258a558e45df47a6368227be0c46c",
+      "modelPreviewSaved": true,
+      "tagSourceUndoRedo": true,
+      "tagDrawerHideReopen": true,
+      "viewportUnchanged": true,
+      "audioContinuesThroughDrawers": null
+    },
+    "authoredSample": {
+      "kind": "native-preview-bytes-WebView2-OfflineAudioContext",
+      "tagId": 3964406488,
+      "loopTagId": 3964472025,
+      "sampleSha256": "2eea80445d243392abffa977a85dddf0dc08db8fa4fef6c6a1e45c6d7a895676",
+      "channels": 2,
+      "duration": 1.320625,
+      "rms": 0.00029680629465371044
+    },
+    "customGainAndMute": {
+      "kind": "imported-native-bytes-WebView2-OfflineAudioContext",
+      "loudRms": 0.056564300410287774,
+      "quietRms": 0.014141075102571943,
+      "ratio": 0.25,
+      "muteRms": 0
+    },
+    "muteAndVolumeReachable": true,
+    "nativeFocus": false,
+    "focusedPlaybackAcceptedForR11": false
+  },
+  "supplementalFocusedR10Audio": {
+    "appSha256": "26f32b45b6b70c502c1ee8114c814c3bd6272fcd135527e5c1fe7ae7f29a1016",
+    "scope": "Separate focused native R10 run; frozen original R10 receipt is unchanged",
+    "nativeFocus": true,
+    "authoredAmbience": {
+      "mapSha256": "e6e2ffff238bcb7509e2c0574fde52e4d4c291e1ac4e9d21fc7228de1a5fddad",
+      "bsp": "levels\\spark\\assembly_933b2da5\\connected",
+      "clusters": 11,
+      "partitionNodes": 35657,
+      "partitionLeaves": 17885,
+      "assignedBackgrounds": 2,
+      "voices": 1,
+      "rms": 0.0003
+    },
+    "actualMix": {
+      "loudRms": 0.057,
+      "quietRms": 0.0184,
+      "ratio": 0.32280701754385965,
+      "muteRms": 0,
+      "voices": 1
+    },
+    "audioContinuesThroughDrawers": true,
+    "inputsUnchanged": true,
+    "physicalListeningAccepted": false
+  },
+  "errors": [],
+  "sourceFilesUnchanged": true,
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "limitations": [
+    "Complete game shader, lighting, object-function and audio/acoustic parity remain unaccepted.",
+    "Direct Spark editing covers audited typed fields; complete arbitrary-field schemas require compatible source tags and native tools.",
+    "R11 audio decoding and gains were rendered offline; focused playback evidence belongs only to the separately identified R10 executable.",
+    "No game loading, new gameplay, peer replication or physical audio-device listening acceptance is implied.",
+    "Screenshots, texture bytes, source geometry and private absolute paths are excluded."
+  ]
+}

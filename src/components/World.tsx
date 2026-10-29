@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import type { MapInspection, MeshData, Project, SceneObject, Vec3,ShaderPreview } from '../types';
 import {createHaloMaterial,extraTextureKey,updateHaloMaterial} from '../haloMaterial';
+import {renderIndices} from '../haloGeometry';
 import {configureSourceTexture} from '../sourceTexture';
 import {playerStartCamera} from '../sourceCamera';
 import {sourceSpartan} from '../sourceSpartan';
@@ -103,7 +104,7 @@ function planWorldMaterialPreviews(inspection:MapInspection,_mesh:MeshData|null|
     const enhanced=renderFeatures(features);
     if(tag.class==='senv'&&(tag.shaderPreview?.alphaTest||(enhanced.enabled&&enhanced.normalMaps)))roles['Bump map']='normalMap';
     if(tag.class==='soso'&&enhanced.enabled&&(enhanced.specular||enhanced.selfIllumination))roles['Multipurpose map']='multipurpose';
-    for(const ref of tag.references){const role=roles[ref.label]??(/^Chicago layer [1-3]$/.test(ref.label)?`layer${ref.label.at(-1)}`:null);if(!role)continue;
+    for(const ref of tag.references){const role=roles[ref.label]??(/^(?:Chicago|Transparent) layer [1-3]$/.test(ref.label)?`layer${ref.label.at(-1)}`:null);if(!role)continue;
       const key=extraTextureKey(tag.id,role),bitmap=inspection.tags.find(t=>t.id===ref.targetId);
       if(!extras.has(key)&&bitmap?.class==='bitm'&&!bitmap.external)detailTasks.push({kind:'detail',shaderTagId:tag.id,bitmapTagId:bitmap.id,imageIndex:0,role,key});
     }
@@ -187,7 +188,7 @@ export function Mesh({
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
-    g.setIndex(data.indices);
+    g.setIndex(renderIndices(data));
     if (data.normals?.length === data.positions.length) {
       g.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
     } else {
@@ -1133,7 +1134,7 @@ export default function World({
     return () => window.removeEventListener('keydown', key);
   }, [fly,project.id]);
   return (
-    <div className="world-layout" data-source-shaders={Object.keys(shaderTextures).length} data-source-lightmaps={Object.keys(lightmapTextures).length}
+    <div className="world-layout" data-source-shaders={Object.keys(shaderTextures).length} data-source-shader-ids={Object.keys(shaderTextures).join(',')} data-source-lightmaps={Object.keys(lightmapTextures).length}
       data-source-details={Object.keys(extraTextures).length} data-sky-triangles={(sourceAppearance?.skyMesh?.indices.length??0)/3}
       data-material-loading={!!autoPreviewProgress?.active}
       data-pending-materials={ownedPreviewPlan?[...ownedPreviewPlan.shaderTasks,...ownedPreviewPlan.lightmapTasks,...ownedPreviewPlan.detailTasks].filter(t=>!automaticAttempts.current.has(t.key)).length:0}>
@@ -1512,7 +1513,7 @@ export default function World({
                         <small title="The cache reader validates each primary bitmap datum against the original source tag table. You can still manually preview a texture for unsupported shaders.">
                           {tag?.primaryBitmapStatus==='resolved' && bitmapTag ? `Primary bitmap: ${bitmapTag.path}` :
                             tag?.primaryBitmapStatus ? `Primary bitmap: ${tag.primaryBitmapStatus} (manual preview only)` :
-                            tag&&!['senv','soso'].includes(tag.class)?`Automatic ${tag.class} shader blending is unsupported; use a local exported image`:
+                            tag&&!tag.shaderPreview?`Automatic ${tag.class} shader blending is unsupported; use a local exported image`:
                             'Primary bitmap: legacy/unverified (filename matching is not authoritative)'}
                         </small></span>
                     </button>

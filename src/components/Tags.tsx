@@ -1,6 +1,6 @@
 import TagFields from './TagFields';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownToLine, ArrowRight, FileCode2, GitBranch, RotateCcw, Search, Sparkles } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, ChevronRight, FileCode2, GitBranch, RotateCcw, Search, Sparkles } from 'lucide-react';
 import type { LibraryEntry, MapInspection, Project, Tag, TagField } from '../types';
 import {
   classNames,
@@ -30,6 +30,7 @@ export default function Tags({
   onFocusHandled,
   onAssignSound,
   onResources,
+  onNativeEditor,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -41,13 +42,14 @@ export default function Tags({
   onFocusHandled?:()=>void;
   onAssignSound?: (cue: CueName, ref: LocalCueReference) => void;
   onResources?:()=>void;
+  onNativeEditor?:()=>void;
 }) {
   const [query, setQuery] = useMapState(project.id,'tags.query','');
   const [filter, setFilter] = useMapState(project.id,'tags.filter','all');
   const [selected, setSelected] = useMapState<number | null>(project.id,'tags.selection',
     inspection?.tags.find((t) => t.class === 'weap')?.id ?? inspection?.tags[0]?.id ?? null,
   );
-  const [limit, setLimit] = useMapState(project.id,'tags.limit',300);
+  const [expanded, setExpanded] = useMapState<Record<string,boolean>>(project.id,'tags.classes',{});
   const [advanced, setAdvanced] = useMapState(project.id,'tags.advanced',false);
   const [extractingTag,setExtractingTag] = useState<number|null>(null);
   const [exchangeJobs,setExchangeJobs] = useState<{
@@ -99,17 +101,17 @@ export default function Tags({
       ),
     [tags, query, filter],
   );
+  const grouped=useMemo(()=>{const groups=new Map<string,Tag[]>();for(const tag of shown){const group=groups.get(tag.class)??[];group.push(tag);groups.set(tag.class,group);}return [...groups].sort(([a],[b])=>a.localeCompare(b));},[shown]);
   // Referenced tags are often outside the active class/search filters.
   // Make the destination visible in the left browser, not just the inspector.
   function navigateToTag(id: number) {
     const tag = tags.find((candidate) => candidate.id === id);
     if (!tag) return;
     setQuery('');
-    setFilter(tag.class);
+    setFilter('all');
     // A large class might contain hundreds of entries. Do not hide a linked
     // target behind the default pagination limit.
-    const classIndex = tags.filter((candidate) => candidate.class === tag.class).findIndex((candidate) => candidate.id === id);
-    setLimit(Math.max(300, classIndex + 1));
+    setExpanded(old=>({...old,[tag.class]:true}));
     setSelected(id);
     setExtractionReceipt(null);
   }
@@ -160,7 +162,7 @@ export default function Tags({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setLimit(300);
+              const value=e.target.value.toLowerCase();if(value.trim())setExpanded(old=>({...old,...Object.fromEntries(tags.filter(tag=>tag.path.toLowerCase().includes(value)||tag.class.toLowerCase().includes(value)).map(tag=>[tag.class,true]))}));
             }}
           />
         </div>
@@ -170,7 +172,7 @@ export default function Tags({
           value={filter}
           onChange={(e) => {
             setFilter(e.target.value);
-            setLimit(300);
+            if(e.target.value!=='all')setExpanded(old=>({...old,[e.target.value]:true}));
           }}
         >
           <option value="all">All tag classes</option>
@@ -180,26 +182,28 @@ export default function Tags({
             </option>
           ))}
         </select>
-        <div className="tag-list">
-          {shown.slice(0, limit).map((t) => (
+        <div className="tag-tree-actions"><button className="small-button" onClick={()=>setExpanded(Object.fromEntries(classes.map(c=>[c,false])))}>Collapse all classes</button></div>
+        <div className="tag-list" aria-label="Tags by class">
+          {grouped.map(([c,members])=>{const open=expanded[c]??(!!query.trim()||filter===c||selectedTag?.class===c);return <div className="tag-class-group" key={c}>
+            <button className="tag-class-toggle" aria-label={`Toggle ${classNames[c]??c} class (${c})`} aria-expanded={open} aria-controls={`tag-class-${c}`} onClick={()=>setExpanded(old=>({...old,[c]:!open}))}>
+              <ChevronRight size={14} className={open?'expanded':''}/><strong>{classNames[c]??c}</strong><code>{c}</code><span>{formatNumber(members.length)}</span>
+            </button>
+            {open&&<div id={`tag-class-${c}`} role="group" aria-label={`${classNames[c]??c} tags`}>{members.map((t) => (
             <button
               className={`tag-row ${selected === t.id ? 'selected' : ''}`}
               key={t.id}
-              onClick={() => setSelected(t.id)}
+              aria-pressed={selected===t.id}
+              onClick={() => {setSelected(t.id);setExtractionReceipt(null);}}
             >
-              <span className={`tag-class class-${t.class}`}>{t.class}</span>
+              <FileCode2 size={14}/>
               <span>
                 <strong>{shortPath(t.path)}</strong>
                 <small>{t.path.split(/[\\/]/).slice(0, -1).join(' / ')}</small>
               </span>
               {project.tagEdits.some((e) => e.tagId === t.id) && <span className="edit-dot" />}
             </button>
-          ))}
-          {shown.length > limit && (
-            <button className="load-more" onClick={() => setLimit((v) => v + 300)}>
-              Show more tags ({shown.length - limit} remaining)
-            </button>
-          )}
+          ))}</div>}
+          </div>;})}
           {shown.length === 0 && <div className="list-empty">No tags match this search.</div>}
         </div>
         <div className="panel-foot">{shown.length} matching · indexed from cache</div>
@@ -224,7 +228,7 @@ export default function Tags({
                   {selectedTag.fields.length ? 'Typed fields available' : 'Inspection only'}
                 </Pill>
               </div>
-              <div className="tag-exchange-actions">
+              <details className="tag-secondary-actions"><summary>Extract, export or transfer tags</summary><div className="tag-exchange-actions">
                 <button type="button" className="small-button" title="Exports tag identities and dependency references in JSON, not actual Halo tag or texture bytes. Importers must verify source hash and cache version." onClick={() => {
                   try {
                     const bundle=createTagExchangeBundle({project,inspection},[selectedTag.id]);
@@ -288,9 +292,20 @@ export default function Tags({
                   </div>}
                   <span className="subtle">Same Halo engine/cache version only. All tag bytes are re-hashed before and after copying into new managed storage. You must still resolve dependencies and compile a compatible scenario.</span>
                 </div>}
-              </div>
+              </div></details>
             </div>
-            <TagDuplicatePanel key={`${project.id}:${selectedTag.id}`} project={project} inspection={inspection} source={selectedTag} edit={edit} />
+            <div className="field-table">
+              <div className="field-table-title">
+                <h3>Editable fields · {selectedTag.fields.length}</h3>
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={advanced} onChange={(e) => setAdvanced(e.target.checked)} />
+                  Show offsets
+                </label>
+              </div>
+              <TagFields project={project} tag={selectedTag} tags={tags} advanced={advanced} change={(field,value)=>change(selectedTag,field,value)} />
+              <details className="tag-native-editing"><summary>Complete native tag editing</summary><p>Spark edits the typed fields indexed above. Extract this tag and its dependencies for a full source tagset, then open the matching native tag editor. Unknown cache fields remain preserved. Build the working tags to apply full-schema changes.</p>{onNativeEditor&&<button disabled={!native} onClick={onNativeEditor}>Open native tag editor</button>}</details>
+            </div>
+            <TagDuplicatePanel key={`duplicate:${project.id}:${selectedTag.id}`} project={project} inspection={inspection} source={selectedTag} edit={edit} />
             {projectile && rocket && (
               <div className="preset-bar">
                 <div>
@@ -306,16 +321,6 @@ export default function Tags({
                 </button>
               </div>
             )}
-            <div className="field-table">
-              <div className="field-table-title">
-                <h3>Properties</h3>
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={advanced} onChange={(e) => setAdvanced(e.target.checked)} />
-                  Show offsets
-                </label>
-              </div>
-              <TagFields project={project} tag={selectedTag} tags={tags} advanced={advanced} change={(field,value)=>change(selectedTag,field,value)} />
-            </div>
             {selectedTag.class === 'snd!' && (
               <>{onResources&&<button className="small-button" onClick={onResources}>Locate Halo Sounds folder</button>}<Sound key={`${selectedTag.id}:${project.source?.resourceSha256?.['sounds.map']}`} projectId={project.id} tagId={selectedTag.id} sourceHash={project.source?.sha256 ?? ''} onAssign={onAssignSound} /></>
             )}
@@ -342,8 +347,8 @@ export default function Tags({
                 })}
               </div>
             )}
-            <TagLineageInspector key={`${project.id}:${selectedTag.id}`} project={project} inspection={inspection} tag={selectedTag} onNavigate={navigateToTag} notify={notify} />
-            <TagMigrationReviewPanel key={`${project.id}:${inspection.sha256}`} project={project} inspection={inspection} notify={notify} />
+            <TagLineageInspector key={`lineage:${project.id}:${selectedTag.id}`} project={project} inspection={inspection} tag={selectedTag} onNavigate={navigateToTag} notify={notify} />
+            <TagMigrationReviewPanel key={`migration:${project.id}:${inspection.sha256}`} project={project} inspection={inspection} notify={notify} />
             <Notice tone="info">
               Edits are stored in your .gsproject. The source map stays unchanged. Use Build &amp; Playtest to
               extract, rebuild and validate the edited cache.

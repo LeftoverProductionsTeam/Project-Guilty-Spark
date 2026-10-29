@@ -78,9 +78,14 @@ export interface Tag {
   primaryBitmapStatus?: 'resolved' | 'missing' | 'invalid' | 'unavailable' | null;
   shaderPreview?:ShaderPreview|null;
 }
-export interface ShaderLayer {bitmapTagId:number;uvScale:[number,number];uvOffset:[number,number];rotation:number;colorFunction:number;alphaFunction:number}
+export interface ShaderAnimation {source:number;function:number;period:number;phase:number;scale:number}
+export interface ShaderLayer {bitmapTagId:number;uvScale:[number,number];uvOffset:[number,number];rotation:number;colorFunction:number;alphaFunction:number;
+  flags?:number;animations?:ShaderAnimation[];rotationCenter?:[number,number]}
+export interface ShaderStage {flags:number;constant0Source:number;constant0Function:number;constant0Period:number;
+  constant0Lower:[number,number,number,number];constant0Upper:[number,number,number,number];constant1:[number,number,number,number];
+  colorInputs:number[];colorOutputs:number[];alphaInputs:number[];alphaOutputs:number[]}
 export interface ShaderPreview {alphaTest:boolean;twoSided:boolean;uvScale:[number,number];kind?:string;shaderType?:number;detailFunction?:number;multipurposeXbox?:boolean;bumpScale?:number;
-  microDetailFunction?:number;detailScales?:[number,number,number];framebufferBlend?:number;layers?:ShaderLayer[]}
+  microDetailFunction?:number;detailScales?:[number,number,number];framebufferBlend?:number;layers?:ShaderLayer[];stages?:ShaderStage[];decal?:boolean;alphaBlended?:boolean}
 export interface SceneObject {
   id: string;
   name: string;

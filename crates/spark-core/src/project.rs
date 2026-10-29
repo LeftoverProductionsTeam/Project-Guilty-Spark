@@ -249,7 +249,7 @@ impl Project {
         if let Some(source) = &self.source {
             if source.resource_sha256.iter().any(|(name, hash)| {
                 !(["bitmaps.map", "sounds.map", "loc.map"].contains(&name.as_str())
-                    || (source.cache_version==13&&(["common.ipak","inplace1.ipak","inplace2.ipak","mcc-textures"].contains(&name.as_str())
+                    || (source.cache_version==13&&(["common.ipak","inplace1.ipak","inplace2.ipak","mcc-textures","mcc-shared-bitmaps.map"].contains(&name.as_str())
                         || name.strip_suffix(".imeta").is_some_and(|n|!n.is_empty()&&n.len()<=64&&n.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_'||b==b'-')))))
                     || hash.len() != 64
                     || !hash.bytes().all(|b| b.is_ascii_hexdigit())

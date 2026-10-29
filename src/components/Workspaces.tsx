@@ -1,4 +1,5 @@
 import ProjectSnapshots from './ProjectSnapshots';
+import { renderIndices } from '../haloGeometry';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Bounds, OrbitControls } from '@react-three/drei';
@@ -42,7 +43,7 @@ function PreviewMesh({ mesh }: { mesh: MeshData }) {
     } else {
       g.computeVertexNormals();
     }
-    g.setIndex(mesh.indices);
+    g.setIndex(renderIndices(mesh));
     for (const part of mesh.parts ?? []) {
       // Preserve real material-group boundaries for future texture assignment.
       if (part.indexStart >= 0 && part.indexCount > 0 && part.indexStart + part.indexCount <= mesh.indices.length) {

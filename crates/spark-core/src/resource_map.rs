@@ -6,6 +6,8 @@
 //! end in __pixels. We require an
 //! explicitly named, user-selected, SHA-256-pinned `bitmaps.map`, an exact tag
 //! path, and an enclosing resource entry before exposing any raw bitmap bytes.
+//! MCC's legacy shared bitmap map retains the retail per-image key/span layout;
+//! its separately pinned ipak resources still use their own reader.
 //! No offsets are inferred from tag IDs or fuzzy filenames. MCC ipaks and
 //! external *tag metadata* are not covered by this reader.
 use crate::{invalid, reject_links, Result, SparkError};
@@ -238,7 +240,7 @@ pub(crate) fn prove_external_image_range(index: &ResourceIndex, tag_path: &str,
     // groups the tag's images in <tag>__pixels. These are format-defined keys,
     // never filename guesses. See Invader resource.cpp and C33 research notes.
     let key = match generation {
-        6 | 7 => format!("{tag_path}_{image_index}"),
+        6 | 7 | 13 => format!("{tag_path}_{image_index}"),
         609 => format!("{tag_path}__pixels"),
         0 => tag_path.to_owned(), // explicit low-level span API, not auto discovery
         _ => return invalid("Unsupported resource-map generation; MCC ipaks need a separate reader"),
@@ -319,5 +321,15 @@ mod tests {
         bytes[0x48..0x4c].copy_from_slice(&0xffff_fff0u32.to_le_bytes());
         let mut file=tempfile::NamedTempFile::new().unwrap();file.write_all(&bytes).unwrap();
         assert!(parse_index(file.as_file_mut(), bytes.len() as u64).is_err());
+    }
+    #[test]
+    fn mcc_shared_pixels_require_the_exact_image_key_and_entire_declared_span() {
+        let index=ResourceIndex{kind_code:1,file_size:2048,entries:vec![ResourceEntry{
+            path:"scenery\\teleporter\\mask_0".into(),data_offset:512,data_size:64}]};
+        assert!(prove_external_image_range(&index,"scenery/teleporter/mask",512,64,16,13,0).is_ok());
+        for (path,offset,length,image) in [("scenery/teleporter/mask",512,65,0),("scenery/teleporter/mask",511,64,0),
+            ("scenery/teleporter/mask",512,64,1),("scenery/teleporter/other",512,64,0)] {
+            assert!(prove_external_image_range(&index,path,offset,length,16,13,image).is_err());
+        }
     }
 }
