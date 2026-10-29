@@ -18,6 +18,11 @@ pub const BIGASS_V2104_SHA256: &str =
 pub fn is_yoyorast_v1(hash: &str) -> bool {
     hash == YOYORAST_V1_SHA256
 }
+pub fn use_mcc_multiplayer_ui(hash:&str,version:u32,scenario_type:u16,profile:Option<&str>)->Result<bool>{
+    let explicit=profile==Some("mcc-multiplayer-ui");
+    if explicit&&(version!=609||scenario_type!=1){return invalid("The MCC multiplayer UI profile only supports Custom Edition multiplayer caches");}
+    Ok(explicit||is_yoyorast_v1(hash)||hash==BIGASS_V2104_SHA256)
+}
 pub fn native_tool(tools: &Toolchain) -> Option<PathBuf> {
     tools
         .h1a_directory
@@ -148,7 +153,7 @@ pub(crate) fn compile_native(
             });
         }
     }
-    if is_yoyorast_v1(&inspection.sha256) || inspection.sha256 == BIGASS_V2104_SHA256 {
+    if use_mcc_multiplayer_ui(&inspection.sha256,inspection.header.version,inspection.header.scenario_type,project.conversion_profile.as_deref())? {
         let tag = "ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection";
         let source = base.join(safe_relative(tag)?);
         let target = tags.join(safe_relative(tag)?);
@@ -170,6 +175,8 @@ pub(crate) fn compile_native(
     }
     let profile = if project.conversion_profile.as_deref() == Some("zombie-recovery") {
         "zombie-recovery"
+    } else if project.conversion_profile.as_deref()==Some("mcc-multiplayer-ui") {
+        "mcc-multiplayer-ui"
     } else if is_yoyorast_v1(&inspection.sha256) {
         "yoyorast-v1-mcc"
     } else if inspection.sha256 == BIGASS_V2104_SHA256 {
@@ -464,6 +471,14 @@ mod tests {
         assert!(shader_changes()
             .iter()
             .all(|(tag, field, _)| safe_relative(tag).is_ok() && field.starts_with("shaders[")));
+    }
+    #[test]
+    fn an_unknown_ce_map_requires_an_explicit_multiplayer_ui_choice(){
+        assert!(!use_mcc_multiplayer_ui(&"a".repeat(64),609,1,None).unwrap());
+        assert!(use_mcc_multiplayer_ui(&"a".repeat(64),609,1,Some("mcc-multiplayer-ui")).unwrap());
+        assert!(use_mcc_multiplayer_ui(&"a".repeat(64),609,0,Some("mcc-multiplayer-ui")).is_err());
+        assert!(use_mcc_multiplayer_ui(&"a".repeat(64),13,1,Some("mcc-multiplayer-ui")).is_err());
+        assert!(use_mcc_multiplayer_ui(YOYORAST_V1_SHA256,609,1,None).unwrap());
     }
     #[test]
     fn sdk_inventory_checks_tag_paths_sizes_and_links() {

@@ -1,5 +1,7 @@
 # C35 follow-through — saved tool edits
 
+Subsequent scoped evidence: [C35 r3 classic bitmap repair and Alpine MCC compilation](C35_CONVERSION_RESOURCE_REPAIR.md). The r2 results and artifacts below remain frozen; Alpine's source-dependency/compiler blocker is now resolved by that separate pass, with gameplay still pending.
+
 This pass continues `5e70f35` on `codex/continuation-35-living-workbench`. It retains the C35 drawers/Director/catalog and all earlier work. It closes a real desktop rebuild blocker and adds read-only monitoring of derived editable tag folders. The earlier C35 r1 executable, installer and source ZIP remain frozen.
 
 ## User workflow

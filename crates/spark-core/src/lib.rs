@@ -18,6 +18,7 @@ pub mod connections;
 pub mod community_servers;
 pub mod community_host;
 pub mod conversion;
+pub mod conversion_resources;
 pub mod engine_machinima;
 pub mod external_changes;
 pub mod invitations;

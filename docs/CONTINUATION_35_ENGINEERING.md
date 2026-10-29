@@ -1,6 +1,6 @@
 # C35 — the living workbench
 
-Subsequent scoped evidence: [saved tool-edit follow-through and desktop snapshot repair](C35_TOOL_EDIT_FOLLOW_THROUGH.md). The r1 results and artifacts recorded below remain historical and frozen; the follow-through has its own native receipt and r2 files.
+Latest scoped evidence: [classic bitmap repair and validated Alpine MCC conversion](C35_CONVERSION_RESOURCE_REPAIR.md), with separate r3 files. Earlier follow-through: [saved tool edits and desktop snapshot repair](C35_TOOL_EDIT_FOLLOW_THROUGH.md), with r2 files. The r1 results, original failed Alpine attempts and artifacts recorded below remain historical and frozen; later reports supersede only their stated gates.
 
 C35 continues master `617d267` on `codex/continuation-35-living-workbench`. It preserves C32–C34, the restoration corpus and frozen earlier artifacts. This is an internal development build, not a completed replacement Halo engine. No remote push, public release or master merge is included.
 

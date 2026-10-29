@@ -2,13 +2,14 @@
 
 ## 0.4.0 — Continuation 35: The living workbench (development)
 
+- Conversion follow-through: audit exact indexed CE bitmap dependencies, review matching source files and create a separate repaired SDK tagset. Add explicit MCC multiplayer UI compatibility, preserve repair reviews across save/check refreshes and validate real Alpine MCC compilation. [Evidence and limits](docs/C35_CONVERSION_RESOURCE_REPAIR.md).
 - Follow-through: monitor saved derived tag changes, review stable file differences and rebuild/open a separate native map. Fix the desktop working-tag pre-build snapshot reason and widen runtime details. [Actual native round trip](docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md).
 - Make navigation and the top window/project header remembered drawers; move utility panels into configurable edge/floating drawers and add native F11 fullscreen with Escape restoration.
 - Preserve per-map workflow context and the new-level wizard; add configurable Q/E camera flight, wheel speed and native focus-release guards.
 - Add a detachable/dockable Recording Director with shared camera authority, keys/timeline/tracking/lens, display controls and read-only saved-map refresh.
 - Add permissioned display/window capture and bounded native WebM recording storage. Actual Save-dialog flow, recording startup, game audio/capture and long takes remain unaccepted.
 - Add a real credited visual map catalog and direct-download selection; verify actual Alpine CE import and original Zombie Demo resource recovery in the native app.
-- Diagnose exact missing classic tags from failed native conversion output. Alpine MCC conversion remains blocked; failed Tool output is never accepted as playable.
+- Diagnose exact missing classic tags from failed native conversion output. The repaired Alpine build passes native cache validation; failed Tool output is never accepted as playable and gameplay remains unaccepted.
 - Retain all historical feature records, source/runtime guards and older releases. [C35 results, limitations and artifacts](docs/CONTINUATION_35_ENGINEERING.md).
 
 ## 0.4.0 — Continuation 33: Reclaim the pixels

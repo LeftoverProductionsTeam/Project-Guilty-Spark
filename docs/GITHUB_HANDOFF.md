@@ -1,6 +1,8 @@
 # C35 Git push handoff
 
-Latest follow-through: **Monitor saved tool tags and repair desktop working-tag rebuilding**. Add stable per-map tag-save detection and changed-file review, fix an invalid pre-build snapshot reason, and widen runtime details. Verify the full desktop path with an actual external scenario edit, MCC compilation and changed-field readback from a separate map tab. Validation is now 409 Rust / 148 frontend / 54 browser / 59 offline checks; the native receipt and limits are in [the follow-through report](C35_TOOL_EDIT_FOLLOW_THROUGH.md). Fresh r2 files preserve the frozen r1 artifacts. The owner still controls pushing.
+Latest pass: **Repair CE bitmap dependencies and validate Alpine MCC conversion**. Audit exact indexed bitmap paths before staging, review matching sources and create a separate repaired SDK tagset. Add explicit MCC multiplayer UI compatibility, keep reviews through save/refresh and retain per-map targets/undo. Alpine passes native compilation and cache validation; retail gameplay remains pending. Current totals: 419 Rust / five opt-in ignored, 152 frontend, 56 browser and 59 offline. [Evidence, workflow and limits](C35_CONVERSION_RESOURCE_REPAIR.md). Fresh r3 artifacts preserve r1/r2. Suggested commit/PR title: **C35: immersive workbench, native tool rebuilds and repaired CE conversion**.
+
+Previous follow-through: **Monitor saved tool tags and repair desktop working-tag rebuilding**. Add stable per-map tag-save detection and changed-file review, fix an invalid pre-build snapshot reason, and widen runtime details. Verify the full desktop path with an actual external scenario edit, MCC compilation and changed-field readback from a separate map tab. Its 409 Rust / 148 frontend / 54 browser / 59 offline results and limits are in [the follow-through report](C35_TOOL_EDIT_FOLLOW_THROUGH.md). The owner still controls pushing.
 
 Title: **C35: immersive drawers, shared Director and real map catalog**
 

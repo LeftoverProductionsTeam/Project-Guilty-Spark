@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "nativeDesktop": true,
+  "appSha256": "326e032b6cd6c76cadbddda4d2f4537efbc50f20ca5c277b75a181054678c8a4",
+  "sourceSha256": "eb9b3693e74e674182d732f340127ef84d3574083821a8d3d95b234d9cb1c39e",
+  "sourceCacheVersion": 609,
+  "requiredIndexedBitmaps": 430,
+  "missingBefore": 3,
+  "availableAfter": 430,
+  "repairFiles": [
+    {
+      "path": "scenery/c_field_generator/bitmaps/c_field_generator_dust.bitmap",
+      "bytes": 3028,
+      "sha256": "862c5843d42313c7dcd1f40990cc9916df634f734b77b838bd94c93c5bf635ef"
+    },
+    {
+      "path": "powerups/active camoflage/bitmaps/camoflage.bitmap",
+      "bytes": 87664,
+      "sha256": "3e4ca8ec89d3b468fbd7ecec53437c1974a4588ba27dc631038d2ceb4a433adc"
+    },
+    {
+      "path": "powerups/over shield/bitmaps/overshield.bitmap",
+      "bytes": 87664,
+      "sha256": "873e74d7922611911b2879ee466713cb8ed79737cd72da96bff0317dca75503f"
+    }
+  ],
+  "sdkFilesVerified": 11544,
+  "repairElapsedMs": 60412.557199999996,
+  "buildElapsedMs": 73993.11009999999,
+  "unconfirmedRejected": true,
+  "wrongWindowRejected": true,
+  "sourceTagsetNotPlayable": true,
+  "explicitMccUiProfile": true,
+  "compiledSha256": "3cb1fe9c6471d02694d34e7d62984532c1aafa076a14ce1a336aecc8eb9fed9a",
+  "compiledBytes": 125690255,
+  "cacheVersion": 13,
+  "scenarioType": 1,
+  "tags": 2629,
+  "separateMapTab": true,
+  "materialCounts": {
+    "sourceShaders": "179",
+    "sourceLightmaps": "27",
+    "sourceDetails": "108",
+    "skyTriangles": "483",
+    "materialLoading": "false",
+    "pendingMaterials": "0"
+  },
+  "originalSdkInputsUnchanged": true,
+  "originalClassicInputsUnchanged": true,
+  "originalSourceUnchanged": true,
+  "sparkAuthoredDocumentUnchanged": true,
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "gameplayAccepted": false,
+  "errors": [],
+  "nativeDesktopWorkflowPassed": true,
+  "conversionManifest": {
+    "changes": [
+      {
+        "after": "MCC SDK UI root",
+        "afterSha256": "b44f13a1336a516ad58de6547f501439dea1e8e87f8a7f7942549dee67c463e0",
+        "before": "CE UI root",
+        "beforeSha256": "d96544d14659dc294b6b13b8f9ed3c948f7140612df2326824e8654ac9d32269",
+        "field": "MCC multiplayer UI dependency root",
+        "tag": "ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection"
+      }
+    ],
+    "compilerSha256": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+    "omittedAudio": [],
+    "profile": "mcc-multiplayer-ui",
+    "runtimeLoad": "pending",
+    "schemaVersion": 1,
+    "sourcePreserved": true,
+    "sourceSha256": "eb9b3693e74e674182d732f340127ef84d3574083821a8d3d95b234d9cb1c39e",
+    "spawnerMechanism": "Source object-class trigger references are retained; native MCC Tool performs target compilation"
+  },
+  "sourceArchive": {
+    "guide": "https://github.com/csauve/alpine#building-the-map",
+    "url": "https://www.dropbox.com/s/j6fb3ox6z1xmzzq/fresh_mp_sp_custom_edition_tagset.7z?dl=1",
+    "bytes": 367632376,
+    "sha256": "bedd626c5fde43cc8713996d2f7d20bb125d3ef9f15f9e59395e2806d377f626",
+    "selectedMembersOnly": true,
+    "archivedCodeExecuted": false,
+    "tagBytesDistributed": false
+  },
+  "retainedDesktopExtractionFailure": {
+    "jobId": "47841d5c-31f6-4298-9a88-afa8c353b13a",
+    "failedWrites": 10,
+    "longestPathCharacters": 268,
+    "toolExitCode": 0,
+    "buildRefused": true,
+    "resolvedByOwnedExtractionAlias": true
+  },
+  "verification": {
+    "rustPassed": 419,
+    "rustOptInIgnored": 5,
+    "frontendPassed": 152,
+    "frontendFiles": 33,
+    "browserPassed": 56,
+    "offlinePassed": 59
+  },
+  "testDate": "2026-10-29"
+}

@@ -815,7 +815,9 @@ export default function App() {
       case 'build':
         return current.quickForge ? <QuickForge key={current.id} project={current} data={data} edit={edit} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:current!.id,document})} onCreate={createQuickForge} onSave={() => save()} onBuild={buildQuickForge} onRuntimes={() => setWorkspace('runtimes')} onSettings={() => setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch} dirty={history.dirty} /> : current.source ? (
           <Build
+            key={current.id}
             edit={edit}
+            onSave={()=>save(false,current.id)}
             onOpenCompiled={buildId=>void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});await load(opened);await refresh();setWorkspace('quickforge');},'Compiled map preserved and opened in its own Level Editor tab.')}
             project={current}
             data={data}

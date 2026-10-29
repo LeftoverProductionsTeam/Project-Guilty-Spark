@@ -207,7 +207,7 @@ impl Project {
         if self.animations.len()>128||self.animation_assignments.len()>128{return invalid("Animation library exceeds 128 assets or assignments");}
         let mut animation_ids=std::collections::HashSet::new();for asset in &self.animations{asset.validate()?;if !animation_ids.insert(&asset.id){return invalid("Duplicate animation asset");}}
         for binding in &self.animation_assignments{uuid::Uuid::parse_str(&binding.id).map_err(|_|crate::SparkError::Invalid("Invalid animation assignment".into()))?;if !animation_ids.contains(&binding.asset_id)||!matches!(binding.mode.as_str(),"custom"|"replace-graph")||binding.source_sha256.len()!=64||binding.target_tag_path.len()>256||crate::safe_relative(&binding.target_tag_path).is_err(){return invalid("Invalid animation assignment or missing source asset");}}
-        if self.conversion_profile.as_deref().is_some_and(|p|!matches!(p,"faithful"|"zombie-recovery")){return invalid("Unknown map conversion profile");}
+        if self.conversion_profile.as_deref().is_some_and(|p|!matches!(p,"faithful"|"zombie-recovery"|"mcc-multiplayer-ui")){return invalid("Unknown map conversion profile");}
         if let Some(environment)=&self.world_environment {environment.validate()?;}
         if self.build_targets.len()>16 {return invalid("At most 16 engine build targets per project");}
         let mut target_ids=std::collections::HashSet::new();

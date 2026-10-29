@@ -33,6 +33,7 @@ use tauri::{Emitter, Manager, State};
 #[path="director_native.rs"] mod director_native;
 #[path="director_recording.rs"]mod director_recording;
 #[path="working_tag_changes_native.rs"]mod working_tag_changes_native;
+#[path="conversion_resources_native.rs"]mod conversion_resources_native;
 #[path="dependency_install.rs"] mod dependency_install;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
@@ -117,6 +118,7 @@ struct AppState {
     director:Mutex<director_native::DirectorState>,
     recordings:Mutex<director_recording::RecordingState>,
     working_tag_changes:Mutex<working_tag_changes_native::WorkingTagChangesState>,
+    conversion_repairs:Mutex<conversion_resources_native::RepairState>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1134,10 +1136,12 @@ fn refresh_installation(app: tauri::AppHandle, state: State<AppState>) -> Reply<
     bootstrap(state)
 }
 #[tauri::command]
-fn compatibility(state: State<AppState>, id: String) -> Reply<build::CompatibilityReport> {
-    let p = lock(&state.library)?.get(&id).map_err(error)?;
-    let i = inspect(&state, &p)?;
-    Ok(build::compatibility(&p, &i, &project_tools(&state, &p)?))
+async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::CompatibilityReport> {
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();
+        let p = lock(&state.library)?.get(&id).map_err(error)?;
+        let i = inspect(&state, &p)?;
+        Ok(build::compatibility(&p, &i, &project_tools(&state, &p)?))
+    }).await.map_err(error)?
 }
 #[tauri::command]
 async fn prepare_mcc_conversion_tools(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:Option<String>)->Reply<String>{
@@ -2462,6 +2466,7 @@ pub fn run() {
                 director:Mutex::new(Default::default()),
                 recordings:Mutex::new(Default::default()),
             working_tag_changes:Mutex::new(Default::default()),
+            conversion_repairs:Mutex::new(Default::default()),
             });
             if let Err(e) = configure(app.handle(), &app.state::<AppState>(), settings) {
                 if let Ok(mut d) = app.state::<AppState>().diagnostics.lock() {
@@ -2479,7 +2484,7 @@ pub fn run() {
         .on_window_event(|window,event|{director_native::window_event(window.app_handle(),window,event);if matches!(event,tauri::WindowEvent::Destroyed){
             if let Some(state)=window.app_handle().try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=window.label());}}
             let app=window.app_handle().clone();let label=window.label().to_owned();
-            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);}});
+            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);}});
         }})
         .invoke_handler(tauri::generate_handler![
             prepare_map_download,
@@ -2499,6 +2504,9 @@ pub fn run() {
             working_tag_changes_native::working_tag_watch_start,
             working_tag_changes_native::working_tag_watch_poll,
             working_tag_changes_native::working_tag_watch_stop,
+            conversion_resources_native::prepare_bitmap_tagset_repair,
+            conversion_resources_native::create_bitmap_tagset_repair,
+            conversion_resources_native::bitmap_tagset_repair_status,
             dependency_install::run_dependency_action,
             dependency_install::discard_dependency_action,
             dependency_install::choose_dependency_path,
@@ -2697,6 +2705,7 @@ mod readiness_tests {
             director:Mutex::new(Default::default()),
             recordings:Mutex::new(Default::default()),
             working_tag_changes:Mutex::new(Default::default()),
+            conversion_repairs:Mutex::new(Default::default()),
         };
         (temp, state, p, record)
     }

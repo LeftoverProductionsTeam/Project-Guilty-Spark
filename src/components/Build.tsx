@@ -17,6 +17,7 @@ import type { Bootstrap, CompatibilityReport, JobEvent, Project, Readiness, Temp
 import { call, native } from '../api';
 import { CheckRow, Notice, PageTitle, Pill } from './ui';
 import BuildTargets from './BuildTargets';
+import ConversionBitmapRepair from './ConversionBitmapRepair';
 export default function Build({
   project,
   data,
@@ -30,6 +31,7 @@ export default function Build({
   onRefresh,
   onResources,
   onOpenCompiled,
+  onSave,
   edit,
 }: {
   project: Project;
@@ -44,20 +46,21 @@ export default function Build({
   onRefresh: () => void;
   onResources: () => void;
   onOpenCompiled: (buildId:string) => void;
+  onSave:()=>Promise<void>;
   edit:(project:Project,description:string)=>void;
 }) {
   const [report, setReport] = useState<CompatibilityReport | null>(null);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [template, setTemplate] = useState<TemplateReport | null>(null);
   const [issues, setIssues] = useState<string[]>([]);
+  const [checking, setChecking] = useState(true);
   const [preparing,setPreparing]=useState(false);
   useEffect(() => {
     let cancelled = false;
     async function fetchReports() {
       if (!native || !project.source) return;
-      setReport(null);
-      setReadiness(null);
-      setTemplate(null);
+      // Keep the repair workflow mounted while saving and refreshing its audit.
+      setChecking(true);
       setIssues([]);
       const results = await Promise.allSettled([
         call<CompatibilityReport>('compatibility', { id: project.id }),
@@ -68,6 +71,7 @@ export default function Build({
       setReport(results[0].status === 'fulfilled' ? results[0].value : null);
       setReadiness(results[1].status === 'fulfilled' ? results[1].value : null);
       setTemplate(results[2].status === 'fulfilled' ? results[2].value : null);
+      setChecking(false);
       const labels = ['Compatibility check', 'Launch readiness', 'Metadata template'];
       setIssues(
         results.flatMap((result, index) =>
@@ -82,7 +86,7 @@ export default function Build({
   }, [project.id, project.modifiedAt, project.builds.length,project.conversionProfile,project.activeBuildTarget,project.buildTargets,dirty, data.settings, epoch]);
   const projectLogs = logs.filter((l) => l.projectId === project.id);
   const last = projectLogs.at(-1);
-  const validated = dirty
+  const validated = dirty || checking
     ? undefined
     : project.builds.find((b) => b.id === readiness?.currentValidatedBuildId);
   const steps = [
@@ -100,17 +104,18 @@ export default function Build({
         actions={
           <>
             {validated && <button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>Open compiled map</button>}
-            <button onClick={onRefresh}>
+            <button onClick={()=>void onAction(async()=>{if(dirty)await onSave();onRefresh();})}>
               <RefreshCw size={14} />
-              Refresh checks
+              {dirty?'Save & refresh checks':'Refresh checks'}
             </button>
-            <button className="primary" onClick={onStart} disabled={!report?.ready || !!activeJob}>
+            <button className="primary" onClick={onStart} disabled={checking || !report?.ready || !!activeJob}>
               <Hammer size={15} />
               {dirty ? 'Save & convert to MCC' : 'Convert map to MCC'}
             </button>
           </>
         }
       />
+      {checking&&<p role="status">Checking saved map dependencies…</p>}
       <div className="build-columns">
         <div className="build-main">
           <section className="surface build-conversion"><h3>Map conversion · CE / PC / Demo to MCC Halo 1</h3>
@@ -120,6 +125,7 @@ export default function Build({
             <p className="subtle">If the SDK is not installed: Steam → Library → include Tools → Halo: CE Mod Tools - MCC. Preparation extracts its bundled tags into Spark’s local cache and remembers the folders.</p>
             {project.source?.sha256==='b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d'&&<label>Zombie Apocalypse conversion profile<select aria-label="Zombie Apocalypse conversion profile" value={project.conversionProfile??'faithful'} onChange={e=>edit({...project,conversionProfile:e.target.value as Project['conversionProfile']},'Choose Zombie Apocalypse conversion profile')}><option value="faithful">Faithful · require the two original missing custom audio cues</option><option value="zombie-recovery">Recovery edition · omit two unavailable cues and disable one corrupt placement</option></select></label>}
             {project.conversionProfile==='zombie-recovery'&&<Notice>The recovery edition retains the actual vehicle-based zombie spawners and valid mixed-class placements. Two missing custom sounds and the corrupt first placement are recorded as omissions. Runtime behavior still needs testing.</Notice>}
+            {project.source?.cacheVersion===609&&data.entries.find(entry=>entry.id===project.id)?.scenarioType===1&&<label className="toggle-setting"><input aria-label="Use MCC multiplayer UI dependencies" type="checkbox" checked={project.conversionProfile==='mcc-multiplayer-ui'} onChange={e=>edit({...project,conversionProfile:e.target.checked?'mcc-multiplayer-ui':'faithful'},'Choose MCC multiplayer UI compatibility')}/><span>Use MCC multiplayer UI dependencies<small>Replaces the CE startup multiplayer UI collection with your installed MCC SDK version. Custom entries under that collection are not retained. The change is recorded; custom UI/HUD and game loading still need testing.</small></span></label>}
           </section>
           {issues.map((issue) => (
             <Notice key={issue}>{issue}</Notice>
@@ -140,6 +146,7 @@ export default function Build({
               {dirty ? 'Save & choose source resources…' : 'Choose source resources…'}
             </button>
           </section>
+          {!!report?.bitmapDependencies?.required&&<ConversionBitmapRepair project={project} settings={data.settings} audit={report.bitmapDependencies} disabled={!!activeJob} onSave={onSave} onUse={next=>edit(next,'Use repaired bitmap dependency tagset')}/>}
           <section className="surface build-target">
             <div className="section-label">Build target</div>
             <div className="target-heading">
@@ -392,8 +399,8 @@ export default function Build({
             Open project folder
           </button>
           <Notice>
-            Zombie Apocalypse acceptance requires a successful conversion, a registered local package, and an
-            in-game load test of the owner’s original map.
+            {project.title} acceptance requires a successful conversion, a registered local package, and an
+            in-game load test of the converted map.
           </Notice>
         </aside>
       </div>

@@ -74,15 +74,15 @@ export const continuation35Requirements = [
     'catalog',
     'Real visual mod catalog, direct downloads, provenance and runtime compatibility',
     'downloads',
-    'Six credited real releases, publisher screenshots, edition/category/author filters, requirements and direct import selection are implemented. Actual Alpine author-release ZIP download/import produced a CE cache with 2676 tags and native texture previews.',
-    'Actual Alpine MCC builds were attempted in isolated copies and failed on three missing classic bitmap tags. No playable output was accepted. Workshop uses Steam; publisher-only download pages remain external routes.',
+    'Six credited real releases, publisher screenshots, edition/category/author filters, requirements and direct import selection are implemented. Actual Alpine author-release import produced a CE cache with 2676 tags. Matching classic bitmap repair plus explicit MCC multiplayer UI compatibility passes native MCC compilation and cache validation.',
+    'Converted Alpine retail MCC loading, custom UI/HUD and gameplay remain unaccepted. Workshop uses Steam; publisher-only download pages remain external routes. No universal conversion claim is made.',
   ],
   [
     'conversion-errors',
     'Native conversion reports exact missing classic tags instead of generic zero-exit failure',
     'conversion',
-    'The failed real Alpine H1A compiler output identified three missing source bitmap tags. A bounded diagnostic now deduplicates safe relative paths and gives matching-resource guidance; focused tests and retained real-log classification passed. Tool zero exit still cannot certify success.',
-    'Alpine requires matching original classic resources or editable tags before another native build and game test. No guessed image substitutions or source-effect removal are used.',
+    'Exact indexed CE bitmap audit runs before SDK staging. A reviewed, source-hashed workflow creates a separate repaired SDK tagset and retains original inputs. The actual Alpine 427/430 audit, three-file repair and explicit MCC multiplayer UI profile pass native conversion; save/check refresh preserves the review.',
+    'Matching editable sources are still required. The explicit UI profile replaces the startup multiplayer UI collection, so custom entries beneath it are not retained. Custom UI/HUD and retail gameplay need testing. No guessed bitmap substitution is used.',
   ],
   [
     'external-tags',
@@ -140,9 +140,20 @@ export const continuation35Overrides = Object.fromEntries(
     },
   ]),
 );
-Object.assign(continuation35Overrides['C35-external-tags'],{
-  files:'crates/spark-core/src/working_tag_changes.rs; src-tauri/src/working_tag_changes_native.rs; src-tauri/src/runtime_workbench.rs; src/components/WorkingTagChanges.tsx; src/components/RuntimeDock.tsx',
-  level:'IMPLEMENTED / NATIVE DESKTOP-TO-COMPILER-TO-CACHE LOCALLY TESTED; gameplay NOT ACCEPTED',
-  evidence:'docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md; docs/fixtures/c35-tool-edit-native-verification.json; scripts/test-working-tags-native.mjs',
-  next:'Accept a real Guerilla/Sapien GUI save and extend source reconciliation to SDK scripts/images with explicit conflicts; retain separate native game acceptance.',
+Object.assign(continuation35Overrides['C35-external-tags'], {
+  files:
+    'crates/spark-core/src/working_tag_changes.rs; src-tauri/src/working_tag_changes_native.rs; src-tauri/src/runtime_workbench.rs; src/components/WorkingTagChanges.tsx; src/components/RuntimeDock.tsx',
+  level: 'IMPLEMENTED / NATIVE DESKTOP-TO-COMPILER-TO-CACHE LOCALLY TESTED; gameplay NOT ACCEPTED',
+  evidence:
+    'docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md; docs/fixtures/c35-tool-edit-native-verification.json; scripts/test-working-tags-native.mjs',
+  next: 'Accept a real Guerilla/Sapien GUI save and extend source reconciliation to SDK scripts/images with explicit conflicts; retain separate native game acceptance.',
 });
+for (const id of ['C35-catalog', 'C35-conversion-errors'])
+  Object.assign(continuation35Overrides[id], {
+    files:
+      'crates/spark-core/src/conversion_resources.rs; crates/spark-core/src/conversion.rs; crates/spark-core/src/build.rs; src-tauri/src/conversion_resources_native.rs; src/components/ConversionBitmapRepair.tsx; src/components/Build.tsx; src/mapCatalog.ts',
+    level: 'IMPLEMENTED / NATIVE DESKTOP REPAIR, COMPILATION AND CACHE OPEN LOCALLY TESTED; gameplay NOT ACCEPTED',
+    evidence:
+      'docs/C35_CONVERSION_RESOURCE_REPAIR.md; docs/fixtures/c35-conversion-repair-native-verification.json; scripts/test-conversion-repair-native.mjs',
+    next: 'Load the converted Alpine map in retail MCC with the exact metadata package and verify UI/HUD, modes, collision, materials and sounds; retain unrelated engine/network gates.',
+  });

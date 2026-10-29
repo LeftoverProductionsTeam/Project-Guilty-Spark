@@ -31,7 +31,7 @@ export const MAP_CATALOG: readonly CatalogMap[] = [
     image: 'https://raw.githubusercontent.com/csauve/alpine/master/screenshot.jpg',
     directDownload: 'https://github.com/csauve/alpine/releases/download/1.0.0/alpine.zip',
     dependencies:
-      'Custom Edition to play the original. Rebuilding the author’s sources also needs HEK base tags, the Refined tag set and Jesse’s HUD. MCC requires conversion checks.',
+      'Custom Edition to play the original. Author sources need HEK base tags, the Refined tag set and Jesse’s HUD. MCC conversion needs matching classic bitmap tags and the explicit MCC multiplayer UI option. Native compilation is checked; gameplay remains untested.',
     permissions:
       'Author releases map and sources under CC BY-NC 4.0: attribution and non-commercial derivatives. https://github.com/csauve/alpine',
   },

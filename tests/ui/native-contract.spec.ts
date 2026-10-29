@@ -358,6 +358,32 @@ test('C35 F11 uses native fullscreen and Escape closes navigation before restori
  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='plugin:window|set_fullscreen').map((c:any)=>c.args.value));expect(calls).toEqual([true,false]);
 });
 
+async function mockBitmapRepair(page:Page){
+ await page.addInitScript(()=>localStorage.setItem('spark-test-settings',JSON.stringify({hekFlavor:'h1aEk',hekDirectory:'kit',hekTagsDirectory:'sdk',invaderDirectory:'invader'})));
+ await mockDesktop(page);await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke,p=w.__sparkMock.projects.a.project;p.source.cacheVersion=609;w.__sparkMock.projects.a.inspection.header.version=609;
+ const missing=['scenery/dust.bitmap','powerups/camo.bitmap','powerups/shield.bitmap'];
+ const receipt={schemaVersion:1,status:'ready-source-tagset',sourceSha256:p.source.sha256,originalSdk:'sdk',tagsDirectory:'prepared-tags',sdkFiles:100,files:missing.map(path=>({path,source:'classic/'+path,bytes:180,sha256:'c'.repeat(64)})),sourcePreserved:true,playableOutput:false};
+ w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+  if(command==='compatibility'){const stored=w.__sparkMock.projects[args.id].project;const ready=stored.buildTargets?.find((t:any)=>t.id===stored.activeBuildTarget)?.tagsDirectory==='prepared-tags'&&stored.conversionProfile==='mcc-multiplayer-ui';return{target:'MCC',pipeline:'Synthetic contract',ready,blockers:ready?[]:['Missing classic bitmap sources'],warnings:[],bitmapDependencies:args.id==='a'?{required:430,available:ready?430:427,missing:ready?[]:missing.map(path=>({path,reason:'Synthetic missing bitmap'})),invalid:[],listTruncated:false}:null};}
+  if(command==='prepare_bitmap_tagset_repair'){w.__sparkMock.repairSource=args.sourceTags;const result={planId:'review',projectId:args.projectId,expiresAtUnix:Date.now()/1000+180,sourceSha256:p.source.sha256,sdkTags:'sdk',sourceTags:args.sourceTags,files:receipt.files};if(w.__sparkMock.deferBitmapReview)return new Promise(resolve=>{w.__sparkMock.finishBitmapReview=()=>resolve(result);});return result;}
+  if(command==='create_bitmap_tagset_repair'){w.__sparkMock.repairCreated=args.confirmed;return{jobId:'repair-job',projectId:'a',status:'copying',message:'Creating separate source',receipt:null};}
+  if(command==='bitmap_tagset_repair_status')return{jobId:'repair-job',projectId:'a',status:'ready',message:'Ready source, not a map',receipt};
+  return original(command,args);
+ };
+ });
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();await chooseTool(page,'Build & playtest');
+}
+test('bitmap repair reviews exact sources, selects a separate target and refreshes saved checks',async({page})=>{
+ await mockBitmapRepair(page);const repair=page.getByRole('region',{name:'Classic bitmap dependency repair',exact:true});await expect(repair).toContainText('427 of 430');await expect(page.getByRole('button',{name:'Convert map to MCC',exact:true})).toBeDisabled();
+ await page.getByRole('checkbox',{name:'Use MCC multiplayer UI dependencies',exact:true}).check();await repair.getByRole('textbox',{name:'Matching classic tags folder',exact:true}).fill('C:/classic/tags');await repair.getByRole('button',{name:'Save & review matching bitmap tags',exact:true}).click();await expect(repair.getByRole('heading',{name:'Review 3 matching source files',exact:true})).toBeVisible();await repair.getByRole('button',{name:'Cancel review',exact:true}).click();expect(await page.evaluate(()=>(window as any).__sparkMock.repairCreated)).toBeUndefined();
+ await repair.getByRole('button',{name:'Save & review matching bitmap tags',exact:true}).click();await repair.getByRole('button',{name:'Create separate repaired tagset',exact:true}).click();await repair.getByRole('button',{name:'Use repaired tagset for this map',exact:true}).click();await expect(page.getByRole('button',{name:'Save & refresh checks',exact:true})).toBeVisible();await page.getByRole('button',{name:'Save & refresh checks',exact:true}).click();await expect(page.getByRole('button',{name:'Convert map to MCC',exact:true})).toBeEnabled();
+ const saved=await page.evaluate(()=>(window as any).__sparkMock.saved);expect(saved.activeBuildTarget).toBeTruthy();expect(saved.buildTargets[0].tagsDirectory).toBe('prepared-tags');expect(saved.conversionProfile).toBe('mcc-multiplayer-ui');expect(saved.source.sha256).toBe('a'.repeat(64));expect(saved.scene).toEqual([]);
+});
+test('a delayed bitmap-source review cannot replace another map workflow',async({page})=>{
+ await mockBitmapRepair(page);await page.evaluate(()=>{(window as any).__sparkMock.deferBitmapReview=true;});const repair=page.getByRole('region',{name:'Classic bitmap dependency repair',exact:true});await repair.getByRole('textbox',{name:'Matching classic tags folder',exact:true}).fill('C:/classic/tags');await repair.getByRole('button',{name:'Save & review matching bitmap tags',exact:true}).click();await expect.poll(()=>page.evaluate(()=>typeof(window as any).__sparkMock.finishBitmapReview)).toBe('function');
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();await chooseTool(page,'Build & playtest');await page.evaluate(()=>(window as any).__sparkMock.finishBitmapReview());await expect(page.getByRole('heading',{name:'Review 3 matching source files',exact:true})).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.repairCreated)).toBeUndefined();
+});
+
 test('saved native tool tags have a stable-save review and separate build workflow',async({page})=>{
  await mockDesktop(page);
  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__sparkMock.tagPhase='unchanged';w.__sparkMock.tagWatch=null;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
@@ -373,7 +399,7 @@ test('saved native tool tags have a stable-save review and separate build workfl
  const tags=page.getByRole('region',{name:'Saved tool tag changes',exact:true});await expect(tags).toContainText('Watching 2,240 tag files');
  await page.evaluate(()=>{(window as any).__sparkMock.tagPhase='saving';});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags).toContainText('Waiting for a stable save');await expect(page.getByRole('button',{name:'Build working tag edits',exact:true})).toBeDisabled();
  await page.evaluate(()=>{(window as any).__sparkMock.tagPhase='changed';});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags).toContainText('1 changed tag file');await tags.locator('summary').click();await expect(tags).toContainText('levels/test/test.scenario');await expect(page.getByRole('button',{name:'1 saved tool edit',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Build working tag edits',exact:true}).click();expect(await page.evaluate(()=>(window as any).__sparkMock.toolBuildProject)).toBe('a');await expect(page.getByRole('dialog',{name:'Runtime and tool details',exact:true})).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.saved)).toBeNull();
+ await page.getByRole('button',{name:'Build working tag edits',exact:true}).click();expect(await page.evaluate(()=>(window as any).__sparkMock.toolBuildProject)).toBe('a');await expect(page.getByRole('dialog')).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.saved)).toBeNull();
 });
 
 test('C35 viewport navigation uses Q/E and RMB wheel speed without stealing text input',async({page})=>{

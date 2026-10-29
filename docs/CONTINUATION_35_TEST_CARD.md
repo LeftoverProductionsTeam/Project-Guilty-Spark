@@ -1,5 +1,7 @@
 # C35 owner acceptance: one Director take
 
+The latest [conversion repair pass](C35_CONVERSION_RESOURCE_REPAIR.md) also needs an Alpine retail MCC check: use matching classic bitmap tags, explicitly select MCC multiplayer UI dependencies, convert and open the validated result, then install it with the exact Excession metadata. Load it in anti-cheat-disabled MCC and check spawning, modes, HUD, collision, materials and sound. The native compiler/editor receipt does not certify those gameplay results.
+
 Use the C35 development executable, an owned map and a new output filename. Keep your ordinary map edits saved first. This test does not require a live memory-edit connection.
 
 1. Open the map in Level editor. **Menu** opens the workspace drawer; **Window** opens project/search/window controls. Close them, press **F11**, open/close one tool drawer and press **Escape** to restore the window. Confirm your map, camera and edits remain in place.

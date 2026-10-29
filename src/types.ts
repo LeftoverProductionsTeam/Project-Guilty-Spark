@@ -176,7 +176,7 @@ export interface Project {
   animations?:import('./animation').AnimationAsset[];
   animationAssignments?:import('./animation').AnimationAssignment[];
   renderFeatures?:import('./renderFeatures').RenderFeatures|null;
-  conversionProfile?:'faithful'|'zombie-recovery'|null;
+  conversionProfile?:'faithful'|'zombie-recovery'|'mcc-multiplayer-ui'|null;
   sourceSceneVersion?:number;
   worldEnvironment?:import('./environment').EditorEnvironment|null;
   buildTargets?:EngineBuildTarget[];
@@ -287,6 +287,7 @@ export interface CompatibilityReport {
   blockers: string[];
   warnings: string[];
   ready: boolean;
+  bitmapDependencies?:import('./conversionResources').BitmapDependencyAudit|null;
 }
 export interface Readiness {
   mccFound: boolean;
