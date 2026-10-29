@@ -146,15 +146,19 @@ try {
     .flatMap((c) => c.pages())
     .find((p) => p.url().includes('?director='));
   await director.waitForLoadState('domcontentloaded');
+  await expect.poll(()=>director.evaluate(()=>typeof window.__TAURI_INTERNALS__?.invoke)).toBe('function');
   let wrongWindow = false;
+  let wrongWindowError = '';
   try {
     await director.evaluate(
       ({ watchId }) => window.__TAURI_INTERNALS__.invoke('working_tag_watch_poll', { watchId, force: false }),
       { watchId: watch.watchId },
     );
   } catch (error) {
+    wrongWindowError=String(error);
     wrongWindow = /another window/.test(String(error));
   }
+  if(!wrongWindow)console.log('Unexpected wrong-window outcome:',wrongWindowError);
   expect(wrongWindow).toBe(true);
   await call('plugin:window|close', { label: detached.window });
   await expect.poll(() => director.isClosed()).toBe(true);
@@ -187,6 +191,16 @@ try {
   const before = get.stdout.trim().split(',').map(Number);
   if (before.length !== 3 || before.some((n) => !Number.isFinite(n)))
     throw Error('Native editor did not read a real player start');
+  // A real native-tag save, not a timestamp fixture. Use an integer field so
+  // the reader's rounded float text cannot introduce a synthetic no-op edit.
+  const indexField='player_starting_locations[0].bsp_index';
+  const index=await run(edit,['-t',tags,'-G',indexField,relative],{windowsHide:true,timeout:30000});
+  if(!/^-?\d+$/.test(index.stdout.trim()))throw Error('Native BSP index is not an exact integer');
+  await run(edit,['-t',tags,'-S',indexField,index.stdout.trim(),relative],{windowsHide:true,timeout:30000});
+  expect(hash(await fs.readFile(scenario))).toBe(hash(tagBefore));
+  const beforeVector=Buffer.alloc(12);before.forEach((value,axis)=>beforeVector.writeFloatBE(value,axis*4));
+  const vectorAt=tagBefore.indexOf(beforeVector);
+  if(vectorAt<64||tagBefore.indexOf(beforeVector,vectorAt+1)!==-1)throw Error('Fixture has no unique native player-start span for an exact preservation check');
   const expected = [before[0] + 0.5, before[1], before[2]];
   await run(edit, ['-t', tags, '-S', 'player_starting_locations[0].position', expected.join(','), relative], {
     windowsHide: true,
@@ -194,6 +208,13 @@ try {
   });
   const tagSavedHash = hash(await fs.readFile(scenario));
   expect(tagSavedHash).not.toBe(hash(tagBefore));
+  const savedBytes=await fs.readFile(scenario);expect(savedBytes.length).toBe(tagBefore.length);
+  const changedBytes=[];
+  for(let at=0;at<tagBefore.length;at++)if(savedBytes[at]!==tagBefore[at]){
+    // Standard native tag header checksum (40..44) may be recomputed.
+    if(!(at>=vectorAt&&at<vectorAt+12)&&!(at>=40&&at<44))throw Error('Native editor changed unrelated tag bytes at '+at);
+    changedBytes.push(at);
+  }
   await expect
     .poll(
       async () => {
@@ -290,6 +311,7 @@ try {
     originalSdkScenarioUnchanged: true,
     parentCacheUnchanged: true,
     editedInputRetained: true,
+    nativeTagRoundTrip:{noOpByteIdentical:true,editedFileBytes:tagBefore.length,changedBytes:changedBytes.length,permittedSpans:[[vectorAt,vectorAt+12],[40,44]],allOtherNativeBytesUnchanged:true,scope:'Actual Invader integer no-op save and one real player-position edit on this canonical scenario; not a guarantee for every tag class/writer.'},
     sparkAuthoredDocumentUnchanged: true,
     gameLaunched: false,
     gameMemoryTouched: false,

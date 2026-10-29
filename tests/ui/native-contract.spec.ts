@@ -831,6 +831,58 @@ test('custom power-ups retain their tool tab, use map undo and require a rebuild
   await page.getByRole('button',{name:'Build map with power-ups',exact:true}).click();await expect(page.getByRole('heading',{name:'From archive to in-game.',exact:true})).toBeVisible();
 });
 
+test('Portability Lab compares explicit native targets and preserves the existing build workflow',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
+    const profiles=['halo1-mcc-steam','halo1-custom-edition'].map((id,index)=>({profileId:id,label:index?'Halo Custom Edition':'MCC Halo 1',cacheVersions:[index?609:13],implementedAdapter:true,target:{edition:index?'customEdition':'mccHalo1',platform:'windows',architecture:'x86',distribution:'synthetic',extensionIds:[]}}));
+    w.__sparkMock.projects.a.project.builds=[{id:'test-build',status:'validated',output:'synthetic.map',timestamp:'Synthetic fixture',target:'mcc-cea'}];
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(['inspect_portability','verify_native_preservation','save_portability_report','compare_portability'].includes(command))w.__sparkMock.calls.push({command,args});
+      if(command==='portability_profiles')return profiles;
+      if(command==='inspect_portability')return {schemaVersion:1,projectId:args.projectId,sourceSha256:'a'.repeat(64),sourceEdition:'Synthetic CE fixture',sourceCacheVersion:609,sourceTags:4,auditedFields:2,limitations:['Synthetic contract; no gameplay proof.'],targets:args.targets.map((id:string)=>({profile:profiles.find(p=>p.profileId===id),cacheFamilyMatches:id==='halo1-custom-edition',compiler:'Synthetic compiler',conversionAvailable:id==='halo1-mcc-steam',buildPreflight:null,findings:id==='halo1-custom-edition'?[{code:'GENERIC_SHADER',severity:'blocker',title:'Requires a different shader for this target',detail:'Native generic shader is unsupported here.',nextAction:'Review a derived Chicago shader.',source:'https://c20.reclaimers.net/h1/tags/',tagIds:[2],affectedTags:1}]:[]}))};
+      if(command==='verify_native_preservation')return {sourceSha256:'a'.repeat(64),derivedSha256:'a'.repeat(64),bytes:100,changedBytes:0,permittedRanges:[],untouchedBytesPreserved:true,byteIdentical:true,scope:'Derived extraction input only.'};
+      if(command==='save_portability_report')return {json:'Synthetic/portability.json',markdown:'Synthetic/portability.md'};
+      if(command==='compare_portability')return {sourceCacheVersion:609,targetCacheVersion:13,unchangedAuditedFields:2,fieldChangeCount:0,unpairedAuditedFields:0,missingTagCount:0,addedTagCount:0,missingTags:[],addedTags:[],fieldChanges:[],scope:'Inspected fields only; gameplay unverified.'};
+      return original(command,args);
+    };
+  });
+  await openFixture(page);await chooseTool(page,'Build & playtest');
+  await page.getByRole('tab',{name:'Portability Lab',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Map conversion · CE / PC / Demo to MCC Halo 1',exact:true})).toBeHidden();
+  await page.getByRole('checkbox',{name:'Halo Custom Edition',exact:false}).check();
+  await page.getByRole('button',{name:'Inspect portability',exact:true}).click();
+  await expect(page.getByText('Requires a different shader for this target',{exact:false})).toBeVisible();
+  await expect(page.getByText('Imported-map conversion to this exact runtime is not implemented.',{exact:false})).toBeVisible();
+  await page.getByRole('button',{name:'Verify untouched native bytes',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'No-op native bytes are identical',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Save JSON & readable report',exact:true}).click();
+  await expect(page.getByText('Synthetic/portability.md',{exact:true})).toBeVisible();
+  await page.getByRole('combobox',{name:'Portability comparison build',exact:true}).selectOption('test-build');
+  await page.getByRole('button',{name:'Compare semantic changes',exact:true}).click();
+  await expect(page.getByText('Inspected fields only; gameplay unverified.',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'MCC build workflow',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Map conversion · CE / PC / Demo to MCC Halo 1',exact:true})).toBeVisible();
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);
+  expect(calls.find((c:any)=>c.command==='inspect_portability').args.targets).toEqual(['halo1-mcc-steam','halo1-custom-edition']);
+  expect(calls.some((c:any)=>c.command==='start_build')).toBe(false);
+});
+
+test('leaving Portability Lab ignores a delayed source report and retains map edits',async({page})=>{
+  await mockDesktop(page);await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+    if(command==='portability_profiles')return [{profileId:'halo1-mcc-steam',label:'MCC Halo 1',target:{platform:'windows',architecture:'x86_64'}}];
+    if(command==='inspect_portability')return new Promise(resolve=>{w.__finishPortability=()=>resolve({sourceEdition:'Stale old-map report',targets:[],limitations:[],sourceTags:1,auditedFields:1});});
+    return original(command,args);
+  };});
+  await openFixture(page);const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('42');await velocity.press('Enter');
+  await chooseTool(page,'Build & playtest');await page.getByRole('tab',{name:'Portability Lab',exact:true}).click();
+  await page.getByRole('button',{name:'Save & inspect portability',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>typeof (window as any).__finishPortability)).toBe('function');
+  await chooseTool(page,'Tag editor');await page.evaluate(()=>(window as any).__finishPortability());
+  await expect(page.getByRole('spinbutton',{name:'Velocity',exact:true})).toHaveValue('42');
+  await expect(page.getByText('Stale old-map report',{exact:false})).toHaveCount(0);
+});
+
 test('downloaded maps can open directly in the MCC conversion flow',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>command==='import_dialog'?[await original('open_project',{id:'b'})]:original(command,args);});

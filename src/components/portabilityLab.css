@@ -1,0 +1,94 @@
+.portability-lab {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.portability-lab .surface {
+  padding: 16px;
+  min-width: 0;
+}
+.portability-lab code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.portability-lab pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+  font-size: 11px;
+}
+.portability-targets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 8px 16px;
+}
+.portability-targets label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.portability-targets input {
+  width: auto;
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+.portability-targets small {
+  display: block;
+  opacity: 0.7;
+}
+.portability-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.portability-steps {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  gap: 8px 16px;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+}
+.portability-steps li + li::before {
+  content: '›';
+  margin-right: 16px;
+  opacity: 0.6;
+}
+.portability-finding {
+  border-top: 1px solid var(--border);
+  padding: 10px 0;
+}
+.portability-finding summary {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  cursor: pointer;
+}
+.portability-finding summary span {
+  font-size: 10px;
+  text-transform: uppercase;
+  opacity: 0.8;
+  flex: 0 0 auto;
+}
+.portability-finding p {
+  margin: 8px 0;
+}
+.build-workflow-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 0 16px;
+}
+.build-workflow-tabs button[aria-selected='true'] {
+  border-color: var(--accent);
+}
+.build-columns[hidden] {
+  display: none;
+}
