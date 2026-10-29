@@ -1,60 +1,167 @@
-Project Guilty Spark - Hosting, collision, onboarding and controls source comparison
-BASELINE: Frozen C33 World Challenges source archive
-OBSERVED_BASELINE_ZIP_SHA256: 33a754b2f5c3d516adc9003b69049b09643c100981d8f9fba1a6637cdcfcb1c8
-BASELINE_FILES_HASH_VERIFIED: 993
-Comparison excludes checksum manifests and this comparison report.
-ADDED_COUNT: 20
-MODIFIED_COUNT: 25
-UNCHANGED_COUNT: 967
+Project Guilty Spark - C34 source comparison
+BASELINE_GIT_COMMIT: fc198e302933fff5bab72f3e53538634bac270f3
+Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
+ADDED_COUNT: 112
+MODIFIED_COUNT: 38
+UNCHANGED_COUNT: 957
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/src/gameplay.rs
-crates/spark-core/src/session_frames.rs
-crates/spark-core/src/session_invite.rs
-crates/spark-steam-bridge/Cargo.toml
-crates/spark-steam-bridge/src/loopback.rs
-crates/spark-steam-bridge/src/main.rs
-crates/spark-steam-bridge/src/windows.rs
-docs/HOSTING_COLLISION_AND_CONTROLS.md
-docs/fixtures/hosting-collision-controls-verification.json
-docs/licenses/49bbe9114e49214df2ccc324cb3ac8d1d1aa1c3a0947f94c286765e86647b32e.txt
-docs/licenses/4bd159d9ac5b4f3b5470b30dd9f8e9aede2a15463b900736a8d29ce62842c5c7.txt
-scripts/build-steam-bridge.mjs
-src-tauri/src/shared_editing.rs
-src-tauri/src/steam_bridge.rs
-src/components/GameplayControls.tsx
-src/components/HostingWorkspace.tsx
-src/components/SettingsPanel.tsx
-src/components/SteamSessionTools.tsx
-src/gameplay.ts
-src/hosting.css
+crates/spark-core/examples/community_listing_check.rs
+crates/spark-core/examples/qa_runtime_library.rs
+crates/spark-core/examples/qa_visibility_zones.rs
+crates/spark-core/examples/qa_working_tags.rs
+crates/spark-core/src/bsp_visibility.rs
+crates/spark-core/src/community_host.rs
+crates/spark-core/src/community_servers.rs
+crates/spark-core/src/dependencies.rs
+crates/spark-core/src/dual_wield.rs
+crates/spark-core/src/external_changes.rs
+crates/spark-core/src/invitations.rs
+crates/spark-core/src/mcc_content_probe.rs
+crates/spark-core/src/runtime_adapters.rs
+crates/spark-core/src/working_tags.rs
+crates/spark-core/tests/dual_wield.rs
+crates/spark-core/tests/external_changes.rs
+crates/spark-core/tests/mcc_content_probe.rs
+docs/CONTINUATION_34_ENGINEERING.md
+docs/CONTINUATION_34_GITHUB_DESCRIPTION.md
+docs/fixtures/continuation34-native-ui-verification.json
+docs/fixtures/working-tags-native-verification.json
+docs/research/C34_AI_ADAPTER_RESEARCH.md
+docs/research/C34_COMMUNITY_PROTOCOLS.md
+docs/research/C34_CONNECTED_WORLD_AUDIT.md
+docs/research/C34_DEPENDENCIES.md
+docs/research/C34_DUAL_WIELD_ENGINE.md
+docs/research/C34_EXTERNAL_MAP_SYNC.md
+docs/research/C34_HOST_ADAPTER.md
+docs/research/C34_LIVE_WRITE_AUDIT.md
+docs/research/C34_MAP_DOWNLOADS.md
+docs/research/C34_MCC_CONTENT.md
+docs/research/C34_VISIBILITY_ZONES.md
+docs/research/C34_WORKING_TAGS.md
+scripts/feature-ledger-evidence.mjs
+scripts/test-runtime-workbench-native.mjs
+src-tauri/gen/schemas/acl-manifests.json
+src-tauri/gen/schemas/capabilities.json
+src-tauri/gen/schemas/desktop-schema.json
+src-tauri/gen/schemas/windows-schema.json
+src-tauri/icons/android/mipmap-anydpi-v26/ic_launcher.xml
+src-tauri/icons/android/mipmap-hdpi/ic_launcher.png
+src-tauri/icons/android/mipmap-hdpi/ic_launcher_foreground.png
+src-tauri/icons/android/mipmap-hdpi/ic_launcher_round.png
+src-tauri/icons/android/mipmap-mdpi/ic_launcher.png
+src-tauri/icons/android/mipmap-mdpi/ic_launcher_foreground.png
+src-tauri/icons/android/mipmap-mdpi/ic_launcher_round.png
+src-tauri/icons/android/mipmap-xhdpi/ic_launcher.png
+src-tauri/icons/android/mipmap-xhdpi/ic_launcher_foreground.png
+src-tauri/icons/android/mipmap-xhdpi/ic_launcher_round.png
+src-tauri/icons/android/mipmap-xxhdpi/ic_launcher.png
+src-tauri/icons/android/mipmap-xxhdpi/ic_launcher_foreground.png
+src-tauri/icons/android/mipmap-xxhdpi/ic_launcher_round.png
+src-tauri/icons/android/mipmap-xxxhdpi/ic_launcher.png
+src-tauri/icons/android/mipmap-xxxhdpi/ic_launcher_foreground.png
+src-tauri/icons/android/mipmap-xxxhdpi/ic_launcher_round.png
+src-tauri/icons/android/values/ic_launcher_background.xml
+src-tauri/icons/ios/AppIcon-20x20@1x.png
+src-tauri/icons/ios/AppIcon-20x20@2x-1.png
+src-tauri/icons/ios/AppIcon-20x20@2x.png
+src-tauri/icons/ios/AppIcon-20x20@3x.png
+src-tauri/icons/ios/AppIcon-29x29@1x.png
+src-tauri/icons/ios/AppIcon-29x29@2x-1.png
+src-tauri/icons/ios/AppIcon-29x29@2x.png
+src-tauri/icons/ios/AppIcon-29x29@3x.png
+src-tauri/icons/ios/AppIcon-40x40@1x.png
+src-tauri/icons/ios/AppIcon-40x40@2x-1.png
+src-tauri/icons/ios/AppIcon-40x40@2x.png
+src-tauri/icons/ios/AppIcon-40x40@3x.png
+src-tauri/icons/ios/AppIcon-512@2x.png
+src-tauri/icons/ios/AppIcon-60x60@2x.png
+src-tauri/icons/ios/AppIcon-60x60@3x.png
+src-tauri/icons/ios/AppIcon-76x76@1x.png
+src-tauri/icons/ios/AppIcon-76x76@2x.png
+src-tauri/icons/ios/AppIcon-83.5x83.5@2x.png
+src-tauri/src/community_host_native.rs
+src-tauri/src/dependency_install.rs
+src-tauri/src/external_changes_native.rs
+src-tauri/src/invitations_native.rs
+src-tauri/src/live_controller_poll.rs
+src-tauri/src/map_download.rs
+src-tauri/src/runtime_workbench.rs
+src/components/CommunityHostAdapter.tsx
+src/components/DependencyPanel.tsx
+src/components/ExternalMapSync.tsx
+src/components/InvitationJoin.tsx
+src/components/MapDownload.tsx
+src/components/OwnedContentProbe.tsx
+src/components/PlayAndServers.tsx
+src/components/RuntimeDock.tsx
+src/components/VisibilityZones.tsx
+src/components/dependencyPanel.css
+src/dependencyGuide.test.ts
+src/dependencyGuide.ts
+src/externalMapSync.css
+src/externalMapSync.test.ts
+src/externalMapSync.ts
+src/externalRevision.test.ts
+src/lobbyFilters.test.ts
+src/lobbyFilters.ts
+src/mapDownload.css
+src/runtimeWorkbench.css
+src/runtimeWorkbench.test.ts
+src/runtimeWorkbench.ts
+src/visibilityZones.css
+src/visibilityZones.test.ts
+src/visibilityZones.ts
+tests/fixtures/synthetic_halo1_tool_errors.log
+tests/ui/fixtures/mapDownload.html
+tests/ui/fixtures/mapDownload.tsx
+tests/ui/fixtures/visibilityZones.tsx
+tests/ui/map-download.spec.ts
+tests/ui/visibility-zones.spec.ts
 
 MODIFIED FILES
 Cargo.lock
-Cargo.toml
 README.md
-THIRD_PARTY_NOTICES.md
 crates/spark-core/src/bsp_assembly.rs
 crates/spark-core/src/bsp_clearance.rs
-crates/spark-core/src/forge_session.rs
+crates/spark-core/src/gameplay.rs
 crates/spark-core/src/lib.rs
-crates/spark-core/src/live_adapter.rs
 crates/spark-core/src/live_adapter_tests.rs
-crates/spark-core/src/project.rs
-crates/spark-core/src/runtime.rs
-docs/DEPENDENCY_LICENSES.json
+crates/spark-core/src/maps.rs
+crates/spark-core/src/mcc.rs
+crates/spark-core/tests/maps.rs
+crates/spark-core/tests/mcc_steam.rs
+docs/COMPATIBILITY_MATRIX.md
+docs/GETTING_STARTED.md
 docs/GITHUB_HANDOFF.md
+docs/MASTER_FEATURE_LEDGER.csv
+docs/MASTER_FEATURE_LEDGER.md
+scripts/package-source.mjs
+scripts/update-feature-ledger.mjs
+src-tauri/Cargo.toml
 src-tauri/src/app.rs
+src-tauri/src/live_camera_native.rs
 src-tauri/src/live_mcc.rs
-src-tauri/src/main.rs
+src-tauri/src/live_sprint_native.rs
 src/App.tsx
-src/components/ForgeCollaboration.tsx
+src/bspAssembly.ts
+src/components/BspAssembly.tsx
+src/components/CommunityMaps.tsx
+src/components/LiveEditor.tsx
 src/components/Runtimes.tsx
+src/components/SettingsPanel.tsx
 src/components/StartupSetup.tsx
-src/styles.css
-src/types.ts
+src/components/ViewportSession.tsx
+src/components/World.tsx
+src/featureCatalog.ts
+src/mapDocuments.ts
+src/mapSession.ts
 tests/ui/browser.spec.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES
+None.
+
+Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
+Earlier C32/C33 release/source archives remain frozen.

@@ -167,6 +167,8 @@ pub fn pair_recipe() -> PairRecipe {
             "Matching first-person firing and reload animations",
             "Separate left and right muzzle markers and magazine/trigger bindings",
             "Verified primary/secondary input hooks, or matching in-game mouse bindings",
+            "An engine-owned offhand manual reload path; stock H1 manual reload selects magazine 0",
+            "Native paired recoil, split ammunition HUD, pickup/drop/melee rules and host-authoritative multiplayer acceptance",
         ],
     }
 }

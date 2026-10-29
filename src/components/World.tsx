@@ -29,6 +29,7 @@ import {sourceSpartan} from '../sourceSpartan';
 import SceneEnvironment from './SceneEnvironment';
 import SceneEffects from './SceneEffects';
 import RenderFeatures from './RenderFeatures';
+import VisibilityZones,{VisibilityZoneOverlay} from './VisibilityZones';
 import {useMapState} from '../mapSession';
 import ViewportSession,{hasViewportSession} from './ViewportSession';
 import ViewportPerformance from './ViewportPerformance';
@@ -528,8 +529,9 @@ export default function World({
   cinematic?:boolean;cameraLocked?:boolean;
 }) {
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
+  const [,setZoneSelection]=useMapState<string|null>(project.id,'visibility.selected',null);
   const selected=selectedId!==undefined?selectedId:localSelected;
-  const setSelected=(id:string|null)=>{setLocalSelected(id);onSelectObject?.(id);};
+  const setSelected=(id:string|null)=>{setLocalSelected(id);if(id)setZoneSelection(null);onSelectObject?.(id);};
   const [query, setQuery] = useMapState(project.id,'world.query','');
   const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(project.id,'world.mode','translate');
   const [snap, setSnap] = useMapState(project.id,'world.snap',false);
@@ -1051,12 +1053,13 @@ export default function World({
           break;
         case 'escape':
           setSelected(null);
+          setZoneSelection(null);
           break;
       }
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [fly]);
+  }, [fly,project.id]);
   return (
     <div className="world-layout" data-source-shaders={Object.keys(shaderTextures).length} data-source-lightmaps={Object.keys(lightmapTextures).length}
       data-source-details={Object.keys(extraTextures).length} data-sky-triangles={(sourceAppearance?.skyMesh?.indices.length??0)/3}
@@ -1208,7 +1211,7 @@ export default function World({
               <Canvas
                 dpr={[1, 1.75]}
                 gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
-                onPointerMissed={(event) => { if (event.button === 0 && event.type === 'click') setSelected(null); }}
+                onPointerMissed={(event) => { if (event.button === 0 && event.type === 'click') {setSelected(null);setZoneSelection(null);} }}
               >
 
                 <Scene
@@ -1237,6 +1240,7 @@ export default function World({
                   lightmapTextures={lightmapTextures}
                 />
                 <ViewportSession id={project.id} channel={cinematic?'machinima':'world'} paused={cameraLocked} requiresControls={!cinematic&&!fly}/>
+                {!cinematic&&<VisibilityZoneOverlay project={project} edit={edit} enabled={!fly&&!cameraLocked&&!selected} onSelectScene={()=>setSelected(null)} onSceneDragStart={onSceneDragStart} onSceneDragEnd={onSceneDragEnd}/>}
                 {viewportChildren}
               </Canvas>
             </Suspense>
@@ -1288,6 +1292,7 @@ export default function World({
         </div>
       </section>
       <aside className="panel inspector">
+        {!cinematic&&<VisibilityZones project={project} edit={edit} onSelectScene={()=>setSelected(null)} onSave={onBeforeResources}/>}
         <RenderFeatures project={project} edit={edit}/>
         <div className="panel-heading">
           <strong>Inspector</strong>

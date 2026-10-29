@@ -1,6 +1,7 @@
 /** Per-map UI state, separate from authored edits and build fingerprints. */
 import { useSyncExternalStore } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import type { MapInspection } from './types';
 const cache = new Map<string, Record<string, unknown>>(),
   listeners = new Set<() => void>();
 const prefix = 'guilty-spark-map-session-v1:';
@@ -73,4 +74,18 @@ export function useMapState<T>(
   const set: Dispatch<SetStateAction<T>> = (next) =>
     writeMapSession(id, key, typeof next === 'function' ? (next as (value: T) => T)(get()) : next);
   return [value, set];
+}
+
+/** Carry view preferences across a new immutable cache revision, never game handles. */
+export function copyMapViewSession(from: string, to: string, before: MapInspection | null, after: MapInspection | null) {
+  if (from === to) return;
+  const prior = record(from);
+  const safe = /^(?:camera\.(?:world|forge|machinima)\.(?:PerspectiveCamera|OrthographicCamera)$|scroll\.|workspace$|tags\.(?:query|filter|limit|advanced)$|world\.(?:query|mode|snap|grid|view|ortho|fly|playerView)$|tools\.open$|hosting\.(?:runtime|tab)$|servers\.(?:provider|filter)$)/;
+  for (const [key, value] of Object.entries(prior)) if (safe.test(key)) writeMapSession(to, key, value);
+  for (const key of ['tags.selection', 'tags.focus']) {
+    const old = before?.tags.find(tag => tag.id === prior[key]);
+    const matches = old ? after?.tags.filter(tag => tag.class === old.class && tag.path.replaceAll('\\','/').toLowerCase() === old.path.replaceAll('\\','/').toLowerCase()) ?? [] : [];
+    writeMapSession(to, key, matches.length === 1 ? matches[0].id : null);
+  }
+  writeMapSession(to, 'level.target', 'source');
 }

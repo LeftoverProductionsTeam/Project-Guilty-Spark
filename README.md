@@ -1,6 +1,6 @@
 # Project Guilty Spark
 
-**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 33** is a prerelease; compiler and game acceptance remain separate from editor previews.
+**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 34 dev** continues the existing prerelease; compiler and game acceptance remain separate from editor previews.
 
 > Project Guilty Spark stands on more than twenty years of research, experimentation, documentation, tools, discoveries, and shared knowledge from the Halo modding community. This project would not exist without the people who explored the Blam engine, created the original editors, reverse-engineered file formats, preserved old maps, documented workflows, and helped generations of modders learn.
 
@@ -23,6 +23,16 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 - Drop supported Halo animation sources onto compatible bipeds; rehearse their real skeletons and compile an SDK camera/actor take with a clean game HUD and player input enabled.
 
 ![Connect Your Halo Games in the native Windows application](docs/screenshots/continuation33/native-connect-games.png)
+
+## C34 internal engineering continuation
+
+C34 continues the existing project and keeps the full feature set as the alpha target. The bottom Runtime & Tools Dock keeps map-specific runtime selection, opens verified derived source in the matching native tools, and provides setup paths. A separate working-tags compiler preserves saved Sapien/Guerilla edits in a new compiled map.
+
+**Settings → Dependencies & setup** checks missing tools and source data, offers remembered folder selection and official guides, and can open a reviewed Steam install page for Halo CE Mod Tools. **Community maps** accepts direct HTTPS map/ZIP downloads and routes preserved imports into Level editor, Tags or conversion. Open maps detect stable external saves every two seconds, retaining conflicting Spark edits in a separate tab. Combined maps support editable tunnel visibility zones with native portal/cluster/PVS readback; editor bounds and independent region streaming remain distinct.
+
+Play & Servers reads the real Delta List service, filters advertised OpenCE/Chupathingy/web-compatible games, checks local runtime/content prerequisites and prepares a pinned, expiring game invitation handoff. Paste supported community, official web or MCC Steam lobby links in **Join by invitation**. MCC-to-community gameplay protocol translation remains unimplemented. Private host profiles and authenticated loopback server observations are available; server launch, eight-player campaign/Firefight and 128-player game acceptance remain separate gates. A process launch is not reported as a successful game connection.
+
+The current Windows manifest regression is fixed with drive/UNC path tests. Idle native controllers avoid unnecessary transport/lock work. The four-map audit confirms one combined BSP and preserves the three passing automated routes; gameplay, two-client AI/co-op and 128-player acceptance remain open. See the [C34 engineering record](docs/CONTINUATION_34_ENGINEERING.md) and [current compatibility matrix](docs/COMPATIBILITY_MATRIX.md).
 
 ## Experimental and unverified
 

@@ -57,10 +57,13 @@ import { initialHistory, thumbnail } from './editor';
 import type {HistoryAction} from './editor';
 import {activeDocument,documentReducer,emptyMapDocuments} from './mapDocuments';
 import MapTabs from './components/MapTabs';
+import RuntimeDock from './components/RuntimeDock';
+import ExternalMapSync from './components/ExternalMapSync';
+import {hasSourceBoundEdits} from './externalMapSync';
 import SettingsPanel from './components/SettingsPanel';
 import MapTools from './components/MapTools';
 import WorkspaceSession from './components/WorkspaceSession';
-import {readMapSession,writeMapSession,useMapState} from './mapSession';
+import {readMapSession,writeMapSession,useMapState,copyMapViewSession} from './mapSession';
 import AssetTransfer,{transferTag} from './components/AssetTransfer';
 import type {TransferSelection} from './components/AssetTransfer';
 import {readHistoryLimit,saveHistoryLimit} from './historyPreferences';
@@ -69,6 +72,8 @@ import {WindowControls,ResizeEdges,dragWindow,maximizeWindow} from './components
 import { Empty, IconButton, Pill, Toast } from './components/ui';
 import Library from './components/Library';
 import CommunityMaps from './components/CommunityMaps';
+import type {MapDownloadAction} from './components/MapDownload';
+import DependencyPanel from './components/DependencyPanel';
 import WorkspaceFinder from './components/WorkspaceFinder';
 import WorkbenchGuide from './components/WorkbenchGuide';
 import LevelEditorWorkspace from './components/LevelEditorWorkspace';
@@ -109,7 +114,7 @@ const nav = [
   { id: 'scenario', label: 'AI & scenario', icon: Users },
   { id: 'build', label: 'Build & playtest', icon: ArrowUpRight },
   { id: 'compare', label: 'Compare variants', icon: ArrowLeftRight },
-  { id: 'runtimes', label: 'Runtimes & friends', icon: Server },
+  { id: 'runtimes', label: 'Play & servers', icon: Server },
   { id: 'live', label: 'Live Lab', icon: Unplug },
   { id: 'interface', label: 'Interface Studio', icon: Palette },
   { id: 'creator', label: 'Creator Studio', icon: BookOpen },
@@ -133,6 +138,7 @@ export default function App() {
   useEffect(()=>saveHistoryLimit(history.limit),[history.limit]);
   const inspection=activeMap?.inspection??null,meshes=activeMap?.meshes??{};
   const [workspace, setWorkspace] = useState<Workspace>(firstVisitWorkspace);
+  const [settingsTab,setSettingsTab]=useState<'tools'|'dependencies'>('tools');
   const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
   const bootRouteHandled=useRef(false);
   useEffect(()=>{if(!ready||bootRouteHandled.current)return;bootRouteHandled.current=true;if(data.settings.onboardingCompleted){markFirstVisitSeen();if(workspace==='get-started')setWorkspace('library');}},[ready,data.settings.onboardingCompleted]);
@@ -168,6 +174,9 @@ export default function App() {
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const buildRequest = useRef(0);
   const current = history.current;
+  const [dependencyRuntime,setDependencyRuntime]=useMapState<RuntimeId>(current?.id??'global','hosting.runtime',current?.quickForge?.runtimeId??current?.buildTargets?.find(t=>t.id===current.activeBuildTarget)?.runtimeId??data.settings.preferredHalo??'mccSteam');
+  function openDependencySetup(){setSettingsTab('dependencies');setWorkspace('settings');}
+  function selectSettingsTab(tab:'tools'|'interface'|'dependencies'){if(tab==='interface')setWorkspace('interface');else{setSettingsTab(tab);setWorkspace('settings');}}
   const [ownedHeaderArt,setOwnedHeaderArt] = useState<{url:string;tagId:number}|null>(null);
   const [ownedHeaderLoading,setOwnedHeaderLoading] = useState(false);
   const [ownedHeaderStatus,setOwnedHeaderStatus] = useState('No local Halo bitmap selected.');
@@ -374,6 +383,43 @@ export default function App() {
     [notice],
   );
   const applyResourceMetadata=useCallback(async(open:OpenProject)=>{const existing=documentsRef.current.documents.find(d=>d.id===open.project.id);if(existing)dispatchDocument({type:'resources',project:open.project});else await load(open);},[load]);
+  const applyDependencyChoice=useCallback((open:OpenProject)=>{
+    const existing=documentsRef.current.documents.find(d=>d.id===open.project.id);
+    if(!existing)return;
+    dispatchDocument({type:'history',id:open.project.id,action:{type:'edit',project:open.project,description:'Update map dependency setup'}});
+    if(open.inspection)dispatchDocument({type:'resources',project:open.project});
+    setEpoch(value=>value+1);
+  },[]);
+  const adoptExternalRevision=useCallback(async(previousId:string,opened:OpenProject,mode:'replaceClean'|'openSeparate')=>{
+    if (documentsRef.current.activeId===previousId && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur(); await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+    }
+    let previous=documentsRef.current.documents.find(d=>d.id===previousId);
+    if (!previous?.history.current) return;
+    await call('claim_project_document',{id:opened.project.id});
+    const prior=previous.history.current;
+    if (!opened.project.buildTargets?.length && prior.buildTargets?.length && prior.source?.cacheVersion===opened.project.source?.cacheVersion) {
+      // Keep chosen tool profiles; no edits, cache offsets or old build receipts
+      // are copied. The normal native conversion preflight rechecks this source.
+      await call('save_project',{project:{...opened.project,buildTargets:prior.buildTargets,activeBuildTarget:prior.activeBuildTarget}});
+      opened=await call<OpenProject>('open_project',{id:opened.project.id});
+    }
+    previous=documentsRef.current.documents.find(d=>d.id===previousId);
+    if (!previous?.history.current) {await call('release_project_document',{id:opened.project.id});return;}
+    const replace=mode==='replaceClean'&&!previous.history.dirty&&!hasSourceBoundEdits(previous.history.current,previous.inspection);
+    window.dispatchEvent(new CustomEvent('guilty-spark-flush-map-view',{detail:previousId}));
+    if (!documentsRef.current.documents.some(d=>d.id===opened.project.id)) copyMapViewSession(previousId,opened.project.id,previous.inspection,opened.inspection);
+    dispatchDocument({type:'external-revision',previousId,open:opened,replaceClean:replace});
+    if (replace) {
+      // React applies the reducer's final dirty/source checks before ownership is
+      // released. A late edit can retain the old document as a separate tab.
+      await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+      if(!documentsRef.current.documents.some(d=>d.id===previousId))await call('release_project_document',{id:previousId});
+    }
+    if (documentsRef.current.activeId===previousId && workspaceRef.current==='live') setWorkspace('world');
+    await refresh();
+    notice(replace?'External save detected. Map and tags refreshed; the previous source revision is preserved.':'External save opened separately. Existing Spark edits remain in their original map tab.','info');
+  },[refresh,notice]);
   useEffect(() => {
     if (!native) return;
     let alive = true;
@@ -522,6 +568,23 @@ export default function App() {
       setBusy(false);
     }
   }
+  async function openDownloadedMaps(imported:OpenProject[],destination:MapDownloadAction){
+    if(!imported.length)return;
+    setBusy(true);
+    try{
+      if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+      await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+      if(historyRef.current.dirty)await save();
+      for(const open of imported){
+        // Reopening an imported download must retain an already open draft.
+        if(!documentsRef.current.documents.some(d=>d.id===open.project.id))await load(open);
+      }
+      dispatchDocument({type:'select',id:imported[0].project.id});
+      setWorkspace(destination==='convert'?'build':destination==='tags'||imported[0].inspection?.header.scenarioType===2?'tags':'world');
+      await refresh();
+      notice(`${imported.length} downloaded map${imported.length===1?'':'s'} opened. Original downloads and existing map drafts are preserved.${destination==='convert'?' Review the target runtime, required tools and conversion checks before building.':''}`,'success');
+    }finally{setBusy(false);}
+  }
   async function importAnimations(paths:string[]){
     const project=historyRef.current.current;if(!project){notice('Open a map or source project before dropping animations.','error');return;}
     setBusy(true);try{const imported=await call<import('./animation').AnimationAsset[]>('import_animation_sources',{projectId:project.id,paths});const current=documentsRef.current.documents.find(d=>d.id===project.id)?.history.current;
@@ -647,7 +710,7 @@ export default function App() {
     if (workspace === 'get-started') return <GettingStarted data={data} project={current} onApply={applySettings} navigate={target => {markFirstVisitSeen();setWorkspace(target);}}/>;
     if (workspace === 'features') return <Features project={current} openMaps={documents.documents.length} navigate={setWorkspace}/>;
     if (workspace === 'community') return <CommunityThanks/>;
-    if (workspace === 'map-finder') return <CommunityMaps onImport={()=>void importFiles()} onImportConvert={()=>void importFiles(undefined,'build')} currentMapTitle={current?.source?current.title:null} onConvertCurrent={()=>setWorkspace('build')} onLibrary={()=>setWorkspace('library')} busy={busy}/>;
+    if (workspace === 'map-finder') return <CommunityMaps onImport={()=>void importFiles()} onImportConvert={()=>void importFiles(undefined,'build')} currentMapTitle={current?.source?current.title:null} onConvertCurrent={()=>setWorkspace('build')} onLibrary={()=>setWorkspace('library')} busy={busy} onDownloaded={openDownloadedMaps} targetLabel={data.settings.preferredHalo==='mccSteam'||!data.settings.preferredHalo?'MCC Halo 1':data.settings.preferredHalo}/>;
     if (workspace === 'library')
       return (
         <Library
@@ -666,7 +729,7 @@ export default function App() {
           busy={busy}
         />
       );
-    if (workspace === 'interface') return <SettingsPanel tab="interface" onTab={tab=>setWorkspace(tab==='interface'?'interface':'settings')}><InterfaceStudio
+    if (workspace === 'interface') return <SettingsPanel tab="interface" onTab={selectSettingsTab}><InterfaceStudio
       preferences={interfacePreferences} onChange={setInterfacePreferences} onPreview={playInterfaceCue}
       bitmapTags={matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection) || (!bitmapPreference && !!current?.source && !!inspection && inspection.sha256.toLowerCase()===current.source.sha256.toLowerCase())
         ? (inspection?.tags.filter(tag=>tag.class==='bitm').map(tag=>({id:tag.id,path:tag.path})) ?? [])
@@ -686,20 +749,25 @@ export default function App() {
       }} /></SettingsPanel>;
     if (workspace === 'settings')
       return (
-        <SettingsPanel tab="tools" onTab={tab=>setWorkspace(tab==='interface'?'interface':'settings')}><Preferences
+        <SettingsPanel tab={settingsTab} onTab={selectSettingsTab}>{settingsTab==='dependencies'?<div className="analysis-page">
+          <label className="field">Dependency target<select aria-label="Dependency target runtime" value={dependencyRuntime} onChange={e=>setDependencyRuntime(e.target.value as RuntimeId)}>
+            <option value="mccSteam">Halo 1 · MCC (Steam)</option><option value="haloCustomEdition">Halo Custom Edition</option><option value="haloPc">Halo PC</option><option value="chupathingyCe">ChupathingyCE</option><option value="openCe">OpenCE</option><option value="haloPcTrial">Halo PC Trial</option><option value="macRetail">Halo Mac</option><option value="macDemo">Halo Mac Demo</option><option value="haloMd">HaloMD</option><option value="haloXbox">Halo Xbox</option>
+          </select></label>
+          <DependencyPanel project={current} runtime={dependencyRuntime} onSetupChanged={next=>{setData(next);setEpoch(value=>value+1);}} onProjectUpdated={applyDependencyChoice} onChooseAssets={()=>setWorkspace(current?'assets':'library')}/>
+        </div>:<Preferences
           data={data}
           undoLimit={history.limit} onUndoLimit={limit=>dispatch({type:'history-limit',limit})}
           onApply={applySettings}
           onAction={action}
           onRuntimes={() => setWorkspace('runtimes')}
-        /></SettingsPanel>
+        />}</SettingsPanel>
       );
     if (workspace === 'compare')
       return (
         <Compare entries={data.entries} currentId={current?.id} dirty={history.dirty} onSave={() => save()} />
       );
     if (workspace === 'runtimes')
-      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} settings={data.settings} onSettings={() => setWorkspace('settings')} onOpenWorkspace={setWorkspace} edit={edit} />;
+      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} settings={data.settings} onSettings={openDependencySetup} onOpenWorkspace={setWorkspace} edit={edit} />;
     if (workspace === 'academy') return <Academy project={current} inspection={inspection} settings={data.settings} navigate={setWorkspace} />;
     if (!current) return commonEmpty;
     switch (workspace) {
@@ -744,7 +812,7 @@ export default function App() {
             epoch={epoch}
             onStart={() => void startBuild()}
             onAction={action}
-            onSettings={() => setWorkspace('settings')}
+            onSettings={openDependencySetup}
             onResources={() =>
               void action(async () => {
                 const projectId = current.id;
@@ -784,7 +852,7 @@ export default function App() {
               <strong>GUILTY SPARK</strong>
               <span>HALO MODERN EVOLVED</span>
             </div>
-            <Pill>0.4.0 · C33</Pill>
+            <Pill>0.4.0 · C34 dev</Pill>
           </button>
           <div className="header-context">
             <span>LOCAL WORKBENCH</span>
@@ -897,6 +965,7 @@ export default function App() {
         <main className={`main-content workspace-${workspace}`}>
           <MapTabs state={documents} disabled={busy||closing} onSelect={selectMap} onClose={id=>void closeMap(id)} onWindow={id=>void closeMap(id,true)} onAssets={()=>setAssetTransferOpen(v=>!v)}/>
           {current&&<MapTools key={current.id} project={current} settings={data.settings} edit={edit}/>}
+          <ExternalMapSync documents={documents.documents.flatMap(d=>d.history.current?[{project:d.history.current,inspection:d.inspection,dirty:d.history.dirty}]:[])} onRevision={adoptExternalRevision}/>
           {assetTransferOpen&&current&&<AssetTransfer key={current.id} data={data} documents={documents.documents} target={current} busy={busy} onTransfer={transferAsset} onClose={()=>setAssetTransferOpen(false)} onTags={()=>{setAssetTransferOpen(false);setWorkspace('tags');}}/>}
           {current && !['library','settings','community','get-started'].includes(workspace) && (
             <div className="editor-bar">
@@ -945,27 +1014,7 @@ export default function App() {
             <Suspense fallback={<div className="loading">Loading workspace…</div>}><WorkspaceSession key={`${current?.id??'global'}:${['world','quickforge','live'].includes(workspace)?'level':workspace}`} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace}>{content()}</WorkspaceSession></Suspense>
           )}
         </main>
-        <footer className="statusbar">
-          <div>
-            <span className="live-dot" />
-            {busy
-              ? 'Working…'
-              : activeJob
-                ? 'Conversion job running'
-                : history.dirty
-                  ? 'Unsaved project changes'
-                  : 'Workbench ready'}
-            {!native && <span>· Native services unavailable in browser</span>}
-          </div>
-          <div>
-            {current && (
-              <span>
-                {current.tagEdits.length} tag edits · {current.scene.length} objects
-              </span>
-            )}
-            <span>API v1</span>
-          </div>
-        </footer>
+        <RuntimeDock project={current} settings={data.settings} dirty={history.dirty} working={busy || !!activeJob} epoch={epoch} onSave={() => save()} onNavigate={next=>next==='settings'?openDependencySetup():setWorkspace(next)} onOpenCompiled={buildId=>{if(current)void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});await load(opened);await refresh();setWorkspace('quickforge');},'Working tag changes compiled, preserved and opened in a new map tab.');}}/>
         {busy && (
           <div className="busy-indicator">
             <LoaderCircle className="spin" size={17} />

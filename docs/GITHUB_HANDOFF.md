@@ -1,3 +1,19 @@
+# C34 Git push handoff
+
+Title: **C34: runtime tools, map refresh and dependency guidance**
+
+Continue Spark with a map-specific Runtime & Tools Dock, working-tag builds, external-save detection, direct map downloads and editable visibility zones. Add missing-dependency guidance with a reviewed Steam install route, real community listings, invitation routing and private host/control preparation. Preserve all C32/C33 work; native dual wield, MCC protocol translation, arbitrary live spawning/BSP replacement and expanded-player game acceptance remain open.
+
+Use the [full C34 description](CONTINUATION_34_GITHUB_DESCRIPTION.md) and [engineering evidence](CONTINUATION_34_ENGINEERING.md). Review the local branch and source diff before pushing; no remote changes are included in this handoff.
+
+```powershell
+git status --short
+git log -3 --oneline --decorate
+git push -u origin codex/continuation-34-runtime-integration
+```
+
+Confirm the hosted Windows CI result after pushing. Keep `latestspark.zip`, owned SDK/maps, private QA data and local build artifacts out of Git.
+
 # C32 + C33 Git push handoff
 
 Continue the existing project; no restoration sources were replaced. The requested merge target is local **master**. The owner will push; no remote push, pull request or repository-setting change is part of this handoff.

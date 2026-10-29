@@ -31,6 +31,34 @@ fn status(data: &NativeCameraData, observed: Option<camera::Info>) -> NativeCame
         detail: "Experimental native third-person camera. Back, shoulder and height translate the authored biped camera track; the engine retains camera rotations, player control and weapon aiming. Camera tracks and weapon flags are shared by matching local tag definitions. Near/far aiming and wall-collision playtests remain required.".into(),
     }
 }
+struct CameraPollTicket {
+    revision: u64,
+    toggle: bool,
+}
+fn prepare_poll(
+    data: &mut NativeCameraData,
+    update_due: bool,
+    input: impl FnOnce(&camera::Shortcut) -> Result<(bool, bool)>,
+) -> Result<Option<CameraPollTicket>> {
+    // Inactive F6 remains available, but only keyboard/focus state is sampled.
+    // Neither the shared edit mutex nor a game process is needed for this.
+    let toggle = if data.shortcut.enabled {
+        let shortcut = data.shortcut.clone();
+        let (down, focused) = input(&shortcut)?;
+        data.shortcut_latch.sample(&shortcut, down, focused)
+    } else {
+        false
+    };
+    Ok(
+        (toggle || (data.enabled && update_due)).then_some(CameraPollTicket {
+            revision: data.poll_revision,
+            toggle,
+        }),
+    )
+}
+fn current_poll(data: &NativeCameraData, ticket: &CameraPollTicket) -> bool {
+    data.poll_revision == ticket.revision && (ticket.toggle || data.enabled)
+}
 pub fn camera_status(s: &Session) -> Result<NativeCameraStatus> {
     let _edit = EditLock::acquire(s)?;
     let p = guarded(s, false)?;
@@ -42,6 +70,7 @@ pub fn camera_status(s: &Session) -> Result<NativeCameraStatus> {
     Ok(status(&data, camera::info(&p, s.base, &s.identity).ok()))
 }
 fn restore_data(s: &Session, data: &mut NativeCameraData) -> Result<()> {
+    data.poll_revision = data.poll_revision.wrapping_add(1);
     data.enabled = false;
     if !data.state.active() {
         return Ok(());
@@ -81,6 +110,7 @@ pub fn camera_shortcut(s: &Session, shortcut: camera::Shortcut) -> Result<Native
     }
     let (down, _) = shortcut_input(s, &shortcut)?;
     data.shortcut_latch.sample(&shortcut, down, false);
+    data.poll_revision = data.poll_revision.wrapping_add(1);
     data.shortcut = shortcut;
     let observed = guarded(s, false)
         .ok()
@@ -96,6 +126,7 @@ fn toggle_data(
     data: &mut NativeCameraData,
     config: Option<camera::Config>,
 ) -> Result<()> {
+    data.poll_revision = data.poll_revision.wrapping_add(1);
     if data.enabled {
         restore_data(s, data)?;
     } else {
@@ -143,6 +174,7 @@ pub fn camera_configure(
             .data
             .lock()
             .map_err(|_| fail("Camera state lock failed"))?;
+        data.poll_revision = data.poll_revision.wrapping_add(1);
         if enabled {
             let p = guarded(s, true)?;
             let _paused = PausedThreads::acquire(s.pid)?;
@@ -177,6 +209,9 @@ pub(super) fn start(s: &Session) {
         let mut last_update = std::time::Instant::now();
         loop {
             std::thread::sleep(std::time::Duration::from_millis(40));
+            if closed.load(Ordering::Acquire) {
+                break;
+            }
             let (Some(camera), Some(sprint), Some(scales)) =
                 (camera.upgrade(), sprint.upgrade(), scales.upgrade())
             else {
@@ -193,46 +228,106 @@ pub(super) fn start(s: &Session) {
                 sprint,
                 scales,
             };
-            let _ = (|| -> Result<()> {
-                let _edit = EditLock::acquire(&session)?;
-                let mut data = session
-                    .camera
-                    .data
-                    .lock()
-                    .map_err(|_| fail("Camera state lock failed"))?;
-                let result = (|| -> Result<()> {
-                    let shortcut = data.shortcut.clone();
-                    let (down, focused) = shortcut_input(&session, &shortcut)?;
-                    if data.shortcut_latch.sample(&shortcut, down, focused) {
-                        toggle_data(&session, &mut data, None)?;
-                    }
-                    if !data.enabled
-                        || last_update.elapsed() < std::time::Duration::from_millis(120)
-                    {
-                        return Ok(());
-                    }
-                    last_update = std::time::Instant::now();
-                    let p = guarded(&session, false)?;
-                    if camera::needs_update(&p, base, &identity, &data.state, &data.config)? {
-                        let p = guarded(&session, true)?;
-                        let _paused = PausedThreads::acquire(pid)?;
-                        let config = data.config.clone();
-                        camera::apply(&p, base, &identity, &mut data.state, Some(&config))?;
+            let update_due = last_update.elapsed() >= std::time::Duration::from_millis(120);
+            let polled = controller_poll::run(
+                &closed,
+                &session.camera.data,
+                "Camera",
+                |data| {
+                    prepare_poll(data, update_due, |shortcut| {
+                        shortcut_input(&session, shortcut)
+                    })
+                },
+                || EditLock::acquire(&session),
+                current_poll,
+                |data, ticket| {
+                    let result = (|| -> Result<()> {
+                        if ticket.toggle {
+                            toggle_data(&session, data, None)?;
+                        }
+                        if !data.enabled
+                            || last_update.elapsed() < std::time::Duration::from_millis(120)
+                        {
+                            return Ok(());
+                        }
+                        last_update = std::time::Instant::now();
+                        let p = guarded(&session, false)?;
+                        if camera::needs_update(&p, base, &identity, &data.state, &data.config)? {
+                            let p = guarded(&session, true)?;
+                            let _paused = PausedThreads::acquire(pid)?;
+                            let config = data.config.clone();
+                            camera::apply(&p, base, &identity, &mut data.state, Some(&config))?;
+                        }
+                        Ok(())
+                    })();
+                    if let Err(error) = result {
+                        let restore = restore_data(&session, data);
+                        data.error = Some(format!(
+                            "Native camera stopped: {error}. {}",
+                            restore.err().map_or(
+                                "Original camera data restored or no pending change.".into(),
+                                |e| format!("Restore requires attention: {e}")
+                            )
+                        ));
                     }
                     Ok(())
-                })();
-                if let Err(error) = result {
-                    let restore = restore_data(&session, &mut data);
-                    data.error = Some(format!(
-                        "Native camera stopped: {error}. {}",
-                        restore.err().map_or(
-                            "Original camera data restored or no pending change.".into(),
-                            |e| format!("Restore requires attention: {e}")
-                        )
-                    ));
-                }
-                Ok(())
-            })();
+                },
+            );
+            if matches!(polled, Ok(controller_poll::Outcome::Closed)) {
+                break;
+            }
         }
     });
+}
+
+#[cfg(test)]
+mod poll_tests {
+    use super::*;
+    #[test]
+    fn inactive_camera_keeps_f6_edges_without_requesting_idle_transport() {
+        let mut data = NativeCameraData::default();
+        assert!(prepare_poll(&mut data, true, |_| Ok((false, true)))
+            .unwrap()
+            .is_none());
+        let ticket = prepare_poll(&mut data, true, |_| Ok((true, true)))
+            .unwrap()
+            .unwrap();
+        assert!(ticket.toggle);
+        assert!(current_poll(&data, &ticket));
+        assert!(prepare_poll(&mut data, true, |_| Ok((true, true)))
+            .unwrap()
+            .is_none());
+        data.poll_revision += 1;
+        assert!(
+            !current_poll(&data, &ticket),
+            "queued F6 cannot override a newer explicit configure"
+        );
+    }
+    #[test]
+    fn camera_updates_only_when_enabled_and_due_without_erasing_pending_errors() {
+        let mut data = NativeCameraData::default();
+        data.shortcut.enabled = false;
+        data.error = Some("restore pending".into());
+        assert!(prepare_poll(&mut data, true, |_| panic!(
+            "disabled shortcut sampled input"
+        ))
+        .unwrap()
+        .is_none());
+        assert_eq!(data.error.as_deref(), Some("restore pending"));
+        data.enabled = true;
+        assert!(prepare_poll(&mut data, false, |_| panic!(
+            "disabled shortcut sampled input"
+        ))
+        .unwrap()
+        .is_none());
+        let ticket = prepare_poll(&mut data, true, |_| {
+            panic!("disabled shortcut sampled input")
+        })
+        .unwrap()
+        .unwrap();
+        assert!(!ticket.toggle);
+        assert!(current_poll(&data, &ticket));
+        data.enabled = false;
+        assert!(!current_poll(&data, &ticket));
+    }
 }

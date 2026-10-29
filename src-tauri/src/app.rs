@@ -25,6 +25,12 @@ use std::{
 };
 use tauri::{Emitter, Manager, State};
 #[path="shared_editing.rs"] mod shared_editing;
+#[path="runtime_workbench.rs"] mod runtime_workbench;
+#[path="external_changes_native.rs"] mod external_changes_native;
+#[path="invitations_native.rs"] mod invitations_native;
+#[path="community_host_native.rs"] mod community_host_native;
+#[path="map_download.rs"] mod map_download;
+#[path="dependency_install.rs"] mod dependency_install;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -99,6 +105,12 @@ struct AppState {
     live_mcc: Mutex<Option<crate::live_mcc::Session>>,
     forge_session: Mutex<Option<shared_editing::Session>>,
     document_owners: Mutex<HashMap<String,String>>,
+    runtime_workbench: Mutex<runtime_workbench::WorkbenchState>,
+    external_changes: Mutex<external_changes_native::ExternalChangesState>,
+    invitations: Mutex<invitations_native::InvitationsState>,
+    community_hosts: Mutex<community_host_native::CommunityHostState>,
+    map_downloads: map_download::DownloadRegistry,
+    dependency_install: Mutex<dependency_install::DependencyInstallState>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -209,10 +221,11 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
             while entries.iter().any(|e|e.title==title){title=format!("{base} ({ordinal})");ordinal+=1;}
             project.title=title;
             if build.target=="mcc-cea" && inspection.header.version==13 {
-                let tags=state.root.join("jobs").join(&build_id).join("tags");
-                if tags.is_dir() && tags.join(core::safe_relative(&format!("{}.scenario",inspection.scenario_path)).map_err(error)?).is_file() {
+                if let Ok(tags)=runtime_workbench::compiled_tags(&state,&source,&build) {
+                  if tags.is_dir() && tags.join(core::safe_relative(&format!("{}.scenario",inspection.scenario_path)).map_err(error)?).is_file() {
                     core::reject_links(&tags).map_err(error)?;
                     if let Some(tools)=inherited_tools {if let Some(kit)=tools.h1a_directory {project.bind_compiled_mcc_tags(kit,tags,tools.invader_directory).map_err(error)?;}}
+                  }
                 }
             }
             library.save(&project,Some(&inspection)).map_err(error)?;
@@ -679,6 +692,23 @@ async fn import_paths(app: tauri::AppHandle, paths: Vec<PathBuf>) -> Reply<Vec<O
     })
     .await
     .map_err(error)?
+}
+#[tauri::command]
+fn prepare_map_download(state:State<AppState>,url:String)->Reply<map_download::DownloadStatus>{state.map_downloads.prepare(&url).map_err(error)}
+#[tauri::command]
+fn map_download_status(state:State<AppState>,id:String)->Reply<map_download::DownloadStatus>{state.map_downloads.status(&id).map_err(error)}
+#[tauri::command]
+fn cancel_map_download(state:State<AppState>,id:String)->Reply<bool>{state.map_downloads.cancel(&id).map_err(error)}
+#[tauri::command]
+async fn download_and_import_maps(app:tauri::AppHandle,id:String)->Reply<Vec<OpenProject>>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let receipt=state.map_downloads.download(&id,&state.root.join("Inbox/downloads")).map_err(error)?;
+        state.map_downloads.mark_importing(&id).map_err(error)?;
+        match import_file(&state,&receipt.path){
+            Ok(opened)=>{state.map_downloads.mark_imported(&id,opened.iter().map(|p|p.project.id.clone()).collect()).map_err(error)?;let _=app.emit("spark:library-changed",());Ok(opened)},
+            Err(reason)=>{let _=state.map_downloads.mark_import_failed(&id);Err(reason)}
+        }
+    }).await.map_err(error)?
 }
 #[tauri::command]
 async fn import_dialog(app: tauri::AppHandle) -> Reply<Vec<OpenProject>> {
@@ -1462,7 +1492,7 @@ fn launch_readiness(state: State<AppState>, id: String) -> Reply<Readiness> {
         }
         Err(e) => e.clone(),
     };
-    Ok(Readiness{mcc_found:install.mcc_path.is_some(),halo1_installed:install.halo1_installed,steam_available:install.steam_executable.is_some(),package_valid,registered,running:steam::is_mcc_running(),launch_ready:ready,current_validated_build_id:current.ok().map(|b|b.id),current_build_message,message:if ready{"Choose ‘Play Halo: MCC Anti-Cheat Disabled (Mods and Limited Services)’ in Steam. Launch mode and in-game load remain unverified."}else{"Build and install a validated local package before launching this project. Live editing, VR, and multiplayer AI replication are not implemented for MCC."}.into()})
+    Ok(Readiness{mcc_found:install.mcc_path.is_some(),halo1_installed:install.halo1_installed,steam_available:install.steam_executable.is_some(),package_valid,registered,running:steam::is_mcc_running(),launch_ready:ready,current_validated_build_id:current.ok().map(|b|b.id),current_build_message,message:if ready{"Choose ‘Play Halo: MCC Anti-Cheat Disabled (Mods and Limited Services)’ in Steam. Launch mode and in-game load remain unverified."}else{"Build and install a validated local package before launching this project. Settings → Dependencies & setup explains missing tools and source data. Existing-object live edits use a separate exact-build adapter; arbitrary spawning, live BSP replacement and multiplayer AI replication remain unavailable for MCC."}.into()})
 }
 #[tauri::command]
 fn launch_mcc(state: State<AppState>, id: String) -> Reply<String> {
@@ -2407,6 +2437,12 @@ pub fn run() {
                 live_mcc: Mutex::new(None),
                 forge_session: Mutex::new(None),
                 document_owners: Mutex::new(HashMap::new()),
+                runtime_workbench: Mutex::new(Default::default()),
+                external_changes: Mutex::new(Default::default()),
+                invitations: Mutex::new(Default::default()),
+                community_hosts: Mutex::new(Default::default()),
+                map_downloads: Default::default(),
+                dependency_install: Mutex::new(Default::default()),
             });
             if let Err(e) = configure(app.handle(), &app.state::<AppState>(), settings) {
                 if let Ok(mut d) = app.state::<AppState>().diagnostics.lock() {
@@ -2421,8 +2457,41 @@ pub fn run() {
             }
             Ok(())
         })
-        .on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){if let Some(state)=window.app_handle().try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=window.label());}}}})
+        .on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){
+            if let Some(state)=window.app_handle().try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=window.label());}}
+            let app=window.app_handle().clone();let label=window.label().to_owned();
+            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);}});
+        }})
         .invoke_handler(tauri::generate_handler![
+            prepare_map_download,
+            download_and_import_maps,
+            map_download_status,
+            cancel_map_download,
+            dependency_install::dependency_report,
+            dependency_install::prepare_dependency_action,
+            dependency_install::run_dependency_action,
+            dependency_install::discard_dependency_action,
+            dependency_install::choose_dependency_path,
+            community_host_native::community_host_plan,
+            community_host_native::community_host_save,
+            community_host_native::community_control_connect,
+            community_host_native::community_control_poll,
+            community_host_native::community_control_disconnect,
+            invitations_native::invitation_prepare,
+            invitations_native::invitation_handoff,
+            external_changes_native::external_map_watch_start,
+            external_changes_native::external_map_watch_poll,
+            external_changes_native::external_map_watch_stop,
+            external_changes_native::external_map_change_import,
+            runtime_workbench::runtime_workbench_report,
+            runtime_workbench::prepare_runtime_tool,
+            runtime_workbench::launch_runtime_tool,
+            runtime_workbench::build_working_tags,
+            runtime_workbench::runtime_tool_processes,
+            runtime_workbench::community_listing,
+            runtime_workbench::community_join_preflight,
+            runtime_workbench::community_join,
+            runtime_workbench::mcc_owned_content_probe,
             bsp_assembly_options,
             plan_bsp_assembly,
             preview_bsp_assembly,
@@ -2589,6 +2658,12 @@ mod readiness_tests {
             live_mcc: Mutex::new(None),
             forge_session: Mutex::new(None),
             document_owners:Mutex::new(HashMap::new()),
+            runtime_workbench:Mutex::new(Default::default()),
+            external_changes:Mutex::new(Default::default()),
+            invitations:Mutex::new(Default::default()),
+            community_hosts:Mutex::new(Default::default()),
+            map_downloads:Default::default(),
+            dependency_install:Mutex::new(Default::default()),
         };
         (temp, state, p, record)
     }

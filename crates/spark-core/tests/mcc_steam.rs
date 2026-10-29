@@ -157,6 +157,46 @@ fn preserves_utf16_manifest_and_rejects_invalid_encoding() {
     assert_eq!(fs::read(&path).unwrap(), [0x80, 0x81]);
 }
 #[test]
+fn manifest_lookup_accepts_equivalent_verbatim_drive_and_unc_paths() {
+    let d = tempfile::tempdir().unwrap();
+    let manifest = d.path().join("ModManifest.txt");
+    for (entry, root) in [
+        (r"D:\Owned Mods", r"\\?\D:\Owned Mods"),
+        (r"\\?\D:\Owned Mods", r"D:\Owned Mods"),
+        (
+            r"\\server\share\Owned Mods",
+            r"\\?\UNC\server\share\Owned Mods",
+        ),
+        (
+            r"\\?\UNC\server\share\Owned Mods",
+            r"\\server\share\Owned Mods",
+        ),
+    ] {
+        fs::write(&manifest, format!("\"{entry}\"\r\n")).unwrap();
+        assert!(
+            mcc::manifest_contains(&manifest, std::path::Path::new(root)).unwrap(),
+            "equivalent path spellings: {entry:?} and {root:?}"
+        );
+    }
+}
+#[cfg(windows)]
+#[test]
+fn registration_from_canonical_windows_path_is_detected_and_idempotent() {
+    let d = tempfile::tempdir().unwrap();
+    let root = d.path().join("Owned Mods");
+    fs::create_dir(&root).unwrap();
+    let verbatim = fs::canonicalize(&root).unwrap();
+    assert!(verbatim.to_string_lossy().starts_with(r"\\?\"));
+    let manifest = d.path().join("ModManifest.txt");
+    mcc::register_root(&manifest, &verbatim).unwrap();
+    let registered = fs::read(&manifest).unwrap();
+    assert!(mcc::manifest_contains(&manifest, &verbatim).unwrap());
+    assert!(mcc::manifest_contains(&manifest, &root).unwrap());
+    assert!(mcc::register_root(&manifest, &verbatim).unwrap().is_none());
+    assert_eq!(fs::read(&manifest).unwrap(), registered);
+    assert!(!fs::read_to_string(&manifest).unwrap().starts_with(r"\\?\"));
+}
+#[test]
 fn registration_lock_does_not_overwrite_manifest() {
     let d = tempfile::tempdir().unwrap();
     let root = d.path().join("Mods");

@@ -2,7 +2,7 @@
 // Usage: node scripts/package-source.mjs <fresh-output.zip>
 import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';import crypto from 'node:crypto';import {spawnSync} from 'node:child_process';
 if(process.platform!=='win32')throw new Error('This release helper currently uses Windows .NET ZIP; use the recorded manifest on other hosts.');
-const output=path.resolve(process.argv[2]??'releases/Project_Guilty_Spark_07_Halo_Modding_Brain_Continuation_33_SOURCE.zip');
+const output=path.resolve(process.argv[2]??'releases/Project_Guilty_Spark_Continuation_34_SOURCE.zip');
 if(await fs.stat(output).then(()=>true,()=>false))throw new Error('Refusing to overwrite an existing source release');
 const roots=['src','src-tauri','crates','scripts','tests','docs','examples','public','.github'];
 const excludedDirectories=new Set(['target','dist','node_modules','.git','.local','.research','.toolchain']);
@@ -18,7 +18,7 @@ const manifest=[];let total=0;
 for(const file of files){const bytes=await fs.readFile(file);if(bytes.length>32*1024*1024)throw new Error(`Source member exceeds 32 MiB: ${file}`);total+=bytes.length;if(total>128*1024*1024)throw new Error('Source package exceeds 128 MiB');manifest.push(`${hash(bytes)}  ${file}`);}
 const sums='# SHA256  relative paths - all source files except these two checksum manifests\n'+manifest.join('\n')+'\n';
 await fs.writeFile('SOURCE_SHA256SUMS.txt',sums);await fs.writeFile('SOURCE_MANIFEST_SHA256.txt',sums);
-const stage=await fs.mkdtemp(path.join(os.tmpdir(),'GuiltySpark-C33-source-'));
+const stage=await fs.mkdtemp(path.join(os.tmpdir(),'GuiltySpark-source-'));
 for(const file of [...files,'SOURCE_SHA256SUMS.txt','SOURCE_MANIFEST_SHA256.txt']){const destination=path.join(stage,file);await fs.mkdir(path.dirname(destination),{recursive:true});await fs.copyFile(file,destination);}
 await fs.mkdir(path.dirname(output),{recursive:true});
 const zipCommand='$ErrorActionPreference="Stop"; Add-Type -AssemblyName System.IO.Compression; Add-Type -AssemblyName System.IO.Compression.FileSystem; $stage=[System.IO.Path]::GetFullPath($env:GS_SOURCE_STAGE); $archive=[System.IO.Compression.ZipFile]::Open($env:GS_SOURCE_OUTPUT,[System.IO.Compression.ZipArchiveMode]::Create); try { foreach($file in [System.IO.Directory]::EnumerateFiles($stage,"*",[System.IO.SearchOption]::AllDirectories)) { $relative=$file.Substring($stage.Length+1).Replace([char]92,[char]47); [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive,$file,$relative,[System.IO.Compression.CompressionLevel]::Optimal) | Out-Null } } finally { $archive.Dispose() }';

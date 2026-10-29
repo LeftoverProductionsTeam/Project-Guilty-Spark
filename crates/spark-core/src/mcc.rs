@@ -131,11 +131,33 @@ fn decode_manifest(bytes: &[u8]) -> Result<(String, bool, bool)> {
         Ok((text, false, bom))
     }
 }
+/// Rust's Windows canonical paths use the extended-length namespace. MCC's
+/// manifest uses ordinary DOS/UNC paths, so preserve the same location in both
+/// spellings. In particular, removing only `\\?\` from a UNC path loses its
+/// leading share separators. Leave other device namespaces untouched.
+fn manifest_path_spelling(value: &str) -> String {
+    if let Some(tail) = value.strip_prefix("\\\\?\\") {
+        if tail
+            .get(..4)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("UNC\\"))
+        {
+            return format!("\\\\{}", &tail[4..]);
+        }
+        let bytes = tail.as_bytes();
+        if bytes.len() >= 3
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && bytes[2] == b'\\'
+        {
+            return tail.to_owned();
+        }
+    }
+    value.to_owned()
+}
 fn normalized_path(s: &str) -> String {
-    s.trim()
-        .trim_matches('"')
-        .trim_end_matches(['\\', '/'])
-        .replace('/', "\\")
+    let value = s.trim().trim_matches('"').replace('/', "\\");
+    manifest_path_spelling(&value)
+        .trim_end_matches('\\')
         .to_lowercase()
 }
 pub fn manifest_contains(manifest: &Path, root: &Path) -> Result<bool> {
@@ -151,10 +173,7 @@ pub fn manifest_contains(manifest: &Path, root: &Path) -> Result<bool> {
 pub fn register_root(manifest: &Path, root: &Path) -> Result<Option<PathBuf>> {
     reject_links(manifest)?;
     reject_links(root)?;
-    let value = fs::canonicalize(root)?
-        .to_string_lossy()
-        .trim_start_matches("\\\\?\\")
-        .to_string();
+    let value = manifest_path_spelling(&fs::canonicalize(root)?.to_string_lossy());
     if value.contains(['\n', '\r', '\0', '"']) {
         return invalid("Mod root cannot contain line breaks or quotes");
     }

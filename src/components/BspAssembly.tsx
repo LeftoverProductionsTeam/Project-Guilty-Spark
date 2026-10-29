@@ -5,6 +5,7 @@ import type { LibraryEntry, Project, Vec3 } from '../types';
 import { assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport } from '../bspAssembly';
 import { NumberField } from './ui';
+import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
 export default function BspAssembly({
   project,
@@ -58,13 +59,15 @@ export default function BspAssembly({
   useEffect(() => {
     const signature = assemblySignature(project.bspAssembly ?? null);
     let previous = appliedSource;
+    let previousPlan:Plan|null=null;
     try {
-      previous = assemblySignature(JSON.parse(appliedSource));
+      previousPlan=JSON.parse(appliedSource);
+      previous = assemblySignature(previousPlan);
     } catch {
       /* Replace an invalid saved identity. */
     }
     if (signature !== previous) {
-      setDraft(project.bspAssembly ?? null);
+      setDraft(mergeZoneOnlyUpdate(previousPlan,project.bspAssembly??null,draft));
       setReport(null);
     }
     if (signature !== appliedSource) setAppliedSource(signature);

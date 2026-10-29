@@ -1171,6 +1171,7 @@ fn placements(
             "Vehicle" => "vehi",
             "Equipment" => "eqip",
             "Weapon" => "weap",
+            "Sound scenery" => "ssce",
             _ => "",
         };
         if let Some(target) = tid.and_then(|id| tags.iter().find(|t| t.id == id)) {
