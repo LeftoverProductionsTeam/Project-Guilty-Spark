@@ -450,6 +450,15 @@ pub fn registry() -> Vec<RuntimeAdapterProfile> {
     }).collect();
     for (id, label, edition, platform, distribution, architecture, family) in [
         (
+            "halo1-warthog-xbox",
+            "Warthog Xbox community build",
+            "warthogXbox",
+            "xbox",
+            "community",
+            "x86",
+            GameFamily::Halo1,
+        ),
+        (
             "halo1-mcc-store",
             "MCC Halo 1 — Microsoft Store",
             "mccHalo1",

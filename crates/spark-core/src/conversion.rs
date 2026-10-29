@@ -217,6 +217,12 @@ pub(crate) fn compile_native(
             inspection.scripts.len(),
         )?;
     }
+    runner.emit("native-preservation","Snapshotting native tag bytes before target compilation",58,"info");
+    let inventory_started=std::time::Instant::now();
+    let input_tags=crate::working_tags::tree_hashes(tags,runner.cancel)?;
+    let input_json=serde_json::to_vec_pretty(&input_tags)?;
+    project::atomic_write(&workspace.join("native-tag-input-hashes.json"),&input_json,false)?;
+    let inventory_before_ms=inventory_started.elapsed().as_millis();
     let log = runner.run(
         &tool,
         &[
@@ -238,6 +244,15 @@ pub(crate) fn compile_native(
     if !native_compile_succeeded(&log) {
         return invalid(native_compile_failure(&log));
     }
+    let inventory_started=std::time::Instant::now();
+    let final_tags=crate::working_tags::tree_hashes(tags,runner.cancel)?;
+    if input_tags!=final_tags{return invalid("Native compiler changed, added or removed editable input tags. Output was withheld; review the isolated workspace and original tag sources before continuing");}
+    project::atomic_write(&workspace.join("native-tag-preservation.json"),&serde_json::to_vec_pretty(&serde_json::json!({
+        "schemaVersion":1,"status":"passed","nativeFiles":input_tags.len(),"allInputTagBytesUnchanged":true,
+        "inputManifestSha256":maps::hash_file(&workspace.join("native-tag-input-hashes.json"))?,
+        "inventoryBeforeMs":inventory_before_ms,"inventoryAfterMs":inventory_started.elapsed().as_millis(),
+        "scope":"Exact loose native tag bytes during target compilation only. Extraction, intentional compatibility edits and compiled cache repacking are separate operations; game loading remains pending."
+    }))?,false)?;
     let name = crate::mcc::package_map_name(&inspection.scenario_path)?;
     let compiled = workspace.join("maps").join(&name);
     crate::reject_links(&compiled)?;
