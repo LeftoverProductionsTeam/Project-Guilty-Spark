@@ -1,26 +1,20 @@
-Project Guilty Spark - C35 r7 source comparison
-BASELINE_GIT_COMMIT: c7d12ba2754850d9e968c2322d3fe655e229dae5
+Project Guilty Spark - C35 r8 source comparison
+BASELINE_GIT_COMMIT: c13e1dee6d2cc61cb9e3b938e3fdbe04332014e3
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 8
+ADDED_COUNT: 3
 MODIFIED_COUNT: 25
-UNCHANGED_COUNT: 1112
+UNCHANGED_COUNT: 1120
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/examples/qa_looping_audio.rs
-crates/spark-core/src/looping_audio.rs
-docs/C35_LOOPING_AUDIO.md
-docs/fixtures/c35-looping-audio-native-verification.json
-src/soundClipLoader.test.ts
-src/soundPlayback.test.ts
-src/soundPlayback.ts
-tests/ui/looping-audio.spec.ts
+docs/C35_THREAD_RELEASE.md
+docs/fixtures/c35-thread-release-native-verification.json
+src-tauri/src/live_thread_pause.rs
 
 MODIFIED FILES
 CHANGELOG.md
 README.md
-crates/spark-core/src/audio_preview.rs
-crates/spark-core/src/lib.rs
+docs/C35_LIVE_SESSION_RECOVERY.md
 docs/COMPATIBILITY_MATRIX.md
 docs/CONTINUATION_35_ENGINEERING.md
 docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
@@ -28,23 +22,24 @@ docs/CONTINUATION_35_TEST_CARD.md
 docs/GITHUB_HANDOFF.md
 docs/MASTER_FEATURE_LEDGER.csv
 docs/MASTER_FEATURE_LEDGER.md
+docs/research/C34_LIVE_WRITE_AUDIT.md
 scripts/continuation35-evidence.mjs
 scripts/feature-ledger-evidence.mjs
-scripts/native-director-audio-probe.mjs
 scripts/test-director-recording-native.mjs
 scripts/update-feature-ledger.mjs
-src-tauri/src/app.rs
-src/components/DirectorWindow.tsx
-src/components/MapSounds.tsx
-src/components/SoundMixer.tsx
-src/directorAudio.ts
+src-tauri/src/live_camera_native.rs
+src-tauri/src/live_mcc.rs
+src-tauri/src/live_sprint_native.rs
+src/components/LiveObjectInspector.tsx
+src/components/LiveSessionRecovery.tsx
+src/components/NativeCameraControls.tsx
+src/components/NativeSprintControls.tsx
 src/featureCatalog.ts
-src/soundClipLoader.ts
-src/spatialAudio.ts
+src/liveSession.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-Earlier C32/C33/C34 and C35 r1/r2/r3/r4/r5/r6 release/source archives remain frozen.
+Earlier C32/C33/C34 and C35 r1/r2/r3/r4/r5/r6/r7 release/source archives remain frozen.
