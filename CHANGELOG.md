@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 — Continuation 36: One Halo, no new standards (development)
+
+- Add Portability Lab inside Build & playtest, using existing exact runtime profiles and source-bound native preflight findings.
+- Preserve signed-zero/native cells during unrelated edits; verify every untouched byte of derived extraction inputs.
+- Verify loose native tag bytes before/after H1A compilation and write JSON/readable semantic change reports.
+- Guard painted-detail BSP audio serialization with bounded native snapshots and a conservative refusal where float precision prevents exact proof.
+- Accept the documented protected Chupathingy invitation format without handling passwords or claiming foreign protocol compatibility.
+- Retain C35 R12 rendering, audio, Director, window/drawer and multi-map workflows. [C36 evidence and limitations](docs/CONTINUATION_36_ENGINEERING.md).
+
+C35 r11/r12: [rendering and workflow repair](docs/C35_RENDERING_AND_WORKFLOW.md), then [automatic MCC audio, all-main-track imports and sound layout repair](docs/C35_MCC_AUDIO_AND_WORKFLOW.md). These remain included; the older entries below are historical.
+
 C35 r10: [direct viewport tags/assets and editor ambience](docs/C35_VIEWPORT_WORKFLOW.md). Add hideable source-tag drawers with map-owned undo/save, a shared model/sound library, managed OBJ/WAV/OGG imports and automatic authored ambience with mute/volume. Replace the Window launcher with a 32-pixel collapsible top bar and reduce fullscreen controls to 30 pixels. Imported-cache preview instances remain compile-blocked.
 
 ## 0.4.0 — Continuation 35: The living workbench (development)

@@ -1,0 +1,39 @@
+name: Community workflow or compatibility feedback
+description: Reproduce a specific Halo editing/runtime issue and track its correction.
+title: '[Community] '
+body:
+  - type: input
+    id: credit
+    attributes:
+      label: Reporter or source credit
+      description: Optional public name or source link to credit.
+  - type: input
+    id: runtime
+    attributes:
+      label: Exact runtime and version
+      placeholder: Halo CE 1.10, MCC Halo 1 build, or exact community release/commit
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps and tools
+      description: Include source edition, tool versions and the smallest reproducible workflow.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and source references
+      description: Use shareable logs, screenshots or synthetic fixtures; keep proprietary game files and credentials out of the issue.
+  - type: textarea
+    id: followup
+    attributes:
+      label: Engineering follow-up
+      description: Maintainers record the correction, regression test, tested runtime and remaining limitation here.

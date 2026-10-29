@@ -11,4 +11,6 @@ Do not commit game maps, bitmap/audio exports, HEK/MCC tags or binaries, tool ex
 
 Original contributions use the repository's MIT license. Retain third-party copyright and license notices; identify documentation adaptations separately. Do not copy code from an unlicensed or incompatible project because it is publicly visible. Contributions are reviewed; no CLA or automatic acceptance is implied.
 
+Follow the [native portability policy](docs/NATIVE_PORTABILITY.md): preserve native formats, keep editor metadata outside tags, document the exact target/schema/tool, and separate byte identity, semantic comparison, compilation and game acceptance. Existing community protocols take priority over inventing a Spark player pool. The community-feedback issue form records runtime/version, reproduction, expected/actual behavior, source credit, correction, regression and remaining limits.
+
 Good first contributions: clarify one setup field; improve a keyboard focus path; add a bounded synthetic parser fixture; verify one source in community credits; reproduce a compatibility problem without uploading its map.

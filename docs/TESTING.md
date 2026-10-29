@@ -1,5 +1,22 @@
 # Verification record
 
+## Current C36 evidence
+
+Continue the actual C35 R12 source at `21804c191a918cbf8bd74efac60dfcec65c9083b`. Fresh baseline: 471 Rust passed / five opt-in ignored, 216 frontend tests in 44 files, 77 browser tests and 59 offline checks. C36: 480 Rust passed / seven opt-in ignored, 216 frontend, 79 browser and 59 offline; TypeScript and the Windows release/NSIS build pass. Two owned-asset BSP detail tests were separately opted into and passed. [Exact current evidence and limits](CONTINUATION_36_ENGINEERING.md); [metadata-only receipt](fixtures/c36-native-preservation-verification.json).
+
+The new focused tests reproduce unintended signed-zero byte changes, preserve opaque native bytes/reference padding, resolve repacked native identities, reject ambiguous schemas/targets and refuse unproven painted-detail serialization. Fresh actual Windows workflows cover the Portability Lab, CE-to-MCC compilation, Invader no-op/edit/rebuild, Director VP8/Opus recording and source-backed rendering/audio. No Halo game or community client was executed during these checks. Earlier verification below remains historical.
+
+```powershell
+node scripts/cargo.mjs test --workspace --locked
+node node_modules/typescript/bin/tsc -b
+node node_modules/vitest/vitest.mjs run
+node node_modules/@playwright/test/cli.js test --reporter=line
+node --run test:offline
+node scripts/desktop.mjs build
+```
+
+Opt-in native procedures require a fresh private QA directory and lawfully owned content. `scripts/test-portability-native.mjs` uses the frozen C35 executable, real CE/MCC maps, matching editable SDK tags, Invader and H1A Tool; it records actual tool output and refuses incomplete builds. `scripts/test-working-tags-native.mjs` consumes a fresh `qa_runtime_library` replica. The rendering, main-track audio and Director-recording native scripts use separate libraries/profiles. Read each script's named arguments; do not substitute a synthetic fixture for a game/compiler acceptance claim. Game bytes, screenshots/audio/video, tool binaries and QA libraries remain outside the source archive.
+
 Recorded 2026-10-25 on Windows x64. Tests are separated from actual game acceptance.
 
 ## Automated checks
