@@ -15,6 +15,13 @@ export interface ActiveRecording {
 interface RecordingOptions {
   countdown?: number;
   signal?: AbortSignal;
+  outputDirectory?: string;
+  fileName?: string;
+  onSaved?: (receipt: RecordingReceipt) => void;
+  beforeStart?: (signal?: AbortSignal) => Promise<void>;
+}
+export function nextTakeName() {
+  return `Spark-take-${new Date().toISOString().replace(/[:.]/g, '-')}-${crypto.randomUUID().slice(0, 8)}.webm`;
 }
 
 /** Canvas or OS-permissioned display stream only. Ordered writes bound queued memory. */
@@ -26,11 +33,19 @@ export async function recordDirector(
   options: RecordingOptions = {},
 ): Promise<ActiveRecording | null> {
   if (!native) throw new Error('Save recording is available in the desktop Director.');
+  if (options.signal?.aborted) throw new Error('Recording cancelled.');
+  const videoTrack = stream.getVideoTracks()[0];
+  const sourceHasEnded = () => !videoTrack || videoTrack.readyState === 'ended';
+  if (sourceHasEnded()) throw new Error('The video source has ended. Choose a live source before recording.');
   const mime = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp8', 'video/webm'].find(
     (mime) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mime),
   );
   if (!mime) throw new Error('WebM recording is not supported here; OBS can capture this window.');
-  const file = await call<RecordingReceipt | null>('director_record_open', { projectId });
+  const file = await call<RecordingReceipt | null>('director_record_open', {
+    projectId,
+    ...(options.outputDirectory?.trim() ? { outputDirectory: options.outputDirectory.trim() } : {}),
+    ...(options.fileName ? { fileName: options.fileName } : {}),
+  });
   if (!file) {
     onState('idle', 'Recording cancelled.');
     return null;
@@ -54,6 +69,9 @@ export async function recordDirector(
       });
     }
     if (options.signal?.aborted) throw new Error('Recording cancelled.');
+    await options.beforeStart?.(options.signal);
+    if (options.signal?.aborted) throw new Error('Recording cancelled.');
+    if (sourceHasEnded()) throw new Error('The video source ended before recording started.');
   } catch (reason) {
     await call('director_record_finish', { id: file.id, failed: true }).catch(() => {});
     throw reason;
@@ -73,6 +91,8 @@ export async function recordDirector(
     event.preventDefault();
     event.returnValue = '';
   };
+  const sourceEnded = () => stop();
+  videoTrack.addEventListener?.('ended', sourceEnded);
   window.addEventListener('beforeunload', unload);
   recorder.ondataavailable = (event) => {
     if (!event.data.size || failed) return;
@@ -110,15 +130,17 @@ export async function recordDirector(
     stop();
   };
   recorder.onstop = () => {
+    videoTrack.removeEventListener?.('ended', sourceEnded);
     onState('saving', 'Saving recording…');
     void queue
       .then(() => call<RecordingReceipt>('director_record_finish', { id: file.id, failed }))
-      .then((receipt) =>
+      .then((receipt) => {
         onState(
           'idle',
           `Saved ${receipt.path} · ${(receipt.bytes / 1048576).toFixed(1)} MiB · SHA-256 ${receipt.sha256}`,
-        ),
-      )
+        );
+        options.onSaved?.(receipt);
+      })
       .catch((reason) => onState('idle', String(reason)))
       .finally(() => {
         window.removeEventListener('beforeunload', unload);
@@ -133,6 +155,7 @@ export async function recordDirector(
       `Recording to ${file.path} · ${track?.width ?? '?'}×${track?.height ?? '?'} at ${track?.frameRate?.toFixed(1) ?? '?'} fps · ${stream.getAudioTracks().length ? 'shared audio included' : 'video only — no game audio track'}`,
     );
   } catch (reason) {
+    videoTrack.removeEventListener?.('ended', sourceEnded);
     window.removeEventListener('beforeunload', unload);
     await call('director_record_finish', { id: file.id, failed: true }).catch(() => {});
     finish();

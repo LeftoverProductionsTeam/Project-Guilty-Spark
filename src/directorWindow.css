@@ -45,6 +45,55 @@
 .gs-director-settings > span {
   color: #a8c3d2;
 }
+.gs-director-output {
+  position: relative;
+}
+.gs-director-output > summary {
+  cursor: pointer;
+  padding: 6px;
+  color: #fff;
+}
+.gs-director-output-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: min(560px, calc(100vw - 32px));
+  padding: 16px;
+  background: #101a27;
+  border: 1px solid var(--accent, #71d6e9);
+  border-radius: 12px 4px;
+  z-index: 110;
+  box-shadow: 0 14px 32px #0009;
+}
+.gs-director-output-menu label {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.gs-director-output-menu input {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  background: #09121e;
+  color: #fff;
+}
+.gs-director-output-menu small {
+  color: #c1d7e2;
+  line-height: 1.6;
+  display: block;
+}
+@media (max-width: 700px) {
+  .gs-director-output-menu {
+    position: fixed;
+    top: 120px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: 60vh;
+    overflow: auto;
+  }
+}
 .gs-director-stage {
   flex: 1;
   min-height: 0;

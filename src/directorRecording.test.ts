@@ -47,7 +47,10 @@ beforeEach(() => {
         : null,
   );
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 test('a cancelled native picker never starts an encoder or sends chunks', async () => {
   ipc.mockResolvedValueOnce(null);
   const status = vi.fn();
@@ -103,9 +106,18 @@ test('a failed write never publishes a successful recording', async () => {
   expect(status.mock.calls.at(-1)?.[1]).toContain('partial retained');
   expect(status.mock.calls.some((call) => String(call[1]).startsWith('Saved '))).toBe(false);
 });
-test('an excessive pending buffer stops capture without sending an oversized native write',async()=>{
- ipc.mockImplementation(async(command:string,args:any)=>{if(command==='director_record_open')return{id:'owned',path:'partial.webm'};if(command==='director_record_finish'){expect(args.failed).toBe(true);throw Error('partial retained');}});
- const take=await recordDirector('map',stream,6000000,()=>{});Recorder.current.chunk(33*1024*1024);await take!.finished;expect(ipc.mock.calls.some(call=>call[0]==='director_record_append')).toBe(false);
+test('an excessive pending buffer stops capture without sending an oversized native write', async () => {
+  ipc.mockImplementation(async (command: string, args: any) => {
+    if (command === 'director_record_open') return { id: 'owned', path: 'partial.webm' };
+    if (command === 'director_record_finish') {
+      expect(args.failed).toBe(true);
+      throw Error('partial retained');
+    }
+  });
+  const take = await recordDirector('map', stream, 6000000, () => {});
+  Recorder.current.chunk(33 * 1024 * 1024);
+  await take!.finished;
+  expect(ipc.mock.calls.some((call) => call[0] === 'director_record_append')).toBe(false);
 });
 test('countdown cancellation closes the native reservation without starting an encoder', async () => {
   const controller = new AbortController(),
@@ -115,4 +127,63 @@ test('countdown cancellation closes the native reservation without starting an e
   await expect(take).rejects.toThrow(/cancelled/);
   expect(ipc).toHaveBeenLastCalledWith('director_record_finish', { id: 'owned', failed: true });
   expect(Recorder.current.state).toBe('inactive');
+});
+test('named takes pass the visible destination and notify only after native publication', async () => {
+  const saved = vi.fn(),
+    take = await recordDirector('map', stream, 6000000, () => {}, {
+      outputDirectory: 'D:/takes',
+      fileName: 'scene-2.webm',
+      onSaved: saved,
+    });
+  expect(ipc).toHaveBeenCalledWith('director_record_open', {
+    projectId: 'map',
+    outputDirectory: 'D:/takes',
+    fileName: 'scene-2.webm',
+  });
+  expect(saved).not.toHaveBeenCalled();
+  Recorder.current.chunk(100);
+  take!.stop();
+  await take!.finished;
+  expect(saved).toHaveBeenCalledWith(expect.objectContaining({ path: 'new.webm', sha256: 'verified' }));
+});
+test('failed publication keeps the take name available for recovery and never reports saved', async () => {
+  const saved = vi.fn();
+  ipc.mockImplementation(async (command: string) => {
+    if (command === 'director_record_open') return { id: 'owned', path: 'exists.webm' };
+    if (command === 'director_record_finish') throw Error('existing file protected');
+  });
+  const status = vi.fn(),
+    take = await recordDirector('map', stream, 6000000, status, { onSaved: saved });
+  Recorder.current.chunk(100);
+  take!.stop();
+  await take!.finished;
+  expect(saved).not.toHaveBeenCalled();
+  expect(status.mock.calls.at(-1)?.[1]).toContain('existing file protected');
+});
+test('ended sources and already-cancelled requests never reserve an output', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    recordDirector('map', stream, 6000000, () => {}, { signal: controller.signal }),
+  ).rejects.toThrow(/cancelled/);
+  const ended = { getVideoTracks: () => [{ readyState: 'ended' }] } as unknown as MediaStream;
+  await expect(recordDirector('map', ended, 6000000, () => {})).rejects.toThrow(/source has ended/);
+  expect(ipc).not.toHaveBeenCalled();
+});
+test('a video source ending stops the take even when an audio track remains live', async () => {
+  const video = Object.assign(new EventTarget(), {
+    readyState: 'live',
+    getSettings: () => ({ width: 1280, height: 720, frameRate: 30 }),
+  });
+  const source = {
+    getVideoTracks: () => [video],
+    getAudioTracks: () => [{ readyState: 'live' }],
+  } as unknown as MediaStream;
+  const take = await recordDirector('map', source, 6000000, () => {});
+  Recorder.current.chunk(100);
+  video.readyState = 'ended';
+  video.dispatchEvent(new Event('ended'));
+  await take!.finished;
+  expect(Recorder.current.state).toBe('inactive');
+  expect(ipc).toHaveBeenLastCalledWith('director_record_finish', { id: 'owned', failed: false });
 });

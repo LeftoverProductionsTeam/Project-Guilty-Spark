@@ -2,6 +2,7 @@
 
 ## 0.4.0 — Continuation 35: The living workbench (development)
 
+- Director follow-through: add remembered recording folders and named takes, fix stale cross-window UI preferences, clean empty cancelled reservations and keep export dimensions fixed across interface changes. Correct a premature browser first-frame check with independent decoding. [Evidence and limits](docs/C35_DIRECTOR_RECORDING.md).
 - Conversion follow-through: audit exact indexed CE bitmap dependencies, review matching source files and create a separate repaired SDK tagset. Add explicit MCC multiplayer UI compatibility, preserve repair reviews across save/check refreshes and validate real Alpine MCC compilation. [Evidence and limits](docs/C35_CONVERSION_RESOURCE_REPAIR.md).
 - Follow-through: monitor saved derived tag changes, review stable file differences and rebuild/open a separate native map. Fix the desktop working-tag pre-build snapshot reason and widen runtime details. [Actual native round trip](docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md).
 - Make navigation and the top window/project header remembered drawers; move utility panels into configurable edge/floating drawers and add native F11 fullscreen with Escape restoration.

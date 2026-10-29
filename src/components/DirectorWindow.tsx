@@ -8,7 +8,7 @@ import type { CameraPose } from '../machinima';
 import { poseShot, sampleCamera, takeDuration } from '../machinima';
 import { useDirectorSession } from '../directorSession';
 import type { DirectorComposition } from '../directorSession';
-import { recordDirector } from '../directorRecording';
+import { recordDirector, nextTakeName } from '../directorRecording';
 import type { ActiveRecording } from '../directorRecording';
 import type { DirectorBridge } from './MachinimaRig';
 import { SourceStage } from './MachinimaWorkspace';
@@ -18,6 +18,9 @@ import { observeWindowFocus } from '../windowFocus';
 import { matchesLiveMap, runtimeScene } from '../liveScene';
 import type { LiveStatus } from './LiveObjectInspector';
 import { NumberField } from './ui';
+import { useMapState } from '../mapSession';
+import { directorCanvasCapture } from '../directorCanvasCapture';
+import type { DirectorCanvasCapture } from '../directorCanvasCapture';
 import '../directorWindow.css';
 const World = lazy(() => import('./World'));
 function apply(camera: PerspectiveCamera, pose: CameraPose) {
@@ -161,11 +164,13 @@ export default function DirectorWindow({
     [countdown, setCountdown] = useState(0);
   const [linked, setLinked] = useState(false),
     [live, setLive] = useState<LiveStatus | null>(null);
+  const [outputDirectory,setOutputDirectory]=useMapState(projectId,'director.recordingFolder','');
+  const [takeName,setTakeName]=useState(nextTakeName);
   const bridge = useRef<DirectorBridge>({ canvas: null, pose: null }),
     video = useRef<HTMLVideoElement>(null),
     [feed, setFeed] = useState<MediaStream | null>(null),
     active = useRef<ActiveRecording | null>(null),
-    ownedCanvasStream = useRef<MediaStream | null>(null),
+    ownedCanvas = useRef<DirectorCanvasCapture | null>(null),
     clock = useRef({ started: 0, accumulated: 0, running: false }),
     starting = useRef<AbortController | null>(null),
     latest = useRef(session);
@@ -289,7 +294,7 @@ export default function DirectorWindow({
   useEffect(
     () => () => {
       starting.current?.abort();
-      ownedCanvasStream.current?.getTracks().forEach((track) => track.stop());
+      ownedCanvas.current?.dispose();
     },
     [],
   );
@@ -329,12 +334,12 @@ export default function DirectorWindow({
     clock.current = { started: 0, accumulated: 0, running: false };
     setElapsed(0);
     try {
-      const stream = mode === 'capture' ? feed : bridge.current.canvas?.captureStream(fps);
+      if(mode==='editor'&&bridge.current.canvas)ownedCanvas.current=directorCanvasCapture(bridge.current.canvas,fps);
+      const stream = mode === 'capture' ? feed : ownedCanvas.current?.stream;
       if (!stream)
         throw new Error(
           mode === 'capture' ? 'Choose the game window first.' : 'Wait for the map view to render.',
         );
-      if (mode === 'editor') ownedCanvasStream.current = stream;
       active.current = await recordDirector(
         projectId,
         stream,
@@ -353,20 +358,20 @@ export default function DirectorWindow({
           setRecording(state);
           setMessage(detail);
           if (state === 'idle') {
-            ownedCanvasStream.current?.getTracks().forEach((track) => track.stop());
-            ownedCanvasStream.current = null;
+            ownedCanvas.current?.dispose();
+            ownedCanvas.current = null;
             active.current = null;
           }
         },
-        { countdown, signal: controller.signal },
+        { countdown, signal: controller.signal, outputDirectory, fileName:takeName, onSaved:()=>setTakeName(nextTakeName()),beforeStart:mode==='editor'?signal=>ownedCanvas.current!.start(signal):undefined },
       );
       if (!active.current) {
-        ownedCanvasStream.current?.getTracks().forEach((track) => track.stop());
-        ownedCanvasStream.current = null;
+        ownedCanvas.current?.dispose();
+        ownedCanvas.current = null;
       }
     } catch (e) {
-      ownedCanvasStream.current?.getTracks().forEach((track) => track.stop());
-      ownedCanvasStream.current = null;
+      ownedCanvas.current?.dispose();
+      ownedCanvas.current = null;
       setRecording('idle');
       setMessage(String(e));
     } finally {
@@ -530,6 +535,7 @@ export default function DirectorWindow({
           <label>
             Frame rate
             <select
+              aria-label="Frame rate"
               value={fps}
               disabled={recording !== 'idle'}
               onChange={(e) => setFps(Number(e.target.value))}
@@ -542,6 +548,7 @@ export default function DirectorWindow({
           <label>
             Render width
             <select
+              aria-label="Render width"
               value={resolution}
               disabled={recording !== 'idle'}
               onChange={(e) => setResolution(Number(e.target.value))}
@@ -555,6 +562,7 @@ export default function DirectorWindow({
           <label>
             Quality
             <select
+              aria-label="Quality"
               value={quality}
               disabled={recording !== 'idle'}
               onChange={(e) => setQuality(Number(e.target.value))}
@@ -566,12 +574,20 @@ export default function DirectorWindow({
           </label>
           <label>
             Countdown
-            <select value={countdown} onChange={(e) => setCountdown(Number(e.target.value))}>
+            <select aria-label="Countdown" value={countdown} disabled={recording!=='idle'} onChange={(e) => setCountdown(Number(e.target.value))}>
               <option value="0">None</option>
               <option value="3">3 seconds</option>
               <option value="5">5 seconds</option>
             </select>
           </label>
+          <details className="gs-director-output">
+            <summary>Recording output · {outputDirectory?'named takes':'choose each time'}</summary>
+            <div className="gs-director-output-menu" role="group" aria-label="Recording output settings" onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();const details=e.currentTarget.closest('details');if(details){details.open=false;details.querySelector('summary')?.focus();}}}}>
+            <label>Recording folder<input aria-label="Recording folder" value={outputDirectory} disabled={recording!=='idle'} onChange={e=>setOutputDirectory(e.target.value)} placeholder="Empty: show Save dialog · or enter an existing absolute folder"/></label>
+            <label>Next take filename<input aria-label="Next take filename" value={takeName} disabled={recording!=='idle'} onChange={e=>setTakeName(e.target.value)} maxLength={160}/></label>
+            <small>The folder is remembered for this map. Each successful take gets a fresh name; existing files stay protected. Leave the folder empty to choose a file in the Save dialog.</small>
+            </div>
+          </details>
           <span>
             Hide the interface with the button above; press Esc to restore it. OBS can capture this window
             directly. An independent engine spectator feed is not implemented for MCC.

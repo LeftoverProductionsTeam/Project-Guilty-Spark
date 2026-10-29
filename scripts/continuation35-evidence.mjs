@@ -39,8 +39,8 @@ export const continuation35Requirements = [
     'recording',
     'Native video output with countdown, bounded storage, pause/resume and clean recording',
     'machinima',
-    'OS Save picker, MediaRecorder canvas/permissioned streams, ordered bounded chunk writes, non-overwrite publication, pause/resume/countdown and failure-retained partial output are implemented and contract tested.',
-    'A native WebView canvas probe encoded and decoded visible map detail at 1920x1080 while the other editor owned focus. Its initial decoded frame was blank; startup quality, actual application Save-picker, A/V synchronization and long takes remain unaccepted. Windows computer-use initialization failed.',
+    'Remembered recording folders and named takes, ordered bounded writes, non-overwrite publication, countdown cancellation and pause/resume are implemented. Actual native UI recording, focus transfer, clean-view changes, independent first-frame/file decoding and Director reopen pass. Fixed-size export samples the existing renderer; map-window preferences merge latest peer values.',
+    'The earlier zero first-frame browser read preceded presentation; independent decoding finds picture data in that original file. OS Save/capture pickers, actual game audio/capture, long takes and physical 4K remain unaccepted. Editor Render is video-only. Windows computer-use initialization failed.',
   ],
   [
     'capture',
@@ -152,8 +152,18 @@ for (const id of ['C35-catalog', 'C35-conversion-errors'])
   Object.assign(continuation35Overrides[id], {
     files:
       'crates/spark-core/src/conversion_resources.rs; crates/spark-core/src/conversion.rs; crates/spark-core/src/build.rs; src-tauri/src/conversion_resources_native.rs; src/components/ConversionBitmapRepair.tsx; src/components/Build.tsx; src/mapCatalog.ts',
-    level: 'IMPLEMENTED / NATIVE DESKTOP REPAIR, COMPILATION AND CACHE OPEN LOCALLY TESTED; gameplay NOT ACCEPTED',
+    level:
+      'IMPLEMENTED / NATIVE DESKTOP REPAIR, COMPILATION AND CACHE OPEN LOCALLY TESTED; gameplay NOT ACCEPTED',
     evidence:
       'docs/C35_CONVERSION_RESOURCE_REPAIR.md; docs/fixtures/c35-conversion-repair-native-verification.json; scripts/test-conversion-repair-native.mjs',
     next: 'Load the converted Alpine map in retail MCC with the exact metadata package and verify UI/HUD, modes, collision, materials and sounds; retain unrelated engine/network gates.',
   });
+Object.assign(continuation35Overrides['C35-recording'], {
+  files:
+    'src/directorRecording.ts; src/directorCanvasCapture.ts; src/components/DirectorWindow.tsx; src-tauri/src/director_recording.rs; src/mapSession.ts',
+  level:
+    'IMPLEMENTED / NATIVE UI RECORDING, FILE DECODE AND REOPEN LOCALLY TESTED; game capture NOT ACCEPTED',
+  evidence:
+    'docs/C35_DIRECTOR_RECORDING.md; docs/fixtures/c35-director-recording-native-verification.json; scripts/test-director-recording-native.mjs',
+  next: 'Accept OS picker routes, actual game audio/capture, longer takes and repeatable frame-pacing/resource measurements without replacing them with editor-only evidence.',
+});

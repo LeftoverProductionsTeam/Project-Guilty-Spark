@@ -45,6 +45,30 @@ export async function probeEditorCapture(page) {
         frame.width = 64;
         frame.height = 36;
         const context = frame.getContext('2d');
+        // loadeddata alone did not establish a presented GPU frame in WebView2.
+        // Sample only after the decoder submits a frame, and retain its media time.
+        const presented = () =>
+          new Promise((resolve, reject) => {
+            if (!video.requestVideoFrameCallback) {
+              reject(Error('Video presentation callbacks unavailable'));
+              return;
+            }
+            const timer = setTimeout(() => {
+              video.cancelVideoFrameCallback(id);
+              reject(Error('Native video presentation timed out'));
+            }, 10000);
+            const id = video.requestVideoFrameCallback((_, metadata) => {
+              clearTimeout(timer);
+              video.pause();
+              resolve(metadata);
+            });
+            void video.play().catch((error) => {
+              clearTimeout(timer);
+              video.cancelVideoFrameCallback(id);
+              reject(error);
+            });
+          });
+        const firstPresented = await presented();
         context.drawImage(video, 0, 0, 64, 36);
         const pixels = context.getImageData(0, 0, 64, 36).data;
         let sum = 0,
@@ -65,6 +89,7 @@ export async function probeEditorCapture(page) {
           };
           video.currentTime = 1;
         });
+        const laterPresented = await presented();
         context.drawImage(video, 0, 0, 64, 36);
         const laterPixels = context.getImageData(0, 0, 64, 36).data;
         sum = 0;
@@ -96,9 +121,11 @@ export async function probeEditorCapture(page) {
             requestedFps: 24,
             elapsedSeconds: (performance.now() - started) / 1000,
             audioTracks: stream.getAudioTracks().length,
-            firstDecodedLumaDeviation: firstDeviation,
+            firstPresentedLumaDeviation: firstDeviation,
+            firstPresentedMediaTime: firstPresented.mediaTime,
+            laterPresentedMediaTime: laterPresented.mediaTime,
             decodedLumaDeviation: deviation,
-            decoded: deviation >= 2,
+            decoded: firstDeviation >= 2 && deviation >= 2,
           },
         };
       } finally {

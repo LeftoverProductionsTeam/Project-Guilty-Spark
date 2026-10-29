@@ -26,6 +26,8 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 
 ## C35 living workbench
 
+The latest [Director recording pass](docs/C35_DIRECTOR_RECORDING.md) adds remembered folders and named takes, fixes preference loss across native windows, cleans empty cancelled reservations and keeps exported frame dimensions stable when the interface changes. Recording and game/OS capture acceptance remain separately documented.
+
 The latest [classic bitmap repair and conversion pass](docs/C35_CONVERSION_RESOURCE_REPAIR.md) checks exact missing CE bitmap tags before staging, reviews matching source files and creates a separate repaired SDK tagset. Alpine now passes native MCC compilation with these files and an explicit MCC multiplayer UI compatibility option; gameplay acceptance remains pending.
 
 The [saved tool-edit follow-through](docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md) adds stable-save monitoring of derived tag folders, a compact changed-files review and the separate native rebuild/open-result workflow. It fixes a desktop pre-build snapshot refusal. A real external scenario edit compiled through the desktop into an MCC cache, with the changed player start read back from the new map; original tags/cache and Spark authoring remained intact.
