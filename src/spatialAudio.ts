@@ -356,10 +356,11 @@ export class SpatialSoundMixer {
     readonly context: BaseAudioContext,
     private load: (emitter: SoundEmitter) => Promise<AudioBuffer>,
     private changed: () => void = () => {},
+    destination: AudioNode = context.destination,
   ) {
     this.master = context.createGain();
     this.master.gain.value = 0;
-    this.master.connect(context.destination);
+    this.master.connect(destination);
     for (const bus of SOUND_BUSES) {
       const node = context.createGain();
       node.gain.value = 0;

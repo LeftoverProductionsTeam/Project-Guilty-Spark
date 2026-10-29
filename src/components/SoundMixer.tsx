@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { call, native } from '../api';
-import type { AudioPreview, MapInspection, Project, SoundInspection, Vec3 } from '../types';
+import type { MapInspection, Project, SoundInspection, Vec3 } from '../types';
+import { loadMapSoundClip } from '../soundClipLoader';
 import {
-  decodeSoundChain,
   createEmitter,
   emptySoundScene,
   followAudioListener,
@@ -135,25 +135,8 @@ export default function SoundMixer({
       let value: SpatialSoundMixer;
       value = new SpatialSoundMixer(
         ctx,
-        async (e) => {
-          const projectId = e.sourceProjectId ?? sourceProjectId,
-            hash = e.sourceSha256 ?? inspection.sha256,
-            report = await call<SoundInspection>('inspect_sound', { projectId, tagId: e.tagId });
-          return decodeSoundChain(
-            ctx,
-            e,
-            report,
-            hash,
-            (permutation) =>
-              call<AudioPreview>('preview_sound', {
-                projectId,
-                tagId: e.tagId,
-                pitchRange: e.pitchRange,
-                permutation,
-              }),
-            () => mixer.current !== value || request !== epoch.current,
-          );
-        },
+        (e) => loadMapSoundClip(ctx, e, sourceProjectId, inspection.sha256,
+          () => mixer.current !== value || request !== epoch.current),
         () => {
           if (mounted.current && mixer.current === value) setStats({ ...value.stats });
         },

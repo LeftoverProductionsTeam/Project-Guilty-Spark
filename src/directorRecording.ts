@@ -19,6 +19,7 @@ interface RecordingOptions {
   fileName?: string;
   onSaved?: (receipt: RecordingReceipt) => void;
   beforeStart?: (signal?: AbortSignal) => Promise<void>;
+  afterStart?: () => Promise<void>;
 }
 export function nextTakeName() {
   return `Spark-take-${new Date().toISOString().replace(/[:.]/g, '-')}-${crypto.randomUUID().slice(0, 8)}.webm`;
@@ -152,8 +153,14 @@ export async function recordDirector(
     const track = stream.getVideoTracks()[0]?.getSettings();
     onState(
       'recording',
-      `Recording to ${file.path} · ${track?.width ?? '?'}×${track?.height ?? '?'} at ${track?.frameRate?.toFixed(1) ?? '?'} fps · ${stream.getAudioTracks().length ? 'shared audio included' : 'video only — no game audio track'}`,
+      `Recording to ${file.path} · ${track?.width ?? '?'}×${track?.height ?? '?'} at ${track?.frameRate?.toFixed(1) ?? '?'} fps · ${stream.getAudioTracks().length ? 'audio track included' : 'video only — no audio track'}`,
     );
+    if (options.afterStart) void Promise.resolve().then(options.afterStart).catch((reason) => {
+      if (recorder.state === 'inactive') return;
+      failed = true;
+      stop();
+      onState('saving', `Recording source stopped: ${String(reason)}. Partial take retained.`);
+    });
   } catch (reason) {
     videoTrack.removeEventListener?.('ended', sourceEnded);
     window.removeEventListener('beforeunload', unload);

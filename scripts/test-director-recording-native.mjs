@@ -8,23 +8,28 @@ import net from 'node:net';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { probeEditorCapture } from './native-editor-capture-probe.mjs';
+import { prepareNativeDirectorAudio, decodeRecordedAudio } from './native-director-audio-probe.mjs';
 const args = new Map();
 for (let n = 2; n < process.argv.length; n += 2) {
   if (
-    !['--app', '--data', '--output', '--decoder'].includes(process.argv[n]) ||
+    !['--app', '--data', '--output', '--decoder', '--map-audio'].includes(process.argv[n]) ||
     !process.argv[n + 1] ||
     args.has(process.argv[n])
   )
     throw Error('Provide unique named paths');
   args.set(process.argv[n], process.argv[n + 1]);
 }
-if (args.size !== 4)
+if (
+  !['--app', '--data', '--output', '--decoder'].every((key) => args.has(key)) ||
+  (args.has('--map-audio') && args.get('--map-audio') !== 'saved')
+)
   throw Error(
     'Required: --app built.exe --data fresh-recording-fixture --output fresh-dir --decoder ffmpeg.exe',
   );
 const data = path.resolve(args.get('--data')),
   output = path.resolve(args.get('--output')),
   decoder = path.resolve(args.get('--decoder'));
+const includeMapAudio = args.get('--map-audio') === 'saved';
 const fixture = JSON.parse(await fs.readFile(path.join(data, 'spark-recording-fixture.json'), 'utf8'));
 if (!fixture.nativeFixture || fixture.schemaVersion !== 1)
   throw Error('Use qa_recording_library with an owned map');
@@ -144,6 +149,9 @@ try {
       intervals: [1000],
     })
     .toBe('false');
+  const mapAudio = includeMapAudio ? await prepareNativeDirectorAudio(call, request, fixture) : null;
+  if (mapAudio)
+    await expect(director.getByTestId('director-audio-summary')).toHaveText('Startup sounds enabled: 1.');
   let wrongWindowRejected = false;
   try {
     await call('director_record_open', {
@@ -171,6 +179,8 @@ try {
   await director.getByLabel('Quality', { exact: true }).selectOption('6000000');
   const summary = director.locator('.gs-director-output > summary');
   await summary.click();
+  expect(await director.getByLabel('Include saved map audio', { exact: true }).isChecked()).toBe(false);
+  if (includeMapAudio) await director.getByLabel('Include saved map audio', { exact: true }).check();
   await director.getByRole('textbox', { name: 'Recording folder', exact: true }).fill(takes);
   await director.getByRole('textbox', { name: 'Next take filename', exact: true }).fill('cancelled.webm');
   await director.getByLabel('Countdown', { exact: true }).selectOption('3');
@@ -227,6 +237,8 @@ try {
     movieSha256 = hash(bytes),
     savedMessage = await director.locator('.gs-director-message').innerText();
   expect(savedMessage).toContain(movieSha256);
+  if (includeMapAudio)
+    expect(await director.getByLabel('Include saved map audio', { exact: true }).isChecked()).toBe(true);
   expect((await call('director_session', { projectId: fixture.projectId })).recording).toBe(false);
   await summary.click();
   const nextName = await director
@@ -341,11 +353,64 @@ try {
     Buffer.from(browserProbe.encoded.split(',')[1], 'base64'),
     { flag: 'wx' },
   );
+  let audioEvidence = null;
+  if (mapAudio) {
+    const near = await decodeRecordedAudio(run, decoder, movie, true);
+    expect(Math.abs(near.decodedSeconds - Number(fields.out_time_us) / 1000000)).toBeLessThan(0.3);
+    const pose = mapAudio.composition.pose;
+    const session = await call('director_session', { projectId: fixture.projectId });
+    const move = (position) => position.map((value, axis) => value + (axis === 0 ? 100 : 0));
+    await request('director_update', {
+      projectId: fixture.projectId,
+      revision: session.revision,
+      composition: {
+        ...mapAudio.composition,
+        pose: { ...pose, position: move(pose.position), lookAt: move(pose.lookAt) },
+      },
+      save: true,
+    });
+    await expect
+      .poll(
+        async () => JSON.parse(await director.locator('canvas').getAttribute('data-gs-director')).position[0],
+      )
+      .toBeCloseTo(pose.position[0] + 100, 4);
+    await summary.click();
+    await director
+      .getByRole('textbox', { name: 'Next take filename', exact: true })
+      .fill('distant-take.webm');
+    await summary.click();
+    await director.getByRole('button', { name: 'Record video…', exact: true }).click();
+    await expect(director.locator('.gs-director-message')).toContainText('Recording to');
+    await expect.poll(() => director.locator('nav output').innerText()).toMatch(/^recording · [2-9]/);
+    await director.getByRole('button', { name: 'Stop & save', exact: true }).click();
+    await expect(director.locator('.gs-director-message')).toContainText('Saved ', { timeout: 45000 });
+    const distantMovie = path.join(takes, 'distant-take.webm');
+    const far = await decodeRecordedAudio(run, decoder, distantMovie, false);
+    const current = await call('director_session', { projectId: fixture.projectId });
+    await request('director_update', {
+      projectId: fixture.projectId,
+      revision: current.revision,
+      composition: mapAudio.composition,
+      save: true,
+    });
+    audioEvidence = {
+      ...mapAudio.metadata,
+      near,
+      beyondSavedMaxDistance: far,
+      distantTakeSha256: hash(await fs.readFile(distantMovie)),
+      startupEvents: ['ambient', 'mapStart'],
+      audioBeforeCountdown: false,
+      microphoneRequested: false,
+      systemAudioRequested: false,
+      gameAudioCaptured: false,
+    };
+  }
   const after = (await call('open_project', { id: fixture.projectId })).project;
   for (const key of ['scene', 'tagEdits', 'quickForge'])
     expect(JSON.parse(JSON.stringify(after[key] ?? null))).toEqual(
       JSON.parse(JSON.stringify(original[key] ?? null)),
     );
+  if (mapAudio) expect(after.audioPreview).toEqual(mapAudio.scene);
   expect(hash(await fs.readFile(original.source.preservedPath))).toBe(fixture.sourceSha256);
   expect(hash(await fs.readFile(original.source.originalPath))).toBe(fixture.sourceSha256);
   expect((await fs.readdir(takes)).filter((f) => f.endsWith('.partial'))).toHaveLength(0);
@@ -361,7 +426,14 @@ try {
       2,
     ),
   );
-  await request('director_window', { projectId: fixture.projectId, action: 'dock', monitor: null });
+  // Closing the requesting WebView can destroy an invoke reply before CDP receives it.
+  // Exercise the visible action and use the native close event as its completion.
+  await director
+    .getByRole('button', { name: 'Dock back', exact: true })
+    .click({ noWaitAfter: true })
+    .catch((error) => {
+      if (!director.isClosed()) throw error;
+    });
   await expect.poll(() => director.isClosed()).toBe(true);
   const again = await call('director_popout', { projectId: fixture.projectId });
   await expect
@@ -386,6 +458,9 @@ try {
   detached = again.window;
   await director.locator('.gs-director-output > summary').click();
   await expect(director.getByRole('textbox', { name: 'Recording folder', exact: true })).toHaveValue(takes);
+  await expect(director.getByLabel('Include saved map audio', { exact: true })).toBeChecked({
+    checked: includeMapAudio,
+  });
   const receipt = {
     schemaVersion: 1,
     nativeDesktop: true,
@@ -404,8 +479,10 @@ try {
     wrongWindowRejected,
     traversalRejected,
     folderRememberedAfterReopen: true,
+    mapAudioPreferenceRememberedAfterReopen: true,
     freshNameAfterSuccess: true,
-    videoOnly: true,
+    videoOnly: !includeMapAudio,
+    savedMapAudio: audioEvidence,
     requestedFps: 24,
     dimensions,
     decodedFrameSizes,

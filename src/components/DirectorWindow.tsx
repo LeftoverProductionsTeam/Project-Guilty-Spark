@@ -21,6 +21,8 @@ import { NumberField } from './ui';
 import { useMapState } from '../mapSession';
 import { directorCanvasCapture } from '../directorCanvasCapture';
 import type { DirectorCanvasCapture } from '../directorCanvasCapture';
+import { prepareDirectorAudio } from '../directorAudio';
+import type { DirectorAudio } from '../directorAudio';
 import '../directorWindow.css';
 const World = lazy(() => import('./World'));
 function apply(camera: PerspectiveCamera, pose: CameraPose) {
@@ -165,12 +167,14 @@ export default function DirectorWindow({
   const [linked, setLinked] = useState(false),
     [live, setLive] = useState<LiveStatus | null>(null);
   const [outputDirectory,setOutputDirectory]=useMapState(projectId,'director.recordingFolder','');
+  const [mapAudio,setMapAudio]=useMapState(projectId,'director.recordingMapAudio',false);
   const [takeName,setTakeName]=useState(nextTakeName);
   const bridge = useRef<DirectorBridge>({ canvas: null, pose: null }),
     video = useRef<HTMLVideoElement>(null),
     [feed, setFeed] = useState<MediaStream | null>(null),
     active = useRef<ActiveRecording | null>(null),
     ownedCanvas = useRef<DirectorCanvasCapture | null>(null),
+    ownedAudio = useRef<DirectorAudio | null>(null),
     clock = useRef({ started: 0, accumulated: 0, running: false }),
     starting = useRef<AbortController | null>(null),
     latest = useRef(session);
@@ -295,6 +299,7 @@ export default function DirectorWindow({
     () => () => {
       starting.current?.abort();
       ownedCanvas.current?.dispose();
+      ownedAudio.current?.dispose();
     },
     [],
   );
@@ -335,7 +340,15 @@ export default function DirectorWindow({
     setElapsed(0);
     try {
       if(mode==='editor'&&bridge.current.canvas)ownedCanvas.current=directorCanvasCapture(bridge.current.canvas,fps);
-      const stream = mode === 'capture' ? feed : ownedCanvas.current?.stream;
+      if (mode === 'editor' && mapAudio) {
+        if (!opened?.project.audioPreview) throw Error('Save an Ambient or Map start sound in Level editor → Map sounds first.');
+        setMessage('Checking saved map sounds…');
+        ownedAudio.current = await prepareDirectorAudio(projectId, projectId, opened.inspection?.sha256 ?? opened.project.source?.sha256 ?? '',
+          opened.project.audioPreview, controller.signal);
+      }
+      const source = mode === 'capture' ? feed : ownedCanvas.current?.stream;
+      const stream = source && ownedAudio.current && mode === 'editor'
+        ? new MediaStream([...source.getVideoTracks(), ...ownedAudio.current.stream.getAudioTracks()]) : source;
       if (!stream)
         throw new Error(
           mode === 'capture' ? 'Choose the game window first.' : 'Wait for the map view to render.',
@@ -354,22 +367,30 @@ export default function DirectorWindow({
             clock.current.started = time;
             clock.current.running = true;
           }
+          if (state === 'saving') ownedAudio.current?.dispose();
           setElapsed(clock.current.accumulated / 1000);
           setRecording(state);
           setMessage(detail);
           if (state === 'idle') {
+            ownedAudio.current?.dispose();
+            ownedAudio.current = null;
             ownedCanvas.current?.dispose();
             ownedCanvas.current = null;
             active.current = null;
           }
         },
-        { countdown, signal: controller.signal, outputDirectory, fileName:takeName, onSaved:()=>setTakeName(nextTakeName()),beforeStart:mode==='editor'?signal=>ownedCanvas.current!.start(signal):undefined },
+        { countdown, signal: controller.signal, outputDirectory, fileName:takeName, onSaved:()=>setTakeName(nextTakeName()),beforeStart:mode==='editor'?signal=>ownedCanvas.current!.start(signal):undefined,
+          afterStart: mode === 'editor' && mapAudio ? async () => { await ownedAudio.current?.start(); } : undefined },
       );
       if (!active.current) {
+        ownedAudio.current?.dispose();
+        ownedAudio.current = null;
         ownedCanvas.current?.dispose();
         ownedCanvas.current = null;
       }
     } catch (e) {
+      ownedAudio.current?.dispose();
+      ownedAudio.current = null;
       ownedCanvas.current?.dispose();
       ownedCanvas.current = null;
       setRecording('idle');
@@ -585,6 +606,11 @@ export default function DirectorWindow({
             <div className="gs-director-output-menu" role="group" aria-label="Recording output settings" onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();const details=e.currentTarget.closest('details');if(details){details.open=false;details.querySelector('summary')?.focus();}}}}>
             <label>Recording folder<input aria-label="Recording folder" value={outputDirectory} disabled={recording!=='idle'} onChange={e=>setOutputDirectory(e.target.value)} placeholder="Empty: show Save dialog · or enter an existing absolute folder"/></label>
             <label>Next take filename<input aria-label="Next take filename" value={takeName} disabled={recording!=='idle'} onChange={e=>setTakeName(e.target.value)} maxLength={160}/></label>
+            {mode === 'editor' && <>
+              <label className="gs-director-audio-option"><input type="checkbox" checked={mapAudio} disabled={recording !== 'idle'} onChange={e => setMapAudio(e.target.checked)}/>Include saved map audio</label>
+              <small data-testid="director-audio-summary">Startup sounds enabled: {opened?.project.audioPreview?.emitters.filter(e => e.enabled && (e.event === 'ambient' || e.event === 'mapStart')).length ?? 0}{opened?.project.audioPreview?.muted ? ' · master muted' : ''}.</small>
+              <small>Records enabled Ambient and Map start emitters from Level editor → Map sounds, with saved bus levels, mute and camera distance. This take keeps a snapshot of the mix. Other events, game audio and microphone audio are not captured here.</small>
+            </>}
             <small>The folder is remembered for this map. Each successful take gets a fresh name; existing files stay protected. Leave the folder empty to choose a file in the Save dialog.</small>
             </div>
           </details>

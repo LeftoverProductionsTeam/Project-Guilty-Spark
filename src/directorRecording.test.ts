@@ -187,3 +187,33 @@ test('a video source ending stops the take even when an audio track remains live
   expect(Recorder.current.state).toBe('inactive');
   expect(ipc).toHaveBeenLastCalledWith('director_record_finish', { id: 'owned', failed: false });
 });
+test('a recording audio startup failure retains a failed take instead of publishing success', async () => {
+  const status = vi.fn(),
+    saved = vi.fn();
+  ipc.mockImplementation(async (command: string, args: any) => {
+    if (command === 'director_record_open') return { id: 'owned', path: 'partial.webm' };
+    if (command === 'director_record_finish') {
+      expect(args.failed).toBe(true);
+      throw Error('partial retained');
+    }
+  });
+  const take = await recordDirector('map', stream, 6000000, status, {
+    afterStart: async () => {
+      throw Error('Audio context stopped');
+    },
+    onSaved: saved,
+  });
+  await take!.finished;
+  expect(saved).not.toHaveBeenCalled();
+  expect(status.mock.calls.some((call) => String(call[1]).startsWith('Saved '))).toBe(false);
+  expect(status.mock.calls.at(-1)?.[1]).toContain('partial retained');
+});
+test('pausing and resuming never restart the recording sound source', async () => {
+  const afterStart = vi.fn(async () => {});
+  const take = await recordDirector('map', stream, 6000000, () => {}, { afterStart });
+  take!.pause();
+  take!.resume();
+  take!.stop();
+  await take!.finished;
+  expect(afterStart).toHaveBeenCalledTimes(1);
+});

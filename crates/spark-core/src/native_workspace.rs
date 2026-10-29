@@ -109,8 +109,17 @@ mod windows {
                 b"owned"
             );
             let device = alias.device.clone();
+            let target = alias.target.clone();
             drop(alias);
-            assert!(query(&device).is_none());
+            // Another tool/test may acquire this letter as soon as our lock is released.
+            // Check the complete target stack for our mapping, not whether the letter is free.
+            let mut remaining = vec![0u16; 32768];
+            let count = unsafe {
+                QueryDosDeviceW(device.as_ptr(), remaining.as_mut_ptr(), remaining.len() as u32)
+            } as usize;
+            assert!(!remaining[..count]
+                .split(|value| *value == 0)
+                .any(|mapping| mapping == &target[..target.len() - 1]));
         }
         #[test]
         fn extraction_rebases_long_owned_paths_and_preserves_external_resources() {

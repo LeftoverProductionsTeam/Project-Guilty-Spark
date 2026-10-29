@@ -26,7 +26,9 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 
 ## C35 living workbench
 
-The latest [Director recording pass](docs/C35_DIRECTOR_RECORDING.md) adds remembered folders and named takes, fixes preference loss across native windows, cleans empty cancelled reservations and keeps exported frame dimensions stable when the interface changes. Recording and game/OS capture acceptance remain separately documented.
+The latest [Director audio pass](docs/C35_DIRECTOR_AUDIO.md) adds an optional saved map sound mix to Editor Render takes. Enable **Recording output → Include saved map audio** after saving Ambient or Map start emitters in Map sounds. Actual native recordings verify an encoded real map sample and camera-distance silence; game audio/capture remains a separate acceptance gate.
+
+The earlier [Director recording pass](docs/C35_DIRECTOR_RECORDING.md) adds remembered folders and named takes, fixes preference loss across native windows, cleans empty cancelled reservations and keeps exported frame dimensions stable when the interface changes. Recording and game/OS capture acceptance remain separately documented.
 
 The latest [classic bitmap repair and conversion pass](docs/C35_CONVERSION_RESOURCE_REPAIR.md) checks exact missing CE bitmap tags before staging, reviews matching source files and creates a separate repaired SDK tagset. Alpine now passes native MCC compilation with these files and an explicit MCC multiplayer UI compatibility option; gameplay acceptance remains pending.
 
@@ -34,7 +36,7 @@ The [saved tool-edit follow-through](docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md) adds 
 
 **Menu** and **Window** open remembered navigation/header drawers, leaving more space for the map. Project setup, Changes, Help, Objects, Inspector, construction and game connection use configurable edge/floating panels. **F11** enters actual native fullscreen with tools at the edges; **Escape** dismisses drawers before restoring the window. Camera flight supports configurable WASD/Q/E, Shift boost, middle-button pan and right-button wheel speed.
 
-Open **Recording Director ↗** from a prepared Level editor view to detach a native camera/recording window, then dock it back with the same revision-checked session. Camera keys, tracking, lens and monitor controls are included. Editor Render and explicitly shared Live Game Capture are distinct; an independent MCC engine spectator adapter is not implemented. A short native video probe decoded real map detail, while application Save-dialog flow, recording startup quality, game audio/capture and long takes remain acceptance gates.
+Open **Recording Director ↗** from a prepared Level editor view to detach a native camera/recording window, then dock it back with the same revision-checked session. Camera keys, tracking, lens and monitor controls are included. Editor Render can record the saved spatial sound scene. Explicitly shared Live Game Capture is a separate route; an independent MCC engine spectator adapter is not implemented. Native named takes pass picture/audio decoding and source-preservation checks; application OS pickers, actual game audio/capture and long takes remain acceptance gates.
 
 The visual Community maps catalog uses real releases, publisher screenshots and published credits/dependencies. Alpine downloads and opens as Custom Edition; its source-complete MCC conversion is now structurally validated. Actual Zombie Demo resource recovery loads original shader/lightmap/detail previews without unrelated MCC substitution. See the [C35 engineering evidence](docs/CONTINUATION_35_ENGINEERING.md), [owner test card](docs/CONTINUATION_35_TEST_CARD.md) and [push summary/description](docs/GITHUB_HANDOFF.md). All earlier engine goals remain in the [319-row cumulative ledger](docs/MASTER_FEATURE_LEDGER.md).
 
