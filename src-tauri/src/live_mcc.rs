@@ -13,9 +13,14 @@ use std::sync::{
 mod controller_poll;
 #[path = "live_cleanup.rs"]
 mod cleanup;
+#[path = "live_thread_pause.rs"]
+#[cfg(windows)]
+mod thread_pause;
 pub use cleanup::Report as DisconnectReport;
 #[derive(Default)]
 pub struct ScaleSession {
+    #[cfg(windows)]
+    thread_release: thread_pause::Recovery,
     state: Mutex<scaling::ScaleState>,
     error: Mutex<Option<String>>,
     keeper_started: AtomicBool,
@@ -60,6 +65,8 @@ impl Session {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
+    #[cfg(windows)]
+    pub thread_release: thread_pause::Status,
     pub pid: u32,
     pub session_token: String,
     pub cleanup_pending: bool,
@@ -73,6 +80,8 @@ pub struct Status {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CleanupStatus {
+    #[cfg(windows)]
+    pub thread_release: thread_pause::Status,
     pub has_session: bool,
     pub session_token: Option<String>,
     pub pending: Vec<&'static str>,
@@ -80,15 +89,22 @@ pub struct CleanupStatus {
 }
 pub fn cleanup_status(session: Option<&Session>) -> Result<CleanupStatus> {
     let Some(session) = session.filter(|s| !s.closed.load(Ordering::Acquire)) else {
-        return Ok(CleanupStatus { has_session: false, session_token: None, pending: vec![], detail: "No previous live session.".into() });
+        return Ok(CleanupStatus { #[cfg(windows)] thread_release: Default::default(), has_session: false, session_token: None, pending: vec![], detail: "No previous live session.".into() });
     };
     let mut pending = vec![];
-    if session.scales.state.lock().map_err(|_| spark_core::SparkError::Invalid("Scale state lock failed".into()))?.active() { pending.push("shared sizes"); }
-    if session.camera.data.lock().map_err(|_| spark_core::SparkError::Invalid("Camera state lock failed".into()))?.state.active() { pending.push("camera"); }
-    if session.sprint.data.lock().map_err(|_| spark_core::SparkError::Invalid("Sprint state lock failed".into()))?.state.active() { pending.push("sprint"); }
+    #[cfg(windows)]
+    let thread_release = session.scales.thread_release.status();
+    #[cfg(windows)]
+    if thread_release.issue.is_some() || thread_release.pending_threads > 0 { pending.push("thread release"); }
+    match session.scales.state.lock() { Ok(state) => { if state.active() { pending.push("shared sizes"); } }, Err(_) => pending.push("shared sizes (state unavailable)") }
+    match session.camera.data.lock() { Ok(data) => { if data.state.active() { pending.push("camera"); } }, Err(_) => pending.push("camera (state unavailable)") }
+    match session.sprint.data.lock() { Ok(data) => { if data.state.active() { pending.push("sprint"); } }, Err(_) => pending.push("sprint (state unavailable)") }
     let detail = if pending.is_empty() { "A previous live session is retained. Release it before connecting again.".into() }
         else { format!("Previous live session retains temporary {}. Cleanup restores the same target or retires records only when the original target is proven obsolete.", pending.join(", ")) };
-    Ok(CleanupStatus { has_session: true, session_token: Some(session.token()), pending, detail })
+    let detail = if pending.iter().any(|part| part.ends_with("(state unavailable)")) { format!("{detail} Some local data journals are unavailable. Recorded thread release can still be retried; data restoration remains blocked.") } else { detail };
+    #[cfg(windows)]
+    let detail = if let Some(issue) = &thread_release.issue { format!("{detail} {issue} Further live edits are blocked. Release previous live session retries only recorded increments before data cleanup.") } else { detail };
+    Ok(CleanupStatus { #[cfg(windows)] thread_release, has_session: true, session_token: Some(session.token()), pending, detail })
 }
 pub fn check_session_token(session: Option<&Session>, expected: Option<&str>) -> Result<()> {
     if let (Some(session), Some(expected)) = (session, expected) {
@@ -256,71 +272,6 @@ mod windows {
             }
         }
     }
-    // A short, bounded data transaction must not expose half a mass/inertia
-    // update to the physics step. Every successful suspend is paired with one
-    // resume, including preparation errors and unwinding. No remote code runs.
-    struct PausedThreads {
-        handles: Vec<Process>,
-    }
-    impl Drop for PausedThreads {
-        fn drop(&mut self) {
-            for thread in self.handles.iter().rev() {
-                unsafe {
-                    ResumeThread(thread.0);
-                }
-            }
-        }
-    }
-    impl PausedThreads {
-        fn acquire(pid: u32) -> Result<Self> {
-            let mut guard = Self { handles: vec![] };
-            let mut ids = std::collections::HashSet::new();
-            for _ in 0..4 {
-                let raw = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) };
-                if raw == INVALID_HANDLE_VALUE {
-                    return Err(failed("Cannot enumerate MCC threads"));
-                }
-                let snapshot = Process(raw);
-                let mut entry: THREADENTRY32 = unsafe { std::mem::zeroed() };
-                entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
-                let mut more = unsafe { Thread32First(snapshot.0, &mut entry) };
-                let mut added = 0;
-                while more != 0 {
-                    if entry.th32OwnerProcessID == pid && !ids.contains(&entry.th32ThreadID) {
-                        if guard.handles.len() >= 512 {
-                            return invalid("MCC thread count exceeds the scale transaction bound");
-                        }
-                        let handle = unsafe {
-                            OpenThread(
-                                THREAD_SUSPEND_RESUME | THREAD_QUERY_LIMITED_INFORMATION,
-                                0,
-                                entry.th32ThreadID,
-                            )
-                        };
-                        if handle.is_null() {
-                            return Err(failed("Cannot prepare an atomic MCC physics edit"));
-                        }
-                        let thread = Process(handle);
-                        if unsafe { GetProcessIdOfThread(thread.0) } != pid
-                            || unsafe { SuspendThread(thread.0) } == u32::MAX
-                        {
-                            return Err(failed(
-                                "MCC thread pause was refused; no scale data was changed",
-                            ));
-                        }
-                        guard.handles.push(thread);
-                        ids.insert(entry.th32ThreadID);
-                        added += 1;
-                    }
-                    more = unsafe { Thread32Next(snapshot.0, &mut entry) };
-                }
-                if added == 0 && !guard.handles.is_empty() {
-                    return Ok(guard);
-                }
-            }
-            invalid("MCC threads changed during preparation; no scale data was changed")
-        }
-    }
     impl live::Memory for Process {
         fn read(&self, address: u64, size: usize) -> Result<Vec<u8>> {
             if size == 0 || size > 1024 * 1024 {
@@ -432,6 +383,10 @@ mod windows {
         if s.closed.load(Ordering::Acquire) || s.scales.keeper_stop.load(Ordering::Acquire) {
             return invalid("Live session cleanup is pending or completed. Finish releasing the previous session, then reconnect before editing.");
         }
+        let release = s.scales.thread_release.status();
+        if release.issue.is_some() || release.pending_threads > 0 {
+            return invalid("Thread release needs attention. Use Release previous live session before making further live edits.");
+        }
         Ok(())
     }
     fn guarded(s: &Session, writable: bool) -> Result<Process> {
@@ -509,6 +464,7 @@ mod windows {
         let mut camera = s.camera.data.lock().map_err(|_| spark_core::SparkError::Invalid("Camera state lock failed".into()))?;
         let mut sprint = s.sprint.data.lock().map_err(|_| spark_core::SparkError::Invalid("Sprint state lock failed".into()))?;
         let mut error = s.scales.error.lock().map_err(|_| spark_core::SparkError::Invalid("Scale keeper lock failed".into()))?;
+        s.scales.thread_release.clear_after_cleanup()?;
         *scales = Default::default();
         camera.state = Default::default(); camera.error = None;
         sprint.state = Default::default(); sprint.error = None;
@@ -529,7 +485,7 @@ mod windows {
             .lock()
             .map_err(|_| spark_core::SparkError::Invalid("Scale state lock failed".into()))?
             .vehicle_active();
-        Ok(Status{pid:s.pid,session_token:s.token(),cleanup_pending:s.scales.keeper_stop.load(Ordering::Acquire),snapshot,experimental:true,active_vehicle_physics:vehicle_active,active_shared_scales:s.scales_active(),scale_keeper_error:s.scales.error.lock().map_err(|_|spark_core::SparkError::Invalid("Scale keeper lock failed".into()))?.clone(),detail:"Experimental MCC Halo 1 adapter: object positions and uniform scale with readback. World items share their authored size tag. Vehicles couple shared contact spheres, suspension, mass and inertia; park and exit matching vehicles first. Driving and peer replication require game checks.".into()})
+        Ok(Status{thread_release:s.scales.thread_release.status(),pid:s.pid,session_token:s.token(),cleanup_pending:s.scales.keeper_stop.load(Ordering::Acquire) || s.scales.thread_release.status().issue.is_some(),snapshot,experimental:true,active_vehicle_physics:vehicle_active,active_shared_scales:s.scales_active(),scale_keeper_error:s.scales.error.lock().map_err(|_|spark_core::SparkError::Invalid("Scale keeper lock failed".into()))?.clone(),detail:"Experimental MCC Halo 1 adapter: object positions and uniform scale with readback. World items share their authored size tag. Vehicles couple shared contact spheres, suspension, mass and inertia; park and exit matching vehicles first. Driving and peer replication require game checks.".into()})
     }
     pub fn gameplay_inventory(s:&Session)->Result<live::GameplayInventory> {
         let _edit=EditLock::acquire(s)?;live::gameplay_inventory(&guarded(s,false)?,s.base,&s.identity)
@@ -558,9 +514,8 @@ mod windows {
             .state
             .lock()
             .map_err(|_| spark_core::SparkError::Invalid("Scale state lock failed".into()))?;
-        let paused = PausedThreads::acquire(s.pid)?;
-        let result = scaling::resize(&process, s.base, &s.identity, &mut state, operation);
-        drop(paused);
+        let result = s.scales.thread_release.run(s.pid, ||
+            scaling::resize(&process, s.base, &s.identity, &mut state, operation));
         drop(state);
         if result.is_ok() {
             *s.scales.error.lock().map_err(|_| {
@@ -616,8 +571,8 @@ mod windows {
                     spark_core::SparkError::Invalid("Scale state lock failed".into())
                 })?;
                 if scaling::needs_synchronization(&process, base, &identity, &state)? {
-                    let _paused = PausedThreads::acquire(pid)?;
-                    scaling::synchronize_respawns(&process, base, &identity, &mut state)?;
+                    session.scales.thread_release.run(pid, ||
+                        scaling::synchronize_respawns(&process, base, &identity, &mut state))?;
                 }
                 Ok(())
             })();
@@ -636,6 +591,10 @@ mod windows {
     pub fn disconnect(s: &Session) -> Result<DisconnectReport> {
         let _edit = EditLock::acquire(s)?;
         if s.closed.load(Ordering::Acquire){return Ok(DisconnectReport::already_disconnected());}
+        // Stop new writes before touching local data locks. A poisoned camera/size lock must
+        // not prevent release of increments owned by the independent thread journal.
+        s.scales.keeper_stop.store(true, Ordering::Release);
+        s.scales.thread_release.retry()?;
         quiesce_controllers(s)?;
         let pending = !cleanup_status(Some(s))?.pending.is_empty();
         cleanup::run(pending, || cleanup_target(s), || {
@@ -646,13 +605,13 @@ mod windows {
             .state
             .lock()
             .map_err(|_| spark_core::SparkError::Invalid("Scale state lock failed".into()))?;
-        if !state.active() {
-            return Ok(());
+        if state.active() {
+            // Recheck identity in the existing restore operation after observation.
+            let process = guarded_restore(s)?;
+            s.scales.thread_release.run(s.pid, ||
+                scaling::reset(&process, s.base, &s.identity, &mut state))?;
         }
-        // Recheck identity in the existing restore operation after observation.
-        let process = guarded_restore(s)?;
-        let _paused = PausedThreads::acquire(s.pid)?;
-        scaling::reset(&process, s.base, &s.identity, &mut state)
+        s.scales.thread_release.clear_after_cleanup()
         }, || retire_journals(s), || s.closed.store(true, Ordering::Release))
         .map_err(|reason| spark_core::SparkError::Invalid(format!(
             "Live cleanup incomplete. Automatic controllers stopped; remaining restoration records retained: {reason}"
@@ -700,6 +659,46 @@ mod windows {
             assert!(!old.sprint.data.lock().unwrap().enabled);
             assert!(!cleanup_status(Some(&old)).unwrap().has_session);
             assert_eq!(disconnect(&old).unwrap().outcome, cleanup::Outcome::AlreadyDisconnected);
+        }
+        #[test]
+        fn thread_release_fault_blocks_new_data_edits_and_remains_visible_until_cleanup() {
+            let session = local_session(u32::MAX, 1);
+            session.scales.thread_release.fixture_issue();
+            session.camera.data.lock().unwrap().enabled = true;
+            session.sprint.data.lock().unwrap().enabled = true;
+            assert!(editing_allowed(&session).unwrap_err().to_string().contains("Thread release"));
+            assert!(moves(&session, &[]).unwrap_err().to_string().contains("Thread release"));
+            let status = cleanup_status(Some(&session)).unwrap();
+            assert!(status.pending.contains(&"thread release"));
+            assert_eq!(status.thread_release.pending_threads, 0);
+            assert!(status.thread_release.issue.is_some());
+            let report = disconnect(&session).unwrap();
+            assert_eq!(report.outcome, cleanup::Outcome::Retired);
+            assert_eq!(report.retired_target, Some(cleanup::RetiredTarget::ProcessEnded));
+            assert!(session.scales.thread_release.status().issue.is_none());
+            assert!(session.closed.load(Ordering::Acquire));
+            assert!(!session.camera.data.lock().unwrap().enabled);
+            assert!(!session.sprint.data.lock().unwrap().enabled);
+        }
+        #[test]
+        fn poisoned_data_journal_keeps_the_recovery_token_visible_and_new_writes_stopped() {
+            let session = local_session(u32::MAX, 1);
+            session.scales.thread_release.fixture_issue();
+            let poisoned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let _held = session.camera.data.lock().unwrap();
+                panic!("synthetic camera journal unwind");
+            }));
+            assert!(poisoned.is_err());
+            let status = cleanup_status(Some(&session)).unwrap();
+            assert!(status.has_session);
+            assert_eq!(status.session_token, Some(session.token()));
+            assert!(status.pending.contains(&"camera (state unavailable)"));
+            assert!(status.detail.contains("Recorded thread release can still be retried"));
+            assert!(disconnect(&session).unwrap_err().to_string().contains("Camera state lock failed"));
+            assert!(session.scales.keeper_stop.load(Ordering::Acquire));
+            assert!(!session.closed.load(Ordering::Acquire));
+            assert!(editing_allowed(&session).is_err());
+            assert!(cleanup_status(Some(&session)).unwrap().has_session);
         }
         #[test]
         fn lifecycle_observes_an_owned_child_lifetime_module_absence_and_exit_without_writes() {

@@ -54,8 +54,8 @@ fn restore_data(s: &Session, data: &mut NativeSprintData) -> Result<()> {
         return Ok(());
     }
     let p = guarded_restore(s)?;
-    let _paused = PausedThreads::acquire(s.pid)?;
-    sprint::reset(&p, s.base, &s.identity, &mut data.state)?;
+    s.scales.thread_release.run(s.pid, ||
+        sprint::reset(&p, s.base, &s.identity, &mut data.state))?;
     data.error = None;
     Ok(())
 }
@@ -146,9 +146,9 @@ fn start(s: &Session) {
                     let down = data.enabled && held(&session, &data.config.hotkey)?;
                     if sprint::needs_update(&p, base, &identity, &data.state, &data.config, down)? {
                         let p = guarded(&session, true)?;
-                        let _paused = PausedThreads::acquire(pid)?;
                         let config = data.config.clone();
-                        sprint::tick(&p, base, &identity, &mut data.state, &config, down)?;
+                        session.scales.thread_release.run(pid, ||
+                            sprint::tick(&p, base, &identity, &mut data.state, &config, down))?;
                     }
                     Ok(())
                 })();

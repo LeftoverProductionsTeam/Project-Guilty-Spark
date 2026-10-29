@@ -78,8 +78,19 @@ export default function LiveSessionRecovery({
       {status?.hasSession && (
         <>
           <p>{status.detail}</p>
+          {!!status.threadRelease?.pendingThreads && (
+            <p>
+              {status.threadRelease.pendingThreads} recorded thread{' '}
+              {status.threadRelease.pendingThreads === 1 ? 'release remains' : 'releases remain'}. Retry
+              releases only Spark’s recorded increments, then continues map-data cleanup.
+            </p>
+          )}
           <button disabled={busy || disabled} onClick={() => void release()}>
-            {busy ? 'Releasing previous session…' : 'Release previous live session'}
+            {busy
+              ? 'Releasing previous session…'
+              : status.threadRelease?.pendingThreads
+                ? 'Retry thread release & cleanup'
+                : 'Release previous live session'}
           </button>
         </>
       )}

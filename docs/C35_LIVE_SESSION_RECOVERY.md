@@ -1,5 +1,7 @@
 # C35 r6 — Live-session cleanup, reconnect and stale edit handling
 
+Later scoped work: [r8 acknowledged thread release](C35_THREAD_RELEASE.md) adds release bookkeeping/retry and keeps recovery visible when local data state is unavailable. The r6 results below remain historical.
+
 Continue `1f87ccf` on `codex/continuation-35-living-workbench`. This pass repairs cleanup and connection ownership around the existing experimental MCC adapter. It preserves the source editors, map conversion, Director audio and earlier release artifacts.
 
 ## User workflow

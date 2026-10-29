@@ -80,8 +80,8 @@ fn restore_data(s: &Session, data: &mut NativeCameraData) -> Result<()> {
         return Ok(());
     }
     let p = guarded_restore(s)?;
-    let _paused = PausedThreads::acquire(s.pid)?;
-    camera::apply(&p, s.base, &s.identity, &mut data.state, None)?;
+    s.scales.thread_release.run(s.pid, ||
+        camera::apply(&p, s.base, &s.identity, &mut data.state, None))?;
     data.error = None;
     Ok(())
 }
@@ -137,8 +137,8 @@ fn toggle_data(
         let config = config.unwrap_or_else(|| data.config.clone());
         config.validate()?;
         let p = guarded(s, true)?;
-        let _paused = PausedThreads::acquire(s.pid)?;
-        camera::apply(&p, s.base, &s.identity, &mut data.state, Some(&config))?;
+        s.scales.thread_release.run(s.pid, ||
+            camera::apply(&p, s.base, &s.identity, &mut data.state, Some(&config)))?;
         data.config = config;
         data.enabled = true;
     }
@@ -178,8 +178,8 @@ pub fn camera_configure(
         data.poll_revision = data.poll_revision.wrapping_add(1);
         if enabled {
             let p = guarded(s, true)?;
-            let _paused = PausedThreads::acquire(s.pid)?;
-            camera::apply(&p, s.base, &s.identity, &mut data.state, Some(&config))?;
+            s.scales.thread_release.run(s.pid, ||
+                camera::apply(&p, s.base, &s.identity, &mut data.state, Some(&config)))?;
         } else {
             restore_data(s, &mut data)?;
         }
@@ -257,9 +257,9 @@ pub(super) fn start(s: &Session) {
                         let p = guarded(&session, false)?;
                         if camera::needs_update(&p, base, &identity, &data.state, &data.config)? {
                             let p = guarded(&session, true)?;
-                            let _paused = PausedThreads::acquire(pid)?;
                             let config = data.config.clone();
-                            camera::apply(&p, base, &identity, &mut data.state, Some(&config))?;
+                            session.scales.thread_release.run(pid, ||
+                                camera::apply(&p, base, &identity, &mut data.state, Some(&config)))?;
                         }
                         Ok(())
                     })();

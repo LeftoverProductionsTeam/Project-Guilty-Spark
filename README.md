@@ -26,6 +26,8 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 
 ## C35 living workbench
 
+The latest [thread-release pass](docs/C35_THREAD_RELEASE.md) reports failed releases from the experimental live adapter, retains only outstanding owned increments for retry and blocks new edits in that connection. Recovery stays reachable after a failed snapshot or unavailable local journal. Windows child-process and UI checks pass; engine-owned timing, abnormal-exit recovery and a new MCC gameplay test remain open.
+
 The latest [looping audio pass](docs/C35_LOOPING_AUDIO.md) preserves source main-track intro, repeat and end clips in rehearsal and saved Director audio. Choose a looping sound and track in Map sounds. **Finish sound end clips** and Director's **Finish sound & save** play the authored ending; existing Stop controls cut immediately. Native event, alternate/detail and acoustic parity remain separate gates.
 
 The latest [live-session recovery pass](docs/C35_LIVE_SESSION_RECOVERY.md) keeps cleanup available after the game snapshot fails, distinguishes restoration from obsolete-record retirement and protects live object edits from stale connections. Pending cleanup pauses new edits; reconnecting resets old bindings and undo. Windows lifecycle, desktop API and browser tests pass; full MCC transition/recovery acceptance remains open.

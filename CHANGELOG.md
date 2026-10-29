@@ -2,6 +2,7 @@
 
 ## 0.4.0 — Continuation 35: The living workbench (development)
 
+- Live transport follow-through: acknowledge thread release before returning operation success, retain failed owned increments for retry, preserve other owners' counts and block new edits after faults. Keep recovery reachable when local data state is unavailable; show retry counts and disable pending object/camera/sprint writes. [Evidence and remaining gates](docs/C35_THREAD_RELEASE.md).
 - Looping audio follow-through: read source main tracks, retain intro/loop/end clips and fade flags, share bounded PCM buffers and finish authored endings before saving Director takes. Remember sound search/track context and correct the late-finish envelope anchor. [Evidence and limits](docs/C35_LOOPING_AUDIO.md).
 - Live-session follow-through: keep cleanup reachable after sampling fails, distinguish verified restoration from obsolete-record retirement, fence cleanup/object edits to their connection and block new writes during pending cleanup. Stop queued keepers, reset stale live bindings/history and discard late old-session receipts. [Evidence and remaining MCC gates](docs/C35_LIVE_SESSION_RECOVERY.md).
 - Director audio follow-through: optionally record the saved Ambient/Map start mix with source-verified clips, spatial camera listening, bounded preparation and owned audio cleanup. Independently decode real native Opus output and camera-distance silence. Fix a drive-alias test race without changing production mapping behavior. [Evidence and limits](docs/C35_DIRECTOR_AUDIO.md).

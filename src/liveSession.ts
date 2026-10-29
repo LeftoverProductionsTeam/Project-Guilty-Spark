@@ -1,9 +1,14 @@
 import { call } from './api';
+export interface ThreadReleaseStatus {
+  pendingThreads: number;
+  issue: string | null;
+}
 export interface LiveCleanupStatus {
   hasSession: boolean;
   sessionToken: string | null;
   pending: string[];
   detail: string;
+  threadRelease?: ThreadReleaseStatus;
 }
 export interface LiveDisconnectReport {
   outcome: 'restored' | 'retired' | 'noChanges' | 'alreadyDisconnected';

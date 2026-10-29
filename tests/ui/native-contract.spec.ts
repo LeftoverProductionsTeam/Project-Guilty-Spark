@@ -1113,6 +1113,55 @@ test('unavailable snapshots retain reachable cleanup and an honest retirement re
   await expect(page.getByText('Disconnected. Original vehicle physics restored.', {exact:true})).toHaveCount(0);
 });
 
+test('unacknowledged thread release stays visible and retries with the original connection', async ({page}) => {
+  await retainedLiveFixture(page);
+  await page.evaluate(() => {
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__cleanup.fail=true;
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      const result=await original(command,args);
+      if(command==='live_mcc_cleanup_status'&&result.hasSession)return {...result,pending:['thread release'],threadRelease:{pendingThreads:1,issue:'Synthetic resume not acknowledged'},detail:'Synthetic owned thread increment retained; new edits blocked.'};
+      return result;
+    };
+  });
+  const recovery=page.getByRole('region',{name:'Previous live session',exact:true});
+  await recovery.getByRole('button',{name:'Check previous session',exact:true}).click();
+  await expect(recovery).toContainText('1 recorded thread release remains');
+  expect(await page.evaluate(()=>(window as any).__cleanup.calls)).toEqual([]);
+  await recovery.getByRole('button',{name:'Retry thread release & cleanup',exact:true}).click();
+  await expect(recovery).toContainText('journals retained for retry');
+  await expect(recovery.getByRole('button',{name:'Retry thread release & cleanup',exact:true})).toBeEnabled();
+  await page.evaluate(()=>{(window as any).__cleanup.fail=false;});
+  await recovery.getByRole('button',{name:'Retry thread release & cleanup',exact:true}).click();await expect(recovery).toHaveCount(0);
+  expect(await page.evaluate(()=>(window as any).__cleanup.calls)).toEqual(['old-synthetic-connection','old-synthetic-connection']);
+});
+
+test('connected thread-release faults disable object, sprint and camera writes while disconnect remains usable',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
+    const state=w.__threadRelease={connected:false,fail:true,calls:[] as string[],reads:0};
+    const object={datum:12,tagDatum:7,kind:0,scale:1,tagPath:'synthetic/biped',position:[1,2,3],velocity:[0,0,0],forward:[1,0,0],up:[0,0,1],parentDatum:4294967295,player:true};
+    const status=()=>({pid:3,sessionToken:'synthetic-thread-connection',cleanupPending:true,threadRelease:{pendingThreads:1,issue:'Synthetic thread resume not acknowledged'},activeVehiclePhysics:false,activeSharedScales:false,scaleKeeperError:null,snapshot:{profile:'synthetic',identity:{scenario:'test/map',checksum:123,tagCount:1,scenarioDatum:7},objects:[object]},detail:'Synthetic pending-release contract'});
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='live_mcc_connect'){state.connected=true;return status();}
+      if(command==='live_mcc_sample'){if(!state.connected)throw Error('No synthetic live session');return status();}
+      if(command==='live_mcc_sprint_status'){state.reads++;return {enabled:false,sprinting:false,restorePending:false,config:{hotkey:'ShiftLeft',multiplier:1.75},observed:{playerDatum:12,multiplier:1,canSprint:true,reason:'Synthetic'},error:null,detail:'Synthetic'};}
+      if(command==='live_mcc_camera_status'){state.reads++;return {enabled:false,active:false,restorePending:false,config:{back:.4,right:.3,up:.15},shortcut:{enabled:false,key:'F6'},observed:{available:true,reason:'Synthetic',weaponThirdPerson:false,trackCount:1},error:null,detail:'Synthetic'};}
+      if(command==='live_mcc_disconnect'){state.calls.push(args.expectedSession);if(state.fail)throw Error('Synthetic thread release still incomplete');state.connected=false;return {outcome:'restored',retiredTarget:null,detail:'Synthetic owned thread release acknowledged and temporary data restored.'};}
+      return original(command,args);
+    };
+  });
+  await chooseTool(page,'Level editor');await page.getByRole('button',{name:'Connect to a running Halo game',exact:true}).click();await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');await page.getByRole('button',{name:'Toggle Game connection',exact:true}).click();
+  await page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();await page.getByRole('button',{name:'Connect current Halo 1 session',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__threadRelease.reads)).toBeGreaterThanOrEqual(2);
+  await expect(page.getByRole('button',{name:'Toggle in-game third person',exact:true})).toBeDisabled();
+  await page.locator('.native-sprint-controls>summary').click();await expect(page.getByRole('button',{name:'Enable native sprint',exact:true})).toBeDisabled();
+  await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');await expect(page.getByRole('button',{name:'Apply live object position',exact:true})).toBeDisabled();
+  const release=page.getByRole('button',{name:'Retry thread release & disconnect',exact:true});await release.click();await expect(page.getByText('Synthetic thread release still incomplete',{exact:false})).toBeVisible();await expect(release).toBeEnabled();
+  await page.evaluate(()=>{(window as any).__threadRelease.fail=false;});await release.click();await expect(page.getByText('Synthetic owned thread release acknowledged and temporary data restored.',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__threadRelease.calls)).toEqual(['synthetic-thread-connection','synthetic-thread-connection']);
+});
+
 test('competing live connections and uncertain cleanup preserve retry and the new identity', async ({page}) => {
   await retainedLiveFixture(page);
   const recovery = page.getByRole('region', {name:'Previous live session',exact:true});

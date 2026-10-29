@@ -38,7 +38,7 @@ function stored(): Config {
   }
   return { ...DEFAULT };
 }
-export default function NativeCameraControls() {
+export default function NativeCameraControls({ blocked = false }: { blocked?: boolean } = {}) {
   const [status, setStatus] = useState<Status | null>(null),
     [draft, setDraft] = useState<Config>(stored),
     [error, setError] = useState(''),
@@ -84,7 +84,7 @@ export default function NativeCameraControls() {
     setDraft((current) => ({ ...current, [key]: value }));
   }
   async function configure(enabled: boolean, config = draft) {
-    if (changing.current) return;
+    if (changing.current || blocked) return;
     changing.current = true;
     epoch.current++;
     setBusy(true);
@@ -109,7 +109,7 @@ export default function NativeCameraControls() {
     }
   }
   async function shortcut(value: { enabled: boolean; key: string }) {
-    if (changing.current) return;
+    if (changing.current || blocked) return;
     changing.current = true;
     epoch.current++;
     setBusy(true);
@@ -125,7 +125,7 @@ export default function NativeCameraControls() {
     }
   }
   async function toggle() {
-    if (changing.current) return;
+    if (changing.current || blocked) return;
     changing.current = true;
     epoch.current++;
     setBusy(true);
@@ -156,7 +156,7 @@ export default function NativeCameraControls() {
         <button
           aria-label="Toggle in-game third person"
           aria-pressed={!!status?.enabled}
-          disabled={!native || busy || !status || status.restorePending}
+          disabled={!native || blocked || busy || !status || status.restorePending}
           onClick={() => void toggle()}
         >
           {status?.enabled ? 'Switch to first person' : 'Switch to third person'}
@@ -206,7 +206,7 @@ export default function NativeCameraControls() {
             <input
               type="checkbox"
               aria-label="Enable in-game camera shortcut"
-              disabled={!native || busy || !status || status.restorePending}
+              disabled={!native || blocked || busy || !status || status.restorePending}
               checked={!!status?.shortcut?.enabled}
               onChange={(e) =>
                 void shortcut({ enabled: e.target.checked, key: status?.shortcut?.key ?? 'F6' })
@@ -218,7 +218,7 @@ export default function NativeCameraControls() {
             Camera shortcut
             <select
               aria-label="In-game camera shortcut"
-              disabled={!native || busy || !status || status.restorePending}
+              disabled={!native || blocked || busy || !status || status.restorePending}
               value={status?.shortcut?.key ?? 'F6'}
               onChange={(e) => void shortcut({ enabled: !!status?.shortcut?.enabled, key: e.target.value })}
             >
@@ -254,13 +254,15 @@ export default function NativeCameraControls() {
         </div>
         <div className="analysis-actions">
           <button
-            disabled={!native || busy || !status || status.restorePending || (status.enabled && !dirty)}
+            disabled={
+              !native || blocked || busy || !status || status.restorePending || (status.enabled && !dirty)
+            }
             onClick={() => void configure(true)}
           >
             {status?.enabled ? 'Apply camera position' : 'Enable third-person camera'}
           </button>
           <button
-            disabled={!native || busy || !status || (!status.enabled && !status.restorePending)}
+            disabled={!native || blocked || busy || !status || (!status.enabled && !status.restorePending)}
             onClick={() => void configure(false)}
           >
             Restore original camera

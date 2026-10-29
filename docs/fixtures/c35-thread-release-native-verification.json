@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 1,
+  "testDate": "2026-10-29",
+  "continuation": 35,
+  "revision": 8,
+  "appSha256": "d375ec76be1602e6960bd35defcb51719f3094aa65178b96ca2fef2a1ee91dda",
+  "scope": "Acknowledged experimental live thread release: real owned Windows children, simulated error routing, packaged idle API and editor recording regression; no MCC thread or game-memory acceptance",
+  "verification": {
+    "rustPassed": 448,
+    "rustOptInIgnored": 5,
+    "frontendPassed": 190,
+    "frontendFiles": 39,
+    "browserPassed": 64,
+    "offlinePassed": 59
+  },
+  "nativeThreadTests": {
+    "binarySha256": "0b712d227b2fa2b756646e69fe1dbc9a4cde55465c0e29cf9fdb9895aec16417",
+    "configuration": "Windows debug unit-test executable",
+    "focusedLivePassed": 28,
+    "focusedGameOptInIgnored": 1,
+    "newTests": 13,
+    "simulatedBackendTests": 8,
+    "nativeOwnedChildTests": 3,
+    "sessionIntegrationTests": 2,
+    "actualSuspendAndResume": true,
+    "ownedChildOnly": true,
+    "injectedFailureBeforeResumeApi": true,
+    "actualWindowsResumeFailureReproduced": false,
+    "retainedKernelHandleRetry": true,
+    "foreignIncrementPreserved": true,
+    "completedThreadExitRetiresHandle": true,
+    "selfPauseRefused": true,
+    "allChildrenReaped": true,
+    "gameOpened": false,
+    "processMemoryWrites": false
+  },
+  "browserContracts": {
+    "syntheticSessions": true,
+    "retainedResumeCountAndConnection": true,
+    "failedRetryRetainsSession": true,
+    "objectSprintAndCameraWritesDisabled": true,
+    "disconnectStillUsable": true
+  },
+  "nativeDirector": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "idleLiveCleanupApi": {
+      "hasSession": false,
+      "pending": [],
+      "threadRelease": {
+        "pendingThreads": 0,
+        "issue": null
+      },
+      "releaseOutcome": "alreadyDisconnected",
+      "unboundMoveAndScaleRefused": true,
+      "gameAttached": false
+    },
+    "appSha256": "d375ec76be1602e6960bd35defcb51719f3094aa65178b96ca2fef2a1ee91dda",
+    "sourceSha256": "3cb1fe9c6471d02694d34e7d62984532c1aafa076a14ce1a336aecc8eb9fed9a",
+    "nativeUiRecordAndSave": true,
+    "explicitNamedTakeWorkflow": true,
+    "osSavePickerTested": false,
+    "osCapturePickerTested": false,
+    "countdownCancellationRemovesEmptyPartial": true,
+    "pausedClockStable": true,
+    "backgroundRecording": true,
+    "cleanViewToggledDuringTake": true,
+    "closeBlockedWhileRecording": true,
+    "existingTakeProtected": true,
+    "wrongWindowRejected": true,
+    "traversalRejected": true,
+    "folderRememberedAfterReopen": true,
+    "mapAudioPreferenceRememberedAfterReopen": true,
+    "freshNameAfterSuccess": true,
+    "videoOnly": false,
+    "savedMapAudio": {
+      "tagId": 3830055638,
+      "tagPath": "sound\\sfx\\vehicles\\ghost_lp",
+      "sampleSha256": "036fdf55e25b145515af969201556e14f2608363ffecbb1f12318fc240a46637",
+      "previewSha256": "1588c7043a2cc300935cd716d8ff85c1c00333b82e28ab71b00a9fee7061854a",
+      "format": "Xbox ADPCM",
+      "sourceChannels": 1,
+      "sourceSampleRate": 22050,
+      "sourceDurationSeconds": 2.742857142857143,
+      "sourceSha256": "3cb1fe9c6471d02694d34e7d62984532c1aafa076a14ce1a336aecc8eb9fed9a",
+      "synthetic": false,
+      "loopingTagId": 3829924564,
+      "loopingTagPath": "sound\\sfx\\vehicles\\ghost",
+      "track": 0,
+      "fadeInSeconds": 0,
+      "fadeOutSeconds": 0.5,
+      "phases": {
+        "intro": {
+          "tagId": 3829990101,
+          "sourceSampleSha256": "fa77ccdad14d21d83c656304563de886d2d94edb9189839df3ed5f27ecf62ab8",
+          "previewSha256": "99d542abbe9db9989d006b56f6df64837e486ded5a3af94c2b80a717f52cd84f",
+          "durationSeconds": 2.7399546485260773
+        },
+        "loop": {
+          "tagId": 3830055638,
+          "sourceSampleSha256": "036fdf55e25b145515af969201556e14f2608363ffecbb1f12318fc240a46637",
+          "previewSha256": "1588c7043a2cc300935cd716d8ff85c1c00333b82e28ab71b00a9fee7061854a",
+          "durationSeconds": 2.742857142857143
+        },
+        "end": {
+          "tagId": 3830121175,
+          "sourceSampleSha256": "c8f31d2835cf0ce3d7e195c2c16cd72b6dd3b7d8dfdc5e98820c55c42b7e41f0",
+          "previewSha256": "ab1748ea397b83a450d82bd19231185fcf5d6785e707e3898902004d0cecefb6",
+          "durationSeconds": 2.2029931972789116
+        }
+      },
+      "near": {
+        "codec": "opus",
+        "decodedChannels": 2,
+        "decodedSampleRate": 48000,
+        "decodedFrames": 192960,
+        "decodedSeconds": 4.02,
+        "rms": 0.05212991575425353,
+        "peak": 0.23646780848503113
+      },
+      "beyondSavedMaxDistance": {
+        "codec": "opus",
+        "decodedChannels": 2,
+        "decodedSampleRate": 48000,
+        "decodedFrames": 144000,
+        "decodedSeconds": 3,
+        "rms": 0,
+        "peak": 0
+      },
+      "distantTakeSha256": "7e2f9646dcd61728997570f0f5c7fbf82a0dc3adc1c0b2aa8c4ae3d6d96e12f3",
+      "startupEvents": [
+        "ambient",
+        "mapStart"
+      ],
+      "audioBeforeCountdown": false,
+      "microphoneRequested": false,
+      "systemAudioRequested": false,
+      "gameAudioCaptured": false,
+      "phasedTake": {
+        "sha256": "563e3f629527e4410af1f4a59901afcbb44cce28fa5984f78ef7420985ccffd6",
+        "decoded": {
+          "codec": "opus",
+          "decodedChannels": 2,
+          "decodedSampleRate": 48000,
+          "decodedFrames": 518400,
+          "decodedSeconds": 10.8,
+          "rms": 0.0568607649174697,
+          "peak": 0.24019558727741241
+        },
+        "waveform": {
+          "method": "zero-mean normalized waveform correlation",
+          "decodedMonoSampleRate": 4000,
+          "templateSamples": 1000,
+          "threshold": 0.85,
+          "matches": {
+            "intro": {
+              "correlation": 0.9821844652270678,
+              "sourceOffsetSeconds": 0.06,
+              "recordedOffsetSeconds": 0.06925
+            },
+            "loop": {
+              "correlation": 0.9828555547271616,
+              "sourceOffsetSeconds": 0.06,
+              "recordedOffsetSeconds": 5.552
+            },
+            "end": {
+              "correlation": 0.988434008744576,
+              "sourceOffsetSeconds": 0.06,
+              "recordedOffsetSeconds": 8.67875
+            }
+          }
+        },
+        "finishWaitMs": 2955,
+        "spatial": false,
+        "nativeFinishSoundUi": true
+      }
+    },
+    "requestedFps": 24,
+    "dimensions": {
+      "width": 1920,
+      "height": 658
+    },
+    "decodedFrameSizes": [
+      "1920x658"
+    ],
+    "bytes": 1051349,
+    "sha256": "77c8e270732531d35bc009def22f8c7b13cc9b4059274a7efc18770e67fef18d",
+    "decoderSha256": "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3",
+    "decoderVersion": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
+    "decodedFrames": 89,
+    "decodedSeconds": 3.996,
+    "firstDecodedLumaMean": 35.18699363425881,
+    "firstDecodedLumaDeviation": 27.642520901944476,
+    "browserPresentationProbe": {
+      "scope": "Native editor canvas encoder/decoder; not the application Save picker or game capture",
+      "mime": "video/webm;codecs=vp8",
+      "bytes": 684004,
+      "width": 1920,
+      "height": 658,
+      "requestedFps": 24,
+      "elapsedSeconds": 2.3616999999880792,
+      "audioTracks": 0,
+      "firstPresentedLumaDeviation": 27.248090332532446,
+      "firstPresentedMediaTime": 0,
+      "laterPresentedMediaTime": 1.01,
+      "decodedLumaDeviation": 27.81374689279437,
+      "decoded": true
+    },
+    "sourcePreserved": true,
+    "authoredDocumentPreserved": true,
+    "gameLaunched": false,
+    "gameplayAccepted": false,
+    "errors": []
+  },
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "gameplayAccepted": false,
+  "engineOwnedApplyBoundaryImplemented": false,
+  "wallClockPauseDeadlineImplemented": false,
+  "abnormalExitRecoveryAccepted": false,
+  "crossProcessRecoveryJournalImplemented": false,
+  "privateMapAudioVideoAndQaIncluded": false
+}

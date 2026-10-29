@@ -103,6 +103,7 @@ try {
   const idleCleanup = await call('live_mcc_cleanup_status');
   expect(idleCleanup.hasSession).toBe(false);
   expect(idleCleanup.pending).toEqual([]);
+  expect(idleCleanup.threadRelease).toEqual({ pendingThreads: 0, issue: null });
   for (const [command, operation] of [
     ['live_mcc_move_object', { datum: 0, tagDatum: 0, expectedPosition: [0, 0, 0], position: [0, 0, 0] }],
     [
@@ -535,6 +536,7 @@ try {
     idleLiveCleanupApi: {
       hasSession: false,
       pending: [],
+      threadRelease: idleCleanup.threadRelease,
       releaseOutcome: idleRelease.outcome,
       unboundMoveAndScaleRefused: true,
       gameAttached: false,
