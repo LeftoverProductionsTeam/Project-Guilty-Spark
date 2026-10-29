@@ -8,7 +8,11 @@ import net from 'node:net';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { probeEditorCapture } from './native-editor-capture-probe.mjs';
-import { prepareNativeDirectorAudio, decodeRecordedAudio } from './native-director-audio-probe.mjs';
+import {
+  prepareNativeDirectorAudio,
+  decodeRecordedAudio,
+  verifyRecordedPhases,
+} from './native-director-audio-probe.mjs';
 const args = new Map();
 for (let n = 2; n < process.argv.length; n += 2) {
   if (
@@ -21,7 +25,7 @@ for (let n = 2; n < process.argv.length; n += 2) {
 }
 if (
   !['--app', '--data', '--output', '--decoder'].every((key) => args.has(key)) ||
-  (args.has('--map-audio') && args.get('--map-audio') !== 'saved')
+  (args.has('--map-audio') && !['saved', 'phases'].includes(args.get('--map-audio')))
 )
   throw Error(
     'Required: --app built.exe --data fresh-recording-fixture --output fresh-dir --decoder ffmpeg.exe',
@@ -29,7 +33,7 @@ if (
 const data = path.resolve(args.get('--data')),
   output = path.resolve(args.get('--output')),
   decoder = path.resolve(args.get('--decoder'));
-const includeMapAudio = args.get('--map-audio') === 'saved';
+const includeMapAudio = args.has('--map-audio');
 const fixture = JSON.parse(await fs.readFile(path.join(data, 'spark-recording-fixture.json'), 'utf8'));
 if (!fixture.nativeFixture || fixture.schemaVersion !== 1)
   throw Error('Use qa_recording_library with an owned map');
@@ -101,11 +105,17 @@ try {
   expect(idleCleanup.pending).toEqual([]);
   for (const [command, operation] of [
     ['live_mcc_move_object', { datum: 0, tagDatum: 0, expectedPosition: [0, 0, 0], position: [0, 0, 0] }],
-    ['live_mcc_scale_object', { datum: 0, tagDatum: 0, expectedScale: 1, scale: 1, includeSharedPhysics: false }],
+    [
+      'live_mcc_scale_object',
+      { datum: 0, tagDatum: 0, expectedScale: 1, scale: 1, includeSharedPhysics: false },
+    ],
   ]) {
     let refused = false;
-    try { await call(command, { operation }); }
-    catch (error) { refused = /expectedSession|expected_session/.test(String(error)); }
+    try {
+      await call(command, { operation });
+    } catch (error) {
+      refused = /expectedSession|expected_session/.test(String(error));
+    }
     expect(refused).toBe(true);
   }
   const idleRelease = await call('live_mcc_disconnect', { expectedSession: 'no-owned-session-fixture' });
@@ -164,7 +174,9 @@ try {
       intervals: [1000],
     })
     .toBe('false');
-  const mapAudio = includeMapAudio ? await prepareNativeDirectorAudio(call, request, fixture) : null;
+  const mapAudio = includeMapAudio
+    ? await prepareNativeDirectorAudio(call, request, fixture, args.get('--map-audio'))
+    : null;
   if (mapAudio)
     await expect(director.getByTestId('director-audio-summary')).toHaveText('Startup sounds enabled: 1.');
   let wrongWindowRejected = false;
@@ -419,6 +431,47 @@ try {
       systemAudioRequested: false,
       gameAudioCaptured: false,
     };
+    if (mapAudio.phases) {
+      // A nonspatial source isolates phase identity from HRTF filtering. The two earlier takes retain spatial checks.
+      mapAudio.scene.emitters[0].spatial = false;
+      const currentProject = (await call('open_project', { id: fixture.projectId })).project;
+      await call('save_project', { project: { ...currentProject, audioPreview: mapAudio.scene } });
+      await expect(director.getByTestId('director-looping-summary')).toContainText('0 spatial emitters');
+      await summary.click();
+      await director
+        .getByRole('textbox', { name: 'Next take filename', exact: true })
+        .fill('phased-take.webm');
+      await summary.click();
+      await director.getByRole('button', { name: 'Record video…', exact: true }).click();
+      await expect(director.locator('.gs-director-message')).toContainText('Recording to');
+      await expect
+        .poll(
+          async () => {
+            const text = await director.locator('nav output').innerText();
+            return Number(text.match(/^recording · (\d+)/)?.[1] ?? 0);
+          },
+          { timeout: 20000 },
+        )
+        .toBeGreaterThanOrEqual(8);
+      const finishAt = Date.now();
+      await director.getByRole('button', { name: 'Finish sound & save', exact: true }).click();
+      await expect(director.getByRole('button', { name: 'Finishing sound…', exact: true })).toBeDisabled();
+      await expect(director.locator('.gs-director-message')).toContainText('Saved ', { timeout: 45000 });
+      const finishWaitMs = Date.now() - finishAt;
+      expect(finishWaitMs).toBeGreaterThan(
+        (mapAudio.metadata.fadeOutSeconds + mapAudio.phases.end.sample.durationSeconds) * 1000 - 250,
+      );
+      const phaseMovie = path.join(takes, 'phased-take.webm');
+      audioEvidence.phasedTake = {
+        sha256: hash(await fs.readFile(phaseMovie)),
+        decoded: await decodeRecordedAudio(run, decoder, phaseMovie, true),
+        waveform: await verifyRecordedPhases(run, decoder, phaseMovie, mapAudio, output),
+        finishWaitMs,
+        spatial: false,
+        nativeFinishSoundUi: true,
+      };
+      await director.screenshot({ path: path.join(output, 'native-looping-audio-saved.png') });
+    }
   }
   const after = (await call('open_project', { id: fixture.projectId })).project;
   for (const key of ['scene', 'tagEdits', 'quickForge'])
@@ -479,7 +532,13 @@ try {
   const receipt = {
     schemaVersion: 1,
     nativeDesktop: true,
-    idleLiveCleanupApi: { hasSession: false, pending: [], releaseOutcome: idleRelease.outcome, unboundMoveAndScaleRefused: true, gameAttached: false },
+    idleLiveCleanupApi: {
+      hasSession: false,
+      pending: [],
+      releaseOutcome: idleRelease.outcome,
+      unboundMoveAndScaleRefused: true,
+      gameAttached: false,
+    },
     appSha256,
     sourceSha256: fixture.sourceSha256,
     nativeUiRecordAndSave: true,

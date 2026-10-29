@@ -2093,6 +2093,15 @@ async fn launch_legacy_companion(app: tauri::AppHandle, registration_id: String,
 }
 
 #[tauri::command]
+async fn inspect_looping_sound(app: tauri::AppHandle, project_id: String, tag_id: u32) -> Reply<core::looping_audio::Inspection> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source = project.source.ok_or("Project has no source map")?;
+        core::looping_audio::inspect(&source.preserved_path, &source.sha256, tag_id).map_err(error)
+    }).await.map_err(error)?
+}
+#[tauri::command]
 async fn inspect_sound(
     app: tauri::AppHandle,
     project_id: String,
@@ -2657,6 +2666,7 @@ pub fn run() {
             choose_runtime_path,
             launch_registered_runtime,
             inspect_sound,
+            inspect_looping_sound,
             preview_owned_object_model,
             preview_sound,
             compare_peer_manifest,

@@ -715,6 +715,36 @@ test('map sound events save with the map and stop their audio context on tool ch
   await chooseTool(page,"Tag editor");await expect.poll(()=>page.evaluate(()=>(window as any).__soundContexts.every((c:AudioContext)=>c.state==='closed'))).toBe(true);
   await chooseTool(page,"Level editor");await page.locator('.gs-map-sounds>summary').click();await expect(page.getByRole('combobox',{name:'Map sound emitter',exact:true})).toBeVisible();await expect(page.getByRole('spinbutton',{name:'Map sound master volume',exact:true})).toHaveValue('0');
 });
+test('looping source tracks persist across tools and Finish waits for their end clip',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(async()=>{
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke,open=await original('open_project',{id:'a'});
+    open.inspection.tags.push({id:1000,index:1,class:'lsnd',path:'sound/test_engine',dataOffset:4,external:false,fields:[],references:[{label:'Track 1 · Loop',targetId:999},{label:'Track 2 · Loop',targetId:996}]});
+    const frames=4410,bytes=new Uint8Array(44+frames*2),view=new DataView(bytes.buffer),text=(at:number,value:string)=>[...value].forEach((c,i)=>bytes[at+i]=c.charCodeAt(0));
+    text(0,'RIFF');view.setUint32(4,bytes.length-8,true);text(8,'WAVEfmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,22050,true);view.setUint32(28,44100,true);view.setUint16(32,2,true);view.setUint16(34,16,true);text(36,'data');view.setUint32(40,frames*2,true);
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
+    const RealAudio=window.AudioContext;w.__soundContexts=[];w.AudioContext=class extends RealAudio{constructor(){super();w.__soundContexts.push(this);}};
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='open_project'&&args.id==='a'){const actual=await original(command,args);return {...actual,inspection:open.inspection};}
+      if(command==='inspect_looping_sound')return {tagId:1000,tagPath:'sound/test_engine',sourceSha256:'a'.repeat(64),loops:true,warnings:[],tracks:[{index:0,gain:.5,startTagId:998,loopTagId:999,endTagId:997,fadeInSeconds:.05,fadeOutSeconds:.1},{index:1,gain:.7,startTagId:998,loopTagId:996,endTagId:997,fadeInSeconds:.05,fadeOutSeconds:.1}]};
+      if(command==='inspect_sound')return {tagId:args.tagId,tagPath:'sound/test_engine_sample',sourceSha256:'a'.repeat(64),warnings:[],permutations:[{pitchRange:0,permutation:0,name:'Synthetic silence',format:'PCM',channels:1,sampleRate:22050,byteLength:frames*2,embedded:true,available:true,sha256:'c'.repeat(64),durationSeconds:.2,reason:null}]};
+      if(command==='preview_sound')return {name:'Synthetic silence',mime:'audio/wav',sha256:hash,bytes:Array.from(bytes),sourceSha256:'a'.repeat(64),sourceSampleSha256:'c'.repeat(64)};
+      return original(command,args);
+    };
+  });
+  await openFixture(page);await chooseTool(page,'Level editor');await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await page.locator('.gs-map-sounds>summary').click();
+  await page.getByRole('textbox',{name:'Find a map sound',exact:true}).fill('test_engine');await page.getByRole('combobox',{name:'Map sound tag',exact:true}).selectOption('1000');
+  await page.getByRole('combobox',{name:'Looping sound track',exact:true}).selectOption('1');await page.getByRole('button',{name:'Add selected sound emitter',exact:true}).click();
+  await expect(page.getByText('Authored main track 2 includes source intro/end clips',{exact:false})).toBeVisible();
+  await page.getByRole('button',{name:'Start sound scene',exact:true}).click();
+  const mixer=page.getByRole('region',{name:'Spatial sound rehearsal',exact:true});await expect(mixer.getByRole('status')).toContainText('1/24 voices');
+  await page.getByRole('button',{name:'Finish sound end clips',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__soundContexts.every((ctx:AudioContext)=>ctx.state==='closed'))).toBe(true);
+  await chooseTool(page,'Tag editor');await chooseTool(page,'Level editor');await page.locator('.gs-map-sounds>summary').click();
+  await expect(page.getByRole('textbox',{name:'Find a map sound',exact:true})).toHaveValue('test_engine');await expect(page.getByRole('combobox',{name:'Map sound tag',exact:true})).toHaveValue('1000');await expect(page.getByRole('combobox',{name:'Looping sound track',exact:true})).toHaveValue('1');
+  await page.getByRole('button',{name:'Use loop sample only',exact:true}).click();await expect(page.getByText('Authored main track 2 includes source intro/end clips',{exact:false})).toHaveCount(0);
+});
+
 test('shared QuickForge survives tool changes and pauses a divergent local draft on restore',async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]})));
   await mockDesktop(page);await openFixture(page);await chooseTool(page,"Level editor");

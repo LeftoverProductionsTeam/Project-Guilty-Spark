@@ -1,14 +1,16 @@
 import { followAudioListener, SpatialSoundMixer, validateSoundScene } from './spatialAudio';
 import type { SoundEmitter, SoundScene } from './spatialAudio';
 import { loadMapSoundClip } from './soundClipLoader';
+import { soundBytes, soundKey } from './soundPlayback';
+import type { LoadedSound } from './soundPlayback';
 
 export interface DirectorAudio {
   stream: MediaStream;
   start: () => Promise<void>;
+  finish: () => Promise<void>;
   dispose: () => void;
 }
-const clipKey = (e: SoundEmitter) =>
-  `${e.sourceProjectId ?? ''}/${e.sourceSha256 ?? ''}/${e.tagId}/${e.pitchRange}/${e.permutation}/${e.followChain !== false}`;
+const clipKey = soundKey;
 
 export function directorSoundEmitters(scene: SoundScene) {
   const errors = validateSoundScene(scene);
@@ -47,7 +49,7 @@ export async function prepareDirectorAudio(
     void context.close().catch(() => {});
     throw error;
   }
-  const buffers = new Map<string, AudioBuffer>();
+  const buffers = new Map<string, LoadedSound>();
   const dispose = () => {
     if (disposed) return;
     disposed = true;
@@ -77,7 +79,7 @@ export async function prepareDirectorAudio(
               throw Error(`${emitter.name}: ${String(error)}`);
             });
           if (disposed) throw Error('Recording audio cancelled.');
-          const decodedBytes = buffer.length * buffer.numberOfChannels * 4;
+          const decodedBytes = soundBytes(buffer);
           if (decodedBytes > 32 * 1024 * 1024) throw Error('Decoded sound exceeds the 32 MiB clip limit.');
           bytes += decodedBytes;
           if (bytes > 64 * 1024 * 1024)
@@ -108,6 +110,9 @@ export async function prepareDirectorAudio(
         started = true;
         await mixer!.event('ambient');
         await mixer!.event('mapStart');
+      },
+      async finish() {
+        await mixer?.finish();
       },
       dispose,
     };

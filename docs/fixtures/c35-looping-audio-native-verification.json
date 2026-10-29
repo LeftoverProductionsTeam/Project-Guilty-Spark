@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "testDate": "2026-10-29",
+  "continuation": 35,
+  "revision": 7,
+  "appSha256": "4a205152a428f9248e0708f41e4f47eb8e27e7f2444477a18ef31c674e958566",
+  "scope": "Owned-map editor main-track phases, actual Web Audio rendering and native Director output; not native Halo sound-event/acoustic parity",
+  "verification": {
+    "rustPassed": 435,
+    "rustOptInIgnored": 5,
+    "frontendPassed": 190,
+    "frontendFiles": 39,
+    "browserPassed": 62,
+    "offlinePassed": 59
+  },
+  "source": {
+    "cacheSha256": "3cb1fe9c6471d02694d34e7d62984532c1aafa076a14ce1a336aecc8eb9fed9a",
+    "engine": "MCC Halo 1 version 13",
+    "map": "Owned derived Alpine cache",
+    "originalAndPreservedUnchanged": true
+  },
+  "nativeDirector": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "idleLiveCleanupApi": {
+      "hasSession": false,
+      "pending": [],
+      "releaseOutcome": "alreadyDisconnected",
+      "unboundMoveAndScaleRefused": true,
+      "gameAttached": false
+    },
+    "appSha256": "4a205152a428f9248e0708f41e4f47eb8e27e7f2444477a18ef31c674e958566",
+    "sourceSha256": "3cb1fe9c6471d02694d34e7d62984532c1aafa076a14ce1a336aecc8eb9fed9a",
+    "nativeUiRecordAndSave": true,
+    "explicitNamedTakeWorkflow": true,
+    "osSavePickerTested": false,
+    "osCapturePickerTested": false,
+    "countdownCancellationRemovesEmptyPartial": true,
+    "pausedClockStable": true,
+    "backgroundRecording": true,
+    "cleanViewToggledDuringTake": true,
+    "closeBlockedWhileRecording": true,
+    "existingTakeProtected": true,
+    "wrongWindowRejected": true,
+    "traversalRejected": true,
+    "folderRememberedAfterReopen": true,
+    "mapAudioPreferenceRememberedAfterReopen": true,
+    "freshNameAfterSuccess": true,
+    "videoOnly": false,
+    "savedMapAudio": {
+      "tagId": 3830055638,
+      "tagPath": "sound\\sfx\\vehicles\\ghost_lp",
+      "sampleSha256": "036fdf55e25b145515af969201556e14f2608363ffecbb1f12318fc240a46637",
+      "previewSha256": "1588c7043a2cc300935cd716d8ff85c1c00333b82e28ab71b00a9fee7061854a",
+      "format": "Xbox ADPCM",
+      "sourceChannels": 1,
+      "sourceSampleRate": 22050,
+      "sourceDurationSeconds": 2.742857142857143,
+      "sourceSha256": "3cb1fe9c6471d02694d34e7d62984532c1aafa076a14ce1a336aecc8eb9fed9a",
+      "synthetic": false,
+      "loopingTagId": 3829924564,
+      "loopingTagPath": "sound\\sfx\\vehicles\\ghost",
+      "track": 0,
+      "fadeInSeconds": 0,
+      "fadeOutSeconds": 0.5,
+      "phases": {
+        "intro": {
+          "tagId": 3829990101,
+          "sourceSampleSha256": "fa77ccdad14d21d83c656304563de886d2d94edb9189839df3ed5f27ecf62ab8",
+          "previewSha256": "99d542abbe9db9989d006b56f6df64837e486ded5a3af94c2b80a717f52cd84f",
+          "durationSeconds": 2.7399546485260773
+        },
+        "loop": {
+          "tagId": 3830055638,
+          "sourceSampleSha256": "036fdf55e25b145515af969201556e14f2608363ffecbb1f12318fc240a46637",
+          "previewSha256": "1588c7043a2cc300935cd716d8ff85c1c00333b82e28ab71b00a9fee7061854a",
+          "durationSeconds": 2.742857142857143
+        },
+        "end": {
+          "tagId": 3830121175,
+          "sourceSampleSha256": "c8f31d2835cf0ce3d7e195c2c16cd72b6dd3b7d8dfdc5e98820c55c42b7e41f0",
+          "previewSha256": "ab1748ea397b83a450d82bd19231185fcf5d6785e707e3898902004d0cecefb6",
+          "durationSeconds": 2.2029931972789116
+        }
+      },
+      "near": {
+        "codec": "opus",
+        "decodedChannels": 2,
+        "decodedSampleRate": 48000,
+        "decodedFrames": 175680,
+        "decodedSeconds": 3.66,
+        "rms": 0.05263075930452254,
+        "peak": 0.2304280549287796
+      },
+      "beyondSavedMaxDistance": {
+        "codec": "opus",
+        "decodedChannels": 2,
+        "decodedSampleRate": 48000,
+        "decodedFrames": 144000,
+        "decodedSeconds": 3,
+        "rms": 0,
+        "peak": 0
+      },
+      "distantTakeSha256": "19370b0e932ea54935fb3e08fdcc9607c67821f2e2ed51c227a741f15bb663e8",
+      "startupEvents": [
+        "ambient",
+        "mapStart"
+      ],
+      "audioBeforeCountdown": false,
+      "microphoneRequested": false,
+      "systemAudioRequested": false,
+      "gameAudioCaptured": false,
+      "phasedTake": {
+        "sha256": "724f0571a9eb69a34573d46f65eb73a7e6274d58c3c5bfb4f3c15aed0f5a9478",
+        "decoded": {
+          "codec": "opus",
+          "decodedChannels": 2,
+          "decodedSampleRate": 48000,
+          "decodedFrames": 518400,
+          "decodedSeconds": 10.8,
+          "rms": 0.05682116040947538,
+          "peak": 0.2392420768737793
+        },
+        "waveform": {
+          "method": "zero-mean normalized waveform correlation",
+          "decodedMonoSampleRate": 4000,
+          "templateSamples": 1000,
+          "threshold": 0.85,
+          "matches": {
+            "intro": {
+              "correlation": 0.997428677564543,
+              "sourceOffsetSeconds": 0.06,
+              "recordedOffsetSeconds": 0.0675
+            },
+            "loop": {
+              "correlation": 0.9989266298258277,
+              "sourceOffsetSeconds": 0.06,
+              "recordedOffsetSeconds": 2.8075
+            },
+            "end": {
+              "correlation": 0.9381226680769724,
+              "sourceOffsetSeconds": 0.06,
+              "recordedOffsetSeconds": 8.6975
+            }
+          }
+        },
+        "finishWaitMs": 2961,
+        "spatial": false,
+        "nativeFinishSoundUi": true
+      }
+    },
+    "requestedFps": 24,
+    "dimensions": {
+      "width": 1920,
+      "height": 658
+    },
+    "decodedFrameSizes": [
+      "1920x658"
+    ],
+    "bytes": 1004211,
+    "sha256": "89ba04a2457bb1ed69a87612504a9752d8edd5cae948a0bebbe3e8a32cfa1231",
+    "decoderSha256": "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3",
+    "decoderVersion": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
+    "decodedFrames": 86,
+    "decodedSeconds": 3.626,
+    "firstDecodedLumaMean": 35.18699363425881,
+    "firstDecodedLumaDeviation": 27.642520901944476,
+    "browserPresentationProbe": {
+      "scope": "Native editor canvas encoder/decoder; not the application Save picker or game capture",
+      "mime": "video/webm;codecs=vp8",
+      "bytes": 704113,
+      "width": 1920,
+      "height": 658,
+      "requestedFps": 24,
+      "elapsedSeconds": 2.3723000000119208,
+      "audioTracks": 0,
+      "firstPresentedLumaDeviation": 27.248090332532446,
+      "firstPresentedMediaTime": 0,
+      "laterPresentedMediaTime": 1.05,
+      "decodedLumaDeviation": 27.810112834709606,
+      "decoded": true
+    },
+    "sourcePreserved": true,
+    "authoredDocumentPreserved": true,
+    "gameLaunched": false,
+    "gameplayAccepted": false,
+    "errors": []
+  },
+  "browserContracts": {
+    "syntheticSamples": true,
+    "realOfflineAudioContext": true,
+    "middleOnlyRepeat": true,
+    "gaplessOneShot": true,
+    "lateFinishFadeShape": true,
+    "endingBeforeFinishResolution": true,
+    "trackSelectionAndToolContext": true
+  },
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "nativeGameAudioParityAccepted": false,
+  "gameplayAccepted": false,
+  "privateMapAudioVideoAndQaIncluded": false
+}

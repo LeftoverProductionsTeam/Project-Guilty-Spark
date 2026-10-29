@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { call, native } from '../api';
 import type { MapInspection, Project, SoundInspection, Vec3 } from '../types';
 import { loadMapSoundClip } from '../soundClipLoader';
+import type { LoopingInspection } from '../soundClipLoader';
 import {
   createEmitter,
   emptySoundScene,
@@ -39,6 +40,17 @@ export default function SoundMixer({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [stats, setStats] = useState({ voices: 0, loading: 0, cachedClips: 0, cachedBytes: 0 });
+  const [loopTrack, setLoopTrack] = useMapState(project.id, 'sound-loop-track', 0);
+  const loopOptions =
+    inspection.tags
+      .find((tag) => tag.id === tagId && tag.class === 'lsnd')
+      ?.references.filter((reference) => /^Track \d+ · Loop$/.test(reference.label))
+      .map((reference) => ({
+        index: Number(reference.label.match(/^Track (\d+)/)![1]) - 1,
+        id: reference.targetId,
+      })) ?? [];
+  const chosenTrack =
+    loopOptions.find((option) => option.index === loopTrack)?.index ?? loopOptions[0]?.index ?? 0;
   const mixer = useRef<SpatialSoundMixer | null>(null),
     context = useRef<AudioContext | null>(null),
     unsubscribe = useRef<(() => void) | null>(null),
@@ -78,6 +90,7 @@ export default function SoundMixer({
         void (async () => {
           for (const emitter of scene.emitters.filter((e) => e.enabled && e.loop && e.event === 'ambient')) {
             if (mixer.current !== current || !playingScene.current) return;
+            if (!current.repeats(emitter)) continue;
             try {
               await current.play(emitter);
             } catch (error) {
@@ -135,10 +148,17 @@ export default function SoundMixer({
       let value: SpatialSoundMixer;
       value = new SpatialSoundMixer(
         ctx,
-        (e) => loadMapSoundClip(ctx, e, sourceProjectId, inspection.sha256,
-          () => mixer.current !== value || request !== epoch.current),
+        (e) =>
+          loadMapSoundClip(
+            ctx,
+            e,
+            sourceProjectId,
+            inspection.sha256,
+            () => mixer.current !== value || request !== epoch.current,
+          ),
         () => {
           if (mounted.current && mixer.current === value) setStats({ ...value.stats });
+          if (mounted.current && mixer.current === value && value.error) setError(value.error);
         },
       );
       value.configure(sceneRef.current);
@@ -154,8 +174,22 @@ export default function SoundMixer({
   }
   async function add() {
     if (tagId === null) return;
-    const request = epoch.current,
-      report = await call<SoundInspection>('inspect_sound', { projectId: sourceProjectId, tagId });
+    const request = epoch.current;
+    let looping: LoopingInspection | null = null;
+    if (inspection.tags.find((tag) => tag.id === tagId)?.class === 'lsnd') {
+      looping = await call<LoopingInspection>('inspect_looping_sound', { projectId: sourceProjectId, tagId });
+      if (looping.sourceSha256 !== inspection.sha256) throw Error('Looping source changed.');
+    }
+    const track = looping?.tracks.find((track) => track.index === chosenTrack && track.loopTagId !== null);
+    if (looping && !track)
+      throw Error(
+        'This looping tag has no main loop. Choose its individual sound tags to audition its clips.',
+      );
+    const soundId = track?.loopTagId ?? tagId;
+    const report = await call<SoundInspection>('inspect_sound', {
+      projectId: sourceProjectId,
+      tagId: soundId,
+    });
     if (!mounted.current || request !== epoch.current) return;
     if (report.sourceSha256 !== inspection.sha256) throw Error('Sound source changed.');
     const sample = report.permutations.find((p) => p.available && p.chainStart !== false);
@@ -167,7 +201,7 @@ export default function SoundMixer({
     const origin = project.quickForge?.spawns[0]?.position ??
         project.scene.find((o) => o.kind === 'Player spawn')?.position ?? [0, 0, 0],
       next = createEmitter(
-        tagId,
+        soundId,
         (report.tagPath.split(/[\\/]/).at(-1) ?? 'Map sound').slice(0, 120),
         origin as Vec3,
       );
@@ -187,6 +221,13 @@ export default function SoundMixer({
       next.bus = 'music';
       next.spatial = false;
     }
+    if (looping && track) {
+      next.name = (looping.tagPath.split(/[\\/]/).at(-1) ?? 'Looping sound').slice(0, 120);
+      next.loopingSource = { tagId: looping.tagId, track: track.index };
+      next.loop = looping.loops;
+      next.gain = track.gain;
+      next.event = 'ambient';
+    }
     change({ ...sceneRef.current, emitters: [...sceneRef.current.emitters, next] });
     select(next.id);
   }
@@ -199,6 +240,27 @@ export default function SoundMixer({
         left/right placement and distance falloff.
       </p>
       <div className="analysis-actions">
+        {loopOptions.length > 0 && (
+          <label>
+            Source track
+            <select
+              aria-label="Looping sound track"
+              value={chosenTrack}
+              disabled={busy}
+              onChange={(event) => setLoopTrack(Number(event.target.value))}
+            >
+              {loopOptions.map((option) => (
+                <option key={option.index} value={option.index}>
+                  Track {option.index + 1} ·{' '}
+                  {inspection.tags
+                    .find((tag) => tag.id === option.id)
+                    ?.path.split(/[\\/]/)
+                    .at(-1)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           disabled={!native || busy || tagId === null || scene.emitters.length >= 64}
           onClick={() => void action(add)}
@@ -214,13 +276,22 @@ export default function SoundMixer({
               if (request !== epoch.current || !mounted.current) return;
               const current = sceneRef.current,
                 added = found.filter((e) => !current.emitters.some((old) => old.id === e.id));
-              if (!added.length)
+              let upgraded = 0;
+              const existing = current.emitters.map((old) => {
+                const native = found.find((e) => e.id === old.id && e.tagId === old.tagId);
+                if (native?.loopingSource && !old.loopingSource) {
+                  upgraded++;
+                  return { ...old, loopingSource: native.loopingSource };
+                }
+                return old;
+              });
+              if (!added.length && !upgraded)
                 throw Error(
                   'No new placed sound-scenery loops were found. BSP cluster ambience and scripted sounds need their own bindings.',
                 );
               if (added.length + current.emitters.length > 64)
                 throw Error('Import would exceed 64 emitters. Remove unused emitters before importing.');
-              change({ ...current, emitters: [...current.emitters, ...added] });
+              change({ ...current, emitters: [...existing, ...added] });
             })
           }
         >
@@ -243,7 +314,32 @@ export default function SoundMixer({
         <button disabled={!active && !busy} onClick={stop}>
           Stop all map sounds
         </button>
+        <button
+          disabled={!active || busy}
+          onClick={() =>
+            void action(async () => {
+              playingScene.current = false;
+              setScenePlaying(false);
+              await mixer.current?.finish();
+              stop();
+            })
+          }
+        >
+          Finish sound end clips
+        </button>
       </div>
+      {emitter?.loopingSource && (
+        <>
+          <p className="subtle">
+            Authored main track {emitter.loopingSource.track + 1} includes source intro/end clips, repeat
+            flags and flagged fades. Stop all cuts immediately; Finish plays the source ending.
+            Alternate/detail sounds and global script/music effects are not sequenced.
+          </p>
+          <button className="small-button" disabled={busy} onClick={() => update({ loopingSource: null })}>
+            Use loop sample only
+          </button>
+        </>
+      )}
       <NumberField
         label="Map sound master volume"
         min={0}

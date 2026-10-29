@@ -12,7 +12,7 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 
 - Preserve owned maps, inspect real classic tag data, stage supported field/placement edits, and compare variants.
 - Render actual classic/MCC BSP geometry, object models, source materials, detail layers, lightmaps, decals, sky and atmospheric fog. Textures stream from verified owned resources, including supported MCC texture packs. Open a player-start view or use the map overview.
-- Browse map sounds in World or Tag editor. Preview verified embedded/shared Vorbis and PCM/Xbox ADPCM with local playback controls. Sound events and spatial mixing still need engine work.
+- Browse map sounds in World or Tag editor. Preview verified embedded/shared Vorbis and PCM/Xbox ADPCM, rehearse spatial events and preserve authored main-track intro/loop/end clips. Native event/acoustic parity still needs engine work.
 - Author original QuickForge geometry and game-mode source; retain separate MCC/CE target configurations; use managed isolated compiler jobs and explicit compatibility gates.
 - Connect compatible BSPs with a rebuilt tunnel, native collision, portals and lightmaps. Optionally retain single-BSP [donor scenery](docs/DONOR_SCENERY.md) with source-bound model dependencies and compiled placement readback.
 - Continue from compiled revisions with matching per-map tags, inspect optional viewport performance metrics, and review the [three-map/performance pass](docs/THREE_MAP_WORLD_AND_PERFORMANCE.md).
@@ -25,6 +25,8 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 ![Connect Your Halo Games in the native Windows application](docs/screenshots/continuation33/native-connect-games.png)
 
 ## C35 living workbench
+
+The latest [looping audio pass](docs/C35_LOOPING_AUDIO.md) preserves source main-track intro, repeat and end clips in rehearsal and saved Director audio. Choose a looping sound and track in Map sounds. **Finish sound end clips** and Director's **Finish sound & save** play the authored ending; existing Stop controls cut immediately. Native event, alternate/detail and acoustic parity remain separate gates.
 
 The latest [live-session recovery pass](docs/C35_LIVE_SESSION_RECOVERY.md) keeps cleanup available after the game snapshot fails, distinguishes restoration from obsolete-record retirement and protects live object edits from stale connections. Pending cleanup pauses new edits; reconnecting resets old bindings and undo. Windows lifecycle, desktop API and browser tests pass; full MCC transition/recovery acceptance remains open.
 

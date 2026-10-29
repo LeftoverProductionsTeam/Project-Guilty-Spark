@@ -1,5 +1,7 @@
 # C35 owner acceptance: game capture and longer takes
 
+The [r7 looping-audio report](C35_LOOPING_AUDIO.md) covers source main-track start/repeat/end export. In Map sounds select a supported looping tag and track, add/save an emitter, then compare **Finish sound end clips** with immediate **Stop all map sounds**. Record with saved audio and check **Finish sound & save** against the original ending. Check startup, a long repeat, an early finish, mute/solo, pitch and tool changes with your own map. Alternate/detail/script behavior and native game acoustics remain separate.
+
 The [r6 live-session recovery pass](C35_LIVE_SESSION_RECOVERY.md) also needs a controlled MCC check: connect in official mods mode, make a small reversible control/size change, park and exit vehicles, then disconnect and verify original values. Reconnect, change the loaded map or exit Halo, and verify **Release previous live session** reports obsolete-record retirement without claiming restoration into a new map. Check that an older Spark window cannot release/edit the new connection. Keep full game transitions and failed-restoration retry separate from the completed Windows child/API/browser tests.
 
 The [r5 Director audio report](C35_DIRECTOR_AUDIO.md) covers the automated native saved-map sound export and the [r4 Director report](C35_DIRECTOR_RECORDING.md) covers the named-take workflow. OS Save and display/window pickers, actual game audio/capture, longer takes and physical 4K remain owner acceptance steps.

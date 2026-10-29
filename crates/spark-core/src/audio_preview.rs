@@ -46,7 +46,12 @@ pub struct Emitter {
     pub priority: u32,
     pub cooldown_ms: u32,
     pub spatial: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub looping_source: Option<LoopingSource>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LoopingSource { pub tag_id: u32, pub track: usize }
 fn follow_chain_default() -> bool {
     true
 }
@@ -89,6 +94,7 @@ impl SoundScene {
                 || e.name.chars().any(char::is_control)
                 || e.pitch_range > 7
                 || e.permutation > 255
+                || e.looping_source.as_ref().is_some_and(|source| source.track > 3)
                 || !matches!(
                     e.event.as_str(),
                     "ambient"
@@ -124,6 +130,11 @@ mod tests {
         let mut document = serde_json::json!({"schemaVersion":1,"master":0.5,"muted":false,"maxVoices":24,"buses":{"ambience":{"gain":1,"muted":false,"solo":false},"music":{"gain":1,"muted":false,"solo":false},"effects":{"gain":1,"muted":false,"solo":false},"dialogue":{"gain":1,"muted":false,"solo":false}},"emitters":[{"id":uuid::Uuid::new_v4().to_string(),"name":"Wind","tagId":4,"pitchRange":0,"permutation":0,"event":"ambient","bus":"ambience","position":[1,2,3],"gain":1,"pitch":0,"loop":true,"enabled":true,"minDistance":1,"maxDistance":40,"rolloff":1,"priority":50,"cooldownMs":100,"spatial":true}]});
         let valid: SoundScene = serde_json::from_value(document.clone()).unwrap();
         valid.validate().unwrap();
+        document["emitters"][0]["loopingSource"] = serde_json::json!({"tagId":7,"track":0});
+        let linked: SoundScene = serde_json::from_value(document.clone()).unwrap(); linked.validate().unwrap();
+        document["emitters"][0]["loopingSource"]["track"] = serde_json::json!(4);
+        assert!(serde_json::from_value::<SoundScene>(document.clone()).unwrap().validate().is_err());
+        document["emitters"][0]["loopingSource"] = serde_json::Value::Null;
         let mut p = crate::project::Project::new("Audio rehearsal");
         let fingerprint = p.fingerprint().unwrap();
         p.audio_preview = Some(valid);

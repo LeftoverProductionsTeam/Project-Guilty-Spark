@@ -1,4 +1,6 @@
 import type { AudioPreview, MapInspection, SceneObject, SoundInspection, Vec3 } from './types';
+import { soundBytes, soundKey, soundPlayback } from './soundPlayback';
+import type { LoadedSound, SoundPlayback } from './soundPlayback';
 export type SoundBus = 'ambience' | 'music' | 'effects' | 'dialogue';
 export type SoundEvent =
   'ambient' | 'mapStart' | 'manual' | 'weaponFire' | 'pickup' | 'explosion' | 'footstep' | 'interaction';
@@ -36,6 +38,7 @@ export interface SoundEmitter {
   priority: number;
   cooldownMs: number;
   spatial: boolean;
+  loopingSource?: { tagId: number; track: number } | null;
 }
 export interface SoundScene {
   schemaVersion: 1;
@@ -126,6 +129,7 @@ export async function sourceSoundEmitters(
         const index = Number(reference.label.match(/^Track (\d+)/)?.[1]) - 1,
           gain = loop.fields.find((f) => f.key === `loop-${index}-gain`)?.value;
         if (typeof gain === 'number' && gain >= 0 && gain <= 1) emitter.gain = gain;
+        emitter.loopingSource = { tagId: loop.id, track: index };
         out.push(emitter);
         if (out.length >= 64) return out;
       }
@@ -190,7 +194,12 @@ export function validateSoundScene(s: SoundScene): string[] {
       typeof e.loop !== 'boolean' ||
       typeof e.enabled !== 'boolean' ||
       (e.followChain !== undefined && typeof e.followChain !== 'boolean') ||
-      typeof e.spatial !== 'boolean'
+      typeof e.spatial !== 'boolean' ||
+      (e.loopingSource != null &&
+        (!Number.isInteger(e.loopingSource.tagId) ||
+          !finite(e.loopingSource.tagId, 0, 0xffffffff) ||
+          !Number.isInteger(e.loopingSource.track) ||
+          !finite(e.loopingSource.track, 0, 3)))
     )
       errors.push('Invalid positional sound emitter.');
     if (e && typeof e.id === 'string') ids.add(e.id);
@@ -336,6 +345,12 @@ interface Voice {
   gain: GainNode;
   panner: PannerNode | null;
   started: number;
+  clip: SoundPlayback;
+  envelope: GainNode;
+  sources: Set<AudioBufferSourceNode>;
+  ending: boolean;
+  finished: Promise<void>;
+  resolve: () => void;
 }
 /** Bounded Web Audio rehearsal. This does not intercept or replace MCC audio. */
 export class SpatialSoundMixer {
@@ -346,15 +361,17 @@ export class SpatialSoundMixer {
   private request = 0;
   private inFlight = new Map<string, number>();
   private cooldown = new Map<string, number>();
-  private cache = new Map<string, AudioBuffer>();
-  private loadingBuffers = new Map<string, Promise<AudioBuffer>>();
+  private cache = new Map<string, SoundPlayback>();
+  private loadingBuffers = new Map<string, Promise<SoundPlayback>>();
+  private finishing: Promise<void> | null = null;
+  private playbackFailure: Error | null = null;
   private cacheBytes = 0;
   private disposed = false;
   private pose: ListenerPose = { position: [0, 0, 0], forward: [1, 0, 0], up: [0, 0, 1] };
   private scene: SoundScene = emptySoundScene();
   constructor(
     readonly context: BaseAudioContext,
-    private load: (emitter: SoundEmitter) => Promise<AudioBuffer>,
+    private load: (emitter: SoundEmitter) => Promise<LoadedSound>,
     private changed: () => void = () => {},
     destination: AudioNode = context.destination,
   ) {
@@ -378,6 +395,12 @@ export class SpatialSoundMixer {
       cachedBytes: this.cacheBytes,
     };
   }
+  get error() {
+    return this.playbackFailure?.message ?? null;
+  }
+  repeats(emitter: SoundEmitter) {
+    return emitter.loop && this.cache.get(soundKey(emitter))?.canLoop !== false;
+  }
   configure(scene: SoundScene) {
     const errors = validateSoundScene(scene);
     if (errors.length) throw Error(errors.join(' '));
@@ -399,6 +422,7 @@ export class SpatialSoundMixer {
         next.pitchRange !== voice.emitter.pitchRange ||
         next.permutation !== voice.emitter.permutation ||
         (next.followChain !== false) !== (voice.emitter.followChain !== false) ||
+        soundKey(next) !== soundKey(voice.emitter) ||
         next.spatial !== voice.emitter.spatial ||
         next.loop !== voice.emitter.loop
       ) {
@@ -407,7 +431,8 @@ export class SpatialSoundMixer {
       }
       const oldBus = voice.emitter.bus;
       voice.emitter = next;
-      voice.source.playbackRate.setTargetAtTime(2 ** (next.pitch / 12), now, 0.015);
+      for (const source of voice.sources)
+        source.playbackRate.setTargetAtTime(2 ** (next.pitch / 12), now, 0.015);
       voice.gain.gain.setTargetAtTime(this.gain(next), now, 0.015);
       if (voice.panner) this.position(voice.panner, next.position);
       if (oldBus !== next.bus) {
@@ -473,7 +498,8 @@ export class SpatialSoundMixer {
     if (errors.length) throw Error(errors.join('\n'));
   }
   async play(emitter: SoundEmitter) {
-    if (this.disposed || !emitter.enabled) return;
+    if (this.disposed || this.finishing || !emitter.enabled) return;
+    if (!this.voices.length && !this.inFlight.size) this.playbackFailure = null;
     if (this.inFlight.has(emitter.id) || this.voices.some((v) => v.emitter.id === emitter.id && emitter.loop))
       return;
     const generation = this.generation,
@@ -483,14 +509,14 @@ export class SpatialSoundMixer {
     this.inFlight.set(emitter.id, token);
     this.changed();
     try {
-      const key = `${emitter.sourceProjectId ?? ''}/${emitter.sourceSha256 ?? ''}/${emitter.tagId}/${emitter.pitchRange}/${emitter.permutation}/${emitter.followChain !== false}`;
+      const key = soundKey(emitter);
       let buffer = this.cache.get(key);
       if (!buffer) {
         let pending = this.loadingBuffers.get(key);
         if (!pending) {
           if (this.loadingBuffers.size >= 2)
             throw Error('Two sound clips are already loading. Retry after they finish.');
-          pending = this.load(emitter);
+          pending = this.load(emitter).then(soundPlayback);
           this.loadingBuffers.set(key, pending);
         }
         try {
@@ -498,12 +524,12 @@ export class SpatialSoundMixer {
         } finally {
           if (this.loadingBuffers.get(key) === pending) this.loadingBuffers.delete(key);
         }
-        const bytes = buffer.length * buffer.numberOfChannels * 4;
+        const bytes = soundBytes(buffer);
         if (bytes > 32 * 1024 * 1024) throw Error('Decoded sound exceeds the 32 MiB clip limit.');
         if (generation !== this.generation) return;
-        const active = new Set(this.voices.map((v) => v.source.buffer!));
+        const active = new Set<LoadedSound>(this.voices.map((v) => v.clip));
         const held = () => new Set([...active, ...this.cache.values()]);
-        const size = () => [...held()].reduce((n, b) => n + b.length * b.numberOfChannels * 4, 0);
+        const size = () => [...held()].reduce((n, b) => n + soundBytes(b), 0);
         if (!this.cache.has(key)) {
           while (size() + bytes > 64 * 1024 * 1024) {
             const candidate = [...this.cache].find(([, b]) => !active.has(b));
@@ -512,7 +538,7 @@ export class SpatialSoundMixer {
                 'Active sounds fill the 64 MiB audio budget. Stop a voice before loading another clip.',
               );
             this.cache.delete(candidate[0]);
-            this.cacheBytes -= candidate[1].length * candidate[1].numberOfChannels * 4;
+            this.cacheBytes -= soundBytes(candidate[1]);
           }
           this.cache.set(key, buffer);
           this.cacheBytes += bytes;
@@ -527,7 +553,8 @@ export class SpatialSoundMixer {
         current.sourceSha256 !== emitter.sourceSha256 ||
         current.pitchRange !== emitter.pitchRange ||
         current.permutation !== emitter.permutation ||
-        (current.followChain !== false) !== (emitter.followChain !== false)
+        (current.followChain !== false) !== (emitter.followChain !== false) ||
+        soundKey(current) !== key
       )
         return;
       emitter = current;
@@ -538,10 +565,14 @@ export class SpatialSoundMixer {
         if (victim.emitter.priority > emitter.priority) return;
         this.stopVoice(victim);
       }
+      const clip = buffer;
       const source = this.context.createBufferSource(),
+        envelope = this.context.createGain(),
         gain = this.context.createGain();
-      source.buffer = buffer;
-      source.loop = emitter.loop;
+      source.buffer = clip.buffer;
+      source.loop = emitter.loop && clip.canLoop !== false;
+      if (clip.loopStart !== undefined) source.loopStart = clip.loopStart;
+      if (clip.loopEnd !== undefined) source.loopEnd = clip.loopEnd;
       source.playbackRate.value = 2 ** (emitter.pitch / 12);
       gain.gain.value = this.gain(emitter);
       let panner: PannerNode | null = null;
@@ -550,17 +581,45 @@ export class SpatialSoundMixer {
         panner.panningModel = 'HRTF';
         panner.rolloffFactor = 0;
         this.position(panner, emitter.position, true);
-        source.connect(panner);
+        source.connect(envelope);
+        envelope.connect(panner);
         panner.connect(gain);
-      } else source.connect(gain);
+      } else {
+        source.connect(envelope);
+        envelope.connect(gain);
+      }
       gain.connect(this.buses.get(emitter.bus)!);
-      const voice = { emitter, source, gain, panner, started: token };
+      let resolve!: () => void;
+      const finished = new Promise<void>((done) => {
+        resolve = done;
+      });
+      const voice: Voice = {
+        emitter,
+        source,
+        gain,
+        panner,
+        started: token,
+        clip,
+        envelope,
+        sources: new Set([source]),
+        ending: false,
+        finished,
+        resolve,
+      };
+      envelope.gain.value = clip.fadeInSeconds ? 0 : 1;
+      if (clip.fadeInSeconds)
+        envelope.gain.linearRampToValueAtTime(1, this.context.currentTime + clip.fadeInSeconds);
       this.voices.push(voice);
       source.onended = () => {
         this.release(voice);
       };
       this.cooldown.set(emitter.id, this.context.currentTime);
-      source.start();
+      try {
+        source.start();
+      } catch (error) {
+        this.stopVoice(voice);
+        throw error;
+      }
       this.changed();
     } finally {
       if (this.inFlight.get(emitter.id) === token) this.inFlight.delete(emitter.id);
@@ -571,22 +630,91 @@ export class SpatialSoundMixer {
     const index = this.voices.indexOf(voice);
     if (index < 0) return;
     this.voices.splice(index, 1);
-    voice.source.disconnect();
+    for (const source of voice.sources) {
+      source.onended = null;
+      source.disconnect();
+    }
+    voice.sources.clear();
+    voice.envelope.disconnect();
     voice.panner?.disconnect();
     voice.gain.disconnect();
+    voice.resolve();
     this.changed();
   }
   private stopVoice(voice: Voice) {
-    voice.source.onended = null;
-    try {
-      voice.source.stop();
-    } catch {
-      /* Already ended. */
+    for (const source of voice.sources) {
+      source.onended = null;
+      try {
+        source.stop();
+      } catch {
+        /* Already ended. */
+      }
     }
     this.release(voice);
   }
+  private endVoice(voice: Voice, fade: boolean) {
+    if (voice.ending) return;
+    try {
+      voice.ending = true;
+      const now = this.context.currentTime,
+        at = now + (fade ? (voice.clip.fadeOutSeconds ?? 0) : 0);
+      const original = voice.source;
+      original.onended = () => {
+        original.disconnect();
+        voice.sources.delete(original);
+      };
+      if (at > now) {
+        const parameter = voice.envelope.gain;
+        const held = parameter.value;
+        if (typeof parameter.cancelAndHoldAtTime === 'function') parameter.cancelAndHoldAtTime(now);
+        else parameter.cancelScheduledValues(now);
+        // With no future event, cancelAndHold need not insert an event at `now`.
+        // Anchor explicitly so the new ramp cannot begin at an old startup point.
+        parameter.setValueAtTime(held, now);
+        parameter.linearRampToValueAtTime(0, at);
+      }
+      try {
+        original.stop(at);
+      } catch {
+        /* Already ended. */
+      }
+      if (voice.clip.outroStart === undefined) {
+        original.onended = () => this.release(voice);
+        if (at === now) this.release(voice);
+        return;
+      }
+      const tail = this.context.createBufferSource();
+      tail.buffer = voice.clip.buffer;
+      tail.playbackRate.value = 2 ** (voice.emitter.pitch / 12);
+      tail.connect(voice.envelope);
+      voice.envelope.gain.setValueAtTime(1, at);
+      voice.sources.add(tail);
+      voice.source = tail;
+      tail.onended = () => this.release(voice);
+      tail.start(at, voice.clip.outroStart);
+    } catch (error) {
+      this.playbackFailure = new Error(`Could not finish ${voice.emitter.name}: ${String(error)}`);
+      this.stopVoice(voice);
+    }
+  }
+  finish(): Promise<void> {
+    if (this.finishing) return this.finishing;
+    this.generation++;
+    this.inFlight.clear();
+    this.cooldown.clear();
+    const voices = [...this.voices];
+    for (const voice of voices) this.endVoice(voice, true);
+    const done = Promise.all(voices.map((voice) => voice.finished)).then(() => {
+      if (this.finishing === done) this.finishing = null;
+      if (this.playbackFailure) throw this.playbackFailure;
+    });
+    this.finishing = done;
+    return done;
+  }
   stop() {
     this.generation++;
+    this.finishing = null;
+    this.playbackFailure = null;
     for (const voice of [...this.voices]) this.stopVoice(voice);
     this.inFlight.clear();
     this.cooldown.clear();

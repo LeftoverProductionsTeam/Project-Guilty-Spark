@@ -53,8 +53,9 @@ function DirectorRig({
     tracking = useRef(''),
     ended = useRef<number | null>(null);
   useEffect(() => {
-    applied.current='';tracking.current='';
-  },[camera]);
+    applied.current = '';
+    tracking.current = '';
+  }, [camera]);
   useEffect(() => {
     bridge.current.canvas = gl.domElement;
     return () => {
@@ -166,9 +167,10 @@ export default function DirectorWindow({
     [countdown, setCountdown] = useState(0);
   const [linked, setLinked] = useState(false),
     [live, setLive] = useState<LiveStatus | null>(null);
-  const [outputDirectory,setOutputDirectory]=useMapState(projectId,'director.recordingFolder','');
-  const [mapAudio,setMapAudio]=useMapState(projectId,'director.recordingMapAudio',false);
-  const [takeName,setTakeName]=useState(nextTakeName);
+  const [outputDirectory, setOutputDirectory] = useMapState(projectId, 'director.recordingFolder', '');
+  const [mapAudio, setMapAudio] = useMapState(projectId, 'director.recordingMapAudio', false);
+  const [takeName, setTakeName] = useState(nextTakeName);
+  const [finishingSound, setFinishingSound] = useState(false);
   const bridge = useRef<DirectorBridge>({ canvas: null, pose: null }),
     video = useRef<HTMLVideoElement>(null),
     [feed, setFeed] = useState<MediaStream | null>(null),
@@ -339,16 +341,25 @@ export default function DirectorWindow({
     clock.current = { started: 0, accumulated: 0, running: false };
     setElapsed(0);
     try {
-      if(mode==='editor'&&bridge.current.canvas)ownedCanvas.current=directorCanvasCapture(bridge.current.canvas,fps);
+      if (mode === 'editor' && bridge.current.canvas)
+        ownedCanvas.current = directorCanvasCapture(bridge.current.canvas, fps);
       if (mode === 'editor' && mapAudio) {
-        if (!opened?.project.audioPreview) throw Error('Save an Ambient or Map start sound in Level editor → Map sounds first.');
+        if (!opened?.project.audioPreview)
+          throw Error('Save an Ambient or Map start sound in Level editor → Map sounds first.');
         setMessage('Checking saved map sounds…');
-        ownedAudio.current = await prepareDirectorAudio(projectId, projectId, opened.inspection?.sha256 ?? opened.project.source?.sha256 ?? '',
-          opened.project.audioPreview, controller.signal);
+        ownedAudio.current = await prepareDirectorAudio(
+          projectId,
+          projectId,
+          opened.inspection?.sha256 ?? opened.project.source?.sha256 ?? '',
+          opened.project.audioPreview,
+          controller.signal,
+        );
       }
       const source = mode === 'capture' ? feed : ownedCanvas.current?.stream;
-      const stream = source && ownedAudio.current && mode === 'editor'
-        ? new MediaStream([...source.getVideoTracks(), ...ownedAudio.current.stream.getAudioTracks()]) : source;
+      const stream =
+        source && ownedAudio.current && mode === 'editor'
+          ? new MediaStream([...source.getVideoTracks(), ...ownedAudio.current.stream.getAudioTracks()])
+          : source;
       if (!stream)
         throw new Error(
           mode === 'capture' ? 'Choose the game window first.' : 'Wait for the map view to render.',
@@ -372,6 +383,7 @@ export default function DirectorWindow({
           setRecording(state);
           setMessage(detail);
           if (state === 'idle') {
+            setFinishingSound(false);
             ownedAudio.current?.dispose();
             ownedAudio.current = null;
             ownedCanvas.current?.dispose();
@@ -379,8 +391,20 @@ export default function DirectorWindow({
             active.current = null;
           }
         },
-        { countdown, signal: controller.signal, outputDirectory, fileName:takeName, onSaved:()=>setTakeName(nextTakeName()),beforeStart:mode==='editor'?signal=>ownedCanvas.current!.start(signal):undefined,
-          afterStart: mode === 'editor' && mapAudio ? async () => { await ownedAudio.current?.start(); } : undefined },
+        {
+          countdown,
+          signal: controller.signal,
+          outputDirectory,
+          fileName: takeName,
+          onSaved: () => setTakeName(nextTakeName()),
+          beforeStart: mode === 'editor' ? (signal) => ownedCanvas.current!.start(signal) : undefined,
+          afterStart:
+            mode === 'editor' && mapAudio
+              ? async () => {
+                  await ownedAudio.current?.start();
+                }
+              : undefined,
+        },
       );
       if (!active.current) {
         ownedAudio.current?.dispose();
@@ -541,11 +565,37 @@ export default function DirectorWindow({
             {recording === 'preparing' ? 'Cancel recording' : 'Stop & save'}
           </button>
           <button
-            disabled={!['paused', 'recording'].includes(recording)}
+            disabled={finishingSound || !['paused', 'recording'].includes(recording)}
             onClick={() => (recording === 'paused' ? active.current?.resume() : active.current?.pause())}
           >
             {recording === 'paused' ? 'Resume' : 'Pause'}
           </button>
+          {mode === 'editor' && mapAudio && ['recording', 'paused'].includes(recording) && (
+            <button
+              disabled={recording !== 'recording' || finishingSound}
+              onClick={() =>
+                void (async () => {
+                  const take = active.current,
+                    sound = ownedAudio.current;
+                  if (!take || !sound) return;
+                  setFinishingSound(true);
+                  setMessage('Finishing source fades and end clips. Stop & save cuts them immediately.');
+                  try {
+                    await sound.finish();
+                    if (active.current === take) take.stop();
+                  } catch (error) {
+                    setMessage(
+                      `Sound ending needs attention: ${String(error)}. Use Stop & save to retain this take.`,
+                    );
+                  } finally {
+                    setFinishingSound(false);
+                  }
+                })()
+              }
+            >
+              {finishingSound ? 'Finishing sound…' : 'Finish sound & save'}
+            </button>
+          )}
           <output aria-live="polite">
             {recording} · {elapsed.toFixed(1)}s
           </output>
@@ -595,23 +645,91 @@ export default function DirectorWindow({
           </label>
           <label>
             Countdown
-            <select aria-label="Countdown" value={countdown} disabled={recording!=='idle'} onChange={(e) => setCountdown(Number(e.target.value))}>
+            <select
+              aria-label="Countdown"
+              value={countdown}
+              disabled={recording !== 'idle'}
+              onChange={(e) => setCountdown(Number(e.target.value))}
+            >
               <option value="0">None</option>
               <option value="3">3 seconds</option>
               <option value="5">5 seconds</option>
             </select>
           </label>
           <details className="gs-director-output">
-            <summary>Recording output · {outputDirectory?'named takes':'choose each time'}</summary>
-            <div className="gs-director-output-menu" role="group" aria-label="Recording output settings" onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();const details=e.currentTarget.closest('details');if(details){details.open=false;details.querySelector('summary')?.focus();}}}}>
-            <label>Recording folder<input aria-label="Recording folder" value={outputDirectory} disabled={recording!=='idle'} onChange={e=>setOutputDirectory(e.target.value)} placeholder="Empty: show Save dialog · or enter an existing absolute folder"/></label>
-            <label>Next take filename<input aria-label="Next take filename" value={takeName} disabled={recording!=='idle'} onChange={e=>setTakeName(e.target.value)} maxLength={160}/></label>
-            {mode === 'editor' && <>
-              <label className="gs-director-audio-option"><input type="checkbox" checked={mapAudio} disabled={recording !== 'idle'} onChange={e => setMapAudio(e.target.checked)}/>Include saved map audio</label>
-              <small data-testid="director-audio-summary">Startup sounds enabled: {opened?.project.audioPreview?.emitters.filter(e => e.enabled && (e.event === 'ambient' || e.event === 'mapStart')).length ?? 0}{opened?.project.audioPreview?.muted ? ' · master muted' : ''}.</small>
-              <small>Records enabled Ambient and Map start emitters from Level editor → Map sounds, with saved bus levels, mute and camera distance. This take keeps a snapshot of the mix. Other events, game audio and microphone audio are not captured here.</small>
-            </>}
-            <small>The folder is remembered for this map. Each successful take gets a fresh name; existing files stay protected. Leave the folder empty to choose a file in the Save dialog.</small>
+            <summary>Recording output · {outputDirectory ? 'named takes' : 'choose each time'}</summary>
+            <div
+              className="gs-director-output-menu"
+              role="group"
+              aria-label="Recording output settings"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const details = e.currentTarget.closest('details');
+                  if (details) {
+                    details.open = false;
+                    details.querySelector('summary')?.focus();
+                  }
+                }
+              }}
+            >
+              <label>
+                Recording folder
+                <input
+                  aria-label="Recording folder"
+                  value={outputDirectory}
+                  disabled={recording !== 'idle'}
+                  onChange={(e) => setOutputDirectory(e.target.value)}
+                  placeholder="Empty: show Save dialog · or enter an existing absolute folder"
+                />
+              </label>
+              <label>
+                Next take filename
+                <input
+                  aria-label="Next take filename"
+                  value={takeName}
+                  disabled={recording !== 'idle'}
+                  onChange={(e) => setTakeName(e.target.value)}
+                  maxLength={160}
+                />
+              </label>
+              {mode === 'editor' && (
+                <>
+                  <label className="gs-director-audio-option">
+                    <input
+                      type="checkbox"
+                      checked={mapAudio}
+                      disabled={recording !== 'idle'}
+                      onChange={(e) => setMapAudio(e.target.checked)}
+                    />
+                    Include saved map audio
+                  </label>
+                  <small data-testid="director-audio-summary">
+                    Startup sounds enabled:{' '}
+                    {opened?.project.audioPreview?.emitters.filter(
+                      (e) => e.enabled && (e.event === 'ambient' || e.event === 'mapStart'),
+                    ).length ?? 0}
+                    {opened?.project.audioPreview?.muted ? ' · master muted' : ''}.
+                  </small>
+                  <small data-testid="director-looping-summary">
+                    {opened?.project.audioPreview?.emitters.filter((e) => e.enabled && e.loopingSource)
+                      .length ?? 0}{' '}
+                    authored tracks ·{' '}
+                    {opened?.project.audioPreview?.emitters.filter((e) => e.enabled && e.spatial).length ?? 0}{' '}
+                    spatial emitters.
+                  </small>
+                  <small>
+                    Records enabled Ambient and Map start emitters from Level editor → Map sounds, with saved
+                    bus levels, mute and camera distance. This take keeps a snapshot of the mix. Other events,
+                    game audio and microphone audio are not captured here.
+                  </small>
+                </>
+              )}
+              <small>
+                The folder is remembered for this map. Each successful take gets a fresh name; existing files
+                stay protected. Leave the folder empty to choose a file in the Save dialog.
+              </small>
             </div>
           </details>
           <span>
@@ -633,7 +751,7 @@ export default function DirectorWindow({
                 animation={null}
                 onError={setMessage}
                 cinema={{
-                      externalAuthority:true,
+                  externalAuthority: true,
                   locked,
                   rig: composition ? (
                     <DirectorRig
@@ -650,7 +768,7 @@ export default function DirectorWindow({
               />
             ) : (
               <World
-                    externalCameraAuthority
+                externalCameraAuthority
                 project={displayedProject!}
                 inspection={opened.inspection}
                 assetMeshes={{}}

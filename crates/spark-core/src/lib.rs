@@ -3,6 +3,7 @@ pub mod appearance;
 pub mod assets;
 pub mod asset_transfer;
 pub mod audio;
+pub mod looping_audio;
 mod audio_pcm;
 pub mod binary;
 pub mod bitmap_preview;
