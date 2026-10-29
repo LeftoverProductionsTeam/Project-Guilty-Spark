@@ -1,58 +1,64 @@
-Project Guilty Spark - C35 r11 source comparison
-BASELINE_GIT_COMMIT: 5bbbcd7e925b7f67d6d6fced3ebec86de739ab1b
+Project Guilty Spark - C35 r12 source comparison
+BASELINE_GIT_COMMIT: d8ae7abb173b387892127e94f9f905444be2902e
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 11
-MODIFIED_COUNT: 30
-UNCHANGED_COUNT: 1140
+ADDED_COUNT: 9
+MODIFIED_COUNT: 38
+UNCHANGED_COUNT: 1143
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/src/shader_transparent.rs
-docs/C35_RENDERING_AND_WORKFLOW.md
-docs/fixtures/c35-rendering-workflow-native-verification.json
-scripts/test-rendering-workflow-native.mjs
-src/haloGeometry.test.ts
-src/haloGeometry.ts
-src/haloTransparency.test.ts
-src/haloTransparency.ts
-tests/ui/fixtures/haloMaterials.html
-tests/ui/fixtures/haloMaterials.ts
-tests/ui/halo-materials.spec.ts
+crates/spark-core/examples/qa_mcc_audio.rs
+crates/spark-core/src/mcc_audio.rs
+docs/C35_MCC_AUDIO_AND_WORKFLOW.md
+docs/fixtures/c35-mcc-audio-native-verification.json
+scripts/native-main-track-audio-probe.mjs
+scripts/test-main-track-audio-native.mjs
+src/loopingEmitters.test.ts
+src/loopingEmitters.ts
+src/soundMixer.css
 
 MODIFIED FILES
+COMMUNITY_CREDITS.md
 README.md
-crates/spark-core/src/bitmap_preview.rs
-crates/spark-core/src/maps.rs
-crates/spark-core/src/mcc_textures.rs
+crates/spark-core/examples/qa_c35_workspace.rs
+crates/spark-core/examples/verify_tag_exchange.rs
+crates/spark-core/src/audio.rs
+crates/spark-core/src/bsp_clearance.rs
+crates/spark-core/src/lib.rs
+crates/spark-core/src/library.rs
 crates/spark-core/src/project.rs
-crates/spark-core/src/resource_map.rs
+crates/spark-core/src/tag_exchange.rs
+crates/spark-core/src/working_tags.rs
+crates/spark-core/tests/netgame_models.rs
 docs/CONTINUATION_35_ENGINEERING.md
 docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
 docs/GITHUB_HANDOFF.md
 docs/MASTER_FEATURE_LEDGER.csv
 scripts/continuation35-evidence.mjs
 scripts/feature-ledger-evidence.mjs
-scripts/test-viewport-workflow-native.mjs
+src-tauri/src/app.rs
+src-tauri/src/live_thread_pause.rs
 src/App.tsx
-src/components/LevelEditorWorkspace.tsx
-src/components/MapDecals.tsx
-src/components/RuntimeDock.tsx
+src/components/MapSounds.tsx
+src/components/QuickForge.tsx
+src/components/Sound.tsx
+src/components/SoundMixer.tsx
 src/components/Tags.tsx
-src/components/WindowFrame.tsx
-src/components/WorkspacePanels.tsx
-src/components/Workspaces.tsx
+src/components/ViewportAssetLibrary.tsx
 src/components/World.tsx
+src/directorAudio.test.ts
+src/editorAudio.test.ts
+src/editorAudio.ts
 src/featureCatalog.ts
-src/haloMaterial.ts
-src/mapDecals.test.ts
-src/mapDecals.ts
-src/materialAudit.ts
+src/hosting.css
+src/mapDocuments.test.ts
+src/mapDocuments.ts
 src/types.ts
-src/workspacePanels.css
+src/viewportAssets.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-The six currently present C35 r8/r10 executable, installer and source files remain frozen and independently rehashed; absent older files are not reconstructed.
+The nine currently present C35 r8/r10/r11 executable, installer and source files remain frozen and independently rehashed; absent older files are not reconstructed.
