@@ -302,7 +302,7 @@ fn ogg_crc(page: &[u8]) -> u32 {
 
 /// A complete single logical Vorbis stream, with bounded headers and duration.
 /// This does not claim the compressed audio packets have been decoded.
-fn validate_vorbis(data: &[u8]) -> Result<(u8, u32, f64)> {
+pub(crate) fn validate_vorbis(data: &[u8]) -> Result<(u8, u32, f64)> {
     if data.len() > MAX_PREVIEW_BYTES {
         return invalid("Vorbis exceeds preview size limit");
     }

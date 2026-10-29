@@ -335,25 +335,66 @@ test('C35 drawers return viewport space, remember each workspace and support foc
  await page.getByRole('button',{name:'Close Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();
 });
 
+test('object tags open in a hideable drawer without changing workspace, camera layout or history',async({page})=>{
+ await mockDesktop(page);await page.evaluate(()=>{const open=(window as any).__sparkMock.projects.a;open.project.scene=[{id:'test-object',name:'Selected test weapon',kind:'Weapon',tagId:1,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:8,rotationOffset:null,assetId:null}];open.inspection.objects=structuredClone(open.project.scene);});
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ const viewport=page.getByTestId('viewport'),before=await viewport.boundingBox();
+ await page.getByRole('button',{name:'Toggle Objects',exact:true}).click();
+ await page.getByRole('button',{name:'Selected test weapon',exact:true}).click();
+ const drawer=page.getByRole('region',{name:'Object tags panel',exact:true});await expect(drawer).toBeVisible();
+ await expect(drawer.getByLabel('Velocity',{exact:true})).toBeVisible();
+ expect(await viewport.boundingBox()).toEqual(before);await expect(page.getByRole('combobox',{name:'Editing target',exact:true})).toBeVisible();
+ const value=drawer.getByLabel('Velocity',{exact:true});await value.fill('23');await value.press('Enter');
+ await page.getByRole('button',{name:'Close Object tags',exact:true}).click();await expect(drawer).toBeHidden();
+ await page.getByRole('button',{name:'Toggle Object tags',exact:true}).click();await expect(drawer.getByLabel('Velocity',{exact:true})).toHaveValue('23');expect(await viewport.boundingBox()).toEqual(before);
+ await page.keyboard.press('Control+z');await expect(value).toHaveValue('10');await page.keyboard.press('Control+y');await expect(value).toHaveValue('23');
+ await page.getByRole('button',{name:'Close Object tags',exact:true}).click();await page.getByRole('button',{name:'Fullscreen editing',exact:true}).click();
+ await page.getByRole('button',{name:'Toggle Object tags',exact:true}).click();await expect(drawer).toBeVisible();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
+});
+
+test('map audio preferences survive tag drawers, fullscreen and map switches independently',async({page})=>{
+ await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ const volume=page.getByRole('slider',{name:'Map sound volume',exact:true});await expect(volume).toHaveValue('0.35');
+ await volume.fill('0.61');await page.getByRole('button',{name:'Mute map sounds',exact:true}).click();await expect(page.getByRole('button',{name:'Unmute map sounds',exact:true})).toHaveAttribute('aria-pressed','true');
+ await page.getByRole('button',{name:'Toggle Object tags',exact:true}).click();await expect(page.getByRole('region',{name:'Object tags panel',exact:true})).toBeVisible();await page.getByRole('button',{name:'Close Object tags',exact:true}).click();await expect(volume).toHaveValue('0.61');
+ await page.keyboard.press('F11');await expect(volume).toBeInViewport();await expect(page.getByRole('button',{name:'Unmute map sounds',exact:true})).toBeInViewport();await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await expect(volume).toHaveValue('0.35');await expect(page.getByRole('button',{name:'Mute map sounds',exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await expect(volume).toHaveValue('0.61');await expect(page.getByRole('button',{name:'Unmute map sounds',exact:true})).toBeVisible();
+});
+
+test('cross-map model placement opens source tags and keeps undo and save in that source map',async({page})=>{
+ await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await page.getByRole('button',{name:'Toggle Asset library',exact:true}).click();
+ const library=page.getByRole('region',{name:'Asset library panel',exact:true});await library.getByLabel('Asset library map',{exact:true}).selectOption('b');
+ await expect(page.getByTestId('viewport').locator('canvas')).toBeVisible();
+ await library.getByRole('button',{name:'Add test at view',exact:true}).click();await expect(page.locator('.viewport-object-actions strong')).toHaveText('test');
+ await page.getByRole('button',{name:'Close Asset library',exact:true}).click();await page.locator('.viewport-object-actions').getByRole('button',{name:'Object tags',exact:true}).click();
+ const tags=page.getByRole('region',{name:'Object tags panel',exact:true});await expect(tags).toContainText('Synthetic candidate');const value=tags.getByLabel('Velocity',{exact:true});await expect(value).toHaveValue('25');await value.fill('39');await value.press('Enter');await value.focus();await page.keyboard.press('Control+z');await expect(value).toHaveValue('25');await value.focus();await page.keyboard.press('Control+y');await expect(value).toHaveValue('39');await value.focus();await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.id)).toBe('b');await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');
+});
+
 test('C35 empty Level editor asks for an editing context without assuming an installed MCC map',async({page})=>{
  await mockDesktop(page);await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,"Level editor");
  await expect(page.getByRole('heading',{name:'What would you like to work on?',exact:true})).toBeVisible();
  for(const label of['Open a Halo map','Create a new Halo level','Connect to a running Halo game'])await expect(page.getByRole('button',{name:label,exact:true})).toBeVisible();
 });
 
-test('C35 the window header is a drawer that overlays without consuming editor height',async({page})=>{
+test('the top bar is thin by default, collapses from its own edge and has no Window launcher',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
- const viewport=page.getByTestId('viewport'),header=page.locator('#gs-window-header');await expect(viewport).toBeVisible();await expect(header).toBeHidden();const closed=await viewport.boundingBox();expect(closed!.y).toBeLessThan(200);
- await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();await expect(header).toBeVisible();await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeVisible();await expect(header.getByRole('button',{name:/Find tools/})).toBeVisible();expect(await header.evaluate(e=>getComputedStyle(e).position)).toBe('fixed');const opened=await viewport.boundingBox();expect(opened!.height).toBeCloseTo(closed!.height,0);
- await page.keyboard.press('Escape');await expect(header).toBeHidden();await page.keyboard.press('Control+Shift+Backslash');await expect(header).toBeVisible();await page.getByRole('button',{name:'Hide window and project header',exact:true}).click();await expect(header).toBeHidden();await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toBeVisible();
+ const viewport=page.getByTestId('viewport'),header=page.locator('#gs-window-header');await expect(header).toBeVisible();expect((await header.boundingBox())!.height).toBeLessThanOrEqual(33);await expect(page.getByRole('button',{name:'Window',exact:true})).toHaveCount(0);const before=await viewport.boundingBox();
+ await page.getByRole('button',{name:'Collapse top bar',exact:true}).click();await expect(header).toBeHidden();expect((await viewport.boundingBox())!.height).toBeGreaterThan(before!.height+25);await expect(page.getByRole('button',{name:'Show top bar',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Show top bar',exact:true}).click();await expect(header).toBeVisible();expect(await viewport.boundingBox()).toEqual(before);await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);await expect(header.getByRole('button',{name:/Find tools/})).toBeVisible();
+ await page.keyboard.press('Control+Shift+Backslash');await expect(header).toBeHidden();await page.keyboard.press('Control+Shift+Backslash');await expect(header).toBeVisible();
 });
 
 test('C35 F11 uses native fullscreen and Escape closes navigation before restoring editing',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await mockDesktop(page);
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
- const viewport=page.getByTestId('viewport');await expect(viewport).toBeVisible();const original=await viewport.boundingBox();
+ const viewport=page.getByTestId('viewport');await expect(viewport).toBeVisible();const original=await viewport.boundingBox(),normalStrip=await page.getByRole('navigation',{name:'Workspace panels',exact:true}).boundingBox();
  await page.keyboard.press('F11');await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
- const full=await viewport.boundingBox();expect(full!.width).toBeGreaterThan(1240);expect(full!.height).toBeGreaterThan(650);expect(full!.height).toBeGreaterThan(original!.height);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();await expect(page.getByRole('button',{name:'Exit fullscreen',exact:true})).toBeInViewport();
+ const full=await viewport.boundingBox();expect(full!.width).toBeGreaterThan(1240);expect(full!.height).toBeGreaterThan(650);expect(full!.height).toBeGreaterThan(original!.height);const fullStrip=await page.getByRole('navigation',{name:'Workspace panels',exact:true}).boundingBox();expect(fullStrip!.height).toBeLessThan(normalStrip!.height);expect(fullStrip!.height).toBeLessThanOrEqual(32);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();await expect(page.getByRole('button',{name:'Exit fullscreen',exact:true})).toBeInViewport();
  await page.mouse.move(100,2);await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
  await page.keyboard.press('Control+Backslash');await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
  await page.keyboard.press('Escape');await expect(page.locator('.gs-navigation-drawer')).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
@@ -387,7 +428,7 @@ test('fullscreen from maximized restores the original mode and keeps mouse windo
  await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
  expect(await page.evaluate(()=>(window as any).__sparkMock.maximized)).toBe(false);
  await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();
- await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();
+ await page.getByRole('button',{name:'Show top bar',exact:true}).click();
  await expect(page.locator('#gs-window-header')).toBeVisible();
  await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);
  await page.keyboard.press('Escape');await expect(page.locator('#gs-window-header')).toBeHidden();
@@ -758,7 +799,7 @@ test('downloaded maps can open directly in the MCC conversion flow',async({page}
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((c:any)=>c.command==='compatibility'&&c.args.id==='b')).toBe(true);expect(calls.some((c:any)=>c.command==='start_build')).toBe(false);
 });
 
-test('map sound events save with the map and stop their audio context on tool changes',async({page})=>{
+test('map sound events persist through drawers and editing tools, then release on leaving the map',async({page})=>{
   await mockDesktop(page);
   await page.evaluate(async()=>{
     const w=window as any,original=w.__TAURI_INTERNALS__.invoke,open=await original('open_project',{id:'a'});
@@ -773,12 +814,12 @@ test('map sound events save with the map and stop their audio context on tool ch
       return original(command,args);
     };
   });
-  await openFixture(page);await chooseTool(page,"Level editor");await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await page.locator('.gs-map-sounds>summary').click();await page.getByRole('combobox',{name:'Map sound tag',exact:true}).selectOption('999');
+  await openFixture(page);await chooseTool(page,"Level editor");await page.getByRole('button',{name:'Toggle Map sounds',exact:true}).click();await page.getByRole('combobox',{name:'Map sound tag',exact:true}).selectOption('999');
   await page.getByRole('button',{name:'Add selected sound emitter',exact:true}).click();const mixer=page.getByRole('region',{name:'Spatial sound rehearsal',exact:true});
   await expect(page.getByRole('combobox',{name:'Map sound emitter',exact:true})).toBeVisible();await page.getByRole('spinbutton',{name:'Map sound master volume',exact:true}).fill('0');await page.getByRole('spinbutton',{name:'Map sound master volume',exact:true}).press('Enter');
   await page.getByRole('button',{name:'Start sound scene',exact:true}).click();await expect(mixer.getByRole('status')).toContainText('1/24 voices');
-  await chooseTool(page,"Tag editor");await expect.poll(()=>page.evaluate(()=>(window as any).__soundContexts.every((c:AudioContext)=>c.state==='closed'))).toBe(true);
-  await chooseTool(page,"Level editor");await page.locator('.gs-map-sounds>summary').click();await expect(page.getByRole('combobox',{name:'Map sound emitter',exact:true})).toBeVisible();await expect(page.getByRole('spinbutton',{name:'Map sound master volume',exact:true})).toHaveValue('0');
+  await chooseTool(page,"Tag editor");await expect.poll(()=>page.evaluate(()=>(window as any).__soundContexts.some((c:AudioContext)=>c.state==='running'))).toBe(true);await chooseTool(page,'Map library');await expect.poll(()=>page.evaluate(()=>(window as any).__soundContexts.every((c:AudioContext)=>c.state==='closed'))).toBe(true);
+  await chooseTool(page,"Level editor");await expect(page.getByRole('combobox',{name:'Map sound emitter',exact:true})).toBeVisible();await expect(page.getByRole('spinbutton',{name:'Map sound master volume',exact:true})).toHaveValue('0');
 });
 test('looping source tracks persist across tools and Finish waits for their end clip',async({page})=>{
   await mockDesktop(page);
@@ -797,7 +838,7 @@ test('looping source tracks persist across tools and Finish waits for their end 
       return original(command,args);
     };
   });
-  await openFixture(page);await chooseTool(page,'Level editor');await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await page.locator('.gs-map-sounds>summary').click();
+  await openFixture(page);await chooseTool(page,'Level editor');await page.getByRole('button',{name:'Toggle Map sounds',exact:true}).click();
   await page.getByRole('textbox',{name:'Find a map sound',exact:true}).fill('test_engine');await page.getByRole('combobox',{name:'Map sound tag',exact:true}).selectOption('1000');
   await page.getByRole('combobox',{name:'Looping sound track',exact:true}).selectOption('1');await page.getByRole('button',{name:'Add selected sound emitter',exact:true}).click();
   await expect(page.getByText('Authored main track 2 includes source intro/end clips',{exact:false})).toBeVisible();
@@ -805,7 +846,7 @@ test('looping source tracks persist across tools and Finish waits for their end 
   const mixer=page.getByRole('region',{name:'Spatial sound rehearsal',exact:true});await expect(mixer.getByRole('status')).toContainText('1/24 voices');
   await page.getByRole('button',{name:'Finish sound end clips',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__soundContexts.every((ctx:AudioContext)=>ctx.state==='closed'))).toBe(true);
-  await chooseTool(page,'Tag editor');await chooseTool(page,'Level editor');await page.locator('.gs-map-sounds>summary').click();
+  await chooseTool(page,'Tag editor');await chooseTool(page,'Level editor');
   await expect(page.getByRole('textbox',{name:'Find a map sound',exact:true})).toHaveValue('test_engine');await expect(page.getByRole('combobox',{name:'Map sound tag',exact:true})).toHaveValue('1000');await expect(page.getByRole('combobox',{name:'Looping sound track',exact:true})).toHaveValue('1');
   await page.getByRole('button',{name:'Use loop sample only',exact:true}).click();await expect(page.getByText('Authored main track 2 includes source intro/end clips',{exact:false})).toHaveCount(0);
 });

@@ -48,7 +48,12 @@ pub struct Emitter {
     pub spatial: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub looping_source: Option<LoopingSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_sound: Option<CustomSound>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub struct CustomSound { pub asset_id: String, pub sha256: String }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LoopingSource { pub tag_id: u32, pub track: usize }
@@ -73,6 +78,12 @@ impl SoundScene {
         }
         let mut ids = HashSet::new();
         for e in &self.emitters {
+            if let Some(sound)=&e.custom_sound {
+                uuid::Uuid::parse_str(&sound.asset_id).map_err(|_|crate::SparkError::Invalid("Invalid custom sound asset".into()))?;
+                if sound.sha256.len()!=64 || !sound.sha256.bytes().all(|b|b.is_ascii_hexdigit()) || e.source_sha256.as_deref()!=Some(sound.sha256.as_str()) || e.source_project_id.is_none() || e.tag_id!=0 || e.looping_source.is_some() || e.pitch_range!=0 || e.permutation!=0 {
+                    return invalid("Custom sound needs its exact asset identity and a single audio source");
+                }
+            }
             uuid::Uuid::parse_str(&e.id)
                 .map_err(|_| crate::SparkError::Invalid("Invalid sound emitter identity".into()))?;
             if e.source_project_id.is_some() != e.source_sha256.is_some() {

@@ -197,7 +197,7 @@ pub fn compatibility(
         || project
             .scene
             .iter()
-            .any(|o| !inspection.objects.iter().any(|v| v.id == o.id) || o.scale != [1.0; 3])
+            .any(|o| !inspection.objects.iter().any(|v| v.id == o.id) || o.scale != [1.0; 3] || o.source_model.is_some() || o.asset_id.is_some())
     {
         blockers.push("Editor-only instances, duplication, deletion and per-instance scale cannot be compiled into Halo tags yet".into());
     }

@@ -46,7 +46,7 @@ export function soundBytes(loaded: LoadedSound) {
   return clip.buffer.length * clip.buffer.numberOfChannels * 4;
 }
 export function soundKey(e: SoundEmitter) {
-  return `${e.sourceProjectId ?? ''}/${e.sourceSha256 ?? ''}/${e.tagId}/${e.pitchRange}/${e.permutation}/${e.followChain !== false}/${e.loopingSource?.tagId ?? ''}/${e.loopingSource?.track ?? ''}`;
+  return `${e.sourceProjectId ?? ''}/${e.sourceSha256 ?? ''}/${e.tagId}/${e.pitchRange}/${e.permutation}/${e.followChain !== false}/${e.loopingSource?.tagId ?? ''}/${e.loopingSource?.track ?? ''}/${e.customSound?.assetId ?? ''}/${e.customSound?.sha256 ?? ''}`;
 }
 export function joinSoundPhases(
   context: BaseAudioContext,

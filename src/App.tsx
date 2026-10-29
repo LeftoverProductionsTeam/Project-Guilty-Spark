@@ -13,6 +13,7 @@ import {
   Box,
   ChevronRight,
   ChevronUp,
+  ChevronDown,
   CircleHelp,
   FileCode2,
   FolderOpen,
@@ -47,7 +48,10 @@ import type {
   RuntimeId,
   Settings,
   Workspace,
+  Vec3,
 } from './types';
+import type {ViewportAsset} from './viewportAssets';
+import {createEmitter,emptySoundScene} from './spatialAudio';
 import { browserBootstrap, call, native } from './api';
 import { applyInterfacePreferences, readInterfacePreferences, saveInterfacePreferences } from './interfacePreferences';
 import type { CueName, LocalCueReference } from './interfacePreferences';
@@ -59,6 +63,7 @@ import type {HistoryAction} from './editor';
 import {activeDocument,documentReducer,emptyMapDocuments} from './mapDocuments';
 import MapTabs from './components/MapTabs';
 import RuntimeDock from './components/RuntimeDock';
+import {EditorAudioProvider,EditorSoundControls} from './components/EditorAudio';
 import ExternalMapSync from './components/ExternalMapSync';
 import {hasSourceBoundEdits} from './externalMapSync';
 import SettingsPanel from './components/SettingsPanel';
@@ -143,24 +148,26 @@ export default function App() {
   const inspection=activeMap?.inspection??null,meshes=activeMap?.meshes??{};
   const [workspace, setWorkspace] = useState<Workspace>(firstVisitWorkspace);
   const[sidebarOpen,setSidebarOpen]=useMapState('global','chrome.sidebar',false);
-  const[headerOpen,setHeaderOpen]=useMapState('global','chrome.header',false);
-  const toggleNavigation=()=>{setHeaderOpen(false);setSidebarOpen(open=>!open);};
-  const toggleHeader=()=>{setSidebarOpen(false);setHeaderOpen(open=>!open);};
+  const[headerOpen,setHeaderOpen]=useMapState('global','chrome.compact-header',true);
+  const[headerPeek,setHeaderPeek]=useState(false);
+  const toggleNavigation=()=>{setHeaderPeek(false);setSidebarOpen(open=>!open);};
+  const collapseHeader=()=>{setHeaderOpen(false);setHeaderPeek(false);};
+  const showHeader=()=>{if(document.documentElement.dataset.gsFocusMode==='true')setHeaderPeek(true);else setHeaderOpen(true);};
   useEffect(()=>{
-    if(!sidebarOpen&&!headerOpen)return;
+    if(!sidebarOpen&&!headerPeek)return;
     const dismiss=(event:globalThis.PointerEvent)=>{
       const target=event.target as HTMLElement;
-      if(target.closest('#gs-workspace-navigation,#gs-window-header,.gs-navigation-toggle,.gs-header-toggle'))return;
-      setSidebarOpen(false);setHeaderOpen(false);
+      if(target.closest('#gs-workspace-navigation,#gs-window-header,.gs-navigation-toggle,.gs-header-reveal'))return;
+      setSidebarOpen(false);setHeaderPeek(false);
     };
     document.addEventListener('pointerdown',dismiss,true);
     return()=>document.removeEventListener('pointerdown',dismiss,true);
-  },[sidebarOpen,headerOpen,setSidebarOpen,setHeaderOpen]);
-  useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape'&&(sidebarOpen||headerOpen)&&!document.querySelector('[role="dialog"]')){event.preventDefault();event.stopImmediatePropagation();if(sidebarOpen){setSidebarOpen(false);document.querySelector<HTMLButtonElement>('.gs-navigation-toggle')?.focus();}else{setHeaderOpen(false);document.querySelector<HTMLButtonElement>('.gs-header-toggle')?.focus();}}else if((event.ctrlKey||event.metaKey)&&event.code==='Backslash'&&!event.altKey){event.preventDefault();event.stopImmediatePropagation();if(event.shiftKey){setSidebarOpen(false);setHeaderOpen(open=>!open);}else{setHeaderOpen(false);setSidebarOpen(open=>!open);}}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[sidebarOpen,headerOpen,setSidebarOpen,setHeaderOpen]);
+  },[sidebarOpen,headerPeek,setSidebarOpen]);
+  useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='F11')setHeaderPeek(false);if(event.key==='Escape'&&(sidebarOpen||headerPeek)&&!document.querySelector('[role="dialog"]')){event.preventDefault();event.stopImmediatePropagation();if(sidebarOpen){setSidebarOpen(false);document.querySelector<HTMLButtonElement>('.gs-navigation-toggle')?.focus();}else{setHeaderPeek(false);document.querySelector<HTMLButtonElement>('.gs-header-reveal')?.focus();}}else if((event.ctrlKey||event.metaKey)&&event.code==='Backslash'&&!event.altKey){event.preventDefault();event.stopImmediatePropagation();if(event.shiftKey){setSidebarOpen(false);if(document.documentElement.dataset.gsFocusMode==='true')setHeaderPeek(open=>!open);else setHeaderOpen(open=>!open);}else{setHeaderPeek(false);setSidebarOpen(open=>!open);}}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[sidebarOpen,headerPeek,setSidebarOpen,setHeaderOpen]);
   const [settingsTab,setSettingsTab]=useState<'tools'|'dependencies'>('tools');
   const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
   const headerWorkspace=useRef(workspace);
-  useEffect(()=>{if(headerWorkspace.current!==workspace){headerWorkspace.current=workspace;setHeaderOpen(false);}},[workspace,setHeaderOpen]);
+  useEffect(()=>{if(headerWorkspace.current!==workspace){headerWorkspace.current=workspace;setHeaderPeek(false);}},[workspace]);
   const bootRouteHandled=useRef(false);
   useEffect(()=>{if(!ready||bootRouteHandled.current)return;bootRouteHandled.current=true;if(data.settings.onboardingCompleted){markFirstVisitSeen();if(workspace==='get-started')setWorkspace('library');}},[ready,data.settings.onboardingCompleted]);
   const [focusTagId, setFocusTagId] = useMapState<number | null>(activeMap?.id??'no-map','tags.focus',null);
@@ -250,10 +257,11 @@ export default function App() {
   const documentsRef=useRef(documents);documentsRef.current=documents;
   const applyHistory=useCallback((type:'undo'|'redo')=>{
     const active=document.activeElement;
+    const targetId=active instanceof HTMLElement?active.closest<HTMLElement>('[data-history-project]')?.dataset.historyProject??documentsRef.current.activeId:documentsRef.current.activeId;
+    const apply=()=>{if(targetId)dispatchDocument({type:'history',id:targetId,action:{type}});};
     if(active instanceof HTMLInputElement&&['number','range'].includes(active.type)){
-      const id=historyRef.current.current?.id;active.blur();
-      requestAnimationFrame(()=>{if(historyRef.current.current?.id===id)dispatch({type});});
-    }else dispatch({type});
+      active.blur();requestAnimationFrame(apply);
+    }else apply();
   },[]);
   const notice = useCallback((message: string, tone = 'info') => {
     setToast({ message, tone });
@@ -395,6 +403,7 @@ export default function App() {
         }
       }
       for (const asset of open.project.assets) {
+        if(asset.kind!=='obj')continue;
         try {
           const mesh = await call<MeshData>('asset_mesh', { id: open.project.id, assetId: asset.id });
           dispatchDocument({type:'mesh',id:open.project.id,assetId:asset.id,mesh});
@@ -507,7 +516,9 @@ export default function App() {
         else if (payload.type === 'drop') {
           setDragging(false);
           const animations=payload.paths.filter(path=>/\.(jma|jmm|jmo|jmr|jmt|jmz|fbx|model_animations)$/i.test(path));
-          if(animations.length)void importAnimations(animations);
+          const assets=payload.paths.filter(path=>/\.(obj|wav|ogg)$/i.test(path));
+          if(assets.length){if(assets.length!==payload.paths.length){notice('Drop maps/animations and custom assets separately.','info');return;}if(assets.length>16){notice('Import at most 16 custom files per drop.','error');return;}const event=new CustomEvent('guilty-spark-asset-file-drop',{cancelable:true,detail:{paths:assets,x:payload.position.x/window.devicePixelRatio,y:payload.position.y/window.devicePixelRatio}});window.dispatchEvent(event);if(!event.defaultPrevented)void importDroppedAssets(assets);}
+          else if(animations.length)void importAnimations(animations);
           else void importFiles(payload.paths);
         }
       }),
@@ -544,7 +555,8 @@ export default function App() {
         }
         if (e.key.toLowerCase() === 's') {
           e.preventDefault();
-          void save(true).catch(() => {});
+          const id=e.target instanceof HTMLElement?e.target.closest<HTMLElement>('[data-history-project]')?.dataset.historyProject:undefined;
+          void save(true,id).catch(() => {});
         }
         if (e.key.toLowerCase() === 'z') {
           const text=e.target instanceof Element?e.target.closest('input,textarea,[contenteditable="true"]'):null;
@@ -564,7 +576,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', key);
   }, [save,help,createModal,applyHistory]);
   function edit(project: Project, description: string) {
-    dispatch({ type: 'edit', project, description });
+    dispatchDocument({type:'history',id:project.id,action:{type:'edit',project,description}});
   }
   async function importFiles(paths?: string[], destination?: 'build') {
     setBusy(true);
@@ -670,16 +682,19 @@ export default function App() {
     const jobId = await call<string>('quickforge_build', { projectId: project.id });
     setActiveJob(jobId);
   }
-  async function importAsset() {
-    if (!current) return;
+  async function importAsset(position?:Vec3,path?:string) {
+    const target=historyRef.current.current;
+    if (!target) return;
     setBusy(true);
     try {
       if (historyRef.current.dirty) await save();
-      const result = await call<AssetResult | null>('import_asset', { id: current.id });
+      const result = await call<AssetResult | null>('import_asset', { id: target.id,...(path?{path}:{}) });
       if (result) {
-        dispatch({ type: 'load', project: result.project });
+        dispatchDocument({type:'history',id:target.id,action:{type:'assets',project:result.project}});
         dispatchDocument({type:'mesh',id:result.project.id,assetId:result.asset.id,mesh:result.mesh});
-        notice(result.warnings.join(' '), 'info');
+        const latest=documentsRef.current.documents.find(document=>document.id===target.id)?.history.current;
+        if(latest){const imported=result.project.scene.find(object=>object.assetId===result.asset.id);if(imported)edit({...latest,assets:result.project.assets,scene:[...latest.scene,{...imported,position:position??imported.position}]},'Place imported OBJ '+result.asset.name);}
+        notice(result.warnings.join(' ')||'Model imported into this map. Its source preview can be moved and replaced.','info');
         await refresh();
       }
     } catch (e) {
@@ -687,6 +702,32 @@ export default function App() {
     } finally {
       setBusy(false);
     }
+  }
+  async function importSound(position?:Vec3,path?:string){
+    const target=historyRef.current.current;if(!target)return false;setBusy(true);
+    try{await save(false,target.id);const result=await call<{project:Project;asset:import('./types').Asset}|null>('import_custom_sound',{projectId:target.id,...(path?{path}:{})});if(!result)return false;
+      dispatchDocument({type:'history',id:target.id,action:{type:'assets',project:result.project}});
+      const latest=documentsRef.current.documents.find(document=>document.id===target.id)?.history.current;if(!latest)return false;
+      const scene=latest.audioPreview??emptySoundScene();if(scene.emitters.length>=64)throw Error('The sound scene is full; the file is retained in the asset library.');
+      const emitter=createEmitter(0,result.asset.name.slice(0,120),position??[0,0,0]);emitter.sourceProjectId=target.id;emitter.sourceSha256=result.asset.sha256;emitter.customSound={assetId:result.asset.id,sha256:result.asset.sha256};emitter.loop=false;emitter.event='manual';emitter.bus='effects';
+      edit({...latest,assets:result.project.assets,audioPreview:{...scene,emitters:[...scene.emitters,emitter]}},'Place custom sound '+result.asset.name);writeMapSession(target.id,'sound-emitter-selection',emitter.id);await refresh();notice('Custom sound imported into the saved spatial mix.','success');return true;
+    }catch(reason){notice(String(reason),'error');return false;}finally{setBusy(false);}
+  }
+  async function importDroppedAssets(paths:string[],point?:Vec3){
+    const target=historyRef.current.current?.id;if(!target){notice('Open a map or asset project before importing custom files.','info');return;}
+    for(const path of paths){if(historyRef.current.current?.id!==target){notice('Remaining files were not imported because the active map changed.','info');break;}if(/\.obj$/i.test(path))await importAsset(point,path);else await importSound(point,path);}
+  }
+  async function placeLibraryMesh(item:ViewportAsset,position:Vec3,replaceId?:string|null){
+    if(item.kind!=='mesh')return;
+    const target=historyRef.current.current;if(!target)return;setBusy(true);
+    try{
+      let asset=item.asset;
+      if(item.sourceId!==target.id){await save(false,target.id);const result=await call<AssetResult>('copy_project_asset',{sourceId:item.sourceId,assetId:item.asset.id,targetId:target.id});asset=result.asset;dispatchDocument({type:'history',id:target.id,action:{type:'assets',project:result.project}});dispatchDocument({type:'mesh',id:target.id,assetId:asset.id,mesh:result.mesh});}
+      const latest=documentsRef.current.documents.find(document=>document.id===target.id)?.history.current;if(!latest)return;
+      const old=replaceId?latest.scene.find(object=>object.id===replaceId):undefined;if(replaceId&&!old)throw Error('The selected object is no longer available.');
+      const object={...(old??{id:crypto.randomUUID(),position,rotation:[0,0,0] as Vec3,scale:[1,1,1] as Vec3,visible:true,sourceOffset:null,rotationOffset:null}),name:asset.name,kind:'Workshop mesh',tagId:null,assetId:asset.id,sourceModel:null};
+      edit({...latest,assets:latest.assets.some(value=>value.id===asset.id)?latest.assets:[...latest.assets,asset],scene:old?latest.scene.map(value=>value.id===old.id?object:value):[...latest.scene,object]},`${old?'Replace':'Place'} custom model ${asset.name}`);writeMapSession(target.id,'world.selection',object.id);writeMapSession(target.id,'forge.workshopSelection',object.id);
+    }catch(reason){notice(String(reason),'error');}finally{setBusy(false);}
   }
   async function startBuild() {
     if (!current) return;
@@ -720,8 +761,8 @@ export default function App() {
       </div>
     </Empty>
   );
-  function forgeView(project:Project|null){return <QuickForge key={project?.id??'new'} project={project} data={data} edit={edit} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:project!.id,document})} onCreate={createQuickForge} onSave={()=>save()} onBuild={buildQuickForge} onRuntimes={()=>setWorkspace('runtimes')} onLive={()=>setWorkspace('live')} onSettings={()=>setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch} dirty={project?history.dirty:false}/>;}
-  function sourceView(){return current?.quickForge?forgeView(current):current?<Suspense fallback={<div className="loading">Loading map viewer…</div>}><World key={current.id} project={current} inspection={inspection} assetMeshes={meshes} edit={edit} notify={notice} onBeforeResources={save} onResourcesConnected={applyResourceMetadata} onOpenTag={tagId=>{setFocusTagId(tagId);setWorkspace('tags');}}/></Suspense>:forgeView(null);}
+  function forgeView(project:Project|null){return <QuickForge library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),busy}} key={project?.id??'new'} project={project} data={data} edit={edit} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:project!.id,document})} onCreate={createQuickForge} onSave={()=>save()} onBuild={buildQuickForge} onRuntimes={()=>setWorkspace('runtimes')} onLive={()=>setWorkspace('live')} onSettings={()=>setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch} dirty={project?history.dirty:false}/>;}
+  function sourceView(){return current?.quickForge?forgeView(current):current?<Suspense fallback={<div className="loading">Loading map viewer…</div>}><World library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),busy}} key={current.id} project={current} inspection={inspection} assetMeshes={meshes} edit={edit} notify={notice} onBeforeResources={save} onResourcesConnected={applyResourceMetadata} onOpenTag={(tagId,sourceId)=>{if(sourceId&&sourceId!==current.id){writeMapSession(sourceId,'tags.focus',tagId);dispatchDocument({type:'select',id:sourceId});}else setFocusTagId(tagId);setWorkspace('tags');}}/></Suspense>:forgeView(null);}
   async function openRecordingDirector(){const project=historyRef.current.current;if(!project)return;try{await save();window.dispatchEvent(new CustomEvent('guilty-spark-flush-map-view',{detail:project.id}));let session=await call<import('./directorSession').DirectorSession>('director_session',{projectId:project.id});if(session.revision===0){const pose=readMapSession<{position:number[];target?:number[];quaternion:number[]}|null>(project.id,'camera.world.PerspectiveCamera',null);if(pose?.position.length===3&&pose.quaternion?.length===4){const[x,y,z,w]=pose.quaternion,p=pose.position,target=pose.target??[p[0]-2*(x*z+w*y),p[1]-2*(y*z-w*x),p[2]-(1-2*(x*x+y*y))];session=await call('director_update',{projectId:project.id,revision:session.revision,composition:{...session.composition,pose:{position:p,lookAt:target,fov:55,roll:0}},save:true});}}await call('director_popout',{projectId:project.id});setDockedDirector(false);if(workspace==='machinima')setWorkspace('world');notice('Recording Director opened. Use its display selector or drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
   function content(){
     if(workspace==='world'||workspace==='quickforge'||workspace==='live')return <LevelEditorWorkspace entries={data.entries} onBuild={()=>setWorkspace('build')} project={current} inspection={inspection} assetMeshes={meshes} intent={workspace} onSourceEdit={edit} onImportMap={()=>void importFiles()} onContinue={id=>void openProject(id,'world')} onDirector={()=>void openRecordingDirector()}
@@ -866,8 +907,9 @@ export default function App() {
   return (
     <>
       <div className="gs-window-content">
-      <div className="application gs-drawers" inert={closing || undefined}>
-        <header id="gs-window-header" className="app-header gs-header-drawer" hidden={!headerOpen} onPointerDown={event=>void dragWindow(event).catch(e=>notice(String(e),'error'))}
+      <div className="application gs-drawers" data-header-open={headerOpen} inert={closing || undefined}>
+        <button className="gs-header-reveal" data-collapsed={!headerOpen} aria-label="Show top bar" title="Show top bar (Ctrl+Shift+\\)" onClick={showHeader}><ChevronDown size={12}/></button>
+        <header id="gs-window-header" className="app-header gs-compact-header" data-peek={headerPeek} hidden={!headerOpen&&!headerPeek} onPointerDown={event=>void dragWindow(event).catch(e=>notice(String(e),'error'))}
           onDoubleClick={event=>{if(!(event.target as HTMLElement).closest('button,a,input,select'))void maximizeWindow().catch(e=>notice(String(e),'error'));}}
           style={ownedHeaderArt && matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection)
           ? { backgroundImage: `linear-gradient(90deg,rgba(7,17,26,.96) 0%,rgba(9,24,35,.9) 44%,rgba(8,22,33,.58) 100%),url("${ownedHeaderArt.url}")`,backgroundSize:'cover',backgroundPosition:'center' }
@@ -901,7 +943,7 @@ export default function App() {
               <CircleHelp size={18} />
             </IconButton>
           </div>
-          <IconButton label="Hide window and project header" onClick={()=>setHeaderOpen(false)}><ChevronUp size={17}/></IconButton>
+          <IconButton label="Collapse top bar" onClick={collapseHeader}><ChevronUp size={17}/></IconButton>
         </header>
         <aside id="gs-workspace-navigation" className="sidebar gs-navigation-drawer" aria-label="Workspace navigation" hidden={!sidebarOpen} onClickCapture={e=>{if((e.target as HTMLElement).closest('.nav-item'))setSidebarOpen(false);}}>
           <div className="sidebar-label">WORKSPACES</div>
@@ -990,7 +1032,8 @@ export default function App() {
         </aside>
         <main className={`main-content workspace-${workspace}`}>
           <MapTabs state={documents} disabled={busy||closing} onSelect={selectMap} onClose={id=>void closeMap(id)} onWindow={id=>void closeMap(id,true)} onAssets={()=>setAssetTransferOpen(v=>!v)}/>
-          <WorkspacePanels onNavigationToggle={toggleNavigation} navigationOpen={sidebarOpen} onHeaderToggle={toggleHeader} headerOpen={headerOpen} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace} actions={<><IconButton label="Undo (Ctrl+Z)" onClick={()=>applyHistory('undo')} disabled={!history.past.length}><Undo2 size={14}/></IconButton><IconButton label="Redo (Ctrl+Y / Ctrl+Shift+Z)" onClick={()=>applyHistory('redo')} disabled={!history.future.length}><Redo2 size={14}/></IconButton></>}>
+          <EditorAudioProvider project={current} inspection={inspection} active={!closing&&['world','quickforge','live','tags','assets','scenario','creator','firefight','build','preservation'].includes(workspace)} resourceScope={JSON.stringify(documents.documents.map(document=>[document.id,document.history.current?.source?.resourceSha256]))}>
+          <WorkspacePanels onNavigationToggle={toggleNavigation} navigationOpen={sidebarOpen} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace} actions={<>{current&&<EditorSoundControls projectId={current.id}/>}<IconButton label="Undo (Ctrl+Z)" onClick={()=>applyHistory('undo')} disabled={!history.past.length}><Undo2 size={14}/></IconButton><IconButton label="Redo (Ctrl+Y / Ctrl+Shift+Z)" onClick={()=>applyHistory('redo')} disabled={!history.future.length}><Redo2 size={14}/></IconButton></>}>
           {current&&<WorkspacePanel id="project-setup" label="Project setup"><MapTools key={current.id} project={current} settings={data.settings} edit={edit}/></WorkspacePanel>}
           {['world','quickforge','live','machinima'].includes(workspace)&&<WorkspacePanel id="navigation" label="Camera"><NavigationSettings/></WorkspacePanel>}
           <WorkspacePanel id="source-changes" label="Changes"><ExternalMapSync documents={documents.documents.flatMap(d=>d.history.current?[{project:d.history.current,inspection:d.inspection,dirty:d.history.dirty}]:[])} onRevision={adoptExternalRevision}/></WorkspacePanel>
@@ -1042,6 +1085,7 @@ export default function App() {
             <Suspense fallback={<div className="loading">Loading workspace…</div>}><WorkspaceSession key={`${current?.id??'global'}:${['world','quickforge','live'].includes(workspace)?'level':workspace}`} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace}>{content()}</WorkspaceSession></Suspense>
           )}
           </WorkspacePanels>
+          </EditorAudioProvider>
         </main>
         <RuntimeDock project={current} settings={data.settings} dirty={history.dirty} working={busy || !!activeJob} epoch={epoch} onSave={() => save()} onNavigate={next=>next==='settings'?openDependencySetup():setWorkspace(next)} onOpenCompiled={buildId=>{if(current)void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});await load(opened);await refresh();setWorkspace('quickforge');},'Working tag changes compiled, preserved and opened in a new map tab.');}}/>
         {busy && (

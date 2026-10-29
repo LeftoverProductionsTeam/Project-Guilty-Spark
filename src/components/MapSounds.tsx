@@ -11,6 +11,7 @@ export default function MapSounds({
   edit,
   onOpenTag,
   onResources,
+  expanded,
 }: {
   projectId: string;
   inspection: MapInspection;
@@ -18,6 +19,7 @@ export default function MapSounds({
   edit: (p: Project, description: string) => void;
   onOpenTag?: (id: number) => void;
   onResources?: () => void;
+  expanded?:boolean;
 }) {
   const [query, setQuery] = useMapState(project.id, 'map-sounds.query', ''),
     [selected, setSelected] = useMapState(project.id, 'map-sounds.tag', '');
@@ -27,7 +29,7 @@ export default function MapSounds({
   );
   const choices = sounds.filter((t) => t.path.toLowerCase().includes(query.toLowerCase())).slice(0, 100);
   return (
-    <details className="gs-map-sounds">
+    <details className="gs-map-sounds" open={expanded||undefined}>
       <summary>Map sounds · {sounds.length} source tags</summary>
       {onResources && (
         <button className="small-button" onClick={onResources}>

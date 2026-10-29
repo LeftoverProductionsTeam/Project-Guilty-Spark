@@ -32,6 +32,18 @@ export async function loadMapSoundClip(
   if (cancelled()) throw Error('Sound loading was stopped.');
   const projectId = emitter.sourceProjectId ?? sourceProjectId;
   const sourceHash = emitter.sourceSha256 ?? sourceSha256;
+  if (emitter.customSound) {
+    const preview=await call<{assetId:string;sha256:string;info:{channels:number;durationSeconds:number};base64:string}>('preview_custom_sound',{projectId,assetId:emitter.customSound.assetId,sha256:emitter.customSound.sha256});
+    if(cancelled())throw Error('Sound loading was stopped.');
+    if(preview.assetId!==emitter.customSound.assetId||preview.sha256!==emitter.customSound.sha256||![1,2].includes(preview.info.channels)||!Number.isFinite(preview.info.durationSeconds)||preview.info.durationSeconds<=0||Math.ceil(preview.info.durationSeconds*context.sampleRate)*preview.info.channels*4>32*1024*1024||preview.base64.length>Math.ceil(16*1024*1024/3)*4)throw Error('Custom sound identity or decoded budget is invalid.');
+    const bytes=Uint8Array.from(atob(preview.base64),character=>character.charCodeAt(0));
+    const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+    if(hash!==emitter.customSound.sha256)throw Error('Custom sound bytes differ from the imported source.');
+    const buffer=await context.decodeAudioData(bytes.buffer);
+    if(cancelled())throw Error('Sound loading was stopped.');
+    if(buffer.numberOfChannels!==preview.info.channels||buffer.length*buffer.numberOfChannels*4>32*1024*1024||Math.abs(buffer.duration-preview.info.durationSeconds)>Math.max(.1,2/context.sampleRate))throw Error('Decoded custom sound dimensions differ from its verified source.');
+    return buffer;
+  }
   const decode = async (tagId: number, selected = false) => {
     if (cancelled()) throw Error('Sound loading was stopped.');
     const report = await call<SoundInspection>('inspect_sound', { projectId, tagId });

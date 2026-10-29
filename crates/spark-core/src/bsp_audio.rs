@@ -60,6 +60,15 @@ pub struct Bsp {
     pub portal_count: usize,
     pub pvs_sha256: String,
     pub pas_sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub listener_tree: Option<ListenerTree>,
+}
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListenerTree {
+    pub nodes: Vec<[u32; 3]>,
+    pub planes: Vec<[f32; 4]>,
+    pub leaf_clusters: Vec<Option<usize>>,
 }
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -112,6 +121,21 @@ pub fn inspect(path: &Path, expected: &str) -> Result<Inspection> {
     read(&header, &bytes, sha)
 }
 fn read(header: &maps::MapHeader, bytes: &[u8], sha: String) -> Result<Inspection> {
+    read_with_listener(header, bytes, sha, false)
+}
+pub fn inspect_ambience(path: &Path, expected: &str) -> Result<Inspection> {
+    let (header, bytes, sha) = maps::read_cache_snapshot(path)?;
+    if sha != expected {
+        return invalid("Map ambience source changed");
+    }
+    read_with_listener(&header, &bytes, sha, true)
+}
+fn read_with_listener(
+    header: &maps::MapHeader,
+    bytes: &[u8],
+    sha: String,
+    include_listener: bool,
+) -> Result<Inspection> {
     if ![6, 7, 13, 609].contains(&header.version) || header.extended {
         return invalid("BSP audio inspection requires an unextended Halo 1 PC-family cache");
     }
@@ -175,6 +199,7 @@ fn read(header: &maps::MapHeader, bytes: &[u8], sha: String) -> Result<Inspectio
     };
     let mut bsps = vec![];
     let (mut total_clusters, mut total_subclusters) = (0, 0);
+    let (mut total_nodes, mut total_planes, mut total_leaves) = (0, 0, 0);
     for index in 0..bsp_count {
         let row = refs + index * 32;
         let path = dependency(row + 16, "sbsp")?
@@ -270,6 +295,68 @@ fn read(header: &maps::MapHeader, bytes: &[u8], sha: String) -> Result<Inspectio
         if portal_count > 65536 {
             return invalid("BSP portal count exceeds the inspection bound");
         }
+        let listener_tree = if include_listener {
+            let (collision, n) = space.block(&r, root + 0xb0, 96, 1)?;
+            let (leaves, leaf_count) = space.block(&r, root + 0xe0, 16, 65536)?;
+            if n == 0 || leaf_count == 0 {
+                None
+            } else {
+                let (nodes, node_count) = space.block(&r, collision, 12, 131072)?;
+                let (planes, plane_count) = space.block(&r, collision + 12, 16, 65536)?;
+                let (_, collision_leaf_count) = space.block(&r, collision + 24, 8, 65536)?;
+                total_nodes += node_count;
+                total_planes += plane_count;
+                total_leaves += leaf_count;
+                if total_nodes > 131072 || total_planes > 65536 || total_leaves > 65536 {
+                    return invalid("Map ambience listener geometry exceeds its total budget");
+                }
+                if node_count == 0 || collision_leaf_count != leaf_count {
+                    None
+                } else {
+                    let mut tree = ListenerTree {
+                        nodes: Vec::with_capacity(node_count),
+                        planes: Vec::with_capacity(plane_count),
+                        leaf_clusters: Vec::with_capacity(leaf_count),
+                    };
+                    for i in 0..plane_count {
+                        let at = planes + i * 16;
+                        let plane = [r.f32(at)?, r.f32(at + 4)?, r.f32(at + 8)?, r.f32(at + 12)?];
+                        let norm = plane[..3].iter().map(|v| v * v).sum::<f32>();
+                        if !(0.000001..=4.).contains(&norm) || plane[3].abs() > 1e6 {
+                            return invalid("Invalid ambience BSP plane");
+                        }
+                        tree.planes.push(plane);
+                    }
+                    for i in 0..leaf_count {
+                        tree.leaf_clusters
+                            .push(selected(r.u16(leaves + i * 16 + 8)?, clusters.len())?);
+                    }
+                    for i in 0..node_count {
+                        let at = nodes + i * 12;
+                        let row = [r.u32(at)?, r.u32(at + 4)?, r.u32(at + 8)?];
+                        if row[0] as usize >= plane_count {
+                            return invalid("Ambience BSP plane index is invalid");
+                        }
+                        for child in &row[1..] {
+                            if *child != u32::MAX {
+                                let max = if child & 0x80000000 != 0 {
+                                    leaf_count
+                                } else {
+                                    node_count
+                                };
+                                if (child & 0x7fffffff) as usize >= max {
+                                    return invalid("Ambience BSP child index is invalid");
+                                }
+                            }
+                        }
+                        tree.nodes.push(row);
+                    }
+                    Some(tree)
+                }
+            }
+        } else {
+            None
+        };
         bsps.push(Bsp {
             index,
             tag_path: path,
@@ -279,6 +366,7 @@ fn read(header: &maps::MapHeader, bytes: &[u8], sha: String) -> Result<Inspectio
             portal_count,
             pvs_sha256: data_hash(root + 0x140)?,
             pas_sha256: data_hash(root + 0x214)?,
+            listener_tree,
         });
     }
     Ok(Inspection {
@@ -873,6 +961,58 @@ mod tests {
         assert!(read(&h, &b, "a".repeat(64)).unwrap().bsps[0]
             .background_palette
             .is_empty());
+    }
+    #[test]
+    fn listener_partition_checks_real_leaf_clusters_and_refuses_invalid_indices() {
+        let (h, mut bytes) = fixture(13);
+        let pointer = |at: u32| 0x60000000 + (at - 0x2000);
+        for (at, count, target) in [
+            (0x2020 + 0xb0, 1, 0x2900),
+            (0x2020 + 0xe0, 2, 0x2b00),
+            (0x2900, 1, 0x2a00),
+            (0x290c, 1, 0x2a20),
+            (0x2918, 2, 0x2a40),
+        ] {
+            word(&mut bytes, at, count);
+            word(&mut bytes, at + 4, pointer(target));
+        }
+        word(&mut bytes, 0x2a00, 0);
+        word(&mut bytes, 0x2a04, 0x80000000);
+        word(&mut bytes, 0x2a08, 0x80000001);
+        word(&mut bytes, 0x2a20, 1f32.to_bits());
+        half(&mut bytes, 0x2b08, 0);
+        half(&mut bytes, 0x2b18, 1);
+        let report = read_with_listener(&h, &bytes, "a".repeat(64), true).unwrap();
+        let tree = report.bsps[0].listener_tree.as_ref().unwrap();
+        assert_eq!(tree.leaf_clusters, vec![Some(0), Some(1)]);
+        assert_eq!(tree.nodes, vec![[0, 0x80000000, 0x80000001]]);
+        assert!(read(&h, &bytes, "a".repeat(64)).unwrap().bsps[0]
+            .listener_tree
+            .is_none());
+        for (at, value) in [
+            (0x2a00, 1),
+            (0x2a08, 0x80000002),
+            (0x2a08, 1),
+            (0x2a20, 0),
+            (0x2a20, f32::NAN.to_bits()),
+            (0x2020 + 0xe0, 65537),
+        ] {
+            let mut bad = bytes.clone();
+            word(&mut bad, at, value);
+            assert!(
+                read_with_listener(&h, &bad, "a".repeat(64), true).is_err(),
+                "invalid listener field at {at:x}"
+            );
+        }
+        half(&mut bytes, 0x2b08, 2);
+        assert!(read_with_listener(&h, &bytes, "a".repeat(64), true).is_err());
+        half(&mut bytes, 0x2b08, 0);
+        word(&mut bytes, 0x2918, 1);
+        assert!(read_with_listener(&h, &bytes, "a".repeat(64), true)
+            .unwrap()
+            .bsps[0]
+            .listener_tree
+            .is_none());
     }
     fn source_tag(root: &Path, path: &str, class: &[u8; 4]) -> Dependency {
         let file = root.join(path);

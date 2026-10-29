@@ -93,6 +93,7 @@ export interface SceneObject {
   sourceOffset: number | null;
   rotationOffset: number | null;
   assetId: string | null;
+  sourceModel?: { projectId: string; sourceSha256: string; tagId: number; path: string; class: import('./forge').ForgePlacement['tagClass'] } | null;
 }
 export interface MeshData {
   rig?:ModelRig|null;

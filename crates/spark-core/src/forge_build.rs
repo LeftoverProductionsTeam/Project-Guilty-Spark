@@ -180,6 +180,7 @@ pub fn run_job(
     extra_blockers:Vec<String>,cancel:Arc<AtomicBool>,on_event:impl Fn(JobEvent)+Send+Sync,
 ) -> Result<QuickForgeBuildReceipt> {
     project.validate()?;
+    if project.scene.iter().any(|object|object.source_model.is_some()||object.asset_id.is_some()) {return invalid("Custom/source preview meshes need compiled Halo model and scenario tags before a QuickForge game build. Remove the preview placements or compile their source models first.");}
     uuid::Uuid::parse_str(job_id).map_err(|_|SparkError::Invalid("Job ID is not a UUID".into()))?;
     let document=project.quick_forge.as_ref().ok_or_else(||SparkError::Invalid("This project has no QuickForge document".into()))?;
     let started=Instant::now(); let directory=jobs_root.join(job_id);

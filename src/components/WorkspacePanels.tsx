@@ -11,6 +11,7 @@ import '../workspacePanels.css';
 interface Descriptor {
   id: string;
   label: string;
+  defaultDock?: PanelPlacement['dock'];
 }
 interface ContextValue {
   host: HTMLDivElement | null;
@@ -20,6 +21,7 @@ interface ContextValue {
   register: (d: Descriptor) => () => void;
   update: (id: string, p: Partial<PanelPlacement>) => void;
   attention: (id: string, count: number) => void;
+  reveal: (id: string) => void;
 }
 const Context = createContext<ContextValue | null>(null);
 export default function WorkspacePanels({
@@ -29,8 +31,6 @@ export default function WorkspacePanels({
   actions,
   onNavigationToggle,
   navigationOpen,
-  onHeaderToggle,
-  headerOpen,
 }: {
   id: string;
   workspace: string;
@@ -38,8 +38,6 @@ export default function WorkspacePanels({
   actions?: ReactNode;
   onNavigationToggle: () => void;
   navigationOpen: boolean;
-  onHeaderToggle: () => void;
-  headerOpen: boolean;
 }) {
   const [raw, setRaw] = useMapState<WorkspaceLayout>(id, `layout.${workspace}`, () => ({
     version: 1,
@@ -51,7 +49,7 @@ export default function WorkspacePanels({
   const focus = layout.focus || fullscreen;
   const [peek, setPeek] = useState<string | null>(null);
   const [frameError, setFrameError] = useState('');
-  useEffect(() => setPeek(null), [fullscreen, id, workspace]);
+  useEffect(() => setPeek(null), [focus, fullscreen, id, workspace]);
   const [descriptors, setDescriptors] = useState<Descriptor[]>([]),
     [host, setHost] = useState<HTMLDivElement | null>(null),
     [counts, setCounts] = useState<Record<string, number>>({});
@@ -63,14 +61,25 @@ export default function WorkspacePanels({
       peek,
       register: (d) => {
         setDescriptors((previous) => (previous.some((p) => p.id === d.id) ? previous : [...previous, d]));
+        if (d.defaultDock)
+          setRaw((old) =>
+            cleanLayout(old).panels[d.id]
+              ? old
+              : changePanel(cleanLayout(old), d.id, { dock: d.defaultDock, open: false }),
+          );
         return () => setDescriptors((previous) => previous.filter((p) => p.id !== d.id));
       },
       update: (panel, patch) => {
         if (patch.open === false) setPeek((old) => (old === panel ? null : old));
+        if (patch.open === true && !focus) setPeek(panel);
         setRaw((old) => changePanel(cleanLayout(old), panel, patch));
       },
       attention: (panel, count) =>
         setCounts((old) => (old[panel] === count ? old : { ...old, [panel]: count })),
+      reveal: (panel) => {
+        setPeek(panel);
+        setRaw((old) => changePanel(cleanLayout(old), panel, { open: true }));
+      },
     }),
     [host, layout, focus, peek, setRaw],
   );
@@ -93,15 +102,31 @@ export default function WorkspacePanels({
         e.preventDefault();
         void changeFullscreen();
       }
-      if (e.key === 'Escape' && focus && !document.querySelector('[role="dialog"]')) {
-        e.preventDefault();
-        if (fullscreen && peek) setPeek(null);
-        else void leaveFocus();
+      if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) {
+        const panel =
+          peek ??
+          (!focus
+            ? Object.entries(layout.panels)
+                .filter(([, value]) => value.open)
+                .at(-1)?.[0]
+            : null);
+        if (panel) {
+          e.preventDefault();
+          setPeek(null);
+          if (!focus) setRaw((old) => changePanel(cleanLayout(old), panel, { open: false }));
+          const label = descriptors.find((value) => value.id === panel)?.label;
+          Array.from(document.querySelectorAll<HTMLButtonElement>('.gs-panel-buttons button'))
+            .find((button) => button.getAttribute('aria-label') === `Toggle ${label}`)
+            ?.focus();
+        } else if (focus) {
+          e.preventDefault();
+          void leaveFocus();
+        }
       }
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [focus, fullscreen, peek, changeFullscreen, setRaw]);
+  }, [focus, fullscreen, peek, changeFullscreen, setRaw, layout.panels, descriptors]);
   const padding = { left: 0, right: 0, bottom: 0 };
   if (!focus)
     for (const placement of Object.values(layout.panels))
@@ -123,16 +148,6 @@ export default function WorkspacePanels({
             <Menu size={16} />
           </button>
           <button
-            className="gs-header-toggle"
-            aria-label="Toggle window and project header"
-            aria-expanded={headerOpen}
-            aria-controls="gs-window-header"
-            title="Window and project controls (Ctrl+Shift+\)"
-            onClick={onHeaderToggle}
-          >
-            Window
-          </button>
-          <button
             aria-label={fullscreen ? 'Exit fullscreen editing' : 'Fullscreen editing'}
             aria-pressed={fullscreen}
             title="Borderless fullscreen (F11). Escape returns to your workspace."
@@ -149,14 +164,9 @@ export default function WorkspacePanels({
                 aria-label={`Toggle ${panel.label}`}
                 aria-expanded={(!focus || peek === panel.id) && !!layout.panels[panel.id]?.open}
                 onClick={() => {
-                  if (fullscreen) {
+                  if (focus) {
                     setPeek((old) => (old === panel.id ? null : panel.id));
                     context.update(panel.id, { open: true });
-                  } else if (focus) {
-                    void leaveFocus();
-                    setRaw((old) =>
-                      changePanel({ ...cleanLayout(old), focus: false }, panel.id, { open: true }),
-                    );
                   } else context.update(panel.id, { open: !layout.panels[panel.id]?.open });
                 }}
               >
@@ -178,7 +188,7 @@ export default function WorkspacePanels({
                       checked={!!layout.panels[panel.id]?.open}
                       onChange={(e) => {
                         context.update(panel.id, { open: e.target.checked });
-                        if (fullscreen) setPeek(e.target.checked ? panel.id : null);
+                        if (focus) setPeek(e.target.checked ? panel.id : null);
                       }}
                     />
                     {panel.label}
@@ -206,7 +216,11 @@ export default function WorkspacePanels({
               {focus ? 'Exit focus · Esc' : 'Focus mode'}
             </button>
           </div>
-          <WindowControls notify={setFrameError} fullscreen={fullscreen} onExitFullscreen={()=>changeFullscreen(false)}/>
+          <WindowControls
+            notify={setFrameError}
+            fullscreen={fullscreen}
+            onExitFullscreen={() => changeFullscreen(false)}
+          />
         </nav>
         <div
           className="gs-workspace-content"
@@ -219,6 +233,11 @@ export default function WorkspacePanels({
     </Context.Provider>
   );
 }
+/** Reveal an existing overlay without changing the map, camera or focus layout. */
+export function useRevealWorkspacePanel() {
+  const context = useContext(Context);
+  return context?.reveal ?? (() => {});
+}
 export function usePanelAttention(id: string, count: number) {
   const context = useContext(Context);
   const ref = useRef(context);
@@ -228,13 +247,26 @@ export function usePanelAttention(id: string, count: number) {
     return () => ref.current?.attention(id, 0);
   }, [id, count]);
 }
-export function WorkspacePanel({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+export function WorkspacePanel({
+  id,
+  label,
+  defaultDock,
+  children,
+}: {
+  id: string;
+  label: string;
+  defaultDock?: PanelPlacement['dock'];
+  children: ReactNode;
+}) {
   const context = useContext(Context),
     register = useRef(context?.register);
   register.current = context?.register;
   const section = useRef<HTMLElement>(null);
-  useEffect(() => register.current?.({ id, label }), [id, label]);
-  const placement = context?.panels[id] ?? defaultPanel();
+  useEffect(() => register.current?.({ id, label, defaultDock }), [id, label, defaultDock]);
+  const placement = context?.panels[id] ?? {
+    ...defaultPanel(),
+    ...(defaultDock ? { dock: defaultDock } : {}),
+  };
   const drag = useRef<{ pointer: number; x: number; y: number; left: number; top: number } | null>(null);
   if (!context) return <>{children}</>;
   if (!context.host) return null;

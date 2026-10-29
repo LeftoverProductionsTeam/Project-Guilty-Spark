@@ -1,4 +1,10 @@
-# C35 owner acceptance: window controls, BSP audio and game capture
+# C35 owner acceptance: direct viewport tools, map ambience and fullscreen
+
+The [r10 viewport report](C35_VIEWPORT_WORKFLOW.md) covers the new workflow. Confirm there is no Window launcher: the themed top bar is thin, collapses from its own chevron and restores from the edge handle. F11 should occupy the whole display and slightly thin the editing controls; close, restore, mute and volume must remain accessible.
+
+Click an actual object and edit its tags in the drawer. Hide/reopen it and fly around; retain camera, viewport dimensions and edits. Open another map, drag a source model from Asset library, inspect that model’s source tags and confirm undo/save stay with its source. Imported-cache new instances are previews until native compilation supports them.
+
+Listen to assigned ambience while Spark is focused, move through actual cluster boundaries, change volume and mute/unmute. Hide/reopen drawers and switch editing tools without restarting the mix. Check custom WAV/OGG import, emitter controls and source sample audition. Hardware listening and the physical file picker/Explorer drop remain owner checks.
 
 The [r9 window/audio report](C35_BSP_AUDIO.md) covers the reported drawer regressions. Open navigation and the original header in your chosen theme: the map should remain visible and interactive, with one app-close X and a header-hide chevron. Maximize, press F11, then use the visible fullscreen-exit control. Confirm maximized mode returns. Close from fullscreen with any ordinary source edits saved.
 

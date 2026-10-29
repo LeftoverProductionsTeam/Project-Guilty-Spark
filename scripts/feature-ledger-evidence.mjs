@@ -1,6 +1,7 @@
 // Current evidence for the cumulative ledger. Historical source tables remain
 // immutable inputs; old status and code descriptions are retained separately.
 // A domain summarizes a bounded path, never every feature sharing a keyword.
+// C35 r10 operation-specific viewport/audio updates are applied below.
 const entry = (files, operation, gap, target, level, evidence, next, extra = {}) => ({
   files, operation, gap, target, level, evidence, next,
   state: 'PARTIAL — acceptance open', priority: 'P1',
@@ -468,3 +469,6 @@ export const rowEvidenceOverrides = {
   'C34U-campaign-eight': {state:'NOT ACCEPTED — eight-player campaign; dedicated route unsupported',operation:'Campaign is a separate typed request with an eight-player goal and native-client menu guidance. Pinned dedicated.c refuses campaign levels, so no dedicated launch spec or fake Slayer conversion is generated.',gap:'Actual matching-client campaign hosting, eight-player capacity, authored AI/script/checkpoint/transition/recovery acceptance remain missing.',level:'UPSTREAM DECLARED menu route; eight-player game NOT TESTED'},
   'C34U-firefight-eight': {state:'NOT IMPLEMENTED — native eight-player Firefight',operation:'Firefight is a distinct gated operation. No dedicated Firefight gametype/director or accepted authored eight-client survival game is fabricated by setting a capacity field.',gap:'Actual survival scenario/director, host-authoritative AI/progression and real eight-client acceptance are required.',level:'NOT IMPLEMENTED — engine wave adapter/game acceptance'},
 };
+
+// R10 follows existing domains without replacing unrelated runtime/game gates.
+for(const name of ['audio','assets','interface']){const topic=evidenceTopics[name];if(!topic)continue;topic.files+='; src/viewportAssets.ts; src/components/ViewportTags.tsx; src/components/EditorAudio.tsx; crates/spark-core/src/custom_sounds.rs';topic.operation+=' C35 r10 adds direct viewport tag drawers, a shared open-map asset library and source-bound model previews, managed OBJ/WAV/OGG import, automatic authored editor ambience with mute/volume, a 32-pixel collapsible top bar and a 30-pixel fullscreen strip. Imported-cache preview instances remain compile-blocked.';topic.evidence+='; docs/C35_VIEWPORT_WORKFLOW.md; docs/fixtures/c35-viewport-workflow-native-verification.json; scripts/test-viewport-workflow-native.mjs';}

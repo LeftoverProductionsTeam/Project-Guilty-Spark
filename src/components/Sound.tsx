@@ -4,8 +4,12 @@ import { call } from '../api';
 import type { AudioPreview, SoundInspection, SoundPermutation } from '../types';
 import type { CueName, LocalCueReference } from '../interfacePreferences';
 import { Notice, Pill } from './ui';
+import {useEditorAudio} from './EditorAudio';
+import {useMapState} from '../mapSession';
 
 export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: { projectId: string; tagId: number; sourceHash?: string; onAssign?: (cue: CueName, ref: LocalCueReference) => void }) {
+  const shared=useEditorAudio();
+  const [mapMuted]=useMapState(shared?.projectId??projectId,'editor-sound.muted',false),[mapVolume]=useMapState(shared?.projectId??projectId,'editor-sound.volume',.35);
   const [inspection, setInspection] = useState<SoundInspection | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -13,6 +17,8 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
   const [playing,setPlaying]=useState(false),[repeat,setRepeat]=useState(false),[volume,setVolume]=useState(0.5);
   const [clock,setClock]=useState({position:0,duration:0});
   const player=useRef<HTMLAudioElement>(null);
+  const effectiveVolume=volume*(shared?Math.max(0,Math.min(1,mapVolume)):1);
+  useEffect(()=>{if(player.current)player.current.volume=effectiveVolume;},[effectiveVolume,clip]);
   const request = useRef(0);
   const url = useRef<string | null>(null);
   useEffect(() => {
@@ -119,9 +125,10 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
             preload="metadata"
             src={clip.url}
             loop={repeat}
+            muted={!!shared&&mapMuted}
             onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)}
             onTimeUpdate={event=>setClock({position:event.currentTarget.currentTime,duration:event.currentTarget.duration||0})}
-            onLoadedMetadata={event=>{event.currentTarget.volume=volume;setClock({position:0,duration:event.currentTarget.duration});}}
+            onLoadedMetadata={event=>{event.currentTarget.volume=effectiveVolume;setClock({position:0,duration:event.currentTarget.duration});}}
             onError={() =>
               setError(
                 'The webview could not decode this source audio. Container validation is not a playback guarantee.',
@@ -136,7 +143,7 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
             <span>{clock.position.toFixed(1)} / {clock.duration.toFixed(1)} s</span>
           </div>
           <label><input type="checkbox" checked={repeat} onChange={event=>setRepeat(event.target.checked)}/> Repeat this sample</label>
-          <label className="field-label">Preview volume<input aria-label="Sound preview volume" type="range" min="0" max="1" step="0.01" value={volume} onChange={event=>{const value=Number(event.target.value);setVolume(value);if(player.current)player.current.volume=value;}}/></label>
+          <label className="field-label">Preview volume<input aria-label="Sound preview volume" type="range" min="0" max="1" step="0.01" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
           <small>
             SHA-256 <code>{clip.sha256}</code>
           </small>

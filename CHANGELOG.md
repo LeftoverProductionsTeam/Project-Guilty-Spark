@@ -1,5 +1,7 @@
 # Changelog
 
+C35 r10: [direct viewport tags/assets and editor ambience](docs/C35_VIEWPORT_WORKFLOW.md). Add hideable source-tag drawers with map-owned undo/save, a shared model/sound library, managed OBJ/WAV/OGG imports and automatic authored ambience with mute/volume. Replace the Window launcher with a 32-pixel collapsible top bar and reduce fullscreen controls to 30 pixels. Imported-cache preview instances remain compile-blocked.
+
 ## 0.4.0 — Continuation 35: The living workbench (development)
 
 - Restore theme-preserving, interactive sidebar/header drawers; remove opaque backdrops and the duplicate close X. Keep one native control group visible in fullscreen and restore maximized mode on exit. Correct the runtime-details width.

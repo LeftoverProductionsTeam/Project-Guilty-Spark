@@ -281,6 +281,12 @@ impl Project {
         }
         let mut ids = std::collections::HashSet::new();
         for object in &self.scene {
+            if let Some(source) = &object.source_model {
+                uuid::Uuid::parse_str(&source.project_id).map_err(|_| crate::SparkError::Invalid("Invalid source model project".into()))?;
+                if source.source_sha256.len()!=64 || !source.source_sha256.bytes().all(|b|b.is_ascii_hexdigit()) || source.path.is_empty() || source.path.len()>512 || source.path.chars().any(char::is_control) || !matches!(source.class.as_str(),"scen"|"weap"|"eqip"|"vehi"|"bipd"|"itmc") {
+                    return invalid("Invalid source model identity");
+                }
+            }
             if !ids.insert(&object.id)
                 || object.id.len() > 200
                 || object.name.len() > 512
@@ -454,6 +460,9 @@ pub fn validate_edits(project: &Project, inspection: &MapInspection) -> Result<(
     Ok(())
 }
 pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Vec<u8>> {
+    if project.scene.iter().any(|object| object.source_model.is_some()) {
+        return invalid("Source-linked preview models require editable scenario placement tags before a game build. Use QuickForge source placements or remove the preview placement.");
+    }
     validate_edits(project, inspection)?;
     let source = project.source.as_ref().ok_or_else(|| {
         crate::SparkError::Invalid("A Halo map is required to build a cache".into())

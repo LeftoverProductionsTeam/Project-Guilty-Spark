@@ -39,6 +39,7 @@ export interface SoundEmitter {
   cooldownMs: number;
   spatial: boolean;
   loopingSource?: { tagId: number; track: number } | null;
+  customSound?: { assetId: string; sha256: string } | null;
 }
 export interface SoundScene {
   schemaVersion: 1;
@@ -200,6 +201,7 @@ export function validateSoundScene(s: SoundScene): string[] {
           !finite(e.loopingSource.tagId, 0, 0xffffffff) ||
           !Number.isInteger(e.loopingSource.track) ||
           !finite(e.loopingSource.track, 0, 3)))
+      || (e.customSound != null && (!/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(e.customSound.assetId) || !/^[a-f\d]{64}$/i.test(e.customSound.sha256) || e.sourceSha256!==e.customSound.sha256 || !e.sourceProjectId || e.tagId!==0 || e.loopingSource!=null || e.pitchRange!==0 || e.permutation!==0))
     )
       errors.push('Invalid positional sound emitter.');
     if (e && typeof e.id === 'string') ids.add(e.id);

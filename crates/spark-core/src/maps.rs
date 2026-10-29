@@ -212,6 +212,17 @@ pub struct SceneObject {
     pub source_offset: Option<usize>,
     pub rotation_offset: Option<usize>,
     pub asset_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_model: Option<SourceModelReference>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceModelReference {
+    pub project_id: String,
+    pub source_sha256: String,
+    pub tag_id: u32,
+    pub path: String,
+    pub class: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -605,6 +616,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
                     source_offset: Some(p),
                     rotation_offset: Some(p + 12),
                     asset_id: None,
+                    source_model: None,
                 });
             }
         }
@@ -623,7 +635,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             if r.fourcc(row+80)?!="itmc"{continue;}
             objects.push(SceneObject{id:format!("netgame-equipment-{index}"),name:format!("{} · pickup {}",collection.path.rsplit('\\').next().unwrap_or(&collection.path),index+1),
                 kind:"Netgame item".into(),tag_id:Some(datum),position:vec3(&r,row+64)?,rotation:[r.f32(row+76)?,0.,0.],scale:[1.;3],visible:true,
-                source_offset:Some(row+64),rotation_offset:Some(row+76),asset_id:None});
+                source_offset:Some(row+64),rotation_offset:Some(row+76),asset_id:None,source_model:None});
         },
         Err(error)=>diagnostics.push(Diagnostic::warning("NETGAME_ITEMS_UNREADABLE",error.to_string())),
     }
@@ -1191,6 +1203,7 @@ fn placements(
             source_offset: Some(p + 8),
             rotation_offset: Some(p + 20),
             asset_id: None,
+            source_model: None,
         });
     }
     Ok(rows)

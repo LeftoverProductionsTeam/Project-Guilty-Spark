@@ -137,3 +137,4 @@ pub fn safe_relative(value: &str) -> Result<std::path::PathBuf> {
 }
 
 pub mod bsp_audio;
+pub mod custom_sounds;

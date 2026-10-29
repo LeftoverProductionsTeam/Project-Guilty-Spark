@@ -30,7 +30,7 @@ import SceneEnvironment from './SceneEnvironment';
 import SceneEffects from './SceneEffects';
 import RenderFeatures from './RenderFeatures';
 import VisibilityZones,{VisibilityZoneOverlay} from './VisibilityZones';
-import {useMapState} from '../mapSession';
+import {useMapState,writeMapSession} from '../mapSession';
 import ViewportSession,{hasViewportSession} from './ViewportSession';
 import ViewportPerformance from './ViewportPerformance';
 import {renderFeatures} from '../renderFeatures';
@@ -69,7 +69,17 @@ import { validateSceneTransform } from '../sourcePreflight';
 import type { ViewMode } from '../renderView';
 import RightMouseFly from './RightMouseFly';
 import EnvironmentControls from './EnvironmentControls';
-import{WorkspacePanel}from'./WorkspacePanels';
+import{WorkspacePanel,useRevealWorkspacePanel}from'./WorkspacePanels';
+import ViewportTags from './ViewportTags';
+import ViewportAssetLibrary from './ViewportAssetLibrary';
+import type {ViewportLibraryControls} from './ViewportAssetLibrary';
+import {viewportAssetCatalog,sourcePlacement,placeLibraryModel,librarySoundEmitter} from '../viewportAssets';
+import type {ViewportAsset} from '../viewportAssets';
+import {useOwnedForgeModels,forgeModelKey} from '../useOwnedForgeModels';
+import type {OwnedModelView} from '../useOwnedForgeModels';
+import {useViewportAssetDrop} from '../useViewportAssetDrop';
+import {emptySoundScene} from '../spatialAudio';
+import SoundMixer from './SoundMixer';
 import { DEFAULT_ENVIRONMENT, sunlightPosition, toHex } from '../environment';
 import type { EditorEnvironment } from '../environment';
 import { HelpTip, IconButton, Notice, NumberField, Pill } from './ui';
@@ -211,7 +221,7 @@ export function Mesh({
   return (
     <mesh geometry={geometry} material={materials ?? undefined} frustumCulled={!sky}
       onBeforeRender={(_renderer,scene,camera,_geometry,material)=>updateHaloMaterial(material,scene,camera)} raycast={sky?()=>null:undefined} onClick={(event) => {
-      if (!onShaderClick || !materialLens || event.faceIndex == null) return;
+      if (!onShaderClick || !materialLens || event.faceIndex == null || event.button!==0 || event.delta>5) return;
       const tagId = shaderForTriangle(data, event.faceIndex);
       if (tagId === null) return;
       event.stopPropagation();
@@ -258,6 +268,16 @@ function ObjectVisual({
 }) {
   if (asset) return <Mesh data={asset} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
   return null;
+}
+function ViewportDropPoint({point,onReady}:{point:MutableRefObject<((x:number,y:number)=>Vec3|null)|null>;onReady:(ready:boolean)=>void}){
+  const {camera,gl,scene}=useThree();
+  useEffect(()=>{point.current=(x,y)=>{const rect=gl.domElement.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((x-rect.x)/rect.width*2-1,-(y-rect.y)/rect.height*2+1),camera);const hit=ray.intersectObjects(scene.children,true).find(result=>{let object:THREE.Object3D|null=result.object;while(object){if(object.userData.assetSurface)return true;object=object.parent;}return false;});return (hit?.point??ray.ray.at(5,new THREE.Vector3())).toArray() as Vec3;};onReady(true);return()=>{point.current=null;onReady(false);};},[camera,gl,scene,point,onReady]);
+  return null;
+}
+function SceneObjectVisual({object,inspection,assetMeshes,ownedModels,spawnModel,...props}:{object:SceneObject;inspection:MapInspection|null;assetMeshes:Record<string,MeshData>;ownedModels:Record<string,OwnedModelView>;spawnModel?:MeshData}&Omit<Parameters<typeof ObjectVisual>[0],'object'|'asset'>){
+  const source=sourcePlacement(object),view=source?ownedModels[forgeModelKey(source)]:undefined;
+  if(source)return <ObjectVisual {...props} object={object} asset={view?.mesh} shaderTextures={view?.shaderTextures} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures}/>;
+  return <ObjectVisual {...props} object={object} asset={object.kind==='Player spawn'?spawnModel:resolveObjectMesh(inspection,object.tagId,object.assetId,assetMeshes)}/>;
 }
 function FrameCamera({
   mesh,
@@ -351,6 +371,7 @@ function Scene({
   sourceAppearance,extraTextures,
   onSceneDragStart,onSceneDragEnd,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,
+  ownedModels,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -374,6 +395,7 @@ function Scene({
   sourceAppearance:SourceAppearance|null;extraTextures:Record<string,THREE.Texture>;
   onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
   cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;
+  ownedModels:Record<string,OwnedModelView>;
 }) {
   const group = useRef<THREE.Group>(null);
   const chosen = project.scene.find((o) => o.id === selected);
@@ -418,6 +440,7 @@ function Scene({
         />
       )}
       {previewMesh?.positions.length ? (
+        <group userData={{assetSurface:true}}>
         <Mesh
           data={previewMesh}
           shaderMetadata={shaderMetadata} extraTextures={extraTextures}
@@ -429,6 +452,7 @@ function Scene({
           lightmapTextures={viewMode === 'render' || viewMode === 'materials' ? lightmapTextures : EMPTY_LIGHTMAP_TEXTURES}
           onShaderClick={onOpenTag}
         />
+        </group>
       ) : null}
       {viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
       {all
@@ -436,18 +460,20 @@ function Scene({
         .map((o) => (
           <group
             key={o.id}
+            userData={{assetSurface:true}}
             position={o.position}
             rotation={[o.rotation[2], o.rotation[1], o.rotation[0], 'ZYX']}
             scale={o.scale}
             onClick={(e) => {
+              if(e.button!==0||e.delta>5)return;
               e.stopPropagation();
               setSelected(o.id);
             }}
           >
-            <ObjectVisual
+            <SceneObjectVisual
+              inspection={inspection} assetMeshes={assetMeshes} ownedModels={ownedModels} spawnModel={spawnModel}
               shaderMetadata={shaderMetadata} extraTextures={extraTextures}
               object={o}
-              asset={o.kind==='Player spawn'?spawnModel:resolveObjectMesh(inspection, o.tagId, o.assetId, assetMeshes)}
               selected={false}
               size={markerSize}
               wireframe={viewMode === 'wireframe'}
@@ -457,9 +483,8 @@ function Scene({
         ))}
       {chosen?.visible && (
         <>
-          <group ref={group} position={chosen.position} rotation={[chosen.rotation[2],chosen.rotation[1],chosen.rotation[0],'ZYX']} scale={chosen.scale}>
-            <ObjectVisual shaderMetadata={shaderMetadata} extraTextures={extraTextures} object={chosen}
-              asset={chosen.kind==='Player spawn'?spawnModel:resolveObjectMesh(inspection,chosen.tagId,chosen.assetId,assetMeshes)}
+          <group userData={{assetSurface:true}} ref={group} position={chosen.position} rotation={[chosen.rotation[2],chosen.rotation[1],chosen.rotation[0],'ZYX']} scale={chosen.scale} onClick={event=>{if(event.button!==0||event.delta>5)return;event.stopPropagation();setSelected(chosen.id);}}>
+            <SceneObjectVisual inspection={inspection} assetMeshes={assetMeshes} ownedModels={ownedModels} spawnModel={spawnModel} shaderMetadata={shaderMetadata} extraTextures={extraTextures} object={chosen}
               selected size={markerSize} wireframe={viewMode==='wireframe'} shaderTextures={viewMode==='render'?shaderTextures:EMPTY_SHADER_TEXTURES}/>
           </group>
         <TransformControls
@@ -518,22 +543,64 @@ export default function World({
   onBeforeResources,
   selectedId,onSelectObject,viewportChildren,onSceneDragStart,onSceneDragEnd,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,
+  library,
 }: {
   project: Project;
   inspection: MapInspection | null;
   assetMeshes: Record<string, MeshData>;
   edit: (p: Project, description: string) => void;
   notify: (m: string) => void;
-  onOpenTag?: (tagId: number) => void;
+  onOpenTag?: (tagId: number,sourceProjectId?:string) => void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: () => Promise<void>;
   selectedId?:string|null;onSelectObject?:(id:string|null)=>void;viewportChildren?:React.ReactNode;onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
   cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;
+  library?:ViewportLibraryControls;
 }) {
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
+  const [tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null);
+  const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',project.id);
+  const [tagRevision,setTagRevision]=useState(0);
+  const revealPanel=useRevealWorkspacePanel();
+  const openObjectTag=(tagId:number,sourceId=project.id)=>{
+    const source=sourceId===project.id?inspection:library?.documents.find(document=>document.id===sourceId)?.inspection;
+    if(source&&!source.tags.some(tag=>tag.id===tagId))return;
+    setTagSource(sourceId);
+    setTagRequest(tagId);setTagRevision(value=>value+1);revealPanel('object-tags');
+  };
   const [,setZoneSelection]=useMapState<string|null>(project.id,'visibility.selected',null);
   const selected=selectedId!==undefined?selectedId:localSelected;
-  const setSelected=(id:string|null)=>{setLocalSelected(id);if(id)setZoneSelection(null);onSelectObject?.(id);};
+  const setSelected=(id:string|null)=>{setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
+  const tagDocument=library?.documents.find(document=>document.id===tagSource);
+  const tagContext=tagSource===project.id?{project,inspection}:tagDocument?.history.current?{project:tagDocument.history.current,inspection:tagDocument.inspection}:null;
+  const catalog=useMemo(()=>viewportAssetCatalog(library?.documents??[]),[library?.documents]);
+  const viewportElement=useRef<HTMLDivElement|null>(null),dropPoint=useRef<((x:number,y:number)=>Vec3|null)|null>(null),projectValue=useRef(project),alive=useRef(true);
+  projectValue.current=project;
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[project.id]);
+  const [assetBusy,setAssetBusy]=useState(false);
+  const [dropReady,setDropReady]=useState(false);
+  const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
+  const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
+  const {models:ownedModels,failures:modelIssues}=useOwnedForgeModels(linked,resourceScopes);
+  async function dropAsset(key:string,position:Vec3,replaceId?:string|null){
+    if(!library||library.busy||assetBusy)return;
+    const item=catalog.find(candidate=>candidate.key===key);if(!item){notify('The source map is no longer open. Reopen it before placing this asset.');return;}
+    setAssetBusy(true);
+    try{
+      if(item.kind==='model'){
+        const placed=placeLibraryModel(projectValue.current,item.asset,position,replaceId);
+        edit(placed.project,`${replaceId?'Replace':'Place'} source model ${item.name}`);setLocalSelected(placed.selectedId);
+      }else if(item.kind==='mesh')await library.onPlaceMesh(item,position,replaceId);
+      else{
+        const emitter=await librarySoundEmitter(item,position);if(!alive.current)return;
+        const latest=projectValue.current,scene=latest.audioPreview??emptySoundScene();if(scene.emitters.length>=64)throw Error('The sound scene is full (64 emitters).');
+        edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,emitter]}},'Place sound '+item.name);writeMapSession(project.id,'sound-emitter-selection',emitter.id);revealPanel('map-sounds');
+      }
+    }catch(reason){if(alive.current)notify(String(reason));}finally{if(alive.current)setAssetBusy(false);}
+  }
+  async function dropFiles(paths:string[],position:Vec3){if(!library||library.busy)return;for(const path of paths){if(!alive.current)return;if(/\.obj$/i.test(path))await library.onImportModel(position,path);else if(await library.onImportSound(position,path))revealPanel('map-sounds');}}
+  const assetDrag=useViewportAssetDrop(project.id,viewportElement,dropPoint,(key,position)=>void dropAsset(key,position),library?(paths,position)=>void dropFiles(paths,position):undefined);
+  const viewPoint=()=>{const rect=viewportElement.current?.getBoundingClientRect();return rect?dropPoint.current?.(rect.x+rect.width/2,rect.y+rect.height/2)??undefined:undefined;};
   const [query, setQuery] = useMapState(project.id,'world.query','');
   const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(project.id,'world.mode','translate');
   const [snap, setSnap] = useMapState(project.id,'world.snap',false);
@@ -1210,7 +1277,7 @@ export default function World({
             <Focus size={17} />
           </IconButton>
         </div>
-        <div className="viewport" data-testid="viewport">
+        <div ref={viewportElement} className={`viewport${assetDrag.dragging?' viewport-asset-drop-active':''}`} data-testid="viewport">
           <ViewportBoundary>
             <Suspense fallback={<div className="loading">Preparing geometry…</div>}>
               <Canvas
@@ -1237,19 +1304,24 @@ export default function World({
                     environment,sourceAppearance,extraTextures,
                     onSceneDragStart,onSceneDragEnd,
                     cinematic,cameraLocked,externalCameraAuthority,
+                    ownedModels,
                   }}
                   inspection={inspection}
                   onTransform={update}
-                  onOpenTag={onOpenTag}
+                  onOpenTag={cinematic?onOpenTag:openObjectTag}
                   shaderTextures={shaderTextures}
                   lightmapTextures={lightmapTextures}
                 />
                 <ViewportSession id={project.id} channel={cinematic?'machinima':'world'} paused={cameraLocked||externalCameraAuthority} requiresControls={!cinematic&&!fly}/>
+                {library&&<ViewportDropPoint point={dropPoint} onReady={setDropReady}/>}
+                {!cinematic&&project.audioPreview?.emitters.filter(emitter=>emitter.spatial).map(emitter=><mesh key={emitter.id} position={emitter.position} onClick={event=>{event.stopPropagation();writeMapSession(project.id,'sound-emitter-selection',emitter.id);revealPanel('map-sounds');}}><sphereGeometry args={[.12,10,6]}/><meshBasicMaterial color={emitter.enabled?'#89e4ef':'#777777'} wireframe/></mesh>)}
                 {!cinematic&&<VisibilityZoneOverlay project={project} edit={edit} enabled={!fly&&!cameraLocked&&!selected} onSelectScene={()=>setSelected(null)} onSceneDragStart={onSceneDragStart} onSceneDragEnd={onSceneDragEnd}/>}
                 {viewportChildren}
               </Canvas>
             </Suspense>
           </ViewportBoundary>
+          {!cinematic&&chosen&&<div className="viewport-object-actions"><strong>{chosen.name}</strong>{(chosen.tagId!==null||chosen.sourceModel)&&<button onClick={()=>chosen.sourceModel?openObjectTag(chosen.sourceModel.tagId,chosen.sourceModel.projectId):openObjectTag(chosen.tagId!)}>Object tags</button>}<button onClick={()=>revealPanel('inspector')}>Transform</button><button onClick={()=>setSelected(null)}>Deselect object</button></div>}
+          {assetDrag.dragging&&<div className="viewport-asset-drop-hint">Drop to place at the surface · Esc cancels</div>}
           {!cinematic&&inspection&&[6,7,609].includes(inspection.header.version)&&!project.source?.resourceSha256?.['bitmaps.map']&&<div className="gs-texture-setup" role="status"><strong>Map textures need their original bitmaps.map.</strong><button disabled={!native||connectingTextures||!onResourcesConnected} onClick={()=>void locateTextures()}>{connectingTextures?'Verifying textures…':'Locate Halo Textures'}</button>{textureSetupError&&<span role="alert">{textureSetupError}</span>}</div>}
           <div className="viewport-label">
             <span className="live-dot" />
@@ -1297,6 +1369,9 @@ export default function World({
           <Pill tone="blue">Editor preview</Pill>
         </div>
       </section>
+      {!cinematic&&selectedId===undefined&&<WorkspacePanel id="object-tags" label="Object tags">{tagContext?.inspection?<><p className="subtle">{tagContext.project.title} · source tags</p><ViewportTags key={tagContext.project.id} project={tagContext.project} inspection={tagContext.inspection} requestedTagId={tagRequest} requestRevision={tagRevision} edit={edit} notify={notify} onFullEditor={id=>onOpenTag?.(id,tagContext.project.id)} onSave={library?()=>library.onSaveMap(tagContext.project.id):onBeforeResources}/></>:<p>Open this model’s source map in a tab to edit its tags. Its preview keeps the original source identity.</p>}</WorkspacePanel>}
+      {!cinematic&&library&&<WorkspacePanel id="asset-library" label="Asset library" defaultDock="left"><ViewportAssetLibrary projectId={project.id} assets={catalog} begin={assetDrag.begin} activate={assetDrag.activate} canReplace={!!chosen} replace={item=>{if(chosen)void dropAsset(item.key,chosen.position,chosen.id);}} importModel={()=>void library.onImportModel(viewPoint())} importSound={()=>void library.onImportSound(viewPoint()).then(added=>{if(added)revealPanel('map-sounds');})} busy={library.busy||assetBusy||!dropReady}/></WorkspacePanel>}
+      {!cinematic&&selectedId===undefined&&<WorkspacePanel id="map-sounds" label="Map sounds">{inspection?<MapSounds expanded key={project.source?.resourceSha256?.['sounds.map']} projectId={project.id} project={project} edit={edit} inspection={inspection} onOpenTag={openObjectTag} onResources={()=>void (async()=>{try{await onBeforeResources?.();const open=await call<OpenProject|null>('choose_project_resources',{projectId:project.id});if(open)await onResourcesConnected?.(open);}catch(error){notify(String(error));}})()}/>:<SoundMixer project={project} inspection={null} sourceProjectId={project.id} tagId={null} edit={edit}/>}</WorkspacePanel>}
       <WorkspacePanel id="inspector" label="Inspector"><aside className="panel inspector">
         {!cinematic&&<VisibilityZones project={project} edit={edit} onSelectScene={()=>setSelected(null)} onSave={onBeforeResources}/>}
         <RenderFeatures project={project} edit={edit}/>
@@ -1304,9 +1379,6 @@ export default function World({
           <strong>Inspector</strong>
           {chosen && <Pill>{chosen.kind}</Pill>}
         </div>
-        {inspection&&<MapSounds key={project.source?.resourceSha256?.['sounds.map']} projectId={project.id} project={project} edit={edit} inspection={inspection} onOpenTag={onOpenTag} onResources={()=>void (async()=>{
-          try{await onBeforeResources?.();const open=await call<OpenProject|null>('choose_project_resources',{projectId:project.id});if(open)await onResourcesConnected?.(open);}catch(error){notify(String(error));}
-        })()}/>}
         <details className="gs-world-environment-panel">
           <summary title="Temporary local fog, sun and ambient preview for comparing your owned map. Never modifies or exports a compiled Halo map.">Environment · preview sun, ambient &amp; fog</summary>
           <p>{project.worldEnvironment?'Saved editor override':sourceAppearance?.skyPath?`Map sky: ${sourceAppearance.skyPath}`:'Reading the map’s authored environment…'}</p>
@@ -1468,6 +1540,7 @@ export default function World({
         )}
         {chosen ? (
           <div className="inspector-body">
+            {chosen.sourceModel&&<><p className="subtle">Source-linked model preview · compile editable scenario/model tags before a game build.</p>{modelIssues[forgeModelKey(sourcePlacement(chosen)!)]&&<Notice>{modelIssues[forgeModelKey(sourcePlacement(chosen)!)]}</Notice>}<button onClick={()=>openObjectTag(chosen.sourceModel!.tagId,chosen.sourceModel!.projectId)}>Edit model source tags</button></>}
             {chosen.tagId!==null&&!resolveObjectMesh(inspection,chosen.tagId,chosen.assetId,assetMeshes)&&<Notice tone="warning">This source model is unavailable in the current reader. Its item is not drawn. The placement remains editable in the hierarchy.</Notice>}
             <label className="field-label">
               Object name

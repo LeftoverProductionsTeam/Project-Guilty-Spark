@@ -79,7 +79,7 @@ test('sidebar keeps every workspace visible in tall and short windows', async ({
 });
 test('workspace search keeps focus bounded and navigates with the keyboard', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();
+  await expect(page.locator('#gs-window-header')).toBeVisible();
   const launcher=page.getByRole('button',{name:/Find tools/});
   await launcher.click();
   const search=page.getByRole('textbox',{name:'Search workspaces'});
@@ -92,13 +92,13 @@ test('workspace search keeps focus bounded and navigates with the keyboard', asy
   await page.getByRole('button',{name:'Create a new Halo level',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Make a place to play.'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Create editable map',exact:true})).toBeDisabled();
-  await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();await launcher.click();await page.keyboard.press('Escape');
+  await expect(page.locator('#gs-window-header')).toBeVisible();await launcher.click();await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(launcher).toBeFocused();
 });
 test('browser preview states native boundaries and navigates workspaces', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();
+  await expect(page.locator('#gs-window-header')).toBeVisible();
   await expect(page.getByText('Browser preview', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make a Halo world. Know what the engine needs.' })).toBeVisible();
   await chooseTool(page,"Map library");
@@ -139,7 +139,7 @@ test('preservation and runtime workspaces disclose unavailable evidence without 
 });
 test('help modal traps focus and restores it after Escape', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();
+  await expect(page.locator('#gs-window-header')).toBeVisible();
   const help = page.getByRole('button', { name: 'Help & shortcuts' });
   await help.click();
   await expect(page.getByRole('dialog')).toBeVisible();

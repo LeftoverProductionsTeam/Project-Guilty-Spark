@@ -17,7 +17,12 @@
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
+.gs-workspace-tools > button {
+  flex: none;
+  white-space: nowrap;
+}
 .gs-panel-buttons {
+  flex: 1 1 0;
   display: flex;
   gap: 4px;
   min-width: 0;
@@ -32,6 +37,9 @@
   display: flex;
   align-items: center;
   gap: 5px;
+}
+.gs-panel-buttons > button {
+  flex: none;
 }
 .gs-panel-buttons [aria-expanded='true'] {
   border-color: var(--accent);
@@ -398,7 +406,6 @@ html[data-gs-focus-mode='true'] .sidebar.gs-navigation-drawer:not([hidden]) {
   font-size: 12px;
   z-index: 15;
 }
-.gs-workspace-shell[data-focus='true'][data-fullscreen='false'] .gs-panel-buttons,
 .gs-workspace-shell[data-focus='true'] .gs-layout-menu {
   display: none;
 }
@@ -467,26 +474,94 @@ html[data-gs-fullscreen='true'] .gs-navigation-drawer {
   }
 }
 .application.gs-drawers {
+  grid-template-rows: 32px minmax(0, 1fr) auto !important;
+}
+.application.gs-drawers[data-header-open='false'] {
   grid-template-rows: 0 minmax(0, 1fr) auto !important;
 }
-:root .application.gs-drawers > .gs-header-drawer {
-  position: fixed;
-  inset: 6px 8px auto;
-  z-index: 132;
-  height: 60px !important;
-  visibility: visible !important;
-  overflow: visible !important;
-  border: 1px solid var(--accent);
-  border-radius: 18px 6px;
+:root .application.gs-drawers > .gs-compact-header {
+  position: relative;
+  height: 32px !important;
+  min-height: 0;
+  visibility: visible;
+  overflow: hidden;
+  border-radius: 0;
   padding: 0 8px;
-  box-shadow: 0 15px 40px #0009;
-  background-color: var(--panel);
 }
-.application.gs-drawers > .gs-header-drawer[hidden] {
+.application.gs-drawers > .gs-compact-header[hidden] {
   display: none !important;
 }
-:root[data-gs-native-frame='true'] .application.gs-drawers > .gs-header-drawer {
-  right: 110px;
+.gs-compact-header .brand img {
+  width: 22px;
+  height: 22px;
+}
+.gs-compact-header .brand > div {
+  gap: 0;
+}
+.gs-compact-header .brand > div > span {
+  display: none;
+}
+.gs-compact-header .brand strong {
+  font-size: 10px;
+}
+.gs-compact-header .brand .pill {
+  font-size: 8px;
+  padding: 2px 4px;
+}
+.gs-compact-header .header-context {
+  font-size: 11px;
+}
+.gs-compact-header .header-actions {
+  gap: 8px;
+}
+.gs-compact-header .header-actions > button {
+  min-height: 0;
+  padding: 3px 6px;
+  font-size: 10px;
+}
+.gs-compact-header > .icon-button {
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 3px;
+}
+.gs-header-reveal {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 133;
+  width: 48px;
+  height: 9px;
+  min-height: 0;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 0 8px 8px;
+}
+.gs-header-reveal[data-collapsed='true'] {
+  display: flex;
+}
+html[data-gs-focus-mode='true'] .gs-header-reveal {
+  display: flex;
+}
+html[data-gs-focus-mode='true'] .application.gs-drawers {
+  grid-template-rows: 0 minmax(0, 1fr) auto !important;
+}
+html[data-gs-focus-mode='true'] .application.gs-drawers > .gs-compact-header {
+  display: none;
+}
+html[data-gs-focus-mode='true'] .application.gs-drawers > .gs-compact-header[data-peek='true'] {
+  display: flex !important;
+  position: fixed;
+  inset: 5px 110px auto 8px;
+  z-index: 132;
+  height: 32px !important;
+  visibility: visible !important;
+  overflow: hidden;
+  border: 1px solid var(--accent);
+  border-radius: 10px 4px;
 }
 .application.gs-drawers > .gs-navigation-drawer {
   top: 44px;
@@ -494,11 +569,6 @@ html[data-gs-fullscreen='true'] .gs-navigation-drawer {
 .gs-workspace-tools > .gs-navigation-toggle {
   margin: 0;
   padding: 6px;
-}
-.gs-workspace-tools > .gs-header-toggle {
-  white-space: nowrap;
-  padding: 6px 8px;
-  font-size: 11px;
 }
 html[data-gs-fullscreen='true'] .application.gs-drawers {
   grid-template-rows: 0 minmax(0, 1fr) 5px !important;
@@ -519,3 +589,28 @@ html[data-gs-fullscreen='true'] .application.gs-drawers {
   width: 18px;
   height: 18px;
 }
+/* Fullscreen keeps a usable editing strip while giving its space to the map. */
+html[data-gs-fullscreen='true'] .gs-workspace-tools {
+  min-height: 30px;
+  padding: 2px 6px;
+  gap: 4px;
+}
+html[data-gs-fullscreen='true'] .gs-workspace-tools > button,
+html[data-gs-fullscreen='true'] .gs-panel-buttons button,
+html[data-gs-fullscreen='true'] .gs-layout-actions > button {
+  min-height: 24px;
+  height: 24px;
+  padding: 3px 5px;
+  font-size: 10px;
+}
+html[data-gs-fullscreen='true'] .gs-workspace-tools :is(.icon-button,.gs-window-button) {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 3px;
+}
+html[data-gs-fullscreen='true'] .editor-sound-controls input[type='range'] { width: 60px; height: 20px; min-height: 20px; }
+html[data-gs-fullscreen='true'] .editor-sound-controls button { min-height: 24px; height: 24px; padding: 3px; }
+html[data-gs-fullscreen='true'] .gs-panel-buttons { scrollbar-width: none; }
+html[data-gs-fullscreen='true'] .gs-panel-buttons::-webkit-scrollbar { display: none; }
+html[data-gs-fullscreen='true'] .gs-panel-layer { inset: 30px 0 0; }

@@ -6,7 +6,9 @@ Existing [`runtime.rs`](../crates/spark-core/src/runtime.rs) workflows and all t
 
 Evidence is **unknown**, **unsupported**, **upstream-declared**, **implemented**, **locally tested** or **multiplayer-tested** for a named operation. Source tests, native UI, compilation, engine load, gameplay, peers and scale remain distinct. Dock availability is **Ready**, **Running**, **Set up**, **Update needed** or **Not available for this version**; readiness never replaces native preflight.
 
-Latest C35 r9 adds native rebuilt BSP audio selections and repairs nonmodal drawer/window controls ([scoped evidence](C35_BSP_AUDIO.md)). Compiled bindings and native window state are separate from actual game acoustics.
+Latest C35 r10 adds source-bound object-tag drawers, cross-map library previews, managed OBJ/WAV/OGG imports and automatic editor ambience with per-map mute/volume. It replaces the Window launcher with a thin collapsible top bar and tighter native fullscreen controls ([scoped evidence](C35_VIEWPORT_WORKFLOW.md)). Imported-cache new/replaced instances remain previews and are refused by the game-build guards. Full engine acoustics remain separate.
+
+C35 r9 adds native rebuilt BSP audio selections and repairs nonmodal drawer/window controls ([scoped evidence](C35_BSP_AUDIO.md)). Compiled bindings and native window state are separate from actual game acoustics.
 
 ## Files, builders and tools
 

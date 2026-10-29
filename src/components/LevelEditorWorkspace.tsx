@@ -6,6 +6,7 @@ import BspAssembly from './BspAssembly';
 import{WorkspacePanel}from'./WorkspacePanels';
 import {useMapState} from '../mapSession';
 import type { Project, MapInspection, MeshData, OpenProject } from '../types';
+import {useEditorAudio} from './EditorAudio';
 
 /** One map viewer; document type selects its source tools and an exact live
  * identity selects runtime poses. A different running map never replaces an
@@ -45,6 +46,8 @@ export default function LevelEditorWorkspace({
   const [target, setTarget] = useMapState<'auto' | 'source' | 'live'>(project?.id??'new-map','level.target',intent === 'live' ? 'live' : 'auto');
   const [creating,setCreating]=useMapState(project?.id??'new-map','level.creating',false);
   const [live, setLive] = useState(false);
+  const audio=useEditorAudio();
+  useEffect(()=>{audio?.setLive(live);return()=>audio?.setLive(false);},[audio,live]);
   useEffect(() => {
     if (intent === 'live') {
       setTarget('live');

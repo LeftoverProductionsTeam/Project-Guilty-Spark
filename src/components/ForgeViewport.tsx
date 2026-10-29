@@ -39,6 +39,7 @@ export interface ForgeSnapshot {
 }
 export type ForgeCamera = 'orbit' | 'fly' | 'walk' | 'machinima';
 export interface ForgeViewportProps {
+  resourceScopes?:Record<string,string>;
   sessionId?:string;
   actorAnimation?:import('../animation').AnimationPreview|null;
   renderFeatures?:import('../renderFeatures').RenderFeatures|null;
@@ -597,7 +598,7 @@ function ForgeScene(props: ForgeViewportProps) {
 }
 export default function ForgeViewport(props: ForgeViewportProps) {
   const selectionGuard=useRef(0);
-  const {models,failures}=useOwnedForgeModels([...props.document.placements,...(props.spawnModelSource?[props.spawnModelSource]:[])]);
+  const {models,failures}=useOwnedForgeModels([...props.document.placements,...(props.spawnModelSource?[props.spawnModelSource]:[])],props.resourceScopes);
   const [recording,setRecording]=useState(false),take=useRef<RehearsalFrame[]>([]);
   useEffect(()=>{if(props.cameraMode!=='machinima')setRecording(false);},[props.cameraMode]);
   const missing=Object.keys(failures).length;

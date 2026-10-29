@@ -1318,22 +1318,28 @@ async fn copy_project_asset(app:tauri::AppHandle,window:tauri::WebviewWindow,sou
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();check_document_owner(&state,&target_id,&owner)?;let lib=lock(&state.library)?;let(project,asset,imported)=core::asset_transfer::copy_obj(&lib,&source_id,&asset_id,&target_id).map_err(error)?;Ok(AssetResult{project,asset,mesh:imported.mesh,warnings:imported.warnings})}).await.map_err(error)?
 }
 #[tauri::command]
-async fn import_asset(app: tauri::AppHandle, id: String) -> Reply<Option<AssetResult>> {
-    let file = rfd::AsyncFileDialog::new()
+async fn import_asset(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, path: Option<PathBuf>) -> Reply<Option<AssetResult>> {
+    let owner=window.label().to_string();
+    let path=if let Some(path)=path{path}else{let file = rfd::AsyncFileDialog::new()
         .set_title("Import OBJ geometry into the Asset Workshop")
         .add_filter("Wavefront OBJ", &["obj"])
         .pick_file()
         .await;
     let Some(file) = file else { return Ok(None) };
-    let path = file.path().to_path_buf();
+    file.path().to_path_buf()};
+    if !path.extension().is_some_and(|extension|extension.eq_ignore_ascii_case("obj")){return Err("Choose a Wavefront OBJ file".into());}
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
+        check_document_owner(&state,&id,&owner)?;
+        core::reject_links(&path).map_err(error)?;
         let meta = fs::metadata(&path).map_err(error)?;
         if meta.len() > 64 * 1024 * 1024 {
             return Err("OBJ exceeds 64 MiB".into());
         }
-        let imported =
-            assets::parse_obj(&fs::read_to_string(&path).map_err(error)?).map_err(error)?;
+        let mut bytes=Vec::new();
+        std::io::Read::read_to_end(&mut std::io::Read::take(fs::File::open(&path).map_err(error)?,64*1024*1024+1),&mut bytes).map_err(error)?;
+        if bytes.len()>64*1024*1024{return Err("OBJ exceeds 64 MiB".into());}
+        let imported=assets::parse_obj(std::str::from_utf8(&bytes).map_err(error)?).map_err(error)?;
         let lib = lock(&state.library)?;
         let mut p = lib.get(&id).map_err(error)?;
         let asset_id = uuid::Uuid::new_v4().to_string();
@@ -1341,7 +1347,7 @@ async fn import_asset(app: tauri::AppHandle, id: String) -> Reply<Option<AssetRe
         core::reject_links(&dir).map_err(error)?;
         fs::create_dir_all(&dir).map_err(error)?;
         let raw = dir.join(format!("{asset_id}.obj"));
-        fs::copy(&path, &raw).map_err(error)?;
+        project::atomic_write(&raw,&bytes,false).map_err(error)?;
         let asset = Asset {
             id: asset_id.clone(),
             name: path
@@ -1376,6 +1382,7 @@ async fn import_asset(app: tauri::AppHandle, id: String) -> Reply<Option<AssetRe
             source_offset: None,
             rotation_offset: None,
             asset_id: Some(asset_id),
+            source_model: None,
         });
         p.modified_at = chrono::Utc::now().to_rfc3339();
         lib.save(&p, None).map_err(error)?;
@@ -1388,6 +1395,20 @@ async fn import_asset(app: tauri::AppHandle, id: String) -> Reply<Option<AssetRe
     })
     .await
     .map_err(error)?
+}
+#[tauri::command]
+async fn import_custom_sound(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,path:Option<PathBuf>)->Reply<Option<serde_json::Value>>{
+    let path=if let Some(path)=path{path}else{let Some(file)=rfd::AsyncFileDialog::new().set_title("Import a custom sound into this map").add_filter("WAVE or Vorbis audio",&["wav","ogg"]).pick_file().await else{return Ok(None)};file.path().to_path_buf()};
+    let owner=window.label().to_string();
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;let lib=lock(&state.library)?;let(project,asset)=core::custom_sounds::import(&lib,&project_id,&path).map_err(error)?;Ok(Some(serde_json::json!({"project":project,"asset":asset})))}).await.map_err(error)?
+}
+#[tauri::command]
+async fn preview_custom_sound(app:tauri::AppHandle,project_id:String,asset_id:String,sha256:String)->Reply<core::custom_sounds::Preview>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let lib=lock(&state.library)?;core::custom_sounds::preview(&lib,&project_id,&asset_id,&sha256).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn inspect_map_ambience(app:tauri::AppHandle,project_id:String)->Reply<core::bsp_audio::Inspection>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("Choose a preserved map to inspect its ambience")?;core::bsp_audio::inspect_ambience(&source.preserved_path,&source.sha256).map_err(error)}).await.map_err(error)?
 }
 #[tauri::command]
 async fn import_animation_sources(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,paths:Option<Vec<PathBuf>>)->Reply<Vec<core::animations::AnimationAsset>>{
@@ -2638,6 +2659,9 @@ pub fn run() {
             validate_existing,
             cancel_build,
             import_asset,
+            import_custom_sound,
+            preview_custom_sound,
+            inspect_map_ambience,
             import_animation_sources,
             preview_animation_clip,
             copy_project_asset,

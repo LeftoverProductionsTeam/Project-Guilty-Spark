@@ -1,15 +1,15 @@
+import TagFields from './TagFields';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownToLine, ArrowRight, FileCode2, GitBranch, RotateCcw, Search, Sparkles } from 'lucide-react';
 import type { LibraryEntry, MapInspection, Project, Tag, TagField } from '../types';
 import {
   classNames,
   effectiveReferenceId,
-  fieldValue,
   formatNumber,
   setTagValue,
   shortPath,
 } from '../editor';
-import { Empty, Notice, NumberField, Pill } from './ui';
+import { Empty, Notice, Pill } from './ui';
 import Sound from './Sound';
 import TagLineageInspector from './TagLineageInspector';
 import TagMigrationReviewPanel from './TagMigrationReviewPanel';
@@ -314,85 +314,7 @@ export default function Tags({
                   Show offsets
                 </label>
               </div>
-              {selectedTag.fields.length ? (
-                selectedTag.fields.map((f) => {
-                  const value = fieldValue(project, selectedTag, f);
-                  const changed = value !== f.value;
-                  return (
-                    <div className={`property-row ${changed ? 'changed' : ''}`} key={f.key}>
-                      <div>
-                        <label htmlFor={`field-${f.key}`}>{f.label}</label>
-                        <small>
-                          {f.unit ||
-                            (f.kind === 'reference'
-                              ? `Reference · ${classNames[f.targetClass ?? ''] ?? f.targetClass}`
-                              : 'Float32')}
-                          {advanced && ` · 0x${f.offset.toString(16).toUpperCase()}`}
-                        </small>
-                      </div>
-                      <div className="property-value">
-                        {f.kind === 'reference' ? (
-                          <select
-                            id={`field-${f.key}`}
-                            aria-label={f.label}
-                            value={value}
-                            onChange={(e) => change(selectedTag, f, Number(e.target.value))}
-                          >
-                            {tags
-                              .filter((t) => t.class === f.targetClass)
-                              .map((t) => (
-                                <option key={t.id} value={t.id}>
-                                  {shortPath(t.path)}
-                                </option>
-                              ))}
-                          </select>
-                        ) : (
-                          <NumberField
-                            label={f.label}
-                            value={value}
-                            min={f.min}
-                            max={f.max}
-                            step={f.kind === 'f32' ? undefined : 1}
-                            onCommit={(v) => change(selectedTag, f, v)}
-                          />
-                        )}
-                        <button
-                          className="field-reset"
-                          aria-label={`Reset ${f.label}`}
-                          disabled={!changed}
-                          onClick={() => change(selectedTag, f, f.value)}
-                        >
-                          <RotateCcw size={13} />
-                        </button>
-                      </div>
-                      {changed && (
-                        <div className="property-diff">
-                          <span>
-                            {f.kind === 'reference'
-                              ? shortPath(tags.find((t) => t.id === f.value)?.path ?? String(f.value))
-                              : formatNumber(f.value)}
-                          </span>
-                          <ArrowRight size={11} />
-                          <strong>
-                            {f.kind === 'reference'
-                              ? shortPath(tags.find((t) => t.id === value)?.path ?? String(value))
-                              : formatNumber(value)}
-                          </strong>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="read-only-tag">
-                  <FileCode2 size={24} />
-                  <h3>This tag is indexed for inspection</h3>
-                  <p>
-                    Its full field schema is not implemented. Unknown bytes are preserved in the original
-                    cache and handled by the extraction tool.
-                  </p>
-                </div>
-              )}
+              <TagFields project={project} tag={selectedTag} tags={tags} advanced={advanced} change={(field,value)=>change(selectedTag,field,value)} />
             </div>
             {selectedTag.class === 'snd!' && (
               <>{onResources&&<button className="small-button" onClick={onResources}>Locate Halo Sounds folder</button>}<Sound key={`${selectedTag.id}:${project.source?.resourceSha256?.['sounds.map']}`} projectId={project.id} tagId={selectedTag.id} sourceHash={project.source?.sha256 ?? ''} onAssign={onAssignSound} /></>

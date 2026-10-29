@@ -97,3 +97,15 @@ it('keeps old loop-only emitters valid and honors a linked project identity for 
   );
   expect(ipc.mock.calls.every((call) => call[1].projectId === 'other-project')).toBe(true);
 });
+it('hashes imported custom audio, checks decoded dimensions, and refuses substitution or resampling overflow',async()=>{
+  const bytes=Uint8Array.of(1,2,3,4),sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(value=>value.toString(16).padStart(2,'0')).join('');
+  const selected={...emitter,tagId:0,sourceProjectId:'donor',sourceSha256:sha,loopingSource:null,customSound:{assetId:'asset',sha256:sha}};
+  const payload={assetId:'asset',sha256:sha,info:{channels:1,durationSeconds:1},base64:btoa(String.fromCharCode(...bytes))};
+  ipc.mockResolvedValue(payload);const decodeAudioData=vi.fn().mockResolvedValue(pcm([1,2,3,4]));const customContext={...context,decodeAudioData} as unknown as BaseAudioContext;
+  expect(await loadMapSoundClip(customContext,selected,'owner',hash,()=>false)).toHaveProperty('duration',1);
+  expect(ipc).toHaveBeenLastCalledWith('preview_custom_sound',{projectId:'donor',assetId:'asset',sha256:sha});
+  ipc.mockResolvedValue({...payload,base64:btoa('wrong')});await expect(loadMapSoundClip(customContext,selected,'owner',hash,()=>false)).rejects.toThrow(/bytes differ/);
+  ipc.mockResolvedValue({...payload,info:{channels:2,durationSeconds:180}});await expect(loadMapSoundClip({...customContext,sampleRate:192000} as BaseAudioContext,selected,'owner',hash,()=>false)).rejects.toThrow(/budget/);
+  expect(decodeAudioData).toHaveBeenCalledTimes(1);
+  ipc.mockResolvedValue(payload);decodeAudioData.mockResolvedValue({...pcm([1,2,3,4]),numberOfChannels:2});await expect(loadMapSoundClip(customContext,selected,'owner',hash,()=>false)).rejects.toThrow(/dimensions/);
+});

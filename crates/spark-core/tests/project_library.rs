@@ -238,6 +238,7 @@ fn exported_asset_workspace_reingests_meshes_with_integrity() {
         source_offset: None,
         rotation_offset: None,
         asset_id: Some(aid),
+        source_model: None,
     });
     let descriptor = d.path().join("export.gsproject");
     project::save_project(&descriptor, &p).unwrap();

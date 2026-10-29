@@ -14,11 +14,11 @@ export const forgeModelKey=(value:ForgePlacement)=>`${value.sourceProjectId}:${v
 
 /** One shared set of source models/textures for a viewport. Transform edits do
  * not reload sources. A missing dependency never creates replacement geometry. */
-export function useOwnedForgeModels(placements:ForgePlacement[]){
+export function useOwnedForgeModels(placements:ForgePlacement[],resourceScopes:Record<string,string>={}){
   const [models,setModels]=useState<Record<string,OwnedModelView>>({});
   const [failures,setFailures]=useState<Record<string,string>>({});
   const sources=[...new Map(placements.map(p=>[forgeModelKey(p),p])).values()];
-  const scope=JSON.stringify(sources.map(p=>[p.sourceProjectId,p.sourceSha256,p.tagId]));
+  const scope=JSON.stringify(sources.map(p=>[p.sourceProjectId,p.sourceSha256,p.tagId,resourceScopes[p.sourceProjectId??'']??'']));
   useEffect(()=>{
     let live=true,textureBytes=0,geometryBytes=0;
     const pool=new Map<string,THREE.Texture>(),loaded:Record<string,OwnedModelView>={},errors:Record<string,string>={};
