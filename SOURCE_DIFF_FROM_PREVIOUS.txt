@@ -1,50 +1,40 @@
-Project Guilty Spark - C35 r3 source comparison
-BASELINE_GIT_COMMIT: 98158685d1355ef1c83364dfc17f0e2147187673
+Project Guilty Spark - C35 r4 source comparison
+BASELINE_GIT_COMMIT: a53f2728d794f225742557767f1875882035a5f4
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 11
-MODIFIED_COUNT: 22
-UNCHANGED_COUNT: 1085
+ADDED_COUNT: 7
+MODIFIED_COUNT: 16
+UNCHANGED_COUNT: 1102
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/examples/qa_conversion_library.rs
-crates/spark-core/examples/qa_repair_conversion_resources.rs
-crates/spark-core/src/conversion_resources.rs
-docs/C35_CONVERSION_RESOURCE_REPAIR.md
-docs/fixtures/c35-conversion-repair-native-verification.json
-scripts/test-conversion-repair-native.mjs
-src-tauri/src/conversion_resources_native.rs
-src/components/ConversionBitmapRepair.tsx
-src/conversionResources.css
-src/conversionResources.test.ts
-src/conversionResources.ts
+crates/spark-core/examples/qa_recording_library.rs
+docs/C35_DIRECTOR_RECORDING.md
+docs/fixtures/c35-director-recording-native-verification.json
+scripts/test-director-recording-native.mjs
+src/directorCanvasCapture.test.ts
+src/directorCanvasCapture.ts
+src/mapSession.test.ts
 
 MODIFIED FILES
 CHANGELOG.md
 README.md
-crates/spark-core/examples/qa_convert.rs
-crates/spark-core/src/build.rs
-crates/spark-core/src/conversion.rs
-crates/spark-core/src/lib.rs
-crates/spark-core/src/native_workspace.rs
-crates/spark-core/src/project.rs
-docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md
 docs/CONTINUATION_35_ENGINEERING.md
 docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
 docs/CONTINUATION_35_TEST_CARD.md
 docs/GITHUB_HANDOFF.md
 docs/MASTER_FEATURE_LEDGER.csv
 scripts/continuation35-evidence.mjs
-src-tauri/src/app.rs
-src/App.tsx
-src/components/Build.tsx
+scripts/native-editor-capture-probe.mjs
+src-tauri/src/director_recording.rs
+src/components/DirectorWindow.tsx
+src/directorRecording.test.ts
+src/directorRecording.ts
+src/directorWindow.css
 src/featureCatalog.ts
-src/mapCatalog.ts
-src/types.ts
-tests/ui/native-contract.spec.ts
+src/mapSession.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-Earlier C32/C33/C34 and C35 r1/r2 release/source archives remain frozen.
+Earlier C32/C33/C34 and C35 r1/r2/r3 release/source archives remain frozen.
