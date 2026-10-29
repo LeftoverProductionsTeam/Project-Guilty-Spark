@@ -1,7 +1,8 @@
-Project Guilty Spark - C36 r1 source comparison
+Project Guilty Spark - C36 r2 source comparison
 BASELINE_GIT_COMMIT: 21804c191a918cbf8bd74efac60dfcec65c9083b
+SOURCE_CONTENT_GIT_COMMIT: 73433ac0e5c5b11bcac9cf316c6ce389b7239ef4
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 15
+ADDED_COUNT: 20
 MODIFIED_COUNT: 29
 UNCHANGED_COUNT: 1161
 REMOVED_COUNT: 0
@@ -11,12 +12,17 @@ ADDED FILES
 crates/spark-core/src/bsp_detail.rs
 crates/spark-core/src/portability.rs
 crates/spark-core/tests/portability.rs
+docs/C36_COMMUNITY_NATIVE_TESTS.md
 docs/CONTINUATION_36_ENGINEERING.md
 docs/CONTINUATION_36_GITHUB_DESCRIPTION.md
 docs/NATIVE_PORTABILITY.md
+docs/fixtures/c36-community-client-files.json
+docs/fixtures/c36-community-native-verification.json
 docs/fixtures/c36-native-preservation-verification.json
 docs/research/C36_COMMUNITY_INTEROPERABILITY.md
+scripts/analyze-community-runtime-native.mjs
 scripts/continuation36-evidence.mjs
+scripts/test-community-runtime-native.mjs
 scripts/test-portability-native.mjs
 src-tauri/src/portability_native.rs
 src/components/PortabilityLab.tsx
@@ -58,4 +64,4 @@ REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-All 29 currently present C35 release files (including sidecars/receipts) remain frozen and independently rehashed; absent older files are not reconstructed.
+All 29 currently present C35 release files (including sidecars/receipts) remain frozen and independently rehashed; absent older files are not reconstructed. Initial C36 r1 artifacts and sidecars are also retained unchanged.
