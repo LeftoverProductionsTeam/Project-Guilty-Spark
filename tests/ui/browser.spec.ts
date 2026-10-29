@@ -1,4 +1,13 @@
 import { test, expect } from '@playwright/test';
+test('runtime dock keeps all nine tools visible without a horizontal scrollbar',async({page})=>{
+  for(const size of [{width:1500,height:950},{width:1280,height:768},{width:1024,height:640}]){
+    await page.setViewportSize(size);await page.goto('/');
+    const dock=page.getByRole('contentinfo',{name:'Runtime & Tools Dock'});
+    for(const name of ['Play Halo','Test Scene','Edit level','Edit tags','Build','Publish','Find games','Host','Legacy tools'])await expect(dock.getByRole('button',{name:new RegExp(`^${name}`)})).toBeVisible();
+    const bounds=await dock.evaluate(element=>{const r=element.getBoundingClientRect();return {bottom:r.bottom,extra:element.scrollWidth-element.clientWidth,clipped:[...element.querySelectorAll('.runtime-dock-actions>button')].some(button=>button.getBoundingClientRect().right>r.right)};});
+    expect(bounds.bottom).toBeLessThanOrEqual(size.height);expect(bounds.extra).toBe(0);expect(bounds.clipped).toBe(false);
+  }
+});
 
 test('linked Halo sound segments decode in link order without an inserted gap', async ({page}) => {
   await page.goto('/');
@@ -104,7 +113,7 @@ test('preservation and runtime workspaces disclose unavailable evidence without 
   await page.goto('/');
   await page.getByRole('button', { name: 'Compare variants', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Import two map variants' })).toBeVisible();
-  await page.getByRole('button', { name: 'Runtimes & friends', exact: true }).click();
+  await page.getByRole('button', { name: 'Play & servers', exact: true }).click();
   await expect(
     page.getByText('Runtime discovery and file hashing require the desktop application.'),
   ).toBeVisible();

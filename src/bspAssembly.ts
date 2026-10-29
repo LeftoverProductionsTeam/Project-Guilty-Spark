@@ -13,6 +13,7 @@ export interface BspAssembly {
   tunnelWidth: number;
   tunnelHeight: number;
   tunnelShaderPath: string;
+  visibilityZones?: import('./visibilityZones').VisibilityZone[];
 }
 export interface BspOption {
   index: number;
@@ -41,7 +42,7 @@ export function assemblySignature(plan: BspAssembly | null): string {
     return value;
   };
   return JSON.stringify(
-    ordered(plan ? { ...plan, includeDonorScenery: plan.includeDonorScenery ?? false } : null),
+    ordered(plan ? { ...plan, visibilityZones: plan.visibilityZones?.length ? plan.visibilityZones : undefined, includeDonorScenery: plan.includeDonorScenery ?? false } : null),
   );
 }
 /** Move the imported section and keep its tunnel mouth attached. */

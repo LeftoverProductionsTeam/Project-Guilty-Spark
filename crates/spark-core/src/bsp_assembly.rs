@@ -43,6 +43,8 @@ pub struct BspAssembly {
     pub tunnel_width: f32,
     pub tunnel_height: f32,
     pub tunnel_shader_path: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub visibility_zones: Vec<crate::bsp_visibility::VisibilityZone>,
 }
 fn is_false(value: &bool) -> bool { !*value }
 impl BspAssembly {
@@ -99,6 +101,7 @@ impl BspAssembly {
         if self.tunnel_shader_path.len() > 200 {
             return invalid("Tunnel shader path is too long");
         }
+        crate::bsp_visibility::validate(&self.visibility_zones, &self.tunnel_points)?;
         Ok(())
     }
 }
@@ -624,7 +627,8 @@ fn add_portals(
     let inside = |p: V, b: (V, V)| (0..3).all(|k| p[k] >= b.0[k] - 0.1 && p[k] <= b.1[k] + 0.1);
     let slot = materials.len();
     let mut count = 0;
-    for pair in assembly.tunnel_points.windows(2) {
+    let mut generated_cuts:Vec<([[f64;3];4],bool)>=vec![];
+    for (segment, pair) in assembly.tunnel_points.windows(2).enumerate() {
         let (a, b) = (pair[0].map(f64::from), pair[1].map(f64::from));
         let d = sub(b, a);
         let length = d[0].hypot(d[1]);
@@ -633,27 +637,26 @@ fn add_portals(
             .map(|n| add(a, mul(d, n as f64 / steps as f64)))
             .filter(|p| !inside(*p, base_bounds) && !inside(*p, donor_bounds))
             .collect();
-        if candidates.len() < 4 {
+        let authored = crate::bsp_visibility::authored_centers(&assembly.visibility_zones, &assembly.tunnel_points, segment)?;
+        if authored.is_none() && candidates.len() < 4 {
             continue;
         }
-        let first = candidates[candidates.len() / 3];
-        let last = candidates[candidates.len() * 2 / 3];
-        if dot(sub(first, last), sub(first, last)) < 0.25 {
+        let [first, last] = authored.unwrap_or_else(||[candidates[candidates.len() / 3],candidates[candidates.len() * 2 / 3]]);
+        if [first,last].iter().any(|p|inside(*p,base_bounds)||inside(*p,donor_bounds)) {
+            return invalid("Authored visibility cuts must lie in an isolated tunnel segment outside both source BSP bounds; move the portal handles or choose a longer segment");
+        }
+        let separation_squared=dot(sub(first,last),sub(first,last));
+        if authored.is_some() && separation_squared<0.25-1e-8 {
+            return invalid("Authored visibility cuts are too close together");
+        } else if authored.is_none() && separation_squared<0.25 {
             continue;
         }
-        let side = [
-            -d[1] / length * assembly.tunnel_width as f64 / 2.,
-            d[0] / length * assembly.tunnel_width as f64 / 2.,
-            0.,
-        ];
         for center in [first, last] {
-            let up = [0., 0., assembly.tunnel_height as f64];
-            let points = [
-                sub(center, side),
-                add(center, side),
-                add(add(center, side), up),
-                add(sub(center, side), up),
-            ];
+            let points = if authored.is_some(){crate::bsp_visibility::authored_portal_quad(center,d,assembly.tunnel_width as f64,assembly.tunnel_height as f64)?}else{crate::bsp_visibility::portal_quad(center,d,assembly.tunnel_width as f64,assembly.tunnel_height as f64)?};
+            if generated_cuts.iter().any(|(previous,was_authored)|(*was_authored||authored.is_some())&&crate::bsp_visibility::portals_intersect(previous,&points)) {
+                return invalid("Authored visibility planes cross or overlap another portal. Move the handles away from the tunnel bend or other cuts");
+            }
+            generated_cuts.push((points,authored.is_some()));
             let n = normal(points[0], points[1], points[2]);
             let begin = mesh.positions.len() / 3;
             for p in points {
@@ -867,6 +870,7 @@ pub fn plan(
         tunnel_width: 2.,
         tunnel_height: 1.6,
         tunnel_shader_path: shader.path.clone(),
+        visibility_zones: vec![],
     };
     plan.validate()?;
     Ok(plan)
@@ -1106,6 +1110,23 @@ pub fn export_jms(geometry: &AssemblyGeometry) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn authored_visibility_exports_real_portal_faces_and_preserves_empty_serialization() {
+        let mut plan:BspAssembly=serde_json::from_value(serde_json::json!({"schemaVersion":1,"donorProjectId":uuid::Uuid::nil(),"donorTitle":"Fixture","donorSource":{"originalPath":"fixture.map","preservedPath":"fixture.map","sha256":"a".repeat(64),"cacheVersion":13,"engine":"fixture","scenarioPath":"fixture"},"donorTagsDirectory":"fixture","donorBspIndex":0,"translation":[0.,0.,0.],"yawDegrees":0.,"tunnelPoints":[[1.,0.,0.],[9.,0.,0.]],"tunnelWidth":2.,"tunnelHeight":1.6,"tunnelShaderPath":"fixture/metal"})).unwrap();
+        assert!(serde_json::to_value(&plan).unwrap().get("visibilityZones").is_none());
+        let bounds=|lo:f32,hi:f32|MeshData{positions:vec![lo,-1.,0.,hi,1.,2.,lo,1.,0.],indices:vec![0,1,2],parts:vec![maps::MeshPart{name:"fixture".into(),index_start:0,index_count:3}],..Default::default()};
+        let(base,donor)=(bounds(0.,2.),bounds(8.,10.));
+        plan.visibility_zones=vec![crate::bsp_visibility::VisibilityZone::Tunnel{id:uuid::Uuid::new_v4().to_string(),name:"Portal span".into(),segment:0,start:0.25,end:0.75}];
+        let(mut mesh,mut materials,mut slots)=(MeshData::default(),vec![],vec![]);
+        assert_eq!(add_portals(&mut mesh,&mut materials,&mut slots,&plan,&base,&donor).unwrap(),2);
+        assert_eq!(mesh.positions[0],3.);
+        assert_eq!(mesh.positions[12],7.);
+        let geometry=AssemblyGeometry{mesh,materials,triangle_materials:slots,report:AssemblyReport{input_triangles:0,output_triangles:4,generated_uv_faces:0,walk_samples:0,portal_count:2,donor_scenery:0,warnings:vec![]}};
+        assert!(export_jms(&geometry).unwrap().contains("+portal\r\n<none>\r\n"));
+        if let crate::bsp_visibility::VisibilityZone::Tunnel{start,..}=&mut plan.visibility_zones[0]{*start=0.05;}
+        assert!(add_portals(&mut MeshData::default(),&mut vec![],&mut vec![],&plan,&base,&donor).is_err());
+    }
 
     fn material() -> AssemblyMaterial {
         AssemblyMaterial {

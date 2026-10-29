@@ -4,6 +4,9 @@ import { COMMUNITY_MAP_SOURCES, describeCommunityDownload, filterCommunityMapSou
 import type { CommunityMapFilter } from '../communityMapSources';
 import { native } from '../api';
 import { HelpTip, Notice, PageTitle, Pill } from './ui';
+import MapDownload from './MapDownload';
+import type {MapDownloadAction} from './MapDownload';
+import type {OpenProject} from '../types';
 
 const FILTERS: {value: CommunityMapFilter; label: string}[] = [
   {value: 'all', label: 'All archives'}, {value: 'halo-ce', label: 'Custom Edition'},
@@ -11,8 +14,9 @@ const FILTERS: {value: CommunityMapFilter; label: string}[] = [
   {value: 'halo-md', label: 'HaloMD'},
 ];
 
-export default function CommunityMaps({onImport, onImportConvert, currentMapTitle, onConvertCurrent, onLibrary, busy}: {
+export default function CommunityMaps({onImport, onImportConvert, currentMapTitle, onConvertCurrent, onLibrary, busy,onDownloaded,targetLabel}: {
   onImport: () => void; onImportConvert: () => void; currentMapTitle: string|null; onConvertCurrent: () => void; onLibrary: () => void; busy: boolean;
+  onDownloaded?:(opened:OpenProject[],action:MapDownloadAction)=>void|Promise<void>;targetLabel?:string;
 }) {
   const [query, setQuery] = useState('');
   const [audience, setAudience] = useState<CommunityMapFilter>('all');
@@ -26,10 +30,11 @@ export default function CommunityMaps({onImport, onImportConvert, currentMapTitl
       description="Download a Custom Edition map from an archive, then import and convert it to MCC Halo 1 inside Spark. Conversion checks explain missing resources and unsupported features."
       actions={<><button className="small-button" onClick={onLibrary}><FolderOpen size={16}/> Your map library</button>
         <button className="primary" onClick={onImportConvert} disabled={!native || busy}><ArrowDownToLine size={16}/>{busy?'Importing…':'Import & convert to MCC'}</button></>}/>
-    <Notice tone="info">This is a curated directory, <strong>not</strong> a live inventory or a built-in downloader. Source links open outside Spark and downloads are initiated in your browser. No auto-installs, scraping, executable launches or replacement of game maps.</Notice>
+    <MapDownload onDownloaded={onDownloaded} busy={busy} targetLabel={targetLabel}/>
+    <Notice tone="info">The archives below are a researched directory. Their catalog links open in your browser; paste a direct map/package URL above to download and import inside Spark. No installs, executable launches or replacement of game maps.</Notice>
     <div className="gs-download-steps" aria-label="Download and import steps">
       <div><b>01</b><strong>Find a map</strong><p>Open an archive below. Confirm its author, edition, required resources and permission.</p></div>
-      <div><b>02</b><strong>Download yourself</strong><p>Use the author or archive download link in your browser. Keep the original package.</p></div>
+      <div><b>02</b><strong>Download into Spark</strong><p>Paste the direct author/package link above, or import a package you already downloaded.</p></div>
       <div><b>03</b><strong>Inspect in Spark</strong><p>Choose Import downloaded map. Spark preserves, hashes and validates supported files.</p></div>
       <div><b>04</b><strong>Convert to MCC</strong><p>Choose Import &amp; convert to MCC. Prepare installed MCC tools, resolve the compatibility report, then build and playtest the separate MCC package.</p></div>
     </div>

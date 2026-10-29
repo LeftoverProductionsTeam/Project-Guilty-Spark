@@ -111,6 +111,9 @@ fn start(s: &Session) {
         (s.pid, s.base, s.created, s.root.clone(), s.identity.clone());
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_millis(40));
+        if closed.load(Ordering::Acquire) {
+            break;
+        }
         let (Some(sprint), Some(scales), Some(camera)) =
             (weak.upgrade(), scales_weak.upgrade(), camera_weak.upgrade())
         else {
@@ -127,38 +130,40 @@ fn start(s: &Session) {
             sprint,
             camera,
         };
-        let _ = (|| -> Result<()> {
-            let _edit = EditLock::acquire(&session)?;
-            let mut data = session
-                .sprint
-                .data
-                .lock()
-                .map_err(|_| fail("Sprint state lock failed"))?;
-            if !data.enabled {
-                return Ok(());
-            }
-            let update = (|| -> Result<()> {
-                let p = guarded(&session, false)?;
-                let down = data.enabled && held(&session, &data.config.hotkey)?;
-                if sprint::needs_update(&p, base, &identity, &data.state, &data.config, down)? {
-                    let p = guarded(&session, true)?;
-                    let _paused = PausedThreads::acquire(pid)?;
-                    let config = data.config.clone();
-                    sprint::tick(&p, base, &identity, &mut data.state, &config, down)?;
+        let polled = controller_poll::run(
+            &closed,
+            &session.sprint.data,
+            "Sprint",
+            |data| Ok(data.enabled.then_some(())),
+            || EditLock::acquire(&session),
+            |data, _| data.enabled,
+            |data, _| {
+                let update = (|| -> Result<()> {
+                    let p = guarded(&session, false)?;
+                    let down = data.enabled && held(&session, &data.config.hotkey)?;
+                    if sprint::needs_update(&p, base, &identity, &data.state, &data.config, down)? {
+                        let p = guarded(&session, true)?;
+                        let _paused = PausedThreads::acquire(pid)?;
+                        let config = data.config.clone();
+                        sprint::tick(&p, base, &identity, &mut data.state, &config, down)?;
+                    }
+                    Ok(())
+                })();
+                if let Err(error) = update {
+                    let restore = restore_data(&session, data);
+                    data.error = Some(format!(
+                        "Native sprint stopped: {error}. {}",
+                        restore.err().map_or(
+                            "Original speed restored or no pending change.".into(),
+                            |e| format!("Restore requires attention: {e}")
+                        )
+                    ));
                 }
                 Ok(())
-            })();
-            if let Err(error) = update {
-                let restore = restore_data(&session, &mut data);
-                data.error = Some(format!(
-                    "Native sprint stopped: {error}. {}",
-                    restore.err().map_or(
-                        "Original speed restored or no pending change.".into(),
-                        |e| format!("Restore requires attention: {e}")
-                    )
-                ));
-            }
-            Ok(())
-        })();
+            },
+        );
+        if matches!(polled, Ok(controller_poll::Outcome::Closed)) {
+            break;
+        }
     });
 }

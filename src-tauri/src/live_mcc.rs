@@ -8,6 +8,9 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
+#[path = "live_controller_poll.rs"]
+#[cfg(any(windows, test))]
+mod controller_poll;
 #[derive(Default)]
 pub struct ScaleSession {
     state: Mutex<scaling::ScaleState>,
@@ -22,7 +25,7 @@ pub struct NativeSprintSession {data:Mutex<NativeSprintData>,started:AtomicBool}
 #[serde(rename_all="camelCase")]
 pub struct NativeSprintStatus {pub enabled:bool,pub sprinting:bool,pub restore_pending:bool,pub config:live::sprint::Config,pub observed:Option<live::sprint::Info>,pub error:Option<String>,pub detail:String}
 #[derive(Default)]
-struct NativeCameraData {enabled:bool,config:live::camera::Config,state:live::camera::State,error:Option<String>,shortcut:live::camera::Shortcut,shortcut_latch:live::camera::ShortcutLatch}
+struct NativeCameraData {enabled:bool,config:live::camera::Config,state:live::camera::State,error:Option<String>,shortcut:live::camera::Shortcut,shortcut_latch:live::camera::ShortcutLatch,poll_revision:u64}
 #[derive(Default)]
 pub struct NativeCameraSession {data:Mutex<NativeCameraData>,started:AtomicBool}
 #[derive(Serialize)]

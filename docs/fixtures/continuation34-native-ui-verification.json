@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "nativeDesktop": true,
+  "appSha256": "3c6d00009a9e50ea0f0700fb01d0efece38a7462ce4355bf5f92593493c29bee",
+  "toolPreviewPlans": [
+    {
+      "actionId": "testScene",
+      "architecture": "x86",
+      "sha256": "fc9e2b6193c6f6d9ff988278b0d39a983747f3fdbdeca7cafadd28f1f0c53e73",
+      "unconfirmedLaunchRejected": true
+    },
+    {
+      "actionId": "editLevel",
+      "architecture": "x86",
+      "sha256": "44b1208d8c663d22654072664007e2ddcbe781bd738525ddd164125757dde4c8",
+      "unconfirmedLaunchRejected": true
+    },
+    {
+      "actionId": "editTags",
+      "architecture": "x86",
+      "sha256": "0fafb97046b6f8e93ddf95d0f92f802b708585377b9fb552775ff7a9394ccfa9",
+      "unconfirmedLaunchRejected": true
+    }
+  ],
+  "dependencyChecks": [
+    {
+      "id": "game",
+      "state": "ready",
+      "architecture": null
+    },
+    {
+      "id": "steam",
+      "state": "ready",
+      "architecture": "x86_64"
+    },
+    {
+      "id": "h1a",
+      "state": "ready",
+      "architecture": "x86"
+    },
+    {
+      "id": "invader",
+      "state": "unverified",
+      "architecture": "x86_64"
+    },
+    {
+      "id": "resources",
+      "state": "notApplicable",
+      "architecture": null
+    },
+    {
+      "id": "tags",
+      "state": "setupRequired",
+      "architecture": null
+    },
+    {
+      "id": "webview2",
+      "state": "ready",
+      "architecture": null
+    }
+  ],
+  "dependencyPreviewChecked": true,
+  "foreignMccInvitationBlocked": true,
+  "externalSave": {
+    "realPrivateCopy": true,
+    "automaticRevision": true,
+    "oldPreservedSha256": "85d2390bdeced18f8f7617b751ddcbf42555ab4533aa8a993ebb0dcd28f9095b",
+    "newPreservedSha256": "85a30bd8a1eca633df1f68eae1743bf6dce76a41ba03ff1996f50c91128fa4de",
+    "auditedFieldReadback": true,
+    "originalRetained": true
+  },
+  "realProviderRows": 51,
+  "providerRejectedRows": 0,
+  "tokenRedaction": true,
+  "wrongRuntimeBlocked": true,
+  "contentFiles": 203,
+  "validCacheIndexes": 30,
+  "contentProbeComplete": true,
+  "gameOrToolLaunched": false,
+  "gameMemoryTouched": false,
+  "gameConnectionObserved": false,
+  "fixtureReplicated": true,
+  "originalLibraryModified": false
+}

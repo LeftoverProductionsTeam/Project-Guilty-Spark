@@ -1,0 +1,51 @@
+.external-map-sync {
+  margin: 4px 0;
+  padding: 5px 9px;
+  color: var(--text, #edf7ff);
+  background: var(--panel, #101921);
+  border-bottom: 1px solid var(--line, #28404d);
+  font-size: 11px;
+}
+.external-map-sync-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.external-map-sync-status strong {
+  color: var(--accent, #5ee2ef);
+}
+.external-map-sync button {
+  font-size: 11px;
+  min-height: 25px;
+  padding: 3px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.external-map-sync > details {
+  margin-top: 3px;
+  max-height: 35vh;
+  overflow: auto;
+}
+.external-map-sync summary {
+  cursor: pointer;
+}
+.external-map-sync-paths {
+  display: grid;
+  gap: 5px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line, #28404d);
+}
+.external-map-sync-paths label {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.external-map-sync-paths code {
+  overflow-wrap: anywhere;
+  user-select: text;
+  color: var(--text, #edf7ff);
+}

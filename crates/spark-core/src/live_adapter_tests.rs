@@ -131,6 +131,30 @@ fn native_sprint_uses_the_authored_player_multiplier_without_compounding_and_res
     assert!(m.writes.borrow().iter().all(|at|*at==record+0xd4));
 }
 #[test]
+fn explicit_native_controller_restoration_does_not_write_twice() {
+    let (m, id, record) = sprint_fixture();
+    let mut sprint_state = sprint::State::default();
+    sprint::tick(&m, BASE, &id, &mut sprint_state, &sprint::Config::default(), true).unwrap();
+    sprint::reset(&m, BASE, &id, &mut sprint_state).unwrap();
+    let restored_writes = m.writes.borrow().len();
+    assert_eq!(restored_writes, 2, "one apply and one restore");
+    assert_eq!(u32_at(&m, record + 0xd4).unwrap(), 1.2f32.to_bits());
+    assert!(!sprint_state.active());
+    sprint::reset(&m, BASE, &id, &mut sprint_state).unwrap();
+    assert_eq!(m.writes.borrow().len(), restored_writes);
+
+    let (m, id) = camera_fixture();
+    let mut camera_state = camera::State::default();
+    camera::apply(&m, BASE, &id, &mut camera_state, Some(&camera::Config::default())).unwrap();
+    camera::apply(&m, BASE, &id, &mut camera_state, None).unwrap();
+    let restored_writes = m.writes.borrow().len();
+    assert_eq!(vec3(&m, CAMERA_POINTS).unwrap(), [-1., 0., 0.5]);
+    assert_eq!(u32_at(&m, CAMERA_WEAPON + 0x308).unwrap(), 0x21);
+    assert!(!camera_state.active());
+    camera::apply(&m, BASE, &id, &mut camera_state, None).unwrap();
+    assert_eq!(m.writes.borrow().len(), restored_writes);
+}
+#[test]
 fn native_sprint_releases_for_reload_crouch_vehicle_and_death_without_velocity_writes(){
     for (at,bytes)in[(OBJECT+0x1d8,0x400u32.to_le_bytes()),(OBJECT+0x1d8,1u32.to_le_bytes()),(OBJECT+0xd8,7u32.to_le_bytes()),(OBJECT+0x9c,0f32.to_le_bytes())]{
         let(m,id,record)=sprint_fixture();let mut state=sprint::State::default();let config=sprint::Config::default();sprint::tick(&m,BASE,&id,&mut state,&config,true).unwrap();

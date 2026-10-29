@@ -178,6 +178,25 @@ async function mockDesktop(page: Page) {
         if (command === 'open_project') {if(mock.delayOpen){const delay=mock.delayOpen;mock.delayOpen=0;await new Promise(resolve=>setTimeout(resolve,delay));}return structuredClone(projects[args.id]);}
         if (command === 'claim_project_document' || command === 'release_project_document') return null;
         if (command === 'auto_connect_classic_textures') return null;
+        if (command === 'external_map_watch_start' || command === 'external_map_watch_poll') return {watchId:args.projectId??args.watchId,projectId:args.projectId??args.watchId,path:'C:/synthetic/external.map',status:'watching',candidate:null,message:'Watching a synthetic input; no real filesystem is read.'};
+        if (command === 'external_map_watch_stop') return null;
+        if (command === 'runtime_workbench_report') {
+          const actionNames = [['play','Play Halo'],['testScene','Test Scene'],['editLevel','Edit level'],['editTags','Edit tags'],['build','Build'],['publish','Publish'],['findGames','Find games'],['host','Host'],['legacy','Legacy tools']];
+          return {report:{schemaVersion:1,profileId:'synthetic',target:{family:'halo1',edition:'synthetic',platform:'windows',distribution:'synthetic',architecture:'x86_64'},capabilities:[],diagnostics:[],playerScale:{goalPlayers:128,checkpoints:[2,8,16,32,64,128],acceptedGamePlayers:null}},profiles:[],sourceIssue:'Synthetic source not built',toolsIssue:'Synthetic kit not configured',actions:actionNames.map(([id,label])=>({id,label,operation:id,availability: id==='findGames'?'ready':'setupRequired',description:'Synthetic operation',nextAction:'Set up the matching runtime',requiresConfirmation:false})),processes:[]};
+        }
+        if (command === 'runtime_tool_processes') return [];
+        if (command === 'community_listing') {
+          const timestamp=Math.floor(Date.now()/1000);
+          const servers=['a','b'].map((id,index)=>({id:id.repeat(64),provider:'Synthetic Delta List',source:'synthetic',name:`Synthetic game ${index+1}`,map:{family:'xbox',name:'bloodgulch',pack:null,displayName:'Blood Gulch'},gameType:'Slayer',mode:'multiplayer',players:2,advertisedCapacity:128,open:true,locked:false,inProgress:true,legacyNetworkVersion:43,protocol:'delta',build:null,platform:null,hosting:'synthetic',region:null,providerVerified:false,fetchedAtUnix:timestamp,advertisementAgeSeconds:0}));
+          const result={listing:{provider:'synthetic',fetchedAtUnix:timestamp,expiresAtUnix:timestamp+30,servers,rejectedRows:0,diagnostics:[]},stale:false,refreshAfterUnix:timestamp+30,fetching:false,error:null};
+          if(w.__sparkMock.deferListing)return new Promise(resolve=>{w.__sparkMock.finishListing=()=>resolve(result);});
+          return result;
+        }
+        if (command === 'community_join_preflight') {
+          const result={readiness:'blocked',runtimeId:args.runtimeId,registrationId:'synthetic',issues:[{code:'wrongRuntime',summary:'This synthetic game needs a compatible community runtime',setupRoute:'Runtime adapters'}],limitations:['Synthetic contract only; no game was launched'],connectionOutcome:'unobserved'};
+          if(w.__sparkMock.deferJoinCheck)return new Promise(resolve=>{w.__sparkMock.finishJoinCheck=()=>resolve(result);});
+          return result;
+        }
         if (command === 'bsp_assembly_options') return [{index:0,name:'Synthetic campaign interior',triangles:12}];
         if (command === 'plan_bsp_assembly') {
           const plan = {schemaVersion:1,donorProjectId:args.donorProjectId,donorTitle:projects[args.donorProjectId].project.title,donorSource:structuredClone(projects[args.donorProjectId].project.source),donorTagsDirectory:'C:/synthetic/tags',donorBspIndex:args.donorBspIndex,translation:[20,0,0],yawDegrees:0,tunnelPoints:[[0,0,0],[20,0,0]],tunnelWidth:2,tunnelHeight:1.6,tunnelShaderPath:'synthetic/stone'};
@@ -293,6 +312,161 @@ async function openFixture(page: Page) {
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
 
+test('dependency setup offers a reviewed official install action without launching on inspection or cancel',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+    if(command==='dependency_report')return {schemaVersion:1,runtimeId:args.runtimeId,projectId:args.projectId,platform:'windows',diagnostics:[],items:[{id:'h1a',label:'Halo CE Mod Tools · MCC',state:'setupRequired',detail:'Install the official editing kit in Steam.',path:null,sha256:null,architecture:null,actions:[{id:'h1a.install',kind:'installH1aViaSteam',label:'Install Halo CE Mod Tools in Steam',target:'steam://install/1532190',requiresReview:true}]}]};
+    if(command==='prepare_dependency_action')return {id:'fixture-preview',actionId:'h1a.install',runtimeId:args.runtimeId,projectId:args.projectId,label:'Review Steam install',uri:'steam://install/1532190',executable:'C:/synthetic/Steam.exe',executableArchitecture:'x86',executableSha256:'a'.repeat(64),arguments:['steam://install/1532190'],expiresAtUnix:Math.floor(Date.now()/1000)+90,detail:'Synthetic review only'};
+    if(command==='discard_dependency_action'){w.__sparkMock.discardedDependency=true;return null;}
+    if(command==='run_dependency_action'){w.__sparkMock.installedDependency=true;return {outcome:'handoffUnobserved',detail:'Synthetic Steam UI handoff; no installer ran'};}
+    return original(command,args);
+  };});
+  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();await page.getByRole('tab',{name:'Dependencies & setup',exact:true}).click();
+  await expect(page.getByText('Setup needed',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Install Halo CE Mod Tools in Steam',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Open Steam install UI',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Cancel dependency action',exact:true}).click();
+  expect(await page.evaluate(()=>(window as any).__sparkMock.installedDependency??false)).toBe(false);
+  expect(await page.evaluate(()=>(window as any).__sparkMock.discardedDependency)).toBe(true);
+  await page.getByRole('button',{name:'Install Halo CE Mod Tools in Steam',exact:true}).click();
+  await page.getByRole('checkbox',{name:/I reviewed this destination/}).check();await page.getByRole('button',{name:'Open Steam install UI',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Dependencies and setup'}).getByRole('status')).toContainText('Synthetic Steam UI handoff');
+});
+
+test('an MCC invitation check explains the missing foreign protocol bridge and never offers a false join',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+    if(command==='invitation_prepare')return {id:null,expiresAtUnix:0,executable:null,executableSha256:null,dataRoot:null,route:{client:args.client,kind:'nativeCommunity',canHandoff:false,translationStatus:'mccProtocolBridgeMissing',detail:'The selected MCC client does not implement this protocol.',requirements:[],gameplayVerified:false}};
+    return original(command,args);
+  };});
+  await page.getByRole('button',{name:'Play & servers',exact:true}).click();await page.locator('input[aria-label="Game invitation"]').fill('halo://join/'+'a'.repeat(64));
+  await page.getByRole('button',{name:'Check invitation & adapter',exact:true}).click();
+  await expect(page.getByText(/MCC-to-OpenCE\/Chupathingy\/WebRTC gameplay translation is not implemented/)).toBeVisible();
+  await expect(page.getByRole('button',{name:'Hand invitation to client',exact:true})).toHaveCount(0);
+  await expect(page.locator('input[aria-label="Game invitation"]')).toHaveValue('');
+});
+
+async function prepareExternalRevision(page:Page){await page.evaluate(()=>{
+  const w=window as any,m=w.__sparkMock;const opened=structuredClone(m.projects.a);opened.project.id='d';opened.project.title='Synthetic external revision';opened.project.source.sha256='d'.repeat(64);opened.inspection.sha256='d'.repeat(64);opened.inspection.tags[0].fields[0].value=33;m.projects.d=opened;
+  const original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+    if(command==='external_map_watch_poll'&&args.watchId==='a'&&m.changedExternal)return {watchId:'a',projectId:'a',path:'C:/synthetic/external.map',status:'changed',candidate:{sha256:'d'.repeat(64),cacheVersion:7,scenarioPath:'levels/test',matchesSource:true,fileSize:100},message:'Synthetic external save ready'};
+    if(command==='external_map_change_import'){m.changedExternal=false;return {previousProjectId:'a',watchedPath:'C:/synthetic/external.map',opened:structuredClone(m.projects.d),deduplicated:false};}
+    return original(command,args);
+  };
+});}
+test('external saves refresh a clean map and retain its tag view without changing another open map',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await prepareExternalRevision(page);
+  await expect(page.getByLabel('External map changes')).toContainText('watching 1 map');
+  await page.evaluate(()=>{(window as any).__sparkMock.changedExternal=true;});await page.getByRole('button',{name:'Scan now',exact:true}).click();
+  await expect(page.getByRole('tab',{name:/Synthetic external revision/})).toBeVisible();
+  await expect(page.getByRole('tab',{name:/Synthetic baseline/})).toHaveCount(0);
+  await expect(page.getByRole('spinbutton').first()).toHaveValue('33');
+});
+test('external saves preserve a Spark tag draft and open the changed map separately',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await prepareExternalRevision(page);
+  await page.getByRole('spinbutton').first().fill('20');await page.getByRole('spinbutton').first().blur();
+  await expect(page.getByLabel('External map changes')).toContainText('watching 1 map');
+  await page.evaluate(()=>{(window as any).__sparkMock.changedExternal=true;});await page.getByRole('button',{name:'Scan now',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Open changed map and keep Spark edits',exact:true})).toBeVisible();
+  await expect(page.getByRole('tab',{name:/Synthetic external revision/})).toHaveCount(0);
+  await page.getByRole('button',{name:'Open changed map and keep Spark edits',exact:true}).click();await expect(page.getByRole('tab',{name:/Synthetic external revision/})).toBeVisible();
+  await page.getByRole('tab',{name:/Synthetic baseline/}).click();await page.getByRole('button',{name:'Tag editor',exact:true}).click();await expect(page.getByRole('spinbutton').first()).toHaveValue('20');
+});
+
+test('in-app downloads open all imported maps and retain an already open edited draft',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await page.getByRole('spinbutton').first().fill('20');await page.getByRole('spinbutton').first().blur();
+  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+    const status={id:'synthetic-download',phase:'imported',bytes:100,total:100,sourceUrl:'https://example.com',detail:'Synthetic preserved download',projectIds:['a','b']};
+    if(command==='prepare_map_download'||command==='map_download_status')return status;
+    if(command==='download_and_import_maps')return [structuredClone(w.__sparkMock.projects.a),structuredClone(w.__sparkMock.projects.b)];
+    return original(command,args);
+  };});
+  await page.getByRole('button',{name:'Community maps',exact:true}).click();await page.getByLabel('Direct map download URL').fill('https://example.com/arena.zip');await page.getByLabel('Downloaded map action').selectOption('tags');await page.getByRole('button',{name:'Download & import map',exact:true}).click();
+  await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toBeVisible();await expect(page.getByRole('tab',{name:/Synthetic baseline/})).toBeVisible();await expect(page.getByRole('spinbutton').first()).toHaveValue('20');
+});
+
+test('community games appear on first open and an obsolete requirement check cannot lock the browser', async ({page}) => {
+  await mockDesktop(page); await openFixture(page);
+  await page.evaluate(() => {(window as any).__sparkMock.deferListing = true;});
+  await page.getByRole('button', {name:'Play & servers',exact:true}).click();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).__sparkMock.finishListing)).toBe('function');
+  await page.evaluate(() => (window as any).__sparkMock.finishListing());
+  const games = page.getByRole('list', {name:'Advertised games'});
+  await expect(games.getByRole('listitem')).toHaveCount(2);
+  await games.getByRole('listitem').first().click();
+  const check = page.getByRole('button', {name:'Check installed runtime & map',exact:true});
+  await expect(check).toBeEnabled();
+  await page.evaluate(() => {(window as any).__sparkMock.deferJoinCheck = true;});
+  await check.click();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).__sparkMock.finishJoinCheck)).toBe('function');
+  await games.getByRole('listitem').nth(1).click();
+  await page.evaluate(() => (window as any).__sparkMock.finishJoinCheck());
+  await expect(page.getByRole('region', {name:'Selected game requirements'}).getByRole('heading',{name:'Synthetic game 2',exact:true})).toBeVisible();
+  await expect(check).toBeEnabled();
+  await expect(page.getByText('Requirements need attention',{exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button', {name:'Hand invitation to game',exact:true})).toHaveCount(0);
+});
+
+test('a second map window receives a shared listing refresh without another HTTPS request',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+    if(command==='community_listing'&&args.refresh){return {listing:null,fetching:true,stale:true,error:null,refreshAfterUnix:Math.floor(Date.now()/1000)+30};}
+    return original(command,args);
+  };});
+  await page.getByRole('button',{name:'Play & servers',exact:true}).click();await expect(page.getByRole('list',{name:'Advertised games'}).getByRole('listitem')).toHaveCount(2);
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((item:any)=>item.command==='community_listing'&&item.args.refresh===false))).toBe(true);
+});
+
+test('runtime dock remembers each map target and rejects a late tool preview from another map', async ({page}) => {
+  await mockDesktop(page); await openFixture(page);
+  const dock = page.getByRole('contentinfo', {name:'Runtime & Tools Dock'});
+  await dock.getByRole('combobox', {name:'Active map runtime'}).selectOption('openCe');
+  await page.getByRole('button', {name:'Map library',exact:true}).click();
+  await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();
+  await expect(dock.getByRole('combobox',{name:'Active map runtime'})).toHaveValue('mccSteam');
+  await page.getByRole('tab',{name:/Synthetic baseline/}).click();
+  await expect(dock.getByRole('combobox',{name:'Active map runtime'})).toHaveValue('openCe');
+  await dock.getByRole('combobox',{name:'Active map runtime'}).selectOption('mccSteam');
+  await page.evaluate(() => {
+    const w=window as any, original=w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any) => {
+      if(command==='runtime_workbench_report'){const report=await original(command,args);report.actions.find((a:any)=>a.id==='editLevel').availability='ready';return report;}
+      if(command==='prepare_runtime_tool')return new Promise(resolve=>{w.__sparkMock.finishToolPreview=()=>resolve({id:'synthetic',runtimeId:'mccSteam',actionId:'editLevel',projectId:'a',buildId:'synthetic',executable:'C:/synthetic/sapien.exe',executableSha256:'a'.repeat(64),workingDirectory:'C:/synthetic/job',tagsDirectory:'C:/synthetic/job/tags',scenarioFile:'C:/synthetic/job/tags/level.scenario',arguments:[],startupScript:null,expiresAtUnix:Math.floor(Date.now()/1000)+90,detail:'Synthetic plan only'});});
+      return original(command,args);
+    };
+  });
+  await dock.getByRole('button',{name:'Runtime and tool details',exact:true}).click();
+  await page.getByRole('button',{name:'Refresh inspection',exact:true}).click();
+  await page.getByRole('button',{name:'Close runtime details',exact:true}).click();
+  await dock.getByRole('button',{name:/^Edit level/}).click();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).__sparkMock.finishToolPreview)).toBe('function');
+  await page.getByRole('tab',{name:/Synthetic candidate/}).click();
+  await page.evaluate(() => (window as any).__sparkMock.finishToolPreview());
+  await expect(page.getByRole('heading',{name:'Open Sapien',exact:true})).toHaveCount(0);
+  await expect(dock).toContainText('Synthetic candidate');
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>call.command==='launch_runtime_tool'))).toBe(false);
+});
+
+test('runtime dock observes an exited tool and makes its action available again', async ({page}) => {
+  await mockDesktop(page); await openFixture(page);
+  await page.evaluate(() => {
+    const w=window as any, original=w.__TAURI_INTERNALS__.invoke;w.__sparkMock.toolRunning=true;
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any) => {
+      const process={id:'synthetic-process',actionId:'editLevel',projectId:'a',processId:42,status:w.__sparkMock.toolRunning?'running':'exited',exitCode:w.__sparkMock.toolRunning?null:0,detail:'Synthetic lifecycle only'};
+      if(command==='runtime_tool_processes')return [process];
+      if(command==='runtime_workbench_report'){const report=await original(command,args);report.actions.find((a:any)=>a.id==='editLevel').availability=w.__sparkMock.toolRunning?'running':'ready';report.processes=[process];return report;}
+      return original(command,args);
+    };
+  });
+  const dock=page.getByRole('contentinfo',{name:'Runtime & Tools Dock'});
+  await dock.getByRole('button',{name:'Runtime and tool details',exact:true}).click();
+  await page.getByRole('button',{name:'Refresh inspection',exact:true}).click();
+  await page.getByRole('button',{name:'Close runtime details',exact:true}).click();
+  await expect(dock.getByRole('button',{name:/^Edit level/})).toContainText('Running');
+  await page.evaluate(() => {(window as any).__sparkMock.toolRunning=false;});
+  await expect(dock.getByRole('button',{name:/^Edit level/})).toContainText('Ready',{timeout:7000});
+});
+
 test('campaign tag duplicates stay map-owned and undoable, and UI maps expose their own tags',async({page})=>{
   await mockDesktop(page);
   await page.evaluate(()=>{
@@ -344,7 +518,7 @@ test('slow onboarding saves keep navigation available and do not steal a later r
   await page.getByRole('button',{name:'Start here',exact:true}).click();await expect(page.getByRole('heading',{name:'Your editing tools',exact:true})).toBeVisible();
 });
 test('hosting uses the selected map and gameplay presets retain fixed left and right gun controls',async({page})=>{
-  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();
+  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Play & servers',exact:true}).click();
   await page.getByRole('button',{name:'Hosting & servers',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic MCC Custom Games guide',exact:true})).toBeVisible();
   await expect(page.getByText('Use Halo CE Custom Games for this multiplayer map.',{exact:true})).toBeVisible();
@@ -354,17 +528,17 @@ test('hosting uses the selected map and gameplay presets retain fixed left and r
   await page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true}).selectOption('KeyV');
   await expect(page.getByText('Left gun · independent primary trigger',{exact:true})).toBeVisible();
   await expect(page.getByText('Right gun · independent secondary trigger',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();
+  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Play & servers',exact:true}).click();
   await expect(page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true})).toHaveValue('KeyV');
   await expect(page.getByText('Changing a preset does not enable them in the running game.',{exact:false})).toBeVisible();
 });
 
 test('native camera position edits persist across tools and restore through the adapter',async({page})=>{
-  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
+  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Play & servers',exact:true}).click();await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
   const camera=page.locator('.native-camera-controls');await camera.locator('summary').click();
   await camera.getByRole('button',{name:'Enable third-person camera',exact:true}).click();await expect(camera.getByText('Third-person camera active',{exact:false})).toBeVisible();
   await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).fill('-0.45');await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).press('Enter');await camera.getByRole('button',{name:'Apply camera position',exact:true}).click();
-  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();await camera.locator('summary').click();
+  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Play & servers',exact:true}).click();await camera.locator('summary').click();
   await expect(camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true})).toHaveValue('-0.45');
   await camera.getByRole('button',{name:'Restore original camera',exact:true}).click();await expect(camera.getByText('Original camera selected',{exact:false})).toBeVisible();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='live_mcc_camera_configure'));expect(calls.map((c:any)=>c.args.enabled)).toEqual([true,true,false]);expect(calls[1].args.config.right).toBe(-.45);
@@ -372,7 +546,7 @@ test('native camera position edits persist across tools and restore through the 
 
 test('the dedicated camera button toggles without opening settings and uses current native state',async({page})=>{
   await mockDesktop(page);await openFixture(page);
-  await page.getByRole('button',{name:'Runtimes & friends',exact:true}).click();
+  await page.getByRole('button',{name:'Play & servers',exact:true}).click();
   await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
   const camera=page.locator('.native-camera-controls'),button=camera.getByRole('button',{name:'Toggle in-game third person',exact:true});
   await expect(camera.locator('details')).not.toHaveAttribute('open','');
@@ -735,7 +909,8 @@ test('a delayed replacement plan cannot overwrite edits made while it runs', asy
 test('friends preflight surfaces blocked proof without a network success claim', async ({ page }) => {
   await mockDesktop(page);
   await openFixture(page);
-  await page.getByRole('button', { name: 'Runtimes & friends', exact: true }).click();
+  await page.getByRole('button', { name: 'Play & servers', exact: true }).click();
+  await page.getByRole('button', { name: 'Runtime adapters', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open Steam launch selector', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Friends preflight', exact: true }).click();
   await page.getByRole('button', { name: 'Create manifest', exact: true }).click();

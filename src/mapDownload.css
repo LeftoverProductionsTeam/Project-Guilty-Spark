@@ -1,0 +1,23 @@
+.gs-direct-map-download label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  color: var(--text, #eefaff);
+}
+.gs-direct-map-download input,
+.gs-direct-map-download select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface, #101c29);
+  color: var(--text, #eefaff);
+  border: 1px solid var(--border, #40576b);
+}
+.gs-direct-map-download p {
+  overflow-wrap: anywhere;
+}
+.gs-direct-map-download progress {
+  width: min(500px, 100%);
+  margin-right: 12px;
+  accent-color: var(--accent, #68e9df);
+}

@@ -6,6 +6,7 @@ import LiveObjectInspector from './LiveObjectInspector';
 import type { LiveViewportControls, LiveStatus } from './LiveObjectInspector';
 import { matchesLiveMap, runtimeScene } from '../liveScene';
 import { Notice } from './ui';
+import {assemblySignature} from '../bspAssembly';
 const World = lazy(() => import('./World'));
 type DropPoint = (x: number, y: number) => Vec3 | null;
 function LiveCameraStart({ status }: { status: LiveStatus }) {
@@ -160,7 +161,7 @@ function LiveViewport({
       const before = scene.find((s) => s.id === o.id);
       return !before || JSON.stringify(before) !== JSON.stringify(o);
     });
-    if(!changed.length&&next.scene.length===scene.length&&onSourceEdit&&(JSON.stringify(next.renderFeatures)!==JSON.stringify(project!.renderFeatures)||JSON.stringify(next.worldEnvironment)!==JSON.stringify(project!.worldEnvironment))){onSourceEdit({...project!,renderFeatures:next.renderFeatures,worldEnvironment:next.worldEnvironment},description);return;}
+    if(!changed.length&&next.scene.length===scene.length&&onSourceEdit&&(JSON.stringify(next.renderFeatures)!==JSON.stringify(project!.renderFeatures)||JSON.stringify(next.worldEnvironment)!==JSON.stringify(project!.worldEnvironment)||assemblySignature(next.bspAssembly??null)!==assemblySignature(project!.bspAssembly??null))){onSourceEdit({...project!,renderFeatures:next.renderFeatures,worldEnvironment:next.worldEnvironment,bspAssembly:next.bspAssembly},description);return;}
     if (next.scene.length !== scene.length || changed.length !== 1) {
       notify(
         'Live duplication, deletion and multi-object source edits need engine support. No game operation was sent.',

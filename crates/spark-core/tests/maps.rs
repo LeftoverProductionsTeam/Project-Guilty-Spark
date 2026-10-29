@@ -5,6 +5,36 @@ use spark_core::{
     maps::{self, parse_header},
 };
 #[test]
+fn sound_scenery_accepts_ssce_and_retains_real_cross_class_warnings() {
+    let d = tempfile::tempdir().unwrap();
+    let path = d.path().join("sound-scenery.map");
+    for version in [7, 13] {
+        let mut bytes = fixture(version);
+        fourcc(&mut bytes, 0x828 + 64, "ssce");
+        put_u32(&mut bytes, 0x1000 + 0x2dc, 1);
+        put_u32(&mut bytes, 0x1000 + 0x2e0, pointer(version, 0x3400));
+        put_u32(&mut bytes, 0x1000 + 0x2e8, 1);
+        put_u32(&mut bytes, 0x1000 + 0x2ec, pointer(version, 0x3500));
+        put_u32(&mut bytes, 0x350c, 0xe0000002);
+        std::fs::write(&path, &bytes).unwrap();
+        let report = maps::inspect_map(&path, None).unwrap();
+        assert!(report.objects.iter().any(|o| o.kind == "Sound scenery"
+            && o.tag_id == Some(0xe0000002)));
+        assert!(!report.diagnostics.iter().any(|d|
+            d.code == "LEGACY_PLACEMENT_CLASS" && d.message.starts_with("Sound scenery")));
+        // The original synthetic fixture intentionally assigns a weapon to
+        // scenery. That independent, real mismatch must still be diagnosed.
+        assert!(report.diagnostics.iter().any(|d|
+            d.code == "LEGACY_PLACEMENT_CLASS" && d.message.starts_with("Scenery")));
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        put_u32(&mut bytes, 0x350c, 0xe0000001);
+        std::fs::write(&path, &bytes).unwrap();
+        let report = maps::inspect_map(&path, None).unwrap();
+        assert!(report.diagnostics.iter().any(|d|
+            d.code == "LEGACY_PLACEMENT_CLASS" && d.message.starts_with("Sound scenery")));
+    }
+}
+#[test]
 fn bounds_known_legacy_whole_file_tag_size_without_touching_source() {
     let d = tempfile::tempdir().unwrap();
     let path = d.path().join("pearl.map");

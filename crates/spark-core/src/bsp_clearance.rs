@@ -313,6 +313,7 @@ mod tests {
             tunnel_width: 2.,
             tunnel_height: 1.6,
             tunnel_shader_path: "fixture/stone".into(),
+            visibility_zones: vec![],
         }
     }
     fn quad(mesh: &mut MeshData, p: [V; 4]) {

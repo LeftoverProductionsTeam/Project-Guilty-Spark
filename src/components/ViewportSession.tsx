@@ -43,6 +43,11 @@ export default function ViewportSession({
     flushRef = useRef<() => void>(() => {}),
     pause = useRef(paused);
   pause.current = paused;
+  useEffect(() => {
+    const flush = (event: Event) => { if ((event as CustomEvent<string>).detail === id) flushRef.current(); };
+    window.addEventListener('guilty-spark-flush-map-view', flush);
+    return () => window.removeEventListener('guilty-spark-flush-map-view', flush);
+  }, [id]);
   const key = `camera.${channel}.${camera.type}`;
   const view = camera as import('three').PerspectiveCamera | import('three').OrthographicCamera;
   const controlMatches = !!controls && (controls as unknown as { object: unknown }).object === camera;

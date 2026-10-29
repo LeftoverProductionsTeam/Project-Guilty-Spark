@@ -4,13 +4,22 @@ export default function SettingsPanel({
   onTab,
   children,
 }: {
-  tab: 'tools' | 'interface';
-  onTab: (tab: 'tools' | 'interface') => void;
+  tab: 'tools' | 'interface' | 'dependencies';
+  onTab: (tab: 'tools' | 'interface' | 'dependencies') => void;
   children: ReactNode;
 }) {
   return (
     <div className="gs-settings-workspace">
       <div className="gs-settings-tabs" role="tablist" aria-label="Settings sections">
+        <button
+          role="tab"
+          id="settings-dependencies-tab"
+          aria-selected={tab === 'dependencies'}
+          aria-controls="settings-content"
+          onClick={() => onTab('dependencies')}
+        >
+          Dependencies &amp; setup
+        </button>
         <button
           role="tab"
           id="settings-tools-tab"

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "evidenceLevel": "native compiler and actual cache field readback; gameplay not run",
+  "sourceProjectId": "aec67820-237b-4e06-9f71-ebea08c5332b",
+  "projectFingerprint": "63f0f1e92289954456fa0e4e652d6e50229badc0dc5ae9bb2239db6cf6805a98",
+  "parentBuildId": "d6887e18-14fa-4026-8580-6ab954ad70df",
+  "acceptedBuildId": "5d8e4338-b364-43e0-bd2f-261a8c829833",
+  "failedFirstBuildId": "b3c6d4e1-ff47-487c-90eb-0bf9551c2327",
+  "firstFailure": "H1A Tool rejects forward slashes in tag-index paths; failed receipt retained. Native argument spelling fixed and regression added before successful retry.",
+  "tool": {
+    "steamAppId": "1532190",
+    "steamBuildId": "11722677",
+    "architecture": "x86",
+    "sha256": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+    "invaderInfoSha256": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4",
+    "invaderEditSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12"
+  },
+  "input": {
+    "files": 2240,
+    "bytes": 116552443,
+    "origin": "Actual indexed tags and source dependencies from the preserved native C33 room job; no SDK master copy",
+    "inventorySha256": "6a58734d50d81d61bc23c6b30a769f46b80282b97f7aa9f9550e023105edbf6b",
+    "finalInventorySha256": "6a58734d50d81d61bc23c6b30a769f46b80282b97f7aa9f9550e023105edbf6b"
+  },
+  "fieldReadback": {
+    "field": "player_starting_locations[0].position",
+    "parent": [-8.0, -10.666666984558105, 0.10000000149011612],
+    "expected": [-7.5, -10.666667, 0.1],
+    "compiled": [-7.5, -10.666666984558105, 0.10000000149011612]
+  },
+  "output": {
+    "cacheVersion": 13,
+    "scenarioType": 1,
+    "scenarioPath": "levels/quickforge/c33_collision_acceptance/c33_collision_acceptance",
+    "sha256": "85d2390bdeced18f8f7617b751ddcbf42555ab4533aa8a993ebb0dcd28f9095b",
+    "bytes": 88869842,
+    "tags": 2239,
+    "collisionTriangles": 12,
+    "crc32Mismatched": 0,
+    "isProtected": 0,
+    "stubCount": 0
+  },
+  "preservation": {
+    "originalTagsBefore": 11544,
+    "originalTagsAfter": 11544,
+    "changedOriginalTags": 0,
+    "parentCacheSha256Before": "db4b32895e81c96543593fcc734fb021ceda09fbae47d6ed095415d66fefd57b",
+    "parentCacheSha256After": "db4b32895e81c96543593fcc734fb021ceda09fbae47d6ed095415d66fefd57b",
+    "inputScenarioSha256Before": "d15cb6f14325fc1e908b5edac8d59e86cd736cc6aa6c8475d6e28fdffbbd2ff5",
+    "inputScenarioSha256After": "d15cb6f14325fc1e908b5edac8d59e86cd736cc6aa6c8475d6e28fdffbbd2ff5"
+  },
+  "elapsedMs": 56577,
+  "performanceComparison": "None; single operation timing only",
+  "privateEvidenceRoot": ".local/continuation34/working-tags-acceptance",
+  "qaReplica": {
+    "library": ".local/continuation34/native-ui-fixture",
+    "files": 2246,
+    "bytes": 206019818,
+    "cacheTagManifestBytesUnchanged": true,
+    "programsLaunchedBySeeder": false
+  },
+  "notTested": [
+    "Actual game or Standalone loading/gameplay",
+    "Campaign or UI native working-tag compilation",
+    "Native campaign HSC preservation beyond source-only orchestration tests",
+    "Two-client networking or AI",
+    "UI edit synchronization back into the QuickForge source document"
+  ]
+}

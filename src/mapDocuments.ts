@@ -1,6 +1,7 @@
 import { historyReducer, initialHistory } from './editor';
 import type { HistoryAction, HistoryState } from './editor';
 import type { MapInspection, MeshData, OpenProject, Project } from './types';
+import { hasSourceBoundEdits } from './externalMapSync';
 export interface MapDocument {
   id: string;
   history: HistoryState;
@@ -14,6 +15,7 @@ export interface MapDocuments {
 }
 export type DocumentAction =
   | { type: 'open'; open: OpenProject }
+  | { type: 'external-revision'; previousId: string; open: OpenProject; replaceClean: boolean }
   | { type: 'resources'; project: Project }
   | { type: 'select'; id: string }
   | { type: 'close'; id: string }
@@ -27,6 +29,19 @@ export function activeDocument(state: MapDocuments): MapDocument | undefined {
   return state.documents.find((d) => d.id === state.activeId);
 }
 export function documentReducer(state: MapDocuments, action: DocumentAction): MapDocuments {
+  if (action.type === 'external-revision') {
+    const previous = state.documents.find(document => document.id === action.previousId);
+    if (!previous || !previous.history.current) return state;
+    const incoming = action.open.project, current = previous.history.current;
+    if (!incoming.source || !action.open.inspection || incoming.source.sha256 !== action.open.inspection.sha256 || incoming.id === previous.id) return state;
+    const existing = state.documents.find(document => document.id === incoming.id);
+    const matching = current.source?.cacheVersion === incoming.source.cacheVersion && current.source.scenarioPath.replaceAll('\\','/').toLowerCase() === incoming.source.scenarioPath.replaceAll('\\','/').toLowerCase();
+    const replace = action.replaceClean && matching && !previous.history.dirty && !hasSourceBoundEdits(current, previous.inspection) && !hasSourceBoundEdits(incoming, action.open.inspection);
+    const next = existing ?? {id: incoming.id, inspection: action.open.inspection, meshes: {}, history: historyReducer({...initialHistory, limit: state.limit}, {type:'load',project:incoming})};
+    let documents = replace ? state.documents.filter(document => document.id !== previous.id) : state.documents;
+    if (!existing) documents = replace ? state.documents.flatMap(document => document.id === previous.id ? [next] : [document]) : [...documents, next];
+    return {...state, documents, activeId: state.activeId === previous.id ? incoming.id : state.activeId};
+  }
   if(action.type==='resources'){
     const source=action.project.source;
     if(!source)return state;

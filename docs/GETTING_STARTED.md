@@ -1,10 +1,16 @@
 # Connect your first Halo project
 
-1. Open Spark → **Start here → Connect Your Halo Games**. Check which game runtime is found. Multiple editions can be registered through Runtimes & friends.
-2. If MCC is installed but Map Builder is absent, install the separate free [Halo: CE Mod Tools - MCC](https://store.steampowered.com/app/1532190/) through Steam Library → Tools. Follow its supplied extraction instructions in a fresh working copy. Spark does not execute its batch files or overwrite stock tags.
+1. Open Spark → **Start here → Connect Your Halo Games**. Check which game runtime is found. Multiple editions can be registered through Play & servers → Runtime adapters. Choices are remembered.
+2. Open **Settings → Dependencies & setup** for missing tools, resources or source assets. If MCC is installed but Map Builder is absent, review **Open Steam install UI** for the separate free [Halo: CE Mod Tools - MCC](https://store.steampowered.com/app/1532190/), or use Steam Library → Tools. Spark shows the exact Steam executable and destination before handing off. Steam manages installation; follow the supplied extraction instructions in a fresh working copy. Spark does not execute its batch files or overwrite stock tags.
 3. Select the editing-kit folder, its generation and **Editable Halo Tags**, then choose **Check and connect editing kit**. Header/hash checks identify files; they do not prove the tools ran or a tagset is complete.
 4. Import your own map in Map Library. Spark preserves a managed copy and records its identity. Open Level Editor. If shared images are needed, choose **Locate Halo Textures** and select the map's original resource folder. The source/index/image-span checks must pass. Supported MCC packs and internal rebuilt-map images have dedicated readers.
 5. For an original level, create a QuickForge project. Add separate MCC/CE configurations under Build → Engine build targets. Each needs its own compatible editable tags, kit and Invader installation. No map binary is universally interchangeable.
+
+To download a Custom Edition map inside Spark, open **Community maps**, paste its author's direct HTTPS `.map` or `.zip` link and choose Level editor, Tag editor or conversion. Spark preserves the original download and imports all map candidates without replacing an open draft. Catalog pages open in your browser; they need their actual download link. Unsupported resources, protection or features remain explicit conversion blockers.
+
+The bottom **Runtime & Tools Dock** follows the active map. Sapien, Guerilla and Standalone previews show the actual tool and derived working tags. After saving and closing those tools, use **Build working tag edits** in dock details to compile their current files, then open the separate verified output. This differs from rebuilding older QuickForge brushes. Game loading remains its own test.
+
+For HMT or another compiled-map editor, expand **External editor files** and copy the working map path. Spark checks stable external saves every two seconds. Clean maps refresh as new preserved revisions; if Spark has authored edits, choose **Open changed map and keep Spark edits** to retain both tabs. The read-only preserved copy is never the external editor's write target.
 
 **Editable Halo Tags** describe game objects, materials and scenarios. **Halo Textures** are images used by some compiled maps. **Map Builder** compiles source into a target-specific map. Source images/models live under the kit's data folder; temporary compiler jobs and caches belong to Spark's managed local data, not the original game directory.
 

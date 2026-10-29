@@ -21,6 +21,8 @@ import '../onboarding.css';
 import CompatibilityTable from './CompatibilityTable';
 import HostingWorkspace from './HostingWorkspace';
 import GameplayControls from './GameplayControls';
+import PlayAndServers from './PlayAndServers';
+import CommunityHostAdapter from './CommunityHostAdapter';
 import {useMapState} from '../mapSession';
 
 const editable = new Set<RuntimeId>(['chupathingyCe', 'openCe', 'haloPc', 'haloCustomEdition']);
@@ -97,7 +99,7 @@ export default function Runtimes({
   const [selected, setSelected] = useMapState<RuntimeId>(project?.id??'global','hosting.runtime',project?.quickForge?.runtimeId ?? settings.preferredHalo ?? 'mccSteam');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useMapState<'runtime'|'friends'|'hosting'|'gameplay'>(project?.id??'global','hosting.tab','runtime');
+  const [tab, setTab] = useMapState<'runtime'|'friends'|'hosting'|'gameplay'|'servers'>(project?.id??'global','hosting.tab','servers');
   const alive = useRef(true);
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -123,8 +125,8 @@ export default function Runtimes({
     <div className="analysis-page">
       <PageTitle
         eyebrow="RUNTIMES / LOCAL CAPABILITY EVIDENCE"
-        title="Runtimes & friends"
-        description="Keep installation evidence, map compatibility and peer checks separate from gameplay verification."
+        title="Play & servers"
+        description="Choose a session provider, check its runtime and content, then use the matching game’s join and hosting workflow."
         actions={
           <button disabled={loading || !native} onClick={() => void refresh()}>
             <RefreshCw size={15} />
@@ -141,6 +143,7 @@ export default function Runtimes({
       )}
       {error && <Notice>{error}</Notice>}
       <div className="tabs workspace-tabs">
+        <button className={tab === 'servers' ? 'selected' : ''} onClick={() => setTab('servers')}>Find games</button>
         <button className={tab === 'runtime' ? 'selected' : ''} onClick={() => setTab('runtime')}>
           Runtime adapters
         </button>
@@ -172,7 +175,8 @@ export default function Runtimes({
         </label>
       )}
       {tab==='gameplay'&&<GameplayControls key={project?.id??'global'} project={project} edit={edit} onEditor={()=>onOpenWorkspace('quickforge')}/>}
-      {report && tab!=='gameplay' &&
+      {tab==='servers'&&<PlayAndServers project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')} onSettings={onSettings} onHost={()=>setTab('hosting')} onFriends={()=>setTab('friends')}/>}
+      {report && tab!=='gameplay' && tab!=='servers' &&
         (tab === 'runtime' ? (
           <>
             <CompatibilityTable/>
@@ -180,7 +184,7 @@ export default function Runtimes({
             <ToolchainShelf runtime={selected} settings={settings} onSettings={onSettings} onOpenWorkspace={onOpenWorkspace} />
           </>
         ) : tab === 'hosting' ? (
-          <HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/>
+          <><CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')}/><HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/></>
         ) : (
           <Friends
             key={`${selected}:${project?.id ?? ''}`}
