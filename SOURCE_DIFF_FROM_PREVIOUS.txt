@@ -1,45 +1,50 @@
-Project Guilty Spark - C35 r8 source comparison
-BASELINE_GIT_COMMIT: c13e1dee6d2cc61cb9e3b938e3fdbe04332014e3
+Project Guilty Spark - C35 r9 source comparison
+BASELINE_GIT_COMMIT: 06994586e88356dcc74cab01919c42931d6f1365
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 3
-MODIFIED_COUNT: 25
-UNCHANGED_COUNT: 1120
+ADDED_COUNT: 6
+MODIFIED_COUNT: 27
+UNCHANGED_COUNT: 1121
 REMOVED_COUNT: 0
 
 ADDED FILES
-docs/C35_THREAD_RELEASE.md
-docs/fixtures/c35-thread-release-native-verification.json
-src-tauri/src/live_thread_pause.rs
+crates/spark-core/examples/qa_bsp_audio.rs
+crates/spark-core/src/bsp_audio.rs
+docs/C35_BSP_AUDIO.md
+docs/fixtures/c35-bsp-audio-native-verification.json
+scripts/test-bsp-audio-native.mjs
+src/components/BspAudioEditor.tsx
 
 MODIFIED FILES
 CHANGELOG.md
 README.md
-docs/C35_LIVE_SESSION_RECOVERY.md
+crates/spark-core/examples/qa_runtime_library.rs
+crates/spark-core/src/lib.rs
+crates/spark-core/src/working_tags.rs
 docs/COMPATIBILITY_MATRIX.md
 docs/CONTINUATION_35_ENGINEERING.md
 docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
 docs/CONTINUATION_35_TEST_CARD.md
+docs/GETTING_STARTED.md
 docs/GITHUB_HANDOFF.md
 docs/MASTER_FEATURE_LEDGER.csv
-docs/MASTER_FEATURE_LEDGER.md
-docs/research/C34_LIVE_WRITE_AUDIT.md
 scripts/continuation35-evidence.mjs
 scripts/feature-ledger-evidence.mjs
-scripts/test-director-recording-native.mjs
-scripts/update-feature-ledger.mjs
-src-tauri/src/live_camera_native.rs
-src-tauri/src/live_mcc.rs
-src-tauri/src/live_sprint_native.rs
-src/components/LiveObjectInspector.tsx
-src/components/LiveSessionRecovery.tsx
-src/components/NativeCameraControls.tsx
-src/components/NativeSprintControls.tsx
+src-tauri/capabilities/main.json
+src-tauri/src/app.rs
+src-tauri/src/runtime_workbench.rs
+src/App.tsx
+src/components/RuntimeDock.tsx
+src/components/WindowFrame.tsx
+src/components/WorkspacePanels.tsx
 src/featureCatalog.ts
-src/liveSession.ts
+src/runtimeWorkbench.css
+src/useWindowFullscreen.ts
+src/workspacePanels.css
+tests/ui/helpers/navigation.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-Earlier C32/C33/C34 and C35 r1/r2/r3/r4/r5/r6/r7 release/source archives remain frozen.
+Earlier C32/C33/C34 and C35 r1/r2/r3/r4/r5/r6/r7/r8 release/source archives remain frozen.
