@@ -1,40 +1,41 @@
-Project Guilty Spark - C35 r4 source comparison
-BASELINE_GIT_COMMIT: a53f2728d794f225742557767f1875882035a5f4
+Project Guilty Spark - C35 r5 source comparison
+BASELINE_GIT_COMMIT: 86fbe07f82d155ec82dbfc7c07e3a61aac7b833e
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 7
-MODIFIED_COUNT: 16
-UNCHANGED_COUNT: 1102
+ADDED_COUNT: 6
+MODIFIED_COUNT: 18
+UNCHANGED_COUNT: 1107
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/examples/qa_recording_library.rs
-docs/C35_DIRECTOR_RECORDING.md
-docs/fixtures/c35-director-recording-native-verification.json
-scripts/test-director-recording-native.mjs
-src/directorCanvasCapture.test.ts
-src/directorCanvasCapture.ts
-src/mapSession.test.ts
+docs/C35_DIRECTOR_AUDIO.md
+docs/fixtures/c35-director-audio-native-verification.json
+scripts/native-director-audio-probe.mjs
+src/directorAudio.test.ts
+src/directorAudio.ts
+src/soundClipLoader.ts
 
 MODIFIED FILES
 CHANGELOG.md
 README.md
+crates/spark-core/src/native_workspace.rs
+docs/COMPATIBILITY_MATRIX.md
 docs/CONTINUATION_35_ENGINEERING.md
 docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
 docs/CONTINUATION_35_TEST_CARD.md
 docs/GITHUB_HANDOFF.md
 docs/MASTER_FEATURE_LEDGER.csv
-scripts/continuation35-evidence.mjs
-scripts/native-editor-capture-probe.mjs
-src-tauri/src/director_recording.rs
+docs/MASTER_FEATURE_LEDGER.md
+scripts/test-director-recording-native.mjs
 src/components/DirectorWindow.tsx
+src/components/SoundMixer.tsx
 src/directorRecording.test.ts
 src/directorRecording.ts
 src/directorWindow.css
 src/featureCatalog.ts
-src/mapSession.ts
+src/spatialAudio.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-Earlier C32/C33/C34 and C35 r1/r2/r3 release/source archives remain frozen.
+Earlier C32/C33/C34 and C35 r1/r2/r3/r4 release/source archives remain frozen.
