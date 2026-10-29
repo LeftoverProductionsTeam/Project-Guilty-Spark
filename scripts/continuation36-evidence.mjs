@@ -68,9 +68,9 @@ const rows = [
     'community-join',
     'Join and play through existing community multiplayer protocols',
     'server',
-    'Audited pinned OpenCE/Chupathingy/Delta/Warthog revisions and public listing fields. Verified publisher-signed OpenCE build-329 and Chupathingy v0.8.1c Windows clients are staged only in private QA storage; released native two-process test interfaces and isolated loopback setup were verified.',
-    'Owner Xbox content is pending. No client was executed, game joined or player/AI agreement measured. Listing protocol numbers alone cannot establish cross-version or cross-engine compatibility; the conservative existing gate remains.',
-    'crates/spark-core/src/community_servers.rs; docs/research/C36_COMMUNITY_INTEROPERABILITY.md',
+    'Publisher-verified OpenCE build-329 and Chupathingy v0.8.1c each ran two native private Blood Gulch processes over unchanged owned Xbox data. OpenCE-host/Chupathingy-client also simulated; opposite direction was refused as host32/client39. A30 native OpenCE co-op loaded with two processes. Reproducible runner/analyzer retain phase, position and inventory differences.',
+    'Spark listing/invitation-to-client flow, authenticated remote compatibility, human trigger/aim/projectile behavior, complete state/AI parity and two-computer play remain unaccepted. Native hooks apply impact damage and forced kills; no broad protocol or perfect replication claim. The conservative production listing gate remains.',
+    'scripts/test-community-runtime-native.mjs; scripts/analyze-community-runtime-native.mjs; docs/C36_COMMUNITY_NATIVE_TESTS.md; crates/spark-core/src/community_servers.rs',
   ],
   [
     'mcc-bridge',
@@ -84,9 +84,9 @@ const rows = [
     'ai-sync',
     'Verify engine-owned synchronized AI and cooperative survival',
     'networkAi',
-    'Pinned release source exposes real campaign co-op selection in OpenCE/Chupathingy native test modes. The test plan distinguishes two independent native simulations from packet bots and scripted player input from AI actors.',
-    'No owned Xbox content or two-client AI encounter was available. Actor creation, movement, firing, damage, deaths, late join, wave agreement, eight-player campaign and Firefight remain unaccepted.',
-    'docs/research/C36_COMMUNITY_INTEROPERABILITY.md; docs/MCC_MULTIPLAYER_AI_FEASIBILITY.md',
+    'Two actual OpenCE native processes loaded owned Xbox A30 in co-op and logged player simulation. Exact released actor synchronization remains engine-owned; scripted player input and impact-damage hooks are distinguished from AI observations.',
+    'Enemy actor identity/movement/firing/damage/death agreement was not instrumented or accepted. Late join, Zombie waves, eight-player campaign and Firefight remain unaccepted; player state alone cannot certify AI.',
+    'scripts/test-community-runtime-native.mjs; docs/C36_COMMUNITY_NATIVE_TESTS.md; docs/MCC_MULTIPLAYER_AI_FEASIBILITY.md',
   ],
   [
     'four-map',
@@ -170,9 +170,9 @@ export const continuation36Overrides = Object.fromEntries(
       operation: row.operation,
       gap: row.gap,
       target:
-        'Windows x64 C36 development build; owned CE Alpine/MCC/QuickForge fixtures and exact native tools where stated; community clients staged only',
+        'Windows x64 C36 development build; owned CE/MCC/QuickForge and Xbox fixtures; exact native tools and publisher-verified community releases where stated',
       level:
-        'IMPLEMENTED / SOURCE, NATIVE UI AND COMPILER LOCALLY TESTED where stated; new GAMEPLAY / PEER / AI NOT ACCEPTED',
+        'SOURCE / NATIVE UI / COMPILER LOCALLY TESTED where stated; scoped native community two-process simulation only in the explicit community row; AI/full gameplay NOT ACCEPTED',
       evidence:
         'docs/CONTINUATION_36_ENGINEERING.md; docs/fixtures/c36-native-preservation-verification.json; docs/research/C36_COMMUNITY_INTEROPERABILITY.md',
       next: row.gap,

@@ -6,7 +6,9 @@ Title: **C36: native Halo portability, preservation gates and reviewed conversio
 
 Add Portability Lab and cited native preflight, fix unintended signed-zero changes and verify exact compiler input tags. Actual Invader/H1A round trips and CE-to-MCC conversion pass, with explicit semantic changes and a conservative painted-detail BSP guard. Preserve C35 recording/render/audio/UI, route protected community invitations correctly and retain game, multiplayer/AI and broader gameplay acceptance as open gates.
 
-Use the [full PR description](CONTINUATION_36_GITHUB_DESCRIPTION.md), [engineering report](CONTINUATION_36_ENGINEERING.md), [native policy](NATIVE_PORTABILITY.md) and [exact receipt](fixtures/c36-native-preservation-verification.json). C36 files use fresh r1 names; no C35 file is replaced. Local tests do not establish green hosted CI. No public release, tag, force push or master merge is included.
+The later [native community trials](C36_COMMUNITY_NATIVE_TESTS.md) add actual same-runtime Blood Gulch sessions, asymmetric mixed OpenCE-host/Chupathingy-client simulation and native A30 co-op. Raw state/phase/inventory differences remain visible; the opposite mixed direction is version-refused. The public runner/analyzer reproduce controlled execution and strict sampled comparisons without changing production protocol gates.
+
+Use the [full PR description](CONTINUATION_36_GITHUB_DESCRIPTION.md), [engineering report](CONTINUATION_36_ENGINEERING.md), [native policy](NATIVE_PORTABILITY.md) and [exact receipt](fixtures/c36-native-preservation-verification.json). Final C36 files use fresh r2 names; C35 and initial C36 r1 files remain frozen. The accepted application binary is unchanged; r2 includes later native game evidence and QA scripts. Local tests do not establish green hosted CI. No public release, tag, force push or master merge is included.
 
 Reviewed push and optional PR commands after inspecting status:
 

@@ -7,6 +7,7 @@
 - Verify loose native tag bytes before/after H1A compilation and write JSON/readable semantic change reports.
 - Guard painted-detail BSP audio serialization with bounded native snapshots and a conservative refusal where float precision prevents exact proof.
 - Accept the documented protected Chupathingy invitation format without handling passwords or claiming foreign protocol compatibility.
+- Add reproducible private native community runtime tests over owned Xbox data. Record same-runtime sessions, asymmetric OpenCE-host/Chupathingy-client simulation, opposite-direction version refusal and sampled state differences; keep trigger/projectile/AI and Spark join-flow acceptance separate.
 - Retain C35 R12 rendering, audio, Director, window/drawer and multi-map workflows. [C36 evidence and limitations](docs/CONTINUATION_36_ENGINEERING.md).
 
 C35 r11/r12: [rendering and workflow repair](docs/C35_RENDERING_AND_WORKFLOW.md), then [automatic MCC audio, all-main-track imports and sound layout repair](docs/C35_MCC_AUDIO_AND_WORKFLOW.md). These remain included; the older entries below are historical.

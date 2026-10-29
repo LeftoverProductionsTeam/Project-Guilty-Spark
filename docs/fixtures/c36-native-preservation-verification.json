@@ -5,7 +5,7 @@
   "baselineCommit": "21804c191a918cbf8bd74efac60dfcec65c9083b",
   "branch": "codex/continuation-36-one-halo",
   "appSha256": "7af65f1fd5f8383714ae93a097b06c0744f994a689e19d357136bab90a6e18a6",
-  "evidenceScope": "Actual Windows Spark UI, native external tools/compiler and independent media decoding. No Halo game/community client, game memory, public server, human listening, OS picker or gameplay/AI/scale acceptance.",
+  "evidenceScope": "Actual Windows Spark UI, native tools/compiler and independent media decoding, plus separate exact community two-process scripted native simulations. No MCC game load/memory, public server, human firing/aiming, full state/AI/scale, physical listening or OS picker acceptance.",
   "tests": {
     "baseline": {
       "rustPassed": 471,
@@ -570,10 +570,10 @@
     "limit": "Sequential fresh libraries/profiles on the same Windows desktop, reverse execution order from the full acceptance run; OS cache and background desktop load are uncontrolled. No speedup claim."
   },
   "community": {
-    "clientsExecuted": false,
-    "isoAvailable": false,
-    "gameJoined": false,
-    "twoClientGameplay": false,
+    "clientsExecuted": true,
+    "isoAvailable": true,
+    "gameJoined": true,
+    "twoClientGameplay": true,
     "aiAgreement": false,
     "publicHosting": false,
     "routerFirewallChanges": false,
@@ -585,7 +585,8 @@
         "zipSha256": "fd258338a7aaa8c93fc41ad2e2d53a040944306593a2e3d6d631befab38c65a0",
         "exeSha256": "bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a",
         "publisherEd25519ChecksumsVerified": true,
-        "redistributed": false
+        "redistributed": false,
+        "executedPrivately": true
       },
       {
         "project": "OpenCE",
@@ -594,10 +595,13 @@
         "zipSha256": "103f0c3cd46279e7dbc86cbfe8c3320898f3921af3cd237515c17800fcba42c6",
         "exeSha256": "b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c",
         "publisherEd25519ChecksumsVerified": true,
-        "redistributed": false
+        "redistributed": false,
+        "executedPrivately": true
       }
     ],
-    "next": "Verify owner-provided Xbox content, then native same-runtime/mixed-runtime private host/join and separate AI agreement. Actual Spark listing-to-client flow remains a separate gate."
+    "next": "Accept Spark listing/invitation-to-client flow, authenticated runtime/content compatibility, human combat and independently observed AI. Keep asymmetric direction and raw sampled differences.",
+    "twoClientGameplayScope": "Real released native game processes on one Windows computer, loopback system-link, scripted player input and native impact-damage/forced-kill hooks. No MCC game protocol, public host, Spark listing-to-client flow, human play, projectile-flight/aiming, full inventory/object parity, AI agreement or player-scale certification.",
+    "evidenceFile": "c36-community-native-verification.json"
   },
   "preservation": {
     "originalSourceFilesUnchanged": true,
@@ -606,7 +610,8 @@
     "priorLedgerIdsRetained": 319,
     "currentLedgerRows": 336,
     "normalUserLibraryUsed": false,
-    "ownedGameAssetsPublished": false
+    "ownedGameAssetsPublished": false,
+    "originalXboxImageRehashedUnchanged": true
   },
   "limitations": [
     "Native compiler/cache and Spark editor acceptance only; no Halo runtime load, gameplay, multiplayer or AI agreement.",

@@ -1,0 +1,5790 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-29",
+  "scope": "Real released native game processes on one Windows computer, loopback system-link, scripted player input and native impact-damage/forced-kill hooks. No MCC game protocol, public host, Spark listing-to-client flow, human play, projectile-flight/aiming, full inventory/object parity, AI agreement or player-scale certification.",
+  "originalIso": {
+    "bytes": 3728867328,
+    "sha256": "bbed30485a34fb971687648f31a8b50467c92d7ef296e3f97bad51372db1b012",
+    "format": "XDVDFS original Xbox cache-5 data",
+    "openedReadOnly": true,
+    "rehashAfterExtractionMatched": true
+  },
+  "nativeData": [
+    {
+      "name": "ui.map",
+      "bytes": 14145536,
+      "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+      "cacheVersion": 5
+    },
+    {
+      "name": "bloodgulch.map",
+      "bytes": 22571008,
+      "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+      "cacheVersion": 5
+    },
+    {
+      "name": "a30.map",
+      "bytes": 152610816,
+      "sha256": "4875fa105e6c517589a796cfdcc7fcaa07e98df13d14e601bfc9eb1eab7e30b5",
+      "cacheVersion": 5
+    },
+    {
+      "name": "carousel.map",
+      "bytes": 20215808,
+      "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+      "cacheVersion": 5
+    }
+  ],
+  "releases": "c36-community-client-files.json",
+  "environment": {
+    "perProcessExecutableDataSaveLogRoots": true,
+    "ownedDerivedMapCopies": true,
+    "online": false,
+    "publicListing": false,
+    "upnp": false,
+    "mapDownloadsAndSharing": false,
+    "automaticUpdates": false,
+    "routerFirewallChanges": false,
+    "normalOwnerSparkLibraryUsed": false
+  },
+  "observedPrerequisite": {
+    "issue": "UI plus selected Blood Gulch was insufficient for native fast-host setup; the exact releases open stock Carousel first.",
+    "resolution": "Add unchanged owned carousel.map. Public QA preflight now refuses it when missing before copying or launching processes.",
+    "preflightRefusalVerified": true,
+    "firstAttempt": "opence-same-2 loaded UI but did not host/join; both timed exits normal. Not counted as game acceptance."
+  },
+  "analysisProcedure": {
+    "script": "scripts/analyze-community-runtime-native.mjs",
+    "runner": "scripts/test-community-runtime-native.mjs",
+    "examplesPerDetailCappedAt": 4,
+    "totalsComplete": true,
+    "exactAndNearPhaseComparisonsSeparate": true,
+    "positionPassThreshold": null,
+    "exit0Meaning": "Selected sampled fields agree, not perfect gameplay.",
+    "exit2Meaning": "Refused, missing simulation or observed sampled-state disagreement."
+  },
+  "runs": [
+    {
+      "schemaVersion": 1,
+      "analyzer": "analyze-community-runtime-native",
+      "run": {
+        "label": "opence-same-3",
+        "mode": "bloodgulch:slayer",
+        "privateFromReceipt": true,
+        "humanInputFromReceipt": false,
+        "twoComputersFromReceipt": false,
+        "publicListingFromReceipt": false,
+        "routerFirewallChangesFromReceipt": false,
+        "rendererFromReceipt": "native-null"
+      },
+      "provenance": {
+        "analyzerSourceSha256": "4e904764319cf4b14e10ad0b83b23107ac8e114551b43621060670ccf7a7fa5f",
+        "execution": {
+          "path": "execution.json",
+          "bytes": 5562,
+          "sha256": "7f84af9aa431be4447b2b54381d293647fc3f8542180a732206f92cffdb66df3"
+        },
+        "records": [
+          {
+            "role": "host",
+            "runtime": "opence-build-329",
+            "executableSha256FromReceipt": "b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c",
+            "wallDurationSeconds": 80.407,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "host:bloodgulch:slayer",
+            "scriptedInput": "bot:1",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "true",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "bloodgulch.map",
+                "bytes": 22571008,
+                "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              }
+            ]
+          },
+          {
+            "role": "client",
+            "runtime": "opence-build-329",
+            "executableSha256FromReceipt": "b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c",
+            "wallDurationSeconds": 60.407,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "join",
+            "scriptedInput": "bot:2",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "true",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "bloodgulch.map",
+                "bytes": 22571008,
+                "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              }
+            ]
+          }
+        ],
+        "logs": [
+          {
+            "role": "host",
+            "path": "host/stdio.log",
+            "bytes": 27518,
+            "sha256": "101dea0dd7577997ed4baeb0a172b49b7f29aaa9e4bfb466e48711bc9cbcef35",
+            "samples": 55,
+            "firstTick": 30,
+            "lastTick": 1650,
+            "localPlayerIds": [0]
+          },
+          {
+            "role": "client",
+            "path": "client/stdio.log",
+            "bytes": 23603,
+            "sha256": "92550f8f176ae39046d35a50140cea570d26f05edb39c8d1ee041d48c1f46956",
+            "samples": 47,
+            "firstTick": 30,
+            "lastTick": 1410,
+            "localPlayerIds": [1]
+          }
+        ],
+        "boundary": "Hashes bind this analysis to these files; executable signatures, actual processes and preserved content are not independently authenticated by this log analyzer."
+      },
+      "verdict": {
+        "status": "sampled-native-simulation",
+        "selectedComparison": "exactTicks",
+        "joinMarkersObserved": true,
+        "bidirectionalPacketCountersObserved": true,
+        "atLeastTwoMachinePlayersObserved": true,
+        "completeInventoryParity": false,
+        "humanPlayAccepted": false,
+        "aiActorAcceptance": false,
+        "twoComputerAcceptance": false,
+        "renderingOrAudioAcceptance": false,
+        "universalCrossRuntimeCompatibility": false,
+        "listingGateChangeAuthorized": false
+      },
+      "comparisons": {
+        "nominalTickRateHz": 30,
+        "exactTicks": {
+          "tickWindow": 0,
+          "samplePairs": 47,
+          "tickDifferenceHistogram": {
+            "0": 47
+          },
+          "playerComparisons": 94,
+          "playerIds": [0, 1],
+          "stateFields": {
+            "alive": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 88,
+              "agree": 88,
+              "notComparable": 6
+            },
+            "shield": {
+              "compared": 88,
+              "agree": 88,
+              "notComparable": 6
+            },
+            "score": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "positionDeltas": [
+            {
+              "id": 0,
+              "count": 47,
+              "minimum": 0.01048809,
+              "median": 0.03884585,
+              "p95": 0.06370243,
+              "maximum": 0.06739436
+            },
+            {
+              "id": 1,
+              "count": 41,
+              "minimum": 0.001,
+              "median": 0.04234383,
+              "p95": 0.08217664,
+              "maximum": 0.09244999
+            }
+          ],
+          "largestPositionDeltas": [
+            {
+              "hostTick": 1410,
+              "clientTick": 1410,
+              "id": 1,
+              "deltaWorldUnits": 0.09244999,
+              "host": [49.464, -77.275, 0.619],
+              "client": [49.379, -77.294, 0.65],
+              "sameDeathCount": true,
+              "nextObservation": null
+            },
+            {
+              "hostTick": 1200,
+              "clientTick": 1200,
+              "id": 1,
+              "deltaWorldUnits": 0.08857765,
+              "host": [51.126, -77.814, 0.142],
+              "client": [51.067, -77.88, 0.145],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1230,
+                "clientTick": 1230,
+                "deltaWorldUnits": 0.08217664
+              }
+            },
+            {
+              "hostTick": 1230,
+              "clientTick": 1230,
+              "id": 1,
+              "deltaWorldUnits": 0.08217664,
+              "host": [49.516, -79.894, 0.115],
+              "client": [49.473, -79.964, 0.113],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1260,
+                "clientTick": 1260,
+                "deltaWorldUnits": 0.03215587
+              }
+            },
+            {
+              "hostTick": 780,
+              "clientTick": 780,
+              "id": 1,
+              "deltaWorldUnits": 0.07988742,
+              "host": [37.528, -89.794, 0.017],
+              "client": [37.573, -89.86, 0.018],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 810,
+                "clientTick": 810,
+                "deltaWorldUnits": 0.03456877
+              }
+            },
+            {
+              "hostTick": 1320,
+              "clientTick": 1320,
+              "id": 1,
+              "deltaWorldUnits": 0.07547847,
+              "host": [50.937, -79.697, 0.136],
+              "client": [51.001, -79.657, 0.137],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1350,
+                "clientTick": 1350,
+                "deltaWorldUnits": 0.04101219
+              }
+            },
+            {
+              "hostTick": 360,
+              "clientTick": 360,
+              "id": 1,
+              "deltaWorldUnits": 0.07218726,
+              "host": [36.126, -90.308, 0.597],
+              "client": [36.065, -90.285, 0.628],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 390,
+                "clientTick": 390,
+                "deltaWorldUnits": 0.06
+              }
+            },
+            {
+              "hostTick": 60,
+              "clientTick": 60,
+              "id": 1,
+              "deltaWorldUnits": 0.07095069,
+              "host": [106.664, -163.367, 0.523],
+              "client": [106.716, -163.404, 0.554],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 90,
+                "clientTick": 90,
+                "deltaWorldUnits": 0.04374929
+              }
+            },
+            {
+              "hostTick": 690,
+              "clientTick": 690,
+              "id": 1,
+              "deltaWorldUnits": 0.06917369,
+              "host": [92.075, -147.802, 0.695],
+              "client": [92.035, -147.746, 0.702],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 720,
+                "clientTick": 720,
+                "deltaWorldUnits": 0.04234383
+              }
+            }
+          ],
+          "grenades": {
+            "compared": 88,
+            "differences": {
+              "total": 3,
+              "truncated": false,
+              "examples": [
+                {
+                  "hostTick": 600,
+                  "clientTick": 600,
+                  "id": 0,
+                  "host": [2, 1],
+                  "client": [2, 0],
+                  "nextObservation": {
+                    "hostTick": 630,
+                    "clientTick": 630,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 1020,
+                  "clientTick": 1020,
+                  "id": 0,
+                  "host": [1, 0],
+                  "client": [0, 0],
+                  "nextObservation": {
+                    "hostTick": 1050,
+                    "clientTick": 1050,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 1230,
+                  "clientTick": 1230,
+                  "id": 0,
+                  "host": [1, 2],
+                  "client": [0, 2],
+                  "nextObservation": {
+                    "hostTick": 1260,
+                    "clientTick": 1260,
+                    "agrees": true
+                  }
+                }
+              ]
+            }
+          },
+          "weapons": {
+            "compared": 88,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          }
+        },
+        "nearPhaseTicks": {
+          "tickWindow": 2,
+          "samplePairs": 47,
+          "tickDifferenceHistogram": {
+            "0": 47
+          },
+          "playerComparisons": 94,
+          "playerIds": [0, 1],
+          "stateFields": {
+            "alive": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 88,
+              "agree": 88,
+              "notComparable": 6
+            },
+            "shield": {
+              "compared": 88,
+              "agree": 88,
+              "notComparable": 6
+            },
+            "score": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "positionDeltas": [
+            {
+              "id": 0,
+              "count": 47,
+              "minimum": 0.01048809,
+              "median": 0.03884585,
+              "p95": 0.06370243,
+              "maximum": 0.06739436
+            },
+            {
+              "id": 1,
+              "count": 41,
+              "minimum": 0.001,
+              "median": 0.04234383,
+              "p95": 0.08217664,
+              "maximum": 0.09244999
+            }
+          ],
+          "largestPositionDeltas": [
+            {
+              "hostTick": 1410,
+              "clientTick": 1410,
+              "id": 1,
+              "deltaWorldUnits": 0.09244999,
+              "host": [49.464, -77.275, 0.619],
+              "client": [49.379, -77.294, 0.65],
+              "sameDeathCount": true,
+              "nextObservation": null
+            },
+            {
+              "hostTick": 1200,
+              "clientTick": 1200,
+              "id": 1,
+              "deltaWorldUnits": 0.08857765,
+              "host": [51.126, -77.814, 0.142],
+              "client": [51.067, -77.88, 0.145],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1230,
+                "clientTick": 1230,
+                "deltaWorldUnits": 0.08217664
+              }
+            },
+            {
+              "hostTick": 1230,
+              "clientTick": 1230,
+              "id": 1,
+              "deltaWorldUnits": 0.08217664,
+              "host": [49.516, -79.894, 0.115],
+              "client": [49.473, -79.964, 0.113],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1260,
+                "clientTick": 1260,
+                "deltaWorldUnits": 0.03215587
+              }
+            },
+            {
+              "hostTick": 780,
+              "clientTick": 780,
+              "id": 1,
+              "deltaWorldUnits": 0.07988742,
+              "host": [37.528, -89.794, 0.017],
+              "client": [37.573, -89.86, 0.018],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 810,
+                "clientTick": 810,
+                "deltaWorldUnits": 0.03456877
+              }
+            },
+            {
+              "hostTick": 1320,
+              "clientTick": 1320,
+              "id": 1,
+              "deltaWorldUnits": 0.07547847,
+              "host": [50.937, -79.697, 0.136],
+              "client": [51.001, -79.657, 0.137],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1350,
+                "clientTick": 1350,
+                "deltaWorldUnits": 0.04101219
+              }
+            },
+            {
+              "hostTick": 360,
+              "clientTick": 360,
+              "id": 1,
+              "deltaWorldUnits": 0.07218726,
+              "host": [36.126, -90.308, 0.597],
+              "client": [36.065, -90.285, 0.628],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 390,
+                "clientTick": 390,
+                "deltaWorldUnits": 0.06
+              }
+            },
+            {
+              "hostTick": 60,
+              "clientTick": 60,
+              "id": 1,
+              "deltaWorldUnits": 0.07095069,
+              "host": [106.664, -163.367, 0.523],
+              "client": [106.716, -163.404, 0.554],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 90,
+                "clientTick": 90,
+                "deltaWorldUnits": 0.04374929
+              }
+            },
+            {
+              "hostTick": 690,
+              "clientTick": 690,
+              "id": 1,
+              "deltaWorldUnits": 0.06917369,
+              "host": [92.075, -147.802, 0.695],
+              "client": [92.035, -147.746, 0.702],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 720,
+                "clientTick": 720,
+                "deltaWorldUnits": 0.04234383
+              }
+            }
+          ],
+          "grenades": {
+            "compared": 88,
+            "differences": {
+              "total": 3,
+              "truncated": false,
+              "examples": [
+                {
+                  "hostTick": 600,
+                  "clientTick": 600,
+                  "id": 0,
+                  "host": [2, 1],
+                  "client": [2, 0],
+                  "nextObservation": {
+                    "hostTick": 630,
+                    "clientTick": 630,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 1020,
+                  "clientTick": 1020,
+                  "id": 0,
+                  "host": [1, 0],
+                  "client": [0, 0],
+                  "nextObservation": {
+                    "hostTick": 1050,
+                    "clientTick": 1050,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 1230,
+                  "clientTick": 1230,
+                  "id": 0,
+                  "host": [1, 2],
+                  "client": [0, 2],
+                  "nextObservation": {
+                    "hostTick": 1260,
+                    "clientTick": 1260,
+                    "agrees": true
+                  }
+                }
+              ]
+            }
+          },
+          "weapons": {
+            "compared": 88,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          }
+        },
+        "timing": "Near-phase pairs are monotonic and one-to-one, within two ticks (about 67 ms at nominal 30 Hz). This comparison aid is not an approved network latency or position tolerance. Logs sample about once per second; matching printed values have only their printed precision."
+      },
+      "roles": [
+        {
+          "role": "host",
+          "stateTransitions": {
+            "total": 31,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.87,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.74,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.6,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.45,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              }
+            ]
+          },
+          "movement": [
+            {
+              "id": 0,
+              "aliveSamples": 55,
+              "movingSameLifeSampleIntervals": 54,
+              "greatestAdjacentSameLifeDisplacement": 2.11163467,
+              "bounds": [
+                {
+                  "min": 38.093,
+                  "max": 41.79
+                },
+                {
+                  "min": -92.468,
+                  "max": -86.21
+                },
+                {
+                  "min": 0.023,
+                  "max": 0.838
+                }
+              ],
+              "includesScriptedRelocations": true
+            },
+            {
+              "id": 1,
+              "aliveSamples": 42,
+              "movingSameLifeSampleIntervals": 39,
+              "greatestAdjacentSameLifeDisplacement": 102.5026506,
+              "bounds": [
+                {
+                  "min": 33.809,
+                  "max": 108.198
+                },
+                {
+                  "min": -163.987,
+                  "max": -76.273
+                },
+                {
+                  "min": -0.029,
+                  "max": 0.857
+                }
+              ],
+              "includesScriptedRelocations": true
+            }
+          ],
+          "shieldDecreases": {
+            "total": 18,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "before": 1,
+                "after": 0.87
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "before": 0.87,
+                "after": 0.74
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "before": 0.74,
+                "after": 0.6
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "before": 0.6,
+                "after": 0.45
+              }
+            ]
+          },
+          "observedDeaths": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 1,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "observedRespawns": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 600,
+                "byTick": 630
+              },
+              {
+                "id": 1,
+                "afterTick": 1110,
+                "byTick": 1140
+              }
+            ]
+          },
+          "scoreChanges": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 0,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "markers": {
+            "total": 17,
+            "truncated": true,
+            "examples": [
+              {
+                "kind": "hosting",
+                "line": 15,
+                "message": "halo-linux: network test: hosting bloodgulch",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "starting",
+                "line": 18,
+                "message": "halo-linux: network test: starting the game",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "scriptedRelocationCue",
+                "line": 30,
+                "message": "halo-linux: network test: the host brings player 1 near the first",
+                "afterTick": 90,
+                "beforeTick": 120
+              },
+              {
+                "kind": "scriptedImpactDamageCue",
+                "line": 32,
+                "message": "halo-linux: network test: player 0 shoots player 1",
+                "actorId": 0,
+                "targetId": 1,
+                "afterTick": 120,
+                "beforeTick": 150
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 10,
+          "forcedKillCues": 2,
+          "finalDamageCounters": {
+            "hits": 0,
+            "dealt": 9,
+            "rejected": 0,
+            "replayed": 0
+          },
+          "finalItemCounters": {
+            "current": 36,
+            "created": 69,
+            "deleted": 23,
+            "failed": 0,
+            "removed": 0
+          },
+          "finalNetworkCounters": {
+            "sent": 4481,
+            "received": 2671,
+            "corrections": 0
+          },
+          "finalScoreboard": [
+            {
+              "id": 0,
+              "alive": true,
+              "score": 2,
+              "kills": 2,
+              "deaths": 0,
+              "team": 0,
+              "machine": 0
+            },
+            {
+              "id": 1,
+              "alive": false,
+              "score": 0,
+              "kills": 0,
+              "deaths": 2,
+              "team": 1,
+              "machine": 1
+            }
+          ]
+        },
+        {
+          "role": "client",
+          "stateTransitions": {
+            "total": 28,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.87,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.74,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.6,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.45,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              }
+            ]
+          },
+          "movement": [
+            {
+              "id": 0,
+              "aliveSamples": 47,
+              "movingSameLifeSampleIntervals": 46,
+              "greatestAdjacentSameLifeDisplacement": 2.10065823,
+              "bounds": [
+                {
+                  "min": 38.073,
+                  "max": 41.797
+                },
+                {
+                  "min": -92.471,
+                  "max": -86.349
+                },
+                {
+                  "min": 0.025,
+                  "max": 0.801
+                }
+              ],
+              "includesScriptedRelocations": false
+            },
+            {
+              "id": 1,
+              "aliveSamples": 41,
+              "movingSameLifeSampleIntervals": 38,
+              "greatestAdjacentSameLifeDisplacement": 102.51537899,
+              "bounds": [
+                {
+                  "min": 33.82,
+                  "max": 108.241
+                },
+                {
+                  "min": -163.979,
+                  "max": -76.269
+                },
+                {
+                  "min": -0.03,
+                  "max": 0.888
+                }
+              ],
+              "includesScriptedRelocations": false
+            }
+          ],
+          "shieldDecreases": {
+            "total": 18,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "before": 1,
+                "after": 0.87
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "before": 0.87,
+                "after": 0.74
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "before": 0.74,
+                "after": 0.6
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "before": 0.6,
+                "after": 0.45
+              }
+            ]
+          },
+          "observedDeaths": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 1,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "observedRespawns": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 600,
+                "byTick": 630
+              },
+              {
+                "id": 1,
+                "afterTick": 1110,
+                "byTick": 1140
+              }
+            ]
+          },
+          "scoreChanges": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 0,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "markers": {
+            "total": 12,
+            "truncated": true,
+            "examples": [
+              {
+                "kind": "searching",
+                "line": 16,
+                "message": "halo-linux: network test: searching for games",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "joining",
+                "line": 17,
+                "message": "halo-linux: network test: joining",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "scriptedImpactDamageCue",
+                "line": 28,
+                "message": "halo-linux: network test: player 1 shoots player 0",
+                "actorId": 1,
+                "targetId": 0,
+                "afterTick": 120,
+                "beforeTick": 150
+              },
+              {
+                "kind": "scriptedImpactDamageCue",
+                "line": 33,
+                "message": "halo-linux: network test: player 1 shoots player 0",
+                "actorId": 1,
+                "targetId": 0,
+                "afterTick": 240,
+                "beforeTick": 270
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 9,
+          "forcedKillCues": 0,
+          "finalDamageCounters": {
+            "hits": 9,
+            "dealt": 0,
+            "rejected": 0,
+            "replayed": 33
+          },
+          "finalItemCounters": {
+            "current": 36,
+            "created": 65,
+            "deleted": 21,
+            "failed": 0,
+            "removed": 0
+          },
+          "finalNetworkCounters": {
+            "sent": 2632,
+            "received": 4417,
+            "corrections": 10
+          },
+          "finalScoreboard": [
+            {
+              "id": 0,
+              "alive": true,
+              "score": 2,
+              "kills": 2,
+              "deaths": 0,
+              "team": 0,
+              "machine": 0
+            },
+            {
+              "id": 1,
+              "alive": true,
+              "score": 0,
+              "kills": 0,
+              "deaths": 2,
+              "team": 1,
+              "machine": 1
+            }
+          ]
+        }
+      ],
+      "departure": {
+        "clientTimedExitMarker": true,
+        "hostTimedExitMarker": true,
+        "hostExitAfterClientWallSecondsFromReceipt": 17.417,
+        "hostProcessOutlivedClientFromReceipt": true,
+        "postExitSimulationDirectlyWallTimestamped": false,
+        "hostSamplesAfterLastClientSample": 8,
+        "additionalHostTicksAfterLastClientSample": 240,
+        "firstPostClientGameOverTick": 1470,
+        "continuedActiveMatchEstablished": false,
+        "explicitGracefulInGameLeaveEstablished": false,
+        "retainedClientScoreboardEntry": true,
+        "note": "Continued ticks and app exit receipts are separate from a graceful in-game leave, reusable lobby, active match or reconnect acceptance. A retained dead entry without an increased death count is not an additional combat death."
+      },
+      "refusals": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "errors": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "issues": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "limitations": [
+        "Upstream SHOOT cues apply native weapon-impact damage; they do not establish trigger input, projectile flight, aiming or visible firing. KILL cues separately force a scoring death.",
+        "Scripted player input is not human gameplay or campaign AI. Sampled counters do not certify complete state, physics, animation, rendering, audio, scale or multiplayer limits.",
+        "Position differences are measured without a pass threshold. Grenades, ordered weapon records and item count differences remain explicit; role-local cumulative counters need not equal. A score of -1 can mean that the game has no score callback, so equal -1 values do not establish scoring behavior.",
+        "No signed Delta compatibility table or local runtime/content attestation is supplied or accepted here. A same-runtime run cannot authorize OpenCE/Chupathingy mixed compatibility or relax the listing gate."
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "analyzer": "analyze-community-runtime-native",
+      "run": {
+        "label": "chupa-same-1",
+        "mode": "bloodgulch:slayer",
+        "privateFromReceipt": true,
+        "humanInputFromReceipt": false,
+        "twoComputersFromReceipt": false,
+        "publicListingFromReceipt": false,
+        "routerFirewallChangesFromReceipt": false,
+        "rendererFromReceipt": "native-null"
+      },
+      "provenance": {
+        "analyzerSourceSha256": "4e904764319cf4b14e10ad0b83b23107ac8e114551b43621060670ccf7a7fa5f",
+        "execution": {
+          "path": "execution.json",
+          "bytes": 5991,
+          "sha256": "6add721127e8033c6cc09eb4aad97dec5d8c2cb0a654350d0340c4a1a44db980"
+        },
+        "records": [
+          {
+            "role": "host",
+            "runtime": "chupathingy-v0.8.1c",
+            "executableSha256FromReceipt": "bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a",
+            "wallDurationSeconds": 80.783,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "host:bloodgulch:slayer",
+            "scriptedInput": "bot:1",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "false",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "bloodgulch.map",
+                "bytes": 22571008,
+                "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              }
+            ]
+          },
+          {
+            "role": "client",
+            "runtime": "chupathingy-v0.8.1c",
+            "executableSha256FromReceipt": "bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a",
+            "wallDurationSeconds": 60.742,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "join",
+            "scriptedInput": "bot:2",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "false",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "bloodgulch.map",
+                "bytes": 22571008,
+                "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              }
+            ]
+          }
+        ],
+        "logs": [
+          {
+            "role": "host",
+            "path": "host/stdio.log",
+            "bytes": 32916,
+            "sha256": "97788c069fab8039aff0615438f820d7d9ea76d7bd53ea89de6960f96631bb9d",
+            "samples": 55,
+            "firstTick": 30,
+            "lastTick": 1652,
+            "localPlayerIds": [0]
+          },
+          {
+            "role": "client",
+            "path": "client/stdio.log",
+            "bytes": 27459,
+            "sha256": "b877bab917b4bdcc0350e76c7927697a16314f17f1f8ee647286c47b47d1942d",
+            "samples": 46,
+            "firstTick": 30,
+            "lastTick": 1380,
+            "localPlayerIds": [1]
+          }
+        ],
+        "boundary": "Hashes bind this analysis to these files; executable signatures, actual processes and preserved content are not independently authenticated by this log analyzer."
+      },
+      "verdict": {
+        "status": "sampled-state-disagreement",
+        "selectedComparison": "nearPhaseTicks",
+        "joinMarkersObserved": true,
+        "bidirectionalPacketCountersObserved": true,
+        "atLeastTwoMachinePlayersObserved": true,
+        "completeInventoryParity": false,
+        "humanPlayAccepted": false,
+        "aiActorAcceptance": false,
+        "twoComputerAcceptance": false,
+        "renderingOrAudioAcceptance": false,
+        "universalCrossRuntimeCompatibility": false,
+        "listingGateChangeAuthorized": false
+      },
+      "comparisons": {
+        "nominalTickRateHz": 30,
+        "exactTicks": {
+          "tickWindow": 0,
+          "samplePairs": 2,
+          "tickDifferenceHistogram": {
+            "0": 2
+          },
+          "playerComparisons": 4,
+          "playerIds": [0, 1],
+          "stateFields": {
+            "alive": {
+              "compared": 4,
+              "agree": 4,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 4,
+              "agree": 4,
+              "notComparable": 0
+            },
+            "shield": {
+              "compared": 4,
+              "agree": 4,
+              "notComparable": 0
+            },
+            "score": {
+              "compared": 4,
+              "agree": 4,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 4,
+              "agree": 4,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 4,
+              "agree": 4,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 4,
+              "agree": 4,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 4,
+              "agree": 4,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 4,
+              "agree": 4,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "positionDeltas": [
+            {
+              "id": 0,
+              "count": 2,
+              "minimum": 0.07068946,
+              "median": 0.09135097,
+              "p95": 0.09135097,
+              "maximum": 0.09135097
+            },
+            {
+              "id": 1,
+              "count": 2,
+              "minimum": 0.06986415,
+              "median": 0.13083577,
+              "p95": 0.13083577,
+              "maximum": 0.13083577
+            }
+          ],
+          "largestPositionDeltas": [
+            {
+              "hostTick": 60,
+              "clientTick": 60,
+              "id": 1,
+              "deltaWorldUnits": 0.13083577,
+              "host": [54.14, -81.528, 0.177],
+              "client": [54.262, -81.575, 0.172],
+              "sameDeathCount": true,
+              "nextObservation": null
+            },
+            {
+              "hostTick": 60,
+              "clientTick": 60,
+              "id": 0,
+              "deltaWorldUnits": 0.09135097,
+              "host": [26.689, -83.243, 0.38],
+              "client": [26.614, -83.295, 0.384],
+              "sameDeathCount": true,
+              "nextObservation": null
+            },
+            {
+              "hostTick": 30,
+              "clientTick": 30,
+              "id": 0,
+              "deltaWorldUnits": 0.07068946,
+              "host": [28.372, -82.173, 0.272],
+              "client": [28.317, -82.217, 0.278],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 60,
+                "clientTick": 60,
+                "deltaWorldUnits": 0.09135097
+              }
+            },
+            {
+              "hostTick": 30,
+              "clientTick": 30,
+              "id": 1,
+              "deltaWorldUnits": 0.06986415,
+              "host": [52.486, -81.492, 0.122],
+              "client": [52.547, -81.458, 0.124],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 60,
+                "clientTick": 60,
+                "deltaWorldUnits": 0.13083577
+              }
+            }
+          ],
+          "grenades": {
+            "compared": 4,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            }
+          },
+          "weapons": {
+            "compared": 4,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          }
+        },
+        "nearPhaseTicks": {
+          "tickWindow": 2,
+          "samplePairs": 46,
+          "tickDifferenceHistogram": {
+            "0": 2,
+            "2": 44
+          },
+          "playerComparisons": 92,
+          "playerIds": [0, 1],
+          "stateFields": {
+            "alive": {
+              "compared": 92,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 86,
+              "agree": 86,
+              "notComparable": 6
+            },
+            "shield": {
+              "compared": 86,
+              "agree": 82,
+              "notComparable": 6
+            },
+            "score": {
+              "compared": 92,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 92,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 92,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 92,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 92,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 92,
+              "agree": 92,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 4,
+            "truncated": false,
+            "examples": [
+              {
+                "hostTick": 692,
+                "clientTick": 690,
+                "id": 0,
+                "fields": {
+                  "shield": {
+                    "host": 0.69,
+                    "client": 0.68,
+                    "nextObservation": {
+                      "hostTick": 722,
+                      "clientTick": 720,
+                      "agrees": false
+                    }
+                  }
+                }
+              },
+              {
+                "hostTick": 722,
+                "clientTick": 720,
+                "id": 0,
+                "fields": {
+                  "shield": {
+                    "host": 0.94,
+                    "client": 0.93,
+                    "nextObservation": {
+                      "hostTick": 752,
+                      "clientTick": 750,
+                      "agrees": true
+                    }
+                  }
+                }
+              },
+              {
+                "hostTick": 1172,
+                "clientTick": 1170,
+                "id": 0,
+                "fields": {
+                  "shield": {
+                    "host": 0.76,
+                    "client": 0.74,
+                    "nextObservation": {
+                      "hostTick": 1202,
+                      "clientTick": 1200,
+                      "agrees": false
+                    }
+                  }
+                }
+              },
+              {
+                "hostTick": 1202,
+                "clientTick": 1200,
+                "id": 0,
+                "fields": {
+                  "shield": {
+                    "host": 1,
+                    "client": 0.99,
+                    "nextObservation": {
+                      "hostTick": 1232,
+                      "clientTick": 1230,
+                      "agrees": true
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "positionDeltas": [
+            {
+              "id": 0,
+              "count": 46,
+              "minimum": 0.00223607,
+              "median": 0.06374951,
+              "p95": 0.0976934,
+              "maximum": 0.10914669
+            },
+            {
+              "id": 1,
+              "count": 40,
+              "minimum": 0,
+              "median": 0,
+              "p95": 0.06986415,
+              "maximum": 0.22719375
+            }
+          ],
+          "largestPositionDeltas": [
+            {
+              "hostTick": 92,
+              "clientTick": 90,
+              "id": 1,
+              "deltaWorldUnits": 0.22719375,
+              "host": [55.779, -82.561, 0.352],
+              "client": [55.716, -82.509, 0.14],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 122,
+                "clientTick": 120,
+                "deltaWorldUnits": 0
+              }
+            },
+            {
+              "hostTick": 60,
+              "clientTick": 60,
+              "id": 1,
+              "deltaWorldUnits": 0.13083577,
+              "host": [54.14, -81.528, 0.177],
+              "client": [54.262, -81.575, 0.172],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 92,
+                "clientTick": 90,
+                "deltaWorldUnits": 0.22719375
+              }
+            },
+            {
+              "hostTick": 362,
+              "clientTick": 360,
+              "id": 0,
+              "deltaWorldUnits": 0.10914669,
+              "host": [28.243, -82.678, 0.284],
+              "client": [28.136, -82.658, 0.292],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 392,
+                "clientTick": 390,
+                "deltaWorldUnits": 0.08103086
+              }
+            },
+            {
+              "hostTick": 992,
+              "clientTick": 990,
+              "id": 0,
+              "deltaWorldUnits": 0.0980663,
+              "host": [29.285, -82.67, 0.952],
+              "client": [29.201, -82.639, 0.912],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1022,
+                "clientTick": 1020,
+                "deltaWorldUnits": 0.02791057
+              }
+            },
+            {
+              "hostTick": 1112,
+              "clientTick": 1110,
+              "id": 0,
+              "deltaWorldUnits": 0.0976934,
+              "host": [28.746, -83.412, 0.239],
+              "client": [28.834, -83.454, 0.233],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1142,
+                "clientTick": 1140,
+                "deltaWorldUnits": 0.04546427
+              }
+            },
+            {
+              "hostTick": 1292,
+              "clientTick": 1290,
+              "id": 0,
+              "deltaWorldUnits": 0.09710304,
+              "host": [30.637, -82.315, 0.677],
+              "client": [30.71, -82.265, 0.637],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1322,
+                "clientTick": 1320,
+                "deltaWorldUnits": 0.05552477
+              }
+            },
+            {
+              "hostTick": 482,
+              "clientTick": 480,
+              "id": 0,
+              "deltaWorldUnits": 0.09667471,
+              "host": [28.666, -84.041, 0.235],
+              "client": [28.762, -84.05, 0.228],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 512,
+                "clientTick": 510,
+                "deltaWorldUnits": 0.06694027
+              }
+            },
+            {
+              "hostTick": 1202,
+              "clientTick": 1200,
+              "id": 0,
+              "deltaWorldUnits": 0.09589578,
+              "host": [29.826, -81.282, 0.125],
+              "client": [29.74, -81.24, 0.131],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1232,
+                "clientTick": 1230,
+                "deltaWorldUnits": 0.04789572
+              }
+            }
+          ],
+          "grenades": {
+            "compared": 86,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            }
+          },
+          "weapons": {
+            "compared": 86,
+            "differences": {
+              "total": 2,
+              "truncated": false,
+              "examples": [
+                {
+                  "hostTick": 572,
+                  "clientTick": 570,
+                  "id": 0,
+                  "host": [
+                    {
+                      "definitionLow16": 1281,
+                      "totalAndLoadedRounds": 0
+                    },
+                    {
+                      "definitionLow16": 918,
+                      "totalAndLoadedRounds": 23
+                    }
+                  ],
+                  "client": [
+                    {
+                      "definitionLow16": 1281,
+                      "totalAndLoadedRounds": 0
+                    },
+                    {
+                      "definitionLow16": 918,
+                      "totalAndLoadedRounds": 22
+                    }
+                  ],
+                  "nextObservation": {
+                    "hostTick": 602,
+                    "clientTick": 600,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 1202,
+                  "clientTick": 1200,
+                  "id": 0,
+                  "host": [
+                    {
+                      "definitionLow16": 1281,
+                      "totalAndLoadedRounds": 0
+                    },
+                    {
+                      "definitionLow16": 918,
+                      "totalAndLoadedRounds": 19
+                    },
+                    {
+                      "definitionLow16": 918,
+                      "totalAndLoadedRounds": 22
+                    }
+                  ],
+                  "client": [
+                    {
+                      "definitionLow16": 1281,
+                      "totalAndLoadedRounds": 0
+                    },
+                    {
+                      "definitionLow16": 918,
+                      "totalAndLoadedRounds": 19
+                    },
+                    {
+                      "definitionLow16": 918,
+                      "totalAndLoadedRounds": 21
+                    }
+                  ],
+                  "nextObservation": {
+                    "hostTick": 1232,
+                    "clientTick": 1230,
+                    "agrees": true
+                  }
+                }
+              ]
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 1,
+            "truncated": false,
+            "examples": [
+              {
+                "hostTick": 902,
+                "clientTick": 900,
+                "host": 36,
+                "client": 35
+              }
+            ]
+          }
+        },
+        "timing": "Near-phase pairs are monotonic and one-to-one, within two ticks (about 67 ms at nominal 30 Hz). This comparison aid is not an approved network latency or position tolerance. Logs sample about once per second; matching printed values have only their printed precision."
+      },
+      "roles": [
+        {
+          "role": "host",
+          "stateTransitions": {
+            "total": 31,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 122,
+                "byTick": 152,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.87,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 242,
+                "byTick": 272,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.73,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 362,
+                "byTick": 392,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.6,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 482,
+                "byTick": 512,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.44,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              }
+            ]
+          },
+          "movement": [
+            {
+              "id": 0,
+              "aliveSamples": 55,
+              "movingSameLifeSampleIntervals": 54,
+              "greatestAdjacentSameLifeDisplacement": 2.19972135,
+              "bounds": [
+                {
+                  "min": 25.125,
+                  "max": 32.901
+                },
+                {
+                  "min": -84.676,
+                  "max": -81.282
+                },
+                {
+                  "min": -0.041,
+                  "max": 1.168
+                }
+              ],
+              "includesScriptedRelocations": true
+            },
+            {
+              "id": 1,
+              "aliveSamples": 42,
+              "movingSameLifeSampleIntervals": 39,
+              "greatestAdjacentSameLifeDisplacement": 92.7624184,
+              "bounds": [
+                {
+                  "min": 19.65,
+                  "max": 84.43
+                },
+                {
+                  "min": -156.801,
+                  "max": -81.445
+                },
+                {
+                  "min": -0.085,
+                  "max": 2.932
+                }
+              ],
+              "includesScriptedRelocations": true
+            }
+          ],
+          "shieldDecreases": {
+            "total": 18,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 122,
+                "byTick": 152,
+                "before": 1,
+                "after": 0.87
+              },
+              {
+                "id": 0,
+                "afterTick": 242,
+                "byTick": 272,
+                "before": 0.87,
+                "after": 0.73
+              },
+              {
+                "id": 0,
+                "afterTick": 362,
+                "byTick": 392,
+                "before": 0.73,
+                "after": 0.6
+              },
+              {
+                "id": 0,
+                "afterTick": 482,
+                "byTick": 512,
+                "before": 0.6,
+                "after": 0.44
+              }
+            ]
+          },
+          "observedDeaths": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 512,
+                "byTick": 542,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 1,
+                "afterTick": 1022,
+                "byTick": 1052,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "observedRespawns": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 602,
+                "byTick": 632
+              },
+              {
+                "id": 1,
+                "afterTick": 1112,
+                "byTick": 1142
+              }
+            ]
+          },
+          "scoreChanges": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 512,
+                "byTick": 542,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 0,
+                "afterTick": 1022,
+                "byTick": 1052,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "markers": {
+            "total": 25,
+            "truncated": true,
+            "examples": [
+              {
+                "kind": "protocol",
+                "line": 7,
+                "message": "chupathingyce: OpenCE network version 32 (joins 11-40); Delta 1, wire chupa-39a, legacy table: built in; protocol auto",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "protocol",
+                "line": 8,
+                "message": "chupathingyce: Following OpenCE network version 32 (built in)",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "hosting",
+                "line": 21,
+                "message": "chupathingyce: network test: hosting bloodgulch",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "protocol",
+                "line": 22,
+                "message": "chupathingyce: Delta Peer: hosting with Delta on port 5160",
+                "afterTick": null,
+                "beforeTick": 30
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 10,
+          "forcedKillCues": 2,
+          "finalDamageCounters": {
+            "hits": 0,
+            "dealt": 9,
+            "rejected": 0,
+            "replayed": 0
+          },
+          "finalItemCounters": {
+            "current": 36,
+            "created": 69,
+            "deleted": 23,
+            "failed": 0,
+            "removed": 0
+          },
+          "finalNetworkCounters": {
+            "sent": 4461,
+            "received": 2645,
+            "corrections": 0
+          },
+          "finalScoreboard": [
+            {
+              "id": 0,
+              "alive": true,
+              "score": 2,
+              "kills": 2,
+              "deaths": 0,
+              "team": 0,
+              "machine": 0
+            },
+            {
+              "id": 1,
+              "alive": false,
+              "score": 0,
+              "kills": 0,
+              "deaths": 2,
+              "team": 1,
+              "machine": 1
+            }
+          ]
+        },
+        {
+          "role": "client",
+          "stateTransitions": {
+            "total": 28,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.87,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.73,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.6,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.44,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              }
+            ]
+          },
+          "movement": [
+            {
+              "id": 0,
+              "aliveSamples": 46,
+              "movingSameLifeSampleIntervals": 45,
+              "greatestAdjacentSameLifeDisplacement": 2.25062747,
+              "bounds": [
+                {
+                  "min": 25.08,
+                  "max": 31.484
+                },
+                {
+                  "min": -84.66,
+                  "max": -81.24
+                },
+                {
+                  "min": 0.004,
+                  "max": 1.136
+                }
+              ],
+              "includesScriptedRelocations": false
+            },
+            {
+              "id": 1,
+              "aliveSamples": 40,
+              "movingSameLifeSampleIntervals": 37,
+              "greatestAdjacentSameLifeDisplacement": 92.7624184,
+              "bounds": [
+                {
+                  "min": 19.65,
+                  "max": 84.43
+                },
+                {
+                  "min": -156.801,
+                  "max": -81.445
+                },
+                {
+                  "min": -0.085,
+                  "max": 2.932
+                }
+              ],
+              "includesScriptedRelocations": false
+            }
+          ],
+          "shieldDecreases": {
+            "total": 18,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "before": 1,
+                "after": 0.87
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "before": 0.87,
+                "after": 0.73
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "before": 0.73,
+                "after": 0.6
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "before": 0.6,
+                "after": 0.44
+              }
+            ]
+          },
+          "observedDeaths": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 1,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "observedRespawns": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 600,
+                "byTick": 630
+              },
+              {
+                "id": 1,
+                "afterTick": 1110,
+                "byTick": 1140
+              }
+            ]
+          },
+          "scoreChanges": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 0,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "markers": {
+            "total": 17,
+            "truncated": true,
+            "examples": [
+              {
+                "kind": "protocol",
+                "line": 7,
+                "message": "chupathingyce: OpenCE network version 32 (joins 11-40); Delta 1, wire chupa-39a, legacy table: built in; protocol auto",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "protocol",
+                "line": 8,
+                "message": "chupathingyce: Following OpenCE network version 32 (built in)",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "searching",
+                "line": 21,
+                "message": "chupathingyce: network test: searching for games",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "joining",
+                "line": 22,
+                "message": "chupathingyce: network test: joining",
+                "afterTick": null,
+                "beforeTick": 30
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 9,
+          "forcedKillCues": 0,
+          "finalDamageCounters": {
+            "hits": 9,
+            "dealt": 0,
+            "rejected": 0,
+            "replayed": 36
+          },
+          "finalItemCounters": {
+            "current": 36,
+            "created": 65,
+            "deleted": 21,
+            "failed": 0,
+            "removed": 0
+          },
+          "finalNetworkCounters": {
+            "sent": 2575,
+            "received": 4339,
+            "corrections": 8
+          },
+          "finalScoreboard": [
+            {
+              "id": 0,
+              "alive": true,
+              "score": 2,
+              "kills": 2,
+              "deaths": 0,
+              "team": 0,
+              "machine": 0
+            },
+            {
+              "id": 1,
+              "alive": true,
+              "score": 0,
+              "kills": 0,
+              "deaths": 2,
+              "team": 1,
+              "machine": 1
+            }
+          ]
+        }
+      ],
+      "departure": {
+        "clientTimedExitMarker": true,
+        "hostTimedExitMarker": true,
+        "hostExitAfterClientWallSecondsFromReceipt": 17.778,
+        "hostProcessOutlivedClientFromReceipt": true,
+        "postExitSimulationDirectlyWallTimestamped": false,
+        "hostSamplesAfterLastClientSample": 10,
+        "additionalHostTicksAfterLastClientSample": 272,
+        "firstPostClientGameOverTick": 1472,
+        "continuedActiveMatchEstablished": false,
+        "explicitGracefulInGameLeaveEstablished": false,
+        "retainedClientScoreboardEntry": true,
+        "note": "Continued ticks and app exit receipts are separate from a graceful in-game leave, reusable lobby, active match or reconnect acceptance. A retained dead entry without an increased death count is not an additional combat death."
+      },
+      "refusals": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "errors": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "issues": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "limitations": [
+        "Upstream SHOOT cues apply native weapon-impact damage; they do not establish trigger input, projectile flight, aiming or visible firing. KILL cues separately force a scoring death.",
+        "Scripted player input is not human gameplay or campaign AI. Sampled counters do not certify complete state, physics, animation, rendering, audio, scale or multiplayer limits.",
+        "Position differences are measured without a pass threshold. Grenades, ordered weapon records and item count differences remain explicit; role-local cumulative counters need not equal. A score of -1 can mean that the game has no score callback, so equal -1 values do not establish scoring behavior.",
+        "No signed Delta compatibility table or local runtime/content attestation is supplied or accepted here. A same-runtime run cannot authorize OpenCE/Chupathingy mixed compatibility or relax the listing gate."
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "analyzer": "analyze-community-runtime-native",
+      "run": {
+        "label": "mixed-chupa-host-1",
+        "mode": "bloodgulch:slayer",
+        "privateFromReceipt": true,
+        "humanInputFromReceipt": false,
+        "twoComputersFromReceipt": false,
+        "publicListingFromReceipt": false,
+        "routerFirewallChangesFromReceipt": false,
+        "rendererFromReceipt": "native-null"
+      },
+      "provenance": {
+        "analyzerSourceSha256": "4e904764319cf4b14e10ad0b83b23107ac8e114551b43621060670ccf7a7fa5f",
+        "execution": {
+          "path": "execution.json",
+          "bytes": 5815,
+          "sha256": "f50cf8534c57721b506caed5a2819bd12fea750aff4edd5d61855b9b1111ded7"
+        },
+        "records": [
+          {
+            "role": "host",
+            "runtime": "chupathingy-v0.8.1c",
+            "executableSha256FromReceipt": "bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a",
+            "wallDurationSeconds": 80.708,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "host:bloodgulch:slayer",
+            "scriptedInput": "bot:1",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "false",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "bloodgulch.map",
+                "bytes": 22571008,
+                "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              }
+            ]
+          },
+          {
+            "role": "client",
+            "runtime": "opence-build-329",
+            "executableSha256FromReceipt": "b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c",
+            "wallDurationSeconds": 60.41,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "join",
+            "scriptedInput": "bot:2",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "true",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "bloodgulch.map",
+                "bytes": 22571008,
+                "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              }
+            ]
+          }
+        ],
+        "logs": [
+          {
+            "role": "host",
+            "path": "host/stdio.log",
+            "bytes": 8518,
+            "sha256": "035da52a3412a50965b9d19602077b0855cdf69cfed44dcba9d944600bbec1c1",
+            "samples": 0,
+            "firstTick": null,
+            "lastTick": null,
+            "localPlayerIds": []
+          },
+          {
+            "role": "client",
+            "path": "client/stdio.log",
+            "bytes": 1443,
+            "sha256": "44abf2c3a2f04e25a037ff604b36cf8197912da1f53c49bbc24125fdd0790224",
+            "samples": 0,
+            "firstTick": null,
+            "lastTick": null,
+            "localPlayerIds": []
+          }
+        ],
+        "boundary": "Hashes bind this analysis to these files; executable signatures, actual processes and preserved content are not independently authenticated by this log analyzer."
+      },
+      "verdict": {
+        "status": "join-refused",
+        "selectedComparison": "exactTicks",
+        "joinMarkersObserved": false,
+        "bidirectionalPacketCountersObserved": false,
+        "atLeastTwoMachinePlayersObserved": false,
+        "completeInventoryParity": false,
+        "humanPlayAccepted": false,
+        "aiActorAcceptance": false,
+        "twoComputerAcceptance": false,
+        "renderingOrAudioAcceptance": false,
+        "universalCrossRuntimeCompatibility": false,
+        "listingGateChangeAuthorized": false
+      },
+      "comparisons": {
+        "nominalTickRateHz": 30,
+        "exactTicks": {
+          "tickWindow": 0,
+          "samplePairs": 0,
+          "tickDifferenceHistogram": {},
+          "playerComparisons": 0,
+          "playerIds": [],
+          "stateFields": {
+            "alive": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "shield": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "score": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "positionDeltas": [],
+          "largestPositionDeltas": [],
+          "grenades": {
+            "compared": 0,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            }
+          },
+          "weapons": {
+            "compared": 0,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          }
+        },
+        "nearPhaseTicks": {
+          "tickWindow": 2,
+          "samplePairs": 0,
+          "tickDifferenceHistogram": {},
+          "playerComparisons": 0,
+          "playerIds": [],
+          "stateFields": {
+            "alive": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "shield": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "score": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 0,
+              "agree": 0,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "positionDeltas": [],
+          "largestPositionDeltas": [],
+          "grenades": {
+            "compared": 0,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            }
+          },
+          "weapons": {
+            "compared": 0,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          }
+        },
+        "timing": "Near-phase pairs are monotonic and one-to-one, within two ticks (about 67 ms at nominal 30 Hz). This comparison aid is not an approved network latency or position tolerance. Logs sample about once per second; matching printed values have only their printed precision."
+      },
+      "roles": [
+        {
+          "role": "host",
+          "stateTransitions": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "movement": [],
+          "shieldDecreases": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "observedDeaths": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "observedRespawns": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "scoreChanges": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "markers": {
+            "total": 19,
+            "truncated": true,
+            "examples": [
+              {
+                "kind": "protocol",
+                "line": 7,
+                "message": "chupathingyce: OpenCE network version 32 (joins 11-40); Delta 1, wire chupa-39a, legacy table: built in; protocol auto",
+                "afterTick": null,
+                "beforeTick": null
+              },
+              {
+                "kind": "protocol",
+                "line": 8,
+                "message": "chupathingyce: Following OpenCE network version 32 (built in)",
+                "afterTick": null,
+                "beforeTick": null
+              },
+              {
+                "kind": "hosting",
+                "line": 21,
+                "message": "chupathingyce: network test: hosting bloodgulch",
+                "afterTick": null,
+                "beforeTick": null
+              },
+              {
+                "kind": "protocol",
+                "line": 22,
+                "message": "chupathingyce: Delta Peer: hosting with Delta on port 5160",
+                "afterTick": null,
+                "beforeTick": null
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 0,
+          "forcedKillCues": 0,
+          "finalDamageCounters": null,
+          "finalItemCounters": null,
+          "finalNetworkCounters": null,
+          "finalScoreboard": []
+        },
+        {
+          "role": "client",
+          "stateTransitions": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "movement": [],
+          "shieldDecreases": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "observedDeaths": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "observedRespawns": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "scoreChanges": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "markers": {
+            "total": 4,
+            "truncated": false,
+            "examples": [
+              {
+                "kind": "searching",
+                "line": 16,
+                "message": "halo-linux: network test: searching for games",
+                "afterTick": null,
+                "beforeTick": null
+              },
+              {
+                "kind": "joinRefusal",
+                "line": 17,
+                "message": "halo-linux: Halo: cannot join this game: The host is using an older version of the network code than you.",
+                "afterTick": null,
+                "beforeTick": null
+              },
+              {
+                "kind": "joinRefusal",
+                "line": 19,
+                "message": "You are on version 39. The host is on version 32.",
+                "afterTick": null,
+                "beforeTick": null
+              },
+              {
+                "kind": "timedExit",
+                "line": 22,
+                "message": "halo-linux: exiting after debug.exit_after",
+                "afterTick": null,
+                "beforeTick": null
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 0,
+          "forcedKillCues": 0,
+          "finalDamageCounters": null,
+          "finalItemCounters": null,
+          "finalNetworkCounters": null,
+          "finalScoreboard": []
+        }
+      ],
+      "departure": {
+        "clientTimedExitMarker": true,
+        "hostTimedExitMarker": true,
+        "hostExitAfterClientWallSecondsFromReceipt": 17.697,
+        "hostProcessOutlivedClientFromReceipt": true,
+        "postExitSimulationDirectlyWallTimestamped": false,
+        "hostSamplesAfterLastClientSample": 0,
+        "additionalHostTicksAfterLastClientSample": 0,
+        "firstPostClientGameOverTick": null,
+        "continuedActiveMatchEstablished": false,
+        "explicitGracefulInGameLeaveEstablished": false,
+        "retainedClientScoreboardEntry": false,
+        "note": "Continued ticks and app exit receipts are separate from a graceful in-game leave, reusable lobby, active match or reconnect acceptance. A retained dead entry without an increased death count is not an additional combat death."
+      },
+      "refusals": {
+        "total": 2,
+        "truncated": false,
+        "examples": [
+          {
+            "role": "client",
+            "kind": "joinRefusal",
+            "line": 17,
+            "message": "halo-linux: Halo: cannot join this game: The host is using an older version of the network code than you.",
+            "afterTick": null,
+            "beforeTick": null
+          },
+          {
+            "role": "client",
+            "kind": "joinRefusal",
+            "line": 19,
+            "message": "You are on version 39. The host is on version 32.",
+            "afterTick": null,
+            "beforeTick": null
+          }
+        ]
+      },
+      "errors": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "issues": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "limitations": [
+        "Upstream SHOOT cues apply native weapon-impact damage; they do not establish trigger input, projectile flight, aiming or visible firing. KILL cues separately force a scoring death.",
+        "Scripted player input is not human gameplay or campaign AI. Sampled counters do not certify complete state, physics, animation, rendering, audio, scale or multiplayer limits.",
+        "Position differences are measured without a pass threshold. Grenades, ordered weapon records and item count differences remain explicit; role-local cumulative counters need not equal. A score of -1 can mean that the game has no score callback, so equal -1 values do not establish scoring behavior.",
+        "No signed Delta compatibility table or local runtime/content attestation is supplied or accepted here. A same-runtime run cannot authorize OpenCE/Chupathingy mixed compatibility or relax the listing gate."
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "analyzer": "analyze-community-runtime-native",
+      "run": {
+        "label": "mixed-opence-host-2",
+        "mode": "bloodgulch:slayer",
+        "privateFromReceipt": true,
+        "humanInputFromReceipt": false,
+        "twoComputersFromReceipt": false,
+        "publicListingFromReceipt": false,
+        "routerFirewallChangesFromReceipt": false,
+        "rendererFromReceipt": "OpenCE native null renderer; Chupathingy hidden native window renderer"
+      },
+      "provenance": {
+        "analyzerSourceSha256": "4e904764319cf4b14e10ad0b83b23107ac8e114551b43621060670ccf7a7fa5f",
+        "execution": {
+          "path": "execution.json",
+          "bytes": 5584,
+          "sha256": "18b4c03baec273b76ea1406d885bf6601c4965363679aec21e19c8b59ecfd9af"
+        },
+        "records": [
+          {
+            "role": "host",
+            "runtime": "opence-build-329",
+            "executableSha256FromReceipt": "b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c",
+            "wallDurationSeconds": 80.406,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "host:bloodgulch:slayer",
+            "scriptedInput": "bot:1",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "true",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              },
+              {
+                "name": "bloodgulch.map",
+                "bytes": 22571008,
+                "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+                "cacheVersion": 5
+              }
+            ]
+          },
+          {
+            "role": "client",
+            "runtime": "chupathingy-v0.8.1c",
+            "executableSha256FromReceipt": "bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a",
+            "wallDurationSeconds": 60.734,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "join",
+            "scriptedInput": "bot:2",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "false",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              },
+              {
+                "name": "bloodgulch.map",
+                "bytes": 22571008,
+                "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+                "cacheVersion": 5
+              }
+            ]
+          }
+        ],
+        "logs": [
+          {
+            "role": "host",
+            "path": "host/stdio.log",
+            "bytes": 27322,
+            "sha256": "cb86a164dd1459d11c01b7c1bbf5e0b0b7fb0050d7d22a1720eb32b738d3805d",
+            "samples": 55,
+            "firstTick": 30,
+            "lastTick": 1650,
+            "localPlayerIds": [0]
+          },
+          {
+            "role": "client",
+            "path": "client/stdio.log",
+            "bytes": 27746,
+            "sha256": "17a60fbfd341e7226daa3771c66bcf64afeb78e6139e8d998621558c25d8eb26",
+            "samples": 47,
+            "firstTick": 30,
+            "lastTick": 1410,
+            "localPlayerIds": [1]
+          }
+        ],
+        "boundary": "Hashes bind this analysis to these files; executable signatures, actual processes and preserved content are not independently authenticated by this log analyzer."
+      },
+      "verdict": {
+        "status": "sampled-state-disagreement",
+        "selectedComparison": "exactTicks",
+        "joinMarkersObserved": true,
+        "bidirectionalPacketCountersObserved": true,
+        "atLeastTwoMachinePlayersObserved": true,
+        "completeInventoryParity": false,
+        "humanPlayAccepted": false,
+        "aiActorAcceptance": false,
+        "twoComputerAcceptance": false,
+        "renderingOrAudioAcceptance": false,
+        "universalCrossRuntimeCompatibility": false,
+        "listingGateChangeAuthorized": false
+      },
+      "comparisons": {
+        "nominalTickRateHz": 30,
+        "exactTicks": {
+          "tickWindow": 0,
+          "samplePairs": 47,
+          "tickDifferenceHistogram": {
+            "0": 47
+          },
+          "playerComparisons": 94,
+          "playerIds": [0, 1],
+          "stateFields": {
+            "alive": {
+              "compared": 94,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 86,
+              "agree": 86,
+              "notComparable": 8
+            },
+            "shield": {
+              "compared": 86,
+              "agree": 74,
+              "notComparable": 8
+            },
+            "score": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 94,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 94,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 16,
+            "truncated": true,
+            "examples": [
+              {
+                "hostTick": 120,
+                "clientTick": 120,
+                "id": 1,
+                "fields": {
+                  "shield": {
+                    "host": 1,
+                    "client": 0.85,
+                    "nextObservation": {
+                      "hostTick": 150,
+                      "clientTick": 150,
+                      "agrees": true
+                    }
+                  }
+                }
+              },
+              {
+                "hostTick": 240,
+                "clientTick": 240,
+                "id": 1,
+                "fields": {
+                  "shield": {
+                    "host": 0.85,
+                    "client": 0.7,
+                    "nextObservation": {
+                      "hostTick": 270,
+                      "clientTick": 270,
+                      "agrees": true
+                    }
+                  }
+                }
+              },
+              {
+                "hostTick": 360,
+                "clientTick": 360,
+                "id": 1,
+                "fields": {
+                  "shield": {
+                    "host": 0.7,
+                    "client": 0.56,
+                    "nextObservation": {
+                      "hostTick": 390,
+                      "clientTick": 390,
+                      "agrees": true
+                    }
+                  }
+                }
+              },
+              {
+                "hostTick": 480,
+                "clientTick": 480,
+                "id": 1,
+                "fields": {
+                  "shield": {
+                    "host": 0.56,
+                    "client": 0.4,
+                    "nextObservation": null
+                  }
+                }
+              }
+            ]
+          },
+          "positionDeltas": [
+            {
+              "id": 0,
+              "count": 47,
+              "minimum": 0.01979899,
+              "median": 0.07422937,
+              "p95": 0.10242558,
+              "maximum": 0.10901835
+            },
+            {
+              "id": 1,
+              "count": 39,
+              "minimum": 0,
+              "median": 0.0532635,
+              "p95": 0.08764702,
+              "maximum": 98.16531641
+            }
+          ],
+          "largestPositionDeltas": [
+            {
+              "hostTick": 1170,
+              "clientTick": 1170,
+              "id": 1,
+              "deltaWorldUnits": 98.16531641,
+              "host": [54.701, -77.34, 0.74],
+              "client": [90.751, -168.646, 0.943],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1200,
+                "clientTick": 1200,
+                "deltaWorldUnits": 0.04754997
+              }
+            },
+            {
+              "hostTick": 1050,
+              "clientTick": 1050,
+              "id": 0,
+              "deltaWorldUnits": 0.10901835,
+              "host": [91.944, -166.859, 0.087],
+              "client": [92.011, -166.773, 0.087],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1080,
+                "clientTick": 1080,
+                "deltaWorldUnits": 0.0700928
+              }
+            },
+            {
+              "hostTick": 540,
+              "clientTick": 540,
+              "id": 0,
+              "deltaWorldUnits": 0.10793053,
+              "host": [91.383, -169.561, 0.113],
+              "client": [91.369, -169.668, 0.115],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 570,
+                "clientTick": 570,
+                "deltaWorldUnits": 0.06313478
+              }
+            },
+            {
+              "hostTick": 210,
+              "clientTick": 210,
+              "id": 0,
+              "deltaWorldUnits": 0.10242558,
+              "host": [91.091, -168.953, 0.099],
+              "client": [91.192, -168.936, 0.1],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 240,
+                "clientTick": 240,
+                "deltaWorldUnits": 0.09464671
+              }
+            },
+            {
+              "hostTick": 510,
+              "clientTick": 510,
+              "id": 0,
+              "deltaWorldUnits": 0.10183811,
+              "host": [91.838, -167.656, 0.085],
+              "client": [91.825, -167.757, 0.086],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 540,
+                "clientTick": 540,
+                "deltaWorldUnits": 0.10793053
+              }
+            },
+            {
+              "hostTick": 630,
+              "clientTick": 630,
+              "id": 0,
+              "deltaWorldUnits": 0.0990202,
+              "host": [92.6, -170.276, 0.152],
+              "client": [92.678, -170.215, 0.152],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 660,
+                "clientTick": 660,
+                "deltaWorldUnits": 0.07422937
+              }
+            },
+            {
+              "hostTick": 420,
+              "clientTick": 420,
+              "id": 0,
+              "deltaWorldUnits": 0.09845811,
+              "host": [90.769, -168.22, 0.75],
+              "client": [90.814, -168.133, 0.74],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 450,
+                "clientTick": 450,
+                "deltaWorldUnits": 0.07433034
+              }
+            },
+            {
+              "hostTick": 30,
+              "clientTick": 30,
+              "id": 0,
+              "deltaWorldUnits": 0.09837683,
+              "host": [92.974, -168.584, 0.115],
+              "client": [93.003, -168.49, 0.114],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 60,
+                "clientTick": 60,
+                "deltaWorldUnits": 0.04259108
+              }
+            }
+          ],
+          "grenades": {
+            "compared": 86,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            }
+          },
+          "weapons": {
+            "compared": 86,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "hostTick": 900,
+                "clientTick": 900,
+                "host": 35,
+                "client": 57
+              },
+              {
+                "hostTick": 1020,
+                "clientTick": 1020,
+                "host": 36,
+                "client": 37
+              }
+            ]
+          }
+        },
+        "nearPhaseTicks": {
+          "tickWindow": 2,
+          "samplePairs": 47,
+          "tickDifferenceHistogram": {
+            "0": 47
+          },
+          "playerComparisons": 94,
+          "playerIds": [0, 1],
+          "stateFields": {
+            "alive": {
+              "compared": 94,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 86,
+              "agree": 86,
+              "notComparable": 8
+            },
+            "shield": {
+              "compared": 86,
+              "agree": 74,
+              "notComparable": 8
+            },
+            "score": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 94,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 94,
+              "agree": 92,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 16,
+            "truncated": true,
+            "examples": [
+              {
+                "hostTick": 120,
+                "clientTick": 120,
+                "id": 1,
+                "fields": {
+                  "shield": {
+                    "host": 1,
+                    "client": 0.85,
+                    "nextObservation": {
+                      "hostTick": 150,
+                      "clientTick": 150,
+                      "agrees": true
+                    }
+                  }
+                }
+              },
+              {
+                "hostTick": 240,
+                "clientTick": 240,
+                "id": 1,
+                "fields": {
+                  "shield": {
+                    "host": 0.85,
+                    "client": 0.7,
+                    "nextObservation": {
+                      "hostTick": 270,
+                      "clientTick": 270,
+                      "agrees": true
+                    }
+                  }
+                }
+              },
+              {
+                "hostTick": 360,
+                "clientTick": 360,
+                "id": 1,
+                "fields": {
+                  "shield": {
+                    "host": 0.7,
+                    "client": 0.56,
+                    "nextObservation": {
+                      "hostTick": 390,
+                      "clientTick": 390,
+                      "agrees": true
+                    }
+                  }
+                }
+              },
+              {
+                "hostTick": 480,
+                "clientTick": 480,
+                "id": 1,
+                "fields": {
+                  "shield": {
+                    "host": 0.56,
+                    "client": 0.4,
+                    "nextObservation": null
+                  }
+                }
+              }
+            ]
+          },
+          "positionDeltas": [
+            {
+              "id": 0,
+              "count": 47,
+              "minimum": 0.01979899,
+              "median": 0.07422937,
+              "p95": 0.10242558,
+              "maximum": 0.10901835
+            },
+            {
+              "id": 1,
+              "count": 39,
+              "minimum": 0,
+              "median": 0.0532635,
+              "p95": 0.08764702,
+              "maximum": 98.16531641
+            }
+          ],
+          "largestPositionDeltas": [
+            {
+              "hostTick": 1170,
+              "clientTick": 1170,
+              "id": 1,
+              "deltaWorldUnits": 98.16531641,
+              "host": [54.701, -77.34, 0.74],
+              "client": [90.751, -168.646, 0.943],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1200,
+                "clientTick": 1200,
+                "deltaWorldUnits": 0.04754997
+              }
+            },
+            {
+              "hostTick": 1050,
+              "clientTick": 1050,
+              "id": 0,
+              "deltaWorldUnits": 0.10901835,
+              "host": [91.944, -166.859, 0.087],
+              "client": [92.011, -166.773, 0.087],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 1080,
+                "clientTick": 1080,
+                "deltaWorldUnits": 0.0700928
+              }
+            },
+            {
+              "hostTick": 540,
+              "clientTick": 540,
+              "id": 0,
+              "deltaWorldUnits": 0.10793053,
+              "host": [91.383, -169.561, 0.113],
+              "client": [91.369, -169.668, 0.115],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 570,
+                "clientTick": 570,
+                "deltaWorldUnits": 0.06313478
+              }
+            },
+            {
+              "hostTick": 210,
+              "clientTick": 210,
+              "id": 0,
+              "deltaWorldUnits": 0.10242558,
+              "host": [91.091, -168.953, 0.099],
+              "client": [91.192, -168.936, 0.1],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 240,
+                "clientTick": 240,
+                "deltaWorldUnits": 0.09464671
+              }
+            },
+            {
+              "hostTick": 510,
+              "clientTick": 510,
+              "id": 0,
+              "deltaWorldUnits": 0.10183811,
+              "host": [91.838, -167.656, 0.085],
+              "client": [91.825, -167.757, 0.086],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 540,
+                "clientTick": 540,
+                "deltaWorldUnits": 0.10793053
+              }
+            },
+            {
+              "hostTick": 630,
+              "clientTick": 630,
+              "id": 0,
+              "deltaWorldUnits": 0.0990202,
+              "host": [92.6, -170.276, 0.152],
+              "client": [92.678, -170.215, 0.152],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 660,
+                "clientTick": 660,
+                "deltaWorldUnits": 0.07422937
+              }
+            },
+            {
+              "hostTick": 420,
+              "clientTick": 420,
+              "id": 0,
+              "deltaWorldUnits": 0.09845811,
+              "host": [90.769, -168.22, 0.75],
+              "client": [90.814, -168.133, 0.74],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 450,
+                "clientTick": 450,
+                "deltaWorldUnits": 0.07433034
+              }
+            },
+            {
+              "hostTick": 30,
+              "clientTick": 30,
+              "id": 0,
+              "deltaWorldUnits": 0.09837683,
+              "host": [92.974, -168.584, 0.115],
+              "client": [93.003, -168.49, 0.114],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 60,
+                "clientTick": 60,
+                "deltaWorldUnits": 0.04259108
+              }
+            }
+          ],
+          "grenades": {
+            "compared": 86,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            }
+          },
+          "weapons": {
+            "compared": 86,
+            "differences": {
+              "total": 0,
+              "truncated": false,
+              "examples": []
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "hostTick": 900,
+                "clientTick": 900,
+                "host": 35,
+                "client": 57
+              },
+              {
+                "hostTick": 1020,
+                "clientTick": 1020,
+                "host": 36,
+                "client": 37
+              }
+            ]
+          }
+        },
+        "timing": "Near-phase pairs are monotonic and one-to-one, within two ticks (about 67 ms at nominal 30 Hz). This comparison aid is not an approved network latency or position tolerance. Logs sample about once per second; matching printed values have only their printed precision."
+      },
+      "roles": [
+        {
+          "role": "host",
+          "stateTransitions": {
+            "total": 30,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.86,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.72,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.58,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.44,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              }
+            ]
+          },
+          "movement": [
+            {
+              "id": 0,
+              "aliveSamples": 55,
+              "movingSameLifeSampleIntervals": 54,
+              "greatestAdjacentSameLifeDisplacement": 2.21307049,
+              "bounds": [
+                {
+                  "min": 88.814,
+                  "max": 95.379
+                },
+                {
+                  "min": -171.353,
+                  "max": -165.705
+                },
+                {
+                  "min": 0.085,
+                  "max": 0.785
+                }
+              ],
+              "includesScriptedRelocations": true
+            },
+            {
+              "id": 1,
+              "aliveSamples": 42,
+              "movingSameLifeSampleIntervals": 39,
+              "greatestAdjacentSameLifeDisplacement": 98.68210068,
+              "bounds": [
+                {
+                  "min": 52.977,
+                  "max": 91.084
+                },
+                {
+                  "min": -169.869,
+                  "max": -76.66
+                },
+                {
+                  "min": -0.078,
+                  "max": 0.771
+                }
+              ],
+              "includesScriptedRelocations": true
+            }
+          ],
+          "shieldDecreases": {
+            "total": 19,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "before": 1,
+                "after": 0.86
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "before": 0.86,
+                "after": 0.72
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "before": 0.72,
+                "after": 0.58
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "before": 0.58,
+                "after": 0.44
+              }
+            ]
+          },
+          "observedDeaths": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 1,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "observedRespawns": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 600,
+                "byTick": 630
+              },
+              {
+                "id": 1,
+                "afterTick": 1110,
+                "byTick": 1140
+              }
+            ]
+          },
+          "scoreChanges": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 0,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "markers": {
+            "total": 16,
+            "truncated": true,
+            "examples": [
+              {
+                "kind": "hosting",
+                "line": 15,
+                "message": "halo-linux: network test: hosting bloodgulch",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "starting",
+                "line": 18,
+                "message": "halo-linux: network test: starting the game",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "scriptedImpactDamageCue",
+                "line": 30,
+                "message": "halo-linux: network test: player 0 shoots player 1",
+                "actorId": 0,
+                "targetId": 1,
+                "afterTick": 120,
+                "beforeTick": 150
+              },
+              {
+                "kind": "scriptedImpactDamageCue",
+                "line": 35,
+                "message": "halo-linux: network test: player 0 shoots player 1",
+                "actorId": 0,
+                "targetId": 1,
+                "afterTick": 240,
+                "beforeTick": 270
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 10,
+          "forcedKillCues": 2,
+          "finalDamageCounters": {
+            "hits": 0,
+            "dealt": 9,
+            "rejected": 0,
+            "replayed": 0
+          },
+          "finalItemCounters": {
+            "current": 36,
+            "created": 69,
+            "deleted": 23,
+            "failed": 0,
+            "removed": 0
+          },
+          "finalNetworkCounters": {
+            "sent": 4531,
+            "received": 2661,
+            "corrections": 0
+          },
+          "finalScoreboard": [
+            {
+              "id": 0,
+              "alive": true,
+              "score": 2,
+              "kills": 2,
+              "deaths": 0,
+              "team": 0,
+              "machine": 0
+            },
+            {
+              "id": 1,
+              "alive": false,
+              "score": 0,
+              "kills": 0,
+              "deaths": 2,
+              "team": 1,
+              "machine": 1
+            }
+          ]
+        },
+        {
+          "role": "client",
+          "stateTransitions": {
+            "total": 29,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.86,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.72,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.58,
+                "score": 0,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "changed": ["shield", "kills"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.44,
+                "score": 0,
+                "kills": 1,
+                "deaths": 0
+              }
+            ]
+          },
+          "movement": [
+            {
+              "id": 0,
+              "aliveSamples": 47,
+              "movingSameLifeSampleIntervals": 46,
+              "greatestAdjacentSameLifeDisplacement": 2.09313879,
+              "bounds": [
+                {
+                  "min": 88.789,
+                  "max": 94.825
+                },
+                {
+                  "min": -171.338,
+                  "max": -165.681
+                },
+                {
+                  "min": 0.085,
+                  "max": 0.748
+                }
+              ],
+              "includesScriptedRelocations": false
+            },
+            {
+              "id": 1,
+              "aliveSamples": 39,
+              "movingSameLifeSampleIntervals": 36,
+              "greatestAdjacentSameLifeDisplacement": 99.39592691,
+              "bounds": [
+                {
+                  "min": 53.054,
+                  "max": 91.038
+                },
+                {
+                  "min": -169.85,
+                  "max": -76.68
+                },
+                {
+                  "min": -0.081,
+                  "max": 0.943
+                }
+              ],
+              "includesScriptedRelocations": false
+            }
+          ],
+          "shieldDecreases": {
+            "total": 18,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 120,
+                "byTick": 150,
+                "before": 1,
+                "after": 0.86
+              },
+              {
+                "id": 0,
+                "afterTick": 240,
+                "byTick": 270,
+                "before": 0.86,
+                "after": 0.72
+              },
+              {
+                "id": 0,
+                "afterTick": 360,
+                "byTick": 390,
+                "before": 0.72,
+                "after": 0.58
+              },
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "before": 0.58,
+                "after": 0.44
+              }
+            ]
+          },
+          "observedDeaths": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 480,
+                "byTick": 510,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 1,
+                "afterTick": 990,
+                "byTick": 1020,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "observedRespawns": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 600,
+                "byTick": 630
+              },
+              {
+                "id": 1,
+                "afterTick": 1110,
+                "byTick": 1140
+              }
+            ]
+          },
+          "scoreChanges": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 0,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "markers": {
+            "total": 15,
+            "truncated": true,
+            "examples": [
+              {
+                "kind": "protocol",
+                "line": 7,
+                "message": "chupathingyce: OpenCE network version 32 (joins 11-40); Delta 1, wire chupa-39a, legacy table: built in; protocol auto",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "protocol",
+                "line": 8,
+                "message": "chupathingyce: Following OpenCE network version 32 (built in)",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "searching",
+                "line": 20,
+                "message": "chupathingyce: network test: searching for games",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "joining",
+                "line": 21,
+                "message": "chupathingyce: network test: joining",
+                "afterTick": null,
+                "beforeTick": 30
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 9,
+          "forcedKillCues": 0,
+          "finalDamageCounters": {
+            "hits": 9,
+            "dealt": 0,
+            "rejected": 0,
+            "replayed": 33
+          },
+          "finalItemCounters": {
+            "current": 36,
+            "created": 65,
+            "deleted": 21,
+            "failed": 0,
+            "removed": 0
+          },
+          "finalNetworkCounters": {
+            "sent": 2630,
+            "received": 4471,
+            "corrections": 11
+          },
+          "finalScoreboard": [
+            {
+              "id": 0,
+              "alive": true,
+              "score": 2,
+              "kills": 2,
+              "deaths": 0,
+              "team": 0,
+              "machine": 0
+            },
+            {
+              "id": 1,
+              "alive": true,
+              "score": 0,
+              "kills": 0,
+              "deaths": 2,
+              "team": 1,
+              "machine": 1
+            }
+          ]
+        }
+      ],
+      "departure": {
+        "clientTimedExitMarker": true,
+        "hostTimedExitMarker": true,
+        "hostExitAfterClientWallSecondsFromReceipt": 17.412,
+        "hostProcessOutlivedClientFromReceipt": true,
+        "postExitSimulationDirectlyWallTimestamped": false,
+        "hostSamplesAfterLastClientSample": 8,
+        "additionalHostTicksAfterLastClientSample": 240,
+        "firstPostClientGameOverTick": 1470,
+        "continuedActiveMatchEstablished": false,
+        "explicitGracefulInGameLeaveEstablished": false,
+        "retainedClientScoreboardEntry": true,
+        "note": "Continued ticks and app exit receipts are separate from a graceful in-game leave, reusable lobby, active match or reconnect acceptance. A retained dead entry without an increased death count is not an additional combat death."
+      },
+      "refusals": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "errors": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "issues": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "limitations": [
+        "Upstream SHOOT cues apply native weapon-impact damage; they do not establish trigger input, projectile flight, aiming or visible firing. KILL cues separately force a scoring death.",
+        "Scripted player input is not human gameplay or campaign AI. Sampled counters do not certify complete state, physics, animation, rendering, audio, scale or multiplayer limits.",
+        "Position differences are measured without a pass threshold. Grenades, ordered weapon records and item count differences remain explicit; role-local cumulative counters need not equal. A score of -1 can mean that the game has no score callback, so equal -1 values do not establish scoring behavior.",
+        "No signed Delta compatibility table or local runtime/content attestation is supplied or accepted here. A same-runtime run cannot authorize OpenCE/Chupathingy mixed compatibility or relax the listing gate."
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "analyzer": "analyze-community-runtime-native",
+      "run": {
+        "label": "opence-coop-a30-1",
+        "mode": "a30:coop",
+        "privateFromReceipt": true,
+        "humanInputFromReceipt": false,
+        "twoComputersFromReceipt": false,
+        "publicListingFromReceipt": false,
+        "routerFirewallChangesFromReceipt": false,
+        "rendererFromReceipt": "OpenCE native null renderer; Chupathingy hidden native window renderer"
+      },
+      "provenance": {
+        "analyzerSourceSha256": "4e904764319cf4b14e10ad0b83b23107ac8e114551b43621060670ccf7a7fa5f",
+        "execution": {
+          "path": "execution.json",
+          "bytes": 5313,
+          "sha256": "acb69f3506a5d0e7209047e48999af83300cffbaecc55ea54be7afbd582c9e24"
+        },
+        "records": [
+          {
+            "role": "host",
+            "runtime": "opence-build-329",
+            "executableSha256FromReceipt": "b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c",
+            "wallDurationSeconds": 80.408,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "host:a30:coop",
+            "scriptedInput": "bot:1",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "true",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              },
+              {
+                "name": "a30.map",
+                "bytes": 152610816,
+                "sha256": "4875fa105e6c517589a796cfdcc7fcaa07e98df13d14e601bfc9eb1eab7e30b5",
+                "cacheVersion": 5
+              }
+            ]
+          },
+          {
+            "role": "client",
+            "runtime": "opence-build-329",
+            "executableSha256FromReceipt": "b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c",
+            "wallDurationSeconds": 60.406,
+            "exitCode": 0,
+            "signal": null,
+            "forced": false,
+            "inputsUnchangedFromReceipt": true,
+            "networkTest": "join",
+            "scriptedInput": "bot:2",
+            "impactCueInterval": "4",
+            "forcedKillCueInterval": "17",
+            "rendererSettings": {
+              "null": "true",
+              "hidden": "true",
+              "audioDriver": "dummy",
+              "videoDriver": null
+            },
+            "inputs": [
+              {
+                "name": "ui.map",
+                "bytes": 14145536,
+                "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+                "cacheVersion": 5
+              },
+              {
+                "name": "carousel.map",
+                "bytes": 20215808,
+                "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+                "cacheVersion": 5
+              },
+              {
+                "name": "a30.map",
+                "bytes": 152610816,
+                "sha256": "4875fa105e6c517589a796cfdcc7fcaa07e98df13d14e601bfc9eb1eab7e30b5",
+                "cacheVersion": 5
+              }
+            ]
+          }
+        ],
+        "logs": [
+          {
+            "role": "host",
+            "path": "host/stdio.log",
+            "bytes": 30888,
+            "sha256": "b3ed28a6e49a18d13761a303684c198eee585cc214a1931ea836108c0b354abd",
+            "samples": 64,
+            "firstTick": 30,
+            "lastTick": 1920,
+            "localPlayerIds": [0]
+          },
+          {
+            "role": "client",
+            "path": "client/stdio.log",
+            "bytes": 23318,
+            "sha256": "ac66ddf89ab85ec54323386d7ae748a0d2fedd28d558aafae4933dc85b306e2c",
+            "samples": 47,
+            "firstTick": 30,
+            "lastTick": 1410,
+            "localPlayerIds": [1]
+          }
+        ],
+        "boundary": "Hashes bind this analysis to these files; executable signatures, actual processes and preserved content are not independently authenticated by this log analyzer."
+      },
+      "verdict": {
+        "status": "sampled-state-disagreement",
+        "selectedComparison": "exactTicks",
+        "joinMarkersObserved": true,
+        "bidirectionalPacketCountersObserved": true,
+        "atLeastTwoMachinePlayersObserved": true,
+        "completeInventoryParity": false,
+        "humanPlayAccepted": false,
+        "aiActorAcceptance": false,
+        "twoComputerAcceptance": false,
+        "renderingOrAudioAcceptance": false,
+        "universalCrossRuntimeCompatibility": false,
+        "listingGateChangeAuthorized": false
+      },
+      "comparisons": {
+        "nominalTickRateHz": 30,
+        "exactTicks": {
+          "tickWindow": 0,
+          "samplePairs": 47,
+          "tickDifferenceHistogram": {
+            "0": 47
+          },
+          "playerComparisons": 94,
+          "playerIds": [0, 1],
+          "stateFields": {
+            "alive": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 75,
+              "agree": 75,
+              "notComparable": 19
+            },
+            "shield": {
+              "compared": 75,
+              "agree": 74,
+              "notComparable": 19
+            },
+            "score": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 1,
+            "truncated": false,
+            "examples": [
+              {
+                "hostTick": 1170,
+                "clientTick": 1170,
+                "id": 0,
+                "fields": {
+                  "shield": {
+                    "host": 0.85,
+                    "client": 0.84,
+                    "nextObservation": {
+                      "hostTick": 1200,
+                      "clientTick": 1200,
+                      "agrees": true
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "positionDeltas": [
+            {
+              "id": 0,
+              "count": 47,
+              "minimum": 0,
+              "median": 0.02302173,
+              "p95": 0.05032892,
+              "maximum": 0.0652227
+            },
+            {
+              "id": 1,
+              "count": 28,
+              "minimum": 0,
+              "median": 0,
+              "p95": 0.01933908,
+              "maximum": 0.07293833
+            }
+          ],
+          "largestPositionDeltas": [
+            {
+              "hostTick": 780,
+              "clientTick": 780,
+              "id": 1,
+              "deltaWorldUnits": 0.07293833,
+              "host": [31.51, -102.369, 58.748],
+              "client": [31.5, -102.297, 58.742],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 810,
+                "clientTick": 810,
+                "deltaWorldUnits": 0
+              }
+            },
+            {
+              "hostTick": 660,
+              "clientTick": 660,
+              "id": 0,
+              "deltaWorldUnits": 0.0652227,
+              "host": [30.803, -99.939, 58.458],
+              "client": [30.801, -99.874, 58.453],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 690,
+                "clientTick": 690,
+                "deltaWorldUnits": 0.04870318
+              }
+            },
+            {
+              "hostTick": 720,
+              "clientTick": 720,
+              "id": 0,
+              "deltaWorldUnits": 0.05587486,
+              "host": [28.943, -100.472, 59.217],
+              "client": [28.911, -100.499, 59.18],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 750,
+                "clientTick": 750,
+                "deltaWorldUnits": 0.05032892
+              }
+            },
+            {
+              "hostTick": 750,
+              "clientTick": 750,
+              "id": 0,
+              "deltaWorldUnits": 0.05032892,
+              "host": [28.628, -102.126, 58.491],
+              "client": [28.613, -102.174, 58.489],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 780,
+                "clientTick": 780,
+                "deltaWorldUnits": 0.02529822
+              }
+            },
+            {
+              "hostTick": 1410,
+              "clientTick": 1410,
+              "id": 0,
+              "deltaWorldUnits": 0.04908156,
+              "host": [28.307, -102.001, 58.457],
+              "client": [28.324, -102.047, 58.459],
+              "sameDeathCount": true,
+              "nextObservation": null
+            },
+            {
+              "hostTick": 690,
+              "clientTick": 690,
+              "id": 0,
+              "deltaWorldUnits": 0.04870318,
+              "host": [29.87, -99.682, 58.505],
+              "client": [29.854, -99.636, 58.505],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 720,
+                "clientTick": 720,
+                "deltaWorldUnits": 0.05587486
+              }
+            },
+            {
+              "hostTick": 840,
+              "clientTick": 840,
+              "id": 0,
+              "deltaWorldUnits": 0.04302325,
+              "host": [29.093, -100.56, 58.53],
+              "client": [29.094, -100.603, 58.531],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 870,
+                "clientTick": 870,
+                "deltaWorldUnits": 0.03377869
+              }
+            },
+            {
+              "hostTick": 630,
+              "clientTick": 630,
+              "id": 0,
+              "deltaWorldUnits": 0.04130375,
+              "host": [31.43, -101.7, 58.686],
+              "client": [31.417, -101.661, 58.682],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 660,
+                "clientTick": 660,
+                "deltaWorldUnits": 0.0652227
+              }
+            }
+          ],
+          "grenades": {
+            "compared": 75,
+            "differences": {
+              "total": 4,
+              "truncated": false,
+              "examples": [
+                {
+                  "hostTick": 600,
+                  "clientTick": 600,
+                  "id": 0,
+                  "host": [2, 1],
+                  "client": [2, 0],
+                  "nextObservation": {
+                    "hostTick": 630,
+                    "clientTick": 630,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 840,
+                  "clientTick": 840,
+                  "id": 1,
+                  "host": [1, 0],
+                  "client": [0, 0],
+                  "nextObservation": {
+                    "hostTick": 870,
+                    "clientTick": 870,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 1020,
+                  "clientTick": 1020,
+                  "id": 0,
+                  "host": [3, 0],
+                  "client": [2, 0],
+                  "nextObservation": {
+                    "hostTick": 1050,
+                    "clientTick": 1050,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 1230,
+                  "clientTick": 1230,
+                  "id": 0,
+                  "host": [1, 2],
+                  "client": [0, 2],
+                  "nextObservation": {
+                    "hostTick": 1260,
+                    "clientTick": 1260,
+                    "agrees": true
+                  }
+                }
+              ]
+            }
+          },
+          "weapons": {
+            "compared": 75,
+            "differences": {
+              "total": 3,
+              "truncated": false,
+              "examples": [
+                {
+                  "hostTick": 330,
+                  "clientTick": 330,
+                  "id": 0,
+                  "host": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 175
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "client": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 174
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "nextObservation": {
+                    "hostTick": 360,
+                    "clientTick": 360,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 420,
+                  "clientTick": 420,
+                  "id": 0,
+                  "host": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 170
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "client": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 169
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "nextObservation": {
+                    "hostTick": 450,
+                    "clientTick": 450,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 510,
+                  "clientTick": 510,
+                  "id": 0,
+                  "host": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 165
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "client": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 164
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "nextObservation": {
+                    "hostTick": 540,
+                    "clientTick": 540,
+                    "agrees": true
+                  }
+                }
+              ]
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          }
+        },
+        "nearPhaseTicks": {
+          "tickWindow": 2,
+          "samplePairs": 47,
+          "tickDifferenceHistogram": {
+            "0": 47
+          },
+          "playerComparisons": 94,
+          "playerIds": [0, 1],
+          "stateFields": {
+            "alive": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "health": {
+              "compared": 75,
+              "agree": 75,
+              "notComparable": 19
+            },
+            "shield": {
+              "compared": 75,
+              "agree": 74,
+              "notComparable": 19
+            },
+            "score": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "kills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "deaths": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "friendlyFireKills": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "team": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            },
+            "machine": {
+              "compared": 94,
+              "agree": 94,
+              "notComparable": 0
+            }
+          },
+          "missingPlayers": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "stateDisagreements": {
+            "total": 1,
+            "truncated": false,
+            "examples": [
+              {
+                "hostTick": 1170,
+                "clientTick": 1170,
+                "id": 0,
+                "fields": {
+                  "shield": {
+                    "host": 0.85,
+                    "client": 0.84,
+                    "nextObservation": {
+                      "hostTick": 1200,
+                      "clientTick": 1200,
+                      "agrees": true
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "positionDeltas": [
+            {
+              "id": 0,
+              "count": 47,
+              "minimum": 0,
+              "median": 0.02302173,
+              "p95": 0.05032892,
+              "maximum": 0.0652227
+            },
+            {
+              "id": 1,
+              "count": 28,
+              "minimum": 0,
+              "median": 0,
+              "p95": 0.01933908,
+              "maximum": 0.07293833
+            }
+          ],
+          "largestPositionDeltas": [
+            {
+              "hostTick": 780,
+              "clientTick": 780,
+              "id": 1,
+              "deltaWorldUnits": 0.07293833,
+              "host": [31.51, -102.369, 58.748],
+              "client": [31.5, -102.297, 58.742],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 810,
+                "clientTick": 810,
+                "deltaWorldUnits": 0
+              }
+            },
+            {
+              "hostTick": 660,
+              "clientTick": 660,
+              "id": 0,
+              "deltaWorldUnits": 0.0652227,
+              "host": [30.803, -99.939, 58.458],
+              "client": [30.801, -99.874, 58.453],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 690,
+                "clientTick": 690,
+                "deltaWorldUnits": 0.04870318
+              }
+            },
+            {
+              "hostTick": 720,
+              "clientTick": 720,
+              "id": 0,
+              "deltaWorldUnits": 0.05587486,
+              "host": [28.943, -100.472, 59.217],
+              "client": [28.911, -100.499, 59.18],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 750,
+                "clientTick": 750,
+                "deltaWorldUnits": 0.05032892
+              }
+            },
+            {
+              "hostTick": 750,
+              "clientTick": 750,
+              "id": 0,
+              "deltaWorldUnits": 0.05032892,
+              "host": [28.628, -102.126, 58.491],
+              "client": [28.613, -102.174, 58.489],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 780,
+                "clientTick": 780,
+                "deltaWorldUnits": 0.02529822
+              }
+            },
+            {
+              "hostTick": 1410,
+              "clientTick": 1410,
+              "id": 0,
+              "deltaWorldUnits": 0.04908156,
+              "host": [28.307, -102.001, 58.457],
+              "client": [28.324, -102.047, 58.459],
+              "sameDeathCount": true,
+              "nextObservation": null
+            },
+            {
+              "hostTick": 690,
+              "clientTick": 690,
+              "id": 0,
+              "deltaWorldUnits": 0.04870318,
+              "host": [29.87, -99.682, 58.505],
+              "client": [29.854, -99.636, 58.505],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 720,
+                "clientTick": 720,
+                "deltaWorldUnits": 0.05587486
+              }
+            },
+            {
+              "hostTick": 840,
+              "clientTick": 840,
+              "id": 0,
+              "deltaWorldUnits": 0.04302325,
+              "host": [29.093, -100.56, 58.53],
+              "client": [29.094, -100.603, 58.531],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 870,
+                "clientTick": 870,
+                "deltaWorldUnits": 0.03377869
+              }
+            },
+            {
+              "hostTick": 630,
+              "clientTick": 630,
+              "id": 0,
+              "deltaWorldUnits": 0.04130375,
+              "host": [31.43, -101.7, 58.686],
+              "client": [31.417, -101.661, 58.682],
+              "sameDeathCount": true,
+              "nextObservation": {
+                "hostTick": 660,
+                "clientTick": 660,
+                "deltaWorldUnits": 0.0652227
+              }
+            }
+          ],
+          "grenades": {
+            "compared": 75,
+            "differences": {
+              "total": 4,
+              "truncated": false,
+              "examples": [
+                {
+                  "hostTick": 600,
+                  "clientTick": 600,
+                  "id": 0,
+                  "host": [2, 1],
+                  "client": [2, 0],
+                  "nextObservation": {
+                    "hostTick": 630,
+                    "clientTick": 630,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 840,
+                  "clientTick": 840,
+                  "id": 1,
+                  "host": [1, 0],
+                  "client": [0, 0],
+                  "nextObservation": {
+                    "hostTick": 870,
+                    "clientTick": 870,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 1020,
+                  "clientTick": 1020,
+                  "id": 0,
+                  "host": [3, 0],
+                  "client": [2, 0],
+                  "nextObservation": {
+                    "hostTick": 1050,
+                    "clientTick": 1050,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 1230,
+                  "clientTick": 1230,
+                  "id": 0,
+                  "host": [1, 2],
+                  "client": [0, 2],
+                  "nextObservation": {
+                    "hostTick": 1260,
+                    "clientTick": 1260,
+                    "agrees": true
+                  }
+                }
+              ]
+            }
+          },
+          "weapons": {
+            "compared": 75,
+            "differences": {
+              "total": 3,
+              "truncated": false,
+              "examples": [
+                {
+                  "hostTick": 330,
+                  "clientTick": 330,
+                  "id": 0,
+                  "host": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 175
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "client": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 174
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "nextObservation": {
+                    "hostTick": 360,
+                    "clientTick": 360,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 420,
+                  "clientTick": 420,
+                  "id": 0,
+                  "host": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 170
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "client": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 169
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "nextObservation": {
+                    "hostTick": 450,
+                    "clientTick": 450,
+                    "agrees": true
+                  }
+                },
+                {
+                  "hostTick": 510,
+                  "clientTick": 510,
+                  "id": 0,
+                  "host": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 165
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "client": [
+                    {
+                      "definitionLow16": 1151,
+                      "totalAndLoadedRounds": 164
+                    },
+                    {
+                      "definitionLow16": 1841,
+                      "totalAndLoadedRounds": 76
+                    }
+                  ],
+                  "nextObservation": {
+                    "hostTick": 540,
+                    "clientTick": 540,
+                    "agrees": true
+                  }
+                }
+              ]
+            },
+            "meaning": "Ordered present-slot tag-index low 16 bits and total-plus-loaded rounds; not a complete inventory or universal tag identity."
+          },
+          "groundItemCountDifferences": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          }
+        },
+        "timing": "Near-phase pairs are monotonic and one-to-one, within two ticks (about 67 ms at nominal 30 Hz). This comparison aid is not an approved network latency or position tolerance. Logs sample about once per second; matching printed values have only their printed precision."
+      },
+      "roles": [
+        {
+          "role": "host",
+          "stateTransitions": {
+            "total": 28,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.87,
+                "score": -1,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 660,
+                "byTick": 690,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 1,
+                "score": -1,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 720,
+                "byTick": 750,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.87,
+                "score": -1,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 840,
+                "byTick": 870,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.73,
+                "score": -1,
+                "kills": 0,
+                "deaths": 0
+              }
+            ]
+          },
+          "movement": [
+            {
+              "id": 0,
+              "aliveSamples": 64,
+              "movingSameLifeSampleIntervals": 55,
+              "greatestAdjacentSameLifeDisplacement": 2.21746838,
+              "bounds": [
+                {
+                  "min": 27.366,
+                  "max": 31.759
+                },
+                {
+                  "min": -103.502,
+                  "max": -95.742
+                },
+                {
+                  "min": 58.315,
+                  "max": 59.258
+                }
+              ],
+              "includesScriptedRelocations": false
+            },
+            {
+              "id": 1,
+              "aliveSamples": 29,
+              "movingSameLifeSampleIntervals": 24,
+              "greatestAdjacentSameLifeDisplacement": 2.22818603,
+              "bounds": [
+                {
+                  "min": 26.449,
+                  "max": 31.757
+                },
+                {
+                  "min": -103.553,
+                  "max": -93.815
+                },
+                {
+                  "min": 58.231,
+                  "max": 59.151
+                }
+              ],
+              "includesScriptedRelocations": false
+            }
+          ],
+          "shieldDecreases": {
+            "total": 13,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "before": 1,
+                "after": 0.87
+              },
+              {
+                "id": 0,
+                "afterTick": 720,
+                "byTick": 750,
+                "before": 1,
+                "after": 0.87
+              },
+              {
+                "id": 0,
+                "afterTick": 840,
+                "byTick": 870,
+                "before": 0.87,
+                "after": 0.73
+              },
+              {
+                "id": 0,
+                "afterTick": 960,
+                "byTick": 990,
+                "before": 0.73,
+                "after": 0.6
+              }
+            ]
+          },
+          "observedDeaths": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 1,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "observedRespawns": {
+            "total": 3,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 390,
+                "byTick": 420
+              },
+              {
+                "id": 1,
+                "afterTick": 600,
+                "byTick": 630
+              },
+              {
+                "id": 1,
+                "afterTick": 1110,
+                "byTick": 1140
+              }
+            ]
+          },
+          "scoreChanges": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "markers": {
+            "total": 12,
+            "truncated": true,
+            "examples": [
+              {
+                "kind": "hosting",
+                "line": 15,
+                "message": "halo-linux: network test: hosting a30",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "starting",
+                "line": 18,
+                "message": "halo-linux: network test: starting the game",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "scriptedImpactDamageCue",
+                "line": 43,
+                "message": "halo-linux: network test: player 0 shoots player 1",
+                "actorId": 0,
+                "targetId": 1,
+                "afterTick": 480,
+                "beforeTick": 510
+              },
+              {
+                "kind": "forcedKillCue",
+                "line": 45,
+                "message": "halo-linux: network test: the first player kills the last",
+                "afterTick": 510,
+                "beforeTick": 540
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 7,
+          "forcedKillCues": 2,
+          "finalDamageCounters": {
+            "hits": 0,
+            "dealt": 12,
+            "rejected": 0,
+            "replayed": 0
+          },
+          "finalItemCounters": {
+            "current": 72,
+            "created": 121,
+            "deleted": 13,
+            "failed": 0,
+            "removed": 0
+          },
+          "finalNetworkCounters": {
+            "sent": 10816,
+            "received": 2375,
+            "corrections": 0
+          },
+          "finalScoreboard": [
+            {
+              "id": 0,
+              "alive": true,
+              "score": -1,
+              "kills": 0,
+              "deaths": 0,
+              "team": 1,
+              "machine": 0
+            },
+            {
+              "id": 1,
+              "alive": false,
+              "score": -1,
+              "kills": 0,
+              "deaths": 2,
+              "team": 1,
+              "machine": 1
+            }
+          ]
+        },
+        {
+          "role": "client",
+          "stateTransitions": {
+            "total": 20,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.87,
+                "score": -1,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 660,
+                "byTick": 690,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 1,
+                "score": -1,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 720,
+                "byTick": 750,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.87,
+                "score": -1,
+                "kills": 0,
+                "deaths": 0
+              },
+              {
+                "id": 0,
+                "afterTick": 840,
+                "byTick": 870,
+                "changed": ["shield"],
+                "alive": true,
+                "health": 1,
+                "shield": 0.73,
+                "score": -1,
+                "kills": 0,
+                "deaths": 0
+              }
+            ]
+          },
+          "movement": [
+            {
+              "id": 0,
+              "aliveSamples": 47,
+              "movingSameLifeSampleIntervals": 39,
+              "greatestAdjacentSameLifeDisplacement": 2.24207538,
+              "bounds": [
+                {
+                  "min": 27.562,
+                  "max": 31.762
+                },
+                {
+                  "min": -103.502,
+                  "max": -97.428
+                },
+                {
+                  "min": 58.412,
+                  "max": 59.228
+                }
+              ],
+              "includesScriptedRelocations": false
+            },
+            {
+              "id": 1,
+              "aliveSamples": 28,
+              "movingSameLifeSampleIntervals": 23,
+              "greatestAdjacentSameLifeDisplacement": 2.08582669,
+              "bounds": [
+                {
+                  "min": 26.449,
+                  "max": 31.755
+                },
+                {
+                  "min": -103.553,
+                  "max": -95.905
+                },
+                {
+                  "min": 58.412,
+                  "max": 59.151
+                }
+              ],
+              "includesScriptedRelocations": false
+            }
+          ],
+          "shieldDecreases": {
+            "total": 12,
+            "truncated": true,
+            "examples": [
+              {
+                "id": 0,
+                "afterTick": 480,
+                "byTick": 510,
+                "before": 1,
+                "after": 0.87
+              },
+              {
+                "id": 0,
+                "afterTick": 720,
+                "byTick": 750,
+                "before": 1,
+                "after": 0.87
+              },
+              {
+                "id": 0,
+                "afterTick": 840,
+                "byTick": 870,
+                "before": 0.87,
+                "after": 0.73
+              },
+              {
+                "id": 0,
+                "afterTick": 960,
+                "byTick": 990,
+                "before": 0.73,
+                "after": 0.6
+              }
+            ]
+          },
+          "observedDeaths": {
+            "total": 2,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 510,
+                "byTick": 540,
+                "before": 0,
+                "after": 1
+              },
+              {
+                "id": 1,
+                "afterTick": 1020,
+                "byTick": 1050,
+                "before": 1,
+                "after": 2
+              }
+            ]
+          },
+          "observedRespawns": {
+            "total": 3,
+            "truncated": false,
+            "examples": [
+              {
+                "id": 1,
+                "afterTick": 390,
+                "byTick": 420
+              },
+              {
+                "id": 1,
+                "afterTick": 600,
+                "byTick": 630
+              },
+              {
+                "id": 1,
+                "afterTick": 1110,
+                "byTick": 1140
+              }
+            ]
+          },
+          "scoreChanges": {
+            "total": 0,
+            "truncated": false,
+            "examples": []
+          },
+          "markers": {
+            "total": 9,
+            "truncated": true,
+            "examples": [
+              {
+                "kind": "searching",
+                "line": 16,
+                "message": "halo-linux: network test: searching for games",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "joining",
+                "line": 17,
+                "message": "halo-linux: network test: joining",
+                "afterTick": null,
+                "beforeTick": 30
+              },
+              {
+                "kind": "scriptedImpactDamageCue",
+                "line": 40,
+                "message": "halo-linux: network test: player 1 shoots player 0",
+                "actorId": 1,
+                "targetId": 0,
+                "afterTick": 480,
+                "beforeTick": 510
+              },
+              {
+                "kind": "scriptedImpactDamageCue",
+                "line": 49,
+                "message": "halo-linux: network test: player 1 shoots player 0",
+                "actorId": 1,
+                "targetId": 0,
+                "afterTick": 720,
+                "beforeTick": 750
+              }
+            ]
+          },
+          "nativeImpactDamageCues": 6,
+          "forcedKillCues": 0,
+          "finalDamageCounters": {
+            "hits": 12,
+            "dealt": 0,
+            "rejected": 0,
+            "replayed": 30
+          },
+          "finalItemCounters": {
+            "current": 72,
+            "created": 27,
+            "deleted": 11,
+            "failed": 0,
+            "removed": 1
+          },
+          "finalNetworkCounters": {
+            "sent": 2319,
+            "received": 9124,
+            "corrections": 17
+          },
+          "finalScoreboard": [
+            {
+              "id": 0,
+              "alive": true,
+              "score": -1,
+              "kills": 0,
+              "deaths": 0,
+              "team": 1,
+              "machine": 0
+            },
+            {
+              "id": 1,
+              "alive": true,
+              "score": -1,
+              "kills": 0,
+              "deaths": 2,
+              "team": 1,
+              "machine": 1
+            }
+          ]
+        }
+      ],
+      "departure": {
+        "clientTimedExitMarker": true,
+        "hostTimedExitMarker": true,
+        "hostExitAfterClientWallSecondsFromReceipt": 17.244,
+        "hostProcessOutlivedClientFromReceipt": true,
+        "postExitSimulationDirectlyWallTimestamped": false,
+        "hostSamplesAfterLastClientSample": 17,
+        "additionalHostTicksAfterLastClientSample": 510,
+        "firstPostClientGameOverTick": null,
+        "continuedActiveMatchEstablished": false,
+        "explicitGracefulInGameLeaveEstablished": false,
+        "retainedClientScoreboardEntry": true,
+        "note": "Continued ticks and app exit receipts are separate from a graceful in-game leave, reusable lobby, active match or reconnect acceptance. A retained dead entry without an increased death count is not an additional combat death."
+      },
+      "refusals": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "errors": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "issues": {
+        "total": 0,
+        "truncated": false,
+        "examples": []
+      },
+      "limitations": [
+        "Upstream SHOOT cues apply native weapon-impact damage; they do not establish trigger input, projectile flight, aiming or visible firing. KILL cues separately force a scoring death.",
+        "Scripted player input is not human gameplay or campaign AI. Sampled counters do not certify complete state, physics, animation, rendering, audio, scale or multiplayer limits.",
+        "Position differences are measured without a pass threshold. Grenades, ordered weapon records and item count differences remain explicit; role-local cumulative counters need not equal. A score of -1 can mean that the game has no score callback, so equal -1 values do not establish scoring behavior.",
+        "No signed Delta compatibility table or local runtime/content attestation is supplied or accepted here. A same-runtime run cannot authorize OpenCE/Chupathingy mixed compatibility or relax the listing gate."
+      ]
+    }
+  ],
+  "unresolved": [
+    "Spark listing/invitation-to-client flow and authenticated exact-runtime/content compatibility.",
+    "Opposite mixed host direction rejected; native compatibility is asymmetric for these releases.",
+    "State, position, grenade/ammo and phase discrepancies are preserved; strict analyzers do not declare full parity.",
+    "AI actors/waves, human aiming/firing/projectiles, two computers, visible render/audio and larger player counts are not certified.",
+    "Native timed application exit and continued host ticks do not prove graceful in-game departure or a reusable joinable match."
+  ]
+}

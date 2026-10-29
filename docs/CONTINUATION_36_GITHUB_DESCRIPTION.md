@@ -1,6 +1,6 @@
 # C36: native Halo portability, preservation gates and reviewed conversions
 
-Add Portability Lab and native Engine Preflight to the existing build workflow, preserving native Halo files and keeping Spark metadata outside them. Fix unintended signed-zero byte changes, verify native compiler inputs, report semantic conversion differences and stop unproven painted-detail BSP saves. Real Windows Invader/H1A conversion, native tag round trips and C35 Director/render/audio regressions pass; game loading, community multiplayer/AI and the broader gameplay backlog remain separate acceptance gates.
+Add Portability Lab and native Engine Preflight to the existing build workflow, preserving native Halo files and keeping Spark metadata outside them. Fix unintended signed-zero byte changes, verify compiler inputs, report semantic conversion differences and stop unproven painted-detail BSP saves. Real Invader/H1A conversion, native tag round trips and C35 Director/render/audio regressions pass. Separate private OpenCE/Chupathingy game trials demonstrate asymmetric exact-release interoperability with explicit state/phase discrepancies; MCC converted-map loading, complete combat/AI parity and the broader gameplay backlog remain open.
 
 ## Why
 
@@ -27,11 +27,13 @@ Checks: **480 Rust passed / 7 opt-in ignored**, with both new owned-BSP tests se
 
 Only the existing imported-cache MCC converter is implemented. Full native class/animation/script/limit schemas, all-engine conversion, retail game load and visual/audio equivalence remain open. Nine sound-distance pairs and the explicit MCC UI omissions need runtime review. The native tag no-op fixture is one canonical scenario, not a universal serializer guarantee. The painted-detail gate covers Spark's BSP audio writer; generic Sapien saves and exact native detail editing remain unverified.
 
-Pinned OpenCE/Chupathingy/Delta/Warthog research preserves their distinct protocol identities. Publisher-signed community clients are staged privately, but owned Xbox content was pending and no game client was executed or joined. Protected invitations are not MCC wire translation. AI agreement, eight-player campaign/Firefight, game-peer edits and 128-player gameplay are unaccepted. Four-map game traversal, procedural UV authoring and the existing advanced gameplay backlog remain in the full ledger.
+Publisher-signed OpenCE build-329 and Chupathingy v0.8.1c ran with owned Xbox data, separate roots and loopback-only private configuration. Same-runtime pairs and OpenCE-host/Chupathingy-client joined and simulated Blood Gulch; the opposite direction was refused as host32/client39. Logs retain interpolation, phase and inventory differences rather than claiming perfect state parity. Native hooks exercise impact damage and forced death/respawn, not trigger input or projectile flight. [Exact trial scope and reproduction](C36_COMMUNITY_NATIVE_TESTS.md).
+
+Spark's listing/invitation-to-client flow and authenticated cross-version resolution remain separate. Protected invitations are not MCC wire translation. AI agreement, eight-player campaign/Firefight, game-peer edits and 128-player gameplay are unaccepted. Four-map game traversal, procedural UV authoring and the existing advanced gameplay backlog remain in the full ledger.
 
 ## Safety and performance
 
-Originals and SDK masters remain untouched; QA uses fresh libraries/profiles and derived files. Twenty-nine C35 release files are frozen. All 319 previous ledger IDs remain, with 17 added C36 records. No public hosting, router/firewall changes, game-memory writes, anti-cheat/authentication bypass or third-party engine code was introduced.
+Originals, the Xbox image and SDK masters remain untouched; QA uses isolated libraries/profiles and derived files. Twenty-nine C35 release files are frozen. All 319 prior ledger IDs remain, with 17 added C36 records. No public hosting, router/firewall changes, MCC memory writes, anti-cheat/authentication bypass or third-party engine implementation was introduced.
 
 Same-fixture C35/C36 opening and compatibility measurements vary across sequential/reverse-order runs; no optimization claim. Native compiler integrity checks add **18.46 seconds** of full-tree I/O in the recorded **131.86-second** conversion. Large-chunk, full-system/GPU/network and long-session profiling remain open.
 
@@ -39,4 +41,4 @@ Same-fixture C35/C36 opening and compatibility measurements vary across sequenti
 
 C20/Reclaimers research, Invader and existing Halo tool authors, OpenCE, Chupathingy and Warthog retain attribution and their exact CC BY-SA/GPL/AGPL boundaries. No game assets, native tools, private QA media or staged clients are redistributed. See [community credits](../COMMUNITY_CREDITS.md).
 
-Next: load/play the validated Alpine output in matching H1A Standalone, review target sound/UI differences, verify owned Xbox content and run controlled native private joins before AI agreement. Continue exact painted-detail/native schema work, four-map runtime acceptance and native-compatible procedural UV authoring. This branch does not silently merge master, tag or publish a public release.
+Next: load/play the converted Alpine output in matching H1A Standalone, review sound/UI differences, accept visible/human play through Spark's actual join route and observe AI actors independently across clients. Continue exact painted-detail/native schema work, four-map runtime acceptance and native-compatible procedural UV authoring. This branch does not silently merge master, tag or publish a public release.

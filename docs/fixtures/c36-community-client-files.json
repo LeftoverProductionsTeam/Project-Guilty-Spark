@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "scope": "Pinned official test dependencies only; not a universal runtime/protocol compatibility registry.",
+  "clients": [
+    {
+      "id": "chupathingy-v0.8.1c",
+      "release": "v0.8.1c",
+      "revision": "880a933ec33b2ae2dbbeb4018a9090c528a075bc",
+      "releaseUrl": "https://github.com/ChupathingyCE/chupathingyce/releases/tag/v0.8.1c",
+      "archiveSha256": "fd258338a7aaa8c93fc41ad2e2d53a040944306593a2e3d6d631befab38c65a0",
+      "license": "GPL-3.0-or-later",
+      "files": [
+        {
+          "name": "mbedtls-LICENSE.txt",
+          "bytes": 30405,
+          "sha256": "f8582e76de1b7dd1caa680ab9a82cf2455b4392f00613b68a63df88121909175"
+        },
+        {
+          "name": "expat-COPYING.txt",
+          "bytes": 1165,
+          "sha256": "431dd07ea1ffce7b9e525014bbf923006f129ee28ef5cdffc048f8e3eb39191c"
+        },
+        {
+          "name": "miniupnpc-LICENSE.txt",
+          "bytes": 1556,
+          "sha256": "b3633761a56f77c6cd65358126da1f5d952eb1ecafa1a42e83dadb068b35e29f"
+        },
+        {
+          "name": "Kenney-Input-Prompts-CC0.txt",
+          "bytes": 708,
+          "sha256": "ca2f58f80f903512119da5828868199478119818cd7ecffb303d625cb74cbb5a"
+        },
+        {
+          "name": "NotoSans-OFL.txt",
+          "bytes": 4489,
+          "sha256": "bf51547e7634b219e85d0391a5836850696497e0cef079857978f286b5d9377f"
+        },
+        {
+          "name": "Overpass-OFL.txt",
+          "bytes": 4485,
+          "sha256": "f76873f787c73f5cfdf12caa616326026f4f0c8640433f39bcc43ae6db92743f"
+        },
+        {
+          "name": "brokers.txt",
+          "bytes": 523,
+          "sha256": "62bcfaaa2bb777b4a8a12c74479b7b9f8ec2444cef7184b0b79314cb4a48641f"
+        },
+        {
+          "name": "OpenCE-OFL.txt",
+          "bytes": 4602,
+          "sha256": "2237b5d655a32d435d55f93e23d6cf83eac200f9518cb00b53efdb6ef3002424"
+        },
+        {
+          "name": "halo.exe",
+          "bytes": 22965248,
+          "sha256": "bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a",
+          "architecture": "x64"
+        },
+        {
+          "name": "SDL3.dll",
+          "bytes": 2844160,
+          "sha256": "1f98969319302a100931f4385e5918a0bd53ab07773040682d22e7edb54858c0"
+        },
+        {
+          "name": "LICENSE.txt",
+          "bytes": 35823,
+          "sha256": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809"
+        },
+        {
+          "name": "CyborgInterfaceGothic-OFL.txt",
+          "bytes": 4665,
+          "sha256": "81cc719292872d857c744ae86100fad7f8b887438a993236710d88d2baf525d6"
+        }
+      ]
+    },
+    {
+      "id": "opence-build-329",
+      "release": "build-329",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "releaseUrl": "https://github.com/OpenCommunityEdition/OpenCE/releases/tag/build-329",
+      "archiveSha256": "103f0c3cd46279e7dbc86cbfe8c3320898f3921af3cd237515c17800fcba42c6",
+      "license": "AGPL-3.0",
+      "files": [
+        {
+          "name": "SDL3.dll",
+          "bytes": 2358784,
+          "sha256": "47d508b4232cf9462096bdb6f613a330d9a94a7eb09c305fad073430c6531920"
+        },
+        {
+          "name": "halo.exe",
+          "bytes": 21479424,
+          "sha256": "b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c",
+          "architecture": "x86"
+        },
+        {
+          "name": "expat-COPYING.txt",
+          "bytes": 1165,
+          "sha256": "431dd07ea1ffce7b9e525014bbf923006f129ee28ef5cdffc048f8e3eb39191c"
+        },
+        {
+          "name": "gametypes/lone_wolves.toml",
+          "bytes": 459,
+          "sha256": "de68aaba74a7950f1221ce388a59a0e84fbdca27314f5781510885dfd2f66b8b"
+        },
+        {
+          "name": "gametypes/btb_slayer.toml",
+          "bytes": 645,
+          "sha256": "511076ac4d1e08c79e223eac2755eff87aeb66a7dfa7d028c2c26fa3715152a3"
+        },
+        {
+          "name": "gametypes/ctf_classic.toml",
+          "bytes": 545,
+          "sha256": "aa10ea81a3ae1a4304ec5fa17ce08190901e2b8b06038f6ce48bc8aaf27bb197"
+        },
+        {
+          "name": "gametypes/king_moving.toml",
+          "bytes": 293,
+          "sha256": "5f7ff1ea7d01bf57f90973bd847ef34358013dac467b7240a6c4cbe41290004d"
+        },
+        {
+          "name": "brokers.txt",
+          "bytes": 623,
+          "sha256": "f7740b9f5f01283589e81f8b385a8affe2ba6d0e396a69973d4952694a1e0470"
+        },
+        {
+          "name": "opus-COPYING.txt",
+          "bytes": 1989,
+          "sha256": "cbd8bd07329a234413710c02b19d22c0cf78fc451882593e817130779b5455e3"
+        },
+        {
+          "name": "init.txt.example",
+          "bytes": 1202,
+          "sha256": "7c8b3e0154662e44270a0a1b383f8c238cca3d6a01b49acd11a8801abbeca037"
+        },
+        {
+          "name": "lucide-LICENSE.txt",
+          "bytes": 3251,
+          "sha256": "6fc5b7332939dd5c61af3a5f97450f7bc05d4a396dd0bc21ac341716b3b05096"
+        },
+        {
+          "name": "miniupnpc-LICENSE.txt",
+          "bytes": 1556,
+          "sha256": "b3633761a56f77c6cd65358126da1f5d952eb1ecafa1a42e83dadb068b35e29f"
+        },
+        {
+          "name": "LICENSE.txt",
+          "bytes": 35184,
+          "sha256": "e0eedba615d5cd1b986afb6c5b3a4b1ae33713e7e9dc74d19daec5e3221f9d2e"
+        },
+        {
+          "name": "masters.txt",
+          "bytes": 769,
+          "sha256": "f6f2511a590e563fd87f848658049f3521572b2cd10afae4227253b65650adff"
+        },
+        {
+          "name": "jsmn-LICENSE.txt",
+          "bytes": 1081,
+          "sha256": "24b1f9656f5ccd7518ca8ad71a86be66a06dd7e6204a569e7475be7c0ef9ee5a"
+        },
+        {
+          "name": "mbedtls-LICENSE.txt",
+          "bytes": 30405,
+          "sha256": "f8582e76de1b7dd1caa680ab9a82cf2455b4392f00613b68a63df88121909175"
+        },
+        {
+          "name": "Overpass-OFL.txt",
+          "bytes": 4485,
+          "sha256": "f76873f787c73f5cfdf12caa616326026f4f0c8640433f39bcc43ae6db92743f"
+        }
+      ]
+    }
+  ]
+}
