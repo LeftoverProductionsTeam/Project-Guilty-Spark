@@ -16,6 +16,21 @@ describe('Independent open map documents',()=>{
     s=documentReducer(s,{type:'history',action:{type:'undo'}});expect(activeDocument(s)?.history.current?.title).toBe('a');expect(s.documents[1].history.current?.title).toBe('edited B');
     s=documentReducer(s,{type:'history',action:{type:'redo'}});expect(activeDocument(s)?.history.current?.title).toBe('edited A');
   });
+  it('keeps audio pins across undo and a late response containing only texture metadata',()=>{
+    const a={...project('a'),source:{sha256:'a'.repeat(64),resourceSha256:{}}}as Project;
+    const audio={kind:'classic' as const,directory:'C:/owned',sha256:{'sounds.map':'c'.repeat(64)}};
+    let s=open(emptyMapDocuments(100),a);
+    s=documentReducer(s,{type:'history',action:{type:'edit',project:{...a,title:'edited'},description:'edit during sound scan'}});
+    s=documentReducer(s,{type:'resources',project:{...a,source:{...a.source!,audioResources:audio}}});
+    s=documentReducer(s,{type:'resources',project:{...a,source:{...a.source!,resourceDirectory:'textures',resourceSha256:{'bitmaps.map':'b'.repeat(64)}}}});
+    s=documentReducer(s,{type:'resources',kind:'audio',project:{...a,source:{...a.source!,audioResources:audio}}});
+    expect(s.documents[0].history.current?.title).toBe('edited');
+    expect(s.documents[0].history.current?.source?.resourceDirectory).toBe('textures');
+    expect(s.documents[0].history.current?.source?.audioResources).toEqual(audio);
+    s=documentReducer(s,{type:'history',action:{type:'undo'}});
+    expect(s.documents[0].history.current?.title).toBe('a');
+    expect(s.documents[0].history.current?.source?.audioResources).toEqual(audio);
+  });
   it('routes late asset loads and save acknowledgements to their own document',()=>{
     const a=project('a');let s=open(open(emptyMapDocuments(100),a),project('b'));
     s=documentReducer(s,{type:'mesh',id:'a',assetId:'asset-a',mesh:{positions:[0,0,0],indices:[],normals:[],uvs:[]}as never});

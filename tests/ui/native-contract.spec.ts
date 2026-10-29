@@ -185,6 +185,7 @@ async function mockDesktop(page: Page) {
         if (command === 'open_project') {if(mock.delayOpen){const delay=mock.delayOpen;mock.delayOpen=0;await new Promise(resolve=>setTimeout(resolve,delay));}return structuredClone(projects[args.id]);}
         if (command === 'claim_project_document' || command === 'release_project_document') return null;
         if (command === 'auto_connect_classic_textures') return null;
+        if (command === 'auto_connect_sound_resources') return null;
         if (command === 'external_map_watch_start' || command === 'external_map_watch_poll') return {watchId:args.projectId??args.watchId,projectId:args.projectId??args.watchId,path:'C:/synthetic/external.map',status:'watching',candidate:null,message:'Watching a synthetic input; no real filesystem is read.'};
         if (command === 'external_map_watch_stop') return null;
         if (command === 'runtime_workbench_report') {
@@ -838,6 +839,49 @@ test('downloaded maps can open directly in the MCC conversion flow',async({page}
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((c:any)=>c.command==='compatibility'&&c.args.id==='b')).toBe(true);expect(calls.some((c:any)=>c.command==='start_build')).toBe(false);
 });
 
+test('automatic sound discovery merges late pins without a folder prompt or losing edits',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='auto_connect_sound_resources')return new Promise(resolve=>{w.__finishSoundDiscovery=async()=>{
+        const open=await original('open_project',{id:args.projectId});
+        resolve({...open,project:{...open.project,source:{...open.project.source,audioResources:{kind:'classic',directory:'C:/MCC/halo1/maps/custom_edition',sha256:{'sounds.map':'c'.repeat(64)}}}}});
+      };});
+      return original(command,args);
+    };
+  });
+  await openFixture(page);const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});
+  await field.fill('24');await field.press('Tab');
+  await page.waitForFunction(()=>typeof (window as any).__finishSoundDiscovery==='function');
+  await page.evaluate(()=>(window as any).__finishSoundDiscovery());
+  await expect(field).toHaveValue('24');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.source?.audioResources?.kind)).toBe('classic');
+  await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>call.command==='choose_project_resources'))).toBe(false);
+});
+
+test('sound settings stay labelled and separated in a narrow drawer without visiting server tools',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');
+  await page.getByRole('button',{name:'Toggle Map sounds',exact:true}).click();
+  const panel=page.locator('[data-panel-id="map-sounds"]');
+  await panel.getByLabel('Map sounds drawer options',{exact:true}).click();
+  for(const width of [280,360,520]){
+    await panel.getByRole('slider',{name:'Map sounds size',exact:true}).fill(String(width));
+    for(const bus of ['ambience','music','effects','dialogue']){
+      const group=panel.getByRole('group',{name:bus,exact:true});
+      const mute=group.getByRole('checkbox',{name:'Mute',exact:true}),solo=group.getByRole('checkbox',{name:'Solo',exact:true});
+      const m=await mute.locator('..').boundingBox(),s=await solo.locator('..').boundingBox();
+      expect(m).not.toBeNull();expect(s).not.toBeNull();
+      expect(m!.x+m!.width+6<=s!.x||m!.y+m!.height<=s!.y).toBe(true);
+      const bounds=await group.boundingBox(),input=await group.getByRole('spinbutton',{name:bus+' bus volume',exact:true}).boundingBox();
+      expect(input!.x).toBeGreaterThanOrEqual(bounds!.x);expect(input!.x+input!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width);
+    }
+    await expect(panel.getByText('Master volume',{exact:true})).toBeVisible();
+    await expect(panel.getByText('Voice limit',{exact:true})).toBeVisible();
+  }
+});
+
 test('map sound events persist through drawers and editing tools, then release on leaving the map',async({page})=>{
   await mockDesktop(page);
   await page.evaluate(async()=>{
@@ -888,6 +932,15 @@ test('looping source tracks persist across tools and Finish waits for their end 
   await chooseTool(page,'Tag editor');await chooseTool(page,'Level editor');
   await expect(page.getByRole('textbox',{name:'Find a map sound',exact:true})).toHaveValue('test_engine');await expect(page.getByRole('combobox',{name:'Map sound tag',exact:true})).toHaveValue('1000');await expect(page.getByRole('combobox',{name:'Looping sound track',exact:true})).toHaveValue('1');
   await page.getByRole('button',{name:'Use loop sample only',exact:true}).click();await expect(page.getByText('Authored main track 2 includes source intro/end clips',{exact:false})).toHaveCount(0);
+  await page.getByRole('button',{name:'Add all source tracks',exact:true}).click();
+  const emitters=page.getByRole('combobox',{name:'Map sound emitter',exact:true});
+  await expect(emitters.locator('option')).toHaveCount(3);
+  await page.keyboard.press('Control+z');await expect(emitters.locator('option')).toHaveCount(1);
+  await page.keyboard.press('Control+Shift+z');await expect(emitters.locator('option')).toHaveCount(3);
+  await page.evaluate(()=>{const w=window as any,previous=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='inspect_sound'&&args.tagId===996?Promise.resolve({tagId:996,sourceSha256:'a'.repeat(64),permutations:[]}):previous(command,args);});
+  await page.getByRole('button',{name:'Add all source tracks',exact:true}).click();
+  await expect(mixer.getByText(/Track 2: no playable source sample/)).toBeVisible();
+  await expect(emitters.locator('option')).toHaveCount(3);
 });
 
 test('shared QuickForge survives tool changes and pauses a divergent local draft on restore',async({page})=>{

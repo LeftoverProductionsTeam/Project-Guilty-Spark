@@ -204,6 +204,7 @@ export interface Project {
     scenarioPath: string;
     archive?: { originalPath: string; sha256: string; entryPath: string } | null;
     resourceDirectory?: string | null;
+    audioResources?: {kind:'classic'|'mccClassicAdpcm';directory:string;sha256:Record<string,string>} | null;
     resourceSha256?: Record<string, string>;
   } | null;
   provenance: Provenance;

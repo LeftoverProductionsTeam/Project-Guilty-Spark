@@ -74,7 +74,7 @@ import{WorkspacePanel,useRevealWorkspacePanel}from'./WorkspacePanels';
 import ViewportTags from './ViewportTags';
 import ViewportAssetLibrary from './ViewportAssetLibrary';
 import type {ViewportLibraryControls} from './ViewportAssetLibrary';
-import {viewportAssetCatalog,sourcePlacement,placeLibraryModel,librarySoundEmitter} from '../viewportAssets';
+import {viewportAssetCatalog,sourcePlacement,placeLibraryModel,librarySoundEmitters} from '../viewportAssets';
 import type {ViewportAsset} from '../viewportAssets';
 import {useOwnedForgeModels,forgeModelKey} from '../useOwnedForgeModels';
 import type {OwnedModelView} from '../useOwnedForgeModels';
@@ -593,9 +593,9 @@ export default function World({
         edit(placed.project,`${replaceId?'Replace':'Place'} source model ${item.name}`);setLocalSelected(placed.selectedId);
       }else if(item.kind==='mesh')await library.onPlaceMesh(item,position,replaceId);
       else{
-        const emitter=await librarySoundEmitter(item,position);if(!alive.current)return;
-        const latest=projectValue.current,scene=latest.audioPreview??emptySoundScene();if(scene.emitters.length>=64)throw Error('The sound scene is full (64 emitters).');
-        edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,emitter]}},'Place sound '+item.name);writeMapSession(project.id,'sound-emitter-selection',emitter.id);revealPanel('map-sounds');
+        const emitters=await librarySoundEmitters(item,position);if(!alive.current)return;
+        const latest=projectValue.current,scene=latest.audioPreview??emptySoundScene();if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
+        edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,...emitters]}},'Place sound '+item.name);writeMapSession(project.id,'sound-emitter-selection',emitters[0].id);revealPanel('map-sounds');
       }
     }catch(reason){if(alive.current)notify(String(reason));}finally{if(alive.current)setAssetBusy(false);}
   }

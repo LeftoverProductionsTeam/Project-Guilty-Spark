@@ -31,6 +31,9 @@ export default function MapSounds({
   return (
     <details className="gs-map-sounds" open={expanded||undefined}>
       <summary>Map sounds · {sounds.length} source tags</summary>
+      {project.source?.audioResources&&<p className="subtle" title={project.source.audioResources.directory}>
+        {project.source.audioResources.kind==='mccClassicAdpcm'?'MCC classic sound bank connected':'Matching sounds.map connected'}
+      </p>}
       {onResources && (
         <button className="small-button" onClick={onResources}>
           Locate Halo Sounds folder
@@ -82,14 +85,15 @@ export default function MapSounds({
           </button>
           {sounds.find((tag) => String(tag.id) === selected)?.class === 'snd!' ? (
             <Sound
-              key={selected}
+              key={`${selected}:${JSON.stringify(project.source?.audioResources??project.source?.resourceSha256)}`}
               projectId={projectId}
               tagId={Number(selected)}
               sourceHash={inspection.sha256}
             />
           ) : (
             <p className="subtle">
-              Add this looping sound as an emitter to play its authored main-track intro, loop and end clips.
+              Add one source track or all tracks to keep their authored gains, intro, loop and end clips.
+              Import current BSP ambience to save the listener's assigned tracks for Director recording.
               Alternate/detail/script behavior is separate.
             </p>
           )}

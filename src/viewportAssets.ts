@@ -6,7 +6,7 @@ import { call } from './api';
 import { createEmitter } from './spatialAudio';
 import type { SoundEmitter } from './spatialAudio';
 import type { SoundInspection } from './types';
-import type { LoopingInspection } from './soundClipLoader';
+import { loopingSoundEmitters } from './loopingEmitters';
 
 export type ViewportAsset =
   | {
@@ -183,10 +183,10 @@ export function placeLibraryModel(
     selectedId: object.id,
   };
 }
-export async function librarySoundEmitter(
+export async function librarySoundEmitters(
   item: Extract<ViewportAsset, { kind: 'sound' }> | Extract<ViewportAsset, { kind: 'mesh' | 'customSound' }>,
   point: Vec3,
-): Promise<SoundEmitter> {
+): Promise<SoundEmitter[]> {
   const position = checkedDropPoint(point);
   if (item.kind === 'customSound') {
     const emitter = createEmitter(0, item.name.slice(0, 120), position);
@@ -196,18 +196,13 @@ export async function librarySoundEmitter(
     emitter.loop = false;
     emitter.event = 'manual';
     emitter.bus = 'effects';
-    return emitter;
+    return [emitter];
   }
   if (item.kind !== 'sound') throw Error('Choose a sound asset.');
-  const loop = item.looping
-    ? await call<LoopingInspection>('inspect_looping_sound', { projectId: item.sourceId, tagId: item.tagId })
-    : null;
-  if (loop && (loop.sourceSha256 !== item.sourceSha256 || loop.tagId !== item.tagId))
-    throw Error('The sound source changed; reopen its map.');
-  const track = loop?.tracks.find((track) => track.loopTagId !== null),
-    soundId = track?.loopTagId ?? item.tagId;
-  if (loop && !track)
-    throw Error('The looping tag has no supported main track. Choose its individual sound.');
+  if (item.looping) return loopingSoundEmitters({
+    projectId: item.sourceId, sha256: item.sourceSha256, tagId: item.tagId, name: item.name,
+  }, position);
+  const soundId = item.tagId;
   const report = await call<SoundInspection>('inspect_sound', { projectId: item.sourceId, tagId: soundId });
   if (report.sourceSha256 !== item.sourceSha256 || report.tagId !== soundId)
     throw Error('The sound source identity changed.');
@@ -218,14 +213,10 @@ export async function librarySoundEmitter(
   emitter.sourceSha256 = item.sourceSha256;
   emitter.pitchRange = sample.pitchRange;
   emitter.permutation = sample.permutation;
-  emitter.loop = loop?.loops ?? /ambient|wind|rain|water|loop|music/i.test(item.path);
+  emitter.loop = /ambient|wind|rain|water|loop|music/i.test(item.path);
   if (!emitter.loop) {
     emitter.event = 'manual';
     emitter.bus = 'effects';
   }
-  if (track) {
-    emitter.loopingSource = { tagId: item.tagId, track: track.index };
-    emitter.gain = Math.max(0, Math.min(2, track.gain));
-  }
-  return emitter;
+  return [emitter];
 }

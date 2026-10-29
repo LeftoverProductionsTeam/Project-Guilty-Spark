@@ -9,7 +9,7 @@ import {
 } from './spatialAudio';
 import type { ListenerPose, SoundEmitter, SoundScene } from './spatialAudio';
 import { loadMapSoundClip } from './soundClipLoader';
-import { librarySoundEmitter } from './viewportAssets';
+import { loopingSoundEmitters } from './loopingEmitters';
 import type { MapInspection, Project, Vec3 } from './types';
 import { soundKey } from './soundPlayback';
 export interface AmbienceBsp {
@@ -73,12 +73,14 @@ export class EditorAudioSession {
   private meter = new Float32Array(256);
   private pose: ListenerPose = { position: [0, 0, 0], forward: [1, 0, 0], up: [0, 0, 1] };
   private placed: SoundEmitter[] = [];
-  private background: SoundEmitter | null = null;
+  private background: SoundEmitter[] = [];
   private metadata: Ambience | null = null;
   private backgroundKey = '';
   private sourceKey = '';
   private placedKey = '';
-  private cache = new Map<number, Promise<SoundEmitter>>();
+  private cache = new Map<string, Promise<SoundEmitter[]>>();
+  private backgroundRequest: Promise<SoundEmitter[]> | null = null;
+  private backgroundFailure = '';
   private failures = new Set<string>();
   private played = new Set<string>();
   private callbacks = new Set<() => void>();
@@ -187,7 +189,9 @@ export class EditorAudioSession {
       this.backgroundRevision++;
       this.release();
       this.metadata = null;
-      this.background = null;
+      this.background = [];
+      this.backgroundRequest = null;
+      this.backgroundFailure = '';
       this.backgroundKey = '';
       this.cache.clear();
       this.placedKey = '';
@@ -302,49 +306,62 @@ export class EditorAudioSession {
     const key = tag ? `${chosen!.bsp.index}:${tag.id}` : '';
     if (key === this.backgroundKey) return;
     this.backgroundKey = key;
-    this.background = null;
+    this.background = [];
+    this.backgroundRequest = null;
+    if (this.backgroundFailure) this.failures.delete(this.backgroundFailure);
+    this.backgroundFailure = '';
     this.backgroundRevision++;
     if (!tag) return;
     const revision = this.backgroundRevision,
       sourceRevision = this.sourceRevision;
-    let promise = this.cache.get(tag.id);
+    let promise = this.cache.get(key);
     if (!promise) {
-      promise = librarySoundEmitter(
+      promise = loopingSoundEmitters(
         {
-          key,
-          kind: 'sound',
-          sourceId: this.projectId,
-          sourceTitle: configuration.project.title,
+          projectId: this.projectId,
           name: tag.path.split(/[\\/]/).at(-1) ?? 'Map ambience',
-          path: tag.path,
           tagId: tag.id,
-          sourceSha256: metadata.sourceSha256,
-          looping: true,
+          sha256: metadata.sourceSha256,
         },
         [0, 0, 0],
-      ).then((emitter) => ({
-        ...emitter,
-        spatial: false,
-        bus: 'ambience' as const,
-        event: 'ambient' as const,
-        priority: 75,
-      }));
-      this.cache.set(tag.id, promise);
+        `bsp:${chosen!.bsp.index}`,
+        () => this.closed || sourceRevision !== this.sourceRevision,
+      ).then((emitters) => emitters.map(emitter => ({
+          ...emitter,
+          spatial: false,
+          bus: 'ambience' as const,
+          event: 'ambient' as const,
+          priority: 75,
+        })));
+      if (this.cache.size >= 64) this.cache.delete(this.cache.keys().next().value!);
+      this.cache.set(key, promise);
     }
+    this.backgroundRequest = promise;
     void promise
-      .then((emitter) => {
+      .then((emitters) => {
         if (!this.closed && sourceRevision === this.sourceRevision && revision === this.backgroundRevision) {
-          this.background = emitter;
+          this.background = emitters;
           this.configure();
           void this.synchronize();
         }
       })
       .catch((reason) => {
-        if (!this.closed && sourceRevision === this.sourceRevision) {
-          this.failures.add(`Assigned map ambience: ${String(reason)}`);
+        if (!this.closed && sourceRevision === this.sourceRevision && revision === this.backgroundRevision) {
+          this.backgroundFailure = `Assigned map ambience: ${String(reason)}`;
+          this.failures.add(this.backgroundFailure);
           this.publish();
         }
       });
+  }
+  /** Save the current source-bound group to the mix without doubling its automatic voices. */
+  async assignedAmbience(): Promise<SoundEmitter[]> {
+    this.backgroundForListener();
+    const request = this.backgroundRequest, revision = this.backgroundRevision;
+    if (!request) throw Error('No unique BSP ambience is assigned here. Move into an assigned cluster and try again.');
+    const emitters = await request;
+    if (this.closed || revision !== this.backgroundRevision)
+      throw Error('The map or listener ambience changed. Try importing its current tracks again.');
+    return structuredClone(emitters);
   }
   private scene(): SoundScene {
     const configuration = this.configuration,
@@ -365,7 +382,7 @@ export class EditorAudioSession {
           Math.hypot(...a.position.map((value, axis) => value - this.pose.position[axis])) -
           Math.hypot(...b.position.map((value, axis) => value - this.pose.position[axis])),
       );
-    const automatic = [...(this.background ? [this.background] : []), ...native]
+    const automatic = [...this.background, ...native]
       .filter((emitter) => !ids.has(emitter.id))
       .slice(0, Math.max(0, 64 - authored.length));
     return {

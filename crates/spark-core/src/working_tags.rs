@@ -828,6 +828,7 @@ mod tests {
             archive: None,
             resource_directory: None,
             resource_sha256: BTreeMap::new(),
+            audio_resources: None,
         });
         let record = BuildRecord {
             id: parent_id,

@@ -8,6 +8,8 @@
 
 ## What works today
 
+The [C35 r12 sound and workflow pass](docs/C35_MCC_AUDIO_AND_WORKFLOW.md) automatically finds matching classic sound resources or MCC's installed classic ADPCM bank. Looping sounds retain all authored main tracks in one undoable import, with saved BSP ambience available to Director audio. Sound controls load their own styles, keep visible labels and fit narrow drawers without overlapping mute/solo controls. MCC CELT music/dialogue and complete engine audio parity remain open.
+
 The [C35 r11 rendering and workflow pass](docs/C35_RENDERING_AND_WORKFLOW.md) corrects cached model face winding, transparent shader routing and decal orientation/blending. MCC's exact shared bitmap spans supply legacy teleporter textures missing from imeta. The title and map tabs share one compact header with lowered upper-right window actions. One fullscreen mode keeps map tabs, editing tools, runtime actions and drawers available; narrow tool strips have a More menu. Existing sources and per-map edits stay preserved.
 
 The [C35 r10 viewport pass](docs/C35_VIEWPORT_WORKFLOW.md) adds direct object-tag drawers, a shared open-map model/sound library and custom OBJ/WAV/OGG imports. Assigned ambience plays automatically with remembered per-map mute/volume. The latest workbench header and fullscreen behavior are described in the r11 pass above. Imported-cache model additions and custom meshes remain previews until supported native compilation. Tag Editor now groups matching tags in collapsible classes, keeps editable fields first and provides native tag-editor handoff for complete source schemas.
@@ -16,7 +18,7 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 
 - Preserve owned maps, inspect real classic tag data, stage supported field/placement edits, and compare variants.
 - Render actual classic/MCC BSP geometry, object models, source materials, detail layers, lightmaps, decals, sky and atmospheric fog. Textures stream from verified owned resources, including supported MCC texture packs. Open a player-start view or use the map overview.
-- Browse map sounds in World or Tag editor. Preview verified embedded/shared Vorbis and PCM/Xbox ADPCM, rehearse spatial events and preserve authored main-track intro/loop/end clips. Native event/acoustic parity still needs engine work.
+- Browse map sounds in World or Tag editor. Automatically connect supported installed resources, preview verified embedded/shared Vorbis and PCM/Xbox ADPCM, rehearse spatial events and preserve every authored main track with intro/loop/end clips. MCC classic ADPCM banks are supported; CELT music/dialogue and native event/acoustic parity still need engine work.
 - Author original QuickForge geometry and game-mode source; retain separate MCC/CE target configurations; use managed isolated compiler jobs and explicit compatibility gates.
 - Connect compatible BSPs with a rebuilt tunnel, native collision, portals and lightmaps. Optionally retain single-BSP [donor scenery](docs/DONOR_SCENERY.md) with source-bound model dependencies and compiled placement readback.
 - Continue from compiled revisions with matching per-map tags, inspect optional viewport performance metrics, and review the [three-map/performance pass](docs/THREE_MAP_WORLD_AND_PERFORMANCE.md).

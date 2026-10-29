@@ -7,7 +7,7 @@ import type {ViewportLibraryControls} from './ViewportAssetLibrary';
 import ViewportAssetLibrary from './ViewportAssetLibrary';
 import ViewportTags from './ViewportTags';
 import WorkshopScene,{WorkshopObjectFields} from './WorkshopScene';
-import {viewportAssetCatalog,placeLibraryModel,librarySoundEmitter} from '../viewportAssets';
+import {viewportAssetCatalog,placeLibraryModel,librarySoundEmitters} from '../viewportAssets';
 import {useViewportAssetDrop} from '../useViewportAssetDrop';
 import {emptySoundScene} from '../spatialAudio';
 import SoundMixer from './SoundMixer';
@@ -339,7 +339,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     if(!library||assetBusy||library.busy)return;const item=catalog.find(value=>value.key===key);if(!item){notify('Reopen the source map before placing this asset.','error');return;}setAssetBusy(true);
     try{if(item.kind==='model'){const placed=placeLibraryModel(latestProject.current,item.asset,snapPoint(point,gridSnap?snap:0),replaceId);edit(placed.project,`${replaceId?'Replace':'Place'} ${item.name}`);setSelected([placed.selectedId]);setWorkshopSelected(null);}
       else if(item.kind==='mesh'){await library.onPlaceMesh(item,point,replaceId);setSelected([]);}
-      else{const emitter=await librarySoundEmitter(item,point);if(!assetAlive.current)return;const latest=latestProject.current,scene=latest.audioPreview??emptySoundScene();if(scene.emitters.length>=64)throw Error('The sound scene is full.');edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,emitter]}},'Place sound '+item.name);writeMapSession(project.id,'sound-emitter-selection',emitter.id);revealPanel('map-sounds');}
+      else{const emitters=await librarySoundEmitters(item,point);if(!assetAlive.current)return;const latest=latestProject.current,scene=latest.audioPreview??emptySoundScene();if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,...emitters]}},'Place sound '+item.name);writeMapSession(project.id,'sound-emitter-selection',emitters[0].id);revealPanel('map-sounds');}
     }catch(reason){if(assetAlive.current)notify(String(reason),'error');}finally{if(assetAlive.current)setAssetBusy(false);}
   }
   async function dropFiles(paths:string[],point:Vec3){if(!library||library.busy)return;for(const path of paths){if(!assetAlive.current)return;if(/\.obj$/i.test(path))await library.onImportModel(point,path);else if(await library.onImportSound(point,path))revealPanel('map-sounds');}}

@@ -45,6 +45,7 @@ mod native_workspace;
 pub mod project;
 pub mod powerups;
 pub mod audio_preview;
+pub mod mcc_audio;
 pub mod render;
 pub mod render_features;
 pub mod resource_map;

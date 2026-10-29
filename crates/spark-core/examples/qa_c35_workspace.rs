@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::copy(&correct.source.as_ref().unwrap().preserved_path, &preserved)?;
     let inbox = root.join("empty-inbox");
     fs::create_dir(&inbox)?;
-    wrong.source = Some(Source {
+    wrong.source = Some(Source {audio_resources:None,
         original_path: inbox.join("restoration-candidate.map"),
         preserved_path: preserved,
         resource_directory: Some(inbox),

@@ -57,7 +57,7 @@ export default function ViewportAssetLibrary({
   );
   return (
     <div className="viewport-asset-library">
-      <p>Drag a model or sound onto the view, or choose Add at view. Sources are the maps you have open.</p>
+      <p>Drag a model or sound onto the view, or choose Add at view. Looping sounds include all authored main tracks. Sources are the maps you have open.</p>
       <label>
         Open map
         <select

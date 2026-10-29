@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { call, native } from '../api';
 import type { MapInspection, Project, SoundInspection, Vec3 } from '../types';
 import { loadMapSoundClip } from '../soundClipLoader';
+import { loopingSoundEmitters } from '../loopingEmitters';
 import type { LoopingInspection } from '../soundClipLoader';
 import {
   createEmitter,
@@ -17,6 +18,7 @@ import type { SoundEmitter, SoundEvent, SoundScene } from '../spatialAudio';
 import { Notice, NumberField } from './ui';
 import { useMapState } from '../mapSession';
 import {useEditorAudio} from './EditorAudio';
+import '../soundMixer.css';
 export default function SoundMixer({
   project,
   inspection,
@@ -43,6 +45,7 @@ export default function SoundMixer({
     [error, setError] = useState(''),
     [stats, setStats] = useState({ voices: 0, loading: 0, cachedClips: 0, cachedBytes: 0 });
   const [loopTrack, setLoopTrack] = useMapState(project.id, 'sound-loop-track', 0);
+  const resourceKey=JSON.stringify(project.source?.audioResources??project.source?.resourceSha256);
   const loopOptions =
     inspection?.tags
       .find((tag) => tag.id === tagId && tag.class === 'lsnd')
@@ -79,11 +82,13 @@ export default function SoundMixer({
   }
   useEffect(() => {
     mounted.current = true;
+    setError('');
     return () => {
       mounted.current = false;
+      epoch.current++;
       if(shared){mixer.current=null;unsubscribe.current?.();unsubscribe.current=null;}else stop();
     };
-  }, [project.id, (inspection?.sha256??project.source?.sha256??''),shared]);
+  }, [project.id, (inspection?.sha256??project.source?.sha256??''),shared,resourceKey]);
   useEffect(()=>{if(!shared)return;const update=()=>{const status=shared.getSnapshot();setActive(status.voices>0||status.phase==='loading'||status.phase==='needsGesture');setStats({voices:status.voices,loading:status.phase==='loading'?1:0,cachedClips:status.cachedClips,cachedBytes:status.cachedBytes});};update();return shared.subscribe(update);},[shared]);
   useEffect(() => {
     try {
@@ -235,6 +240,26 @@ export default function SoundMixer({
     change({ ...sceneRef.current, emitters: [...sceneRef.current.emitters, next] });
     select(next.id);
   }
+  async function addSourceTracks() {
+    if (tagId === null || !inspection) return;
+    const request = epoch.current;
+    const source = inspection.tags.find(tag => tag.id === tagId && tag.class === 'lsnd');
+    if (!source) return;
+    const origin = project.quickForge?.spawns[0]?.position ??
+      project.scene.find(object => object.kind === 'Player spawn')?.position ?? [0, 0, 0];
+    const emitters = await loopingSoundEmitters({projectId:sourceProjectId,sha256:inspection.sha256,
+      tagId:source.id,name:source.path.split(/[\\/]/).at(-1) ?? 'Map sound'}, origin as Vec3,
+      undefined,()=>!mounted.current||request!==epoch.current);
+    if (!mounted.current || request !== epoch.current) return;
+    if (sourceProjectId === project.id) for (const emitter of emitters) {
+      delete emitter.sourceProjectId; delete emitter.sourceSha256;
+    }
+    const current = sceneRef.current;
+    if (current.emitters.length + emitters.length > 64)
+      throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
+    change({...current,emitters:[...current.emitters,...emitters]});
+    select(emitters[0].id);
+  }
   const emitter = scene.emitters.find((e) => e.id === selected) ?? scene.emitters[0];
   return (
     <section className="sound-mixer" aria-label="Spatial sound rehearsal">
@@ -271,6 +296,18 @@ export default function SoundMixer({
         >
           Add selected sound emitter
         </button>
+        {loopOptions.length > 1 && <button disabled={!native||busy||scene.emitters.length+loopOptions.length>64}
+          onClick={()=>void action(addSourceTracks)}>Add all source tracks</button>}
+        {shared && sourceProjectId === project.id && <button disabled={!native||busy||scene.emitters.length>=64}
+          title="Save every main track of the current BSP ambience to this mix for editing and Director recording."
+          onClick={()=>void action(async()=>{
+            const request=epoch.current, found=await shared.assignedAmbience();
+            if(!mounted.current||request!==epoch.current)return;
+            const current=sceneRef.current,added=found.filter(emitter=>!current.emitters.some(old=>old.id===emitter.id));
+            if(!added.length)throw Error('These BSP ambience tracks are already in the saved mix.');
+            if(current.emitters.length+added.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
+            change({...current,emitters:[...current.emitters,...added]});select(added[0].id);
+          })}>Import current BSP ambience</button>}
         <button
           disabled={busy || !inspection || scene.emitters.length >= 64 || sourceProjectId !== project.id}
           onClick={() =>
@@ -345,15 +382,15 @@ export default function SoundMixer({
           </button>
         </>
       )}
-      <NumberField
+      <div className="sound-mixer-field"><span>Master volume</span><NumberField
         label="Map sound master volume"
         min={0}
         max={1}
         step={0.05}
         value={scene.master}
         onCommit={(master) => change({ ...scene, master })}
-      />
-      <label>
+      /></div>
+      <label className="sound-toggle">
         <input
           type="checkbox"
           checked={scene.muted}
@@ -365,7 +402,7 @@ export default function SoundMixer({
         {SOUND_BUSES.map((bus) => (
           <fieldset key={bus}>
             <legend>{bus}</legend>
-            <NumberField
+            <div className="sound-mixer-field"><span>Volume</span><NumberField
               label={`${bus} bus volume`}
               value={scene.buses[bus].gain}
               min={0}
@@ -374,9 +411,10 @@ export default function SoundMixer({
               onCommit={(gain) =>
                 change({ ...scene, buses: { ...scene.buses, [bus]: { ...scene.buses[bus], gain } } })
               }
-            />
+            /></div>
+            <div className="sound-bus-toggles">
             {(['muted', 'solo'] as const).map((key) => (
-              <label key={key}>
+              <label className="sound-toggle" key={key}>
                 <input
                   type="checkbox"
                   checked={scene.buses[bus][key]}
@@ -390,17 +428,18 @@ export default function SoundMixer({
                 {key === 'muted' ? 'Mute' : 'Solo'}
               </label>
             ))}
+            </div>
           </fieldset>
         ))}
       </div>
-      <NumberField
+      <div className="sound-mixer-field"><span>Voice limit</span><NumberField
         label="Maximum sound voices"
         value={scene.maxVoices}
         min={1}
         max={32}
         step={1}
         onCommit={(maxVoices) => change({ ...scene, maxVoices })}
-      />
+      /></div>
       <label>
         Audition an event
         <select
@@ -469,7 +508,7 @@ export default function SoundMixer({
             </select>
           </label>
           {(['enabled', 'loop', 'spatial'] as const).map((key) => (
-            <label key={key}>
+            <label className="sound-toggle" key={key}>
               <input
                 type="checkbox"
                 checked={emitter[key]}
@@ -478,7 +517,7 @@ export default function SoundMixer({
               {key === 'spatial' ? 'Positional 3D audio' : key === 'loop' ? 'Loop sample' : 'Emitter enabled'}
             </label>
           ))}
-          <label>
+          <label className="sound-toggle">
             <input
               type="checkbox"
               checked={emitter.followChain !== false}
@@ -488,7 +527,7 @@ export default function SoundMixer({
           </label>
           <div className="vector-fields">
             {(['X', 'Y', 'Z'] as const).map((axis, i) => (
-              <NumberField
+              <SoundNumber
                 key={axis}
                 label={`Sound emitter ${axis}`}
                 value={emitter.position[i]}
@@ -498,7 +537,7 @@ export default function SoundMixer({
               />
             ))}
           </div>
-          <NumberField
+          <SoundNumber
             label="Sound emitter gain"
             value={emitter.gain}
             min={0}
@@ -506,7 +545,7 @@ export default function SoundMixer({
             step={0.05}
             onCommit={(gain) => update({ gain })}
           />
-          <NumberField
+          <SoundNumber
             label="Sound pitch (semitones)"
             value={emitter.pitch}
             min={-12}
@@ -514,28 +553,28 @@ export default function SoundMixer({
             step={1}
             onCommit={(pitch) => update({ pitch })}
           />
-          <NumberField
+          <SoundNumber
             label="Sound reference distance"
             value={emitter.minDistance}
             min={0.01}
             max={emitter.maxDistance}
             onCommit={(minDistance) => update({ minDistance })}
           />
-          <NumberField
+          <SoundNumber
             label="Sound maximum distance"
             value={emitter.maxDistance}
             min={emitter.minDistance}
             max={10000}
             onCommit={(maxDistance) => update({ maxDistance })}
           />
-          <NumberField
+          <SoundNumber
             label="Sound distance rolloff"
             value={emitter.rolloff}
             min={0}
             max={10}
             onCommit={(rolloff) => update({ rolloff })}
           />
-          <NumberField
+          <SoundNumber
             label="Sound voice priority"
             value={emitter.priority}
             min={0}
@@ -543,7 +582,7 @@ export default function SoundMixer({
             step={1}
             onCommit={(priority) => update({ priority })}
           />
-          <NumberField
+          <SoundNumber
             label="Sound event cooldown (ms)"
             value={emitter.cooldownMs}
             min={0}
@@ -578,11 +617,16 @@ export default function SoundMixer({
       </p>
       {error && <Notice tone="error">{error}</Notice>}
       <p className="subtle">
-        These settings rehearse the editor’s sounds and events. They do not change Halo’s sound classes,
-        script events or looping-track transitions. Acoustic occlusion/reverb and engine-event timing still
-        require implementation and acceptance. Stop releases all voices; switching maps or tools stops
-        playback.
+        These settings save the editor’s sound mix, including source main-track phases and fades.
+        Native sound classes, script events, alternate/detail behavior and acoustic occlusion/reverb remain
+        separate. Drawers and editing tools share playback; leaving the active map or choosing Stop releases
+        this window’s voices.
       </p>
     </section>
   );
+}
+
+function SoundNumber(props:Parameters<typeof NumberField>[0]) {
+  const label=props.label.replace(/^Sound emitter /,'').replace(/^Sound /,'');
+  return <div className="sound-mixer-field"><span>{label.charAt(0).toUpperCase()+label.slice(1)}</span><NumberField {...props}/></div>;
 }

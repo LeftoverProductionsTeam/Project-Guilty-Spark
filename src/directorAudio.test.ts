@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { directorSoundEmitters, prepareDirectorAudio } from './directorAudio';
 import { createEmitter, emptySoundScene, publishAudioListener } from './spatialAudio';
+import type { SoundEmitter } from './spatialAudio';
 const clip = { length: 48000, numberOfChannels: 1 } as AudioBuffer;
 function fixture() {
   const parameter = () => ({
@@ -44,7 +45,7 @@ function fixture() {
   };
   const scene = emptySoundScene();
   scene.emitters = [createEmitter(1, 'Wind')];
-  const load = vi.fn(async () => clip),
+  const load = vi.fn(async (_context:BaseAudioContext,_emitter:SoundEmitter) => clip),
     controller = new AbortController();
   const prepare = () =>
     prepareDirectorAudio('map', 'source', 'a'.repeat(64), scene, controller.signal, {
@@ -88,6 +89,18 @@ describe('Director saved map audio ownership', () => {
     f.scene.emitters = [];
     await audio.start();
     expect(f.starts).toHaveBeenCalledTimes(3);
+    audio.dispose();
+  });
+  it('preflights each track even when source tracks share their main loop sample', async () => {
+    const f=fixture();
+    f.scene.emitters=[0,1].map(track=>({...createEmitter(5,`Source track ${track+1}`),
+      sourceProjectId:'11111111-1111-4111-8111-111111111111',sourceSha256:'a'.repeat(64),
+      loopingSource:{tagId:10,track},gain:track===0?.25:.75,spatial:false}));
+    const audio=await f.prepare();
+    expect(f.load.mock.calls.map(([,emitter])=>emitter.loopingSource!.track)).toEqual([0,1]);
+    expect(f.starts).not.toHaveBeenCalled();
+    await audio.start();
+    expect(f.starts).toHaveBeenCalledTimes(2);
     audio.dispose();
   });
   it('closes and stops the audio track on a missing clip without starting voices', async () => {

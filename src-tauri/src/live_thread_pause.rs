@@ -208,6 +208,23 @@ pub(super) struct Native;
 fn failed(message: &str) -> SparkError {
     SparkError::Invalid(format!("{message}: {}", std::io::Error::last_os_error()))
 }
+/// A thread can end between the liveness probe and ResumeThread. Recheck the original
+/// handle after zero/failure, without ever issuing another decrement. A successful
+/// zero count remains a mismatch when termination cannot be positively observed.
+fn checked_release(
+    mut ended: impl FnMut(u32) -> Result<bool>,
+    resume: impl FnOnce() -> Result<u32>,
+) -> Result<Released> {
+    if ended(0)? {
+        return Ok(Released::Ended);
+    }
+    match resume() {
+        Ok(0) if matches!(ended(10), Ok(true)) => Ok(Released::Ended),
+        Ok(count) => Ok(Released::Decremented(count)),
+        Err(_) if matches!(ended(10), Ok(true)) => Ok(Released::Ended),
+        Err(error) => Err(error),
+    }
+}
 impl Backend for Native {
     type Thread = ThreadHandle;
     fn enumerate(&self, pid: u32) -> Result<Vec<u32>> {
@@ -264,16 +281,21 @@ impl Backend for Native {
         Ok(count)
     }
     fn release(&self, thread: &ThreadHandle) -> Result<Released> {
-        match unsafe { WaitForSingleObject(thread.raw(), 0) } {
-            WAIT_OBJECT_0 => return Ok(Released::Ended),
-            WAIT_TIMEOUT => {}
-            _ => return Err(failed("Cannot verify the original paused thread")),
-        }
-        let count = unsafe { ResumeThread(thread.raw()) };
-        if count == u32::MAX {
-            return Err(failed("ResumeThread failed"));
-        }
-        Ok(Released::Decremented(count))
+        checked_release(
+            |timeout| match unsafe { WaitForSingleObject(thread.raw(), timeout) } {
+                WAIT_OBJECT_0 => Ok(true),
+                WAIT_TIMEOUT => Ok(false),
+                _ => Err(failed("Cannot verify the original paused thread")),
+            },
+            || {
+                let count = unsafe { ResumeThread(thread.raw()) };
+                if count == u32::MAX {
+                    Err(failed("ResumeThread failed"))
+                } else {
+                    Ok(count)
+                }
+            },
+        )
     }
 }
 
@@ -288,6 +310,77 @@ mod tests {
             Arc,
         },
     };
+    #[test]
+    fn exit_between_probe_and_release_is_verified_without_another_resume() {
+        for fail_resume in [false, true] {
+            let probes = std::cell::RefCell::new(vec![]);
+            let resumes = Cell::new(0);
+            let result = checked_release(
+                |timeout| {
+                    probes.borrow_mut().push(timeout);
+                    Ok(timeout != 0)
+                },
+                || {
+                    resumes.set(resumes.get() + 1);
+                    if fail_resume {
+                        invalid("Synthetic exit during resume")
+                    } else {
+                        Ok(0)
+                    }
+                },
+            )
+            .unwrap();
+            assert!(matches!(result, Released::Ended));
+            assert_eq!(resumes.get(), 1);
+            assert_eq!(*probes.borrow(), [0, 10]);
+        }
+    }
+    #[test]
+    fn unconfirmed_exit_keeps_mismatches_and_failures_without_repeating_resume() {
+        for fail_probe in [false, true] {
+            for fail_resume in [false, true] {
+                let resumes = Cell::new(0);
+                let result = checked_release(
+                    |timeout| {
+                        if timeout == 0 || !fail_probe {
+                            Ok(false)
+                        } else {
+                            invalid("Unknown thread state")
+                        }
+                    },
+                    || {
+                        resumes.set(resumes.get() + 1);
+                        if fail_resume {
+                            invalid("Resume not acknowledged")
+                        } else {
+                            Ok(0)
+                        }
+                    },
+                );
+                assert_eq!(resumes.get(), 1);
+                if fail_resume {
+                    assert!(result.is_err());
+                } else {
+                    assert!(matches!(result, Ok(Released::Decremented(0))));
+                }
+            }
+        }
+        assert!(checked_release(
+            |_| invalid("Initial thread state unknown"),
+            || panic!("unverified resume")
+        )
+        .is_err());
+        assert!(matches!(
+            checked_release(
+                |timeout| {
+                    assert_eq!(timeout, 0);
+                    Ok(false)
+                },
+                || Ok(1)
+            ),
+            Ok(Released::Decremented(1))
+        ));
+    }
 
     #[derive(Default)]
     struct FakeState {
@@ -694,6 +787,14 @@ mod tests {
         assert!(recovery.run(child.0.id(), || Ok(())).is_err());
         child.0.kill().unwrap();
         child.0.wait().unwrap();
+        // A process wait is not the retained thread's completion observation.
+        // Synchronize the exact owned handles before certifying completed-exit retirement.
+        for entry in &recovery.journal().pending {
+            assert_eq!(
+                unsafe { WaitForSingleObject(entry.thread.raw(), 10_000) },
+                WAIT_OBJECT_0
+            );
+        }
         recovery.retry().unwrap();
         assert_eq!(recovery.status().pending_threads, 0);
         let own = Recovery::<Native>::default();

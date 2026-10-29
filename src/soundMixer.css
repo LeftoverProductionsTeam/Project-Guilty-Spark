@@ -1,0 +1,94 @@
+.sound-mixer {
+  min-width: 0;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px 4px;
+}
+.sound-mixer > label,
+.sound-emitter-fields > label,
+.sound-mixer-field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  margin: 10px 0;
+  font-size: 11px;
+}
+.sound-mixer .number-field,
+.sound-mixer input[type='number'],
+.sound-mixer select {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.sound-mixer .sound-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  min-height: 28px;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.sound-mixer .sound-toggle input {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+.sound-mixer > .sound-toggle {
+  margin: 0 0 10px;
+}
+.sound-buses {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+.sound-buses fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.sound-buses legend {
+  padding: 0 4px;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+.sound-buses .sound-mixer-field {
+  margin: 0 0 4px;
+}
+.sound-bus-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 14px;
+  row-gap: 2px;
+}
+.sound-emitter-fields {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.sound-emitter-fields .sound-mixer-field { margin: 0; }
+.sound-emitter-fields .vector-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:8px; }
+.sound-mixer .analysis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.sound-mixer .analysis-actions button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+}
+.sound-mixer > h3 {
+  margin: 0 0 8px;
+}
+.sound-mixer > p {
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}

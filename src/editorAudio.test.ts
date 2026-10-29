@@ -201,7 +201,7 @@ it('follows the actual BSP branch and leaf cluster while refusing void, cycles a
   expect(ambienceCluster(bsp, [NaN, 0, 0])).toBeNull();
   publishAudioListener(projectId, { position: [4, 0, 0], forward: [1, 0, 0], up: [0, 0, 1] });
 });
-it('uses an assigned overview loop, honors a silent cluster, and resumes its exact pinned loop on return', async () => {
+it('plays all assigned main tracks, imports without doubling, and honors silent clusters and re-entry', async () => {
   const config = configuration(),
     hash = 'a'.repeat(64);
   config.project.audioPreview!.emitters = [];
@@ -235,7 +235,7 @@ it('uses an assigned overview loop, honors a silent cluster, and resumes its exa
     command === 'inspect_map_ambience'
       ? metadata
       : command === 'inspect_looping_sound'
-        ? { sourceSha256: hash, tagId: 10, loops: true, tracks: [{ index: 0, loopTagId: 11, gain: 1 }] }
+        ? { sourceSha256: hash, tagId: 10, loops: true, tracks: [{ index: 0, loopTagId: 11, gain: 1 },{index:1,loopTagId:12,gain:.5}] }
         : command === 'inspect_sound'
           ? {
               sourceSha256: hash,
@@ -257,13 +257,40 @@ it('uses an assigned overview loop, honors a silent cluster, and resumes its exa
   session.update({ ...config, inspection });
   await flush();
   await vi.advanceTimersByTimeAsync(200);
-  expect(starts).toBe(1);
+  await vi.waitFor(()=>expect(starts).toBe(2));
+  const group=await session.assignedAmbience();
+  expect(group.map(emitter=>[emitter.loopingSource?.track,emitter.gain,emitter.spatial])).toEqual([[0,1,false],[1,.5,false]]);
+  const withSaved={...config,inspection,project:{...config.project,audioPreview:{...config.project.audioPreview!,emitters:group}}};
+  session.update(withSaved);
+  await vi.advanceTimersByTimeAsync(400);
+  expect(starts).toBe(2);
+  expect(session.getSnapshot().voices).toBe(2);
+  session.update({...config,inspection});
   publishAudioListener(projectId, { position: [1, -1, 0], forward: [1, 0, 0], up: [0, 0, 1] });
   await vi.advanceTimersByTimeAsync(200);
   expect(session.getSnapshot().voices).toBe(0);
   publishAudioListener(projectId, { position: [-1, 0, 0], forward: [1, 0, 0], up: [0, 0, 1] });
   await vi.advanceTimersByTimeAsync(200);
-  expect(starts).toBe(2);
-  expect(hooks.load).toHaveBeenCalledTimes(1);
+  expect(starts).toBe(4);
+  expect(hooks.load).toHaveBeenCalledTimes(2);
+  expect((await session.assignedAmbience()).map(e=>e.id)).toEqual(group.map(e=>e.id));
+  session.dispose();
+});
+it('discards a failed background request after the selected BSP changes',async()=>{
+  const config=configuration(),hash='a'.repeat(64);
+  config.project.audioPreview!.emitters=[];
+  config.project.source={sha256:hash} as Project['source'];
+  const inspection={sha256:hash,tags:[{id:1,class:'sbsp'},{id:10,class:'lsnd',path:'sound/actual'}]} as never;
+  let reject!:(error:Error)=>void;
+  hooks.ipc.mockImplementation((command)=>command==='inspect_map_ambience'?Promise.resolve({sourceSha256:hash,
+    bsps:[{index:0,tagPath:'levels/test',backgroundPalette:[{tagPath:'sound/actual'}],clusters:[{index:0,background:0}]}]}):
+    new Promise((_resolve,fail)=>{reject=fail;}));
+  const session=new EditorAudioSession(projectId);session.connect();session.update({...config,inspection});
+  await flush();expect(reject).toBeTypeOf('function');
+  session.update({...config,inspection,bspIndex:1});
+  reject(Error('Old background resource is unavailable'));await flush();
+  expect(session.getSnapshot().detail).not.toContain('Old background');
+  expect(session.getSnapshot().voices).toBe(0);
+  await expect(session.assignedAmbience()).rejects.toThrow(/No unique BSP/);
   session.dispose();
 });

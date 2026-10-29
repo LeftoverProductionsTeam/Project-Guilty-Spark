@@ -185,6 +185,14 @@ export default function App() {
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const buildRequest = useRef(0);
   const current = history.current;
+  useEffect(()=>{
+    if(!native||!current?.source||current.source.audioResources)return;
+    let disposed=false;
+    void call<OpenProject|null>('auto_connect_sound_resources',{projectId:current.id}).then(open=>{
+      if(open&&!closingRef.current)dispatchDocument({type:'resources',project:open.project,kind:'audio'});
+    }).catch(reason=>{if(!disposed)notice('Sound resources: '+String(reason),'error');});
+    return()=>{disposed=true;};
+  },[current?.id,current?.source?.sha256,data.installation.mccPath]);
   const[dockedDirector,setDockedDirector]=useMapState(current?.id??'global','director.docked',false);
   useEffect(()=>{if(!native)return;const stop=listen<string>('spark:director-docked',({payload})=>{if(typeof payload!=='string')return;writeMapSession(payload,'director.docked',true);if(historyRef.current.current?.id===payload)setWorkspace('machinima');});return()=>{void stop.then(stop=>stop());};},[]);
   const [dependencyRuntime,setDependencyRuntime]=useMapState<RuntimeId>(current?.id??'global','hosting.runtime',current?.quickForge?.runtimeId??current?.buildTargets?.find(t=>t.id===current.activeBuildTarget)?.runtimeId??data.settings.preferredHalo??'mccSteam');
@@ -1014,7 +1022,7 @@ export default function App() {
           </div>
         </aside>
         <main className={`main-content workspace-${workspace}`}>
-          <EditorAudioProvider project={current} inspection={inspection} active={!closing&&['world','quickforge','live','tags','assets','scenario','creator','firefight','build','preservation'].includes(workspace)} resourceScope={JSON.stringify(documents.documents.map(document=>[document.id,document.history.current?.source?.resourceSha256]))}>
+          <EditorAudioProvider project={current} inspection={inspection} active={!closing&&['world','quickforge','live','tags','assets','scenario','creator','firefight','build','preservation'].includes(workspace)} resourceScope={JSON.stringify(documents.documents.map(document=>[document.id,{map:document.history.current?.source?.resourceSha256,audio:document.history.current?.source?.audioResources?.sha256}]))}>
           <WorkspacePanels onNavigationToggle={toggleNavigation} navigationOpen={sidebarOpen} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace} actions={<>{current&&<EditorSoundControls projectId={current.id}/>}<IconButton label="Undo (Ctrl+Z)" onClick={()=>applyHistory('undo')} disabled={!history.past.length}><Undo2 size={14}/></IconButton><IconButton label="Redo (Ctrl+Y / Ctrl+Shift+Z)" onClick={()=>applyHistory('redo')} disabled={!history.future.length}><Redo2 size={14}/></IconButton></>}>
           {current&&<WorkspacePanel id="project-setup" label="Project setup"><MapTools key={current.id} project={current} settings={data.settings} edit={edit}/></WorkspacePanel>}
           {['world','quickforge','live','machinima'].includes(workspace)&&<WorkspacePanel id="navigation" label="Camera"><NavigationSettings/></WorkspacePanel>}

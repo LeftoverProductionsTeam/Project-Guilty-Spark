@@ -475,3 +475,11 @@ for(const name of ['audio','assets','interface']){const topic=evidenceTopics[nam
 
 // R11 follows the existing domains and leaves engine/game acceptance separate.
 for(const name of ['assets','interface','tags','audio']){const topic=evidenceTopics[name];if(!topic)continue;topic.evidence+='; docs/C35_RENDERING_AND_WORKFLOW.md; docs/fixtures/c35-rendering-workflow-native-verification.json';topic.operation+=' C35 r11 corrects renderer front-face winding, decoded generic transparent material routing, MCC exact shared bitmap fallback and decal orientation/blending. The title/map tabs share one compact header; Focus mode/header hiding are retired, native window actions belong to the header layout and short tag drawers size to content. Tag classes expand matching tags and preserve selection. Full-schema editing uses the existing native tool-plan workflow; unknown cache fields remain preserved. A separate focused R10 native audio run verified authored playback, gain changes, zero muted output and continuity through drawers; this is not physical listening or game acoustic parity.';}
+
+// R12 records supported automatic audio discovery and scoped UI/native evidence.
+for(const name of ['audio','interface','assets']) {
+  const topic=evidenceTopics[name];
+  topic.files+='; src/loopingEmitters.ts; src/soundMixer.css; crates/spark-core/src/mcc_audio.rs';
+  topic.operation+=' C35 r12 finds matching classic sound resources or the installed MCC classic ADPCM bank/index automatically, independently of texture pins and undo history. Loop imports add every authored main track in one undoable edit; saved BSP ambience shares stable IDs with automatic playback. The sound mixer loads scoped styles directly and labels numeric fields, preventing overlapping mute/solo controls at 280/360/520 pixels. Real MCC source inspection verifies 16 permutations; native group/save/undo and production offline mix/mute checks pass. CELT music/dialogue, native sound functions/events/acoustics and game audio parity remain open.';
+  topic.evidence+='; docs/C35_MCC_AUDIO_AND_WORKFLOW.md; docs/fixtures/c35-mcc-audio-native-verification.json';
+}

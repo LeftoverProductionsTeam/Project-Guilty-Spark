@@ -322,7 +322,7 @@ export default function Tags({
               </div>
             )}
             {selectedTag.class === 'snd!' && (
-              <>{onResources&&<button className="small-button" onClick={onResources}>Locate Halo Sounds folder</button>}<Sound key={`${selectedTag.id}:${project.source?.resourceSha256?.['sounds.map']}`} projectId={project.id} tagId={selectedTag.id} sourceHash={project.source?.sha256 ?? ''} onAssign={onAssignSound} /></>
+              <>{onResources&&<button className="small-button" onClick={onResources}>Locate Halo Sounds folder</button>}<Sound key={`${selectedTag.id}:${JSON.stringify(project.source?.audioResources??project.source?.resourceSha256)}`} projectId={project.id} tagId={selectedTag.id} sourceHash={project.source?.sha256 ?? ''} onAssign={onAssignSound} /></>
             )}
             {selectedTag.references.length > 0 && (
               <div className="reference-list">

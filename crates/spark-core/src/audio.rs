@@ -52,7 +52,7 @@ struct SoundData {
     external:std::collections::BTreeMap<usize,Vec<u8>>,
 }
 
-fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(&Path,&str)>) -> Result<SoundData> {
+fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(&Path,&str)>,audio:Option<&crate::mcc_audio::Binding>) -> Result<SoundData> {
     let (header, bytes, sha256) = maps::read_cache_snapshot(path)?;
     if sha256 != expected_sha256 {
         return invalid("Audio source checksum differs from the preserved project source");
@@ -60,6 +60,10 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
     if ![6, 7, 609,13].contains(&header.version) || header.extended {
         return invalid("Audio preview requires an unextended classic or MCC Halo 1 cache with supported sound metadata");
     }
+    if let Some(binding)=audio { binding.validate(header.version)?; }
+    let classic_path=audio.filter(|binding|binding.kind=="classic").map(|binding|binding.directory.join("sounds.map"));
+    let resources=classic_path.as_ref().zip(audio.and_then(|binding|binding.sha256.get("sounds.map"))).map(|(path,hash)|(path.as_path(),hash.as_str())).or(resources);
+    let mut mcc_bank:Option<Result<crate::mcc_audio::Bank>>=None;
     let r = Reader(&bytes);
     let start = header.tag_offset as usize;
     let end = start + header.tag_size as usize;
@@ -142,6 +146,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
     let mut inspected_sample_bytes = 0usize;
     for pitch_range in 0..pitch_count {
         let pitch = pitches + pitch_range * 72;
+        let pitch_name=r.string(pitch,32)?;
         let count = r.u32(pitch + 60)? as usize;
         if count > 256 {
             return invalid("Sound exceeds 256 permutations per pitch range");
@@ -201,9 +206,15 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
                 }
                 let owned;
                 let samples=if flags==1 {
+                    if header.version==13&&audio.is_some_and(|binding|binding.kind=="mccClassicAdpcm") {
+                        if codec!=1{return invalid("This MCC bank binding supports classic Xbox ADPCM; other bank codecs require a separate decoder");}
+                        let bank=mcc_bank.get_or_insert_with(||crate::mcc_audio::Bank::open(audio.unwrap())).as_mut().map_err(|reason|SparkError::Invalid(format!("Pinned MCC sound bank: {reason}")))?;
+                        owned=bank.read_sample(&report.tag_path,&pitch_name,pitch_range,&item.name,permutation,length,channels,sample_rate)?;
+                    }else{
                     let pair=resource.as_mut().map_err(|_|SparkError::Invalid("Pinned sounds.map could not be verified".into()))?
                         .as_mut().ok_or_else(||SparkError::Invalid("Samples need an external resource: connect the original sounds.map in the project's resources folder".into()))?;
                     owned=crate::resource_map::read_external_sound_from_verified(&mut pair.0,&pair.1,&report.tag_path,pitch_range,permutation,header.version,offset as u64,length)?;
+                    }
                     owned.as_slice()
                 }else{r.bytes(offset,length)?};
                 let duration=if codec==3 {
@@ -226,6 +237,8 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
         }
     }
     if let Ok(Some((file,_)))=&mut resource {crate::resource_map::verify_open_handle_hash(file,resources.unwrap().1)?;}
+    if let Some(Ok(bank))=&mut mcc_bank {bank.verify()?;}
+    if audio.is_some_and(|binding|binding.kind=="mccClassicAdpcm") {report.warnings.push("Installed MCC classic ADPCM bank/index are hash-pinned; source tag, pitch, permutation, rate, channels and encoded length must match. CELT music/dialogue and native sound functions remain separate.".into());}
     report.warnings.push("Source samples are SHA-256 checked. Shared samples require an exact sounds.map permutation span. Individual sample playback does not apply native sound classes, scripts, acoustic clusters or looping-track transitions. The spatial mixer can follow linked sample segments.".into());
     Ok(SoundData {
         report,
@@ -239,7 +252,10 @@ pub fn inspect_sound(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<
     inspect_sound_with_resources(path,expected_sha256,tag_id,None)
 }
 pub fn inspect_sound_with_resources(path:&Path,expected_sha256:&str,tag_id:u32,resources:Option<(&Path,&str)>)->Result<SoundInspection>{
-    Ok(sound_data(path,expected_sha256,tag_id,resources)?.report)
+    inspect_sound_with_bindings(path,expected_sha256,tag_id,resources,None)
+}
+pub fn inspect_sound_with_bindings(path:&Path,expected_sha256:&str,tag_id:u32,resources:Option<(&Path,&str)>,audio:Option<&crate::mcc_audio::Binding>)->Result<SoundInspection>{
+    Ok(sound_data(path,expected_sha256,tag_id,resources,audio)?.report)
 }
 pub fn preview_sound(
     path: &Path,
@@ -251,7 +267,10 @@ pub fn preview_sound(
     preview_sound_with_resources(path,expected_sha256,tag_id,pitch_range,permutation,None)
 }
 pub fn preview_sound_with_resources(path:&Path,expected_sha256:&str,tag_id:u32,pitch_range:usize,permutation:usize,resources:Option<(&Path,&str)>)->Result<AudioPreview>{
-    let data = sound_data(path, expected_sha256, tag_id,resources)?;
+    preview_sound_with_bindings(path,expected_sha256,tag_id,pitch_range,permutation,resources,None)
+}
+pub fn preview_sound_with_bindings(path:&Path,expected_sha256:&str,tag_id:u32,pitch_range:usize,permutation:usize,resources:Option<(&Path,&str)>,audio:Option<&crate::mcc_audio::Binding>)->Result<AudioPreview>{
+    let data = sound_data(path, expected_sha256, tag_id,resources,audio)?;
     let index = data
         .report
         .permutations

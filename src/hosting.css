@@ -80,8 +80,3 @@
 .native-camera-controls .vector-fields {display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
 .powerup-fields {display:grid;gap:12px;max-width:780px;}
 .powerup-fields>label {display:grid;gap:6px;}
-.sound-mixer {margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:18px 6px;}
-.sound-mixer>label,.sound-emitter-fields>label {display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;}
-.sound-buses {display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;}
-.sound-buses fieldset {border:1px solid var(--line);border-radius:12px;padding:8px;}
-.sound-emitter-fields {display:grid;gap:8px;margin-top:12px;}

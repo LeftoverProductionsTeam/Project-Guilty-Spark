@@ -83,8 +83,9 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
         Source sound permutations
       </h3>
       <p className="subtle">
-        Play original Vorbis or decoded PCM / Xbox ADPCM from this map. Shared samples use the project's verified sounds.map.
-        Connect its original resources folder in the map library if samples are missing.
+        Play original Vorbis or decoded PCM / Xbox ADPCM from this map. Matching installed sound resources
+        connect automatically, including MCC's classic sound bank. Missing original resources can be chosen
+        in the map library. MCC music/dialogue codecs and native sound functions remain separate.
       </p>
       {busy && <p role="status">Reading bounded audio data…</p>}
       {error && <Notice>{error}</Notice>}

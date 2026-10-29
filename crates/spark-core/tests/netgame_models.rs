@@ -12,7 +12,7 @@ fn source_pickups_keep_collection_identity_and_patch_only_their_position_and_yaw
     let dir=tempfile::tempdir().unwrap();let file=dir.path().join("fixture.map");std::fs::write(&file,&bytes).unwrap();
     let inspection=maps::inspect_map(&file,None).unwrap();let original=inspection.objects.iter().find(|o|o.kind=="Netgame item").unwrap();
     assert_eq!(original.tag_id,Some(0xe0000003));assert_eq!(original.position,[12.,-8.,3.]);
-    let mut p=Project::new("Pickup source");p.source=Some(Source{original_path:file.clone(),preserved_path:file.clone(),sha256:inspection.sha256.clone(),
+    let mut p=Project::new("Pickup source");p.source=Some(Source{audio_resources:None,original_path:file.clone(),preserved_path:file.clone(),sha256:inspection.sha256.clone(),
         cache_version:7,engine:"Halo PC".into(),scenario_path:inspection.scenario_path.clone(),archive:None,resource_directory:None,resource_sha256:Default::default()});p.scene=inspection.objects.clone();
     let object=p.scene.iter_mut().find(|o|o.kind=="Netgame item").unwrap();object.position[0]=15.;object.rotation[0]=1.;
     let patched=project::patched_cache(&p,&inspection).unwrap();assert_eq!(&patched[0x4150..0x4160],&bytes[0x4150..0x4160]);

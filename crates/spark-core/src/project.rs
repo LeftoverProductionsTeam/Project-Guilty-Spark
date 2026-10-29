@@ -38,6 +38,8 @@ pub struct Source {
     pub resource_directory: Option<PathBuf>,
     #[serde(default)]
     pub resource_sha256: std::collections::BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub audio_resources: Option<crate::mcc_audio::Binding>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -247,6 +249,7 @@ impl Project {
             studio.validate()?;
         }
         if let Some(source) = &self.source {
+            if let Some(audio)=&source.audio_resources { audio.validate(source.cache_version)?; }
             if source.resource_sha256.iter().any(|(name, hash)| {
                 !(["bitmaps.map", "sounds.map", "loc.map"].contains(&name.as_str())
                     || (source.cache_version==13&&(["common.ipak","inplace1.ipak","inplace2.ipak","mcc-textures","mcc-shared-bitmaps.map"].contains(&name.as_str())

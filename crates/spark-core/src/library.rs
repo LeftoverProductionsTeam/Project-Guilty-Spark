@@ -210,6 +210,7 @@ impl Library {
             scenario_path: inspection.scenario_path.clone(),
             archive: None,
             resource_directory: resources.or(path.parent()).map(Path::to_path_buf),
+            audio_resources: None,
             resource_sha256: resources
                 .or(path.parent())
                 .map(project::resource_hashes)
@@ -239,7 +240,7 @@ impl Library {
                 }
             }
             let mut imported=self.import_map(&src.original_path, src.resource_directory.as_deref())?.0;
-            if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();}imported
+            if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();source.audio_resources=src.audio_resources.clone();}imported
         } else {
             self.create(&incoming.title)?
         };

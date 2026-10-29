@@ -969,6 +969,47 @@ async fn connect_halo_textures(app:tauri::AppHandle,window:tauri::WebviewWindow,
     }).await.map_err(error)?
 }
 #[tauri::command]
+async fn auto_connect_sound_resources(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<Option<OpenProject>> {
+    let owner=window.label().to_string();
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
+        let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source=project.source.as_ref().ok_or("No preserved sound source")?;
+        let inspected=inspect(&state,&project)?;
+        if source.audio_resources.is_some(){return Ok(Some(OpenProject{project,inspection:Some((*inspected).clone())}));}
+        let mcc=lock(&state.installation)?.mcc_path.clone();
+        let binding=if source.cache_version==13 {
+            let Some(root)=mcc else{return Ok(None)};
+            let directory=root.join("halo1/sound/pc");
+            if !directory.join("sounds_adpcm.fsb").is_file()||!directory.join("lst/sounds_adpcm.lst.bin").is_file(){return Ok(None);}
+            Some(core::mcc_audio::pin_mcc(&directory).map_err(error)?)
+        }else if [6,7,609].contains(&source.cache_version) {
+            let mut roots=vec![];
+            if let Some(root)=&source.resource_directory{roots.push(root.clone());}
+            if let Some(root)=source.original_path.parent(){roots.push(root.to_path_buf());}
+            if let Some(root)=lock(&state.settings)?.resource_directory.clone(){roots.push(root);}
+            if let Some(root)=mcc{roots.push(root.join("halo1/maps/custom_edition"));}
+            let mut seen=std::collections::HashSet::new();let mut found=None;
+            for root in roots.into_iter().filter(|root|seen.insert(root.clone())).take(6) {
+                if !root.join("sounds.map").is_file(){continue;}
+                let Ok(binding)=core::mcc_audio::pin_classic(&root) else{continue};
+                if source.resource_directory.as_ref()==Some(&root)&&source.resource_sha256.get("sounds.map").is_some_and(|hash|Some(hash)!=binding.sha256.get("sounds.map")){continue;}
+                let matching=inspected.tags.iter().filter(|tag|tag.class=="snd!").take(8).any(|tag|audio::inspect_sound_with_bindings(&source.preserved_path,&source.sha256,tag.id,None,Some(&binding)).is_ok_and(|report|report.permutations.iter().any(|p|!p.embedded&&p.available)));
+                if matching{found=Some(binding);break;}
+            }
+            found
+        }else{None};
+        let Some(binding)=binding else{return Ok(None)};
+        let library=lock(&state.library)?;let mut latest=library.get(&project_id).map_err(error)?;
+        check_document_owner(&state,&project_id,&owner)?;
+        let latest_source=latest.source.as_mut().ok_or("Sound source disappeared")?;
+        if latest_source.sha256!=source.sha256{return Err("Sound source changed during automatic resource discovery".into());}
+        if latest_source.audio_resources.is_some(){return Ok(Some(OpenProject{project:latest,inspection:Some((*inspected).clone())}));}
+        latest_source.audio_resources=Some(binding);library.save(&latest,None).map_err(error)?;
+        Ok(Some(OpenProject{project:latest,inspection:Some((*inspected).clone())}))
+    }).await.map_err(error)?
+}
+#[tauri::command]
 async fn auto_connect_classic_textures(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<Option<OpenProject>>{
     let candidates={let state=app.state::<AppState>();check_document_owner(&state,&project_id,window.label())?;let lib=lock(&state.library)?;let project=lib.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("No map source")?;
         if ![6,7,609].contains(&source.cache_version)||source.resource_sha256.contains_key("bitmaps.map"){return Ok(None);}
@@ -2134,7 +2175,7 @@ async fn inspect_sound(
         let s = p.source.ok_or("Project has no source map")?;
         let resource=s.resource_directory.as_ref().map(|p|p.join("sounds.map"));
         let pinned=resource.as_ref().zip(s.resource_sha256.get("sounds.map")).map(|(p,h)|(p.as_path(),h.as_str()));
-        audio::inspect_sound_with_resources(&s.preserved_path, &s.sha256, tag_id,pinned).map_err(error)
+        audio::inspect_sound_with_bindings(&s.preserved_path, &s.sha256, tag_id,pinned,s.audio_resources.as_ref()).map_err(error)
     })
     .await
     .map_err(error)?
@@ -2174,13 +2215,14 @@ async fn preview_sound(
         let s = p.source.ok_or("Project has no source map")?;
         let resource=s.resource_directory.as_ref().map(|p|p.join("sounds.map"));
         let pinned=resource.as_ref().zip(s.resource_sha256.get("sounds.map")).map(|(p,h)|(p.as_path(),h.as_str()));
-        audio::preview_sound_with_resources(
+        audio::preview_sound_with_bindings(
             &s.preserved_path,
             &s.sha256,
             tag_id,
             pitch_range,
             permutation,
             pinned,
+            s.audio_resources.as_ref(),
         )
         .map_err(error)
     })
@@ -2651,6 +2693,7 @@ pub fn run() {
             halo_setup_report,
             connect_halo_textures,
             auto_connect_classic_textures,
+            auto_connect_sound_resources,
             save_settings,
             refresh_installation,
             compatibility,
