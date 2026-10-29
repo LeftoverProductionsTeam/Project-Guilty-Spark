@@ -2301,7 +2301,8 @@ async fn live_mcc_connect(app:tauri::AppHandle,mods_mode:bool)->Reply<crate::liv
         let session=crate::live_mcc::connect(&root,mods_mode).map_err(error)?;
         let shortcut=lock(&state.settings)?.native_camera_shortcut.clone();
         crate::live_mcc::camera_shortcut(&session,shortcut).map_err(error)?;
-        let status=crate::live_mcc::sample(&session).map_err(error);*slot=Some(session);status
+        let status=crate::live_mcc::sample(&session).map_err(error);*slot=Some(session);
+        let _=app.emit("spark:live-session-changed",());status
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -2351,10 +2352,11 @@ async fn live_mcc_camera_toggle(app:tauri::AppHandle,config:Option<core::live_ad
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 struct LiveBinding {placement_id:String,datum:u32,tag_datum:u32,expected_position:[f32;3]}
 #[tauri::command]
-async fn live_mcc_apply(app:tauri::AppHandle,project_id:String,document:quickforge::QuickForgeDocument,bindings:Vec<LiveBinding>)->Reply<Vec<core::live_adapter::MoveReceipt>>{
+async fn live_mcc_apply(app:tauri::AppHandle,project_id:String,document:quickforge::QuickForgeDocument,bindings:Vec<LiveBinding>,expected_session:String)->Reply<Vec<core::live_adapter::MoveReceipt>>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;
         if p.quick_forge.is_none()||document.runtime_id!=runtime::RuntimeId::MccSteam{return Err("Choose an MCC QuickForge project for live updates".into());}quickforge::validate_document(&document).map_err(error)?;
         let session=lock(&state.live_mcc)?.clone().ok_or("Live adapter is disconnected")?;
+        crate::live_mcc::check_session_token(Some(&session),Some(&expected_session)).map_err(error)?;
         if !session.identity.scenario.eq_ignore_ascii_case(&quickforge::scenario_path(&document).map_err(error)?.replace('\\',"/")){return Err("Loaded Halo scenario does not match this QuickForge map. Build and load this project's map before binding live objects.".into());}
         let snapshot=crate::live_mcc::sample(&session).map_err(error)?;
         let mut moves=vec![];for binding in bindings {let placement=document.placements.iter().find(|p|p.id==binding.placement_id).ok_or("Bound placement was removed")?;
@@ -2367,10 +2369,27 @@ async fn live_mcc_apply(app:tauri::AppHandle,project_id:String,document:quickfor
     }).await.map_err(error)?
 }
 #[tauri::command]
-async fn live_mcc_disconnect(app:tauri::AppHandle)->Reply<()>{tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let mut slot=lock(&state.live_mcc)?;if let Some(session)=slot.as_ref(){crate::live_mcc::disconnect(session).map_err(error)?;}*slot=None;Ok(())}).await.map_err(error)?}
+async fn live_mcc_cleanup_status(app: tauri::AppHandle) -> Reply<crate::live_mcc::CleanupStatus> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let session = lock(&state.live_mcc)?;
+        crate::live_mcc::cleanup_status(session.as_ref()).map_err(error)
+    }).await.map_err(error)?
+}
 #[tauri::command]
-async fn live_mcc_move_object(app:tauri::AppHandle,operation:core::live_adapter::MoveObject)->Reply<Vec<core::live_adapter::MoveReceipt>>{
+async fn live_mcc_disconnect(app:tauri::AppHandle, expected_session:Option<String>)->Reply<crate::live_mcc::DisconnectReport>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let mut slot=lock(&state.live_mcc)?;
+        crate::live_mcc::check_session_token(slot.as_ref(),expected_session.as_deref()).map_err(error)?;
+        let report=if let Some(session)=slot.as_ref(){crate::live_mcc::disconnect(session).map_err(error)?}
+            else { crate::live_mcc::DisconnectReport::already_disconnected() };
+        *slot=None;let _=app.emit("spark:live-session-changed",());Ok(report)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn live_mcc_move_object(app:tauri::AppHandle,operation:core::live_adapter::MoveObject,expected_session:String)->Reply<Vec<core::live_adapter::MoveReceipt>>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the live Halo adapter first")?;
+        crate::live_mcc::check_session_token(Some(&session),Some(&expected_session)).map_err(error)?;
         crate::live_mcc::moves(&session,&[operation]).map_err(error)
     }).await.map_err(error)?
 }
@@ -2379,8 +2398,8 @@ async fn live_mcc_scale_info(app:tauri::AppHandle,datum:u32)->Reply<core::live_a
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the live Halo adapter first")?;crate::live_mcc::scale_info(&session,datum).map_err(error)}).await.map_err(error)?
 }
 #[tauri::command]
-async fn live_mcc_scale_object(app:tauri::AppHandle,operation:core::live_adapter::scaling::ScaleOperation)->Reply<core::live_adapter::scaling::ScaleReceipt>{
-    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the live Halo adapter first")?;crate::live_mcc::scale(&session,&operation).map_err(error)}).await.map_err(error)?
+async fn live_mcc_scale_object(app:tauri::AppHandle,operation:core::live_adapter::scaling::ScaleOperation,expected_session:String)->Reply<core::live_adapter::scaling::ScaleReceipt>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect the live Halo adapter first")?;crate::live_mcc::check_session_token(Some(&session),Some(&expected_session)).map_err(error)?;crate::live_mcc::scale(&session,&operation).map_err(error)}).await.map_err(error)?
 }
 #[tauri::command]
 async fn live_mcc_import_map(app:tauri::AppHandle)->Reply<OpenProject>{
@@ -2546,6 +2565,7 @@ pub fn run() {
             live_mcc_camera_shortcut,
             live_mcc_camera_toggle,
             live_mcc_apply,
+            live_mcc_cleanup_status,
             live_mcc_disconnect,
             live_mcc_move_object,
             live_mcc_scale_info,

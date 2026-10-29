@@ -96,6 +96,21 @@ try {
   call = (command, args = {}) =>
     page.evaluate(({ command, args }) => window.__TAURI_INTERNALS__.invoke(command, args), { command, args });
   const boot = await call('bootstrap');
+  const idleCleanup = await call('live_mcc_cleanup_status');
+  expect(idleCleanup.hasSession).toBe(false);
+  expect(idleCleanup.pending).toEqual([]);
+  for (const [command, operation] of [
+    ['live_mcc_move_object', { datum: 0, tagDatum: 0, expectedPosition: [0, 0, 0], position: [0, 0, 0] }],
+    ['live_mcc_scale_object', { datum: 0, tagDatum: 0, expectedScale: 1, scale: 1, includeSharedPhysics: false }],
+  ]) {
+    let refused = false;
+    try { await call(command, { operation }); }
+    catch (error) { refused = /expectedSession|expected_session/.test(String(error)); }
+    expect(refused).toBe(true);
+  }
+  const idleRelease = await call('live_mcc_disconnect', { expectedSession: 'no-owned-session-fixture' });
+  expect(idleRelease.outcome).toBe('alreadyDisconnected');
+  expect((await call('live_mcc_cleanup_status')).hasSession).toBe(false);
   await call('save_settings', {
     settings: { ...boot.settings, onboardingCompleted: true, autoBuild: false },
   });
@@ -464,6 +479,7 @@ try {
   const receipt = {
     schemaVersion: 1,
     nativeDesktop: true,
+    idleLiveCleanupApi: { hasSession: false, pending: [], releaseOutcome: idleRelease.outcome, unboundMoveAndScaleRefused: true, gameAttached: false },
     appSha256,
     sourceSha256: fixture.sourceSha256,
     nativeUiRecordAndSave: true,

@@ -1,6 +1,6 @@
 # C35 — the living workbench
 
-Latest scoped evidence: [saved map audio in native Director recordings](C35_DIRECTOR_AUDIO.md), with r5 files. Earlier follow-through: [Director recording, named takes and fixed export dimensions](C35_DIRECTOR_RECORDING.md), with r4 files; [classic bitmap repair and validated Alpine MCC conversion](C35_CONVERSION_RESOURCE_REPAIR.md), with r3 files; and [saved tool edits and desktop snapshot repair](C35_TOOL_EDIT_FOLLOW_THROUGH.md), with r2 files. The r1 results, original failures and artifacts below remain historical and frozen; later reports supersede only their stated gates.
+Latest scoped evidence: [live-session cleanup and reconnect](C35_LIVE_SESSION_RECOVERY.md), with r6 files. Earlier follow-through: [saved map audio in native Director recordings](C35_DIRECTOR_AUDIO.md), with r5 files; [Director recording, named takes and fixed export dimensions](C35_DIRECTOR_RECORDING.md), with r4 files; [classic bitmap repair and validated Alpine MCC conversion](C35_CONVERSION_RESOURCE_REPAIR.md), with r3 files; and [saved tool edits and desktop snapshot repair](C35_TOOL_EDIT_FOLLOW_THROUGH.md), with r2 files. The r1 results, original failures and artifacts below remain historical and frozen; later reports supersede only their stated gates.
 
 C35 continues master `617d267` on `codex/continuation-35-living-workbench`. It preserves C32–C34, the restoration corpus and frozen earlier artifacts. This is an internal development build, not a completed replacement Halo engine. No remote push, public release or master merge is included.
 

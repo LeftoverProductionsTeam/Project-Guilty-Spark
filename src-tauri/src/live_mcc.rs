@@ -11,11 +11,15 @@ use std::sync::{
 #[path = "live_controller_poll.rs"]
 #[cfg(any(windows, test))]
 mod controller_poll;
+#[path = "live_cleanup.rs"]
+mod cleanup;
+pub use cleanup::Report as DisconnectReport;
 #[derive(Default)]
 pub struct ScaleSession {
     state: Mutex<scaling::ScaleState>,
     error: Mutex<Option<String>>,
     keeper_started: AtomicBool,
+    keeper_stop: AtomicBool,
 }
 #[derive(Default)]
 struct NativeSprintData {enabled:bool,config:live::sprint::Config,state:live::sprint::State,error:Option<String>}
@@ -34,6 +38,7 @@ pub struct NativeCameraStatus {pub enabled:bool,pub active:bool,pub restore_pend
 #[derive(Clone)]
 pub struct Session {
     closed: Arc<AtomicBool>,
+    connection_id: String,
     pub pid: u32,
     pub base: u64,
     pub created: u64,
@@ -44,6 +49,7 @@ pub struct Session {
     pub camera:Arc<NativeCameraSession>,
 }
 impl Session {
+    fn token(&self) -> String { format!("{}:{}:{}", self.pid, self.created, self.connection_id) }
     fn scales_active(&self)->bool {
         self.scales
             .state
@@ -55,12 +61,42 @@ impl Session {
 #[serde(rename_all = "camelCase")]
 pub struct Status {
     pub pid: u32,
+    pub session_token: String,
+    pub cleanup_pending: bool,
     pub snapshot: live::Snapshot,
     pub experimental: bool,
     pub active_vehicle_physics: bool,
     pub active_shared_scales: bool,
     pub scale_keeper_error: Option<String>,
     pub detail: String,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupStatus {
+    pub has_session: bool,
+    pub session_token: Option<String>,
+    pub pending: Vec<&'static str>,
+    pub detail: String,
+}
+pub fn cleanup_status(session: Option<&Session>) -> Result<CleanupStatus> {
+    let Some(session) = session.filter(|s| !s.closed.load(Ordering::Acquire)) else {
+        return Ok(CleanupStatus { has_session: false, session_token: None, pending: vec![], detail: "No previous live session.".into() });
+    };
+    let mut pending = vec![];
+    if session.scales.state.lock().map_err(|_| spark_core::SparkError::Invalid("Scale state lock failed".into()))?.active() { pending.push("shared sizes"); }
+    if session.camera.data.lock().map_err(|_| spark_core::SparkError::Invalid("Camera state lock failed".into()))?.state.active() { pending.push("camera"); }
+    if session.sprint.data.lock().map_err(|_| spark_core::SparkError::Invalid("Sprint state lock failed".into()))?.state.active() { pending.push("sprint"); }
+    let detail = if pending.is_empty() { "A previous live session is retained. Release it before connecting again.".into() }
+        else { format!("Previous live session retains temporary {}. Cleanup restores the same target or retires records only when the original target is proven obsolete.", pending.join(", ")) };
+    Ok(CleanupStatus { has_session: true, session_token: Some(session.token()), pending, detail })
+}
+pub fn check_session_token(session: Option<&Session>, expected: Option<&str>) -> Result<()> {
+    if let (Some(session), Some(expected)) = (session, expected) {
+        if session.token() != expected {
+            return invalid("The live session changed in another Spark window. Refresh the connection before editing or releasing it.");
+        }
+    }
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -132,6 +168,9 @@ mod windows {
             found.push((entry.th32ProcessID, wide(&entry.szExeFile)));
             more = unsafe { Process32NextW(snapshot.0, &mut entry) };
         }
+        if unsafe { GetLastError() } != ERROR_NO_MORE_FILES {
+            return Err(failed("Running process enumeration did not complete"));
+        }
         Ok(found)
     }
     fn check_anticheat() -> Result<()> {
@@ -143,7 +182,7 @@ mod windows {
         }
         Ok(())
     }
-    fn module(pid: u32) -> Result<(u64, PathBuf)> {
+    fn loaded_module(pid: u32) -> Result<Option<(u64, PathBuf)>> {
         let raw = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid) };
         if raw == INVALID_HANDLE_VALUE {
             return Err(failed("Cannot inspect MCC modules"));
@@ -154,14 +193,21 @@ mod windows {
         let mut more = unsafe { Module32FirstW(snapshot.0, &mut entry) };
         while more != 0 {
             if wide(&entry.szModule).eq_ignore_ascii_case("halo1.dll") {
-                return Ok((
+                return Ok(Some((
                     entry.modBaseAddr as u64,
                     PathBuf::from(wide(&entry.szExePath)),
-                ));
+                )));
             }
             more = unsafe { Module32NextW(snapshot.0, &mut entry) };
         }
-        invalid("MCC is running, but Halo 1 is not loaded. Enter the intended Halo 1 map first.")
+        if unsafe { GetLastError() } != ERROR_NO_MORE_FILES {
+            return Err(failed("MCC module enumeration did not complete"));
+        }
+        Ok(None)
+    }
+    fn module(pid: u32) -> Result<(u64, PathBuf)> {
+        loaded_module(pid)?.ok_or_else(|| spark_core::SparkError::Invalid(
+            "MCC is running, but Halo 1 is not loaded. Enter the intended Halo 1 map first.".into()))
     }
     fn executable(root: &Path) -> PathBuf {
         root.join("MCC/Binaries/Win64/MCC-Win64-Shipping.exe")
@@ -370,6 +416,7 @@ mod windows {
         let snapshot = live::snapshot(&process, base)?;
         let session = Session {
             closed:Arc::new(AtomicBool::new(false)),
+            connection_id: uuid::Uuid::new_v4().to_string(),
             pid,
             base,
             created: created(process.0)?,
@@ -381,7 +428,21 @@ mod windows {
         };
         Ok(session)
     }
+    fn editing_allowed(s: &Session) -> Result<()> {
+        if s.closed.load(Ordering::Acquire) || s.scales.keeper_stop.load(Ordering::Acquire) {
+            return invalid("Live session cleanup is pending or completed. Finish releasing the previous session, then reconnect before editing.");
+        }
+        Ok(())
+    }
     fn guarded(s: &Session, writable: bool) -> Result<Process> {
+        if writable { editing_allowed(s)?; }
+        guarded_process(s, writable)
+    }
+    fn guarded_restore(s: &Session) -> Result<Process> {
+        // Only the existing journal-owned restore paths bypass the new-edit gate.
+        guarded_process(s, true)
+    }
+    fn guarded_process(s: &Session, writable: bool) -> Result<Process> {
         if s.closed.load(Ordering::Acquire){return invalid("This live session is disconnected; reconnect before editing");}
         check_anticheat()?;
         let p = open(s.pid, writable)?;
@@ -392,6 +453,67 @@ mod windows {
             return invalid("MCC restarted or its Halo module changed; reconnect the live adapter");
         }
         Ok(p)
+    }
+    enum Lifetime { Current(Process), Ended, Replaced }
+    fn process_lifetime(pid: u32, expected_created: u64) -> Result<Lifetime> {
+        // Query/wait only. A failed access check is never treated as proof of exit.
+        let raw = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE, 0, pid) };
+        if raw.is_null() {
+            let reason = std::io::Error::last_os_error();
+            if !processes()?.iter().any(|(found, _)| *found == pid) {
+                return Ok(Lifetime::Ended);
+            }
+            return invalid(format!("Cannot verify the previous Halo process lifetime: {reason}"));
+        }
+        let process = Process(raw);
+        match unsafe { WaitForSingleObject(process.0, 0) } {
+            WAIT_OBJECT_0 => return Ok(Lifetime::Ended),
+            WAIT_TIMEOUT => {},
+            _ => return Err(failed("Cannot query the previous Halo process state")),
+        }
+        if created(process.0)? != expected_created { return Ok(Lifetime::Replaced); }
+        Ok(Lifetime::Current(process))
+    }
+    fn cleanup_target(s: &Session) -> Result<cleanup::Target> {
+        use cleanup::{RetiredTarget as Gone, Target};
+        let _lifetime = match process_lifetime(s.pid, s.created)? {
+            Lifetime::Ended => return Ok(Target::Retired(Gone::ProcessEnded)),
+            Lifetime::Replaced => return Ok(Target::Retired(Gone::ProcessReplaced)),
+            Lifetime::Current(process) => process,
+        };
+        let Some((base, path)) = loaded_module(s.pid)? else {
+            return Ok(Target::Retired(Gone::ModuleUnloaded));
+        };
+        if base != s.base || path.canonicalize()? != s.root.join("halo1/halo1.dll").canonicalize()? {
+            return Ok(Target::Retired(Gone::ModuleReplaced));
+        }
+        let process = guarded(s, false)?;
+        if live::snapshot(&process, s.base)?.identity != s.identity {
+            return Ok(Target::Retired(Gone::MapChanged));
+        }
+        Ok(Target::Current)
+    }
+    fn quiesce_controllers(s: &Session) -> Result<()> {
+        let mut camera = s.camera.data.lock().map_err(|_| spark_core::SparkError::Invalid("Camera state lock failed".into()))?;
+        let mut sprint = s.sprint.data.lock().map_err(|_| spark_core::SparkError::Invalid("Sprint state lock failed".into()))?;
+        camera.enabled = false;
+        camera.shortcut.enabled = false;
+        camera.shortcut_latch = Default::default();
+        camera.poll_revision = camera.poll_revision.wrapping_add(1);
+        sprint.enabled = false;
+        s.scales.keeper_stop.store(true, Ordering::Release);
+        Ok(())
+    }
+    fn retire_journals(s: &Session) -> Result<()> {
+        let mut scales = s.scales.state.lock().map_err(|_| spark_core::SparkError::Invalid("Scale state lock failed".into()))?;
+        let mut camera = s.camera.data.lock().map_err(|_| spark_core::SparkError::Invalid("Camera state lock failed".into()))?;
+        let mut sprint = s.sprint.data.lock().map_err(|_| spark_core::SparkError::Invalid("Sprint state lock failed".into()))?;
+        let mut error = s.scales.error.lock().map_err(|_| spark_core::SparkError::Invalid("Scale keeper lock failed".into()))?;
+        *scales = Default::default();
+        camera.state = Default::default(); camera.error = None;
+        sprint.state = Default::default(); sprint.error = None;
+        *error = None;
+        Ok(())
     }
     pub fn sample(s: &Session) -> Result<Status> {
         let _edit = EditLock::acquire(s)?;
@@ -407,7 +529,7 @@ mod windows {
             .lock()
             .map_err(|_| spark_core::SparkError::Invalid("Scale state lock failed".into()))?
             .vehicle_active();
-        Ok(Status{pid:s.pid,snapshot,experimental:true,active_vehicle_physics:vehicle_active,active_shared_scales:s.scales_active(),scale_keeper_error:s.scales.error.lock().map_err(|_|spark_core::SparkError::Invalid("Scale keeper lock failed".into()))?.clone(),detail:"Experimental MCC Halo 1 adapter: object positions and uniform scale with readback. World items share their authored size tag. Vehicles couple shared contact spheres, suspension, mass and inertia; park and exit matching vehicles first. Driving and peer replication require game checks.".into()})
+        Ok(Status{pid:s.pid,session_token:s.token(),cleanup_pending:s.scales.keeper_stop.load(Ordering::Acquire),snapshot,experimental:true,active_vehicle_physics:vehicle_active,active_shared_scales:s.scales_active(),scale_keeper_error:s.scales.error.lock().map_err(|_|spark_core::SparkError::Invalid("Scale keeper lock failed".into()))?.clone(),detail:"Experimental MCC Halo 1 adapter: object positions and uniform scale with readback. World items share their authored size tag. Vehicles couple shared contact spheres, suspension, mass and inertia; park and exit matching vehicles first. Driving and peer replication require game checks.".into()})
     }
     pub fn gameplay_inventory(s:&Session)->Result<live::GameplayInventory> {
         let _edit=EditLock::acquire(s)?;live::gameplay_inventory(&guarded(s,false)?,s.base,&s.identity)
@@ -449,6 +571,7 @@ mod windows {
         result
     }
     fn start_keeper(s: &Session) {
+        s.scales.keeper_stop.store(false, Ordering::Release);
         if s.scales.keeper_started.swap(true, Ordering::AcqRel) {
             return;
         }
@@ -456,15 +579,21 @@ mod windows {
         let sprint_weak=Arc::downgrade(&s.sprint);
         let camera_weak=Arc::downgrade(&s.camera);
         let closed=s.closed.clone();
+        let connection_id = s.connection_id.clone();
         let (pid, base, created, root, identity) =
             (s.pid, s.base, s.created, s.root.clone(), s.identity.clone());
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_millis(300));
             let Some(scales) = weak.upgrade() else { break };
+            if closed.load(Ordering::Acquire) || scales.keeper_stop.load(Ordering::Acquire) {
+                scales.keeper_started.store(false, Ordering::Release);
+                break;
+            }
             let Some(sprint)=sprint_weak.upgrade()else{break};
             let Some(camera)=camera_weak.upgrade()else{break};
             let session = Session {
                 closed:closed.clone(),
+                connection_id: connection_id.clone(),
                 pid,
                 base,
                 created,
@@ -479,6 +608,9 @@ mod windows {
             }
             let result = (|| -> Result<()> {
                 let _edit = EditLock::acquire(&session)?;
+                if closed.load(Ordering::Acquire) || session.scales.keeper_stop.load(Ordering::Acquire) {
+                    return Ok(());
+                }
                 let process = guarded(&session, true)?;
                 let mut state = session.scales.state.lock().map_err(|_| {
                     spark_core::SparkError::Invalid("Scale state lock failed".into())
@@ -501,10 +633,12 @@ mod windows {
             }
         });
     }
-    pub fn disconnect(s: &Session) -> Result<()> {
+    pub fn disconnect(s: &Session) -> Result<DisconnectReport> {
         let _edit = EditLock::acquire(s)?;
-        if s.closed.load(Ordering::Acquire){return Ok(());}
-        let result=(||->Result<()>{
+        if s.closed.load(Ordering::Acquire){return Ok(DisconnectReport::already_disconnected());}
+        quiesce_controllers(s)?;
+        let pending = !cleanup_status(Some(s))?.pending.is_empty();
+        cleanup::run(pending, || cleanup_target(s), || {
         sprint_control::restore_locked(s)?;
         camera_control::restore_locked(s)?;
         let mut state = s
@@ -515,27 +649,95 @@ mod windows {
         if !state.active() {
             return Ok(());
         }
-        // An ended process or reloaded map owns fresh data. Never restore old
-        // addresses into it. Temporary tag edits do not modify map files.
-        if !processes()?.iter().any(|(pid, _)| *pid == s.pid) {
-            *state = scaling::ScaleState::default();
-            return Ok(());
-        }
-        let process = guarded(s, true)?;
-        if live::snapshot(&process, s.base)?.identity != s.identity {
-            *state = scaling::ScaleState::default();
-            return Ok(());
-        }
+        // Recheck identity in the existing restore operation after observation.
+        let process = guarded_restore(s)?;
         let _paused = PausedThreads::acquire(s.pid)?;
         scaling::reset(&process, s.base, &s.identity, &mut state)
-        })();
-        if result.is_ok(){s.closed.store(true,Ordering::Release);}
-        result
+        }, || retire_journals(s), || s.closed.store(true, Ordering::Release))
+        .map_err(|reason| spark_core::SparkError::Invalid(format!(
+            "Live cleanup incomplete. Automatic controllers stopped; remaining restoration records retained: {reason}"
+        )))
     }
     #[cfg(test)]
     mod tests {
         use super::*;
         use live::Memory;
+        fn local_session(pid: u32, created: u64) -> Session {
+            Session {
+                closed: Arc::new(AtomicBool::new(false)),
+                connection_id: uuid::Uuid::new_v4().to_string(),
+                pid, created, base: 0, root: PathBuf::from("unused-lifecycle-fixture"),
+                identity: live::MapIdentity { scenario: "lifecycle fixture".into(), checksum: 0,
+                    scenario_datum: 0, tag_count: 0, header: 0, object_table: 0, object_data: 0 },
+                scales: Arc::new(Default::default()), camera: Arc::new(Default::default()), sprint: Arc::new(Default::default()),
+            }
+        }
+        #[test]
+        fn cleanup_closes_an_empty_session_and_rejects_a_replaced_connection_token() {
+            let old = local_session(u32::MAX, 1);
+            let next = local_session(u32::MAX, 1);
+            assert_ne!(old.token(), next.token(), "Reconnect within one process needs a fresh identity");
+            assert!(check_session_token(Some(&next), Some(&old.token())).is_err());
+            assert!(!next.closed.load(Ordering::Acquire));
+            assert!(check_session_token(Some(&old), Some(&old.token())).is_ok());
+            assert!(check_session_token(None, Some(&old.token())).is_ok());
+            old.camera.data.lock().unwrap().enabled = true;
+            old.camera.data.lock().unwrap().shortcut.enabled = true;
+            old.sprint.data.lock().unwrap().enabled = true;
+            let before = cleanup_status(Some(&old)).unwrap();
+            assert!(before.has_session); assert!(before.pending.is_empty());
+            assert_eq!(disconnect(&old).unwrap().outcome, cleanup::Outcome::NoChanges);
+            assert!(old.closed.load(Ordering::Acquire));
+            assert!(old.scales.keeper_stop.load(Ordering::Acquire));
+            assert!(editing_allowed(&old).is_err());
+            assert!(editing_allowed(&next).is_ok());
+            quiesce_controllers(&next).unwrap();
+            assert!(!next.closed.load(Ordering::Acquire));
+            assert!(editing_allowed(&next).is_err());
+            assert!(moves(&next, &[]).unwrap_err().to_string().contains("cleanup is pending"));
+            assert!(!old.camera.data.lock().unwrap().enabled);
+            assert!(!old.camera.data.lock().unwrap().shortcut.enabled);
+            assert!(!old.sprint.data.lock().unwrap().enabled);
+            assert!(!cleanup_status(Some(&old)).unwrap().has_session);
+            assert_eq!(disconnect(&old).unwrap().outcome, cleanup::Outcome::AlreadyDisconnected);
+        }
+        #[test]
+        fn lifecycle_observes_an_owned_child_lifetime_module_absence_and_exit_without_writes() {
+            use std::{io::{BufRead, BufReader}, os::windows::process::CommandExt, process::{Command, Stdio}, time::{Duration, Instant}};
+            struct Child(std::process::Child);
+            impl Drop for Child {
+                fn drop(&mut self) {
+                    if self.0.try_wait().ok().flatten().is_none() { let _ = self.0.kill(); }
+                    let _ = self.0.wait();
+                }
+            }
+            let mut child = Child(Command::new("powershell.exe")
+                .args(["-NoProfile", "-NonInteractive", "-Command", "[Console]::Out.WriteLine('spark-owned-lifecycle-child'); [Console]::In.ReadLine() | Out-Null"])
+                .creation_flags(CREATE_NO_WINDOW).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap());
+            let stdout = child.0.stdout.take().unwrap();
+            let (send, receive) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                let mut line = String::new(); let result = BufReader::new(stdout).read_line(&mut line);
+                let _ = send.send(result.map(|_| line));
+            });
+            assert_eq!(receive.recv_timeout(Duration::from_secs(10)).unwrap().unwrap().trim(), "spark-owned-lifecycle-child");
+            let pid = child.0.id();
+            let query = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+            assert!(!query.is_null()); let query = Process(query); let stamp = created(query.0).unwrap();
+            assert!(matches!(process_lifetime(pid, stamp).unwrap(), Lifetime::Current(_)));
+            assert!(matches!(process_lifetime(pid, stamp + 1).unwrap(), Lifetime::Replaced));
+            let session = local_session(pid, stamp);
+            assert_eq!(cleanup_target(&session).unwrap(), cleanup::Target::Retired(cleanup::RetiredTarget::ModuleUnloaded));
+            drop(child.0.stdin.take());
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while child.0.try_wait().unwrap().is_none() {
+                assert!(Instant::now() < deadline, "owned child did not finish");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert!(matches!(process_lifetime(pid, stamp).unwrap(), Lifetime::Ended));
+            assert_eq!(cleanup_target(&session).unwrap(), cleanup::Target::Retired(cleanup::RetiredTarget::ProcessEnded));
+            eprintln!("C35 lifecycle native fixture: matching lifetime, mismatched creation time, completed module absence and process exit passed; no process-memory writes or suspension.");
+        }
         #[test]
         #[ignore="Requires the owner's running reviewed MCC Halo 1 session in official mods mode"]
         fn native_camera_disconnect_rejects_a_stale_session(){
@@ -605,6 +807,6 @@ pub fn scale(_: &Session, _: &scaling::ScaleOperation) -> Result<scaling::ScaleR
     invalid("The MCC live process adapter requires Windows")
 }
 #[cfg(not(windows))]
-pub fn disconnect(_: &Session) -> Result<()> {
-    Ok(())
+pub fn disconnect(_: &Session) -> Result<DisconnectReport> {
+    Ok(DisconnectReport::already_disconnected())
 }

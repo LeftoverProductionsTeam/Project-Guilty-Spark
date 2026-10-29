@@ -1,5 +1,7 @@
 # C34 current MCC write-transport audit
 
+Later scoped change: [C35 r6 cleanup/reconnect](../C35_LIVE_SESSION_RECOVERY.md) adds verified target retirement, pending-cleanup write fencing and stopped-keeper checks. The broad-suspension, resume-acknowledgement, elapsed-time and abnormal-termination limits below remain open. The original source hashes and C34 observations remain historical.
+
 Audit date: **2026-10-28**. This is source inspection of existing behavior plus a narrow local controller scheduling repair, not a game-memory experiment or a reproduced game deadlock. No byte-write algorithm, suspension mechanism, memory layout, offset or runtime gate changed. No target game process was opened, suspended, modified or launched. Existing exact-profile operations and historic game observations remain recorded individually.
 
 ## Scope and existing controls

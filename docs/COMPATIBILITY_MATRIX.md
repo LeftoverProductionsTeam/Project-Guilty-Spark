@@ -55,6 +55,7 @@ A Steam build number/launcher identity or selected launch option is insufficient
 | Operation | Exact retained evidence | Remaining gate |
 |---|---|---|
 | Existing object inspect/move/restore | Actual local MCC Blood Gulch readback and move/restore | Other cases/failure behavior and peers separate |
+| Live-session cleanup/reconnect | Verified-target restore vs obsolete-record retirement, connection IDs for cleanup/object edits, pending-cleanup write gate and stale live history/binding reset. Windows child-process lifecycle, native idle API and browser contracts passed ([r6 evidence](C35_LIVE_SESSION_RECOVERY.md)) | New full MCC transition/recovery acceptance, identical-identity reloads and engine-owned write timing remain open |
 | Item/vehicle uniform scale | Owner confirmed corrected 2× Warthog tires and driving after physics/suspension coupling | Smaller scales, other vehicles, collision/handling and peers open |
 | Shift sprint | Native 1.5× trial measured and owner-confirmed; configurable default then raised to 1.75× | New default and proportional running animation unaccepted |
 | Editable shoulder view / quick toggle | Native track/weapon flags toggle and exact restore; dedicated button/saved default F6 shortcut | **Owner-reported shots left of reticle remain open**; physical key, near/far aim, walls/weapon/respawn/vehicle acceptance pending |

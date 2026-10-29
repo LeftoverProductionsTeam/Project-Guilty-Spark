@@ -53,7 +53,7 @@ fn restore_data(s: &Session, data: &mut NativeSprintData) -> Result<()> {
         data.state = sprint::State::default();
         return Ok(());
     }
-    let p = guarded(s, true)?;
+    let p = guarded_restore(s)?;
     let _paused = PausedThreads::acquire(s.pid)?;
     sprint::reset(&p, s.base, &s.identity, &mut data.state)?;
     data.error = None;
@@ -73,6 +73,7 @@ pub fn sprint_configure(
     config: sprint::Config,
 ) -> Result<NativeSprintStatus> {
     config.validate()?;
+    if enabled { editing_allowed(s)?; }
     virtual_key(&config.hotkey)?;
     let status = {
         let _edit = EditLock::acquire(s)?;
@@ -107,6 +108,7 @@ fn start(s: &Session) {
     let scales_weak = Arc::downgrade(&s.scales);
     let camera_weak = Arc::downgrade(&s.camera);
     let closed = s.closed.clone();
+    let connection_id = s.connection_id.clone();
     let (pid, base, created, root, identity) =
         (s.pid, s.base, s.created, s.root.clone(), s.identity.clone());
     std::thread::spawn(move || loop {
@@ -121,6 +123,7 @@ fn start(s: &Session) {
         };
         let session = Session {
             closed: closed.clone(),
+            connection_id: connection_id.clone(),
             pid,
             base,
             created,

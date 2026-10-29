@@ -2,6 +2,7 @@
 
 ## 0.4.0 — Continuation 35: The living workbench (development)
 
+- Live-session follow-through: keep cleanup reachable after sampling fails, distinguish verified restoration from obsolete-record retirement, fence cleanup/object edits to their connection and block new writes during pending cleanup. Stop queued keepers, reset stale live bindings/history and discard late old-session receipts. [Evidence and remaining MCC gates](docs/C35_LIVE_SESSION_RECOVERY.md).
 - Director audio follow-through: optionally record the saved Ambient/Map start mix with source-verified clips, spatial camera listening, bounded preparation and owned audio cleanup. Independently decode real native Opus output and camera-distance silence. Fix a drive-alias test race without changing production mapping behavior. [Evidence and limits](docs/C35_DIRECTOR_AUDIO.md).
 - Director follow-through: add remembered recording folders and named takes, fix stale cross-window UI preferences, clean empty cancelled reservations and keep export dimensions fixed across interface changes. Correct a premature browser first-frame check with independent decoding. [Evidence and limits](docs/C35_DIRECTOR_RECORDING.md).
 - Conversion follow-through: audit exact indexed CE bitmap dependencies, review matching source files and create a separate repaired SDK tagset. Add explicit MCC multiplayer UI compatibility, preserve repair reviews across save/check refreshes and validate real Alpine MCC compilation. [Evidence and limits](docs/C35_CONVERSION_RESOURCE_REPAIR.md).

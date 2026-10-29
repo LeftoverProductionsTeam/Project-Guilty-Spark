@@ -189,6 +189,7 @@ async function mockDesktop(page: Page) {
           return {report:{schemaVersion:1,profileId:'synthetic',target:{family:'halo1',edition:'synthetic',platform:'windows',distribution:'synthetic',architecture:'x86_64'},capabilities:[],diagnostics:[],playerScale:{goalPlayers:128,checkpoints:[2,8,16,32,64,128],acceptedGamePlayers:null}},profiles:[],sourceIssue:'Synthetic source not built',toolsIssue:'Synthetic kit not configured',actions:actionNames.map(([id,label])=>({id,label,operation:id,availability: id==='findGames'?'ready':'setupRequired',description:'Synthetic operation',nextAction:'Set up the matching runtime',requiresConfirmation:false})),processes:[]};
         }
         if (command === 'runtime_tool_processes') return [];
+        if (command === 'live_mcc_cleanup_status') return {hasSession:false,sessionToken:null,pending:[],detail:'No synthetic session'};
         if (command === 'community_listing') {
           const timestamp=Math.floor(Date.now()/1000);
           const servers=['a','b'].map((id,index)=>({id:id.repeat(64),provider:'Synthetic Delta List',source:'synthetic',name:`Synthetic game ${index+1}`,map:{family:'xbox',name:'bloodgulch',pack:null,displayName:'Blood Gulch'},gameType:'Slayer',mode:'multiplayer',players:2,advertisedCapacity:128,open:true,locked:false,inProgress:true,legacyNetworkVersion:43,protocol:'delta',build:null,platform:null,hosting:'synthetic',region:null,providerVerified:false,fetchedAtUnix:timestamp,advertisementAgeSeconds:0}));
@@ -734,8 +735,8 @@ test('live Ctrl+Z waits for an in-flight game receipt and then supports redo',as
   await page.evaluate(()=>{
     const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
     const object={datum:12,tagDatum:7,kind:0,scale:1,tagPath:'synthetic/biped',position:[1,2,3],velocity:[0,0,0],forward:[1,0,0],up:[0,0,1],parentDatum:4294967295,player:true};
-    let connected=false;w.__liveReceipt={pending:false,object,calls:0};
-    const status=()=>structuredClone({pid:3,activeVehiclePhysics:false,activeSharedScales:false,scaleKeeperError:null,snapshot:{profile:'synthetic',identity:{scenario:'test/map',checksum:123,tagCount:1,scenarioDatum:7},objects:[object]},detail:'Synthetic receipt timing test'});
+    let connected=false;w.__liveReceipt={pending:false,object,calls:0,token:'first-synthetic-connection'};
+    const status=()=>structuredClone({pid:3,sessionToken:w.__liveReceipt.token,activeVehiclePhysics:false,activeSharedScales:false,scaleKeeperError:null,snapshot:{profile:'synthetic',identity:{scenario:'test/map',checksum:123,tagCount:1,scenarioDatum:7},objects:[object]},detail:'Synthetic receipt timing test'});
     w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
       if(command==='live_mcc_connect'){connected=true;return status();}
       if(command==='live_mcc_sample'){if(!connected)throw new Error('No test session');return status();}
@@ -746,6 +747,9 @@ test('live Ctrl+Z waits for an in-flight game receipt and then supports redo',as
   await chooseTool(page,"Level editor");await page.getByRole('button',{name:'Connect to a running Halo game',exact:true}).click();await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');await page.getByRole('button',{name:'Toggle Game connection',exact:true}).click();await page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();await page.getByRole('button',{name:'Connect current Halo 1 session',exact:true}).click();await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');
   const x=page.getByRole('spinbutton',{name:'Live position X',exact:true});await x.fill('4');await x.press('Tab');await page.getByRole('button',{name:'Apply live object position',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.pending)).toBe(true);await page.keyboard.press('Control+z');
   await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.object.position[0])).toBe(1);await expect(page.getByRole('button',{name:'Redo live edit (Ctrl+Y)',exact:true})).toBeEnabled();await page.keyboard.press('Control+y');await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.object.position[0])).toBe(4);await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.calls)).toBe(3);
+  await page.evaluate(()=>{(window as any).__liveReceipt.token='reconnected-same-pid-and-map';});
+  await expect(page.getByRole('button',{name:'Undo live edit (Ctrl+Z)',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Redo live edit (Ctrl+Y)',exact:true})).toBeDisabled();
 });
 
 test('numeric-field Ctrl+Z and both redo shortcuts survive autosave; history limit persists',async({page})=>{
@@ -1034,4 +1038,97 @@ test('friends preflight surfaces blocked proof without a network success claim',
       ),
     ),
   ).toBe(false);
+});
+
+async function retainedLiveFixture(page: Page) {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const w = window as any, original = w.__TAURI_INTERNALS__.invoke;
+    const state = w.__cleanup = { present: true, token: 'old-synthetic-connection', calls: [] as string[], defer: false, pending: false, fail: false, finish: null as null | (() => void) };
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'live_mcc_sample') throw Error('Synthetic map changed; snapshot unavailable');
+      if (command === 'live_mcc_cleanup_status') return {hasSession: state.present, sessionToken: state.present ? state.token : null, pending: state.present ? ['camera', 'shared sizes'] : [], detail: 'Synthetic retained camera and size journals; source cache unchanged.'};
+      if (command === 'live_mcc_disconnect') {
+        state.calls.push(args.expectedSession);
+        if (args.expectedSession !== state.token) throw Error('The live session changed in another Spark window. Refresh before releasing it.');
+        if (state.defer) { state.pending = true; await new Promise<void>(resolve => { state.finish = resolve; }); state.pending = false; }
+        if (state.fail) throw Error('Synthetic cleanup could not verify the target; journals retained for retry.');
+        state.present = false;
+        return {outcome:'retired',retiredTarget:'mapChanged',detail:'Disconnected. Obsolete records retired. No old values were written into the replacement session.'};
+      }
+      return original(command, args);
+    };
+  });
+  await chooseTool(page, 'Level editor');
+  await page.getByRole('button', {name:'Connect to a running Halo game',exact:true}).click();
+  await page.getByRole('combobox', {name:'Editing target',exact:true}).selectOption('live');
+  await page.getByRole('button', {name:'Toggle Game connection',exact:true}).click();
+  await expect(page.getByRole('region', {name:'Previous live session',exact:true})).toBeVisible();
+}
+
+test('unavailable snapshots retain reachable cleanup and an honest retirement receipt', async ({page}) => {
+  await retainedLiveFixture(page);
+  const recovery = page.getByRole('region', {name:'Previous live session',exact:true});
+  await page.getByRole('checkbox', {name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();
+  const connect = page.getByRole('button', {name:'Connect current Halo 1 session',exact:true});
+  await expect(connect).toBeEnabled();
+  await page.evaluate(() => {(window as any).__cleanup.defer = true;});
+  await recovery.getByRole('button', {name:'Release previous live session',exact:true}).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__cleanup.pending)).toBe(true);
+  await expect(connect).toBeDisabled();
+  await page.evaluate(() => {(window as any).__cleanup.finish();});
+  await expect(page.getByText('Disconnected. Obsolete records retired. No old values were written into the replacement session.', {exact:true})).toBeVisible();
+  await expect(recovery).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__cleanup.calls)).toEqual(['old-synthetic-connection']);
+  await expect(page.getByText('Disconnected. Original vehicle physics restored.', {exact:true})).toHaveCount(0);
+});
+
+test('competing live connections and uncertain cleanup preserve retry and the new identity', async ({page}) => {
+  await retainedLiveFixture(page);
+  const recovery = page.getByRole('region', {name:'Previous live session',exact:true});
+  await page.evaluate(() => {(window as any).__cleanup.token = 'new-synthetic-connection';});
+  await recovery.getByRole('button', {name:'Release previous live session',exact:true}).click();
+  await expect(recovery).toContainText('The live session changed in another Spark window');
+  expect(await page.evaluate(() => (window as any).__cleanup.present)).toBe(true);
+  await page.evaluate(() => {(window as any).__cleanup.fail = true;});
+  await recovery.getByRole('button', {name:'Release previous live session',exact:true}).click();
+  await expect(recovery).toContainText('journals retained for retry');
+  expect(await page.evaluate(() => (window as any).__cleanup.present)).toBe(true);
+  await page.evaluate(() => {(window as any).__cleanup.fail = false;});
+  await recovery.getByRole('button', {name:'Release previous live session',exact:true}).click();
+  await expect(recovery).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__cleanup.calls)).toEqual(['old-synthetic-connection','new-synthetic-connection','new-synthetic-connection']);
+});
+
+test('a late old-session receipt cannot populate new live undo or replay its queued undo', async ({page}) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const w=window as any, original=w.__TAURI_INTERNALS__.invoke;
+    const object={datum:12,tagDatum:7,kind:0,scale:1,tagPath:'synthetic/biped',position:[1,2,3],velocity:[0,0,0],forward:[1,0,0],up:[0,0,1],parentDatum:4294967295,player:true};
+    const state=w.__lateLive={connected:false,token:'original-connection',object,pending:false,calls:[] as string[],finish:null as null|(()=>void)};
+    const status=()=>structuredClone({pid:3,sessionToken:state.token,activeVehiclePhysics:false,activeSharedScales:false,scaleKeeperError:null,snapshot:{profile:'synthetic',identity:{scenario:'same/map',checksum:123,tagCount:1,scenarioDatum:7},objects:[object]},detail:'Synthetic late receipt contract'});
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='live_mcc_connect'){state.connected=true;return status();}
+      if(command==='live_mcc_sample'){if(!state.connected)throw Error('No synthetic session');return status();}
+      if(command==='live_mcc_move_object'){
+        state.calls.push(args.expectedSession);const acknowledged=[...args.operation.position];object.position=acknowledged;state.pending=true;
+        await new Promise<void>(resolve=>{state.finish=resolve;});state.pending=false;
+        return [{datum:12,applied:true,observedPosition:acknowledged,message:'Old synthetic operation acknowledged'}];
+      }
+      return original(command,args);
+    };
+  });
+  await chooseTool(page,'Level editor');await page.getByRole('button',{name:'Connect to a running Halo game',exact:true}).click();
+  await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');await page.getByRole('button',{name:'Toggle Game connection',exact:true}).click();
+  await page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();await page.getByRole('button',{name:'Connect current Halo 1 session',exact:true}).click();
+  await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');
+  const x=page.getByRole('spinbutton',{name:'Live position X',exact:true});await x.fill('4');await x.press('Tab');
+  await page.getByRole('button',{name:'Apply live object position',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__lateLive.pending)).toBe(true);await page.keyboard.press('Control+z');
+  await page.evaluate(()=>{const s=(window as any).__lateLive;s.token='replacement-connection';s.object.position=[100,2,3];s.finish();});
+  await expect(page.getByText('Live connection changed after the edit. Its history was not carried into the new session.',{exact:false})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Undo live edit (Ctrl+Z)',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Redo live edit (Ctrl+Y)',exact:true})).toBeDisabled();
+  expect(await page.evaluate(()=>(window as any).__lateLive.calls)).toEqual(['original-connection']);
+  expect(await page.evaluate(()=>(window as any).__lateLive.object.position)).toEqual([100,2,3]);
 });

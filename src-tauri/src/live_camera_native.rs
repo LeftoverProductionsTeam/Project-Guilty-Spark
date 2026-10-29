@@ -79,7 +79,7 @@ fn restore_data(s: &Session, data: &mut NativeCameraData) -> Result<()> {
         data.state = camera::State::default();
         return Ok(());
     }
-    let p = guarded(s, true)?;
+    let p = guarded_restore(s)?;
     let _paused = PausedThreads::acquire(s.pid)?;
     camera::apply(&p, s.base, &s.identity, &mut data.state, None)?;
     data.error = None;
@@ -96,6 +96,7 @@ pub(super) fn restore_locked(s: &Session) -> Result<()> {
 }
 pub fn camera_shortcut(s: &Session, shortcut: camera::Shortcut) -> Result<NativeCameraStatus> {
     shortcut.function_key()?;
+    if shortcut.enabled { editing_allowed(s)?; }
     let _edit = EditLock::acquire(s)?;
     let mut data = s
         .camera
@@ -203,6 +204,7 @@ pub(super) fn start(s: &Session) {
     let sprint = Arc::downgrade(&s.sprint);
     let scales = Arc::downgrade(&s.scales);
     let closed = s.closed.clone();
+    let connection_id = s.connection_id.clone();
     let (pid, base, created, root, identity) =
         (s.pid, s.base, s.created, s.root.clone(), s.identity.clone());
     std::thread::spawn(move || {
@@ -219,6 +221,7 @@ pub(super) fn start(s: &Session) {
             };
             let session = Session {
                 closed: closed.clone(),
+                connection_id: connection_id.clone(),
                 pid,
                 base,
                 created,

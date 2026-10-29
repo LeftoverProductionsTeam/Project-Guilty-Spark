@@ -26,7 +26,9 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 
 ## C35 living workbench
 
-The latest [Director audio pass](docs/C35_DIRECTOR_AUDIO.md) adds an optional saved map sound mix to Editor Render takes. Enable **Recording output → Include saved map audio** after saving Ambient or Map start emitters in Map sounds. Actual native recordings verify an encoded real map sample and camera-distance silence; game audio/capture remains a separate acceptance gate.
+The latest [live-session recovery pass](docs/C35_LIVE_SESSION_RECOVERY.md) keeps cleanup available after the game snapshot fails, distinguishes restoration from obsolete-record retirement and protects live object edits from stale connections. Pending cleanup pauses new edits; reconnecting resets old bindings and undo. Windows lifecycle, desktop API and browser tests pass; full MCC transition/recovery acceptance remains open.
+
+The [Director audio pass](docs/C35_DIRECTOR_AUDIO.md) adds an optional saved map sound mix to Editor Render takes. Enable **Recording output → Include saved map audio** after saving Ambient or Map start emitters in Map sounds. Actual native recordings verify an encoded real map sample and camera-distance silence; game audio/capture remains a separate acceptance gate.
 
 The earlier [Director recording pass](docs/C35_DIRECTOR_RECORDING.md) adds remembered folders and named takes, fixes preference loss across native windows, cleans empty cancelled reservations and keeps exported frame dimensions stable when the interface changes. Recording and game/OS capture acceptance remain separately documented.
 

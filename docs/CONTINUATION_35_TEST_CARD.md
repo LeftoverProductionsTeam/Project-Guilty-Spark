@@ -1,5 +1,7 @@
 # C35 owner acceptance: game capture and longer takes
 
+The [r6 live-session recovery pass](C35_LIVE_SESSION_RECOVERY.md) also needs a controlled MCC check: connect in official mods mode, make a small reversible control/size change, park and exit vehicles, then disconnect and verify original values. Reconnect, change the loaded map or exit Halo, and verify **Release previous live session** reports obsolete-record retirement without claiming restoration into a new map. Check that an older Spark window cannot release/edit the new connection. Keep full game transitions and failed-restoration retry separate from the completed Windows child/API/browser tests.
+
 The [r5 Director audio report](C35_DIRECTOR_AUDIO.md) covers the automated native saved-map sound export and the [r4 Director report](C35_DIRECTOR_RECORDING.md) covers the named-take workflow. OS Save and display/window pickers, actual game audio/capture, longer takes and physical 4K remain owner acceptance steps.
 
 The latest [conversion repair pass](C35_CONVERSION_RESOURCE_REPAIR.md) also needs an Alpine retail MCC check: use matching classic bitmap tags, explicitly select MCC multiplayer UI dependencies, convert and open the validated result, then install it with the exact Excession metadata. Load it in anti-cheat-disabled MCC and check spawning, modes, HUD, collision, materials and sound. The native compiler/editor receipt does not certify those gameplay results.
