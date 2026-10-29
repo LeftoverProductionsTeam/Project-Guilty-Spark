@@ -1,3 +1,4 @@
+import {chooseTool} from './helpers/navigation';
 import { test, expect } from '@playwright/test';
 test('runtime dock keeps all nine tools visible without a horizontal scrollbar',async({page})=>{
   for(const size of [{width:1500,height:950},{width:1280,height:768},{width:1024,height:640}]){
@@ -66,7 +67,7 @@ test('sidebar keeps every workspace visible in tall and short windows', async ({
   for (const size of [{width:1280,height:944},{width:1280,height:768},{width:1024,height:640}]) {
     await page.setViewportSize(size);await page.goto('/');
     const sidebar=page.locator('.sidebar');
-    await expect(sidebar.getByRole('navigation',{name:'Workspaces'})).toBeVisible();
+    if(!await sidebar.isVisible())await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await expect(sidebar.getByRole('navigation',{name:'Workspaces'})).toBeVisible();
     const overflow=await sidebar.evaluate(element=>{
       const box=element.getBoundingClientRect();
       return {extra:element.scrollHeight-element.clientHeight,clipped:[...element.querySelectorAll('.nav-item')].filter(item=>{const r=item.getBoundingClientRect();return r.top<box.top-1||r.bottom>box.bottom+1;}).map(item=>item.textContent)};
@@ -78,6 +79,7 @@ test('sidebar keeps every workspace visible in tall and short windows', async ({
 });
 test('workspace search keeps focus bounded and navigates with the keyboard', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();
   const launcher=page.getByRole('button',{name:/Find tools/});
   await launcher.click();
   const search=page.getByRole('textbox',{name:'Search workspaces'});
@@ -87,23 +89,25 @@ test('workspace search keeps focus bounded and navigates with the keyboard', asy
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByText('No workspace matches.',{exact:false})).toBeVisible();
   await search.fill('QuickForge');await search.press('Enter');
+  await page.getByRole('button',{name:'Create a new Halo level',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Make a place to play.'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Create editable map',exact:true})).toBeDisabled();
-  await launcher.click();await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();await launcher.click();await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(launcher).toBeFocused();
 });
 test('browser preview states native boundaries and navigates workspaces', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();
   await expect(page.getByText('Browser preview', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make a Halo world. Know what the engine needs.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Map library', exact: true }).click();
+  await chooseTool(page,"Map library");
   await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Tag editor', exact: true }).click();
+  await chooseTool(page,"Tag editor");
   await expect(page.getByRole('heading', { name: 'Choose a world to work on' })).toBeVisible();
-  await page.getByRole('button', { name: 'Settings & tools', exact: true }).click();
+  await chooseTool(page,"Settings & tools");
   await expect(page.getByText('Live editing · AI replication · VR')).toBeVisible();
-  await page.getByRole('button', { name: 'Map library', exact: false }).first().click();
+  await chooseTool(page,'Map library');
   await page.getByRole('button', { name: 'Import map or archive', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('desktop application');
 });
@@ -111,15 +115,17 @@ test('preservation and runtime workspaces disclose unavailable evidence without 
   page,
 }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Compare variants', exact: true }).click();
+  await chooseTool(page,"Compare variants");
   await expect(page.getByRole('heading', { name: 'Import two map variants' })).toBeVisible();
-  await page.getByRole('button', { name: 'Play & servers', exact: true }).click();
+  await chooseTool(page,"Play & servers");
   await expect(
     page.getByText('Runtime discovery and file hashing require the desktop application.'),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Refresh reports', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Level editor', exact: true }).click();
+  await chooseTool(page,"Level editor");
+  await page.getByRole('button',{name:'Connect to a running Halo game',exact:true}).click();
   await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');
+  await page.getByRole('button',{name:'Toggle Game connection',exact:true}).click();
   await expect(
     page.getByRole('heading', { name: 'Live Halo 1 objects · MCC' }),
   ).toBeVisible();
@@ -128,11 +134,12 @@ test('preservation and runtime workspaces disclose unavailable evidence without 
   await page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();
   await expect(connect).toBeDisabled();
   await expect(page.getByRole('button', { name: /Spawn|Dispatch/ })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Build & playtest', exact: true }).click();
+  await chooseTool(page,"Build & playtest");
   await expect(page.getByRole('heading', { name: 'Choose a world to work on' })).toBeVisible();
 });
 test('help modal traps focus and restores it after Escape', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();
   const help = page.getByRole('button', { name: 'Help & shortcuts' });
   await help.click();
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -146,7 +153,7 @@ test('help modal traps focus and restores it after Escape', async ({ page }) => 
 
 test('Dark Glow saves custom colors and keeps text white on dark surfaces',async({page})=>{
   await page.goto('/');
-  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();
+  await chooseTool(page,"Settings & tools");
   await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
   await page.locator('.interface-theme-dark-glow').click();
   await expect(page.locator('html')).toHaveAttribute('data-gs-theme','dark-glow');
@@ -166,7 +173,7 @@ test('Dark Glow saves custom colors and keeps text white on dark surfaces',async
   await expect(page.locator('.analysis-card').first()).toHaveCSS('background-color','rgb(16, 23, 37)');
   await choose('Primary glow color','#ff5d9c');await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-gs-theme','dark-glow');
-  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();
+  await chooseTool(page,"Settings & tools");
   await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
   await expect(page.getByLabel('Primary glow color',{exact:true})).toHaveValue('#ff5d9c');
   await expect(page.getByLabel('Secondary glow color',{exact:true})).toHaveValue('#83ffcd');

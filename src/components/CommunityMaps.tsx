@@ -7,6 +7,8 @@ import { HelpTip, Notice, PageTitle, Pill } from './ui';
 import MapDownload from './MapDownload';
 import type {MapDownloadAction} from './MapDownload';
 import type {OpenProject} from '../types';
+import MapCatalog from './MapCatalog';
+import type {CatalogMap} from '../mapCatalog';
 
 const FILTERS: {value: CommunityMapFilter; label: string}[] = [
   {value: 'all', label: 'All archives'}, {value: 'halo-ce', label: 'Custom Edition'},
@@ -22,16 +24,18 @@ export default function CommunityMaps({onImport, onImportConvert, currentMapTitl
   const [audience, setAudience] = useState<CommunityMapFilter>('all');
   const [filename, setFilename] = useState('');
   const [copyState, setCopyState] = useState<string>('');
+  const [selectedMap,setSelectedMap]=useState<CatalogMap|null>(null),[downloading,setDownloading]=useState(false);
   const matching = useMemo(() => filterCommunityMapSources(query, audience), [query, audience]);
   const extensionAdvice = filename.trim() ? describeCommunityDownload(filename) : null;
   return <div className="analysis-page gs-map-discovery">
     <PageTitle eyebrow="HALO MODDING ARCHIVES / CREATE • PRESERVE • SHARE"
       title="Discover community maps. Preserve your favorites."
-      description="Download a Custom Edition map from an archive, then import and convert it to MCC Halo 1 inside Spark. Conversion checks explain missing resources and unsupported features."
+      description="Browse original releases, open their maps in Spark, and check conversion to your Halo runtime. Each map keeps its own resources and compatibility report."
       actions={<><button className="small-button" onClick={onLibrary}><FolderOpen size={16}/> Your map library</button>
         <button className="primary" onClick={onImportConvert} disabled={!native || busy}><ArrowDownToLine size={16}/>{busy?'Importing…':'Import & convert to MCC'}</button></>}/>
-    <MapDownload onDownloaded={onDownloaded} busy={busy} targetLabel={targetLabel}/>
-    <Notice tone="info">The archives below are a researched directory. Their catalog links open in your browser; paste a direct map/package URL above to download and import inside Spark. No installs, executable launches or replacement of game maps.</Notice>
+    <MapCatalog busy={busy||downloading} onChoose={map=>{setSelectedMap(map);requestAnimationFrame(()=>document.querySelector('.gs-direct-map-download')?.scrollIntoView({block:'start',behavior:'smooth'}));}}/>
+    <MapDownload onDownloaded={onDownloaded} busy={busy} targetLabel={targetLabel} selection={selectedMap?.directDownload?{url:selectedMap.directDownload,label:selectedMap.title}:null} onActiveChange={setDownloading}/>
+    <Notice tone="info">Direct releases can download into Spark. Publisher pages and Workshop releases open in your browser. Downloaded originals stay separate from installed game maps.</Notice>
     <div className="gs-download-steps" aria-label="Download and import steps">
       <div><b>01</b><strong>Find a map</strong><p>Open an archive below. Confirm its author, edition, required resources and permission.</p></div>
       <div><b>02</b><strong>Download into Spark</strong><p>Paste the direct author/package link above, or import a package you already downloaded.</p></div>

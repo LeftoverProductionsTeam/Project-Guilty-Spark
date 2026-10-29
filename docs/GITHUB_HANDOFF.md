@@ -1,4 +1,21 @@
-# C34 Git push handoff
+# C35 Git push handoff
+
+Title: **C35: immersive drawers, shared Director and real map catalog**
+
+Make the sidebar and top header remembered drawers, add configurable panels and actual native fullscreen, and retain per-map editing context. Add the detachable/dockable Recording Director, bounded video storage, original Zombie Demo resource recovery and a credited visual catalog with real Alpine import. Report Alpine's missing classic bitmap dependencies precisely; retain recording/game acceptance and the wider engine backlog as explicit gates.
+
+Use the [full C35 description](CONTINUATION_35_GITHUB_DESCRIPTION.md), [engineering evidence](CONTINUATION_35_ENGINEERING.md) and [owner acceptance card](CONTINUATION_35_TEST_CARD.md). This branch continues master `617d267`; no C35 merge, remote push or public release is included. Previous C32–C34 descriptions below remain historical.
+
+```powershell
+git status --short
+git log -3 --oneline --decorate
+git show --stat --oneline HEAD
+git push -u origin codex/continuation-35-living-workbench
+```
+
+After pushing, check hosted Windows CI. Keep owned maps/tags, private QA data, `latestspark.zip` and local release binaries out of Git. The source ZIP and Windows development artifacts are provided separately under `releases/`.
+
+# C34 Git push handoff (historical)
 
 Title: **C34: runtime tools, map refresh and dependency guidance**
 

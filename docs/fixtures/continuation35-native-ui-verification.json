@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "nativeDesktop": true,
+  "appSha256": "299adb982dfc8122db0a2814c08ce29354e788ebe00445408390ac2cb3baa802",
+  "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+  "resourceSha256": "5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea",
+  "materialCounts": {
+    "sourceShaders": "132",
+    "sourceLightmaps": "15",
+    "sourceDetails": "59",
+    "skyTriangles": "308",
+    "materialLoading": "false",
+    "pendingMaterials": "0"
+  },
+  "sizes": [
+    {
+      "requestedLogical": {
+        "width": 1280,
+        "height": 720
+      },
+      "actual": {
+        "width": 1280,
+        "height": 720,
+        "dpi": 1
+      },
+      "viewport": {
+        "x": 7,
+        "y": 180,
+        "width": 1266,
+        "height": 427.5
+      }
+    },
+    {
+      "requestedLogical": {
+        "width": 1366,
+        "height": 768
+      },
+      "actual": {
+        "width": 1366,
+        "height": 768,
+        "dpi": 1
+      },
+      "viewport": {
+        "x": 7,
+        "y": 180,
+        "width": 1352,
+        "height": 475.5
+      }
+    },
+    {
+      "requestedLogical": {
+        "width": 1920,
+        "height": 1080
+      },
+      "actual": {
+        "width": 1920,
+        "height": 1080,
+        "dpi": 1
+      },
+      "viewport": {
+        "x": 7,
+        "y": 180,
+        "width": 1906,
+        "height": 781
+      }
+    },
+    {
+      "requestedLogical": {
+        "width": 2560,
+        "height": 1440
+      },
+      "actual": {
+        "width": 2560,
+        "height": 1440,
+        "dpi": 1
+      },
+      "viewport": {
+        "x": 7,
+        "y": 180,
+        "width": 2546,
+        "height": 1141
+      }
+    },
+    {
+      "requestedLogical": {
+        "width": 3840,
+        "height": 2160
+      },
+      "actual": {
+        "width": 3840,
+        "height": 2160,
+        "dpi": 1
+      },
+      "viewport": {
+        "x": 7,
+        "y": 180,
+        "width": 3826,
+        "height": 1861
+      }
+    }
+  ],
+  "headerDrawer": {
+    "overlays": true,
+    "closedViewport": {
+      "x": 7,
+      "y": 180,
+      "width": 1486,
+      "height": 651
+    },
+    "openViewport": {
+      "x": 7,
+      "y": 180,
+      "width": 1486,
+      "height": 651
+    }
+  },
+  "normalViewport": {
+    "x": 7,
+    "y": 180,
+    "width": 1266,
+    "height": 427.5
+  },
+  "fullscreenViewport": {
+    "x": 0,
+    "y": 5,
+    "width": 2560,
+    "height": 1070
+  },
+  "fullscreenClient": {
+    "width": 2560,
+    "height": 1080
+  },
+  "displays": [
+    {
+      "index": 0,
+      "name": "\\\\.\\DISPLAY1",
+      "width": 2560,
+      "height": 1080,
+      "scale": 1
+    },
+    {
+      "index": 1,
+      "name": "\\\\.\\DISPLAY2",
+      "width": 1920,
+      "height": 1080,
+      "scale": 1
+    },
+    {
+      "index": 2,
+      "name": "\\\\.\\DISPLAY5",
+      "width": 1920,
+      "height": 1080,
+      "scale": 1
+    }
+  ],
+  "movedDisplays": [
+    {
+      "index": 1,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1,
+      "actual": {
+        "width": 1920,
+        "height": 1080,
+        "dpi": 1
+      }
+    },
+    {
+      "index": 2,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1,
+      "actual": {
+        "width": 1920,
+        "height": 1080,
+        "dpi": 1
+      }
+    }
+  ],
+  "editorPerformance": {
+    "fps": 99.99999999999997,
+    "frameMs": 10.000000000000002,
+    "drawCalls": 922,
+    "triangles": 293956,
+    "geometries": 295,
+    "textures": 173,
+    "sampledAt": 1793252362473
+  },
+  "directorPerformance": {
+    "fps": 62.86982247689202,
+    "frameMs": 15.905882355044866,
+    "drawCalls": 923,
+    "triangles": 297135,
+    "geometries": 296,
+    "textures": 173,
+    "sampledAt": 1793252371091
+  },
+  "editorCapture": {
+    "scope": "Native editor canvas encoder/decoder; not the application Save picker or game capture",
+    "mime": "video/webm;codecs=vp8",
+    "bytes": 185643,
+    "width": 1920,
+    "height": 1080,
+    "requestedFps": 24,
+    "elapsedSeconds": 2.359699999988079,
+    "audioTracks": 0,
+    "firstDecodedLumaDeviation": 0,
+    "decodedLumaDeviation": 35.472459561781925,
+    "decoded": true,
+    "sha256": "433998ad8ce98ccba0d093f160ed5a9d892ca2a523485ebbf6b1e28c9af7ea67",
+    "savedByQaHarness": true,
+    "applicationSavePickerTested": false
+  },
+  "downloadEvidence": {
+    "source": "https://github.com/csauve/alpine/releases/download/1.0.0/alpine.zip",
+    "projectId": "31001e35-ce00-4c87-96fd-8b50ee6d172f",
+    "sourceSha256": "eb9b3693e74e674182d732f340127ef84d3574083821a8d3d95b234d9cb1c39e",
+    "cacheVersion": 609,
+    "tags": 2676,
+    "sourceShaders": 28,
+    "mccBuildVerified": false,
+    "gameplayVerified": false
+  },
+  "drawerPreservesViewport": true,
+  "escapeRestoresPanels": true,
+  "toolsOpenInsideFullscreen": true,
+  "singleCameraAuthority": true,
+  "savedMapChangesRefreshDirector": true,
+  "staleCameraRejected": true,
+  "wrongDirectorRejected": true,
+  "compositionSurvivesReopen": true,
+  "directorRendersWhenOtherEditorFocused": true,
+  "originalMapAndResourcesUnchanged": true,
+  "authoredSceneAndTagsUnchanged": true,
+  "gameConnected": false,
+  "gameplayCaptureTested": false,
+  "nativeSavePickerTested": false,
+  "errors": []
+}

@@ -1,4 +1,5 @@
 import BuildTargets from './BuildTargets';
+import{WorkspacePanel}from'./WorkspacePanels';
 import RenderFeatures from './RenderFeatures';
 import LiveForge from './LiveForge';
 import MapSounds from './MapSounds';
@@ -804,7 +805,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         </button>
       </div>
       <div className="forge-main">
-        <aside className="forge-hierarchy">
+        <WorkspacePanel id="forge-palette" label="Build tools"><aside className="forge-hierarchy">
           <div className="forge-panel-heading">
             <strong>Scene hierarchy</strong>
             <Pill>{nodes.length}</Pill>
@@ -908,7 +909,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
               Delete
             </button>
           </div>
-        </aside>
+        </aside></WorkspacePanel>
         <section className="forge-center">
           <ForgeCollaboration projectId={project.id} document={doc} entries={data.entries} onShared={props.onSharedDocument} onSave={props.onSave}/>
           {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
@@ -1106,7 +1107,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             </div>
           </div>
         </section>
-        <aside className="forge-inspector">
+        <WorkspacePanel id="forge-inspector" label="Inspector"><aside className="forge-inspector">
           <div className="forge-panel-tabs">
             <button className={tab === 'palette' ? 'selected' : ''} onClick={() => setTab('palette')}>
               Palette
@@ -1354,7 +1355,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
               />
             )}
           </div>
-        </aside>
+        </aside></WorkspacePanel>
       </div>
       <section className={`forge-build-panel ${expandedBuild ? 'expanded' : ''}`}>
         <div className="forge-build-heading">

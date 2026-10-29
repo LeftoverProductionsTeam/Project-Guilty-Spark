@@ -4,8 +4,10 @@ use spark_core::{
     library::Library,
 };
 use std::{
+    fs::OpenOptions,
+    io::Write,
     path::Path,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{atomic::AtomicBool, Arc,Mutex},
 };
 fn main() -> spark_core::Result<()> {
     let a: Vec<_> = std::env::args().collect();
@@ -15,6 +17,7 @@ fn main() -> spark_core::Result<()> {
     }
     std::fs::create_dir_all(&a[1])?;
     let root = std::fs::canonicalize(&a[1])?;
+    let events=Mutex::new(OpenOptions::new().write(true).create_new(true).open(root.join("qa-events.jsonl"))?);
     let lib = Library::open(&root)?;
     let resources = a.get(6).filter(|s| s.as_str() != "-").map(|p| Path::new(p));
     let (mut p, i) = lib.import_map(Path::new(&a[2]), resources)?;
@@ -37,6 +40,7 @@ fn main() -> spark_core::Result<()> {
         &id,
         Arc::new(AtomicBool::new(false)),
         |e| {
+            if let Ok(mut file)=events.lock(){if let Err(reason)=writeln!(file,"{}",serde_json::to_string(&e).unwrap_or_default()){eprintln!("Failed to retain native QA diagnostics: {reason}");}}
             if e.severity == "error" || e.phase == "validated" {
                 eprintln!("{}: {}", e.phase, e.message);
             }

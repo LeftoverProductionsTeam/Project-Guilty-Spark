@@ -1,3 +1,4 @@
+import {chooseTool} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
 import { test, expect, type Page } from '@playwright/test';
 
@@ -174,6 +175,9 @@ async function mockDesktop(page: Page) {
           return sequence;
         }
         if (command === 'plugin:event|unlisten') return null;
+        if(command==='plugin:window|is_fullscreen')return !!mock.fullscreen;
+        if(command==='plugin:window|set_fullscreen'){mock.fullscreen=args.value;return null;}
+        if(command==='plugin:window|is_maximized')return false;
         if (command === 'bootstrap') return structuredClone(bootstrap);
         if (command === 'open_project') {if(mock.delayOpen){const delay=mock.delayOpen;mock.delayOpen=0;await new Promise(resolve=>setTimeout(resolve,delay));}return structuredClone(projects[args.id]);}
         if (command === 'claim_project_document' || command === 'release_project_document') return null;
@@ -308,9 +312,68 @@ async function openFixture(page: Page) {
     .locator('.map-card')
     .filter({ has: page.getByRole('heading', { name: 'Synthetic baseline', exact: true }) })
     .click();
-  await page.getByRole('button', { name: 'Tag editor', exact: true }).click();
+  await chooseTool(page,"Tag editor");
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
+
+test('C35 drawers return viewport space, remember each workspace and support focus mode',async({page})=>{
+ await page.setViewportSize({width:1280,height:720});await mockDesktop(page);
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ const viewport=page.getByTestId('viewport');await expect(viewport).toBeVisible();
+ await expect(page.locator('.gs-navigation-drawer')).toBeHidden();const original=await viewport.boundingBox();
+ await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();
+ const overlaid=await viewport.boundingBox();expect(overlaid!.width).toBeCloseTo(original!.width,0);
+ await page.getByLabel('Inspector position').selectOption('float');await page.getByLabel('Inspector size').fill('430');
+ await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,"Tag editor");await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,"Level editor");await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.getByLabel('Inspector position')).toHaveValue('float');
+ await page.getByRole('button',{name:'Focus mode',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();const focused=await viewport.boundingBox();expect(focused!.height).toBeGreaterThan(original!.height+85);expect(focused!.width).toBeGreaterThan(1200);
+ await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Close Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();
+});
+
+test('C35 empty Level editor asks for an editing context without assuming an installed MCC map',async({page})=>{
+ await mockDesktop(page);await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,"Level editor");
+ await expect(page.getByRole('heading',{name:'What would you like to work on?',exact:true})).toBeVisible();
+ for(const label of['Open a Halo map','Create a new Halo level','Connect to a running Halo game'])await expect(page.getByRole('button',{name:label,exact:true})).toBeVisible();
+});
+
+test('C35 the window header is a drawer that overlays without consuming editor height',async({page})=>{
+ await page.setViewportSize({width:1280,height:720});await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ const viewport=page.getByTestId('viewport'),header=page.locator('#gs-window-header');await expect(viewport).toBeVisible();await expect(header).toBeHidden();const closed=await viewport.boundingBox();expect(closed!.y).toBeLessThan(200);
+ await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();await expect(header).toBeVisible();await expect(header.getByRole('button',{name:'Close window',exact:true})).toBeVisible();await expect(header.getByRole('button',{name:/Find tools/})).toBeVisible();const opened=await viewport.boundingBox();expect(opened!.height).toBeCloseTo(closed!.height,0);
+ await page.keyboard.press('Escape');await expect(header).toBeHidden();await page.keyboard.press('Control+Shift+Backslash');await expect(header).toBeVisible();await page.getByRole('button',{name:'Close window header',exact:true}).click();await expect(header).toBeHidden();await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toBeVisible();
+});
+
+test('C35 F11 uses native fullscreen and Escape closes navigation before restoring editing',async({page})=>{
+ await page.setViewportSize({width:1280,height:720});await mockDesktop(page);
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ const viewport=page.getByTestId('viewport');await expect(viewport).toBeVisible();const original=await viewport.boundingBox();
+ await page.keyboard.press('F11');await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
+ const full=await viewport.boundingBox();expect(full!.width).toBeGreaterThan(1240);expect(full!.height).toBeGreaterThan(690);expect(full!.height).toBeGreaterThan(original!.height);
+ await page.mouse.move(100,2);await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
+ await page.keyboard.press('Control+Backslash');await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
+ await page.keyboard.press('Escape');await expect(page.locator('.gs-navigation-drawer')).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
+ await page.keyboard.press('Escape');await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','false');
+ await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toBeVisible();
+ const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='plugin:window|set_fullscreen').map((c:any)=>c.args.value));expect(calls).toEqual([true,false]);
+});
+
+test('C35 viewport navigation uses Q/E and RMB wheel speed without stealing text input',async({page})=>{
+ await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ const canvas=page.getByTestId('viewport').locator('canvas');await expect.poll(()=>canvas.getAttribute('data-gs-camera')).toBeTruthy();
+ const box=await canvas.boundingBox();await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);await page.mouse.down({button:'right'});
+ await expect(canvas).toHaveAttribute('data-gs-fly-active','true');const before=JSON.parse((await canvas.getAttribute('data-gs-camera'))!);
+ await page.keyboard.down('e');await page.waitForTimeout(250);await page.keyboard.up('e');await page.waitForTimeout(300);const after=JSON.parse((await canvas.getAttribute('data-gs-camera'))!);expect(after.position[2]).toBeGreaterThan(before.position[2]+.5);
+ await page.mouse.wheel(0,-120);await expect(canvas.locator('..')).toHaveAttribute('data-nav-speed',/Camera speed/);await page.mouse.up({button:'right'});
+ await page.getByRole('button',{name:'Toggle Camera',exact:true}).click();const speed=page.getByRole('spinbutton',{name:'Camera movement speed',exact:true});
+ expect(Number(await speed.inputValue())).toBeGreaterThan(12);await speed.focus();const resting=JSON.parse((await canvas.getAttribute('data-gs-camera'))!);await page.keyboard.press('e');await page.waitForTimeout(350);const typed=JSON.parse((await canvas.getAttribute('data-gs-camera'))!);expect(typed.position).toEqual(resting.position);expect(typed.quaternion).toEqual(resting.quaternion);
+});
+
+test('C35 drawers fit emulated DPI layouts while preserving the map workspace',async({page})=>{
+ await mockDesktop(page);await openFixture(page);const session=await page.context().newCDPSession(page);
+ for(const scale of[1,1.25,1.5,2]){await session.send('Emulation.setDeviceMetricsOverride',{width:1280,height:720,deviceScaleFactor:scale,mobile:false});expect(await page.evaluate(()=>devicePixelRatio)).toBe(scale);const drawer=page.locator('.gs-navigation-drawer');if(!await drawer.isVisible())await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();expect(await drawer.evaluate(e=>e.scrollWidth-e.clientWidth)).toBe(0);await page.keyboard.press('Escape');await expect(page.getByRole('heading',{name:'test',exact:true})).toBeVisible();}
+ await session.send('Emulation.clearDeviceMetricsOverride');
+});
 
 test('dependency setup offers a reviewed official install action without launching on inspection or cancel',async({page})=>{
   await mockDesktop(page);await openFixture(page);
@@ -321,7 +384,7 @@ test('dependency setup offers a reviewed official install action without launchi
     if(command==='run_dependency_action'){w.__sparkMock.installedDependency=true;return {outcome:'handoffUnobserved',detail:'Synthetic Steam UI handoff; no installer ran'};}
     return original(command,args);
   };});
-  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();await page.getByRole('tab',{name:'Dependencies & setup',exact:true}).click();
+  await chooseTool(page,"Settings & tools");await page.getByRole('tab',{name:'Dependencies & setup',exact:true}).click();
   await expect(page.getByText('Setup needed',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Install Halo CE Mod Tools in Steam',exact:true}).click();
   await expect(page.getByRole('button',{name:'Open Steam install UI',exact:true})).toBeDisabled();
@@ -339,7 +402,7 @@ test('an MCC invitation check explains the missing foreign protocol bridge and n
     if(command==='invitation_prepare')return {id:null,expiresAtUnix:0,executable:null,executableSha256:null,dataRoot:null,route:{client:args.client,kind:'nativeCommunity',canHandoff:false,translationStatus:'mccProtocolBridgeMissing',detail:'The selected MCC client does not implement this protocol.',requirements:[],gameplayVerified:false}};
     return original(command,args);
   };});
-  await page.getByRole('button',{name:'Play & servers',exact:true}).click();await page.locator('input[aria-label="Game invitation"]').fill('halo://join/'+'a'.repeat(64));
+  await chooseTool(page,"Play & servers");await page.locator('input[aria-label="Game invitation"]').fill('halo://join/'+'a'.repeat(64));
   await page.getByRole('button',{name:'Check invitation & adapter',exact:true}).click();
   await expect(page.getByText(/MCC-to-OpenCE\/Chupathingy\/WebRTC gameplay translation is not implemented/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Hand invitation to client',exact:true})).toHaveCount(0);
@@ -353,10 +416,10 @@ async function prepareExternalRevision(page:Page){await page.evaluate(()=>{
     if(command==='external_map_change_import'){m.changedExternal=false;return {previousProjectId:'a',watchedPath:'C:/synthetic/external.map',opened:structuredClone(m.projects.d),deduplicated:false};}
     return original(command,args);
   };
-});}
+});await page.getByRole('button',{name:'Toggle Changes',exact:true}).click();}
 test('external saves refresh a clean map and retain its tag view without changing another open map',async({page})=>{
   await mockDesktop(page);await openFixture(page);await prepareExternalRevision(page);
-  await expect(page.getByLabel('External map changes')).toContainText('watching 1 map');
+  await expect(page.getByLabel('External map changes')).toContainText('1 map monitored');
   await page.evaluate(()=>{(window as any).__sparkMock.changedExternal=true;});await page.getByRole('button',{name:'Scan now',exact:true}).click();
   await expect(page.getByRole('tab',{name:/Synthetic external revision/})).toBeVisible();
   await expect(page.getByRole('tab',{name:/Synthetic baseline/})).toHaveCount(0);
@@ -365,12 +428,12 @@ test('external saves refresh a clean map and retain its tag view without changin
 test('external saves preserve a Spark tag draft and open the changed map separately',async({page})=>{
   await mockDesktop(page);await openFixture(page);await prepareExternalRevision(page);
   await page.getByRole('spinbutton').first().fill('20');await page.getByRole('spinbutton').first().blur();
-  await expect(page.getByLabel('External map changes')).toContainText('watching 1 map');
+  await expect(page.getByLabel('External map changes')).toContainText('1 map monitored');
   await page.evaluate(()=>{(window as any).__sparkMock.changedExternal=true;});await page.getByRole('button',{name:'Scan now',exact:true}).click();
   await expect(page.getByRole('button',{name:'Open changed map and keep Spark edits',exact:true})).toBeVisible();
   await expect(page.getByRole('tab',{name:/Synthetic external revision/})).toHaveCount(0);
   await page.getByRole('button',{name:'Open changed map and keep Spark edits',exact:true}).click();await expect(page.getByRole('tab',{name:/Synthetic external revision/})).toBeVisible();
-  await page.getByRole('tab',{name:/Synthetic baseline/}).click();await page.getByRole('button',{name:'Tag editor',exact:true}).click();await expect(page.getByRole('spinbutton').first()).toHaveValue('20');
+  await page.getByRole('tab',{name:/Synthetic baseline/}).click();await chooseTool(page,"Tag editor");await expect(page.getByRole('spinbutton').first()).toHaveValue('20');
 });
 
 test('in-app downloads open all imported maps and retain an already open edited draft',async({page})=>{
@@ -381,14 +444,14 @@ test('in-app downloads open all imported maps and retain an already open edited 
     if(command==='download_and_import_maps')return [structuredClone(w.__sparkMock.projects.a),structuredClone(w.__sparkMock.projects.b)];
     return original(command,args);
   };});
-  await page.getByRole('button',{name:'Community maps',exact:true}).click();await page.getByLabel('Direct map download URL').fill('https://example.com/arena.zip');await page.getByLabel('Downloaded map action').selectOption('tags');await page.getByRole('button',{name:'Download & import map',exact:true}).click();
+  await chooseTool(page,"Community maps");await page.getByLabel('Direct map download URL').fill('https://example.com/arena.zip');await page.getByLabel('Downloaded map action').selectOption('tags');await page.getByRole('button',{name:'Download & import map',exact:true}).click();
   await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toBeVisible();await expect(page.getByRole('tab',{name:/Synthetic baseline/})).toBeVisible();await expect(page.getByRole('spinbutton').first()).toHaveValue('20');
 });
 
 test('community games appear on first open and an obsolete requirement check cannot lock the browser', async ({page}) => {
   await mockDesktop(page); await openFixture(page);
   await page.evaluate(() => {(window as any).__sparkMock.deferListing = true;});
-  await page.getByRole('button', {name:'Play & servers',exact:true}).click();
+  await chooseTool(page,"Play & servers");
   await expect.poll(() => page.evaluate(() => typeof (window as any).__sparkMock.finishListing)).toBe('function');
   await page.evaluate(() => (window as any).__sparkMock.finishListing());
   const games = page.getByRole('list', {name:'Advertised games'});
@@ -413,7 +476,7 @@ test('a second map window receives a shared listing refresh without another HTTP
     if(command==='community_listing'&&args.refresh){return {listing:null,fetching:true,stale:true,error:null,refreshAfterUnix:Math.floor(Date.now()/1000)+30};}
     return original(command,args);
   };});
-  await page.getByRole('button',{name:'Play & servers',exact:true}).click();await expect(page.getByRole('list',{name:'Advertised games'}).getByRole('listitem')).toHaveCount(2);
+  await chooseTool(page,"Play & servers");await expect(page.getByRole('list',{name:'Advertised games'}).getByRole('listitem')).toHaveCount(2);
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((item:any)=>item.command==='community_listing'&&item.args.refresh===false))).toBe(true);
 });
 
@@ -421,7 +484,7 @@ test('runtime dock remembers each map target and rejects a late tool preview fro
   await mockDesktop(page); await openFixture(page);
   const dock = page.getByRole('contentinfo', {name:'Runtime & Tools Dock'});
   await dock.getByRole('combobox', {name:'Active map runtime'}).selectOption('openCe');
-  await page.getByRole('button', {name:'Map library',exact:true}).click();
+  await chooseTool(page,"Map library");
   await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();
   await expect(dock.getByRole('combobox',{name:'Active map runtime'})).toHaveValue('mccSteam');
   await page.getByRole('tab',{name:/Synthetic baseline/}).click();
@@ -499,26 +562,27 @@ test('campaign tag duplicates stay map-owned and undoable, and UI maps expose th
 });
 
 test('an open map still leaves every sidebar tool visible in a short window',async({page})=>{
-  await page.setViewportSize({width:1024,height:640});await mockDesktop(page);await openFixture(page);
+  await page.setViewportSize({width:1024,height:640});await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();
   await expect(page.locator('.sidebar').getByRole('button',{name:'Interface Studio',exact:true})).toHaveCount(0);
   expect(await page.locator('.sidebar').evaluate(element=>element.scrollHeight-element.clientHeight)).toBe(0);
   await expect(page.getByRole('button',{name:'Export .gsproject',exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+  await chooseTool(page,"Settings & tools");await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Make the workbench yours.',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();
   await expect(page.locator('.sidebar').getByRole('button',{name:'Settings & tools',exact:true})).toHaveClass(/selected/);
 });
 test('slow onboarding saves keep navigation available and do not steal a later route',async({page})=>{
-  await mockDesktop(page);await page.getByRole('button',{name:'Start here',exact:true}).click();
+  await mockDesktop(page);await chooseTool(page,"Start here");
   await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='save_settings'?new Promise((resolve,reject)=>{w.__finishSetup=()=>original(command,args).then(resolve,reject);}):original(command,args);});
   await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
   await expect(page.getByRole('button',{name:'Saving Halo choice…',exact:true})).toBeDisabled();
-  await page.getByRole('button',{name:'Map library',exact:true}).click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await chooseTool(page,"Map library");await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
   await page.evaluate(()=>(window as any).__finishSetup());
   await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Start here',exact:true}).click();await expect(page.getByRole('heading',{name:'Your editing tools',exact:true})).toBeVisible();
+  await chooseTool(page,"Start here");await expect(page.getByRole('heading',{name:'Your editing tools',exact:true})).toBeVisible();
 });
 test('hosting uses the selected map and gameplay presets retain fixed left and right gun controls',async({page})=>{
-  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Play & servers',exact:true}).click();
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Play & servers");
   await page.getByRole('button',{name:'Hosting & servers',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic MCC Custom Games guide',exact:true})).toBeVisible();
   await expect(page.getByText('Use Halo CE Custom Games for this multiplayer map.',{exact:true})).toBeVisible();
@@ -528,17 +592,17 @@ test('hosting uses the selected map and gameplay presets retain fixed left and r
   await page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true}).selectOption('KeyV');
   await expect(page.getByText('Left gun · independent primary trigger',{exact:true})).toBeVisible();
   await expect(page.getByText('Right gun · independent secondary trigger',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Play & servers',exact:true}).click();
+  await chooseTool(page,"Tag editor");await chooseTool(page,"Play & servers");
   await expect(page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true})).toHaveValue('KeyV');
   await expect(page.getByText('Changing a preset does not enable them in the running game.',{exact:false})).toBeVisible();
 });
 
 test('native camera position edits persist across tools and restore through the adapter',async({page})=>{
-  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Play & servers',exact:true}).click();await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Play & servers");await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
   const camera=page.locator('.native-camera-controls');await camera.locator('summary').click();
   await camera.getByRole('button',{name:'Enable third-person camera',exact:true}).click();await expect(camera.getByText('Third-person camera active',{exact:false})).toBeVisible();
   await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).fill('-0.45');await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).press('Enter');await camera.getByRole('button',{name:'Apply camera position',exact:true}).click();
-  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Play & servers',exact:true}).click();await camera.locator('summary').click();
+  await chooseTool(page,"Tag editor");await chooseTool(page,"Play & servers");await camera.locator('summary').click();
   await expect(camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true})).toHaveValue('-0.45');
   await camera.getByRole('button',{name:'Restore original camera',exact:true}).click();await expect(camera.getByText('Original camera selected',{exact:false})).toBeVisible();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='live_mcc_camera_configure'));expect(calls.map((c:any)=>c.args.enabled)).toEqual([true,true,false]);expect(calls[1].args.config.right).toBe(-.45);
@@ -546,7 +610,7 @@ test('native camera position edits persist across tools and restore through the 
 
 test('the dedicated camera button toggles without opening settings and uses current native state',async({page})=>{
   await mockDesktop(page);await openFixture(page);
-  await page.getByRole('button',{name:'Play & servers',exact:true}).click();
+  await chooseTool(page,"Play & servers");
   await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
   const camera=page.locator('.native-camera-controls'),button=camera.getByRole('button',{name:'Toggle in-game third person',exact:true});
   await expect(camera.locator('details')).not.toHaveAttribute('open','');
@@ -568,9 +632,9 @@ test('the dedicated camera button toggles without opening settings and uses curr
 });
 
 test('custom power-ups retain their tool tab, use map undo and require a rebuild',async({page})=>{
-  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Creator Studio',exact:true}).click();await page.getByRole('tab',{name:'Custom power-ups',exact:true}).click();
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Creator Studio");await page.getByRole('tab',{name:'Custom power-ups',exact:true}).click();
   await page.getByRole('button',{name:'Add custom power-up',exact:true}).click();const duration=page.getByRole('spinbutton',{name:'Power-up duration (seconds)',exact:true});await duration.fill('120');await duration.press('Enter');
-  await page.getByRole('combobox',{name:'Power-up effect',exact:true}).selectOption('overshield');await page.getByRole('button',{name:'Tag editor',exact:true}).click();await page.getByRole('button',{name:'Creator Studio',exact:true}).click();
+  await page.getByRole('combobox',{name:'Power-up effect',exact:true}).selectOption('overshield');await chooseTool(page,"Tag editor");await chooseTool(page,"Creator Studio");
   await expect(page.getByRole('tab',{name:'Custom power-ups',exact:true})).toHaveAttribute('aria-selected','true');await expect(duration).toHaveValue('120');await expect(page.getByRole('combobox',{name:'Power-up effect',exact:true})).toHaveValue('overshield');
   await page.getByRole('button',{name:'Remove power-up',exact:true}).click();await expect(page.getByRole('combobox',{name:'Custom power-up',exact:true})).toHaveCount(0);await page.keyboard.press('Control+z');await expect(page.getByRole('combobox',{name:'Custom power-up',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Build map with power-ups',exact:true}).click();await expect(page.getByRole('heading',{name:'From archive to in-game.',exact:true})).toBeVisible();
@@ -579,7 +643,7 @@ test('custom power-ups retain their tool tab, use map undo and require a rebuild
 test('downloaded maps can open directly in the MCC conversion flow',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>command==='import_dialog'?[await original('open_project',{id:'b'})]:original(command,args);});
-  await page.getByRole('button',{name:'Community maps',exact:true}).click();await page.getByRole('button',{name:'Import & convert to MCC',exact:true}).click();await expect(page.getByRole('heading',{name:'From archive to in-game.',exact:true})).toBeVisible();
+  await chooseTool(page,"Community maps");await page.getByRole('button',{name:'Import & convert to MCC',exact:true}).click();await expect(page.getByRole('heading',{name:'From archive to in-game.',exact:true})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Map conversion · CE / PC / Demo to MCC Halo 1',exact:true})).toBeVisible();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((c:any)=>c.command==='compatibility'&&c.args.id==='b')).toBe(true);expect(calls.some((c:any)=>c.command==='start_build')).toBe(false);
 });
@@ -599,22 +663,22 @@ test('map sound events save with the map and stop their audio context on tool ch
       return original(command,args);
     };
   });
-  await openFixture(page);await page.getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.gs-map-sounds>summary').click();await page.getByRole('combobox',{name:'Map sound tag',exact:true}).selectOption('999');
+  await openFixture(page);await chooseTool(page,"Level editor");await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await page.locator('.gs-map-sounds>summary').click();await page.getByRole('combobox',{name:'Map sound tag',exact:true}).selectOption('999');
   await page.getByRole('button',{name:'Add selected sound emitter',exact:true}).click();const mixer=page.getByRole('region',{name:'Spatial sound rehearsal',exact:true});
   await expect(page.getByRole('combobox',{name:'Map sound emitter',exact:true})).toBeVisible();await page.getByRole('spinbutton',{name:'Map sound master volume',exact:true}).fill('0');await page.getByRole('spinbutton',{name:'Map sound master volume',exact:true}).press('Enter');
   await page.getByRole('button',{name:'Start sound scene',exact:true}).click();await expect(mixer.getByRole('status')).toContainText('1/24 voices');
-  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__soundContexts.every((c:AudioContext)=>c.state==='closed'))).toBe(true);
-  await page.getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.gs-map-sounds>summary').click();await expect(page.getByRole('combobox',{name:'Map sound emitter',exact:true})).toBeVisible();await expect(page.getByRole('spinbutton',{name:'Map sound master volume',exact:true})).toHaveValue('0');
+  await chooseTool(page,"Tag editor");await expect.poll(()=>page.evaluate(()=>(window as any).__soundContexts.every((c:AudioContext)=>c.state==='closed'))).toBe(true);
+  await chooseTool(page,"Level editor");await page.locator('.gs-map-sounds>summary').click();await expect(page.getByRole('combobox',{name:'Map sound emitter',exact:true})).toBeVisible();await expect(page.getByRole('spinbutton',{name:'Map sound master volume',exact:true})).toHaveValue('0');
 });
 test('shared QuickForge survives tool changes and pauses a divergent local draft on restore',async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]})));
-  await mockDesktop(page);await openFixture(page);await page.getByRole('button',{name:'Level editor',exact:true}).click();
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Level editor");
   const sharing=page.locator('details.forge-live-panel').filter({has:page.locator('summary').filter({hasText:'Shared QuickForge'})});await sharing.locator('summary').first().click();
   await page.getByRole('button',{name:'Host editing session',exact:true}).click();await expect(page.getByRole('button',{name:'Leave session',exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Tag editor',exact:true}).click();
+  await chooseTool(page,"Tag editor");
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='forge_session_leave').length)).toBe(0);
   await page.evaluate(()=>{(window as any).__sparkMock.session.view.document.name='Another editor changed the name';});
-  await page.getByRole('button',{name:'Level editor',exact:true}).click();await sharing.locator('summary').first().click();
+  await chooseTool(page,"Level editor");await sharing.locator('summary').first().click();
   await expect(page.getByText('Paused · local draft retained',{exact:false})).toBeVisible();
   await expect(page.getByRole('button',{name:'Export local draft',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Leave session',exact:true}).click();
@@ -635,7 +699,7 @@ test('live Ctrl+Z waits for an in-flight game receipt and then supports redo',as
       return original(command,args);
     };
   });
-  await page.getByRole('button',{name:'Level editor',exact:true}).click();await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');await page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();await page.getByRole('button',{name:'Connect current Halo 1 session',exact:true}).click();await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');
+  await chooseTool(page,"Level editor");await page.getByRole('button',{name:'Connect to a running Halo game',exact:true}).click();await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');await page.getByRole('button',{name:'Toggle Game connection',exact:true}).click();await page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam'}).check();await page.getByRole('button',{name:'Connect current Halo 1 session',exact:true}).click();await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');
   const x=page.getByRole('spinbutton',{name:'Live position X',exact:true});await x.fill('4');await x.press('Tab');await page.getByRole('button',{name:'Apply live object position',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.pending)).toBe(true);await page.keyboard.press('Control+z');
   await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.object.position[0])).toBe(1);await expect(page.getByRole('button',{name:'Redo live edit (Ctrl+Y)',exact:true})).toBeEnabled();await page.keyboard.press('Control+y');await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.object.position[0])).toBe(4);await expect.poll(()=>page.evaluate(()=>(window as any).__liveReceipt.calls)).toBe(3);
 });
@@ -648,37 +712,37 @@ test('numeric-field Ctrl+Z and both redo shortcuts survive autosave; history lim
   await field.focus();await page.keyboard.press('Control+y');await expect(field).toHaveValue('24');
   await field.focus();await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');
   await field.focus();await page.keyboard.press('Control+Shift+z');await expect(field).toHaveValue('24');
-  await page.getByRole('button',{name:'Settings & tools',exact:true}).click();const limit=page.getByRole('spinbutton',{name:'Undo history limit',exact:true});await expect(limit).toHaveValue('100');
+  await chooseTool(page,"Settings & tools");const limit=page.getByRole('spinbutton',{name:'Undo history limit',exact:true});await expect(limit).toHaveValue('100');
   await limit.fill('150');await limit.press('Tab');await expect.poll(()=>page.evaluate(()=>localStorage.getItem('guilty-spark-undo-limit-v1'))).toBe('150');
-  await page.reload();await page.getByRole('button',{name:'Settings & tools',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Undo history limit',exact:true})).toHaveValue('150');
+  await page.reload();await chooseTool(page,"Settings & tools");await expect(page.getByRole('spinbutton',{name:'Undo history limit',exact:true})).toHaveValue('150');
 });
 test('onboarding keeps a failed save on its step and remembers completed Halo and tool choices',async({page})=>{
-  await mockDesktop(page);await page.goto('/');await page.getByRole('button',{name:'Start here',exact:true}).click();
+  await mockDesktop(page);await page.goto('/');await chooseTool(page,"Start here");
   await page.evaluate(()=>(window as any).__sparkMock.failSettings=true);
   await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.locator('.gs-first-setup').getByRole('alert')).toContainText('settings write failed');await expect(page.getByRole('heading',{name:'Which Halo are you working with?',exact:true})).toBeVisible();
   await page.evaluate(()=>(window as any).__sparkMock.failSettings=false);await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
   await page.getByRole('textbox',{name:'Setup Map Builder folder',exact:true}).fill('C:/owned/HCEEK');await page.getByRole('combobox',{name:'Setup editing kit generation',exact:true}).selectOption('h1aEk');await page.getByRole('textbox',{name:'Setup Editable Halo Tags folder',exact:true}).fill('C:/owned/working-tags');await page.getByRole('button',{name:'Save setup & open help',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'How-to & Glossary',exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();await page.getByRole('button',{name:'Start here',exact:true}).click();await expect(page.getByRole('heading',{name:'Your workbench is ready',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'How-to & Glossary',exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();await chooseTool(page,"Start here");await expect(page.getByRole('heading',{name:'Your workbench is ready',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Change Halo or tools',exact:true}).click();await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.getByRole('textbox',{name:'Setup Editable Halo Tags folder',exact:true})).toHaveValue('C:/owned/working-tags');
 });
 test('feature search preserves multiple open maps and each map undo history',async({page})=>{
   await mockDesktop(page);await openFixture(page);const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('24');await velocity.press('Tab');
-  await page.getByRole('button',{name:'Map library',exact:true}).click();await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await page.getByRole('button',{name:'Tag editor',exact:true}).click();
-  await page.getByRole('button',{name:'Features & workflows',exact:true}).click();await expect(page.getByRole('heading',{name:'What can Spark do?',exact:true})).toBeVisible();await expect(page.locator('.feature-map-context')).toContainText('Synthetic candidate');await expect(page.locator('.feature-map-context')).toContainText('2 open maps');
+  await chooseTool(page,"Map library");await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await chooseTool(page,"Tag editor");
+  await chooseTool(page,"Features & workflows");await expect(page.getByRole('heading',{name:'What can Spark do?',exact:true})).toBeVisible();await expect(page.locator('.feature-map-context')).toContainText('Synthetic candidate');await expect(page.locator('.feature-map-context')).toContainText('2 open maps');
   await page.getByRole('searchbox',{name:'Find a Spark feature',exact:true}).fill('multiple maps');await expect(page.getByRole('heading',{name:'Multiple maps & windows',exact:true})).toBeVisible();await page.getByRole('searchbox',{name:'Find a Spark feature',exact:true}).fill('zzzz-unavailable');await expect(page.getByText('No features match this search.',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Show all features',exact:true}).click();
-  await page.getByRole('tab',{name:/Synthetic baseline/}).click();await page.getByRole('button',{name:'Tag editor',exact:true}).click();await expect(velocity).toHaveValue('24');await velocity.focus();await page.keyboard.press('Control+z');await expect(velocity).toHaveValue('10');await page.getByRole('tab',{name:/Synthetic candidate/}).click();await expect(velocity).toHaveValue('25');
+  await page.getByRole('tab',{name:/Synthetic baseline/}).click();await chooseTool(page,"Tag editor");await expect(velocity).toHaveValue('24');await velocity.focus();await page.keyboard.press('Control+z');await expect(velocity).toHaveValue('10');await page.getByRole('tab',{name:/Synthetic candidate/}).click();await expect(velocity).toHaveValue('25');
 });
 test('maps retain independent tag views, tool profiles and last workspace; a late load respects navigation',async({page})=>{
   await mockDesktop(page);await openFixture(page);const search=page.getByRole('textbox',{name:'Search tags',exact:true});await search.fill('test');await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
-  await page.locator('.gs-map-tools>summary').click();await page.locator('.gs-map-tools .gs-build-targets>summary').click();await page.locator('.gs-map-tools').getByRole('button',{name:'Add MCC target',exact:true}).click();const aFields=page.locator('.gs-map-tools fieldset').getByRole('textbox');await aFields.nth(0).fill('Map A kit');await aFields.nth(1).fill('C:/MapA/HCEEK');await aFields.nth(2).fill('C:/MapA/tags');
-  await page.getByRole('button',{name:'Map library',exact:true}).click();await page.evaluate(()=>(window as any).__sparkMock.delayOpen=600);await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await page.getByRole('button',{name:'Features & workflows',exact:true}).click();await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toBeVisible();await expect(page.getByRole('heading',{name:'What can Spark do?',exact:true})).toBeVisible();await expect(page.locator('.gs-map-tools')).toContainText('default tools');
-  await page.getByRole('button',{name:'Tag editor',exact:true}).click();await expect(search).toHaveValue('');await search.fill('candidate');
+  await page.getByRole('button',{name:'Toggle Project setup',exact:true}).click();await page.locator('.gs-map-tools>summary').click();await page.locator('.gs-map-tools .gs-build-targets>summary').click();await page.locator('.gs-map-tools').getByRole('button',{name:'Add MCC target',exact:true}).click();const aFields=page.locator('.gs-map-tools fieldset').getByRole('textbox');await aFields.nth(0).fill('Map A kit');await aFields.nth(1).fill('C:/MapA/HCEEK');await aFields.nth(2).fill('C:/MapA/tags');
+  await chooseTool(page,"Map library");await page.evaluate(()=>(window as any).__sparkMock.delayOpen=600);await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await chooseTool(page,"Features & workflows");await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toBeVisible();await expect(page.getByRole('heading',{name:'What can Spark do?',exact:true})).toBeVisible();await expect(page.locator('.gs-map-tools')).toContainText('default tools');
+  await chooseTool(page,"Tag editor");await expect(search).toHaveValue('');await search.fill('candidate');
   await page.getByRole('tab',{name:/Synthetic baseline/}).click();await expect(search).toHaveValue('test');await expect(page.getByRole('combobox',{name:'Filter tag class',exact:true})).toHaveValue('weap');await expect(page.locator('.gs-map-tools fieldset').getByRole('textbox').nth(0)).toHaveValue('Map A kit');await expect(page.locator('.gs-map-tools fieldset').getByRole('textbox').nth(2)).toHaveValue('C:/MapA/tags');
-  await page.getByRole('button',{name:'Level editor',exact:true}).click();await page.getByRole('tab',{name:/Synthetic candidate/}).click();await expect(search).toHaveValue('candidate');await page.getByRole('tab',{name:/Synthetic baseline/}).click();await expect(page.getByRole('combobox',{name:'Editing target',exact:true})).toBeVisible();
+  await chooseTool(page,"Level editor");await page.getByRole('tab',{name:/Synthetic candidate/}).click();await expect(search).toHaveValue('candidate');await page.getByRole('tab',{name:/Synthetic baseline/}).click();await expect(page.getByRole('combobox',{name:'Editing target',exact:true})).toBeVisible();
 });
 test('settings Browse survives a bootstrap refresh without erasing other drafts', async ({ page }) => {
   await mockDesktop(page);
-  await page.getByRole('button', { name: 'Settings & tools', exact: true }).click();
+  await chooseTool(page,"Settings & tools");
   await page
     .getByRole('textbox', { name: 'Halo Textures and shared sounds', exact: true })
     .fill('C:/synthetic/resources');
@@ -705,7 +769,7 @@ test('settings Browse survives a bootstrap refresh without erasing other drafts'
 });
 test('comparison renders semantic values and warns about undecoded payloads', async ({ page }) => {
   await mockDesktop(page);
-  await page.getByRole('button', { name: 'Compare variants', exact: true }).click();
+  await chooseTool(page,"Compare variants");
   const changed = page.locator('.difference-row').filter({ hasText: 'Velocity' });
   await expect(changed).toContainText('10');
   await expect(changed).toContainText('25');
@@ -721,7 +785,7 @@ test('cancelled descriptor export has no success notice and all readiness failur
 }) => {
   await mockDesktop(page);
   await openFixture(page);
-  await page.getByRole('button', { name: 'Export .gsproject' }).click();
+  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await page.getByRole('button', { name: 'Export .gsproject' }).click();
   await expect
     .poll(() =>
       page.evaluate(
@@ -731,7 +795,7 @@ test('cancelled descriptor export has no success notice and all readiness failur
     )
     .toBe(1);
   await expect(page.getByText('Project descriptor exported.', { exact: false })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Build & playtest', exact: true }).click();
+  await chooseTool(page,"Build & playtest");
   await expect(page.getByText('Compatibility check: Error: Synthetic compatibility error')).toBeVisible();
   await expect(page.getByText('Launch readiness: Error: Synthetic readiness error')).toBeVisible();
   await expect(page.getByText('Metadata template: Error: Synthetic template error')).toBeVisible();
@@ -766,14 +830,14 @@ test('close guard commits focused fields and stays open after a save failure', a
   ).toBe(1);
 });
 test('BSP connection drafts survive tool switches and applied connections undo per map',async({page})=>{
-  await mockDesktop(page);await openFixture(page);await page.locator('.sidebar').getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.bsp-assembly>summary').click();await page.getByRole('button',{name:'Plan connected tunnel',exact:true}).click();const width=page.getByRole('spinbutton',{name:'Tunnel width',exact:true});await width.fill('4');await width.press('Tab');await page.locator('.sidebar').getByRole('button',{name:'Features & workflows',exact:true}).click();await page.locator('.sidebar').getByRole('button',{name:'Level editor',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');await page.getByRole('button',{name:'Apply connection',exact:true}).click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.keyboard.press('Control+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.keyboard.press('Control+Shift+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Check tunnel clearance',exact:true}).click();await expect(page.locator('.bsp-assembly')).toContainText('42 points');expect(await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.tunnelWidth)).toBe(4);
-  await page.locator('.sidebar').getByRole('button',{name:'Map library',exact:true}).click();await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await page.locator('.sidebar').getByRole('button',{name:'Level editor',exact:true}).click();await page.locator('.bsp-assembly>summary').click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Level editor");if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await page.getByRole('button',{name:'Toggle Construction',exact:true}).click();await page.locator('.bsp-assembly>summary').click();await page.getByRole('button',{name:'Plan connected tunnel',exact:true}).click();const width=page.getByRole('spinbutton',{name:'Tunnel width',exact:true});await width.fill('4');await width.press('Tab');await chooseTool(page,"Features & workflows");await chooseTool(page,"Level editor");await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');await page.getByRole('button',{name:'Apply connection',exact:true}).click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.keyboard.press('Control+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.keyboard.press('Control+Shift+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Check tunnel clearance',exact:true}).click();await expect(page.locator('.bsp-assembly')).toContainText('42 points');expect(await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.tunnelWidth)).toBe(4);
+  await chooseTool(page,"Map library");await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await chooseTool(page,"Level editor");if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await page.getByRole('button',{name:'Toggle Construction',exact:true}).click();await page.locator('.bsp-assembly>summary').click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');
 });
 test('donor scenery participates in undo and changing a BSP transform clears stale clearance', async ({ page }) => {
   await mockDesktop(page);
   await openFixture(page);
-  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
-  await page.locator('.bsp-assembly>summary').click();
+  await chooseTool(page,"Level editor");
+  if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await page.getByRole('button',{name:'Toggle Construction',exact:true}).click();await page.locator('.bsp-assembly>summary').click();
   await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
   const scenery = page.getByRole('checkbox', { name: 'Include donor scenery', exact: true });
   await expect(scenery).not.toBeChecked();
@@ -816,8 +880,8 @@ test('donor scenery participates in undo and changing a BSP transform clears sta
 test('BSP donor choices do not silently replace a draft and entrance rotation preserves its mouth', async ({ page }) => {
   await mockDesktop(page);
   await openFixture(page);
-  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
-  await page.locator('.bsp-assembly>summary').click();
+  await chooseTool(page,"Level editor");
+  if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await page.getByRole('button',{name:'Toggle Construction',exact:true}).click();await page.locator('.bsp-assembly>summary').click();
   await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
   const width = page.getByRole('spinbutton', { name: 'Tunnel width', exact: true });
   await width.fill('4'); await width.press('Tab');
@@ -853,8 +917,8 @@ test('BSP donor choices do not silently replace a draft and entrance rotation pr
 
 test('legacy connection identities preserve an unapplied draft after upgrading', async ({ page }) => {
   await mockDesktop(page); await openFixture(page);
-  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
-  await page.locator('.bsp-assembly>summary').click();
+  await chooseTool(page,"Level editor");
+  if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await page.getByRole('button',{name:'Toggle Construction',exact:true}).click();await page.locator('.bsp-assembly>summary').click();
   await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
   await page.getByRole('button', { name: 'Apply connection', exact: true }).click();
   await page.getByRole('button', { name: 'Check tunnel clearance', exact: true }).click();
@@ -869,32 +933,32 @@ test('legacy connection identities preserve an unapplied draft after upgrading',
     localStorage.setItem('spark-test-applied-bsp', JSON.stringify(saved));
   });
   await page.reload();
-  await page.locator('.sidebar').getByRole('button', { name: 'Map library', exact: true }).click();
+  await chooseTool(page,"Map library");
   await openFixture(page);
-  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
+  await chooseTool(page,"Level editor");
   await expect(width).toHaveValue('6');
   await expect(page.getByRole('button', { name: 'Apply connection', exact: true })).toBeEnabled();
 });
 
 test('a delayed BSP plan cannot resurrect a draft after leaving the workspace', async ({ page }) => {
   await mockDesktop(page); await openFixture(page);
-  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
-  await page.locator('.bsp-assembly>summary').click();
+  await chooseTool(page,"Level editor");
+  if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await page.getByRole('button',{name:'Toggle Construction',exact:true}).click();await page.locator('.bsp-assembly>summary').click();
   await page.evaluate(() => { (window as any).__sparkMock.deferBspPlan = true; });
   await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
   await page.waitForFunction(() => !!(window as any).__sparkMock.finishBspPlan);
-  await page.locator('.sidebar').getByRole('button', { name: 'Features & workflows', exact: true }).click();
+  await chooseTool(page,"Features & workflows");
   await expect(page.getByRole('heading', { name: 'What can Spark do?', exact: true })).toBeVisible();
   await page.evaluate(() => (window as any).__sparkMock.finishBspPlan());
-  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
+  await chooseTool(page,"Level editor");
   await expect(page.locator('.bsp-draft-heading')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Plan connected tunnel', exact: true })).toBeEnabled();
 });
 
 test('a delayed replacement plan cannot overwrite edits made while it runs', async ({ page }) => {
   await mockDesktop(page); await openFixture(page);
-  await page.locator('.sidebar').getByRole('button', { name: 'Level editor', exact: true }).click();
-  await page.locator('.bsp-assembly>summary').click();
+  await chooseTool(page,"Level editor");
+  if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await page.getByRole('button',{name:'Toggle Construction',exact:true}).click();await page.locator('.bsp-assembly>summary').click();
   await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
   await page.evaluate(() => { (window as any).__sparkMock.deferBspPlan = true; });
   await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
@@ -909,7 +973,7 @@ test('a delayed replacement plan cannot overwrite edits made while it runs', asy
 test('friends preflight surfaces blocked proof without a network success claim', async ({ page }) => {
   await mockDesktop(page);
   await openFixture(page);
-  await page.getByRole('button', { name: 'Play & servers', exact: true }).click();
+  await chooseTool(page,"Play & servers");
   await page.getByRole('button', { name: 'Runtime adapters', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open Steam launch selector', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Friends preflight', exact: true }).click();

@@ -50,6 +50,7 @@ import type {OwnedBitmapBatchResponse} from '../ownedBitmapBatch';
 import {summarizeTextureFailures} from '../textureDiagnostics';
 import type {TextureFailure} from '../textureDiagnostics';
 import HaloTextures from './HaloTextures';
+import ViewportActivity from './ViewportActivity';
 import MapSounds from './MapSounds';
 import SpatialAudioListener from './SpatialAudioListener';
 import ViewportTelemetry from './ViewportTelemetry';
@@ -68,6 +69,7 @@ import { validateSceneTransform } from '../sourcePreflight';
 import type { ViewMode } from '../renderView';
 import RightMouseFly from './RightMouseFly';
 import EnvironmentControls from './EnvironmentControls';
+import{WorkspacePanel}from'./WorkspacePanels';
 import { DEFAULT_ENVIRONMENT, sunlightPosition, toHex } from '../environment';
 import type { EditorEnvironment } from '../environment';
 import { HelpTip, IconButton, Notice, NumberField, Pill } from './ui';
@@ -348,7 +350,7 @@ function Scene({
   environment,
   sourceAppearance,extraTextures,
   onSceneDragStart,onSceneDragEnd,
-  cinematic=false,cameraLocked=false,
+  cinematic=false,cameraLocked=false,externalCameraAuthority=false,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -371,7 +373,7 @@ function Scene({
   environment: EditorEnvironment;
   sourceAppearance:SourceAppearance|null;extraTextures:Record<string,THREE.Texture>;
   onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
-  cinematic?:boolean;cameraLocked?:boolean;
+  cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;
 }) {
   const group = useRef<THREE.Group>(null);
   const chosen = project.scene.find((o) => o.id === selected);
@@ -408,7 +410,7 @@ function Scene({
       )}
       <SceneEnvironment value={environment} maximumFogDensity={project.worldEnvironment?1:sourceAppearance?.fogMaximumDensity??1} overrideLighting={!!project.worldEnvironment}/>
       {sourceAppearance?.skyMesh&&viewMode==='render'&&<SkyGeometry data={sourceAppearance.skyMesh} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>}
-      {grid && (
+      {grid && !cinematic && (
         <gridHelper
           args={[200, 100, '#354854', '#1b2b35']}
           rotation={[Math.PI / 2, 0, 0]}
@@ -495,13 +497,13 @@ function Scene({
         <OrbitControls makeDefault enablePan mouseButtons={{LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.PAN,RIGHT:undefined}} enableDamping dampingFactor={0.1} />
       )}
       {!cinematic&&!fly && <RightMouseFly speed={15} />}
-      <FrameCamera
+      {!externalCameraAuthority&&<FrameCamera
         mesh={previewMesh ?? Object.values(assetMeshes)[0] ?? null}
         objects={project.scene}
         frame={frame}
         playerView={playerView} startId={startId} director={cinematic} sessionId={project.id}
         focus={chosen}
-      />
+      />}
     </>
   );
 }
@@ -515,7 +517,7 @@ export default function World({
   onResourcesConnected,
   onBeforeResources,
   selectedId,onSelectObject,viewportChildren,onSceneDragStart,onSceneDragEnd,
-  cinematic=false,cameraLocked=false,
+  cinematic=false,cameraLocked=false,externalCameraAuthority=false,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -526,7 +528,7 @@ export default function World({
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: () => Promise<void>;
   selectedId?:string|null;onSelectObject?:(id:string|null)=>void;viewportChildren?:React.ReactNode;onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
-  cinematic?:boolean;cameraLocked?:boolean;
+  cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;
 }) {
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
   const [,setZoneSelection]=useMapState<string|null>(project.id,'visibility.selected',null);
@@ -536,8 +538,9 @@ export default function World({
   const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(project.id,'world.mode','translate');
   const [snap, setSnap] = useMapState(project.id,'world.snap',false);
   const [grid, setGrid] = useMapState(project.id,'world.grid',false);
-  const [viewMode, setViewMode] = useMapState<ViewMode>(project.id,'world.view',hasRenderGeometry(inspection)?'render':'smooth');
-  const [ortho, setOrtho] = useMapState(project.id,'world.ortho',false);
+  const [viewMode, setViewMode] = useMapState<ViewMode>(project.id,cinematic?'director.view':'world.view',hasRenderGeometry(inspection)?'render':'smooth');
+  const [savedOrtho, setOrtho] = useMapState(project.id,'world.ortho',false);
+  const ortho=!cinematic&&savedOrtho;
   const [fly, setFly] = useMapState(project.id,'world.fly',false);
   const [frame, setFrame] = useState(0);
   const [playerView,setPlayerView]=useMapState(project.id,'world.playerView',true);
@@ -552,6 +555,8 @@ export default function World({
   const [loadingOwnedBitmap, setLoadingOwnedBitmap] = useState<Record<number, boolean>>({});
   const [resourceAudit, setResourceAudit] = useState<ResourceMapAudit | null>(null);
   const [auditingResources, setAuditingResources] = useState(false);
+  const[connectingTextures,setConnectingTextures]=useState(false),[textureSetupError,setTextureSetupError]=useState('');
+  async function locateTextures(){setConnectingTextures(true);setTextureSetupError('');try{await onBeforeResources?.();const opened=await call<OpenProject|null>('connect_halo_textures',{projectId:project.id,mode:'file',path:''});if(opened)await onResourcesConnected?.(opened);}catch(e){setTextureSetupError(String(e));}finally{setConnectingTextures(false);}}
   const [textureFailures,setTextureFailures] = useState<TextureFailure[]>([]);
   const [automaticTextures,setAutomaticTextures]=useState(true);
   const automaticAttempts=useRef(new Set<string>());
@@ -1065,7 +1070,7 @@ export default function World({
       data-source-details={Object.keys(extraTextures).length} data-sky-triangles={(sourceAppearance?.skyMesh?.indices.length??0)/3}
       data-material-loading={!!autoPreviewProgress?.active}
       data-pending-materials={ownedPreviewPlan?[...ownedPreviewPlan.shaderTasks,...ownedPreviewPlan.lightmapTasks,...ownedPreviewPlan.detailTasks].filter(t=>!automaticAttempts.current.has(t.key)).length:0}>
-      <aside className="panel hierarchy">
+      <WorkspacePanel id="objects" label="Objects"><aside className="panel hierarchy">
         <div className="panel-heading">
           <strong>Scene hierarchy</strong>
           <Pill>{project.scene.length}</Pill>
@@ -1148,7 +1153,7 @@ export default function World({
             <p className="subtle">Exported geometry can be imported into Asset Workshop in another project. This does not make an imported BSP editable or gameplay-ready.</p>
           </>}
         </div>
-      </aside>
+      </aside></WorkspacePanel>
       <section className="viewport-shell">
         <div className="viewport-toolbar">
           <div className="button-group">
@@ -1213,7 +1218,7 @@ export default function World({
                 gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
                 onPointerMissed={(event) => { if (event.button === 0 && event.type === 'click') {setSelected(null);setZoneSelection(null);} }}
               >
-
+                <ViewportActivity continuous={cinematic}/>
                 <Scene
                   {...{
                     project,
@@ -1231,7 +1236,7 @@ export default function World({
                     playerView,startId,
                     environment,sourceAppearance,extraTextures,
                     onSceneDragStart,onSceneDragEnd,
-                    cinematic,cameraLocked,
+                    cinematic,cameraLocked,externalCameraAuthority,
                   }}
                   inspection={inspection}
                   onTransform={update}
@@ -1239,12 +1244,13 @@ export default function World({
                   shaderTextures={shaderTextures}
                   lightmapTextures={lightmapTextures}
                 />
-                <ViewportSession id={project.id} channel={cinematic?'machinima':'world'} paused={cameraLocked} requiresControls={!cinematic&&!fly}/>
+                <ViewportSession id={project.id} channel={cinematic?'machinima':'world'} paused={cameraLocked||externalCameraAuthority} requiresControls={!cinematic&&!fly}/>
                 {!cinematic&&<VisibilityZoneOverlay project={project} edit={edit} enabled={!fly&&!cameraLocked&&!selected} onSelectScene={()=>setSelected(null)} onSceneDragStart={onSceneDragStart} onSceneDragEnd={onSceneDragEnd}/>}
                 {viewportChildren}
               </Canvas>
             </Suspense>
           </ViewportBoundary>
+          {!cinematic&&inspection&&[6,7,609].includes(inspection.header.version)&&!project.source?.resourceSha256?.['bitmaps.map']&&<div className="gs-texture-setup" role="status"><strong>Map textures need their original bitmaps.map.</strong><button disabled={!native||connectingTextures||!onResourcesConnected} onClick={()=>void locateTextures()}>{connectingTextures?'Verifying textures…':'Locate Halo Textures'}</button>{textureSetupError&&<span role="alert">{textureSetupError}</span>}</div>}
           <div className="viewport-label">
             <span className="live-dot" />
             {previewMesh?.positions.length
@@ -1291,7 +1297,7 @@ export default function World({
           <Pill tone="blue">Editor preview</Pill>
         </div>
       </section>
-      <aside className="panel inspector">
+      <WorkspacePanel id="inspector" label="Inspector"><aside className="panel inspector">
         {!cinematic&&<VisibilityZones project={project} edit={edit} onSelectScene={()=>setSelected(null)} onSave={onBeforeResources}/>}
         <RenderFeatures project={project} edit={edit}/>
         <div className="panel-heading">
@@ -1546,7 +1552,7 @@ export default function World({
             <small>W · translate &nbsp; E · rotate &nbsp; R · scale</small>
           </div>
         )}
-      </aside>
+      </aside></WorkspacePanel>
     </div>
   );
 }

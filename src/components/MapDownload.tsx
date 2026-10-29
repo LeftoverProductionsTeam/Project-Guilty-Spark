@@ -31,10 +31,14 @@ export default function MapDownload({
   onDownloaded,
   busy = false,
   targetLabel = 'MCC Halo 1',
+  selection,
+  onActiveChange,
 }: {
   onDownloaded?: (opened: OpenProject[], action: MapDownloadAction) => void | Promise<void>;
   busy?: boolean;
   targetLabel?: string;
+  selection?: {url:string;label:string}|null;
+  onActiveChange?:(active:boolean)=>void;
 }) {
   const [url, setUrl] = useState(''),
     [action, setAction] = useState<MapDownloadAction>('world');
@@ -103,6 +107,8 @@ export default function MapDownload({
       ['queued', 'resolving', 'downloading', 'validating', 'publishing', 'downloaded', 'importing'].includes(
         status.phase,
       ));
+  useEffect(()=>{onActiveChange?.(active);return()=>onActiveChange?.(false);},[active,onActiveChange]);
+  useEffect(()=>{if(selection&&!active){setUrl(selection.url);setError('');}},[selection?.url]);
   const cancellable = !!status && ['queued', 'resolving', 'downloading', 'validating'].includes(status.phase);
   const mb = (bytes: number) => (bytes / 1048576).toFixed(1);
   async function download() {
@@ -152,6 +158,7 @@ export default function MapDownload({
     <section className="analysis-card gs-direct-map-download" aria-label="Download maps inside Spark">
       <div className="eyebrow">PRESERVE · EDIT · CONVERT</div>
       <h2>Download a map into Spark</h2>
+      {selection&&url===selection.url&&<p>Selected from the catalog: <strong>{selection.label}</strong>. Choose where to open it, then download.</p>}
       <p>
         Paste an author's direct HTTPS <code>.map</code> or <code>.zip</code> link. Spark keeps the original
         download, records its SHA-256 and imports map candidates without changing an open draft or installed

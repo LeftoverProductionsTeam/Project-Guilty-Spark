@@ -1,6 +1,6 @@
 # Project Guilty Spark
 
-**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 34 dev** continues the existing prerelease; compiler and game acceptance remain separate from editor previews.
+**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 35 dev** continues the existing prerelease; compiler and game acceptance remain separate from editor previews.
 
 > Project Guilty Spark stands on more than twenty years of research, experimentation, documentation, tools, discoveries, and shared knowledge from the Halo modding community. This project would not exist without the people who explored the Blam engine, created the original editors, reverse-engineered file formats, preserved old maps, documented workflows, and helped generations of modders learn.
 
@@ -23,6 +23,14 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 - Drop supported Halo animation sources onto compatible bipeds; rehearse their real skeletons and compile an SDK camera/actor take with a clean game HUD and player input enabled.
 
 ![Connect Your Halo Games in the native Windows application](docs/screenshots/continuation33/native-connect-games.png)
+
+## C35 living workbench
+
+**Menu** and **Window** open remembered navigation/header drawers, leaving more space for the map. Project setup, Changes, Help, Objects, Inspector, construction and game connection use configurable edge/floating panels. **F11** enters actual native fullscreen with tools at the edges; **Escape** dismisses drawers before restoring the window. Camera flight supports configurable WASD/Q/E, Shift boost, middle-button pan and right-button wheel speed.
+
+Open **Recording Director ↗** from a prepared Level editor view to detach a native camera/recording window, then dock it back with the same revision-checked session. Camera keys, tracking, lens and monitor controls are included. Editor Render and explicitly shared Live Game Capture are distinct; an independent MCC engine spectator adapter is not implemented. A short native video probe decoded real map detail, while application Save-dialog flow, recording startup quality, game audio/capture and long takes remain acceptance gates.
+
+The visual Community maps catalog uses real releases, publisher screenshots and published credits/dependencies. Alpine downloads and opens as Custom Edition; its MCC build currently needs three missing classic bitmap tags, now reported explicitly. Actual Zombie Demo resource recovery loads original shader/lightmap/detail previews without unrelated MCC substitution. See the [C35 engineering evidence](docs/CONTINUATION_35_ENGINEERING.md), [owner test card](docs/CONTINUATION_35_TEST_CARD.md) and [push summary/description](docs/GITHUB_HANDOFF.md). All earlier engine goals remain in the [319-row cumulative ledger](docs/MASTER_FEATURE_LEDGER.md).
 
 ## C34 internal engineering continuation
 

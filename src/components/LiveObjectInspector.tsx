@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import type {ReactNode} from 'react';
 import {call,native} from '../api';
+import{WorkspacePanel}from'./WorkspacePanels';
 import {NumberField,Notice} from './ui';
 import {readHistoryLimit} from '../historyPreferences';
 import {isEditingText} from '../editorFlight';
@@ -62,6 +63,6 @@ export default function LiveObjectInspector({viewport,presentation='sidebar',con
     </>}{message&&<p role="status">{message}</p>}{error&&<Notice tone="error">{error}</Notice>}<p className="subtle">Moves affect this running session. They do not rewrite a source map. Rotation, spawning, BSP replacement and free-camera hooks are not enabled. Reloading or respawning can invalidate a binding; failed readback never becomes a successful undo entry.</p>
   </section>;
   return <div className={presentation==='drawer'?'level-connected-view':viewport?'live-editor-layout':'live-inspector-layout'}>
-    {presentation==='drawer'?<details className="level-session-controls" open={controlsOpen||undefined}><summary>Game connection &amp; live controls · {status?'connected':'offline'}</summary>{inspector}</details>:inspector}
+    {presentation==='drawer'?<WorkspacePanel id="connection" label="Game connection"><details className="level-session-controls" open={controlsOpen||undefined}><summary>Connect to your Halo game · {status?'connected':'offline'}</summary>{inspector}</details></WorkspacePanel>:inspector}
     {viewport?.({status,selected:id?Number(id):null,select:datum=>setId(datum===null?'':String(datum)),move:externalMove,scale:externalScale,busy})}</div>;
 }

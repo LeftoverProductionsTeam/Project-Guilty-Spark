@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — Continuation 35: The living workbench (development)
+
+- Make navigation and the top window/project header remembered drawers; move utility panels into configurable edge/floating drawers and add native F11 fullscreen with Escape restoration.
+- Preserve per-map workflow context and the new-level wizard; add configurable Q/E camera flight, wheel speed and native focus-release guards.
+- Add a detachable/dockable Recording Director with shared camera authority, keys/timeline/tracking/lens, display controls and read-only saved-map refresh.
+- Add permissioned display/window capture and bounded native WebM recording storage. Actual Save-dialog flow, recording startup, game audio/capture and long takes remain unaccepted.
+- Add a real credited visual map catalog and direct-download selection; verify actual Alpine CE import and original Zombie Demo resource recovery in the native app.
+- Diagnose exact missing classic tags from failed native conversion output. Alpine MCC conversion remains blocked; failed Tool output is never accepted as playable.
+- Retain all historical feature records, source/runtime guards and older releases. [C35 results, limitations and artifacts](docs/CONTINUATION_35_ENGINEERING.md).
+
 ## 0.4.0 — Continuation 33: Reclaim the pixels
 
 - Support verified Demo/PC per-image resource keys and CE pixel spans; add RGB565 lightmap decoding and retain exact per-image failure reasons.

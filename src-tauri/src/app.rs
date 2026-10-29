@@ -30,6 +30,8 @@ use tauri::{Emitter, Manager, State};
 #[path="invitations_native.rs"] mod invitations_native;
 #[path="community_host_native.rs"] mod community_host_native;
 #[path="map_download.rs"] mod map_download;
+#[path="director_native.rs"] mod director_native;
+#[path="director_recording.rs"]mod director_recording;
 #[path="dependency_install.rs"] mod dependency_install;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
@@ -111,6 +113,8 @@ struct AppState {
     community_hosts: Mutex<community_host_native::CommunityHostState>,
     map_downloads: map_download::DownloadRegistry,
     dependency_install: Mutex<dependency_install::DependencyInstallState>,
+    director:Mutex<director_native::DirectorState>,
+    recordings:Mutex<director_recording::RecordingState>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -772,7 +776,9 @@ fn save_project(state: State<AppState>, window:tauri::WebviewWindow, mut project
         project::validate_edits(&project, &*inspect(&state, &project)?).map_err(error)?;
     }
     project.modified_at = chrono::Utc::now().to_rfc3339();
-    lock(&state.library)?.save(&project, None).map_err(error)
+    let entry=lock(&state.library)?.save(&project, None).map_err(error)?;
+    let _=window.app_handle().emit("spark:project-saved",&project.id);
+    Ok(entry)
 }
 #[tauri::command]
 async fn export_project(app: tauri::AppHandle, id: String) -> Reply<Option<PathBuf>> {
@@ -901,6 +907,10 @@ async fn bitmap_resource_candidates(app:tauri::AppHandle,project_id:String)->Rep
         if let Some(s)=project.source.as_ref() {
             if let Some(p)=&s.resource_directory {roots.push((p.clone(),"Previously selected resources"));}
             if let Some(p)=s.original_path.parent(){roots.push((p.to_path_buf(),"Beside the original map"));}
+            let library=lock(&state.library)?;
+            for entry in library.list().map_err(error)?.into_iter().filter(|entry|entry.id!=project_id&&entry.sha256.as_deref()==Some(s.sha256.as_str())).take(24){
+                if let Ok(other)=library.get(&entry.id){if let Some(other)=other.source{if let Some(p)=other.resource_directory{roots.push((p,"Resources used by an identical preserved map"));}if let Some(p)=other.original_path.parent(){roots.push((p.to_path_buf(),"Beside an identical preserved map"));}}}
+            }
         }
         if let Some(p)=settings.resource_directory {roots.push((p,"Configured resource folder"));}
         if let Some(p)=installed.mcc_path {roots.push((p.join("halo1/maps"),"Detected MCC legacy compatibility resources; ipak is separate"));}
@@ -914,7 +924,8 @@ async fn bitmap_resource_candidates(app:tauri::AppHandle,project_id:String)->Rep
 }
 
 #[tauri::command]
-async fn connect_halo_textures(app:tauri::AppHandle,project_id:String,mode:String,path:String)->Reply<Option<OpenProject>> {
+async fn connect_halo_textures(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,mode:String,path:String)->Reply<Option<OpenProject>> {
+    let owner=window.label().to_owned();check_document_owner(&app.state::<AppState>(),&project_id,&owner)?;
     let chosen=match mode.as_str() {
         "file"=>rfd::AsyncFileDialog::new().set_title("Locate Halo Textures — original bitmaps.map")
             .add_filter("Halo bitmap resources",&["map"]).pick_file().await.map(|f|f.path().to_path_buf()),
@@ -930,6 +941,7 @@ async fn connect_halo_textures(app:tauri::AppHandle,project_id:String,mode:Strin
         if !file.is_absolute(){return Err("Choose an absolute path to your original bitmaps.map".into());}
         let folder=file.parent().ok_or("Resource folder unavailable")?.to_path_buf();
         let state=app.state::<AppState>();
+        check_document_owner(&state,&project_id,&owner)?;
         let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;
         let before=serde_json::to_vec(&p).map_err(error)?;
         let s=p.source.as_ref().ok_or("Open a Halo map before connecting its shared textures")?;
@@ -946,7 +958,9 @@ async fn connect_halo_textures(app:tauri::AppHandle,project_id:String,mode:Strin
         source.resource_directory=Some(folder);source.resource_sha256=hashes;
         p.modified_at=chrono::Utc::now().to_rfc3339();
         lib.save(&p,Some(&inspected)).map_err(error)?;
+        drop(lib);
         lock(&state.inspections)?.remove(&project_id);
+        let _=app.emit("spark:project-saved",&project_id);
         Ok(Some(OpenProject{project:p,inspection:Some((*inspected).clone())}))
     }).await.map_err(error)?
 }
@@ -957,7 +971,7 @@ async fn auto_connect_classic_textures(app:tauri::AppHandle,window:tauri::Webvie
         let mut roots=vec![];if let Some(dir)=&source.resource_directory{roots.push(dir.clone());}if let Some(dir)=source.original_path.parent(){roots.push(dir.to_path_buf());}
         for entry in lib.list().map_err(error)?{if entry.sha256.as_deref()!=Some(source.sha256.as_str())||entry.id==project_id{continue;}if let Ok(other)=lib.get(&entry.id){if let Some(s)=other.source{if let Some(dir)=s.resource_directory{roots.push(dir);}if let Some(dir)=s.original_path.parent(){roots.push(dir.to_path_buf());}}}}
         if let Some(dir)=lock(&state.settings)?.resource_directory.clone(){roots.push(dir);}let mut seen=std::collections::HashSet::new();roots.into_iter().map(|dir|dir.join("bitmaps.map")).filter(|file|file.is_file()&&seen.insert(file.clone())).take(12).collect::<Vec<_>>()};
-    for file in candidates{if let Ok(Some(open))=connect_halo_textures(app.clone(),project_id.clone(),"path".into(),file.to_string_lossy().into_owned()).await{return Ok(Some(open));}}Ok(None)
+    for file in candidates{if let Ok(Some(open))=connect_halo_textures(app.clone(),window.clone(),project_id.clone(),"path".into(),file.to_string_lossy().into_owned()).await{return Ok(Some(open));}}Ok(None)
 }
 
 #[tauri::command]
@@ -1684,7 +1698,7 @@ fn start_watcher(app: &tauri::AppHandle, state: &AppState) -> Reply<()> {
 }
 #[tauri::command]
 async fn close_application(app: tauri::AppHandle,window:tauri::WebviewWindow) -> Reply<()> {
-    if app.webview_windows().len()==1 {
+    if app.webview_windows().keys().filter(|label|!label.starts_with("director-")).count()==1 {
         let closing=app.clone();tauri::async_runtime::spawn_blocking(move||{let state=closing.state::<AppState>();let mut live=lock(&state.live_mcc)?;if let Some(session)=live.as_ref(){crate::live_mcc::disconnect(session).map_err(error)?;}*live=None;Ok::<(),String>(())}).await.map_err(error)??;
     }
     lock(&app.state::<AppState>().document_owners)?.retain(|_,owner|owner!=window.label());
@@ -2443,6 +2457,8 @@ pub fn run() {
                 community_hosts: Mutex::new(Default::default()),
                 map_downloads: Default::default(),
                 dependency_install: Mutex::new(Default::default()),
+                director:Mutex::new(Default::default()),
+                recordings:Mutex::new(Default::default()),
             });
             if let Err(e) = configure(app.handle(), &app.state::<AppState>(), settings) {
                 if let Ok(mut d) = app.state::<AppState>().diagnostics.lock() {
@@ -2457,10 +2473,10 @@ pub fn run() {
             }
             Ok(())
         })
-        .on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){
+        .on_window_event(|window,event|{director_native::window_event(window.app_handle(),window,event);if matches!(event,tauri::WindowEvent::Destroyed){
             if let Some(state)=window.app_handle().try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=window.label());}}
             let app=window.app_handle().clone();let label=window.label().to_owned();
-            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);}});
+            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);}});
         }})
         .invoke_handler(tauri::generate_handler![
             prepare_map_download,
@@ -2469,6 +2485,14 @@ pub fn run() {
             cancel_map_download,
             dependency_install::dependency_report,
             dependency_install::prepare_dependency_action,
+            director_native::director_session,
+            director_native::director_update,
+            director_native::director_popout,
+            director_native::director_displays,
+            director_native::director_window,
+            director_recording::director_record_open,
+            director_recording::director_record_append,
+            director_recording::director_record_finish,
             dependency_install::run_dependency_action,
             dependency_install::discard_dependency_action,
             dependency_install::choose_dependency_path,
@@ -2664,6 +2688,8 @@ mod readiness_tests {
             community_hosts:Mutex::new(Default::default()),
             map_downloads:Default::default(),
             dependency_install:Mutex::new(Default::default()),
+            director:Mutex::new(Default::default()),
+            recordings:Mutex::new(Default::default()),
         };
         (temp, state, p, record)
     }

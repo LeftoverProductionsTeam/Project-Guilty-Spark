@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "challenge": "Conscars Alpine 1.0.0 CE to MCC Halo 1",
+  "sourceUrl": "https://github.com/csauve/alpine/releases/download/1.0.0/alpine.zip",
+  "sourceSha256": "eb9b3693e74e674182d732f340127ef84d3574083821a8d3d95b234d9cb1c39e",
+  "actualNativeCompileAttempted": true,
+  "attempts": 2,
+  "tools": "Installed Invader and H1A Tool; isolated copies of 11544 SDK baseline tags",
+  "toolExitCode": 0,
+  "failedToLoadScenario": true,
+  "diagnostic": "MCC conversion needs 3 missing source tag(s): powerups/active camoflage/bitmaps/camoflage.bitmap; powerups/over shield/bitmaps/overshield.bitmap; scenery/c_field_generator/bitmaps/c_field_generator_dust.bitmap. Locate the original map's matching classic resource files or editable tags and rebuild. Installed MCC texture packs are not a substitute for missing classic tag data. No playable output was accepted.",
+  "nativeSuccessConfirmed": false,
+  "scope": "Read-only classification of retained real tool output; no compilation or game launch",
+  "productionDiagnosticReplayedFromRealLog": true,
+  "thirdCompilePerformedForDiagnosticOnly": false,
+  "gameLaunched": false,
+  "playableOutputAccepted": false,
+  "originalSourceReplacement": false
+}

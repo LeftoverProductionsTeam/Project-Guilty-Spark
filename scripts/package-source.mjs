@@ -2,13 +2,14 @@
 // Usage: node scripts/package-source.mjs <fresh-output.zip>
 import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';import crypto from 'node:crypto';import {spawnSync} from 'node:child_process';
 if(process.platform!=='win32')throw new Error('This release helper currently uses Windows .NET ZIP; use the recorded manifest on other hosts.');
-const output=path.resolve(process.argv[2]??'releases/Project_Guilty_Spark_Continuation_34_SOURCE.zip');
+const output=path.resolve(process.argv[2]??'releases/Project_Guilty_Spark_Continuation_35_SOURCE.zip');
 if(await fs.stat(output).then(()=>true,()=>false))throw new Error('Refusing to overwrite an existing source release');
 const roots=['src','src-tauri','crates','scripts','tests','docs','examples','public','.github'];
 const excludedDirectories=new Set(['target','dist','node_modules','.git','.local','.research','.toolchain']);
-const excludedExtensions=new Set(['.exe','.dll','.pdb','.map','.yelo','.sqlite3','.woff','.woff2']);
+const excludedPrefixes=['src-tauri/gen','src-tauri/icons/android','src-tauri/icons/ios'];
+const excludedExtensions=new Set(['.exe','.dll','.pdb','.map','.yelo','.sqlite3','.woff','.woff2','.log']);
 const files=[];
-async function walk(directory){for(const entry of await fs.readdir(directory,{withFileTypes:true})){const file=path.join(directory,entry.name);if(entry.isSymbolicLink())throw new Error(`Linked source file refused: ${file}`);if(entry.isDirectory()){if(!excludedDirectories.has(entry.name))await walk(file);}else if(entry.isFile()&&!excludedExtensions.has(path.extname(file).toLowerCase())&&!file.endsWith('.tsbuildinfo')&&!/\.bak(?:-|$)/.test(entry.name)){files.push(file.replaceAll('\\','/'));}}}
+async function walk(directory){if(excludedPrefixes.includes(directory.replaceAll('\\','/')))return;for(const entry of await fs.readdir(directory,{withFileTypes:true})){const file=path.join(directory,entry.name);if(entry.isSymbolicLink())throw new Error(`Linked source file refused: ${file}`);if(entry.isDirectory()){if(!excludedDirectories.has(entry.name))await walk(file);}else if(entry.isFile()&&!excludedExtensions.has(path.extname(file).toLowerCase())&&!file.endsWith('.tsbuildinfo')&&!/\.bak(?:-|$)/.test(entry.name)){files.push(file.replaceAll('\\','/'));}}}
 for(const root of roots){if(await fs.stat(root).then(s=>s.isDirectory(),()=>false))await walk(root);}
 for(const file of await fs.readdir('.'))if(file.endsWith('.md')||['.gitignore','.gitattributes','.prettierignore','.prettierrc.json','Cargo.lock','Cargo.toml','LICENSE','README.md','SOURCE_DIFF_FROM_PREVIOUS.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml','tsconfig.json','vite.config.ts','vitest.config.ts','playwright.config.ts','index.html'].includes(file))files.push(file);
 files.sort();if(new Set(files).size!==files.length||files.length>4096)throw new Error('Invalid source inventory');

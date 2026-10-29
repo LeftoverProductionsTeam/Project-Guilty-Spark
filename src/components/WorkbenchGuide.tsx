@@ -17,7 +17,7 @@ export default function WorkbenchGuide({workspace,evidence,onNavigate}:{
   return <section className={`gs-workbench-guide ${expanded?'expanded':''}`} aria-label={`Field guide for ${guide.title}`}>
     <div className="gs-guide-summary">
       <span className="gs-guide-glyph" aria-hidden="true"><ShieldCheck size={16}/></span>
-      <div className="gs-guide-label"><small>07 HALO MODDING BRAIN / FIELD GUIDE</small><strong>{guide.title}</strong></div>
+      <div className="gs-guide-label"><small>WORKSPACE HELP</small><strong>{guide.title}</strong></div>
       <span className="gs-guide-evidence" title={guide.explanation}>{guide.status}</span>
       <HelpTip help={`${guide.tip} ${guide.cannot}`}/>
       <button type="button" className="gs-guide-toggle" aria-expanded={expanded} aria-controls={panelId}

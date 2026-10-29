@@ -229,7 +229,7 @@ pub(crate) fn compile_native(
         60,
     )?;
     if !native_compile_succeeded(&log) {
-        return invalid("MCC Tool did not confirm successful cache compilation. Its zero exit code alone is not success; inspect the conversion log");
+        return invalid(native_compile_failure(&log));
     }
     let name = crate::mcc::package_map_name(&inspection.scenario_path)?;
     let compiled = workspace.join("maps").join(&name);
@@ -241,6 +241,24 @@ pub(crate) fn compile_native(
         return invalid("MCC cache changed while copying the output");
     }
     Ok(())
+}
+/// Diagnose actual missing files without treating Tool's zero exit as success.
+pub fn native_compile_failure(log:&str)->String {
+    let mut missing=std::collections::BTreeSet::new();
+    for line in log.lines().take(4096){
+        let lower=line.to_ascii_lowercase();
+        if !lower.contains("0x00000002")&&!lower.contains("0x00000003"){continue;}
+        let prefix="file_open('tags\\";
+        let Some(start)=lower.find(prefix).map(|at|at+prefix.len()) else{continue};
+        let Some(end)=line[start..].find("')").map(|at|at+start)else{continue};
+        let tag=line[start..end].replace('\\',"/");
+        if tag.len()>512||tag.is_empty()||tag.chars().any(|c|c.is_control()||":*?<>|\"".contains(c))||tag.split('/').any(|part|part.is_empty()||part=="."||part==".."){continue;}
+        missing.insert(tag.to_ascii_lowercase());
+    }
+    if missing.is_empty(){return "MCC Tool did not confirm successful cache compilation. Its zero exit code alone is not success; inspect the conversion log".into();}
+    let list=missing.iter().take(8).cloned().collect::<Vec<_>>().join("; ");
+    let remaining=if missing.len()>8{format!(" (+{} more)",missing.len()-8)}else{String::new()};
+    format!("MCC conversion needs {} missing source tag(s): {list}{remaining}. Locate the original map's matching classic resource files or editable tags and rebuild. Installed MCC texture packs are not a substitute for missing classic tag data. No playable output was accepted.",missing.len())
 }
 pub fn native_compile_succeeded(log: &str) -> bool {
     let s = log.to_ascii_lowercase();
@@ -421,6 +439,23 @@ mod tests {
         assert!(!native_compile_succeeded(
             "successfully built cache file.\nEXCEPTION halt"
         ));
+    }
+    #[test]
+    fn missing_native_tags_report_exact_dependencies_and_matching_resource_guidance() {
+        let log="file_open('tags\\scenery\\test\\dust.bitmap') error 0x00000002\nfile_open('tags\\SCENERY\\TEST\\DUST.BITMAP') error 0x00000002\nfile_open('tags\\powerups\\active camoflage\\camoflage.bitmap') error 0x00000003\n### FAILED TO LOAD SCENARIO.";
+        let message=native_compile_failure(log);
+        assert!(message.contains("2 missing source tag(s)"));
+        assert!(message.contains("scenery/test/dust.bitmap"));
+        assert!(message.contains("powerups/active camoflage/camoflage.bitmap"));
+        assert!(message.contains("matching classic resource files"));
+        assert!(message.contains("No playable output was accepted"));
+        assert!(!native_compile_succeeded(log));
+    }
+    #[test]
+    fn dependency_diagnostics_do_not_echo_absolute_or_traversing_paths() {
+        let log="file_open('tags\\..\\private.bitmap') error 0x00000002\nfile_open('tags\\C:\\Users\\private.bitmap') error 0x00000002\n### FAILED TO LOAD SCENARIO.";
+        let message=native_compile_failure(log);
+        assert!(!message.contains("private.bitmap"));assert!(message.contains("zero exit code"));
     }
     #[test]
     fn compatibility_bindings_are_scoped_to_the_exact_published_yoyorast_source() {

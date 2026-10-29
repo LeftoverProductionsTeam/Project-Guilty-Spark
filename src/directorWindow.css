@@ -1,0 +1,160 @@
+.gs-director-window {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  color: #fff;
+  overflow: hidden;
+}
+.gs-director-window > header,
+.gs-director-window > nav,
+.gs-director-settings,
+.gs-director-cameras {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: #101a27;
+  border-bottom: 1px solid #345061;
+  font-size: 11px;
+  flex: none;
+}
+.gs-director-window > header > strong {
+  margin-right: auto;
+}
+.gs-director-window label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gs-director-window select,
+.gs-director-window input {
+  width: auto;
+  max-width: 200px;
+  padding: 5px;
+  font-size: 11px;
+}
+.gs-director-window button {
+  font-size: 11px;
+  padding: 6px 10px;
+}
+.gs-director-window input[type='number'] {
+  width: 64px;
+}
+.gs-director-settings > span {
+  color: #a8c3d2;
+}
+.gs-director-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+.gs-director-stage > video {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.gs-director-stage > .world-layout {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.gs-director-stage .hierarchy,
+.gs-director-stage .inspector,
+.gs-director-stage .viewport-toolbar,
+.gs-director-stage .viewport-status,
+.gs-director-stage .viewport-label,
+.gs-director-stage .bsp-control,
+.gs-director-stage .axis-hint,
+.gs-director-stage .viewport-help {
+  display: none !important;
+}
+.gs-director-stage .viewport-shell {
+  grid-column: 1;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.gs-director-stage .viewport {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+.gs-director-message {
+  margin: 0;
+  padding: 8px 12px;
+  background: #142739;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  max-height: 90px;
+  overflow: auto;
+  flex: none;
+}
+.gs-director-reveal {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 95;
+  opacity: 0;
+  background: #071722aa !important;
+}
+.gs-director-reveal:hover,
+.gs-director-reveal:focus-visible {
+  opacity: 1;
+}
+.gs-director-clean [data-nav-speed]:after {
+  display: none;
+}
+.gs-director-clean {
+  background: #000;
+}
+.gs-texture-setup {
+  position: absolute;
+  left: 10px;
+  bottom: 12px;
+  z-index: 15;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #101e2ded;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 11px;
+  max-width: calc(100% - 20px);
+  flex-wrap: wrap;
+}
+.gs-texture-setup > span {
+  flex-basis: 100%;
+  max-width: 600px;
+  overflow-wrap: anywhere;
+}
+.gs-director-window[data-embedded='true'] {
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+}
+.gs-director-key-editor {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: #101a27;
+  font-size: 11px;
+}
+.gs-director-key-editor input {
+  max-width: 180px;
+}
+.gs-director-key-editor label {
+  gap: 5px;
+}
+.gs-director-window output {
+  font-variant-numeric: tabular-nums;
+}
+.gs-director-stage .gs-texture-setup {
+  display: none;
+}

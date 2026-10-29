@@ -10,6 +10,7 @@ import {
   type ExternalWatchReport,
 } from '../externalMapSync';
 import { Notice } from './ui';
+import{usePanelAttention}from'./WorkspacePanels';
 import '../externalMapSync.css';
 
 export default function ExternalMapSync({
@@ -90,6 +91,7 @@ export default function ExternalMapSync({
   );
   const failures = Object.entries(errors).filter(([id, message]) => ids.has(id) && message);
   const overLimit = documents.filter((document) => document.project.source).length > 32;
+  usePanelAttention('source-changes',attention.length+failures.length);
   const mapped = documents.filter((document) => document.project.source);
   if (!mapped.length) return null;
   const watched = mapped.filter(
@@ -110,7 +112,7 @@ export default function ExternalMapSync({
     <div className="external-map-sync" aria-label="External map changes" aria-live="polite">
       <div className="external-map-sync-status">
         <span>
-          <strong>External saves</strong> · watching {watched} map{watched === 1 ? '' : 's'} every 2s
+          <strong>Changes from other editors</strong> · {watched} map{watched === 1 ? '' : 's'} monitored
           {watched < mapped.length ? ` · ${mapped.length - watched} starting / unavailable` : ''}
           {pending ? ` · ${pending} pending` : ''}
           {failures.length ? ` · ${failures.length} errors` : ''}
