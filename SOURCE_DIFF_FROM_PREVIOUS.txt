@@ -1,64 +1,61 @@
-Project Guilty Spark - C35 r12 source comparison
-BASELINE_GIT_COMMIT: d8ae7abb173b387892127e94f9f905444be2902e
+Project Guilty Spark - C36 r1 source comparison
+BASELINE_GIT_COMMIT: 21804c191a918cbf8bd74efac60dfcec65c9083b
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 9
-MODIFIED_COUNT: 38
-UNCHANGED_COUNT: 1143
+ADDED_COUNT: 15
+MODIFIED_COUNT: 29
+UNCHANGED_COUNT: 1161
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/examples/qa_mcc_audio.rs
-crates/spark-core/src/mcc_audio.rs
-docs/C35_MCC_AUDIO_AND_WORKFLOW.md
-docs/fixtures/c35-mcc-audio-native-verification.json
-scripts/native-main-track-audio-probe.mjs
-scripts/test-main-track-audio-native.mjs
-src/loopingEmitters.test.ts
-src/loopingEmitters.ts
-src/soundMixer.css
+.github/ISSUE_TEMPLATE/community-feedback.yml
+crates/spark-core/src/bsp_detail.rs
+crates/spark-core/src/portability.rs
+crates/spark-core/tests/portability.rs
+docs/CONTINUATION_36_ENGINEERING.md
+docs/CONTINUATION_36_GITHUB_DESCRIPTION.md
+docs/NATIVE_PORTABILITY.md
+docs/fixtures/c36-native-preservation-verification.json
+docs/research/C36_COMMUNITY_INTEROPERABILITY.md
+scripts/continuation36-evidence.mjs
+scripts/test-portability-native.mjs
+src-tauri/src/portability_native.rs
+src/components/PortabilityLab.tsx
+src/components/portabilityLab.css
+src/portability.ts
 
 MODIFIED FILES
+CHANGELOG.md
 COMMUNITY_CREDITS.md
+CONTRIBUTING.md
 README.md
-crates/spark-core/examples/qa_c35_workspace.rs
-crates/spark-core/examples/verify_tag_exchange.rs
-crates/spark-core/src/audio.rs
-crates/spark-core/src/bsp_clearance.rs
+crates/spark-core/src/bsp_audio.rs
+crates/spark-core/src/build.rs
+crates/spark-core/src/conversion.rs
+crates/spark-core/src/invitations.rs
 crates/spark-core/src/lib.rs
-crates/spark-core/src/library.rs
 crates/spark-core/src/project.rs
-crates/spark-core/src/tag_exchange.rs
+crates/spark-core/src/runtime_adapters.rs
 crates/spark-core/src/working_tags.rs
-crates/spark-core/tests/netgame_models.rs
-docs/CONTINUATION_35_ENGINEERING.md
-docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
+docs/ARCHITECTURE.md
+docs/COMPATIBILITY_MATRIX.md
+docs/GETTING_STARTED.md
 docs/GITHUB_HANDOFF.md
+docs/KNOWN_LIMITATIONS.md
 docs/MASTER_FEATURE_LEDGER.csv
-scripts/continuation35-evidence.mjs
-scripts/feature-ledger-evidence.mjs
+docs/MASTER_FEATURE_LEDGER.md
+docs/TESTING.md
+scripts/test-working-tags-native.mjs
+scripts/update-feature-ledger.mjs
 src-tauri/src/app.rs
-src-tauri/src/live_thread_pause.rs
 src/App.tsx
-src/components/MapSounds.tsx
-src/components/QuickForge.tsx
-src/components/Sound.tsx
-src/components/SoundMixer.tsx
-src/components/Tags.tsx
-src/components/ViewportAssetLibrary.tsx
-src/components/World.tsx
-src/directorAudio.test.ts
-src/editorAudio.test.ts
-src/editorAudio.ts
+src/components/BspAudioEditor.tsx
+src/components/Build.tsx
+src/components/InvitationJoin.tsx
 src/featureCatalog.ts
-src/hosting.css
-src/mapDocuments.test.ts
-src/mapDocuments.ts
-src/types.ts
-src/viewportAssets.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-The nine currently present C35 r8/r10/r11 executable, installer and source files remain frozen and independently rehashed; absent older files are not reconstructed.
+All 29 currently present C35 release files (including sidecars/receipts) remain frozen and independently rehashed; absent older files are not reconstructed.
