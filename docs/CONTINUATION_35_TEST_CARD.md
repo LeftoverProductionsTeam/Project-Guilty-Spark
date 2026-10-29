@@ -1,4 +1,8 @@
-# C35 owner acceptance: game capture and longer takes
+# C35 owner acceptance: window controls, BSP audio and game capture
+
+The [r9 window/audio report](C35_BSP_AUDIO.md) covers the reported drawer regressions. Open navigation and the original header in your chosen theme: the map should remain visible and interactive, with one app-close X and a header-hide chevron. Maximize, press F11, then use the visible fullscreen-exit control. Confirm maximized mode returns. Close from fullscreen with any ordinary source edits saved.
+
+For the compiled audio challenge, inspect **Runtime & Tools → Details → BSP ambience & sound environments**, choose actual cluster loops/environments and build/open a separate revision. Load that revision in the matching Halo runtime, traverse the assigned boundaries and compare the sounds/preset behavior with the authored choices. Native compilation and editor opening do not establish game acoustics.
 
 The [r8 thread-release report](C35_THREAD_RELEASE.md) needs a new controlled MCC check of camera, sprint, size and normal disconnect on the reviewed build. Keep Spark open and use an owned mods session. Verify that an operation reporting a release problem offers cleanup, blocks further writes and retains its connection after a failed retry. Do not deliberately interrupt or terminate Spark while game threads are paused; abnormal-exit recovery remains open. Windows child-process tests are separate from game acceptance.
 
@@ -12,7 +16,7 @@ The latest [conversion repair pass](C35_CONVERSION_RESOURCE_REPAIR.md) also need
 
 Use the C35 development executable, an owned map and a new output filename. Keep your ordinary map edits saved first. This test does not require a live memory-edit connection.
 
-1. Open the map in Level editor. **Menu** opens the workspace drawer; **Window** opens project/search/window controls. Close them, press **F11**, open/close one tool drawer and press **Escape** to restore the window. Confirm your map, camera and edits remain in place.
+1. Open the map in Level editor. **Menu** opens the workspace drawer; **Window** opens the original project/search header. Native window controls stay visible in the compact editing strip. Close them, press **F11**, open/close one tool drawer and press **Escape** to restore the window. Confirm your map, camera and edits remain in place.
 2. Prepare a useful view and select **Recording Director ↗**. Confirm the same view appears, move the Director to the desired monitor, and try fullscreen/hide interface. Escape restores its controls; Dock back retains the composition.
 3. For an actual Halo/OBS test, launch your game normally. In Director choose **Live Game Capture**, then explicitly select the intended game window/display in the OS picker. Confirm the feed and whether an audio track was supplied. This captures the game's current camera; an independent MCC spectator camera is not available. Leave the game focused and move your character. Confirm the feed continues without taking gameplay input.
 4. For the OS Save test, leave the folder under **Recording output** empty. Choose **Record video…**, select a **new `.webm` filename**, complete the countdown, record about ten seconds, pause/resume once and stop. Reopen that file and check the first second, the rest of the picture, audio if supplied, and the final frame. Report whether the file saves/plays correctly and whether movement/audio stay synchronized. A remembered folder and named take are also available.

@@ -2553,6 +2553,7 @@ pub fn run() {
             runtime_workbench::prepare_runtime_tool,
             runtime_workbench::launch_runtime_tool,
             runtime_workbench::build_working_tags,
+            runtime_workbench::inspect_bsp_audio_workspace,
             runtime_workbench::runtime_tool_processes,
             runtime_workbench::community_listing,
             runtime_workbench::community_join_preflight,

@@ -625,10 +625,23 @@ pub(super) async fn launch_runtime_tool(
 }
 
 #[tauri::command]
+pub(super) async fn inspect_bsp_audio_workspace(app:tauri::AppHandle,project_id:String)->Reply<core::bsp_audio::Workspace>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let context=source_context(&state,&project)?;
+        let cache=context.build.output.as_ref().ok_or("Validated parent cache is missing")?;
+        let sha=context.build.sha256.as_deref().ok_or("Validated parent cache identity is missing")?;
+        core::bsp_audio::inspect_workspace(&context.build.id,cache,sha,&context.tags).map_err(error)
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
 pub(super) async fn build_working_tags(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
     project_id: String,
+    bsp_audio: Option<core::bsp_audio::Request>,
 ) -> Reply<String> {
     let owner = window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
@@ -642,7 +655,7 @@ pub(super) async fn build_working_tags(
         let invader_info=build::tool_path(&tools,"invader-info").ok_or("Configure Invader info before verifying a working-tag build")?;
         verify_compiler_location(&state,&forge_build::ForgeToolchain{hek_directory:settings.hek_directory.clone(),hek_flavor:settings.hek_flavor.clone(),invader_directory:settings.invader_directory.clone(),hek_tags_directory:Some(context.tags.clone())})?;
         let scenario_type=if project.quick_forge.is_some(){1}else{inspect(&state,&project)?.header.scenario_type};
-        let input=core::working_tags::WorkingTagsInput{parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
+        let input=core::working_tags::WorkingTagsInput{bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
         snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;
         let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
         let mut jobs=lock(&state.jobs)?;if !jobs.is_empty(){return Err("Another build is running; wait for completion or cancel it first".into());}jobs.insert(job_id.clone(),cancel.clone());drop(jobs);

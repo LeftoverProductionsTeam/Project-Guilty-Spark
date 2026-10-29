@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { native } from './api';
+// Window state survives switching tools, which remounts the workspace controls.
+let restoreMaximized = false;
 
 /** Read actual window state; remembered layouts must not pretend a window is fullscreen. */
 export function useWindowFullscreen() {
@@ -33,8 +35,25 @@ export function useWindowFullscreen() {
     try {
       const active = native ? await getCurrentWindow().isFullscreen() : !!document.fullscreenElement;
       const next = enabled ?? !active;
-      if (native) await getCurrentWindow().setFullscreen(next);
-      else if (next && !active) await document.documentElement.requestFullscreen();
+      if (native) {
+        const current = getCurrentWindow();
+        if (next && !active) {
+          restoreMaximized = await current.isMaximized();
+          if (restoreMaximized) await current.unmaximize();
+        }
+        try {
+          await current.setFullscreen(next);
+          if ((await current.isFullscreen()) !== next)
+            throw new Error('The window did not enter the requested display mode.');
+        } catch (reason) {
+          if (next && restoreMaximized && !(await current.isFullscreen())) await current.maximize();
+          throw reason;
+        }
+        if (!next && restoreMaximized) {
+          await current.maximize();
+          restoreMaximized = false;
+        }
+      } else if (next && !active) await document.documentElement.requestFullscreen();
       else if (!next && active) await document.exitFullscreen();
       if (alive.current) {
         setFullscreen(next);

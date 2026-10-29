@@ -26,6 +26,7 @@ import type {
 import { availabilityLabel, evidenceLabel, runtimeNames } from '../runtimeWorkbench';
 import { Notice } from './ui';
 import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
+import BspAudioEditor, {type BspAudioRequest} from './BspAudioEditor';
 import '../runtimeWorkbench.css';
 
 const actions = [
@@ -260,13 +261,13 @@ export default function RuntimeDock({
       if (request === generation.current) setBusy(false);
     }
   }
-  async function buildWorkingTags() {
+  async function buildWorkingTags(bspAudio?:BspAudioRequest) {
     if (!project || dirty || working || busy || toolTags.report?.status==='saving') return;
     const request = generation.current;
     setBusy(true);
     setError('');
     try {
-      await call<string>('build_working_tags', { projectId: project.id });
+      await call<string>('build_working_tags', { projectId: project.id, ...(bspAudio?{bspAudio}:{}) });
       if (request === generation.current) {
         setDetails(false);
         setNotice(
@@ -453,6 +454,7 @@ export default function RuntimeDock({
               </button>
             </div>
             {project && report?.workingSource && <WorkingTagChanges {...toolTags}/>}
+            {project && report?.workingSource && runtime==='mccSteam' && <BspAudioEditor key={project.id+report.workingSource.buildId} projectId={project.id} parentBuildId={report.workingSource.buildId} blocked={busy||working||dirty||toolTags.report?.status==='saving'||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')} onBuild={buildWorkingTags}/>}
             {project && (
               <div className="button-row">
                 <button

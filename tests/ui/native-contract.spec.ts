@@ -177,7 +177,10 @@ async function mockDesktop(page: Page) {
         if (command === 'plugin:event|unlisten') return null;
         if(command==='plugin:window|is_fullscreen')return !!mock.fullscreen;
         if(command==='plugin:window|set_fullscreen'){mock.fullscreen=args.value;return null;}
-        if(command==='plugin:window|is_maximized')return false;
+        if(command==='plugin:window|is_maximized')return !!mock.maximized;
+        if(command==='plugin:window|toggle_maximize'){mock.maximized=!mock.maximized;return null;}
+        if(command==='plugin:window|unmaximize'){mock.maximized=false;return null;}
+        if(command==='plugin:window|maximize'){mock.maximized=true;return null;}
         if (command === 'bootstrap') return structuredClone(bootstrap);
         if (command === 'open_project') {if(mock.delayOpen){const delay=mock.delayOpen;mock.delayOpen=0;await new Promise(resolve=>setTimeout(resolve,delay));}return structuredClone(projects[args.id]);}
         if (command === 'claim_project_document' || command === 'release_project_document') return null;
@@ -341,8 +344,8 @@ test('C35 empty Level editor asks for an editing context without assuming an ins
 test('C35 the window header is a drawer that overlays without consuming editor height',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  const viewport=page.getByTestId('viewport'),header=page.locator('#gs-window-header');await expect(viewport).toBeVisible();await expect(header).toBeHidden();const closed=await viewport.boundingBox();expect(closed!.y).toBeLessThan(200);
- await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();await expect(header).toBeVisible();await expect(header.getByRole('button',{name:'Close window',exact:true})).toBeVisible();await expect(header.getByRole('button',{name:/Find tools/})).toBeVisible();const opened=await viewport.boundingBox();expect(opened!.height).toBeCloseTo(closed!.height,0);
- await page.keyboard.press('Escape');await expect(header).toBeHidden();await page.keyboard.press('Control+Shift+Backslash');await expect(header).toBeVisible();await page.getByRole('button',{name:'Close window header',exact:true}).click();await expect(header).toBeHidden();await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();await expect(header).toBeVisible();await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeVisible();await expect(header.getByRole('button',{name:/Find tools/})).toBeVisible();expect(await header.evaluate(e=>getComputedStyle(e).position)).toBe('fixed');const opened=await viewport.boundingBox();expect(opened!.height).toBeCloseTo(closed!.height,0);
+ await page.keyboard.press('Escape');await expect(header).toBeHidden();await page.keyboard.press('Control+Shift+Backslash');await expect(header).toBeVisible();await page.getByRole('button',{name:'Hide window and project header',exact:true}).click();await expect(header).toBeHidden();await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toBeVisible();
 });
 
 test('C35 F11 uses native fullscreen and Escape closes navigation before restoring editing',async({page})=>{
@@ -350,13 +353,48 @@ test('C35 F11 uses native fullscreen and Escape closes navigation before restori
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  const viewport=page.getByTestId('viewport');await expect(viewport).toBeVisible();const original=await viewport.boundingBox();
  await page.keyboard.press('F11');await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
- const full=await viewport.boundingBox();expect(full!.width).toBeGreaterThan(1240);expect(full!.height).toBeGreaterThan(690);expect(full!.height).toBeGreaterThan(original!.height);
+ const full=await viewport.boundingBox();expect(full!.width).toBeGreaterThan(1240);expect(full!.height).toBeGreaterThan(650);expect(full!.height).toBeGreaterThan(original!.height);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();await expect(page.getByRole('button',{name:'Exit fullscreen',exact:true})).toBeInViewport();
  await page.mouse.move(100,2);await page.getByRole('button',{name:'Toggle Inspector',exact:true}).click();await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
  await page.keyboard.press('Control+Backslash');await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
  await page.keyboard.press('Escape');await expect(page.locator('.gs-navigation-drawer')).toBeHidden();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
  await page.keyboard.press('Escape');await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','false');
  await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toBeVisible();
  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='plugin:window|set_fullscreen').map((c:any)=>c.args.value));expect(calls).toEqual([true,false]);
+});
+
+test('drawers keep the existing themes and leave the map interactive without a screen cover',async({page})=>{
+ await page.setViewportSize({width:1280,height:720});await mockDesktop(page);
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ for(const theme of ['dark-glow','covenant']){
+  await page.evaluate(theme=>document.documentElement.dataset.gsTheme=theme,theme);
+  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();
+  const drawer=page.locator('#gs-workspace-navigation');await expect(drawer).toBeVisible();
+  await expect(page.locator('.gs-navigation-backdrop,.gs-header-backdrop')).toHaveCount(0);
+  const viewport=page.getByTestId('viewport'),before=await viewport.boundingBox();
+  const target={x:before!.x+before!.width*.75,y:before!.y+before!.height*.6};
+  expect(await page.evaluate(({x,y})=>!!document.elementFromPoint(x,y)?.closest('[data-testid="viewport"]'),target)).toBe(true);
+  if(theme==='covenant')expect(await drawer.evaluate(e=>getComputedStyle(e).backgroundImage)).toContain('linear-gradient');
+  await page.mouse.click(target.x,target.y);await expect(drawer).toBeHidden();await expect(viewport).toBeVisible();
+  const after=await viewport.boundingBox();expect(after).toEqual(before);
+ }
+ await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);
+});
+
+test('fullscreen from maximized restores the original mode and keeps mouse window actions reachable',async({page})=>{
+ await mockDesktop(page);await page.getByRole('button',{name:'Maximize window',exact:true}).click();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.maximized)).toBe(true);
+ await page.getByRole('button',{name:'Fullscreen editing',exact:true}).click();
+ await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.maximized)).toBe(false);
+ await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();
+ await page.getByRole('button',{name:'Toggle window and project header',exact:true}).click();
+ await expect(page.locator('#gs-window-header')).toBeVisible();
+ await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);
+ await page.keyboard.press('Escape');await expect(page.locator('#gs-window-header')).toBeHidden();
+ await page.getByRole('button',{name:'Exit fullscreen',exact:true}).click();
+ await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','false');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.maximized)).toBe(true);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>['plugin:window|unmaximize','plugin:window|set_fullscreen','plugin:window|maximize'].includes(c.command)).map((c:any)=>[c.command,c.args.value??null]))).toEqual([['plugin:window|unmaximize',null],['plugin:window|set_fullscreen',true],['plugin:window|set_fullscreen',false],['plugin:window|maximize',null]]);
 });
 
 async function mockBitmapRepair(page:Page){
@@ -401,6 +439,33 @@ test('saved native tool tags have a stable-save review and separate build workfl
  await page.evaluate(()=>{(window as any).__sparkMock.tagPhase='saving';});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags).toContainText('Waiting for a stable save');await expect(page.getByRole('button',{name:'Build working tag edits',exact:true})).toBeDisabled();
  await page.evaluate(()=>{(window as any).__sparkMock.tagPhase='changed';});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags).toContainText('1 changed tag file');await tags.locator('summary').click();await expect(tags).toContainText('levels/test/test.scenario');await expect(page.getByRole('button',{name:'1 saved tool edit',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Build working tag edits',exact:true}).click();expect(await page.evaluate(()=>(window as any).__sparkMock.toolBuildProject)).toBe('a');await expect(page.getByRole('dialog')).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.saved)).toBeNull();
+});
+
+async function mockBspAudio(page:Page){
+  await mockDesktop(page);await page.evaluate(()=>{
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke;
+    const state=w.__bspAudio={build:'owned-build',fail:false,calls:[] as any[]};
+    const dependency={path:'sound/forest.sound_looping',sha256:'c'.repeat(64)},environment={path:'sound/stone.sound_environment',sha256:'d'.repeat(64)};
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='runtime_workbench_report'){const report=await original(command,args);report.sourceIssue=null;report.toolsIssue=null;report.workingSource={buildId:state.build,tagsDirectory:'owned/tags'};return report;}
+      if(command==='inspect_bsp_audio_workspace')return {parentBuildId:state.build,inspection:{sourceSha256:'a'.repeat(64),bsps:[{index:0,tagPath:'levels/test/bsp',portalCount:1,backgroundPalette:[],environmentPalette:[],clusters:[{index:0,background:null,environment:null,bounds:[[0,0,0],[1,1,1]]},{index:1,background:null,environment:null,bounds:null}]}]},bspTagHashes:{'levels/test/bsp.scenario_structure_bsp':'b'.repeat(64)},backgrounds:[dependency],environments:[environment]};
+      if(command==='build_working_tags'){state.calls.push(structuredClone(args));if(state.fail)throw Error('Synthetic working BSP changed after inspection');return 'synthetic-audio-job';}
+      return original(command,args);
+    };
+  });
+  await openFixture(page);await page.getByRole('button',{name:'Runtime and tool details',exact:true}).click();await page.locator('.bsp-audio-editor>summary').click();await page.getByRole('button',{name:'Inspect BSP audio',exact:true}).click();
+}
+test('BSP audio bindings use the inspected parent and survive reopening before a separate native build',async({page})=>{
+  await mockBspAudio(page);
+  await page.getByRole('combobox',{name:'BSP background loop',exact:true}).selectOption('sound/forest.sound_looping');await page.getByRole('combobox',{name:'BSP sound environment',exact:true}).selectOption('sound/stone.sound_environment');await page.getByRole('button',{name:'Stage all 2 clusters',exact:true}).click();
+  await expect(page.locator('.bsp-audio-editor')).toContainText('2 staged cluster bindings');
+  await page.keyboard.press('Escape');await page.getByRole('button',{name:'Runtime and tool details',exact:true}).click();await page.locator('.bsp-audio-editor>summary').click();await expect(page.locator('.bsp-audio-editor')).toContainText('2 staged cluster bindings');
+  await page.getByRole('button',{name:'Inspect BSP audio',exact:true}).click();
+  await page.getByRole('button',{name:'Build BSP audio revision',exact:true}).click();const calls=await page.evaluate(()=>(window as any).__bspAudio.calls);expect(calls).toHaveLength(1);expect(calls[0].projectId).toBe('a');expect(calls[0].bspAudio.parentBuildId).toBe('owned-build');expect(calls[0].bspAudio.changes.map((c:any)=>c.cluster)).toEqual([0,1]);expect(calls[0].bspAudio.changes[0].environment.sha256).toBe('d'.repeat(64));expect(await page.evaluate(()=>(window as any).__sparkMock.saved)).toBeNull();
+});
+test('a failed BSP audio build retains its draft and a replaced parent requires review',async({page})=>{
+  await mockBspAudio(page);await page.getByRole('button',{name:'Stage cluster binding',exact:true}).click();await page.evaluate(()=>{(window as any).__bspAudio.fail=true;});await page.getByRole('button',{name:'Build BSP audio revision',exact:true}).click();await expect(page.getByText('Synthetic working BSP changed after inspection',{exact:false})).toBeVisible();await expect(page.locator('.bsp-audio-editor')).toContainText('1 staged cluster binding');
+  await page.evaluate(()=>{(window as any).__bspAudio.build='new-build';});await page.getByRole('button',{name:'Refresh inspection',exact:true}).click();await page.locator('.bsp-audio-editor>summary').click();await page.getByRole('button',{name:'Inspect BSP audio',exact:true}).click();await expect(page.locator('.bsp-audio-editor')).toContainText('older working build');await expect(page.getByRole('button',{name:'Build BSP audio revision',exact:true})).toBeDisabled();await page.getByRole('button',{name:'Clear BSP audio draft',exact:true}).click();await expect(page.getByRole('button',{name:'Stage cluster binding',exact:true})).toBeEnabled();
 });
 
 test('C35 viewport navigation uses Q/E and RMB wheel speed without stealing text input',async({page})=>{

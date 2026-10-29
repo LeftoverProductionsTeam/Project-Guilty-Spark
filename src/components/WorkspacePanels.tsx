@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { Menu, PanelLeftClose, PanelRightOpen, Scan, X, RotateCcw } from 'lucide-react';
 import { useMapState } from '../mapSession';
 import { useWindowFullscreen } from '../useWindowFullscreen';
+import { WindowControls } from './WindowFrame';
 import { changePanel, cleanLayout, defaultPanel } from '../workspaceLayout';
 import type { PanelPlacement, WorkspaceLayout } from '../workspaceLayout';
 import '../workspacePanels.css';
@@ -49,6 +50,7 @@ export default function WorkspacePanels({
   const { fullscreen, change: changeFullscreen, error: windowError } = useWindowFullscreen();
   const focus = layout.focus || fullscreen;
   const [peek, setPeek] = useState<string | null>(null);
+  const [frameError, setFrameError] = useState('');
   useEffect(() => setPeek(null), [fullscreen, id, workspace]);
   const [descriptors, setDescriptors] = useState<Descriptor[]>([]),
     [host, setHost] = useState<HTMLDivElement | null>(null),
@@ -138,7 +140,7 @@ export default function WorkspacePanels({
           >
             {fullscreen ? 'Exit fullscreen · F11' : 'Fullscreen · F11'}
           </button>
-          {windowError && <span role="alert">{windowError}</span>}
+          {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
           <div className="gs-panel-buttons">
             {descriptors.map((panel) => (
               <button
@@ -204,6 +206,7 @@ export default function WorkspacePanels({
               {focus ? 'Exit focus · Esc' : 'Focus mode'}
             </button>
           </div>
+          <WindowControls notify={setFrameError} fullscreen={fullscreen} onExitFullscreen={()=>changeFullscreen(false)}/>
         </nav>
         <div
           className="gs-workspace-content"

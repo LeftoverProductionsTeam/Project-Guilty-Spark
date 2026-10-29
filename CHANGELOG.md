@@ -2,6 +2,9 @@
 
 ## 0.4.0 — Continuation 35: The living workbench (development)
 
+- Restore theme-preserving, interactive sidebar/header drawers; remove opaque backdrops and the duplicate close X. Keep one native control group visible in fullscreen and restore maximized mode on exit. Correct the runtime-details width.
+- Add per-map BSP background-loop/environment drafts, exact source/dependency inspection and separate native working-tag builds with compiled binding, collision and PVS/PAS verification. [Evidence and game acceptance limits](docs/C35_BSP_AUDIO.md).
+
 - Live transport follow-through: acknowledge thread release before returning operation success, retain failed owned increments for retry, preserve other owners' counts and block new edits after faults. Keep recovery reachable when local data state is unavailable; show retry counts and disable pending object/camera/sprint writes. [Evidence and remaining gates](docs/C35_THREAD_RELEASE.md).
 - Looping audio follow-through: read source main tracks, retain intro/loop/end clips and fade flags, share bounded PCM buffers and finish authored endings before saving Director takes. Remember sound search/track context and correct the late-finish envelope anchor. [Evidence and limits](docs/C35_LOOPING_AUDIO.md).
 - Live-session follow-through: keep cleanup reachable after sampling fails, distinguish verified restoration from obsolete-record retirement, fence cleanup/object edits to their connection and block new writes during pending cleanup. Stop queued keepers, reset stale live bindings/history and discard late old-session receipts. [Evidence and remaining MCC gates](docs/C35_LIVE_SESSION_RECOVERY.md).

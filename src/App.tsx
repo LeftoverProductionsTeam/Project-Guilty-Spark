@@ -12,6 +12,7 @@ import {
   Heart,
   Box,
   ChevronRight,
+  ChevronUp,
   CircleHelp,
   FileCode2,
   FolderOpen,
@@ -70,7 +71,7 @@ import AssetTransfer,{transferTag} from './components/AssetTransfer';
 import type {TransferSelection} from './components/AssetTransfer';
 import {readHistoryLimit,saveHistoryLimit} from './historyPreferences';
 import { firstVisitWorkspace, markFirstVisitSeen, WORKSPACE_TOOLTIPS } from './firstRun';
-import {WindowControls,ResizeEdges,dragWindow,maximizeWindow} from './components/WindowFrame';
+import {ResizeEdges,dragWindow,maximizeWindow} from './components/WindowFrame';
 import { Empty, IconButton, Pill, Toast } from './components/ui';
 import Library from './components/Library';
 import CommunityMaps from './components/CommunityMaps';
@@ -145,6 +146,16 @@ export default function App() {
   const[headerOpen,setHeaderOpen]=useMapState('global','chrome.header',false);
   const toggleNavigation=()=>{setHeaderOpen(false);setSidebarOpen(open=>!open);};
   const toggleHeader=()=>{setSidebarOpen(false);setHeaderOpen(open=>!open);};
+  useEffect(()=>{
+    if(!sidebarOpen&&!headerOpen)return;
+    const dismiss=(event:globalThis.PointerEvent)=>{
+      const target=event.target as HTMLElement;
+      if(target.closest('#gs-workspace-navigation,#gs-window-header,.gs-navigation-toggle,.gs-header-toggle'))return;
+      setSidebarOpen(false);setHeaderOpen(false);
+    };
+    document.addEventListener('pointerdown',dismiss,true);
+    return()=>document.removeEventListener('pointerdown',dismiss,true);
+  },[sidebarOpen,headerOpen,setSidebarOpen,setHeaderOpen]);
   useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape'&&(sidebarOpen||headerOpen)&&!document.querySelector('[role="dialog"]')){event.preventDefault();event.stopImmediatePropagation();if(sidebarOpen){setSidebarOpen(false);document.querySelector<HTMLButtonElement>('.gs-navigation-toggle')?.focus();}else{setHeaderOpen(false);document.querySelector<HTMLButtonElement>('.gs-header-toggle')?.focus();}}else if((event.ctrlKey||event.metaKey)&&event.code==='Backslash'&&!event.altKey){event.preventDefault();event.stopImmediatePropagation();if(event.shiftKey){setSidebarOpen(false);setHeaderOpen(open=>!open);}else{setHeaderOpen(false);setSidebarOpen(open=>!open);}}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[sidebarOpen,headerOpen,setSidebarOpen,setHeaderOpen]);
   const [settingsTab,setSettingsTab]=useState<'tools'|'dependencies'>('tools');
   const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
@@ -890,11 +901,8 @@ export default function App() {
               <CircleHelp size={18} />
             </IconButton>
           </div>
-          <WindowControls notify={notice}/>
-          <IconButton label="Close window header" onClick={()=>setHeaderOpen(false)}><X size={15}/></IconButton>
+          <IconButton label="Hide window and project header" onClick={()=>setHeaderOpen(false)}><ChevronUp size={17}/></IconButton>
         </header>
-        {headerOpen&&<button className="gs-header-backdrop" aria-label="Close window and project header" onClick={()=>setHeaderOpen(false)}/>}
-        {sidebarOpen&&<button className="gs-navigation-backdrop" aria-label="Close workspace navigation" onClick={()=>setSidebarOpen(false)}/>}
         <aside id="gs-workspace-navigation" className="sidebar gs-navigation-drawer" aria-label="Workspace navigation" hidden={!sidebarOpen} onClickCapture={e=>{if((e.target as HTMLElement).closest('.nav-item'))setSidebarOpen(false);}}>
           <div className="sidebar-label">WORKSPACES</div>
           <nav aria-label="Workspaces">

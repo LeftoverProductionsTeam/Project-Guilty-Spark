@@ -133,7 +133,7 @@
 .runtime-dock-notice button {
   pointer-events: auto;
 }
-.runtime-details-dialog {
+.modal.runtime-details-dialog {
   width: min(940px, 92vw);
   max-width: min(940px, 92vw);
   max-height: 83vh;
@@ -320,3 +320,7 @@
     display: none;
   }
 }
+
+.bsp-audio-editor{grid-column:1/-1;min-width:0;padding:.65rem;border-top:1px solid var(--border)}
+.bsp-audio-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}.bsp-audio-grid label{display:grid;gap:.3rem;min-width:0}.bsp-audio-grid select{width:100%;min-width:0;max-width:100%}.bsp-audio-draft{max-height:12rem;overflow:auto;overflow-wrap:anywhere}.bsp-audio-draft>div{padding:.35rem 0;border-bottom:1px solid var(--border)}
+@media(max-width:640px){.bsp-audio-grid{grid-template-columns:1fr}}

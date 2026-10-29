@@ -135,3 +135,5 @@ pub fn safe_relative(value: &str) -> Result<std::path::PathBuf> {
     }
     Ok(std::path::PathBuf::from(normalized))
 }
+
+pub mod bsp_audio;

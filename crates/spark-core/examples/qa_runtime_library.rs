@@ -14,7 +14,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const MAX_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_FILES: usize = 20_000;
 fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, Box<dyn std::error::Error>> {
     spark_core::reject_links(path)?;
@@ -71,7 +71,7 @@ fn bounded_files(
         .checked_add(metadata.len())
         .ok_or("QA size overflow")?;
     if *bytes > MAX_BYTES || files.len() >= MAX_FILES {
-        return Err("QA context exceeds256MiB/20000files".into());
+        return Err("QA context exceeds4GiB/20000files".into());
     }
     files.insert(relative.to_path_buf(), metadata.len());
     Ok(())
@@ -107,8 +107,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     spark_core::reject_links(&source)?;
     let source = fs::canonicalize(source)?;
     let mut project = project::load_project(Path::new(&args[1]))?;
-    if project.source.is_some() {
-        return Err("This narrow QA fixture requires a source-owned QuickForge project, not a managed imported source cache".into());
+    if let Some(source) = &project.source {
+        for path in [&source.original_path, &source.preserved_path] {
+            spark_core::reject_links(path)?;
+            if maps::hash_file(path)? != source.sha256 {
+                return Err("QA imported source identity changed".into());
+            }
+        }
     }
     let mut record: BuildRecord = read_json(&source.join("receipt.json"))?;
     let mut receipt: WorkingTagsReceipt = read_json(&source.join("working-tags-receipt.json"))?;
@@ -228,6 +233,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("QA destination cannot be inside accepted source".into());
     }
     fs::create_dir(&destination)?;
+    let destination = fs::canonicalize(destination)?;
     let job = destination.join("jobs").join(&record.id);
     fs::create_dir_all(&job)?;
     let mut copied_hashes = BTreeMap::new();
@@ -273,11 +279,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     project.builds.retain(|b| b.id != record.id);
     project.builds.push(record.clone());
     let library = Library::open(&destination)?;
+    if let Some(source) = &mut project.source {
+        let preserved = destination
+            .join("projects")
+            .join(&project.id)
+            .join("source.map");
+        fs::create_dir_all(preserved.parent().ok_or("QA source has no parent")?)?;
+        let mut input = fs::File::open(&source.preserved_path)?;
+        let mut output = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&preserved)?;
+        std::io::copy(&mut input, &mut output)?;
+        drop(output);
+        if maps::hash_file(&source.preserved_path)? != source.sha256
+            || maps::hash_file(&preserved)? != source.sha256
+        {
+            return Err("QA preserved source copy changed".into());
+        }
+        source.preserved_path = preserved;
+    }
     let entry = library.save(&project, None)?;
     if library.get(&project.id)?.fingerprint()? != record.project_fingerprint {
         return Err("Seeded library fingerprint changed".into());
     }
-    let summary = serde_json::json!({"schemaVersion":1,"sourceJob":source,"library":destination,"projectId":project.id,"projectPath":entry.project_path,"jobId":record.id,"copiedFiles":files.len(),"copiedBytes":bytes,"cacheSha256":record.sha256,"tagBytesUnchanged":true,"manifestBytesUnchanged":true,"sourceUnchanged":true,"omitted":"Redundant workspace/maps cache and transient Tool logs; output cache preserved.","programsLaunched":false});
+    let summary = serde_json::json!({"schemaVersion":1,"sourceJob":source,"library":std::path::absolute(&args[2])?,"projectId":project.id,"projectPath":entry.project_path,"jobId":record.id,"copiedFiles":files.len(),"copiedBytes":bytes,"cacheSha256":record.sha256,"tagBytesUnchanged":true,"manifestBytesUnchanged":true,"sourceUnchanged":true,"omitted":"Redundant workspace/maps cache and transient Tool logs; output cache preserved.","programsLaunched":false});
     project::atomic_write(
         &destination.join("qa-seed-receipt.json"),
         &serde_json::to_vec_pretty(&summary)?,
