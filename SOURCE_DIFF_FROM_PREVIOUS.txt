@@ -1,41 +1,43 @@
-Project Guilty Spark - C35 r5 source comparison
-BASELINE_GIT_COMMIT: 86fbe07f82d155ec82dbfc7c07e3a61aac7b833e
+Project Guilty Spark - C35 r6 source comparison
+BASELINE_GIT_COMMIT: 1f87ccf8aa63eae3f235c10f522fae4279a70e02
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
 ADDED_COUNT: 6
-MODIFIED_COUNT: 18
-UNCHANGED_COUNT: 1107
+MODIFIED_COUNT: 20
+UNCHANGED_COUNT: 1111
 REMOVED_COUNT: 0
 
 ADDED FILES
-docs/C35_DIRECTOR_AUDIO.md
-docs/fixtures/c35-director-audio-native-verification.json
-scripts/native-director-audio-probe.mjs
-src/directorAudio.test.ts
-src/directorAudio.ts
-src/soundClipLoader.ts
+docs/C35_LIVE_SESSION_RECOVERY.md
+docs/fixtures/c35-live-session-recovery-native-verification.json
+src-tauri/src/live_cleanup.rs
+src/components/LiveSessionRecovery.tsx
+src/liveSession.test.ts
+src/liveSession.ts
 
 MODIFIED FILES
 CHANGELOG.md
 README.md
-crates/spark-core/src/native_workspace.rs
 docs/COMPATIBILITY_MATRIX.md
 docs/CONTINUATION_35_ENGINEERING.md
 docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
 docs/CONTINUATION_35_TEST_CARD.md
 docs/GITHUB_HANDOFF.md
+docs/LIVE_ADAPTER.md
 docs/MASTER_FEATURE_LEDGER.csv
 docs/MASTER_FEATURE_LEDGER.md
+docs/research/C34_LIVE_WRITE_AUDIT.md
 scripts/test-director-recording-native.mjs
-src/components/DirectorWindow.tsx
-src/components/SoundMixer.tsx
-src/directorRecording.test.ts
-src/directorRecording.ts
-src/directorWindow.css
+src-tauri/src/app.rs
+src-tauri/src/live_camera_native.rs
+src-tauri/src/live_mcc.rs
+src-tauri/src/live_sprint_native.rs
+src/components/LiveForge.tsx
+src/components/LiveObjectInspector.tsx
 src/featureCatalog.ts
-src/spatialAudio.ts
+tests/ui/native-contract.spec.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-Earlier C32/C33/C34 and C35 r1/r2/r3/r4 release/source archives remain frozen.
+Earlier C32/C33/C34 and C35 r1/r2/r3/r4/r5 release/source archives remain frozen.
