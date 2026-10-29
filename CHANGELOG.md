@@ -2,6 +2,7 @@
 
 ## 0.4.0 — Continuation 35: The living workbench (development)
 
+- Follow-through: monitor saved derived tag changes, review stable file differences and rebuild/open a separate native map. Fix the desktop working-tag pre-build snapshot reason and widen runtime details. [Actual native round trip](docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md).
 - Make navigation and the top window/project header remembered drawers; move utility panels into configurable edge/floating drawers and add native F11 fullscreen with Escape restoration.
 - Preserve per-map workflow context and the new-level wizard; add configurable Q/E camera flight, wheel speed and native focus-release guards.
 - Add a detachable/dockable Recording Director with shared camera authority, keys/timeline/tracking/lens, display controls and read-only saved-map refresh.

@@ -1,5 +1,7 @@
 # C35 — the living workbench
 
+Subsequent scoped evidence: [saved tool-edit follow-through and desktop snapshot repair](C35_TOOL_EDIT_FOLLOW_THROUGH.md). The r1 results and artifacts recorded below remain historical and frozen; the follow-through has its own native receipt and r2 files.
+
 C35 continues master `617d267` on `codex/continuation-35-living-workbench`. It preserves C32–C34, the restoration corpus and frozen earlier artifacts. This is an internal development build, not a completed replacement Halo engine. No remote push, public release or master merge is included.
 
 ## Delivered behavior

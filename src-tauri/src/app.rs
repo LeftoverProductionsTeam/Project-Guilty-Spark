@@ -32,6 +32,7 @@ use tauri::{Emitter, Manager, State};
 #[path="map_download.rs"] mod map_download;
 #[path="director_native.rs"] mod director_native;
 #[path="director_recording.rs"]mod director_recording;
+#[path="working_tag_changes_native.rs"]mod working_tag_changes_native;
 #[path="dependency_install.rs"] mod dependency_install;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
@@ -115,6 +116,7 @@ struct AppState {
     dependency_install: Mutex<dependency_install::DependencyInstallState>,
     director:Mutex<director_native::DirectorState>,
     recordings:Mutex<director_recording::RecordingState>,
+    working_tag_changes:Mutex<working_tag_changes_native::WorkingTagChangesState>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2459,6 +2461,7 @@ pub fn run() {
                 dependency_install: Mutex::new(Default::default()),
                 director:Mutex::new(Default::default()),
                 recordings:Mutex::new(Default::default()),
+            working_tag_changes:Mutex::new(Default::default()),
             });
             if let Err(e) = configure(app.handle(), &app.state::<AppState>(), settings) {
                 if let Ok(mut d) = app.state::<AppState>().diagnostics.lock() {
@@ -2476,7 +2479,7 @@ pub fn run() {
         .on_window_event(|window,event|{director_native::window_event(window.app_handle(),window,event);if matches!(event,tauri::WindowEvent::Destroyed){
             if let Some(state)=window.app_handle().try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=window.label());}}
             let app=window.app_handle().clone();let label=window.label().to_owned();
-            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);}});
+            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);}});
         }})
         .invoke_handler(tauri::generate_handler![
             prepare_map_download,
@@ -2493,6 +2496,9 @@ pub fn run() {
             director_recording::director_record_open,
             director_recording::director_record_append,
             director_recording::director_record_finish,
+            working_tag_changes_native::working_tag_watch_start,
+            working_tag_changes_native::working_tag_watch_poll,
+            working_tag_changes_native::working_tag_watch_stop,
             dependency_install::run_dependency_action,
             dependency_install::discard_dependency_action,
             dependency_install::choose_dependency_path,
@@ -2690,6 +2696,7 @@ mod readiness_tests {
             dependency_install:Mutex::new(Default::default()),
             director:Mutex::new(Default::default()),
             recordings:Mutex::new(Default::default()),
+            working_tag_changes:Mutex::new(Default::default()),
         };
         (temp, state, p, record)
     }

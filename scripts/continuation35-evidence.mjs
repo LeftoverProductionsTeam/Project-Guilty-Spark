@@ -88,8 +88,8 @@ export const continuation35Requirements = [
     'external-tags',
     'Retain reliable external tools and synchronize loose tags without losing edits',
     'externalRefresh',
-    'Existing two-second cache-file external-save/revision/conflict workflow remains tested through the Changes drawer; supported working-tags builds remain available.',
-    'General loose-tag tree synchronization, per-file conflicts/backup/reconcile UX and broad native editor round-trips remain incomplete.',
+    'The existing two-second compiled-map monitor is retained. Derived working tags now have native filesystem notification, three-second stable-save checks, verified compiled-inventory or explicit watch-start baselines, bounded changed-file review and incremental hashing. A real external scenario edit passed the complete desktop MCC rebuild and separate-map readback after fixing its pre-build snapshot reason.',
+    'General loose script/image trees, arbitrary SDK locations, automatic typed merging, per-file conflict reconciliation and actual Guerilla/Sapien GUI save trials remain incomplete. Native acceptance used installed Invader and MCC Tool, without game loading.',
   ],
   [
     'performance',
@@ -140,3 +140,9 @@ export const continuation35Overrides = Object.fromEntries(
     },
   ]),
 );
+Object.assign(continuation35Overrides['C35-external-tags'],{
+  files:'crates/spark-core/src/working_tag_changes.rs; src-tauri/src/working_tag_changes_native.rs; src-tauri/src/runtime_workbench.rs; src/components/WorkingTagChanges.tsx; src/components/RuntimeDock.tsx',
+  level:'IMPLEMENTED / NATIVE DESKTOP-TO-COMPILER-TO-CACHE LOCALLY TESTED; gameplay NOT ACCEPTED',
+  evidence:'docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md; docs/fixtures/c35-tool-edit-native-verification.json; scripts/test-working-tags-native.mjs',
+  next:'Accept a real Guerilla/Sapien GUI save and extend source reconciliation to SDK scripts/images with explicit conflicts; retain separate native game acceptance.',
+});

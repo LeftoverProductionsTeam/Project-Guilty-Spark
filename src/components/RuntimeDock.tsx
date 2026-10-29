@@ -25,6 +25,7 @@ import type {
 } from '../runtimeWorkbench';
 import { availabilityLabel, evidenceLabel, runtimeNames } from '../runtimeWorkbench';
 import { Notice } from './ui';
+import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
 import '../runtimeWorkbench.css';
 
 const actions = [
@@ -71,6 +72,7 @@ export default function RuntimeDock({
   const [plan, setPlan] = useState<ToolLaunchPlan | null>(null),
     [consent, setConsent] = useState(false);
   const [notice, setNotice] = useState('');
+  const toolTags=useWorkingTagChanges(project?.id??null,runtime==='mccSteam'?report?.workingSource?.buildId??null:null);
   const generation = useRef(0);
   const currentReport = useRef(report);
   currentReport.current = report;
@@ -259,7 +261,7 @@ export default function RuntimeDock({
     }
   }
   async function buildWorkingTags() {
-    if (!project || dirty || working || busy) return;
+    if (!project || dirty || working || busy || toolTags.report?.status==='saving') return;
     const request = generation.current;
     setBusy(true);
     setError('');
@@ -288,6 +290,7 @@ export default function RuntimeDock({
           <span className="runtime-dock-save">
             {working ? 'Working…' : dirty ? 'Unsaved changes' : 'Saved'}
           </span>
+          {!!toolTags.report?.changedFiles&&<button className="runtime-dock-tag-changes" onClick={()=>setDetails(true)}>{toolTags.report.changedFiles} saved tool edit{toolTags.report.changedFiles===1?'':'s'}</button>}
           <button
             className="runtime-dock-details"
             aria-label="Runtime and tool details"
@@ -449,6 +452,7 @@ export default function RuntimeDock({
                 Play &amp; servers
               </button>
             </div>
+            {project && report?.workingSource && <WorkingTagChanges {...toolTags}/>}
             {project && (
               <div className="button-row">
                 <button
@@ -458,6 +462,7 @@ export default function RuntimeDock({
                     busy ||
                     working ||
                     dirty ||
+                    toolTags.report?.status==='saving' ||
                     !!report?.sourceIssue ||
                     !!report?.toolsIssue ||
                     report?.processes.some((p) => p.projectId === project.id && p.status === 'running')

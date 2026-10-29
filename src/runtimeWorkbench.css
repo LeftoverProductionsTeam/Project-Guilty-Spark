@@ -41,6 +41,12 @@
   background: transparent;
   color: inherit;
 }
+.runtime-dock-tag-changes{font-size:10px;color:var(--text);border-color:var(--accent);padding:1px 6px;white-space:nowrap;}
+.working-tag-changes{padding:12px;margin:12px 0;border:1px solid var(--accent);border-radius:12px 4px;background:var(--panel);color:var(--text);}
+.working-tag-changes .button-row{flex-wrap:wrap;}
+.working-tag-changes ul{max-height:240px;overflow:auto;padding-left:20px;}
+.working-tag-changes li{padding:4px 0;overflow-wrap:anywhere;font-size:12px;}
+.working-tag-changes li>span{text-transform:capitalize;color:var(--accent);}
 .runtime-dock-actions {
   display: grid;
   grid-template-columns: minmax(125px, 1.5fr) repeat(9, minmax(0, 1fr));
@@ -129,6 +135,7 @@
 }
 .runtime-details-dialog {
   width: min(940px, 92vw);
+  max-width: min(940px, 92vw);
   max-height: 83vh;
   overflow-y: auto;
 }

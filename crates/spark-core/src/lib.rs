@@ -54,6 +54,7 @@ pub mod runtime_adapters;
 pub mod steam;
 pub mod snapshots;
 pub mod working_tags;
+pub mod working_tag_changes;
 
 use std::path::Path;
 use thiserror::Error;

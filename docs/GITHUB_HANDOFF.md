@@ -1,5 +1,7 @@
 # C35 Git push handoff
 
+Latest follow-through: **Monitor saved tool tags and repair desktop working-tag rebuilding**. Add stable per-map tag-save detection and changed-file review, fix an invalid pre-build snapshot reason, and widen runtime details. Verify the full desktop path with an actual external scenario edit, MCC compilation and changed-field readback from a separate map tab. Validation is now 409 Rust / 148 frontend / 54 browser / 59 offline checks; the native receipt and limits are in [the follow-through report](C35_TOOL_EDIT_FOLLOW_THROUGH.md). Fresh r2 files preserve the frozen r1 artifacts. The owner still controls pushing.
+
 Title: **C35: immersive drawers, shared Director and real map catalog**
 
 Make the sidebar and top header remembered drawers, add configurable panels and actual native fullscreen, and retain per-map editing context. Add the detachable/dockable Recording Director, bounded video storage, original Zombie Demo resource recovery and a credited visual catalog with real Alpine import. Report Alpine's missing classic bitmap dependencies precisely; retain recording/game acceptance and the wider engine backlog as explicit gates.

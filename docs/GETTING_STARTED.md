@@ -12,6 +12,8 @@ To download a Custom Edition map inside Spark, open **Community maps** and choos
 
 The bottom **Runtime & Tools Dock** follows the active map. Sapien, Guerilla and Standalone previews show the actual tool and derived working tags. After saving and closing those tools, use **Build working tag edits** in dock details to compile their current files, then open the separate verified output. This differs from rebuilding older QuickForge brushes. Game loading remains its own test.
 
+For validated derived tags, the dock also shows **N saved tool edits** after stable saves. Open it to review changed paths, or use **Scan tool tags now** in runtime details. Working-tag builds compare against their verified compiled inventory; other supported source jobs compare against the files present when monitoring connected. The new cache opens separately and your original authoring project remains available. See the [saved tool-edit workflow and limits](C35_TOOL_EDIT_FOLLOW_THROUGH.md).
+
 For HMT or another compiled-map editor, open **Changes**, expand **External editor files** and copy the working map path. Spark checks stable external saves every two seconds. Clean maps refresh as new preserved revisions; if Spark has authored edits, choose **Open changed map and keep Spark edits** to retain both tabs. The read-only preserved copy is never the external editor's write target.
 
 **Editable Halo Tags** describe game objects, materials and scenarios. **Halo Textures** are images used by some compiled maps. **Map Builder** compiles source into a target-specific map. Source images/models live under the kit's data folder; temporary compiler jobs and caches belong to Spark's managed local data, not the original game directory.

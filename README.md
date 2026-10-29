@@ -26,6 +26,8 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 
 ## C35 living workbench
 
+The [saved tool-edit follow-through](docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md) adds stable-save monitoring of derived tag folders, a compact changed-files review and the separate native rebuild/open-result workflow. It fixes a desktop pre-build snapshot refusal. A real external scenario edit compiled through the desktop into an MCC cache, with the changed player start read back from the new map; original tags/cache and Spark authoring remained intact.
+
 **Menu** and **Window** open remembered navigation/header drawers, leaving more space for the map. Project setup, Changes, Help, Objects, Inspector, construction and game connection use configurable edge/floating panels. **F11** enters actual native fullscreen with tools at the edges; **Escape** dismisses drawers before restoring the window. Camera flight supports configurable WASD/Q/E, Shift boost, middle-button pan and right-button wheel speed.
 
 Open **Recording Director ↗** from a prepared Level editor view to detach a native camera/recording window, then dock it back with the same revision-checked session. Camera keys, tracking, lens and monitor controls are included. Editor Render and explicitly shared Live Game Capture are distinct; an independent MCC engine spectator adapter is not implemented. A short native video probe decoded real map detail, while application Save-dialog flow, recording startup quality, game audio/capture and long takes remain acceptance gates.

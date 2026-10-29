@@ -358,6 +358,24 @@ test('C35 F11 uses native fullscreen and Escape closes navigation before restori
  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='plugin:window|set_fullscreen').map((c:any)=>c.args.value));expect(calls).toEqual([true,false]);
 });
 
+test('saved native tool tags have a stable-save review and separate build workflow',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__sparkMock.tagPhase='unchanged';w.__sparkMock.tagWatch=null;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+  if(command==='runtime_workbench_report'){const report=await original(command,args);report.sourceIssue=null;report.toolsIssue=null;report.workingSource=args.projectId?{buildId:'owned-build',tagsDirectory:'owned/tags'}:null;return report;}
+  if(command==='working_tag_watch_start'){w.__sparkMock.tagWatch=args.projectId;return {watchId:'watch',projectId:args.projectId,buildId:'owned-build',tagsDirectory:'owned/tags',status:'unchanged',basis:'compiledBuild',revision:0,totalFiles:2240,changedFiles:0,changes:[],listTruncated:false,hashesReadLastScan:2240};}
+  if(command==='working_tag_watch_poll'){const phase=w.__sparkMock.tagPhase;return {watchId:'watch',projectId:w.__sparkMock.tagWatch,buildId:'owned-build',tagsDirectory:'owned/tags',status:phase,basis:'compiledBuild',revision:1,totalFiles:2240,changedFiles:phase==='changed'?1:0,changes:phase==='changed'?[{kind:'modified',path:'levels/test/test.scenario'}]:[],listTruncated:false,hashesReadLastScan:phase==='changed'?1:0};}
+  if(command==='working_tag_watch_stop')return null;
+  if(command==='build_working_tags'){w.__sparkMock.toolBuildProject=args.projectId;return 'synthetic-job';}
+  return original(command,args);
+ };});
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await page.getByRole('button',{name:'Runtime and tool details',exact:true}).click();
+ const tags=page.getByRole('region',{name:'Saved tool tag changes',exact:true});await expect(tags).toContainText('Watching 2,240 tag files');
+ await page.evaluate(()=>{(window as any).__sparkMock.tagPhase='saving';});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags).toContainText('Waiting for a stable save');await expect(page.getByRole('button',{name:'Build working tag edits',exact:true})).toBeDisabled();
+ await page.evaluate(()=>{(window as any).__sparkMock.tagPhase='changed';});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags).toContainText('1 changed tag file');await tags.locator('summary').click();await expect(tags).toContainText('levels/test/test.scenario');await expect(page.getByRole('button',{name:'1 saved tool edit',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Build working tag edits',exact:true}).click();expect(await page.evaluate(()=>(window as any).__sparkMock.toolBuildProject)).toBe('a');await expect(page.getByRole('dialog',{name:'Runtime and tool details',exact:true})).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.saved)).toBeNull();
+});
+
 test('C35 viewport navigation uses Q/E and RMB wheel speed without stealing text input',async({page})=>{
  await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  const canvas=page.getByTestId('viewport').locator('canvas');await expect.poll(()=>canvas.getAttribute('data-gs-camera')).toBeTruthy();

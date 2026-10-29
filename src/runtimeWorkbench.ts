@@ -69,6 +69,7 @@ export interface RuntimeWorkbenchReport {
   toolsIssue: string | null;
   processes: ToolProcessView[];
   workingBuild: { id: string; message: string } | null;
+  workingSource?: { buildId: string; tagsDirectory: string } | null;
 }
 export interface ToolLaunchPlan {
   id: string;
