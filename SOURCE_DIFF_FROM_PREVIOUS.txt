@@ -1,80 +1,40 @@
-Project Guilty Spark - C35 source comparison
-BASELINE_GIT_COMMIT: 617d267a8dd8b1c504d47bdaef4c0f338615786e
+Project Guilty Spark - C35 r2 source comparison
+BASELINE_GIT_COMMIT: 5e70f35d2b3ea7dc9359c53e824a5a0af53dea81
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 32
-MODIFIED_COUNT: 31
-UNCHANGED_COUNT: 1036
+ADDED_COUNT: 8
+MODIFIED_COUNT: 15
+UNCHANGED_COUNT: 1084
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/examples/qa_c35_workspace.rs
-crates/spark-core/examples/qa_compile_diagnostic.rs
-crates/spark-core/examples/qa_map_materials.rs
-docs/CONTINUATION_35_ENGINEERING.md
-docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
-docs/CONTINUATION_35_TEST_CARD.md
-docs/fixtures/continuation35-alpine-conversion.json
-docs/fixtures/continuation35-native-ui-verification.json
-scripts/continuation35-evidence.mjs
-scripts/native-editor-capture-probe.mjs
-scripts/test-living-workbench-native.mjs
-src-tauri/src/director_native.rs
-src-tauri/src/director_recording.rs
-src/components/DirectorWindow.tsx
-src/components/MapCatalog.tsx
-src/components/NavigationSettings.tsx
-src/components/ViewportActivity.tsx
-src/components/WorkspacePanels.tsx
-src/directorRecording.test.ts
-src/directorRecording.ts
-src/directorSession.ts
-src/directorWindow.css
-src/editorFlight.test.ts
-src/mapCatalog.css
-src/mapCatalog.test.ts
-src/mapCatalog.ts
-src/useWindowFullscreen.ts
-src/windowFocus.ts
-src/workspaceLayout.test.ts
-src/workspaceLayout.ts
-src/workspacePanels.css
-tests/ui/helpers/navigation.ts
+crates/spark-core/src/working_tag_changes.rs
+docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md
+docs/fixtures/c35-tool-edit-native-verification.json
+scripts/test-working-tags-native.mjs
+src-tauri/src/working_tag_changes_native.rs
+src/components/WorkingTagChanges.tsx
+src/workingTagSync.test.ts
+src/workingTagSync.ts
 
 MODIFIED FILES
 CHANGELOG.md
 README.md
-crates/spark-core/examples/qa_convert.rs
-crates/spark-core/src/conversion.rs
+crates/spark-core/src/lib.rs
+docs/CONTINUATION_35_ENGINEERING.md
+docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
 docs/GETTING_STARTED.md
 docs/GITHUB_HANDOFF.md
 docs/MASTER_FEATURE_LEDGER.csv
-docs/MASTER_FEATURE_LEDGER.md
-scripts/package-source.mjs
-scripts/test-editor-flight.mjs
-scripts/update-feature-ledger.mjs
-src-tauri/capabilities/main.json
+scripts/continuation35-evidence.mjs
 src-tauri/src/app.rs
-src-tauri/tauri.conf.json
-src/App.tsx
-src/components/CommunityMaps.tsx
-src/components/ExternalMapSync.tsx
-src/components/ForgeViewport.tsx
-src/components/LevelEditorWorkspace.tsx
-src/components/LiveObjectInspector.tsx
-src/components/MachinimaWorkspace.tsx
-src/components/MapDownload.tsx
-src/components/QuickForge.tsx
-src/components/RightMouseFly.tsx
-src/components/WorkbenchGuide.tsx
-src/components/World.tsx
-src/editorFlight.ts
-src/featureCatalog.ts
-src/main.tsx
-tests/ui/browser.spec.ts
+src-tauri/src/runtime_workbench.rs
+src/components/RuntimeDock.tsx
+src/runtimeWorkbench.css
+src/runtimeWorkbench.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-Earlier C32/C33/C34 release/source archives remain frozen.
+Earlier C32/C33/C34 and C35 r1 release/source archives remain frozen.
