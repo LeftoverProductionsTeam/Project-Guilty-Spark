@@ -1,40 +1,50 @@
-Project Guilty Spark - C35 r2 source comparison
-BASELINE_GIT_COMMIT: 5e70f35d2b3ea7dc9359c53e824a5a0af53dea81
+Project Guilty Spark - C35 r3 source comparison
+BASELINE_GIT_COMMIT: 98158685d1355ef1c83364dfc17f0e2147187673
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 8
-MODIFIED_COUNT: 15
-UNCHANGED_COUNT: 1084
+ADDED_COUNT: 11
+MODIFIED_COUNT: 22
+UNCHANGED_COUNT: 1085
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/src/working_tag_changes.rs
-docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md
-docs/fixtures/c35-tool-edit-native-verification.json
-scripts/test-working-tags-native.mjs
-src-tauri/src/working_tag_changes_native.rs
-src/components/WorkingTagChanges.tsx
-src/workingTagSync.test.ts
-src/workingTagSync.ts
+crates/spark-core/examples/qa_conversion_library.rs
+crates/spark-core/examples/qa_repair_conversion_resources.rs
+crates/spark-core/src/conversion_resources.rs
+docs/C35_CONVERSION_RESOURCE_REPAIR.md
+docs/fixtures/c35-conversion-repair-native-verification.json
+scripts/test-conversion-repair-native.mjs
+src-tauri/src/conversion_resources_native.rs
+src/components/ConversionBitmapRepair.tsx
+src/conversionResources.css
+src/conversionResources.test.ts
+src/conversionResources.ts
 
 MODIFIED FILES
 CHANGELOG.md
 README.md
+crates/spark-core/examples/qa_convert.rs
+crates/spark-core/src/build.rs
+crates/spark-core/src/conversion.rs
 crates/spark-core/src/lib.rs
+crates/spark-core/src/native_workspace.rs
+crates/spark-core/src/project.rs
+docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md
 docs/CONTINUATION_35_ENGINEERING.md
 docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
-docs/GETTING_STARTED.md
+docs/CONTINUATION_35_TEST_CARD.md
 docs/GITHUB_HANDOFF.md
 docs/MASTER_FEATURE_LEDGER.csv
 scripts/continuation35-evidence.mjs
 src-tauri/src/app.rs
-src-tauri/src/runtime_workbench.rs
-src/components/RuntimeDock.tsx
-src/runtimeWorkbench.css
-src/runtimeWorkbench.ts
+src/App.tsx
+src/components/Build.tsx
+src/featureCatalog.ts
+src/mapCatalog.ts
+src/types.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-Earlier C32/C33/C34 and C35 r1 release/source archives remain frozen.
+Earlier C32/C33/C34 and C35 r1/r2 release/source archives remain frozen.
