@@ -65,6 +65,9 @@ pub(super) struct ToolProcessView {
     status: String,
     exit_code: Option<i32>,
     detail: String,
+    executable: PathBuf,
+    executable_sha256: String,
+    tags_directory: PathBuf,
 }
 
 #[derive(Clone, Serialize)]
@@ -391,6 +394,15 @@ pub(super) fn source_editor_context(state:&AppState,project_id:&str)->Reply<Stri
     let candidates:Vec<_>=processes(state)?.into_iter().filter(|p|p.project_id==project_id&&p.status=="running"&&matches!(p.action_id.as_str(),"editTags"|"editLevel")).map(|p|format!("{} PID {}",if p.action_id=="editTags"{"Guerilla"}else{"Sapien"},p.process_id)).collect();
     Ok(if candidates.is_empty(){"Writer unknown: no Spark-launched source editor is running. Filesystem events do not identify the writing process.".into()}else{format!("Open tool context: {}. Actual writer unconfirmed; filesystem events do not identify the writing process.",candidates.join(", "))})
 }
+pub(super) fn source_editor_associations(state: &AppState, project_id: &str, tags: &Path) -> Reply<Vec<native_save_evidence::ToolAssociation>> {
+    Ok(processes(state)?.into_iter().filter(|process| process.project_id == project_id && process.status == "running" && process.tags_directory == tags && matches!(process.action_id.as_str(), "editTags" | "editLevel"))
+        .map(|process| native_save_evidence::ToolAssociation {
+            tool: if process.action_id == "editTags" { "Guerilla" } else { "Sapien" }.into(),
+            version: "Selected editing-kit executable; product version not independently queried".into(),
+            executable: process.executable, executable_sha256: process.executable_sha256,
+            process_id: Some(process.process_id), basis: "Spark-observed launch for this map/source folder; actual writer unconfirmed".into(),
+        }).collect())
+}
 
 #[tauri::command]
 pub(super) async fn runtime_tool_processes(app: tauri::AppHandle) -> Reply<Vec<ToolProcessView>> {
@@ -630,7 +642,7 @@ pub(super) async fn launch_runtime_tool(
         let mut command=Command::new(&executable);command.current_dir(&context.workspace).args(&plan.view.arguments).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
         #[cfg(windows)]{use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);}
         let child=command.spawn().map_err(error)?;
-        let view=ToolProcessView{id:plan.view.id,action_id:plan.view.action_id,project_id:project.id,process_id:child.id(),status:"running".into(),exit_code:None,detail:"Process launch observed. Scene loading and gameplay await acceptance. Save and close this tool, then choose Build working tag edits in dock details.".into()};
+        let view=ToolProcessView{id:plan.view.id,action_id:plan.view.action_id,project_id:project.id,process_id:child.id(),status:"running".into(),exit_code:None,detail:"Process launch observed. Scene loading and gameplay await acceptance. Save and close this tool, then choose Build working tag edits in dock details.".into(),executable:plan.view.executable,executable_sha256:plan.view.executable_sha256,tags_directory:context.tags};
         lock(&state.runtime_workbench)?.processes.push(ToolProcess{child,view:view.clone()});
         Ok(view)
     }).await.map_err(error)?

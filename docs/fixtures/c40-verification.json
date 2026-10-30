@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "standardRust": {
+    "passed": 518,
+    "failed": 0,
+    "ignored": 7
+  },
+  "paintedBspOptIn": {
+    "passed": 1,
+    "separateFromStandardSuite": true
+  },
+  "frontend": {
+    "files": 46,
+    "passed": 222
+  },
+  "browser": {
+    "passed": 82,
+    "syntheticContracts": true
+  },
+  "offline": {
+    "scripts": 59
+  },
+  "typescript": true,
+  "windowsBuild": {
+    "executable": true,
+    "nsisInstaller": true,
+    "appSha256": "5a92f8bf9eb275a16329626f073d48a85d6b40956666824dde0fd187c6351776"
+  },
+  "nativeSource": {
+    "receipt": "c40-native-save-integrity.json",
+    "nativeBuildMs": 31289.45490000001,
+    "preservedInputFiles": 2240
+  },
+  "mantle": {
+    "officialRepo": "https://github.com/SutlabSol/OpenCE-Mantle",
+    "reviewedTag": "v0.7.0",
+    "reviewedCommit": "ccedcec379bb4e4bbfe815297fec9fbf8913bf5d",
+    "downloadedOrExecuted": false,
+    "actualApplicationAcceptance": "unverified",
+    "dedicatedRuntime": "haloCustomEdition",
+    "cacheVersion": 609,
+    "launcherArgs": [],
+    "originalMapPassed": false
+  },
+  "gameplayAccepted": false,
+  "combinedIntegrationVerification": "pending",
+  "sparklink": {
+    "receipt": "c40-sparklink-native.json",
+    "nativeProcesses": 3,
+    "physicalMachines": 1,
+    "gamePeerReplicationTested": false,
+    "nativeBuildMs": 18940.7802
+  }
+}

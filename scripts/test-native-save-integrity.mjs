@@ -145,6 +145,11 @@ try {
     })
     .toBe(1);
   expect(observation.integrity.invalidFiles).toBe(0);
+  expect(observation.writerEvidence.writerConfidence).toBe('unknown');
+  expect(observation.writerEvidence.associations[0].tool).toBe('Baboon');
+  expect(observation.writerEvidence.associations[0].processId).toBeNull();
+  expect(observation.writerEvidence.associations[0].executableSha256).toHaveLength(64);
+  expect(observation.writerEvidence.files[0].observedSha256).toBe(hash(normalized));
   const normalizedAccepted = await call('baboon_reconcile', {
     projectId: project.id,
     sessionId: prepared.sessionId,
@@ -193,6 +198,7 @@ try {
     detectedByNativeParser: true,
     reconciliationRejected: true,
     writerContext: observation.writerContext,
+    writerEvidence: observation.writerEvidence,
     actualControlledWriter: 'QA Node process, intentionally malformed fixture; not Baboon or Invader',
   };
   const crcBad = Buffer.from(normalized);
@@ -300,7 +306,10 @@ try {
   );
   throw e;
 } finally {
-  if (call) await call('request_close_window').catch(() => {});
+  if (call) await Promise.race([
+    call('request_close_window').catch(() => {}),
+    new Promise(resolve => setTimeout(resolve, 1500)),
+  ]);
   await browser?.close().catch(() => {});
   if (child.exitCode === null) child.kill();
 }

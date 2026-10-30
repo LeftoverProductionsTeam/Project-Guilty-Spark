@@ -262,7 +262,7 @@ export default function BaboonTools({
       )}
       {observed && (
         <div className="baboon-saved-changes" aria-live="polite">
-          <NativeTagIntegrity report={observed.integrity} writerContext={observed.writerContext} />
+          <NativeTagIntegrity report={observed.integrity} writerContext={observed.writerContext} evidence={observed.writerEvidence} />
           {observed.changes.changedFiles > 0 && (
             <Notice>
               External editor rewrite: this save may include changes beyond the field you edited. Spark

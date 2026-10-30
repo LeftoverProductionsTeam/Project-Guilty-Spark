@@ -12,8 +12,10 @@ export interface WorkingTagReport {
   changes: { path: string; kind: 'added' | 'modified' | 'removed' }[];
   listTruncated: boolean;
   hashesReadLastScan: number;
+  contentAudit?: { bytesReadLastPoll: number; filesCheckedLastPoll: number; completedSweeps: number };
   integrity?: import('./nativeTagIntegrity').NativeTagIntegrityReport;
   writerContext?: string;
+  writerEvidence?: import('./nativeTagIntegrity').NativeSaveEvidence;
 }
 export interface WorkingTagApi {
   start: (projectId: string) => Promise<WorkingTagReport>;

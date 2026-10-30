@@ -36,6 +36,18 @@ pub struct Tool {
     pub legacy: Vec<LegacyTarget>,
     pub version: Option<String>,
     pub sha256: Option<String>,
+    #[serde(default)]
+    pub cache_versions: Vec<u32>,
+    #[serde(default)]
+    pub release_url: Option<String>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompanionCandidate {
+    pub id: String,
+    pub label: String,
+    pub reported_workflow: String,
+    pub missing_evidence: String,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -43,9 +55,14 @@ pub struct Catalog {
     pub schema_version: u32,
     pub reviewed_at: String,
     pub tools: Vec<Tool>,
+    #[serde(default)]
+    pub companion_candidates: Vec<CompanionCandidate>,
 }
 pub fn validate(catalog: &Catalog) -> Result<()> {
-    if catalog.schema_version != 1 || catalog.tools.len() > 64 {
+    if catalog.schema_version != 1
+        || catalog.tools.len() > 64
+        || catalog.companion_candidates.len() > 32
+    {
         return invalid("Unsupported tool catalog version or size");
     }
     let mut ids = BTreeSet::new();
@@ -69,6 +86,7 @@ pub fn validate(catalog: &Catalog) -> Result<()> {
                 "sourceHandoff",
                 "managedWorkflow",
                 "upstreamOnly",
+                "externalCompanion",
             ]
             .contains(&tool.integration.as_str())
         {
@@ -94,6 +112,28 @@ pub fn validate(catalog: &Catalog) -> Result<()> {
         {
             return invalid("Research profiles cannot grant execution");
         }
+        if tool
+            .release_url
+            .as_ref()
+            .is_some_and(|url| !url.starts_with("https://"))
+        {
+            return invalid("A companion release link must use HTTPS");
+        }
+        if tool.integration == "externalCompanion"
+            && (tool.id != "openceMantle"
+                || tool.handler != "externalCompanion"
+                || tool.runtimes != ["haloCustomEdition"]
+                || tool.cache_versions != [609]
+                || tool.inputs != ["classicCache"]
+                || tool.platforms != ["windows"]
+                || tool.location != "external"
+                || tool.filename.is_some()
+                || !tool.legacy.is_empty())
+        {
+            return invalid(
+                "External companion execution is limited to the reviewed CE Mantle route",
+            );
+        }
         if tool.inputs.iter().any(|v| {
             ![
                 "none",
@@ -108,6 +148,18 @@ pub fn validate(catalog: &Catalog) -> Result<()> {
             .contains(&v.as_str())
         }) {
             return invalid("Unknown tool input format");
+        }
+    }
+    for candidate in &catalog.companion_candidates {
+        if candidate.id.is_empty()
+            || !candidate.id.bytes().all(|c| c.is_ascii_alphanumeric())
+            || !ids.insert(&candidate.id)
+            || candidate.reported_workflow.is_empty()
+            || candidate.missing_evidence.is_empty()
+        {
+            return invalid(
+                "A research candidate needs a unique identity and explicit evidence gaps",
+            );
         }
     }
     Ok(())
@@ -154,6 +206,8 @@ pub struct Context {
     pub flavor: Option<String>,
     pub source_kind: String,
     pub owned_native_tags: bool,
+    #[serde(default)]
+    pub cache_version: Option<u32>,
 }
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -178,10 +232,14 @@ pub fn assess(tool: &Tool, context: &Context, installed: &Installation) -> Asses
             .sha256
             .as_ref()
             .is_none_or(|h| installed.sha256.as_ref() == Some(h));
-    let compatible = tool
-        .inputs
-        .iter()
-        .any(|s| s == &context.source_kind || (s == "nativeH1" && context.owned_native_tags));
+    let compatible = (tool.cache_versions.is_empty()
+        || context
+            .cache_version
+            .is_some_and(|v| tool.cache_versions.contains(&v)))
+        && tool
+            .inputs
+            .iter()
+            .any(|s| s == &context.source_kind || (s == "nativeH1" && context.owned_native_tags));
     let (state, detail) = if !tool.families.contains(&context.family) {
         (
             "requiresRuntime",
@@ -206,6 +264,8 @@ pub fn assess(tool: &Tool, context: &Context, installed: &Installation) -> Asses
             "requiresRuntime",
             "The configured editing-kit generation does not match the selected Halo.",
         )
+    } else if !tool.cache_versions.is_empty() && !compatible {
+        ("cacheUnsupported", "This external companion requires a Halo Custom Edition PC cache (609). Runtime selection and the map's actual cache format are checked separately; convert to a separate compatible output first.")
     } else if !compatible {
         ("sourceUnsupported","This operation needs compatible source. A compiled map is not a loose tag; extract/build verified working source first.")
     } else if !installed.found {
@@ -239,6 +299,7 @@ mod tests {
             flavor: Some("h1aEk".into()),
             source_kind: "mccCache".into(),
             owned_native_tags: false,
+            cache_version: Some(13),
         }
     }
     #[test]
@@ -290,6 +351,37 @@ mod tests {
         let t = c.tools.iter_mut().find(|t| t.id == "refinery").unwrap();
         t.filename = Some("Refinery.exe".into());
         assert!(validate(&c).is_err());
+    }
+    #[test]
+    fn mantle_checks_runtime_and_actual_cache_independently() {
+        let tool = tool("openceMantle").unwrap();
+        let installed = Installation {
+            found: true,
+            ..Default::default()
+        };
+        let mut context = context();
+        for runtime in ["mccSteam", "haloRetail", "macDemo", "haloMD", "xbox"] {
+            context.runtime_id = runtime.into();
+            context.cache_version = Some(609);
+            context.source_kind = "classicCache".into();
+            assert_eq!(assess(tool, &context, &installed).state, "requiresRuntime");
+        }
+        context.runtime_id = "haloCustomEdition".into();
+        for cache in [None, Some(5), Some(6), Some(7), Some(13)] {
+            context.cache_version = cache;
+            let assessment = assess(tool, &context, &installed);
+            assert_eq!(assessment.state, "cacheUnsupported");
+            assert!(!assessment.can_use_workflow);
+            assert!(!assessment.compatible_source);
+        }
+        context.cache_version = Some(609);
+        assert!(assess(tool, &context, &installed).can_use_workflow);
+        context.host = "linux".into();
+        assert_eq!(assess(tool, &context, &installed).state, "requiresRuntime");
+        assert!(legacy_tools("haloCustomEdition", Some("legacyHek"))
+            .unwrap()
+            .iter()
+            .all(|tool| tool.id != "openceMantle"));
     }
     #[test]
     fn legacy_api_and_frontend_use_the_same_order_and_edition_boundary() {

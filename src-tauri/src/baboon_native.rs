@@ -385,10 +385,12 @@ pub(super) struct Poll {
     revisions: Vec<String>,
     integrity: core::native_tag_integrity::Report,
     writer_context: String,
+    writer_evidence: native_save_evidence::SaveEvidence,
 }
 fn poll(state: &AppState, session: &Session) -> Reply<Poll> {
     let watched = watched(state, session)?;
     let mut watch = lock(&watched)?;
+    watch.monitor.audit_background().map_err(error)?;
     let changed = {
         let mut paths = lock(&watch.paths)?;
         std::mem::take(&mut *paths)
@@ -456,6 +458,13 @@ fn poll(state: &AppState, session: &Session) -> Reply<Poll> {
         revisions: session.revisions.clone(),
         integrity,
         writer_context,
+        writer_evidence: native_save_evidence::collect(&watch.monitor, vec![native_save_evidence::ToolAssociation {
+            tool: "Baboon".into(), version: "0.3.2 (prepared reviewed binary)".into(),
+            executable: root(state, &session.id)?.join("editor/Baboon.exe"),
+            executable_sha256: session.executable_sha256.clone(),
+            process_id: watch.child.as_ref().map(Child::id),
+            basis: if watch.child.is_some() { "Associated prepared handoff and last Spark-launched process; actual writer unconfirmed" } else { "Prepared handoff only; no Spark-observed launch in this watch, actual writer unknown" }.into(),
+        }]),
     })
 }
 #[tauri::command]

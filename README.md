@@ -1,5 +1,11 @@
 # Project Guilty Spark
 
+## C40 native-save integrity and CE companion
+
+Missed save notifications and preserved timestamps now have a bounded background content sweep. Native edits wait for semantic validation before reconciliation or compilation. Save diagnostics retain file hashes and tool launch associations without inventing a confirmed writer. [C40 audit, verification and consolidation](docs/CONTINUATION_40_ENGINEERING.md).
+
+[OpenCE Mantle](https://github.com/SutlabSol/OpenCE-Mantle) is an optional, manually configured external companion for **Halo Custom Edition PC cache 609**. Its dedicated route checks the selected runtime and actual map format, launches with no arguments, and passes no original map. Mantle itself has not been downloaded or acceptance-tested. [Tool boundaries and setup](docs/COMPATIBLE_TOOLS.md). The leftknut candidate remains research-only pending official identity and runtime evidence.
+
 ## C39 SparkLink: Live Studio
 
 SparkLink extends the existing QuickForge session drawer with private TLS invitations, creator roles, authoritative source revisions, per-author undo/redo, durable host recovery and retained local drafts. Each creator keeps their camera. The owner can compile a frozen acknowledged source while editing continues. [Architecture](docs/SPARKLINK_ARCHITECTURE.md) · [Host/join and recovery](docs/SPARKLINK_SETUP.md) · [Evidence and remaining phases](docs/CONTINUATION_39_ENGINEERING.md).
@@ -16,7 +22,7 @@ This first shared QuickForge slice covers geometry, placements, materials, spawn
 
 The [master consolidation report](docs/MASTER_CONSOLIDATION.md) records the complete branch inventory, preserved research, recoverable backups and combined source/native regressions. [GitHub summary and description](docs/MASTER_CONSOLIDATION_GITHUB_DESCRIPTION.md). Seven pending dependency-update proposals remain separate from completed engineering work. Top-level `SOURCE_*` manifests are retained historical packaging evidence; the current Git tree and consolidation receipts identify this source revision.
 
-**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · C39 dev** continues the C35–C38 workbench and One Halo investigation; compiler and game acceptance remain separate from editor previews.
+**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · C40 dev** continues the existing workbench, SparkLink and One Halo investigation; compiler and game acceptance remain separate from editor previews.
 
 > Project Guilty Spark stands on more than twenty years of research, experimentation, documentation, tools, discoveries, and shared knowledge from the Halo modding community. This project would not exist without the people who explored the Blam engine, created the original editors, reverse-engineered file formats, preserved old maps, documented workflows, and helped generations of modders learn.
 

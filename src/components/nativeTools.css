@@ -71,3 +71,7 @@
 .tool-ecosystem .gs-tool-card p {
   margin-block: 0.15rem;
 }
+.native-tag-integrity code,
+.tool-ecosystem code {
+  overflow-wrap: anywhere;
+}

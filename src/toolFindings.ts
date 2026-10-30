@@ -18,6 +18,15 @@ export const toolFindings = [
       'Separate byte rewrites from actual structure failures. Keep original opaque bytes; parser acceptance does not prove every unexposed field or gameplay behavior.',
   },
   {
+    tool: 'Sapien · Halo 1 CE / H1A editing kits',
+    version: 'Edition-specific preservation warning; exact offending binary not isolated',
+    status: 'Reported detail-object loss/vertical shift · not a confirmed writer defect',
+    detail:
+      'BSP/environment save workflows can erase or shift painted detail objects. C36 checked a real A30 painted BSP and blocks Spark environment writes that cannot preserve its exact native payload. This does not identify a defective Sapien version or establish a Halo 3/Reach issue.',
+    action:
+      'Keep pre-save BSP bytes and tool identities. Compare detail counts, integer payload and exact Z data; rounded displayed values are insufficient. Generic external Sapien saves remain outside Spark’s write guard.',
+  },
+  {
     tool: 'Eschaton',
     version: 'Not supplied',
     status: 'Historical user report · unverified cause',
