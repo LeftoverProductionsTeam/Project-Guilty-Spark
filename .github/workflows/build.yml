@@ -27,6 +27,7 @@ jobs:
       - run: pnpm check
       - run: pnpm test
       - run: pnpm test:offline
+      - run: node --test scripts/probe-mcc-h1-interface.test.mjs
   windows-native:
     name: Windows native build and UI
     runs-on: windows-latest

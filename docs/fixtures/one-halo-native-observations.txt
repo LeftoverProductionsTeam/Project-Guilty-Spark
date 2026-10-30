@@ -1,0 +1,25 @@
+One Halo native observations — 2026-10-29
+Metadata/selected diagnostic lines only. No game content or raw packets.
+
+Final real Chupathingy discovery:
+chupathingyce: ChupathingyCE 0.8.1c (release, release config, commit 880a933e, built 2026-10-28) Windows x64
+chupathingyce: OpenCE network version 32 (joins 11-40); Delta 1, wire chupa-39a, legacy table: built in; protocol auto
+chupathingyce: Following OpenCE network version 32 (built in)
+chupathingyce: network test: hosting bloodgulch
+Probe: 1 query; 280 bytes; 0 whole ms (integer timer; loopback only); source/nonce checked.
+Advertisement: packet format 1; discovery protocol 2; legacy 32; levels\test\bloodgulch\bloodgulch; 1 player; pregame=true; port 5150.
+Host exit: 0; watchdog forced=false; source and copied inputs unchanged=true.
+No session admission or MCC attachment.
+
+MCC-only bootstrap:
+chupathingyce: ChupathingyCE 0.8.1c (release, release config, commit 880a933e, built 2026-10-28) Windows x64
+chupathingyce: OpenCE network version 32 (joins 11-40); Delta 1, wire chupa-39a, legacy table: built in; protocol auto
+chupathingyce: Following OpenCE network version 32 (built in)
+chupathingyce: maps folder: <private-test-root>\data/maps is not the Xbox maps (ui.map version 13): quitting
+Native exit: 1; watchdog forced=false; originals and copies unchanged=true.
+Only owned MCC ui.map and bloodgulch.map copies supplied; no Xbox fallback or content import.
+
+Initial probe failure retained:
+10.29.26 19:26:24  failed to decode a message_client_broadcast_game_search packet
+10.29.26 19:26:25  failed to decode a message_client_broadcast_game_search packet
+Initial query omitted format-version byte; 16-byte corrected query subsequently accepted.
