@@ -210,6 +210,7 @@ impl Library {
             scenario_path: inspection.scenario_path.clone(),
             archive: None,
             resource_directory: resources.or(path.parent()).map(Path::to_path_buf),
+            audio_resources: None,
             resource_sha256: resources
                 .or(path.parent())
                 .map(project::resource_hashes)
@@ -239,7 +240,7 @@ impl Library {
                 }
             }
             let mut imported=self.import_map(&src.original_path, src.resource_directory.as_deref())?.0;
-            if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();}imported
+            if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();source.audio_resources=src.audio_resources.clone();}imported
         } else {
             self.create(&incoming.title)?
         };
@@ -250,10 +251,24 @@ impl Library {
         p.quick_forge = incoming.quick_forge;
         p.firefight = incoming.firefight;
         p.history = incoming.history;
+        p.audio_preview = incoming.audio_preview;
+        for object in &mut p.scene {if let Some(reference)=&mut object.source_model {if reference.project_id==incoming.id&&p.source.as_ref().is_some_and(|source|source.sha256==reference.source_sha256){reference.project_id=p.id.clone();}}}
+        if let Some(scene)=&mut p.audio_preview {for emitter in &mut scene.emitters {if emitter.custom_sound.is_some()&&emitter.source_project_id.as_deref()==Some(incoming.id.as_str()){emitter.source_project_id=Some(p.id.clone());}}}
         // Re-ingest referenced OBJ files with integrity checks; never trust a descriptor's compiled mesh or receipt paths.
         p.assets.clear();
         let dir = self.project_dir(&p.id)?.join("assets");
         for asset in incoming.assets {
+            if asset.kind=="custom-sound" {
+                let bytes=crate::custom_sounds::read(&asset.path)?;
+                let extension=asset.path.extension().and_then(|value|value.to_str()).unwrap_or("").to_ascii_lowercase();
+                crate::custom_sounds::inspect(&bytes,&extension)?;
+                use sha2::{Digest,Sha256};
+                if format!("{:x}",Sha256::digest(&bytes))!=asset.sha256{return invalid("Referenced custom sound checksum changed");}
+                crate::reject_links(&dir)?;fs::create_dir_all(&dir)?;
+                let new_id=uuid::Uuid::new_v4().to_string();let raw=dir.join(format!("{new_id}.{extension}"));project::atomic_write(&raw,&bytes,false)?;
+                if let Some(scene)=&mut p.audio_preview {for emitter in &mut scene.emitters {if emitter.source_project_id.as_deref()==Some(p.id.as_str()){if let Some(sound)=&mut emitter.custom_sound {if sound.asset_id==asset.id {sound.asset_id=new_id.clone();}}}}}
+                p.assets.push(project::Asset{id:new_id,name:asset.name,kind:asset.kind,sha256:asset.sha256,path:raw,vertices:0,triangles:0,has_uvs:false,materials:vec![]});continue;
+            }
             if asset.kind != "obj" || fs::metadata(&asset.path)?.len() > 64 * 1024 * 1024 {
                 return invalid("Referenced asset is not a supported OBJ or exceeds 64 MiB");
             }

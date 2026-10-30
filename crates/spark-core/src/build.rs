@@ -34,6 +34,8 @@ pub struct CompatibilityReport {
     pub blockers: Vec<String>,
     pub warnings: Vec<String>,
     pub ready: bool,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub bitmap_dependencies:Option<crate::conversion_resources::BitmapAudit>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,6 +90,12 @@ fn validate_resource_snapshot(source: &project::Source, folder: Option<&Path>) -
     }
     Ok(())
 }
+pub fn fallback_bitmap_audit(project:&Project,inspection:&MapInspection,tools:&Toolchain)->Result<Option<crate::conversion_resources::BitmapAudit>>{
+    if tools.h1a_directory.is_none()||inspection.header.version!=609{return Ok(None);}
+    if project.source.as_ref().and_then(|source|resource_folder(source,tools)).is_some_and(|root|root.join("bitmaps.map").is_file()){return Ok(None);}
+    let sdk=tools.base_tags_directory.as_ref().ok_or_else(||SparkError::Invalid("Choose extracted MCC SDK tags before resolving indexed classic bitmaps".into()))?;
+    Ok(Some(crate::conversion_resources::audit(&inspection.tags,sdk)?))
+}
 pub fn compatibility(
     project: &Project,
     inspection: &MapInspection,
@@ -130,6 +138,11 @@ pub fn compatibility(
         }
         warnings.push("Conversion layers extracted custom tags over a verified copy of the selected MCC SDK tagset. All writes stay in a fresh job; the source and SDK masters remain unchanged.".into());
         if crate::conversion::is_yoyorast_v1(&inspection.sha256){warnings.push("Yoyorast V1 uses the tested MCC stock-shader and multiplayer UI adaptation. Every changed derived tag is recorded in conversion-manifest.json.".into());}
+    }
+    if project.conversion_profile.as_deref()==Some("mcc-multiplayer-ui"){
+        if !native{blockers.push("The MCC multiplayer UI profile requires the native H1A compiler".into());}
+        if let Err(error)=crate::conversion::use_mcc_multiplayer_ui(&inspection.sha256,inspection.header.version,inspection.header.scenario_type,project.conversion_profile.as_deref()){blockers.push(error.to_string());}
+        warnings.push("The selected profile replaces the CE startup multiplayer UI collection with the installed MCC SDK version. Custom entries under that collection are not retained; review the conversion manifest and test custom UI/HUD behavior in game.".into());
     }
     if !project.powerups.is_empty(){
         if !native{blockers.push("Custom power-up conversion requires the native MCC H1A compiler and invader-edit".into());}
@@ -184,7 +197,7 @@ pub fn compatibility(
         || project
             .scene
             .iter()
-            .any(|o| !inspection.objects.iter().any(|v| v.id == o.id) || o.scale != [1.0; 3])
+            .any(|o| !inspection.objects.iter().any(|v| v.id == o.id) || o.scale != [1.0; 3] || o.source_model.is_some() || o.asset_id.is_some())
     {
         blockers.push("Editor-only instances, duplication, deletion and per-instance scale cannot be compiled into Halo tags yet".into());
     }
@@ -196,12 +209,19 @@ pub fn compatibility(
         warnings.push("This map contains AI encounters. Importing it does not add multiplayer AI synchronization to MCC.".into());
     }
     warnings.push("A successful extraction/rebuild/CRC check establishes structural validity. MCC load testing is still required; playable is never inferred from the header.".into());
+    let bitmap_dependencies=match fallback_bitmap_audit(project,inspection,tools){
+        Ok(Some(audit))=>{
+            if audit.blocked(){let paths=audit.missing.iter().chain(&audit.invalid).take(8).map(|item|item.path.as_str()).collect::<Vec<_>>().join("; ");blockers.push(format!("Indexed CE bitmap dependencies need matching classic resources or editable tags: {paths}. Review the bitmap dependency repair before copying a large SDK. MCC texture packs cannot replace these classic tag files."));}
+            Some(audit)
+        },Ok(None)=>None,Err(error)=>{if native{blockers.push(error.to_string());}None}
+    };
     CompatibilityReport {
         target: "MCC Halo 1 · cache 13".into(),
         pipeline:if native{"Verified SDK copy → source tag extraction → explicit compatibility profile → MCC H1A Tool → tag/index/CRC validation".into()}else{"Invader extract → audited edits → invader-build -g mcc-cea → tag/index/CRC validation".into()},
         ready: blockers.is_empty(),
         blockers,
         warnings,
+        bitmap_dependencies,
     }
 }
 pub(crate) struct Runner<'a> {
@@ -281,9 +301,16 @@ impl Runner<'_> {
             let name=s.to_string_lossy();
             (name.eq_ignore_ascii_case("tool.exe") && args.iter().any(|s|s=="-tags_dir"))
                 || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"))
+                || (name.eq_ignore_ascii_case("invader-extract.exe") && phase=="extract")
         }) {
             Some(crate::native_workspace::Alias::new(cwd)?)
         } else {None};
+        #[cfg(windows)]
+        let extraction_args = if phase=="extract" {
+            native_alias.as_ref().map(|alias|crate::native_workspace::extraction_arguments(args,cwd,alias.path())).transpose()?
+        } else {None};
+        #[cfg(windows)]
+        let args=extraction_args.as_deref().unwrap_or(args);
         #[cfg(windows)]
         let cwd = native_alias.as_ref().map_or(cwd,|a|a.path());
         let mut child = cmd

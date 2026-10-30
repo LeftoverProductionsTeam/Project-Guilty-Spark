@@ -6,6 +6,7 @@ use spark_core::{
     community_servers as servers, mcc_content_probe as content, runtime_adapters as adapters,
 };
 use std::process::{Child, Command};
+const WORKING_TAG_SNAPSHOT_REASON:&str="before-build";
 
 #[derive(Default)]
 pub(super) struct WorkbenchState {
@@ -96,7 +97,11 @@ pub(super) struct WorkbenchReport {
     tools_issue: Option<String>,
     processes: Vec<ToolProcessView>,
     working_build: Option<BuildRecord>,
+    working_source: Option<WorkingSource>,
 }
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+struct WorkingSource { build_id:String, tags_directory:PathBuf }
 
 #[derive(Clone)]
 struct SourceContext {
@@ -498,6 +503,7 @@ pub(super) async fn runtime_workbench_report(
                     .is_file()
             })
             .map(|context| context.build.clone());
+        let working_source=context.as_ref().ok().and_then(|c|c.as_ref()).map(|c|WorkingSource{build_id:c.build.id.clone(),tags_directory:c.tags.clone()});
         Ok(WorkbenchReport {
             report,
             profiles: adapters::registry(),
@@ -506,6 +512,7 @@ pub(super) async fn runtime_workbench_report(
             tools_issue,
             processes: observed,
             working_build,
+            working_source,
         })
     })
     .await
@@ -618,10 +625,23 @@ pub(super) async fn launch_runtime_tool(
 }
 
 #[tauri::command]
+pub(super) async fn inspect_bsp_audio_workspace(app:tauri::AppHandle,project_id:String)->Reply<core::bsp_audio::Workspace>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let context=source_context(&state,&project)?;
+        let cache=context.build.output.as_ref().ok_or("Validated parent cache is missing")?;
+        let sha=context.build.sha256.as_deref().ok_or("Validated parent cache identity is missing")?;
+        core::bsp_audio::inspect_workspace(&context.build.id,cache,sha,&context.tags).map_err(error)
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
 pub(super) async fn build_working_tags(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
     project_id: String,
+    bsp_audio: Option<core::bsp_audio::Request>,
 ) -> Reply<String> {
     let owner = window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
@@ -635,8 +655,8 @@ pub(super) async fn build_working_tags(
         let invader_info=build::tool_path(&tools,"invader-info").ok_or("Configure Invader info before verifying a working-tag build")?;
         verify_compiler_location(&state,&forge_build::ForgeToolchain{hek_directory:settings.hek_directory.clone(),hek_flavor:settings.hek_flavor.clone(),invader_directory:settings.invader_directory.clone(),hek_tags_directory:Some(context.tags.clone())})?;
         let scenario_type=if project.quick_forge.is_some(){1}else{inspect(&state,&project)?.header.scenario_type};
-        let input=core::working_tags::WorkingTagsInput{parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
-        snapshot_project_state(&state,&project,"before-working-tag-build")?;
+        let input=core::working_tags::WorkingTagsInput{bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
+        snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;
         let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
         let mut jobs=lock(&state.jobs)?;if !jobs.is_empty(){return Err("Another build is running; wait for completion or cancel it first".into());}jobs.insert(job_id.clone(),cancel.clone());drop(jobs);
         let jobs_root=state.root.join("jobs");let returned=job_id.clone();let worker_app=app.clone();
@@ -931,6 +951,15 @@ pub(super) async fn mcc_owned_content_probe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn working_tag_build_snapshot_uses_the_supported_persistence_contract() {
+        let directory=tempfile::tempdir().unwrap();
+        let project=Project::new("Saved tool edits");
+        let snapshot=core::snapshots::create(directory.path(),&project,WORKING_TAG_SNAPSHOT_REASON,10).unwrap();
+        let restored=core::snapshots::preview(directory.path(),&project,&snapshot.id,&snapshot.sha256).unwrap();
+        assert_eq!(restored.fingerprint().unwrap(),project.fingerprint().unwrap());
+        assert_eq!(snapshot.reason,"before-build");
+    }
     #[test]
     fn working_receipts_match_native_quickforge_scenario_spelling() {
         assert!(scenario_paths_match(

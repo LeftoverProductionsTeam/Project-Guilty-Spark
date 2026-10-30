@@ -38,6 +38,8 @@ pub struct Source {
     pub resource_directory: Option<PathBuf>,
     #[serde(default)]
     pub resource_sha256: std::collections::BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub audio_resources: Option<crate::mcc_audio::Binding>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -207,7 +209,7 @@ impl Project {
         if self.animations.len()>128||self.animation_assignments.len()>128{return invalid("Animation library exceeds 128 assets or assignments");}
         let mut animation_ids=std::collections::HashSet::new();for asset in &self.animations{asset.validate()?;if !animation_ids.insert(&asset.id){return invalid("Duplicate animation asset");}}
         for binding in &self.animation_assignments{uuid::Uuid::parse_str(&binding.id).map_err(|_|crate::SparkError::Invalid("Invalid animation assignment".into()))?;if !animation_ids.contains(&binding.asset_id)||!matches!(binding.mode.as_str(),"custom"|"replace-graph")||binding.source_sha256.len()!=64||binding.target_tag_path.len()>256||crate::safe_relative(&binding.target_tag_path).is_err(){return invalid("Invalid animation assignment or missing source asset");}}
-        if self.conversion_profile.as_deref().is_some_and(|p|!matches!(p,"faithful"|"zombie-recovery")){return invalid("Unknown map conversion profile");}
+        if self.conversion_profile.as_deref().is_some_and(|p|!matches!(p,"faithful"|"zombie-recovery"|"mcc-multiplayer-ui")){return invalid("Unknown map conversion profile");}
         if let Some(environment)=&self.world_environment {environment.validate()?;}
         if self.build_targets.len()>16 {return invalid("At most 16 engine build targets per project");}
         let mut target_ids=std::collections::HashSet::new();
@@ -247,9 +249,10 @@ impl Project {
             studio.validate()?;
         }
         if let Some(source) = &self.source {
+            if let Some(audio)=&source.audio_resources { audio.validate(source.cache_version)?; }
             if source.resource_sha256.iter().any(|(name, hash)| {
                 !(["bitmaps.map", "sounds.map", "loc.map"].contains(&name.as_str())
-                    || (source.cache_version==13&&(["common.ipak","inplace1.ipak","inplace2.ipak","mcc-textures"].contains(&name.as_str())
+                    || (source.cache_version==13&&(["common.ipak","inplace1.ipak","inplace2.ipak","mcc-textures","mcc-shared-bitmaps.map"].contains(&name.as_str())
                         || name.strip_suffix(".imeta").is_some_and(|n|!n.is_empty()&&n.len()<=64&&n.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_'||b==b'-')))))
                     || hash.len() != 64
                     || !hash.bytes().all(|b| b.is_ascii_hexdigit())
@@ -281,6 +284,12 @@ impl Project {
         }
         let mut ids = std::collections::HashSet::new();
         for object in &self.scene {
+            if let Some(source) = &object.source_model {
+                uuid::Uuid::parse_str(&source.project_id).map_err(|_| crate::SparkError::Invalid("Invalid source model project".into()))?;
+                if source.source_sha256.len()!=64 || !source.source_sha256.bytes().all(|b|b.is_ascii_hexdigit()) || source.path.is_empty() || source.path.len()>512 || source.path.chars().any(char::is_control) || !matches!(source.class.as_str(),"scen"|"weap"|"eqip"|"vehi"|"bipd"|"itmc") {
+                    return invalid("Invalid source model identity");
+                }
+            }
             if !ids.insert(&object.id)
                 || object.id.len() > 200
                 || object.name.len() > 512
@@ -454,6 +463,9 @@ pub fn validate_edits(project: &Project, inspection: &MapInspection) -> Result<(
     Ok(())
 }
 pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Vec<u8>> {
+    if project.scene.iter().any(|object| object.source_model.is_some()) {
+        return invalid("Source-linked preview models require editable scenario placement tags before a game build. Use QuickForge source placements or remove the preview placement.");
+    }
     validate_edits(project, inspection)?;
     let source = project.source.as_ref().ok_or_else(|| {
         crate::SparkError::Invalid("A Halo map is required to build a cache".into())

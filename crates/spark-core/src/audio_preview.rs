@@ -46,7 +46,17 @@ pub struct Emitter {
     pub priority: u32,
     pub cooldown_ms: u32,
     pub spatial: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub looping_source: Option<LoopingSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_sound: Option<CustomSound>,
 }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub struct CustomSound { pub asset_id: String, pub sha256: String }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LoopingSource { pub tag_id: u32, pub track: usize }
 fn follow_chain_default() -> bool {
     true
 }
@@ -68,6 +78,12 @@ impl SoundScene {
         }
         let mut ids = HashSet::new();
         for e in &self.emitters {
+            if let Some(sound)=&e.custom_sound {
+                uuid::Uuid::parse_str(&sound.asset_id).map_err(|_|crate::SparkError::Invalid("Invalid custom sound asset".into()))?;
+                if sound.sha256.len()!=64 || !sound.sha256.bytes().all(|b|b.is_ascii_hexdigit()) || e.source_sha256.as_deref()!=Some(sound.sha256.as_str()) || e.source_project_id.is_none() || e.tag_id!=0 || e.looping_source.is_some() || e.pitch_range!=0 || e.permutation!=0 {
+                    return invalid("Custom sound needs its exact asset identity and a single audio source");
+                }
+            }
             uuid::Uuid::parse_str(&e.id)
                 .map_err(|_| crate::SparkError::Invalid("Invalid sound emitter identity".into()))?;
             if e.source_project_id.is_some() != e.source_sha256.is_some() {
@@ -89,6 +105,7 @@ impl SoundScene {
                 || e.name.chars().any(char::is_control)
                 || e.pitch_range > 7
                 || e.permutation > 255
+                || e.looping_source.as_ref().is_some_and(|source| source.track > 3)
                 || !matches!(
                     e.event.as_str(),
                     "ambient"
@@ -124,6 +141,11 @@ mod tests {
         let mut document = serde_json::json!({"schemaVersion":1,"master":0.5,"muted":false,"maxVoices":24,"buses":{"ambience":{"gain":1,"muted":false,"solo":false},"music":{"gain":1,"muted":false,"solo":false},"effects":{"gain":1,"muted":false,"solo":false},"dialogue":{"gain":1,"muted":false,"solo":false}},"emitters":[{"id":uuid::Uuid::new_v4().to_string(),"name":"Wind","tagId":4,"pitchRange":0,"permutation":0,"event":"ambient","bus":"ambience","position":[1,2,3],"gain":1,"pitch":0,"loop":true,"enabled":true,"minDistance":1,"maxDistance":40,"rolloff":1,"priority":50,"cooldownMs":100,"spatial":true}]});
         let valid: SoundScene = serde_json::from_value(document.clone()).unwrap();
         valid.validate().unwrap();
+        document["emitters"][0]["loopingSource"] = serde_json::json!({"tagId":7,"track":0});
+        let linked: SoundScene = serde_json::from_value(document.clone()).unwrap(); linked.validate().unwrap();
+        document["emitters"][0]["loopingSource"]["track"] = serde_json::json!(4);
+        assert!(serde_json::from_value::<SoundScene>(document.clone()).unwrap().validate().is_err());
+        document["emitters"][0]["loopingSource"] = serde_json::Value::Null;
         let mut p = crate::project::Project::new("Audio rehearsal");
         let fingerprint = p.fingerprint().unwrap();
         p.audio_preview = Some(valid);

@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "nativeDesktop": true,
+  "appSha256": "2ed3aa5d01e67dc411e6543f043932550ec9d700e9d3b6429c629880ce3a8bc8",
+  "sourceSha256": "3cb1fe9c6471d02694d34e7d62984532c1aafa076a14ce1a336aecc8eb9fed9a",
+  "nativeUiRecordAndSave": true,
+  "explicitNamedTakeWorkflow": true,
+  "osSavePickerTested": false,
+  "osCapturePickerTested": false,
+  "countdownCancellationRemovesEmptyPartial": true,
+  "pausedClockStable": true,
+  "backgroundRecording": true,
+  "cleanViewToggledDuringTake": true,
+  "closeBlockedWhileRecording": true,
+  "existingTakeProtected": true,
+  "wrongWindowRejected": true,
+  "traversalRejected": true,
+  "folderRememberedAfterReopen": true,
+  "freshNameAfterSuccess": true,
+  "videoOnly": true,
+  "requestedFps": 24,
+  "dimensions": {
+    "width": 1920,
+    "height": 658
+  },
+  "decodedFrameSizes": ["1920x658"],
+  "bytes": 1000558,
+  "sha256": "118c54dd475772747003428bc351a74b928ff0a34d77345112d41575ec9421ea",
+  "decoderSha256": "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3",
+  "decoderVersion": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
+  "decodedFrames": 86,
+  "decodedSeconds": 3.62,
+  "firstDecodedLumaMean": 35.21433738425867,
+  "firstDecodedLumaDeviation": 27.503886139467863,
+  "browserPresentationProbe": {
+    "scope": "Native editor canvas encoder/decoder; not the application Save picker or game capture",
+    "mime": "video/webm;codecs=vp8",
+    "bytes": 666025,
+    "width": 1920,
+    "height": 658,
+    "requestedFps": 24,
+    "elapsedSeconds": 2.337899999976158,
+    "audioTracks": 0,
+    "firstPresentedLumaDeviation": 27.248090332532446,
+    "firstPresentedMediaTime": 0,
+    "laterPresentedMediaTime": 1.002,
+    "decodedLumaDeviation": 27.830033024554503,
+    "decoded": true
+  },
+  "sourcePreserved": true,
+  "authoredDocumentPreserved": true,
+  "gameLaunched": false,
+  "gameplayAccepted": false,
+  "errors": [],
+  "testDate": "2026-10-29",
+  "verification": {
+    "rustPassed": 424,
+    "rustOptInIgnored": 5,
+    "frontendPassed": 165,
+    "frontendFiles": 35,
+    "browserPassed": 56,
+    "offlinePassed": 59
+  },
+  "originalProbeRecheck": {
+    "sha256": "433998ad8ce98ccba0d093f160ed5a9d892ca2a523485ebbf6b1e28c9af7ea67",
+    "independentFirstFrameHasPicture": true,
+    "grayscaleMeanAt128x72": 232.68229166666666,
+    "grayscaleDeviationAt128x72": 39.909141261202265
+  },
+  "retainedPreFixFailure": {
+    "cleanViewFrameSizes": ["1920x658", "1920x1080"],
+    "folderPreferenceLostOnReopen": true,
+    "corrected": true
+  },
+  "decoderDistribution": {
+    "url": "https://pypi.org/project/imageio-ffmpeg/0.6.0/",
+    "wheelSha256": "02fa47c83703c37df6bfe4896aab339013f62bf02c5ebf2dce6da56af04ffc0a",
+    "productDependency": false,
+    "binaryDistributed": false
+  }
+}

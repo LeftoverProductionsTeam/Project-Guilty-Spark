@@ -18,6 +18,11 @@ pub const BIGASS_V2104_SHA256: &str =
 pub fn is_yoyorast_v1(hash: &str) -> bool {
     hash == YOYORAST_V1_SHA256
 }
+pub fn use_mcc_multiplayer_ui(hash:&str,version:u32,scenario_type:u16,profile:Option<&str>)->Result<bool>{
+    let explicit=profile==Some("mcc-multiplayer-ui");
+    if explicit&&(version!=609||scenario_type!=1){return invalid("The MCC multiplayer UI profile only supports Custom Edition multiplayer caches");}
+    Ok(explicit||is_yoyorast_v1(hash)||hash==BIGASS_V2104_SHA256)
+}
 pub fn native_tool(tools: &Toolchain) -> Option<PathBuf> {
     tools
         .h1a_directory
@@ -148,7 +153,7 @@ pub(crate) fn compile_native(
             });
         }
     }
-    if is_yoyorast_v1(&inspection.sha256) || inspection.sha256 == BIGASS_V2104_SHA256 {
+    if use_mcc_multiplayer_ui(&inspection.sha256,inspection.header.version,inspection.header.scenario_type,project.conversion_profile.as_deref())? {
         let tag = "ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection";
         let source = base.join(safe_relative(tag)?);
         let target = tags.join(safe_relative(tag)?);
@@ -170,6 +175,8 @@ pub(crate) fn compile_native(
     }
     let profile = if project.conversion_profile.as_deref() == Some("zombie-recovery") {
         "zombie-recovery"
+    } else if project.conversion_profile.as_deref()==Some("mcc-multiplayer-ui") {
+        "mcc-multiplayer-ui"
     } else if is_yoyorast_v1(&inspection.sha256) {
         "yoyorast-v1-mcc"
     } else if inspection.sha256 == BIGASS_V2104_SHA256 {
@@ -229,7 +236,7 @@ pub(crate) fn compile_native(
         60,
     )?;
     if !native_compile_succeeded(&log) {
-        return invalid("MCC Tool did not confirm successful cache compilation. Its zero exit code alone is not success; inspect the conversion log");
+        return invalid(native_compile_failure(&log));
     }
     let name = crate::mcc::package_map_name(&inspection.scenario_path)?;
     let compiled = workspace.join("maps").join(&name);
@@ -241,6 +248,24 @@ pub(crate) fn compile_native(
         return invalid("MCC cache changed while copying the output");
     }
     Ok(())
+}
+/// Diagnose actual missing files without treating Tool's zero exit as success.
+pub fn native_compile_failure(log:&str)->String {
+    let mut missing=std::collections::BTreeSet::new();
+    for line in log.lines().take(4096){
+        let lower=line.to_ascii_lowercase();
+        if !lower.contains("0x00000002")&&!lower.contains("0x00000003"){continue;}
+        let prefix="file_open('tags\\";
+        let Some(start)=lower.find(prefix).map(|at|at+prefix.len()) else{continue};
+        let Some(end)=line[start..].find("')").map(|at|at+start)else{continue};
+        let tag=line[start..end].replace('\\',"/");
+        if tag.len()>512||tag.is_empty()||tag.chars().any(|c|c.is_control()||":*?<>|\"".contains(c))||tag.split('/').any(|part|part.is_empty()||part=="."||part==".."){continue;}
+        missing.insert(tag.to_ascii_lowercase());
+    }
+    if missing.is_empty(){return "MCC Tool did not confirm successful cache compilation. Its zero exit code alone is not success; inspect the conversion log".into();}
+    let list=missing.iter().take(8).cloned().collect::<Vec<_>>().join("; ");
+    let remaining=if missing.len()>8{format!(" (+{} more)",missing.len()-8)}else{String::new()};
+    format!("MCC conversion needs {} missing source tag(s): {list}{remaining}. Locate the original map's matching classic resource files or editable tags and rebuild. Installed MCC texture packs are not a substitute for missing classic tag data. No playable output was accepted.",missing.len())
 }
 pub fn native_compile_succeeded(log: &str) -> bool {
     let s = log.to_ascii_lowercase();
@@ -423,12 +448,37 @@ mod tests {
         ));
     }
     #[test]
+    fn missing_native_tags_report_exact_dependencies_and_matching_resource_guidance() {
+        let log="file_open('tags\\scenery\\test\\dust.bitmap') error 0x00000002\nfile_open('tags\\SCENERY\\TEST\\DUST.BITMAP') error 0x00000002\nfile_open('tags\\powerups\\active camoflage\\camoflage.bitmap') error 0x00000003\n### FAILED TO LOAD SCENARIO.";
+        let message=native_compile_failure(log);
+        assert!(message.contains("2 missing source tag(s)"));
+        assert!(message.contains("scenery/test/dust.bitmap"));
+        assert!(message.contains("powerups/active camoflage/camoflage.bitmap"));
+        assert!(message.contains("matching classic resource files"));
+        assert!(message.contains("No playable output was accepted"));
+        assert!(!native_compile_succeeded(log));
+    }
+    #[test]
+    fn dependency_diagnostics_do_not_echo_absolute_or_traversing_paths() {
+        let log="file_open('tags\\..\\private.bitmap') error 0x00000002\nfile_open('tags\\C:\\Users\\private.bitmap') error 0x00000002\n### FAILED TO LOAD SCENARIO.";
+        let message=native_compile_failure(log);
+        assert!(!message.contains("private.bitmap"));assert!(message.contains("zero exit code"));
+    }
+    #[test]
     fn compatibility_bindings_are_scoped_to_the_exact_published_yoyorast_source() {
         assert!(is_yoyorast_v1(YOYORAST_V1_SHA256));
         assert!(!is_yoyorast_v1(crate::legacy::ZOMBIE_DEMO_SHA256));
         assert!(shader_changes()
             .iter()
             .all(|(tag, field, _)| safe_relative(tag).is_ok() && field.starts_with("shaders[")));
+    }
+    #[test]
+    fn an_unknown_ce_map_requires_an_explicit_multiplayer_ui_choice(){
+        assert!(!use_mcc_multiplayer_ui(&"a".repeat(64),609,1,None).unwrap());
+        assert!(use_mcc_multiplayer_ui(&"a".repeat(64),609,1,Some("mcc-multiplayer-ui")).unwrap());
+        assert!(use_mcc_multiplayer_ui(&"a".repeat(64),609,0,Some("mcc-multiplayer-ui")).is_err());
+        assert!(use_mcc_multiplayer_ui(&"a".repeat(64),13,1,Some("mcc-multiplayer-ui")).is_err());
+        assert!(use_mcc_multiplayer_ui(YOYORAST_V1_SHA256,609,1,None).unwrap());
     }
     #[test]
     fn sdk_inventory_checks_tag_paths_sizes_and_links() {

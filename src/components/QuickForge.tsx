@@ -1,10 +1,19 @@
 import BuildTargets from './BuildTargets';
+import{WorkspacePanel,useRevealWorkspacePanel}from'./WorkspacePanels';
 import RenderFeatures from './RenderFeatures';
 import LiveForge from './LiveForge';
 import MapSounds from './MapSounds';
+import type {ViewportLibraryControls} from './ViewportAssetLibrary';
+import ViewportAssetLibrary from './ViewportAssetLibrary';
+import ViewportTags from './ViewportTags';
+import WorkshopScene,{WorkshopObjectFields} from './WorkshopScene';
+import {viewportAssetCatalog,placeLibraryModel,librarySoundEmitters} from '../viewportAssets';
+import {useViewportAssetDrop} from '../useViewportAssetDrop';
+import {emptySoundScene} from '../spatialAudio';
+import SoundMixer from './SoundMixer';
 import ForgeCollaboration from './ForgeCollaboration';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {useMapState} from '../mapSession';
+import {useMapState,writeMapSession} from '../mapSession';
 import {
   Box,
   Copy,
@@ -135,6 +144,7 @@ type PaletteItem =
   | { type: 'zone' };
 const dragType = 'application/x-guiltyspark-forge';
 interface Props {
+  library?:ViewportLibraryControls;
   project: Project | null;
   data: Bootstrap;
   edit: (project: Project, description: string) => void;
@@ -317,6 +327,24 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const [ghost, setGhost] = useState<Vec3 | null>(null),
     [dragging, setDragging] = useState<PaletteItem | null>(null);
   const dropPoint = useRef<((x: number, y: number) => Vec3 | null) | null>(null);
+  const library=props.library,revealPanel=useRevealWorkspacePanel(),viewportElement=useRef<HTMLDivElement|null>(null),assetAlive=useRef(true);
+  const catalog=useMemo(()=>viewportAssetCatalog(library?.documents??[]),[library?.documents]);
+  const [assetBusy,setAssetBusy]=useState(false),[workshopSelected,setWorkshopSelected]=useMapState<string|null>(project.id,'forge.workshopSelection',null);
+  const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',''),[tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null),[tagRevision,setTagRevision]=useState(0);
+  const tagDocument=library?.documents.find(document=>document.id===tagSource),tagProject=tagDocument?.history.current;
+  const workshop=project.scene.find(object=>object.id===workshopSelected&&object.assetId),workshopMeshes=library?.documents.find(document=>document.id===project.id)?.meshes??{};
+  useEffect(()=>{assetAlive.current=true;return()=>{assetAlive.current=false;};},[project.id]);
+  function openPlacementTag(id:string){const placement=latestProject.current.quickForge?.placements.find(value=>value.id===id);if(!placement?.sourceProjectId||placement.tagId===null)return;setTagSource(placement.sourceProjectId);setTagRequest(placement.tagId);setTagRevision(value=>value+1);revealPanel('object-tags');}
+  async function dropLibraryAsset(key:string,point:Vec3,replaceId?:string|null){
+    if(!library||assetBusy||library.busy)return;const item=catalog.find(value=>value.key===key);if(!item){notify('Reopen the source map before placing this asset.','error');return;}setAssetBusy(true);
+    try{if(item.kind==='model'){const placed=placeLibraryModel(latestProject.current,item.asset,snapPoint(point,gridSnap?snap:0),replaceId);edit(placed.project,`${replaceId?'Replace':'Place'} ${item.name}`);setSelected([placed.selectedId]);setWorkshopSelected(null);}
+      else if(item.kind==='mesh'){await library.onPlaceMesh(item,point,replaceId);setSelected([]);}
+      else{const emitters=await librarySoundEmitters(item,point);if(!assetAlive.current)return;const latest=latestProject.current,scene=latest.audioPreview??emptySoundScene();if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,...emitters]}},'Place sound '+item.name);writeMapSession(project.id,'sound-emitter-selection',emitters[0].id);revealPanel('map-sounds');}
+    }catch(reason){if(assetAlive.current)notify(String(reason),'error');}finally{if(assetAlive.current)setAssetBusy(false);}
+  }
+  async function dropFiles(paths:string[],point:Vec3){if(!library||library.busy)return;for(const path of paths){if(!assetAlive.current)return;if(/\.obj$/i.test(path))await library.onImportModel(point,path);else if(await library.onImportSound(point,path))revealPanel('map-sounds');}}
+  const assetDrag=useViewportAssetDrop(project.id,viewportElement,dropPoint,(key,point)=>void dropLibraryAsset(key,point),library?(paths,point)=>void dropFiles(paths,point):undefined);
+  const viewPoint=()=>{const rect=viewportElement.current?.getBoundingClientRect();return rect?dropPoint.current?.(rect.x+rect.width/2,rect.y+rect.height/2)??undefined:undefined;};
   const pointerDrag = useRef<{item:PaletteItem;x:number;y:number;pointerId:number;moved:boolean}|null>(null);
   const suppressPaletteClick = useRef(0);
   const cancelledPointer = useRef<number|null>(null);
@@ -484,6 +512,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     notify(`Selected source brush for diagnostic triangle ${triangle}. Fix its geometry and regenerate the preview before rerunning Tool.`);
   }
   function select(id: string | null, additive: boolean) {
+    setWorkshopSelected(null);
     setSelectedZone(null);
     setSelected((items) =>
       !id
@@ -494,7 +523,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             : [...items, id]
           : [id],
     );
-    if (id) setTab('properties');
+    if (id) {setTab('properties');if(!additive)openPlacementTag(id);}
   }
   function changeNode(update: (node: ForgeNode) => ForgeNode, description: string) {
     try {
@@ -804,7 +833,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         </button>
       </div>
       <div className="forge-main">
-        <aside className="forge-hierarchy">
+        <WorkspacePanel id="forge-palette" label="Build tools"><aside className="forge-hierarchy">
           <div className="forge-panel-heading">
             <strong>Scene hierarchy</strong>
             <Pill>{nodes.length}</Pill>
@@ -908,7 +937,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
               Delete
             </button>
           </div>
-        </aside>
+        </aside></WorkspacePanel>
         <section className="forge-center">
           <ForgeCollaboration projectId={project.id} document={doc} entries={data.entries} onShared={props.onSharedDocument} onSave={props.onSave}/>
           {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
@@ -988,7 +1017,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             </label>
           </div>
           <div
-            className={`forge-viewport ${dragging ? 'drag-active' : ''}`}
+            ref={viewportElement}
+            className={`forge-viewport ${dragging || assetDrag.dragging ? 'drag-active' : ''}`}
             onDragOver={(event) => {
               if (!dragging && !event.dataTransfer.types.includes(dragType)) return;
               event.preventDefault();
@@ -1026,8 +1056,10 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
           >
             <ForgeViewport
               sessionId={project.id}
+              resourceScopes={Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})]))}
               renderFeatures={project.renderFeatures}
               document={doc}
+              viewportChildren={<><WorkshopScene project={project} meshes={workshopMeshes} selected={workshopSelected} onSelect={id=>{setWorkshopSelected(id);setSelected([]);revealPanel('workshop-object');}} onTransform={object=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?object:value)},'Transform custom model')} mode={mode} snap={gridSnap?snap:0}/>{project.audioPreview?.emitters.filter(emitter=>emitter.spatial).map(emitter=><mesh key={emitter.id} position={emitter.position} onClick={event=>{event.stopPropagation();writeMapSession(project.id,'sound-emitter-selection',emitter.id);revealPanel('map-sounds');}}><sphereGeometry args={[.12,10,6]}/><meshBasicMaterial color="#89e4ef" wireframe/></mesh>)}</>}
               showHillAreas={showHillAreas}
               showGameRoutes={showGameRoutes}
               snapshot={snapshot}
@@ -1075,6 +1107,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             onZoneMove={(id, position) => { if (project.firefight) edit({ ...project, firefight: { ...project.firefight, spawnZones: project.firefight.spawnZones.map((zone) => zone.id === id ? { ...zone, position } : zone) } }, 'Move AI spawn zone'); }}
             onError={(message) => notify(message, 'error')}
             />
+            {assetDrag.dragging&&<div className="viewport-asset-drop-hint">Drop a model or sound onto the map · Esc cancels</div>}
             <div className="forge-viewport-badges">
               <Pill tone={preflight.ready ? 'green' : 'amber'}>
                 {previewBusy
@@ -1106,7 +1139,11 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             </div>
           </div>
         </section>
-        <aside className="forge-inspector">
+        {library&&<WorkspacePanel id="asset-library" label="Asset library" defaultDock="left"><ViewportAssetLibrary projectId={project.id} assets={catalog} begin={assetDrag.begin} activate={assetDrag.activate} canReplace={!!workshop||selected.length===1&&doc.placements.some(value=>value.id===selected[0])} replace={item=>{const placement=doc.placements.find(value=>value.id===selected[0]);if(item.kind==='mesh'&&workshop)void dropLibraryAsset(item.key,workshop.position,workshop.id);else if(item.kind==='model'&&placement)void dropLibraryAsset(item.key,placement.position,placement.id);else notify('Choose a placed Halo model or a custom mesh of the same placement kind.','error');}} importModel={()=>void library.onImportModel(viewPoint())} importSound={()=>void library.onImportSound(viewPoint()).then(added=>{if(added)revealPanel('map-sounds');})} busy={library.busy||assetBusy}/></WorkspacePanel>}
+        {library&&<WorkspacePanel id="object-tags" label="Object tags">{tagProject&&tagDocument?.inspection?<><p className="subtle">{tagProject.title} · source tags</p><ViewportTags project={tagProject} inspection={tagDocument.inspection} requestedTagId={tagRequest} requestRevision={tagRevision} edit={edit} notify={notify} onSave={()=>library.onSaveMap(tagProject.id)}/></>:<p>Open this placement’s source map in a tab to edit its tags in this drawer.</p>}</WorkspacePanel>}
+        {library&&<WorkspacePanel id="map-sounds" label="Map sounds"><label>Sound source map<select aria-label="QuickForge sound source map" value={sourceId} onChange={event=>setSourceId(event.target.value)}><option value="">Choose an imported source map</option>{sources.map(source=><option key={source.id} value={source.id}>{source.title}</option>)}</select></label>{sourceOpen?.inspection?<MapSounds expanded key={sourceOpen.project.id} project={project} edit={edit} projectId={sourceOpen.project.id} inspection={sourceOpen.inspection}/>:<SoundMixer project={project} inspection={null} sourceProjectId={project.id} tagId={null} edit={edit}/>}</WorkspacePanel>}
+        {workshop&&<WorkspacePanel id="workshop-object" label="Custom model"><WorkshopObjectFields object={workshop} update={object=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?object:value)},'Edit custom model')} remove={()=>{edit({...latestProject.current,scene:latestProject.current.scene.filter(value=>value.id!==workshop.id)},'Remove custom model');setWorkshopSelected(null);}}/></WorkspacePanel>}
+        <WorkspacePanel id="forge-inspector" label="Inspector"><aside className="forge-inspector">
           <div className="forge-panel-tabs">
             <button className={tab === 'palette' ? 'selected' : ''} onClick={() => setTab('palette')}>
               Palette
@@ -1117,11 +1154,11 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             <button className={tab === 'firefight' ? 'selected' : ''} onClick={() => setTab('firefight')}>
               Firefight
             </button>
-            <button className={tab === 'sound' ? 'selected' : ''} onClick={() => setTab('sound')}>Sound</button>
+            <button className={tab === 'sound' ? 'selected' : ''} onClick={() => {setTab('sound');if(library)revealPanel('map-sounds');}}>Sound</button>
           </div>
           <div className="forge-inspector-scroll">
             <RenderFeatures project={project} edit={props.edit}/>
-            {tab==='sound'&&<><label>Sound source map<select aria-label="QuickForge sound source map" value={sourceId} onChange={e=>setSourceId(e.target.value)}><option value="">Choose an imported source map</option>{sources.map(source=><option key={source.id} value={source.id}>{source.title}</option>)}</select></label>{sourceOpen?.inspection?<MapSounds key={sourceOpen.project.id} project={project} edit={props.edit} projectId={sourceOpen.project.id} inspection={sourceOpen.inspection}/>:<p>Open an imported map as a sound source. Emitter positions belong to this QuickForge map; original audio stays in its preserved source project.</p>}</>}
+            {tab==='sound'&&!library&&<><label>Sound source map<select aria-label="QuickForge sound source map" value={sourceId} onChange={e=>setSourceId(e.target.value)}><option value="">Choose an imported source map</option>{sources.map(source=><option key={source.id} value={source.id}>{source.title}</option>)}</select></label>{sourceOpen?.inspection?<MapSounds key={sourceOpen.project.id} project={project} edit={props.edit} projectId={sourceOpen.project.id} inspection={sourceOpen.inspection}/>:<p>Open an imported map as a sound source. Emitter positions belong to this QuickForge map; original audio stays in its preserved source project.</p>}</>}
             {tab === 'palette' && (
               <>
                 <div className="forge-panel-heading">
@@ -1354,7 +1391,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
               />
             )}
           </div>
-        </aside>
+        </aside></WorkspacePanel>
       </div>
       <section className={`forge-build-panel ${expandedBuild ? 'expanded' : ''}`}>
         <div className="forge-build-heading">

@@ -1,0 +1,44 @@
+.conversion-bitmap-repair > details > summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 650;
+  font-size: 14px;
+  padding: 4px 0;
+}
+.conversion-bitmap-repair ul {
+  max-height: 220px;
+  overflow: auto;
+  padding-left: 20px;
+}
+.conversion-bitmap-repair li {
+  padding: 4px 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.conversion-bitmap-repair label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 14px 0;
+}
+.conversion-bitmap-repair input {
+  width: 100%;
+}
+.conversion-bitmap-repair .button-row {
+  flex-wrap: wrap;
+}
+.conversion-bitmap-review {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 14px 4px;
+  overflow-wrap: anywhere;
+}
+.conversion-bitmap-review button {
+  margin: 6px 8px 0 0;
+}
+.build-conversion .toggle-setting small {
+  display: block;
+  line-height: 1.65;
+  margin-top: 5px;
+}

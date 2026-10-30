@@ -3,6 +3,7 @@ pub mod appearance;
 pub mod assets;
 pub mod asset_transfer;
 pub mod audio;
+pub mod looping_audio;
 mod audio_pcm;
 pub mod binary;
 pub mod bitmap_preview;
@@ -18,6 +19,7 @@ pub mod connections;
 pub mod community_servers;
 pub mod community_host;
 pub mod conversion;
+pub mod conversion_resources;
 pub mod engine_machinima;
 pub mod external_changes;
 pub mod invitations;
@@ -43,6 +45,7 @@ mod native_workspace;
 pub mod project;
 pub mod powerups;
 pub mod audio_preview;
+pub mod mcc_audio;
 pub mod render;
 pub mod render_features;
 pub mod resource_map;
@@ -54,6 +57,7 @@ pub mod runtime_adapters;
 pub mod steam;
 pub mod snapshots;
 pub mod working_tags;
+pub mod working_tag_changes;
 
 use std::path::Path;
 use thiserror::Error;
@@ -132,3 +136,6 @@ pub fn safe_relative(value: &str) -> Result<std::path::PathBuf> {
     }
     Ok(std::path::PathBuf::from(normalized))
 }
+
+pub mod bsp_audio;
+pub mod custom_sounds;

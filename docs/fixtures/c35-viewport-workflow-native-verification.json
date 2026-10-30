@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "testDate": "2026-10-29",
+  "continuation": 35,
+  "revision": 10,
+  "appSha256": "26f32b45b6b70c502c1ee8114c814c3bd6272fcd135527e5c1fe7ae7f29a1016",
+  "scope": "Actual Windows UI/import/source-preview persistence and independent native-byte WebView2 audio rendering; focused playback and hardware listening not accepted",
+  "verification": {
+    "rustPassed": 461,
+    "rustOptInIgnored": 5,
+    "frontendPassed": 199,
+    "frontendFiles": 41,
+    "browserPassed": 71,
+    "offlinePassed": 59
+  },
+  "sources": [
+    {
+      "name": "bloodgulch.map",
+      "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102"
+    },
+    {
+      "name": "beavercreek.map",
+      "sha256": "893ed257ae92bbd000406cebeba403d5adb258a558e45df47a6368227be0c46c"
+    },
+    {
+      "name": "timberland.map",
+      "sha256": "e6e2ffff238bcb7509e2c0574fde52e4d4c291e1ac4e9d21fc7228de1a5fddad"
+    }
+  ],
+  "checks": {
+    "customImport": {
+      "soundSha256": "a95f7cc55905a62859be0bf24535227e43c501b2ed25e5ae11725d3ab00fb094",
+      "modelSha256": "a5ef04f55cfb16ec7d18c6e0d264b2237d9e09a529cb69e0174e594f8025eec8",
+      "channels": 1,
+      "sampleRate": 48000,
+      "durationSeconds": 1
+    },
+    "topBar": {
+      "height": 32,
+      "noWindowLauncher": true,
+      "collapseAndReveal": true
+    },
+    "nativeFocus": false,
+    "independentAuthoredAudio": {
+      "kind": "native-preview-bytes-WebView2-OfflineAudioContext",
+      "tagId": 3964406488,
+      "loopTagId": 3964472025,
+      "sampleSha256": "2eea80445d243392abffa977a85dddf0dc08db8fa4fef6c6a1e45c6d7a895676",
+      "channels": 2,
+      "duration": 1.320625,
+      "rms": 0.00029680629465371044
+    },
+    "authoredAmbience": {
+      "mapSha256": "e6e2ffff238bcb7509e2c0574fde52e4d4c291e1ac4e9d21fc7228de1a5fddad",
+      "bsp": "levels\\spark\\assembly_933b2da5\\connected",
+      "clusters": 11,
+      "partitionNodes": 35657,
+      "partitionLeaves": 17885,
+      "assignedBackgrounds": 2,
+      "voices": 0,
+      "rms": 0
+    },
+    "independentCustomAudio": {
+      "kind": "imported-native-bytes-WebView2-OfflineAudioContext",
+      "loudRms": 0.056564300410287774,
+      "quietRms": 0.014141075102571943,
+      "ratio": 0.25,
+      "muteRms": 0
+    },
+    "compactMuteVolumeUi": true,
+    "sourceModelGeometry": {
+      "objectTagId": 3834446617,
+      "modelTagId": 3834512154,
+      "triangles": 787
+    },
+    "viewportEditing": {
+      "crossMapPointerDrop": true,
+      "sourceTagId": 3834446617,
+      "sourceSha256": "893ed257ae92bbd000406cebeba403d5adb258a558e45df47a6368227be0c46c",
+      "modelPreviewSaved": true,
+      "tagSourceUndoRedo": true,
+      "tagDrawerHideReopen": true,
+      "viewportUnchanged": true,
+      "audioContinuesThroughDrawers": null
+    },
+    "fullscreenStrip": {
+      "height": 30
+    },
+    "window": {
+      "maximizeFullscreenRestore": true,
+      "oneCloseControl": true,
+      "audioControlsReachable": true
+    }
+  },
+  "inputsUnchanged": true,
+  "pageErrors": [],
+  "focusedAutomaticPlaybackAccepted": false,
+  "hardwareListeningAccepted": false,
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "limitations": [
+    "No Halo process, game memory, retail game loading, physical file chooser or audio-device listening acceptance.",
+    "Imported-cache model additions and custom meshes remain previews until native model/scenario compilation supports them.",
+    "Native foreground activation was unavailable. Focused automatic playback and physical listening remain unaccepted; source decoding/gains are independently rendered in WebView2 OfflineAudioContext."
+  ]
+}

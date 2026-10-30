@@ -221,7 +221,9 @@ export function projectMapDecals(
           .addScaledVector(up, vertex.p[1])
           .addScaledVector(n, vertex.p[2] + 0.0003);
         part.positions.push(p.x, p.y, p.z);
-        part.uvs.push(vertex.p[0] / width + 0.5, vertex.p[1] / height + 0.5);
+        // Source DDS rows start at the top. Projector up must point towards
+        // row zero, rather than reflecting every generated sign vertically.
+        part.uvs.push(vertex.p[0] / width + 0.5, 0.5 - vertex.p[1] / height);
         part.lightmapUvs.push(...vertex.uv);
       };
       for (let i = 1; i + 1 < vertices.length; i++) {

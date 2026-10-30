@@ -62,6 +62,12 @@ describe('source decal projection', () => {
       0,
     );
   });
+  it('keeps the top of source bitmap rows above the bottom of the painted sign', () => {
+    const result=projectMapDecals(indexDecalSurfaces(plane),[decal]);
+    for(const part of result.parts)for(let i=0;i<part.positions.length/3;i++){
+      expect(part.uvs[i*2+1]).toBeCloseTo(.5-part.positions[i*3+1]);
+    }
+  });
   it('preserves aspect and honors bounded geometry work', () => {
     const result = projectMapDecals(
       indexDecalSurfaces(plane),

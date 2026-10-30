@@ -1,6 +1,7 @@
 // Current evidence for the cumulative ledger. Historical source tables remain
 // immutable inputs; old status and code descriptions are retained separately.
 // A domain summarizes a bounded path, never every feature sharing a keyword.
+// C35 r10 operation-specific viewport/audio updates are applied below.
 const entry = (files, operation, gap, target, level, evidence, next, extra = {}) => ({
   files, operation, gap, target, level, evidence, next,
   state: 'PARTIAL — acceptance open', priority: 'P1',
@@ -22,11 +23,11 @@ export const evidenceTopics = {
     'Owned H1 classic source -> separately installed MCC H1A editing-kit Tool', 'LOCALLY TESTED — source and native compiler, not full gameplay',
     'docs/QUICKFORGE_BSP_PIPELINE.md; docs/RECLAMATION_AND_WORKFLOW_POLISH.md; crates/spark-core/src/project.rs',
     'Preserve the accepted native compile, then accept an actual playable arena and format-specific generated collision in Halo.', {priority: 'P0'}),
-  bsp: entry('crates/spark-core/src/bsp_assembly.rs; crates/spark-core/src/forge_build.rs; src/components/QuickForge.tsx',
-    'Four source areas compile into one actual resident BSP. Latest hash 5b0103b6… was rechecked with 11 clusters/10 portals, connected symmetric PVS and routes at 423/440/394 samples; this is compiled visibility, not independent region streaming.',
-    'Manual traversal, scenery/biped physics, retail MCC and multiplayer remain open. All 11 clusters lack donor fog/weather/background sound/sound-environment selections; independent streaming and full gameplay transplantation are unimplemented.',
+  bsp: entry('crates/spark-core/src/bsp_assembly.rs; crates/spark-core/src/forge_build.rs; src/components/QuickForge.tsx; crates/spark-core/src/bsp_audio.rs; crates/spark-core/src/working_tags.rs; src/components/BspAudioEditor.tsx; src/components/RuntimeDock.tsx',
+    'Four source areas compile into one actual resident BSP. Latest hash 5b0103b6… was rechecked with 11 clusters/10 portals, connected symmetric PVS and routes at 423/440/394 samples; this is compiled visibility, not independent region streaming. C35 r9 adds explicit background-loop/environment assignments to compiled BSP clusters through separate H1A working-tag builds. Two native builds verify logical audio bindings, unchanged collision and exact PVS/PAS; the desktop opens a new map tab without changing its input tags/cache.',
+    'Manual traversal, scenery/biped physics, retail MCC and multiplayer remain open. The original 11-cluster audit remains unchanged; r9 separate revisions support explicit audio selections. Automatic donor fog/weather/acoustics, independent streaming and full gameplay transplantation are unimplemented.',
     'Owned four-map H1 source -> one native-built MCC world; no live BSP replacement', 'LOCALLY TESTED — native compile and collision samples only',
-    'docs/research/C34_CONNECTED_WORLD_AUDIT.md; docs/FOUR_MAP_CHALLENGE.md; docs/fixtures/four-map-challenge-verification.json',
+    'docs/research/C34_CONNECTED_WORLD_AUDIT.md; docs/FOUR_MAP_CHALLENGE.md; docs/fixtures/four-map-challenge-verification.json; docs/C35_BSP_AUDIO.md; docs/fixtures/c35-bsp-audio-native-verification.json; scripts/test-bsp-audio-native.mjs',
     'Walk all tunnel entrances/routes in the compiled world, record visual/collision defects, then test retail MCC and two actual game clients.', {priority: 'P0', risk: 'Collision samples do not certify scenery collision, biped movement, portals/PVS performance or multiplayer. Donor gameplay state is not imported.'}),
   assets: entry('crates/spark-core/src/assets.rs; crates/spark-core/src/asset_transfer.rs; crates/spark-core/src/animations.rs; src/components/AssetTransfer.tsx',
     'Bounded owned OBJ/source-model import and cross-map source-linked asset transfer are implemented; weighted actor/animation paths are separate.',
@@ -34,12 +35,12 @@ export const evidenceTopics = {
     'Owned source assets / selected H1 target; SDK FBX needs genuine fixture', 'IMPLEMENTED — partial source pipeline',
     'docs/RECLAMATION_AND_WORKFLOW_POLISH.md; crates/spark-core/src/assets.rs; crates/spark-core/src/asset_transfer.rs',
     'Compile and inspect one real imported model with matching materials, LOD and collision; accept it in the target game.'),
-  live: entry('crates/spark-core/src/live_adapter.rs; crates/spark-core/src/live_scaling.rs; src-tauri/src/live_mcc.rs; src/components/LiveObjectInspector.tsx',
-    'Exact Steam MCC Halo 1 existing-object move/readback and scale controls exist. Corrected shared Warthog physics/suspension was owner-confirmed at 2×.',
+  live: entry('crates/spark-core/src/live_adapter.rs; crates/spark-core/src/live_scaling.rs; src-tauri/src/live_mcc.rs; src/components/LiveObjectInspector.tsx; src-tauri/src/live_thread_pause.rs; src/components/LiveSessionRecovery.tsx',
+    'Exact Steam MCC Halo 1 existing-object move/readback and scale controls exist. Corrected shared Warthog physics/suspension was owner-confirmed at 2×. C35 r8 acknowledges existing pause releases, retains failed owned increments for retry and blocks further edits in that connection. Owned Windows child tests validate counts/release/termination; new MCC timing and recovery acceptance remain open.',
     'Arbitrary new live spawn/delete/rotation, engine calls, live BSP replacement, other vehicle/scale cases and game-peer replication remain open.',
     'Windows Steam MCC Halo 1 1.3528.0.0; exact EXE/module SHA-256 pair in LIVE_ADAPTER.md', 'LOCALLY TESTED — exact-build single-machine operations',
-    'docs/LIVE_ADAPTER.md; docs/NATIVE_GAMEPLAY_AND_AUDIO.md; docs/research/C34_LIVE_WRITE_AUDIT.md',
-    'Retain exact-build/session/generation guards; replace normal broad suspension with an accepted engine-owned operation boundary and acknowledged cleanup. Disabled-controller lock polling was corrected without changing write gates.', {priority: 'P0', risk: 'Normal broad suspension, ignored ResumeThread results and no elapsed pause deadline remain. Idle lock polling is source-fixed/tested; no new native crash/recovery/performance guarantee. Registry is not a write permit.'}),
+    'docs/LIVE_ADAPTER.md; docs/NATIVE_GAMEPLAY_AND_AUDIO.md; docs/research/C34_LIVE_WRITE_AUDIT.md; docs/C35_THREAD_RELEASE.md; docs/fixtures/c35-thread-release-native-verification.json',
+    'Retain exact-build/session/generation guards and acknowledged local release/retry; replace normal broad suspension with an accepted engine-owned operation boundary and durable recovery. Disabled-controller lock polling and local cleanup gates remain in place.', {priority: 'P0', risk: 'Normal broad suspension, no elapsed pause deadline, no durable cross-process journal and abnormal-exit recovery remain open. C35 r8 checks release results and retries retained owned handles without forcing other owners to zero; this does not establish engine-owned timing, game recovery or performance. Registry is not a write permit.'}),
   liveSpawn: entry('crates/spark-core/src/live_adapter.rs; crates/spark-core/src/runtime_adapters.rs; src-tauri/src/live_mcc.rs',
     'The existing adapter edits bounded existing objects; source asset placement and gizmos do not allocate engine objects.',
     'Validated arbitrary engine object-create/delete/rotation and resource ownership are not implemented.',
@@ -58,11 +59,11 @@ export const evidenceTopics = {
     'Bounded Halo Demo/PC/CE caches and MCC Halo 1 v13; exact resources per source', 'LOCALLY TESTED — selected native previews, not full game parity',
     'docs/RECLAMATION_AND_WORKFLOW_POLISH.md; docs/LIVING_RENDER_ENGINEERING.md; docs/LIVE_EDITOR_WORKSPACES.md',
     'Compare the same owned map/camera in editor and its actual runtime; retain per-material/resource failures and measured memory/frame pacing.'),
-  audio: entry('crates/spark-core/src/audio.rs; crates/spark-core/src/audio_preview.rs; src/spatialAudio.ts; src/components/MapSounds.tsx',
-    'Real embedded/exact-shared PCM, Xbox ADPCM and Vorbis samples plus bounded spatial editor rehearsal, buses, event audition and validated linked sample segments exist.',
-    'Native sound-event hooks, sound classes, script timing, BSP acoustic clusters, obstruction/reverb and complete looping intro/outro parity remain open.',
+  audio: entry('crates/spark-core/src/audio.rs; crates/spark-core/src/audio_preview.rs; src/spatialAudio.ts; src/components/MapSounds.tsx; crates/spark-core/src/looping_audio.rs; src/soundPlayback.ts; src/directorAudio.ts; src/soundClipLoader.ts; crates/spark-core/src/bsp_audio.rs; crates/spark-core/src/working_tags.rs; src/components/BspAudioEditor.tsx; src/components/RuntimeDock.tsx',
+    'Real embedded/exact-shared PCM, Xbox ADPCM and Vorbis samples plus bounded spatial editor rehearsal, buses, event audition and validated linked sample segments exist. C35 r7 adds source main-track intro/loop/end phases and flagged fades in rehearsal and saved Director audio, with actual browser rendering and independently decoded native source-waveform checks. C35 r9 adds explicit background-loop/environment assignments to compiled BSP clusters through separate H1A working-tag builds. Two native builds verify logical audio bindings, unchanged collision and exact PVS/PAS; the desktop opens a new map tab without changing its input tags/cache.',
+    'Native sound-event hooks, sound classes, script timing, alternate/detail/global-music behavior, automatic donor acoustics, editor BSP acoustic emulation, obstruction/reverb and complete native looping/audio parity remain open.',
     'Selected classic/MCC H1 samples; 12 native-built MCC sound tags and 17 linked sample chains inspected', 'LOCALLY TESTED — source decode / editor mixing; no native parity',
-    'docs/NATIVE_GAMEPLAY_AND_AUDIO.md; docs/ZOMBIE_AUDIO_AND_SPAWN_EVIDENCE.md',
+    'docs/NATIVE_GAMEPLAY_AND_AUDIO.md; docs/ZOMBIE_AUDIO_AND_SPAWN_EVIDENCE.md; docs/C35_LOOPING_AUDIO.md; docs/fixtures/c35-looping-audio-native-verification.json; docs/C35_BSP_AUDIO.md; docs/fixtures/c35-bsp-audio-native-verification.json; scripts/test-bsp-audio-native.mjs',
     'Compare the same native events and listener paths in Halo; add native routing and acoustic behavior without inventing missing sounds.', {risk: 'Auditioned clips and muted automated mix tests do not establish audible quality or native map sound behavior.'}),
   tags: entry('crates/spark-core/src/maps.rs; crates/spark-core/src/tag_exchange.rs; src/components/Tags.tsx; src/tagMigrationReview.ts',
     'Typed tag edits, class-safe references, bounded recursive extraction/export and compatible staged imports retain source identities; 255-file recursive acceptance is documented.',
@@ -468,3 +469,17 @@ export const rowEvidenceOverrides = {
   'C34U-campaign-eight': {state:'NOT ACCEPTED — eight-player campaign; dedicated route unsupported',operation:'Campaign is a separate typed request with an eight-player goal and native-client menu guidance. Pinned dedicated.c refuses campaign levels, so no dedicated launch spec or fake Slayer conversion is generated.',gap:'Actual matching-client campaign hosting, eight-player capacity, authored AI/script/checkpoint/transition/recovery acceptance remain missing.',level:'UPSTREAM DECLARED menu route; eight-player game NOT TESTED'},
   'C34U-firefight-eight': {state:'NOT IMPLEMENTED — native eight-player Firefight',operation:'Firefight is a distinct gated operation. No dedicated Firefight gametype/director or accepted authored eight-client survival game is fabricated by setting a capacity field.',gap:'Actual survival scenario/director, host-authoritative AI/progression and real eight-client acceptance are required.',level:'NOT IMPLEMENTED — engine wave adapter/game acceptance'},
 };
+
+// R10 follows existing domains without replacing unrelated runtime/game gates.
+for(const name of ['audio','assets','interface']){const topic=evidenceTopics[name];if(!topic)continue;topic.files+='; src/viewportAssets.ts; src/components/ViewportTags.tsx; src/components/EditorAudio.tsx; crates/spark-core/src/custom_sounds.rs';topic.operation+=' C35 r10 adds direct viewport tag drawers, a shared open-map asset library and source-bound model previews, managed OBJ/WAV/OGG import, automatic authored editor ambience with mute/volume, a 32-pixel collapsible top bar and a 30-pixel fullscreen strip. Imported-cache preview instances remain compile-blocked.';topic.evidence+='; docs/C35_VIEWPORT_WORKFLOW.md; docs/fixtures/c35-viewport-workflow-native-verification.json; scripts/test-viewport-workflow-native.mjs';}
+
+// R11 follows the existing domains and leaves engine/game acceptance separate.
+for(const name of ['assets','interface','tags','audio']){const topic=evidenceTopics[name];if(!topic)continue;topic.evidence+='; docs/C35_RENDERING_AND_WORKFLOW.md; docs/fixtures/c35-rendering-workflow-native-verification.json';topic.operation+=' C35 r11 corrects renderer front-face winding, decoded generic transparent material routing, MCC exact shared bitmap fallback and decal orientation/blending. The title/map tabs share one compact header; Focus mode/header hiding are retired, native window actions belong to the header layout and short tag drawers size to content. Tag classes expand matching tags and preserve selection. Full-schema editing uses the existing native tool-plan workflow; unknown cache fields remain preserved. A separate focused R10 native audio run verified authored playback, gain changes, zero muted output and continuity through drawers; this is not physical listening or game acoustic parity.';}
+
+// R12 records supported automatic audio discovery and scoped UI/native evidence.
+for(const name of ['audio','interface','assets']) {
+  const topic=evidenceTopics[name];
+  topic.files+='; src/loopingEmitters.ts; src/soundMixer.css; crates/spark-core/src/mcc_audio.rs';
+  topic.operation+=' C35 r12 finds matching classic sound resources or the installed MCC classic ADPCM bank/index automatically, independently of texture pins and undo history. Loop imports add every authored main track in one undoable edit; saved BSP ambience shares stable IDs with automatic playback. The sound mixer loads scoped styles directly and labels numeric fields, preventing overlapping mute/solo controls at 280/360/520 pixels. Real MCC source inspection verifies 16 permutations; native group/save/undo and production offline mix/mute checks pass. CELT music/dialogue, native sound functions/events/acoustics and game audio parity remain open.';
+  topic.evidence+='; docs/C35_MCC_AUDIO_AND_WORKFLOW.md; docs/fixtures/c35-mcc-audio-native-verification.json';
+}

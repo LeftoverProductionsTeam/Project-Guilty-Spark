@@ -3,7 +3,7 @@
   "identifier": "main",
   "description": "Editor events and explicitly requested custom window controls. Filesystem/process operations use validated Rust commands.",
   "windows": [
-    "main", "editor-*"
+    "main", "editor-*", "director-*"
   ],
   "permissions": [
     "core:default",
@@ -12,7 +12,13 @@
     "core:window:allow-minimize",
     "core:window:allow-unminimize",
     "core:window:allow-toggle-maximize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
     "core:window:allow-close",
-    "core:window:allow-set-focus"
+    "core:window:allow-set-focus",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-set-size",
+    "core:window:allow-is-focused"
   ]
 }

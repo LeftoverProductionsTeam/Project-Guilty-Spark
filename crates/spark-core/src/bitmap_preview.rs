@@ -41,6 +41,7 @@ pub fn preview_mcc_bitmap_batch(path:&Path,expected:&str,inspection:&MapInspecti
     if requests.is_empty()||requests.len()>MAX_BATCH_REQUESTS{return invalid("MCC preview requires 1 to 24 bitmap requests");}
     let(header,bytes,actual)=maps::read_cache_snapshot(path)?;if header.version!=13||actual!=expected||actual!=inspection.sha256{return invalid("MCC bitmap source snapshot changed");}
     let mut bundle:Option<crate::mcc_textures::TextureBundle>=None;
+    let mut shared:Option<(File,crate::resource_map::ResourceIndex,String)>=None;
     let r=Reader(&bytes);let start=header.tag_offset as usize;let end=start+header.tag_size as usize;let base=r.u32(start)?.checked_sub(40).ok_or_else(||SparkError::Invalid("Invalid MCC tag base".into()))?;
     let mut seen=HashSet::new();let mut spent=0;let mut items=vec![];
     for request in requests{if request.image_index>=MAX_IMAGES_PER_TAG||!seen.insert((request.bitmap_tag_id,request.image_index)){return invalid("MCC bitmap requests must be unique and bounded");}
@@ -55,10 +56,26 @@ pub fn preview_mcc_bitmap_batch(path:&Path,expected:&str,inspection:&MapInspecti
             if inspection.tags.iter().filter(|t|t.class=="bitm"&&t.id!=tag.id).any(|t|crate::mcc_textures::texture_key(&t.path,request.image_index).ok().as_deref()==Some(&key)){return invalid("MCC canonical bitmap key has a source tag collision");}
             if bundle.is_none(){bundle=Some(crate::mcc_textures::TextureBundle::open(directory,hashes,&header.name)?);}
             let bundle=bundle.as_mut().ok_or_else(||SparkError::Invalid("MCC texture bundle unavailable".into()))?;
-            let mip=bundle.top_mip(&key)?;let next=spent+mip.pixels.len();if next>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}spent=next;
-            Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,width:mip.width,height:mip.height,format:mip.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(mip.width,mip.height,mip.format,&mip.pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())})
+            if bundle.contains_key(&key)? {
+                let mip=bundle.top_mip(&key)?;let next=spent+mip.pixels.len();if next>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}spent=next;
+                return Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,width:mip.width,height:mip.height,format:mip.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(mip.width,mip.height,mip.format,&mip.pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())});
+            }
+            let hash=hashes.get("mcc-shared-bitmaps.map").ok_or_else(||SparkError::Invalid("Exact MCC texture key is missing; reconnect Halo Textures to verify MCC's shared bitmaps.map".into()))?;
+            if shared.is_none() {
+                let path=crate::mcc_textures::shared_bitmaps_path(directory).ok_or_else(||SparkError::Invalid("MCC shared bitmap location is unavailable".into()))?;
+                let (file,index)=crate::resource_map::open_verified(&path,hash)?;
+                shared=Some((file,index,hash.clone()));
+            }
+            let meta=read_top_mip_metadata(&bytes,&header,at,request.image_index)?;
+            if spent+meta.size>MAX_BATCH_RAW_BYTES{return invalid("MCC bitmap batch exceeds 16 MiB");}
+            let (file,index,_)=shared.as_mut().ok_or_else(||SparkError::Invalid("MCC shared bitmaps unavailable".into()))?;
+            let pixels=crate::resource_map::read_external_top_mip_from_verified(file,index,&tag.path,meta.raw_offset as u64,meta.declared_size as u64,meta.size,13,request.image_index)?;
+            spent+=pixels.len();
+            Ok(OwnedBitmapPreview{bitmap_tag_id:tag.id,image_index:request.image_index,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,&pixels)?),source_kind:"verified-resource".into(),resource_sha256:Some(bundle.sha256.clone())})
         })();let(preview,error,error_code)=match attempt{Ok(p)=>(Some(p),None,None),Err(e)=>{let(code,reason)=bitmap_failure(&e);(None,Some(reason),Some(code.into()))}};items.push(OwnedBitmapBatchItem{bitmap_tag_id:request.bitmap_tag_id,image_index:request.image_index,preview,error,error_code});
-    }Ok(OwnedBitmapBatch{source_sha256:actual,resource_sha256:bundle.map(|b|b.sha256),items})
+    }
+    if let Some((file,_,hash))=&mut shared { crate::resource_map::verify_open_handle_hash(file,hash)?; }
+    Ok(OwnedBitmapBatch{source_sha256:actual,resource_sha256:bundle.map(|b|b.sha256),items})
 }
 
 /// Self-contained H1A builds have embedded images and need no installed pack.
@@ -325,7 +342,7 @@ fn dds_top_mip(width: u16, height: u16, format: &str, pixels: &[u8]) -> Result<V
     Ok(dds)
 }
 
-fn base64(bytes: &[u8]) -> String {
+pub(crate) fn base64(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {

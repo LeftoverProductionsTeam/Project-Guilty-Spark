@@ -1,6 +1,6 @@
 # Project Guilty Spark
 
-**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 34 dev** continues the existing prerelease; compiler and game acceptance remain separate from editor previews.
+**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 35 dev** continues the existing prerelease; compiler and game acceptance remain separate from editor previews.
 
 > Project Guilty Spark stands on more than twenty years of research, experimentation, documentation, tools, discoveries, and shared knowledge from the Halo modding community. This project would not exist without the people who explored the Blam engine, created the original editors, reverse-engineered file formats, preserved old maps, documented workflows, and helped generations of modders learn.
 
@@ -8,11 +8,17 @@
 
 ## What works today
 
+The [C35 r12 sound and workflow pass](docs/C35_MCC_AUDIO_AND_WORKFLOW.md) automatically finds matching classic sound resources or MCC's installed classic ADPCM bank. Looping sounds retain all authored main tracks in one undoable import, with saved BSP ambience available to Director audio. Sound controls load their own styles, keep visible labels and fit narrow drawers without overlapping mute/solo controls. MCC CELT music/dialogue and complete engine audio parity remain open.
+
+The [C35 r11 rendering and workflow pass](docs/C35_RENDERING_AND_WORKFLOW.md) corrects cached model face winding, transparent shader routing and decal orientation/blending. MCC's exact shared bitmap spans supply legacy teleporter textures missing from imeta. The title and map tabs share one compact header with lowered upper-right window actions. One fullscreen mode keeps map tabs, editing tools, runtime actions and drawers available; narrow tool strips have a More menu. Existing sources and per-map edits stay preserved.
+
+The [C35 r10 viewport pass](docs/C35_VIEWPORT_WORKFLOW.md) adds direct object-tag drawers, a shared open-map model/sound library and custom OBJ/WAV/OGG imports. Assigned ambience plays automatically with remembered per-map mute/volume. The latest workbench header and fullscreen behavior are described in the r11 pass above. Imported-cache model additions and custom meshes remain previews until supported native compilation. Tag Editor now groups matching tags in collapsible classes, keeps editable fields first and provides native tag-editor handoff for complete source schemas.
+
 The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes the onboarding save path, compacts the sidebar, moves Interface Studio into Settings, retains shared editor sessions and adds a separately built Spacewar test module. A four-map dogleg tunnel passes native compilation and compiled collision checks. The [native gameplay, tag and audio pass](docs/NATIVE_GAMEPLAY_AND_AUDIO.md) adds working MCC Shift sprint, an editable shoulder camera with a dedicated first/third-person button and saved F6 shortcut, native power-up recipes, spatial sound rehearsal with linked segments, safe campaign tag duplication through rebuilding, and audited UI-widget fields. Dual-wield firing, player sword/lunge, third-person aim correction and complete rendering/audio parity remain open; compiler checks alone do not establish game loading.
 
 - Preserve owned maps, inspect real classic tag data, stage supported field/placement edits, and compare variants.
 - Render actual classic/MCC BSP geometry, object models, source materials, detail layers, lightmaps, decals, sky and atmospheric fog. Textures stream from verified owned resources, including supported MCC texture packs. Open a player-start view or use the map overview.
-- Browse map sounds in World or Tag editor. Preview verified embedded/shared Vorbis and PCM/Xbox ADPCM with local playback controls. Sound events and spatial mixing still need engine work.
+- Browse map sounds in World or Tag editor. Automatically connect supported installed resources, preview verified embedded/shared Vorbis and PCM/Xbox ADPCM, rehearse spatial events and preserve every authored main track with intro/loop/end clips. MCC classic ADPCM banks are supported; CELT music/dialogue and native event/acoustic parity still need engine work.
 - Author original QuickForge geometry and game-mode source; retain separate MCC/CE target configurations; use managed isolated compiler jobs and explicit compatibility gates.
 - Connect compatible BSPs with a rebuilt tunnel, native collision, portals and lightmaps. Optionally retain single-BSP [donor scenery](docs/DONOR_SCENERY.md) with source-bound model dependencies and compiled placement readback.
 - Continue from compiled revisions with matching per-map tags, inspect optional viewport performance metrics, and review the [three-map/performance pass](docs/THREE_MAP_WORLD_AND_PERFORMANCE.md).
@@ -23,6 +29,30 @@ The [hosting and workflow pass](docs/HOSTING_COLLISION_AND_CONTROLS.md) fixes th
 - Drop supported Halo animation sources onto compatible bipeds; rehearse their real skeletons and compile an SDK camera/actor take with a clean game HUD and player input enabled.
 
 ![Connect Your Halo Games in the native Windows application](docs/screenshots/continuation33/native-connect-games.png)
+
+## C35 living workbench
+
+The latest [BSP audio and window pass](docs/C35_BSP_AUDIO.md) restores the existing theme in nonmodal drawers, removes the extra header X and keeps app controls visible in fullscreen, including entry from maximized mode. Validated working maps can assign native background loops and sound environments to actual BSP clusters, then compile/open a separate verified MCC revision. Game acoustics remain an independent acceptance gate.
+
+The latest [thread-release pass](docs/C35_THREAD_RELEASE.md) reports failed releases from the experimental live adapter, retains only outstanding owned increments for retry and blocks new edits in that connection. Recovery stays reachable after a failed snapshot or unavailable local journal. Windows child-process and UI checks pass; engine-owned timing, abnormal-exit recovery and a new MCC gameplay test remain open.
+
+The latest [looping audio pass](docs/C35_LOOPING_AUDIO.md) preserves source main-track intro, repeat and end clips in rehearsal and saved Director audio. Choose a looping sound and track in Map sounds. **Finish sound end clips** and Director's **Finish sound & save** play the authored ending; existing Stop controls cut immediately. Native event, alternate/detail and acoustic parity remain separate gates.
+
+The latest [live-session recovery pass](docs/C35_LIVE_SESSION_RECOVERY.md) keeps cleanup available after the game snapshot fails, distinguishes restoration from obsolete-record retirement and protects live object edits from stale connections. Pending cleanup pauses new edits; reconnecting resets old bindings and undo. Windows lifecycle, desktop API and browser tests pass; full MCC transition/recovery acceptance remains open.
+
+The [Director audio pass](docs/C35_DIRECTOR_AUDIO.md) adds an optional saved map sound mix to Editor Render takes. Enable **Recording output → Include saved map audio** after saving Ambient or Map start emitters in Map sounds. Actual native recordings verify an encoded real map sample and camera-distance silence; game audio/capture remains a separate acceptance gate.
+
+The earlier [Director recording pass](docs/C35_DIRECTOR_RECORDING.md) adds remembered folders and named takes, fixes preference loss across native windows, cleans empty cancelled reservations and keeps exported frame dimensions stable when the interface changes. Recording and game/OS capture acceptance remain separately documented.
+
+The latest [classic bitmap repair and conversion pass](docs/C35_CONVERSION_RESOURCE_REPAIR.md) checks exact missing CE bitmap tags before staging, reviews matching source files and creates a separate repaired SDK tagset. Alpine now passes native MCC compilation with these files and an explicit MCC multiplayer UI compatibility option; gameplay acceptance remains pending.
+
+The [saved tool-edit follow-through](docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md) adds stable-save monitoring of derived tag folders, a compact changed-files review and the separate native rebuild/open-result workflow. It fixes a desktop pre-build snapshot refusal. A real external scenario edit compiled through the desktop into an MCC cache, with the changed player start read back from the new map; original tags/cache and Spark authoring remained intact.
+
+**Menu** opens the remembered navigation drawer. The title and map tabs share one 40-pixel row (34 in fullscreen); window actions sit centrally at the upper right. **F11** enters native fullscreen with a 30-pixel drawer strip and visible map/edit/build controls. There is no separate Focus mode or header-hiding step. Project setup, Changes, Help, Objects, Inspector, construction and game connection use edge/floating drawers; the sliders icon contains drawer placement/size/pinning. **Escape** closes a popup or drawer first, then exits fullscreen. Camera flight supports configurable WASD/Q/E, Shift boost, middle-button pan and right-button wheel speed.
+
+Open **Recording Director ↗** from a prepared Level editor view to detach a native camera/recording window, then dock it back with the same revision-checked session. Camera keys, tracking, lens and monitor controls are included. Editor Render can record the saved spatial sound scene. Explicitly shared Live Game Capture is a separate route; an independent MCC engine spectator adapter is not implemented. Native named takes pass picture/audio decoding and source-preservation checks; application OS pickers, actual game audio/capture and long takes remain acceptance gates.
+
+The visual Community maps catalog uses real releases, publisher screenshots and published credits/dependencies. Alpine downloads and opens as Custom Edition; its source-complete MCC conversion is now structurally validated. Actual Zombie Demo resource recovery loads original shader/lightmap/detail previews without unrelated MCC substitution. See the [C35 engineering evidence](docs/CONTINUATION_35_ENGINEERING.md), [owner test card](docs/CONTINUATION_35_TEST_CARD.md) and [push summary/description](docs/GITHUB_HANDOFF.md). All earlier engine goals remain in the [319-row cumulative ledger](docs/MASTER_FEATURE_LEDGER.md).
 
 ## C34 internal engineering continuation
 

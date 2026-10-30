@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "testDate": "2026-10-29",
+  "continuation": 35,
+  "revision": 9,
+  "appSha256": "76ef27b6d411187da321fecfc13a8b87f8acb058821dd0c9b425a27410cd5d5d",
+  "scope": "Native BSP audio working-tag compilation/open and actual desktop drawer/window controls; no game audio acceptance",
+  "verification": {
+    "rustPassed": 455,
+    "rustOptInIgnored": 5,
+    "frontendPassed": 190,
+    "frontendFiles": 39,
+    "browserPassed": 68,
+    "offlinePassed": 59
+  },
+  "coreChallenge": {
+    "originalCacheSha256": "5b0103b63b91add77116fc11f1bdb5f8d3cb51a115c4ad24b7e8fb6d41fbd541",
+    "derivedCacheSha256": "615feac8fab4b9b5759655c3d3af888b5e07633c188bd7981d4c8d948efa1688",
+    "clusters": 11,
+    "portals": 10,
+    "assignedClusters": 2,
+    "background": "sound/sfx/ambience/a30/forest_day.sound_looping",
+    "environments": [
+      "sound/sound environments/mountains.sound_environment",
+      "sound/sound environments/stone_room.sound_environment"
+    ],
+    "tags": 2780,
+    "inputTagFiles": 12336,
+    "sourceTagTreeUnchanged": true,
+    "collisionUnchanged": true,
+    "pvsUnchanged": true,
+    "pasUnchanged": true
+  },
+  "nativeDesktop": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "appSha256": "76ef27b6d411187da321fecfc13a8b87f8acb058821dd0c9b425a27410cd5d5d",
+    "clusters": 11,
+    "portals": 10,
+    "ownedBackgrounds": 406,
+    "ownedEnvironments": 32,
+    "buildElapsedMs": 116459.3816,
+    "inputSha256": "615feac8fab4b9b5759655c3d3af888b5e07633c188bd7981d4c8d948efa1688",
+    "compiledSha256": "e6e2ffff238bcb7509e2c0574fde52e4d4c291e1ac4e9d21fc7228de1a5fddad",
+    "cacheVersion": 13,
+    "tags": 2781,
+    "cluster": 0,
+    "environment": "gsbsp_5b18c55c_0/sound/sound environments/stone_room.sound_environment",
+    "collisionUnchanged": true,
+    "pvsUnchanged": true,
+    "pasUnchanged": true,
+    "inputBspUnchanged": true,
+    "parentCacheUnchanged": true,
+    "separateMapTab": true,
+    "documentUnchanged": true,
+    "draftSurvivesDetails": true,
+    "window": {
+      "nativeMaximizedToFullscreen": true,
+      "restoresMaximized": true,
+      "controlsVisible": true,
+      "closeButtons": 1,
+      "themes": [
+        "dark-glow",
+        "covenant"
+      ],
+      "drawersWithoutBackdrop": true,
+      "fullscreenMetrics": {
+        "width": 1920,
+        "height": 1080,
+        "screenWidth": 1920,
+        "screenHeight": 1080,
+        "toolbar": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 43,
+          "top": 0,
+          "right": 1920,
+          "bottom": 43,
+          "left": 0
+        }
+      },
+      "closeInFullscreen": true
+    },
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gameplayAccepted": false,
+    "errors": []
+  },
+  "earlierArtifacts": {
+    "earlierArtifacts": 24,
+    "allMatchExistingSidecars": true,
+    "overwritten": 0
+  },
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "gameplayAccepted": false,
+  "ownedGameAssetsIncluded": false
+}

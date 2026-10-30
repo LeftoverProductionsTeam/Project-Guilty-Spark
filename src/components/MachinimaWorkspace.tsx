@@ -44,11 +44,12 @@ interface Props {
   notify: (message: string) => void;
   onLive: () => void;
   onEditor: () => void;
+  onDirector: () => void;
   onBuild?:()=>void;
   onSave:()=>Promise<void>;
   onResourcesConnected:(open:OpenProject)=>Promise<void>;
 }
-function SourceStage({
+export function SourceStage({
   projectId,
   document,
   sourceId,
@@ -59,7 +60,7 @@ function SourceStage({
   projectId:string;
   document: QuickForgeDocument;
   sourceId: string;
-  cinema: { locked: boolean; rig: React.ReactNode };
+  cinema: { locked: boolean; rig: React.ReactNode;externalAuthority?:boolean };
   onError: (m: string) => void;
   animation:AnimationPreview|null;
 }) {
@@ -129,6 +130,7 @@ function SourceStage({
         spawnModelSource={spawn}
         actorAnimation={animation}
         cameraLocked={cinema.locked}
+        externalCameraAuthority={cinema.externalAuthority}
         cinema
         viewportChildren={cinema.rig}
       />
@@ -149,6 +151,7 @@ export default function MachinimaWorkspace({
   notify,
   onLive,
   onEditor,
+  onDirector,
   onBuild,
   onSave,
   onResourcesConnected,
@@ -280,10 +283,10 @@ export default function MachinimaWorkspace({
           <h2>
             <Clapperboard size={22} /> {project.title}
           </h2>
-          <p>Source camera rehearsal · hold RMB + WASD, R/F to fly · actor arrows and Q/E</p>
+          <p>Source camera rehearsal · hold RMB + WASD, Q/E to descend / ascend · actor arrows and Q/E</p>
         </div>
         <div>
-          <button onClick={onEditor}>Level editor</button>
+          <button onClick={onEditor}>Level editor</button><button onClick={onDirector}>Recording Director ↗</button>
           <button onClick={onLive}>MCC live mode</button>
         </div>
       </header>

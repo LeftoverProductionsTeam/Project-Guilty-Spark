@@ -1,4 +1,4 @@
-//! Short, temporary DOS alias for native compiler and rename filename buffers. Only the
+//! Short, temporary DOS alias for native compiler, extraction and rename filename buffers. Only the
 //! exact mapping created here is removed. The owned job remains the data root.
 #[cfg(windows)]
 mod windows {
@@ -25,6 +25,20 @@ mod windows {
         }
         let end = out.iter().position(|v| *v == 0).unwrap_or(n as usize);
         Some(String::from_utf16_lossy(&out[..end]))
+    }
+    /// Rebase only existing absolute arguments inside this owned job. External
+    /// resource folders and non-path tool flags retain their original identity.
+    pub(crate) fn extraction_arguments(args: &[String], workspace: &Path, alias: &Path) -> Result<Vec<String>> {
+        let root = workspace.canonicalize()?;
+        args.iter().map(|arg| {
+            let path = Path::new(arg);
+            if !path.is_absolute() { return Ok(arg.clone()); }
+            let resolved = path.canonicalize()?;
+            Ok(match resolved.strip_prefix(&root) {
+                Ok(relative) => alias.join(relative).to_string_lossy().into_owned(),
+                Err(_) => arg.clone(),
+            })
+        }).collect()
     }
     pub(crate) struct Alias {
         path: PathBuf,
@@ -95,10 +109,42 @@ mod windows {
                 b"owned"
             );
             let device = alias.device.clone();
+            let target = alias.target.clone();
             drop(alias);
-            assert!(query(&device).is_none());
+            // Another tool/test may acquire this letter as soon as our lock is released.
+            // Check the complete target stack for our mapping, not whether the letter is free.
+            let mut remaining = vec![0u16; 32768];
+            let count = unsafe {
+                QueryDosDeviceW(device.as_ptr(), remaining.as_mut_ptr(), remaining.len() as u32)
+            } as usize;
+            assert!(!remaining[..count]
+                .split(|value| *value == 0)
+                .any(|mapping| mapping == &target[..target.len() - 1]));
+        }
+        #[test]
+        fn extraction_rebases_long_owned_paths_and_preserves_external_resources() {
+            let temp = tempfile::tempdir().unwrap();
+            let root = temp.path().join("an owned workspace with spaces".repeat(4));
+            std::fs::create_dir_all(root.join("tags")).unwrap();
+            let input = root.join("original input.map");
+            std::fs::write(&input,b"source").unwrap();
+            let external = temp.path().join("classic resources");
+            std::fs::create_dir(&external).unwrap();
+            let alias=Alias::new(&root).unwrap();
+            let args=vec!["-t".into(),root.join("tags").display().to_string(),"-m".into(),external.display().to_string(),"-O".into(),"-G".into(),input.display().to_string()];
+            let actual=extraction_arguments(&args,&root,alias.path()).unwrap();
+            assert_eq!(actual[1],alias.path().join("tags").display().to_string());
+            assert_eq!(actual[3],args[3]);
+            assert_eq!(&actual[4..6],&args[4..6]);
+            assert_eq!(std::fs::read(&actual[6]).unwrap(),b"source");
+            let long_tag="ui/shell/main_menu/settings_select/player_setup/player_profile_edit/controls_setup/advanced/horizontal_sensitivity_spinner.ui_widget_definition";
+            let target=alias.path().join("tags").join(long_tag);
+            assert!(root.join("tags").join(long_tag).as_os_str().len()>260);
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::write(&target,b"new owned tag").unwrap();
+            assert_eq!(std::fs::read(root.canonicalize().unwrap().join("tags").join(long_tag)).unwrap(),b"new owned tag");
         }
     }
 }
 #[cfg(windows)]
-pub(crate) use windows::Alias;
+pub(crate) use windows::{Alias,extraction_arguments};

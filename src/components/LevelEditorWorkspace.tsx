@@ -3,8 +3,10 @@ import type { ReactNode } from 'react';
 import { Layers3, Plus, Radio } from 'lucide-react';
 import LiveEditor from './LiveEditor';
 import BspAssembly from './BspAssembly';
+import{WorkspacePanel}from'./WorkspacePanels';
 import {useMapState} from '../mapSession';
 import type { Project, MapInspection, MeshData, OpenProject } from '../types';
+import {useEditorAudio} from './EditorAudio';
 
 /** One map viewer; document type selects its source tools and an exact live
  * identity selects runtime poses. A different running map never replaces an
@@ -23,6 +25,7 @@ export default function LevelEditorWorkspace({
   onSourceEdit,
   entries,
   onBuild,
+  onImportMap,onContinue,onDirector,
 }: {
   project: Project | null;
   inspection: MapInspection | null;
@@ -37,30 +40,36 @@ export default function LevelEditorWorkspace({
   onSourceEdit: (project: Project, description: string) => void;
   entries:import('../types').LibraryEntry[];
   onBuild:()=>void;
+  onImportMap:()=>void;onContinue:(id:string)=>void;
+  onDirector:()=>void;
 }) {
   const [target, setTarget] = useMapState<'auto' | 'source' | 'live'>(project?.id??'new-map','level.target',intent === 'live' ? 'live' : 'auto');
-  const [creating, setCreating] = useState(false),
-    [live, setLive] = useState(false);
+  const [creating,setCreating]=useMapState(project?.id??'new-map','level.creating',false);
+  const [live, setLive] = useState(false);
+  const audio=useEditorAudio();
+  useEffect(()=>{audio?.setLive(live);return()=>audio?.setLive(false);},[audio,live]);
   useEffect(() => {
     if (intent === 'live') {
       setTarget('live');
       setCreating(false);
     }
   }, [intent]);
-  useEffect(() => setCreating(false), [project?.id]);
   const mode = creating ? 'source' : target;
+  const valid=!!project?.quickForge||!!project?.assets.length||!!project?.source&&inspection?.sha256===project.source.sha256;
+  if(!valid&&!creating&&target!=='live')return <section className="gs-editing-choice"><h1>What would you like to work on?</h1><p>Open a map, build a new level, or connect to your game. Each keeps its own files and camera.</p><div><button onClick={onImportMap}>Open a Halo map</button><button onClick={()=>{setCreating(true);setTarget('source');}}>Create a new Halo level</button><button onClick={()=>setTarget('live')}>Connect to a running Halo game</button>{entries[0]&&<button onClick={()=>onContinue(entries[0].id)}>Continue {entries[0].title}</button>}</div></section>;
   return (
     <div className="level-editor-workspace">
       <header className="level-editor-context">
         {live ? <Radio size={17} /> : <Layers3 size={17} />}
         <strong>LEVEL EDITOR</strong>
+        {valid&&<button className="small-button" onClick={onDirector}>Recording Director ↗</button>}
         <span role="status">
           {live
             ? 'Live Halo session'
             : creating || project?.quickForge
               ? 'QuickForge source'
               : project?.source
-                ? 'Source map'
+                ? `Source map · ${inspection?.header.engine??'Halo'}`
                 : 'New map'}
         </span>
         <label>
@@ -102,7 +111,7 @@ export default function LevelEditorWorkspace({
           </button>
         )}
       </header>
-      {project?.source&&!project.quickForge&&<BspAssembly key={project.id} project={project} entries={entries} onEdit={onSourceEdit} onSave={onBeforeResources} onBuild={onBuild}/>}
+      {project?.source&&!project.quickForge&&<WorkspacePanel id="construction" label="Construction"><BspAssembly key={project.id} project={project} entries={entries} onEdit={onSourceEdit} onSave={onBeforeResources} onBuild={onBuild}/></WorkspacePanel>}
       <section className="level-editor-body" aria-label="Map viewer">
         <LiveEditor
           onSourceEdit={onSourceEdit}

@@ -25,6 +25,8 @@ import type {
 } from '../runtimeWorkbench';
 import { availabilityLabel, evidenceLabel, runtimeNames } from '../runtimeWorkbench';
 import { Notice } from './ui';
+import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
+import BspAudioEditor, {type BspAudioRequest} from './BspAudioEditor';
 import '../runtimeWorkbench.css';
 
 const actions = [
@@ -71,6 +73,7 @@ export default function RuntimeDock({
   const [plan, setPlan] = useState<ToolLaunchPlan | null>(null),
     [consent, setConsent] = useState(false);
   const [notice, setNotice] = useState('');
+  const toolTags=useWorkingTagChanges(project?.id??null,runtime==='mccSteam'?report?.workingSource?.buildId??null:null);
   const generation = useRef(0);
   const currentReport = useRef(report);
   currentReport.current = report;
@@ -174,6 +177,7 @@ export default function RuntimeDock({
     writeMapSession(id, 'hosting.tab', tab);
     onNavigate('runtimes');
   }
+  useEffect(()=>{const request=(event:Event)=>{const detail=(event as CustomEvent<{projectId:string;actionId:string}>).detail;if(detail?.projectId!==project?.id||detail.actionId!=='editTags')return;setDetails(true);if(working||busy){setError('Wait for the active operation before preparing a native editor.');return;}const action=report?.actions.find(action=>action.id==='editTags');if(action)void act(action);};window.addEventListener('guilty-spark-runtime-tool',request);return()=>window.removeEventListener('guilty-spark-runtime-tool',request);},[project?.id,report,dirty,working,busy]);
   async function act(action: RuntimeDockAction) {
     setError('');
     setNotice('');
@@ -258,13 +262,13 @@ export default function RuntimeDock({
       if (request === generation.current) setBusy(false);
     }
   }
-  async function buildWorkingTags() {
-    if (!project || dirty || working || busy) return;
+  async function buildWorkingTags(bspAudio?:BspAudioRequest) {
+    if (!project || dirty || working || busy || toolTags.report?.status==='saving') return;
     const request = generation.current;
     setBusy(true);
     setError('');
     try {
-      await call<string>('build_working_tags', { projectId: project.id });
+      await call<string>('build_working_tags', { projectId: project.id, ...(bspAudio?{bspAudio}:{}) });
       if (request === generation.current) {
         setDetails(false);
         setNotice(
@@ -288,6 +292,7 @@ export default function RuntimeDock({
           <span className="runtime-dock-save">
             {working ? 'Working…' : dirty ? 'Unsaved changes' : 'Saved'}
           </span>
+          {!!toolTags.report?.changedFiles&&<button className="runtime-dock-tag-changes" onClick={()=>setDetails(true)}>{toolTags.report.changedFiles} saved tool edit{toolTags.report.changedFiles===1?'':'s'}</button>}
           <button
             className="runtime-dock-details"
             aria-label="Runtime and tool details"
@@ -449,6 +454,8 @@ export default function RuntimeDock({
                 Play &amp; servers
               </button>
             </div>
+            {project && report?.workingSource && <WorkingTagChanges {...toolTags}/>}
+            {project && report?.workingSource && runtime==='mccSteam' && <BspAudioEditor key={project.id+report.workingSource.buildId} projectId={project.id} parentBuildId={report.workingSource.buildId} blocked={busy||working||dirty||toolTags.report?.status==='saving'||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')} onBuild={buildWorkingTags}/>}
             {project && (
               <div className="button-row">
                 <button
@@ -458,6 +465,7 @@ export default function RuntimeDock({
                     busy ||
                     working ||
                     dirty ||
+                    toolTags.report?.status==='saving' ||
                     !!report?.sourceIssue ||
                     !!report?.toolsIssue ||
                     report?.processes.some((p) => p.projectId === project.id && p.status === 'running')

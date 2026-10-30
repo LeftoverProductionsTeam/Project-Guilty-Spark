@@ -1,4 +1,5 @@
 import ProjectSnapshots from './ProjectSnapshots';
+import { renderIndices } from '../haloGeometry';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Bounds, OrbitControls } from '@react-three/drei';
@@ -42,7 +43,7 @@ function PreviewMesh({ mesh }: { mesh: MeshData }) {
     } else {
       g.computeVertexNormals();
     }
-    g.setIndex(mesh.indices);
+    g.setIndex(renderIndices(mesh));
     for (const part of mesh.parts ?? []) {
       // Preserve real material-group boundaries for future texture assignment.
       if (part.indexStart >= 0 && part.indexCount > 0 && part.indexStart + part.indexCount <= mesh.indices.length) {
@@ -69,7 +70,8 @@ export function Assets({
   onImport: () => void;
   onWorld: () => void;
 }) {
-  const [chosen, setChosen] = useState<string | null>(project.assets[0]?.id ?? null);
+  const modelAssets=project.assets.filter(asset=>asset.kind==='obj');
+  const [chosen, setChosen] = useState<string | null>(modelAssets[0]?.id ?? null);
   const [exchangeFeedback, setExchangeFeedback] = useState('');
   const [movingAssetId,setMovingAssetId] = useState('');
   const [alignMode,setAlignMode] = useState<MeshSnapMode>('face');
@@ -79,7 +81,7 @@ export function Assets({
   const [weldSeams,setWeldSeams] = useState(false);
   const [assembly,setAssembly] = useState<{targetId:string;movingId:string;result:MeshAssembly}|null>(null);
   const [assemblyError,setAssemblyError] = useState('');
-  const asset = project.assets.find((a) => a.id === chosen) ?? project.assets.at(-1);
+  const asset = modelAssets.find((a) => a.id === chosen) ?? modelAssets.at(-1);
   const mesh = asset ? meshes[asset.id] : undefined;
   const compatible = project.assets.filter(a=>a.id!==asset?.id && !!meshes[a.id]);
   const movingAsset = compatible.find(a=>a.id===movingAssetId);
@@ -125,12 +127,12 @@ export function Assets({
       />
       <Notice tone="info">
         OBJ import now preserves vertex normals, UV seams and material-group boundaries in the preview mesh.
-        External MTL textures, Halo render/collision tag generation, glTF, animation and audio decoding are not implemented.
+        External MTL textures, Halo render/collision tag generation, glTF and automatic animation import are not implemented here. Import WAV/OGG sounds through the Level editor’s Asset library.
       </Notice>
-      {project.assets.length ? (
+      {modelAssets.length ? (
         <div className="asset-layout">
           <div className="surface asset-list">
-            {project.assets.map((a) => (
+            {modelAssets.map((a) => (
               <button
                 key={a.id}
                 className={a.id === asset?.id ? 'asset-item selected' : 'asset-item'}

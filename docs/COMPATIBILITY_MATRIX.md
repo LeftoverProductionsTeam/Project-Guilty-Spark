@@ -6,6 +6,10 @@ Existing [`runtime.rs`](../crates/spark-core/src/runtime.rs) workflows and all t
 
 Evidence is **unknown**, **unsupported**, **upstream-declared**, **implemented**, **locally tested** or **multiplayer-tested** for a named operation. Source tests, native UI, compilation, engine load, gameplay, peers and scale remain distinct. Dock availability is **Ready**, **Running**, **Set up**, **Update needed** or **Not available for this version**; readiness never replaces native preflight.
 
+Latest C35 r10 adds source-bound object-tag drawers, cross-map library previews, managed OBJ/WAV/OGG imports and automatic editor ambience with per-map mute/volume. It replaces the Window launcher with a thin collapsible top bar and tighter native fullscreen controls ([scoped evidence](C35_VIEWPORT_WORKFLOW.md)). Imported-cache new/replaced instances remain previews and are refused by the game-build guards. Full engine acoustics remain separate.
+
+C35 r9 adds native rebuilt BSP audio selections and repairs nonmodal drawer/window controls ([scoped evidence](C35_BSP_AUDIO.md)). Compiled bindings and native window state are separate from actual game acoustics.
+
 ## Files, builders and tools
 
 | Exact target | Inspect / edit / extract | Convert / build / launch | Evidence and next gate |
@@ -55,6 +59,8 @@ A Steam build number/launcher identity or selected launch option is insufficient
 | Operation | Exact retained evidence | Remaining gate |
 |---|---|---|
 | Existing object inspect/move/restore | Actual local MCC Blood Gulch readback and move/restore | Other cases/failure behavior and peers separate |
+| Live-session cleanup/reconnect | Verified-target restore vs obsolete-record retirement, connection IDs for cleanup/object edits, pending-cleanup write gate and stale live history/binding reset. Windows child-process lifecycle, native idle API and browser contracts passed ([r6 evidence](C35_LIVE_SESSION_RECOVERY.md)) | New full MCC transition/recovery acceptance, identical-identity reloads and engine-owned write timing remain open |
+| Experimental thread release | All nine existing pause sites acknowledge release results; retained owned handles retry before data cleanup; foreign counts are preserved. Actual owned Windows child and browser checks passed ([r8 evidence](C35_THREAD_RELEASE.md)) | New MCC acceptance, engine-owned timing, elapsed pause limits, durable cross-process/abnormal-exit recovery remain open |
 | Item/vehicle uniform scale | Owner confirmed corrected 2× Warthog tires and driving after physics/suspension coupling | Smaller scales, other vehicles, collision/handling and peers open |
 | Shift sprint | Native 1.5× trial measured and owner-confirmed; configurable default then raised to 1.75× | New default and proportional running animation unaccepted |
 | Editable shoulder view / quick toggle | Native track/weapon flags toggle and exact restore; dedicated button/saved default F6 shortcut | **Owner-reported shots left of reticle remain open**; physical key, near/far aim, walls/weapon/respawn/vehicle acceptance pending |
@@ -64,9 +70,9 @@ A Steam build number/launcher identity or selected launch option is insufficient
 | Live BSP/tunnels | Offline derived connected-world compiler path | No live collision/visibility/resource relinking or peer transition adapter |
 | Game-peer live edits / AI | Source collaboration is separate evidence | No accepted authoritative game-side edit/AI replication |
 | Campaign tag duplication | Native A10 tag-copy/single-owner redirect retained original scripts; campaign/UI index/CRC checks passed | Mission/UI engine load pending. Arbitrary extra scenario object writer remains build-blocked |
-| Rendering/audio | Selected real materials/lightmaps/models/decals; source decode and spatial editor rehearsal/linked segments | Complete shaders/effects/environment/native sound-event/acoustic/loop parity open |
+| Rendering/audio | Selected real materials/lightmaps/models/decals; source decode and spatial editor rehearsal/linked segments; optional saved Ambient/Map start mix in native Director WebM takes ([r5 evidence](C35_DIRECTOR_AUDIO.md)); source main-track intro/loop/end and flagged fades with independently matched real recorded waveforms ([r7 evidence](C35_LOOPING_AUDIO.md)) | Complete shaders/effects/environment, native sound events/acoustics and alternate/detail/script/loop parity remain open |
 
-Native compilation/readback does not prove runtime safety. [The current write-transport source audit](research/C34_LIVE_WRITE_AUDIT.md) confirms remaining normal broad suspension, ignored resume results and no elapsed pause deadline. The disabled-controller mutex polling was separately corrected/tested without new memory writes or native gameplay acceptance; no measured performance gain is claimed. See [live restrictions](LIVE_ADAPTER.md), [native gameplay/audio](NATIVE_GAMEPLAY_AND_AUDIO.md) and [Reclamation](RECLAMATION_AND_WORKFLOW_POLISH.md).
+Native compilation/readback does not prove runtime safety. [The current write-transport source audit](research/C34_LIVE_WRITE_AUDIT.md) records remaining normal broad suspension and no elapsed pause deadline. R8 separately repairs normal/error resume acknowledgement and retained-handle retry; engine-owned timing and abnormal-exit recovery remain open. The disabled-controller mutex polling was separately corrected/tested without new memory writes or native gameplay acceptance; no measured performance gain is claimed. See [live restrictions](LIVE_ADAPTER.md), [native gameplay/audio](NATIVE_GAMEPLAY_AND_AUDIO.md) and [Reclamation](RECLAMATION_AND_WORKFLOW_POLISH.md).
 
 ## Discovery, game sessions, AI and scale
 

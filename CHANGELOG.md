@@ -1,5 +1,27 @@
 # Changelog
 
+C35 r10: [direct viewport tags/assets and editor ambience](docs/C35_VIEWPORT_WORKFLOW.md). Add hideable source-tag drawers with map-owned undo/save, a shared model/sound library, managed OBJ/WAV/OGG imports and automatic authored ambience with mute/volume. Replace the Window launcher with a 32-pixel collapsible top bar and reduce fullscreen controls to 30 pixels. Imported-cache preview instances remain compile-blocked.
+
+## 0.4.0 — Continuation 35: The living workbench (development)
+
+- Restore theme-preserving, interactive sidebar/header drawers; remove opaque backdrops and the duplicate close X. Keep one native control group visible in fullscreen and restore maximized mode on exit. Correct the runtime-details width.
+- Add per-map BSP background-loop/environment drafts, exact source/dependency inspection and separate native working-tag builds with compiled binding, collision and PVS/PAS verification. [Evidence and game acceptance limits](docs/C35_BSP_AUDIO.md).
+
+- Live transport follow-through: acknowledge thread release before returning operation success, retain failed owned increments for retry, preserve other owners' counts and block new edits after faults. Keep recovery reachable when local data state is unavailable; show retry counts and disable pending object/camera/sprint writes. [Evidence and remaining gates](docs/C35_THREAD_RELEASE.md).
+- Looping audio follow-through: read source main tracks, retain intro/loop/end clips and fade flags, share bounded PCM buffers and finish authored endings before saving Director takes. Remember sound search/track context and correct the late-finish envelope anchor. [Evidence and limits](docs/C35_LOOPING_AUDIO.md).
+- Live-session follow-through: keep cleanup reachable after sampling fails, distinguish verified restoration from obsolete-record retirement, fence cleanup/object edits to their connection and block new writes during pending cleanup. Stop queued keepers, reset stale live bindings/history and discard late old-session receipts. [Evidence and remaining MCC gates](docs/C35_LIVE_SESSION_RECOVERY.md).
+- Director audio follow-through: optionally record the saved Ambient/Map start mix with source-verified clips, spatial camera listening, bounded preparation and owned audio cleanup. Independently decode real native Opus output and camera-distance silence. Fix a drive-alias test race without changing production mapping behavior. [Evidence and limits](docs/C35_DIRECTOR_AUDIO.md).
+- Director follow-through: add remembered recording folders and named takes, fix stale cross-window UI preferences, clean empty cancelled reservations and keep export dimensions fixed across interface changes. Correct a premature browser first-frame check with independent decoding. [Evidence and limits](docs/C35_DIRECTOR_RECORDING.md).
+- Conversion follow-through: audit exact indexed CE bitmap dependencies, review matching source files and create a separate repaired SDK tagset. Add explicit MCC multiplayer UI compatibility, preserve repair reviews across save/check refreshes and validate real Alpine MCC compilation. [Evidence and limits](docs/C35_CONVERSION_RESOURCE_REPAIR.md).
+- Follow-through: monitor saved derived tag changes, review stable file differences and rebuild/open a separate native map. Fix the desktop working-tag pre-build snapshot reason and widen runtime details. [Actual native round trip](docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md).
+- Make navigation and the top window/project header remembered drawers; move utility panels into configurable edge/floating drawers and add native F11 fullscreen with Escape restoration.
+- Preserve per-map workflow context and the new-level wizard; add configurable Q/E camera flight, wheel speed and native focus-release guards.
+- Add a detachable/dockable Recording Director with shared camera authority, keys/timeline/tracking/lens, display controls and read-only saved-map refresh.
+- Add permissioned display/window capture and bounded native WebM recording storage. Actual Save-dialog flow, recording startup, game audio/capture and long takes remain unaccepted.
+- Add a real credited visual map catalog and direct-download selection; verify actual Alpine CE import and original Zombie Demo resource recovery in the native app.
+- Diagnose exact missing classic tags from failed native conversion output. The repaired Alpine build passes native cache validation; failed Tool output is never accepted as playable and gameplay remains unaccepted.
+- Retain all historical feature records, source/runtime guards and older releases. [C35 results, limitations and artifacts](docs/CONTINUATION_35_ENGINEERING.md).
+
 ## 0.4.0 — Continuation 33: Reclaim the pixels
 
 - Support verified Demo/PC per-image resource keys and CE pixel spans; add RGB565 lightmap decoding and retain exact per-image failure reasons.

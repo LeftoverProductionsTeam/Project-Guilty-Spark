@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import type { MeshData, SceneDecal } from '../types';
 import { decalTextureKey, indexDecalSurfaces, projectMapDecals } from '../mapDecals';
 import type { DecalPart } from '../mapDecals';
+import { applyHaloBlend } from '../haloTransparency';
 const vertex = `varying vec2 decalUv,lightUv;varying float depth;
 attribute vec2 uv1;
 void main(){decalUv=uv;lightUv=uv1;vec4 p=modelViewMatrix*vec4(position,1.0);depth=-p.z;gl_Position=projectionMatrix*p;}`;
@@ -13,8 +14,9 @@ void main(){vec4 c=texture2D(decalMap,decalUv);if(alphaTest&&c.a<.5)discard;
 c.rgb*=tint;if(hasLight)c.rgb*=texture2D(lightMap,lightUv).rgb;c.a*=intensity;
 vec3 neutral=blend==1?vec3(1.0):blend==2?vec3(.5):blend>=3?vec3(0.0):fogColor;
 if(blend==1||blend==2){c.rgb=mix(neutral,c.rgb,c.a);c.a=1.0;}
+if(blend>=3&&blend<=6)c.rgb*=intensity;
 if(fogEnabled){float f=clamp((depth-fogNear)/max(.001,fogFar-fogNear),0.0,1.0)*fogMaximum;
-if(blend==0)c.rgb=mix(c.rgb,fogColor,f);else if(blend==1||blend==2)c.rgb=mix(c.rgb,neutral,f);else c.a*=1.0-f;}
+if(blend==0)c.rgb=mix(c.rgb,fogColor,f);else if(blend==1||blend==2)c.rgb=mix(c.rgb,neutral,f);else {c.rgb*=1.0-f;c.a*=1.0-f;}}
 gl_FragColor=linearOutput&&blend!=1&&blend!=2?sRGBTransferEOTF(c):c;}`;
 function DecalMesh({
   part,
@@ -58,23 +60,7 @@ function DecalMesh({
           fogMaximum: { value: 1 },
         },
       });
-    if (d.blend === 1 || d.blend === 2) {
-      m.blending = THREE.CustomBlending;
-      m.blendSrc = THREE.DstColorFactor;
-      m.blendDst = d.blend === 2 ? THREE.SrcColorFactor : THREE.ZeroFactor;
-    } else if (d.blend === 3 || d.blend === 7) {
-      m.blending = THREE.AdditiveBlending;
-    } else if (d.blend === 4) {
-      m.blending = THREE.CustomBlending;
-      m.blendEquation = THREE.ReverseSubtractEquation;
-      m.blendSrc = THREE.SrcAlphaFactor;
-      m.blendDst = THREE.OneFactor;
-    } else if (d.blend === 5 || d.blend === 6) {
-      m.blending = THREE.CustomBlending;
-      m.blendEquation = d.blend === 5 ? THREE.MinEquation : THREE.MaxEquation;
-      m.blendSrc = THREE.OneFactor;
-      m.blendDst = THREE.OneFactor;
-    }
+    applyHaloBlend(m,d.blend);
     return { geometry: g, material: m };
   }, [part, texture, light]);
   useEffect(

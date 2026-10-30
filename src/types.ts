@@ -78,9 +78,14 @@ export interface Tag {
   primaryBitmapStatus?: 'resolved' | 'missing' | 'invalid' | 'unavailable' | null;
   shaderPreview?:ShaderPreview|null;
 }
-export interface ShaderLayer {bitmapTagId:number;uvScale:[number,number];uvOffset:[number,number];rotation:number;colorFunction:number;alphaFunction:number}
+export interface ShaderAnimation {source:number;function:number;period:number;phase:number;scale:number}
+export interface ShaderLayer {bitmapTagId:number;uvScale:[number,number];uvOffset:[number,number];rotation:number;colorFunction:number;alphaFunction:number;
+  flags?:number;animations?:ShaderAnimation[];rotationCenter?:[number,number]}
+export interface ShaderStage {flags:number;constant0Source:number;constant0Function:number;constant0Period:number;
+  constant0Lower:[number,number,number,number];constant0Upper:[number,number,number,number];constant1:[number,number,number,number];
+  colorInputs:number[];colorOutputs:number[];alphaInputs:number[];alphaOutputs:number[]}
 export interface ShaderPreview {alphaTest:boolean;twoSided:boolean;uvScale:[number,number];kind?:string;shaderType?:number;detailFunction?:number;multipurposeXbox?:boolean;bumpScale?:number;
-  microDetailFunction?:number;detailScales?:[number,number,number];framebufferBlend?:number;layers?:ShaderLayer[]}
+  microDetailFunction?:number;detailScales?:[number,number,number];framebufferBlend?:number;layers?:ShaderLayer[];stages?:ShaderStage[];decal?:boolean;alphaBlended?:boolean}
 export interface SceneObject {
   id: string;
   name: string;
@@ -93,6 +98,7 @@ export interface SceneObject {
   sourceOffset: number | null;
   rotationOffset: number | null;
   assetId: string | null;
+  sourceModel?: { projectId: string; sourceSha256: string; tagId: number; path: string; class: import('./forge').ForgePlacement['tagClass'] } | null;
 }
 export interface MeshData {
   rig?:ModelRig|null;
@@ -176,7 +182,7 @@ export interface Project {
   animations?:import('./animation').AnimationAsset[];
   animationAssignments?:import('./animation').AnimationAssignment[];
   renderFeatures?:import('./renderFeatures').RenderFeatures|null;
-  conversionProfile?:'faithful'|'zombie-recovery'|null;
+  conversionProfile?:'faithful'|'zombie-recovery'|'mcc-multiplayer-ui'|null;
   sourceSceneVersion?:number;
   worldEnvironment?:import('./environment').EditorEnvironment|null;
   buildTargets?:EngineBuildTarget[];
@@ -198,6 +204,7 @@ export interface Project {
     scenarioPath: string;
     archive?: { originalPath: string; sha256: string; entryPath: string } | null;
     resourceDirectory?: string | null;
+    audioResources?: {kind:'classic'|'mccClassicAdpcm';directory:string;sha256:Record<string,string>} | null;
     resourceSha256?: Record<string, string>;
   } | null;
   provenance: Provenance;
@@ -287,6 +294,7 @@ export interface CompatibilityReport {
   blockers: string[];
   warnings: string[];
   ready: boolean;
+  bitmapDependencies?:import('./conversionResources').BitmapDependencyAudit|null;
 }
 export interface Readiness {
   mccFound: boolean;

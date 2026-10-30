@@ -28,6 +28,8 @@ const MAX_RECEIPT_BYTES: u64 = 4 * 1024 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkingTagsInput {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub bsp_audio: Option<crate::bsp_audio::Request>,
     pub parent_build: BuildRecord,
     pub tags_directory: PathBuf,
     pub scenario_path: String,
@@ -39,6 +41,8 @@ pub struct WorkingTagsInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTagsReceipt {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub bsp_audio: Option<crate::bsp_audio::Request>,
     pub schema_version: u32,
     pub job_id: String,
     pub project_id: String,
@@ -362,6 +366,12 @@ fn prepare(
         }
         tools.insert(key.into(), maps::hash_file(&path)?);
     }
+    if let Some(request) = &input.bsp_audio {
+        let metadata = crate::bsp_audio::inspect(&parent_output, expected)?;
+        crate::bsp_audio::validate(request, &input.parent_build.id, &metadata, &tags)?;
+        let edit = checked_file(&input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"}))?;
+        tools.insert("invaderEdit".into(), maps::hash_file(&edit)?);
+    }
     let source_data = parent_native_identity(project, input, &parent, &tools["haloTool"])?;
     preserved_source(project)?;
     Ok(Prepared {
@@ -525,6 +535,7 @@ fn run_with(
         event: &on_event,
     };
     let mut receipt = WorkingTagsReceipt {
+        bsp_audio: input.bsp_audio.clone(),
         schema_version: 1,
         job_id: job_id.into(),
         project_id: project.id.clone(),
@@ -609,6 +620,13 @@ fn run_with(
             &serde_json::to_vec_pretty(&receipt)?,
             false,
         )?;
+        if let Some(request) = &input.bsp_audio {
+            let metadata = crate::bsp_audio::inspect(&prepared.parent_output, &receipt.parent_output_sha256)?;
+            let edit = input.invader_info.with_file_name(if cfg!(windows) {"invader-edit.exe"} else {"invader-edit"});
+            if maps::hash_file(&edit)? != prepared.tools["invaderEdit"] { return invalid("Invader edit changed after audio inspection"); }
+            crate::bsp_audio::apply(request, &metadata, &tags, &edit, &runner, &workspace)?;
+            if maps::hash_file(&edit)? != prepared.tools["invaderEdit"] { return invalid("Invader edit changed during audio editing"); }
+        }
         let args = native_arguments(&receipt.scenario_path)?;
         // Use Runner's existing protected write phase: cancellation/timeout is
         // observed after native Tool exits, never by forcefully killing it.
@@ -644,6 +662,13 @@ fn run_with(
             .any(|script| !inspected.scripts.iter().any(|s| s.name == script.name))
         {
             return invalid("Working-tag compilation lost an original scenario script; this output was not accepted");
+        }
+        if let Some(request) = &input.bsp_audio {
+            let before = crate::bsp_audio::inspect(&prepared.parent_output, &receipt.parent_output_sha256)?;
+            let after = crate::bsp_audio::inspect(&output, &inspected.sha256)?;
+            crate::bsp_audio::verify_output(&before, &after, request)?;
+            if inspected.mesh.positions != prepared.parent_inspection.mesh.positions || inspected.mesh.indices != prepared.parent_inspection.mesh.indices { return invalid("BSP audio rebuild changed collision geometry"); }
+            project::atomic_write(&directory.join("bsp-audio-verification.json"), &serde_json::to_vec_pretty(&serde_json::json!({"source":before,"output":after,"collisionUnchanged":true,"gameplayAccepted":false}))?, false)?;
         }
         for check in ["crc32_mismatched", "is_protected", "stub_count"] {
             recheck_tools(input, &prepared.tools)?;
@@ -803,6 +828,7 @@ mod tests {
             archive: None,
             resource_directory: None,
             resource_sha256: BTreeMap::new(),
+            audio_resources: None,
         });
         let record = BuildRecord {
             id: parent_id,
@@ -826,6 +852,7 @@ mod tests {
         fs::write(&info, b"test verifier identity only; never executed").unwrap();
         fs::write(parent.join("conversion-manifest.json"), serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"compilerSha256":maps::hash_file(&tool).unwrap(),"sourceSha256":project.source.as_ref().unwrap().sha256,"sourcePreserved":true})).unwrap()).unwrap();
         let input = WorkingTagsInput {
+            bsp_audio: None,
             parent_build: record,
             tags_directory: tags,
             scenario_path: "levels/fixture/fixture".into(),
@@ -855,6 +882,13 @@ mod tests {
             assert_eq!(phase, "verify");
             Ok("0\n".into())
         }
+    }
+    #[test]
+    fn stale_bsp_audio_request_is_refused_before_staging_or_tool_execution() {
+        let mut c=case();let id=uuid::Uuid::new_v4().to_string();
+        c.input.bsp_audio=Some(crate::bsp_audio::Request{parent_build_id:"other-parent".into(),source_sha256:"a".repeat(64),bsp_index:0,bsp_tag:"levels/fixture/fixture.scenario_structure_bsp".into(),bsp_tag_sha256:"b".repeat(64),changes:vec![]});
+        let result=run_with(&c.project,&c.input,&c.jobs,&id,Arc::new(AtomicBool::new(false)),|_|{},|_,_,_,_,_,_|panic!("stale audio request ran a tool"));
+        assert!(result.is_err());assert!(!c.jobs.join(&id).exists());
     }
     #[test]
     fn staged_working_edits_survive_without_source_extraction_and_chain_provenance() {

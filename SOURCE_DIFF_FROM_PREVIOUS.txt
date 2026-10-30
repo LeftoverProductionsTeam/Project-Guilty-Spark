@@ -1,167 +1,64 @@
-Project Guilty Spark - C34 source comparison
-BASELINE_GIT_COMMIT: fc198e302933fff5bab72f3e53538634bac270f3
+Project Guilty Spark - C35 r12 source comparison
+BASELINE_GIT_COMMIT: d8ae7abb173b387892127e94f9f905444be2902e
 Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 112
+ADDED_COUNT: 9
 MODIFIED_COUNT: 38
-UNCHANGED_COUNT: 957
+UNCHANGED_COUNT: 1143
 REMOVED_COUNT: 0
 
 ADDED FILES
-crates/spark-core/examples/community_listing_check.rs
-crates/spark-core/examples/qa_runtime_library.rs
-crates/spark-core/examples/qa_visibility_zones.rs
-crates/spark-core/examples/qa_working_tags.rs
-crates/spark-core/src/bsp_visibility.rs
-crates/spark-core/src/community_host.rs
-crates/spark-core/src/community_servers.rs
-crates/spark-core/src/dependencies.rs
-crates/spark-core/src/dual_wield.rs
-crates/spark-core/src/external_changes.rs
-crates/spark-core/src/invitations.rs
-crates/spark-core/src/mcc_content_probe.rs
-crates/spark-core/src/runtime_adapters.rs
-crates/spark-core/src/working_tags.rs
-crates/spark-core/tests/dual_wield.rs
-crates/spark-core/tests/external_changes.rs
-crates/spark-core/tests/mcc_content_probe.rs
-docs/CONTINUATION_34_ENGINEERING.md
-docs/CONTINUATION_34_GITHUB_DESCRIPTION.md
-docs/fixtures/continuation34-native-ui-verification.json
-docs/fixtures/working-tags-native-verification.json
-docs/research/C34_AI_ADAPTER_RESEARCH.md
-docs/research/C34_COMMUNITY_PROTOCOLS.md
-docs/research/C34_CONNECTED_WORLD_AUDIT.md
-docs/research/C34_DEPENDENCIES.md
-docs/research/C34_DUAL_WIELD_ENGINE.md
-docs/research/C34_EXTERNAL_MAP_SYNC.md
-docs/research/C34_HOST_ADAPTER.md
-docs/research/C34_LIVE_WRITE_AUDIT.md
-docs/research/C34_MAP_DOWNLOADS.md
-docs/research/C34_MCC_CONTENT.md
-docs/research/C34_VISIBILITY_ZONES.md
-docs/research/C34_WORKING_TAGS.md
-scripts/feature-ledger-evidence.mjs
-scripts/test-runtime-workbench-native.mjs
-src-tauri/gen/schemas/acl-manifests.json
-src-tauri/gen/schemas/capabilities.json
-src-tauri/gen/schemas/desktop-schema.json
-src-tauri/gen/schemas/windows-schema.json
-src-tauri/icons/android/mipmap-anydpi-v26/ic_launcher.xml
-src-tauri/icons/android/mipmap-hdpi/ic_launcher.png
-src-tauri/icons/android/mipmap-hdpi/ic_launcher_foreground.png
-src-tauri/icons/android/mipmap-hdpi/ic_launcher_round.png
-src-tauri/icons/android/mipmap-mdpi/ic_launcher.png
-src-tauri/icons/android/mipmap-mdpi/ic_launcher_foreground.png
-src-tauri/icons/android/mipmap-mdpi/ic_launcher_round.png
-src-tauri/icons/android/mipmap-xhdpi/ic_launcher.png
-src-tauri/icons/android/mipmap-xhdpi/ic_launcher_foreground.png
-src-tauri/icons/android/mipmap-xhdpi/ic_launcher_round.png
-src-tauri/icons/android/mipmap-xxhdpi/ic_launcher.png
-src-tauri/icons/android/mipmap-xxhdpi/ic_launcher_foreground.png
-src-tauri/icons/android/mipmap-xxhdpi/ic_launcher_round.png
-src-tauri/icons/android/mipmap-xxxhdpi/ic_launcher.png
-src-tauri/icons/android/mipmap-xxxhdpi/ic_launcher_foreground.png
-src-tauri/icons/android/mipmap-xxxhdpi/ic_launcher_round.png
-src-tauri/icons/android/values/ic_launcher_background.xml
-src-tauri/icons/ios/AppIcon-20x20@1x.png
-src-tauri/icons/ios/AppIcon-20x20@2x-1.png
-src-tauri/icons/ios/AppIcon-20x20@2x.png
-src-tauri/icons/ios/AppIcon-20x20@3x.png
-src-tauri/icons/ios/AppIcon-29x29@1x.png
-src-tauri/icons/ios/AppIcon-29x29@2x-1.png
-src-tauri/icons/ios/AppIcon-29x29@2x.png
-src-tauri/icons/ios/AppIcon-29x29@3x.png
-src-tauri/icons/ios/AppIcon-40x40@1x.png
-src-tauri/icons/ios/AppIcon-40x40@2x-1.png
-src-tauri/icons/ios/AppIcon-40x40@2x.png
-src-tauri/icons/ios/AppIcon-40x40@3x.png
-src-tauri/icons/ios/AppIcon-512@2x.png
-src-tauri/icons/ios/AppIcon-60x60@2x.png
-src-tauri/icons/ios/AppIcon-60x60@3x.png
-src-tauri/icons/ios/AppIcon-76x76@1x.png
-src-tauri/icons/ios/AppIcon-76x76@2x.png
-src-tauri/icons/ios/AppIcon-83.5x83.5@2x.png
-src-tauri/src/community_host_native.rs
-src-tauri/src/dependency_install.rs
-src-tauri/src/external_changes_native.rs
-src-tauri/src/invitations_native.rs
-src-tauri/src/live_controller_poll.rs
-src-tauri/src/map_download.rs
-src-tauri/src/runtime_workbench.rs
-src/components/CommunityHostAdapter.tsx
-src/components/DependencyPanel.tsx
-src/components/ExternalMapSync.tsx
-src/components/InvitationJoin.tsx
-src/components/MapDownload.tsx
-src/components/OwnedContentProbe.tsx
-src/components/PlayAndServers.tsx
-src/components/RuntimeDock.tsx
-src/components/VisibilityZones.tsx
-src/components/dependencyPanel.css
-src/dependencyGuide.test.ts
-src/dependencyGuide.ts
-src/externalMapSync.css
-src/externalMapSync.test.ts
-src/externalMapSync.ts
-src/externalRevision.test.ts
-src/lobbyFilters.test.ts
-src/lobbyFilters.ts
-src/mapDownload.css
-src/runtimeWorkbench.css
-src/runtimeWorkbench.test.ts
-src/runtimeWorkbench.ts
-src/visibilityZones.css
-src/visibilityZones.test.ts
-src/visibilityZones.ts
-tests/fixtures/synthetic_halo1_tool_errors.log
-tests/ui/fixtures/mapDownload.html
-tests/ui/fixtures/mapDownload.tsx
-tests/ui/fixtures/visibilityZones.tsx
-tests/ui/map-download.spec.ts
-tests/ui/visibility-zones.spec.ts
+crates/spark-core/examples/qa_mcc_audio.rs
+crates/spark-core/src/mcc_audio.rs
+docs/C35_MCC_AUDIO_AND_WORKFLOW.md
+docs/fixtures/c35-mcc-audio-native-verification.json
+scripts/native-main-track-audio-probe.mjs
+scripts/test-main-track-audio-native.mjs
+src/loopingEmitters.test.ts
+src/loopingEmitters.ts
+src/soundMixer.css
 
 MODIFIED FILES
-Cargo.lock
+COMMUNITY_CREDITS.md
 README.md
-crates/spark-core/src/bsp_assembly.rs
+crates/spark-core/examples/qa_c35_workspace.rs
+crates/spark-core/examples/verify_tag_exchange.rs
+crates/spark-core/src/audio.rs
 crates/spark-core/src/bsp_clearance.rs
-crates/spark-core/src/gameplay.rs
 crates/spark-core/src/lib.rs
-crates/spark-core/src/live_adapter_tests.rs
-crates/spark-core/src/maps.rs
-crates/spark-core/src/mcc.rs
-crates/spark-core/tests/maps.rs
-crates/spark-core/tests/mcc_steam.rs
-docs/COMPATIBILITY_MATRIX.md
-docs/GETTING_STARTED.md
+crates/spark-core/src/library.rs
+crates/spark-core/src/project.rs
+crates/spark-core/src/tag_exchange.rs
+crates/spark-core/src/working_tags.rs
+crates/spark-core/tests/netgame_models.rs
+docs/CONTINUATION_35_ENGINEERING.md
+docs/CONTINUATION_35_GITHUB_DESCRIPTION.md
 docs/GITHUB_HANDOFF.md
 docs/MASTER_FEATURE_LEDGER.csv
-docs/MASTER_FEATURE_LEDGER.md
-scripts/package-source.mjs
-scripts/update-feature-ledger.mjs
-src-tauri/Cargo.toml
+scripts/continuation35-evidence.mjs
+scripts/feature-ledger-evidence.mjs
 src-tauri/src/app.rs
-src-tauri/src/live_camera_native.rs
-src-tauri/src/live_mcc.rs
-src-tauri/src/live_sprint_native.rs
+src-tauri/src/live_thread_pause.rs
 src/App.tsx
-src/bspAssembly.ts
-src/components/BspAssembly.tsx
-src/components/CommunityMaps.tsx
-src/components/LiveEditor.tsx
-src/components/Runtimes.tsx
-src/components/SettingsPanel.tsx
-src/components/StartupSetup.tsx
-src/components/ViewportSession.tsx
+src/components/MapSounds.tsx
+src/components/QuickForge.tsx
+src/components/Sound.tsx
+src/components/SoundMixer.tsx
+src/components/Tags.tsx
+src/components/ViewportAssetLibrary.tsx
 src/components/World.tsx
+src/directorAudio.test.ts
+src/editorAudio.test.ts
+src/editorAudio.ts
 src/featureCatalog.ts
+src/hosting.css
+src/mapDocuments.test.ts
 src/mapDocuments.ts
-src/mapSession.ts
-tests/ui/browser.spec.ts
+src/types.ts
+src/viewportAssets.ts
 tests/ui/native-contract.spec.ts
 
 REMOVED FILES
 None.
 
 Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-Earlier C32/C33 release/source archives remain frozen.
+The nine currently present C35 r8/r10/r11 executable, installer and source files remain frozen and independently rehashed; absent older files are not reconstructed.

@@ -1,5 +1,7 @@
 # Live Halo adapter and shared QuickForge
 
+C35 r6 adds [live-session recovery](C35_LIVE_SESSION_RECOVERY.md). After sampling fails, use **Game connection → Release previous live session** to restore a verified current target or retire records for a proven obsolete target. Uncertain cleanup retains remaining records and blocks new edits for retry. Cleanup receipts state what actually happened; disconnect does not undo object position edits. Reconnect and bind objects again after release. Connection IDs also keep old live history and position/size requests out of a newer connection.
+
 C33 adds a Windows process-memory transport for MCC Halo 1 and a separate two-editor source session. The adapter is **experimental**. The reviewed Steam build has been tested in a running Blood Gulch session: object movement, readback, restoration and vehicle resizing. The owner confirmed correct tire contact and driving at 2× after the suspension correction. Two-computer game replication remains unverified.
 
 ## MCC connection
@@ -57,7 +59,7 @@ Choose a live vehicle, review the shared-instance count, and select **Resize all
 
 These dimensional laws maintain density and couple visual and physical length. Vehicle control still uses the game's authored drive system. Physics and suspension tag edits are shared by matching definitions; Spark refuses visual-only vehicle resizing. Native zero scale means unscaled, effective 1×; undo restores that zero sentinel when applicable. Positive authored item scales are retained as the undo baseline.
 
-The native transport serializes edits across Spark processes and briefly pauses the exact MCC process's threads for a bounded field transaction. Every successful thread suspend is paired with a resume on normal completion, preparation failure or unwinding. It performs no executable-memory writes or remote calls. Fields are read back; a failed transaction rolls back attempted writes, including a partially written field. An incomplete rollback blocks subsequent resizing and requires a map reload or game restart.
+The experimental native transport serializes cooperating writers and currently suspends observed MCC threads around several typed field operations. Normal/unwind cleanup attempts one resume for each successful suspend; resume return values, elapsed pause limits and abnormal-termination recovery remain unaccepted ([transport audit](research/C34_LIVE_WRITE_AUDIT.md)). It performs no executable-memory writes or remote calls. Fields are read back; a failed transaction rolls back attempted writes, including a partially written field. An incomplete rollback blocks subsequent resizing and requires a map reload or game restart.
 
 Keep Spark running while using resized vehicles. A 300 ms keeper aligns newly respawned matching vehicle models and bounds with the shared physics. This is not a first-tick engine spawn hook; frame-perfect respawn alignment is not claimed. Normal disconnect and window close restore active vehicle families after parking/exiting. Forced termination cannot guarantee restoration; reloading the map resets temporary tag data. Source map and installed game files are never rewritten.
 

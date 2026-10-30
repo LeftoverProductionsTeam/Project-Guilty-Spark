@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 1,
+  "revision": "C35 r12",
+  "date": "2026-10-29",
+  "scope": "Native Spark editor UI, exact owned MCC classic ADPCM data, production WebView2 offline audio and retained rendering/window regressions.",
+  "executable": {
+    "file": "GuiltySpark-C35-0.4.0-living-workbench-dev-r12.exe",
+    "sha256": "4d6ab61e9b9d148d7dd881188f8ff078a6108ec04c58bb4e79d9fbaabbd95e0a",
+    "bytes": 30384128
+  },
+  "installer": {
+    "file": "GuiltySpark-C35-0.4.0-living-workbench-dev-r12-setup.exe",
+    "sha256": "4da2f86151b4758ee1469a1e3a502da3725263a29f73c926b5507d15244cbd1a",
+    "bytes": 7575165
+  },
+  "tests": {
+    "rust": {
+      "passed": 471,
+      "failed": 0,
+      "ignored": 5
+    },
+    "frontend": {
+      "passed": 216,
+      "files": 44
+    },
+    "browser": {
+      "passed": 77
+    },
+    "offline": {
+      "passed": 59
+    },
+    "typescript": "passed",
+    "windowsReleaseAndNsis": "passed",
+    "ownedWindowsThreadTests": {
+      "passed": 13,
+      "scope": "Test-owned child processes; deterministic release interleavings; no game access."
+    }
+  },
+  "coreAudio": {
+    "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+    "binding": {
+      "kind": "mccClassicAdpcm",
+      "sha256": {
+        "sounds_adpcm.fsb": "d9a70adcb681bcb152a50ea61904fc921d2d94aff3000fe3d2827823c9e49e88",
+        "sounds_adpcm.lst.bin": "d469b6d72c7d8f6d141da2b61c14b29862a57d3563ebb195e3829f18db742a78"
+      }
+    },
+    "loopingTagId": 3824943752,
+    "tracks": 2,
+    "availablePermutations": 16,
+    "phases": [
+      {
+        "availablePermutations": 1,
+        "channels": 1,
+        "durationSeconds": 2.38875283446712,
+        "phase": "start",
+        "previewSha256": "62b865d43e3697fe567c1804e449a9adf90bae70f24ebcda5e86df7aac0376b5",
+        "sampleRate": 22050,
+        "sampleSha256": "ca9b8891a989b5818497d3447148a74048907981c95f8c6b4cc500cc83719f85",
+        "tagId": 3825009289,
+        "track": 0
+      },
+      {
+        "availablePermutations": 4,
+        "channels": 1,
+        "durationSeconds": 1.4628571428571429,
+        "phase": "loop",
+        "previewSha256": "fc6054521f456234c44c66fe56cecd237380e77defc1c3d609b363a55ee14280",
+        "sampleRate": 22050,
+        "sampleSha256": "bfec52f671163bed77fce99e78b04b84f67f052a8f72ec6649e35b26cb9d2bb4",
+        "tagId": 3825074826,
+        "track": 0
+      },
+      {
+        "availablePermutations": 1,
+        "channels": 1,
+        "durationSeconds": 2.6296598639455784,
+        "phase": "end",
+        "previewSha256": "65b4a9540dd661a6e754db800b8175ae18768a4fa3cd87018d0a5880f62f1c21",
+        "sampleRate": 22050,
+        "sampleSha256": "87c1501327109931897a4cbd3d767bcbc687690e18d04e37b751a58fcba7d289",
+        "tagId": 3825140363,
+        "track": 0
+      },
+      {
+        "availablePermutations": 10,
+        "channels": 1,
+        "durationSeconds": 1.364172335600907,
+        "phase": "loop",
+        "previewSha256": "0322e6af5a92ea081e55b5bc354f30e907879bd74f39ce3d365dc0f66e2d1801",
+        "sampleRate": 22050,
+        "sampleSha256": "487d71adcf621d0a9f659a6500a12ee07351760136d12893ecacb2a51a528d45",
+        "tagId": 3825205900,
+        "track": 1
+      }
+    ],
+    "sourceUnchanged": true
+  },
+  "nativeAudio": {
+    "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+    "automaticResources": {
+      "kind": "mccClassicAdpcm",
+      "sha256": {
+        "sounds_adpcm.fsb": "d9a70adcb681bcb152a50ea61904fc921d2d94aff3000fe3d2827823c9e49e88",
+        "sounds_adpcm.lst.bin": "d469b6d72c7d8f6d141da2b61c14b29862a57d3563ebb195e3829f18db742a78"
+      },
+      "noFolderPicker": true
+    },
+    "group": {
+      "loopTagId": 3824943752,
+      "sourceTracks": [
+        {
+          "index": 0,
+          "tagId": 3825074826,
+          "gain": 0.6
+        },
+        {
+          "index": 1,
+          "tagId": 3825205900,
+          "gain": 0.3
+        }
+      ],
+      "savedTracks": 2,
+      "undoRedoAtomic": true,
+      "sourceSceneAndTagsUnchanged": true
+    },
+    "soundLayout": {
+      "widths": [
+        280,
+        360,
+        520
+      ],
+      "muteSoloSeparated": true,
+      "labelsVisible": true
+    },
+    "productionAudio": {
+      "kind": "native-source-production-mixer-OfflineAudioContext",
+      "tracks": [
+        {
+          "tagId": 3825074826,
+          "track": 0,
+          "gain": 0.6,
+          "decodedFrames": 311100,
+          "decodedChannels": 1
+        },
+        {
+          "tagId": 3825205900,
+          "track": 1,
+          "gain": 0.3,
+          "decodedFrames": 65480,
+          "decodedChannels": 1
+        }
+      ],
+      "voices": 2,
+      "relativeError": 9.413865752842912e-8,
+      "rms": 0.023488099793187,
+      "firstTrackOnlyError": 0.6499587608546493,
+      "muteRms": 0,
+      "hardwareListeningAccepted": false
+    },
+    "inputsUnchanged": true,
+    "errors": []
+  },
+  "renderingRegression": {
+    "appSha256": "4d6ab61e9b9d148d7dd881188f8ff078a6108ec04c58bb4e79d9fbaabbd95e0a",
+    "maps": [
+      {
+        "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+        "sourceDecals": 8,
+        "selectedShaderChecks": 4,
+        "previewImages": [
+          {
+            "id": 3867149580,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3866952969,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3793551529,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3793617066,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3915843571,
+            "ok": true,
+            "error": null
+          }
+        ],
+        "viewport": {
+          "sourceShaders": 132,
+          "sourceLightmaps": 15,
+          "sourceDetails": 59,
+          "skyTriangles": 308,
+          "pendingMaterials": 0
+        }
+      },
+      {
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "sourceDecals": 8,
+        "selectedShaderChecks": 4,
+        "previewImages": [
+          {
+            "id": 3886220847,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3885827625,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3788636254,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3788701791,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3788767328,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3940682092,
+            "ok": true,
+            "error": null
+          }
+        ],
+        "viewport": {
+          "sourceShaders": 151,
+          "sourceLightmaps": 15,
+          "sourceDetails": 83,
+          "skyTriangles": 183,
+          "pendingMaterials": 0
+        }
+      }
+    ],
+    "windowControls": {
+      "normal": {
+        "x": 1818,
+        "y": 5.5,
+        "width": 96,
+        "height": 28
+      },
+      "combinedHeader": {
+        "x": 1818,
+        "y": 5.5,
+        "width": 96,
+        "height": 28
+      },
+      "fullscreen": {
+        "x": 1818,
+        "y": 3.5,
+        "width": 96,
+        "height": 26
+      }
+    },
+    "headerBounds": {
+      "normal": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 40
+      },
+      "fullscreen": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 34
+      }
+    },
+    "tagTree": {
+      "classes": 59,
+      "weaponTags": 20,
+      "editableFields": 7
+    },
+    "inputsUnchanged": true,
+    "errors": []
+  },
+  "limitations": [
+    "MCC classic ADPCM effects only; CELT music/dialogue, native vehicle sound-function modulation, alternate/detail/script sequencing and acoustic/game audio parity remain open.",
+    "Native production audio is WebView2 OfflineAudioContext output. Hardware speaker/headphone listening and in-game behavior are not accepted.",
+    "Two-track automatic BSP selection/stale-group handling is source-bound unit coverage. Actual native import/save/undo uses the owned Warthog loop.",
+    "The thread-release regression uses owned child processes. Engine-owned update boundaries and abnormal-exit recovery remain open.",
+    "No Halo launch, game-memory write, peer-replication, live spawn/BSP replacement or new gameplay acceptance is part of this pass.",
+    "Private audio/screenshots, absolute installation paths, normal user data, SDK and game content are excluded from this receipt and source distribution."
+  ]
+}

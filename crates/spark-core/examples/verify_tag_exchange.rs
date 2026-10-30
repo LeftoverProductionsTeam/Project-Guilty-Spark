@@ -8,7 +8,7 @@ fn main()->Result<(),Box<dyn std::error::Error>>{
     if root.exists(){return Err("Choose a fresh managed acceptance folder".into());}std::fs::create_dir_all(root)?;
     let inspection=maps::inspect_map(map,Some(resources))?;
     let tag=inspection.tags.iter().find(|t|t.class=="weap"&&t.path.replace('\\',"/").eq_ignore_ascii_case(&args[5].replace('\\',"/"))).ok_or("Exact source weapon tag unavailable")?;
-    let mut project=Project::new("Recursive source acceptance");project.source=Some(Source{original_path:map.into(),preserved_path:map.into(),sha256:inspection.sha256.clone(),
+    let mut project=Project::new("Recursive source acceptance");project.source=Some(Source{audio_resources:None,original_path:map.into(),preserved_path:map.into(),sha256:inspection.sha256.clone(),
         cache_version:inspection.header.version,engine:inspection.header.engine.clone(),scenario_path:inspection.scenario_path.clone(),archive:None,
         resource_directory:Some(resources.into()),resource_sha256:project::resource_hashes(resources)?});project.scene=inspection.objects.clone();
     let tools=Toolchain{invader_directory:Some((&args[3]).into()),resource_directory:Some(resources.into()),..Toolchain::default()};let job=uuid::Uuid::new_v4().to_string();

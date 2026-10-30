@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "nativeDesktop": true,
+  "appSha256": "b991c84352ea2d967f62b944ed474406e2f722ee5bddee46126de99a7a892306",
+  "initial": {
+    "files": 2240,
+    "hashesRead": 2240,
+    "elapsedMs": 3472.5468
+  },
+  "wrongWindowRejected": true,
+  "changedFiles": 1,
+  "changedFile": "levels/quickforge/c33_collision_acceptance/c33_collision_acceptance.scenario",
+  "stableScanHashesRead": 1,
+  "externalEditToolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+  "field": "player_starting_locations[0].position",
+  "before": [
+    -7.5,
+    -10.666667,
+    0.1
+  ],
+  "expected": [
+    -7,
+    -10.666667,
+    0.1
+  ],
+  "compiled": [
+    -7,
+    -10.666667,
+    0.1
+  ],
+  "buildElapsedMs": 16248.6729,
+  "cacheVersion": 13,
+  "scenarioType": 1,
+  "tags": 2239,
+  "parentSha256": "85d2390bdeced18f8f7617b751ddcbf42555ab4533aa8a993ebb0dcd28f9095b",
+  "compiledSha256": "fa75952cdf222f5cf8a26554471e33cf5efc37d4843bf52dedb8e8d700ba7975",
+  "separateMapTab": true,
+  "parentCacheUnchanged": true,
+  "editedInputRetained": true,
+  "sparkAuthoredDocumentUnchanged": true,
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "gameplayAccepted": false,
+  "errors": [],
+  "originalSdkScenarioUnchanged": true,
+  "evidenceScope": "Metadata names the verified original scenario; whole SDK-tree equality was not freshly measured by this harness."
+}

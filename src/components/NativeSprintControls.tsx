@@ -11,7 +11,7 @@ interface Status {
   error: string | null;
   detail: string;
 }
-export default function NativeSprintControls() {
+export default function NativeSprintControls({ blocked = false }: { blocked?: boolean } = {}) {
   const [status, setStatus] = useState<Status | null>(null),
     [key, setKey] = useState('ShiftLeft'),
     [multiplier, setMultiplier] = useState(1.75),
@@ -57,7 +57,7 @@ export default function NativeSprintControls() {
     };
   }, []);
   async function configure(enabled: boolean) {
-    if (changing.current) return;
+    if (changing.current || blocked) return;
     changing.current = true;
     epoch.current++;
     setBusy(true);
@@ -117,13 +117,13 @@ export default function NativeSprintControls() {
       />
       <div className="analysis-actions">
         <button
-          disabled={!native || busy || !status || status.enabled || status.restorePending}
+          disabled={!native || blocked || busy || !status || status.enabled || status.restorePending}
           onClick={() => void configure(true)}
         >
           Enable native sprint
         </button>
         <button
-          disabled={!native || busy || !status || (!status.enabled && !status.restorePending)}
+          disabled={!native || blocked || busy || !status || (!status.enabled && !status.restorePending)}
           onClick={() => void configure(false)}
         >
           Disable and restore speed

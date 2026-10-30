@@ -303,6 +303,7 @@ mod tests {
                 archive: None,
                 resource_directory: None,
                 resource_sha256: Default::default(),
+                audio_resources: None,
             },
             donor_tags_directory: "fixture-tags".into(),
             donor_bsp_index: 0,

@@ -2,6 +2,7 @@ import SceneEnvironment from './SceneEnvironment';
 import SceneEffects from './SceneEffects';
 import ViewportLabel from './ViewportLabel';
 import ViewportTelemetry from './ViewportTelemetry';
+import ViewportActivity from './ViewportActivity';
 import SpatialAudioListener from './SpatialAudioListener';
 import { Suspense, useEffect, useMemo, useRef,useState } from 'react';
 import MachinimaActor from './MachinimaActor';
@@ -38,6 +39,7 @@ export interface ForgeSnapshot {
 }
 export type ForgeCamera = 'orbit' | 'fly' | 'walk' | 'machinima';
 export interface ForgeViewportProps {
+  resourceScopes?:Record<string,string>;
   sessionId?:string;
   actorAnimation?:import('../animation').AnimationPreview|null;
   renderFeatures?:import('../renderFeatures').RenderFeatures|null;
@@ -78,6 +80,7 @@ export interface ForgeViewportProps {
   viewportChildren?:React.ReactNode;
   cameraLocked?:boolean;
   cinema?:boolean;
+  externalCameraAuthority?:boolean;
 }
 function brushGeometry(snapshot: ForgeSnapshot, brush: ForgeBrush, cutaway: boolean): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
@@ -589,13 +592,13 @@ function ForgeScene(props: ForgeViewportProps) {
 <WalkCamera document={doc} snapshot={snapshot} collisionEnabled={props.walkCollision} onError={props.onError} />
       ))}
       {!props.cameraLocked&&cameraMode === 'orbit' && <RightMouseFly speed={12} />}
-      <CameraFrame document={doc} frame={props.frame} mode={cameraMode} diagnosticBounds={props.focusWrlOverlay ? props.wrlOverlay?.bounds : null} />
+      {!props.externalCameraAuthority&&<CameraFrame document={doc} frame={props.frame} mode={cameraMode} diagnosticBounds={props.focusWrlOverlay ? props.wrlOverlay?.bounds : null} />}
     </>
   );
 }
 export default function ForgeViewport(props: ForgeViewportProps) {
   const selectionGuard=useRef(0);
-  const {models,failures}=useOwnedForgeModels([...props.document.placements,...(props.spawnModelSource?[props.spawnModelSource]:[])]);
+  const {models,failures}=useOwnedForgeModels([...props.document.placements,...(props.spawnModelSource?[props.spawnModelSource]:[])],props.resourceScopes);
   const [recording,setRecording]=useState(false),take=useRef<RehearsalFrame[]>([]);
   useEffect(()=>{if(props.cameraMode!=='machinima')setRecording(false);},[props.cameraMode]);
   const missing=Object.keys(failures).length;
@@ -609,16 +612,17 @@ export default function ForgeViewport(props: ForgeViewportProps) {
           if (event.type === 'click' && event.button === 0&&performance.now()>=selectionGuard.current) props.onSelect(null, false);
         }}
       >
+        <ViewportActivity continuous={!!props.cinema}/>
         <Suspense fallback={null}>
           <ForgeScene {...props} ownedModels={models} recording={recording} rehearsalTake={take} selectionGuard={selectionGuard}/>
-          {props.sessionId&&<ViewportSession id={props.sessionId} channel={props.cinema?'machinima':'forge'} paused={props.cameraLocked} ready={!!props.snapshot} requiresControls={props.cameraMode==='orbit'}/>}
+          {props.sessionId&&<ViewportSession id={props.sessionId} channel={props.cinema?'machinima':'forge'} paused={props.cameraLocked||props.externalCameraAuthority} ready={!!props.snapshot} requiresControls={props.cameraMode==='orbit'}/>}
           {props.viewportChildren}
         </Suspense>
       </Canvas>
     </ViewportBoundary>
     {props.cameraMode==='machinima'&&<div className="forge-director-controls">
       <strong>Director rehearsal · source preview</strong>
-      <span>Camera: hold RMB + WASD, R/F · Actor: arrows, Q/E turn · Shift speeds up</span>
+      <span>Camera: hold RMB + WASD, Q/E down/up · Actor: arrows, Q/E turn · Shift speeds up</span>
       {!props.spawnModelSource?<span>Connect a map containing a Spartan model to rehearse.</span>:<>
         <button className="small-button" onClick={()=>setRecording(!recording)}>{recording?'Stop rehearsal recording':'Record rehearsal'}</button>
         <button className="small-button" disabled={recording} onClick={()=>{if(!take.current.length){props.onError('Record a rehearsal before exporting it.');return;}downloadLocalText('spark-director-rehearsal.json',JSON.stringify({schemaVersion:1,kind:'editorRehearsal',gamePlaybackVerified:false,sourceSha256:props.spawnModelSource?.sourceSha256,frames:take.current},null,2),'application/json');}}>Export rehearsal</button>

@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "testDate": "2026-10-29",
+  "continuation": 35,
+  "revision": 6,
+  "appSha256": "dd1a140c962fe5002722ff4658e8afbb925065a46344540b368194804f5ec635",
+  "scope": "Native Windows lifecycle queries and local cleanup planning/API/browser contracts, plus real-map editor recording regression; no MCC gameplay transition acceptance",
+  "verification": {
+    "rustPassed": 431,
+    "rustOptInIgnored": 5,
+    "frontendPassed": 179,
+    "frontendFiles": 37,
+    "browserPassed": 59,
+    "offlinePassed": 59
+  },
+  "nativeProcessLifecycle": {
+    "ownedChildOnly": true,
+    "actualCreationTimeQueried": true,
+    "mismatchedCreationTimeRejected": true,
+    "completedModuleAbsenceObserved": true,
+    "actualProcessExitObserved": true,
+    "actualPidReuseTested": false,
+    "gameModuleUnloadTested": false,
+    "processMemoryWrites": false,
+    "threadSuspension": false,
+    "gameOpened": false
+  },
+  "cleanupPlanning": {
+    "allFiveRetirementReasons": true,
+    "unknownObservationKeepsRecords": true,
+    "failedRestorationKeepsRemainingRecords": true,
+    "noChangesSkipsProcessProbe": true,
+    "currentRestorePrecedesClose": true,
+    "oldConnectionTokenRejected": true,
+    "pendingCleanupRejectsNewEdits": true,
+    "idempotentCleanup": true
+  },
+  "browserContracts": {
+    "syntheticGameOnly": true,
+    "recoveryReachableAfterSampleFailure": true,
+    "busyCleanupBlocksConnect": true,
+    "competingConnectionRejected": true,
+    "uncertainCleanupRetry": true,
+    "samePidMapReconnectResetsHistory": true,
+    "lateReceiptAndQueuedUndoDiscarded": true,
+    "objectEditsCarryConnectionId": true
+  },
+  "actualDesktopIdleApi": {
+    "hasSession": false,
+    "pending": [],
+    "releaseOutcome": "alreadyDisconnected",
+    "unboundMoveAndScaleRefused": true,
+    "gameAttached": false
+  },
+  "sourceSha256": {
+    "liveMcc": "a6a8df62d851608f1148355e88702060d1ddf13882027d7d2ef2c779a471548d",
+    "cleanupPlanner": "b241fd783dbad5b4177c3634c51be0b4ddf4dd4466eefa717d75c891449ebbc6",
+    "nativeCamera": "9f4b729fa81178245e30f628c12ff87d5e5e289111a8076d0d4734b6f55a007a",
+    "nativeSprint": "73e79d08f898d001a1b6213316bc76cb89b5051b5b7e7dc96bee9ce32887fdac",
+    "appCommands": "25cba681cc276fe600691dbc0c0476471234d0c62ad10cb137bad3c37c560d29"
+  },
+  "recordingRegression": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "idleLiveCleanupApi": {
+      "hasSession": false,
+      "pending": [],
+      "releaseOutcome": "alreadyDisconnected",
+      "unboundMoveAndScaleRefused": true,
+      "gameAttached": false
+    },
+    "appSha256": "dd1a140c962fe5002722ff4658e8afbb925065a46344540b368194804f5ec635",
+    "sourceSha256": "3cb1fe9c6471d02694d34e7d62984532c1aafa076a14ce1a336aecc8eb9fed9a",
+    "nativeUiRecordAndSave": true,
+    "explicitNamedTakeWorkflow": true,
+    "osSavePickerTested": false,
+    "osCapturePickerTested": false,
+    "countdownCancellationRemovesEmptyPartial": true,
+    "pausedClockStable": true,
+    "backgroundRecording": true,
+    "cleanViewToggledDuringTake": true,
+    "closeBlockedWhileRecording": true,
+    "existingTakeProtected": true,
+    "wrongWindowRejected": true,
+    "traversalRejected": true,
+    "folderRememberedAfterReopen": true,
+    "mapAudioPreferenceRememberedAfterReopen": true,
+    "freshNameAfterSuccess": true,
+    "videoOnly": false,
+    "savedMapAudio": {
+      "tagId": 3954117179,
+      "tagPath": "sound\\sfx\\ambience\\exteriors\\loops\\eeriewind",
+      "sampleSha256": "7d78e3cfeee3912c6eb27e3381d7327b1f67859da6755a887e697413d37833ac",
+      "previewSha256": "96a5f80be18953bb37d0b4c0a278063fda8ead4dde99baa159c527f48e6e9649",
+      "format": "Xbox ADPCM",
+      "sourceChannels": 2,
+      "sourceSampleRate": 44100,
+      "sourceDurationSeconds": 1.3206349206349206,
+      "sourceSha256": "3cb1fe9c6471d02694d34e7d62984532c1aafa076a14ce1a336aecc8eb9fed9a",
+      "synthetic": false,
+      "near": {
+        "codec": "opus",
+        "decodedChannels": 2,
+        "decodedSampleRate": 48000,
+        "decodedFrames": 169920,
+        "decodedSeconds": 3.54,
+        "rms": 0.030948035965159573,
+        "peak": 0.12232367694377899
+      },
+      "beyondSavedMaxDistance": {
+        "codec": "opus",
+        "decodedChannels": 2,
+        "decodedSampleRate": 48000,
+        "decodedFrames": 146880,
+        "decodedSeconds": 3.06,
+        "rms": 0,
+        "peak": 0
+      },
+      "distantTakeSha256": "0b203e370e5a0b33ae863df71d6922696ded4ef7ca520f89f029cab1a38de429",
+      "startupEvents": [
+        "ambient",
+        "mapStart"
+      ],
+      "audioBeforeCountdown": false,
+      "microphoneRequested": false,
+      "systemAudioRequested": false,
+      "gameAudioCaptured": false
+    },
+    "requestedFps": 24,
+    "dimensions": {
+      "width": 1920,
+      "height": 658
+    },
+    "decodedFrameSizes": [
+      "1920x658"
+    ],
+    "bytes": 1033706,
+    "sha256": "8fd6c97019d00c880a95d9c5c5293539ae8cd5d4defc2c567ee0e32f14c1f248",
+    "decoderSha256": "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3",
+    "decoderVersion": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
+    "decodedFrames": 82,
+    "decodedSeconds": 3.483,
+    "firstDecodedLumaMean": 35.18699363425881,
+    "firstDecodedLumaDeviation": 27.642520901944476,
+    "browserPresentationProbe": {
+      "scope": "Native editor canvas encoder/decoder; not the application Save picker or game capture",
+      "mime": "video/webm;codecs=vp8",
+      "bytes": 671035,
+      "width": 1920,
+      "height": 658,
+      "requestedFps": 24,
+      "elapsedSeconds": 2.3375,
+      "audioTracks": 0,
+      "firstPresentedLumaDeviation": 27.248090332532446,
+      "firstPresentedMediaTime": 0,
+      "laterPresentedMediaTime": 1.003,
+      "decodedLumaDeviation": 27.83052795677812,
+      "decoded": true
+    },
+    "sourcePreserved": true,
+    "authoredDocumentPreserved": true,
+    "gameLaunched": false,
+    "gameplayAccepted": false,
+    "errors": []
+  },
+  "gameplayAccepted": false,
+  "gameMemoryTouched": false,
+  "engineOwnedApplyBoundaryImplemented": false,
+  "allResumeResultsAcknowledged": false,
+  "sourceContracts": {
+    "quickForgeBindingsCarryOriginalConnection": true,
+    "statusLockWorkRunsInBlockingWorker": true,
+    "noNewMemoryLayoutOrByteWriteImplementation": true
+  }
+}

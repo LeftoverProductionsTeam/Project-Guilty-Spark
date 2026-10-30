@@ -385,7 +385,7 @@ mod tests {
         let receipt=TagExtractReceipt{status:"extracted-unverified-import".into(),job_id:job.clone(),source_sha256:"ab".repeat(32),source_project_id:uuid::Uuid::new_v4().to_string(),source_engine:"Test engine".into(),source_version:7,requested_tag:"weapons\\test.weapon".into(),tag_root:folder.join("tags"),receipt_path:folder.join("extraction-receipt.json"),files,total_bytes:total,notice:"Synthetic transfer test".into()};
         fs::write(&receipt.receipt_path,serde_json::to_vec(&receipt).unwrap()).unwrap();
         let cache=root.path().join("target.map");fs::write(&cache,b"immutable target identity fixture").unwrap();
-        let mut target=Project::new("Target transfer test");target.source=Some(project::Source{original_path:cache.clone(),preserved_path:cache.clone(),sha256:maps::hash_file(&cache).unwrap(),cache_version:7,engine:"Test engine".into(),scenario_path:"fixture".into(),archive:None,resource_directory:None,resource_sha256:Default::default()});
+        let mut target=Project::new("Target transfer test");target.source=Some(project::Source{audio_resources:None,original_path:cache.clone(),preserved_path:cache.clone(),sha256:maps::hash_file(&cache).unwrap(),cache_version:7,engine:"Test engine".into(),scenario_path:"fixture".into(),archive:None,resource_directory:None,resource_sha256:Default::default()});
         let id=uuid::Uuid::new_v4().to_string();let staged=stage_into_project(&target,root.path(),&job,&id).unwrap();
         assert_eq!(staged.status,"staged-not-merged");assert_eq!(fs::read(staged.tag_root.join("weapons/test.weapon")).unwrap(),bytes);
         assert!(stage_into_project(&target,root.path(),&job,&id).is_err());

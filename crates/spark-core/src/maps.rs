@@ -12,6 +12,9 @@ use std::{
 mod decals;
 #[path = "ui_tags.rs"]
 mod ui_tags;
+#[path = "shader_transparent.rs"]
+mod shader_transparent;
+pub use shader_transparent::{ShaderAnimation, ShaderStage};
 pub use decals::SceneDecal;
 
 pub const MAX_CACHE_BYTES: u64 = 768 * 1024 * 1024;
@@ -193,11 +196,17 @@ pub struct ShaderPreview {
     #[serde(default)] pub detail_scales:[f32;3],
     #[serde(default)] pub framebuffer_blend:u16,
     #[serde(default)] pub layers:Vec<ShaderLayer>,
+    #[serde(default)] pub stages:Vec<ShaderStage>,
+    #[serde(default)] pub decal:bool,
+    #[serde(default)] pub alpha_blended:bool,
 }
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ShaderLayer {pub bitmap_tag_id:u32,pub uv_scale:[f32;2],pub uv_offset:[f32;2],pub rotation:f32,
-    pub color_function:u16,pub alpha_function:u16}
+    pub color_function:u16,pub alpha_function:u16,
+    #[serde(default)] pub flags:u16,
+    #[serde(default)] pub animations:Vec<ShaderAnimation>,
+    #[serde(default)] pub rotation_center:[f32;2]}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SceneObject {
@@ -212,6 +221,17 @@ pub struct SceneObject {
     pub source_offset: Option<usize>,
     pub rotation_offset: Option<usize>,
     pub asset_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_model: Option<SourceModelReference>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceModelReference {
+    pub project_id: String,
+    pub source_sha256: String,
+    pub tag_id: u32,
+    pub path: String,
+    pub class: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -509,7 +529,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
         } else {
             Some(space.pointer(r.u32(at + 20)?, 1)?)
         };
-        let shader_class = matches!(class.as_str(), "senv" | "soso" | "schi" | "scex");
+        let shader_class = matches!(class.as_str(), "senv" | "soso" | "schi" | "scex" | "sotr");
         tags.push(Tag {
             id,
             index: i,
@@ -535,7 +555,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             tag.references.clear();
             tag.shader_preview=None;
             // A failed tag read must NEVER enable basename shader guessing.
-            if matches!(tag.class.as_str(), "senv" | "soso") {
+            if matches!(tag.class.as_str(), "senv" | "soso" | "schi" | "scex" | "sotr") {
                 tag.primary_bitmap_status = Some("invalid".into());
             }
         }
@@ -605,6 +625,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
                     source_offset: Some(p),
                     rotation_offset: Some(p + 12),
                     asset_id: None,
+                    source_model: None,
                 });
             }
         }
@@ -623,7 +644,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             if r.fourcc(row+80)?!="itmc"{continue;}
             objects.push(SceneObject{id:format!("netgame-equipment-{index}"),name:format!("{} · pickup {}",collection.path.rsplit('\\').next().unwrap_or(&collection.path),index+1),
                 kind:"Netgame item".into(),tag_id:Some(datum),position:vec3(&r,row+64)?,rotation:[r.f32(row+76)?,0.,0.],scale:[1.;3],visible:true,
-                source_offset:Some(row+64),rotation_offset:Some(row+76),asset_id:None});
+                source_offset:Some(row+64),rotation_offset:Some(row+76),asset_id:None,source_model:None});
         },
         Err(error)=>diagnostics.push(Diagnostic::warning("NETGAME_ITEMS_UNREADABLE",error.to_string())),
     }
@@ -863,7 +884,8 @@ fn shader_bitmap_references(
     }else{[1.,1.]};
     tag.shader_preview=Some(ShaderPreview{alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
         multipurpose_xbox:tag.class=="soso"&&flags&64!=0,bump_scale:if tag.class=="senv"{r.f32(at+0x124).ok().filter(|v|v.abs()<=1024.&&*v!=0.).unwrap_or(1.)}else{1.},
-        two_sided:tag.class=="senv"||flags&2!=0,uv_scale,
+        two_sided:tag.class=="soso"&&flags&2!=0,uv_scale,
+        alpha_blended:tag.class=="soso"&&flags&8!=0,decal:tag.class=="soso"&&flags&8!=0,
         kind:if tag.class=="senv"{"environment"}else{"model"}.into(),
         shader_type:if tag.class=="senv"{r.u16(at+0x2a)?}else{0},
         detail_function:if tag.references.iter().any(|v|matches!(v.label.as_str(),"Primary detail map"|"Detail map")){r.u16(at+if tag.class=="senv"{0xb0}else{0xd4})?}else{0},
@@ -892,11 +914,13 @@ fn chicago_bitmap_references(r:&Reader,space:&Space,tag:&mut Tag,ids:&std::colle
         let color_function=r.u16(p+0x2c)?;let alpha_function=r.u16(p+0x2e)?;
         if color_function>12||alpha_function>12{return invalid("Chicago colour/alpha function is unsupported");}
         layers.push(ShaderLayer{bitmap_tag_id:datum,uv_scale:[shader_scale(r,p+0x54)?,shader_scale(r,p+0x58)?],
-            uv_offset:[r.f32(p+0x5c)?,r.f32(p+0x60)?],rotation:r.f32(p+0x64)?,color_function,alpha_function});
+            uv_offset:[r.f32(p+0x5c)?,r.f32(p+0x60)?],rotation:r.f32(p+0x64)?,color_function,alpha_function,
+            flags:r.u16(p)?,animations:shader_transparent::animations(r,p+164)?,
+            rotation_center:[r.f32(p+212)?,r.f32(p+216)?]});
         tag.references.push(TagReference{label:if index==0{"Base map".into()}else{format!("Chicago layer {index}")},target_id:datum,class:"bitm".into(),offset:reference});
     }
     tag.primary_bitmap_status=Some("resolved".into());tag.shader_preview=Some(ShaderPreview{kind:"chicago".into(),
-        alpha_test:r.bytes(at+0x29,1)?[0]&1!=0,uv_scale:[1.,1.],two_sided:r.bytes(at+0x29,1)?[0]&4!=0,framebuffer_blend:r.u16(at+0x2c)?,layers,..Default::default()});Ok(())
+        alpha_test:r.bytes(at+0x29,1)?[0]&1!=0,uv_scale:[1.,1.],two_sided:r.bytes(at+0x29,1)?[0]&4!=0,decal:r.bytes(at+0x29,1)?[0]&2!=0,framebuffer_blend:r.u16(at+0x2c)?,layers,..Default::default()});Ok(())
 }
 
 fn read_fields(
@@ -942,6 +966,7 @@ fn read_fields(
         shader_bitmap_references(r, space, tag, ids, at)?;
     }
     if matches!(tag.class.as_str(),"schi"|"scex")&&matches!(version,6|7|13|609){chicago_bitmap_references(r,space,tag,ids,at)?;}
+    if tag.class=="sotr"&&matches!(version,6|7|13|609){shader_transparent::inspect(r,space,tag,ids,at)?;}
     // Read-only dependency metadata from Invader's HEK definitions. Actor variants
     // and item collections can drive AI even when the scenario has no encounters.
     if tag.class == "actv" {
@@ -1191,6 +1216,7 @@ fn placements(
             source_offset: Some(p + 8),
             rotation_offset: Some(p + 20),
             asset_id: None,
+            source_model: None,
         });
     }
     Ok(rows)
@@ -1416,6 +1442,7 @@ mod shader_dependency_tests {
         assert_eq!(tag.references[0].label, "Base map");
         assert_eq!(tag.references[1].label, "Primary detail map");
         assert_eq!(tag.references[2].label, "Bump map");
+        assert!(!tag.shader_preview.as_ref().unwrap().two_sided,"environment shaders must not invent a two-sided flag");
         assert!(tag.fields.is_empty(), "preview metadata must not become writable fields");
     }
     #[test]
