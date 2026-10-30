@@ -163,7 +163,7 @@ pub(super) fn compiled_tags(
     project: &Project,
     build: &BuildRecord,
 ) -> Reply<PathBuf> {
-    source_context_for_build(state, project, build.clone()).map(|context| context.tags)
+    source_context_for_build(state, project, build.clone()).map(|context|context.tags)
 }
 
 fn source_context_for_build(
@@ -226,7 +226,13 @@ fn source_context_for_build(
     } else {
         canonical_directory(&job)?
     };
-    let tags = owned_child(&job, &workspace.join("tags"))?;
+    let default_tags = workspace.join("tags");
+    let selected = baboon_native::working_source(state, project, &build.id, &default_tags)?;
+    let tags = if selected == default_tags {
+        owned_child(&job, &default_tags)?
+    } else {
+        canonical_directory(&selected)?
+    };
     let scenario_path = project.scenario_path().map_err(error)?;
     let scenario = owned_child(
         &tags,
@@ -380,6 +386,10 @@ fn processes(state: &AppState) -> Reply<Vec<ToolProcessView>> {
     }
     Ok(workbench.processes.iter().map(|p| p.view.clone()).collect())
 }
+pub(super) fn source_editor_context(state:&AppState,project_id:&str)->Reply<String>{
+    let candidates:Vec<_>=processes(state)?.into_iter().filter(|p|p.project_id==project_id&&p.status=="running"&&matches!(p.action_id.as_str(),"editTags"|"editLevel")).map(|p|format!("{} PID {}",if p.action_id=="editTags"{"Guerilla"}else{"Sapien"},p.process_id)).collect();
+    Ok(if candidates.is_empty(){"Writer unknown: no Spark-launched source editor is running. Filesystem events do not identify the writing process.".into()}else{format!("Open tool context: {}. Actual writer unconfirmed; filesystem events do not identify the writing process.",candidates.join(", "))})
+}
 
 #[tauri::command]
 pub(super) async fn runtime_tool_processes(app: tauri::AppHandle) -> Reply<Vec<ToolProcessView>> {
@@ -467,6 +477,7 @@ pub(super) async fn runtime_workbench_report(
                     }
                 }
                 observation.project.source_complete = true;
+                if baboon_native::installation(&state).is_ok() {kinds.push(adapters::ToolKind::Baboon);}
                 observation.toolchains.push(adapters::ToolchainEvidence {
                     generation: "h1a-ek".into(),
                     architecture: Some(architectures.into_iter().collect::<Vec<_>>().join(" / ")),
@@ -648,21 +659,24 @@ pub(super) async fn build_working_tags(
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
-        if processes(&state)?.iter().any(|p|p.project_id==project_id && p.status=="running"){return Err("Save and close this map's native editing/test tools before compiling its working tags".into());}
+        if processes(&state)?.iter().any(|p|p.project_id==project_id && p.status=="running") || baboon_native::has_running(&project_id)? {return Err("Save and close this map's native editing/test tools, including Baboon, before compiling its working tags".into());}
         let settings=tool_settings(&state,Some(&project))?;official_h1a_kit(&state,&settings)?;
         let (tool,_,_)=inspect_tool_file(&settings,"haloTool")?;
         let tools=build::Toolchain{invader_directory:settings.invader_directory.clone(),..Default::default()};
         let invader_info=build::tool_path(&tools,"invader-info").ok_or("Configure Invader info before verifying a working-tag build")?;
         verify_compiler_location(&state,&forge_build::ForgeToolchain{hek_directory:settings.hek_directory.clone(),hek_flavor:settings.hek_flavor.clone(),invader_directory:settings.invader_directory.clone(),hek_tags_directory:Some(context.tags.clone())})?;
         let scenario_type=if project.quick_forge.is_some(){1}else{inspect(&state,&project)?.header.scenario_type};
-        let input=core::working_tags::WorkingTagsInput{bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
+        let mut input=core::working_tags::WorkingTagsInput{bsp_audio,parent_build:context.build,tags_directory:context.tags,scenario_path:context.scenario_path,scenario_type,tool,invader_info};
         snapshot_project_state(&state,&project,WORKING_TAG_SNAPSHOT_REASON)?;
         let job_id=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));
         let mut jobs=lock(&state.jobs)?;if !jobs.is_empty(){return Err("Another build is running; wait for completion or cancel it first".into());}jobs.insert(job_id.clone(),cancel.clone());drop(jobs);
         let jobs_root=state.root.join("jobs");let returned=job_id.clone();let worker_app=app.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            let result=core::working_tags::run_build_from_tags(&project,&input,&jobs_root,&job_id,cancel,|e|event(&worker_app,e)).map_err(error);
             let state=worker_app.state::<AppState>();
+            let result=baboon_native::compilation_source(&state,&project,&input.parent_build,&input.tags_directory,cancel.clone()).and_then(|tags|{
+                input.tags_directory=tags;
+                core::working_tags::run_build_from_tags(&project,&input,&jobs_root,&job_id,cancel,|e|event(&worker_app,e)).map_err(error)
+            });
             let result=result.and_then(|record|{let library=lock(&state.library)?;let mut current=library.get(&project_id).map_err(error)?;current.builds.push(record);current.modified_at=chrono::Utc::now().to_rfc3339();library.save(&current,None).map_err(error)});
             if let Err(message)=result{event(&worker_app,JobEvent{job_id:job_id.clone(),project_id,phase:"failed".into(),severity:"error".into(),message,progress:100,timestamp:chrono::Utc::now().to_rfc3339()});}
             if let Ok(mut jobs)=state.jobs.lock(){jobs.remove(&job_id);}

@@ -26,7 +26,9 @@ import type {
 import { availabilityLabel, evidenceLabel, runtimeNames } from '../runtimeWorkbench';
 import { Notice } from './ui';
 import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
+import {integrityBlocks,type NativeTagIntegrityReport} from '../nativeTagIntegrity';
 import BspAudioEditor, {type BspAudioRequest} from './BspAudioEditor';
+import BaboonTools from './BaboonTools';
 import '../runtimeWorkbench.css';
 
 const actions = [
@@ -74,6 +76,10 @@ export default function RuntimeDock({
     [consent, setConsent] = useState(false);
   const [notice, setNotice] = useState('');
   const toolTags=useWorkingTagChanges(project?.id??null,runtime==='mccSteam'?report?.workingSource?.buildId??null:null);
+  const [handoffIntegrity,setHandoffIntegrity]=useState<{projectId:string;integrity?:NativeTagIntegrityReport}|null>(null);
+  useEffect(()=>{const listener=(event:Event)=>{const value=(event as CustomEvent<{projectId:string;integrity?:NativeTagIntegrityReport}>).detail;if(value?.projectId===project?.id)setHandoffIntegrity(value);};window.addEventListener('guilty-spark-tag-integrity',listener);return()=>window.removeEventListener('guilty-spark-tag-integrity',listener);},[project?.id]);
+  const invalidToolFiles=toolTags.report?.integrity?.invalidFiles??0;
+  const invalidHandoffFiles=handoffIntegrity?.projectId===project?.id?handoffIntegrity?.integrity?.invalidFiles??0:0;
   const generation = useRef(0);
   const currentReport = useRef(report);
   currentReport.current = report;
@@ -263,7 +269,7 @@ export default function RuntimeDock({
     }
   }
   async function buildWorkingTags(bspAudio?:BspAudioRequest) {
-    if (!project || dirty || working || busy || toolTags.report?.status==='saving') return;
+    if (!project || dirty || working || busy || toolTags.report?.status==='saving' || integrityBlocks(toolTags.report?.integrity)) return;
     const request = generation.current;
     setBusy(true);
     setError('');
@@ -293,6 +299,7 @@ export default function RuntimeDock({
             {working ? 'Working…' : dirty ? 'Unsaved changes' : 'Saved'}
           </span>
           {!!toolTags.report?.changedFiles&&<button className="runtime-dock-tag-changes" onClick={()=>setDetails(true)}>{toolTags.report.changedFiles} saved tool edit{toolTags.report.changedFiles===1?'':'s'}</button>}
+          {(invalidToolFiles>0||invalidHandoffFiles>0)&&<button role="alert" className="runtime-dock-tag-changes" onClick={()=>setDetails(true)}>Native save integrity warning · {invalidToolFiles+invalidHandoffFiles} files</button>}
           <button
             className="runtime-dock-details"
             aria-label="Runtime and tool details"
@@ -455,6 +462,7 @@ export default function RuntimeDock({
               </button>
             </div>
             {project && report?.workingSource && <WorkingTagChanges {...toolTags}/>}
+            {runtime==='mccSteam' && <BaboonTools project={project} dirty={dirty} epoch={epoch}/>}
             {project && report?.workingSource && runtime==='mccSteam' && <BspAudioEditor key={project.id+report.workingSource.buildId} projectId={project.id} parentBuildId={report.workingSource.buildId} blocked={busy||working||dirty||toolTags.report?.status==='saving'||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')} onBuild={buildWorkingTags}/>}
             {project && (
               <div className="button-row">
@@ -465,7 +473,7 @@ export default function RuntimeDock({
                     busy ||
                     working ||
                     dirty ||
-                    toolTags.report?.status==='saving' ||
+                    toolTags.report?.status==='saving' || integrityBlocks(toolTags.report?.integrity) ||
                     !!report?.sourceIssue ||
                     !!report?.toolsIssue ||
                     report?.processes.some((p) => p.projectId === project.id && p.status === 'running')

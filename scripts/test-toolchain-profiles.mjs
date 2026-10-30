@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {offeredTools,toolchainHint,toolById} from '../src/toolchainProfiles.ts';
 assert.equal(offeredTools('mccSteam',{hekFlavor:'legacyHek'}).length,0,'never mix classic HEK into MCC');
-assert.deepEqual(offeredTools('mccSteam',{hekFlavor:'h1aEk'}).map(t=>t.id),['sapien','guerilla','tagTest','haloTool']);
+assert.deepEqual(offeredTools('mccSteam',{hekFlavor:'h1aEk'}).map(t=>t.id),['sapien','guerilla','baboon','tagTest','haloTool']);
+assert.equal(toolById('baboon').mode,'sourceHandoff');
+assert.ok(!offeredTools('haloCustomEdition',{hekFlavor:'legacyHek'}).some(t=>t.id==='baboon'));
 assert.ok(offeredTools('haloCustomEdition',{hekFlavor:'legacyHek'}).some(t=>t.id==='haloTool'));
 assert.ok(!offeredTools('haloCustomEdition',{hekFlavor:'h1aEk'}).some(t=>t.id==='haloTool'));
 for(const id of ['macDemo','macRetail','haloXbox','haloMd'])assert.equal(offeredTools(id,{hekFlavor:null}).length,0);

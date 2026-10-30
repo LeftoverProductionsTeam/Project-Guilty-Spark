@@ -509,7 +509,7 @@ test('saved native tool tags have a stable-save review and separate build workfl
  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__sparkMock.tagPhase='unchanged';w.__sparkMock.tagWatch=null;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
   if(command==='runtime_workbench_report'){const report=await original(command,args);report.sourceIssue=null;report.toolsIssue=null;report.workingSource=args.projectId?{buildId:'owned-build',tagsDirectory:'owned/tags'}:null;return report;}
   if(command==='working_tag_watch_start'){w.__sparkMock.tagWatch=args.projectId;return {watchId:'watch',projectId:args.projectId,buildId:'owned-build',tagsDirectory:'owned/tags',status:'unchanged',basis:'compiledBuild',revision:0,totalFiles:2240,changedFiles:0,changes:[],listTruncated:false,hashesReadLastScan:2240};}
-  if(command==='working_tag_watch_poll'){const phase=w.__sparkMock.tagPhase;return {watchId:'watch',projectId:w.__sparkMock.tagWatch,buildId:'owned-build',tagsDirectory:'owned/tags',status:phase,basis:'compiledBuild',revision:1,totalFiles:2240,changedFiles:phase==='changed'?1:0,changes:phase==='changed'?[{kind:'modified',path:'levels/test/test.scenario'}]:[],listTruncated:false,hashesReadLastScan:phase==='changed'?1:0};}
+  if(command==='working_tag_watch_poll'){const phase=w.__sparkMock.tagPhase;return {watchId:'watch',projectId:w.__sparkMock.tagWatch,buildId:'owned-build',tagsDirectory:'owned/tags',status:phase,basis:'compiledBuild',revision:1,totalFiles:2240,changedFiles:phase==='changed'?1:0,changes:phase==='changed'?[{kind:'modified',path:'levels/test/test.scenario'}]:[],listTruncated:false,hashesReadLastScan:phase==='changed'?1:0,...(w.__sparkMock.invalidSave?{integrity:{checkedFiles:0,invalidFiles:1,pendingFiles:0,unverifiedFiles:0,findings:[{path:'levels/test/test.scenario',state:'invalid',detail:'Native payload CRC differs from its header'}],listTruncated:false},writerContext:'Writer unknown; last launched tool context does not prove who wrote this file.'}:{})};}
   if(command==='working_tag_watch_stop')return null;
   if(command==='build_working_tags'){w.__sparkMock.toolBuildProject=args.projectId;return 'synthetic-job';}
   return original(command,args);
@@ -519,6 +519,8 @@ test('saved native tool tags have a stable-save review and separate build workfl
  const tags=page.getByRole('region',{name:'Saved tool tag changes',exact:true});await expect(tags).toContainText('Watching 2,240 tag files');
  await page.evaluate(()=>{(window as any).__sparkMock.tagPhase='saving';});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags).toContainText('Waiting for a stable save');await expect(page.getByRole('button',{name:'Build working tag edits',exact:true})).toBeDisabled();
  await page.evaluate(()=>{(window as any).__sparkMock.tagPhase='changed';});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags).toContainText('1 changed tag file');await tags.locator('summary').click();await expect(tags).toContainText('levels/test/test.scenario');await expect(page.getByRole('button',{name:'1 saved tool edit',exact:true})).toBeVisible();
+ await page.evaluate(()=>{(window as any).__sparkMock.invalidSave=true;});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags).toContainText('Native save failed integrity checks');await expect(tags).toContainText('Writer unknown');await expect(page.getByRole('button',{name:'Build working tag edits',exact:true})).toBeDisabled();await expect(page.getByText('Native save integrity warning · 1 files',{exact:true})).toBeVisible();
+ await page.evaluate(()=>{(window as any).__sparkMock.invalidSave=false;});await tags.getByRole('button',{name:'Scan tool tags now',exact:true}).click();await expect(tags.getByText('Native save failed integrity checks',{exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Build working tag edits',exact:true}).click();expect(await page.evaluate(()=>(window as any).__sparkMock.toolBuildProject)).toBe('a');await expect(page.getByRole('dialog')).toHaveCount(0);expect(await page.evaluate(()=>(window as any).__sparkMock.saved)).toBeNull();
 });
 
@@ -998,12 +1000,24 @@ test('looping source tracks persist across tools and Finish waits for their end 
 test('shared QuickForge survives tool changes and pauses a divergent local draft on restore',async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]})));
   await mockDesktop(page);await openFixture(page);await chooseTool(page,"Level editor");
+  await expect(page.locator('.forge-topbar')).toHaveCount(0);
+  await expect(page.locator('.forge-center > .forge-live-panel')).toHaveCount(0);
+  const viewport=await page.locator('.forge-viewport').boundingBox();
+  const session=page.getByRole('region',{name:'QuickForge session panel',exact:true});
+  const revealSession=async()=>{
+    if(await session.isVisible())return;
+    await page.locator('.gs-layout-menu > summary').click();
+    await page.locator('.gs-layout-menu').getByLabel('QuickForge session',{exact:true}).check();
+    await page.locator('.gs-layout-menu > summary').click();
+  };
+  await revealSession();
+  expect(await page.locator('.forge-viewport').boundingBox()).toEqual(viewport);
   const sharing=page.locator('details.forge-live-panel').filter({has:page.locator('summary').filter({hasText:'Shared QuickForge'})});await sharing.locator('summary').first().click();
   await page.getByRole('button',{name:'Host editing session',exact:true}).click();await expect(page.getByRole('button',{name:'Leave session',exact:true})).toBeVisible();
   await chooseTool(page,"Tag editor");
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='forge_session_leave').length)).toBe(0);
   await page.evaluate(()=>{(window as any).__sparkMock.session.view.document.name='Another editor changed the name';});
-  await chooseTool(page,"Level editor");await sharing.locator('summary').first().click();
+  await chooseTool(page,"Level editor");await revealSession();await sharing.locator('summary').first().click();
   await expect(page.getByText('Paused · local draft retained',{exact:false})).toBeVisible();
   await expect(page.getByRole('button',{name:'Export local draft',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Leave session',exact:true}).click();

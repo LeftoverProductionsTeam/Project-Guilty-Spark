@@ -1,4 +1,5 @@
 import LiveObjectInspector from './LiveObjectInspector';
+import BaboonTools from './BaboonTools';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FolderOpen, RefreshCw, Server, ShieldCheck, Upload, Download, Unplug } from 'lucide-react';
 import { call, native } from '../api';
@@ -832,6 +833,7 @@ function ToolchainShelf({runtime,settings,onSettings,onOpenWorkspace}:{runtime:R
     <button className="small-button" type="button" title="Set the exact folder and distinguish classic HEK from MCC H1A Editing Kit before starting native tools." onClick={onSettings}>Configure installed tool paths</button>
     {choices.length===0 ? <p className="subtle">No compatible tool launcher is enabled for the selected profile.</p> : <div className="gs-tool-grid">
       {choices.map(choice=>{
+        if(choice.mode==='sourceHandoff')return <BaboonTools key={choice.id}/>;
         const detection=inventory.find(item=>item.id===choice.id);
         return <div key={choice.id} className="gs-tool-card" title={`${choice.purpose} ${choice.caveat}`}>
           <strong>{choice.label}</strong>

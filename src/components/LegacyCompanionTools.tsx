@@ -4,6 +4,7 @@ import { call, native } from '../api';
 import { companionOfferLabel, cannotGuaranteeCompatibility, mayOfferLaunch, validatedDashboard } from '../legacyCompanions';
 import type { CompanionDashboard, CompanionFormat } from '../legacyCompanions';
 import { Notice, Pill } from './ui';
+import BaboonTools from './BaboonTools';
 
 /** Historical side-by-side tools are an OPTIONAL bridge, never the editor architecture. */
 export default function LegacyCompanionTools(){
@@ -54,6 +55,7 @@ export default function LegacyCompanionTools(){
     }catch(e){setError(String(e));}finally{setBusy(false);}
   }
   return <div className="gs-companions" aria-label="Legacy companion applications">
+    <BaboonTools/>
     <div className="section-heading"><h3>Classic companion tools · run alongside Spark</h3>
       <button type="button" className="small-button" onClick={()=>void refresh()} disabled={!native||busy}><RefreshCw size={13}/> Refresh compatibility</button></div>
     <p>Optional support for separately installed old editors—not a launcher replacing Spark. You can keep their windows open while Spark manages source reviews and builds. All checks are local and read-only until you explicitly launch a registered executable.</p>

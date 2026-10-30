@@ -1,5 +1,7 @@
 # To everyone who kept Halo modding alive
 
+C37 credits [Zoephie/Baboon](https://github.com/Zoephie/Baboon), [camden-smallwood/blam-tags](https://github.com/camden-smallwood/blam-tags), [shared definitions](https://github.com/camden-smallwood/definitions), Invader and the Reclaimers Library. Original external-tool coordination is separate from upstream code and schema ownership. [Pins/licensing investigation](CONTINUATION_37_ENGINEERING.md).
+
 > Thank you to the people who reversed tag structures, preserved map files, wrote a forum guide, patched a forgotten tool, built a multiplayer arena, tested against obscure editions, organized archives, or answered a beginner's question. Guilty Spark grows from those shared discoveries.
 
 ## Attribution principles

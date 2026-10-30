@@ -1,5 +1,10 @@
 # Verification record
 
+## C37 native acceptance
+
+494 Rust tests pass with seven opt-in ignores. TypeScript, 216 frontend tests, 79 browser tests and the Windows executable/NSIS build pass. [Native receipt](fixtures/c37-native-acceptance.json) separates the founder-confirmed Baboon GUI save from fresh automated byte/parser/recovery/Invader/H1A compilation and compiled-field readback. `scripts/test-native-save-integrity.mjs` runs only against a fresh `qa_runtime_library` replica and explicitly does not claim a human Baboon or Halo game test. `scripts/test-baboon-native.mjs` is the separate opt-in human handoff test. [C37 scope](CONTINUATION_37_ENGINEERING.md).
+
+
 ## Current C36 evidence
 
 Continue the actual C35 R12 source at `21804c191a918cbf8bd74efac60dfcec65c9083b`. Fresh baseline: 471 Rust passed / five opt-in ignored, 216 frontend tests in 44 files, 77 browser tests and 59 offline checks. C36: 480 Rust passed / seven opt-in ignored, 216 frontend, 79 browser and 59 offline; TypeScript and the Windows release/NSIS build pass. Two owned-asset BSP detail tests were separately opted into and passed. [Exact current evidence and limits](CONTINUATION_36_ENGINEERING.md); [metadata-only receipt](fixtures/c36-native-preservation-verification.json).
@@ -101,6 +106,8 @@ Owner-installed `halo1/maps/a10.map`:
 The first adapter attempt exposed the zero-exit/incomplete-extraction behavior. The implementation was corrected and the repeated test stopped before compilation with the missing-resource diagnostics. The remaining dependency is original source resource data or official editing-kit assets, not a renamed header.
 
 ## Pending integration
+
+C37 adds two opt-in native acceptances. `scripts/test-native-save-integrity.mjs` exercises harmless serialization, checksum-correct semantic corruption, CRC failure, recovery and a real Invader edit/rebuild. `scripts/test-baboon-edited-native.mjs` launches the verified Baboon on an isolated pistol; a person must actually save radius 0.5 and close it. Its confirmation file is written only after that direct confirmation, and native parsing, field comparison and compilation must still pass. Both scripts require explicit `--app`, `--data`, `--output`, `--kit`, `--invader` and `--baboon` paths. Use a fresh `qa_runtime_library` replica and output directory; never point these tests at a user's only working source. [C37 receipts and scope](CONTINUATION_37_ENGINEERING.md).
 
 No Excession exact-scenario template is installed here. Package metadata validation is a limited contract check, not a full official-schema validator. Actual MCC mod enumeration, anti-cheat-disabled launch selection and loading a generated package remain untested. Steam is not launched automatically during QA.
 

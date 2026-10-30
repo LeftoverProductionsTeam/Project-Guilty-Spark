@@ -12,6 +12,9 @@ test-results/
 playwright-report/
 *.gsproject.bak*
 *.map
+*.iso
+*.xiso
+*.xbe
 *.yelo
 /Pyros Zombie Apocolypse Mod Versions/
 /SAMPLE CODE/

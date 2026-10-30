@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import { WorkingTagSync, type WorkingTagReport } from '../workingTagSync';
 import { Notice } from './ui';
+import NativeTagIntegrity from './NativeTagIntegrity';
 export function useWorkingTagChanges(projectId: string | null, buildId: string | null) {
   const [report, setReport] = useState<WorkingTagReport | null>(null),
     [error, setError] = useState(''),
@@ -88,11 +89,14 @@ export default function WorkingTagChanges({
       <p className="subtle">
         {report?.basis === 'compiledBuild'
           ? 'Compared with this build’s verified tag inventory.'
+          : report?.basis === 'acceptedNativeRevision'
+          ? 'Compared with the accepted native source revision.'
           : 'Changes are compared with the files present when monitoring connected.'}{' '}
         Saves are checked every 3 seconds. Build working tag edits to compile a separate map, then open its
         result. The current cache and Spark draft are retained.
       </p>
       {error && <Notice>{error}</Notice>}
+      <NativeTagIntegrity report={report?.integrity} writerContext={report?.writerContext}/>
       {!!report?.changes.length && (
         <details>
           <summary>

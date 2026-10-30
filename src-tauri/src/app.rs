@@ -36,6 +36,8 @@ use tauri::{Emitter, Manager, State};
 #[path="conversion_resources_native.rs"]mod conversion_resources_native;
 #[path="portability_native.rs"]mod portability_native;
 #[path="dependency_install.rs"] mod dependency_install;
+#[path="baboon_native.rs"] mod baboon_native;
+#[path="native_tag_parser.rs"] mod native_tag_parser;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -216,6 +218,9 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
         let source=lock(&state.library)?.get(&project_id).map_err(error)?;
         let build=verified_build(&state,&source,&build_id)?;
         let inherited_tools=project_tools(&state,&source).ok();
+        // Native revisions consult library settings. Resolve before taking the
+        // import lock so opening a compiled map cannot recursively lock it.
+        let inherited_tags=if build.target=="mcc-cea"{runtime_workbench::compiled_tags(&state,&source,&build).ok()}else{None};
         let library=lock(&state.library)?;
         let entries=library.list().map_err(error)?;
         let existed=entries.iter().any(|e|e.sha256.as_deref()==build.sha256.as_deref());
@@ -230,7 +235,7 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
             while entries.iter().any(|e|e.title==title){title=format!("{base} ({ordinal})");ordinal+=1;}
             project.title=title;
             if build.target=="mcc-cea" && inspection.header.version==13 {
-                if let Ok(tags)=runtime_workbench::compiled_tags(&state,&source,&build) {
+                if let Some(tags)=inherited_tags {
                   if tags.is_dir() && tags.join(core::safe_relative(&format!("{}.scenario",inspection.scenario_path)).map_err(error)?).is_file() {
                     core::reject_links(&tags).map_err(error)?;
                     if let Some(tools)=inherited_tools {if let Some(kit)=tools.h1a_directory {project.bind_compiled_mcc_tags(kit,tags,tools.invader_directory).map_err(error)?;}}
@@ -531,6 +536,7 @@ async fn quickforge_export(app:tauri::AppHandle,project_id:String)->Reply<forge_
 fn quickforge_build(app:tauri::AppHandle,project_id:String)->Reply<String> {
     let state=app.state::<AppState>();
     let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+    baboon_native::guard_regeneration(&state,&project)?;
     snapshot_project_state(&state,&project,"before-build")?;
     let tools=forge_build::tools_for_target(&project,forge_tools(&state)?).map_err(error)?;verify_compiler_location(&state,&tools)?;
     let blockers=forge_provenance_blockers(&state,&project);
@@ -869,6 +875,7 @@ async fn choose_setting_path(key: String) -> Reply<Option<PathBuf>> {
         "metadataTemplateDirectory",
         "hekDirectory",
         "hekTagsDirectory",
+        "baboonDirectory",
     ]
     .contains(&key.as_str())
     {
@@ -1225,6 +1232,7 @@ fn event(app: &tauri::AppHandle, e: JobEvent) {
 fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     let state = app.state::<AppState>();
     let project = lock(&state.library)?.get(&id).map_err(error)?;
+    baboon_native::guard_regeneration(&state,&project)?;
     snapshot_project_state(&state,&project,"before-build")?;
     let inspection = inspect(&state, &project)?;
     let tools = project_tools(&state, &project)?;
@@ -1959,7 +1967,7 @@ fn known_tool_file(settings:&Settings, choice:ToolChoice)->Reply<Option<PathBuf>
 #[tauri::command]
 fn toolchain_inventory(state:State<AppState>,runtime_id:String)->Reply<Vec<ToolchainTool>> {
     let settings=lock(&state.settings)?.clone();
-    allowed_toolchain(&runtime_id,settings.hek_flavor.as_deref()).into_iter().map(|choice|{
+    let mut tools:Vec<ToolchainTool>=allowed_toolchain(&runtime_id,settings.hek_flavor.as_deref()).into_iter().map(|choice|{
         let (file,detail)=match known_tool_file(&settings,choice) {
             Ok(Some(path)) => (Some(path),"Exact installed executable found. Version/runtime compatibility still requires owner testing.".to_string()),
             Ok(None) => (None,"Executable not found in configured tool folder.".to_string()),
@@ -1967,7 +1975,12 @@ fn toolchain_inventory(state:State<AppState>,runtime_id:String)->Reply<Vec<Toolc
         };
         Ok(ToolchainTool { id:choice.id.into(), available:cfg!(target_os="windows") && file.is_some(),executable:file,
             launch_mode:if choice.gui {"externalGui".into()} else {"integratedCli".into()},detail })
-    }).collect()
+    }).collect::<Reply<_>>()?;
+    if runtime_id=="mccSteam"&&settings.hek_flavor.as_deref()==Some("h1aEk") {
+        let (executable,detail)=match baboon_native::installation(&state){Ok(i)=>(Some(i.executable),format!("Verified Baboon {} and matching Halo 1 definitions. Open a validated map's native tag handoff.",i.version)),Err(e)=>(None,e)};
+        tools.push(ToolchainTool{id:"baboon".into(),available:cfg!(windows)&&executable.is_some(),executable,launch_mode:"sourceHandoff".into(),detail});
+    }
+    Ok(tools)
 }
 #[tauri::command]
 fn launch_toolchain_tool(state:State<AppState>,runtime_id:String,tool_id:String,confirm_source_mutation:bool)->Reply<String> {
@@ -2617,6 +2630,13 @@ pub fn run() {
             runtime_workbench::prepare_runtime_tool,
             runtime_workbench::launch_runtime_tool,
             runtime_workbench::build_working_tags,
+            baboon_native::baboon_report,
+            baboon_native::baboon_register,
+            baboon_native::baboon_prepare,
+            baboon_native::baboon_launch,
+            baboon_native::baboon_poll,
+            baboon_native::baboon_reconcile,
+            baboon_native::baboon_restore_start,
             runtime_workbench::inspect_bsp_audio_workspace,
             runtime_workbench::runtime_tool_processes,
             runtime_workbench::community_listing,

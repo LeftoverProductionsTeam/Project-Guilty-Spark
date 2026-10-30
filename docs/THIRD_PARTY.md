@@ -1,5 +1,7 @@
 # Third-party licensing and provenance
 
+C37 integrates Zoephie’s Baboon as a separately installed private executable, with blam-tags/shared definitions credits. No upstream implementation, schema JSON or executable is redistributed. No explicit license was found at the reviewed roots, so shared-code/schema reuse remains blocked pending permission. Exact release/main revisions and published package hashes are in [C37](CONTINUATION_37_ENGINEERING.md) and the metadata-only profile.
+
 Phase 2 adds [zip-rs 9.1.0](https://github.com/zip-rs/zip2), MIT, with default features disabled and only Deflate support enabled; the exact version and transitive dependencies are locked in `Cargo.lock`. Local crate metadata and its LICENSE were checked. ZIP preflight, import policy and receipts are original application code.
 
 Runtime source research pins ChupathingyCE/OpenCE/Mimic revisions in [the feasibility report](MCC_MULTIPLAYER_AI_FEASIBILITY.md). No engine/networking source or binary is embedded. Mimic's absence of an explicit license is a reuse blocker; it is not treated as permission to copy. Owner-supplied readme credits are preserved with their uncertainty in [archaeology](ZOMBIE_APOCALYPSE_ARCHAEOLOGY.md).

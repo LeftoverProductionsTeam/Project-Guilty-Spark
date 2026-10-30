@@ -1,5 +1,8 @@
 # Runtime and operation compatibility — Continuation 36
 
+C37 adds source-bound Baboon 0.3.2/HCEEK handoff, pinned Invader structure checks, conflict-aware revisions and recovery. Exact tested scope and limits are in [C37](CONTINUATION_37_ENGINEERING.md). Legacy caches are not direct Baboon inputs.
+
+
 C36 continues C35 R12 with [Portability Lab/native preservation](NATIVE_PORTABILITY.md), exact source/target findings, native compiler input inventories and scoped semantic comparisons. A new Warthog Xbox descriptor preserves its separate identity without claiming an executable or cross-play adapter. Protected Chupathingy invitations now reach only that runtime's own password prompt. [Current implementation and acceptance](CONTINUATION_36_ENGINEERING.md); [community protocol boundaries](research/C36_COMMUNITY_INTEROPERABILITY.md).
 
 C35 r11/r12 rendering, consolidated header/window controls, tag-class browsing, all-main-track sound imports and automatic MCC classic ADPCM resources remain included. The older r10 header-hide/Focus design below is historical and superseded by one fullscreen mode with visible map tabs and tools. CELT music/dialogue and full engine parity remain open.

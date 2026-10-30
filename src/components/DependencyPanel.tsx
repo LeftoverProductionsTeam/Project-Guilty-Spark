@@ -12,6 +12,7 @@ import {
   type DependencyReport,
 } from '../dependencyGuide';
 import './dependencyPanel.css';
+import BaboonTools from './BaboonTools';
 
 export default function DependencyPanel({
   project,
@@ -145,6 +146,7 @@ export default function DependencyPanel({
   }
   return (
     <section className="dependency-panel" aria-label="Dependencies and setup">
+      <BaboonTools project={project}/>
       <header>
         <div>
           <Wrench size={17} />

@@ -2,7 +2,7 @@
 use crate::{invalid, maps, reject_links, safe_relative, Result, SparkError};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
     time::UNIX_EPOCH,
@@ -49,6 +49,7 @@ pub struct TagChangeMonitor {
     rehash: bool,
     revision: u64,
     hashes_read: usize,
+    dirty_paths: BTreeSet<String>,
 }
 fn inventory(root: &Path) -> Result<Inventory> {
     reject_links(root)?;
@@ -166,10 +167,35 @@ impl TagChangeMonitor {
             rehash: false,
             revision: 0,
             hashes_read,
+            dirty_paths: BTreeSet::new(),
         })
     }
     pub fn root(&self) -> &Path {
         &self.root
+    }
+    pub fn accepted_hashes(&self) -> &Hashes { &self.hashes }
+    pub fn baseline_hashes(&self) -> &Hashes { &self.baseline }
+    pub fn keep_observed_baseline(&mut self) -> Result<()> {
+        if self.pending.is_some() || !self.dirty_paths.is_empty() || self.rehash {
+            return invalid("Wait for a stable native source before keeping its baseline");
+        }
+        self.baseline=self.hashes.clone();
+        self.basis="acceptedNativeRevision".into();
+        Ok(())
+    }
+    /// Native file events invalidate content identity even if an editor restores
+    /// both length and timestamps. Debounce from the newest event, and hash only
+    /// the named files instead of the entire kit on every save.
+    pub fn mark_changed(&mut self, paths: impl IntoIterator<Item = String>) -> Result<()> {
+        let mut changed = false;
+        for path in paths {
+            safe_relative(&path)?;
+            if self.dirty_paths.len() >= MAX_FILES { self.rehash = true; }
+            else { self.dirty_paths.insert(path); }
+            changed = true;
+        }
+        if changed { self.pending = None; }
+        Ok(())
     }
     pub fn report(&self) -> TagChanges {
         let mut changes = Vec::new();
@@ -225,7 +251,7 @@ impl TagChangeMonitor {
         self.hashes_read = 0;
         self.rehash |= rehash;
         let next = inventory(&self.root)?;
-        if next == self.stamps && !self.rehash && self.pending.is_none() {
+        if next == self.stamps && !self.rehash && self.pending.is_none() && self.dirty_paths.is_empty() {
             return Ok(self.report());
         }
         match &self.pending {
@@ -239,7 +265,7 @@ impl TagChangeMonitor {
         }
         let mut hashes = Hashes::new();
         for (path, stamp) in &next {
-            let hash = if !self.rehash && self.stamps.get(path) == Some(stamp) {
+            let hash = if !self.rehash && !self.dirty_paths.contains(path) && self.stamps.get(path) == Some(stamp) {
                 self.hashes.get(path).cloned().ok_or_else(|| {
                     SparkError::Invalid("Working tag hash state is incomplete".into())
                 })?
@@ -263,6 +289,7 @@ impl TagChangeMonitor {
         self.stamps = next;
         self.pending = None;
         self.rehash = false;
+        self.dirty_paths.clear();
         Ok(self.report())
     }
 }
@@ -352,6 +379,25 @@ mod tests {
         saved(dir.path(), "a.weapon", b"aaaa", 200);
         m.scan(2000, false).unwrap();
         assert_eq!(m.scan(3600, false).unwrap().changed_files, 0);
+    }
+    #[test]
+    fn file_events_detect_preserved_timestamps_without_rehashing_the_whole_tree() {
+        let dir = tempdir().unwrap();
+        saved(dir.path(), "a.weapon", b"aaaa", 100);
+        saved(dir.path(), "b.scenery", b"keep", 100);
+        let mut monitor = TagChangeMonitor::new(dir.path(), None).unwrap();
+        saved(dir.path(), "a.weapon", b"bbbb", 100);
+        monitor.mark_changed(["a.weapon".into()]).unwrap();
+        assert_eq!(monitor.scan(0, false).unwrap().status, "saving");
+        saved(dir.path(), "a.weapon", b"cccc", 100);
+        monitor.mark_changed(["a.weapon".into()]).unwrap();
+        monitor.scan(1200, false).unwrap();
+        assert_eq!(monitor.scan(1800, false).unwrap().revision, 0);
+        let report = monitor.scan(2800, false).unwrap();
+        assert_eq!(report.changed_files, 1);
+        assert_eq!(report.hashes_read_last_scan, 1);
+        assert_eq!(monitor.scan(3000, false).unwrap().hashes_read_last_scan, 0);
+        assert!(monitor.mark_changed(["../escape.weapon".into()]).is_err());
     }
     #[test]
     fn invalid_baselines_and_missing_roots_are_rejected() {

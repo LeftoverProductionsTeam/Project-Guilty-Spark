@@ -817,21 +817,11 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     (props.dirty || (!!receipt.sources && !!report && receipt.sources.sourceSha256 !== report.sourceSha256));
   return (
     <div className="forge-workspace">
-      <div className="forge-topbar">
-        <div>
-          <Layers3 size={18} />
-          <strong>QuickForge</strong>
-          <Pill>Original geometry</Pill>
-          <span>
-            {doc.geometry.length} brushes · {doc.placements.length} tag references · {doc.spawns.length}{' '}
-            starts
-          </span>
-        </div>
-        <button className="small-button" onClick={props.onNew}>
-          <Plus size={13} />
-          New map
-        </button>
-      </div>
+      <WorkspacePanel id="forge-session" label="QuickForge session">
+        {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
+        <ForgeCollaboration projectId={project.id} document={doc} entries={data.entries} onShared={props.onSharedDocument} onSave={props.onSave}/>
+        <LiveForge project={project} document={doc} selected={selected}/>
+      </WorkspacePanel>
       <div className="forge-main">
         <WorkspacePanel id="forge-palette" label="Build tools"><aside className="forge-hierarchy">
           <div className="forge-panel-heading">
@@ -939,10 +929,11 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
           </div>
         </aside></WorkspacePanel>
         <section className="forge-center">
-          <ForgeCollaboration projectId={project.id} document={doc} entries={data.entries} onShared={props.onSharedDocument} onSave={props.onSave}/>
-          {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
-          <LiveForge project={project} document={doc} selected={selected}/>
           <div className="forge-toolbar">
+            <span className="forge-source-summary" title="Original QuickForge geometry · brushes, tag references and player starts">
+              <Layers3 size={14}/><strong>QuickForge</strong>
+              <span>{doc.geometry.length} brushes · {doc.placements.length} references · {doc.spawns.length} starts</span>
+            </span>
             <IconButton
               label="Translate (W)"
               active={mode === 'translate'}

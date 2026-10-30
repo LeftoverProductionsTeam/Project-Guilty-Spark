@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — C37 Modder’s Workbench (development)
+
+- Verify a separately installed Baboon release and matching H1 definitions; open exact isolated native tags.
+- Retain source forks, stable-save reports, conflict-aware revisions and recovery.
+- Detect changed native-tag header/class/CRC failures live; show process context without inventing writer attribution and block failed/pending inputs.
+- Preserve the compiler’s validated parent-job boundary when staging external source.
+- Move QuickForge sharing/live controls to a session drawer and remove duplicate heading/New map rows.
+- Correct recursive library locking when opening a compiled map.
+- Retain all prior Portability Lab, rendering/audio, Director and research work. [Scope and evidence](docs/CONTINUATION_37_ENGINEERING.md).
+
 ## 0.4.0 — Continuation 36: One Halo, no new standards (development)
 
 - Add Portability Lab inside Build & playtest, using existing exact runtime profiles and source-bound native preflight findings.

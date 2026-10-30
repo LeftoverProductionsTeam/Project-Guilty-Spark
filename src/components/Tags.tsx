@@ -19,6 +19,7 @@ import { createTagExchangeBundle } from '../haloExchange';
 import { downloadLocalText } from '../exportHelpers';
 import { call, native } from '../api';
 import {useMapState} from '../mapSession';
+import BaboonTools from './BaboonTools';
 export default function Tags({
   project,
   inspection,
@@ -31,6 +32,7 @@ export default function Tags({
   onAssignSound,
   onResources,
   onNativeEditor,
+  hasUnsavedChanges = false,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -43,6 +45,7 @@ export default function Tags({
   onAssignSound?: (cue: CueName, ref: LocalCueReference) => void;
   onResources?:()=>void;
   onNativeEditor?:()=>void;
+  hasUnsavedChanges?:boolean;
 }) {
   const [query, setQuery] = useMapState(project.id,'tags.query','');
   const [filter, setFilter] = useMapState(project.id,'tags.filter','all');
@@ -305,6 +308,7 @@ export default function Tags({
               <TagFields project={project} tag={selectedTag} tags={tags} advanced={advanced} change={(field,value)=>change(selectedTag,field,value)} />
               <details className="tag-native-editing"><summary>Complete native tag editing</summary><p>Spark edits the typed fields indexed above. Extract this tag and its dependencies for a full source tagset, then open the matching native tag editor. Unknown cache fields remain preserved. Build the working tags to apply full-schema changes.</p>{onNativeEditor&&<button disabled={!native} onClick={onNativeEditor}>Open native tag editor</button>}</details>
             </div>
+            <BaboonTools project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges}/>
             <TagDuplicatePanel key={`duplicate:${project.id}:${selectedTag.id}`} project={project} inspection={inspection} source={selectedTag} edit={edit} />
             {projectile && rocket && (
               <div className="preset-bar">

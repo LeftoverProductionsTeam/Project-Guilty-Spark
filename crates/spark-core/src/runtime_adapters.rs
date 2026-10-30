@@ -168,9 +168,19 @@ pub struct ResourceEvidence {
 pub enum ToolKind {
     Sapien,
     Guerilla,
+    Baboon,
     Tool,
     Standalone,
     Legacy,
+}
+
+/// Authoring compatibility is narrower than runtime detection. Baboon's CLI
+/// accepts loose tags in a configured MCC kit, never an arbitrary legacy cache.
+pub fn baboon_kit_for_source(target:&RuntimeTarget,loose_mcc_tags:bool)->Option<&'static crate::baboon::Kit>{
+    if !loose_mcc_tags || !target.edition.to_ascii_lowercase().contains("mcc") {return None;}
+    let family=match target.family {GameFamily::Halo1=>"halo1",GameFamily::Halo2=>"halo2",GameFamily::Halo3=>"halo3",GameFamily::Halo3Odst=>"halo3Odst",GameFamily::HaloReach=>"haloReach",GameFamily::Halo4=>"halo4",_=>return None};
+    let game=if target.edition.to_ascii_lowercase().contains("anniversary")&&target.family==GameFamily::Halo2 {"halo2amp_mcc"}else{crate::baboon::KITS.iter().find(|k|k.family==family)?.game};
+    crate::baboon::kit(game).ok()
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

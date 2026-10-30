@@ -1,5 +1,7 @@
 # Architecture
 
+C37 adds an external-editor boundary in `baboon_native`, reusing the native watcher and working-tag compiler. Native tool code/schemas stay external. Accepted whole-file revisions are staged as fresh inputs below the validated parent job; source/SDK copies are never overwritten. Native header/class/payload-CRC checking is read-only, content-hash cached and separate from semantic parser/compiler proof. [C37 detail](CONTINUATION_37_ENGINEERING.md).
+
 React 19 presents a central versioned Spark project. Tauri 2 commands bridge to Rust spark-core and the managed local library. SQLite stores library summaries/settings; project JSON stores edits, source identities, asset references and target configurations. Original maps are immutable managed copies.
 
 C36 adds [native portability/preflight](NATIVE_PORTABILITY.md) through the existing runtime registry and build workflow. Reports and editor metadata stay outside native tags. Byte-preserving cache patches, exact loose-tag compiler inventories and audited semantic comparisons are distinct proofs; no new mandatory Halo format or game protocol is introduced.

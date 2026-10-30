@@ -1,5 +1,7 @@
 # Contributing to Project Guilty Spark
 
+For native editor work, preserve source before launching a tool, test invalid/truncated/same-stamp saves and report the exact external writer/version. Never infer the writing process from a filesystem notification or present a valid CRC as semantic/gameplay proof. Baboon integration currently uses only separately installed tools; upstream code/schema licensing requires review.
+
 Start with [Getting Started](docs/GETTING_STARTED.md), [Windows builds](docs/BUILD_WINDOWS.md), and the [feature ledger](docs/MASTER_FEATURE_LEDGER.md). Small improvements to explanations, keyboard usability, synthetic fixtures and historical attribution are welcome.
 
 1. Open an issue describing the concrete problem, Halo edition, source generation and expected behavior. Use synthetic or legally shareable examples.
