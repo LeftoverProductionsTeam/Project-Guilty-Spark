@@ -1,5 +1,7 @@
 # Architecture
 
+C38 uses a canonical tool capability catalog shared with the frontend. Managed Invader recipes operate on isolated candidates; the existing native parser verifies exposed fields and the existing complete-file transaction copier stages accepted/recovery revisions. Source publication compares the saved map, build and both native/Baboon selectors. Build startup, native acceptance and Baboon reconciliation share a source-operation guard. Native tags and compiler boundaries retain their formats. [C38 design and limits](CONTINUATION_38_ENGINEERING.md).
+
 C37 adds an external-editor boundary in `baboon_native`, reusing the native watcher and working-tag compiler. Native tool code/schemas stay external. Accepted whole-file revisions are staged as fresh inputs below the validated parent job; source/SDK copies are never overwritten. Native header/class/payload-CRC checking is read-only, content-hash cached and separate from semantic parser/compiler proof. [C37 detail](CONTINUATION_37_ENGINEERING.md).
 
 React 19 presents a central versioned Spark project. Tauri 2 commands bridge to Rust spark-core and the managed local library. SQLite stores library summaries/settings; project JSON stores edits, source identities, asset references and target configurations. Original maps are immutable managed copies.

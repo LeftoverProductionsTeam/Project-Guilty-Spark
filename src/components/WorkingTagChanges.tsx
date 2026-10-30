@@ -3,7 +3,7 @@ import { call, native } from '../api';
 import { WorkingTagSync, type WorkingTagReport } from '../workingTagSync';
 import { Notice } from './ui';
 import NativeTagIntegrity from './NativeTagIntegrity';
-export function useWorkingTagChanges(projectId: string | null, buildId: string | null) {
+export function useWorkingTagChanges(projectId: string | null, buildId: string | null, sourceIdentity: string | null = null) {
   const [report, setReport] = useState<WorkingTagReport | null>(null),
     [error, setError] = useState(''),
     [checking, setChecking] = useState(false);
@@ -45,7 +45,7 @@ export function useWorkingTagChanges(projectId: string | null, buildId: string |
       sync.dispose();
       controller.current = null;
     };
-  }, [projectId, buildId]);
+  }, [projectId, buildId, sourceIdentity]);
   const scan = async () => {
     setChecking(true);
     try {

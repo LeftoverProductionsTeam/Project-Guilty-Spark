@@ -1,5 +1,13 @@
 # Changelog
 
+## C38 — Source-aware native tools
+
+- Share the capability catalog between the desktop allowlist and tool UI; distinguish installation from source/runtime compatibility.
+- Add pinned native dependency traversal, isolated bounding-radius previews and reviewed 360-to-zero lens-flare repair.
+- Accept and recover native tag edits as complete new source forks; preserve unrelated files and serialize source changes with build startup.
+- Preserve C37 Baboon interoperation, reconnect watchers on source-folder changes and expose built native tags in QuickForge's Tag Editor.
+- Protect native edits from procedural export, retain recoverable preview history and document researched tools without claiming integrations.
+
 ## 0.4.0 — Master engineering consolidation
 
 - Preserve C35 R12, C36, One Halo research and frozen C37 ancestry through four ordinary merges in an isolated worktree.

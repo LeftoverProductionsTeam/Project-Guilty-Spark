@@ -1,5 +1,6 @@
 import LiveObjectInspector from './LiveObjectInspector';
 import BaboonTools from './BaboonTools';
+import ToolEcosystem from './ToolEcosystem';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FolderOpen, RefreshCw, Server, ShieldCheck, Upload, Download, Unplug } from 'lucide-react';
 import { call, native } from '../api';
@@ -182,7 +183,8 @@ export default function Runtimes({
           <>
             <CompatibilityTable/>
             <RuntimeDetails key={selected} report={report} onRegistered={setReports} />
-            <ToolchainShelf runtime={selected} settings={settings} onSettings={onSettings} onOpenWorkspace={onOpenWorkspace} />
+            <ToolEcosystem project={project} runtime={selected} settings={settings} onSettings={onSettings} onOpenWorkspace={onOpenWorkspace}/>
+            <details><summary>Advanced · installed tool identity &amp; separate launchers</summary><ToolchainShelf project={project} runtime={selected} settings={settings} onSettings={onSettings} onOpenWorkspace={onOpenWorkspace} /></details>
           </>
         ) : tab === 'hosting' ? (
           <><CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')}/><HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/></>
@@ -797,7 +799,7 @@ interface ToolchainToolState { id:string; available:boolean; executable:string|n
 interface ToolchainProbe { toolId:string;sha256:string;byteSize:number;mode:string;executed:boolean;exitCode:number|null;output:string;message:string }
 /** Each runtime has a separate allowed list; an installed executable is not
  * permission to run it or proof of that tool's target cache compatibility. */
-function ToolchainShelf({runtime,settings,onSettings,onOpenWorkspace}:{runtime:RuntimeId;settings:Settings;onSettings:()=>void;onOpenWorkspace:(target:'tags'|'build'|'quickforge')=>void}) {
+function ToolchainShelf({project,runtime,settings,onSettings,onOpenWorkspace}:{project:Project|null;runtime:RuntimeId;settings:Settings;onSettings:()=>void;onOpenWorkspace:(target:'tags'|'build'|'quickforge')=>void}) {
   const [inventory,setInventory]=useState<ToolchainToolState[]>([]);
   const [status,setStatus]=useState('');
   const [error,setError]=useState('');
@@ -833,7 +835,7 @@ function ToolchainShelf({runtime,settings,onSettings,onOpenWorkspace}:{runtime:R
     <button className="small-button" type="button" title="Set the exact folder and distinguish classic HEK from MCC H1A Editing Kit before starting native tools." onClick={onSettings}>Configure installed tool paths</button>
     {choices.length===0 ? <p className="subtle">No compatible tool launcher is enabled for the selected profile.</p> : <div className="gs-tool-grid">
       {choices.map(choice=>{
-        if(choice.mode==='sourceHandoff')return <BaboonTools key={choice.id}/>;
+        if(choice.mode==='sourceHandoff')return <BaboonTools key={choice.id} project={project}/>;
         const detection=inventory.find(item=>item.id===choice.id);
         return <div key={choice.id} className="gs-tool-card" title={`${choice.purpose} ${choice.caveat}`}>
           <strong>{choice.label}</strong>

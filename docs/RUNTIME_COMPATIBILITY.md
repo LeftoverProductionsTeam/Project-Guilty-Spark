@@ -1,5 +1,7 @@
 # Runtime compatibility and evidence
 
+C38 native operations are tested against a pinned Windows Invader release and owned MCC H1 loose working tags. A legacy cache with an installed Baboon remains source-unsupported until a compatible source route is established. Runtime, source, kit and executable assessment now comes from the shared catalog. No additional game/runtime compatibility is implied. [Exact tools and formats](COMPATIBLE_TOOLS.md).
+
 C37 compatible-tool update: verified Baboon 0.3.2 HCEEK/H1EK handoff is limited to validated MCC H1 loose source. It is not a direct compiled Demo/Mac `.map` editor or a game/network adapter. H2/H3/ODST/Reach/H4/H2A aliases remain upstream declarations. [Tool identity and native source boundary](CONTINUATION_37_ENGINEERING.md).
 
 Updated 2026-10-25. Adapter schema/version: **1**. Runtime discovery, registration inspection and inventory are read-only. They do not execute a game, probe command-line version flags, deploy content or alter Steam state.

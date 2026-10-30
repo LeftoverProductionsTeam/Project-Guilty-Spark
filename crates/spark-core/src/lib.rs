@@ -21,6 +21,8 @@ pub mod community_servers;
 pub mod community_host;
 pub mod community_lan;
 pub mod tool_transaction;
+pub mod tool_ecosystem;
+pub mod native_operations;
 pub mod baboon;
 pub mod native_tag_integrity;
 pub mod conversion;

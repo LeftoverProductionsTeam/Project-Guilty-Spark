@@ -29,7 +29,7 @@ fn output<R: Read + Send + 'static>(mut reader: R) -> std::thread::JoinHandle<(S
         (String::from_utf8_lossy(&data).replace("\r\n", "\n"), cut)
     })
 }
-fn fields(executable: &Path, tags: &Path, relative: &str) -> Reply<(bool, String, bool)> {
+pub(super) fn fields(executable: &Path, tags: &Path, relative: &str) -> Reply<(bool, String, bool)> {
     let mut command = Command::new(executable);
     command.args([
         "-t",
@@ -85,7 +85,7 @@ fn fields(executable: &Path, tags: &Path, relative: &str) -> Reply<(bool, String
         out_cut || err_cut,
     ))
 }
-fn installed(state: &AppState, project: &Project) -> Reply<PathBuf> {
+pub(super) fn installed(state: &AppState, project: &Project) -> Reply<PathBuf> {
     let directory = project_tools(state, project)?
         .invader_directory
         .ok_or("Configure the tested Invader build for live native-structure checks")?;

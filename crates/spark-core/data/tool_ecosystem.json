@@ -1,0 +1,868 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-30",
+  "tools": [
+    {
+      "id": "sapien",
+      "label": "Sapien · scenario placement",
+      "group": "official",
+      "mode": "externalGui",
+      "purpose": "Place scenario objects, player starts, encounters and devices in a tag-based level.",
+      "modifiesFiles": true,
+      "caveat": "Requires a compiled scenario BSP and a compatible installed tag tree.",
+      "filename": "sapien.exe",
+      "location": "hek",
+      "maintainer": "Microsoft / Halo Studios",
+      "sourceUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/",
+      "license": "Separately installed official kit; MCC EULA. Not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "mccSteam",
+        "haloCustomEdition"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "sourceHandoff",
+      "handler": "editLevel",
+      "legacy": [
+        {
+          "runtime": "mccSteam",
+          "flavor": "h1aEk",
+          "order": 0
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "legacyHek",
+          "order": 0
+        }
+      ],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "guerilla",
+      "label": "Guerilla · tag editor",
+      "group": "official",
+      "mode": "externalGui",
+      "purpose": "Inspect and modify editable Halo tags and their references.",
+      "modifiesFiles": true,
+      "caveat": "Can change source tags: use a separately backed-up working tree.",
+      "filename": "guerilla.exe",
+      "location": "hek",
+      "maintainer": "Microsoft / Halo Studios",
+      "sourceUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/",
+      "license": "Separately installed official kit; MCC EULA. Not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "mccSteam",
+        "haloCustomEdition"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "sourceHandoff",
+      "handler": "editTags",
+      "legacy": [
+        {
+          "runtime": "mccSteam",
+          "flavor": "h1aEk",
+          "order": 1
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "legacyHek",
+          "order": 1
+        }
+      ],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "baboon",
+      "label": "Baboon · native tag editor",
+      "group": "community",
+      "mode": "sourceHandoff",
+      "purpose": "Edit compatible MCC Halo 1 loose tags in an isolated per-map editing kit.",
+      "modifiesFiles": true,
+      "caveat": "Requires the verified portable executable and matching definitions. Compiled maps must first have validated MCC working tags.",
+      "filename": "Baboon.exe",
+      "location": "baboon",
+      "maintainer": "Zoephie, Paddy Tee, Camden and contributors",
+      "sourceUrl": "https://github.com/Zoephie/Baboon",
+      "license": "No explicit license at reviewed roots; external executable/definitions only.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "mccSteam"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "managedHandoff",
+      "handler": "baboon",
+      "legacy": [
+        {
+          "runtime": "mccSteam",
+          "flavor": "h1aEk",
+          "order": 2
+        }
+      ],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "tagTest",
+      "label": "H1A standalone · tag test",
+      "group": "official",
+      "mode": "externalGui",
+      "purpose": "Run a development Halo build from tag data to shorten local playtest iteration.",
+      "modifiesFiles": false,
+      "caveat": "Official Standalone is for H1A editing kit; not a multiplayer host or live editing API.",
+      "filename": "halo_tag_test.exe",
+      "location": "hek",
+      "maintainer": "Microsoft / Halo Studios",
+      "sourceUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/",
+      "license": "Separately installed official kit; MCC EULA. Not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "mccSteam"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "sourceHandoff",
+      "handler": "testScene",
+      "legacy": [
+        {
+          "runtime": "mccSteam",
+          "flavor": "h1aEk",
+          "order": 3
+        }
+      ],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "haloTool",
+      "label": "Halo Tool · structure/build",
+      "group": "official",
+      "mode": "integratedCli",
+      "purpose": "Compile JMS geometry into structure BSP and subsequently build tag-based content.",
+      "modifiesFiles": true,
+      "caveat": "Run through configured QuickForge build jobs; the bare CLI is not launched by this button.",
+      "filename": "tool.exe",
+      "location": "hek",
+      "maintainer": "Microsoft / Halo Studios",
+      "sourceUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/",
+      "license": "Separately installed official kit; MCC EULA. Not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "mccSteam",
+        "haloCustomEdition"
+      ],
+      "inputs": [
+        "nativeH1",
+        "forgeSource"
+      ],
+      "integration": "managedWorkflow",
+      "handler": "build",
+      "legacy": [
+        {
+          "runtime": "mccSteam",
+          "flavor": "h1aEk",
+          "order": 4
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "legacyHek",
+          "order": 2
+        }
+      ],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "invaderEditor",
+      "label": "Invader Qt · tag editor",
+      "group": "invader",
+      "mode": "externalGui",
+      "purpose": "Open an external editor for supported classic Halo tags.",
+      "modifiesFiles": true,
+      "caveat": "Compatibility with a target map does not establish tool support for its runtime.",
+      "filename": "invader-edit-qt.exe",
+      "location": "invader",
+      "maintainer": "SnowyMouse and contributors",
+      "sourceUrl": "https://github.com/SnowyMouse/invader",
+      "license": "GPL-3.0-only and component licenses; external executable, no embedded source.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "haloCustomEdition",
+        "haloPc",
+        "haloPcTrial",
+        "openCe",
+        "chupathingyCe"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "sourceHandoff",
+      "handler": "legacyGui",
+      "legacy": [
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "legacyHek",
+          "order": 3
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "h1aEk",
+          "order": 0
+        },
+        {
+          "runtime": "haloPc",
+          "flavor": "legacyHek",
+          "order": 0
+        },
+        {
+          "runtime": "haloPc",
+          "flavor": "h1aEk",
+          "order": 0
+        },
+        {
+          "runtime": "haloPcTrial",
+          "flavor": "legacyHek",
+          "order": 0
+        },
+        {
+          "runtime": "haloPcTrial",
+          "flavor": "h1aEk",
+          "order": 0
+        },
+        {
+          "runtime": "openCe",
+          "flavor": "legacyHek",
+          "order": 0
+        },
+        {
+          "runtime": "openCe",
+          "flavor": "h1aEk",
+          "order": 0
+        },
+        {
+          "runtime": "chupathingyCe",
+          "flavor": "legacyHek",
+          "order": 0
+        },
+        {
+          "runtime": "chupathingyCe",
+          "flavor": "h1aEk",
+          "order": 0
+        }
+      ],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "invaderBuild",
+      "label": "Invader · cache builder",
+      "group": "invader",
+      "mode": "integratedCli",
+      "purpose": "Compile supported classic Halo cache files from complete tag dependencies.",
+      "modifiesFiles": true,
+      "caveat": "Only supported targets and validated source trees may be built. No arbitrary CLI flags.",
+      "filename": "invader-build.exe",
+      "location": "invader",
+      "maintainer": "SnowyMouse and contributors",
+      "sourceUrl": "https://github.com/SnowyMouse/invader",
+      "license": "GPL-3.0-only and component licenses; external executable, no embedded source.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "haloCustomEdition"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "managedWorkflow",
+      "handler": "build",
+      "legacy": [
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "legacyHek",
+          "order": 4
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "h1aEk",
+          "order": 1
+        }
+      ],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "invaderExtract",
+      "label": "Invader · tag extraction",
+      "group": "invader",
+      "mode": "integratedCli",
+      "purpose": "Extract real source tags and their references from an owned cache.",
+      "modifiesFiles": true,
+      "caveat": "Uses Tag Browser’s managed, hash-bound extraction workflow.",
+      "filename": "invader-extract.exe",
+      "location": "invader",
+      "maintainer": "SnowyMouse and contributors",
+      "sourceUrl": "https://github.com/SnowyMouse/invader",
+      "license": "GPL-3.0-only and component licenses; external executable, no embedded source.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "haloCustomEdition",
+        "haloPc",
+        "haloPcTrial",
+        "openCe",
+        "chupathingyCe"
+      ],
+      "inputs": [
+        "classicCache",
+        "mccCache"
+      ],
+      "integration": "managedWorkflow",
+      "handler": "extract",
+      "legacy": [
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "legacyHek",
+          "order": 5
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "h1aEk",
+          "order": 2
+        },
+        {
+          "runtime": "haloPc",
+          "flavor": "legacyHek",
+          "order": 1
+        },
+        {
+          "runtime": "haloPc",
+          "flavor": "h1aEk",
+          "order": 1
+        },
+        {
+          "runtime": "haloPcTrial",
+          "flavor": "legacyHek",
+          "order": 1
+        },
+        {
+          "runtime": "haloPcTrial",
+          "flavor": "h1aEk",
+          "order": 1
+        },
+        {
+          "runtime": "openCe",
+          "flavor": "legacyHek",
+          "order": 1
+        },
+        {
+          "runtime": "openCe",
+          "flavor": "h1aEk",
+          "order": 1
+        },
+        {
+          "runtime": "chupathingyCe",
+          "flavor": "legacyHek",
+          "order": 1
+        },
+        {
+          "runtime": "chupathingyCe",
+          "flavor": "h1aEk",
+          "order": 1
+        }
+      ],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "invaderInfo",
+      "label": "Invader · read-only info",
+      "group": "invader",
+      "mode": "integratedCli",
+      "purpose": "View Invader build/version and binary identity in the Spark job console.",
+      "modifiesFiles": false,
+      "caveat": "Only the documented -i information switch is offered; no arbitrary commands.",
+      "filename": "invader-info.exe",
+      "location": "invader",
+      "maintainer": "SnowyMouse and contributors",
+      "sourceUrl": "https://github.com/SnowyMouse/invader",
+      "license": "GPL-3.0-only and component licenses; external executable, no embedded source.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "haloCustomEdition",
+        "haloPc",
+        "haloPcTrial",
+        "openCe",
+        "chupathingyCe"
+      ],
+      "inputs": [
+        "none",
+        "classicCache",
+        "mccCache",
+        "nativeH1",
+        "forgeSource"
+      ],
+      "integration": "managedWorkflow",
+      "handler": "info",
+      "legacy": [
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "legacyHek",
+          "order": 6
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "flavor": "h1aEk",
+          "order": 3
+        },
+        {
+          "runtime": "haloPc",
+          "flavor": "legacyHek",
+          "order": 2
+        },
+        {
+          "runtime": "haloPc",
+          "flavor": "h1aEk",
+          "order": 2
+        },
+        {
+          "runtime": "haloPcTrial",
+          "flavor": "legacyHek",
+          "order": 2
+        },
+        {
+          "runtime": "haloPcTrial",
+          "flavor": "h1aEk",
+          "order": 2
+        },
+        {
+          "runtime": "openCe",
+          "flavor": "legacyHek",
+          "order": 2
+        },
+        {
+          "runtime": "openCe",
+          "flavor": "h1aEk",
+          "order": 2
+        },
+        {
+          "runtime": "chupathingyCe",
+          "flavor": "legacyHek",
+          "order": 2
+        },
+        {
+          "runtime": "chupathingyCe",
+          "flavor": "h1aEk",
+          "order": 2
+        }
+      ],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "invaderNative",
+      "label": "Invader · native tag fields",
+      "group": "invader",
+      "mode": "integratedCli",
+      "purpose": "Read and edit reviewed native fields in a recoverable source revision.",
+      "modifiesFiles": true,
+      "caveat": "Only reviewed operations and the pinned Invader build can run. A native parser/compiler pass is separate from gameplay.",
+      "filename": "invader-edit.exe",
+      "location": "invader",
+      "maintainer": "SnowyMouse and contributors",
+      "sourceUrl": "https://github.com/SnowyMouse/invader",
+      "license": "GPL-3.0-only and component licenses; external executable, no embedded source.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "mccSteam"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "managedWorkflow",
+      "handler": "nativeFields",
+      "legacy": [],
+      "version": "0.55.0.r4134.33518109",
+      "sha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12"
+    },
+    {
+      "id": "invaderDependency",
+      "label": "Invader · dependency audit",
+      "group": "invader",
+      "mode": "integratedCli",
+      "purpose": "Check the selected native tag and its recursive dependencies without changing source.",
+      "modifiesFiles": false,
+      "caveat": "Only reviewed operations and the pinned Invader build can run. A native parser/compiler pass is separate from gameplay.",
+      "filename": "invader-dependency.exe",
+      "location": "invader",
+      "maintainer": "SnowyMouse and contributors",
+      "sourceUrl": "https://github.com/SnowyMouse/invader",
+      "license": "GPL-3.0-only and component licenses; external executable, no embedded source.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "mccSteam"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "managedWorkflow",
+      "handler": "dependencies",
+      "legacy": [],
+      "version": "0.55.0.r4134.33518109",
+      "sha256": "727e6983582f882b17a52822547ee1805c13856de912494ce28ff2a726a3b554"
+    },
+    {
+      "id": "invaderRepair",
+      "label": "Invader · reviewed repair",
+      "group": "invader",
+      "mode": "integratedCli",
+      "purpose": "Preview a narrowly scoped lens-flare repair, compare native fields and retain the original.",
+      "modifiesFiles": true,
+      "caveat": "Only reviewed operations and the pinned Invader build can run. A native parser/compiler pass is separate from gameplay.",
+      "filename": "invader-bludgeon.exe",
+      "location": "invader",
+      "maintainer": "SnowyMouse and contributors",
+      "sourceUrl": "https://github.com/SnowyMouse/invader",
+      "license": "GPL-3.0-only and component licenses; external executable, no embedded source.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "mccSteam"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "managedWorkflow",
+      "handler": "repair",
+      "legacy": [],
+      "version": "0.55.0.r4134.33518109",
+      "sha256": "094c844b9bdc494341d0fd08c07bd0d23344ea224c71205ce9846e46452205f3"
+    },
+    {
+      "id": "blenderHalo",
+      "label": "Halo Asset Blender Toolset",
+      "group": "community",
+      "mode": "sourceHandoff",
+      "purpose": "Upstream JMS/JMA and edition-specific asset workflows; no verified Spark Blender handoff yet.",
+      "modifiesFiles": true,
+      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "General-101 / Steven Garcia and contributors",
+      "sourceUrl": "https://github.com/General-101/Halo-Asset-Blender-Development-Toolset",
+      "license": "MIT; addon separately installed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1",
+        "halo2",
+        "halo3"
+      ],
+      "runtimes": [],
+      "inputs": [
+        "sourceGeometry"
+      ],
+      "integration": "upstreamOnly",
+      "handler": "research",
+      "legacy": [],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "osoyoos",
+      "label": "Osoyoos",
+      "group": "community",
+      "mode": "sourceHandoff",
+      "purpose": "Optional editing-kit profile launcher; source-aware Spark execution is not implemented.",
+      "modifiesFiles": true,
+      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "num0005 and contributors",
+      "sourceUrl": "https://github.com/num0005/Osoyoos-Launcher",
+      "license": "MIT with separately licensed reference/placeholder components; not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1",
+        "halo2",
+        "halo3",
+        "haloReach",
+        "halo4"
+      ],
+      "runtimes": [],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "upstreamOnly",
+      "handler": "research",
+      "legacy": [],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "mozzarilla",
+      "label": "Mozzarilla / MEK",
+      "group": "community",
+      "mode": "sourceHandoff",
+      "purpose": "Legacy loose-tag/OpenSauce candidate; module-specific installation and native handoff remain unverified.",
+      "modifiesFiles": true,
+      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "Sigmmma / MosesOfEgypt and contributors",
+      "sourceUrl": "https://github.com/Sigmmma/mek",
+      "license": "GPL-3.0 catalog evidence; exact module/distribution review still required.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "upstreamOnly",
+      "handler": "research",
+      "legacy": [],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "refinery",
+      "label": "Refinery / MEK",
+      "group": "community",
+      "mode": "sourceHandoff",
+      "purpose": "Legacy cache extraction/recovery candidate; MCC support and Spark execution remain unverified.",
+      "modifiesFiles": true,
+      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "Sigmmma / MosesOfEgypt and contributors",
+      "sourceUrl": "https://github.com/Sigmmma/mek",
+      "license": "GPL-3.0 catalog evidence; exact module/distribution review still required.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [],
+      "inputs": [
+        "classicCache",
+        "xboxCache"
+      ],
+      "integration": "upstreamOnly",
+      "handler": "research",
+      "legacy": [],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "reclaimer",
+      "label": "Reclaimer",
+      "group": "community",
+      "mode": "sourceHandoff",
+      "purpose": "Compiled-cache inspection and asset extraction research; not a native rebuild guarantee.",
+      "modifiesFiles": true,
+      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "Gravemind2401 and contributors",
+      "sourceUrl": "https://github.com/Gravemind2401/Reclaimer",
+      "license": "GPL-3.0 upstream license; exact binary/distribution review pending. Not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1",
+        "halo2",
+        "halo3",
+        "haloReach",
+        "halo4"
+      ],
+      "runtimes": [],
+      "inputs": [
+        "classicCache",
+        "mccCache"
+      ],
+      "integration": "upstreamOnly",
+      "handler": "research",
+      "legacy": [],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "assembly",
+      "label": "Assembly",
+      "group": "community",
+      "mode": "sourceHandoff",
+      "purpose": "Generation-specific cache editing research; source tags remain authoritative.",
+      "modifiesFiles": true,
+      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "XboxChaos and contributors",
+      "sourceUrl": "https://github.com/XboxChaos/Assembly",
+      "license": "GPL-3.0 upstream license; upstream restricts sharing precompiled builds. Not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1",
+        "halo2",
+        "halo3",
+        "haloReach",
+        "halo4"
+      ],
+      "runtimes": [],
+      "inputs": [
+        "classicCache",
+        "mccCache",
+        "xboxCache"
+      ],
+      "integration": "upstreamOnly",
+      "handler": "research",
+      "legacy": [],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "excession",
+      "label": "MCC Excession",
+      "group": "community",
+      "mode": "sourceHandoff",
+      "purpose": "Publishing companion research; existing owned-package preparation is separate from verified Excession validation.",
+      "modifiesFiles": true,
+      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "Microsoft / Halo Studios",
+      "sourceUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/excession/creatingmodpackage/creatinghome",
+      "license": "Official separately installed tool; MCC EULA. Not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1",
+        "halo2",
+        "halo3",
+        "haloReach",
+        "halo4"
+      ],
+      "runtimes": [],
+      "inputs": [
+        "mccCache"
+      ],
+      "integration": "upstreamOnly",
+      "handler": "research",
+      "legacy": [],
+      "version": null,
+      "sha256": null
+    },
+    {
+      "id": "foundry",
+      "label": "Foundry",
+      "group": "community",
+      "mode": "sourceHandoff",
+      "purpose": "Current upstream identifies H1 through H4 editing kits; exact per-game import/export routes and the Spark handoff remain unverified.",
+      "modifiesFiles": true,
+      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "ILoveAGoodCrisp and contributors",
+      "sourceUrl": "https://github.com/ILoveAGoodCrisp/Foundry",
+      "license": "GPL-3.0 upstream license; addon and references separately installed. Not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1",
+        "halo2",
+        "halo3",
+        "halo3odst",
+        "haloReach",
+        "halo4",
+        "halo2Anniversary"
+      ],
+      "runtimes": [],
+      "inputs": [
+        "sourceGeometry"
+      ],
+      "integration": "upstreamOnly",
+      "handler": "research",
+      "legacy": [],
+      "version": null,
+      "sha256": null
+    }
+  ]
+}
