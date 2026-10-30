@@ -127,6 +127,7 @@ export default function Firefight({
           description="Author deterministic rules and spawn zones. Runtime scripting and network gameplay require separate validation."
         />
       )}
+      <div className="firefight-setup">
       <Notice tone="info">
         Authoring rules only. No live game bridge or two-client AI synchronization is connected. The rules
         preview uses scripted virtual spawns and kills.
@@ -160,25 +161,28 @@ export default function Firefight({
             </button>
           )}
           {catalog.presets.length > 0 && (
-            <details className="forge-details">
-              <summary>Recovered Zombie presets</summary>
+            <section className="forge-details firefight-presets" aria-label="Firefight presets">
+              <h3>Start from a preset</h3>
+              <div className="firefight-preset-grid">
               {catalog.presets.map((preset) => (
                 <div className="forge-preset" key={preset.id}>
-                  <button disabled={!preset.config} onClick={() => begin(preset.config!)}>
+                  <button title={`${preset.detail}${preset.missingActorVariants.length ? ` Missing: ${preset.missingActorVariants.join(', ')}` : ''}`} disabled={!preset.config} onClick={() => begin(preset.config!)}>
                     {preset.name}
                   </button>
-                  <p>{preset.detail}</p>
                   {preset.missingActorVariants.length > 0 && (
                     <small>Missing: {preset.missingActorVariants.join(', ')}</small>
                   )}
                 </div>
               ))}
-            </details>
+              </div><details className="firefight-preset-notes"><summary>Preset credits &amp; requirements</summary>{catalog.presets.map(preset=><p key={preset.id}><strong>{preset.name}</strong> · {preset.detail}</p>)}</details>
+            </section>
           )}
         </>
       )}
+      </div>
       {config && (
-        <>
+        <div className="firefight-plan">
+          <section className="firefight-rules">
           <div className="forge-panel-heading">
             <h3>Survival rules</h3>
             <Pill>{config.waves.length} waves</Pill>
@@ -239,6 +243,7 @@ export default function Firefight({
             />
             Request ammo replenishment each wave (runtime integration required)
           </label>
+          </section><section className="firefight-waves">
           <div className="forge-panel-heading">
             <h3>Wave timeline</h3>
             <button
@@ -420,6 +425,7 @@ export default function Firefight({
               </div>
             </article>
           ))}
+          </section><section className="firefight-zones">
           <div className="forge-panel-heading">
             <h3>AI spawn zones</h3>
             <button
@@ -498,6 +504,7 @@ export default function Firefight({
               </label>
             </div>
           ))}
+          </section><section className="firefight-validation">
           <div className="analysis-actions">
             <button disabled={busy} onClick={() => void run('validate')}>
               <ShieldCheck size={14} />
@@ -551,7 +558,8 @@ export default function Firefight({
               ))}
             </section>
           )}
-        </>
+          </section>
+        </div>
       )}
     </div>
   );

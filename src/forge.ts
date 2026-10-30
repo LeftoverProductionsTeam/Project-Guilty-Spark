@@ -26,6 +26,7 @@ export interface ForgeMaterial {
   color: Vec3;
 }
 export interface ForgePlacement extends ForgeEntity {
+  publishedAssetId?: string;
   tagId: number | null;
   tagPath: string;
   tagClass: 'scen' | 'weap' | 'eqip' | 'vehi' | 'bipd' | 'itmc';
@@ -46,7 +47,15 @@ export interface ForgeObjective extends ForgeEntity {
   team: number;
   sequence: number;
 }
+export interface StudioNativeSource {
+  inventorySha256: string; fieldTag: string; fieldTagSha256: string; boundingRadius: number;
+  templateTag: string; templateSha256: string; dependencies: Record<string,string>;
+  previewSha256: string; previewTagId: number; previewTagPath: string;
+}
+export interface StudioNativeAsset { id: string; name: string; sha256: string; bytes: number[]; }
+export interface StudioNativeDocument { source: StudioNativeSource; fields: {id: string; boundingRadius: number}[]; assets: StudioNativeAsset[]; }
 export interface QuickForgeDocument {
+  native?: StudioNativeDocument;
   schemaVersion: number;
   name: string;
   template: string;

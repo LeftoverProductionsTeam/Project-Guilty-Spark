@@ -1,4 +1,5 @@
 use notify::Watcher;
+#[path="workspace_windows.rs"] mod workspace_windows;
 use serde::{Deserialize, Serialize};
 use spark_core::{
     self as core, archive, assets, audio, quickforge, forge_build, firefight, tag_exchange,
@@ -25,6 +26,8 @@ use std::{
 };
 use tauri::{Emitter, Manager, State};
 #[path="shared_editing.rs"] mod shared_editing;
+#[path="external_browser.rs"] mod external_browser;
+#[path="studio_native_source.rs"] mod studio_native_source;
 #[path="runtime_workbench.rs"] mod runtime_workbench;
 #[path="external_changes_native.rs"] mod external_changes_native;
 #[path="invitations_native.rs"] mod invitations_native;
@@ -498,7 +501,7 @@ fn forge_provenance_blockers(state: &AppState, project: &Project) -> Vec<String>
             let source=source_project.source.as_ref().ok_or("Asset provenance must reference an imported map")?;
             if placement.source_sha256.as_ref()!=Some(&source.sha256) || maps::hash_file(&source.preserved_path).map_err(error)?!=source.sha256 {return Err("Referenced asset source changed or has no matching SHA-256".into());}
             let inspected=inspect(state,&source_project)?;
-            if !inspected.tags.iter().any(|tag|Some(tag.id)==placement.tag_id && tag.class==placement.tag_class && tag.path.replace('\\',"/").eq_ignore_ascii_case(&placement.tag_path.replace('\\',"/"))){return Err(format!("Asset reference {} does not match the preserved source tag",placement.name));}
+            if !inspected.tags.iter().any(|tag|Some(tag.id)==placement.tag_id && tag.class==placement.tag_class && tag.path.replace('\\',"/").eq_ignore_ascii_case(&document.native.as_ref().filter(|_|placement.published_asset_id.is_some()).map(|n|n.source.preview_tag_path.clone()).unwrap_or_else(||placement.tag_path.clone()).replace('\\',"/"))){return Err(format!("Asset reference {} does not match the preserved source tag",placement.name));}
             Ok(())
         })();
         if let Err(e)=result {blockers.push(e);}
@@ -558,7 +561,7 @@ fn quickforge_build(app:tauri::AppHandle,project_id:String)->Reply<String> {
     let jobs_root=state.root.join("jobs");let returned=job_id.clone();
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();
-        let result=forge_build::run_job(&project,&tools,&jobs_root,&job_id,false,blockers,cancel,|e|event(&app,e)).map_err(error).and_then(|receipt|{if let Some(binding)=&shared_binding{project::atomic_write(&jobs_root.join(&job_id).join("studio-binding.json"),&serde_json::to_vec_pretty(binding).map_err(error)?,false).map_err(error)?;}save_forge_receipt(&state,&receipt)});
+        let result=(||{let mut tools=tools;let prepared=studio_native_source::prepare_build(&state,&project,&mut tools,cancel.clone())?;forge_build::run_prepared_job(&project,&tools,&jobs_root,&job_id,false,blockers,cancel,prepared.as_ref(),|e|event(&app,e)).map_err(error)})().and_then(|receipt|{if let Some(binding)=&shared_binding{project::atomic_write(&jobs_root.join(&job_id).join("studio-binding.json"),&serde_json::to_vec_pretty(binding).map_err(error)?,false).map_err(error)?;}save_forge_receipt(&state,&receipt)});
         if let Err(message)=result {event(&app,JobEvent{job_id:job_id.clone(),project_id:project_id.clone(),phase:"failed".into(),severity:"error".into(),message,progress:100,timestamp:chrono::Utc::now().to_rfc3339()});}
         if let Ok(mut jobs)=state.jobs.lock(){jobs.remove(&job_id);}
         let _=app.emit("spark:library-changed",());
@@ -938,7 +941,7 @@ async fn bitmap_resource_candidates(app:tauri::AppHandle,project_id:String)->Rep
             }
         }
         if let Some(p)=settings.resource_directory {roots.push((p,"Configured resource folder"));}
-        if let Some(p)=installed.mcc_path {roots.push((p.join("halo1/maps"),"Detected MCC legacy compatibility resources; ipak is separate"));}
+        if let Some(p)=installed.mcc_path {roots.push((p.join("halo1/maps"),"Detected MCC legacy compatibility resources; ipak is separate"));roots.push((p.join("halo1/maps/custom_edition"),"Detected MCC Custom Edition compatibility resources"));}
         let registrations:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
         for r in registrations {roots.push((r.root.join("maps"),"Registered Halo installation"));
             if let Some(p)=r.data_root {roots.push((p.join("maps"),"Registered runtime data"));}}
@@ -1032,12 +1035,14 @@ async fn auto_connect_sound_resources(app:tauri::AppHandle,window:tauri::Webview
 }
 #[tauri::command]
 async fn auto_connect_classic_textures(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<Option<OpenProject>>{
-    let candidates={let state=app.state::<AppState>();check_document_owner(&state,&project_id,window.label())?;let lib=lock(&state.library)?;let project=lib.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("No map source")?;
+    {let state=app.state::<AppState>();check_document_owner(&state,&project_id,window.label())?;let project=lock(&state.library)?.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("No map source")?;
         if ![6,7,609].contains(&source.cache_version)||source.resource_sha256.contains_key("bitmaps.map"){return Ok(None);}
-        let mut roots=vec![];if let Some(dir)=&source.resource_directory{roots.push(dir.clone());}if let Some(dir)=source.original_path.parent(){roots.push(dir.to_path_buf());}
-        for entry in lib.list().map_err(error)?{if entry.sha256.as_deref()!=Some(source.sha256.as_str())||entry.id==project_id{continue;}if let Ok(other)=lib.get(&entry.id){if let Some(s)=other.source{if let Some(dir)=s.resource_directory{roots.push(dir);}if let Some(dir)=s.original_path.parent(){roots.push(dir.to_path_buf());}}}}
-        if let Some(dir)=lock(&state.settings)?.resource_directory.clone(){roots.push(dir);}let mut seen=std::collections::HashSet::new();roots.into_iter().map(|dir|dir.join("bitmaps.map")).filter(|file|file.is_file()&&seen.insert(file.clone())).take(12).collect::<Vec<_>>()};
-    for file in candidates{if let Ok(Some(open))=connect_halo_textures(app.clone(),window.clone(),project_id.clone(),"path".into(),file.to_string_lossy().into_owned()).await{return Ok(Some(open));}}Ok(None)
+    }
+    // Use the same bounded discovery as the resource picker, including owned
+    // runtime installations. Compatibility is still proved by the exact
+    // source bitmap index; an installed MCC folder alone grants no match.
+    let candidates=bitmap_resource_candidates(app.clone(),project_id.clone()).await?;
+    for candidate in candidates.into_iter().take(12){if let Some(path)=candidate.get("path").and_then(|p|p.as_str()){if let Ok(Some(open))=connect_halo_textures(app.clone(),window.clone(),project_id.clone(),"path".into(),path.into()).await{return Ok(Some(open));}}}Ok(None)
 }
 
 #[tauri::command]
@@ -1810,11 +1815,12 @@ fn release_project_document(state:State<AppState>,window:tauri::WebviewWindow,id
     let mut owners=lock(&state.document_owners)?;if owners.get(&id).is_some_and(|owner|owner==window.label()){owners.remove(&id);}Ok(())
 }
 #[tauri::command]
-async fn open_project_window(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Reply<String> {
+async fn open_project_window(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,workspace:Option<String>)->Reply<String> {
     let state=app.state::<AppState>();let project=lock(&state.library)?.get(&id).map_err(error)?;
     check_document_owner(&state,&id,window.label())?;
     let label=format!("editor-{}",uuid::Uuid::new_v4());
-    let url=tauri::WebviewUrl::App(format!("index.html?project={}",project.id).into());
+    let route=workspace.as_deref().map(workspace_windows::checked_workspace).transpose()?;
+    let url=tauri::WebviewUrl::App(format!("index.html?project={}{}",project.id,route.map(|w|format!("&workspace={w}")).unwrap_or_default()).into());
     // Only a registered UUID project may select the local app page. No arbitrary URL or script.
     if uuid::Uuid::parse_str(&project.id).is_err(){return Err("Invalid project identity".into());}
     let child=tauri::WebviewWindowBuilder::new(&app,&label,url).title(format!("{} · Project Guilty Spark",project.title)).inner_size(1440.,900.).min_inner_size(1000.,640.).decorations(false).transparent(true).shadow(true).theme(Some(tauri::Theme::Dark)).build().map_err(error)?;
@@ -2209,6 +2215,16 @@ async fn preview_owned_object_model(app:tauri::AppHandle,project_id:String,tag_i
     }).await.map_err(error)?
 }
 #[tauri::command]
+async fn preview_owned_object_collision(app:tauri::AppHandle,project_id:String,tag_id:u32,source_sha256:String)->Reply<Option<maps::MeshData>>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source=project.source.as_ref().ok_or("Collision source has no preserved map")?;
+        if source.sha256!=source_sha256{return Err("Collision source identity differs from this project".into());}
+        let inspection=inspect(&state,&project)?;
+        core::render::preview_owned_object_collision(&source.preserved_path,&source.sha256,&inspection,tag_id).map_err(error)
+    }).await.map_err(error)?
+}
+#[tauri::command]
 async fn preview_sound(
     app: tauri::AppHandle,
     project_id: String,
@@ -2599,6 +2615,7 @@ pub fn run() {
             tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){shared_editing::release_window(&state,&label);external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);}});
         }})
         .invoke_handler(tauri::generate_handler![
+            external_browser::open_external_url,
             prepare_map_download,
             download_and_import_maps,
             map_download_status,
@@ -2648,8 +2665,12 @@ pub fn run() {
             native_operations_native::native_tag_inventory,
             native_operations_native::native_dependency_check,
             native_operations_native::native_operation_preview,
+            studio_native_source::studio_native_admit,
+            studio_native_source::studio_native_import,
+            studio_native_source::studio_native_recover_source,
             native_operations_native::native_operation_accept,
             tool_ecosystem_native::tool_ecosystem_report,
+            tool_ecosystem_native::launch_discovered_tool,
             external_companions_native::choose_external_companion_path,
             external_companions_native::register_external_companion,
             external_companions_native::forget_external_companion,
@@ -2666,6 +2687,7 @@ pub fn run() {
             claim_project_document,
             release_project_document,
             open_project_window,
+            workspace_windows::open_workspace_window,
             live_mcc_connect,
             live_mcc_sample,
             live_mcc_gameplay_inventory,
@@ -2786,6 +2808,7 @@ pub fn run() {
             inspect_sound,
             inspect_looping_sound,
             preview_owned_object_model,
+            preview_owned_object_collision,
             preview_sound,
             compare_peer_manifest,
             choose_peer_manifest,

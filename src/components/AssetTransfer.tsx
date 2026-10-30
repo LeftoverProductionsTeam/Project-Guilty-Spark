@@ -1,3 +1,8 @@
+import LibraryAssetPreview from './LibraryAssetPreview';
+import {WorkspacePanel,useRevealWorkspacePanel} from './WorkspacePanels';
+import {viewportAssetCatalog,placeLibraryModel} from '../viewportAssets';
+import type {ViewportAsset} from '../viewportAssets';
+import {beginAssetTransfer} from '../assetDragRegistry';
 import { useEffect, useState } from 'react';
 import type { Bootstrap, OpenProject, Project } from '../types';
 import type { MapDocument } from '../mapDocuments';
@@ -6,7 +11,7 @@ import { catalogAssets, placeAsset } from '../forge';
 import type { ForgeAsset } from '../forge';
 import { Notice } from './ui';
 export type TransferSelection =
-  { kind: 'tag'; asset: ForgeAsset } | { kind: 'obj'; sourceId: string; assetId: string };
+  { kind: 'tag'; asset: ForgeAsset } | { kind: 'obj'; sourceId: string; assetId: string } | {kind:'sound';item:Exclude<ViewportAsset,{kind:'model'}>};
 export default function AssetTransfer({
   data,
   documents,
@@ -24,6 +29,8 @@ export default function AssetTransfer({
   onClose: () => void;
   onTags: () => void;
 }) {
+  const reveal=useRevealWorkspacePanel();
+  useEffect(()=>{reveal('asset-transfer');},[target.id]);
   const sources = data.entries.filter((e) => e.id !== target.id),
     [sourceId, setSourceId] = useState(sources[0]?.id ?? ''),
     [open, setOpen] = useState<OpenProject | null>(null),
@@ -58,8 +65,9 @@ export default function AssetTransfer({
   const tags = open
     ? catalogAssets(open).filter((a) => (a.name + ' ' + a.path).toLowerCase().includes(query.toLowerCase()))
     : [];
+  const assets=open?viewportAssetCatalog([{history:{current:open.project},inspection:open.inspection}]).filter(item=>(item.name+' '+item.path).toLowerCase().includes(query.toLowerCase())):[];
   return (
-    <section className="asset-transfer-panel" aria-label="Transfer map assets">
+    <WorkspacePanel id="asset-transfer" label="Transfer assets" defaultDock="right"><section className="asset-transfer-panel" aria-label="Transfer map assets">
       <header>
         <div>
           <h3>Transfer assets into {target.title}</h3>
@@ -94,50 +102,25 @@ export default function AssetTransfer({
         {loading && <span>Reading preserved map…</span>}
       </div>
       <div className="asset-transfer-list">
-        {open?.project.assets
-          .filter((a) => a.name.toLowerCase().includes(query.toLowerCase()))
-          .map((a) => (
-            <button
-              key={a.id}
-              disabled={busy}
-              onClick={() =>
-                void onTransfer({ kind: 'obj', sourceId: open.project.id, assetId: a.id }).catch((e) =>
-                  setError(String(e)),
-                )
-              }
-            >
-              {a.name} · {a.triangles.toLocaleString()} triangles · copy OBJ
-            </button>
-          ))}
-        {tags.slice(0, 200).map((a) => (
-          <button
-            key={a.key}
-            disabled={busy || !target.quickForge}
-            onClick={() => void onTransfer({ kind: 'tag', asset: a }).catch((e) => setError(String(e)))}
-          >
-            {a.name} · {a.class} · add source-linked model
-          </button>
-        ))}
+        {assets.slice(0,150).map(item=><article key={item.key} className="gs-transfer-card"><LibraryAssetPreview item={item}/><button disabled={busy} onPointerDown={event=>beginAssetTransfer(item,target.id,event)} onClick={()=>void onTransfer(item.kind==='model'?{kind:'tag',asset:item.asset}:item.kind==='sound'||item.kind==='customSound'?{kind:'sound',item}:{kind:'obj',sourceId:item.sourceId,assetId:item.asset.id}).catch(e=>setError(String(e)))}><strong>{item.name}</strong><small>{item.kind} · drag into the viewport</small></button></article>)}
       </div>
       {!target.quickForge && tags.length > 0 && (
         <Notice>
-          Halo tag placements transfer into editable QuickForge projects. An imported compiled cache needs tag
-          extraction, dependency staging and a rebuild before foreign tags can appear in gameplay. OBJ
-          geometry can be copied here as workshop assets.
+          Source-linked models can be placed in this editor. Foreign tags need extraction,
+          dependency staging and a compatible native rebuild before appearing in gameplay.
         </Notice>
       )}
-      {tags.length > 200 && <p>Showing the first 200 tags; narrow the search to find more.</p>}
+      {assets.length > 150 && <p>Showing the first 150 assets; narrow the search to find more.</p>}
       {!sources.length && <p>Import another map in Map Library to choose its assets.</p>}
       {error && <Notice tone="error">{error}</Notice>}
       <button className="small-button" onClick={onTags}>
         Open recursive tag extraction & staging
       </button>
-    </section>
+    </section></WorkspacePanel>
   );
 }
 export function transferTag(project: Project, asset: ForgeAsset): Project {
-  if (!project.quickForge)
-    throw new Error('Choose an editable QuickForge target before transferring Halo tag placements.');
+  if (!project.quickForge) return placeLibraryModel(project,asset,[0,0,0]).project;
   if (!asset.sourceProjectId || !asset.sourceSha256 || asset.tagId === null)
     throw new Error('The asset must have a preserved source map and tag identity.');
   if (project.quickForge.placements.length >= 1024)

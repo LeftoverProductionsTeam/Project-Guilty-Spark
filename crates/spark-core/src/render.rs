@@ -488,6 +488,65 @@ pub fn preview_owned_object_model(path:&std::path::Path,expected:&str,inspection
     object_model_mesh(&bytes,&header,&inspection.tags,object_id,0)
 }
 
+/// Read the actual first-permutation collision BSPs in the model's default
+/// pose. Render triangles are never substituted for missing collision data.
+pub fn object_collision_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id:u32)->Result<Option<MeshData>> {
+    let r=Reader(bytes);let region=tag_space(&r,header)?;
+    let mut object=tags.iter().find(|t|t.id==object_id&&!t.external).ok_or_else(||crate::SparkError::Invalid("Collision object is unavailable".into()))?;
+    if object.class=="itmc" {
+        let at=object.data_offset.ok_or_else(||crate::SparkError::Invalid("Item collection body unavailable".into()))?;
+        if at<region.begin||at.checked_add(12).is_none_or(|end|end>region.end){return invalid("Item collection escapes its region");}
+        let (items,n)=region.block(&r,at,84,32)?;if n==0{return Ok(None);}
+        let id=r.u32(items+48)?;object=tags.iter().find(|t|t.id==id&&!t.external).ok_or_else(||crate::SparkError::Invalid("Collision item dependency is unavailable".into()))?;
+    }
+    if !matches!(object.class.as_str(),"weap"|"eqip"|"scen"|"vehi"|"bipd"|"garb"|"mach"|"ctrl"|"lifi"|"ssce"){return invalid("Unsupported collision object class");}
+    let at=object.data_offset.ok_or_else(||crate::SparkError::Invalid("Collision object body unavailable".into()))?;
+    if at<region.begin||at.checked_add(128).is_none_or(|end|end>region.end){return invalid("Object collision reference escapes tag region");}
+    let id=r.u32(at+0x7c)?;if id==u32::MAX{return Ok(None);}
+    if r.fourcc(at+0x70)?!="coll"{return invalid("Object collision reference has the wrong class");}
+    let tag=tags.iter().find(|t|t.id==id&&t.class=="coll"&&!t.external).ok_or_else(||crate::SparkError::Invalid("Exact collision tag is unavailable".into()))?;
+    let at=tag.data_offset.ok_or_else(||crate::SparkError::Invalid("Collision tag body unavailable".into()))?;
+    if at<region.begin||at.checked_add(664).is_none_or(|end|end>region.end){return invalid("Collision tag escapes its region");}
+    let (nodes,n)=region.block(&r,at+652,64,64)?;if n==0{return Ok(None);}
+    let (_,model)=object_model_mesh(bytes,header,tags,object.id,0)?;
+    let rig=model.rig.ok_or_else(||crate::SparkError::Invalid("Collision default-pose hierarchy unavailable".into()))?;
+    fn rotate(v:[f32;3],q:[f32;4])->[f32;3]{let t=[2.*(q[1]*v[2]-q[2]*v[1]),2.*(q[2]*v[0]-q[0]*v[2]),2.*(q[0]*v[1]-q[1]*v[0])];[v[0]+q[3]*t[0]+q[1]*t[2]-q[2]*t[1],v[1]+q[3]*t[1]+q[2]*t[0]-q[0]*t[2],v[2]+q[3]*t[2]+q[0]*t[1]-q[1]*t[0]]}
+    fn pose(rig:&crate::maps::ModelRig,index:usize,depth:usize)->Result<([f32;3],[f32;4])>{
+        if depth>=64||index>=rig.nodes.len(){return invalid("Collision pose hierarchy is invalid");}let bone=&rig.nodes[index];
+        if !bone.position.iter().chain(bone.rotation.iter()).all(|v|v.is_finite()){return invalid("Collision pose is non-finite");}
+        if bone.parent<0{return Ok((bone.position,bone.rotation));}
+        let (p,a)=pose(rig,bone.parent as usize,depth+1)?;let b=bone.rotation;let t=rotate(bone.position,a);
+        Ok(([p[0]+t[0],p[1]+t[1],p[2]+t[2]],[a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]]))
+    }
+    let mut mesh=MeshData{label:format!("{} · actual default-pose collision",object.path),source:"halo-model-collision".into(),..Default::default()};
+    for i in 0..n {
+        let node=nodes+i*64;let name=r.string(node,32)?;
+        let bone=rig.nodes.iter().position(|b|b.name==name).ok_or_else(||crate::SparkError::Invalid(format!("Collision bone {name} is not in the exact model")))?;
+        let (position,rotation)=pose(&rig,bone,0)?;let (bsps,count)=region.block(&r,node+52,96,32)?;if count==0{continue;}
+        let (surfaces,sn)=region.block(&r,bsps+60,12,131072)?;let (edges,en)=region.block(&r,bsps+72,24,262144)?;let (vertices,vn)=region.block(&r,bsps+84,16,131072)?;
+        if mesh.positions.len()/3+vn>MAX_MODEL_VERTICES{return invalid("Object collision exceeds vertex budget");}let base=(mesh.positions.len()/3)as u32;
+        for v in 0..vn {let at=vertices+v*16;let p=rotate([finite_model_float(&r,at)?,finite_model_float(&r,at+4)?,finite_model_float(&r,at+8)?],rotation);mesh.positions.extend_from_slice(&[p[0]+position[0],p[1]+position[1],p[2]+position[2]]);}
+        for s in 0..sn {
+            let first=r.u32(surfaces+s*12+4)?as usize;let mut edge=first;let mut polygon=vec![];
+            for _ in 0..128 {
+                if edge>=en{return invalid("Object collision edge escapes its array");}let at=edges+edge*24;let left=r.u32(at+16)?as usize==s;
+                if !left&&r.u32(at+20)?as usize!=s{return invalid("Object collision edge has no matching surface");}
+                let vertex=r.u32(at+if left{0}else{4})?;if vertex as usize>=vn{return invalid("Object collision vertex escapes its array");}polygon.push(base+vertex);
+                edge=r.u32(at+if left{8}else{12})?as usize;if edge==first{break;}
+            }
+            if edge!=first{return invalid("Object collision polygon is not closed");}
+            for triangle in crate::maps::source_polygon_triangles(&polygon,&mesh.positions)?{mesh.indices.extend_from_slice(&triangle);}
+            if mesh.indices.len()>MAX_PREVIEW_INDICES{return invalid("Object collision exceeds triangle budget");}
+        }
+    }
+    if mesh.indices.is_empty(){return Ok(None);}Ok(Some(mesh))
+}
+pub fn preview_owned_object_collision(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<Option<MeshData>>{
+    let (header,bytes,actual)=crate::maps::read_cache_snapshot(path)?;
+    if actual!=expected||actual!=inspection.sha256{return invalid("Collision source changed during inspection");}
+    object_collision_mesh(&bytes,&header,&inspection.tags,object_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -637,5 +696,27 @@ mod geometry_tests {
         assert_eq!(pose.indices,[0,1,2]);
         // Reject a plausible in-file index location if outside model region.
         assert!(gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+4).is_err());
+    }
+    #[test]
+    fn object_collision_uses_exact_bone_pose_and_rejects_escaped_or_broken_edges() {
+        let mut b=vec![0u8;0x4000];let address=0x4044_0000;
+        let tag=|id,class:&str,at|Tag{id,index:id as usize,class:class.into(),path:format!("fixture/{id}"),data_offset:Some(at),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None};
+        let tags=vec![tag(1,"scen",0x100),tag(2,"mod2",0x400),tag(3,"coll",0x1000)];
+        let header=MapHeader{version:7,engine:"Halo PC".into(),name:"fixture".into(),build:"test".into(),scenario_type:1,file_size:b.len()as u64,declared_size:b.len()as u32,tag_offset:0,tag_size:b.len()as u32,crc32:0,flags:0,demo_layout:false,compressed:false,extended:false,legacy_tag_size_repair:false};
+        b[0x128..0x12c].copy_from_slice(b"2dom");put32(&mut b,0x134,2);b[0x170..0x174].copy_from_slice(b"lloc");put32(&mut b,0x17c,3);
+        put32(&mut b,20,0x3000);put32(&mut b,28,3*68);put32(&mut b,32,3*68+6);
+        put32(&mut b,0x400+184,1);put32(&mut b,0x400+188,address+0x600);
+        b[0x600..0x604].copy_from_slice(b"root");put16(&mut b,0x600+36,u16::MAX);putf(&mut b,0x600+40,2.);putf(&mut b,0x600+44,3.);putf(&mut b,0x600+48,4.);putf(&mut b,0x600+64,1.);
+        put32(&mut b,0x400+208,1);put32(&mut b,0x400+212,address+0x800);put32(&mut b,0x800+36,1);put32(&mut b,0x800+40,address+0x900);
+        put32(&mut b,0x900+72,1);put32(&mut b,0x900+88,3);
+        for(i,p)in [[0.,0.,0.],[1.,0.,0.],[0.,1.,0.]].iter().enumerate(){for axis in 0..3{putf(&mut b,0x3000+i*68+axis*4,p[axis]);putf(&mut b,0x1800+i*16+axis*4,p[axis]);}put16(&mut b,0x3000+i*68+58,u16::MAX);putf(&mut b,0x3000+i*68+60,1.);}
+        put16(&mut b,0x3000+3*68,0);put16(&mut b,0x3000+3*68+2,1);put16(&mut b,0x3000+3*68+4,2);
+        put32(&mut b,0x1000+652,1);put32(&mut b,0x1000+656,address+0x1400);b[0x1400..0x1404].copy_from_slice(b"root");put32(&mut b,0x1400+52,1);put32(&mut b,0x1400+56,address+0x1500);
+        for(offset,count,at)in [(60,1,0x1600),(72,3,0x1700),(84,3,0x1800)]{put32(&mut b,0x1500+offset,count);put32(&mut b,0x1500+offset+4,address+at);}
+        for i in 0..3{let at=0x1700+i*24;put32(&mut b,at,i as u32);put32(&mut b,at+4,((i+1)%3)as u32);put32(&mut b,at+8,((i+1)%3)as u32);put32(&mut b,at+20,u32::MAX);}
+        let mesh=object_collision_mesh(&b,&header,&tags,1).unwrap().unwrap();assert_eq!(mesh.positions,[2.,3.,4.,3.,3.,4.,2.,4.,4.]);assert_eq!(mesh.indices,[0,1,2]);
+        put32(&mut b,0x1700+8,99);assert!(object_collision_mesh(&b,&header,&tags,1).is_err());put32(&mut b,0x1700+8,1);
+        put32(&mut b,0x1500+88,address+0x3fff);assert!(object_collision_mesh(&b,&header,&tags,1).is_err());
+        put32(&mut b,0x17c,u32::MAX);assert!(object_collision_mesh(&b,&header,&tags,1).unwrap().is_none());
     }
 }

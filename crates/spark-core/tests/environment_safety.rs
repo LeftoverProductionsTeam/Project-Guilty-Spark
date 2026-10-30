@@ -50,7 +50,7 @@ fn source_export_is_complete_hashed_and_never_overwrites() {
 fn two_sources_must_not_claim_the_same_tag_path() {
     let mut doc=quickforge::create_arena("Cross-map QA", "smallIndoorArena").unwrap();
     let source_id=uuid::Uuid::new_v4().to_string();
-    let first=quickforge::ForgePlacement {
+    let first=quickforge::ForgePlacement { published_asset_id: None,
         id:"imported-1".into(),name:"Rock from map one".into(),
         tag_path:"scenery\\rocks\\rock".into(),tag_class:"scen".into(),
         position:[1.,2.,3.],rotation:[0.,0.,0.],team:-1,respawn_seconds:0,

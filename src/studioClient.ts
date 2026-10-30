@@ -88,6 +88,18 @@ export function studioDifferences(
       rows.push({ target: key, mine: brief(local[key]), shared: brief(shared[key]) });
     if (rows.length >= 12) return rows;
   }
+  if(local.native||shared.native){
+    for(const id of new Set([...(local.native?.fields??[]),...(shared.native?.fields??[])].map(field=>field.id))){
+      const mine=local.native?.fields.find(field=>field.id===id),theirs=shared.native?.fields.find(field=>field.id===id);
+      if(JSON.stringify(mine)!==JSON.stringify(theirs))rows.push({target:'Native field / '+id,mine:mine?String(mine.boundingRadius):'Original source value',shared:theirs?String(theirs.boundingRadius):'Original source value'});
+      if(rows.length>=12)return rows;
+    }
+    for(const id of new Set([...(local.native?.assets??[]),...(shared.native?.assets??[])].map(asset=>asset.id))){
+      const mine=local.native?.assets.find(asset=>asset.id===id),theirs=shared.native?.assets.find(asset=>asset.id===id);
+      if(mine?.sha256!==theirs?.sha256||mine?.name!==theirs?.name)rows.push({target:'Published asset / '+id,mine:mine?`${mine.name} (${mine.bytes.length} bytes, ${mine.sha256.slice(0,12)})`:'Not published',shared:theirs?`${theirs.name} (${theirs.bytes.length} bytes, ${theirs.sha256.slice(0,12)})`:'Not published'});
+      if(rows.length>=12)return rows;
+    }
+  }
   return rows;
 }
 export function announceStudio(projectId: string, view: StudioView | null, hosting = false, paused = false) {

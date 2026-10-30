@@ -1,4 +1,4 @@
-import { Vector2 } from 'three';
+import { Vector2,WebGLRenderTarget,HalfFloatType } from 'three';
 import type { WebGLRenderer, Scene, Camera } from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -15,7 +15,9 @@ export function createVisualPipeline(
   withBloom: boolean,
   withDof: boolean,
 ) {
-  const composer = new EffectComposer(gl),
+  const target=new WebGLRenderTarget(1,1,{type:HalfFloatType});
+  target.samples=gl.getContext().getContextAttributes()?.antialias?Math.min(4,gl.capabilities.maxSamples):0;
+  const composer = new EffectComposer(gl,target),
     render = new RenderPass(scene, camera);
   const bloom = withBloom ? new UnrealBloomPass(new Vector2(256, 256), 0.35, 0.4, 0.9) : null;
   const bokeh = withDof

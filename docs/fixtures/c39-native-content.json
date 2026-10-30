@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "nativeProcesses": 3,
+  "separateDataRoots": 3,
+  "physicalMachines": 1,
+  "transport": "private TCP + TLS 1.3, invitation-pinned certificate",
+  "mockedIpc": false,
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "gamePeerReplicationTested": false,
+  "nativeTagSharingTested": true,
+  "binaryAssetTransferTested": true,
+  "appSha256": "c62db26183ce02de80f0c7fb96954d2cd14cdba5411e71eb1144ffcff74f5b79",
+  "processes": [
+    {
+      "participant": "A (owner)",
+      "pid": 9012,
+      "projectId": "aec67820-237b-4e06-9f71-ebea08c5332b"
+    },
+    {
+      "participant": "B (publisher)",
+      "pid": 13528,
+      "projectId": "aec67820-237b-4e06-9f71-ebea08c5332b"
+    },
+    {
+      "participant": "C (placer)",
+      "pid": 23232,
+      "projectId": "aec67820-237b-4e06-9f71-ebea08c5332b"
+    }
+  ],
+  "threeAuthorNativeAcceptance": {
+    "revision": 3,
+    "documentSha256": "9deea80faa46b222d94aceb7d369ef2c871295314fe9b74336fa8a5c228ea14d",
+    "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+    "assetId": "e91131bf-51ae-4b2f-8aa9-626900d29534",
+    "assetBytes": 632,
+    "actualModelsInThreeViewports": true,
+    "simultaneousAuthorActions": true
+  },
+  "participantUndoAndReferencedAssetConflict": true,
+  "sameFieldConflictCorruptBytesAndDuplicateAck": true,
+  "permissionsCoverNativeImportEditAndBuild": true,
+  "nativeSourceIntegrityAndIndependentToolBuildGuard": {
+    "truncatedAdmittedTagRejected": true,
+    "exactRecoveryBytesRetained": true,
+    "unsharedWorkingTagsBuildRefused": true
+  },
+  "synchronizationSurvivesWorkspaceChange": true,
+  "committedRevision": {
+    "sessionId": "2a49b0b0-63f9-4e29-a796-73594cefbe7f",
+    "revision": 14,
+    "documentSha256": "7f3f158a9688fd07139112ada725da81c4984be0c3c48f4001746f834e786a83",
+    "localProjects": [
+      "aec67820-237b-4e06-9f71-ebea08c5332b",
+      "aec67820-237b-4e06-9f71-ebea08c5332b",
+      "aec67820-237b-4e06-9f71-ebea08c5332b"
+    ]
+  },
+  "actualHaloToolchain": {
+    "jobId": "24fe287e-490b-467f-8c76-9582c96c42dc",
+    "revision": 14,
+    "laterRevision": 15,
+    "nativeRadius": 0.2750000059604645,
+    "publishedAssetPath": "scenery\\sparklink\\e91131bf-51ae-4b2f-8aa9-626900d29534",
+    "compiledModelTriangles": 31,
+    "placement": [
+      2,
+      2,
+      0.1
+    ],
+    "outputSha256": "8848c5f2a5f4f6264c1fb566535ce211243b719e2b9b25f875ed5446b8bbcbe0",
+    "durationMs": 37557.985400000005,
+    "gameplayTested": false
+  },
+  "durableNativeRecovery": {
+    "revision": 15,
+    "assetBytesIdentical": true,
+    "semanticFieldIntact": true,
+    "authorIdentitiesAndHistoryRetained": true,
+    "newInvitation": true,
+    "replayDeduplicated": true,
+    "durationMs": 11804.067099999986
+  },
+  "revocationRetainsOtherParticipants": true,
+  "originalSourcesUnchanged": {
+    "separateNativeTrees": 3,
+    "filesPerTree": 2240,
+    "templateUnchanged": true,
+    "importUnchanged": true
+  },
+  "synchronizationMeasurements": {
+    "samples": 7,
+    "valuesMs": [
+      6550.046199999997,
+      506.7543999999907,
+      378.78600000000733,
+      399.12369999999646,
+      362.3625999999931,
+      589.8353999999963,
+      477.6533999999956
+    ],
+    "physicalMachines": 1,
+    "includesNativeIpcAndReactConsumption": true,
+    "coldThreeAuthorPathMs": 6550.046199999997,
+    "warmMedianMs": 438.38854999999603,
+    "warmMaximumMs": 589.8353999999963
+  },
+  "pageErrors": [],
+  "acceptanceComplete": true,
+  "evidenceRun": "run-2026-10-30T20-34-15-384Z",
+  "sourceBaseCommit": "2a3e779bf7784463df68a24f372aa4b1e5439ccd"
+}

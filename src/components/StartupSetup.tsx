@@ -25,7 +25,7 @@ const halos: { id: RuntimeId; name: string; description: string }[] = [
   {
     id: 'chupathingyCe',
     name: 'ChupathingyCE',
-    description: 'Register this separately installed runtime in Play & servers.',
+    description: 'Register this separately installed runtime in Online.',
   },
   {
     id: 'openCe',

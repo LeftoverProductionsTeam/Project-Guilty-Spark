@@ -17,6 +17,7 @@ import {makeFiveModeTestPlan, seedFiveModePlaytests} from '../haloModeTestPlan';
 import {forgeTargets} from '../forge';
 import PowerupStudio from './PowerupStudio';
 import {useMapState} from '../mapSession';
+import ExternalBrowserLink from './ExternalBrowserLink';
 
 type Pane = 'mission' | 'cinematic' | 'powerups' | 'server' | 'playtest';
 function freshId(): string { return crypto.randomUUID(); }
@@ -142,7 +143,16 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
     <PageTitle eyebrow="PROJECT GUILTY SPARK / CREATOR STUDIO" title="Direct the experience."
       description="Design original mission beats, cinematic shots, dedicated-server rotations and manual QA evidence—all in your saved project."
       actions={<div className="analysis-actions"><button type="button" onClick={report}><Download size={15}/> Export evidence JSON</button><button className="primary" type="button" onClick={exportSourcePack}><Download size={15}/> Export CE script pack</button></div>} />
-    <section className="analysis-card">
+    <section className="studio-guide" aria-label="Creator Studio quick start">
+      <div><strong>Start with one objective</strong><ol><li>Add a mission beat or camera shot.</li><li>Use names that exist in your scenario’s AI, trigger volumes or camera points.</li><li>Export the script pack, compile it with your matching editing kit, then playtest.</li></ol></div>
+      <nav aria-label="HaloScript learning resources"><strong>Learn HaloScript</strong>
+        <ExternalBrowserLink href="https://c20.reclaimers.net/general/scripting/">Scripting basics</ExternalBrowserLink>
+        <ExternalBrowserLink href="https://c20.reclaimers.net/h1/scripting/">Halo 1 function reference</ExternalBrowserLink>
+        <ExternalBrowserLink href="https://c20.reclaimers.net/h1/scripting/limits/">Common mistakes &amp; limits</ExternalBrowserLink>
+        <ExternalBrowserLink href="https://c20.reclaimers.net/h1/h1-ek/h1-sapien/">Bind and compile in Sapien</ExternalBrowserLink>
+      </nav>
+    </section>
+    <details className="analysis-card studio-handoff"><summary>Export &amp; compile setup</summary><div>
       <h2>QuickForge → Editing Kit source handoff</h2>
       <p>Places your generated scripts under the matching <code>data/levels/quickforge/.../scripts/</code> folder inside a review-only ZIP. Requires a QuickForge singleplayer Firefight/Zombie source project and separately owned editing tools. No Halo files are modified.</p>
       <div className="studio-fields"><label>Script startup (optional)
@@ -153,16 +163,15 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
         </select></label></div>
       <button type="button" onClick={exportHceekTree}><Download size={15}/> Export HCEEK source tree ZIP</button>
       <small className="studio-hint">The official compiler and actual target game must independently validate the scripts, BSP, AI, lighting and network behavior.</small>
-    </section>
-    {bindingChecks.length>0 && <section className="analysis-card">
-      <h2>Scenario dependency preflight · {bindingChecks.length} references</h2>
+    </div></details>
+    {bindingChecks.length>0 && <details className="analysis-card studio-bindings"><summary>Scenario references · {bindingChecks.length} to check</summary>
       <p>Imported map names are evidence only; your editable scenario must still be compiled and playtested.</p>
       {bindingChecks.map(check => <div className="squad-row" key={check.dependency}>
         <span><code>{check.dependency}</code> — {check.detail}</span>
         <Pill tone={check.status==='presentInImportedCache'?'green':'muted'}>{check.status}</Pill>
       </div>)}
-    </section>}
-    <Notice tone="info">Mission and cinematic directors now export bounded Halo CE .hsc script source plus dependency manifests. HaloScript compilation still requires matching scenario assets in Sapien/HEK and actual in-game testing. No stock map or server is modified.</Notice>
+    </details>}
+    <p className="studio-hint">Exports are Halo CE .hsc source. Matching scenario assets, native compilation and an in-game test are required.</p>
     <div className="studio-tabs" role="tablist" aria-label="Creator Studio sections">
       {([
         ['mission', 'Mission director', Flag],
@@ -184,10 +193,10 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
       {studio.missions.map((beat, i) => <div className="studio-record" key={beat.id}>
         <div className="studio-record-heading"><strong>{String(i + 1).padStart(2, '0')} · {beat.title || 'Untitled beat'}</strong><button type="button" aria-label={`Remove beat ${i + 1}`} onClick={() => change({ ...studio, missions: studio.missions.filter(m => m.id !== beat.id) }, 'Remove mission beat')}><Trash2 size={15}/></button></div>
         <div className="studio-fields"><label>Title<input maxLength={120} value={beat.title} onChange={e => updateBeat(beat.id, { title: e.target.value })}/></label>
-        <label>Trigger<select value={beat.trigger} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'] })}>
+        <label title="Choose when this objective starts. Volumes and encounters must have the same names in your editable scenario.">Trigger<select value={beat.trigger} onChange={e => updateBeat(beat.id, { trigger: e.target.value as MissionBeat['trigger'] })}>
           <option value="manual">Manually advanced</option><option value="triggerVolume">Trigger volume (needs scenario binding)</option>
           <option value="encounterCleared">Encounter cleared (needs AI binding)</option><option value="timer">Timer (needs script binding)</option></select></label>
-        <label>Encounter name (optional)<input maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
+        <label title="The encounter name from Sapien’s AI hierarchy; this does not create or place actors by itself.">Encounter name (optional)<input maxLength={128} value={beat.encounterName} placeholder="scenario encounter reference" onChange={e => updateBeat(beat.id, { encounterName: e.target.value })}/></label></div>
         {beat.trigger === 'manual' && <p className="subtle">Mission waits at this beat until another HaloScript trigger calls <code>gs_complete_{i+1}</code>.</p>}
         {beat.trigger === 'triggerVolume' && <label>Scenario trigger-volume identifier<input maxLength={31} spellCheck={false} placeholder="gs_entry_volume" value={beat.triggerRef ?? ''} onChange={e => updateBeat(beat.id, {triggerRef:e.target.value})}/></label>}
         {beat.trigger === 'timer' && <label>Delay (seconds)<NumberField label="Mission beat delay seconds" min={1} max={600} value={beat.timerSeconds ?? 5} step={1} onCommit={n => updateBeat(beat.id,{timerSeconds:Math.round(n)})}/></label>}

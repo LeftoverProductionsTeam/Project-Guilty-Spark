@@ -1,3 +1,4 @@
+import {runtimeNames} from '../runtimeWorkbench';
 import { useState } from 'react';
 import { call, native } from '../api';
 import { useMapState } from '../mapSession';
@@ -12,6 +13,7 @@ export default function BuildTargets({
   defaults?: Settings;
 }) {
   const [error, setError] = useState('');
+  const [newRuntime,setNewRuntime]=useState<RuntimeId>(defaults?.preferredHalo??'mccSteam');
   const [open, setOpen] = useMapState(project.id, 'tools.targetsOpen', false);
   const targets = project.buildTargets ?? [];
   const active = targets.find((t) => t.id === project.activeBuildTarget);
@@ -29,14 +31,14 @@ export default function BuildTargets({
         ...targets,
         {
           id,
-          name: runtimeId === 'mccSteam' ? 'MCC Halo CE' : 'Halo Custom Edition',
+          name: runtimeNames[runtimeId],
           runtimeId,
-          builder: runtimeId === 'mccSteam' ? 'h1a-tool' : 'invader-ce',
+          builder: runtimeId === 'mccSteam' ? 'h1a-tool' : runtimeId==='haloCustomEdition'?'invader-ce':'unsupported',
           hekDirectory:
             defaults?.hekFlavor === (runtimeId === 'mccSteam' ? 'h1aEk' : 'legacyHek')
               ? (defaults.hekDirectory ?? null)
               : null,
-          hekFlavor: runtimeId === 'mccSteam' ? 'h1aEk' : 'legacyHek',
+          hekFlavor: runtimeId === 'mccSteam' ? 'h1aEk' : runtimeId==='haloCustomEdition'?'legacyHek':null,
           tagsDirectory:
             defaults?.hekFlavor === (runtimeId === 'mccSteam' ? 'h1aEk' : 'legacyHek')
               ? (defaults.hekTagsDirectory ?? null)
@@ -68,18 +70,7 @@ export default function BuildTargets({
         Keep a separate editable tagset and tool configuration for each engine. Every build uses a fresh
         job/output folder. Existing projects continue to use Settings until a target is selected.
       </p>
-      <div className="analysis-actions">
-        <button className="small-button" disabled={targets.length >= 16} onClick={() => add('mccSteam')}>
-          Add MCC target
-        </button>
-        <button
-          className="small-button"
-          disabled={targets.length >= 16}
-          onClick={() => add('haloCustomEdition')}
-        >
-          Add Custom Edition target
-        </button>
-      </div>
+      <div className="analysis-actions"><label>Target runtime<select aria-label="New engine target runtime" value={newRuntime} onChange={e=>setNewRuntime(e.target.value as RuntimeId)}>{Object.entries(runtimeNames).map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></label><button className="small-button" disabled={targets.length>=16} onClick={()=>add(newRuntime)}>Add runtime target</button></div>
       {targets.map((t) => (
         <fieldset key={t.id}>
           <legend>
@@ -90,7 +81,7 @@ export default function BuildTargets({
             <input value={t.name} maxLength={100} onChange={(e) => update(t, { name: e.target.value })} />
           </label>
           <p>
-            {t.runtimeId === 'mccSteam'
+            {t.builder==='unsupported'?'Runtime profile saved independently. Native cache compilation for this runtime still needs a verified adapter; installed tools and inspection remain available.':t.runtimeId === 'mccSteam'
               ? 'MCC H1A Tool compiles the native tags to classic MCC cache version 13.'
               : 'Compatible CE source + Invader gbx-custom output (cache version 609). MCC map binaries cannot be copied directly into CE.'}
           </p>
@@ -105,7 +96,7 @@ export default function BuildTargets({
               value={t.hekFlavor ?? ''}
               onChange={(e) => update(t, { hekFlavor: e.target.value as EngineBuildTarget['hekFlavor'] })}
             >
-              <option value="h1aEk">MCC H1A kit</option>
+              <option value="">Choose a compatible authoring kit</option><option value="h1aEk">MCC H1A kit</option>
               {t.runtimeId !== 'mccSteam' && <option value="legacyHek">Legacy CE HEK</option>}
             </select>
           </label>

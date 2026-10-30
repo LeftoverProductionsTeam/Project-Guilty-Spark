@@ -174,3 +174,19 @@ pub(super) async fn tool_ecosystem_report(
     .await
     .map_err(error)?
 }
+#[tauri::command]
+pub(super) async fn launch_discovered_tool(app:tauri::AppHandle,window:tauri::WebviewWindow,runtime_id:String,project_id:Option<String>,tool_id:String)->Reply<String> {
+    if let Some(id)=&project_id {check_document_owner(&app.state::<AppState>(),id,window.label())?;}
+    let report=tool_ecosystem_report(app.clone(),runtime_id,project_id).await?;
+    let row=report.tools.into_iter().find(|r|r.definition.id==tool_id).ok_or("Unknown catalog tool")?;
+    if !["sapien","guerilla","tagTest","invaderEditor"].contains(&tool_id.as_str())||row.assessment.state=="requiresRuntime" {return Err("Use this tool's managed/source handoff or select a compatible runtime".into());}
+    let executable=row.executable.ok_or("Choose the installed tool in Dependencies & setup")?;
+    tauri::async_runtime::spawn_blocking(move||{
+        core::reject_links(&executable).map_err(error)?;
+        let state=app.state::<AppState>();let folder=state.root.join("tool-launches").join(uuid::Uuid::new_v4().to_string());core::reject_links(&folder).map_err(error)?;fs::create_dir_all(folder.join("tags")).map_err(error)?;fs::create_dir(folder.join("data")).map_err(error)?;
+        let identity=maps::hash_file(&executable).map_err(error)?;
+        let child=std::process::Command::new(&executable).current_dir(&folder).spawn().map_err(error)?;
+        project::atomic_write(&folder.join("launch.json"),&serde_json::to_vec_pretty(&(&tool_id,&executable,&identity,child.id())).map_err(error)?,false).map_err(error)?;
+        Ok(format!("Opened {} in a separate scratch workspace (PID {}). Choose a source explicitly in the tool; no map or original tag directory was passed.",row.definition.label,child.id()))
+    }).await.map_err(error)?
+}

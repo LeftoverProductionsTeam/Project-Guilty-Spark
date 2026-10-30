@@ -1,3 +1,5 @@
+import {COMMUNITY_MAP_SOURCES} from '../communityMapSources';
+import ExternalBrowserLink from './ExternalBrowserLink';
 import { useMemo, useState } from 'react';
 import { filterMapCatalog, MAP_CATALOG } from '../mapCatalog';
 import type { CatalogCategory, CatalogEdition, CatalogMap } from '../mapCatalog';
@@ -32,6 +34,7 @@ export default function MapCatalog({
         </div>
         <small>Maintained selection · checked 28 October 2026</small>
       </header>
+      <nav className="gs-full-catalogs" aria-label="Browse complete community map catalogs"><strong>Browse more maps</strong>{COMMUNITY_MAP_SOURCES.filter(source=>source.catalog).map(source=><ExternalBrowserLink key={source.id} href={source.url}>{source.title} ↗</ExternalBrowserLink>)}<button onClick={()=>document.querySelector('.gs-map-sources')?.scrollIntoView({behavior:'smooth',block:'start'})}>All archives & editions</button></nav>
       <div className="gs-catalog-filters">
         <input
           aria-label="Search maps and authors"
@@ -72,7 +75,7 @@ export default function MapCatalog({
       <div className="gs-catalog-grid">
         {maps.map((map) => (
           <article key={map.id} aria-label={`${map.title} map`}>
-            <a className="gs-catalog-image" href={map.source} target="_blank" rel="noopener noreferrer">
+            <ExternalBrowserLink className="gs-catalog-image" href={map.source} target="_blank" rel="noopener noreferrer">
               {map.image ? (
                 <img
                   src={map.image}
@@ -86,7 +89,7 @@ export default function MapCatalog({
                 />
               ) : null}
               <span>Publisher preview</span>
-            </a>
+            </ExternalBrowserLink>
             <div className="gs-catalog-card-body">
               <small>
                 {editionNames[map.edition]} · {map.categories.join(' · ')}
@@ -103,13 +106,13 @@ export default function MapCatalog({
                     Download into Spark…
                   </button>
                 )}
-                <a href={map.source} target="_blank" rel="noopener noreferrer">
+                <ExternalBrowserLink href={map.source} target="_blank" rel="noopener noreferrer">
                   Publisher &amp; credits ↗
-                </a>
+                </ExternalBrowserLink>
                 {map.mccWorkshop && (
-                  <a href={map.mccWorkshop} target="_blank" rel="noopener noreferrer">
+                  <ExternalBrowserLink href={map.mccWorkshop} target="_blank" rel="noopener noreferrer">
                     Author’s MCC release ↗
-                  </a>
+                  </ExternalBrowserLink>
                 )}
               </div>
               <details>

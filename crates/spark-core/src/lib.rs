@@ -26,6 +26,7 @@ pub mod native_operations;
 pub mod studio_journal;
 pub mod studio_tls;
 pub mod studio_session;
+pub mod studio_native;
 pub mod baboon;
 pub mod native_tag_integrity;
 pub mod conversion;

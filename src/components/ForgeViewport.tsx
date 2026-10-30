@@ -1,3 +1,7 @@
+import TransformControls from './HaloTransformControls';
+import useEndToFloor from '../useEndToFloor';
+import type {DropBody} from '../useEndToFloor';
+import {useRendererQuality} from './RendererQuality';
 import SceneEnvironment from './SceneEnvironment';
 import SceneEffects from './SceneEffects';
 import ViewportLabel from './ViewportLabel';
@@ -16,8 +20,7 @@ import {
   OrbitControls,
   PerspectiveCamera,
   PointerLockControls,
-  TransformControls,
-} from '@react-three/drei';
+  } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ForgeBrush, ForgeMesh, ForgeNode, ForgePlacement,QuickForgeDocument } from '../forge';
 import { forgeNodes, nodeRotation, transformForgeNode } from '../forge';
@@ -415,6 +418,14 @@ function ForgeScene(props: ForgeViewportProps) {
   const zoneGroup = useRef<THREE.Group>(null);
   const nodes = forgeNodes(doc).filter((node) => node.value.visible);
   const chosen = nodes.filter((node) => selected.includes(node.value.id) && !node.value.locked);
+  const geometryCurrent=JSON.stringify(snapshot?.document.geometry)===JSON.stringify(doc.geometry);
+  const brushMesh=(id:string)=>snapshot?{positions:snapshot.mesh.positions,indices:snapshot.mesh.parts.filter(p=>p.brushId===id).flatMap(p=>snapshot.mesh.indices.slice(p.indexStart,p.indexStart+p.indexCount))}:undefined;
+  const selectedBrushes=new Set(chosen.filter(n=>n.type==='brush').map(n=>n.value.id));
+  const dropBody=(node:ForgeNode):DropBody=>{
+    const placement=node.type==='placement'?node.value:undefined,preview=node.type==='brush'?brushMesh(node.value.id):placement?props.ownedModels?.[forgeModelKey(placement)]?.mesh:{positions:[0,0,node.type==='spawn'?-.2:0],indices:[]};
+    return {id:node.value.id,name:node.value.name,preview,collision:node.type==='brush'?preview:undefined,source:placement?.sourceProjectId&&placement.sourceSha256&&placement.tagId!=null?{projectId:placement.sourceProjectId,sourceSha256:placement.sourceSha256,tagId:placement.tagId}:undefined,matrix:node.type==='brush'?new THREE.Matrix4():new THREE.Matrix4().compose(new THREE.Vector3(...node.value.position),new THREE.Quaternion().setFromEuler(new THREE.Euler(...nodeRotation(node),'XYZ')),new THREE.Vector3(1,1,1))};
+  };
+  useEndToFloor({enabled:cameraMode==='orbit'&&geometryCurrent,revision:JSON.stringify(doc),selected:chosen.map(dropBody),others:nodes.filter(n=>n.type==='placement'&&!selected.includes(n.value.id)).map(dropBody),terrain:snapshot?{positions:snapshot.mesh.positions,indices:snapshot.mesh.parts.filter(p=>!selectedBrushes.has(p.brushId)).flatMap(p=>snapshot.mesh.indices.slice(p.indexStart,p.indexStart+p.indexCount))}:null,onDrop:delta=>onTransform(chosen.map(node=>({...node,value:{...node.value,position:[node.value.position[0],node.value.position[1],node.value.position[2]+delta]}} as ForgeNode))),onError:props.onError});
   const selectionBasis=chosen.map(node=>[node.value.id,...node.value.position,...nodeRotation(node)].join(':')).join('|');
   // Keep the gizmo's declarative basis stable while preview/material state
   // changes. New Vector3/Euler props would reset an in-progress native drag.
@@ -601,13 +612,15 @@ export default function ForgeViewport(props: ForgeViewportProps) {
   const {models,failures}=useOwnedForgeModels([...props.document.placements,...(props.spawnModelSource?[props.spawnModelSource]:[])],props.resourceScopes);
   const [recording,setRecording]=useState(false),take=useRef<RehearsalFrame[]>([]);
   useEffect(()=>{if(props.cameraMode!=='machinima')setRecording(false);},[props.cameraMode]);
+  const rendererQuality=useRendererQuality(props.sessionId??'forge-preview');
   const missing=Object.keys(failures).length;
   return (
     <>
     <ViewportBoundary>
       <Canvas
-        dpr={[1, 1.5]}
-        gl={{ antialias: true, preserveDrawingBuffer:!!props.cinema }}
+        key={String(rendererQuality.antialias)}
+                dpr={rendererQuality.dpr}
+        gl={{ antialias: rendererQuality.antialias, preserveDrawingBuffer:!!props.cinema }}
         onPointerMissed={(event) => {
           if (event.type === 'click' && event.button === 0&&performance.now()>=selectionGuard.current) props.onSelect(null, false);
         }}

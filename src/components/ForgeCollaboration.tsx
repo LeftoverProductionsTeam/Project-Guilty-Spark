@@ -14,6 +14,8 @@ import {
 } from '../studioClient';
 import { Notice } from './ui';
 import SteamSessionTools from './SteamSessionTools';
+import StudioNativeContent from './StudioNativeContent';
+import {WorkspacePanel,useRevealWorkspacePanel} from './WorkspacePanels';
 import '../hosting.css';
 import './studio.css';
 type Transport = 'lan' | 'steamSpacewar';
@@ -23,13 +25,16 @@ export default function ForgeCollaboration({
   entries,
   onShared,
   onSave,
+  hidden = false,
 }: {
+  hidden?: boolean;
   projectId: string;
   document: QuickForgeDocument;
   entries: LibraryEntry[];
   onShared: (document: QuickForgeDocument) => void;
   onSave: () => Promise<void>;
 }) {
+  const reveal = useRevealWorkspacePanel();
   const [view, setView] = useState<View | null>(null),
     [session, setSession] = useState<Info | null>(null),
     [other, setOther] = useState<Info | null>(null);
@@ -63,6 +68,7 @@ export default function ForgeCollaboration({
     accepting = useRef<string | null>(null),
     active = useRef(true),
     inFlight = useRef(false),
+    nextPollAfter = useRef(0),
     actionRequest = useRef<number | null>(null),
     queuedReverse = useRef<{ sessionId: string; redo: boolean }[]>([]),
     drainReverse = useRef<() => void>(() => {}),
@@ -154,10 +160,10 @@ export default function ForgeCollaboration({
   }, [expanded, projectId, session?.sessionId]);
   useEffect(() => {
     const open = (e: Event) => {
-      if ((e as CustomEvent<{ projectId: string }>).detail?.projectId === projectId) setExpanded(true);
+      if ((e as CustomEvent<{ projectId: string }>).detail?.projectId === projectId) {setExpanded(true);reveal('sparklink');}
     };
     window.addEventListener('guilty-spark-live-studio-open', open);
-    if (readMapSession(projectId, 'studio.openRequest', false)) setExpanded(true);
+    if (readMapSession(projectId, 'studio.openRequest', false)) {setExpanded(true);reveal('sparklink');}
     return () => window.removeEventListener('guilty-spark-live-studio-open', open);
   }, [projectId]);
   async function clear(packet: Pending) {
@@ -170,6 +176,7 @@ export default function ForgeCollaboration({
   async function tick() {
     if (
       inFlight.current ||
+      performance.now() < nextPollAfter.current ||
       actionRequest.current !== null ||
       blocked.current ||
       !shared.current ||
@@ -221,6 +228,11 @@ export default function ForgeCollaboration({
       setError('');
       setRemoteConflict(null);
     } catch (e) {
+      if(String(e).includes('SparkLink request rate exceeded')) {
+        nextPollAfter.current=performance.now()+1250;
+        if(active.current)setMessage('Session busy · retaining the pending operation and retrying shortly.');
+        return;
+      }
       if (active.current) {
         blocked.current = true;
         queuedReverse.current = [];
@@ -396,18 +408,19 @@ export default function ForgeCollaboration({
   }
   const people = view?.participants ?? [],
     differences = remoteConflict ? studioDifferences(latest.current.doc, remoteConflict.document) : [];
+  if(hidden) return null;
   return (
-    <details
+    <WorkspacePanel id="sparklink" label="SparkLink"><details
       className="forge-live-panel studio-panel"
       open={expanded}
       onToggle={(e) => setExpanded(e.currentTarget.open)}
     >
-      <summary>SparkLink · Shared QuickForge{session ? ' · active' : ''}</summary>
+      <summary>SparkLink · Shared source{session ? ' · active' : ''}</summary>
       <p className="subtle">
         Live Studio shares source geometry, placements, spawns, materials and environment. Each creator keeps
-        their camera. Native tag edits and binary asset imports are not shared yet; game changes use separate
-        verified adapters.
+        their camera. Admitted native fields and complete scenery assets share the same revision; game changes use separate verified adapters.
       </p>
+      <StudioNativeContent projectId={projectId} document={doc} entries={entries} connected={!!session} viewer={view?.role==='viewer'} onChange={onShared}/>
       {restoring && <p role="status">Restoring session controls…</p>}
       {other ? (
         <Notice>
@@ -886,6 +899,6 @@ export default function ForgeCollaboration({
         labels. No firewall rule, public listener, cloud account or game-file transfer is configured
         automatically.
       </p>
-    </details>
+    </details></WorkspacePanel>
   );
 }

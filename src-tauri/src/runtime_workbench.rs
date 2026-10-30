@@ -670,7 +670,7 @@ pub(super) async fn build_working_tags(
     let owner = window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
         let _source_guard=native_operations_native::source_guard()?;
-        let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
+        let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;studio_native_source::require_unshared(&state,&project_id)?;
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
         if processes(&state)?.iter().any(|p|p.project_id==project_id && p.status=="running") || baboon_native::has_running(&project_id)? {return Err("Save and close this map's native editing/test tools, including Baboon, before compiling its working tags".into());}

@@ -1,4 +1,4 @@
-export type PanelDock = 'left' | 'right' | 'bottom' | 'float';
+export type PanelDock = 'left' | 'right' | 'top' | 'bottom' | 'float';
 export interface PanelPlacement {
   open: boolean;
   dock: PanelDock;
@@ -31,7 +31,7 @@ export function cleanLayout(input: unknown): WorkspaceLayout {
     if (!/^[a-z][\w-]{0,55}$/.test(id) || !raw || typeof raw !== 'object') continue;
     panels[id] = {
       open: raw.open === true,
-      dock: ['left', 'right', 'bottom', 'float'].includes(raw.dock) ? raw.dock : 'right',
+      dock: ['left', 'right', 'top', 'bottom', 'float'].includes(raw.dock) ? raw.dock : 'right',
       width: bounded(raw.width, 240, 720, 360),
       height: bounded(raw.height, 160, 900, 420),
       x: bounded(raw.x, 0, 4096, 60),

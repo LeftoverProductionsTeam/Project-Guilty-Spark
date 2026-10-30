@@ -93,6 +93,7 @@ pub(super) fn publish(
     value: Selection,
     expected: Option<Selection>,
 ) -> Reply<PathBuf> {
+    studio_native_source::require_unshared(state,&project.id)?;
     if value.project_id != project.id
         || value.fingerprint != project.fingerprint().map_err(error)?
     {

@@ -1,3 +1,4 @@
+import RendererQuality from './RendererQuality';
 import type {Project} from '../types';
 import {DEFAULT_RENDER_FEATURES,renderFeatures} from '../renderFeatures';
 import type {RenderFeatures as Features} from '../renderFeatures';
@@ -5,7 +6,7 @@ export default function RenderFeatures({project,edit}:{project:Project;edit:(p:P
   const p=renderFeatures(project.renderFeatures);
   function update<K extends keyof Features>(key:K,value:Features[K]){edit({...project,renderFeatures:{...p,[key]:value}},'Change renderer '+key);}
   const range=(key: keyof Features,label:string,min:number,max:number,step:number)=><label key={key}>{label}<input type="range" aria-label={label} min={min} max={max} step={step} value={p[key] as number} onChange={e=>update(key,Number(e.target.value) as never)}/><output>{Number(p[key]).toFixed(2)}</output></label>;
-  return <details className="gs-render-features"><summary>Advanced rendering · surface detail, HDR &amp; bloom</summary>
+  return <details className="gs-render-features"><summary>Advanced rendering · surface detail, HDR &amp; bloom</summary><RendererQuality projectId={project.id}/>
     <label><input type="checkbox" checked={p.enabled} onChange={e=>update('enabled',e.target.checked)}/>Enable renderer enhancements</label>
     <p>Shared by source, live, QuickForge and machinima views. Uses verified source normal/multipurpose maps where available. These are editor effects; they do not install OpenSauce or change the game renderer.</p>
     {p.enabled&&<>

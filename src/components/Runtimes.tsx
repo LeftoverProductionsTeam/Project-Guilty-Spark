@@ -124,10 +124,10 @@ export default function Runtimes({
   }, [refresh]);
   const report = reports.find((item) => item.id === selected);
   return (
-    <div className="analysis-page">
+    <div className="analysis-page online-page">
       <PageTitle
         eyebrow="RUNTIMES / LOCAL CAPABILITY EVIDENCE"
-        title="Play & servers"
+        title="Online"
         description="Choose a session provider, check its runtime and content, then use the matching game’s join and hosting workflow."
         actions={
           <button disabled={loading || !native} onClick={() => void refresh()}>
@@ -152,7 +152,7 @@ export default function Runtimes({
         <button className={tab === 'friends' ? 'selected' : ''} onClick={() => setTab('friends')}>
           Friends preflight
         </button>
-        <button className={tab === 'hosting' ? 'selected' : ''} onClick={() => setTab('hosting')}>Hosting &amp; servers</button>
+        <button className={tab === 'hosting' ? 'selected' : ''} onClick={() => setTab('hosting')}>Host game</button>
         <button className={tab === 'gameplay' ? 'selected' : ''} onClick={() => setTab('gameplay')}>Gameplay controls</button>
       </div>
       {loading && !reports.length && (

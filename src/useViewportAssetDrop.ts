@@ -19,6 +19,8 @@ export function useViewportAssetDrop(
   const pending = useRef<{ id: number; key: string; x: number; y: number; moved: boolean } | null>(null),
     suppressClick = useRef(false);
   useEffect(() => {
+    const begin=(event:Event)=>{const d=(event as CustomEvent).detail;if(d?.projectId===projectId&&typeof d.key==='string'&&d.key.length<512&&[d.pointer,d.x,d.y].every(Number.isFinite))pending.current={id:d.pointer,key:d.key,x:d.x,y:d.y,moved:false};};
+    window.addEventListener('guilty-spark-asset-drag-start',begin);
     const cancel = () => {
       pending.current = null;
       setDragging(false);
@@ -91,6 +93,7 @@ export function useViewportAssetDrop(
     window.addEventListener('guilty-spark-asset-file-drop', fileDrop);
     return () => {
       cancel();
+      window.removeEventListener('guilty-spark-asset-drag-start',begin);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', cancel);

@@ -1,6 +1,6 @@
 # Project Guilty Spark
 
-Windows CI manifest registration now resolves the selected mod folder consistently when Windows supplies a short path such as `RUNNER~1`. The reported three failures were reproduced locally before the fix; the full locked Windows workspace suite then passed with the same short-path condition. [Fix and verification](docs/WINDOWS_MANIFEST_CI_FIX.md). A new GitHub-hosted run is still required after pushing.
+Windows CI manifest registration now resolves the selected mod folder consistently when Windows supplies a short path such as `RUNNER~1`. The reported three failures were reproduced locally before the fix; the full locked Windows workspace suite then passed with the same short-path condition. [Fix and verification](docs/WINDOWS_MANIFEST_CI_FIX.md). Hosted CI results remain separate from this local verification record.
 
 ## C40 native-save integrity and CE companion
 
@@ -12,7 +12,9 @@ Missed save notifications and preserved timestamps now have a bounded background
 
 SparkLink extends the existing QuickForge session drawer with private TLS invitations, creator roles, authoritative source revisions, per-author undo/redo, durable host recovery and retained local drafts. Each creator keeps their camera. The owner can compile a frozen acknowledged source while editing continues. [Architecture](docs/SPARKLINK_ARCHITECTURE.md) · [Host/join and recovery](docs/SPARKLINK_SETUP.md) · [Evidence and remaining phases](docs/CONTINUATION_39_ENGINEERING.md).
 
-This first shared QuickForge slice covers geometry, placements, materials, spawns, objectives and environment intent. Shared native tags, custom binary imports, remote work-area indicators, collaborative live Halo delivery and game-peer replication remain open. Existing solo tools and research continue intact; source synchronization does not certify gameplay.
+The native-content extension now proves a simultaneous **tag edit → validated asset publication → placement** across three independent Windows Spark processes with separate project directories. All three converge; H1A Tool compiles a frozen revision and the native cache reader verifies the edited pistol radius, published scenery model and placement. Roles, conflicts, author-specific undo, corruption refusal and abrupt host recovery are exercised against real processes. [Exact capabilities, timings and limits](docs/C39_NATIVE_CONTENT_ACCEPTANCE.md).
+
+This is a bounded MCC Halo 1 source workflow: one supported pistol field and complete copies of one locally admitted scenery template with matching dependencies. Arbitrary model/sound/animation uploads, direct compiled-map editing, remote work-area indicators, collaborative live Halo delivery and game-peer replication remain open. Existing C35–C40 history, native tools and research remain intact.
 
 ## C38 source-aware native workbench
 

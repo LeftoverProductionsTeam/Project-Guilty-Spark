@@ -58,7 +58,9 @@ export default function ToolEcosystem({
   settings,
   onSettings,
   onOpenWorkspace,
+  search = '',
 }: {
+  search?: string;
   project: Project | null;
   runtime: RuntimeId;
   settings: Settings;
@@ -158,6 +160,7 @@ export default function ToolEcosystem({
           {stateNames[assessment.state] ?? assessment.state}
         </Pill>
         <p>{tool.purpose}</p>
+        {assessment.executableFound&&['sapien','guerilla','tagTest','invaderEditor'].includes(tool.id)&&<button disabled={busy} onClick={()=>{setBusy(true);setError('');void call<string>('launch_discovered_tool',{runtimeId:runtime,projectId,toolId:tool.id}).then(setMessage,e=>setError(String(e))).finally(()=>setBusy(false));}}>Launch {tool.label}</button>}
         <p className="subtle">{assessment.detail}</p>
         {tool.integration === 'externalCompanion' && (
           <>
@@ -266,6 +269,7 @@ export default function ToolEcosystem({
         <>
           <div className="gs-tool-grid">
             {report.tools
+              .filter(row=>!search.trim()||`${row.definition.label} ${row.definition.purpose} ${row.assessment.executableFound?'installed':'install setup'}`.toLowerCase().includes(search.toLowerCase()))
               .filter(
                 (row) =>
                   row.definition.integration !== 'upstreamOnly' && row.assessment.state !== 'requiresRuntime',

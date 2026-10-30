@@ -1,6 +1,7 @@
+import TransformControls from './HaloTransformControls';
 import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
-import { Edges, Line, TransformControls } from '@react-three/drei';
+import { Edges, Line, } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { Project, Vec3 } from '../types';

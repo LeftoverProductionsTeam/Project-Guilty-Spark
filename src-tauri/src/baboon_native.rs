@@ -563,6 +563,7 @@ pub(super) async fn baboon_reconcile(
     tauri::async_runtime::spawn_blocking(move||{
         let _source_guard=native_operations_native::source_guard()?;
         native_operations_native::require_idle(&app.state::<AppState>())?;
+        studio_native_source::require_unshared(&app.state::<AppState>(),&project_id)?;
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;let mut session=load(&state,&session_id,&owner,&project_id)?;
         let p=lock(&state.library)?.get(&project_id).map_err(error)?;if p.fingerprint().map_err(error)?!=session.fingerprint{return Err("The saved map revision changed. Both sources remain available; review against the current map before rebuilding".into());}
         let observed=poll(&state,&session)?;
@@ -616,6 +617,7 @@ pub(super) async fn baboon_restore_start(
     tauri::async_runtime::spawn_blocking(move||{
         let _source_guard=native_operations_native::source_guard()?;
         native_operations_native::require_idle(&app.state::<AppState>())?;
+        studio_native_source::require_unshared(&app.state::<AppState>(),&project_id)?;
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
         let mut session=load(&state,&session_id,&owner,&project_id)?;
         let p=lock(&state.library)?.get(&project_id).map_err(error)?;

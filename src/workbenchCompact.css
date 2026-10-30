@@ -1,0 +1,108 @@
+/* Shared workbench density. Keep controls legible and give content the width
+   of its workspace; only lists and genuinely overflowing content scroll. */
+.application :is(.analysis-page,.library-page,.build-page,.settings-page,.preservation-page,.scenario-page) {padding:14px 18px;max-width:none;}
+.application .page-title {gap:12px;margin-bottom:12px;align-items:center;}
+.application .page-title h1 {font-size:22px;line-height:1.2;margin:0;}
+.application .page-title p {margin:5px 0 0;line-height:1.4;max-width:90ch;}
+.application .page-title .eyebrow {margin-bottom:5px;letter-spacing:1.2px;}
+.application :is(.analysis-card,.analysis-coverage) {padding:12px;margin:10px 0;}
+.application .analysis-card h2 {font-size:15px;margin-bottom:8px;}
+.application :is(.analysis-card,.analysis-coverage) p {line-height:1.45;margin:6px 0;}
+.application :is(.analysis-actions,.analysis-summary) {gap:7px;margin:8px 0;}
+.application :is(.analysis-card label,.compare-selectors label,.runtime-picker) {gap:4px;margin:7px 0;}
+.application :is(.tabs,.studio-tabs,.gs-settings-tabs,.gs-panel-buttons) > button {padding:5px 9px;min-height:28px;border-radius:6px;box-shadow:none;}
+.application :is(.tabs,.studio-tabs,.gs-settings-tabs,.gs-panel-buttons) > button:is(.selected,.active,[aria-selected='true'],[aria-expanded='true']) {background:color-mix(in srgb,var(--accent) 8%,transparent);border-color:transparent;box-shadow:inset 0 -2px var(--accent);border-radius:6px 6px 2px 2px;}
+.application .map-tab {border-radius:12px 12px 0 0;min-height:30px;box-shadow:none;overflow:hidden;}
+.application .map-tab:is(.active,.selected,[aria-selected='true']) {background:color-mix(in srgb,var(--accent) 7%,var(--panel));box-shadow:inset 0 2px var(--accent);}
+.application .gs-workspace-tools {gap:3px;padding-inline:6px;}
+.application .gs-panel-buttons {gap:1px;}
+.application .gs-panel-buttons > button {font-size:11px;padding:4px 7px;}
+.application .gs-panel-content {padding:8px;}
+.application .gs-panel-content :is(h2,h3,h4) {margin:7px 0;font-size:12px;}
+.application .gs-panel-content p {margin:6px 0;line-height:1.4;}
+.application .gs-panel-content .forge-live-panel {max-height:none;overflow:visible;margin:0;padding:0;border:0;border-radius:0;background:transparent;}
+.application .studio-panel label {display:grid;grid-template-columns:minmax(92px,.7fr) minmax(0,1.3fr);gap:6px;align-items:center;margin:6px 0;}
+.application .studio-panel label :is(input:not([type='checkbox']),select,textarea) {width:100%;}
+.application .studio-panel .hosting-toggle {display:flex;}
+.application .studio-panel .subtle {font-size:11px;line-height:1.4;}
+.application .studio-panel textarea {min-height:60px;max-height:120px;resize:vertical;}
+.application .studio-native {padding-block:6px;border-bottom:1px solid var(--line);}
+.application .studio-assets {padding-left:0;list-style:none;margin:6px 0;}
+.application .studio-assets li {display:grid;grid-template-columns:1fr auto;gap:4px;padding:6px 0;}
+.application .studio-assets li strong {min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.application .studio-native-import {margin-top:8px;}
+.application .studio-assets small {grid-column:1;font-size:10px;}
+.application .studio-assets li button {grid-column:2;grid-row:1/3;}
+.application .compare-selectors {gap:8px;}
+.application .compare-identities {margin:8px 0;gap:8px;}
+.application .compare-identities > div {padding:9px;gap:4px;}
+.application .compare-source-details {font-size:11px;margin:7px 0;}
+.application .analysis-coverage > div {gap:10px 16px;margin-top:10px;}
+.application .analysis-filters {gap:8px;margin:10px 0;}
+.application .difference-row {padding:9px;margin-bottom:6px;}
+.application .firefight-page {width:100%;display:grid;grid-template-columns:minmax(230px,.65fr) minmax(0,2fr);align-content:start;gap:12px;}
+.application .firefight-page > .page-title {grid-column:1/-1;}
+.application .firefight-page .firefight-plan {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start;}
+.application .firefight-plan > section {min-width:0;padding:10px;border:1px solid var(--line);border-radius:8px;}
+.application .firefight-waves {grid-column:2;grid-row:1/3;}
+.application .firefight-validation {grid-column:1/-1;}
+.application .firefight-page .forge-rule-grid {grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;}
+.application .firefight-preset-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:7px;}
+.application .firefight-preset-grid .forge-preset {padding:0;border:0;}
+.application .firefight-preset-grid button {width:100%;min-height:34px;text-align:left;white-space:normal;}
+.application .firefight-preset-notes {font-size:11px;margin-top:8px;}
+.application .firefight-plan .forge-wave {padding:9px;margin:8px 0;}
+.application .studio-guide {display:grid;grid-template-columns:2fr 1fr;gap:16px;border-bottom:1px solid var(--line);padding:8px 0;}
+.application .studio-guide ol {margin:6px 0;padding-left:20px;line-height:1.5;}
+.application .studio-guide nav {display:flex;flex-wrap:wrap;align-content:start;gap:6px 12px;}
+.application .studio-guide nav strong {flex-basis:100%;}
+.application .studio-handoff > div {margin-top:9px;}
+.application .creator-studio .studio-tabs {margin:9px 0;gap:4px;}
+.application .creator-studio .studio-heading {margin:4px 0 8px;gap:8px;align-items:center;}
+.application .creator-studio .studio-record {padding:10px;margin:8px 0;}
+.application .creator-studio .studio-fields {gap:7px;margin-bottom:8px;}
+.application .creator-studio .studio-empty {padding:14px 10px;}
+.application .library-hero {height:auto;min-height:150px;margin-bottom:12px;}
+.application .hero-copy {padding:12px 16px;}
+.application .hero-copy h2 {font-size:26px;line-height:1.1;margin:8px 0;}
+.application .hero-copy h2 br {display:none;}
+.application .hero-copy p {font-size:12px;line-height:1.4;margin:6px 0;}
+.application .gs-hero-actions {margin-top:8px;}
+.application .hero-link {margin-top:0;}
+.application .runtime-strip {padding:9px 12px;margin-block:8px;}
+.application .map-grid {grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+.application .map-card .map-thumbnail {height:110px;}
+.application .build-columns {gap:12px;grid-template-columns:minmax(0,1fr) minmax(260px,300px);}
+.application .build-main {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start;}
+.application .build-main > :is(.build-conversion,.compatibility,.log-panel) {grid-column:1/-1;}
+.application .build-page .surface {padding:12px;margin:0;}
+.application .build-page .surface p {line-height:1.45;margin:6px 0;}
+.application .build-log {max-height:180px;}
+.application .dependency-panel {grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px;padding:12px;align-content:start;}
+.application .dependency-panel > :is(header,.notice,.dependency-review,.dependency-footnote,[role='status']) {grid-column:1/-1;}
+.application .dependency-item {border:1px solid var(--line);border-radius:8px;padding:10px;gap:5px;align-content:start;}
+.application .dependency-item p {font-size:11px;line-height:1.4;margin:3px 0;}
+.application .dependency-item .dependency-actions {margin-top:5px;}
+.application .gs-settings-tabs {padding:6px 12px;gap:5px;}
+.application .interface-studio {display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:10px;align-content:start;}
+.application .interface-studio > .page-title {grid-column:1/-1;}
+.application .interface-studio > .analysis-card {margin:0;}
+.application .gs-howto-grid,.application .feature-catalog {grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;}
+.application .gs-glossary {display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px;}
+.application .gs-glossary > div {padding:10px;margin:0;}
+.application .gs-credits-grid {grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;}
+.application .gs-credit {padding:10px;}
+.application .gs-academy-layout {grid-template-columns:minmax(210px,280px) minmax(0,1fr);gap:12px;}
+.application .gs-lesson-item {padding:9px;margin-bottom:6px;}
+.application .gs-academy-body .analysis-card {margin:8px 0;padding:10px;}
+.application .gs-halo-choices {grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;}
+.application .gs-halo-choices > button {min-height:88px;padding:10px;text-align:left;}
+.application .gs-starter-picker {grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px;}
+.gs-help-bubble.gs-help-portal:not([hidden]) {display:block;visibility:visible;opacity:1;transform:none;pointer-events:none;width:max-content;padding:9px 11px;border:1px solid var(--accent,#79c9dd);border-radius:8px;background:var(--panel,#121827);color:#fff;box-shadow:0 8px 28px #0008;font:12px/1.45 system-ui;white-space:normal;overflow-wrap:anywhere;}
+.gs-help-portal[hidden] {display:none;}
+.application .number-field input:not(:focus) {cursor:ew-resize;}
+.gs-external-link-menu {display:grid;gap:2px;width:190px;padding:5px;border:1px solid var(--line,#384458);border-radius:8px;background:var(--panel,#121827);box-shadow:0 8px 24px #0008;}
+.gs-external-link-menu button {padding:8px;text-align:left;background:transparent;border:0;color:#fff;}
+.gs-external-link-menu button:hover,.gs-external-link-menu button:focus-visible {background:#ffffff12;}
+@media(max-width:1100px){.application .firefight-page{grid-template-columns:1fr;}.application .studio-guide{grid-template-columns:1fr;}.application .build-main{grid-template-columns:1fr;}.application .build-columns{grid-template-columns:minmax(0,1fr) 260px;}}
+@media(max-width:760px){.application .firefight-page .firefight-plan,.application .build-columns,.application .gs-academy-layout{display:block;}.application .firefight-plan>section{margin-block:8px;}.application .library-hero{height:auto;min-height:145px;}.application .hero-copy{padding:14px;}.application .hero-art{display:none;}.application .page-title{flex-wrap:wrap;}}

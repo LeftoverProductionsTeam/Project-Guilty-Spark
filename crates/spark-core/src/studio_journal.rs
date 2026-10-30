@@ -466,7 +466,7 @@ mod tests {
     #[test]
     fn portable_native_asset_reference_never_grants_local_build_provenance() {
         let mut document = quickforge::create_arena("assets", "emptyArena").unwrap();
-        document.placements.push(quickforge::ForgePlacement {
+        document.placements.push(quickforge::ForgePlacement { published_asset_id: None,
             id: id(),
             name: "Owned Warthog".into(),
             tag_path: "vehicles/warthog/mp_warthog".into(),

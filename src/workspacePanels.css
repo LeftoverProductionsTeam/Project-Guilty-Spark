@@ -160,8 +160,16 @@
   border-bottom: 0;
 }
 .gs-workspace-panel[data-dock='float'] {
-  resize: both;
+  resize: none;
 }
+.gs-workspace-panel[data-dock='top'] {left:0;right:0;top:0;border-radius:0 0 12px 12px;border-top:0;}
+.gs-panel-resize {position:absolute;touch-action:none;z-index:6;}
+.gs-workspace-panel[data-dock='left'] .gs-panel-resize {right:0;top:0;bottom:0;width:6px;cursor:ew-resize;}
+.gs-workspace-panel[data-dock='right'] .gs-panel-resize {left:0;top:0;bottom:0;width:6px;cursor:ew-resize;}
+.gs-workspace-panel[data-dock='top'] .gs-panel-resize {left:0;right:0;bottom:0;height:6px;cursor:ns-resize;}
+.gs-workspace-panel[data-dock='bottom'] .gs-panel-resize {left:0;right:0;top:0;height:6px;cursor:ns-resize;}
+.gs-workspace-panel[data-dock='float'] .gs-panel-resize {right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);border-radius:0 0 10px;}
+.gs-panel-resize:focus-visible {outline:2px solid var(--accent);outline-offset:-2px;}
 .gs-workspace-panel > header {
   display: flex;
   justify-content: space-between;
@@ -182,6 +190,8 @@
   flex: 1;
   min-width: 0;
   touch-action: none;
+  cursor:move;
+  user-select:none;
 }
 .gs-workspace-panel[data-dock='float'] .gs-panel-drag {
   cursor: move;
@@ -731,3 +741,29 @@ html[data-gs-fullscreen='true'] .gs-window-actions .gs-window-button { height:26
 .viewport-tags .panel-heading { margin-bottom:4px; }.viewport-tags .viewport-tag-path { margin:5px 0;font-size:10px; }
 .tag-detail { padding:16px 22px; }.tag-detail-heading { margin-bottom:12px; }.tag-detail-heading h2 { font-size:24px;margin:5px 0; }
 .tag-detail .property-row { padding:9px 0; }.tag-secondary-actions { margin-top:9px;font-size:11px; }.tag-secondary-actions>summary { cursor:pointer; }
+
+/* The tab owns its fill; child buttons must follow its curved silhouette. */
+.application .map-tab { overflow:hidden; isolation:isolate; }
+:root[data-gs-theme] .application .map-tab button,
+:root[data-gs-theme] .application .map-tab button[aria-selected='true'] { background:transparent !important; box-shadow:none !important; border-color:transparent; border-radius:inherit; }
+:root[data-gs-theme] .application .map-tab .map-tab-action:hover { background:color-mix(in srgb,var(--accent) 14%,transparent) !important; }
+
+:root[data-gs-theme] .application .axis-hint .gs-axis-x {color:#ff5555 !important;}
+:root[data-gs-theme] .application .axis-hint .gs-axis-y {color:#60df78 !important;}
+:root[data-gs-theme] .application .axis-hint .gs-axis-z {color:#65a6ff !important;}
+.gs-finder-dialog .tool-ecosystem {padding:10px;margin-bottom:14px;}
+.gs-finder-dialog .gs-tool-grid {grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
+
+.gs-workspace-panel[data-panel-id='asset-transfer'] .asset-transfer-panel {max-height:none;padding:0;border:0;background:transparent;}
+.gs-workspace-panel[data-panel-id='asset-transfer'] .asset-transfer-tools {display:grid;grid-template-columns:1fr;}
+.gs-workspace-panel[data-panel-id='asset-transfer'] .asset-transfer-list {display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));max-height:none;gap:10px;}
+.gs-transfer-card {min-width:0;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel);}
+.gs-transfer-card>button {width:100%;display:grid;gap:4px;text-align:left;}
+.library-asset-preview {display:grid;place-items:center;min-height:96px;overflow:hidden;background:#0b1721;}
+.library-asset-preview img {width:100%;height:112px;object-fit:contain;}
+.library-asset-preview .sound-inspector {max-width:100%;padding:6px;}
+
+.gs-full-catalogs {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px;border:1px solid var(--line);border-radius:9px;margin-bottom:10px;}
+.gs-full-catalogs a {padding:6px 9px;border-radius:7px;background:var(--panel);}
+.gs-map-file-advisor p.subtle {display:block;}
+.gs-map-file-advisor p.subtle code {display:inline;}

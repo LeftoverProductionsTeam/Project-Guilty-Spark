@@ -179,6 +179,14 @@ pub fn run_job(
     project:&Project,tools:&ForgeToolchain,jobs_root:&Path,job_id:&str,export_only:bool,
     extra_blockers:Vec<String>,cancel:Arc<AtomicBool>,on_event:impl Fn(JobEvent)+Send+Sync,
 ) -> Result<QuickForgeBuildReceipt> {
+    run_prepared_job(project,tools,jobs_root,job_id,export_only,extra_blockers,cancel,None,on_event)
+}
+/// Native semantic recipes must first be materialized and read back by the
+/// local reviewed native tools. Pin every staged input to that prepared fork.
+pub fn run_prepared_job(
+    project:&Project,tools:&ForgeToolchain,jobs_root:&Path,job_id:&str,export_only:bool,
+    extra_blockers:Vec<String>,cancel:Arc<AtomicBool>,prepared:Option<&BTreeMap<String,String>>,on_event:impl Fn(JobEvent)+Send+Sync,
+) -> Result<QuickForgeBuildReceipt> {
     project.validate()?;
     if project.scene.iter().any(|object|object.source_model.is_some()||object.asset_id.is_some()) {return invalid("Custom/source preview meshes need compiled Halo model and scenario tags before a QuickForge game build. Remove the preview placements or compile their source models first.");}
     uuid::Uuid::parse_str(job_id).map_err(|_|SparkError::Invalid("Job ID is not a UUID".into()))?;
@@ -196,6 +204,7 @@ pub fn run_job(
         project::save_project(&sources.directory.join("project.gsproject"),project)?;
         if let Some(config)=&project.firefight {project::atomic_write(&sources.directory.join("firefight-authoring.json"),&serde_json::to_vec_pretty(config)?,false)?;}
         if export_only {receipt.status="exported".into();return Ok(());}
+        if document.native.is_some() && prepared.is_none() {return invalid("Native shared source requires an explicit local verified materialization before compilation");}
         let engine=match target(document.runtime_id){Ok(v)=>Some(v),Err(e)=>{receipt.blockers.push(e.to_string());None}};
         if project.firefight.is_some(){receipt.blockers.push("Firefight rules are authored and locally simulated, but no supported game-side wave bridge has been implemented or verified. A Firefight game build is blocked.".into());}
         let tool=tool_file(tools);
@@ -234,6 +243,11 @@ pub fn run_job(
         emit("dependencies","Copying and hashing owner-selected tags into an isolated job".into(),15,"info");
         let workspace=&sources.directory;let stage=workspace.join("tags");
         let hashes=stage_tags(tags.as_ref().unwrap(),&stage,&cancel,|done,total,bytes,total_bytes|emit("tag-staging",format!("Prepared {done}/{total} tags · {}/{} MiB",bytes/(1024*1024),total_bytes/(1024*1024)),(15+done*8/total.max(1)) as u8,"info"))?;
+        if prepared.is_some_and(|expected|expected!=&hashes) {return invalid("Prepared native revision changed before compilation; no Halo compiler was started");}
+        if let Some(native)=&document.native {
+            for asset in &native.assets {if hashes.get(&format!("{}.scenery",asset.tag_path()))!=Some(&asset.sha256){return invalid("Prepared source omitted or changed a published native asset");}}
+            project::atomic_write(&directory.join("native-source-binding.json"),&serde_json::to_vec_pretty(&(document.native.as_ref(),&hashes))?,false)?;
+        }
         project::atomic_write(&directory.join("input-tags.json"),&serde_json::to_vec_pretty(&hashes)?,false)?;
         let material_blockers=audit_material_bindings(document,hashes.keys())?;
         if !material_blockers.is_empty(){receipt.blockers.extend(material_blockers);receipt.status="blocked".into();return Ok(());}

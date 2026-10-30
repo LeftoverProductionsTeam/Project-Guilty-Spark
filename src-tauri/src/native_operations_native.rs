@@ -175,7 +175,7 @@ fn source(state: &AppState, id: &str, tag_id: Option<u32>) -> Reply<Source> {
         class,
     })
 }
-fn executable(state: &AppState, project: &Project, id: &str) -> Reply<PathBuf> {
+pub(super) fn executable(state: &AppState, project: &Project, id: &str) -> Reply<PathBuf> {
     let tool = core::tool_ecosystem::tool(id).map_err(error)?;
     if tool.integration != "managedWorkflow" || tool.location != "invader" {
         return Err("This tool has no reviewed native operation".into());
@@ -197,7 +197,7 @@ fn executable(state: &AppState, project: &Project, id: &str) -> Reply<PathBuf> {
     }
     Ok(file)
 }
-fn fields(state: &AppState, project: &Project, tags: &Path, tag: &str) -> Reply<String> {
+pub(super) fn fields(state: &AppState, project: &Project, tags: &Path, tag: &str) -> Reply<String> {
     let file = tags.join(core::safe_relative(tag).map_err(error)?);
     let before = maps::hash_file(&file).map_err(error)?;
     let parser = native_tag_parser::installed(state, project)?;
@@ -233,7 +233,7 @@ fn pipe<R: Read + Send + 'static>(mut reader: R) -> std::thread::JoinHandle<(Str
         (String::from_utf8_lossy(&bytes).replace("\r\n", "\n"), cut)
     })
 }
-fn run(executable: &Path, args: &[String]) -> Reply<(bool, String, String)> {
+pub(super) fn run(executable: &Path, args: &[String]) -> Reply<(bool, String, String)> {
     let mut command = Command::new(executable);
     command
         .args(args)
@@ -268,7 +268,7 @@ fn run(executable: &Path, args: &[String]) -> Reply<(bool, String, String)> {
     }
     Ok((status.unwrap().success(), stdout, stderr))
 }
-fn verify_bytes(tags: &Path, tag: &str, hash: &str) -> Reply<()> {
+pub(super) fn verify_bytes(tags: &Path, tag: &str, hash: &str) -> Reply<()> {
     let current = BTreeMap::from([(tag.into(), hash.into())]);
     let report = core::native_tag_integrity::Cache::default()
         .scan(tags, &BTreeMap::new(), &current, MAX_TAG)

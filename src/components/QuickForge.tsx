@@ -1,5 +1,6 @@
+import {draggedAsset} from '../assetDragRegistry';
 import BuildTargets from './BuildTargets';
-import{WorkspacePanel,useRevealWorkspacePanel}from'./WorkspacePanels';
+import{WorkspacePanel,WorkspacePanelAddon,useRevealWorkspacePanel}from'./WorkspacePanels';
 import RenderFeatures from './RenderFeatures';
 import LiveForge from './LiveForge';
 import MapSounds from './MapSounds';
@@ -11,7 +12,6 @@ import {viewportAssetCatalog,placeLibraryModel,librarySoundEmitters} from '../vi
 import {useViewportAssetDrop} from '../useViewportAssetDrop';
 import {emptySoundScene} from '../spatialAudio';
 import SoundMixer from './SoundMixer';
-import ForgeCollaboration from './ForgeCollaboration';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {useMapState,writeMapSession,readMapSession} from '../mapSession';
 import {
@@ -329,7 +329,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const dropPoint = useRef<((x: number, y: number) => Vec3 | null) | null>(null);
   const library=props.library,revealPanel=useRevealWorkspacePanel(),viewportElement=useRef<HTMLDivElement|null>(null),assetAlive=useRef(true);
   const [studioRole,setStudioRole]=useState<string|null>(null);
-  useEffect(()=>{const status=(event:Event)=>{const value=(event as CustomEvent<{projectId:string;view?:{role?:string}|null}>).detail;if(value?.projectId===project.id)setStudioRole(value.view?.role??null);};const open=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project.id)revealPanel('forge-session');};window.addEventListener('guilty-spark-studio-status',status);window.addEventListener('guilty-spark-live-studio-open',open);if(readMapSession(project.id,'studio.openRequest',false)){revealPanel('forge-session');requestAnimationFrame(()=>writeMapSession(project.id,'studio.openRequest',false));}return()=>{window.removeEventListener('guilty-spark-studio-status',status);window.removeEventListener('guilty-spark-live-studio-open',open);};},[project.id,revealPanel]);
+  useEffect(()=>{const status=(event:Event)=>{const value=(event as CustomEvent<{projectId:string;view?:{role?:string}|null}>).detail;if(value?.projectId===project.id)setStudioRole(value.view?.role??null);};const open=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project.id)revealPanel('sparklink');};window.addEventListener('guilty-spark-studio-status',status);window.addEventListener('guilty-spark-live-studio-open',open);if(readMapSession(project.id,'studio.openRequest',false)){revealPanel('sparklink');requestAnimationFrame(()=>writeMapSession(project.id,'studio.openRequest',false));}return()=>{window.removeEventListener('guilty-spark-studio-status',status);window.removeEventListener('guilty-spark-live-studio-open',open);};},[project.id,revealPanel]);
   const catalog=useMemo(()=>viewportAssetCatalog(library?.documents??[]),[library?.documents]);
   const [assetBusy,setAssetBusy]=useState(false),[workshopSelected,setWorkshopSelected]=useMapState<string|null>(project.id,'forge.workshopSelection',null);
   const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',''),[tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null),[tagRevision,setTagRevision]=useState(0);
@@ -827,11 +827,10 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     (props.dirty || (!!receipt.sources && !!report && receipt.sources.sourceSha256 !== report.sourceSha256));
   return (
     <div className="forge-workspace">
-      <WorkspacePanel id="forge-session" label="QuickForge session">
+      <WorkspacePanelAddon id="connection">
         {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
-        <ForgeCollaboration projectId={project.id} document={doc} entries={data.entries} onShared={props.onSharedDocument} onSave={props.onSave}/>
         <LiveForge project={project} document={doc} selected={selected}/>
-      </WorkspacePanel>
+      </WorkspacePanelAddon>
       <div className="forge-main">
         <WorkspacePanel id="forge-palette" label="Build tools"><aside className="forge-hierarchy">
           <div className="forge-panel-heading">

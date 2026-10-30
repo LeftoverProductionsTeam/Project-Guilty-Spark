@@ -1,3 +1,4 @@
+import LibraryAssetPreview from './LibraryAssetPreview';
 import { useMemo } from 'react';
 import type { PointerEvent } from 'react';
 import { useMapState } from '../mapSession';
@@ -106,7 +107,7 @@ export default function ViewportAssetLibrary({
       </div>
       <div className="viewport-asset-list">
         {shown.slice(0, 150).map((item) => (
-          <article key={item.key}>
+          <article key={item.key}><LibraryAssetPreview item={item}/>
             <button
               className="viewport-asset-source"
               disabled={busy}

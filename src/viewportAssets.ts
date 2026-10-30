@@ -1,5 +1,5 @@
 import type { MapDocument } from './mapDocuments';
-import type { Asset, Project, SceneObject, Vec3 } from './types';
+import type { Asset, Project, SceneObject, Vec3, MapInspection } from './types';
 import { catalogAssets, placeAsset } from './forge';
 import type { ForgeAsset, ForgePlacement } from './forge';
 import { call } from './api';
@@ -38,7 +38,7 @@ export type ViewportAsset =
       sourceSha256: string;
       looping: boolean;
     };
-export function viewportAssetCatalog(documents: MapDocument[]): ViewportAsset[] {
+export function viewportAssetCatalog(documents: {history:{current:Project|null};inspection:MapInspection|null}[]): ViewportAsset[] {
   return documents.flatMap((document) => {
     const project = document.history.current;
     if (!project) return [];

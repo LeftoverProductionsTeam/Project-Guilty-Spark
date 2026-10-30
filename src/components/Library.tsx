@@ -74,7 +74,7 @@ export default function Library({
             THE PRESERVATION WORKBENCH
           </Pill>
           <h2>
-            Old worlds.
+            Old worlds.{' '}
             <br />
             <span>New possibilities.</span>
           </h2>

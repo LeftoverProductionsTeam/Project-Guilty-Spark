@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .into_iter()
             .enumerate()
         {
-            doc.placements.push(ForgePlacement {
+            doc.placements.push(ForgePlacement { published_asset_id: None,
                 id: format!("fixture-{i}"),
                 name: format!("Schema fixture {class}"),
                 tag_path: format!("fixtures\\asset_{class}"),

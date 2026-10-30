@@ -1,12 +1,12 @@
 # SparkLink: authoritative shared QuickForge source
 
-C39 extends the existing `forge_session` service, LAN/VPN transport, QuickForge document, per-map UI state and native compiler. It is a working source-editing slice of Live Studio. Native semantic-tag collaboration, custom binary-asset transfer, remote camera indicators and collaborative runtime delivery remain later phases.
+C39 extends the existing `forge_session` service, LAN/VPN transport, QuickForge document, per-map UI state and native compiler. Protocol 4 adds an optional immutable native-source admission, one supported semantic field and complete admitted scenery publications. The [native-content acceptance](C39_NATIVE_CONTENT_ACCEPTANCE.md) proves those operations, process recovery and compilation. General native tag schemas, arbitrary custom assets, remote camera indicators and collaborative runtime delivery remain later phases.
 
 ## Evidence levels
 
 | Level | Meaning | C39 implementation |
 | --- | --- | --- |
-| A — shared editor | Independent Spark applications edit one acknowledged source revision. | QuickForge geometry, transforms, materials, native asset references, spawns, objectives and environment intent. |
+| A — shared editor | Independent Spark applications edit one acknowledged source revision. | QuickForge source plus one admitted pistol field and complete validated scenery publications/placements. |
 | B — Halo preview | A supported adapter actually applies an operation to the connected engine. | Existing exact-build adapters remain separate. No new collaborative game acceptance. |
 | C — game peers | Other actual game clients observe the authoritative game change. | Unimplemented by this source protocol; Level A does not imply it. |
 
@@ -42,10 +42,10 @@ Camera pose, selection, drawer layout and recording controls stay in the existin
 
 The owner saves a converged source and builds one immutable project clone. A separate `studio-binding.json` binds its project fingerprint, portable document hash, session UUID and authoritative revision to the owned build job. Other editors can continue creating later source revisions while Tool runs. Opening that older result verifies the frozen project; it does not declare the current draft built or relax deployment readiness.
 
-Native asset references carry the owned source hash, tag ID, native class and path. Each editor resolves that hash against their own imported library. Local library IDs and local source paths do not travel. This is reference sharing, not asset transfer. Each participant must already own compatible content. Tag edits, imported meshes, sounds, scripts, BSP assemblies and other project fields are not silently included in this first shared document.
+Native asset references carry the owned source hash, tag ID, native class and path. Each editor resolves that hash against their own imported library. Local library IDs and local source paths do not travel. Reference sharing remains separate from the explicit admitted scenery publication, which carries complete hash-verified bytes. Each participant must independently verify matching dependencies. General tag edits, imported meshes, sounds, scripts, BSP assemblies and other project fields are not silently included.
 
 ## Modules and protocol
 
-`forge_session.rs` retains portable-source mapping and merge behavior. `studio_session.rs` provides typed version-3 messages, membership, leases and sockets. `studio_journal.rs` provides validated transactions, inverse operations and storage. `studio_tls.rs` uses rustls/rcgen for invitation-pinned TLS. `shared_editing.rs` owns the native window/project boundary, local pending drafts, recovery and build bindings. `ForgeCollaboration` presents the existing session drawer; the small Live Studio header button opens it.
+`forge_session.rs` retains portable-source mapping and merge behavior. `studio_session.rs` provides typed version-4 messages, membership, leases and sockets. `studio_journal.rs` provides validated transactions, inverse operations and storage. `studio_native.rs` validates immutable admission, semantic fields and bounded complete publications. `studio_native_source.rs` performs explicit local validation/recovery and frozen native materialization using the C38 pipeline. `studio_tls.rs` uses rustls/rcgen for invitation-pinned TLS. `shared_editing.rs` owns the native window/project boundary, local pending drafts, recovery and build bindings. `ForgeCollaboration` remains mounted per open source project and presents its existing drawer.
 
 Version-2 invitations require matching older applications; there is no automatic encrypted-to-cleartext fallback. The optional Spacewar bridge stays separate. Its existing SDK transport does not become a new tested multi-machine capability merely because the LAN service changed. See [setup](SPARKLINK_SETUP.md), [security](SPARKLINK_SECURITY.md), [project files](PROJECT_FILES.md) and [C39 evidence](CONTINUATION_39_ENGINEERING.md).

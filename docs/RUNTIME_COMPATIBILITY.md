@@ -1,6 +1,6 @@
 # Runtime compatibility and evidence
 
-C39 SparkLink protocol 3 shares QuickForge authoring source across matching Spark builds. It does not translate Halo runtime protocols or certify live engine/game-peer behavior. Native compilation remains target/kit-specific. See [SparkLink scope](CONTINUATION_39_ENGINEERING.md).
+C39 SparkLink protocol 4 shares QuickForge authoring source and the bounded admitted native-content workflow across matching Spark builds. It does not translate Halo runtime protocols or certify live engine/game-peer behavior. Native compilation remains target/kit-specific. See [native-content acceptance](C39_NATIVE_CONTENT_ACCEPTANCE.md) and the [original source slice](CONTINUATION_39_ENGINEERING.md).
 
 C38 native operations are tested against a pinned Windows Invader release and owned MCC H1 loose working tags. A legacy cache with an installed Baboon remains source-unsupported until a compatible source route is established. Runtime, source, kit and executable assessment now comes from the shared catalog. No additional game/runtime compatibility is implied. [Exact tools and formats](COMPATIBLE_TOOLS.md).
 

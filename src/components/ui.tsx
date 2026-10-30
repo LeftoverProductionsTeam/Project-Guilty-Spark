@@ -1,5 +1,6 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import {createPortal} from 'react-dom';
 import { AlertTriangle, Check, ChevronRight, X } from 'lucide-react';
 export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?: string }) {
   return <span className={`pill ${tone}`}>{children}</span>;
@@ -113,7 +114,8 @@ export function NumberField({
   const display = (n: number) => Number(n.toPrecision(7)).toString();
   const [draft, setDraft] = useState(display(value));
   const [error, setError] = useState('');
-  useEffect(() => setDraft(display(value)), [value]);
+  const scrub=useRef<{pointer:number;x:number;value:number;next:number;moved:boolean}|null>(null);
+  useEffect(() => {scrub.current=null;setDraft(display(value));}, [value]);
   function commit() {
     if (draft === display(value)) {
       setError('');
@@ -137,11 +139,33 @@ export function NumberField({
         max={max}
         step={step}
         disabled={disabled}
+        title="Drag left or right to adjust. Shift: fine adjustment. Click and type an exact value."
+        onPointerDown={e=>{
+          if(e.button!==0||disabled||e.clientX>e.currentTarget.getBoundingClientRect().right-18)return;
+          const parsed=Number(draft);
+          scrub.current={pointer:e.pointerId,x:e.clientX,value:Number.isFinite(parsed)?parsed:value,next:value,moved:false};
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={e=>{
+          const drag=scrub.current;if(!drag||drag.pointer!==e.pointerId)return;
+          const delta=e.clientX-drag.x;if(!drag.moved&&Math.abs(delta)<4)return;
+          drag.moved=true;e.preventDefault();
+          const unit=typeof step==='number'?step:0.1;
+          drag.next=Number(Math.min(max,Math.max(min,drag.value+delta*unit*(e.shiftKey ? 0.1 : 1))).toPrecision(12));
+          setDraft(display(drag.next));setError('');
+        }}
+        onPointerUp={e=>{
+          const drag=scrub.current;if(!drag||drag.pointer!==e.pointerId)return;
+          scrub.current=null;
+          if(drag.moved){e.preventDefault();e.stopPropagation();if(drag.next!==value)onCommit(drag.next);}
+        }}
+        onPointerCancel={()=>{scrub.current=null;setDraft(display(value));}}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur();
           if (e.key === 'Escape') {
+            scrub.current=null;
             setDraft(String(value));
             setError('');
           }
@@ -179,11 +203,19 @@ export function Breadcrumb({ section, title }: { section: string; title: string 
  */
 export function HelpTip({help}:{help:string}) {
   const id = useId();
+  const anchor=useRef<HTMLSpanElement>(null),bubble=useRef<HTMLSpanElement>(null);
+  const [position,setPosition]=useState({left:8,top:8});
   const [hovered,setHovered] = useState(false);
   const [focused,setFocused] = useState(false);
   const [dismissed,setDismissed] = useState(false);
   const visible = (hovered || focused) && !dismissed;
-  return <span className={`gs-help-wrapper ${visible ? 'is-visible' : ''}`}
+  useLayoutEffect(()=>{
+    if(!visible)return;
+    const place=()=>{if(!anchor.current)return;const rect=anchor.current.getBoundingClientRect(),width=Math.min(320,innerWidth-16),height=bubble.current?.offsetHeight??80;setPosition({left:Math.min(innerWidth-width-8,Math.max(8,rect.left)),top:rect.bottom+height+12>innerHeight?Math.max(8,rect.top-height-6):rect.bottom+6});};
+    place();window.addEventListener('resize',place);window.addEventListener('scroll',place,true);
+    return()=>{window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);};
+  },[visible,help]);
+  return <span ref={anchor} className={`gs-help-wrapper ${visible ? 'is-visible' : ''}`}
     onMouseEnter={()=>{setHovered(true);setDismissed(false);}}
     onMouseLeave={()=>setHovered(false)}>
     <button type="button" className="gs-helptip" aria-label="Explain this field"
@@ -194,6 +226,6 @@ export function HelpTip({help}:{help:string}) {
       onKeyDown={event=>{
         if(event.key === 'Escape') {event.preventDefault();event.stopPropagation();setDismissed(true);}
       }}>?</button>
-    <span id={id} role="tooltip" aria-hidden={!visible} className="gs-help-bubble">{help}</span>
+    {createPortal(<span ref={bubble} id={id} role="tooltip" hidden={!visible} aria-hidden={!visible} className="gs-help-bubble gs-help-portal" style={{position:'fixed',left:position.left,top:position.top,zIndex:2147483000,maxWidth:'min(320px, calc(100vw - 16px))'}}>{help}</span>,document.body)}
   </span>;
 }

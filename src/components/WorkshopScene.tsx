@@ -1,5 +1,5 @@
+import TransformControls from './HaloTransformControls';
 import { useRef } from 'react';
-import { TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { MutableRefObject } from 'react';
 import type { MeshData, Project, SceneObject, Vec3 } from '../types';

@@ -117,7 +117,7 @@ test('preservation and runtime workspaces disclose unavailable evidence without 
   await page.goto('/');
   await chooseTool(page,"Compare variants");
   await expect(page.getByRole('heading', { name: 'Import two map variants' })).toBeVisible();
-  await chooseTool(page,"Play & servers");
+  await chooseTool(page,"Online");
   await expect(
     page.getByText('Runtime discovery and file hashing require the desktop application.'),
   ).toBeVisible();

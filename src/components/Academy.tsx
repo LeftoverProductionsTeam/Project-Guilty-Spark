@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { BookOpen, CheckCircle2, ChevronRight, CircleHelp, Hammer, LockKeyhole } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronRight, CircleHelp, Hammer, LockKeyhole, SquareArrowOutUpRight } from 'lucide-react';
+import {call,native} from '../api';
 import type { MapInspection, Project, Settings, Workspace } from '../types';
 import { academyLessons, observedStep } from '../tutorialAcademy';
 import { tutorialSourcesForLesson } from '../forumTutorials';
@@ -12,13 +13,16 @@ import '../academy.css';
  * Manual game verification cannot be self-awarded by clicking a checkbox.
  */
 export default function Academy({project,inspection,settings,navigate}:{project:Project|null;inspection:MapInspection|null;settings?:Partial<Settings>|null;navigate:(target:Workspace)=>void}){
-  const [active,setActive]=useState<LessonId>('preservation');
+  const [active,setActive]=useState<LessonId>(()=>{const requested=new URLSearchParams(location.search).get('lesson');return academyLessons.some(item=>item.id===requested)?requested as LessonId:'preservation';});
+  const [windowError,setWindowError]=useState('');
   const lesson=academyLessons.find(item=>item.id===active)!;
   const observable=lesson.steps.filter(step=>observedStep(step,project)!==null);
   const proven=observable.filter(step=>observedStep(step,project)===true);
   return <div className="analysis-page gs-academy">
     <PageTitle eyebrow="HALO MODDING ACADEMY / LEARN BY BUILDING" title="Learn the old magic. Understand the engine."
-      description="Hands-on Halo 1 tutorials inspired by the classic HEK, Eschaton, SwordEdit and MacGamingMods community. Every step explains what it changes, why it matters and what still needs an actual game test."/>
+      description="Hands-on lessons with the steps, tools and engine concepts you need."
+      actions={<button disabled={!native} onClick={()=>void call('open_workspace_window',{workspace:'academy',context:active}).catch(e=>setWindowError(String(e)))} title="Keep this lesson open in a resizable window on another monitor"><SquareArrowOutUpRight size={14}/>Pop out lesson</button>}/>
+    {windowError&&<Notice tone="error">{windowError}</Notice>}
     <Notice tone="info">Academy uses the current project as evidence. A green source-state check is not proof that a mod compiles or runs in Halo. Unsupported operations remain clearly labeled rather than silently marked completed.</Notice>
     <LegacyWorkflowLab project={project} inspection={inspection} settings={settings} navigate={navigate}/>
     <div className="gs-academy-layout">

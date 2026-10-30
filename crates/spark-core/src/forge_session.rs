@@ -9,8 +9,10 @@ pub fn portable(mut doc:QuickForgeDocument)->QuickForgeDocument {for placement i
 /// Rebase independent property edits; a competing edit to the same property,
 /// or a deletion of a changed entity, is refused before any shared mutation.
 pub fn merge(base:&QuickForgeDocument,next:&QuickForgeDocument,current:&QuickForgeDocument)->Result<QuickForgeDocument>{
+    let native=crate::studio_native::merge(&base.native,&next.native,&current.native)?;
     let b=serde_json::to_value(base)?;let n=serde_json::to_value(next)?;let mut c=serde_json::to_value(current)?;
     for(key,value)in n.as_object().unwrap(){if b.get(key)==Some(value){continue;}
+        if key=="native" {continue;}
         if ["geometry","materials","placements","spawns","objectives"].contains(&key.as_str()){
             let old=b[key].as_array().unwrap();let new=value.as_array().unwrap();let result=c[key].as_array_mut().unwrap();
             let keys:BTreeSet<String>=old.iter().chain(new).map(|v|v["id"].as_str().unwrap().to_owned()).collect();
@@ -33,7 +35,7 @@ pub fn merge(base:&QuickForgeDocument,next:&QuickForgeDocument,current:&QuickFor
         }else if key=="environment"&&b[key].is_object()&&value.is_object()&&c[key].is_object(){for(k,v)in value.as_object().unwrap(){if b[key].get(k)==Some(v){continue;}if c[key].get(k)!=b[key].get(k)&&c[key].get(k)!=Some(v){return invalid(format!("Concurrent edit conflict: environment/{k}. Your local draft was retained."));}c[key][k]=v.clone();}}
         else{if c.get(key)!=b.get(key)&&c.get(key)!=Some(value){return invalid(format!("Concurrent edit conflict: {key}. Your local draft was retained."));}c[key]=value.clone();}
     }
-    let doc:QuickForgeDocument=serde_json::from_value(c)?;quickforge::validate_portable_document(&doc)?;Ok(doc)
+    let mut doc:QuickForgeDocument=serde_json::from_value(c)?;doc.native=native;quickforge::validate_portable_document(&doc)?;Ok(doc)
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]

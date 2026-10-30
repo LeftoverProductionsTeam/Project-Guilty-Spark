@@ -321,6 +321,17 @@ async function openFixture(page: Page) {
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
 
+test('one shared undo toolbar follows workspaces and Back restores the edited map',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('27');await field.press('Tab');
+  for(const name of ['Compare variants','Firefight rules','Creator Studio','Build & playtest','Online','Settings & tools','Modding Academy','Tag editor']){
+    await chooseTool(page,name);await expect(page.getByRole('button',{name:'Undo (Ctrl+Z)',exact:true})).toHaveCount(1);await expect(page.getByRole('button',{name:'Redo (Ctrl+Y / Ctrl+Shift+Z)',exact:true})).toHaveCount(1);
+  }
+  await expect(field).toHaveValue('27');await chooseTool(page,'Map library');await chooseTool(page,'Features & workflows');
+  await page.getByRole('button',{name:'Back to previous workspace',exact:true}).click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Back to previous workspace',exact:true}).click();await expect(field).toHaveValue('27');await page.getByRole('button',{name:'Undo (Ctrl+Z)',exact:true}).click();await expect(field).toHaveValue('10');
+});
+
 test('C35 drawers remember each workspace and fullscreen preserves editing tools',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await mockDesktop(page);
  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
@@ -626,7 +637,7 @@ test('an MCC invitation check explains the missing foreign protocol bridge and n
     if(command==='invitation_prepare')return {id:null,expiresAtUnix:0,executable:null,executableSha256:null,dataRoot:null,route:{client:args.client,kind:'nativeCommunity',canHandoff:false,translationStatus:'mccProtocolBridgeMissing',detail:'The selected MCC client does not implement this protocol.',requirements:[],gameplayVerified:false}};
     return original(command,args);
   };});
-  await chooseTool(page,"Play & servers");await page.locator('input[aria-label="Game invitation"]').fill('halo://join/'+'a'.repeat(64));
+  await chooseTool(page,"Online");await page.locator('input[aria-label="Game invitation"]').fill('halo://join/'+'a'.repeat(64));
   await page.getByRole('button',{name:'Check invitation & adapter',exact:true}).click();
   await expect(page.getByText(/MCC-to-OpenCE\/Chupathingy\/WebRTC gameplay translation is not implemented/)).toBeVisible();
   await expect(page.getByRole('button',{name:'Hand invitation to client',exact:true})).toHaveCount(0);
@@ -675,7 +686,7 @@ test('in-app downloads open all imported maps and retain an already open edited 
 test('community games appear on first open and an obsolete requirement check cannot lock the browser', async ({page}) => {
   await mockDesktop(page); await openFixture(page);
   await page.evaluate(() => {(window as any).__sparkMock.deferListing = true;});
-  await chooseTool(page,"Play & servers");
+  await chooseTool(page,"Online");
   await expect.poll(() => page.evaluate(() => typeof (window as any).__sparkMock.finishListing)).toBe('function');
   await page.evaluate(() => (window as any).__sparkMock.finishListing());
   const games = page.getByRole('list', {name:'Advertised games'});
@@ -700,7 +711,7 @@ test('a second map window receives a shared listing refresh without another HTTP
     if(command==='community_listing'&&args.refresh){return {listing:null,fetching:true,stale:true,error:null,refreshAfterUnix:Math.floor(Date.now()/1000)+30};}
     return original(command,args);
   };});
-  await chooseTool(page,"Play & servers");await expect(page.getByRole('list',{name:'Advertised games'}).getByRole('listitem')).toHaveCount(2);
+  await chooseTool(page,"Online");await expect(page.getByRole('list',{name:'Advertised games'}).getByRole('listitem')).toHaveCount(2);
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((item:any)=>item.command==='community_listing'&&item.args.refresh===false))).toBe(true);
 });
 
@@ -806,8 +817,8 @@ test('slow onboarding saves keep navigation available and do not steal a later r
   await chooseTool(page,"Start here");await expect(page.getByRole('heading',{name:'Your editing tools',exact:true})).toBeVisible();
 });
 test('hosting uses the selected map and gameplay presets retain fixed left and right gun controls',async({page})=>{
-  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Play & servers");
-  await page.getByRole('button',{name:'Hosting & servers',exact:true}).click();
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Online");
+  await page.getByRole('button',{name:'Host game',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Synthetic MCC Custom Games guide',exact:true})).toBeVisible();
   await expect(page.getByText('Use Halo CE Custom Games for this multiplayer map.',{exact:true})).toBeVisible();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='runtime_hosting_plan'));expect(calls.at(-1).args.projectId).toBe('a');
@@ -816,17 +827,17 @@ test('hosting uses the selected map and gameplay presets retain fixed left and r
   await page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true}).selectOption('KeyV');
   await expect(page.getByText('Left gun · independent primary trigger',{exact:true})).toBeVisible();
   await expect(page.getByText('Right gun · independent secondary trigger',{exact:true})).toBeVisible();
-  await chooseTool(page,"Tag editor");await chooseTool(page,"Play & servers");
+  await chooseTool(page,"Tag editor");await chooseTool(page,"Online");
   await expect(page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true})).toHaveValue('KeyV');
   await expect(page.getByText('Changing a preset does not enable them in the running game.',{exact:false})).toBeVisible();
 });
 
 test('native camera position edits persist across tools and restore through the adapter',async({page})=>{
-  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Play & servers");await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Online");await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
   const camera=page.locator('.native-camera-controls');await camera.locator('summary').click();
   await camera.getByRole('button',{name:'Enable third-person camera',exact:true}).click();await expect(camera.getByText('Third-person camera active',{exact:false})).toBeVisible();
   await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).fill('-0.45');await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).press('Enter');await camera.getByRole('button',{name:'Apply camera position',exact:true}).click();
-  await chooseTool(page,"Tag editor");await chooseTool(page,"Play & servers");await camera.locator('summary').click();
+  await chooseTool(page,"Tag editor");await chooseTool(page,"Online");await camera.locator('summary').click();
   await expect(camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true})).toHaveValue('-0.45');
   await camera.getByRole('button',{name:'Restore original camera',exact:true}).click();await expect(camera.getByText('Original camera selected',{exact:false})).toBeVisible();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='live_mcc_camera_configure'));expect(calls.map((c:any)=>c.args.enabled)).toEqual([true,true,false]);expect(calls[1].args.config.right).toBe(-.45);
@@ -834,7 +845,7 @@ test('native camera position edits persist across tools and restore through the 
 
 test('the dedicated camera button toggles without opening settings and uses current native state',async({page})=>{
   await mockDesktop(page);await openFixture(page);
-  await chooseTool(page,"Play & servers");
+  await chooseTool(page,"Online");
   await page.getByRole('button',{name:'Gameplay controls',exact:true}).click();
   const camera=page.locator('.native-camera-controls'),button=camera.getByRole('button',{name:'Toggle in-game third person',exact:true});
   await expect(camera.locator('details')).not.toHaveAttribute('open','');
@@ -1028,29 +1039,34 @@ test('looping source tracks persist across tools and Finish waits for their end 
   await expect(emitters.locator('option')).toHaveCount(3);
 });
 
-test('shared QuickForge survives tool changes and pauses a divergent local draft on restore',async({page})=>{
+test('shared source stays synchronized across tools with one game connection drawer',async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]})));
   await mockDesktop(page);await openFixture(page);await chooseTool(page,"Level editor");
   await expect(page.locator('.forge-topbar')).toHaveCount(0);
   await expect(page.locator('.forge-center > .forge-live-panel')).toHaveCount(0);
   const viewport=await page.locator('.forge-viewport').boundingBox();
-  const session=page.getByRole('region',{name:'QuickForge session panel',exact:true});
+  const session=page.getByRole('region',{name:'SparkLink panel',exact:true});
   const revealSession=async()=>{
     if(await session.isVisible())return;
     await page.locator('.gs-layout-menu > summary').click();
-    await page.locator('.gs-layout-menu').getByLabel('QuickForge session',{exact:true}).check();
+    await page.locator('.gs-layout-menu').getByLabel('SparkLink',{exact:true}).check();
     await page.locator('.gs-layout-menu > summary').click();
   };
   await revealSession();
   expect(await page.locator('.forge-viewport').boundingBox()).toEqual(viewport);
-  const sharing=page.locator('details.forge-live-panel').filter({has:page.locator('summary').filter({hasText:'Shared QuickForge'})});await sharing.locator('summary').first().click();
+  const sharing=page.locator('details.forge-live-panel').filter({has:page.locator('summary').filter({hasText:'Shared source'})});await sharing.locator('summary').first().click();
   await page.getByRole('button',{name:'Host editing session',exact:true}).click();await expect(page.getByRole('button',{name:'Leave session',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Toggle Game connection',exact:true})).toHaveCount(1);
+  await page.getByRole('button',{name:'Toggle Game connection',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Game connection panel',exact:true})).toHaveCount(1);
+  await expect(page.getByText('Live Halo adapter · MCC',{exact:true})).toBeVisible();
   await chooseTool(page,"Tag editor");
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='forge_session_leave').length)).toBe(0);
   await page.evaluate(()=>{(window as any).__sparkMock.session.view.document.name='Another editor changed the name';});
-  await chooseTool(page,"Level editor");await revealSession();await sharing.locator('summary').first().click();
-  await expect(page.getByText('Paused · local draft retained',{exact:false})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Export local draft',exact:true})).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='forge_session_poll').length)).toBeGreaterThan(0);
+  await chooseTool(page,"Level editor");await revealSession();
+  await expect(page.getByText('Paused · local draft retained',{exact:false})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Toggle Game connection',exact:true})).toHaveCount(1);
   await page.getByRole('button',{name:'Leave session',exact:true}).click();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='forge_session_leave'));expect(calls).toHaveLength(1);expect(calls[0].args).toEqual({projectId:'a',sessionId:'11111111-1111-4111-8111-111111111111'});
 });
@@ -1152,7 +1168,7 @@ test('feature search preserves multiple open maps and each map undo history',asy
 });
 test('maps retain independent tag views, tool profiles and last workspace; a late load respects navigation',async({page})=>{
   await mockDesktop(page);await openFixture(page);const search=page.getByRole('textbox',{name:'Search tags',exact:true});await search.fill('test');await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
-  await page.getByRole('button',{name:'Toggle Project setup',exact:true}).click();await page.locator('.gs-map-tools>summary').click();await page.locator('.gs-map-tools .gs-build-targets>summary').click();await page.locator('.gs-map-tools').getByRole('button',{name:'Add MCC target',exact:true}).click();const aFields=page.locator('.gs-map-tools fieldset').getByRole('textbox');await aFields.nth(0).fill('Map A kit');await aFields.nth(1).fill('C:/MapA/HCEEK');await aFields.nth(2).fill('C:/MapA/tags');
+  await page.getByRole('button',{name:'Toggle Project setup',exact:true}).click();await page.locator('.gs-map-tools>summary').click();await page.locator('.gs-map-tools .gs-build-targets>summary').click();await page.locator('.gs-map-tools').getByRole('button',{name:'Add runtime target',exact:true}).click();const aFields=page.locator('.gs-map-tools fieldset').getByRole('textbox');await aFields.nth(0).fill('Map A kit');await aFields.nth(1).fill('C:/MapA/HCEEK');await aFields.nth(2).fill('C:/MapA/tags');
   await chooseTool(page,"Map library");await page.evaluate(()=>(window as any).__sparkMock.delayOpen=600);await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await chooseTool(page,"Features & workflows");await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toBeVisible();await expect(page.getByRole('heading',{name:'What can Spark do?',exact:true})).toBeVisible();await expect(page.locator('.gs-map-tools')).toContainText('default tools');
   await chooseTool(page,"Tag editor");await expect(search).toHaveValue('');await search.fill('candidate');
   await page.getByRole('tab',{name:/Synthetic baseline/}).click();await expect(search).toHaveValue('test');await expect(page.getByRole('combobox',{name:'Filter tag class',exact:true})).toHaveValue('weap');await expect(page.locator('.gs-map-tools fieldset').getByRole('textbox').nth(0)).toHaveValue('Map A kit');await expect(page.locator('.gs-map-tools fieldset').getByRole('textbox').nth(2)).toHaveValue('C:/MapA/tags');
@@ -1191,6 +1207,7 @@ test('comparison renders semantic values and warns about undecoded payloads', as
   const changed = page.locator('.difference-row').filter({ hasText: 'Velocity' });
   await expect(changed).toContainText('10');
   await expect(changed).toContainText('25');
+  await page.locator('.analysis-coverage > summary').click();
   await expect(
     page.getByText('Unchanged tag names are not proof of identical asset data.', { exact: false }),
   ).toBeVisible();
@@ -1391,7 +1408,7 @@ test('a delayed replacement plan cannot overwrite edits made while it runs', asy
 test('friends preflight surfaces blocked proof without a network success claim', async ({ page }) => {
   await mockDesktop(page);
   await openFixture(page);
-  await chooseTool(page,"Play & servers");
+  await chooseTool(page,"Online");
   await page.getByRole('button', { name: 'Runtime adapters', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open Steam launch selector', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Friends preflight', exact: true }).click();

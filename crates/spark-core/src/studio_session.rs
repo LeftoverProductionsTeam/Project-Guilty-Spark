@@ -19,7 +19,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 pub const MAX_FRAME_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_PARTICIPANTS: usize = 8;
 fn fail(s: impl Into<String>) -> SparkError {

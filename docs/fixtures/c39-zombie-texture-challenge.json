@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "status": "FAILED - BSP rendering remains incomplete",
+  "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+  "sourceCacheVersion": 6,
+  "originalsUnchanged": true,
+  "renderingParityAccepted": false,
+  "candidates": [
+    {
+      "kind": "Installed MCC legacy bitmaps.map",
+      "sha256": "74e2436eda3ca9f6d166fb7930ed018c892f206d49a3a6fe063506cbb621d97e",
+      "compatibility": {
+        "Ok": {
+          "cacheGeneration": 6,
+          "internalImages": 142,
+          "missingOrMismatchedImages": 499,
+          "resourceSha256": "74e2436eda3ca9f6d166fb7930ed018c892f206d49a3a6fe063506cbb621d97e",
+          "unsupportedImages": 44,
+          "verifiedImages": 1
+        }
+      }
+    },
+    {
+      "kind": "Installed MCC Custom Edition bitmaps.map",
+      "sha256": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+      "compatibility": {
+        "Err": "This resource file proves no external image ranges for the selected map. Choose that map's original bitmaps.map; self-contained maps do not need it"
+      }
+    }
+  ],
+  "sampledBspFailures": [
+    {
+      "id": 3793551529,
+      "path": "scenery\\teleporter_shield\\bitmaps\\teleporter_shield_dust",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3793617066,
+      "path": "scenery\\teleporter_shield\\bitmaps\\teleporter_shield_mask",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3794075825,
+      "path": "levels\\b30\\bitmaps\\metal flat generic",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3794141362,
+      "path": "levels\\b30\\bitmaps\\detail metal sratches",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3794206899,
+      "path": "levels\\b30\\bitmaps\\metal flat generic bump",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3914598368,
+      "path": "levels\\test\\bloodgulch\\bitmaps\\blood cliff rock",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3914663905,
+      "path": "levels\\b30\\bitmaps\\detail cliff rock",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3787784273,
+      "path": "levels\\b30\\bitmaps\\detail cliff rock smooth",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3914729442,
+      "path": "levels\\a30\\bitmaps\\cliff rock bump",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3915057127,
+      "path": "levels\\b30\\bitmaps\\metal panels generic ext clean",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3915253738,
+      "path": "levels\\b30\\bitmaps\\metal panels generic ext",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    },
+    {
+      "id": 3915188201,
+      "path": "levels\\test\\bloodgulch\\bitmaps\\cap_metal",
+      "code": "resource-mismatch",
+      "error": "Pixel range not proven to belong to the exact bitmap resource entry"
+    }
+  ],
+  "explanation": "The installed legacy file proves one external image range, but 499 ranges do not match this Demo cache. Finding or pinning it does not complete texture restoration. Embedded pixels still load; incompatible external ranges remain refused. Do not relax exact range/hash checks or report full rendering parity.",
+  "next": "Implement a separately validated compatible runtime-image binding or recover the matching original resource; test exact tag/image identities, encoding, dimensions and immutable source before claiming restoration."
+}

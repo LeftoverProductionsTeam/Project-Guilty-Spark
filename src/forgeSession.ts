@@ -3,7 +3,12 @@ import type {LibraryEntry} from './types';
 type Entity=Record<string,unknown>&{id:string};
 const collections=['geometry','materials','placements','spawns','objectives'];
 const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
-export function portableForge(doc:QuickForgeDocument):QuickForgeDocument{return JSON.parse(JSON.stringify({...doc,placements:doc.placements.map(p=>({...p,sourceProjectId:null}))},(_key,value)=>typeof value==='number'&&!Number.isInteger(value)?Math.fround(value):value));}
+export function portableForge(doc:QuickForgeDocument):QuickForgeDocument {
+  // QuickForge geometry is float32. Native semantic recipes and their admitted
+  // baseline use the native reader's exact numeric output and must not be rounded.
+  const result=JSON.parse(JSON.stringify({...doc,native:undefined,placements:doc.placements.map(p=>({...p,sourceProjectId:null}))},(_key,value)=>typeof value==='number'&&!Number.isInteger(value)?Math.fround(value):value)) as QuickForgeDocument;
+  if(doc.native)result.native=structuredClone(doc.native);return result;
+}
 export function localForge(doc:QuickForgeDocument,entries:LibraryEntry[]):QuickForgeDocument{return {...doc,placements:doc.placements.map(p=>({...p,sourceProjectId:entries.find(e=>e.sha256&&e.sha256===p.sourceSha256)?.id??null}))};}
 /** Retain edits made while a network proposal was in flight. The native host
  * independently validates and merges every proposal. */
@@ -11,7 +16,11 @@ export function mergeForge(base:QuickForgeDocument,next:QuickForgeDocument,curre
   const b=base as unknown as Record<string,unknown>,n=next as unknown as Record<string,unknown>,result=structuredClone(current) as unknown as Record<string,unknown>;
   for(const key of Object.keys(n)){
     if(same(b[key],n[key]))continue;
-    if(collections.includes(key)){
+    if(key==='native'){
+      if(!base.native||!next.native||!current.native||!same(base.native.source,next.native.source)||!same(base.native.source,current.native.source))throw new Error('Native source admission changed; review a new session');
+      const mergeRows=(old:unknown[],after:unknown[],out:unknown[])=>{const fake=(rows:unknown[])=>({...base,native:undefined,geometry:rows}) as unknown as QuickForgeDocument;return mergeForge(fake(old),fake(after),fake(out),forceRemote).geometry;};
+      result.native={source:structuredClone(current.native.source),fields:mergeRows(base.native.fields,next.native.fields,current.native.fields),assets:mergeRows(base.native.assets,next.native.assets,current.native.assets)};
+    }else if(collections.includes(key)){
       const old=b[key] as Entity[],after=n[key] as Entity[],out=result[key] as Entity[];
       for(const id of new Set([...old,...after].map(v=>v.id))){const before=old.find(v=>v.id===id),value=after.find(v=>v.id===id),index=out.findIndex(v=>v.id===id);if(same(before,value))continue;
         if(!value){if(index<0)continue;if(!forceRemote&&!same(out[index],before))throw new Error(`Concurrent edit/delete conflict: ${key}/${id}`);out.splice(index,1);}

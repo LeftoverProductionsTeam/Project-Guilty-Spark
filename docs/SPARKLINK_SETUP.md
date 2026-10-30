@@ -11,6 +11,8 @@ Use the same C39 development build on each Windows PC. Each creator needs their 
 
 Start with a small source-only arena. To share a Warthog placement, each participant first imports their own matching map. Its exact source hash and native tag identify the model; Spark maps these to each person's local library. A matching filename alone is insufficient.
 
+For the bounded native-content workflow, each creator first verifies the retained native source, the owned preview map and the same scenery template/dependencies in **Native tags & published assets**. Host or join only after that local verification. One creator can share the supported pistol bounding radius; another validates and publishes a matching complete `.scenery` file; another places the publication. These are author-specific transactions, and the owner builds the common acknowledged revision. The workflow currently accepts only the admitted template, not arbitrary new models, sounds or animations. [Acceptance scope and source recovery](C39_NATIVE_CONTENT_ACCEPTANCE.md).
+
 ## When edits conflict
 
 Two changes to the same property, or deleting something another creator changed, pause synchronization. The local draft remains. Review local/shared differences, export the draft if needed, then deliberately choose **Use shared version and resume** or retry a retained operation. **Undo my shared edit** and **Redo my shared edit** create per-author inverse transactions. They do not erase another creator's independent work.
@@ -25,7 +27,7 @@ The drawer can export or restore a retained unacknowledged draft. **Clear retain
 - Use the actual host LAN/VPN address. Public, wildcard and non-IPv4 endpoints are refused. Spark does not open router ports or alter the firewall. If Windows requests network access, grant only the private network needed for your session.
 - Names are chosen display labels, not verified identities. An Editor invitation grants editing access. Revoke a leaked participant and copy fresh invitations; possession of the old invitation alone will no longer admit new guests.
 - If recovery reports a corrupt/mismatched journal, retain the entire session folder and project snapshots for diagnosis. Spark refuses the active checkpoint rather than discarding acknowledged history. Do not manually replace the head file with an older checkpoint and call it recovered.
-- Ordinary tool switching preserves the native connection. This first UI controller synchronizes while the QuickForge workspace is mounted; returning from another tool with a divergent local draft requires review. Shared native tags/imports and a global all-workspace synchronization controller remain later work.
+- Ordinary tool switching keeps each open QuickForge project's synchronization controller mounted. The native-content test changes a shared field and player-start name while another participant is in the Tag editor, then verifies the rendered map on return. Conflicting unacknowledged drafts still require deliberate review.
 
 ## First acceptance test
 

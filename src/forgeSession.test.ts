@@ -14,3 +14,16 @@ describe('shared QuickForge concurrent edits',()=>{
 
 it('keeps local X undo when the other editor changes Y on the same object',()=>{let h=historyReducer(initialHistory,{type:'load',project:project(base)});const own=structuredClone(base);own.geometry[0].position=[2,0,0];h=historyReducer(h,{type:'edit',project:project(own),description:'Move X'});const remote=structuredClone(own);remote.geometry[0].position[1]=5;h=historyReducer(h,{type:'forge-remote',projectId:'shared-project',document:remote});h=historyReducer(h,{type:'undo'});expect(h.current?.quickForge?.geometry[0].position).toEqual([0,5,0]);});
 it('retains local non-shared undo when remote source changes arrive',()=>{let h=historyReducer(initialHistory,{type:'load',project:project(base)});const local=project(base);local.title='My local title';h=historyReducer(h,{type:'edit',project:local,description:'Rename local project'});const remote=structuredClone(base);remote.geometry[0].position[1]=3;h=historyReducer(h,{type:'forge-remote',projectId:'shared-project',document:remote});h=historyReducer(h,{type:'undo'});expect(h.current?.title).toBe('shared');expect(h.current?.quickForge?.geometry[0].position[1]).toBe(3);});
+
+it('merges native field edits with complete asset publication and preserves inverse conflicts',()=>{
+  const d=structuredClone(base);d.native={source:{inventorySha256:'a'.repeat(64),fieldTag:'weapons/pistol/pistol.weapon',fieldTagSha256:'b'.repeat(64),boundingRadius:0.1,templateTag:'scenery/rock.scenery',templateSha256:'c'.repeat(64),dependencies:{'scenery/rock.gbxmodel':'d'.repeat(64)},previewSha256:'e'.repeat(64),previewTagId:1,previewTagPath:'scenery/rock'},fields:[],assets:[]};
+  const tag=structuredClone(d),asset=structuredClone(d);tag.native!.fields=[{id:'pistolBoundingRadius',boundingRadius:0.3}];asset.native!.assets=[{id:'published',name:'Rock',sha256:'c'.repeat(64),bytes:[1,2,3]}];
+  const merged=mergeForge(d,tag,asset);expect(merged.native!.fields).toEqual(tag.native!.fields);expect(merged.native!.assets).toEqual(asset.native!.assets);
+  const conflict=structuredClone(tag);conflict.native!.fields[0].boundingRadius=0.4;expect(()=>mergeForge(d,tag,conflict)).toThrow(/conflict/);
+  const undone=mergeForge(merged,{...merged,native:{...merged.native!,fields:[]}},merged);expect(undone.native!.fields).toEqual([]);expect(undone.native!.assets).toEqual(asset.native!.assets);
+});
+
+it('does not round native admission or semantic values through float32 geometry normalization',()=>{
+  const d=structuredClone(base);d.native={source:{inventorySha256:'a'.repeat(64),fieldTag:'weapons/pistol/pistol.weapon',fieldTagSha256:'b'.repeat(64),boundingRadius:0.1,templateTag:'scenery/rock.scenery',templateSha256:'c'.repeat(64),dependencies:{'scenery/rock.gbxmodel':'d'.repeat(64)},previewSha256:'e'.repeat(64),previewTagId:1,previewTagPath:'scenery/rock'},fields:[{id:'pistolBoundingRadius',boundingRadius:0.225}],assets:[]};
+  expect(portableForge(d).native).toEqual(d.native);expect(portableForge(portableForge(d))).toEqual(portableForge(d));
+});

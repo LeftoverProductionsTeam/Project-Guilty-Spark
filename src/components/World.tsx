@@ -1,9 +1,14 @@
+import TransformControls from './HaloTransformControls';
+import useEndToFloor from '../useEndToFloor';
+import type {DropBody} from '../useEndToFloor';
+import {draggedAsset} from '../assetDragRegistry';
+import {useRendererQuality} from './RendererQuality';
 import { Component, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode,MutableRefObject } from 'react';
 import { Canvas, useThree,useFrame } from '@react-three/fiber';
 import {
   OrbitControls,
-  TransformControls,
+
   OrthographicCamera,
   PerspectiveCamera,
 } from '@react-three/drei';
@@ -371,6 +376,7 @@ function Scene({
   environment,
   sourceAppearance,extraTextures,
   onSceneDragStart,onSceneDragEnd,
+  onSnapError,
   cinematic=false,cameraLocked=false,externalCameraAuthority=false,
   ownedModels,
 }: {
@@ -395,6 +401,7 @@ function Scene({
   environment: EditorEnvironment;
   sourceAppearance:SourceAppearance|null;extraTextures:Record<string,THREE.Texture>;
   onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
+  onSnapError:(message:string)=>void;
   cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;
   ownedModels:Record<string,OwnedModelView>;
 }) {
@@ -404,6 +411,13 @@ function Scene({
   const markerSize = inspection ? 0.22 : 0.15;
   const shaderMetadata=useMemo(()=>Object.fromEntries((inspection?.tags??[]).filter(t=>t.shaderPreview).map(t=>[t.id,t.shaderPreview!])),[inspection]);
   const spartan=sourceSpartan(inspection),spawnModel=spartan?inspection?.modelMeshes?.[spartan.id]:undefined;
+  const dropBody=(object:SceneObject):DropBody=>{
+    const linked=sourcePlacement(object),view=linked?ownedModels[forgeModelKey(linked)]:undefined;
+    const preview=object.assetId?assetMeshes[object.assetId]:view?.mesh??(object.tagId!==null?inspection?.modelMeshes?.[object.tagId]:undefined);
+    const source=object.sourceModel?{projectId:object.sourceModel.projectId,sourceSha256:object.sourceModel.sourceSha256,tagId:object.sourceModel.tagId}:project.source&&object.tagId!==null?{projectId:project.id,sourceSha256:project.source.sha256,tagId:object.tagId}:undefined;
+    return {id:object.id,name:object.name,preview,source,collision:object.assetId?preview:undefined,matrix:new THREE.Matrix4().compose(new THREE.Vector3(...object.position),new THREE.Quaternion().setFromEuler(new THREE.Euler(object.rotation[2],object.rotation[1],object.rotation[0],'ZYX')),new THREE.Vector3(...object.scale))};
+  };
+  useEndToFloor({enabled:!fly&&!cinematic&&!cameraLocked,revision:JSON.stringify(project.scene),selected:chosen?[dropBody(chosen)]:[],others:all.filter(o=>o.id!==selected&&o.kind!=='Player spawn').map(dropBody),terrain:inspection?.mesh,onDrop:delta=>{if(chosen)onTransform({...chosen,position:[chosen.position[0],chosen.position[1],chosen.position[2]+delta]});},onError:onSnapError});
   const cameraStartId=startId||project.scene.find(o=>o.kind==='Player spawn')?.id;
   return (
     <>
@@ -578,6 +592,7 @@ export default function World({
   const viewportElement=useRef<HTMLDivElement|null>(null),dropPoint=useRef<((x:number,y:number)=>Vec3|null)|null>(null),projectValue=useRef(project),alive=useRef(true);
   projectValue.current=project;
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[project.id]);
+  const rendererQuality=useRendererQuality(project.id);
   const [assetBusy,setAssetBusy]=useState(false);
   const [dropReady,setDropReady]=useState(false);
   const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
@@ -585,7 +600,7 @@ export default function World({
   const {models:ownedModels,failures:modelIssues}=useOwnedForgeModels(linked,resourceScopes);
   async function dropAsset(key:string,position:Vec3,replaceId?:string|null){
     if(!library||library.busy||assetBusy)return;
-    const item=catalog.find(candidate=>candidate.key===key);if(!item){notify('The source map is no longer open. Reopen it before placing this asset.');return;}
+    const item=catalog.find(candidate=>candidate.key===key)??draggedAsset(key);if(!item){notify('The source map is no longer open. Reopen it before placing this asset.');return;}
     setAssetBusy(true);
     try{
       if(item.kind==='model'){
@@ -1282,8 +1297,9 @@ export default function World({
           <ViewportBoundary>
             <Suspense fallback={<div className="loading">Preparing geometry…</div>}>
               <Canvas
-                dpr={[1, 1.75]}
-                gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
+                key={String(rendererQuality.antialias)}
+                dpr={rendererQuality.dpr}
+                gl={{ antialias: rendererQuality.antialias, alpha: false, preserveDrawingBuffer: true }}
                 onPointerMissed={(event) => { if (event.button === 0 && event.type === 'click') {setSelected(null);setZoneSelection(null);} }}
               >
                 <ViewportActivity continuous={cinematic}/>
@@ -1308,6 +1324,7 @@ export default function World({
                     ownedModels,
                   }}
                   inspection={inspection}
+                  onSnapError={notify}
                   onTransform={update}
                   onOpenTag={cinematic?onOpenTag:openObjectTag}
                   shaderTextures={shaderTextures}
@@ -1570,6 +1587,7 @@ export default function World({
                           label={`${property} ${i}`}
                           disabled={property==='rotation'&&i>0&&['Player spawn','Netgame item'].includes(chosen.kind)}
                           min={property === 'scale' ? 0.001 : -1e6}
+                          step={property==='rotation'?1:property==='scale'?0.01:0.1}
                           onCommit={(v) => {
                             try {
                               update({

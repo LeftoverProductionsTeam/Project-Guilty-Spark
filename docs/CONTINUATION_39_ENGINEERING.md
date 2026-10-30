@@ -1,5 +1,7 @@
 # C39 — SparkLink: Live Studio
 
+**Current extension:** [Native tag / asset / placement acceptance](C39_NATIVE_CONTENT_ACCEPTANCE.md) adds the bounded three-author native workflow and global workspace synchronization on the committed C38–C40 foundation. Its separate receipt supersedes the open status for those specific operations below. The original first-slice evidence and its limitations are retained here as historical context; direct compiled-map editing and game-peer replication remain open.
+
 Starting commit: `45596d5072b1c115c71132b78e7798c3baa547d0` (verified C38), branch `codex/c39-sparklink-live-studio`. C38 remains an ancestor; verified master `8c0bed0fcce3fbff7108b53dcee6ef077f253387`, the isolated consolidation worktree, experimental research and dependency proposals remain intact. The ending source commit is recorded in the C39 artifact manifest and Git handoff. This continuation does not silently merge or push.
 
 ## Delivered scope

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "mockedIpc": false,
+  "gameLaunched": false,
+  "gameplayTested": false,
+  "acceptanceComplete": true,
+  "appSha256": "c62db26183ce02de80f0c7fb96954d2cd14cdba5411e71eb1144ffcff74f5b79",
+  "mapSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+  "endToFloorAndHistory": {
+    "nativeBspTriangles": 5940,
+    "nativeObjectCollisionTriangles": 36,
+    "originalZ": 0.0875717,
+    "raised": 12.0875717,
+    "snapped": 0.2546348,
+    "singleUndoRestoresRaised": true,
+    "redoRestoresSnapped": true
+  },
+  "nativeRendererControls": {
+    "low": {
+      "width": 743,
+      "height": 333,
+      "pose": "{\"type\":\"PerspectiveCamera\",\"position\":[98.4934,-157.639,2.32473],\"quaternion\":[0.701915,-0.085532,-0.085532,0.701915],\"zoom\":1,\"target\":[101.375141,-145.990156,2.32473]}"
+    },
+    "high": {
+      "width": 2229,
+      "height": 999,
+      "pose": "{\"type\":\"PerspectiveCamera\",\"position\":[98.4934,-157.639,2.32473],\"quaternion\":[0.701915,-0.085532,-0.085532,0.701915],\"zoom\":1,\"target\":[101.375141,-145.990156,2.32473]}",
+      "aa": true
+    },
+    "antiAliasDisabledInRealContext": true,
+    "cameraRetained": true
+  },
+  "tutorialWindow": {
+    "separateWebview": true,
+    "nativeWindowControlsAllowed": true,
+    "parentWorkspaceRetained": true
+  },
+  "mapWorkspacePopout": {
+    "savedBeforeMove": true,
+    "correctWorkspace": true,
+    "singleWriterOwnershipRetained": true
+  },
+  "pageErrors": [],
+  "originalMapUnchanged": true,
+  "evidenceRun": "run-2026-10-30T20-30-19-899Z",
+  "scope": "Native editor controls only; Zombie Apocalypse rendering acceptance is recorded separately and remains failed"
+}

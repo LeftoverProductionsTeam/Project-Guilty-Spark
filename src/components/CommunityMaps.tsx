@@ -1,3 +1,4 @@
+import ExternalBrowserLink from './ExternalBrowserLink';
 import { useMemo, useState } from 'react';
 import { ArrowDownToLine, Archive, ExternalLink, FolderOpen, Info, Search, ShieldCheck } from 'lucide-react';
 import { COMMUNITY_MAP_SOURCES, describeCommunityDownload, filterCommunityMapSources, isCuratedCommunityUrl } from '../communityMapSources';
@@ -58,9 +59,9 @@ export default function CommunityMaps({onImport, onImportConvert, currentMapTitl
           <h3>{source.title}</h3><div className="gs-map-source-era">{source.era} · {source.audience.replace('halo-','Halo ').toUpperCase()}</div>
           <p>{source.summary}</p><div className="gs-map-source-caveat"><Info size={14}/><small>{source.caveat}</small></div>
           {isCuratedCommunityUrl(source.url) && <>
-            <a className="gs-open-archive" href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${source.title} in your browser (external website)`} title="Opens an external archive; no files are downloaded automatically">
+            <ExternalBrowserLink className="gs-open-archive" href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${source.title} in your browser (external website)`} title="Opens an external archive; no files are downloaded automatically">
               Open {source.catalog?'archive':'historical posts'} <ExternalLink size={15}/>
-            </a>
+            </ExternalBrowserLink>
             <div className="gs-archive-address"><code>{source.url}</code>
               <button type="button" title="Copy the exact archive address if your desktop webview does not open the link" onClick={()=>{
                 if (!navigator.clipboard?.writeText) {setCopyState('Clipboard unavailable. Select and copy the visible archive address.');return;}

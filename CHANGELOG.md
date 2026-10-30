@@ -1,5 +1,14 @@
 # Changelog
 
+## C39 native-content extension — verified on the C38–C40 foundation
+
+- Extend the authoritative source document with one schema-bound pistol radius field and bounded, complete, hash-verified scenery publications. Each participant explicitly verifies the same complete local source inventory and dependencies; network proposals cannot run tools or apply arbitrary binary patches.
+- Demonstrate simultaneous tag editing, native asset validation/publication and world placement in three real Windows Spark processes and three separate libraries. Verify common revision 3, per-author inverse history, referential conflicts, role restrictions, corruption refusal and durable process-crash recovery.
+- Compile frozen shared revision 14 with H1A Tool while revision 15 continues; reopen native output and verify the semantic value, real scenery geometry and scenario placement. Preserve all original caches and 2240 input tags in each source tree. No gameplay or game-peer replication claim.
+- Keep synchronization active across workspaces. Add native-source conflict summaries and exact recovery into a new full source fork, retaining damaged candidates and C38 Baboon/Invader integrity/build guards.
+- Consolidate common undo/redo controls, add collision-aware End snapping, numeric dragging with exact input, viewport anti-aliasing/resolution controls, workspace/tutorial popouts, resizable movable drawers and compact workspace layouts. Native and browser UI evidence is recorded separately from the collaboration test.
+- Automatic classic texture discovery now includes installed MCC compatibility resources, subject to the existing exact source/index verification. The additional Zombie Apocalypse BSP texture challenge still fails: one installed legacy range matches, 499 do not. Negative evidence is retained; discovery is not counted as restoration. Broader shader, reflection, power-up, lighting/fog bake and rendering parity work remains open.
+
 ## Windows CI — MCC manifest lookup
 
 - Resolve an existing mod root during manifest lookup, matching registration's canonical path handling. Short Windows directory aliases no longer make a successful registration appear missing.

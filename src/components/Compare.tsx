@@ -76,7 +76,7 @@ export default function Compare({
     }
   }
   return (
-    <div className="analysis-page">
+    <div className="analysis-page compare-page">
       <PageTitle
         eyebrow="PRESERVATION / SEMANTIC COMPARISON"
         title="Compare map variants"
@@ -143,7 +143,7 @@ export default function Compare({
           )}
           {pair && comparison && (
             <>
-              <div className="compare-identities">
+              <details className="compare-source-details"><summary>Source identities &amp; archive details</summary><div className="compare-identities">
                 {pair.map((open, i) => (
                   <div key={i}>
                     <strong>
@@ -159,7 +159,7 @@ export default function Compare({
                     )}
                   </div>
                 ))}
-              </div>
+              </div></details>
               <div className="analysis-summary">
                 <Pill tone="blue">{comparison.matchedTags} matched tag identities</Pill>
                 <Pill>{comparison.unchangedAuditedTags} unchanged audited tags</Pill>
@@ -169,7 +169,7 @@ export default function Compare({
                   </Pill>
                 ))}
               </div>
-              <details className="analysis-coverage" open>
+              <details className="analysis-coverage">
                 <summary>Comparison coverage and limits</summary>
                 <div>
                   {comparison.coverage.map((item) => (

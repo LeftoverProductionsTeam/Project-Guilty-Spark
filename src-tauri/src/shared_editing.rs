@@ -160,12 +160,13 @@ fn history_key(project: &str) -> String {
     format!("studio-history-{project}")
 }
 pub(super) fn history(state: &AppState, project: &str) -> Reply<Vec<StudioRecord>> {
-    let rows: Vec<StudioRecord> = lock(&state.library)?
+    let mut rows: Vec<StudioRecord> = lock(&state.library)?
         .setting(&history_key(project))
         .map_err(error)?;
     if rows.len() > 32 {
         return Err("SparkLink history exceeds 32 retained sessions".into());
     }
+    rows.sort_by(|a,b|b.created_at.cmp(&a.created_at).then_with(||a.directory_id.cmp(&b.directory_id)));
     Ok(rows)
 }
 pub(super) fn recover(
@@ -372,6 +373,7 @@ pub(super) fn host(
     if p.quick_forge.is_none() {
         return Err("Open a QuickForge project first".into());
     }
+    studio_native_source::matches(state,&project_id,&document)?;
     let mut slot = lock(&state.forge_session)?;
     if slot.is_some() {
         return Err("Another editing session is active. Open its map to manage it.".into());
@@ -588,6 +590,7 @@ pub(super) fn join(
         Peer::Guest(guest).leave();
         return Err("This project's runtime differs from the shared source. Open a matching QuickForge target before joining.".into());
     }
+    if let Err(e)=studio_native_source::matches(state,&project_id,&view.document){ Peer::Guest(guest).leave(); return Err(e); }
     let (client, credential) = guest.identity();
     lock(&state.library)?
         .set_setting(

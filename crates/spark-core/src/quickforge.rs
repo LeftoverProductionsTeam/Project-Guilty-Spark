@@ -29,6 +29,8 @@ fn draft() -> String {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QuickForgeDocument {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native: Option<crate::studio_native::Document>,
     pub schema_version: u32,
     pub name: String,
     pub template: String,
@@ -135,6 +137,8 @@ pub struct ForgeMaterial {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ForgePlacement {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub published_asset_id: Option<String>,
     pub id: String,
     pub name: String,
     pub tag_path: String,
@@ -414,6 +418,7 @@ pub fn validate_portable_document(doc: &QuickForgeDocument) -> Result<()> {
     validate_document_scope(doc, true)
 }
 fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<()> {
+    crate::studio_native::validate(doc)?;
     if doc.schema_version != SCHEMA_VERSION
         || doc.name.trim().is_empty()
         || doc.name.len() > 100
@@ -565,6 +570,7 @@ pub fn create_arena(name: &str, template: &str) -> Result<QuickForgeDocument> {
         return invalid("Unsupported QuickForge template");
     }
     let mut doc = QuickForgeDocument {
+        native: None,
         schema_version: 1,
         name: name.into(),
         template: template.into(),

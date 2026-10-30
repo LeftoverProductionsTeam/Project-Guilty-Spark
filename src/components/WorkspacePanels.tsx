@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal, ArrowLeft, SquareArrowOutUpRight } from 'lucide-react';
 import { useMapState } from '../mapSession';
 import { useWindowFullscreen } from '../useWindowFullscreen';
 import { WindowControls } from './WindowFrame';
@@ -14,6 +14,8 @@ interface Descriptor {
   defaultDock?: PanelPlacement['dock'];
 }
 interface ContextValue {
+  contentHosts: Record<string, HTMLDivElement | null>;
+  attachContent: (id: string, element: HTMLDivElement | null) => void;
   host: HTMLDivElement | null;
   panels: Record<string, PanelPlacement>;
   peek: string | null;
@@ -30,6 +32,7 @@ export default function WorkspacePanels({
   actions,
   onNavigationToggle,
   navigationOpen,
+  onBack,backLabel,onPopout,
 }: {
   id: string;
   workspace: string;
@@ -37,6 +40,7 @@ export default function WorkspacePanels({
   actions?: ReactNode;
   onNavigationToggle: () => void;
   navigationOpen: boolean;
+  onBack?:()=>void;backLabel?:string;onPopout?:()=>void;
 }) {
   const [raw, setRaw] = useMapState<WorkspaceLayout>(id, `layout.${workspace}`, () => ({
     version: 1,
@@ -51,6 +55,8 @@ export default function WorkspacePanels({
   useEffect(()=>setWindowHost(document.getElementById('gs-window-actions')),[]);
   const panelButtons = useRef<HTMLDivElement>(null);
   const [overflowing, setOverflowing] = useState(false);
+  const [contentHosts, setContentHosts] = useState<Record<string, HTMLDivElement | null>>({});
+  const attachContent = useCallback((id:string,element:HTMLDivElement|null)=>setContentHosts(old=>old[id]===element?old:{...old,[id]:element}),[]);
   useEffect(() => setPeek(null), [id, workspace]);
   const [descriptors, setDescriptors] = useState<Descriptor[]>([]),
     [host, setHost] = useState<HTMLDivElement | null>(null),
@@ -63,6 +69,8 @@ export default function WorkspacePanels({
   },[descriptors]);
   const context = useMemo<ContextValue>(
     () => ({
+      contentHosts,
+      attachContent,
       host,
       panels: layout.panels,
       peek,
@@ -88,8 +96,9 @@ export default function WorkspacePanels({
         setRaw((old) => changePanel(cleanLayout(old), panel, { open: true }));
       },
     }),
-    [host, layout, peek, setRaw],
+    [host, layout, peek, setRaw, contentHosts, attachContent],
   );
+  useEffect(()=>{const open=(e:Event)=>{const id=(e as CustomEvent).detail?.id;if(typeof id==='string'&&descriptors.some(d=>d.id===id))context.reveal(id);};window.addEventListener('guilty-spark-reveal-drawer',open);return()=>window.removeEventListener('guilty-spark-reveal-drawer',open);},[context,descriptors]);
   useEffect(() => {
     // Retire old saved Focus layouts; fullscreen keeps tabs and editing tools.
     delete document.documentElement.dataset.gsFocusMode;
@@ -131,11 +140,11 @@ export default function WorkspacePanels({
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [fullscreen, peek, changeFullscreen, setRaw, layout.panels, descriptors]);
-  const padding = { left: 0, right: 0, bottom: 0 };
+  const padding = { left: 0, right: 0, top:0, bottom: 0 };
     for (const placement of Object.values(layout.panels))
       if (placement.open && placement.pinned && placement.dock !== 'float')
         padding[placement.dock] =
-          placement.dock === 'bottom' ? Math.min(placement.height, 360) : Math.min(placement.width, 440);
+          placement.dock === 'bottom'||placement.dock==='top' ? Math.min(placement.height, 360) : Math.min(placement.width, 440);
   return (
     <Context.Provider value={context}>
       <div className="gs-workspace-shell" data-fullscreen={fullscreen}>
@@ -150,6 +159,7 @@ export default function WorkspacePanels({
           >
             <Menu size={16} />
           </button>
+          <button aria-label="Back to previous workspace" title={backLabel?`Back to ${backLabel}`:'No previous workspace'} onClick={onBack} disabled={!onBack||!backLabel}><ArrowLeft size={15}/></button>
           <button
             aria-label={fullscreen ? 'Exit fullscreen editing' : 'Fullscreen editing'}
             aria-pressed={fullscreen}
@@ -158,6 +168,7 @@ export default function WorkspacePanels({
           >
             {fullscreen ? 'Exit fullscreen · F11' : 'Fullscreen · F11'}
           </button>
+          {onPopout&&<button aria-label="Pop out workspace" title="Move this workspace to a resizable window for another monitor" onClick={onPopout}><SquareArrowOutUpRight size={14}/></button>}
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
           <div className="gs-panel-buttons" ref={panelButtons}>
             {descriptors.map((panel) => (
@@ -216,7 +227,7 @@ export default function WorkspacePanels({
         </nav>
         <div
           className="gs-workspace-content"
-          style={{ paddingLeft: padding.left, paddingRight: padding.right, paddingBottom: padding.bottom }}
+          style={{ paddingLeft: padding.left, paddingRight: padding.right, paddingTop:padding.top, paddingBottom: padding.bottom }}
         >
           {children}
         </div>
@@ -239,6 +250,14 @@ export function usePanelAttention(id: string, count: number) {
     return () => ref.current?.attention(id, 0);
   }, [id, count]);
 }
+/** Add related controls to the existing drawer, with no second registration,
+ * button, close control or overlapping panel. The source editor owns its state. */
+export function WorkspacePanelAddon({id,children}:{id:string;children:ReactNode}) {
+  const context=useContext(Context);
+  if(!context)return <>{children}</>;
+  const host=context.contentHosts[id];
+  return host?createPortal(children,host):null;
+}
 export function WorkspacePanel({
   id,
   label,
@@ -253,13 +272,16 @@ export function WorkspacePanel({
   const context = useContext(Context),
     register = useRef(context?.register);
   register.current = context?.register;
+  const attach = context?.attachContent;
+  const appendHost = useCallback((element:HTMLDivElement|null)=>attach?.(id,element),[attach,id]);
   const section = useRef<HTMLElement>(null);
   useEffect(() => register.current?.({ id, label, defaultDock }), [id, label, defaultDock]);
   const placement = context?.panels[id] ?? {
     ...defaultPanel(),
     ...(defaultDock ? { dock: defaultDock } : {}),
   };
-  const drag = useRef<{ pointer: number; x: number; y: number; left: number; top: number } | null>(null);
+  const drag = useRef<{ pointer: number; x: number; y: number; left: number; top: number; moved:boolean } | null>(null);
+  const resize=useRef<{pointer:number;x:number;y:number;width:number;height:number}|null>(null);
   if (!context) return <>{children}</>;
   if (!context.host) return null;
   const styles =
@@ -267,10 +289,10 @@ export function WorkspacePanel({
       ? {
           width: placement.width,
           height: placement.height,
-          left: `min(${placement.x}px, max(0px, 100% - 260px))`,
-          top: `min(${placement.y}px, max(0px, 100% - 160px))`,
+          left: `min(${placement.x}px, max(0px, 100% - ${placement.width}px - 8px))`,
+          top: `min(${placement.y}px, max(0px, 100% - ${placement.height}px - 8px))`,
         }
-      : placement.dock === 'bottom'
+      : placement.dock === 'bottom'||placement.dock==='top'
         ? { height: placement.height }
         : { width: placement.width };
   return createPortal(
@@ -294,27 +316,40 @@ export function WorkspacePanel({
         <span
           className="gs-panel-drag"
           onPointerDown={(e) => {
-            if (e.button !== 0 || placement.dock !== 'float') return;
+            if (e.button !== 0 || !section.current||!context.host) return;
+            e.preventDefault();
             e.currentTarget.setPointerCapture(e.pointerId);
+            const rect=section.current.getBoundingClientRect(),layer=context.host.getBoundingClientRect();
             drag.current = {
               pointer: e.pointerId,
               x: e.clientX,
               y: e.clientY,
-              left: placement.x,
-              top: placement.y,
+              left: rect.left-layer.left,
+              top: rect.top-layer.top,
+              moved:false,
             };
           }}
           onPointerMove={(e) => {
             const origin = drag.current;
-            if (origin?.pointer === e.pointerId)
+            if (origin?.pointer === e.pointerId){
+              if(!origin.moved&&Math.hypot(e.clientX-origin.x,e.clientY-origin.y)<4)return;
+              origin.moved=true;
               context.update(id, {
+                dock:'float',
                 x: origin.left + e.clientX - origin.x,
                 y: origin.top + e.clientY - origin.y,
               });
+            }
           }}
-          onPointerUp={() => {
+          onPointerUp={(event) => {
+            if(drag.current?.moved&&context.host){
+              const layer=context.host.getBoundingClientRect(),x=event.clientX-layer.left,y=event.clientY-layer.top;
+              const dock=x<28?'left':x>layer.width-28?'right':y<28?'top':y>layer.height-28?'bottom':'float';
+              context.update(id,{dock});
+            }
             drag.current = null;
           }}
+          onPointerCancel={()=>{drag.current=null;}}
         >
           <PanelLeftClose size={15} />
           {label}
@@ -329,6 +364,7 @@ export function WorkspacePanel({
         >
           <option value="left">Left edge</option>
           <option value="right">Right edge</option>
+          <option value="top">Top edge</option>
           <option value="bottom">Bottom edge</option>
           <option value="float">Floating</option>
         </select>
@@ -341,16 +377,16 @@ export function WorkspacePanel({
           Pin space
         </label>
         <label>
-          {placement.dock === 'bottom' ? 'Height' : 'Width'}
+          {placement.dock === 'bottom'||placement.dock==='top' ? 'Height' : 'Width'}
           <input
             aria-label={`${label} size`}
             type="range"
-            min={placement.dock === 'bottom' ? 160 : 240}
-            max={placement.dock === 'bottom' ? 600 : 720}
-            value={placement.dock === 'bottom' ? placement.height : placement.width}
+            min={placement.dock === 'bottom'||placement.dock==='top' ? 160 : 240}
+            max={placement.dock === 'bottom'||placement.dock==='top' ? 600 : 720}
+            value={placement.dock === 'bottom'||placement.dock==='top' ? placement.height : placement.width}
             onChange={(e) =>
               context.update(id, {
-                [placement.dock === 'bottom' ? 'height' : 'width']: Number(e.target.value),
+                [placement.dock === 'bottom'||placement.dock==='top' ? 'height' : 'width']: Number(e.target.value),
               })
             }
           />
@@ -361,7 +397,13 @@ export function WorkspacePanel({
           <X size={15} />
         </button>
       </header>
-      <div className="gs-panel-content">{children}</div>
+      <div className="gs-panel-content">{children}<div ref={appendHost} className="gs-panel-addons"/></div>
+      <div className="gs-panel-resize" role="separator" tabIndex={0} aria-label={`Resize ${label} drawer`}
+        aria-orientation={placement.dock==='top'||placement.dock==='bottom'?'horizontal':'vertical'}
+        onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);resize.current={pointer:event.pointerId,x:event.clientX,y:event.clientY,width:placement.width,height:placement.height};}}
+        onPointerMove={event=>{const origin=resize.current;if(!origin||origin.pointer!==event.pointerId)return;const dx=event.clientX-origin.x,dy=event.clientY-origin.y;if(placement.dock==='float')context.update(id,{width:origin.width+dx,height:origin.height+dy});else if(placement.dock==='top'||placement.dock==='bottom')context.update(id,{height:origin.height+dy*(placement.dock==='bottom'?-1:1)});else context.update(id,{width:origin.width+dx*(placement.dock==='right'?-1:1)});}}
+        onPointerUp={()=>{resize.current=null;}} onPointerCancel={()=>{resize.current=null;}}
+        onKeyDown={event=>{const horizontal=placement.dock==='top'||placement.dock==='bottom',delta=event.key===(horizontal?'ArrowDown':'ArrowRight')?10:event.key===(horizontal?'ArrowUp':'ArrowLeft')?-10:0;if(!delta)return;event.preventDefault();const sign=placement.dock==='right'||placement.dock==='bottom'?-1:1;context.update(id,horizontal?{height:placement.height+delta*sign}:{width:placement.width+delta*sign});}}/>
     </section>,
     context.host,
     id,

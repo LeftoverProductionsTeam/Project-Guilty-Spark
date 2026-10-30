@@ -320,8 +320,8 @@ export default function Build({
               </h3>
             </div>
             <p className="subtle">
-              Official Excession metadata is preserved, then paired with the validated cache in a dedicated
-              mod folder.
+              MCC’s package description files (created by its Excession tool) are kept intact and paired
+              with your built map in a separate mod folder.
             </p>
             <CheckRow
               ok={!!validated}
@@ -332,8 +332,8 @@ export default function Build({
             />
             <CheckRow
               ok={!!template?.valid}
-              label="Excession metadata template"
-              detail={template?.title || 'Exact scenario metadata is required'}
+              label="MCC package description"
+              detail={template?.title || 'Choose an Excession package template for this scenario'}
             />
             {template?.blockers.map((b, i) => (
               <div className="compact-warning" key={i}>
@@ -373,7 +373,7 @@ export default function Build({
             <CheckRow ok={!!readiness?.mccFound} label="MCC located" />
             <CheckRow ok={!!readiness?.halo1Installed} label="Halo 1 installed" />
             <CheckRow ok={!!readiness?.steamAvailable} label="Steam available" />
-            <CheckRow ok={!dirty && !!readiness?.packageValid} label="Current package verified" />
+            <CheckRow ok={!dirty && !!readiness?.packageValid} label="Package matches saved edits" detail="Checks file identity and the saved project revision. An in-game playtest is a separate step." />
             <div className="mod-mode-note">
               <Pill tone="amber">Anti-cheat disabled required</Pill>
               <p>
