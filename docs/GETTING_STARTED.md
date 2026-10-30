@@ -1,6 +1,8 @@
 # Connect your first Halo project
 
-**Menu** opens the workspace drawer. The 32-pixel top bar retains project context, search and help; collapse it with its chevron and restore it from the edge handle. Ctrl+Backslash opens navigation; Ctrl+Shift+Backslash toggles the top bar. Objects, Object tags, Asset library, Map sounds and other utilities open as drawers without changing the viewport. F11 uses the full display with a 30-pixel editing strip; mute, volume, undo and native close/restore remain reachable. Escape closes a drawer before leaving fullscreen.
+**Menu** opens the workspace drawer. The title and map tabs share one compact header with upper-right native window controls. Ctrl+Backslash opens navigation. Objects, Object tags, Asset library, Map sounds and other utilities open as drawers without changing the viewport. F11 uses one fullscreen mode with thinner bars; map tabs, editing controls, audio and runtime actions stay available. Escape closes a drawer before leaving fullscreen.
+
+For native edition checks, open **Build & playtest → Portability Lab**. Choose existing runtime profiles, inspect findings, verify untouched bytes and save the readable/JSON report. Use the supported MCC build path, then **Review native changes** before game testing. [Portability policy and scope](NATIVE_PORTABILITY.md).
 
 Click a map object to edit its typed tags in the Object tags drawer. Asset library searches the maps you have open and accepts source model/sound placements plus custom OBJ/WAV/OGG imports. Imported-cache model additions are previews until supported model/scenario compilation. Map ambience plays automatically; use the compact mute and volume controls or Map sounds for the full spatial mix. [Viewport and audio workflow](C35_VIEWPORT_WORKFLOW.md).
 

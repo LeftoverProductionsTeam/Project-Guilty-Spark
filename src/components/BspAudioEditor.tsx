@@ -189,6 +189,7 @@ export default function BspAudioEditor({
         Create a separate compiled map with explicit cluster audio bindings. The open cache and working tags
         stay unchanged.
       </p>
+      <p className="subtle">Painted details are checked before BSP serialization. Changes involving painted detail payloads are blocked until exact preservation can be verified; the original BSP and a detail snapshot stay recoverable.</p>
       <button disabled={!native || blocked || loading} onClick={() => void inspect()}>
         {loading ? 'Inspecting BSP audio…' : 'Inspect BSP audio'}
       </button>

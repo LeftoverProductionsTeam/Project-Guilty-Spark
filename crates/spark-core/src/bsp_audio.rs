@@ -621,6 +621,17 @@ pub(crate) fn apply(
             }
         }
     }
+    let native_bsp=tags.join(relative(&request.bsp_tag,"scenario_structure_bsp")?);
+    let detail_snapshot=||crate::bsp_detail::snapshot(&native_bsp,edit,|args|{
+        let mut command=vec!["-t".into(),tags.to_string_lossy().into_owned()];
+        command.extend_from_slice(args);command.push(request.bsp_tag.clone());
+        runner.run(edit,&command,workspace,"bsp-detail",44)
+    });
+    let details_before=detail_snapshot()?;
+    crate::project::atomic_write(&workspace.join("bsp-details-before.json"),&serde_json::to_vec_pretty(&details_before)?,false)?;
+    if details_before.has_payload() {
+        return invalid("Painted BSP detail objects are present. This native writer rounds detail Z-reference inspection, so exact preservation after serialization is not verified. BSP audio editing was stopped before modifying the derived tag. The original and copied BSP plus detail snapshot remain recoverable; unmodified working-tag builds are still supported.");
+    }
     let invoke = |mut args: Vec<String>| -> Result<String> {
         let mut prefix = vec!["-t".into(), tags.to_string_lossy().into_owned()];
         prefix.append(&mut args);
@@ -799,13 +810,38 @@ pub(crate) fn apply(
             }
         }
     }
-    runner.emit("bsp-audio","BSP audio palette and all cluster index fields read back; native cache verification follows",48,"info");
+    let details_after=detail_snapshot()?;
+    crate::project::atomic_write(&workspace.join("bsp-details-after.json"),&serde_json::to_vec_pretty(&details_after)?,false)?;
+    let preservation=crate::bsp_detail::ensure_preserved(&details_before,&details_after)?;
+    crate::project::atomic_write(&workspace.join("bsp-detail-preservation.json"),&serde_json::to_vec_pretty(&preservation)?,false)?;
+    runner.emit("bsp-audio","BSP audio fields and detail-preservation gate passed; native cache verification follows",48,"info");
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore="requires explicitly selected owned MCC campaign cache/native BSP and installed Invader"]
+    fn owned_campaign_painted_details_block_before_native_audio_serialization() {
+        use std::{path::PathBuf,sync::{Mutex,atomic::AtomicBool}};
+        let selected=|name:&str|PathBuf::from(std::env::var(name).expect("Set the documented opt-in native fixture path"));
+        let cache=selected("SPARK_C36_DETAIL_CACHE");let original_tags=selected("SPARK_C36_DETAIL_TAGS");let edit=selected("SPARK_C36_INVADER_EDIT");
+        let tag=std::env::var("SPARK_C36_DETAIL_BSP").expect("Select the native BSP relative path including extension");
+        let original=original_tags.join(relative(&tag,"scenario_structure_bsp").unwrap());let original_hash=maps::hash_file(&original).unwrap();
+        let cache_hash=maps::hash_file(&cache).unwrap();let inspection=inspect(&cache,&cache_hash).unwrap();
+        let bsp=inspection.bsps.iter().find(|bsp|normalize(&format!("{}.scenario_structure_bsp",bsp.tag_path))==normalize(&tag)).expect("The selected real BSP must belong to the selected cache");
+        assert!(!bsp.clusters.is_empty());
+        let owned=tempfile::tempdir().unwrap();let tags=owned.path().join("tags");let target=tags.join(relative(&tag,"scenario_structure_bsp").unwrap());fs::create_dir_all(target.parent().unwrap()).unwrap();fs::copy(&original,&target).unwrap();
+        let before=fs::read(&target).unwrap();let cancel=AtomicBool::new(false);let events=Mutex::new(Vec::new());let event=|e:crate::build::JobEvent|events.lock().unwrap().push(e);
+        let parent=uuid::Uuid::new_v4().to_string();let runner=crate::build::Runner{id:&parent,project:&parent,cancel:&cancel,event:&event};
+        let request=Request{parent_build_id:parent.clone(),source_sha256:cache_hash.clone(),bsp_index:bsp.index,bsp_tag:tag,bsp_tag_sha256:original_hash.clone(),changes:vec![Change{cluster:0,background:None,environment:None}]};
+        let failure=apply(&request,&inspection,&tags,&edit,&runner,owned.path()).unwrap_err().to_string();assert!(failure.contains("Painted BSP detail objects"),"{failure}");
+        let snapshot:crate::bsp_detail::Snapshot=serde_json::from_slice(&fs::read(owned.path().join("bsp-details-before.json")).unwrap()).unwrap();assert!(snapshot.instances>0);
+        assert_eq!(fs::read(&target).unwrap(),before);assert_eq!(maps::hash_file(&original).unwrap(),original_hash);assert_eq!(maps::hash_file(&cache).unwrap(),cache_hash);
+        assert!(!owned.path().join("bsp-details-after.json").exists());assert!(events.lock().unwrap().len()<16);
+        println!("{}",serde_json::json!({"nativeIntegration":true,"cells":snapshot.cells,"instances":snapshot.instances,"layerCounts":snapshot.layer_counts,"zReferenceVectors":snapshot.z_reference_vectors,"snapshot":snapshot,"blockedBeforeWrite":true,"copiedBspUnchanged":true,"originalBspUnchanged":true,"sourceCacheUnchanged":true,"gameLaunched":false}));
+    }
     fn word(bytes: &mut [u8], at: usize, value: u32) {
         bytes[at..at + 4].copy_from_slice(&value.to_le_bytes());
     }

@@ -911,7 +911,7 @@ export default function App() {
               <strong>GUILTY SPARK</strong>
               <span>HALO MODERN EVOLVED</span>
             </div>
-            <Pill>0.4.0 · C35 dev</Pill>
+            <Pill>0.4.0 · C36 dev</Pill>
           </button>
           {documents.documents.length?<MapTabs state={documents} disabled={busy||closing} onSelect={selectMap} onClose={id=>void closeMap(id)} onWindow={id=>void closeMap(id,true)} onAssets={()=>setAssetTransferOpen(v=>!v)}/>:<div className="header-context">
             <span>LOCAL WORKBENCH</span>

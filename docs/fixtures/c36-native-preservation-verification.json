@@ -1,0 +1,625 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-29",
+  "continuation": 36,
+  "baselineCommit": "21804c191a918cbf8bd74efac60dfcec65c9083b",
+  "branch": "codex/continuation-36-one-halo",
+  "appSha256": "7af65f1fd5f8383714ae93a097b06c0744f994a689e19d357136bab90a6e18a6",
+  "evidenceScope": "Actual Windows Spark UI, native tools/compiler and independent media decoding, plus separate exact community two-process scripted native simulations. No MCC game load/memory, public server, human firing/aiming, full state/AI/scale, physical listening or OS picker acceptance.",
+  "tests": {
+    "baseline": {
+      "rustPassed": 471,
+      "rustIgnored": 5,
+      "frontend": 216,
+      "frontendFiles": 44,
+      "browser": 77,
+      "offline": 59
+    },
+    "current": {
+      "rust": {
+        "passed": 480,
+        "failed": 0,
+        "ignored": 7
+      },
+      "frontend": 216,
+      "frontendFiles": 44,
+      "browser": 79,
+      "offline": 59,
+      "typescript": "passed",
+      "windowsRelease": "passed",
+      "nsis": "built",
+      "ownedBspOptInTestsSeparatelyPassed": 2
+    },
+    "hostedCi": "Not rerun or certified; public master run 40775839532 remains historical remote failure."
+  },
+  "portability": {
+    "baselinePerformance": {
+      "appSha256": "4d6ab61e9b9d148d7dd881188f8ff078a6108ec04c58bb4e79d9fbaabbd95e0a",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "coldImportMs": 4089.1907000000006,
+      "warmOpenProjectMs": [
+        3085.275599999999, 2732.4611999999997, 2916.9516999999996, 3065.3382999999994, 2900.862200000003
+      ],
+      "compatibilityMs": [
+        114.82769999999982, 111.52349999999933, 114.02019999999902, 112.58829999999944, 120.0554000000011
+      ],
+      "medianWarmOpenMs": 2916.9516999999996,
+      "medianCompatibilityMs": 114.02019999999902,
+      "scope": "Same owned MCC fixture; fresh library/profile per executable; 5 warm IPC samples. Cold import includes preservation copy and inspection; these are observations, not a general speedup claim."
+    },
+    "currentPerformance": {
+      "appSha256": "7af65f1fd5f8383714ae93a097b06c0744f994a689e19d357136bab90a6e18a6",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "coldImportMs": 3839.0915999999997,
+      "warmOpenProjectMs": [
+        3578.4748, 3488.0446999999986, 3243.905200000001, 3359.446299999996, 3311.4861999999994
+      ],
+      "compatibilityMs": [
+        111.18209999999817, 109.31620000000112, 107.07809999999881, 108.4117000000042, 111.12490000000253
+      ],
+      "medianWarmOpenMs": 3359.446299999996,
+      "medianCompatibilityMs": 109.31620000000112,
+      "scope": "Same owned MCC fixture; fresh library/profile per executable; 5 warm IPC samples. Cold import includes preservation copy and inspection; these are observations, not a general speedup claim."
+    },
+    "nativePreservation": {
+      "noop": {
+        "sourceSha256": "eb9b3693e74e674182d732f340127ef84d3574083821a8d3d95b234d9cb1c39e",
+        "derivedSha256": "eb9b3693e74e674182d732f340127ef84d3574083821a8d3d95b234d9cb1c39e",
+        "bytes": 62644912,
+        "changedBytes": 0,
+        "permittedRanges": [],
+        "untouchedBytesPreserved": true,
+        "byteIdentical": true,
+        "scope": "Derived cache extraction input only; original source is never written. All bytes outside reviewed changes are identical, including unknown data. Native extraction/serialization/repacking and final game validity require separate checks."
+      },
+      "edited": {
+        "sourceSha256": "eb9b3693e74e674182d732f340127ef84d3574083821a8d3d95b234d9cb1c39e",
+        "derivedSha256": "7b009165f24eed212d1d5052f8b68756771d943d59020be1345875b0b54aefc7",
+        "bytes": 62644912,
+        "changedBytes": 1,
+        "permittedRanges": [[58171612, 58171616]],
+        "untouchedBytesPreserved": true,
+        "byteIdentical": false,
+        "scope": "Derived cache extraction input only; original source is never written. All bytes outside reviewed changes are identical, including unknown data. Native extraction/serialization/repacking and final game validity require separate checks."
+      },
+      "tagPath": "characters\\sentinel\\sentinel",
+      "field": "bounding-radius",
+      "before": 0,
+      "after": 0.125
+    },
+    "lab": {
+      "profiles": [
+        {
+          "id": "halo1-mcc-steam",
+          "cacheFamilyMatches": false,
+          "findings": ["PAINTED_DETAILS", "RESOURCE_DEPENDENCIES", "UNAUDITED_CLASSES"],
+          "buildReady": true
+        },
+        {
+          "id": "halo1-custom-edition",
+          "cacheFamilyMatches": true,
+          "findings": ["PAINTED_DETAILS", "RESOURCE_DEPENDENCIES", "UNAUDITED_CLASSES"]
+        },
+        {
+          "id": "halo1-xbox",
+          "cacheFamilyMatches": false,
+          "findings": ["MODEL_CLASS", "PAINTED_DETAILS", "RESOURCE_DEPENDENCIES", "UNAUDITED_CLASSES"]
+        }
+      ],
+      "jsonAndMarkdownSaved": true,
+      "noConversionOnInspect": true
+    },
+    "conversion": {
+      "elapsedMs": 131855.4051,
+      "buildId": "3c196af6-babd-4d6b-b501-1a74b8fcd0d0",
+      "sha256": "5313b8eed940f364b13f047b1ba4c85ce7e71885a38e67263a64958142839422",
+      "status": "validated",
+      "target": "mcc-cea"
+    },
+    "nativeTagCompilation": {
+      "allInputTagBytesUnchanged": true,
+      "inputManifestSha256": "10a47c4241453c0d22b943d63df09753f2a6a2882c4a1bd9935b456d4959bae9",
+      "inventoryAfterMs": 8869,
+      "inventoryBeforeMs": 9593,
+      "nativeFiles": 11664,
+      "schemaVersion": 1,
+      "scope": "Exact loose native tag bytes during target compilation only. Extraction, intentional compatibility edits and compiled cache repacking are separate operations; game loading remains pending.",
+      "status": "passed"
+    },
+    "semanticDiff": {
+      "sourceCacheVersion": 609,
+      "targetCacheVersion": 13,
+      "unchangedAuditedFields": 4844,
+      "fieldChangeCount": 19,
+      "unpairedAuditedFields": 1082,
+      "missingTagCount": 47,
+      "addedTagCount": 0,
+      "controlledFieldVerified": true,
+      "readableAndMachineReports": true,
+      "scope": "Native class/path identities and Spark-audited fields only. Reference datums resolve to native class/path; offsets and cache IDs may legitimately change. Lists cap at 256 tags/512 changes; totals are complete. Unknown fields, shader appearance, scripts, object behavior and gameplay are not semantic-equivalence claims."
+    },
+    "ownedBuildComparison": {
+      "ui": true,
+      "unknownBuildRejected": true
+    }
+  },
+  "externalNativeRoundTrip": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "appSha256": "7af65f1fd5f8383714ae93a097b06c0744f994a689e19d357136bab90a6e18a6",
+    "initial": {
+      "files": 2240,
+      "hashesRead": 2240,
+      "elapsedMs": 4112.6660999999995
+    },
+    "wrongWindowRejected": true,
+    "changedFiles": 1,
+    "changedFile": "levels/quickforge/c33_collision_acceptance/c33_collision_acceptance.scenario",
+    "stableScanHashesRead": 1,
+    "externalEditToolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "field": "player_starting_locations[0].position",
+    "before": [-7, -10.666667, 0.1],
+    "expected": [-6.5, -10.666667, 0.1],
+    "compiled": [-6.5, -10.666667, 0.1],
+    "buildElapsedMs": 19265.791500000003,
+    "cacheVersion": 13,
+    "scenarioType": 1,
+    "tags": 2239,
+    "parentSha256": "fa75952cdf222f5cf8a26554471e33cf5efc37d4843bf52dedb8e8d700ba7975",
+    "compiledSha256": "ec5a5a68b66a4d3c02e2872da501548cb1818df059b4b32abd71578ab0a37825",
+    "separateMapTab": true,
+    "originalSdkScenarioUnchanged": true,
+    "parentCacheUnchanged": true,
+    "editedInputRetained": true,
+    "nativeTagRoundTrip": {
+      "noOpByteIdentical": true,
+      "editedFileBytes": 1878,
+      "changedBytes": 5,
+      "permittedSpans": [
+        [1570, 1582],
+        [40, 44]
+      ],
+      "allOtherNativeBytesUnchanged": true,
+      "scope": "Actual Invader integer no-op save and one real player-position edit on this canonical scenario; not a guarantee for every tag class/writer."
+    },
+    "sparkAuthoredDocumentUnchanged": true,
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gameplayAccepted": false,
+    "errors": []
+  },
+  "bspPaintedDetailGate": {
+    "blockedBeforeWrite": true,
+    "cells": 282,
+    "copiedBspUnchanged": true,
+    "gameLaunched": false,
+    "instances": 89233,
+    "layerCounts": 282,
+    "nativeIntegration": true,
+    "originalBspUnchanged": true,
+    "snapshot": {
+      "cells": 282,
+      "detailBlocks": 1,
+      "inspectorSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "instances": 89233,
+      "integerFieldsSha256": "d0c25f216042e0d13e141b21417fc1b6fdcee3e7b2ded31e1b95362f608e0720",
+      "layerCounts": 282,
+      "nativeSha256": "117b4efb15489602c09b0d977909e448bd6094193d5578f0d33781e93ecbcac1",
+      "zReferenceDisplaySha256": "d948fcbaafec87c12093bd8cba8799770b0bd076eb903279b4e78fc80b75b661",
+      "zReferenceVectors": 282
+    },
+    "sourceCacheUnchanged": true,
+    "zReferenceVectors": 282
+  },
+  "regression": {
+    "rendering": {
+      "sources": [
+        {
+          "sha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+          "previewImages": [
+            {
+              "id": 3867149580,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3866952969,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3793551529,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3793617066,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3915843571,
+              "ok": true,
+              "error": null
+            }
+          ],
+          "viewport": {
+            "sourceShaders": "132",
+            "sourceLightmaps": "15",
+            "sourceDetails": "59",
+            "skyTriangles": "308",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          }
+        },
+        {
+          "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+          "previewImages": [
+            {
+              "id": 3886220847,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3885827625,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3788636254,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3788701791,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3788767328,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3940682092,
+              "ok": true,
+              "error": null
+            }
+          ],
+          "viewport": {
+            "sourceShaders": "151",
+            "sourceLightmaps": "15",
+            "sourceDetails": "83",
+            "skyTriangles": "183",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          }
+        }
+      ],
+      "windowControls": {
+        "normal": {
+          "x": 2458,
+          "y": 5.5,
+          "width": 96,
+          "height": 28
+        },
+        "combinedHeader": {
+          "x": 2458,
+          "y": 5.5,
+          "width": 96,
+          "height": 28
+        },
+        "fullscreen": {
+          "x": 2458,
+          "y": 3.5,
+          "width": 96,
+          "height": 26
+        }
+      },
+      "headerBounds": {
+        "normal": {
+          "x": 0,
+          "y": 0,
+          "width": 2560,
+          "height": 40
+        },
+        "fullscreen": {
+          "x": 0,
+          "y": 0,
+          "width": 2560,
+          "height": 34
+        }
+      },
+      "tagTree": {
+        "classes": 59,
+        "weaponTags": 20,
+        "editableFields": 7
+      },
+      "errors": [],
+      "scope": [
+        "Editor WebView2 rendering and read-only owned-cache inspection; no Halo game process or claim of full engine parity."
+      ]
+    },
+    "audio": {
+      "automaticResources": {
+        "kind": "mccClassicAdpcm",
+        "sha256": {
+          "sounds_adpcm.fsb": "d9a70adcb681bcb152a50ea61904fc921d2d94aff3000fe3d2827823c9e49e88",
+          "sounds_adpcm.lst.bin": "d469b6d72c7d8f6d141da2b61c14b29862a57d3563ebb195e3829f18db742a78"
+        },
+        "noFolderPicker": true
+      },
+      "group": {
+        "loopTagId": 3824943752,
+        "sourceTracks": [
+          {
+            "index": 0,
+            "tagId": 3825074826,
+            "gain": 0.6
+          },
+          {
+            "index": 1,
+            "tagId": 3825205900,
+            "gain": 0.3
+          }
+        ],
+        "savedTracks": 2,
+        "undoRedoAtomic": true,
+        "sourceSceneAndTagsUnchanged": true
+      },
+      "soundLayout": {
+        "widths": [280, 360, 520],
+        "muteSoloSeparated": true,
+        "labelsVisible": true
+      },
+      "productionAudio": {
+        "kind": "native-source-production-mixer-OfflineAudioContext",
+        "tracks": [
+          {
+            "tagId": 3825074826,
+            "track": 0,
+            "gain": 0.6,
+            "decodedFrames": 311100,
+            "decodedChannels": 1
+          },
+          {
+            "tagId": 3825205900,
+            "track": 1,
+            "gain": 0.3,
+            "decodedFrames": 65480,
+            "decodedChannels": 1
+          }
+        ],
+        "voices": 2,
+        "relativeError": 9.413865752842912e-8,
+        "rms": 0.023488099793187,
+        "firstTrackOnlyError": 0.6499587608546493,
+        "muteRms": 0,
+        "hardwareListeningAccepted": false
+      },
+      "inputsUnchanged": true,
+      "scope": [
+        "No Halo process, game-memory writes, physical listening or native vehicle sound-function modulation acceptance.",
+        "Production audio is independently rendered in WebView2 OfflineAudioContext; saved track import is exercised through the native UI.",
+        "Automatic BSP multitrack selection and stale-zone handling have separate source-bound unit coverage; this map UI trial imports the real Warthog loop."
+      ]
+    },
+    "director": {
+      "nativeUiRecordAndSave": true,
+      "explicitNamedTakeWorkflow": true,
+      "countdownCancellationRemovesEmptyPartial": true,
+      "pausedClockStable": true,
+      "backgroundRecording": true,
+      "closeBlockedWhileRecording": true,
+      "existingTakeProtected": true,
+      "wrongWindowRejected": true,
+      "sourcePreserved": true,
+      "authoredDocumentPreserved": true,
+      "decodedFrameSizes": ["1920x658"],
+      "decodedFrames": 67,
+      "decodedSeconds": 3.03,
+      "decoderSha256": "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3",
+      "savedMapAudio": {
+        "tagId": 3838640985,
+        "tagPath": "sound\\sfx\\vehicles\\ghost_lp",
+        "sampleSha256": "036fdf55e25b145515af969201556e14f2608363ffecbb1f12318fc240a46637",
+        "previewSha256": "1588c7043a2cc300935cd716d8ff85c1c00333b82e28ab71b00a9fee7061854a",
+        "format": "Xbox ADPCM",
+        "sourceChannels": 1,
+        "sourceSampleRate": 22050,
+        "sourceDurationSeconds": 2.742857142857143,
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "synthetic": false,
+        "loopingTagId": 3838509911,
+        "loopingTagPath": "sound\\sfx\\vehicles\\ghost",
+        "track": 0,
+        "fadeInSeconds": 0,
+        "fadeOutSeconds": 0.5,
+        "phases": {
+          "intro": {
+            "tagId": 3838575448,
+            "sourceSampleSha256": "fa77ccdad14d21d83c656304563de886d2d94edb9189839df3ed5f27ecf62ab8",
+            "previewSha256": "99d542abbe9db9989d006b56f6df64837e486ded5a3af94c2b80a717f52cd84f",
+            "durationSeconds": 2.7399546485260773
+          },
+          "loop": {
+            "tagId": 3838640985,
+            "sourceSampleSha256": "036fdf55e25b145515af969201556e14f2608363ffecbb1f12318fc240a46637",
+            "previewSha256": "1588c7043a2cc300935cd716d8ff85c1c00333b82e28ab71b00a9fee7061854a",
+            "durationSeconds": 2.742857142857143
+          },
+          "end": {
+            "tagId": 3838706522,
+            "sourceSampleSha256": "c8f31d2835cf0ce3d7e195c2c16cd72b6dd3b7d8dfdc5e98820c55c42b7e41f0",
+            "previewSha256": "ab1748ea397b83a450d82bd19231185fcf5d6785e707e3898902004d0cecefb6",
+            "durationSeconds": 2.2029931972789116
+          }
+        },
+        "near": {
+          "codec": "opus",
+          "decodedChannels": 2,
+          "decodedSampleRate": 48000,
+          "decodedFrames": 144000,
+          "decodedSeconds": 3,
+          "rms": 0.04979856405003113,
+          "peak": 0.21325863897800446
+        },
+        "beyondSavedMaxDistance": {
+          "codec": "opus",
+          "decodedChannels": 2,
+          "decodedSampleRate": 48000,
+          "decodedFrames": 97920,
+          "decodedSeconds": 2.04,
+          "rms": 0,
+          "peak": 0
+        },
+        "distantTakeSha256": "9e78bbf2d1e59059432245ded81df24b19cbfb34dddfec12a5e4e055f9905c3d",
+        "startupEvents": ["ambient", "mapStart"],
+        "audioBeforeCountdown": false,
+        "microphoneRequested": false,
+        "systemAudioRequested": false,
+        "gameAudioCaptured": false,
+        "phasedTake": {
+          "sha256": "6cf94cd8bb25863beb263adc356ab3353a7952157e136a6248c16480bc9e2e61",
+          "decoded": {
+            "codec": "opus",
+            "decodedChannels": 2,
+            "decodedSampleRate": 48000,
+            "decodedFrames": 521280,
+            "decodedSeconds": 10.86,
+            "rms": 0.05689563166085611,
+            "peak": 0.2392420768737793
+          },
+          "waveform": {
+            "method": "zero-mean normalized waveform correlation",
+            "decodedMonoSampleRate": 4000,
+            "templateSamples": 1000,
+            "threshold": 0.85,
+            "matches": {
+              "intro": {
+                "correlation": 0.997428677564543,
+                "sourceOffsetSeconds": 0.06,
+                "recordedOffsetSeconds": 0.0675
+              },
+              "loop": {
+                "correlation": 0.9989266298258277,
+                "sourceOffsetSeconds": 0.06,
+                "recordedOffsetSeconds": 2.8075
+              },
+              "end": {
+                "correlation": 0.9725345950671785,
+                "sourceOffsetSeconds": 0.06,
+                "recordedOffsetSeconds": 8.77575
+              }
+            }
+          },
+          "finishWaitMs": 2936,
+          "spatial": false,
+          "nativeFinishSoundUi": true
+        }
+      },
+      "idleLiveCleanupApi": {
+        "hasSession": false,
+        "pending": [],
+        "threadRelease": {
+          "pendingThreads": 0,
+          "issue": null
+        },
+        "releaseOutcome": "alreadyDisconnected",
+        "unboundMoveAndScaleRefused": true,
+        "gameAttached": false
+      },
+      "errors": []
+    }
+  },
+  "performanceRepeat": {
+    "schemaVersion": 1,
+    "order": ["current", "baseline"],
+    "otherQaJobsRunning": false,
+    "measurements": {
+      "current": {
+        "appSha256": "7af65f1fd5f8383714ae93a097b06c0744f994a689e19d357136bab90a6e18a6",
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "coldImportMs": 3310.4058000000005,
+        "warmOpenProjectMs": [
+          2852.2933000000003, 2713.3958999999995, 2728.1895999999997, 2668.8663000000015, 2795.0357000000004
+        ],
+        "compatibilityMs": [
+          109.28389999999854, 103.1903000000002, 107.64210000000094, 107.95769999999902, 103.31750000000102
+        ],
+        "medianWarmOpenMs": 2728.1895999999997,
+        "medianCompatibilityMs": 107.64210000000094,
+        "scope": "Same owned MCC fixture; fresh library/profile per executable; 5 warm IPC samples. Cold import includes preservation copy and inspection; these are observations, not a general speedup claim."
+      },
+      "baseline": {
+        "appSha256": "4d6ab61e9b9d148d7dd881188f8ff078a6108ec04c58bb4e79d9fbaabbd95e0a",
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "coldImportMs": 3019.2122999999992,
+        "warmOpenProjectMs": [
+          2965.0170999999973, 2817.3436999999976, 2708.5444000000025, 2825.9712, 2709.0088000000032
+        ],
+        "compatibilityMs": [
+          116.54880000000048, 103.4968000000008, 104.63720000000467, 106.2439000000013, 106.11030000000028
+        ],
+        "medianWarmOpenMs": 2817.3436999999976,
+        "medianCompatibilityMs": 106.11030000000028,
+        "scope": "Same owned MCC fixture; fresh library/profile per executable; 5 warm IPC samples. Cold import includes preservation copy and inspection; these are observations, not a general speedup claim."
+      }
+    },
+    "inputsUnchanged": true,
+    "limit": "Sequential fresh libraries/profiles on the same Windows desktop, reverse execution order from the full acceptance run; OS cache and background desktop load are uncontrolled. No speedup claim."
+  },
+  "community": {
+    "clientsExecuted": true,
+    "isoAvailable": true,
+    "gameJoined": true,
+    "twoClientGameplay": true,
+    "aiAgreement": false,
+    "publicHosting": false,
+    "routerFirewallChanges": false,
+    "stagedDependencies": [
+      {
+        "project": "ChupathingyCE",
+        "release": "v0.8.1c",
+        "revision": "880a933ec33b2ae2dbbeb4018a9090c528a075bc",
+        "zipSha256": "fd258338a7aaa8c93fc41ad2e2d53a040944306593a2e3d6d631befab38c65a0",
+        "exeSha256": "bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a",
+        "publisherEd25519ChecksumsVerified": true,
+        "redistributed": false,
+        "executedPrivately": true
+      },
+      {
+        "project": "OpenCE",
+        "release": "build-329",
+        "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+        "zipSha256": "103f0c3cd46279e7dbc86cbfe8c3320898f3921af3cd237515c17800fcba42c6",
+        "exeSha256": "b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c",
+        "publisherEd25519ChecksumsVerified": true,
+        "redistributed": false,
+        "executedPrivately": true
+      }
+    ],
+    "next": "Accept Spark listing/invitation-to-client flow, authenticated runtime/content compatibility, human combat and independently observed AI. Keep asymmetric direction and raw sampled differences.",
+    "twoClientGameplayScope": "Real released native game processes on one Windows computer, loopback system-link, scripted player input and native impact-damage/forced-kill hooks. No MCC game protocol, public host, Spark listing-to-client flow, human play, projectile-flight/aiming, full inventory/object parity, AI agreement or player-scale certification.",
+    "evidenceFile": "c36-community-native-verification.json"
+  },
+  "preservation": {
+    "originalSourceFilesUnchanged": true,
+    "originalSdkScenarioUnchanged": true,
+    "frozenC35FilesVerified": 29,
+    "priorLedgerIdsRetained": 319,
+    "currentLedgerRows": 336,
+    "normalUserLibraryUsed": false,
+    "ownedGameAssetsPublished": false,
+    "originalXboxImageRehashedUnchanged": true
+  },
+  "limitations": [
+    "Native compiler/cache and Spark editor acceptance only; no Halo runtime load, gameplay, multiplayer or AI agreement.",
+    "Semantic diff covers inspected fields; compiled repacking is not byte identity. Native tag proof covers compiler input files only.",
+    "Private source audio/images/cache/SDK data stay in the fresh QA library; no proprietary files belong in the source package.",
+    "Native tag round-trip proof covers one canonical scenario and audited cache cells, not every class/writer.",
+    "Painted-detail guard covers Spark BSP audio serialization; generic external Sapien saves and exact native Z payload remain unverified.",
+    "Four-map traversal/environment/PVS/vehicle/game acceptance, procedural UV authoring, MCC foreign wire translation, custom synchronized AI and player-scale gates remain open.",
+    "C35 experimental sprint/camera/scaling are retained; dual wield, sword/lunge, arbitrary live spawn/BSP replacement and complete engine rendering/audio parity are not accepted."
+  ]
+}

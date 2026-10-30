@@ -1,4 +1,10 @@
-# Runtime and operation compatibility — Continuation 34
+# Runtime and operation compatibility — Continuation 36
+
+C36 continues C35 R12 with [Portability Lab/native preservation](NATIVE_PORTABILITY.md), exact source/target findings, native compiler input inventories and scoped semantic comparisons. A new Warthog Xbox descriptor preserves its separate identity without claiming an executable or cross-play adapter. Protected Chupathingy invitations now reach only that runtime's own password prompt. [Current implementation and acceptance](CONTINUATION_36_ENGINEERING.md); [community protocol boundaries](research/C36_COMMUNITY_INTEROPERABILITY.md).
+
+C35 r11/r12 rendering, consolidated header/window controls, tag-class browsing, all-main-track sound imports and automatic MCC classic ADPCM resources remain included. The older r10 header-hide/Focus design below is historical and superseded by one fullscreen mode with visible map tabs and tools. CELT music/dialogue and full engine parity remain open.
+
+C36 also records [actual private native community trials](C36_COMMUNITY_NATIVE_TESTS.md) over unchanged Xbox data: OpenCE/OpenCE, Chupathingy/Chupathingy and OpenCE-host/Chupathingy-client simulated; Chupathingy-host/OpenCE-client was version-refused. Exact sampled state/phase/inventory differences remain visible. This does not relax the authenticated-content/version requirement in the public listing gate, establish Spark's complete join flow or imply MCC/browser/stock-Xbox cross-play.
 
 This updates the same cumulative record; frozen C32/C33 releases remain historical evidence. A descriptor, cache header, preview, compiler result, upstream feature or advertised cap does not establish gameplay.
 

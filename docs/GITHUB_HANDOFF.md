@@ -1,4 +1,27 @@
-# C35 Git push handoff
+# C36 Git push handoff
+
+Branch: **`codex/continuation-36-one-halo`**, continuing C35 R12 **`21804c191a918cbf8bd74efac60dfcec65c9083b`**. Local master remains untouched. Implementation commits: **`d03516d`** protected Chupathingy invitations, **`95bb839`** native-byte/compiler/detail preservation, **`514b2d9`** Portability Lab and native workflow checks. Documentation/ledger and source-inventory commits follow these. The final commit/artifact identities are recorded in the C36 delivery receipt.
+
+Title: **C36: native Halo portability, preservation gates and reviewed conversions**.
+
+Add Portability Lab and cited native preflight, fix unintended signed-zero changes and verify exact compiler input tags. Actual Invader/H1A round trips and CE-to-MCC conversion pass, with explicit semantic changes and a conservative painted-detail BSP guard. Preserve C35 recording/render/audio/UI, route protected community invitations correctly and retain game, multiplayer/AI and broader gameplay acceptance as open gates.
+
+The later [native community trials](C36_COMMUNITY_NATIVE_TESTS.md) add actual same-runtime Blood Gulch sessions, asymmetric mixed OpenCE-host/Chupathingy-client simulation and native A30 co-op. Raw state/phase/inventory differences remain visible; the opposite mixed direction is version-refused. The public runner/analyzer reproduce controlled execution and strict sampled comparisons without changing production protocol gates.
+
+Use the [full PR description](CONTINUATION_36_GITHUB_DESCRIPTION.md), [engineering report](CONTINUATION_36_ENGINEERING.md), [native policy](NATIVE_PORTABILITY.md) and [exact receipt](fixtures/c36-native-preservation-verification.json). Final C36 files use fresh r2 names; C35 and initial C36 r1 files remain frozen. The accepted application binary is unchanged; r2 includes later native game evidence and QA scripts. Local tests do not establish green hosted CI. No public release, tag, force push or master merge is included.
+
+Reviewed push and optional PR commands after inspecting status:
+
+```powershell
+git status --short
+git log -5 --oneline
+git push -u origin codex/continuation-36-one-halo
+gh pr create --base master --head codex/continuation-36-one-halo --title "C36: native Halo portability, preservation gates and reviewed conversions" --body-file docs/CONTINUATION_36_GITHUB_DESCRIPTION.md
+```
+
+If credentials prevent pushing, sign Git into the intended account locally and rerun the exact branch push; do not paste a token into chat. The optional PR command requires the GitHub CLI/account. The description can also be pasted into GitHub's compare view. Attach a newly created PR to this Codex task. Previous C35/older handoffs below remain historical.
+
+## Previous C35 handoff
 
 Latest pass: **C35: auto-connect MCC audio and repair sound editing**. Discover matching classic sound resources or MCC's installed classic ADPCM bank/index without a folder prompt. Import every authored main track as one undoable group, save assigned BSP ambience without doubled voices, and load scoped sound styles so labels and mute/solo controls fit narrow drawers. Preserve independent texture pins, edits and undo history across late discovery. Repair the retained-thread shutdown observation race without adding a second resume. [Evidence and remaining gates](C35_MCC_AUDIO_AND_WORKFLOW.md).
 
@@ -93,18 +116,18 @@ Validation and exact limits: [native gameplay and audio](NATIVE_GAMEPLAY_AND_AUD
 
 Before pushing, review the merge and working tree:
 
-~~~powershell
+```powershell
 git status --short
 git log -3 --oneline --decorate
 git show --stat --oneline HEAD
 # Run after reviewing the local master merge:
 git push origin master
-~~~
+```
 
 If desired, retain the source branch remotely as well:
 
-~~~powershell
+```powershell
 git push -u origin codex/continuation-33-native-gameplay
-~~~
+```
 
 Confirm remote CI after your push. Local executables, installers, source ZIPs and verification receipts are under releases with distinct hosting-workflows filenames; earlier world-challenges releases are retained. The optional Steam module is packaged separately. Owned maps, SDK/tag content, local QA data and credentials are excluded from source packaging.

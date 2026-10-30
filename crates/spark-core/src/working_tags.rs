@@ -444,7 +444,7 @@ fn script_hashes(root: Option<&Path>, cancel: &AtomicBool) -> Result<BTreeMap<St
 
 /// Rehash the whole bounded tree, so additions/removals during staging/compile
 /// are rejected as well as changes to files that happened to be enumerated first.
-fn tree_hashes(root: &Path, cancel: &AtomicBool) -> Result<BTreeMap<String, String>> {
+pub(crate) fn tree_hashes(root: &Path, cancel: &AtomicBool) -> Result<BTreeMap<String, String>> {
     let root = checked_directory(root)?;
     let mut stack = vec![(root.clone(), 0usize)];
     let mut hashes = BTreeMap::new();

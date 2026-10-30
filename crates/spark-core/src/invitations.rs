@@ -18,6 +18,7 @@ pub enum InvitationClient {
 #[serde(rename_all = "camelCase")]
 pub enum InvitationKind {
     CommunityGame,
+    PasswordCommunityGame,
     MccSteamLobby,
     WebRoom,
 }
@@ -94,10 +95,16 @@ pub fn parse(value: &str) -> Result<Invitation> {
     }
     let value = value.to_ascii_lowercase();
     let (kind, secret) = if let Some(code) = value.strip_prefix("halo://join/") {
-        if !hex(code, 64) {
-            return invalid("A community game invitation requires exactly 64 hexadecimal digits");
-        }
-        (InvitationKind::CommunityGame, code.to_owned())
+        // Chupathingy fa0f2df4 p2p_internal.h / p2p_crypto.c: p + 36 hex-encoded
+        // bytes (host hash, door and check). Keep them opaque; the game owns the password.
+        let kind = if code.strip_prefix('p').is_some_and(|body| hex(body, 72)) {
+            InvitationKind::PasswordCommunityGame
+        } else if hex(code, 64) {
+            InvitationKind::CommunityGame
+        } else {
+            return invalid("A community invitation requires 64 hexadecimal digits, or a protected Chupathingy link with p followed by exactly 72 hexadecimal digits");
+        };
+        (kind, code.to_owned())
     } else if let Some(ids) = value.strip_prefix("steam://joinlobby/976730/") {
         let ids: Vec<_> = ids.split('/').collect();
         if !(1..=2).contains(&ids.len())
@@ -150,7 +157,9 @@ pub fn route(invitation: &Invitation, client: InvitationClient) -> InvitationRou
     use InvitationClient::*;
     use InvitationKind::*;
     let (can_handoff,status,detail)=match (invitation.kind,client){
-        (CommunityGame,MccSteam)=>(false,"mccProtocolBridgeMissing","This invitation uses the community game protocol. An MCC-to-community wire/session/actor translation adapter is not implemented. A launcher or URL rewrite cannot connect MCC to it."),
+        (CommunityGame|PasswordCommunityGame,MccSteam)=>(false,"mccProtocolBridgeMissing","This invitation uses the community game protocol. An MCC-to-community wire/session/actor translation adapter is not implemented. A launcher or URL rewrite cannot connect MCC to it."),
+        (PasswordCommunityGame,ChupathingyCe)=>(true,"runtimePasswordPromptRequired","Hand the protected invitation to the inspected Chupathingy runtime. The game asks for its password and validates the host, protocol and content. Spark never asks for or decrypts the password; a handoff is not a confirmed connection."),
+        (PasswordCommunityGame,OpenCe|WebOpenCe)=>(false,"protectedInvitationUnsupported","This protected link uses Chupathingy's invitation format. The inspected OpenCE native/web implementation does not parse it. Choose a matching Chupathingy runtime; rewriting the link cannot add password support."),
         (MccSteamLobby,MccSteam)=>(true,"steamHandoffUnverified","Hand the actual MCC invitation to Steam. Steam and MCC must validate membership, the selected Halo title, game version and mod content; Spark has no lobby-connection acknowledgement API."),
         (MccSteamLobby,_) =>(false,"differentSessionProtocol","An MCC Steam lobby is not an OpenCE/Chupathingy/WebRTC session. No cross-protocol translator is implemented."),
         (WebRoom,WebOpenCe)=>(true,"browserRoomHandoffUnverified","Open the official browser room. A browser room is a separate system-link transport, documented for up to 16 browsers; it is not a 128-player internet game."),
@@ -158,7 +167,9 @@ pub fn route(invitation: &Invitation, client: InvitationClient) -> InvitationRou
         (CommunityGame,WebOpenCe)=>(true,"uriConversionOnly","Open the official web client with the game invitation. This converts the invitation URI format only; the browser game must validate its build, protocol and local content. It does not translate MCC gameplay."),
         (CommunityGame,ChupathingyCe|OpenCe)=>(true,"nativeGameNegotiationRequired","Hand the documented invitation to the inspected matching community runtime. The game must negotiate protocol/content and reject incompatibility. This is not a confirmed connection."),
     };
-    InvitationRoute{invitation_id:invitation.id.clone(),kind:invitation.kind,client,can_handoff,translation_status:status.into(),detail:detail.into(),requirements:vec!["Use the matching owned game content; local native or browser storage readiness is separate from recognizing an invitation.".into(),"Private invitations remain in memory and are not included in reports, logs or saved project files.".into()],gameplay_verified:false}
+    let mut requirements=vec!["Use the matching owned game content; local native or browser storage readiness is separate from recognizing an invitation.".into(),"Private invitations remain in memory and are not included in reports, logs or saved project files.".into()];
+    if invitation.kind==PasswordCommunityGame {requirements.push("Use a Chupathingy build supporting protected invitations and enter the host's password only in that game's prompt. Older builds may reject the link.".into());}
+    InvitationRoute{invitation_id:invitation.id.clone(),kind:invitation.kind,client,can_handoff,translation_status:status.into(),detail:detail.into(),requirements,gameplay_verified:false}
 }
 
 impl Invitation {
@@ -181,6 +192,50 @@ impl Invitation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn protected_invites_preserve_the_exact_opaque_game_argument_and_client_boundary() {
+        let value=format!("halo://join/p{}{}{}","12".repeat(16),"ab".repeat(16),"cdef0123");
+        let invitation=parse(&value).unwrap();
+        assert_eq!(value.len(),85);
+        assert_eq!(invitation.kind,InvitationKind::PasswordCommunityGame);
+        assert_eq!(invitation.argument(InvitationClient::ChupathingyCe).unwrap(),value);
+        assert_eq!(parse(&value.to_ascii_uppercase()).unwrap().id,invitation.id);
+        let matching=route(&invitation,InvitationClient::ChupathingyCe);
+        assert!(matching.can_handoff);
+        assert!(!matching.gameplay_verified);
+        assert_eq!(matching.translation_status,"runtimePasswordPromptRequired");
+        assert!(matching.requirements.iter().any(|text|text.contains("only in that game's prompt")));
+        for client in [InvitationClient::OpenCe,InvitationClient::WebOpenCe,InvitationClient::MccSteam] {
+            assert!(!route(&invitation,client).can_handoff);
+            assert!(invitation.argument(client).is_err());
+        }
+        let secret=value.strip_prefix("halo://join/").unwrap();
+        assert!(!format!("{invitation:?}").contains(secret));
+        assert!(!serde_json::to_string(&matching).unwrap().contains(secret));
+        let plain=parse(&format!("halo://join/{}","ab".repeat(32))).unwrap();
+        assert_eq!(plain.kind,InvitationKind::CommunityGame);
+        assert!(plain.argument(InvitationClient::OpenCe).is_ok());
+        assert_ne!(invitation.id,plain.id);
+    }
+    #[test]
+    fn protected_invite_boundaries_reject_truncation_extension_and_injection() {
+        for length in [0,1,63,64,65,71,73,74,2048] {
+            let value=format!("halo://join/p{}","a".repeat(length));
+            assert!(parse(&value).is_err());
+        }
+        let valid=format!("halo://join/p{}","ab".repeat(36));
+        for suffix in ["/","?password=secret","#fragment",";quit","&play","\\child"] {
+            assert!(parse(&(valid.clone()+suffix)).is_err());
+        }
+        for character in ['g','-','%','/','\0','\n',' ','é'] {
+            let malformed=format!("halo://join/p{}{}{}","a".repeat(31),character,"b".repeat(40));
+            assert!(parse(&malformed).is_err());
+        }
+        assert!(parse(&format!("{WEB_CLIENT}?join=p{}","ab".repeat(36))).is_err());
+        assert!(parse(&format!("{WEB_CLIENT}?join=halo%3A%2F%2Fjoin%2Fp{}","ab".repeat(36))).is_err());
+        assert!(parse(&format!("play {valid} tonight")).is_err());
+        assert!(parse(&format!("p{}","ab".repeat(36))).is_err());
+    }
     #[test]
     fn private_invitation_routing_does_not_fabricate_mcc_translation() {
         let invitation = parse(&format!("halo://join/{}", "a".repeat(64))).unwrap();

@@ -119,6 +119,7 @@ export default function InvitationJoin({
         Paste a community game link, an MCC Steam lobby invitation, or an official OpenCE web room/game link.
         Spark checks the requested client and shows whether it can hand off the invitation or needs a protocol
         bridge.
+        {' '}Protected Chupathingy links use the game's own password prompt; enter the password there.
       </p>
       <div className="button-row">
         <label className="invitation-input">

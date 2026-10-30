@@ -490,6 +490,9 @@ pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Ve
             .iter()
             .find(|f| f.key == edit.field_key)
             .unwrap();
+        // A UI/JSON round trip can normalize signed zero or numeric spelling.
+        // Leave the original native cell intact when its semantic value agrees.
+        if edit.value.as_f64()==f.value.as_f64() {continue;}
         if f.kind == "reference" {
             let target = inspection
                 .tags
@@ -530,18 +533,22 @@ pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Ve
             }
             if let Some(at) = original.source_offset {
                 for i in 0..3 {
-                    bytes[at + i * 4..at + i * 4 + 4]
-                        .copy_from_slice(&object.position[i].to_le_bytes());
+                    if object.position[i]!=original.position[i] {
+                        bytes[at + i * 4..at + i * 4 + 4]
+                            .copy_from_slice(&object.position[i].to_le_bytes());
+                    }
                 }
             }
             if let Some(at) = original.rotation_offset {
                 if matches!(original.kind.as_str(),"Player spawn"|"Netgame item") {
                     if object.rotation[1]!=0.||object.rotation[2]!=0.{return invalid("This source placement supports yaw only; pitch and roll must remain zero");}
-                    bytes[at..at + 4].copy_from_slice(&object.rotation[0].to_le_bytes());
+                    if object.rotation[0]!=original.rotation[0] {bytes[at..at + 4].copy_from_slice(&object.rotation[0].to_le_bytes());}
                 } else {
                     for i in 0..3 {
-                        bytes[at + i * 4..at + i * 4 + 4]
-                            .copy_from_slice(&object.rotation[i].to_le_bytes());
+                        if object.rotation[i]!=original.rotation[i] {
+                            bytes[at + i * 4..at + i * 4 + 4]
+                                .copy_from_slice(&object.rotation[i].to_le_bytes());
+                        }
                     }
                 }
             }

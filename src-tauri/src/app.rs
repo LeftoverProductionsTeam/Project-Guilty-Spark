@@ -34,6 +34,7 @@ use tauri::{Emitter, Manager, State};
 #[path="director_recording.rs"]mod director_recording;
 #[path="working_tag_changes_native.rs"]mod working_tag_changes_native;
 #[path="conversion_resources_native.rs"]mod conversion_resources_native;
+#[path="portability_native.rs"]mod portability_native;
 #[path="dependency_install.rs"] mod dependency_install;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
@@ -2697,6 +2698,11 @@ pub fn run() {
             save_settings,
             refresh_installation,
             compatibility,
+            portability_native::portability_profiles,
+            portability_native::inspect_portability,
+            portability_native::verify_native_preservation,
+            portability_native::compare_portability,
+            portability_native::save_portability_report,
             start_build,
             prepare_mcc_conversion_tools,
             validate_existing,

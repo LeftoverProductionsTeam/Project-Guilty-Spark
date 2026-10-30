@@ -103,6 +103,12 @@ pub fn compatibility(
 ) -> CompatibilityReport {
     let mut blockers = vec![];
     let mut warnings = vec![];
+    if let Some(profile)=crate::portability::profiles().into_iter().find(|p|p.profile_id=="halo1-mcc-steam") {
+        for finding in crate::portability::target_findings(inspection,&profile) {
+            if finding.code=="MODEL_CLASS" {blockers.push(format!("{}: {}",finding.title,finding.next_action));}
+            if finding.code=="PAINTED_DETAILS" {warnings.push(format!("{}: {}",finding.title,finding.next_action));}
+        }
+    }
     if let Some(source) = &project.source {
         if let Err(e) = validate_resource_snapshot(source, resource_folder(source, tools)) {
             blockers.push(e.to_string());
@@ -398,7 +404,7 @@ impl Runner<'_> {
                 if phase == "extract" {
                     errors.extend(extraction_errors(&line));
                 }
-                if phase!="bsp-index"||err||!line.bytes().all(|b|b.is_ascii_digit()){
+                if (phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!line.bytes().all(|b|b.is_ascii_digit())){
                     self.emit(phase, line, progress, if err { "tool" } else { "info" });
                 }
             }
@@ -459,7 +465,7 @@ impl Runner<'_> {
             if phase == "extract" {
                 errors.extend(extraction_errors(&line));
             }
-            self.emit(phase, line, progress, if err { "tool" } else { "info" });
+            if phase!="bsp-detail"||err {self.emit(phase, line, progress, if err { "tool" } else { "info" });}
         }
         result?;
         if incomplete_output.load(Ordering::Relaxed) {
@@ -625,7 +631,9 @@ pub fn run_build(
                 }
                 bytes
             } else {
-                project::patched_cache(project, inspection)?
+                let(bytes,preservation)=crate::portability::verify_preservation(project,inspection)?;
+                project::atomic_write(&dir.join("native-preservation.json"),&serde_json::to_vec_pretty(&preservation)?,false)?;
+                bytes
             };
             let mut repairs = crate::legacy::prepare_extraction(&mut bytes, inspection)?;
             if project.conversion_profile.as_deref()==Some("zombie-recovery"){repairs.extend(crate::legacy::prepare_zombie_recovery(&mut bytes,inspection)?);}
@@ -781,6 +789,9 @@ pub fn run_build(
             return invalid("Preserved source integrity changed during build");
         }
         validate_resource_snapshot(source, Some(resource_dir))?;
+        let semantic=crate::portability::compare(inspection,&validated)?;
+        project::atomic_write(&dir.join("semantic-changes.json"),&serde_json::to_vec_pretty(&semantic)?,false)?;
+        project::atomic_write(&dir.join("semantic-changes.md"),crate::portability::diff_markdown(&semantic).as_bytes(),false)?;
         Ok(output)
     })();
     let record = match result {

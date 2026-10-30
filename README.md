@@ -1,12 +1,16 @@
 # Project Guilty Spark
 
-**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 35 dev** continues the existing prerelease; compiler and game acceptance remain separate from editor previews.
+**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 36 dev** continues C35 R12; compiler and game acceptance remain separate from editor previews.
 
 > Project Guilty Spark stands on more than twenty years of research, experimentation, documentation, tools, discoveries, and shared knowledge from the Halo modding community. This project would not exist without the people who explored the Blam engine, created the original editors, reverse-engineered file formats, preserved old maps, documented workflows, and helped generations of modders learn.
 
 [Community credits](COMMUNITY_CREDITS.md) · [Get started](docs/GETTING_STARTED.md) · [Build on Windows](docs/BUILD_WINDOWS.md) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Report a problem](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/issues/new/choose)
 
 ## What works today
+
+The [C36 native-preservation pass](docs/CONTINUATION_36_ENGINEERING.md) adds **Build & playtest → Portability Lab**, source-bound Engine Preflight findings, exact untouched-byte checks and readable/JSON semantic build comparisons. Native tags stay standard files; Spark metadata stays outside them. A real CE-to-MCC build and native tag no-op/edit/rebuild workflow have separate evidence. Painted-detail BSP audio changes stop before an unverified save. Protected Chupathingy invitations route to the matching game's password prompt; they do not add MCC cross-play. [Native portability policy](docs/NATIVE_PORTABILITY.md).
+
+Separate [native community trials](docs/C36_COMMUNITY_NATIVE_TESTS.md) run original Xbox data in real OpenCE/Chupathingy processes: same-runtime sessions and OpenCE-host/Chupathingy-client simulate together, while the opposite direction is version-refused. Reproducible private QA retains sampled state differences. Human combat, full replication/AI parity, Spark's listing-to-client flow and MCC protocol translation remain open.
 
 The [C35 r12 sound and workflow pass](docs/C35_MCC_AUDIO_AND_WORKFLOW.md) automatically finds matching classic sound resources or MCC's installed classic ADPCM bank. Looping sounds retain all authored main tracks in one undoable import, with saved BSP ambience available to Director audio. Sound controls load their own styles, keep visible labels and fit narrow drawers without overlapping mute/solo controls. MCC CELT music/dialogue and complete engine audio parity remain open.
 

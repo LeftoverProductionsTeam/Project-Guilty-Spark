@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   ArrowRight,
   Check,
@@ -18,6 +18,9 @@ import { call, native } from '../api';
 import { CheckRow, Notice, PageTitle, Pill } from './ui';
 import BuildTargets from './BuildTargets';
 import ConversionBitmapRepair from './ConversionBitmapRepair';
+import {useMapState,writeMapSession} from '../mapSession';
+import './portabilityLab.css';
+const PortabilityLab=lazy(()=>import('./PortabilityLab'));
 export default function Build({
   project,
   data,
@@ -55,6 +58,7 @@ export default function Build({
   const [issues, setIssues] = useState<string[]>([]);
   const [checking, setChecking] = useState(true);
   const [preparing,setPreparing]=useState(false);
+  const [view,setView]=useMapState<'build'|'portability'>(project.id,'build.view','build');
   useEffect(() => {
     let cancelled = false;
     async function fetchReports() {
@@ -103,20 +107,22 @@ export default function Build({
         description="A traceable pipeline. A separate package. Your installation protected."
         actions={
           <>
-            {validated && <button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>Open compiled map</button>}
+            {validated && <><button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>Open compiled map</button><button onClick={()=>{writeMapSession(project.id,'portability.compare-build',validated.id);setView('portability');}}>Review native changes</button></>}
             <button onClick={()=>void onAction(async()=>{if(dirty)await onSave();onRefresh();})}>
               <RefreshCw size={14} />
               {dirty?'Save & refresh checks':'Refresh checks'}
             </button>
-            <button className="primary" onClick={onStart} disabled={checking || !report?.ready || !!activeJob}>
+            {view==='build'&&<button className="primary" onClick={onStart} disabled={checking || !report?.ready || !!activeJob}>
               <Hammer size={15} />
               {dirty ? 'Save & convert to MCC' : 'Convert map to MCC'}
-            </button>
+            </button>}
           </>
         }
       />
-      {checking&&<p role="status">Checking saved map dependencies…</p>}
-      <div className="build-columns">
+      <div className="build-workflow-tabs" role="tablist" aria-label="Build workflows"><button role="tab" aria-selected={view==='build'} onClick={()=>setView('build')}>Build & playtest</button><button role="tab" aria-selected={view==='portability'} onClick={()=>setView('portability')}>Portability Lab</button></div>
+      {view==='portability'&&<Suspense fallback={<p role="status">Loading Portability Lab…</p>}><PortabilityLab project={project} dirty={dirty} onSave={onSave} onBuild={()=>setView('build')} onSettings={onSettings}/></Suspense>}
+      {view==='build'&&checking&&<p role="status">Checking saved map dependencies…</p>}
+      <div className="build-columns" hidden={view!=='build'}>
         <div className="build-main">
           <section className="surface build-conversion"><h3>Map conversion · CE / PC / Demo to MCC Halo 1</h3>
             <p>Extract the original map’s custom tags, layer them over a verified copy of your legal MCC SDK tags, and compile a native MCC cache. Source maps and SDK master tags stay unchanged. The game load is a separate check.</p>

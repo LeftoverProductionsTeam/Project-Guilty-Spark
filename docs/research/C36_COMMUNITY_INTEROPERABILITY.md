@@ -1,0 +1,38 @@
+# C36 community multiplayer integration
+
+The existing browser, provider deduplication, runtime/content checks and private invitation handoff remain in place. Spark does not add a gameplay protocol or a separate public server pool. A successful invitation handoff remains distinct from joining, spawning and playing.
+
+## Implemented correction
+
+Spark rejected a valid Chupathingy private invitation: `halo://join/p` followed by 72 hexadecimal digits. The [pinned header](https://github.com/ChupathingyCE/chupathingyce/blob/fa0f2df4958459e82359df6f41b325a7344d477c/port/linux/src/p2p_internal.h) and [parser](https://github.com/ChupathingyCE/chupathingyce/blob/fa0f2df4958459e82359df6f41b325a7344d477c/port/linux/src/p2p_crypto.c) define its host hash, door and check. Spark now recognizes the exact bounded format and hands the opaque argument only to the inspected Chupathingy client. The game owns the password prompt and cryptographic validation. OpenCE, web and MCC routes refuse this format. Existing content, executable, window-owner and expiry checks remain required.
+
+Five focused invitation tests pass, including two new cases for the protected format, wrong clients, redaction, truncation, extension, oversized values and command/URL injection. No client, server or game was launched by these tests. No engine or cryptographic code was copied.
+
+## Actual private runtime tests
+
+Official Windows [Chupathingy v0.8.1c](https://github.com/ChupathingyCE/chupathingyce/releases/tag/v0.8.1c) and [OpenCE build-329](https://github.com/OpenCommunityEdition/OpenCE/releases/tag/build-329) packages were staged privately. Their ZIP digests matched release metadata and publisher Ed25519-signed checksum lists; Chupathingy's signed update manifest was also checked. The owner's Xbox image subsequently arrived and its XDVDFS directory/native cache-5 data were verified. Bounded, unchanged range copies supplied isolated test data; the ISO was rehashed unchanged. No system installer, public join, download/sharing, router/firewall change or anti-cheat bypass was used. GPL/AGPL clients and proprietary content remain excluded from Spark delivery.
+
+The exact released [Chupathingy source](https://github.com/ChupathingyCE/chupathingyce/tree/880a933ec33b2ae2dbbeb4018a9090c528a075bc) and OpenCE revision above provide native `HALO_NETWORK_TEST` host/join modes. Actual tests use two independent full game processes, isolated data/save/log roots and loopback addresses, offline/private configuration, no UPnP, no updates/map sharing/download or public listing. OpenCE runs its native null renderer; Chupathingy uses a hidden native window so its event-pump exit timer remains active. Both retain an external watchdog that would classify forced termination as abnormal.
+
+Same-runtime OpenCE and Chupathingy pairs joined and simulated Blood Gulch with shared player state. **OpenCE host → Chupathingy client** also joined and simulated; **Chupathingy host → OpenCE client** was explicitly rejected as host version 32 versus client 39. This is asymmetric exact-release evidence, not general interchangeable protocols. Spark's conservative listing gate remains unchanged because public listings do not authenticate these exact executable/content identities.
+
+Native hooks drive scripted player input, impact-damage requests and forced kill/respawn. The SHOOT hook applies the held weapon's impact damage; it does not prove trigger input, projectile flight or aiming. Logs support scoped player position, health/shield and score/death comparisons, with observed phase/interpolation and inventory differences retained. They do not establish human/visible play, two computers, full object/inventory parity, AI/waves or Spark's listing/invitation-to-client flow. See [native test evidence and reproduction](../C36_COMMUNITY_NATIVE_TESTS.md).
+
+The first OpenCE host stopped at a real missing prerequisite: fast setup opens stock `carousel.map` before selecting Blood Gulch. Adding the owner's unchanged Carousel data resolved it. UI plus the requested map is therefore insufficient evidence for this exact host path. The upstream first-start ISO importer copies native map files before gameplay, is interactive and is suppressed by hidden/timed startup; there is no reviewed ISO CLI. Native `ui.map` presence alone is a startup check, not a complete-host-content claim.
+
+## Audited upstream boundaries
+
+| Project                    | Revision                                   | Scope established by source                                                                                                               |
+| -------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Chupathingy                | `fa0f2df4958459e82359df6f41b325a7344d477c` | Built-in legacy announce 32; accepted legacy range 11–40; Delta wire `chupa-39a`. Effective signed-table values can change independently. |
+| OpenCE                     | `70c5e600ea345345db040ce1914903cc6746b46e` | Built-in legacy announce 39; native/browser interoperability belongs to its own documented implementation.                                |
+| Warthog Xbox               | `66d1392c2cfc10d52b62d431ad2cf41844a705ad` | Test homebrew target; its declared capabilities do not establish stock Xbox, Gearbox or MCC interoperability.                             |
+| Project Reclaimer releases | `19988e213f79d2b17b2239f1e58019f52e375650` | Halo 3 releases; unpublished engine source is not an open Halo 1 adapter.                                                                 |
+
+These are pinned observations, not a new permanently valid compatibility table. Chupathingy's [Delta documentation](https://github.com/ChupathingyCE/chupathingyce/blob/fa0f2df4958459e82359df6f41b325a7344d477c/docs/delta.md) excludes browser-build interoperability. Its [compatibility design](https://github.com/ChupathingyCE/chupathingyce/blob/fa0f2df4958459e82359df6f41b325a7344d477c/docs/delta-compatibility.md) includes planned sections. Read those separately from implemented guarantees. Compare the actual [OpenCE revision](https://github.com/OpenCommunityEdition/OpenCE/tree/70c5e600ea345345db040ce1914903cc6746b46e), [Warthog revision](https://github.com/ChupathingyCE/warthog-xbox/commit/66d1392c2cfc10d52b62d431ad2cf41844a705ad) and [Reclaimer release repository](https://github.com/ProjectReclaimer/project-reclaimer-releases/tree/19988e213f79d2b17b2239f1e58019f52e375650).
+
+The observed Delta List response returned 50 listings over HTTP 200, without map digests or Delta wire/range fields. Spark's exact-number gate remains conservative and can reject compatible cross-version clients. It must not be relaxed on unsigned/incomplete listing data. Legacy announcement numbers, accepted ranges, signed effective compatibility and Delta wire versions are different concepts.
+
+Initial discovery found MCC/H1A tools but no configured community clients. The later private native tests above advance that original blocker without registering test clients in the owner's ordinary Spark library. Listing/parser evidence remains separate from native simulation, AI agreement and expanded player counts. MCC-to-community wire translation remains unimplemented.
+
+Modern Chupathingy/Warthog sources carry GPLv3 obligations; current OpenCE carries AGPLv3 obligations. Source visibility and process separation do not by themselves resolve reuse requirements. This correction uses original Rust validation of a documented invitation grammar; no upstream engine code or proprietary content is redistributed.
