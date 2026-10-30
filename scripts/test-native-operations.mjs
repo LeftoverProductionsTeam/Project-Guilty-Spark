@@ -448,7 +448,11 @@ try {
   );
   throw error;
 } finally {
-  if (call) await call('request_close_window').catch(() => {});
+  if (call)
+    await Promise.race([
+      call('request_close_window').catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
   if (browser) await browser.close().catch(() => {});
   if (child.exitCode === null) child.kill();
 }

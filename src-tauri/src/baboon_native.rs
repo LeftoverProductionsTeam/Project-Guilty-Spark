@@ -370,7 +370,7 @@ fn watched(state: &AppState, session: &Session) -> Reply<Arc<Mutex<Watched>>> {
         })
     });
     if registry.len() >= 8 {
-        return Err("Eight native editor handoffs are active. Close an unused Baboon editor and hide its panel for two minutes before starting another. All source history is retained.".into());
+        return Err("Eight native editor handoffs are active. Close an unused editor and switch away from that handoff/map for two minutes before starting another. Hiding controls keeps the current handoff monitored. All source history is retained.".into());
     }
     Ok(registry.entry(session.id.clone()).or_insert(watch).clone())
 }

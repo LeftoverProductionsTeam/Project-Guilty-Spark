@@ -26,8 +26,8 @@ import type {
 import { availabilityLabel, evidenceLabel, runtimeNames } from '../runtimeWorkbench';
 import { Notice } from './ui';
 import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
-import {integrityBlocks,type NativeTagIntegrityReport} from '../nativeTagIntegrity';
-import BspAudioEditor, {type BspAudioRequest} from './BspAudioEditor';
+import { integrityBlocks, type NativeTagIntegrityReport } from '../nativeTagIntegrity';
+import BspAudioEditor, { type BspAudioRequest } from './BspAudioEditor';
 import BaboonTools from './BaboonTools';
 import NativeTagOperations from './NativeTagOperations';
 import '../runtimeWorkbench.css';
@@ -76,20 +76,37 @@ export default function RuntimeDock({
   const [plan, setPlan] = useState<ToolLaunchPlan | null>(null),
     [consent, setConsent] = useState(false);
   const [notice, setNotice] = useState('');
-  const toolTags=useWorkingTagChanges(project?.id??null,runtime==='mccSteam'?report?.workingSource?.buildId??null:null,report?.workingSource?.tagsDirectory??null);
-  const [handoffIntegrity,setHandoffIntegrity]=useState<{projectId:string;integrity?:NativeTagIntegrityReport}|null>(null);
-  useEffect(()=>{const listener=(event:Event)=>{const value=(event as CustomEvent<{projectId:string;integrity?:NativeTagIntegrityReport}>).detail;if(value?.projectId===project?.id)setHandoffIntegrity(value);};window.addEventListener('guilty-spark-tag-integrity',listener);return()=>window.removeEventListener('guilty-spark-tag-integrity',listener);},[project?.id]);
-  const invalidToolFiles=toolTags.report?.integrity?.invalidFiles??0;
-  const invalidHandoffFiles=handoffIntegrity?.projectId===project?.id?handoffIntegrity?.integrity?.invalidFiles??0:0;
+  const toolTags = useWorkingTagChanges(
+    project?.id ?? null,
+    runtime === 'mccSteam' ? (report?.workingSource?.buildId ?? null) : null,
+    report?.workingSource?.tagsDirectory ?? null,
+  );
+  const [handoffIntegrity, setHandoffIntegrity] = useState<{
+    projectId: string;
+    integrity?: NativeTagIntegrityReport;
+  } | null>(null);
+  useEffect(() => {
+    const listener = (event: Event) => {
+      const value = (event as CustomEvent<{ projectId: string; integrity?: NativeTagIntegrityReport }>)
+        .detail;
+      if (value?.projectId === project?.id) setHandoffIntegrity(value);
+    };
+    window.addEventListener('guilty-spark-tag-integrity', listener);
+    return () => window.removeEventListener('guilty-spark-tag-integrity', listener);
+  }, [project?.id]);
+  const invalidToolFiles = toolTags.report?.integrity?.invalidFiles ?? 0;
+  const invalidHandoffFiles =
+    handoffIntegrity?.projectId === project?.id ? (handoffIntegrity?.integrity?.invalidFiles ?? 0) : 0;
   const generation = useRef(0);
   const currentReport = useRef(report);
   currentReport.current = report;
-  const dialog = useRef<HTMLElement | null>(null);
+  const detailsDialog = useRef<HTMLElement | null>(null);
+  const planDialog = useRef<HTMLElement | null>(null);
   const busyRef = useRef(busy);
   busyRef.current = busy;
   useEffect(() => {
     if (!details && !plan) return;
-    const element = dialog.current,
+    const element = plan ? planDialog.current : detailsDialog.current,
       prior = document.activeElement as HTMLElement | null;
     if (!element) return;
     const controls = () =>
@@ -146,7 +163,13 @@ export default function RuntimeDock({
       if (request === generation.current) setBusy(false);
     }
   }, [runtime, project?.id, settings.hekDirectory, settings.hekFlavor, settings.hekTagsDirectory, epoch]);
-  useEffect(()=>{const listener=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project?.id)void refresh();};window.addEventListener('guilty-spark-native-source-changed',listener);return()=>window.removeEventListener('guilty-spark-native-source-changed',listener);},[project?.id,refresh]);
+  useEffect(() => {
+    const listener = (event: Event) => {
+      if ((event as CustomEvent<{ projectId: string }>).detail?.projectId === project?.id) void refresh();
+    };
+    window.addEventListener('guilty-spark-native-source-changed', listener);
+    return () => window.removeEventListener('guilty-spark-native-source-changed', listener);
+  }, [project?.id, refresh]);
   useEffect(() => {
     setReport(null);
     setPlan(null);
@@ -185,7 +208,31 @@ export default function RuntimeDock({
     writeMapSession(id, 'hosting.tab', tab);
     onNavigate('runtimes');
   }
-  useEffect(()=>{const request=(event:Event)=>{const detail=(event as CustomEvent<{projectId:string;actionId:string;runtimeId?:RuntimeId}>).detail;if(detail?.projectId!==project?.id||!['editTags','editLevel','testScene','workingTags'].includes(detail.actionId))return;setDetails(true);if(detail.runtimeId&&detail.runtimeId!==runtime){setRuntime(detail.runtimeId);return;}if(detail.actionId==='workingTags')return;if(working||busy){setError('Wait for the active operation before preparing a native editor.');return;}const action=report?.actions.find(action=>action.id===detail.actionId);if(action)void act(action);};window.addEventListener('guilty-spark-runtime-tool',request);return()=>window.removeEventListener('guilty-spark-runtime-tool',request);},[project?.id,report,runtime,dirty,working,busy]);
+  useEffect(() => {
+    const request = (event: Event) => {
+      const detail = (event as CustomEvent<{ projectId: string; actionId: string; runtimeId?: RuntimeId }>)
+        .detail;
+      if (
+        detail?.projectId !== project?.id ||
+        !['editTags', 'editLevel', 'testScene', 'workingTags'].includes(detail.actionId)
+      )
+        return;
+      setDetails(true);
+      if (detail.runtimeId && detail.runtimeId !== runtime) {
+        setRuntime(detail.runtimeId);
+        return;
+      }
+      if (detail.actionId === 'workingTags') return;
+      if (working || busy) {
+        setError('Wait for the active operation before preparing a native editor.');
+        return;
+      }
+      const action = report?.actions.find((action) => action.id === detail.actionId);
+      if (action) void act(action);
+    };
+    window.addEventListener('guilty-spark-runtime-tool', request);
+    return () => window.removeEventListener('guilty-spark-runtime-tool', request);
+  }, [project?.id, report, runtime, dirty, working, busy]);
   async function act(action: RuntimeDockAction) {
     setError('');
     setNotice('');
@@ -270,13 +317,21 @@ export default function RuntimeDock({
       if (request === generation.current) setBusy(false);
     }
   }
-  async function buildWorkingTags(bspAudio?:BspAudioRequest) {
-    if (!project || dirty || working || busy || toolTags.report?.status==='saving' || integrityBlocks(toolTags.report?.integrity)) return;
+  async function buildWorkingTags(bspAudio?: BspAudioRequest) {
+    if (
+      !project ||
+      dirty ||
+      working ||
+      busy ||
+      toolTags.report?.status === 'saving' ||
+      integrityBlocks(toolTags.report?.integrity)
+    )
+      return;
     const request = generation.current;
     setBusy(true);
     setError('');
     try {
-      await call<string>('build_working_tags', { projectId: project.id, ...(bspAudio?{bspAudio}:{}) });
+      await call<string>('build_working_tags', { projectId: project.id, ...(bspAudio ? { bspAudio } : {}) });
       if (request === generation.current) {
         setDetails(false);
         setNotice(
@@ -300,8 +355,16 @@ export default function RuntimeDock({
           <span className="runtime-dock-save">
             {working ? 'Working…' : dirty ? 'Unsaved changes' : 'Saved'}
           </span>
-          {!!toolTags.report?.changedFiles&&<button className="runtime-dock-tag-changes" onClick={()=>setDetails(true)}>{toolTags.report.changedFiles} saved tool edit{toolTags.report.changedFiles===1?'':'s'}</button>}
-          {(invalidToolFiles>0||invalidHandoffFiles>0)&&<button role="alert" className="runtime-dock-tag-changes" onClick={()=>setDetails(true)}>Native save integrity warning · {invalidToolFiles+invalidHandoffFiles} files</button>}
+          {!!toolTags.report?.changedFiles && (
+            <button className="runtime-dock-tag-changes" onClick={() => setDetails(true)}>
+              {toolTags.report.changedFiles} saved tool edit{toolTags.report.changedFiles === 1 ? '' : 's'}
+            </button>
+          )}
+          {(invalidToolFiles > 0 || invalidHandoffFiles > 0) && (
+            <button role="alert" className="runtime-dock-tag-changes" onClick={() => setDetails(true)}>
+              Native save integrity warning · {invalidToolFiles + invalidHandoffFiles} files
+            </button>
+          )}
           <button
             className="runtime-dock-details"
             aria-label="Runtime and tool details"
@@ -388,168 +451,188 @@ export default function RuntimeDock({
           </div>
         )}
       </footer>
+      {runtime === 'mccSteam' && <BaboonTools project={project} dirty={dirty} epoch={epoch} monitorOnly />}
       {details && (
-        <div className="modal-backdrop">
-          <section
-            ref={dialog}
-            className="modal runtime-details-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="runtime-details-title"
-          >
-            <div className="section-heading">
-              <h2 id="runtime-details-title">{runtimeNames[selected]} · runtime &amp; tools</h2>
-              <button aria-label="Close runtime details" onClick={() => setDetails(false)}>
-                <X size={18} />
+      <div className="modal-backdrop">
+        <section
+          ref={detailsDialog}
+          className="modal runtime-details-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="runtime-details-title"
+        >
+          <div className="section-heading">
+            <h2 id="runtime-details-title">{runtimeNames[selected]} · runtime &amp; tools</h2>
+            <button aria-label="Close runtime details" onClick={() => setDetails(false)}>
+              <X size={18} />
+            </button>
+          </div>
+          {!native && (
+            <Notice tone="info">
+              Use the desktop app to inspect the installed runtime, tools and owned content.
+            </Notice>
+          )}
+          {error && <Notice>{error}</Notice>}
+          {dirty && (
+            <Notice tone="info">
+              This map has unsaved changes.{' '}
+              <button
+                onClick={() =>
+                  void onSave()
+                    .then(refresh)
+                    .catch((e) => setError(String(e)))
+                }
+              >
+                Save map
               </button>
-            </div>
-            {!native && (
-              <Notice tone="info">
-                Use the desktop app to inspect the installed runtime, tools and owned content.
-              </Notice>
-            )}
-            {error && <Notice>{error}</Notice>}
-            {dirty && (
-              <Notice tone="info">
-                This map has unsaved changes.{' '}
-                <button
-                  onClick={() =>
-                    void onSave()
-                      .then(refresh)
-                      .catch((e) => setError(String(e)))
-                  }
-                >
-                  Save map
-                </button>
-              </Notice>
-            )}
-            {report?.sourceIssue && (
-              <Notice tone="info">
-                {report.sourceIssue}{' '}
-                <button
-                  onClick={() => {
-                    setDetails(false);
-                    onNavigate(project?.quickForge ? 'quickforge' : project ? 'build' : 'library');
-                  }}
-                >
-                  Open map / build sources
-                </button>
-              </Notice>
-            )}
-            {report?.toolsIssue && (
-              <Notice tone="info">
-                {report.toolsIssue}{' '}
-                <button
-                  onClick={() => {
-                    setDetails(false);
-                    onNavigate('settings');
-                  }}
-                >
-                  Set up matching tools
-                </button>
-              </Notice>
-            )}
-            <div className="button-row">
-              <button disabled={busy || !native} onClick={() => void refresh()}>
-                <RefreshCw size={13} />
-                Refresh inspection
-              </button>
+            </Notice>
+          )}
+          {report?.sourceIssue && (
+            <Notice tone="info">
+              {report.sourceIssue}{' '}
               <button
                 onClick={() => {
                   setDetails(false);
-                  routeServers('servers');
+                  onNavigate(project?.quickForge ? 'quickforge' : project ? 'build' : 'library');
                 }}
               >
-                Play &amp; servers
+                Open map / build sources
               </button>
-            </div>
-            {project && report?.workingSource && <WorkingTagChanges {...toolTags}/>}
-            {runtime==='mccSteam' && <BaboonTools project={project} dirty={dirty} epoch={epoch}/>}
-            {runtime==='mccSteam' && project && report?.workingSource && <NativeTagOperations project={project} dirty={dirty} epoch={epoch}/>}
-            {project && report?.workingSource && runtime==='mccSteam' && <BspAudioEditor key={project.id+report.workingSource.buildId} projectId={project.id} parentBuildId={report.workingSource.buildId} blocked={busy||working||dirty||toolTags.report?.status==='saving'||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')} onBuild={buildWorkingTags}/>}
-            {project && (
-              <div className="button-row">
+            </Notice>
+          )}
+          {report?.toolsIssue && (
+            <Notice tone="info">
+              {report.toolsIssue}{' '}
+              <button
+                onClick={() => {
+                  setDetails(false);
+                  onNavigate('settings');
+                }}
+              >
+                Set up matching tools
+              </button>
+            </Notice>
+          )}
+          <div className="button-row">
+            <button disabled={busy || !native} onClick={() => void refresh()}>
+              <RefreshCw size={13} />
+              Refresh inspection
+            </button>
+            <button
+              onClick={() => {
+                setDetails(false);
+                routeServers('servers');
+              }}
+            >
+              Play &amp; servers
+            </button>
+          </div>
+          {project && report?.workingSource && <WorkingTagChanges {...toolTags} />}
+          {runtime === 'mccSteam' && <BaboonTools project={project} dirty={dirty} epoch={epoch} />}
+          {runtime === 'mccSteam' && project && report?.workingSource && (
+            <NativeTagOperations project={project} dirty={dirty} epoch={epoch} />
+          )}
+          {project && report?.workingSource && runtime === 'mccSteam' && (
+            <BspAudioEditor
+              key={project.id + report.workingSource.buildId}
+              projectId={project.id}
+              parentBuildId={report.workingSource.buildId}
+              blocked={
+                busy ||
+                working ||
+                dirty ||
+                toolTags.report?.status === 'saving' ||
+                !!report.sourceIssue ||
+                !!report.toolsIssue ||
+                report.processes.some((p) => p.projectId === project.id && p.status === 'running')
+              }
+              onBuild={buildWorkingTags}
+            />
+          )}
+          {project && (
+            <div className="button-row">
+              <button
+                disabled={
+                  !native ||
+                  !report ||
+                  busy ||
+                  working ||
+                  dirty ||
+                  toolTags.report?.status === 'saving' ||
+                  integrityBlocks(toolTags.report?.integrity) ||
+                  !!report?.sourceIssue ||
+                  !!report?.toolsIssue ||
+                  report?.processes.some((p) => p.projectId === project.id && p.status === 'running')
+                }
+                onClick={() => void buildWorkingTags()}
+              >
+                <Hammer size={13} />
+                Build working tag edits
+              </button>
+              {report?.workingBuild && (
                 <button
-                  disabled={
-                    !native ||
-                    !report ||
-                    busy ||
-                    working ||
-                    dirty ||
-                    toolTags.report?.status==='saving' || integrityBlocks(toolTags.report?.integrity) ||
-                    !!report?.sourceIssue ||
-                    !!report?.toolsIssue ||
-                    report?.processes.some((p) => p.projectId === project.id && p.status === 'running')
-                  }
-                  onClick={() => void buildWorkingTags()}
+                  disabled={busy || working || dirty}
+                  onClick={() => {
+                    setDetails(false);
+                    onOpenCompiled(report.workingBuild!.id);
+                  }}
                 >
-                  <Hammer size={13} />
-                  Build working tag edits
+                  Open working-tags build
                 </button>
-                {report?.workingBuild && (
-                  <button
-                    disabled={busy || working || dirty}
-                    onClick={() => {
-                      setDetails(false);
-                      onOpenCompiled(report.workingBuild!.id);
-                    }}
-                  >
-                    Open working-tags build
-                  </button>
-                )}
-                <small>
-                  Save and close the native tools first. This preserves working tag changes in a new cache;
-                  the ordinary build regenerates source.
-                </small>
+              )}
+              <small>
+                Save and close the native tools first. This preserves working tag changes in a new cache; the
+                ordinary build regenerates source.
+              </small>
+            </div>
+          )}
+          {report && (
+            <>
+              <p className="subtle">
+                {report.report.target.family} · {report.report.target.edition} ·{' '}
+                {report.report.target.distribution} · {report.report.target.platform} /{' '}
+                {report.report.target.architecture}
+              </p>
+              <div className="runtime-capability-list">
+                {report.report.capabilities.map((item) => (
+                  <div key={item.operation}>
+                    <strong>{item.operation.replace(/([A-Z])/g, ' $1')}</strong>
+                    <span>
+                      {availabilityLabel[item.availability]} · {evidenceLabel[item.evidenceLevel]}
+                    </span>
+                    <p>{item.detail}</p>
+                    {item.gates.length > 0 && <small>{item.gates.map((g) => g.detail).join(' ')}</small>}
+                  </div>
+                ))}
               </div>
-            )}
-            {report && (
-              <>
-                <p className="subtle">
-                  {report.report.target.family} · {report.report.target.edition} ·{' '}
-                  {report.report.target.distribution} · {report.report.target.platform} /{' '}
-                  {report.report.target.architecture}
-                </p>
-                <div className="runtime-capability-list">
-                  {report.report.capabilities.map((item) => (
-                    <div key={item.operation}>
-                      <strong>{item.operation.replace(/([A-Z])/g, ' $1')}</strong>
-                      <span>
-                        {availabilityLabel[item.availability]} · {evidenceLabel[item.evidenceLevel]}
-                      </span>
-                      <p>{item.detail}</p>
-                      {item.gates.length > 0 && <small>{item.gates.map((g) => g.detail).join(' ')}</small>}
-                    </div>
-                  ))}
-                </div>
-                <details>
-                  <summary>Retained runtime and research targets ({report.profiles.length})</summary>
-                  {report.profiles.map((profile) => (
-                    <p key={profile.profileId}>
-                      <strong>{profile.label}</strong> ·{' '}
-                      {profile.implementedAdapter ? 'Operation-specific adapter' : 'Research target'}
-                      <br />
-                      <small>{profile.detail}</small>
-                    </p>
-                  ))}
-                </details>
-                {report.processes.map((process) => (
-                  <p key={process.id}>
-                    {process.actionId} · PID {process.processId} · {process.status}
-                    {process.exitCode !== null && ` (${process.exitCode})`}
+              <details>
+                <summary>Retained runtime and research targets ({report.profiles.length})</summary>
+                {report.profiles.map((profile) => (
+                  <p key={profile.profileId}>
+                    <strong>{profile.label}</strong> ·{' '}
+                    {profile.implementedAdapter ? 'Operation-specific adapter' : 'Research target'}
                     <br />
-                    <small>{process.detail}</small>
+                    <small>{profile.detail}</small>
                   </p>
                 ))}
-              </>
-            )}
-          </section>
-        </div>
+              </details>
+              {report.processes.map((process) => (
+                <p key={process.id}>
+                  {process.actionId} · PID {process.processId} · {process.status}
+                  {process.exitCode !== null && ` (${process.exitCode})`}
+                  <br />
+                  <small>{process.detail}</small>
+                </p>
+              ))}
+            </>
+          )}
+        </section>
+      </div>
       )}
       {plan && (
         <div className="modal-backdrop">
           <section
-            ref={dialog}
+            ref={planDialog}
             className="modal runtime-details-dialog"
             role="dialog"
             aria-modal="true"

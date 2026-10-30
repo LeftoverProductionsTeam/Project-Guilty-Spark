@@ -568,6 +568,37 @@ test('C35 drawers fit emulated DPI layouts while preserving the map workspace',a
  await session.send('Emulation.clearDeviceMetricsOverride');
 });
 
+test('native handoff warnings keep updating with tool controls closed and across workspaces', async ({page}) => {
+  await mockDesktop(page); await openFixture(page);
+  await page.evaluate(() => {
+    const w=window as any, prior=w.__TAURI_INTERNALS__.invoke;
+    w.__sparkMock.handoffBad=false; w.__sparkMock.handoffPolls=0;
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='baboon_report') return {installed:{version:'0.3.2',directory:'C:/fixture',executable:'C:/fixture/Baboon.exe',executableSha256:'a'.repeat(64)},sourceReady:true,sessionId:'synthetic-handoff',compatibleKits:[]};
+      if(command==='baboon_poll') {
+        w.__sparkMock.handoffPolls++;
+        const bad=w.__sparkMock.handoffBad;
+        return {sessionId:args.sessionId,tag:'weapons/test.weapon',running:false,processId:null,revisions:[],changes:{status:bad?'changed':'unchanged',revision:bad?1:0,changedFiles:bad?1:0,totalFiles:1,changes:[],listTruncated:false},integrity:{checkedFiles:0,nativeParserCheckedFiles:0,invalidFiles:bad?1:0,pendingFiles:0,unverifiedFiles:0,findings:bad?[{path:'weapons/test.weapon',state:'invalid',detail:'Synthetic malformed save; actual writer unknown.'}]:[],listTruncated:false}};
+      }
+      return prior(command,args);
+    };
+    window.dispatchEvent(new CustomEvent('guilty-spark-baboon-session',{detail:{projectId:'a'}}));
+  });
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.handoffPolls)).toBeGreaterThan(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.evaluate(()=>(window as any).__sparkMock.handoffBad=true);
+  const warning=page.locator('.runtime-dock-tag-changes[role="alert"]');
+  await expect(warning).toContainText('Native save integrity warning',{timeout:10000});
+  await chooseTool(page,'Tag editor');
+  await expect(warning).toBeVisible();
+  await warning.click();
+  await expect(page.getByRole('dialog').getByText('Native save failed integrity checks',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Close runtime details',exact:true}).click();
+  await page.evaluate(()=>(window as any).__sparkMock.handoffBad=false);
+  await expect(warning).toHaveCount(0,{timeout:10000});
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
 test('dependency setup offers a reviewed official install action without launching on inspection or cancel',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{

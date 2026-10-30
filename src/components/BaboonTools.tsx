@@ -2,12 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import type { Project } from '../types';
 import { Notice, Pill } from './ui';
-import { baboonReleaseUrl, type BaboonDashboard, type BaboonPoll, type BaboonReconciled } from '../baboon';
+import {
+  baboonReleaseUrl,
+  baboonSessionEvent,
+  notifyBaboonSession,
+  type BaboonDashboard,
+  type BaboonPoll,
+  type BaboonReconciled,
+} from '../baboon';
 import './baboonTools.css';
 import NativeTagIntegrity from './NativeTagIntegrity';
 import ToolFindings from './ToolFindings';
 import { integrityBlocks } from '../nativeTagIntegrity';
-import {notifyNativeSource} from '../nativeOperations';
+import { notifyNativeSource } from '../nativeOperations';
 
 /** One registration; each map receives its own native source and portable kit context. */
 export default function BaboonTools({
@@ -15,11 +22,13 @@ export default function BaboonTools({
   tagId,
   dirty = false,
   epoch = 0,
+  monitorOnly = false,
 }: {
   project?: Project | null;
   tagId?: number;
   dirty?: boolean;
   epoch?: number;
+  monitorOnly?: boolean;
 }) {
   const [report, setReport] = useState<BaboonDashboard | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -59,16 +68,16 @@ export default function BaboonTools({
     };
   }, [projectId, tagId, epoch, project?.builds.length, refresh]);
   useEffect(() => {
-    if (
-      !native ||
-      (!expanded &&
-        !observed?.running &&
-        observed?.changes.status !== 'saving' &&
-        !observed?.integrity?.pendingFiles) ||
-      !sessionId ||
-      !projectId
-    )
-      return;
+    const prepared = (event: Event) => {
+      if ((event as CustomEvent<{ projectId: string }>).detail?.projectId === projectId) void refresh();
+    };
+    window.addEventListener(baboonSessionEvent, prepared);
+    return () => window.removeEventListener(baboonSessionEvent, prepared);
+  }, [projectId, refresh]);
+  useEffect(() => {
+    // Collapsing tool controls must not suspend integrity monitoring. Native
+    // hashing/parser caches and the pending guard bound repeated observations.
+    if (!native || !sessionId || !projectId) return;
     let stopped = false,
       pending = false;
     const version = generation.current;
@@ -107,14 +116,7 @@ export default function BaboonTools({
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [
-    expanded,
-    sessionId,
-    projectId,
-    observed?.running,
-    observed?.changes.status,
-    observed?.integrity?.pendingFiles,
-  ]);
+  }, [sessionId, projectId]);
   async function perform(work: () => Promise<void>) {
     const version = generation.current;
     setBusy(true);
@@ -150,6 +152,7 @@ export default function BaboonTools({
       });
       if (version !== generation.current) return;
       setSessionId(prepared.sessionId);
+      notifyBaboonSession(projectId);
       setReview(null);
       const result = await call<BaboonPoll>('baboon_launch', { projectId, sessionId: prepared.sessionId });
       if (version !== generation.current) return;
@@ -183,8 +186,9 @@ export default function BaboonTools({
       if (version === generation.current) setMessage(message);
     });
   }
+  if (monitorOnly) return null;
   return (
-    <details className="baboon-tools" onToggle={(e) => setExpanded(e.currentTarget.open)}>
+    <details className="baboon-tools" open={expanded} onToggle={(e) => setExpanded(e.currentTarget.open)}>
       <summary>
         Baboon · native tag editing{' '}
         <Pill tone={report?.installed ? 'green' : 'muted'}>
@@ -262,7 +266,11 @@ export default function BaboonTools({
       )}
       {observed && (
         <div className="baboon-saved-changes" aria-live="polite">
-          <NativeTagIntegrity report={observed.integrity} writerContext={observed.writerContext} evidence={observed.writerEvidence} />
+          <NativeTagIntegrity
+            report={observed.integrity}
+            writerContext={observed.writerContext}
+            evidence={observed.writerEvidence}
+          />
           {observed.changes.changedFiles > 0 && (
             <Notice>
               External editor rewrite: this save may include changes beyond the field you edited. Spark
@@ -330,7 +338,7 @@ export default function BaboonTools({
       {error && <Notice>{error}</Notice>}
       <details>
         <summary>Compatibility and recovery details</summary>
-        <ToolFindings/>
+        <ToolFindings />
         <p>
           Verified Windows executable identity and matching definitions. The current Spark handoff targets MCC
           Halo 1 loose tags; it does not open arbitrary compiled .map files. Starting copies and new revisions

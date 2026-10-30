@@ -116,6 +116,19 @@ try {
 
   await call('baboon_register', { directory: args.get('--baboon') });
   const prepared = await call('baboon_prepare', { projectId: project.id, tagId: pistol.id });
+  // This is the same discovery signal emitted by Spark's prepare controller.
+  // Only the notification is simulated; every observation reads real native files.
+  await page.evaluate(projectId => window.dispatchEvent(new CustomEvent('guilty-spark-baboon-session', { detail: { projectId } })), project.id);
+  // Connect through the real controls, then leave them. Integrity warnings must
+  // still reach the dock while the map is the active workflow.
+  await page.getByRole('button', { name: 'Runtime and tool details', exact: true }).click();
+  const backgroundPanel = page.locator('.baboon-tools').last();
+  if ((await backgroundPanel.getAttribute('open')) === null)
+    await backgroundPanel.locator('summary').first().click();
+  await backgroundPanel.getByRole('button', { name: 'Recheck', exact: true }).click();
+  await expect(backgroundPanel.getByText(prepared.tag, { exact: true })).toBeVisible({ timeout: 30000 });
+  await page.getByRole('button', { name: 'Close runtime details', exact: true }).click();
+  await expect(backgroundPanel).not.toBeVisible();
   const sessionRoot = path.join(data, 'jobs', 'baboon-' + prepared.sessionId),
     tags = path.join(sessionRoot, 'HCEEK', 'tags'),
     relative = prepared.tag;
@@ -169,6 +182,12 @@ try {
   malformed.writeUInt32BE(~zlib.crc32(malformed.subarray(64)) >>> 0, 40);
   await fs.writeFile(path.join(output, 'controlled-malformed-tag.weapon'), malformed);
   await fs.writeFile(tag, malformed);
+  await expect(page.locator('.runtime-dock-tag-changes[role="alert"]')).toContainText(
+    'Native save integrity warning',
+    { timeout: 30000 },
+  );
+  receipt.backgroundHandoffMonitoring = { dialogClosedDuringWrite: true, automaticDockWarning: true };
+  await page.screenshot({ path: path.join(output, 'native-background-rejection.png') });
   await expect
     .poll(async () => (await observed()).integrity.invalidFiles, { timeout: 30000, intervals: [500, 1500] })
     .toBe(1);
@@ -221,6 +240,7 @@ try {
     priorAcceptedSourceIntact: true,
   };
   const next = await call('baboon_prepare', { projectId: project.id, tagId: pistol.id });
+  await page.evaluate(projectId => window.dispatchEvent(new CustomEvent('guilty-spark-baboon-session', { detail: { projectId } })), project.id);
   const nextRoot = path.join(data, 'jobs', 'baboon-' + next.sessionId),
     nextTags = path.join(nextRoot, 'HCEEK', 'tags'),
     nextTag = path.join(nextTags, ...relative.split('/'));
@@ -306,10 +326,11 @@ try {
   );
   throw e;
 } finally {
-  if (call) await Promise.race([
-    call('request_close_window').catch(() => {}),
-    new Promise(resolve => setTimeout(resolve, 1500)),
-  ]);
+  if (call)
+    await Promise.race([
+      call('request_close_window').catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
   await browser?.close().catch(() => {});
   if (child.exitCode === null) child.kill();
 }

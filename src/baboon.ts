@@ -47,3 +47,7 @@ export interface BaboonReconciled {
   };
 }
 export const baboonReleaseUrl = 'https://github.com/Zoephie/Baboon/releases/tag/v0.3.2';
+export const baboonSessionEvent = 'guilty-spark-baboon-session';
+export function notifyBaboonSession(projectId: string) {
+  window.dispatchEvent(new CustomEvent(baboonSessionEvent, { detail: { projectId } }));
+}
