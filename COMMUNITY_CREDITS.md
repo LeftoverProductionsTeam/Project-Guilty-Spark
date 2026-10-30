@@ -1,5 +1,7 @@
 # Community credits and historical foundations
 
+C38 continues Zoephie/Baboon and SnowyMouse/Invader native workflows, with research profiles for General-101's Blender toolset, num0005/Osoyoos, Sigmmma and MosesOfEgypt/MEK, Gravemind2401/Reclaimer, XboxChaos/Assembly, Crisp/Foundry and Microsoft's official tools. [Exact integration and licensing boundaries](docs/COMPATIBLE_TOOLS.md). No upstream program, parser or schema implementation is redistributed by these profiles.
+
 Project Guilty Spark stands on more than twenty years of research, experimentation, documentation, tools, discoveries, and shared knowledge from the Halo modding community. This project would not exist without the people who explored the Blam engine, created the original editors, reverse-engineered file formats, preserved old maps, documented workflows, and helped generations of modders learn.
 
 Spark continues this work. It does not claim to have invented Halo modding or independently discovered every format. The following are historical/research credits, not claims of code reuse, endorsement, employment or affiliation.

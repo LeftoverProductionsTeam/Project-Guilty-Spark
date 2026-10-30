@@ -38,6 +38,9 @@ use tauri::{Emitter, Manager, State};
 #[path="dependency_install.rs"] mod dependency_install;
 #[path="baboon_native.rs"] mod baboon_native;
 #[path="native_tag_parser.rs"] mod native_tag_parser;
+#[path="native_source_revisions.rs"] mod native_source_revisions;
+#[path="native_operations_native.rs"] mod native_operations_native;
+#[path="tool_ecosystem_native.rs"] mod tool_ecosystem_native;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -527,13 +530,16 @@ fn save_forge_receipt(state:&AppState, receipt:&forge_build::QuickForgeBuildRece
 #[tauri::command]
 async fn quickforge_export(app:tauri::AppHandle,project_id:String)->Reply<forge_build::QuickForgeBuildReceipt> {
     tauri::async_runtime::spawn_blocking(move||{
+        let _source_guard=native_operations_native::source_guard()?;
         let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        baboon_native::guard_regeneration(&state,&project)?;
         let receipt=forge_build::run_job(&project,&forge_build::tools_for_target(&project,forge_tools(&state)?).map_err(error)?,&state.root.join("jobs"),&uuid::Uuid::new_v4().to_string(),true,forge_provenance_blockers(&state,&project),Arc::new(AtomicBool::new(false)),|e|event(&app,e)).map_err(error)?;
         save_forge_receipt(&state,&receipt)?;Ok(receipt)
     }).await.map_err(error)?
 }
 #[tauri::command]
 fn quickforge_build(app:tauri::AppHandle,project_id:String)->Reply<String> {
+    let _source_guard=native_operations_native::source_guard()?;
     let state=app.state::<AppState>();
     let project=lock(&state.library)?.get(&project_id).map_err(error)?;
     baboon_native::guard_regeneration(&state,&project)?;
@@ -1230,6 +1236,7 @@ fn event(app: &tauri::AppHandle, e: JobEvent) {
     }
 }
 fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
+    let _source_guard=native_operations_native::source_guard()?;
     let state = app.state::<AppState>();
     let project = lock(&state.library)?.get(&id).map_err(error)?;
     baboon_native::guard_regeneration(&state,&project)?;
@@ -1921,32 +1928,11 @@ fn probe_toolchain_tool_blocking(state: State<AppState>, runtime_id: String, too
             else{"Read-only executable hash and size. No tool process executed.".into()}})
 }
 fn allowed_toolchain(runtime_id: &str, flavor: Option<&str>) -> Vec<ToolChoice> {
-    let official = [
-        ToolChoice { id:"sapien", filename:"sapien.exe", group:"official", gui:true },
-        ToolChoice { id:"guerilla", filename:"guerilla.exe", group:"official", gui:true },
-        ToolChoice { id:"haloTool", filename:"tool.exe", group:"official", gui:false },
-    ];
-    let invader = [
-        ToolChoice { id:"invaderEditor", filename:"invader-edit-qt.exe", group:"invader", gui:true },
-        ToolChoice { id:"invaderExtract", filename:"invader-extract.exe", group:"invader", gui:false },
-        ToolChoice { id:"invaderInfo", filename:"invader-info.exe", group:"invader", gui:false },
-    ];
-    match runtime_id {
-        "mccSteam" if flavor == Some("h1aEk") => {
-            let mut tools = official.to_vec();
-            tools.push(ToolChoice { id:"tagTest", filename:"halo_tag_test.exe", group:"official", gui:true });
-            tools
-        }
-        "haloCustomEdition" => {
-            let mut tools=Vec::new();
-            if flavor==Some("legacyHek") {tools.extend(official);}
-            tools.extend(invader);
-            tools.push(ToolChoice {id:"invaderBuild",filename:"invader-build.exe",group:"invader",gui:false});
-            tools
-        }
-        "haloPc" | "haloPcTrial" | "openCe" | "chupathingyCe" => invader.to_vec(),
-        _ => vec![],
-    }
+    core::tool_ecosystem::legacy_tools(runtime_id,flavor).unwrap_or_default().into_iter()
+        .filter(|tool|tool.location!="baboon")
+        .filter_map(|tool|tool.filename.as_deref().map(|filename|ToolChoice{
+            id:&tool.id,filename,group:&tool.group,gui:tool.mode=="externalGui"
+        })).collect()
 }
 fn known_tool_file(settings:&Settings, choice:ToolChoice)->Reply<Option<PathBuf>> {
     let root = if choice.group=="official" { settings.hek_directory.as_ref() }
@@ -2637,6 +2623,12 @@ pub fn run() {
             baboon_native::baboon_poll,
             baboon_native::baboon_reconcile,
             baboon_native::baboon_restore_start,
+            native_operations_native::native_tag_context,
+            native_operations_native::native_tag_inventory,
+            native_operations_native::native_dependency_check,
+            native_operations_native::native_operation_preview,
+            native_operations_native::native_operation_accept,
+            tool_ecosystem_native::tool_ecosystem_report,
             runtime_workbench::inspect_bsp_audio_workspace,
             runtime_workbench::runtime_tool_processes,
             runtime_workbench::community_listing,

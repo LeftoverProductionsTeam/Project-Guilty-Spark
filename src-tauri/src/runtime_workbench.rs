@@ -319,6 +319,7 @@ fn tool_settings(state: &AppState, project: Option<&Project>) -> Reply<Settings>
     }
     Ok(settings)
 }
+pub(super) fn has_running(state:&AppState,project:&str)->Reply<bool>{Ok(processes(state)?.iter().any(|p|p.project_id==project&&p.status=="running"))}
 
 fn inspect_tool_file(settings: &Settings, tool_id: &str) -> Reply<(PathBuf, String, String)> {
     let choice = allowed_toolchain("mccSteam", Some("h1aEk"))
@@ -656,6 +657,7 @@ pub(super) async fn build_working_tags(
 ) -> Reply<String> {
     let owner = window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
+        let _source_guard=native_operations_native::source_guard()?;
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;

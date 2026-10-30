@@ -1,6 +1,8 @@
 # Universal workbench continuation
 
-The founder's Universal Halo Modding Workbench directive is retained as the next engineering continuation. The safe master consolidation takes priority; this list does not claim these integrations are complete.
+The Universal Halo Modding Workbench directive is active in C38 after verified master consolidation. The shared tool catalog, bounded native operations, source revisions and their limits are recorded in [C38 engineering](CONTINUATION_38_ENGINEERING.md). Broader integrations below remain open.
+
+The next major directive is **SparkLink: Live Studio**. Extend the existing QuickForge LAN/VPN implementation rather than replace it. First establish a real multi-process shared-world slice with authenticated roles, author-aware history, durable accepted state and recovery. Semantic native tags, validated custom-asset transfer, authoritative collaborative builds and game-side preview/peer replication are separate acceptance layers. The flagship simultaneous tag/import/placement workflow remains an explicit unaccepted requirement until demonstrated.
 
 - Inventory existing adapters before adding tool registrations. Extend capability-aware handoffs for MEK/Mozzarilla, Refinery, Osoyoos, Blender tools, Reclaimer, Assembly, Excession and compatible legacy tools.
 - Keep native source, dependencies, authored scenario placements, BSP detail, collision and visibility data through external editing and native compilation. General geometry reimport remains subject to preservation review.

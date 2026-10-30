@@ -1,5 +1,9 @@
 # Project Guilty Spark
 
+## C38 source-aware native workbench
+
+[C38 engineering and boundaries](docs/CONTINUATION_38_ENGINEERING.md) adds one shared tool catalog, map-source-aware recommendations, real Invader dependency checks, reviewed native radius edits and a narrow lens-flare repair. Edits are previewed in isolated candidates, accepted as new complete source revisions and recoverable without replacing other files. QuickForge can browse its built native tags directly. [Tools and setup](docs/COMPATIBLE_TOOLS.md). SparkLink collaborative editing is the next active engineering initiative; existing editor synchronization and live game replication remain separate capabilities.
+
 ## C37 native tool workflow
 
 [Source-aware Baboon handoff, native revisions and live byte checks](docs/CONTINUATION_37_ENGINEERING.md) continue C35/C36 and the One Halo investigation. Failed native header/class/CRC and pinned native structure checks block acceptance and compilation; unknown writer attribution stays explicit. A genuine Baboon pistol edit passed native compilation and readback. QuickForge sharing/live controls use a compact session drawer. Native launch, compiler and gameplay evidence are reported separately.

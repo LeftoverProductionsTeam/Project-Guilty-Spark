@@ -29,6 +29,7 @@ import WorkingTagChanges, { useWorkingTagChanges } from './WorkingTagChanges';
 import {integrityBlocks,type NativeTagIntegrityReport} from '../nativeTagIntegrity';
 import BspAudioEditor, {type BspAudioRequest} from './BspAudioEditor';
 import BaboonTools from './BaboonTools';
+import NativeTagOperations from './NativeTagOperations';
 import '../runtimeWorkbench.css';
 
 const actions = [
@@ -75,7 +76,7 @@ export default function RuntimeDock({
   const [plan, setPlan] = useState<ToolLaunchPlan | null>(null),
     [consent, setConsent] = useState(false);
   const [notice, setNotice] = useState('');
-  const toolTags=useWorkingTagChanges(project?.id??null,runtime==='mccSteam'?report?.workingSource?.buildId??null:null);
+  const toolTags=useWorkingTagChanges(project?.id??null,runtime==='mccSteam'?report?.workingSource?.buildId??null:null,report?.workingSource?.tagsDirectory??null);
   const [handoffIntegrity,setHandoffIntegrity]=useState<{projectId:string;integrity?:NativeTagIntegrityReport}|null>(null);
   useEffect(()=>{const listener=(event:Event)=>{const value=(event as CustomEvent<{projectId:string;integrity?:NativeTagIntegrityReport}>).detail;if(value?.projectId===project?.id)setHandoffIntegrity(value);};window.addEventListener('guilty-spark-tag-integrity',listener);return()=>window.removeEventListener('guilty-spark-tag-integrity',listener);},[project?.id]);
   const invalidToolFiles=toolTags.report?.integrity?.invalidFiles??0;
@@ -145,6 +146,7 @@ export default function RuntimeDock({
       if (request === generation.current) setBusy(false);
     }
   }, [runtime, project?.id, settings.hekDirectory, settings.hekFlavor, settings.hekTagsDirectory, epoch]);
+  useEffect(()=>{const listener=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project?.id)void refresh();};window.addEventListener('guilty-spark-native-source-changed',listener);return()=>window.removeEventListener('guilty-spark-native-source-changed',listener);},[project?.id,refresh]);
   useEffect(() => {
     setReport(null);
     setPlan(null);
@@ -183,7 +185,7 @@ export default function RuntimeDock({
     writeMapSession(id, 'hosting.tab', tab);
     onNavigate('runtimes');
   }
-  useEffect(()=>{const request=(event:Event)=>{const detail=(event as CustomEvent<{projectId:string;actionId:string}>).detail;if(detail?.projectId!==project?.id||detail.actionId!=='editTags')return;setDetails(true);if(working||busy){setError('Wait for the active operation before preparing a native editor.');return;}const action=report?.actions.find(action=>action.id==='editTags');if(action)void act(action);};window.addEventListener('guilty-spark-runtime-tool',request);return()=>window.removeEventListener('guilty-spark-runtime-tool',request);},[project?.id,report,dirty,working,busy]);
+  useEffect(()=>{const request=(event:Event)=>{const detail=(event as CustomEvent<{projectId:string;actionId:string;runtimeId?:RuntimeId}>).detail;if(detail?.projectId!==project?.id||!['editTags','editLevel','testScene','workingTags'].includes(detail.actionId))return;setDetails(true);if(detail.runtimeId&&detail.runtimeId!==runtime){setRuntime(detail.runtimeId);return;}if(detail.actionId==='workingTags')return;if(working||busy){setError('Wait for the active operation before preparing a native editor.');return;}const action=report?.actions.find(action=>action.id===detail.actionId);if(action)void act(action);};window.addEventListener('guilty-spark-runtime-tool',request);return()=>window.removeEventListener('guilty-spark-runtime-tool',request);},[project?.id,report,runtime,dirty,working,busy]);
   async function act(action: RuntimeDockAction) {
     setError('');
     setNotice('');
@@ -463,6 +465,7 @@ export default function RuntimeDock({
             </div>
             {project && report?.workingSource && <WorkingTagChanges {...toolTags}/>}
             {runtime==='mccSteam' && <BaboonTools project={project} dirty={dirty} epoch={epoch}/>}
+            {runtime==='mccSteam' && project && report?.workingSource && <NativeTagOperations project={project} dirty={dirty} epoch={epoch}/>}
             {project && report?.workingSource && runtime==='mccSteam' && <BspAudioEditor key={project.id+report.workingSource.buildId} projectId={project.id} parentBuildId={report.workingSource.buildId} blocked={busy||working||dirty||toolTags.report?.status==='saving'||!!report.sourceIssue||!!report.toolsIssue||report.processes.some(p=>p.projectId===project.id&&p.status==='running')} onBuild={buildWorkingTags}/>}
             {project && (
               <div className="button-row">

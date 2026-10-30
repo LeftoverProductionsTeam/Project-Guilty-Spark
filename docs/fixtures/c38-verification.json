@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "startingCommit": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+  "branch": "codex/c38-universal-workbench",
+  "rust": {
+    "passed": 502,
+    "ignored": 7
+  },
+  "ownedPaintedBsp": {
+    "passed": 1
+  },
+  "frontend": {
+    "passed": 216,
+    "files": 44
+  },
+  "browser": {
+    "passed": 79,
+    "quiescentFullRun": true
+  },
+  "offline": {
+    "scripts": 59
+  },
+  "typescript": true,
+  "nativeReceipt": "docs/fixtures/c38-native-operations.json",
+  "appSha256": "1e7a88859e7467397ee2f83ec7881f4fded4d96b6deb0c5caa3d0dac6b6076e9",
+  "gameLaunched": false,
+  "gameplayAccepted": false,
+  "notes": [
+    "Earlier contended browser and failed native development runs were retained and are not counted as passes.",
+    "A concurrent seeder execution blocked one Cargo example relink; the full workspace suite subsequently passed with that executable idle.",
+    "General geometry reimport remains unimplemented; procedural regeneration/export protection and independent native file preservation are tested."
+  ]
+}

@@ -142,6 +142,9 @@ fn source_key(project: &str) -> String {
 /// Procedural/cache rebuilds do not consume accepted native revisions. Refuse
 /// that route before staging, rather than silently replacing authored tags.
 pub(super) fn guard_regeneration(state: &AppState, project: &Project) -> Reply<()> {
+    if native_source_revisions::retained(state,&project.id)? {
+        return Err("This map retains native tool revisions. Use Build working tag edits; regenerating geometry would omit native edits and requires scenario/BSP preservation review.".into());
+    }
     let active: Option<ActiveSource> = lock(&state.library)?
         .setting(&source_key(&project.id))
         .map_err(error)?;
@@ -172,6 +175,7 @@ pub(super) fn working_source(
     build_id: &str,
     default: &Path,
 ) -> Reply<PathBuf> {
+    if let Some(selected)=native_source_revisions::selected(state,project,build_id)? {return Ok(selected);}
     let active: Option<ActiveSource> = lock(&state.library)?
         .setting(&source_key(&project.id))
         .map_err(error)?;
@@ -548,6 +552,8 @@ pub(super) async fn baboon_reconcile(
 ) -> Reply<Reconciled> {
     let owner = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
+        let _source_guard=native_operations_native::source_guard()?;
+        native_operations_native::require_idle(&app.state::<AppState>())?;
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;let mut session=load(&state,&session_id,&owner,&project_id)?;
         let p=lock(&state.library)?.get(&project_id).map_err(error)?;if p.fingerprint().map_err(error)?!=session.fingerprint{return Err("The saved map revision changed. Both sources remain available; review against the current map before rebuilding".into());}
         let observed=poll(&state,&session)?;
@@ -599,6 +605,8 @@ pub(super) async fn baboon_restore_start(
 ) -> Reply<String> {
     let owner = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
+        let _source_guard=native_operations_native::source_guard()?;
+        native_operations_native::require_idle(&app.state::<AppState>())?;
         let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
         let mut session=load(&state,&session_id,&owner,&project_id)?;
         let p=lock(&state.library)?.get(&project_id).map_err(error)?;

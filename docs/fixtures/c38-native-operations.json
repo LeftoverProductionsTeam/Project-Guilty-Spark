@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "nativeDesktop": true,
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "gameplayAccepted": false,
+  "parentSha256": "fa75952cdf222f5cf8a26554471e33cf5efc37d4843bf52dedb8e8d700ba7975",
+  "originalNativeFiles": 2240,
+  "toolDiscoveryMs": 420.5589,
+  "sourceAwareProfiles": {
+    "runtimes": 5,
+    "legacyCacheVersion": 6,
+    "installedBaboonRefusesLegacyCache": true,
+    "researchProfilesCannotExecute": true
+  },
+  "dependencyMs": 4383.1925999999985,
+  "missingDependencyRejected": true,
+  "dependencies": {
+    "count": 9,
+    "tool": "Invader dependency 0.55.0.r4134.33518109",
+    "sha256": "727e6983582f882b17a52822547ee1805c13856de912494ce28ff2a726a3b554"
+  },
+  "previewMs": 347.125799999998,
+  "tamperedCandidateRejected": true,
+  "acceptMs": 23900.941100000004,
+  "sourceWatcherRebound": true,
+  "recoveryPreservesIndependentNativeEdit": true,
+  "lensFlareRepair": {
+    "controlledLegacyStyleValue": 360,
+    "repairedNativeValue": 0,
+    "writer": "Reviewed Invader bludgeon",
+    "exposedFieldChanges": [
+      {
+        "before": "rotation_function_scale (20626.480625)                          angle (float32)",
+        "after": "rotation_function_scale (0.000000)                              angle (float32)"
+      }
+    ]
+  },
+  "nonMatchingRepairRefused": true,
+  "baboonInteroperation": {
+    "preparedFromAcceptedInvaderSource": true,
+    "files": 2240,
+    "controlledWriter": "Invader in the Baboon fork; no fresh Baboon GUI edit is claimed",
+    "laterBaboonRevisionSupersedesInvader": true,
+    "nextInvaderRevisionUsesBaboonSource": true
+  },
+  "destructiveRegenerationAndExportProtected": true,
+  "externalGeometry": {
+    "realJmsVertexChanged": true,
+    "protectedConflict": true,
+    "generalGeometryImportNotImplemented": true
+  },
+  "sourceCannotChangeDuringBuild": true,
+  "nativeBuildMs": 43973.86140000002,
+  "nativeCompilation": {
+    "compiledRadius": 0.550000011920929,
+    "sha256": "48ac630921e357dfa17403a464ab1c66cc432faf0602bc9fa0f2c0ad912539bf",
+    "allInputTagsByteIdentical": true,
+    "files": 2240,
+    "sourceAndDraftUnchanged": true
+  },
+  "recoveryAfterCompilation": true,
+  "retainedHistoryAfterUiReload": true,
+  "errors": [],
+  "appSha256": "1e7a88859e7467397ee2f83ec7881f4fded4d96b6deb0c5caa3d0dac6b6076e9"
+}

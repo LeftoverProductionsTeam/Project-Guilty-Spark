@@ -1,0 +1,73 @@
+.native-tag-operations {
+  margin-block: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border, #3d5363);
+  border-radius: 0.6rem;
+}
+.native-tag-operations summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.native-tag-operations p {
+  margin-block: 0.45rem;
+}
+.native-tag-path {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-block: 0.5rem;
+}
+.native-field-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.55rem;
+  margin-block: 0.6rem;
+}
+.native-field-edit label {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1 1 9rem;
+}
+.native-field-edit input {
+  width: 100%;
+  min-width: 0;
+}
+.native-history {
+  display: grid;
+  gap: 0.3rem;
+  margin-block: 0.5rem;
+}
+.native-history select {
+  max-width: 100%;
+  min-width: 0;
+}
+.native-tag-operations pre,
+.tool-ecosystem pre {
+  max-height: 15rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.native-tag-operations ul {
+  max-height: 14rem;
+  overflow: auto;
+  padding-left: 1.2rem;
+}
+.native-tag-operations code {
+  overflow-wrap: anywhere;
+}
+.tool-ecosystem .gs-tool-grid {
+  margin-block: 0.8rem;
+}
+.tool-ecosystem .gs-tool-card {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.tool-ecosystem .gs-tool-card p {
+  margin-block: 0.15rem;
+}

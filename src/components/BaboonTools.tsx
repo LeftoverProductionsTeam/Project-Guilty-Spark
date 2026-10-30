@@ -7,6 +7,7 @@ import './baboonTools.css';
 import NativeTagIntegrity from './NativeTagIntegrity';
 import ToolFindings from './ToolFindings';
 import { integrityBlocks } from '../nativeTagIntegrity';
+import {notifyNativeSource} from '../nativeOperations';
 
 /** One registration; each map receives its own native source and portable kit context. */
 export default function BaboonTools({
@@ -165,6 +166,7 @@ export default function BaboonTools({
     const version = generation.current;
     await perform(async () => {
       const result = await call<BaboonReconciled>('baboon_reconcile', { projectId, sessionId });
+      notifyNativeSource(projectId);
       if (version !== generation.current) return;
       setReview(result);
       setMessage(result.reason);
@@ -177,6 +179,7 @@ export default function BaboonTools({
     const version = generation.current;
     await perform(async () => {
       const message = await call<string>('baboon_restore_start', { projectId, sessionId });
+      notifyNativeSource(projectId);
       if (version === generation.current) setMessage(message);
     });
   }
