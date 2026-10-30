@@ -1,11 +1,13 @@
 //! Read-only reconciliation of an owned editable tag tree. Never patches a cache.
 use crate::{invalid, maps, reject_links, safe_relative, Result, SparkError};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
-    time::UNIX_EPOCH,
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 
 pub const MAX_FILES: usize = 20_000;
@@ -13,6 +15,8 @@ const MAX_FILE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_TREE_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 const STABLE_MS: u64 = 1500;
 pub type Hashes = BTreeMap<String, String>;
+pub const AUDIT_BYTES_PER_POLL: usize = 8 * 1024 * 1024;
+pub const AUDIT_FILES_PER_POLL: usize = 64;
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Stamp {
     bytes: u64,
@@ -38,6 +42,21 @@ pub struct TagChanges {
     pub changes: Vec<TagChange>,
     pub list_truncated: bool,
     pub hashes_read_last_scan: usize,
+    #[serde(default)]
+    pub content_audit: ContentAudit,
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContentAudit {
+    pub bytes_read_last_poll: usize,
+    pub files_checked_last_poll: usize,
+    pub completed_sweeps: u64,
+}
+struct AuditFile {
+    path: String,
+    stamp: Stamp,
+    offset: u64,
+    sha: Sha256,
 }
 pub struct TagChangeMonitor {
     root: PathBuf,
@@ -50,16 +69,22 @@ pub struct TagChangeMonitor {
     revision: u64,
     hashes_read: usize,
     dirty_paths: BTreeSet<String>,
+    audit_cursor: Option<String>,
+    audit_file: Option<AuditFile>,
+    audit: ContentAudit,
+    audited_at: Option<Instant>,
 }
 fn inventory(root: &Path) -> Result<Inventory> {
     reject_links(root)?;
     let mut files = BTreeMap::new();
     let mut stack = vec![(root.to_path_buf(), 0usize)];
     let mut bytes = 0u64;
-    let mut directories=0usize;
+    let mut directories = 0usize;
     while let Some((directory, depth)) = stack.pop() {
-        directories+=1;
-        if directories>MAX_FILES{return invalid("Working tag monitoring exceeds 20000 directories");}
+        directories += 1;
+        if directories > MAX_FILES {
+            return invalid("Working tag monitoring exceeds 20000 directories");
+        }
         if depth > 32 {
             return invalid("Working tag monitoring exceeds 32 directory levels");
         }
@@ -168,19 +193,133 @@ impl TagChangeMonitor {
             revision: 0,
             hashes_read,
             dirty_paths: BTreeSet::new(),
+            audit_cursor: None,
+            audit_file: None,
+            audit: ContentAudit::default(),
+            audited_at: None,
         })
     }
     pub fn root(&self) -> &Path {
         &self.root
     }
-    pub fn accepted_hashes(&self) -> &Hashes { &self.hashes }
-    pub fn baseline_hashes(&self) -> &Hashes { &self.baseline }
+    pub fn accepted_hashes(&self) -> &Hashes {
+        &self.hashes
+    }
+    pub fn baseline_hashes(&self) -> &Hashes {
+        &self.baseline
+    }
+    pub fn audit_background(&mut self) -> Result<()> {
+        if self
+            .audited_at
+            .is_none_or(|at| at.elapsed() >= Duration::from_secs(2))
+        {
+            self.audit_content(AUDIT_BYTES_PER_POLL, AUDIT_FILES_PER_POLL)?;
+            self.audited_at = Some(Instant::now());
+        }
+        Ok(())
+    }
+    /// Rolling SHA-256 verification catches missed events and preserved metadata.
+    /// A large file is streamed over multiple polls, with no open handle retained
+    /// between calls. A mismatch only schedules the normal stable-save validation;
+    /// this background sweep never accepts an edit or certifies semantic validity.
+    pub fn audit_content(&mut self, byte_budget: usize, file_budget: usize) -> Result<()> {
+        self.audit.bytes_read_last_poll = 0;
+        self.audit.files_checked_last_poll = 0;
+        let byte_budget = byte_budget.min(AUDIT_BYTES_PER_POLL);
+        let file_budget = file_budget.min(AUDIT_FILES_PER_POLL);
+        let mut buffer = [0u8; 64 * 1024];
+        while self.audit.bytes_read_last_poll < byte_budget
+            && self.audit.files_checked_last_poll < file_budget
+        {
+            if self.audit_file.is_none() {
+                use std::ops::Bound::{Excluded, Unbounded};
+                let next = match &self.audit_cursor {
+                    Some(cursor) => self
+                        .stamps
+                        .range((Excluded(cursor.clone()), Unbounded))
+                        .next(),
+                    None => self.stamps.iter().next(),
+                };
+                let Some((path, stamp)) = next else {
+                    self.audit_cursor = None;
+                    self.audit.completed_sweeps = self.audit.completed_sweeps.saturating_add(1);
+                    break;
+                };
+                self.audit_file = Some(AuditFile {
+                    path: path.clone(),
+                    stamp: stamp.clone(),
+                    offset: 0,
+                    sha: Sha256::new(),
+                });
+            }
+            let mut part = self.audit_file.take().unwrap();
+            let path = self.root.join(safe_relative(&part.path)?);
+            reject_links(&path)?;
+            let meta = match fs::metadata(&path) {
+                Ok(meta) => Some(meta),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(e) => return Err(e.into()),
+            };
+            let matches = meta.as_ref().is_some_and(|meta| {
+                meta.is_file()
+                    && meta.len() == part.stamp.bytes
+                    && meta
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                        .is_some_and(|t| t.as_nanos() == part.stamp.modified)
+                    && meta
+                        .created()
+                        .ok()
+                        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                        .map(|t| t.as_nanos())
+                        .unwrap_or_default()
+                        == part.stamp.created
+            });
+            if !matches || self.dirty_paths.contains(&part.path) {
+                if !self.dirty_paths.contains(&part.path) {
+                    self.mark_changed([part.path.clone()])?;
+                }
+            } else {
+                let mut file = fs::File::open(&path)?;
+                file.seek(SeekFrom::Start(part.offset))?;
+                while part.offset < part.stamp.bytes
+                    && self.audit.bytes_read_last_poll < byte_budget
+                {
+                    let size = buffer
+                        .len()
+                        .min(byte_budget - self.audit.bytes_read_last_poll)
+                        .min((part.stamp.bytes - part.offset) as usize);
+                    let read = file.read(&mut buffer[..size])?;
+                    if read == 0 {
+                        self.mark_changed([part.path.clone()])?;
+                        break;
+                    }
+                    part.sha.update(&buffer[..read]);
+                    part.offset += read as u64;
+                    self.audit.bytes_read_last_poll += read;
+                }
+                if part.offset < part.stamp.bytes && !self.dirty_paths.contains(&part.path) {
+                    self.audit_file = Some(part);
+                    break;
+                }
+                if !self.dirty_paths.contains(&part.path)
+                    && self.hashes.get(&part.path) != Some(&format!("{:x}", part.sha.finalize()))
+                {
+                    self.mark_changed([part.path.clone()])?;
+                }
+            }
+            self.audit_cursor = Some(part.path);
+            self.audit.files_checked_last_poll += 1;
+        }
+        Ok(())
+    }
     pub fn keep_observed_baseline(&mut self) -> Result<()> {
         if self.pending.is_some() || !self.dirty_paths.is_empty() || self.rehash {
             return invalid("Wait for a stable native source before keeping its baseline");
         }
-        self.baseline=self.hashes.clone();
-        self.basis="acceptedNativeRevision".into();
+        self.baseline = self.hashes.clone();
+        self.basis = "acceptedNativeRevision".into();
         Ok(())
     }
     /// Native file events invalidate content identity even if an editor restores
@@ -190,11 +329,16 @@ impl TagChangeMonitor {
         let mut changed = false;
         for path in paths {
             safe_relative(&path)?;
-            if self.dirty_paths.len() >= MAX_FILES { self.rehash = true; }
-            else { self.dirty_paths.insert(path); }
+            if self.dirty_paths.len() >= MAX_FILES {
+                self.rehash = true;
+            } else {
+                self.dirty_paths.insert(path);
+            }
             changed = true;
         }
-        if changed { self.pending = None; }
+        if changed {
+            self.pending = None;
+        }
         Ok(())
     }
     pub fn report(&self) -> TagChanges {
@@ -228,7 +372,7 @@ impl TagChangeMonitor {
             }
         }
         TagChanges {
-            status: if self.pending.is_some() {
+            status: if self.pending.is_some() || !self.dirty_paths.is_empty() || self.rehash {
                 "saving"
             } else if count > 0 {
                 "changed"
@@ -243,6 +387,7 @@ impl TagChangeMonitor {
             list_truncated: count > changes.len(),
             changes,
             hashes_read_last_scan: self.hashes_read,
+            content_audit: self.audit.clone(),
         }
     }
     /// Metadata is cheap. Hash only changed entries after two stable observations.
@@ -251,7 +396,11 @@ impl TagChangeMonitor {
         self.hashes_read = 0;
         self.rehash |= rehash;
         let next = inventory(&self.root)?;
-        if next == self.stamps && !self.rehash && self.pending.is_none() && self.dirty_paths.is_empty() {
+        if next == self.stamps
+            && !self.rehash
+            && self.pending.is_none()
+            && self.dirty_paths.is_empty()
+        {
             return Ok(self.report());
         }
         match &self.pending {
@@ -265,7 +414,10 @@ impl TagChangeMonitor {
         }
         let mut hashes = Hashes::new();
         for (path, stamp) in &next {
-            let hash = if !self.rehash && !self.dirty_paths.contains(path) && self.stamps.get(path) == Some(stamp) {
+            let hash = if !self.rehash
+                && !self.dirty_paths.contains(path)
+                && self.stamps.get(path) == Some(stamp)
+            {
                 self.hashes.get(path).cloned().ok_or_else(|| {
                     SparkError::Invalid("Working tag hash state is incomplete".into())
                 })?
@@ -409,6 +561,55 @@ mod tests {
         assert!(validate_baseline(&BTreeMap::from([("ok.weapon".into(), "fake".into())])).is_err());
         let d = tempdir().unwrap();
         assert!(TagChangeMonitor::new(&d.path().join("missing"), None).is_err());
+    }
+    #[test]
+    fn rolling_audit_finds_a_missed_same_stamp_save_and_streams_within_budget() {
+        let dir = tempdir().unwrap();
+        saved(dir.path(), "a.weapon", b"aaaa", 100);
+        saved(dir.path(), "b.scenery", &[7; 500], 100);
+        let mut m = TagChangeMonitor::new(dir.path(), None).unwrap();
+        saved(dir.path(), "b.scenery", &[8; 500], 100);
+        assert_eq!(m.scan(0, false).unwrap().status, "unchanged");
+        for _ in 0..8 {
+            m.audit_content(80, 1).unwrap();
+            assert!(m.report().content_audit.bytes_read_last_poll <= 80);
+            assert!(m.report().content_audit.files_checked_last_poll <= 1);
+        }
+        assert_eq!(m.report().status, "saving");
+        assert_eq!(m.report().changed_files, 0, "Audit cannot accept an edit");
+        m.scan(100, false).unwrap();
+        let result = m.scan(1700, false).unwrap();
+        assert_eq!(result.changed_files, 1);
+        assert_eq!(result.hashes_read_last_scan, 1);
+        assert_eq!(result.changes[0].path, "b.scenery");
+        assert_eq!(
+            fs::read(dir.path().join("b.scenery")).unwrap(),
+            vec![8; 500]
+        );
+    }
+    #[test]
+    fn audit_cycles_do_not_reparse_unchanged_files_or_starve_after_add_remove() {
+        let dir = tempdir().unwrap();
+        saved(dir.path(), "a.weapon", b"aaaa", 100);
+        saved(dir.path(), "b.scenery", b"bbbb", 100);
+        let mut m = TagChangeMonitor::new(dir.path(), None).unwrap();
+        m.audit_content(100, 64).unwrap();
+        assert_eq!(m.report().content_audit.completed_sweeps, 1);
+        assert_eq!(m.scan(100, false).unwrap().hashes_read_last_scan, 0);
+        assert_eq!(m.report().revision, 0);
+        fs::remove_file(dir.path().join("a.weapon")).unwrap();
+        m.audit_content(100, 64).unwrap();
+        m.scan(200, false).unwrap();
+        assert_eq!(m.scan(1800, false).unwrap().changed_files, 1);
+        saved(dir.path(), "c.equipment", b"cccc", 100);
+        m.scan(2000, false).unwrap();
+        m.scan(3600, false).unwrap();
+        saved(dir.path(), "c.equipment", b"dddd", 100);
+        for _ in 0..3 {
+            m.audit_content(100, 1).unwrap();
+        }
+        m.scan(4000, false).unwrap();
+        assert_eq!(m.scan(5600, false).unwrap().changed_files, 2);
     }
     #[test]
     fn changed_list_is_bounded_without_hiding_the_total() {

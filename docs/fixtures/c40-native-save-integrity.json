@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "nativeDesktop": true,
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "gameplayAccepted": false,
+  "parentSha256": "fa75952cdf222f5cf8a26554471e33cf5efc37d4843bf52dedb8e8d700ba7975",
+  "normalization": {
+    "changedBytes": 201,
+    "exposedFieldsEquivalent": true,
+    "acceptedAsEquivalent": true,
+    "scope": "Pinned Invader field-output comparison; opaque bytes/unprinted precision are not certified."
+  },
+  "semanticCorruption": {
+    "validChecksum": true,
+    "invalidDependencyLength": true,
+    "detectedByNativeParser": true,
+    "reconciliationRejected": true,
+    "writerContext": "Baboon handoff; actual writer unconfirmed. Other programs can also write this folder. Filesystem notifications supply no writer PID.",
+    "writerEvidence": {
+      "observedAt": "2026-10-30T11:27:55.461576900+00:00",
+      "revision": 1,
+      "writerConfidence": "unknown",
+      "explanation": "Tool associations describe a prepared handoff or Spark-observed launch, not a confirmed file writer. Filesystem events contain no writer PID; a read-only validator is not the writer. Hashes describe the last stable observation, while file metadata may reflect a newer save.",
+      "associations": [
+        {
+          "tool": "Baboon",
+          "version": "0.3.2 (prepared reviewed binary)",
+          "executable": "<isolated Baboon handoff>/editor/Baboon.exe",
+          "executableSha256": "051d5a849d4cb3c60c7a9554f88b7d551f74e2925e6d4a671f2d23f32973fe2e",
+          "processId": null,
+          "basis": "Prepared handoff only; no Spark-observed launch in this watch, actual writer unknown"
+        }
+      ],
+      "files": [
+        {
+          "path": "weapons/pistol/pistol.weapon",
+          "kind": "modified",
+          "previousSha256": "50df9677812206c61ca8cd85d2cc1eeb94e69c1ffe8c873578d88580bd5a62a5",
+          "observedSha256": "6db1bee0fbbdf7d30055f652fecc62aee363170f7c09857db1d8806c24cf4310",
+          "bytes": 2978,
+          "modifiedUnixMs": 1793359671197
+        }
+      ],
+      "listTruncated": false
+    },
+    "actualControlledWriter": "QA Node process, intentionally malformed fixture; not Baboon or Invader"
+  },
+  "crcFailureDetected": true,
+  "recovery": {
+    "startingBytesRestored": true,
+    "damagedExternalEvidenceRetained": true,
+    "priorAcceptedSourceIntact": true
+  },
+  "validEditDetectionMs": 3217.9400000000023,
+  "nativeBuildMs": 31289.45490000001,
+  "validEdit": {
+    "writer": "Invader",
+    "toolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "field": "bounding_radius",
+    "before": 0.1,
+    "expected": 0.225,
+    "compiled": 0.22499999403953552,
+    "reconciled": true,
+    "nativeCompiled": true,
+    "compiledTagBytesPreserved": true
+  },
+  "nativeRecoveryInventoryVerified": 2240,
+  "compiledSha256": "8ba1a69df55bd1808e1f85a2343246f153caa97f33794f37a2bec3f7f0a3f5fb",
+  "appSha256": "5a92f8bf9eb275a16329626f073d48a85d6b40956666824dde0fd187c6351776",
+  "errors": [],
+  "compiledMapOpenedInSeparateTab": true,
+  "scope": "C40 actual Windows Spark IPC/UI, approved native tools, isolated source and H1A compilation; not a new human Baboon GUI save or Halo gameplay test.",
+  "historicalBaboonEvidence": {
+    "path": "c37-native-acceptance.json",
+    "sha256": "2bff8dc95c934c3783e44f1862d3ff2fe0170c6f99d1d5cd628c77e3792fb2bd",
+    "newHumanGuiSaveClaimed": false
+  },
+  "publicPathRedaction": "Only the private executable location is redacted; hashes, observations, counts and outcomes are unchanged."
+}

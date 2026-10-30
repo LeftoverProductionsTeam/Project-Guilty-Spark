@@ -33,6 +33,7 @@ export interface BaboonPoll {
   revisions: string[];
   integrity?: import('./nativeTagIntegrity').NativeTagIntegrityReport;
   writerContext?: string;
+  writerEvidence?: import('./nativeTagIntegrity').NativeSaveEvidence;
 }
 export interface BaboonReconciled {
   accepted: boolean;

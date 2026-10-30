@@ -25,6 +25,7 @@ struct Watch {
     parser: native_tag_parser::Cache,
     integrity: core::native_tag_integrity::Report,
     writer_context: String,
+    tool_associations: Vec<native_save_evidence::ToolAssociation>,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,6 +38,7 @@ pub(super) struct WatchReport {
     writer_context: String,
     #[serde(flatten)]
     changes: TagChanges,
+    writer_evidence: native_save_evidence::SaveEvidence,
 }
 fn report(id: &str, watch: &Watch) -> WatchReport {
     WatchReport {
@@ -47,6 +49,7 @@ fn report(id: &str, watch: &Watch) -> WatchReport {
         integrity: watch.integrity.clone(),
         writer_context: watch.writer_context.clone(),
         changes: watch.monitor.report(),
+        writer_evidence: native_save_evidence::collect(&watch.monitor, watch.tool_associations.clone()),
     }
 }
 pub(super) fn baseline(job: &Path) -> Reply<Option<Hashes>> {
@@ -202,6 +205,7 @@ pub(super) async fn working_tag_watch_start(
             parser: Default::default(),
             integrity: Default::default(),
             writer_context: runtime_workbench::source_editor_context(&state,&project.id)?,
+            tool_associations: runtime_workbench::source_editor_associations(&state, &project.id, &tags)?,
         };
         watch.integrity=watch.integrity_cache.scan(watch.monitor.root(),watch.monitor.baseline_hashes(),watch.monitor.accepted_hashes(),64*1024*1024).map_err(error)?;
         let id = uuid::Uuid::new_v4().to_string();
@@ -249,6 +253,7 @@ pub(super) async fn working_tag_watch_poll(
             );
         }
         watch.touched = Instant::now();
+        watch.monitor.audit_background().map_err(error)?;
         let scan = force
             || watch.dirty.swap(false, Ordering::AcqRel)
             || watch.scanned.elapsed() > Duration::from_secs(30)
@@ -268,6 +273,7 @@ pub(super) async fn working_tag_watch_poll(
             parser.scan(&state,&project,monitor.root(),None,monitor.baseline_hashes(),monitor.accepted_hashes(),integrity,2)?;
         }
         watch.writer_context=runtime_workbench::source_editor_context(&state,&watch.project)?;
+        watch.tool_associations=runtime_workbench::source_editor_associations(&state,&watch.project,watch.monitor.root())?;
         Ok(report(&watch_id, &watch))
     })
     .await

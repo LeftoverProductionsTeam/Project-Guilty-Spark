@@ -863,6 +863,39 @@
       "legacy": [],
       "version": null,
       "sha256": null
+    },
+    {
+      "id": "openceMantle",
+      "label": "OpenCE Mantle — External Companion",
+      "group": "community",
+      "mode": "externalGui",
+      "purpose": "Optional external Halo Custom Edition PC map editor. Upstream features are not Spark-tested capabilities.",
+      "modifiesFiles": true,
+      "caveat": "CE cache 609 only. Manually select an installed Windows application. Spark launches it normally with no arguments and never opens the original map. Edit an isolated copy. MCC, Xbox, Demo, retail PC and HaloMD compatibility is not established. Application startup and save/reconcile acceptance remain unverified.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "SutlabSol / OpenCE Mantle contributors",
+      "sourceUrl": "https://github.com/SutlabSol/OpenCE-Mantle",
+      "releaseUrl": "https://github.com/SutlabSol/OpenCE-Mantle/releases",
+      "license": "External application, not bundled. Upstream documents GPL-3.0 generated definitions and combined distribution; review upstream licensing before any reuse. No code, definitions or assets are copied into Spark.",
+      "platforms": ["windows"],
+      "families": ["halo1"],
+      "runtimes": ["haloCustomEdition"],
+      "inputs": ["classicCache"],
+      "cacheVersions": [609],
+      "integration": "externalCompanion",
+      "handler": "externalCompanion",
+      "legacy": [],
+      "version": "0.7.0 (upstream release reviewed; installed version unverified)",
+      "sha256": null
+    }
+  ],
+  "companionCandidates": [
+    {
+      "id": "leftknutCandidate",
+      "label": "leftknut tool candidate · identity unverified",
+      "reportedWorkflow": "User-reported OBJ/scenery import, triangulation, collision, basic UVs and bitmap painting. Borrowed BSP combiner is untested; a reported Forge startup failure has no verified cause. Game-source Forge/Firefight work is a separate integration category.",
+      "missingEvidence": "Need the official project name, maintainer/repository, license, executable identity and supported runtime/cache versions. No guessed download, launcher, arguments or compatibility claim is provided."
     }
   ]
 }

@@ -41,6 +41,8 @@ use tauri::{Emitter, Manager, State};
 #[path="native_source_revisions.rs"] mod native_source_revisions;
 #[path="native_operations_native.rs"] mod native_operations_native;
 #[path="tool_ecosystem_native.rs"] mod tool_ecosystem_native;
+#[path="external_companions_native.rs"] mod external_companions_native;
+#[path="native_save_evidence.rs"] mod native_save_evidence;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -2648,6 +2650,10 @@ pub fn run() {
             native_operations_native::native_operation_preview,
             native_operations_native::native_operation_accept,
             tool_ecosystem_native::tool_ecosystem_report,
+            external_companions_native::choose_external_companion_path,
+            external_companions_native::register_external_companion,
+            external_companions_native::forget_external_companion,
+            external_companions_native::launch_external_companion,
             runtime_workbench::inspect_bsp_audio_workspace,
             runtime_workbench::runtime_tool_processes,
             runtime_workbench::community_listing,

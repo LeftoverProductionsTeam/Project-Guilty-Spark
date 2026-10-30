@@ -202,7 +202,7 @@ fn executable_for(path: &Path, format: &str, app_root: &Path) -> Reply<(PathBuf,
     reject_links(&binary).map_err(err)?;
     Ok((canonical,binary))
 }
-fn fingerprint(path:&Path,format:&str,app_root:&Path)->Reply<(PathBuf,String)> {
+pub(crate) fn fingerprint(path:&Path,format:&str,app_root:&Path)->Reply<(PathBuf,String)> {
     let (canonical,binary)=executable_for(path,format,app_root)?;
     let sha=maps::hash_file(&binary).map_err(err)?;
     Ok((canonical,sha))

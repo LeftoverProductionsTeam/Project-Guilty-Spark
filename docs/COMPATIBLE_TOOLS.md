@@ -12,6 +12,18 @@ Spark's canonical tool catalog is `crates/spark-core/data/tool_ecosystem.json`. 
 
 Invader edit SHA-256: `02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12`; dependency: `727e6983582f882b17a52822547ee1805c13856de912494ce28ff2a726a3b554`; bludgeon: `094c844b9bdc494341d0fd08c07bd0d23344ea224c71205ce9846e46452205f3`. Mismatched native-operation binaries remain unavailable.
 
+## OpenCE Mantle — External Companion
+
+The canonical catalog includes [OpenCE Mantle](https://github.com/SutlabSol/OpenCE-Mantle), with [official releases](https://github.com/SutlabSol/OpenCE-Mantle/releases). Upstream v0.7.0 was reviewed at commit `ccedcec379bb4e4bbfe815297fec9fbf8913bf5d` on 2026-10-30. The tagged README still contains older version text; the release tag and installed application identity are separate facts.
+
+Select **Halo Custom Edition** and open an actual CE PC **cache 609**. In **Tools for this map**, select the already installed portable/application executable. No tool is downloaded or installed. The registered file hash is checked again before an explicitly confirmed normal launch. The dedicated card is hidden for incompatible map formats and runtimes; a CE runtime selection cannot turn an MCC/Xbox/Demo/retail/HaloMD cache into supported source.
+
+No reliable Windows map/project CLI contract was established from the reviewed Electron entry point. Spark supplies **zero arguments**, including no original map or source path. Open an isolated copy inside Mantle. An executable selection/hash is not proof of product version, application startup, safe save behavior, conversion or gameplay. Actual Mantle launch/edit/reconcile acceptance is **unverified** because no approved installed Mantle binary was supplied. Existing generic user-owned companion registration remains a separate manual facility and does not certify any application’s format support.
+
+Mantle is external and not bundled. Upstream documents GPL-3.0 generated definitions and combined distribution. No Mantle source, definitions, assets or UI were reused in Spark; future code reuse needs its own license review.
+
+**leftknut candidate:** reported OBJ/scenery import, triangulation, collision, basic UVs and bitmap painting remain unverified. The official project name, repository, license, executable and runtime/cache matrix are missing. Spark offers no guessed download or launcher. An untested borrowed BSP combiner and reported Forge startup failure are recorded without assigning a cause. Game-source Forge/Firefight integration is distinct from tag/cache authoring.
+
 ## Researched, not integrated
 
 | Upstream | Reviewed purpose | License / boundary |

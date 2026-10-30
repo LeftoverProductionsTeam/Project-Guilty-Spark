@@ -1,4 +1,6 @@
-# Runtime and operation compatibility — Continuation 36
+# Runtime and operation compatibility — Continuation 40
+
+C40 strengthens native-save detection and semantic acceptance without adding a game transport. Its optional OpenCE Mantle companion route is specifically Windows Custom Edition PC cache 609, with separate runtime/cache checks and no map arguments. Actual Mantle startup/save acceptance remains unverified; it is not an MCC/Xbox/Demo/retail/HaloMD integration. [Exact evidence and remaining runtime limits](CONTINUATION_40_ENGINEERING.md).
 
 C39 adds shared QuickForge Level A source sessions over private TLS. This row does not change any Level B native engine or Level C game-peer acceptance gate. [Exact shared-source scope and actual participant evidence](CONTINUATION_39_ENGINEERING.md).
 

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "nativeProcesses": 3,
+  "separateDataRoots": 3,
+  "physicalMachines": 1,
+  "transport": "private TCP + TLS 1.3, invitation-pinned certificate",
+  "mockedIpc": false,
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "gamePeerReplicationTested": false,
+  "nativeTagSharingTested": false,
+  "binaryAssetTransferTested": false,
+  "appSha256": "5a92f8bf9eb275a16329626f073d48a85d6b40956666824dde0fd187c6351776",
+  "tlsLabelledJoinRefusesPlaintextInvitation": true,
+  "threeNativeEditors": {
+    "participants": [
+      {
+        "name": "Creator A",
+        "role": "owner"
+      },
+      {
+        "name": "Creator B",
+        "role": "editor"
+      },
+      {
+        "name": "Creator C",
+        "role": "editor"
+      }
+    ],
+    "uiJoin": true,
+    "tls": true,
+    "durable": true
+  },
+  "simultaneousIndependentChangesMerged": true,
+  "genuineUiEditAcknowledged": true,
+  "perAuthorUiUndoRedo": {
+    "ctrlZ": true,
+    "ctrlShiftZ": true,
+    "otherAuthorsRetained": true
+  },
+  "ownedAssetReferenceShared": {
+    "nativePath": "vehicles/warthog/mp_warthog",
+    "sameOwnedMapHash": true,
+    "sourceBytesTransferred": false,
+    "actualModelsResolvedInAllViewports": true
+  },
+  "realModelTransformsReachRenderedEditors": true,
+  "independentCameras": true,
+  "replayAndConflicts": {
+    "duplicateDidNotIncrement": true,
+    "sameFieldRejected": true,
+    "deleteVsEditRejected": true
+  },
+  "pendingDraftSurvivesUiReload": true,
+  "rolesAndHostBuildAuthority": true,
+  "unsupportedShellContactStillRejected": true,
+  "nativeBuildSnapshot": {
+    "revision": 14,
+    "editingContinuedAt": 15,
+    "durationMs": 18940.7802,
+    "cacheSha256": "ab9e5fb1ac8eceee6575bed2a2ba0f3edf932731c645815d55b58ce04eb46fdb",
+    "cacheVersion": 13,
+    "frozenSnapshotOpened": true,
+    "gameplayTested": false
+  },
+  "threeRenderedNativeViewports": true,
+  "actualProcessCrashRecovery": {
+    "sourceAndRevisionIntact": true,
+    "sameSessionIdentity": true,
+    "authorIdentitiesRetained": true,
+    "oldOperationReplayDeduplicated": true,
+    "freshInvitation": true,
+    "durationMs": 7366.4086000000025
+  },
+  "revocationKeepsOtherCreatorsAndSource": true,
+  "originalOwnedCachesUnchanged": true,
+  "nativeSourceUnchanged": {
+    "files": 2240,
+    "everyFileByteIdentical": true
+  },
+  "measuredPropagationMs": {
+    "samples": 6,
+    "values": [
+      893.3479999999981,
+      513.0033000000003,
+      508.4279000000024,
+      521.6794999999984,
+      512.4589000000014,
+      510.82960000000094
+    ],
+    "includesNativeIpcAndUiConvergence": true
+  },
+  "pageErrors": []
+}

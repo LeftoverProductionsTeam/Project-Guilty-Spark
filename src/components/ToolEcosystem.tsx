@@ -16,6 +16,7 @@ interface ToolDefinition {
   integration: string;
   handler: string;
   version: string | null;
+  releaseUrl?: string | null;
 }
 interface ToolRow {
   definition: ToolDefinition;
@@ -29,17 +30,24 @@ interface ToolRow {
   };
   executable: string | null;
   installationIssue: string | null;
+  externalCompanion?: {
+    registration: { path: string; executableSha256: string };
+    available: boolean;
+    detail: string;
+  } | null;
 }
 interface EcosystemReport {
   projectId: string | null;
-  context: { runtimeId: string; sourceKind: string; ownedNativeTags: boolean };
+  context: { runtimeId: string; sourceKind: string; ownedNativeTags: boolean; cacheVersion?: number | null };
   sourceIssue: string | null;
   tools: ToolRow[];
+  companionCandidates?: { id: string; label: string; reportedWorkflow: string; missingEvidence: string }[];
 }
 const stateNames: Record<string, string> = {
   installed: 'Ready for this source',
   availableForSetup: 'Set up tool',
   sourceUnsupported: 'Needs compatible source',
+  cacheUnsupported: 'Needs a CE cache (609)',
   unverifiedVersion: 'Version needs review',
   requiresRuntime: 'Different runtime / kit',
   researchOnly: 'Upstream · handoff not verified',
@@ -59,6 +67,7 @@ export default function ToolEcosystem({
 }) {
   const [report, setReport] = useState<EcosystemReport | null>(null),
     [error, setError] = useState(''),
+    [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false);
   const generation = useRef(0);
   const projectId = project?.id ?? null;
@@ -107,6 +116,39 @@ export default function ToolEcosystem({
       );
     } else onOpenWorkspace(tool.handler === 'build' ? 'build' : 'tags');
   }
+  async function companion(action: 'select' | 'launch' | 'forget') {
+    const current = generation.current;
+    if (
+      action === 'launch' &&
+      !window.confirm(
+        'Launch your selected OpenCE Mantle application? Spark will pass no map or source path. Open an isolated copy inside Mantle; its startup and save behavior have not been tested by Spark.',
+      )
+    )
+      return;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const context = { runtimeId: runtime, projectId };
+      if (action === 'select') {
+        const path = await call<string | null>('choose_external_companion_path', context);
+        if (!path || current !== generation.current) return;
+        await call('register_external_companion', { ...context, path });
+      } else if (action === 'forget') await call('forget_external_companion');
+      else {
+        const detail = await call<string>('launch_external_companion', {
+          ...context,
+          confirmExternalLaunch: true,
+        });
+        if (current === generation.current) setMessage(detail);
+      }
+      if (current === generation.current) await refresh();
+    } catch (e) {
+      if (current === generation.current) setError(String(e));
+    } finally {
+      if (current === generation.current) setBusy(false);
+    }
+  }
   function card(row: ToolRow) {
     const { definition: tool, assessment } = row;
     return (
@@ -117,7 +159,29 @@ export default function ToolEcosystem({
         </Pill>
         <p>{tool.purpose}</p>
         <p className="subtle">{assessment.detail}</p>
-        {tool.integration !== 'upstreamOnly' && tool.id !== 'baboon' && (
+        {tool.integration === 'externalCompanion' && (
+          <>
+            <div className="button-row">
+              <button type="button" disabled={busy} onClick={() => void companion('select')}>
+                {row.externalCompanion ? 'Change installed application' : 'Select installed application'}
+              </button>
+              <button
+                type="button"
+                disabled={busy || !assessment.canUseWorkflow}
+                onClick={() => void companion('launch')}
+              >
+                Launch Mantle
+              </button>
+              {row.externalCompanion && (
+                <button type="button" disabled={busy} onClick={() => void companion('forget')}>
+                  Forget selection
+                </button>
+              )}
+            </div>
+            {row.externalCompanion && <p className="subtle">{row.externalCompanion.detail}</p>}
+          </>
+        )}
+        {!['upstreamOnly', 'externalCompanion'].includes(tool.integration) && tool.id !== 'baboon' && (
           <button
             type="button"
             className="small-button"
@@ -144,9 +208,25 @@ export default function ToolEcosystem({
           </p>
           {row.installationIssue && <p>{row.installationIssue}</p>}
           <p>{tool.license}</p>
+          {row.externalCompanion && (
+            <p className="subtle">
+              {row.externalCompanion.registration.path}
+              <br />
+              Registered SHA-256: <code>{row.externalCompanion.registration.executableSha256}</code>
+            </p>
+          )}
           <a href={tool.sourceUrl} target="_blank" rel="noreferrer">
             {tool.maintainer} · official source &amp; setup
           </a>
+          {tool.releaseUrl && (
+            <>
+              {' '}
+              ·{' '}
+              <a href={tool.releaseUrl} target="_blank" rel="noreferrer">
+                Official releases
+              </a>
+            </>
+          )}
         </details>
       </article>
     );
@@ -176,6 +256,7 @@ export default function ToolEcosystem({
         </Notice>
       )}
       {error && <Notice>{error}</Notice>}
+      {message && <Notice tone="info">{message}</Notice>}
       {report?.sourceIssue && (
         <Notice tone="info">
           {report.sourceIssue} Compiled maps remain available in Spark’s integrated editors.
@@ -188,6 +269,12 @@ export default function ToolEcosystem({
               .filter(
                 (row) =>
                   row.definition.integration !== 'upstreamOnly' && row.assessment.state !== 'requiresRuntime',
+              )
+              .filter(
+                (row) =>
+                  row.definition.integration !== 'externalCompanion' ||
+                  !projectId ||
+                  (report.context.cacheVersion === 609 && report.context.sourceKind === 'classicCache'),
               )
               .map(card)}
           </div>
@@ -204,6 +291,18 @@ export default function ToolEcosystem({
               {report.tools.filter((row) => row.definition.integration === 'upstreamOnly').map(card)}
             </div>
           </details>
+          {!!report.companionCandidates?.length && (
+            <details>
+              <summary>Companion candidates · evidence needed</summary>
+              {report.companionCandidates.map((candidate) => (
+                <section key={candidate.id}>
+                  <strong>{candidate.label}</strong>
+                  <p>{candidate.reportedWorkflow}</p>
+                  <p className="subtle">{candidate.missingEvidence}</p>
+                </section>
+              ))}
+            </details>
+          )}
         </>
       )}
     </section>

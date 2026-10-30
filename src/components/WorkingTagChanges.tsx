@@ -3,7 +3,11 @@ import { call, native } from '../api';
 import { WorkingTagSync, type WorkingTagReport } from '../workingTagSync';
 import { Notice } from './ui';
 import NativeTagIntegrity from './NativeTagIntegrity';
-export function useWorkingTagChanges(projectId: string | null, buildId: string | null, sourceIdentity: string | null = null) {
+export function useWorkingTagChanges(
+  projectId: string | null,
+  buildId: string | null,
+  sourceIdentity: string | null = null,
+) {
   const [report, setReport] = useState<WorkingTagReport | null>(null),
     [error, setError] = useState(''),
     [checking, setChecking] = useState(false);
@@ -90,13 +94,29 @@ export default function WorkingTagChanges({
         {report?.basis === 'compiledBuild'
           ? 'Compared with this build’s verified tag inventory.'
           : report?.basis === 'acceptedNativeRevision'
-          ? 'Compared with the accepted native source revision.'
-          : 'Changes are compared with the files present when monitoring connected.'}{' '}
-        Saves are checked every 3 seconds. Build working tag edits to compile a separate map, then open its
-        result. The current cache and Spark draft are retained.
+            ? 'Compared with the accepted native source revision.'
+            : 'Changes are compared with the files present when monitoring connected.'}{' '}
+        Save notifications are checked every 3 seconds. A bounded background hash sweep also catches missed
+        notifications and preserved timestamps; its detection delay depends on library size. Build working tag
+        edits to compile a separate map, then open its result. The current cache and Spark draft are retained.
       </p>
+      {report?.contentAudit && (
+        <details>
+          <summary>Background content checks · {report.contentAudit.completedSweeps} sweeps</summary>
+          <p className="subtle">
+            Last pass: {report.contentAudit.filesCheckedLastPoll} files,{' '}
+            {(report.contentAudit.bytesReadLastPoll / 1048576).toFixed(1)} MiB read. Limits: 64 files / 8 MiB
+            per poll, at most once every 2 seconds. A completed sweep is a byte check, not semantic or
+            gameplay certification. Builds verify the complete source separately.
+          </p>
+        </details>
+      )}
       {error && <Notice>{error}</Notice>}
-      <NativeTagIntegrity report={report?.integrity} writerContext={report?.writerContext}/>
+      <NativeTagIntegrity
+        report={report?.integrity}
+        writerContext={report?.writerContext}
+        evidence={report?.writerEvidence}
+      />
       {!!report?.changes.length && (
         <details>
           <summary>

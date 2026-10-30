@@ -11,6 +11,7 @@ pub(super) struct Report {
     context: ecosystem::Context,
     source_issue: Option<String>,
     tools: Vec<Row>,
+    companion_candidates: Vec<ecosystem::CompanionCandidate>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,6 +20,7 @@ struct Row {
     assessment: ecosystem::Assessment,
     executable: Option<PathBuf>,
     installation_issue: Option<String>,
+    external_companion: Option<external_companions_native::Status>,
 }
 #[tauri::command]
 pub(super) async fn tool_ecosystem_report(
@@ -77,6 +79,9 @@ pub(super) async fn tool_ecosystem_report(
             flavor: settings.hek_flavor.clone(),
             source_kind: source_kind.into(),
             owned_native_tags,
+            cache_version: project
+                .as_ref()
+                .and_then(|p| p.source.as_ref().map(|s| s.cache_version)),
         };
         let catalog = ecosystem::catalog().map_err(error)?;
         let mut tools = Vec::new();
@@ -84,7 +89,19 @@ pub(super) async fn tool_ecosystem_report(
             let mut installed = ecosystem::Installation::default();
             let mut executable = None;
             let mut installation_issue = None;
-            if definition.location == "baboon" {
+            let external_companion = if definition.integration == "externalCompanion" {
+                external_companions_native::status(&state)?
+            } else {
+                None
+            };
+            if let Some(value) = &external_companion {
+                installed.found = value.available;
+                installed.sha256 = Some(value.registration.executable_sha256.clone());
+                executable = Some(value.registration.path.clone());
+                if !value.available {
+                    installation_issue = Some(value.detail.clone());
+                }
+            } else if definition.location == "baboon" {
                 match baboon_native::installation(&state) {
                     Ok(value) => {
                         installed.found = true;
@@ -141,6 +158,7 @@ pub(super) async fn tool_ecosystem_report(
                 assessment,
                 executable,
                 installation_issue,
+                external_companion,
             });
         }
         Ok(Report {
@@ -150,6 +168,7 @@ pub(super) async fn tool_ecosystem_report(
             context,
             source_issue,
             tools,
+            companion_candidates: catalog.companion_candidates.clone(),
         })
     })
     .await

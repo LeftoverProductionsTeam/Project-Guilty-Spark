@@ -27,7 +27,10 @@ pub struct Report {
 }
 impl Report {
     pub fn blocked(&self) -> bool {
-        self.invalid_files > 0 || self.pending_files > 0
+        self.invalid_files > 0
+            || self.pending_files > 0
+            || self.semantic_unverified_files > 0
+            || self.native_parser_checked_files < self.checked_files + self.unverified_files
     }
 }
 #[derive(Default)]
@@ -200,6 +203,22 @@ impl Cache {
 mod tests {
     use super::*;
     use crate::maps;
+    #[test]
+    fn unverified_semantics_never_authorize_reconciliation_or_compilation() {
+        let mut report = Report {
+            checked_files: 2,
+            native_parser_checked_files: 1,
+            ..Default::default()
+        };
+        assert!(report.blocked());
+        report.native_parser_checked_files = 2;
+        assert!(!report.blocked());
+        report.semantic_unverified_files = 1;
+        assert!(report.blocked());
+        report.semantic_unverified_files = 0;
+        report.pending_files = 1;
+        assert!(report.blocked());
+    }
     fn tag(payload: &[u8]) -> Vec<u8> {
         let mut bytes = vec![0; 64];
         bytes[36..40].copy_from_slice(b"weap");
@@ -228,7 +247,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(report.checked_files, 1);
-        assert!(!report.blocked());
+        assert!(
+            report.blocked(),
+            "CRC alone must not authorize reconciliation"
+        );
         let mut damaged = valid.clone();
         damaged[70] ^= 1;
         fs::write(&file, &damaged).unwrap();
