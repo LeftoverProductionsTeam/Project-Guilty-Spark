@@ -15,6 +15,8 @@ flate2 = "1"
 zip = { version = "=9.1.0", default-features = false, features = ["deflate-flate2"] }
 rusqlite = { version = "0.38", features = ["bundled"] }
 manifold-rust = "=0.19.1"
+rustls = { version = "=0.23.46", default-features = false, features = ["std", "ring", "tls12"] }
+rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring"] }
 
 [dev-dependencies]
 tempfile = "3"

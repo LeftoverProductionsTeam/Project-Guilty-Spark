@@ -1,8 +1,14 @@
 # Project Guilty Spark
 
+## C39 SparkLink: Live Studio
+
+SparkLink extends the existing QuickForge session drawer with private TLS invitations, creator roles, authoritative source revisions, per-author undo/redo, durable host recovery and retained local drafts. Each creator keeps their camera. The owner can compile a frozen acknowledged source while editing continues. [Architecture](docs/SPARKLINK_ARCHITECTURE.md) · [Host/join and recovery](docs/SPARKLINK_SETUP.md) · [Evidence and remaining phases](docs/CONTINUATION_39_ENGINEERING.md).
+
+This first shared QuickForge slice covers geometry, placements, materials, spawns, objectives and environment intent. Shared native tags, custom binary imports, remote work-area indicators, collaborative live Halo delivery and game-peer replication remain open. Existing solo tools and research continue intact; source synchronization does not certify gameplay.
+
 ## C38 source-aware native workbench
 
-[C38 engineering and boundaries](docs/CONTINUATION_38_ENGINEERING.md) adds one shared tool catalog, map-source-aware recommendations, real Invader dependency checks, reviewed native radius edits and a narrow lens-flare repair. Edits are previewed in isolated candidates, accepted as new complete source revisions and recoverable without replacing other files. QuickForge can browse its built native tags directly. [Tools and setup](docs/COMPATIBLE_TOOLS.md). SparkLink collaborative editing is the next active engineering initiative; existing editor synchronization and live game replication remain separate capabilities.
+[C38 engineering and boundaries](docs/CONTINUATION_38_ENGINEERING.md) adds one shared tool catalog, map-source-aware recommendations, real Invader dependency checks, reviewed native radius edits and a narrow lens-flare repair. Edits are previewed in isolated candidates, accepted as new complete source revisions and recoverable without replacing other files. QuickForge can browse its built native tags directly. [Tools and setup](docs/COMPATIBLE_TOOLS.md).
 
 ## C37 native tool workflow
 
@@ -10,7 +16,7 @@
 
 The [master consolidation report](docs/MASTER_CONSOLIDATION.md) records the complete branch inventory, preserved research, recoverable backups and combined source/native regressions. [GitHub summary and description](docs/MASTER_CONSOLIDATION_GITHUB_DESCRIPTION.md). Seven pending dependency-update proposals remain separate from completed engineering work. Top-level `SOURCE_*` manifests are retained historical packaging evidence; the current Git tree and consolidation receipts identify this source revision.
 
-**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · C37 dev** continues C35 R12, C36 and the One Halo investigation; compiler and game acceptance remain separate from editor previews.
+**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · C39 dev** continues the C35–C38 workbench and One Halo investigation; compiler and game acceptance remain separate from editor previews.
 
 > Project Guilty Spark stands on more than twenty years of research, experimentation, documentation, tools, discoveries, and shared knowledge from the Halo modding community. This project would not exist without the people who explored the Blam engine, created the original editors, reverse-engineered file formats, preserved old maps, documented workflows, and helped generations of modders learn.
 
@@ -68,7 +74,7 @@ The [saved tool-edit follow-through](docs/C35_TOOL_EDIT_FOLLOW_THROUGH.md) adds 
 
 Open **Recording Director ↗** from a prepared Level editor view to detach a native camera/recording window, then dock it back with the same revision-checked session. Camera keys, tracking, lens and monitor controls are included. Editor Render can record the saved spatial sound scene. Explicitly shared Live Game Capture is a separate route; an independent MCC engine spectator adapter is not implemented. Native named takes pass picture/audio decoding and source-preservation checks; application OS pickers, actual game audio/capture and long takes remain acceptance gates.
 
-The visual Community maps catalog uses real releases, publisher screenshots and published credits/dependencies. Alpine downloads and opens as Custom Edition; its source-complete MCC conversion is now structurally validated. Actual Zombie Demo resource recovery loads original shader/lightmap/detail previews without unrelated MCC substitution. See the [C35 engineering evidence](docs/CONTINUATION_35_ENGINEERING.md), [owner test card](docs/CONTINUATION_35_TEST_CARD.md) and [push summary/description](docs/GITHUB_HANDOFF.md). All earlier engine goals remain in the [319-row cumulative ledger](docs/MASTER_FEATURE_LEDGER.md).
+The visual Community maps catalog uses real releases, publisher screenshots and published credits/dependencies. Alpine downloads and opens as Custom Edition; its source-complete MCC conversion is now structurally validated. Actual Zombie Demo resource recovery loads original shader/lightmap/detail previews without unrelated MCC substitution. See the [C35 engineering evidence](docs/CONTINUATION_35_ENGINEERING.md), [owner test card](docs/CONTINUATION_35_TEST_CARD.md) and [push summary/description](docs/GITHUB_HANDOFF.md). All earlier engine goals remain in the [cumulative feature ledger](docs/MASTER_FEATURE_LEDGER.md).
 
 ## C34 internal engineering continuation
 

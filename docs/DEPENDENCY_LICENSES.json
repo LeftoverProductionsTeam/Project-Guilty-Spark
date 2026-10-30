@@ -61,6 +61,33 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "asn1-rs-derive",
+      "version": "0.6.0",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "asn1-rs-impl",
+      "version": "0.2.0",
+      "license": "MIT/Apache-2.0",
+      "notices": []
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "asn1-rs",
+      "version": "0.7.2",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "atk-sys",
       "version": "0.18.2",
       "license": "MIT",
@@ -133,6 +160,16 @@
       "ecosystem": "cargo",
       "name": "bit-vec",
       "version": "0.8.0",
+      "license": "Apache-2.0 OR MIT",
+      "notices": [
+        "docs/licenses/8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90.txt",
+        "docs/licenses/f51ac2c59a222f7476ce507ca879960e2b64ea64bb2786eefdbeb7b0b538d1b7.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "bit-vec",
+      "version": "0.9.1",
       "license": "Apache-2.0 OR MIT",
       "notices": [
         "docs/licenses/8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90.txt",
@@ -568,6 +605,15 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "data-encoding",
+      "version": "2.11.1",
+      "license": "MIT",
+      "notices": [
+        "docs/licenses/b68ad1a3367b825447089e1f8d6829b97f47a89eb78d2f4ebaef4672f5606186.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "dbus",
       "version": "0.9.12",
       "license": "Apache-2.0/MIT",
@@ -604,6 +650,16 @@
       "notices": [
         "docs/licenses/2710a622a896bba67356913d4d0492cab5465f61b2ecce6d880aeb483834fb50.txt",
         "docs/licenses/8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "der-parser",
+      "version": "10.0.0",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
       ]
     },
     {
@@ -922,7 +978,27 @@
     {
       "ecosystem": "cargo",
       "name": "foreign-types-shared",
+      "version": "0.1.1",
+      "license": "MIT/Apache-2.0",
+      "notices": [
+        "docs/licenses/333ea3aaa3cadb819f4acd9f9153f9feee060a995ca8710f32bc5bd9a4b91734.txt",
+        "docs/licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "foreign-types-shared",
       "version": "0.3.1",
+      "license": "MIT/Apache-2.0",
+      "notices": [
+        "docs/licenses/333ea3aaa3cadb819f4acd9f9153f9feee060a995ca8710f32bc5bd9a4b91734.txt",
+        "docs/licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "foreign-types",
+      "version": "0.3.2",
       "license": "MIT/Apache-2.0",
       "notices": [
         "docs/licenses/333ea3aaa3cadb819f4acd9f9153f9feee060a995ca8710f32bc5bd9a4b91734.txt",
@@ -1102,6 +1178,16 @@
       "license": "MIT",
       "notices": [
         "docs/licenses/c09aae9d3c77b531f56351a9947bc7446511d6b025b3255312d3e3442a9a7583.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "getrandom",
+      "version": "0.2.17",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/42fa16951ce7f24b5a467a40e5b449a1d41e662f97ca779864f053f39e097737.txt",
+        "docs/licenses/aaff376532ea30a0cd5330b9502ad4a4c8bf769c539c87ffe78819d188a18ebf.txt"
       ]
     },
     {
@@ -1335,6 +1421,16 @@
       "license": "MIT OR Apache-2.0",
       "notices": [
         "docs/licenses/391a5396cec6230bfabd4ef4eb2350eb895bc5efce377a2218f5702ed020d3e3.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "hyper-tls",
+      "version": "0.6.0",
+      "license": "MIT/Apache-2.0",
+      "notices": [
+        "docs/licenses/7b033f57f23fffca5bee9406cf453ce31e919c1b867df54bfa7487e73d8c9c1f.txt",
         "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
       ]
     },
@@ -1709,6 +1805,16 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "lazy_static",
+      "version": "1.5.1",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "libappindicator-sys",
       "version": "0.9.0",
       "license": "Apache-2.0 OR MIT",
@@ -1871,6 +1977,17 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "minimal-lexical",
+      "version": "0.2.1",
+      "license": "MIT/Apache-2.0",
+      "notices": [
+        "docs/licenses/23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3.txt",
+        "docs/licenses/8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90.txt",
+        "docs/licenses/dbe1fff0fb1314b6af94f161511406275cf01c5a32441fbf24528a57a051d599.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "miniz_oxide",
       "version": "0.8.9",
       "license": "MIT OR Zlib OR Apache-2.0",
@@ -1915,6 +2032,16 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "native-tls",
+      "version": "0.2.18",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "docs/licenses/f2ad7982ddbfa8c45eb965315718c55b70b9cc311b49afacb50d5fe84173ae2c.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "ndk-context",
       "version": "0.1.1",
       "license": "MIT OR Apache-2.0",
@@ -1950,6 +2077,15 @@
       "license": "MIT",
       "notices": [
         "docs/licenses/66e3ee1fa7f909ad3c612d556f2a0cdabcd809ad6e66f3b0605015ac64841b70.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "nom",
+      "version": "7.1.3",
+      "license": "MIT",
+      "notices": [
+        "docs/licenses/4dbda04344456f09a7a588140455413a9ac59b6b26a1ef7cdf9c800c012d87f0.txt"
       ]
     },
     {
@@ -1995,12 +2131,32 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "num-bigint",
+      "version": "0.4.8",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "num-conv",
       "version": "0.2.2",
       "license": "MIT OR Apache-2.0",
       "notices": [
         "docs/licenses/0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594.txt",
         "docs/licenses/e2e245f2b566d0bfafb0f6a04c16b82d710c4e6e7d799e39bb4ef6e541b85b98.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "num-integer",
+      "version": "0.1.47",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
       ]
     },
     {
@@ -2150,12 +2306,61 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "oid-registry",
+      "version": "0.8.1",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "once_cell",
       "version": "1.21.4",
       "license": "MIT OR Apache-2.0",
       "notices": [
         "docs/licenses/23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3.txt",
         "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "openssl-macros",
+      "version": "0.1.1",
+      "license": "MIT/Apache-2.0",
+      "notices": [
+        "docs/licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "docs/licenses/ea5ab440900ab271811d5c2dc02a9de6e03a6956ac5727e85c11d76df5883d30.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "openssl-probe",
+      "version": "0.2.2",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "openssl-sys",
+      "version": "0.9.117",
+      "license": "MIT",
+      "notices": [
+        "docs/licenses/378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "openssl",
+      "version": "0.10.81",
+      "license": "Apache-2.0",
+      "notices": [
+        "docs/licenses/c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08.txt",
+        "docs/licenses/f3d4287b4a21c5176fea2f9bd4ae800696004e2fb8e05cbc818be513f188a941.txt"
       ]
     },
     {
@@ -2483,6 +2688,15 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "rcgen",
+      "version": "0.14.10",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/debe6fed7ac143217c7f533759c54b14f18cd01d5fe195c51d83c2ae2d136cb4.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "redox_syscall",
       "version": "0.5.18",
       "license": "MIT",
@@ -2570,6 +2784,17 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "ring",
+      "version": "0.17.14",
+      "license": "Apache-2.0 AND ISC",
+      "notices": [
+        "docs/licenses/005fc765ddc5115da796cca915baa9557abae13ff35e0a47c47affc56f6c414d.txt",
+        "docs/licenses/b3d734001a94efff3579978d953391aa7115f877657d25eb54037a43875d078a.txt",
+        "docs/licenses/f025ccfb7dfb6bdfedc75ca0f67acc69e6fb4998143d834f7c2f38a29989680f.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "rsqlite-vfs",
       "version": "0.1.1",
       "license": "MIT",
@@ -2606,6 +2831,16 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "rusticata-macros",
+      "version": "4.1.0",
+      "license": "MIT/Apache-2.0",
+      "notices": [
+        "docs/licenses/a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "rustix",
       "version": "1.1.5",
       "license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
@@ -2613,6 +2848,36 @@
         "docs/licenses/23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3.txt",
         "docs/licenses/268872b9816f90fd8e85db5a28d33f8150ebb8dd016653fb39ef1f94f2686bc5.txt",
         "docs/licenses/377c2e7c53250cc5905c0b0532d35973392af16ffb9596a41d99d202cf3617c9.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "rustls-pki-types",
+      "version": "1.15.1",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/45fd05c4865e7c350b98ad7ac50e1b15462d49af4a91e9b0c9dd933dc9a69742.txt",
+        "docs/licenses/9117d922e667125508dde62b02c1f57ed22f5ad21eb536aa2e2d99e1c796e639.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "rustls-webpki",
+      "version": "0.103.16",
+      "license": "ISC",
+      "notices": [
+        "docs/licenses/5b698ca13897be3afdb7174256fa1574f8c6892b8bea1a66dd6469d3fe27885a.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "rustls",
+      "version": "0.23.46",
+      "license": "Apache-2.0 OR ISC OR MIT",
+      "notices": [
+        "docs/licenses/709e3175b4212f7b13aa93971c9f62ff8c69ec45ad8c6532a7e0c41d7a7d6f8c.txt",
+        "docs/licenses/7cfafc877eccc46c0e346ccbaa5c51bb6b894d2b818e617d970211e232785ad4.txt",
         "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
       ]
     },
@@ -2634,6 +2899,15 @@
       "notices": [
         "docs/licenses/01c266bced4a434da0051174d6bee16a4c82cf634e2679b6155d40d75012390f.txt",
         "docs/licenses/cb3c929a05e6cbc9de9ab06a4c57eeb60ca8c724bef6c138c87d3a577e27aa14.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "schannel",
+      "version": "0.1.30",
+      "license": "MIT",
+      "notices": [
+        "docs/licenses/aa72991ac35b4de0034da0afe943e62b48c4092fc2ba13ae47806d8e9a4ad551.txt"
       ]
     },
     {
@@ -2690,6 +2964,26 @@
       "notices": [
         "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt",
         "docs/licenses/fb77f0a9c53e473abe5103c8632ef9f0f2874d4fb3f17cb2d8c661aab9cee9d7.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "security-framework-sys",
+      "version": "2.17.0",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "security-framework",
+      "version": "3.7.0",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
       ]
     },
     {
@@ -3035,6 +3329,15 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "subtle",
+      "version": "2.6.1",
+      "license": "BSD-3-Clause",
+      "notices": [
+        "docs/licenses/d1fc1bc0d155df60b2e7705b6b2ae02a05c96f948e1cec6e2fb86360b09f346b.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "swift-rs",
       "version": "1.0.9",
       "license": "MIT OR Apache-2.0",
@@ -3080,6 +3383,15 @@
       "license": "Apache-2.0",
       "notices": [
         "docs/licenses/0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "synstructure",
+      "version": "0.13.2",
+      "license": "MIT",
+      "notices": [
+        "docs/licenses/219920e865eee70b7dcfc948a86b099e7f4fe2de01bcca2ca9a20c0a033f2b59.txt"
       ]
     },
     {
@@ -3322,6 +3634,15 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "tokio-native-tls",
+      "version": "0.3.1",
+      "license": "MIT",
+      "notices": [
+        "docs/licenses/898b1ae9821e98daf8964c8d6c7f61641f5f5aa78ad500020771c0939ee0dea1.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "tokio-util",
       "version": "0.7.20",
       "license": "MIT",
@@ -3553,6 +3874,15 @@
         "docs/licenses/23860c2a7b5d96b21569afedf033469bab9fe14a1b24a35068b8641c578ce24d.txt",
         "docs/licenses/7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0.txt",
         "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "untrusted",
+      "version": "0.9.0",
+      "license": "ISC",
+      "notices": [
+        "docs/licenses/7abd9b6960dcf7d4d0a48606a5b71bfe37d472db68d70637f3a58a56785f1621.txt"
       ]
     },
     {
@@ -3914,8 +4244,28 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "windows_aarch64_gnullvm",
+      "version": "0.52.6",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "windows_aarch64_msvc",
       "version": "0.42.2",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "windows_aarch64_msvc",
+      "version": "0.52.6",
       "license": "MIT OR Apache-2.0",
       "notices": [
         "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
@@ -3934,8 +4284,38 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "windows_i686_gnu",
+      "version": "0.52.6",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "windows_i686_gnullvm",
+      "version": "0.52.6",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "windows_i686_msvc",
       "version": "0.42.2",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "windows_i686_msvc",
+      "version": "0.52.6",
       "license": "MIT OR Apache-2.0",
       "notices": [
         "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
@@ -3954,6 +4334,16 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "windows_x86_64_gnu",
+      "version": "0.52.6",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "windows_x86_64_gnullvm",
       "version": "0.42.2",
       "license": "MIT OR Apache-2.0",
@@ -3964,8 +4354,28 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "windows_x86_64_gnullvm",
+      "version": "0.52.6",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "windows_x86_64_msvc",
       "version": "0.42.2",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "windows_x86_64_msvc",
+      "version": "0.52.6",
       "license": "MIT OR Apache-2.0",
       "notices": [
         "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
@@ -4075,6 +4485,16 @@
     {
       "ecosystem": "cargo",
       "name": "windows-sys",
+      "version": "0.52.0",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "windows-sys",
       "version": "0.61.2",
       "license": "MIT OR Apache-2.0",
       "notices": [
@@ -4086,6 +4506,16 @@
       "ecosystem": "cargo",
       "name": "windows-targets",
       "version": "0.42.2",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
+        "docs/licenses/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "windows-targets",
+      "version": "0.52.6",
       "license": "MIT OR Apache-2.0",
       "notices": [
         "docs/licenses/c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b.txt",
@@ -4200,6 +4630,26 @@
     },
     {
       "ecosystem": "cargo",
+      "name": "x509-parser",
+      "version": "0.18.1",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "yasna",
+      "version": "0.6.0",
+      "license": "MIT OR Apache-2.0",
+      "notices": [
+        "docs/licenses/2a7df90e60fd5512b8bca35d3ce90e068f21c52d962855053fd1d9e2e7ca0f16.txt",
+        "docs/licenses/a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
       "name": "yoke-derive",
       "version": "0.8.4",
       "license": "Unicode-3.0",
@@ -4232,6 +4682,16 @@
       "license": "Unicode-3.0",
       "notices": [
         "docs/licenses/f367c1b8e1aa262435251e442901da4607b4650e0e63a026f5044473ecfb90f2.txt"
+      ]
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zeroize",
+      "version": "1.9.1",
+      "license": "Apache-2.0 OR MIT",
+      "notices": [
+        "docs/licenses/8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b.txt",
+        "docs/licenses/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt"
       ]
     },
     {

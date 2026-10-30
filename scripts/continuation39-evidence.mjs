@@ -1,0 +1,46 @@
+const source = 'Founder SparkLink Live Studio directive (2026-10-30)';
+const rows = [
+  ['core', 'A: authenticated authoritative collaborative source', 'multiplayer',
+    'Extends existing forge_session with TLS, persisted operation identities, independent entity/property merge and validated acknowledged QuickForge source.',
+    'Shared native tags, binary imports and general project fields are not part of the first document; three physical machines remain an acceptance gate.'],
+  ['studio-ui', 'B: compact Live Studio session controls', 'interface',
+    'Header status and existing session drawer host/join private invitations, chosen names, role/revocation, activity, inverse operations and retained draft recovery.',
+    'A global synchronization controller outside QuickForge and native OS DPI/multi-monitor acceptance remain pending.'],
+  ['simultaneous', 'C: simultaneous geometry and native asset references', 'multiplayer',
+    'Disjoint QuickForge brushes, transforms, material fields, player starts, objectives and environment intent merge; native asset references resolve to each creators own library.',
+    'Flagship simultaneous tag-edit/custom-import/placement acceptance is incomplete; native asset reference sharing is not content transfer.'],
+  ['semantic-tags', 'D: shared native semantic tag editing', 'tags',
+    'Existing solo cache/native tag tools, external-save reconciliation and validated source forks are preserved.',
+    'Native schema-bound collaborative field operations, tag ownership leases, block insertion/reordering and native serialization acceptance are unimplemented.'],
+  ['asset-transfer', 'E: shared custom asset and dependency import', 'assets',
+    'Source hashes/native tag paths can identify matching content already imported independently on each PC.',
+    'Chunked resumable binary transfer, rights review, dependency reconciliation and cross-user custom model/sound/animation import acceptance remain unimplemented.'],
+  ['shared-build', 'F: immutable collaborative native build', 'tools',
+    'Only the owner builds a saved acknowledged QuickForge revision. A frozen project and session binding retain exact source identity while later editor revisions continue.',
+    'Whole-project native tag/custom-asset convergence and target-game gameplay acceptance remain separate gates.'],
+  ['live-runtime', 'G: collaborative live Halo changes', 'multiplayer',
+    'Existing exact-build live adapters and loaded-game bindings remain separate from source synchronization.',
+    'No collaborative operation-to-runtime delivery, arbitrary spawning/BSP replacement or game-peer visibility is certified by this continuation.'],
+  ['recovery', 'H: durable per-author history and recovery', 'safety',
+    'Alternating checksummed checkpoints, exclusive recovery lock, stable replay IDs, per-author inverse operations and retained pending proposals protect acknowledged and unacknowledged source separately.',
+    'Persistent client receipts for unacknowledged inverse commands, automatic host election, multi-master offline merge and power-loss/hostile-host recovery certification remain open.'],
+  ['security', 'H: protected bounded private transport', 'safety',
+    'TLS 1.3 with invitation certificate pinning, independent participant credentials, authoritative roles, private IPv4 endpoints, bounded typed messages and rate/concurrency limits.',
+    'No independent penetration test, public internet service or hostile-host trust guarantee; legacy plaintext mode is explicit and Steam transport remains separately tested.'],
+  ['presence', 'Remote creator locations and independent views', 'interface',
+    'Chosen names, online presence, roles and revision activity are shared. Cameras, selection, drawers and recording controls stay local.',
+    'Remote frusta, selection/area-of-interest indicators and multi-creator recording acceptance remain unimplemented.'],
+];
+export const continuation39Requirements = rows.map(([id, feature, topic, operation, gap]) => ({
+  id: `C39-${id}`, feature, topic, operation, gap, source,
+  previous: 'Continues C38 at 45596d5; all earlier runtime/native/editor research and unmet acceptance remain preserved.',
+}));
+export const continuation39Overrides = Object.fromEntries(continuation39Requirements.map(row => [row.id, {
+  state: ['C39-semantic-tags', 'C39-asset-transfer', 'C39-live-runtime', 'C39-presence'].includes(row.id)
+    ? 'OPEN - broader collaborative capability remains incomplete' : 'PARTIAL - bounded shared QuickForge implementation',
+  priority: 'P0', operation: row.operation, gap: row.gap, next: row.gap,
+  files: 'crates/spark-core/src/studio_session.rs; crates/spark-core/src/studio_journal.rs; crates/spark-core/src/studio_tls.rs; src-tauri/src/shared_editing.rs; src/components/ForgeCollaboration.tsx',
+  target: 'Windows x64; matching Spark protocol 3; private LAN/VPN; owned QuickForge/native source',
+  level: 'Level A shared editor source; compiler, live engine and game-peer evidence are separate',
+  evidence: 'docs/CONTINUATION_39_ENGINEERING.md; docs/SPARKLINK_ARCHITECTURE.md; scripts/test-sparklink-native.mjs',
+}]));

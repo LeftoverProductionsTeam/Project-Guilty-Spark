@@ -19,12 +19,13 @@ export function mergeForge(base:QuickForgeDocument,next:QuickForgeDocument,curre
         else if(index<0){if(forceRemote)out.push(structuredClone(value));else throw new Error(`Entity was removed: ${key}/${id}`);}
         else for(const field of Object.keys(value)){if(same(before[field],value[field]))continue;
           const v=value[field],b=before[field],c=out[index][field];
-          if(Array.isArray(v)&&Array.isArray(b)&&Array.isArray(c)&&v.length===3&&b.length===3&&c.length===3&&[...v,...b,...c].every(n=>typeof n==='number')){
+          if(['position','rotation','dimensions','color'].includes(field)&&Array.isArray(v)&&Array.isArray(b)&&Array.isArray(c)&&v.length===3&&b.length===3&&c.length===3&&[...v,...b,...c].every(n=>typeof n==='number')){
             out[index][field]=c.map((n,i)=>{if(v[i]===b[i])return n;if(!forceRemote&&n!==b[i]&&n!==v[i])throw new Error(`Concurrent edit conflict: ${key}/${id}/${field}/${i}`);return v[i];});
           }else{if(!forceRemote&&!same(c,b)&&!same(c,v))throw new Error(`Concurrent edit conflict: ${key}/${id}/${field}`);out[index][field]=structuredClone(v);}
         }
       }
-    }else{if(!forceRemote&&!same(result[key],b[key])&&!same(result[key],n[key]))throw new Error(`Concurrent edit conflict: ${key}`);result[key]=structuredClone(n[key]);}
+    }else if(key==='environment'&&b[key]&&n[key]&&result[key]&&typeof b[key]==='object'&&typeof n[key]==='object'){const before=b[key] as Record<string,unknown>,next=n[key] as Record<string,unknown>,now=result[key] as Record<string,unknown>;for(const [field,value]of Object.entries(next)){if(same(before[field],value))continue;if(!forceRemote&&!same(now[field],before[field])&&!same(now[field],value))throw new Error(`Concurrent edit conflict: environment/${field}`);now[field]=structuredClone(value);}}
+    else{if(!forceRemote&&!same(result[key],b[key])&&!same(result[key],n[key]))throw new Error(`Concurrent edit conflict: ${key}`);result[key]=structuredClone(n[key]);}
   }
   return result as unknown as QuickForgeDocument;
 }

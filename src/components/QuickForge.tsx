@@ -13,7 +13,7 @@ import {emptySoundScene} from '../spatialAudio';
 import SoundMixer from './SoundMixer';
 import ForgeCollaboration from './ForgeCollaboration';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {useMapState,writeMapSession} from '../mapSession';
+import {useMapState,writeMapSession,readMapSession} from '../mapSession';
 import {
   Box,
   Copy,
@@ -328,6 +328,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [dragging, setDragging] = useState<PaletteItem | null>(null);
   const dropPoint = useRef<((x: number, y: number) => Vec3 | null) | null>(null);
   const library=props.library,revealPanel=useRevealWorkspacePanel(),viewportElement=useRef<HTMLDivElement|null>(null),assetAlive=useRef(true);
+  const [studioRole,setStudioRole]=useState<string|null>(null);
+  useEffect(()=>{const status=(event:Event)=>{const value=(event as CustomEvent<{projectId:string;view?:{role?:string}|null}>).detail;if(value?.projectId===project.id)setStudioRole(value.view?.role??null);};const open=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project.id)revealPanel('forge-session');};window.addEventListener('guilty-spark-studio-status',status);window.addEventListener('guilty-spark-live-studio-open',open);if(readMapSession(project.id,'studio.openRequest',false)){revealPanel('forge-session');requestAnimationFrame(()=>writeMapSession(project.id,'studio.openRequest',false));}return()=>{window.removeEventListener('guilty-spark-studio-status',status);window.removeEventListener('guilty-spark-live-studio-open',open);};},[project.id,revealPanel]);
   const catalog=useMemo(()=>viewportAssetCatalog(library?.documents??[]),[library?.documents]);
   const [assetBusy,setAssetBusy]=useState(false),[workshopSelected,setWorkshopSelected]=useMapState<string|null>(project.id,'forge.workshopSelection',null);
   const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',''),[tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null),[tagRevision,setTagRevision]=useState(0);
@@ -499,6 +501,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     };
   }, [project.id, props.epoch, props.activeJob]);
   function commit(next: QuickForgeDocument, description: string) {
+    if(studioRole==='viewer'){notify('This Live Studio participant is a viewer. Camera and selection remain available.','info');return;}
     edit({ ...latestProject.current, quickForge: next }, description);
   }
   function selectMeshDiagnosticTriangle(triangles: number[]) {
@@ -523,7 +526,14 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             : [...items, id]
           : [id],
     );
-    if (id) {setTab('properties');if(!additive)openPlacementTag(id);}
+    if (id) {
+      setTab('properties');
+      if (!additive) {
+        const placement = doc.placements.find(value => value.id === id);
+        if (placement?.sourceProjectId && placement.tagId != null) openPlacementTag(id);
+        else revealPanel('forge-inspector');
+      }
+    }
   }
   function changeNode(update: (node: ForgeNode) => ForgeNode, description: string) {
     try {

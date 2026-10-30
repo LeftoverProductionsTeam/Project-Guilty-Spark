@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "startingCommit": "45596d5072b1c115c71132b78e7798c3baa547d0",
+  "branch": "codex/c39-sparklink-live-studio",
+  "unchangedMaster": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+  "endingCommitLocation": "local C39 artifact manifest and git log",
+  "rust": {
+    "passed": 513,
+    "failed": 0,
+    "ignored": 7
+  },
+  "frontend": {
+    "passed": 220,
+    "files": 45
+  },
+  "browser": {
+    "passed": 80,
+    "quiescentFullRun": true,
+    "delayedPollAndInverseRegression": true
+  },
+  "offline": {
+    "scripts": 59
+  },
+  "typescript": true,
+  "nativeReceipt": "docs/fixtures/c39-sparklink-native.json",
+  "nativeProcesses": 3,
+  "physicalMachines": 1,
+  "network": "loopback TLS 1.3; invitation-pinned certificate",
+  "appSha256": "15eabbb5fea49ea1711d2e767bdb8ff44f17f98f037354d5466a02deab9c397a",
+  "gameLaunched": false,
+  "gameplayAccepted": false,
+  "sharedNativeTagsAccepted": false,
+  "binaryAssetTransferAccepted": false,
+  "notes": [
+    "Final packaged application passed the complete three-process run after the transport and ordered-history fixes.",
+    "Failed development attempts remain private evidence and are not counted as passes.",
+    "No Halo process or game memory was touched. Real LAN/VPN PCs, Steam transport and game peers retain separate acceptance gates.",
+    "Queued history keystrokes are transient; persistent client receipts for unacknowledged inverses remain later work."
+  ]
+}

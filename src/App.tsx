@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import LiveStudioIndicator from './components/LiveStudioIndicator';
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -249,7 +250,7 @@ export default function App() {
   const applyHistory=useCallback((type:'undo'|'redo')=>{
     const active=document.activeElement;
     const targetId=active instanceof HTMLElement?active.closest<HTMLElement>('[data-history-project]')?.dataset.historyProject??documentsRef.current.activeId:documentsRef.current.activeId;
-    const apply=()=>{if(targetId)dispatchDocument({type:'history',id:targetId,action:{type}});};
+    const apply=()=>{if(!targetId)return;const h=documentsRef.current.documents.find(d=>d.id===targetId)?.history;const candidate=type==='undo'?h?.past.at(-1):h?.future[0];const localOnly=(p:Project)=>JSON.stringify({...p,quickForge:null,modifiedAt:'',history:[],builds:[]});const hasUnsharedChange=!!candidate&&!!h?.current&&localOnly(candidate)!==localOnly(h.current);if(!hasUnsharedChange&&!window.dispatchEvent(new CustomEvent('guilty-spark-studio-undo',{cancelable:true,detail:{projectId:targetId,redo:type==='redo'}})))return;dispatchDocument({type:'history',id:targetId,action:{type}});};
     if(active instanceof HTMLInputElement&&['number','range'].includes(active.type)){
       active.blur();requestAnimationFrame(apply);
     }else apply();
@@ -911,7 +912,7 @@ export default function App() {
               <strong>GUILTY SPARK</strong>
               <span>HALO MODERN EVOLVED</span>
             </div>
-            <Pill>0.4.0 · C38 dev</Pill>
+            <Pill>0.4.0 · C39 dev</Pill>
           </button>
           {documents.documents.length?<MapTabs state={documents} disabled={busy||closing} onSelect={selectMap} onClose={id=>void closeMap(id)} onWindow={id=>void closeMap(id,true)} onAssets={()=>setAssetTransferOpen(v=>!v)}/>:<div className="header-context">
             <span>LOCAL WORKBENCH</span>
@@ -925,6 +926,7 @@ export default function App() {
             )}
           </div>}
           <div className="header-actions">
+            <LiveStudioIndicator projectId={current?.id??null} canHost={!!current?.quickForge} onOpen={id=>{writeMapSession(id,'studio.openRequest',true);void openProject(id,'quickforge').then(()=>requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-live-studio-open',{detail:{projectId:id}}))));}}/>
             <Pill tone={data.installation.mccPath ? 'green' : 'muted'}>
               <span className="live-dot" />
               {data.installation.mccPath ? 'MCC found' : native ? 'Runtime not found' : 'Browser preview'}

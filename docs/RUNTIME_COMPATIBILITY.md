@@ -1,5 +1,7 @@
 # Runtime compatibility and evidence
 
+C39 SparkLink protocol 3 shares QuickForge authoring source across matching Spark builds. It does not translate Halo runtime protocols or certify live engine/game-peer behavior. Native compilation remains target/kit-specific. See [SparkLink scope](CONTINUATION_39_ENGINEERING.md).
+
 C38 native operations are tested against a pinned Windows Invader release and owned MCC H1 loose working tags. A legacy cache with an installed Baboon remains source-unsupported until a compatible source route is established. Runtime, source, kit and executable assessment now comes from the shared catalog. No additional game/runtime compatibility is implied. [Exact tools and formats](COMPATIBLE_TOOLS.md).
 
 C37 compatible-tool update: verified Baboon 0.3.2 HCEEK/H1EK handoff is limited to validated MCC H1 loose source. It is not a direct compiled Demo/Mac `.map` editor or a game/network adapter. H2/H3/ODST/Reach/H4/H2A aliases remain upstream declarations. [Tool identity and native source boundary](CONTINUATION_37_ENGINEERING.md).

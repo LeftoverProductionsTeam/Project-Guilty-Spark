@@ -218,8 +218,12 @@ fn verified_build(state: &AppState, project: &Project, id: &str) -> Reply<BuildR
 async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)->Reply<OpenProject>{
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();
-        let source=lock(&state.library)?.get(&project_id).map_err(error)?;
-        let build=verified_build(&state,&source,&build_id)?;
+        let mut source=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let build=match verified_build(&state,&source,&build_id){Ok(build)=>build,Err(original)=>{
+            if !state.root.join("jobs").join(&build_id).join("studio-binding.json").is_file(){return Err(original);}
+            source=shared_editing::build_snapshot(&state,&source,&build_id)?;
+            verified_build(&state,&source,&build_id)?
+        }};
         let inherited_tools=project_tools(&state,&source).ok();
         // Native revisions consult library settings. Resolve before taking the
         // import lock so opening a compiled map cannot recursively lock it.
@@ -542,6 +546,7 @@ fn quickforge_build(app:tauri::AppHandle,project_id:String)->Reply<String> {
     let _source_guard=native_operations_native::source_guard()?;
     let state=app.state::<AppState>();
     let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+    let shared_binding=shared_editing::build_binding(&state,&project)?;
     baboon_native::guard_regeneration(&state,&project)?;
     snapshot_project_state(&state,&project,"before-build")?;
     let tools=forge_build::tools_for_target(&project,forge_tools(&state)?).map_err(error)?;verify_compiler_location(&state,&tools)?;
@@ -551,7 +556,7 @@ fn quickforge_build(app:tauri::AppHandle,project_id:String)->Reply<String> {
     let jobs_root=state.root.join("jobs");let returned=job_id.clone();
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();
-        let result=forge_build::run_job(&project,&tools,&jobs_root,&job_id,false,blockers,cancel,|e|event(&app,e)).map_err(error).and_then(|receipt|save_forge_receipt(&state,&receipt));
+        let result=forge_build::run_job(&project,&tools,&jobs_root,&job_id,false,blockers,cancel,|e|event(&app,e)).map_err(error).and_then(|receipt|{if let Some(binding)=&shared_binding{project::atomic_write(&jobs_root.join(&job_id).join("studio-binding.json"),&serde_json::to_vec_pretty(binding).map_err(error)?,false).map_err(error)?;}save_forge_receipt(&state,&receipt)});
         if let Err(message)=result {event(&app,JobEvent{job_id:job_id.clone(),project_id:project_id.clone(),phase:"failed".into(),severity:"error".into(),message,progress:100,timestamp:chrono::Utc::now().to_rfc3339()});}
         if let Ok(mut jobs)=state.jobs.lock(){jobs.remove(&job_id);}
         let _=app.emit("spark:library-changed",());
@@ -1796,7 +1801,7 @@ fn claim_project_document(state:State<AppState>,window:tauri::WebviewWindow,id:S
     let _=lock(&state.library)?.get(&id).map_err(error)?;
     let mut owners=lock(&state.document_owners)?;
     if owners.get(&id).is_some_and(|owner|owner!=window.label()){return Err("This map is already open for editing in another Spark window.".into());}
-    owners.insert(id,window.label().into());Ok(())
+    shared_editing::claim_owner(&state,&id,window.label())?;owners.insert(id,window.label().into());Ok(())
 }
 #[tauri::command]
 fn release_project_document(state:State<AppState>,window:tauri::WebviewWindow,id:String)->Reply<()> {
@@ -2484,25 +2489,39 @@ async fn live_mcc_import_map(app:tauri::AppHandle)->Reply<OpenProject>{
 }
 
 #[tauri::command]
-async fn forge_session_host(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,document:quickforge::QuickForgeDocument,lan:bool,transport:Option<core::session_invite::Transport>,link_game:Option<bool>)->Reply<shared_editing::Info>{
-    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::host(&app.state::<AppState>(),&owner,project_id,document,lan,transport.unwrap_or(core::session_invite::Transport::Lan),link_game.unwrap_or(false))).await.map_err(error)?
+async fn forge_session_host(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,document:quickforge::QuickForgeDocument,lan:bool,transport:Option<core::session_invite::Transport>,link_game:Option<bool>,studio:Option<bool>,display_name:Option<String>,bind_address:Option<String>)->Reply<shared_editing::Info>{
+    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::host(&app.state::<AppState>(),&owner,project_id,document,lan,transport.unwrap_or(core::session_invite::Transport::Lan),link_game.unwrap_or(false),studio.unwrap_or(false),display_name.unwrap_or_else(||"Host".into()),bind_address)).await.map_err(error)?
 }
 #[tauri::command]
-async fn forge_session_status(app:tauri::AppHandle,project_id:String)->Reply<Option<shared_editing::Info>>{tauri::async_runtime::spawn_blocking(move||shared_editing::status(&app.state::<AppState>(),&project_id)).await.map_err(error)?}
+async fn forge_session_status(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<Option<shared_editing::Info>>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::status(&app.state::<AppState>(),&owner,&project_id)).await.map_err(error)?}
 #[tauri::command]
-async fn forge_session_join(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,endpoint:String,key:String,transport:Option<core::session_invite::Transport>,invite:Option<String>)->Reply<core::forge_session::View>{
-    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::join(&app.state::<AppState>(),&owner,project_id,endpoint,key,transport.unwrap_or(core::session_invite::Transport::Lan),invite)).await.map_err(error)?
+async fn forge_session_join(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,endpoint:String,key:String,transport:Option<core::session_invite::Transport>,invite:Option<String>,display_name:Option<String>)->Reply<core::forge_session::View>{
+    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::join(&app.state::<AppState>(),&owner,project_id,endpoint,key,transport.unwrap_or(core::session_invite::Transport::Lan),invite,display_name.unwrap_or_else(||"Editor".into()))).await.map_err(error)?
 }
 #[tauri::command]
-async fn forge_session_poll(app:tauri::AppHandle,project_id:String,session_id:Option<String>)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||shared_editing::poll(&app.state::<AppState>(),&project_id,session_id.as_deref(),false)).await.map_err(error)?}
+async fn forge_session_poll(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,session_id:Option<String>)->Reply<core::forge_session::View>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::poll(&app.state::<AppState>(),&owner,&project_id,session_id.as_deref(),false)).await.map_err(error)?}
 #[tauri::command]
-async fn forge_session_resume(app:tauri::AppHandle,project_id:String,session_id:String)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||shared_editing::poll(&app.state::<AppState>(),&project_id,Some(&session_id),true)).await.map_err(error)?}
+async fn forge_session_resume(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,session_id:String)->Reply<core::forge_session::View>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::poll(&app.state::<AppState>(),&owner,&project_id,Some(&session_id),true)).await.map_err(error)?}
 #[tauri::command]
-async fn forge_session_update(app:tauri::AppHandle,project_id:String,session_id:String,revision:u64,document:quickforge::QuickForgeDocument)->Reply<core::forge_session::View>{tauri::async_runtime::spawn_blocking(move||shared_editing::update(&app.state::<AppState>(),&project_id,&session_id,revision,document)).await.map_err(error)?}
+async fn forge_session_update(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,session_id:String,revision:u64,document:quickforge::QuickForgeDocument,operation_id:Option<String>)->Reply<core::forge_session::View>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::update(&app.state::<AppState>(),&owner,&project_id,&session_id,revision,document,operation_id)).await.map_err(error)?}
 #[tauri::command]
-async fn forge_session_leave(app:tauri::AppHandle,project_id:String,session_id:String)->Reply<()>{tauri::async_runtime::spawn_blocking(move||shared_editing::leave(&app.state::<AppState>(),&project_id,&session_id)).await.map_err(error)?}
+async fn forge_session_leave(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,session_id:String)->Reply<()>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::leave(&app.state::<AppState>(),&owner,&project_id,&session_id)).await.map_err(error)?}
 #[tauri::command]
-async fn forge_session_invite(app:tauri::AppHandle,project_id:String,session_id:String,address:Option<String>)->Reply<String>{tauri::async_runtime::spawn_blocking(move||shared_editing::invite(&app.state::<AppState>(),&project_id,&session_id,address)).await.map_err(error)?}
+async fn forge_session_invite(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,session_id:String,address:Option<String>,viewer:Option<bool>)->Reply<String>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::invite(&app.state::<AppState>(),&owner,&project_id,&session_id,address,viewer.unwrap_or(false))).await.map_err(error)?}
+#[tauri::command]
+async fn forge_session_reverse(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,session_id:String,operation_id:String,redo:bool)->Reply<core::forge_session::View>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::reverse(&app.state::<AppState>(),&owner,&project_id,&session_id,&operation_id,redo)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_session_role(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,session_id:String,participant_id:String,role:core::studio_journal::Role,revoke:bool)->Reply<core::forge_session::View>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::role(&app.state::<AppState>(),&owner,&project_id,&session_id,&participant_id,role,revoke)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_studio_history(app:tauri::AppHandle,project_id:String)->Reply<Vec<shared_editing::StudioRecord>>{tauri::async_runtime::spawn_blocking(move||shared_editing::history(&app.state::<AppState>(),&project_id)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_studio_recover(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,directory_id:String,address:String,display_name:String)->Reply<shared_editing::Info>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::recover(&app.state::<AppState>(),&owner,project_id,directory_id,address,display_name)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_studio_pending(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<Option<shared_editing::Pending>>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::pending(&app.state::<AppState>(),&owner,&project_id)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_studio_save_pending(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,pending:shared_editing::Pending)->Reply<()>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::save_pending(&app.state::<AppState>(),&owner,&project_id,pending)).await.map_err(error)?}
+#[tauri::command]
+async fn forge_studio_clear_pending(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,operation_id:String)->Reply<()>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::clear_pending(&app.state::<AppState>(),&owner,&project_id,&operation_id)).await.map_err(error)?}
 #[tauri::command]
 fn forge_session_parse_invite(text:String)->Reply<core::session_invite::Invite>{core::session_invite::Invite::decode(&text).map_err(error)}
 #[tauri::command]
@@ -2575,7 +2594,7 @@ pub fn run() {
         .on_window_event(|window,event|{director_native::window_event(window.app_handle(),window,event);if matches!(event,tauri::WindowEvent::Destroyed){
             if let Some(state)=window.app_handle().try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=window.label());}}
             let app=window.app_handle().clone();let label=window.label().to_owned();
-            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);}});
+            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){shared_editing::release_window(&state,&label);external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);}});
         }})
         .invoke_handler(tauri::generate_handler![
             prepare_map_download,
@@ -2661,6 +2680,13 @@ pub fn run() {
             forge_session_resume,
             forge_session_invite,
             forge_session_parse_invite,
+            forge_session_reverse,
+            forge_session_role,
+            forge_studio_history,
+            forge_studio_recover,
+            forge_studio_pending,
+            forge_studio_save_pending,
+            forge_studio_clear_pending,
             steam_module_status,
             choose_steam_module,
             steam_session_probe,
