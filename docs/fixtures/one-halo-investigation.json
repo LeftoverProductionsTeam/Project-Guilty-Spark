@@ -1,0 +1,566 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-29T23:59:44.632Z",
+  "sparkBaseCommit": "489443d7b892b14bda553ed5f4f8d33480ffe78c",
+  "branch": "codex/one-halo-mcc-investigation",
+  "scope": "Dedicated MCC H1 to Chupathingy investigation; metadata only; no cross-play release",
+  "actualMcc": [
+    {
+      "relativePath": "MCC/Binaries/Win64/MCC-Win64-Shipping.exe",
+      "bytes": 67179480,
+      "sha256": "be70d6dcd1a884f10ceb342a7a2dcb35ee0fa43181b66a1d19c3d830e9834691",
+      "matchesReviewedObjectProfile": true,
+      "exportCount": 595,
+      "engineExports": [],
+      "directWinsockImport": true,
+      "networkImportDlls": [
+        "WS2_32.dll",
+        "steam_api64.dll",
+        "EOSSDK-Win64-Shipping.dll",
+        "SimpleNetworkLibrary-x64-Release.dll",
+        "HaloNetworkLayer_Ship.dll"
+      ]
+    },
+    {
+      "relativePath": "halo1/halo1.dll",
+      "bytes": 30718936,
+      "sha256": "0a12dc561780f449d3f4d0df10bb8d3bc7be7840a5beb2b236f672eb6cd42e6c",
+      "matchesReviewedObjectProfile": true,
+      "exportCount": 21,
+      "engineExports": [
+        {
+          "name": "CreateDataAccess",
+          "forwarded": false
+        },
+        {
+          "name": "CreateGameEngine",
+          "forwarded": false
+        },
+        {
+          "name": "SetLibrarySettings",
+          "forwarded": false
+        }
+      ],
+      "directWinsockImport": true,
+      "networkImportDlls": [
+        "WS2_32.dll",
+        "WSOCK32.dll"
+      ]
+    }
+  ],
+  "mccObservation": {
+    "processAndHalo1ModulePresent": true,
+    "processMemoryRead": false,
+    "processMemoryWritten": false,
+    "privateLanModeConfirmed": false,
+    "mapIdentityVerified": false,
+    "sessionAdmissionApiVerified": false,
+    "observedLaunchFlag": "-no-eac",
+    "easyAntiCheatProcessObserved": false
+  },
+  "discovery": {
+    "receiptSha256": "66e189bc927a2d4447a22748532a8764bd008004dc63dc9f839ddcd62f347746",
+    "stdioSha256": "5c57af969b4a536838774392440ed5d690805b4a39a0703b3fcf55daf0418242",
+    "runtime": "chupathingy-v0.8.1c",
+    "revision": "880a933ec33b2ae2dbbeb4018a9090c528a075bc",
+    "exeSha256": "bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a",
+    "input": [
+      {
+        "name": "ui.map",
+        "sha256": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833",
+        "cacheVersion": 5,
+        "bytes": 14145536
+      },
+      {
+        "name": "bloodgulch.map",
+        "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+        "cacheVersion": 5,
+        "bytes": 22571008
+      },
+      {
+        "name": "carousel.map",
+        "sha256": "1c6353df6e4530437841b09775e62fa067caa46bb0e40f4579bbf2276991a38e",
+        "cacheVersion": 5,
+        "bytes": 20215808
+      }
+    ],
+    "probeSha256": "ede9d9f6ad1b4b667258ed4afc3233f86f8f08cf92e5850e372df6b637717372",
+    "discovery": {
+      "advertisement": {
+        "packetVersion": 1,
+        "discoveryProtocol": 2,
+        "legacyNetworkVersion": 32,
+        "distributedNetcode": true,
+        "inProgress": false,
+        "advertisedKind": 0,
+        "extensionBytesSha256": "f692c52e517e738d82feae451a2ca4a6564380bb2d79788c26b84ae2bb571e0f",
+        "gameName": "Goat",
+        "mapName": "levels\\test\\bloodgulch\\bloodgulch",
+        "mapVersionHint": 0,
+        "gameEngine": 2,
+        "machines": 1,
+        "players": 1,
+        "maximumPlayers": 128,
+        "scoreLimit": 15,
+        "open": true,
+        "teams": false,
+        "gamePort": 5150
+      },
+      "queriesSent": 1,
+      "ignoredDatagrams": 0,
+      "elapsedMs": 0,
+      "responseBytes": 280,
+      "responseSha256": "f2f9ec74b30d07fc7c20ecbccbd043605d9618ff91860a7fe16de995853db897",
+      "authenticated": false,
+      "sessionAdmissionAttempted": false
+    },
+    "expectedResultObserved": true,
+    "cache13BootstrapRejected": false,
+    "exit": {
+      "code": 0,
+      "signal": null,
+      "forced": false,
+      "elapsedMs": 35745
+    },
+    "inputsUnchanged": true,
+    "mccAttached": false,
+    "mccClientJoined": false,
+    "crossPlayEstablished": false
+  },
+  "mccOnlyContent": {
+    "receiptSha256": "e1e7dc438760638d332567335c628b6746e1cd7a5c4ec68b68d76a4bb75c7c70",
+    "stdioSha256": "07c8add1bc0f8bd0cbf26ccb088a2341fffc676412356ba73a4699462287c801",
+    "runtime": "chupathingy-v0.8.1c",
+    "revision": "880a933ec33b2ae2dbbeb4018a9090c528a075bc",
+    "exeSha256": "bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a",
+    "input": [
+      {
+        "name": "ui.map",
+        "sha256": "51bbf461e76b9cd9f865215a56231930701212b765d8fa05572c811a9d081bfe",
+        "cacheVersion": 13,
+        "bytes": 2949792
+      },
+      {
+        "name": "bloodgulch.map",
+        "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "cacheVersion": 13,
+        "bytes": 15007412
+      }
+    ],
+    "probeSha256": null,
+    "discovery": null,
+    "expectedResultObserved": true,
+    "cache13BootstrapRejected": true,
+    "exit": {
+      "code": 1,
+      "signal": null,
+      "forced": false,
+      "elapsedMs": 349
+    },
+    "inputsUnchanged": true,
+    "mccAttached": false,
+    "mccClientJoined": false,
+    "crossPlayEstablished": false
+  },
+  "firstNativeFailure": {
+    "queryBytes": 15,
+    "missingFormatVersionByte": true,
+    "hostReportedSearchDecodeFailure": true,
+    "exit": {
+      "code": 0,
+      "signal": null,
+      "forced": false
+    },
+    "inputMapsUnchanged": true,
+    "correctedQueryBytes": 16,
+    "retainedPrivately": true
+  },
+  "gates": [
+    {
+      "gate": 1,
+      "result": "passed-private-native-discovery"
+    },
+    {
+      "gate": 2,
+      "result": "blocked-no-verified-supported-MCC-transport-binding"
+    },
+    {
+      "gate": 3,
+      "result": "not-attempted"
+    },
+    {
+      "gate": 4,
+      "result": "not-tested-in-both-runtimes"
+    },
+    {
+      "gate": 5,
+      "result": "not-attempted"
+    },
+    {
+      "gate": 6,
+      "result": "not-attempted"
+    },
+    {
+      "gate": 7,
+      "result": "not-attempted"
+    },
+    {
+      "gate": 8,
+      "result": "not-attempted"
+    },
+    {
+      "gate": 9,
+      "result": "no-mixed-match-stability-test"
+    }
+  ],
+  "rust": {
+    "command": "cargo test --workspace --locked",
+    "passed": 485,
+    "failed": 0,
+    "ignored": 7,
+    "logSha256": "c284877ab6414bad57676630067913303e2ac712a566f87457443ce236d26bb7"
+  },
+  "sourceReferences": [
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/NETCODE.md",
+      "sha256": "f381b707217425a953af68255d2ce534f4915e9d2282a5b49b85dc3123364a48",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/NETCODE.md"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/game/map_families.c",
+      "sha256": "06a634ff2aed22cd35e39727cd4cf5a688e48d467c52d8877171d290d8435304",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/game/map_families.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "source/networking/network_messages.c",
+      "sha256": "f682d93a7c8aac2094a8c155efb13c60393777cf8d9ab9401814a4c811d54618",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/source/networking/network_messages.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "source/networking/network_game_protocol.h",
+      "sha256": "c7a4ab43c54b02cb96921b04ac670f90d185ab2c60ae58309a616c70d21a8b2e",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/source/networking/network_game_protocol.h"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "source/networking/network_connection.c",
+      "sha256": "d84151d8685d54c59d75b9378bb714da272c996fec246af238d7e7b12a75e7c2",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/source/networking/network_connection.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "source/networking/network_client_manager.c",
+      "sha256": "e515b2bfd7276c62cd043590238495f79f3be6c9eda6e341f2cbb072471e594b",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/source/networking/network_client_manager.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "source/networking/network_server_message_handler.c",
+      "sha256": "4f3720d38db61c9ada3cd1d269fe94d2f564d3dd4d7b7defd3e7389f62310b4f",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/source/networking/network_server_message_handler.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "source/networking/network_client_message_handler.c",
+      "sha256": "6995af2d5f35ea3fe13b7164e81ad8d244db472a85d23ce9ece4c111e1bd1cc3",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/source/networking/network_client_message_handler.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "port/linux/NETCODE.md",
+      "sha256": "8f14b5810f47071f353e69c83cdaef67bf7f39000ce7008e45835c590b5c7833",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/port/linux/NETCODE.md"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "source/networking/network_messages.c",
+      "sha256": "d691e269ee1b42de56df80eab314b924aad4bc493cbba40d005846486733458b",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/source/networking/network_messages.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "source/networking/network_game_protocol.h",
+      "sha256": "7cfd12a4a068981dcb218800d6f6fc5bd37d9b23aa1ef96227f608d69e48d285",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/source/networking/network_game_protocol.h"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "source/networking/network_connection.c",
+      "sha256": "7401f7e55637026ebbc3ae540de67c61f6c1562172f24bb476326fddee964849",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/source/networking/network_connection.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "source/networking/network_client_manager.c",
+      "sha256": "dea6aa77e38576da053b66786db2b488afecdd7bf07474ee4f447306210bdb70",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/source/networking/network_client_manager.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "source/networking/network_server_message_handler.c",
+      "sha256": "8e876f565dbc72511abc2bc0d1140497c12ed01cb3c7d526c6607dfe2f87c309",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/source/networking/network_server_message_handler.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "source/networking/network_client_message_handler.c",
+      "sha256": "1d5451c341714d88fd87141c6a4abe440c42186ed683f62ab3958cf3a0dc1b58",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/source/networking/network_client_message_handler.c"
+    },
+    {
+      "id": "alpharing",
+      "revision": "5b333d9424a77aac28418055d20ef74b76545f66",
+      "path": "src/mcc/mcc_manager.cpp",
+      "sha256": "c6ff934abc18f45504b6e707233d674e1c611940bbdbb8940558cb051f6d8895",
+      "url": "https://raw.githubusercontent.com/WinterSquire/AlphaRing/5b333d9424a77aac28418055d20ef74b76545f66/src/mcc/mcc_manager.cpp"
+    },
+    {
+      "id": "alpharing",
+      "revision": "5b333d9424a77aac28418055d20ef74b76545f66",
+      "path": "src/mcc/module_manager.cpp",
+      "sha256": "14e6e16508551e2e419d3e50143b99b7aea7432c513c007a44a4abd497629425",
+      "url": "https://raw.githubusercontent.com/WinterSquire/AlphaRing/5b333d9424a77aac28418055d20ef74b76545f66/src/mcc/module_manager.cpp"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/network_format.txt",
+      "sha256": "ba242f63e039c313a099812c88b07f694b2aa552c16eef21ce8632b4aabc91cd",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/network_format.txt"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/src/xnet.c",
+      "sha256": "62612557db584a989efffd30136eaa1231be864f48144bd7cde0e8f7143b8769",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/src/xnet.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/game/network_objects.c",
+      "sha256": "dc8b9edd6e2f3b1a80e42d5a23653e20df1e8decc9c7a8bd4a9c71ed24cfdf12",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/game/network_objects.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/game/network_distributed.c",
+      "sha256": "83d4311b9c5f7a49c4be634d90b12df37b57eda2af9e3aa4b19fe5a79b3c6c4f",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/game/network_distributed.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/game/network_damage.c",
+      "sha256": "b776cac9bd68aa12232ebd8cfcaf052e12b564fb2fae41998fdbb3b80536c5ab",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/game/network_damage.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "source/memory/data_packets.c",
+      "sha256": "de2830575ce0de0b90700eaccd378801e870c4fa452a79b050170c0073cb5636",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/source/memory/data_packets.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "source/memory/data_packet_groups.c",
+      "sha256": "2620f7155075477e9f19a0eff22178289b8ba02ff5586991b5c5493b3961248a",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/source/memory/data_packet_groups.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "port/linux/network_format.txt",
+      "sha256": "f96734d01e3be110f6828b7a2b9c26fa5b18bd1a7e7092095fbba750ded453ff",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/port/linux/network_format.txt"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "port/linux/src/xnet.c",
+      "sha256": "d3a71ed8f8a46207b2273cabe94b9cd75650cb6f7c25a619c5e73651c8ea2885",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/port/linux/src/xnet.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "port/linux/game/network_objects.c",
+      "sha256": "b10a16b82909dbf49db3086f77e43907d6536e6738295da54e3e6ea35e6b9edb",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/port/linux/game/network_objects.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "port/linux/game/network_distributed.c",
+      "sha256": "332504a6ba42a01870884202fbcc49f902e81547b9173faafb2d302900f148e4",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/port/linux/game/network_distributed.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "port/linux/game/network_damage.c",
+      "sha256": "da1a97a4e153af1eb161d7e73e027ea1a0f82298fbffb6136ffa4b0c0d7224c7",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/port/linux/game/network_damage.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "source/memory/data_packets.c",
+      "sha256": "da5d8358eb04720e8699f0c2fca30749a78463a18970216e7046b9c054949482",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/source/memory/data_packets.c"
+    },
+    {
+      "id": "opence",
+      "revision": "70c5e600ea345345db040ce1914903cc6746b46e",
+      "path": "source/memory/data_packet_groups.c",
+      "sha256": "2620f7155075477e9f19a0eff22178289b8ba02ff5586991b5c5493b3961248a",
+      "url": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/70c5e600ea345345db040ce1914903cc6746b46e/source/memory/data_packet_groups.c"
+    },
+    {
+      "id": "libmcc",
+      "revision": "d203900084d218aab338358738b402af06a01263",
+      "path": "include/libmcc/game/game_engine.h",
+      "sha256": "5558742ba73e866df3ad503438ba2219daece87e137825b94d938f31e470c289",
+      "url": "https://raw.githubusercontent.com/SpringContingency/libmcc/d203900084d218aab338358738b402af06a01263/include/libmcc/game/game_engine.h"
+    },
+    {
+      "id": "libmcc",
+      "revision": "d203900084d218aab338358738b402af06a01263",
+      "path": "include/libmcc/game/game_manager.h",
+      "sha256": "43b4a7ca500d27d53d885d08787447fc97d3db14bafd5ac0f6d297be8f35bde4",
+      "url": "https://raw.githubusercontent.com/SpringContingency/libmcc/d203900084d218aab338358738b402af06a01263/include/libmcc/game/game_manager.h"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/include/halo_port_limits.h",
+      "sha256": "bd9255a5ad92c6846a54c4c31dab1e1c56a91b83e98e63b86bc6419fd937a66b",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/include/halo_port_limits.h"
+    },
+    {
+      "id": "chupa-release",
+      "revision": "880a933ec33b2ae2dbbeb4018a9090c528a075bc",
+      "path": "source/networking/network_server_message_handler.c",
+      "sha256": "9f35bbf0116e89df1bb6839e0f145b4a7536c208df3a011f940550e358c826cf",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/880a933ec33b2ae2dbbeb4018a9090c528a075bc/source/networking/network_server_message_handler.c"
+    },
+    {
+      "id": "chupa-release",
+      "revision": "880a933ec33b2ae2dbbeb4018a9090c528a075bc",
+      "path": "source/networking/network_messages.c",
+      "sha256": "f682d93a7c8aac2094a8c155efb13c60393777cf8d9ab9401814a4c811d54618",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/880a933ec33b2ae2dbbeb4018a9090c528a075bc/source/networking/network_messages.c"
+    },
+    {
+      "id": "chupa-release",
+      "revision": "880a933ec33b2ae2dbbeb4018a9090c528a075bc",
+      "path": "port/linux/include/halo_port_limits.h",
+      "sha256": "bd9255a5ad92c6846a54c4c31dab1e1c56a91b83e98e63b86bc6419fd937a66b",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/880a933ec33b2ae2dbbeb4018a9090c528a075bc/port/linux/include/halo_port_limits.h"
+    },
+    {
+      "id": "chupa-release",
+      "revision": "880a933ec33b2ae2dbbeb4018a9090c528a075bc",
+      "path": "port/linux/game/map_families.c",
+      "sha256": "06a634ff2aed22cd35e39727cd4cf5a688e48d467c52d8877171d290d8435304",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/880a933ec33b2ae2dbbeb4018a9090c528a075bc/port/linux/game/map_families.c"
+    },
+    {
+      "id": "chupa-release",
+      "revision": "880a933ec33b2ae2dbbeb4018a9090c528a075bc",
+      "path": "port/linux/src/sdl_platform.c",
+      "sha256": "58fdaf06f34750f85ec3c17c253c964e612655d867d791a68c9c89e46380cf80",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/880a933ec33b2ae2dbbeb4018a9090c528a075bc/port/linux/src/sdl_platform.c"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/src/sdl_platform.c",
+      "sha256": "82c717362f89c859c0f63012e77d55663015cf138d113fb6c5dd7292987f11eb",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/src/sdl_platform.c"
+    },
+    {
+      "id": "libmcc",
+      "revision": "d203900084d218aab338358738b402af06a01263",
+      "path": "include/libmcc/module/halo1/native.h",
+      "sha256": "e31223bc5b2ebed2b599dde34088ce9d961e3aa067e42a8863acb7305a05138b",
+      "url": "https://raw.githubusercontent.com/SpringContingency/libmcc/d203900084d218aab338358738b402af06a01263/include/libmcc/module/halo1/native.h"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "port/linux/include/delta.h",
+      "sha256": "0e920a5684b94afb27d2f0527057b37621673643ea56f493158ca129bc230283",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/port/linux/include/delta.h"
+    },
+    {
+      "id": "chupa",
+      "revision": "68142e35f97c81308df2550729e5f0c783159ec3",
+      "path": "source/game/game_time.c",
+      "sha256": "1ef43aff582d14f84e7c325fc9f50e555a15f426a85e865c503460ab03708c73",
+      "url": "https://raw.githubusercontent.com/ChupathingyCE/chupathingyce/68142e35f97c81308df2550729e5f0c783159ec3/source/game/game_time.c"
+    }
+  ],
+  "distribution": {
+    "gameAssetsIncluded": false,
+    "gameBinariesIncluded": false,
+    "upstreamEngineSourceIncluded": false,
+    "rawAdvertisementsOrSessionKeysIncluded": false,
+    "rawNetworkTrafficIncluded": false,
+    "privatePathsIncluded": false
+  },
+  "nodeParserTests": {
+    "command": "node --test scripts/probe-mcc-h1-interface.test.mjs",
+    "passed": 2,
+    "failed": 0,
+    "logSha256": "2b0bee8ca5f46c12e8642ccaba7d04cd4f574e5d864c839649bd99bb2af14e35"
+  },
+  "prototypeSources": [
+    {
+      "path": "crates/spark-core/src/community_lan.rs",
+      "sha256": "ef583c47b18d92749b98292c80b00a4974e8f88ac655bec42e57f29e42f24c99"
+    },
+    {
+      "path": "crates/spark-core/examples/one_halo_discovery.rs",
+      "sha256": "d6eb329e6ba01928bf672bd0ad7544429de4baae5484b8eddb8f3c57d9e96df6"
+    },
+    {
+      "path": "scripts/test-one-halo-native.mjs",
+      "sha256": "22affb198a11e2c604832a5d6e776024ec53595a5e95e040df517b8cd6bda044"
+    },
+    {
+      "path": "scripts/probe-mcc-h1-interface.mjs",
+      "sha256": "cd61709a72326c2b685af8d8be1a4b747f84992969c1dd5f184534945199dfa3"
+    },
+    {
+      "path": "scripts/probe-mcc-h1-interface.test.mjs",
+      "sha256": "b50910e93734ff655ec184f93bbe267adfc9b899629c2625b89acf16722821ee"
+    }
+  ],
+  "mccStaticReadback": {
+    "reportSha256": "c0348f1e2605eac5f1026c961faca1fc01a36e4cb9de868b3a58dd0155c7ca3f",
+    "bothFilesStillMatchReviewedProfile": true
+  }
+}

@@ -19,6 +19,7 @@ pub mod creative;
 pub mod connections;
 pub mod community_servers;
 pub mod community_host;
+pub mod community_lan;
 pub mod conversion;
 pub mod conversion_resources;
 pub mod engine_machinima;
