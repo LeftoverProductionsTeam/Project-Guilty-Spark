@@ -292,7 +292,7 @@ function CameraFrame({ document, frame, mode, diagnosticBounds }: { document: Qu
 /** Overlay a local Halo Tool diagnostic WRL without making it selectable,
  * a drop surface, or a source mesh. Colors are supplied by Tool's VRML file.
  */
-function WrlErrorOverlay({ diagnostics }: {diagnostics: WrlDiagnostics}) {
+export function WrlErrorOverlay({ diagnostics }: {diagnostics: WrlDiagnostics}) {
   const geometry = useMemo(() => {
     const linePosition: number[] = [], lineColor: number[] = [];
     const facePosition: number[] = [], faceColor: number[] = [];

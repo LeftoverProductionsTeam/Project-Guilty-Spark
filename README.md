@@ -1,5 +1,9 @@
 # Project Guilty Spark
 
+## Native BSP Workshop
+
+Build joined rooms, corridors and ramps inside Level Editor with four linked views, editable brush topology, extrusion/clipping, per-face UVs/materials and grouped Undo. Real Windows UI acceptance builds the source through Halo Tool and renders the compiled material back in the editor; native readback verifies three clusters and two portals. Player traversal is still pending, and CE cache compilation remains blocked by a documented extracted-tag dependency. [Capabilities, workflow, exact evidence and remaining work](docs/BSP_WORKSHOP.md).
+
 Windows CI manifest registration now resolves the selected mod folder consistently when Windows supplies a short path such as `RUNNER~1`. The reported three failures were reproduced locally before the fix; the full locked Windows workspace suite then passed with the same short-path condition. [Fix and verification](docs/WINDOWS_MANIFEST_CI_FIX.md). Hosted CI results remain separate from this local verification record.
 
 ## C40 native-save integrity and CE companion

@@ -2,7 +2,7 @@
 
 Editable `.gsproject` geometry → bounded source validation → JMS 8200 → isolated tag staging → Halo Tool `structure` → Invader scenario configuration → Tool `lightmaps` → Invader cache build → engine/scenario/CRC checks → separate package and game acceptance.
 
-The native mesh generator and source exporter share brush geometry. Grid snapping is authoring only. Imported cache BSPs remain read-only; there is no arbitrary binary BSP resizing or general room/tunnel Boolean reconstruction.
+The native mesh generator and source exporter share brush geometry. Grid snapping is authoring only. [BSP Workshop](BSP_WORKSHOP.md) adds convex source-room/corridor unions and solid subtraction with real H1A build evidence. Imported cache BSPs remain read-only; this is not arbitrary binary BSP resizing or lossless reconstruction of existing maps.
 
 In Settings, distinguish **classic HEK** from **H1A Editing Kit**, select the separately installed kit, select complete legal editable base tags, and select Invader. Classic Tool uses conventional `data`/`tags` paths inside the isolated job. H1A uses its documented content-directory overrides. MCC and CE targets are gated by the selected kit generation; native extended-engine compilation remains unverified.
 

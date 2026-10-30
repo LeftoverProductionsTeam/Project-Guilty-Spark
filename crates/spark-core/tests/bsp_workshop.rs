@@ -170,3 +170,41 @@ fn workshop_keeps_existing_scenario_and_spawn_guards() {
         .iter()
         .any(|i| i.code == "DUPLICATE_SPAWN_POSITION"));
 }
+#[test]
+fn boolean_floor_keeps_distinct_material_and_authored_uv_coordinates() {
+    let mut d = w::example().unwrap();
+    d.materials.push(q::ForgeMaterial {
+        id: "floor-two".into(),
+        name: "floor_two".into(),
+        shader_path: None,
+        color: [0.1, 0.5, 0.9],
+    });
+    let f = &mut d.workshop.as_mut().unwrap().brushes[0].faces[0];
+    f.material_id = "floor-two".into();
+    f.uv_scale = [2., 3.];
+    f.uv_offset = [0.125, 0.375];
+    let m = q::preview_mesh(&d).unwrap();
+    let mut checked = 0;
+    for part in &m.parts {
+        if part.brush_id != "room-a" || part.face_id.as_deref() != Some("face-0") {
+            continue;
+        }
+        assert_eq!(part.material_id, "floor-two");
+        for i in &m.indices[part.index_start..part.index_start + part.index_count] {
+            let i = *i as usize;
+            assert!(m.positions[i * 3 + 2].abs() < 0.00001);
+            assert!((m.uvs[i * 2] - (2. * m.positions[i * 3] + 0.125)).abs() < 0.00001);
+            assert!((m.uvs[i * 2 + 1] - (3. * m.positions[i * 3 + 1] + 0.375)).abs() < 0.00001);
+            checked += 1;
+        }
+    }
+    assert!(
+        checked >= 6,
+        "The room floor must survive corridor union and ramp subtraction"
+    );
+    assert!(m
+        .parts
+        .iter()
+        .filter(|p| p.material_id == "floor-two")
+        .all(|p| p.brush_id == "room-a" && p.face_id.as_deref() == Some("face-0")));
+}

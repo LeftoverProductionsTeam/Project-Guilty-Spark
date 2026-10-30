@@ -1,5 +1,12 @@
 # Changelog
 
+## Native BSP Workshop — source and H1A build milestone
+
+- Add versioned editable convex volumes, source-face identities, playable-space unions and solid subtraction to the existing QuickForge/JMS pipeline.
+- Integrate four linked perspective/orthographic views, room drawing, brush and sub-element transforms, extrusion, capped clipping, face materials/UVs, exact source-map texture previews and persistent layouts. Geometry transactions retain grouped Undo and refuse stale or invalid operations.
+- Verify real desktop save/reopen, history, geometry refusal, native H1A compilation and compiled-texture readback. Independent BSP readback yields three clusters and two portals.
+- Keep player walkthrough and retail MCC load open. Preserve the separate CE failure: the source actor-variant grenade enum is invalid and unchanged by the build. Existing-map reconstruction, advanced tools, Workshop collaboration and direct compiled-map editing remain open. See [evidence and boundaries](docs/BSP_WORKSHOP.md).
+
 ## C39 native-content extension — verified on the C38–C40 foundation
 
 - Extend the authoritative source document with one schema-bound pistol radius field and bounded, complete, hash-verified scenery publications. Each participant explicitly verifies the same complete local source inventory and dependencies; network proposals cannot run tools or apply arbitrary binary patches.

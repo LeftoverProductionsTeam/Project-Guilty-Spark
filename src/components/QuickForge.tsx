@@ -70,6 +70,7 @@ import type {
 } from '../forge';
 import { HelpTip, IconButton, Notice, NumberField, PageTitle, Pill } from './ui';
 import ForgeViewport from './ForgeViewport';
+import BspWorkshop from './BspWorkshop';
 import EnvironmentControls from './EnvironmentControls';
 import { environmentValue, validateEnvironment } from '../environment';
 import { inspectScenarioRisks } from '../scenarioSafety';
@@ -277,6 +278,8 @@ function NewMapWizard({ onCreate, onCancel,preferredHalo }: { onCreate: Props['o
 }
 function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocument; onNew: () => void }) {
   const { project, document: doc, data, edit, notify } = props;
+  const [bspMode,setBspMode]=useMapState(project.id,'forge.bspWorkshop',!!doc.workshop);
+  const [bspBusy,setBspBusy]=useState(false);
   const [selected, setSelected] = useMapState<string[]>(project.id,'forge.selection',[]),
     [selectedZone, setSelectedZone] = useMapState<string | null>(project.id,'forge.zone',null);
   const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(project.id,'forge.mode','translate'),
@@ -399,7 +402,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const spawnReview = useMemo(() => auditMultiplayerSpawns(doc), [doc]);
   const terrainJoins = useMemo(() => exactTerrainJoins(doc.geometry), [doc.geometry]);
   const chosen = nodes.filter((node) => selected.includes(node.value.id));
-  const preflight = useMemo(() => preflightSourceExport(doc, snapshot, report, validatedDoc, previewBusy), [doc, snapshot, report, validatedDoc, previewBusy]);
+  const preflight = useMemo(() => preflightSourceExport(doc, snapshot, report, validatedDoc, previewBusy||bspBusy), [doc, snapshot, report, validatedDoc, previewBusy,bspBusy]);
   const meshReview = preflight.meshIntegrity;
   // A WRL describes the geometry of one compiler attempt; never present it as
   // diagnostic evidence for edited geometry without an explicit new import.
@@ -572,6 +575,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   }
   useEffect(() => {
     function key(event: KeyboardEvent) {
+      if(bspMode)return;
       if (
         (event.target as HTMLElement)?.closest(
           'input,textarea,select,[contenteditable="true"],[role="dialog"]',
@@ -611,7 +615,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [doc, selected, selectedZone, project.firefight, cameraMode]);
+  }, [doc, selected, selectedZone, project.firefight, cameraMode,bspMode]);
   function addPolygonHill(rawPoint: Vec3 = [0, 0, 0]) {
     const usageId=nextFreeUsageId(doc,'hill');
     if(usageId===null || doc.objectives.length+4>200){notify('No free hill index or not enough Halo CE netgame flag slots (200 maximum).','error');return;}
@@ -826,12 +830,14 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     !!receipt &&
     (props.dirty || (!!receipt.sources && !!report && receipt.sources.sourceSha256 !== report.sourceSha256));
   return (
-    <div className="forge-workspace">
+    <div className={`forge-workspace ${bspMode?'bsp-active':''}`}>
+      <div className="bsp-editor-switch" role="group" aria-label="Geometry authoring mode"><button className={!bspMode?'selected':''} disabled={!!doc.workshop} title={doc.workshop?'This source contains Workshop topology. Use Undo to reverse conversion or open a separate QuickForge project.':'Original QuickForge primitives, asset placement and source preview'} onClick={()=>setBspMode(false)}>QuickForge</button><button className={bspMode?'selected':''} onClick={()=>setBspMode(true)}>BSP Workshop</button></div>
       <WorkspacePanelAddon id="connection">
         {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
         <LiveForge project={project} document={doc} selected={selected}/>
       </WorkspacePanelAddon>
       <div className="forge-main">
+        {bspMode?<BspWorkshop projectId={project.id} document={doc} mesh={snapshot?.document===doc?snapshot.mesh:null} report={validatedDoc===doc?report:null} onCommit={commit} onBusy={setBspBusy} onBack={()=>setBspMode(false)} readOnly={studioRole!=null} materialSource={sourceOpen} textureSources={sources.map(s=>({id:s.id,title:s.title}))} onTextureSource={setSourceId} wrlOverlay={wrlVisible&&!wrlStale?wrlParse.value:null}/>:<>
         <WorkspacePanel id="forge-palette" label="Build tools"><aside className="forge-hierarchy">
           <div className="forge-panel-heading">
             <strong>Scene hierarchy</strong>
@@ -1392,6 +1398,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             )}
           </div>
         </aside></WorkspacePanel>
+        </>}
       </div>
       <section className={`forge-build-panel ${expandedBuild ? 'expanded' : ''}`}>
         <div className="forge-build-heading">

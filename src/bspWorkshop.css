@@ -1,0 +1,327 @@
+.bsp-workshop {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 480px;
+  min-width: 0;
+  color: var(--text, #eff5fc);
+  background: var(--surface, #121725);
+}
+.bsp-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line, #344352);
+  flex-wrap: wrap;
+}
+.bsp-tools {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.bsp-tools button {
+  padding: 4px 7px;
+  min-height: 25px;
+  border-color: transparent;
+  background: transparent;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.bsp-tools button.selected {
+  background: #76cbb21c;
+  border-color: #7bd5c0;
+  box-shadow: inset 0 -2px #7bd5c0;
+}
+.bsp-toolbar label {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+}
+.bsp-toolbar select {
+  padding: 2px 5px;
+  min-height: 25px;
+  width: auto;
+}
+.bsp-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.bsp-views {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  min-height: 420px;
+  overflow: hidden;
+  padding: 2px;
+  background: #344451;
+}
+.bsp-view {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: #111a26;
+  overflow: hidden;
+}
+.bsp-view header {
+  position: absolute;
+  left: 4px;
+  top: 3px;
+  right: 4px;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  font-size: 10px;
+  color: #d2e3ef;
+}
+.bsp-view header b {
+  padding: 3px 5px;
+  background: #0e1727dd;
+  border-radius: 3px;
+}
+.bsp-view header button {
+  pointer-events: auto;
+  font-size: 11px;
+  padding: 1px 5px;
+  min-height: 20px;
+}
+.bsp-ortho {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+.bsp-ortho polygon {
+  fill: #62899b0a;
+  stroke: #758d9f;
+  stroke-width: 1;
+}
+.bsp-ortho polygon.solid {
+  stroke: #c6a679;
+  fill: #bca1760b;
+}
+.bsp-ortho polygon.selected {
+  stroke: #99ffe2;
+  fill: #78dec51c;
+}
+.bsp-ortho polygon.face-selected {
+  fill: #8be4d54d;
+  stroke: #d3fff1;
+  stroke-width: 2;
+}
+.bsp-properties {
+  width: 268px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line, #344352);
+  min-height: 0;
+  max-height: calc(100vh - 180px);
+  overflow: auto;
+  padding: 7px;
+  gap: 6px;
+  font-size: 11px;
+}
+.bsp-source-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+.bsp-source-list > b {
+  grid-column: 1/-1;
+}
+.bsp-source-list button {
+  padding: 4px 5px;
+  min-height: 25px;
+  font-size: 10px;
+  text-align: left;
+}
+.bsp-source-list button.selected {
+  border-color: #85cfbd;
+  background: #86d6c322;
+}
+.bsp-source-fields fieldset {
+  border: 0;
+  padding: 0;
+  margin: 3px 0 7px;
+  min-width: 0;
+}
+.bsp-source-fields legend {
+  font-size: 10px;
+  color: #c9dae4;
+  margin-bottom: 3px;
+}
+.bsp-source-fields label {
+  display: block;
+  font-size: 10px;
+  margin: 3px 0;
+}
+.bsp-source-fields input,
+.bsp-source-fields select {
+  font-size: 11px;
+  min-height: 25px;
+  padding: 3px 5px;
+  width: 100%;
+}
+.bsp-workshop-vector {
+  display: flex;
+  gap: 3px;
+  align-items: flex-start;
+}
+.bsp-workshop-vector > label,
+.bsp-workshop-vector > fieldset {
+  flex: 1;
+  min-width: 0;
+}
+.bsp-inline {
+  display: flex;
+  gap: 4px;
+}
+.bsp-inline button,
+.bsp-source-fields button {
+  font-size: 10px;
+  padding: 4px 6px;
+  min-height: 25px;
+}
+.bsp-source-fields details {
+  border-top: 1px solid #344352;
+  padding: 5px 0;
+}
+.bsp-properties p {
+  font-size: 11px;
+  line-height: 1.45;
+}
+.bsp-properties .notice {
+  padding: 6px;
+  font-size: 11px;
+}
+.bsp-diagnostics button {
+  font-size: 10px;
+  text-align: left;
+  white-space: normal;
+}
+.bsp-workshop footer {
+  font-size: 10px;
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  gap: 10px;
+  color: #a5bdcc;
+  border-top: 1px solid #344352;
+}
+.bsp-split-x,
+.bsp-split-y {
+  position: absolute;
+  z-index: 5;
+  background: #658a9a25;
+  touch-action: none;
+  outline: none;
+}
+.bsp-split-x {
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  transform: translateX(-3px);
+  cursor: col-resize;
+}
+.bsp-split-y {
+  left: 0;
+  right: 0;
+  height: 6px;
+  transform: translateY(-3px);
+  cursor: row-resize;
+}
+.bsp-split-x:hover,
+.bsp-split-y:hover,
+.bsp-split-x:focus,
+.bsp-split-y:focus {
+  background: #9ee3d9aa;
+}
+.bsp-intro {
+  padding: 22px;
+  max-width: 780px;
+}
+.bsp-entry-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.forge-workspace.bsp-active .forge-main {
+  display: block;
+}
+.forge-workspace.bsp-active .forge-main > .workspace-panel-placeholder {
+  display: none;
+}
+@media (max-width: 1000px) {
+  .bsp-properties {
+    width: 225px;
+  }
+  .bsp-tools button {
+    padding: 3px 5px;
+    font-size: 10px;
+  }
+  .bsp-views {
+    min-height: 400px;
+  }
+  .bsp-workshop footer span {
+    display: none;
+  }
+}
+
+.bsp-editor-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--line, #344352);
+}
+.bsp-editor-switch button {
+  font-size: 11px;
+  padding: 3px 9px;
+  min-height: 24px;
+  background: transparent;
+  border-color: transparent;
+}
+.bsp-editor-switch button.selected {
+  color: #b8f5e5;
+  background: #76cbb21c;
+  border-bottom-color: #7bd5c0;
+}
+
+.forge-workspace.bsp-active .forge-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.bsp-workshop {
+  min-height: 260px;
+  height: 100%;
+}
+.bsp-views {
+  min-height: 180px;
+}
+.bsp-properties {
+  max-height: 100%;
+}
+.bsp-workshop-vector > .number-field {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}
+.bsp-workshop-axis > span {
+  display: block;
+  font-size: 9px;
+  line-height: 12px;
+}
+.bsp-workshop-axis .number-field {
+  min-width: 0;
+}

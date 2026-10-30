@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "foundation": "2155ae1f90cb1b0ed619afed0dfcea352feafb3c",
+  "branch": "master",
+  "appSha256": "66ff657a1a7267da0eca75ceebc68a71c30070906d34dcd530fe3b7a84e1a4b8",
+  "mockedIpc": false,
+  "nativeUi": {
+    "fourLinkedViews": true,
+    "orthographicBrushDrawing": true,
+    "transformUndoRedo": true,
+    "clippedSourceRetained": true,
+    "invalidEditRefusedWithoutSourceMutation": true,
+    "reopenPreservesTopology": true,
+    "exactCompiledTextureRendered": true,
+    "pageErrors": [],
+    "compactAxisRow": true
+  },
+  "nativeBuild": {
+    "runtime": "MCC Halo 1 / H1A",
+    "status": "validated",
+    "durationMs": 14275,
+    "sourceSha256": "c77abc2af63de59215076065f454ab1202dedb0da267ad6e25ace3735953217a",
+    "jmsSha256": "cc78c67c13049876cee8594cccc77a4f7cdd684ecbc46dbbdb18c948b1add6b9",
+    "geometry": {
+      "valid": true,
+      "issues": [],
+      "vertices": 186,
+      "triangles": 62,
+      "closedComponents": 1,
+      "sourceSha256": "c77abc2af63de59215076065f454ab1202dedb0da267ad6e25ace3735953217a"
+    },
+    "outputSha256": "7d40da5ac6aa3c558b31253c6a38294d10c00d66e60db75d4f65bc32889aeedc",
+    "target": "mcc-cea",
+    "toolIdentities": {
+      "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+      "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+    }
+  },
+  "independentNativeReadback": {
+    "clusters": 3,
+    "clusterPortals": 2,
+    "command": "invader-edit -C clusters -C cluster_portals <generated scenario_structure_bsp>",
+    "readbackScope": "Original CLI and final GUI-built native tags each read independently: three clusters, two portals",
+    "cliAndGuiJmsMatch": true
+  },
+  "customEdition": {
+    "status": "failed",
+    "structureCompilationSucceeded": true,
+    "cacheCompilationSucceeded": false,
+    "error": "ActorVariant::grenade_type is out of range (28786 >= 4)",
+    "tagPath": "vehicles/warthog/warthog gunner.actor_variant",
+    "sourceAndStagedTagSha256": "96fead28ec58a2ad7cf7a71c363bce5a311cd037c106bb3caf6fa574cf0ed635",
+    "sourceUnchanged": true,
+    "gameplayVerified": false
+  },
+  "gameplay": {
+    "standaloneLaunched": true,
+    "shortContentPathRequired": true,
+    "userWalkthrough": "deferred by user; not verified",
+    "retailMccCacheLoad": "not tested",
+    "verified": false,
+    "controlledTeardown": true,
+    "renderedGameFrameVerified": false,
+    "runtimeObservation": "Responding Standalone process and scenario netgame validation logs; no player/visual acceptance"
+  },
+  "sourceTests": {
+    "passed": 531,
+    "failed": 0,
+    "ignored": 7
+  },
+  "browserTests": {
+    "passed": 88,
+    "contractEvidenceSeparateFromNativeAcceptance": true
+  },
+  "frontendTests": {
+    "passed": 234,
+    "files": 49
+  },
+  "offlineScripts": 59
+}
