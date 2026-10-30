@@ -1,0 +1,47 @@
+# C37 — Native modder's workbench
+
+Continues `c9c92e33b97f9b85fce2fcccbab28e4bb3f2464b` on `codex/c37-modders-workbench`. C35 rendering, drawers, audio, Recording Director, C36 Portability Lab and the One Halo research remain in the same ancestry. Consolidation is a separate operation after this branch is committed.
+
+## Implemented boundary
+
+Spark verifies the separately installed Baboon 0.3.2 Windows executable and selected Halo 1 definition set. Setup appears in Dependencies, compatible editing tools and legacy companions. Map-specific actions appear in Tag Editor and Runtime Dock details. An existing compiled cache is not passed off as an editable loose tag. Only validated MCC H1 working source can use this route.
+
+Each handoff creates a byte-verified immutable starting tree, an independent editable HCEEK tree and a private portable Baboon profile. The executable receives `-HCEEK` plus the **absolute path inside that kit**. A wrong kit profile must reject the path instead of opening an identically named SDK original. No installed Baboon preferences or SDK tag files are changed. Automatic update checks and startup-session reopening are disabled in the portable profile; source-bound CLI opening selects the actual work.
+
+Stable saved files are reviewed through bounded SHA-256 inventories. Three-way reconciliation retains independent working changes and creates a fresh accepted source tree. It refuses same-file conflicts, deletion and structural scenario/BSP/collision/script changes. Recovery forks the starting tree into a new revision; it never writes backward over a later source. Working-tag compilation consumes the selected revision. Old source copies and compiled maps remain available.
+
+**Complete files are accepted, not guessed semantic field merges.** External writers can normalize unrelated bytes. Spark preserves their starting and saved versions; it does not claim that every external serializer preserves every native field. Generic geometry regeneration is explicitly blocked where it would omit native revisions or unreconciled saves. General Blender/Tool geometry reimport plus Sapien placement reconciliation still needs native review. A blocked rebuild is preferable to silently losing authored placements.
+
+The existing watcher now records the actual paths from native events, handles rewrites that retain size/timestamps and restarts its stable-save delay on each event. Running handoffs continue stable-save validation even if their panel is hidden. Idle closed handoffs stop polling. Old idle watches retire after two minutes while running editors stay tracked. A changed active source root rebinds existing working-tag monitoring.
+
+## Community source and licensing
+
+Metadata pins are in [the reviewed profile](fixtures/c37-baboon-profile.json). The actual tested release is [Baboon v0.3.2](https://github.com/Zoephie/Baboon/releases/tag/v0.3.2), commit `a1f051f8508e64cb7507ecbca176e4fb6527d6f3`. Its definitions gitlink is `7706dfb22ff2d436561c264f0e2d469987877f0d`; blam-tags is `124280ab83f8f69fa73e79dd7363fe14a27c7929`. Current-main research (`e3b814591f75e5e040dbdada4457cc33763f9ab3`, definitions `34f29cfd1dcb3fbb5c7c85842c98e9ab698a82e0`) is not substituted for those release pins.
+
+The official Windows ZIP is 31,138,300 bytes, SHA-256 `5281f6312ba6c3c686a2536f53eb7413eb4344425f95c1e57fc83958809b5148`. Executable SHA-256 is `051d5a849d4cb3c60c7a9554f88b7d551f74e2925e6d4a671f2d23f32973fe2e`. The selected 83 H1 JSON definitions have aggregate digest `6d50978f5922394471209eb2e73a266bea188a08a18d75bbed2e0caa110ca6e3` (sorted relative path, NUL, file hash, newline). Inspection never runs an unknown executable. Other releases or edited definitions require a reviewed profile update.
+
+No explicit license was found at the reviewed roots of [Baboon](https://github.com/Zoephie/Baboon), [blam-tags](https://github.com/camden-smallwood/blam-tags) or [definitions](https://github.com/camden-smallwood/definitions). This is a reuse/redistribution blocker, not an assertion that upstream forbids all use. Spark includes original orchestration and small hash metadata only. The approved private download, executable and schemas remain outside public source/artifacts. No upstream submission was made.
+
+Baboon declares HCEEK/H1EK, H2EK, H3EK, H3ODSTEK, HREK, H4EK and H2AMPEK/H2AEK contexts. Those aliases are not evidence of seven implemented Spark runtime handoffs. Legacy compiled Demo/Mac caches still use supported integrated fields, extraction/conversion or compatible classic tools.
+
+## QuickForge workflow
+
+The founder's space-use report is addressed by removing the duplicate QuickForge title/New map row. Source counts sit beside transforms. Shared editing, the legacy live adapter and the live-view action move into the existing **QuickForge session** drawer. Its default unpinned placement overlays the map without resizing it, retains local controls when hidden and uses the existing per-map layout. The Level Editor's target and New QuickForge map actions remain available.
+
+## Evidence and limits
+
+Source tests cover kit/cache isolation, absolute containment, file transactions, conflicts, stale inventories, cancellation and same-stamp event invalidation. Native acceptance uses a fresh 2,240-tag replica of the previously accepted H1A job. The founder confirmed the actual pistol opened in Baboon, then saved and closed it. The unchanged save was byte-identical. A controlled Invader radius edit also rewrote unrelated native bytes; that is recorded as a writer limitation, never described as a byte-preserving edit.
+
+The native pass caught and corrected recursive library locking while opening a compiled map: source-revision resolution now happens before the import lock. The first QA fixture also refused an earlier modified source tree instead of accepting stale identity. These failed attempts are retained privately alongside subsequent receipts.
+
+The final genuine Baboon edited-save test is also complete. The founder changed the isolated pistol's bounding radius from 0.1 to 0.5, saved and closed Baboon. The pinned Invader reader exposed exactly one differing field line, `bounding_radius`; structure and checksum checks passed. Reconciliation selected a new source revision, H1A Tool compiled it, and the reopened cache contained 0.5. Build and readback took 47.39 seconds. All 2,240 starting native file hashes were independently rechecked afterward. This is scoped to the tested pistol and does not certify opaque fields or other serializers. The earlier interrupted edited-save attempt remains recorded as incomplete, not counted as a pass.
+
+The [metadata-only native receipt](fixtures/c37-native-acceptance.json) records the genuine results. A harmless no-op Invader serialization changed 201 bytes while exposing identical typed fields; Spark accepted it as equivalent. A malformed dependency length with a deliberately valid CRC was rejected by the pinned native parser and by reconciliation. A separate CRC failure was detected. Recovery created a new hash-verified source and retained the damaged external evidence. A fresh radius edit 0.1 -> 0.225 reconciled, compiled in 31.32 seconds, and reopened with float32 value 0.224999994. All 2,240 initial native source hashes matched after the run. Stable edited-file detection took 3.40 seconds in this fixture; cold handoff staging previously measured 36.27 seconds. No claim of instant incremental staging is made.
+
+Live structure checks run only the exact reviewed Invader 0.55.0.r4134.33518109 executable (`02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12`), using read-only `-L`. Output is capped at 512 KiB per stream, tags at 64 MiB, each process at five seconds and background checks at two new files per poll. Other versions, truncation and timeouts remain unverified. Exact native field-output comparisons do not certify opaque cells or float precision absent from that output. The validator is named separately from the writer. Filesystem notifications supply no writer PID; known launch context is displayed without accusing its tool of another process’s write. Version-specific findings are listed in Spark’s Baboon compatibility details.
+
+Fresh source results: 494 Rust passed / seven opt-in ignored; 216 frontend tests and 79 browser cases pass, including corruption gating and drawer/viewport preservation. The Windows executable and NSIS installer build successfully. Combined-branch verification is recorded separately by the consolidation report. No new MCC game load, collision traversal, cross-play, live BSP replacement, arbitrary live spawning or peer replication is claimed. C36's painted-detail preflight and its conservative native serialization gate remain unchanged. No speculative geometry offset or renderer compensation is applied to native assets.
+
+## First founder acceptance
+
+Open a validated MCC H1 source project, save it, expand Runtime & Tools details and Baboon, choose the verified portable folder, and open the scenario or selected Tag Editor tag. Save in Baboon, wait for a stable file change, review the complete changed files, keep a new working revision, close the external editor and choose **Build working tag edits**. Open the built map in a separate tab. Use **Restore starting source to a new revision** to recover; the later revisions and last compiled map remain available. Structural source edits require native review rather than automatic application.

@@ -4,18 +4,19 @@
  */
 import type { RuntimeId, Settings } from './types';
 export type ToolFlavor = 'legacyHek'|'h1aEk';
-export type ToolId = 'sapien'|'guerilla'|'tagTest'|'invaderEditor'|'haloTool'|'invaderBuild'|'invaderExtract'|'invaderInfo';
+export type ToolId = 'sapien'|'guerilla'|'baboon'|'tagTest'|'invaderEditor'|'haloTool'|'invaderBuild'|'invaderExtract'|'invaderInfo';
 export interface ToolProfile {
   id: ToolId;
   label: string;
-  group: 'official'|'invader';
-  mode: 'externalGui'|'integratedCli';
+  group: 'official'|'invader'|'community';
+  mode: 'externalGui'|'integratedCli'|'sourceHandoff';
   purpose: string;
   modifiesFiles: boolean;
   /** This is a compatibility recommendation, not a claim of gameplay testing. */
   caveat: string;
 }
 const profiles: Record<ToolId, ToolProfile> = {
+  baboon:{id:'baboon',label:'Baboon · native tag editor',group:'community',mode:'sourceHandoff',purpose:'Edit compatible MCC Halo 1 loose tags in an isolated per-map editing kit.',modifiesFiles:true,caveat:'Requires the verified portable executable and matching definitions. Compiled maps must first have validated MCC working tags.'},
   sapien:{id:'sapien',label:'Sapien · scenario placement',group:'official',mode:'externalGui',purpose:'Place scenario objects, player starts, encounters and devices in a tag-based level.',modifiesFiles:true,caveat:'Requires a compiled scenario BSP and a compatible installed tag tree.'},
   guerilla:{id:'guerilla',label:'Guerilla · tag editor',group:'official',mode:'externalGui',purpose:'Inspect and modify editable Halo tags and their references.',modifiesFiles:true,caveat:'Can change source tags: use a separately backed-up working tree.'},
   tagTest:{id:'tagTest',label:'H1A standalone · tag test',group:'official',mode:'externalGui',purpose:'Run a development Halo build from tag data to shorten local playtest iteration.',modifiesFiles:false,caveat:'Official Standalone is for H1A editing kit; not a multiplayer host or live editing API.'},
@@ -27,7 +28,7 @@ const profiles: Record<ToolId, ToolProfile> = {
 };
 export function offeredTools(runtime:RuntimeId,settings:Pick<Settings,'hekFlavor'>):ToolProfile[]{
   if(runtime==='mccSteam') return settings.hekFlavor==='h1aEk'
-    ? [profiles.sapien,profiles.guerilla,profiles.tagTest,profiles.haloTool] : [];
+    ? [profiles.sapien,profiles.guerilla,profiles.baboon,profiles.tagTest,profiles.haloTool] : [];
   if(runtime==='haloCustomEdition') return [
     ...(settings.hekFlavor==='legacyHek'?[profiles.sapien,profiles.guerilla,profiles.haloTool]:[]),
     profiles.invaderEditor,profiles.invaderBuild,profiles.invaderExtract,profiles.invaderInfo];

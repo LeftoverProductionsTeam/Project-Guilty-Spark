@@ -832,7 +832,7 @@ export default function App() {
       case 'machinima': if(dockedDirector)return <DockedDirector key={current.id} projectId={current.id} embedded onPopout={()=>void openRecordingDirector()} onClose={()=>setDockedDirector(false)}/>;return <MachinimaWorkspace key={current.id} project={current} inspection={inspection} assetMeshes={meshes} data={data} edit={edit} notify={notice} onResourcesConnected={applyResourceMetadata} onSave={save} onLive={()=>setWorkspace('live')} onEditor={()=>setWorkspace('quickforge')} onDirector={()=>void openRecordingDirector()} onBuild={()=>setWorkspace('build')}/>;
       case 'tags':
         return (
-          <Tags key={current.id} project={current} inspection={inspection} entries={data.entries}
+          <Tags key={current.id} project={current} inspection={inspection} entries={data.entries} hasUnsavedChanges={history.dirty}
             onNativeEditor={()=>window.dispatchEvent(new CustomEvent('guilty-spark-runtime-tool',{detail:{projectId:current.id,actionId:'editTags'}}))}
             onSelectMap={(id) => { void openProject(id, 'tags'); }} edit={edit} notify={notice}
             focusTagId={focusTagId} onFocusHandled={()=>setFocusTagId(null)}
@@ -911,7 +911,7 @@ export default function App() {
               <strong>GUILTY SPARK</strong>
               <span>HALO MODERN EVOLVED</span>
             </div>
-            <Pill>0.4.0 · C36 dev</Pill>
+            <Pill>0.4.0 · C37 dev</Pill>
           </button>
           {documents.documents.length?<MapTabs state={documents} disabled={busy||closing} onSelect={selectMap} onClose={id=>void closeMap(id)} onWindow={id=>void closeMap(id,true)} onAssets={()=>setAssetTransferOpen(v=>!v)}/>:<div className="header-context">
             <span>LOCAL WORKBENCH</span>

@@ -2,6 +2,7 @@
 use super::*;
 use notify::Watcher;
 use spark_core::working_tag_changes::{Hashes, TagChangeMonitor, TagChanges};
+use std::collections::BTreeSet;
 const MAX_WATCHES: usize = 8;
 #[derive(Default)]
 pub(super) struct WorkingTagChangesState {
@@ -16,9 +17,14 @@ struct Watch {
     _native: notify::RecommendedWatcher,
     dirty: Arc<AtomicBool>,
     resync: Arc<AtomicBool>,
+    dirty_paths: Arc<Mutex<BTreeSet<String>>>,
     started: Instant,
     scanned: Instant,
     touched: Instant,
+    integrity_cache: core::native_tag_integrity::Cache,
+    parser: native_tag_parser::Cache,
+    integrity: core::native_tag_integrity::Report,
+    writer_context: String,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +33,8 @@ pub(super) struct WatchReport {
     project_id: String,
     build_id: String,
     tags_directory: PathBuf,
+    integrity: core::native_tag_integrity::Report,
+    writer_context: String,
     #[serde(flatten)]
     changes: TagChanges,
 }
@@ -36,10 +44,12 @@ fn report(id: &str, watch: &Watch) -> WatchReport {
         project_id: watch.project.clone(),
         build_id: watch.build.clone(),
         tags_directory: watch.monitor.root().to_path_buf(),
+        integrity: watch.integrity.clone(),
+        writer_context: watch.writer_context.clone(),
         changes: watch.monitor.report(),
     }
 }
-fn baseline(job: &Path) -> Reply<Option<Hashes>> {
+pub(super) fn baseline(job: &Path) -> Reply<Option<Hashes>> {
     let file = job.join("working-tags-receipt.json");
     if !file.is_file() {
         return Ok(None);
@@ -69,14 +79,27 @@ fn baseline(job: &Path) -> Reply<Option<Hashes>> {
     }
     Ok(Some(hashes))
 }
-fn observe(root: &Path) -> Reply<(notify::RecommendedWatcher, Arc<AtomicBool>, Arc<AtomicBool>)> {
+pub(super) fn observe(root: &Path) -> Reply<(notify::RecommendedWatcher, Arc<AtomicBool>, Arc<AtomicBool>, Arc<Mutex<BTreeSet<String>>>)> {
     let dirty = Arc::new(AtomicBool::new(false));
     let resync = Arc::new(AtomicBool::new(false));
     let signal = dirty.clone();
     let lost = resync.clone();
+    let dirty_paths = Arc::new(Mutex::new(BTreeSet::new()));
+    let paths = dirty_paths.clone();
+    let event_root = root.to_path_buf();
     let mut watcher =
         notify::recommended_watcher(move |event: notify::Result<notify::Event>| match event {
             Ok(event) if !event.kind.is_access() => {
+                if let Ok(mut pending) = paths.lock() {
+                    if event.paths.is_empty() { lost.store(true, Ordering::Release); }
+                    for path in event.paths {
+                        let relative = path.strip_prefix(&event_root).ok().map(|p|p.to_string_lossy().replace('\\', "/"));
+                        if let Some(relative) = relative.filter(|p|!p.is_empty() && core::safe_relative(p).is_ok()) {
+                            if pending.len() < 512 { pending.insert(relative); }
+                            else { lost.store(true, Ordering::Release); }
+                        } else { lost.store(true, Ordering::Release); }
+                    }
+                } else { lost.store(true, Ordering::Release); }
                 signal.store(true, Ordering::Release);
             }
             Err(_) => {
@@ -89,7 +112,7 @@ fn observe(root: &Path) -> Reply<(notify::RecommendedWatcher, Arc<AtomicBool>, A
     watcher
         .watch(root, notify::RecursiveMode::Recursive)
         .map_err(error)?;
-    Ok((watcher, dirty, resync))
+    Ok((watcher, dirty, resync, dirty_paths))
 }
 fn get_watch(state: &AppState, id: &str, owner: &str) -> Reply<Arc<Mutex<Watch>>> {
     let watch = lock(&state.working_tag_changes)?
@@ -136,6 +159,7 @@ pub(super) async fn working_tag_watch_start(
                     && w.project == project_id
                     && w.build == build.id
                     && w.fingerprint == fingerprint
+                    && w.monitor.root() == tags
                 {
                     w.touched = Instant::now();
                     return Ok(report(id, &w));
@@ -146,7 +170,7 @@ pub(super) async fn working_tag_watch_start(
             }
         }
         // Subscribe first: writes during the baseline read cause a stable-save retry.
-        let (native, dirty, resync) = observe(&tags)?;
+        let (native, dirty, resync, dirty_paths) = observe(&tags)?;
         let monitor =
             TagChangeMonitor::new(&tags, baseline(&state.root.join("jobs").join(&build.id))?)
                 .map_err(error)?;
@@ -161,7 +185,7 @@ pub(super) async fn working_tag_watch_start(
         {
             return Err("Map changed while connecting tool-save monitoring; reconnect it".into());
         }
-        let watch = Watch {
+        let mut watch = Watch {
             owner,
             project: project_id,
             build: build.id,
@@ -170,17 +194,23 @@ pub(super) async fn working_tag_watch_start(
             _native: native,
             dirty,
             resync,
+            dirty_paths,
             started: Instant::now(),
             scanned: Instant::now(),
             touched: Instant::now(),
+            integrity_cache: Default::default(),
+            parser: Default::default(),
+            integrity: Default::default(),
+            writer_context: runtime_workbench::source_editor_context(&state,&project.id)?,
         };
+        watch.integrity=watch.integrity_cache.scan(watch.monitor.root(),watch.monitor.baseline_hashes(),watch.monitor.accepted_hashes(),64*1024*1024).map_err(error)?;
         let id = uuid::Uuid::new_v4().to_string();
         let result = report(&id, &watch);
         let mut registry = lock(&state.working_tag_changes)?;
         // A second caller may have connected while this baseline was read.
         for (existing_id,existing) in &registry.watches {
             let mut connected=lock(existing)?;
-            if connected.owner==watch.owner&&connected.project==watch.project&&connected.build==watch.build&&connected.fingerprint==watch.fingerprint {
+            if connected.owner==watch.owner&&connected.project==watch.project&&connected.build==watch.build&&connected.fingerprint==watch.fingerprint&&connected.monitor.root()==watch.monitor.root() {
                 connected.touched=Instant::now();return Ok(report(existing_id,&connected));
             }
         }
@@ -224,11 +254,20 @@ pub(super) async fn working_tag_watch_poll(
             || watch.scanned.elapsed() > Duration::from_secs(30)
             || watch.monitor.report().status == "saving";
         if scan {
+            let changed = { let mut paths=lock(&watch.dirty_paths)?; std::mem::take(&mut *paths) };
+            watch.monitor.mark_changed(changed).map_err(error)?;
             let now = watch.started.elapsed().as_millis().min(u64::MAX as u128) as u64;
             let rehash = force || watch.resync.swap(false, Ordering::AcqRel);
             watch.monitor.scan(now, rehash).map_err(error)?;
             watch.scanned = Instant::now();
         }
+        if watch.monitor.report().status!="saving" {
+            let project=lock(&state.library)?.get(&watch.project).map_err(error)?;
+            let Watch{integrity_cache,parser,monitor,integrity,..}=&mut *watch;
+            *integrity=integrity_cache.scan(monitor.root(),monitor.baseline_hashes(),monitor.accepted_hashes(),64*1024*1024).map_err(error)?;
+            parser.scan(&state,&project,monitor.root(),None,monitor.baseline_hashes(),monitor.accepted_hashes(),integrity,2)?;
+        }
+        watch.writer_context=runtime_workbench::source_editor_context(&state,&watch.project)?;
         Ok(report(&watch_id, &watch))
     })
     .await
@@ -258,7 +297,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.weapon");
         fs::write(&path, b"original").unwrap();
-        let (_watch, dirty, _resync) = observe(dir.path()).unwrap();
+        let (_watch, dirty, _resync, _paths) = observe(dir.path()).unwrap();
         fs::write(path, b"saved-changed").unwrap();
         let deadline = Instant::now() + Duration::from_secs(4);
         while !dirty.load(Ordering::Acquire) && Instant::now() < deadline {

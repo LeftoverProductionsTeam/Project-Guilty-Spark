@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "scope": "Native Windows application and native tools. Human Baboon GUI handoff and later automated semantic validation are separate stages.",
+  "baboonHumanHandoff": {
+    "confirmed": true,
+    "noOpByteIdentical": true,
+    "appSha256": "266e7554a739bdc0fd51783629ba0bad513955a89d803ed431965e996617dc2e",
+    "version": "0.3.2",
+    "exeSha256": "051d5a849d4cb3c60c7a9554f88b7d551f74e2925e6d4a671f2d23f32973fe2e"
+  },
+  "nativeDesktop": true,
+  "gameLaunched": false,
+  "gameMemoryTouched": false,
+  "gameplayAccepted": false,
+  "parentSha256": "fa75952cdf222f5cf8a26554471e33cf5efc37d4843bf52dedb8e8d700ba7975",
+  "normalization": {
+    "changedBytes": 201,
+    "exposedFieldsEquivalent": true,
+    "acceptedAsEquivalent": true,
+    "scope": "Pinned Invader field-output comparison; opaque bytes/unprinted precision are not certified."
+  },
+  "semanticCorruption": {
+    "validChecksum": true,
+    "invalidDependencyLength": true,
+    "detectedByNativeParser": true,
+    "reconciliationRejected": true,
+    "writerContext": "Baboon handoff; actual writer unconfirmed. Other programs can also write this folder. Filesystem notifications supply no writer PID.",
+    "actualControlledWriter": "QA Node process, intentionally malformed fixture; not Baboon or Invader"
+  },
+  "crcFailureDetected": true,
+  "recovery": {
+    "startingBytesRestored": true,
+    "damagedExternalEvidenceRetained": true,
+    "priorAcceptedSourceIntact": true
+  },
+  "validEditDetectionMs": 3403.1150999999954,
+  "nativeBuildMs": 31316.1593,
+  "validEdit": {
+    "writer": "Invader",
+    "toolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "field": "bounding_radius",
+    "before": 0.1,
+    "expected": 0.225,
+    "compiled": 0.22499999403953552,
+    "reconciled": true,
+    "nativeCompiled": true,
+    "compiledTagBytesPreserved": true
+  },
+  "nativeRecoveryInventoryVerified": 2240,
+  "compiledSha256": "8ba1a69df55bd1808e1f85a2343246f153caa97f33794f37a2bec3f7f0a3f5fb",
+  "appSha256": "de0f7c0f19d61caf6bf8a979c88e7a7d3b828581ba061e0c4332f2135b158af5",
+  "errors": [],
+  "baboonGenuineEditedSave": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gameplayAccepted": false,
+    "parentSha256": "fa75952cdf222f5cf8a26554471e33cf5efc37d4843bf52dedb8e8d700ba7975",
+    "exposedFieldDifferences": [
+      {
+        "before": "bounding_radius (0.100000)                                              float32",
+        "after": "bounding_radius (0.500000)                                              float32"
+      }
+    ],
+    "baboon": {
+      "version": "0.3.2",
+      "exeSha256": "051d5a849d4cb3c60c7a9554f88b7d551f74e2925e6d4a671f2d23f32973fe2e",
+      "humanEditedSavedClosed": true,
+      "field": "bounding_radius",
+      "before": 0.1,
+      "expected": 0.5,
+      "compiled": 0.5,
+      "nativeValidation": {
+        "nativeParserCheckedFiles": 1,
+        "semanticUnverifiedFiles": 0,
+        "equivalentFieldFiles": 0,
+        "changedFieldFiles": 1,
+        "checkedFiles": 1,
+        "invalidFiles": 0,
+        "unverifiedFiles": 0,
+        "pendingFiles": 0,
+        "findings": [
+          {
+            "path": "weapons/pistol/pistol.weapon",
+            "state": "changed",
+            "detail": "Invader 0.55.0.r4134.33518109: native structure parses and exposed typed fields differ from the starting source. Review intentional field changes; parser acceptance is not gameplay proof."
+          }
+        ],
+        "listTruncated": false
+      },
+      "nativeBuildMs": 47391.000700000004
+    },
+    "reconciled": true,
+    "compiledSha256": "37987a03437492f20b83bad4bf52f540cac943baff10e7b46a1d1de814498bd0",
+    "appSha256": "b0b770ea8ad6d6c28d1a24ed579ce5201f43a82036f9f105aecf269d5357efd8",
+    "errors": [],
+    "startingInventoryVerified": 2240
+  }
+}

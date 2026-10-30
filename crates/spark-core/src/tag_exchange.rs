@@ -26,7 +26,7 @@ pub struct TagExtractReceipt {
     pub total_bytes:u64,
     pub notice:String,
 }
-pub(crate) fn extension(class:&str)->Result<&'static str>{
+pub fn extension(class:&str)->Result<&'static str>{
     match class {
         "scnr"=>Ok("scenario"),"sbsp"=>Ok("scenario_structure_bsp"),
         "weap"=>Ok("weapon"),"proj"=>Ok("projectile"),"bipd"=>Ok("biped"),

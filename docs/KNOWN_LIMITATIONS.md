@@ -1,5 +1,7 @@
 # Known limitations
 
+C37 implements a Windows Baboon 0.3.2 / MCC H1 loose-tag handoff. Other upstream aliases are not complete Spark integrations. Live byte checks cover stable native headers, class/extension and payload CRC, not every semantic structure or invalid gameplay value with a valid checksum. Some writers omit/rewrite checksums; unresolved cases require review. Filesystem events provide no writer PID: Spark shows known launch context and explicitly labels the actual writer unconfirmed. Structural conflicts and geometry reimports that would lose native source are blocked. [Evidence and recovery](CONTINUATION_37_ENGINEERING.md).
+
 Current for C36, continuing C35 R12. Inspection, native tag preservation, compilation, game loading, gameplay and peer agreement are separate evidence. Historical experiments remain in their linked reports; they are not current blanket support claims.
 
 ## Native formats and conversion

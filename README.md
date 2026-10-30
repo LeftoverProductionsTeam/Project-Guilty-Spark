@@ -1,6 +1,10 @@
 # Project Guilty Spark
 
-**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · Continuation 36 dev** continues C35 R12; compiler and game acceptance remain separate from editor previews.
+## C37 native tool workflow
+
+[Source-aware Baboon handoff, native revisions and live byte checks](docs/CONTINUATION_37_ENGINEERING.md) continue C35/C36 and the One Halo investigation. Failed native header/class/CRC checks block acceptance and compilation; unknown writer attribution stays explicit. QuickForge sharing/live controls use a compact session drawer. Native launch, compiler and gameplay evidence are reported separately.
+
+**A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · C37 dev** continues C35 R12, C36 and the One Halo investigation; compiler and game acceptance remain separate from editor previews.
 
 > Project Guilty Spark stands on more than twenty years of research, experimentation, documentation, tools, discoveries, and shared knowledge from the Halo modding community. This project would not exist without the people who explored the Blam engine, created the original editors, reverse-engineered file formats, preserved old maps, documented workflows, and helped generations of modders learn.
 

@@ -1,0 +1,38 @@
+.baboon-tools {
+  margin-block: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border, #42536a);
+  border-radius: 10px;
+  min-width: 0;
+}
+.baboon-tools > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+.baboon-tools p {
+  margin-block: 0.5rem;
+}
+.baboon-tools .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+.baboon-tools .button-row a {
+  margin-right: 0.3rem;
+}
+.baboon-tools li,
+.baboon-saved-changes strong {
+  overflow-wrap: anywhere;
+}
+.baboon-tools label {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+.baboon-tools button {
+  white-space: normal;
+}

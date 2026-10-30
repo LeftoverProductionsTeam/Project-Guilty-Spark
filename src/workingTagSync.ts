@@ -5,13 +5,15 @@ export interface WorkingTagReport {
   buildId: string;
   tagsDirectory: string;
   status: 'saving' | 'changed' | 'unchanged';
-  basis: 'compiledBuild' | 'watchStarted';
+  basis: 'compiledBuild' | 'watchStarted' | 'acceptedNativeRevision';
   revision: number;
   totalFiles: number;
   changedFiles: number;
   changes: { path: string; kind: 'added' | 'modified' | 'removed' }[];
   listTruncated: boolean;
   hashesReadLastScan: number;
+  integrity?: import('./nativeTagIntegrity').NativeTagIntegrityReport;
+  writerContext?: string;
 }
 export interface WorkingTagApi {
   start: (projectId: string) => Promise<WorkingTagReport>;

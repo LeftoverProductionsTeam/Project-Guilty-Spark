@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "version": "0.3.2",
+  "revision": "a1f051f8508e64cb7507ecbca176e4fb6527d6f3",
+  "definitionsRevision": "7706dfb22ff2d436561c264f0e2d469987877f0d",
+  "blamTagsRevision": "124280ab83f8f69fa73e79dd7363fe14a27c7929",
+  "releaseUrl": "https://github.com/Zoephie/Baboon/releases/tag/v0.3.2",
+  "archiveSha256": "5281f6312ba6c3c686a2536f53eb7413eb4344425f95c1e57fc83958809b5148",
+  "exeSha256": "051d5a849d4cb3c60c7a9554f88b7d551f74e2925e6d4a671f2d23f32973fe2e",
+  "distribution": "Metadata only. No executable, upstream parser or schema payload is included; separately installed user-approved tool.",
+  "definitionSets": {
+    "halo2amp_mcc": {
+      "fileCount": 265,
+      "sha256": "052e9019e09806eb57385ed3ec0425848119063d80ff5112297ff2467af3a1f9"
+    },
+    "halo2_mcc": {
+      "fileCount": 121,
+      "sha256": "7303a92aef092e8f5845e5e76eff3eec809257c006c786efa5e6bdb9c67d7161"
+    },
+    "halo3odst_mcc": {
+      "fileCount": 200,
+      "sha256": "8478a5d12d031c2c90ad2f59aacc6648df15d874ba910f18e991068c9962f81b"
+    },
+    "halo3_mcc": {
+      "fileCount": 187,
+      "sha256": "80d6cc9e84b6e2b0153f6596b6c95febb2c7b00841b5755aa90d092cb94cfdcd"
+    },
+    "halo4_mcc": {
+      "fileCount": 265,
+      "sha256": "a4e2c6df85c4f00371bf1907fe17ef0f404a7819fa35c1116ead489a068a2ff4"
+    },
+    "haloce_evolved": {
+      "fileCount": 140,
+      "sha256": "c94f1a263c68ad12397a74ce63e665be2d953a6bbc682ac4c6549055d77ec948"
+    },
+    "haloce_mcc": {
+      "fileCount": 83,
+      "sha256": "6d50978f5922394471209eb2e73a266bea188a08a18d75bbed2e0caa110ca6e3"
+    },
+    "haloreach_mcc": {
+      "fileCount": 239,
+      "sha256": "341ac3414739f4ad63d1b002fd97103c31148f4f7b7f13544e86de8d5d131d32"
+    }
+  }
+}

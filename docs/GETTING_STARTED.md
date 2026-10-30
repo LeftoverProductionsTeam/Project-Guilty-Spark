@@ -1,5 +1,8 @@
 # Connect your first Halo project
 
+For full MCC H1 loose tags, open Runtime & Tools details or the selected tag’s Baboon panel. Choose the complete reviewed portable folder, save in the external editor, review stable-save integrity and field findings, keep a new revision and Build working tag edits. Failed integrity checks block acceptance/builds. Restore starting source creates a new verified recovery copy. See [C37 setup and limits](CONTINUATION_37_ENGINEERING.md).
+
+
 **Menu** opens the workspace drawer. The title and map tabs share one compact header with upper-right native window controls. Ctrl+Backslash opens navigation. Objects, Object tags, Asset library, Map sounds and other utilities open as drawers without changing the viewport. F11 uses one fullscreen mode with thinner bars; map tabs, editing controls, audio and runtime actions stay available. Escape closes a drawer before leaving fullscreen.
 
 For native edition checks, open **Build & playtest → Portability Lab**. Choose existing runtime profiles, inspect findings, verify untouched bytes and save the readable/JSON report. Use the supported MCC build path, then **Review native changes** before game testing. [Portability policy and scope](NATIVE_PORTABILITY.md).
