@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 — Master engineering consolidation
+
+- Preserve C35 R12, C36, One Halo research and frozen C37 ancestry through four ordinary merges in an isolated worktree.
+- Retain all original development refs, historical evidence and experimental code; document seven excluded dependency proposals.
+- Verify the combined native loose-tag edit/import/placement/build/reopen workflow, genuine Baboon edits, corrupted-save rejection and recoverable source.
+- Add combined verification receipts, branch inventory and current push/PR descriptions. Keep game-runtime and multiplayer acceptance separate.
+
 ## 0.4.0 — C37 Modder’s Workbench (development)
 
 - Verify a separately installed Baboon release and matching H1 definitions; open exact isolated native tags.

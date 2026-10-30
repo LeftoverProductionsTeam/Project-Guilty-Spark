@@ -115,3 +115,6 @@ Pinned primary references checked 2026-10-28:
 - [Official MCC tools](https://learn.microsoft.com/en-us/halo-master-chief-collection/general/overview-tools), [official mod launch](https://support.halowaypoint.com/hc/en-us/articles/360037475251-How-to-Launch-Halo-The-Master-Chief-Collection-with-Easy-Anti-Cheat-EAC-Disabled), [H1 sync research](https://c20.reclaimers.net/h1/guides/multiplayer/synchronization/) and [portals/clusters](https://c20.reclaimers.net/h1/guides/levels/portals-and-clusters/).
 
 Research records interoperability facts with attribution; no upstream engine implementation is copied/shipped here. Any later code/component reuse needs exact license/provenance review; public code or a process boundary alone does not settle it. All unique needs remain in [the same cumulative ledger](MASTER_FEATURE_LEDGER.md). These internal gates retain the full-feature alpha vision.
+## Consolidated evidence
+
+The [master consolidation report](MASTER_CONSOLIDATION.md) combines the existing C35, C36 and C37 format-specific evidence without widening runtime support. Native compilation, visual previews, game loading and peer replication remain separate acceptance levels.

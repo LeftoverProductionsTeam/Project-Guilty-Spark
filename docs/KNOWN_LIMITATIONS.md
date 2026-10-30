@@ -1,8 +1,8 @@
 # Known limitations
 
-C37 implements a Windows Baboon 0.3.2 / MCC H1 loose-tag handoff. Other upstream aliases are not complete Spark integrations. Live byte checks cover stable native headers, class/extension and payload CRC, not every semantic structure or invalid gameplay value with a valid checksum. Some writers omit/rewrite checksums; unresolved cases require review. Filesystem events provide no writer PID: Spark shows known launch context and explicitly labels the actual writer unconfirmed. Structural conflicts and geometry reimports that would lose native source are blocked. [Evidence and recovery](CONTINUATION_37_ENGINEERING.md).
+C37 implements a Windows Baboon 0.3.2 / MCC H1 loose-tag handoff. Other upstream aliases are not complete Spark integrations. Live checks cover stable native headers, class/extension, payload CRC and bounded structure parsing with the reviewed Invader release. They do not certify every semantic relationship or invalid gameplay value. Unknown validator versions and unsupported/oversized input remain unverified. Some writers omit/rewrite checksums; unresolved cases require review. Filesystem events provide no writer PID: Spark shows known launch context and explicitly labels the actual writer unconfirmed. Structural conflicts and geometry reimports that would lose native source are blocked. [Evidence and recovery](CONTINUATION_37_ENGINEERING.md).
 
-Current for C36, continuing C35 R12. Inspection, native tag preservation, compilation, game loading, gameplay and peer agreement are separate evidence. Historical experiments remain in their linked reports; they are not current blanket support claims.
+Current for the C35–C37 consolidation. Inspection, native tag preservation, compilation, game loading, gameplay and peer agreement are separate evidence. Historical experiments remain in their linked reports; they are not current blanket support claims.
 
 ## Native formats and conversion
 
@@ -37,3 +37,6 @@ Current for C36, continuing C35 R12. Inspection, native tag preservation, compil
 - Original resources and SDK masters stay outside managed mutations. External tools are not OS-sandboxed. Atomic project files and SQLite are not one cross-resource transaction; interruption may require descriptor reimport. Windows development binaries are unsigned.
 
 See [C36 evidence](CONTINUATION_36_ENGINEERING.md), [native portability](NATIVE_PORTABILITY.md), [exact compatibility](COMPATIBILITY_MATRIX.md), [C35 evidence](CONTINUATION_35_ENGINEERING.md) and the [cumulative ledger](MASTER_FEATURE_LEDGER.md). Retained records are requirements, not completion counts.
+## Consolidated workflow note
+
+Saved maps retain their source, tools and per-map view settings, but open map tabs are not automatically restored at application startup. Reopen the saved projects through the library. The consolidation acceptance explicitly follows that route; it does not claim session-tab restoration.

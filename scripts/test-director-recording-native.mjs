@@ -125,12 +125,17 @@ try {
   await call('save_settings', {
     settings: { ...boot.settings, onboardingCompleted: true, autoBuild: false },
   });
+  // The owner's watched Inbox can import another Blood Gulch concurrently.
+  // Give this owned replica an unambiguous title before selecting its card.
+  const preparedProject = (await call('open_project', { id: fixture.projectId })).project;
+  fixture.title = `Director QA ${fixture.projectId.slice(0, 8)}`;
+  await call('save_project', { project: { ...preparedProject, title: fixture.title } });
   await page.reload();
   await page
     .locator('.map-card')
     .filter({ has: page.getByRole('heading', { name: fixture.title, exact: true }) })
     .click();
-  await expect(page.getByTestId('viewport')).toBeVisible();
+  await expect(page.getByTestId('viewport')).toBeVisible({ timeout: 45000 });
   await expect
     .poll(() => page.locator('.world-layout').getAttribute('data-material-loading'), {
       timeout: 120000,

@@ -1,0 +1,88 @@
+*   7217982 (HEAD -> codex/integration-all-continuations) Merge C37: verified native tool handoffs, save integrity and recoverable source revisions
+|\
+| * bde73ce (codex/c37-modders-workbench) C37: preserve native tool edits and reject corrupted saves
+* | 763d038 Merge One Halo investigation: retain private discovery and unproven MCC session research
+|\|
+| * c9c92e3 (codex/one-halo-mcc-investigation) One Halo: verify native discovery and audit the MCC H1 session boundary
+* | ccc344d Merge C36: retain Portability Lab, native preservation and community-runtime evidence
+|\|
+| * 489443d (codex/continuation-36-one-halo) C36: record verified R2 cumulative source and native evidence inventory
+| * 73433ac C36: reproduce private native community sessions and retain observed limits
+| * dacafb7 C36: record independently verified R1 source inventory
+| * f2d787c C36: document verified native workflows and retain the full feature ledger
+| * 514b2d9 C36: connect Portability Lab to native build and review workflows
+| * 95bb839 C36: preserve native Halo bytes and gate destructive BSP saves
+| * d03516d C36: accept protected Chupathingy private invitations
+* | b742ead Merge C35 R12: preserve rendering, audio, Director and editor workflow
+|\|
+| * 21804c1 (codex/continuation-35-living-workbench) C35: record verified R12 source inventory
+| * d0dc530 C35: auto-connect MCC audio and repair sound editing
+| * d8ae7ab C35: verify r11 cumulative source inventory and release checksums
+| * a754022 C35: repair Halo rendering and unify the editing workflow
+| * 5bbbcd7 Record verified C35 r10 source inventory
+| * 9c117ad Add direct viewport tag drawers, shared assets and editor ambience
+| * ebd5304 C35: inventory and verify the cumulative r9 source package
+| * 904cf41 C35: build native BSP audio revisions and repair immersive window controls
+| * 0699458 C35: inventory and verify the cumulative r8 source package
+| * 3839738 C35: acknowledge live thread release and retain failed increments for cleanup
+| * c13e1de C35: inventory and verify the cumulative r7 source package
+| * a8fefb2 C35: preserve authored looping sound phases and finish Director audio
+| * c7d12ba chore: freeze C35 r6 source inventory and checksums
+| * 6d631ee fix: recover stale live sessions and scope editor requests
+| * 1f87ccf chore: freeze C35 r5 source inventory and checksums
+| * d5f21ce feat: record verified map audio in Director takes
+| * 86fbe07 chore: freeze C35 r4 source inventory and checksums
+| * e9cda46 feat: stabilize Director recording and shared map preferences
+| * a53f272 chore: freeze C35 r3 source inventory and checksums
+| * 0884a1e feat: repair CE conversion resources and Windows extraction paths
+| * 9815868 chore: freeze C35 r2 source inventory and checksums
+| * a162b52 feat: monitor saved tool tags and repair desktop rebuilding
+| * 5e70f35 chore: freeze C35 source inventory and checksum manifests
+| * f4d5f8c feat: deliver C35 immersive workspace and shared Director
+|/
+| * 2d8c7bc (origin/dependabot/cargo/sha2-0.11.1) build(deps): bump sha2 from 0.10.9 to 0.11.1
+|/
+*   617d267 (origin/master, origin/HEAD, master, codex/consolidation-start-20261030T001853Z) Merge C34 runtime tools, map refresh and dependency guidance
+|\
+| * d6bfe25 (origin/codex/continuation-34-runtime-integration, codex/continuation-34-runtime-integration) C34: integrate runtime tools, map refresh and dependency guidance
+|/
+*   fc198e3 Merge C33 native camera, gameplay, map tags and audio continuation
+|\
+| * 6610adf (codex/continuation-33-native-gameplay) feat: add native camera switching, map tag rebuilding and spatial audio
+|/
+*   1753fd0 Merge C33 hosting, collision and workflow polish
+|\
+| * 03686e9 (codex/continuation-33-hosting-collision) feat: polish hosting, collision and onboarding workflows
+|/
+*   f217feb Merge C33 rotated world challenge and connection polish
+|\
+| * 520b69c (codex/continuation-33-world-challenges) feat: validate rotated four-map worlds and polish BSP workflows
+|/
+*   c3a86a3 Merge C33 three-map world and workflow polish
+|\
+| * be3d3af (codex/continuation-33-donor-scenery) feat: connect three Halo maps and streamline editing workflows
+|/
+| * f8e0387 (origin/dependabot/npm_and_yarn/lucide-react-1.61.0) build(deps): bump lucide-react from 0.468.0 to 1.61.0
+|/
+| * b35386e (origin/dependabot/npm_and_yarn/vitest-5.0.5) build(deps-dev): bump vitest from 3.2.7 to 5.0.5
+|/
+| * 23e8df5 (origin/dependabot/npm_and_yarn/typescript-7.0.2) build(deps-dev): bump typescript from 5.9.3 to 7.0.2
+|/
+| * 763013d (origin/dependabot/npm_and_yarn/three-0.186.1) build(deps): bump three from 0.180.0 to 0.186.1
+|/
+| * e5b8664 (origin/dependabot/npm_and_yarn/vite-8.3.5) build(deps-dev): bump vite from 7.3.7 to 8.3.5
+|/
+| * 6dfce35 (origin/dependabot/cargo/rusqlite-0.41.0) build(deps): bump rusqlite from 0.38.0 to 0.41.0
+|/
+*   c74c36e Merge C32-C33 editor workflows and native MCC build reclamation
+|\
+| * 4da849e (codex/continuation-33-resources-and-community) feat: unify C32-C33 editor workflows and native MCC builds
+|/
+* ff14c9c Feature & Polish Push
+* 67cfcdf docs: record final read-only preservation check
+* 2a9152b docs: record corpus archaeology, native verification and multiplayer blockers
+* c666cbe feat: add runtime adapters, safe archives and restoration workspaces
+* 3261193 docs: audit phase one and reproduce the native baseline
+* fed1cf5 fix: exclude native build outputs and archives from Vite watching
+* 50b429f docs: record desktop verification and all restoration candidate blockers
+* 54af05c feat: build source-safe Halo 1 desktop editor and MCC adapters

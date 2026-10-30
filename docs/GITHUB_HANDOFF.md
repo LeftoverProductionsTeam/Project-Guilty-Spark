@@ -1,4 +1,12 @@
-# C36 Git push handoff
+# Master consolidation handoff
+
+The integration branch `codex/integration-all-continuations` retains the C35 R12, C36, One Halo research and frozen C37 histories through four ordinary merge commits. C37 is frozen at `bde73ceb00f42f6dce916a93d9d4c0adb8dae207`. Original development branches and the verified all-reference backups remain available. Seven unvalidated dependency-update proposals are retained separately.
+
+Use the [consolidation report](MASTER_CONSOLIDATION.md) for the exact branch inventory, combined regression/native evidence, limitations and publication status. The [current GitHub description](MASTER_CONSOLIDATION_GITHUB_DESCRIPTION.md) describes the combined change; older continuation descriptions below are historical snapshots.
+
+After the verified local master promotion, the ordinary push is `git push origin master`. If branch protection requires review, push `codex/integration-all-continuations` and use the prepared description in a PR targeting master. Do not force-push, delete branches or change credentials to bypass a rejection. Local evidence does not establish a green hosted CI run.
+
+# C36 Git push handoff (historical)
 
 Branch: **`codex/continuation-36-one-halo`**, continuing C35 R12 **`21804c191a918cbf8bd74efac60dfcec65c9083b`**. Local master remains untouched. Implementation commits: **`d03516d`** protected Chupathingy invitations, **`95bb839`** native-byte/compiler/detail preservation, **`514b2d9`** Portability Lab and native workflow checks. Documentation/ledger and source-inventory commits follow these. The final commit/artifact identities are recorded in the C36 delivery receipt.
 

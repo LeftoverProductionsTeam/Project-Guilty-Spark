@@ -11,7 +11,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Use a fresh recording QA library".into());
     }
     let sha = maps::hash_file(Path::new(&args[1]))?;
-    let library = Library::open(root)?;
+    // Native tests launch from another checkout. Stored source paths must not
+    // depend on the seeder's current directory, even for a relative QA root.
+    fs::create_dir(root)?;
+    let root = fs::canonicalize(root)?;
+    let library = Library::open(&root)?;
     let (project, inspection) = library.import_map(Path::new(&args[1]), None)?;
     fs::write(
         root.join("spark-recording-fixture.json"),

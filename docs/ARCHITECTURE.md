@@ -17,3 +17,6 @@ See [C33 engineering](CONTINUATION_33_ENGINEERING.md), [runtime capabilities](RU
 
 - **Live adapter:** exact-build MCC Halo 1 process reads and bounded object-position writes use map/object identity and readback checks. No code injection or game-file writes. See [adapter limits](LIVE_ADAPTER.md).
 - **Shared source:** private two-editor TCP sessions serialize host revisions, rebase disjoint axis/property edits and retain conflicting local drafts. Each editor binds its own runtime objects. Source sync does not certify game replication.
+## Integration provenance
+
+The C35–C37 consolidation retains the existing rendering/audio, document, Director, Portability Lab, runtime and native-tool boundaries. Four normal merges preserve their ancestry; the integrated production tree matches frozen C37. Combined regression runners and metadata add evidence without enabling experimental networking or widening compiler inputs. [Inventory and verification](MASTER_CONSOLIDATION.md).

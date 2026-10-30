@@ -44,3 +44,6 @@ ZIP import is a separate preservation operation. It validates classic ZIP end/ce
 Focused synthetic tests cover registration/path restrictions, read-only inventory and launch-plan preparation, preservation descriptors, ambiguous version-7 identity, MCC inventory, HCEEK discovery, privacy allowlisting, malformed manifests, content/version mismatches, absent validation, platform differences and separation of manifest agreement from gameplay proof. These tests verify application behavior only.
 
 Automatic native installation identity/version detection, native deployment, direct-map launch, a connected live-edit transport, arbitrary MCC multiplayer AI and VR remain unimplemented or unverified. No copyrighted engine source or native binary is included. Exact upstream revisions, primary links, licensing constraints and the MCC campaign/multiplayer distinction are recorded in [MCC_MULTIPLAYER_AI_FEASIBILITY.md](MCC_MULTIPLAYER_AI_FEASIBILITY.md).
+## Consolidated runtime scope
+
+The [master consolidation report](MASTER_CONSOLIDATION.md) retains C35/C36/C37 and One Halo research. It does not promote descriptor-only targets, private discovery or an external-client launch into MCC protocol compatibility or independent-peer gameplay proof.

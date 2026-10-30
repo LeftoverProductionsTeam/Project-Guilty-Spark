@@ -2,7 +2,9 @@
 
 ## C37 native tool workflow
 
-[Source-aware Baboon handoff, native revisions and live byte checks](docs/CONTINUATION_37_ENGINEERING.md) continue C35/C36 and the One Halo investigation. Failed native header/class/CRC checks block acceptance and compilation; unknown writer attribution stays explicit. QuickForge sharing/live controls use a compact session drawer. Native launch, compiler and gameplay evidence are reported separately.
+[Source-aware Baboon handoff, native revisions and live byte checks](docs/CONTINUATION_37_ENGINEERING.md) continue C35/C36 and the One Halo investigation. Failed native header/class/CRC and pinned native structure checks block acceptance and compilation; unknown writer attribution stays explicit. A genuine Baboon pistol edit passed native compilation and readback. QuickForge sharing/live controls use a compact session drawer. Native launch, compiler and gameplay evidence are reported separately.
+
+The [master consolidation report](docs/MASTER_CONSOLIDATION.md) records the complete branch inventory, preserved research, recoverable backups and combined source/native regressions. [GitHub summary and description](docs/MASTER_CONSOLIDATION_GITHUB_DESCRIPTION.md). Seven pending dependency-update proposals remain separate from completed engineering work. Top-level `SOURCE_*` manifests are retained historical packaging evidence; the current Git tree and consolidation receipts identify this source revision.
 
 **A modern Halo 1 creation and preservation workbench.** Tauri 2 / Rust / React. Windows is the currently verified native development platform. **0.4.0 · C37 dev** continues C35 R12, C36 and the One Halo investigation; compiler and game acceptance remain separate from editor previews.
 

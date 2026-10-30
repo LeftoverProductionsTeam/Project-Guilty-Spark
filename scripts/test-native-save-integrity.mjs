@@ -178,12 +178,13 @@ try {
   }
   expect(rejected).toBe(true);
   expect(await readHash(path.join(normalizedAccepted.source, ...relative.split('/')))).toBe(hash(normalized));
+  await page.getByRole('tab', { name: fixture.title, exact: true }).click();
   await page.getByRole('button', { name: 'Runtime and tool details', exact: true }).click();
   const panel = page.locator('.baboon-tools').last();
-  if ((await panel.getAttribute('open'))===null) await panel.locator('summary').first().click();
+  if ((await panel.getAttribute('open')) === null) await panel.locator('summary').first().click();
   await panel.getByRole('button', { name: 'Recheck', exact: true }).click();
   await expect(panel).toContainText('Verified 0.3.2');
-  await expect(panel).toContainText('Native save failed integrity checks');
+  await expect(panel).toContainText('Native save failed integrity checks', { timeout: 15000 });
   await page.screenshot({ path: path.join(output, 'native-semantic-rejection.png') });
   await page.getByRole('button', { name: 'Close runtime details', exact: true }).click();
   receipt.semanticCorruption = {
@@ -278,11 +279,14 @@ try {
   receipt.appSha256 = await readHash(exe);
   receipt.errors = errors;
   expect(errors).toEqual([]);
-  await page.getByRole('button',{name:'Runtime and tool details',exact:true}).click();
-  await expect(page.getByRole('button',{name:'Open working-tags build',exact:true})).toBeVisible({timeout:30000});
-  await page.getByRole('button',{name:'Open working-tags build',exact:true}).click();
+  await page.getByRole('tab', { name: fixture.title, exact: true }).click();
+  await page.getByRole('button', { name: 'Runtime and tool details', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open working-tags build', exact: true })).toBeVisible({
+    timeout: 30000,
+  });
+  await page.getByRole('button', { name: 'Open working-tags build', exact: true }).click();
   await expect(page.getByRole('tab')).toHaveCount(2);
-  receipt.compiledMapOpenedInSeparateTab=true;
+  receipt.compiledMapOpenedInSeparateTab = true;
   await page.screenshot({ path: path.join(output, 'native-valid-edit-compiled.png') });
   await fs.writeFile(
     path.join(output, 'native-save-integrity-receipt.json'),

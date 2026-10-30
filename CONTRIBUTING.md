@@ -16,3 +16,6 @@ Original contributions use the repository's MIT license. Retain third-party copy
 Follow the [native portability policy](docs/NATIVE_PORTABILITY.md): preserve native formats, keep editor metadata outside tags, document the exact target/schema/tool, and separate byte identity, semantic comparison, compilation and game acceptance. Existing community protocols take priority over inventing a Spark player pool. The community-feedback issue form records runtime/version, reproduction, expected/actual behavior, source credit, correction, regression and remaining limits.
 
 Good first contributions: clarify one setup field; improve a keyboard focus path; add a bounded synthetic parser fixture; verify one source in community credits; reproduce a compatibility problem without uploading its map.
+## Consolidated source
+
+Use the [consolidation report](docs/MASTER_CONSOLIDATION.md) and [branch inventory](docs/fixtures/master-consolidation-refs.json) before replaying an older continuation. Completed engineering histories are preserved through normal merges; pending dependency proposals are separate reviews. Retain experimental evidence and original branches, and keep native fixtures/game files outside public source. The combined native workflow runner requires a fresh explicit QA replica and real external tools; a source-only pass is not gameplay acceptance.

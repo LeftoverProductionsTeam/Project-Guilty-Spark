@@ -1,0 +1,510 @@
+{
+  "schemaVersion": 1,
+  "startingMaster": "617d267a8dd8b1c504d47bdaef4c0f338615786e",
+  "integrationMergeTip": "7217982e1169152baea4523c29698e7d67d29ae4",
+  "frozenC37": "bde73ceb00f42f6dce916a93d9d4c0adb8dae207",
+  "productionSourceMatchesFrozenC37": true,
+  "standardTests": {
+    "rustPassed": 494,
+    "rustIgnored": 7,
+    "frontendPassed": 216,
+    "frontendFiles": 44,
+    "browserPassed": 79,
+    "offlineScriptsPassed": 59,
+    "typescript": true,
+    "windowsRelease": true,
+    "nsis": true
+  },
+  "additionalOwnedBspTests": {
+    "passed": 2,
+    "instances": 89233,
+    "cells": 282,
+    "serializationComparison": {
+      "byteIdentical": false,
+      "displayedFieldsUnchanged": true,
+      "reasons": [
+        "Painted detail preservation is unverified after BSP serialization: the inspector rounds floating-point Z references. This change is blocked until exact native detail payload preservation can be proved; the original BSP remains recoverable."
+      ],
+      "safeForEnvironmentEdit": false
+    },
+    "originalUnchanged": true,
+    "blockedBeforeAudioWrite": true,
+    "copiedBspUnchanged": true
+  },
+  "appSha256": "dc0621d4dee1d51e217411980f6d4f83abc6585537e393422f0c46ecd05c215b",
+  "installerSha256": "b22b61fc2d4b742f45bdad51497008dfda34a926d91a5401f813bc86de8f327e",
+  "combinedWorkflow": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gameplayAccepted": false,
+    "scope": "Native loose-tag edit/import/placement through Invader; Spark save detection, native compilation, cache readback and tab reopening. This does not certify arbitrary imported OBJ placement builds.",
+    "externalEdits": {
+      "writer": "Invader",
+      "executableSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "changedFiles": [
+        {
+          "path": "item_collections/spark_qa/imported_pistol.item_collection",
+          "kind": "added"
+        },
+        {
+          "path": "levels/quickforge/c33_collision_acceptance/c33_collision_acceptance.scenario",
+          "kind": "modified"
+        },
+        {
+          "path": "weapons/pistol/pistol.weapon",
+          "kind": "modified"
+        },
+        {
+          "path": "weapons/spark_qa/imported_pistol.weapon",
+          "kind": "added"
+        }
+      ],
+      "nativeValidation": {
+        "nativeParserCheckedFiles": 4,
+        "semanticUnverifiedFiles": 0,
+        "equivalentFieldFiles": 0,
+        "changedFieldFiles": 0,
+        "checkedFiles": 4,
+        "invalidFiles": 0,
+        "unverifiedFiles": 0,
+        "pendingFiles": 0,
+        "findings": [
+          {
+            "path": "item_collections/spark_qa/imported_pistol.item_collection",
+            "state": "parsed",
+            "detail": "Invader 0.55.0.r4134.33518109 parsed this save; no immutable starting source is available for field comparison."
+          },
+          {
+            "path": "levels/quickforge/c33_collision_acceptance/c33_collision_acceptance.scenario",
+            "state": "parsed",
+            "detail": "Invader 0.55.0.r4134.33518109 parsed this save; no immutable starting source is available for field comparison."
+          },
+          {
+            "path": "weapons/pistol/pistol.weapon",
+            "state": "parsed",
+            "detail": "Invader 0.55.0.r4134.33518109 parsed this save; no immutable starting source is available for field comparison."
+          },
+          {
+            "path": "weapons/spark_qa/imported_pistol.weapon",
+            "state": "parsed",
+            "detail": "Invader 0.55.0.r4134.33518109 parsed this save; no immutable starting source is available for field comparison."
+          }
+        ],
+        "listTruncated": false
+      },
+      "stableDetectionMs": 7576.529399999998
+    },
+    "nativeBuildMs": 24685.975700000003,
+    "workflow": {
+      "nativeTagEditedAndSaved": true,
+      "nativeWeaponImported": true,
+      "nativeScenarioItemPlaced": true,
+      "compiledRadius": 0.22499999403953552,
+      "compiledPlacement": {
+        "kind": "Netgame item",
+        "position": [2, 0, 0.1]
+      },
+      "existingObjectsPreserved": 4,
+      "initialPlayerStarts": 4,
+      "originalSourceFilesVerified": 2240,
+      "allCompilerInputTagBytesPreserved": true,
+      "priorCacheUnchanged": true,
+      "projectOverlayUnchanged": true,
+      "twoTabsReopened": true,
+      "explicitLibraryReopen": true,
+      "automaticStartupTabRestoration": false
+    },
+    "appSha256": "dc0621d4dee1d51e217411980f6d4f83abc6585537e393422f0c46ecd05c215b",
+    "compiledSha256": "dbff0e834d688fe873e9535499ff9039b194bd355bf6e87ac383e0860ee6af1c",
+    "errors": []
+  },
+  "saveIntegrity": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gameplayAccepted": false,
+    "parentSha256": "fa75952cdf222f5cf8a26554471e33cf5efc37d4843bf52dedb8e8d700ba7975",
+    "normalization": {
+      "changedBytes": 201,
+      "exposedFieldsEquivalent": true,
+      "acceptedAsEquivalent": true,
+      "scope": "Pinned Invader field-output comparison; opaque bytes/unprinted precision are not certified."
+    },
+    "semanticCorruption": {
+      "validChecksum": true,
+      "invalidDependencyLength": true,
+      "detectedByNativeParser": true,
+      "reconciliationRejected": true,
+      "writerContext": "Baboon handoff; actual writer unconfirmed. Other programs can also write this folder. Filesystem notifications supply no writer PID.",
+      "actualControlledWriter": "QA Node process, intentionally malformed fixture; not Baboon or Invader"
+    },
+    "crcFailureDetected": true,
+    "recovery": {
+      "startingBytesRestored": true,
+      "damagedExternalEvidenceRetained": true,
+      "priorAcceptedSourceIntact": true
+    },
+    "validEditDetectionMs": 3803.149700000009,
+    "nativeBuildMs": 41450.505200000014,
+    "validEdit": {
+      "writer": "Invader",
+      "toolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "field": "bounding_radius",
+      "before": 0.1,
+      "expected": 0.225,
+      "compiled": 0.22499999403953552,
+      "reconciled": true,
+      "nativeCompiled": true,
+      "compiledTagBytesPreserved": true
+    },
+    "nativeRecoveryInventoryVerified": 2240,
+    "compiledSha256": "8ba1a69df55bd1808e1f85a2343246f153caa97f33794f37a2bec3f7f0a3f5fb",
+    "appSha256": "dc0621d4dee1d51e217411980f6d4f83abc6585537e393422f0c46ecd05c215b",
+    "errors": [],
+    "compiledMapOpenedInSeparateTab": true
+  },
+  "reopenedViewport": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "appSha256": "dc0621d4dee1d51e217411980f6d4f83abc6585537e393422f0c46ecd05c215b",
+    "compiledSha256": "dbff0e834d688fe873e9535499ff9039b194bd355bf6e87ac383e0860ee6af1c",
+    "twoSavedMapsOpened": true,
+    "viewportVisible": true,
+    "materialLoadingCompleted": true,
+    "metadata": {
+      "sourceShaders": "109",
+      "sourceShaderIds": "3783065609,3783327757,3784114201,3784376349,3787391051,3787587662,3787653199,3800826136,3801088284,3801153821,3801284895,3804561745,3804692819,3804889430,3804954967,3811312056,3811508667,3811574204,3811770815,3811901889,3812032963,3812098500,3813605851,3813802462,3813867999,3817144849,3817406997,3817472534,3820421699,3822322272,3822518883,3822584420,3822781031,3823043179,3823239790,3825074826,3828548287,3828744898,3828810435,3836805949,3837002560,3837068097,3837133634,3840082799,3840279410,3840344947,3840410484,3840541558,3841786761,3841917835,3842048909,3844473778,3844670389,3844867000,3845063611,3846636499,3846833110,3849913349,3850109960,3850175497,3850241034,3850437645,3850634256,3852272681,3852534829,3855746142,3856663660,3856925808,3856991345,3858236548,3858498696,3858629770,3862234305,3862561990,3863020749,3863413971,3863741656,3864200415,3864331489,3864397026,3864659174,3871606096,3871802707,3871999318,3872195929,3872458077,3872589151,3872654688,3872720225,3872916836,3873113447,3879732684,3879929295,3879994832,3881895405,3882092016,3882157553,3882223090,3882288627,3882354164,3882550775,3886286384,3889694308,3889890919,3890087530,3891922566,3892053640,3892184714,3929213117",
+      "sourceLightmaps": "1",
+      "sourceDetails": "49",
+      "skyTriangles": "183",
+      "materialLoading": "false",
+      "pendingMaterials": "0"
+    },
+    "viewportWaitMs": 5743.432200000001,
+    "gameLaunched": false,
+    "gameMemoryTouched": false
+  },
+  "rendering": {
+    "appSha256": "dc0621d4dee1d51e217411980f6d4f83abc6585537e393422f0c46ecd05c215b",
+    "maps": [
+      {
+        "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+        "viewport": {
+          "sourceShaders": "132",
+          "sourceShaderIds": "3786342459,3786407996,3786473533,3786539070,3786604607,3786670144,3786735681,3787456588,3787849810,3788177495,3788439643,3788701791,3789357161,3789422698,3789488235,3789553772,3790012531,3790078068,3790602364,3790667901,3792568474,3792634011,3792699548,3792765085,3792830622,3792961696,3793485992,3794469047,3794534584,3794600121,3794665658,3795124417,3795189954,3795648713,3795714250,3795779787,3796173009,3797156064,3797221601,3797287138,3797352675,3797418212,3797483749,3798270193,3798335730,3798401267,3798466804,3798597878,3800432914,3800498451,3800563988,3804430671,3804496208,3806462318,3806527855,3806593392,3816358405,3816555016,3817341460,3817538071,3818062367,3819504181,3819569718,3819635255,3819700792,3819766329,3820159551,3822256735,3822322272,3822387809,3822453346,3824943752,3825009289,3830907619,3831497452,3831562989,3831628526,3835560746,3835626283,3835691820,3835757357,3835888431,3835953968,3836019505,3836085042,3836216116,3836347190,3845718981,3845784518,3849847812,3851944996,3852010533,3852076070,3852141607,3853190199,3853255736,3856401512,3856467049,3856532586,3856598123,3856663660,3856729197,3857450104,3857581178,3863086286,3863151823,3863217360,3864462563,3880060369,3880977887,3881043424,3881108961,3913287628,3913353165,3913418702,3913484239,3913549776,3913615313,3913680850,3913746387,3913811924,3913942998,3914008535,3914074072,3914139609,3914205146,3914270683,3918071829,3918137366,3918202903,3918268440,3918333977",
+          "sourceLightmaps": "15",
+          "sourceDetails": "59",
+          "skyTriangles": "308",
+          "materialLoading": "false",
+          "pendingMaterials": "0"
+        },
+        "previewImages": 5,
+        "allPreviewImagesLoaded": true
+      },
+      {
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "viewport": {
+          "sourceShaders": "151",
+          "sourceShaderIds": "3783065609,3783327757,3783786516,3784114201,3784572960,3784966182,3785293867,3785621552,3785818163,3786080311,3786211385,3786539070,3786801218,3786932292,3787391051,3787718736,3787849810,3788177495,3788570717,3789095013,3789422698,3789684846,3789946994,3790274679,3790471290,3790930049,3791257734,3791388808,3791519882,3792044178,3792306326,3792437400,3792502937,3792699548,3798204656,3798466804,3798532341,3798728952,3798860026,3798991100,3799056637,3801678117,3801940265,3802005802,3813867999,3814064610,3815768572,3815965183,3816030720,3822518883,3822715494,3822912105,3823108716,3823370864,3823501938,3823567475,3823633012,3823829623,3824026234,3831104230,3831300841,3831366378,3831431915,3831497452,3831562989,3831759600,3837395782,3837723467,3837789004,3842507668,3842638742,3842769816,3842966427,3843163038,3843228575,3846374351,3851355163,3851551774,3851748385,3851944996,3853517884,3853714495,3857253493,3857450104,3857515641,3857581178,3860006047,3860399269,3860792491,3861251250,3861775546,3861972157,3862037694,3862168768,3862824138,3862889675,3864134878,3864265952,3864397026,3864855785,3865052396,3865117933,3865183470,3865380081,3865576692,3867280654,3867542802,3870557504,3870688578,3870819652,3870885189,3871868244,3872130392,3872195929,3874948483,3876914593,3877111204,3877242278,3880519128,3880715739,3880781276,3891988103,3892184714,3892250251,3892446862,3892709010,3892905621,3894544046,3897427674,3898345192,3898541803,3898607340,3899983617,3900311302,3900507913,3900704524,3938781519,3938978130,3939174741,3939305815,3939436889,3939633500,3939961185,3940157796,3940288870,3940616555,3940747629,3940878703,3941009777,3941075314,3941140851",
+          "sourceLightmaps": "15",
+          "sourceDetails": "83",
+          "skyTriangles": "183",
+          "materialLoading": "false",
+          "pendingMaterials": "0"
+        },
+        "previewImages": 6,
+        "allPreviewImagesLoaded": true
+      }
+    ],
+    "tagTree": {
+      "classes": 59,
+      "weaponTags": 20,
+      "editableFields": 7
+    },
+    "windowControls": {
+      "normal": {
+        "x": 2458,
+        "y": 5.5,
+        "width": 96,
+        "height": 28
+      },
+      "combinedHeader": {
+        "x": 2458,
+        "y": 5.5,
+        "width": 96,
+        "height": 28
+      },
+      "fullscreen": {
+        "x": 2458,
+        "y": 3.5,
+        "width": 96,
+        "height": 26
+      }
+    },
+    "errors": []
+  },
+  "audio": {
+    "schemaVersion": 1,
+    "appSha256": "dc0621d4dee1d51e217411980f6d4f83abc6585537e393422f0c46ecd05c215b",
+    "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+    "errors": [],
+    "checks": {
+      "automaticResources": {
+        "kind": "mccClassicAdpcm",
+        "sha256": {
+          "sounds_adpcm.fsb": "d9a70adcb681bcb152a50ea61904fc921d2d94aff3000fe3d2827823c9e49e88",
+          "sounds_adpcm.lst.bin": "d469b6d72c7d8f6d141da2b61c14b29862a57d3563ebb195e3829f18db742a78"
+        },
+        "noFolderPicker": true
+      },
+      "group": {
+        "loopTagId": 3824943752,
+        "sourceTracks": [
+          {
+            "index": 0,
+            "tagId": 3825074826,
+            "gain": 0.6
+          },
+          {
+            "index": 1,
+            "tagId": 3825205900,
+            "gain": 0.3
+          }
+        ],
+        "savedTracks": 2,
+        "undoRedoAtomic": true,
+        "sourceSceneAndTagsUnchanged": true
+      },
+      "soundLayout": {
+        "widths": [280, 360, 520],
+        "muteSoloSeparated": true,
+        "labelsVisible": true
+      },
+      "productionAudio": {
+        "kind": "native-source-production-mixer-OfflineAudioContext",
+        "tracks": [
+          {
+            "tagId": 3825074826,
+            "track": 0,
+            "gain": 0.6,
+            "decodedFrames": 311100,
+            "decodedChannels": 1
+          },
+          {
+            "tagId": 3825205900,
+            "track": 1,
+            "gain": 0.3,
+            "decodedFrames": 65480,
+            "decodedChannels": 1
+          }
+        ],
+        "voices": 2,
+        "relativeError": 9.413865752842912e-8,
+        "rms": 0.023488099793187,
+        "firstTrackOnlyError": 0.6499587608546493,
+        "muteRms": 0,
+        "hardwareListeningAccepted": false
+      }
+    },
+    "inputsUnchanged": true,
+    "limitations": [
+      "No Halo process, game-memory writes, physical listening or native vehicle sound-function modulation acceptance.",
+      "Production audio is independently rendered in WebView2 OfflineAudioContext; saved track import is exercised through the native UI.",
+      "Automatic BSP multitrack selection and stale-zone handling have separate source-bound unit coverage; this map UI trial imports the real Warthog loop."
+    ]
+  },
+  "director": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "idleLiveCleanupApi": {
+      "hasSession": false,
+      "pending": [],
+      "threadRelease": {
+        "pendingThreads": 0,
+        "issue": null
+      },
+      "releaseOutcome": "alreadyDisconnected",
+      "unboundMoveAndScaleRefused": true,
+      "gameAttached": false
+    },
+    "appSha256": "dc0621d4dee1d51e217411980f6d4f83abc6585537e393422f0c46ecd05c215b",
+    "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+    "nativeUiRecordAndSave": true,
+    "explicitNamedTakeWorkflow": true,
+    "osSavePickerTested": false,
+    "osCapturePickerTested": false,
+    "countdownCancellationRemovesEmptyPartial": true,
+    "pausedClockStable": true,
+    "backgroundRecording": true,
+    "cleanViewToggledDuringTake": true,
+    "closeBlockedWhileRecording": true,
+    "existingTakeProtected": true,
+    "wrongWindowRejected": true,
+    "traversalRejected": true,
+    "folderRememberedAfterReopen": true,
+    "mapAudioPreferenceRememberedAfterReopen": true,
+    "freshNameAfterSuccess": true,
+    "videoOnly": false,
+    "savedMapAudio": {
+      "tagId": 3799974155,
+      "tagPath": "sound\\sfx\\impulse\\material_effects\\impacts_water",
+      "sampleSha256": "e2f1a60f7ed0f9cac8cce3afedaf639853d7289a6dd200e9e203d21b2d64226e",
+      "previewSha256": "0a17df7dc10ebe0711a66fb9972c5dc633ec2aed7bd9faffc8ee0e3db4008f6a",
+      "format": "Xbox ADPCM",
+      "sourceChannels": 1,
+      "sourceSampleRate": 22050,
+      "sourceDurationSeconds": 1.6282993197278912,
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "synthetic": false,
+      "near": {
+        "codec": "opus",
+        "decodedChannels": 2,
+        "decodedSampleRate": 48000,
+        "decodedFrames": 155520,
+        "decodedSeconds": 3.24,
+        "rms": 0.049580272822316425,
+        "peak": 0.6560677886009216
+      },
+      "beyondSavedMaxDistance": {
+        "codec": "opus",
+        "decodedChannels": 2,
+        "decodedSampleRate": 48000,
+        "decodedFrames": 141120,
+        "decodedSeconds": 2.94,
+        "rms": 0,
+        "peak": 0
+      },
+      "distantTakeSha256": "b25b9fb7e53f3c5dae17ab906722574a510c7ba6a72718f78763679087526ca7",
+      "startupEvents": ["ambient", "mapStart"],
+      "audioBeforeCountdown": false,
+      "microphoneRequested": false,
+      "systemAudioRequested": false,
+      "gameAudioCaptured": false
+    },
+    "requestedFps": 24,
+    "dimensions": {
+      "width": 1920,
+      "height": 658
+    },
+    "decodedFrameSizes": ["1920x658"],
+    "bytes": 1459430,
+    "sha256": "c9558ff341f62ed6e62d90f9b7f66a91abf7bc7b9f35b05145780f086ae5dfc4",
+    "decoderSha256": "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3",
+    "decoderVersion": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
+    "decodedFrames": 67,
+    "decodedSeconds": 3.249,
+    "firstDecodedLumaMean": 82.48773871527763,
+    "firstDecodedLumaDeviation": 53.50392858802295,
+    "browserPresentationProbe": {
+      "scope": "Native editor canvas encoder/decoder; not the application Save picker or game capture",
+      "mime": "video/webm;codecs=vp8",
+      "bytes": 807257,
+      "width": 1920,
+      "height": 658,
+      "requestedFps": 24,
+      "elapsedSeconds": 2.3602999999523164,
+      "audioTracks": 0,
+      "firstPresentedLumaDeviation": 52.36264635393577,
+      "firstPresentedMediaTime": 0,
+      "laterPresentedMediaTime": 1.011,
+      "decodedLumaDeviation": 52.99072248225101,
+      "decoded": true
+    },
+    "sourcePreserved": true,
+    "authoredDocumentPreserved": true,
+    "gameLaunched": false,
+    "gameplayAccepted": false,
+    "errors": []
+  },
+  "portability": {
+    "appSha256": "dc0621d4dee1d51e217411980f6d4f83abc6585537e393422f0c46ecd05c215b",
+    "conversion": {
+      "elapsedMs": 186268.9283,
+      "buildId": "3b2c029b-ab8f-44c7-bf3c-c51174f72df1",
+      "sha256": "5313b8eed940f364b13f047b1ba4c85ce7e71885a38e67263a64958142839422",
+      "status": "validated",
+      "target": "mcc-cea"
+    },
+    "nativeTagCompilation": {
+      "allInputTagBytesUnchanged": true,
+      "inputManifestSha256": "10a47c4241453c0d22b943d63df09753f2a6a2882c4a1bd9935b456d4959bae9",
+      "inventoryAfterMs": 11507,
+      "inventoryBeforeMs": 11428,
+      "nativeFiles": 11664,
+      "schemaVersion": 1,
+      "scope": "Exact loose native tag bytes during target compilation only. Extraction, intentional compatibility edits and compiled cache repacking are separate operations; game loading remains pending.",
+      "status": "passed"
+    },
+    "semanticDiff": {
+      "sourceCacheVersion": 609,
+      "targetCacheVersion": 13,
+      "unchangedAuditedFields": 4844,
+      "fieldChangeCount": 19,
+      "unpairedAuditedFields": 1082,
+      "missingTagCount": 47,
+      "addedTagCount": 0,
+      "controlledFieldVerified": true,
+      "readableAndMachineReports": true,
+      "scope": "Native class/path identities and Spark-audited fields only. Reference datums resolve to native class/path; offsets and cache IDs may legitimately change. Lists cap at 256 tags/512 changes; totals are complete. Unknown fields, shader appearance, scripts, object behavior and gameplay are not semantic-equivalence claims."
+    },
+    "originalsUnchanged": true,
+    "errors": []
+  },
+  "baboonGenuineEditedSave": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gameplayAccepted": false,
+    "parentSha256": "fa75952cdf222f5cf8a26554471e33cf5efc37d4843bf52dedb8e8d700ba7975",
+    "exposedFieldDifferences": [
+      {
+        "before": "bounding_radius (0.100000)                                              float32",
+        "after": "bounding_radius (0.500000)                                              float32"
+      }
+    ],
+    "baboon": {
+      "version": "0.3.2",
+      "exeSha256": "051d5a849d4cb3c60c7a9554f88b7d551f74e2925e6d4a671f2d23f32973fe2e",
+      "humanEditedSavedClosed": true,
+      "field": "bounding_radius",
+      "before": 0.1,
+      "expected": 0.5,
+      "compiled": 0.5,
+      "nativeValidation": {
+        "nativeParserCheckedFiles": 1,
+        "semanticUnverifiedFiles": 0,
+        "equivalentFieldFiles": 0,
+        "changedFieldFiles": 1,
+        "checkedFiles": 1,
+        "invalidFiles": 0,
+        "unverifiedFiles": 0,
+        "pendingFiles": 0,
+        "findings": [
+          {
+            "path": "weapons/pistol/pistol.weapon",
+            "state": "changed",
+            "detail": "Invader 0.55.0.r4134.33518109: native structure parses and exposed typed fields differ from the starting source. Review intentional field changes; parser acceptance is not gameplay proof."
+          }
+        ],
+        "listTruncated": false
+      },
+      "nativeBuildMs": 47391.000700000004
+    },
+    "reconciled": true,
+    "compiledSha256": "37987a03437492f20b83bad4bf52f540cac943baff10e7b46a1d1de814498bd0",
+    "appSha256": "b0b770ea8ad6d6c28d1a24ed579ce5201f43a82036f9f105aecf269d5357efd8",
+    "errors": [],
+    "startingInventoryVerified": 2240
+  },
+  "publication": {
+    "status": "Not pushed; non-interactive GitHub authentication unavailable",
+    "probe": "Cannot prompt because user interactivity has been disabled; unable to get password from user",
+    "credentialsChanged": false,
+    "forcePush": false
+  },
+  "gameplayScope": "No new game launch, game-memory write, MCC cross-play or independent-client gameplay acceptance"
+}
