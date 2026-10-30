@@ -30,6 +30,8 @@ fn draft() -> String {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct QuickForgeDocument {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workshop: Option<crate::bsp_workshop::Workshop>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native: Option<crate::studio_native::Document>,
     pub schema_version: u32,
     pub name: String,
@@ -201,6 +203,8 @@ pub struct ForgeMesh {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ForgeMeshPart {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub face_id: Option<String>,
     pub brush_id: String,
     pub material_id: String,
     pub index_start: usize,
@@ -418,6 +422,7 @@ pub fn validate_portable_document(doc: &QuickForgeDocument) -> Result<()> {
     validate_document_scope(doc, true)
 }
 fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<()> {
+    crate::bsp_workshop::validate_source(doc)?;
     crate::studio_native::validate(doc)?;
     if doc.schema_version != SCHEMA_VERSION
         || doc.name.trim().is_empty()
@@ -458,7 +463,7 @@ fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<(
     for m in &doc.materials {
         if !identifier(&m.id)
             || !material_ids.insert(&m.id)
-            || !identifier(&m.name)
+            || !(identifier(&m.name) || crate::bsp_workshop::special_material(doc, &m.id))
             || m.name.len() > 31
             || m.color
                 .iter()
@@ -570,6 +575,7 @@ pub fn create_arena(name: &str, template: &str) -> Result<QuickForgeDocument> {
         return invalid("Unsupported QuickForge template");
     }
     let mut doc = QuickForgeDocument {
+        workshop: None,
         native: None,
         schema_version: 1,
         name: name.into(),
@@ -1080,6 +1086,7 @@ fn terrain_weld_pairs(doc:&QuickForgeDocument)->Vec<(usize,usize,usize,usize)> {
 
 pub fn preview_mesh(doc: &QuickForgeDocument) -> Result<ForgeMesh> {
     validate_document(doc)?;
+    if doc.workshop.is_some() {return crate::bsp_workshop::mesh(doc);}
     let mut mesh = ForgeMesh {
         positions: vec![],
         normals: vec![],
@@ -1122,6 +1129,7 @@ pub fn preview_mesh(doc: &QuickForgeDocument) -> Result<ForgeMesh> {
             }
         }
         mesh.parts.push(ForgeMeshPart {
+            face_id: None,
             brush_id: b.id.clone(),
             material_id: b.material_id.clone(),
             index_start: start,
@@ -1269,8 +1277,127 @@ pub fn validate_mesh(mesh: &ForgeMesh) -> Vec<GeometryIssue> {
     }
     issues
 }
+fn scenario_issues(doc:&QuickForgeDocument)->Vec<GeometryIssue> {
+    let mut issues=vec![];
+    // Detect the same player start twice in a mode where both may become active.
+    // The old direct scenario editors could leave an MP player waiting for a
+    // clear spawn. Disjoint game-mode records are allowed at the same point.
+    for (i,a) in doc.spawns.iter().enumerate() {
+        for b in doc.spawns.iter().skip(i+1) {
+            if !a.game_modes.iter().any(|mode| b.game_modes.contains(mode)) {continue;}
+            let distance_sq=(0..3).map(|axis|(a.position[axis]-b.position[axis]).powi(2)).sum::<f32>();
+            if distance_sq < 0.0025 {
+                issues.push(issue("DUPLICATE_SPAWN_POSITION",
+                    "Two simultaneously eligible player starts occupy the same position; separate them to prevent an obvious spawn-clearance risk",
+                    vec![a.id.clone(),b.id.clone()]));
+            } else if distance_sq < 1.0 {
+                let mut warning=issue("CROWDED_SPAWNS",
+                    "Two player starts are less than one unit apart; check player collision and clearance inside Halo",
+                    vec![a.id.clone(),b.id.clone()]);
+                warning.severity="warning".into();issues.push(warning);
+            }
+        }
+    }
+    // A single destination tag path cannot resolve to two different binary
+    // source identities. Import requires an explicit conflict resolution.
+    let mut tag_origins=std::collections::BTreeMap::<String,Option<String>>::new();
+    for placed in &doc.placements {
+        let key=format!("{}:{}",placed.tag_class.to_ascii_lowercase(),placed.tag_path.replace('/', "\\").to_ascii_lowercase());
+        if let Some(previous)=tag_origins.get(&key) {
+            if previous != &placed.source_sha256 {
+                issues.push(issue("CONFLICTING_TAG_ORIGINS",
+                    format!("Tag path '{}' is used with incompatible source identities",placed.tag_path),vec![placed.id.clone()]));
+            }
+        } else {tag_origins.insert(key,placed.source_sha256.clone());}
+    }
+    if doc.spawns.len() < 4 {
+        issues.push(issue(
+            "SPAWN_MINIMUM",
+            "A QuickForge arena needs at least four player starts",
+            vec![],
+        ));
+    }
+    if doc.game_mode == "ctf" {
+        for team in [0, 1] {
+            if !doc.spawns.iter().any(|s| s.team == team)
+                || !doc
+                    .objectives
+                    .iter()
+                    .any(|o| o.kind == "ctfFlag" && o.team == team)
+            {
+                issues.push(issue(
+                    "CTF_SETUP",
+                    format!("CTF team {team} needs a player start and flag"),
+                    vec![],
+                ));
+            }
+        }
+    }
+    if doc.game_mode == "king" && !doc.objectives.iter().any(|o| o.kind == "hill") {
+        issues.push(issue(
+            "HILL_REQUIRED",
+            "King of the Hill needs a hill objective",
+            vec![],
+        ));
+    }
+    if doc.game_mode == "oddball" && !doc.objectives.iter().any(|o| o.kind == "oddball") {
+        issues.push(issue(
+            "ODDBALL_REQUIRED",
+            "Oddball needs a ball spawn",
+            vec![],
+        ));
+    }
+    if doc.game_mode == "race"
+        && doc
+            .objectives
+            .iter()
+            .filter(|o| o.kind == "raceCheckpoint")
+            .count()
+            < 2
+    {
+        issues.push(issue(
+            "RACE_CHECKPOINTS",
+            "Race needs at least two checkpoints",
+            vec![],
+        ));
+    }
+    for material in &doc.materials {
+        if material.shader_path.is_none() && !crate::bsp_workshop::special_material(doc, &material.id) {
+            let mut i = issue(
+                "SHADER_UNRESOLVED",
+                format!(
+                    "Material '{}' needs an actual shader tag before compilation",
+                    material.name
+                ),
+                vec![],
+            );
+            i.severity = "warning".into();
+            issues.push(i);
+        }
+    }
+    if !["firefight", "zombie"].contains(&doc.game_mode.as_str()) {
+        for placement in &doc.placements {
+            if ["weap", "eqip", "itmc"].contains(&placement.tag_class.as_str())
+                && (placement.rotation[0].abs() > 0.00001 || placement.rotation[1].abs() > 0.00001)
+            {
+                let mut warning=issue("ITEM_FACING_ONLY","Multiplayer netgame equipment supports yaw only; remove pitch/roll before compilation",vec![placement.id.clone()]);
+                warning.severity = "warning".into();
+                issues.push(warning);
+            }
+        }
+    }
+    issues
+}
+
 pub fn validate(doc: &QuickForgeDocument) -> Result<GeometryReport> {
     validate_document(doc)?;
+    if doc.workshop.is_some() {
+        let mut r=crate::bsp_workshop::report(doc)?;
+        r.issues.extend(netgame_flag_issues(doc));
+        r.issues.extend(scenario_issues(doc));
+        r.valid=!r.issues.iter().any(|i|i.severity=="error");
+        return Ok(r);
+    }
     let mesh = preview_mesh(doc)?;
     let mut issues = validate_mesh(&mesh);
     issues.extend(netgame_flag_issues(doc));
@@ -1413,113 +1540,7 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<GeometryReport> {
             }
         }
     }
-    // Detect the same player start twice in a mode where both may become active.
-    // The old direct scenario editors could leave an MP player waiting for a
-    // clear spawn. Disjoint game-mode records are allowed at the same point.
-    for (i,a) in doc.spawns.iter().enumerate() {
-        for b in doc.spawns.iter().skip(i+1) {
-            if !a.game_modes.iter().any(|mode| b.game_modes.contains(mode)) {continue;}
-            let distance_sq=(0..3).map(|axis|(a.position[axis]-b.position[axis]).powi(2)).sum::<f32>();
-            if distance_sq < 0.0025 {
-                issues.push(issue("DUPLICATE_SPAWN_POSITION",
-                    "Two simultaneously eligible player starts occupy the same position; separate them to prevent an obvious spawn-clearance risk",
-                    vec![a.id.clone(),b.id.clone()]));
-            } else if distance_sq < 1.0 {
-                let mut warning=issue("CROWDED_SPAWNS",
-                    "Two player starts are less than one unit apart; check player collision and clearance inside Halo",
-                    vec![a.id.clone(),b.id.clone()]);
-                warning.severity="warning".into();issues.push(warning);
-            }
-        }
-    }
-    // A single destination tag path cannot resolve to two different binary
-    // source identities. Import requires an explicit conflict resolution.
-    let mut tag_origins=std::collections::BTreeMap::<String,Option<String>>::new();
-    for placed in &doc.placements {
-        let key=format!("{}:{}",placed.tag_class.to_ascii_lowercase(),placed.tag_path.replace('/', "\\").to_ascii_lowercase());
-        if let Some(previous)=tag_origins.get(&key) {
-            if previous != &placed.source_sha256 {
-                issues.push(issue("CONFLICTING_TAG_ORIGINS",
-                    format!("Tag path '{}' is used with incompatible source identities",placed.tag_path),vec![placed.id.clone()]));
-            }
-        } else {tag_origins.insert(key,placed.source_sha256.clone());}
-    }
-    if doc.spawns.len() < 4 {
-        issues.push(issue(
-            "SPAWN_MINIMUM",
-            "A QuickForge arena needs at least four player starts",
-            vec![],
-        ));
-    }
-    if doc.game_mode == "ctf" {
-        for team in [0, 1] {
-            if !doc.spawns.iter().any(|s| s.team == team)
-                || !doc
-                    .objectives
-                    .iter()
-                    .any(|o| o.kind == "ctfFlag" && o.team == team)
-            {
-                issues.push(issue(
-                    "CTF_SETUP",
-                    format!("CTF team {team} needs a player start and flag"),
-                    vec![],
-                ));
-            }
-        }
-    }
-    if doc.game_mode == "king" && !doc.objectives.iter().any(|o| o.kind == "hill") {
-        issues.push(issue(
-            "HILL_REQUIRED",
-            "King of the Hill needs a hill objective",
-            vec![],
-        ));
-    }
-    if doc.game_mode == "oddball" && !doc.objectives.iter().any(|o| o.kind == "oddball") {
-        issues.push(issue(
-            "ODDBALL_REQUIRED",
-            "Oddball needs a ball spawn",
-            vec![],
-        ));
-    }
-    if doc.game_mode == "race"
-        && doc
-            .objectives
-            .iter()
-            .filter(|o| o.kind == "raceCheckpoint")
-            .count()
-            < 2
-    {
-        issues.push(issue(
-            "RACE_CHECKPOINTS",
-            "Race needs at least two checkpoints",
-            vec![],
-        ));
-    }
-    for material in &doc.materials {
-        if material.shader_path.is_none() {
-            let mut i = issue(
-                "SHADER_UNRESOLVED",
-                format!(
-                    "Material '{}' needs an actual shader tag before compilation",
-                    material.name
-                ),
-                vec![],
-            );
-            i.severity = "warning".into();
-            issues.push(i);
-        }
-    }
-    if !["firefight", "zombie"].contains(&doc.game_mode.as_str()) {
-        for placement in &doc.placements {
-            if ["weap", "eqip", "itmc"].contains(&placement.tag_class.as_str())
-                && (placement.rotation[0].abs() > 0.00001 || placement.rotation[1].abs() > 0.00001)
-            {
-                let mut warning=issue("ITEM_FACING_ONLY","Multiplayer netgame equipment supports yaw only; remove pitch/roll before compilation",vec![placement.id.clone()]);
-                warning.severity = "warning".into();
-                issues.push(warning);
-            }
-        }
-    }
+    issues.extend(scenario_issues(doc));
     let valid = !issues.iter().any(|i| i.severity == "error");
     let mut roots=(0..doc.geometry.len()).collect::<Vec<_>>();
     for (a,_,b,_) in &welded {
@@ -1930,6 +1951,7 @@ pub fn export_sources(doc: &QuickForgeDocument, output: &Path) -> Result<SourceE
     let mut dependencies = vec![];
     let mut blockers = vec![];
     for m in &doc.materials {
+        if crate::bsp_workshop::special_material(doc, &m.id) {continue;}
         if let Some(path) = &m.shader_path {
             dependencies.push(ForgeDependency {
                 kind: "shader".into(),

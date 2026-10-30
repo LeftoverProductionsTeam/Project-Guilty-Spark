@@ -55,6 +55,7 @@ export interface StudioNativeSource {
 export interface StudioNativeAsset { id: string; name: string; sha256: string; bytes: number[]; }
 export interface StudioNativeDocument { source: StudioNativeSource; fields: {id: string; boundingRadius: number}[]; assets: StudioNativeAsset[]; }
 export interface QuickForgeDocument {
+  workshop?: import('./bspWorkshop').BspWorkshopSource;
   native?: StudioNativeDocument;
   schemaVersion: number;
   name: string;
@@ -76,7 +77,7 @@ export interface ForgeMesh {
   normals: number[];
   uvs: number[];
   indices: number[];
-  parts: { brushId: string; materialId: string; indexStart: number; indexCount: number }[];
+  parts: { brushId: string; materialId: string; indexStart: number; indexCount: number; faceId?: string }[];
 }
 export interface GeometryIssue {
   severity: 'error' | 'warning';

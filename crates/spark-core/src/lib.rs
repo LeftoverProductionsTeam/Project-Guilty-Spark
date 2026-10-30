@@ -8,6 +8,7 @@ mod audio_pcm;
 pub mod binary;
 pub mod bitmap_preview;
 pub mod bsp_assembly;
+pub mod bsp_workshop;
 pub mod bsp_detail;
 pub mod bsp_visibility;
 mod bsp_compile;

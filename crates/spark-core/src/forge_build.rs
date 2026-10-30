@@ -46,6 +46,28 @@ pub struct QuickForgeBuildReceipt {
     pub build: Option<BuildRecord>,
     pub tool_identities: BTreeMap<String,String>,
 }
+/// Owner-run Standalone acceptance. Keep the existing short-path alias alive for
+/// the whole game process; dropping it after spawn makes lazy tag reads fail.
+/// This verifies the source/build identities but does not certify player movement.
+#[cfg(windows)]
+pub fn workshop_playtest(receipt:&QuickForgeBuildReceipt,kit:&Path)->Result<()> {
+    if receipt.status!="validated" {return invalid("Only a validated native Workshop build can be playtested");}
+    let sources=receipt.sources.as_ref().ok_or_else(||SparkError::Invalid("Missing source receipt".into()))?;
+    let build=receipt.build.as_ref().ok_or_else(||SparkError::Invalid("Missing native build receipt".into()))?;
+    let output=build.output.as_ref().ok_or_else(||SparkError::Invalid("Missing compiled output".into()))?;
+    if build.sha256.as_deref()!=Some(maps::hash_file(output)?.as_str())||sources.jms_sha256!=maps::hash_file(&sources.jms_path)? {return invalid("Workshop output or source JMS changed since compilation");}
+    let project=project::load_project(&sources.directory.join("project.gsproject"))?;
+    if project.fingerprint()?!=receipt.project_fingerprint||project.quick_forge.as_ref().is_none_or(|d|d.workshop.is_none()||d.runtime_id!=RuntimeId::MccSteam) {return invalid("Workshop source is not the exact compiled MCC project");}
+    let exe=kit.join("halo_tag_test.exe");crate::reject_links(&exe)?;
+    let alias=crate::native_workspace::Alias::new(&sources.directory)?;
+    let init_name=format!("spark-workshop-{}.txt",uuid::Uuid::new_v4());
+    project::atomic_write(&sources.directory.join(&init_name),format!("game_variant slayer\r\nmap_name \"{}\"\r\n",sources.scenario_path).as_bytes(),false)?;
+    let mut command=std::process::Command::new(exe);
+    command.current_dir(kit).args(["-window","-vidmode","1280,720","-tags_dir"]).arg(alias.path().join("tags")).arg("-data_dir").arg(alias.path().join("data")).arg("-exec").arg(alias.path().join(init_name));
+    use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);
+    let mut child=command.spawn()?;eprintln!("Workshop Standalone process {}. Walk from Room A through the corridor to Room B and up the ramp. Close the game to release the temporary content path.",child.id());
+    let status=child.wait()?;if !status.success(){return invalid(format!("Standalone exited with {status}; inspect its reports/debug.txt. This is not gameplay acceptance"));}Ok(())
+}
 /// Strictly versioned Tool argument prefix. Legacy HEK does not support
 /// content-path overrides and must use an isolated workspace current_dir.
 /// H1A supports the explicit root flags to keep its writes in that workspace.

@@ -38,8 +38,9 @@ export function preflightSourceExport(
   }
   if (!/^[0-9a-f]{64}$/i.test(validation.sourceSha256)) blockers.push('Invalid source SHA-256 evidence in geometry report.');
   const mesh = snapshot.mesh;
-  if (!doc.geometry.length || doc.geometry.length > 256) blockers.push('Source world needs 1–256 authored brushes.');
-  const ids = [...doc.geometry, ...doc.placements, ...doc.spawns, ...doc.objectives].map(node => node.id);
+  const brushes=doc.workshop?.brushes??doc.geometry;
+  if (!brushes.length || brushes.length > (doc.workshop?64:256)) blockers.push('Source world needs authored brushes within its compilation budget.');
+  const ids = [...brushes, ...(doc.workshop?.portals??[]), ...doc.placements, ...doc.spawns, ...doc.objectives].map(node => node.id);
   if (new Set(ids).size !== ids.length) blockers.push('Duplicate editor object IDs could corrupt placement or geometry references.');
   const materials = new Set(doc.materials.map(material => material.id));
   if (materials.size !== doc.materials.length) blockers.push('Duplicate material IDs.');
@@ -64,7 +65,7 @@ export function preflightSourceExport(
   // caused by separate source brushes even when each has unique vertex indices.
   if (!blockers.some(item=>/buffer|indices|bounds|array lengths|mesh coordinates/i.test(item))) {
     try {
-      const review=auditQuickForgeMesh(mesh);
+      const review=auditQuickForgeMesh(doc.workshop?{...mesh,indices:mesh.parts.filter(p=>p.faceId).flatMap(p=>mesh.indices.slice(p.indexStart,p.indexStart+p.indexCount)),parts:[]}:mesh);
       meshIntegrity=review;
       if(review.duplicateFaces) blockers.push(`Duplicate coincident source faces: ${review.duplicateFaces}. Remove overlapping faces before exporting collision BSP source.`);
       if(review.degenerateTriangles) blockers.push(`${review.degenerateTriangles} zero-area or collapsed source triangles. Repair them before exporting the BSP source.`);
@@ -82,14 +83,16 @@ export function preflightSourceExport(
   let end = 0;
   for (const part of mesh.parts) {
     const brush = byId.get(part.brushId);
-    if (!brush || part.materialId !== brush.materialId) blockers.push('Mesh part has a missing/mismatched source brush or material.');
+    const sourceFace=doc.workshop?.brushes.find(b=>b.id===part.brushId)?.faces.find(f=>f.id===part.faceId);
+    const portal=doc.workshop?.portals.find(p=>p.id===part.brushId);
+    if (doc.workshop?(!sourceFace&&!portal || part.materialId!==(sourceFace??portal)?.materialId):(!brush || part.materialId !== brush.materialId)) blockers.push('Mesh part has a missing/mismatched source face, brush or material.');
     if (!Number.isSafeInteger(part.indexStart) || !Number.isSafeInteger(part.indexCount) ||
         part.indexStart !== end || part.indexCount < 0 || part.indexCount % 3 !== 0 ||
         part.indexStart + part.indexCount > mesh.indices.length)
       blockers.push('Mesh parts have overlapping, missing or invalid triangle ranges.');
     end = part.indexStart + part.indexCount;
   }
-  if (end !== mesh.indices.length || mesh.parts.length !== doc.geometry.length)
+  if (end !== mesh.indices.length || !doc.workshop&&mesh.parts.length !== doc.geometry.length)
     blockers.push('Mesh part coverage does not match the authored brush inventory.');
   if (doc.geometry.some(brush => brush.kind === 'caveTunnel')) {
     try {
