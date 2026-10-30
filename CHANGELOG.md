@@ -1,5 +1,15 @@
 # Changelog
 
+## C40 — Native integrity, CE companion and consolidation
+
+- Add bounded rolling content checks for native saves that preserve metadata or lose filesystem notifications; retain the normal stable-save and full-build identity gates.
+- Require native semantic verification before accepting or compiling changed source; preserve valid normalization separately from CRC/structure failures and opaque-data uncertainty.
+- Keep active-map handoff monitoring alive outside tool dialogs, discover prepared sessions across workspaces, and open affected integrity details without opening an overlay automatically.
+- Retain file identities and associated tool/version/hash/PID context while leaving actual writer identity unknown without direct evidence.
+- Add manually configured, explicitly confirmed, no-argument OpenCE Mantle launching for Windows Custom Edition PC cache 609. No binary is bundled/downloaded and no original map is passed. Actual Mantle behavior remains unverified.
+- Retain the leftknut research candidate without guessed identity/download/launcher support; preserve all prior research, dependency proposals and release artifacts.
+- Consolidate completed C38–C40 work through an isolated verified integration branch; update the README, compatibility, roadmap, source archive and cumulative 366-record ledger without declaring unfinished gameplay features complete.
+
 ## C39 — SparkLink shared QuickForge
 
 - Extend the existing session service with private invitation-pinned TLS, authenticated Owner/Editor/Viewer roles and bounded typed source messages.

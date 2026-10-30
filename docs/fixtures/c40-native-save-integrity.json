@@ -11,6 +11,10 @@
     "acceptedAsEquivalent": true,
     "scope": "Pinned Invader field-output comparison; opaque bytes/unprinted precision are not certified."
   },
+  "backgroundHandoffMonitoring": {
+    "dialogClosedDuringWrite": true,
+    "automaticDockWarning": true
+  },
   "semanticCorruption": {
     "validChecksum": true,
     "invalidDependencyLength": true,
@@ -18,8 +22,8 @@
     "reconciliationRejected": true,
     "writerContext": "Baboon handoff; actual writer unconfirmed. Other programs can also write this folder. Filesystem notifications supply no writer PID.",
     "writerEvidence": {
-      "observedAt": "2026-10-30T11:27:55.461576900+00:00",
-      "revision": 1,
+      "observedAt": "2026-10-30T12:25:35.684756+00:00",
+      "revision": 2,
       "writerConfidence": "unknown",
       "explanation": "Tool associations describe a prepared handoff or Spark-observed launch, not a confirmed file writer. Filesystem events contain no writer PID; a read-only validator is not the writer. Hashes describe the last stable observation, while file metadata may reflect a newer save.",
       "associations": [
@@ -39,7 +43,7 @@
           "previousSha256": "50df9677812206c61ca8cd85d2cc1eeb94e69c1ffe8c873578d88580bd5a62a5",
           "observedSha256": "6db1bee0fbbdf7d30055f652fecc62aee363170f7c09857db1d8806c24cf4310",
           "bytes": 2978,
-          "modifiedUnixMs": 1793359671197
+          "modifiedUnixMs": 1793363128458
         }
       ],
       "listTruncated": false
@@ -52,8 +56,8 @@
     "damagedExternalEvidenceRetained": true,
     "priorAcceptedSourceIntact": true
   },
-  "validEditDetectionMs": 3217.9400000000023,
-  "nativeBuildMs": 31289.45490000001,
+  "validEditDetectionMs": 3707.766899999988,
+  "nativeBuildMs": 31261.47769999999,
   "validEdit": {
     "writer": "Invader",
     "toolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
@@ -67,14 +71,14 @@
   },
   "nativeRecoveryInventoryVerified": 2240,
   "compiledSha256": "8ba1a69df55bd1808e1f85a2343246f153caa97f33794f37a2bec3f7f0a3f5fb",
-  "appSha256": "5a92f8bf9eb275a16329626f073d48a85d6b40956666824dde0fd187c6351776",
+  "appSha256": "1519d03aa0fa33fde802fdf55ded523310fa6b3c0a489af32255190660ddd90e",
   "errors": [],
   "compiledMapOpenedInSeparateTab": true,
-  "scope": "C40 actual Windows Spark IPC/UI, approved native tools, isolated source and H1A compilation; not a new human Baboon GUI save or Halo gameplay test.",
+  "scope": "C40 r2 actual Windows Spark IPC/UI, approved native tools, isolated source and H1A compilation. The prepare-controller discovery notification is simulated after a real native prepare; saved bytes, live warnings, parser results, reconciliation and compilation are real. This is not a new human Baboon GUI save or Halo gameplay test.",
   "historicalBaboonEvidence": {
     "path": "c37-native-acceptance.json",
     "sha256": "2bff8dc95c934c3783e44f1862d3ff2fe0170c6f99d1d5cd628c77e3792fb2bd",
     "newHumanGuiSaveClaimed": false
   },
-  "publicPathRedaction": "Only the private executable location is redacted; hashes, observations, counts and outcomes are unchanged."
+  "publicPathRedaction": "Private executable location only; identities, observations and outcomes are unchanged."
 }

@@ -1,67 +1,152 @@
-Project Guilty Spark - C36 r2 source comparison
-BASELINE_GIT_COMMIT: 21804c191a918cbf8bd74efac60dfcec65c9083b
-SOURCE_CONTENT_GIT_COMMIT: 73433ac0e5c5b11bcac9cf316c6ce389b7239ef4
-Comparison covers the audited source-package roots; checksum manifests and this report are excluded.
-ADDED_COUNT: 20
-MODIFIED_COUNT: 29
-UNCHANGED_COUNT: 1161
+Project Guilty Spark - C40 r2 cumulative source comparison
+BASELINE_GIT_COMMIT: 8c0bed0fcce3fbff7108b53dcee6ef077f253387
+VERIFIED_RUNTIME_SOURCE_COMMIT: f3649cdef9976dc095fe7b0246d0a6a23f87bf30
+Final reporting/checksum commit is recorded by the C40 r2 artifact manifest.
+Comparison uses Git-normalized blobs over audited package roots; this report and generated checksum manifests are excluded.
+ADDED_COUNT: 81
+MODIFIED_COUNT: 53
+UNCHANGED_COUNT: 1194
 REMOVED_COUNT: 0
 
-ADDED FILES
-.github/ISSUE_TEMPLATE/community-feedback.yml
-crates/spark-core/src/bsp_detail.rs
-crates/spark-core/src/portability.rs
-crates/spark-core/tests/portability.rs
-docs/C36_COMMUNITY_NATIVE_TESTS.md
-docs/CONTINUATION_36_ENGINEERING.md
-docs/CONTINUATION_36_GITHUB_DESCRIPTION.md
-docs/NATIVE_PORTABILITY.md
-docs/fixtures/c36-community-client-files.json
-docs/fixtures/c36-community-native-verification.json
-docs/fixtures/c36-native-preservation-verification.json
-docs/research/C36_COMMUNITY_INTEROPERABILITY.md
-scripts/analyze-community-runtime-native.mjs
-scripts/continuation36-evidence.mjs
-scripts/test-community-runtime-native.mjs
-scripts/test-portability-native.mjs
-src-tauri/src/portability_native.rs
-src/components/PortabilityLab.tsx
-src/components/portabilityLab.css
-src/portability.ts
+C37 was already on master. This package adds completed C38/C39 source and C40 integrity/companion work, including background handoff checks.
+Prior release archives, experimental references and independent dependency proposals are preserved.
 
-MODIFIED FILES
+ADDED
+crates/spark-core/data/tool_ecosystem.json
+crates/spark-core/src/native_operations.rs
+crates/spark-core/src/studio_journal.rs
+crates/spark-core/src/studio_session.rs
+crates/spark-core/src/studio_tls.rs
+crates/spark-core/src/tool_ecosystem.rs
+docs/C38_GITHUB_DESCRIPTION.md
+docs/C39_GITHUB_DESCRIPTION.md
+docs/C40_GITHUB_DESCRIPTION.md
+docs/COMPATIBLE_TOOLS.md
+docs/CONTINUATION_38_ENGINEERING.md
+docs/CONTINUATION_39_ENGINEERING.md
+docs/CONTINUATION_40_ENGINEERING.md
+docs/PROJECT_FILES.md
+docs/SPARKLINK_ARCHITECTURE.md
+docs/SPARKLINK_SECURITY.md
+docs/SPARKLINK_SETUP.md
+docs/fixtures/c38-native-operations.json
+docs/fixtures/c38-verification.json
+docs/fixtures/c39-sparklink-native.json
+docs/fixtures/c39-verification.json
+docs/fixtures/c40-consolidation.json
+docs/fixtures/c40-native-background-rejection.png
+docs/fixtures/c40-native-operations.json
+docs/fixtures/c40-native-save-integrity.json
+docs/fixtures/c40-native-semantic-rejection.png
+docs/fixtures/c40-native-valid-edit-compiled.png
+docs/fixtures/c40-sparklink-native.json
+docs/fixtures/c40-verification.json
+docs/licenses/005fc765ddc5115da796cca915baa9557abae13ff35e0a47c47affc56f6c414d.txt
+docs/licenses/2a7df90e60fd5512b8bca35d3ce90e068f21c52d962855053fd1d9e2e7ca0f16.txt
+docs/licenses/42fa16951ce7f24b5a467a40e5b449a1d41e662f97ca779864f053f39e097737.txt
+docs/licenses/45fd05c4865e7c350b98ad7ac50e1b15462d49af4a91e9b0c9dd933dc9a69742.txt
+docs/licenses/4dbda04344456f09a7a588140455413a9ac59b6b26a1ef7cdf9c800c012d87f0.txt
+docs/licenses/5b698ca13897be3afdb7174256fa1574f8c6892b8bea1a66dd6469d3fe27885a.txt
+docs/licenses/709e3175b4212f7b13aa93971c9f62ff8c69ec45ad8c6532a7e0c41d7a7d6f8c.txt
+docs/licenses/7abd9b6960dcf7d4d0a48606a5b71bfe37d472db68d70637f3a58a56785f1621.txt
+docs/licenses/7b033f57f23fffca5bee9406cf453ce31e919c1b867df54bfa7487e73d8c9c1f.txt
+docs/licenses/7cfafc877eccc46c0e346ccbaa5c51bb6b894d2b818e617d970211e232785ad4.txt
+docs/licenses/8c7516d4b27b1e495be5e38b612298b63de48d05f49cdac94f70f3cd70f8864b.txt
+docs/licenses/9117d922e667125508dde62b02c1f57ed22f5ad21eb536aa2e2d99e1c796e639.txt
+docs/licenses/91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69.txt
+docs/licenses/a5c61b93b6ee1d104af9920cf020ff3c7efe818e31fe562c72261847a728f513.txt
+docs/licenses/aa72991ac35b4de0034da0afe943e62b48c4092fc2ba13ae47806d8e9a4ad551.txt
+docs/licenses/b3d734001a94efff3579978d953391aa7115f877657d25eb54037a43875d078a.txt
+docs/licenses/b68ad1a3367b825447089e1f8d6829b97f47a89eb78d2f4ebaef4672f5606186.txt
+docs/licenses/d1fc1bc0d155df60b2e7705b6b2ae02a05c96f948e1cec6e2fb86360b09f346b.txt
+docs/licenses/dbe1fff0fb1314b6af94f161511406275cf01c5a32441fbf24528a57a051d599.txt
+docs/licenses/debe6fed7ac143217c7f533759c54b14f18cd01d5fe195c51d83c2ae2d136cb4.txt
+docs/licenses/ea5ab440900ab271811d5c2dc02a9de6e03a6956ac5727e85c11d76df5883d30.txt
+docs/licenses/f025ccfb7dfb6bdfedc75ca0f67acc69e6fb4998143d834f7c2f38a29989680f.txt
+docs/licenses/f2ad7982ddbfa8c45eb965315718c55b70b9cc311b49afacb50d5fe84173ae2c.txt
+docs/licenses/f3d4287b4a21c5176fea2f9bd4ae800696004e2fb8e05cbc818be513f188a941.txt
+docs/screenshots/continuation38/native-tools-1024.png
+docs/screenshots/continuation38/native-tools-1500.png
+docs/screenshots/continuation39/sparklink-1024.png
+docs/screenshots/continuation39/sparklink-editor-b.png
+docs/screenshots/continuation39/sparklink-editor-c.png
+docs/screenshots/continuation39/sparklink-owner.png
+scripts/continuation38-evidence.mjs
+scripts/continuation39-evidence.mjs
+scripts/continuation40-evidence.mjs
+scripts/test-native-operations.mjs
+scripts/test-sparklink-native.mjs
+src-tauri/src/external_companions_native.rs
+src-tauri/src/native_operations_native.rs
+src-tauri/src/native_save_evidence.rs
+src-tauri/src/native_source_revisions.rs
+src-tauri/src/tool_ecosystem_native.rs
+src/components/LiveStudioIndicator.tsx
+src/components/NativeTagOperations.tsx
+src/components/ToolEcosystem.tsx
+src/components/nativeTools.css
+src/components/studio.css
+src/nativeOperations.ts
+src/nativeTagIntegrity.test.ts
+src/studioClient.test.ts
+src/studioClient.ts
+tests/ui/fixtures/toolEcosystem.html
+tests/ui/fixtures/toolEcosystem.tsx
+tests/ui/tool-companion.spec.ts
+
+MODIFIED
 CHANGELOG.md
 COMMUNITY_CREDITS.md
-CONTRIBUTING.md
+Cargo.lock
 README.md
-crates/spark-core/src/bsp_audio.rs
-crates/spark-core/src/build.rs
-crates/spark-core/src/conversion.rs
-crates/spark-core/src/invitations.rs
+ROADMAP.md
+SECURITY.md
+THIRD_PARTY_NOTICES.md
+crates/spark-core/Cargo.toml
+crates/spark-core/src/forge_session.rs
 crates/spark-core/src/lib.rs
-crates/spark-core/src/project.rs
-crates/spark-core/src/runtime_adapters.rs
-crates/spark-core/src/working_tags.rs
+crates/spark-core/src/native_tag_integrity.rs
+crates/spark-core/src/quickforge.rs
+crates/spark-core/src/session_invite.rs
+crates/spark-core/src/snapshots.rs
+crates/spark-core/src/working_tag_changes.rs
 docs/ARCHITECTURE.md
 docs/COMPATIBILITY_MATRIX.md
+docs/DEPENDENCY_LICENSES.json
 docs/GETTING_STARTED.md
-docs/GITHUB_HANDOFF.md
 docs/KNOWN_LIMITATIONS.md
+docs/MASTER_CONSOLIDATION.md
 docs/MASTER_FEATURE_LEDGER.csv
 docs/MASTER_FEATURE_LEDGER.md
-docs/TESTING.md
-scripts/test-working-tags-native.mjs
+docs/RUNTIME_COMPATIBILITY.md
+docs/UNIVERSAL_WORKBENCH_BACKLOG.md
+scripts/test-native-save-integrity.mjs
 scripts/update-feature-ledger.mjs
 src-tauri/src/app.rs
+src-tauri/src/baboon_native.rs
+src-tauri/src/legacy_companions.rs
+src-tauri/src/native_tag_parser.rs
+src-tauri/src/runtime_workbench.rs
+src-tauri/src/shared_editing.rs
+src-tauri/src/working_tag_changes_native.rs
 src/App.tsx
-src/components/BspAudioEditor.tsx
-src/components/Build.tsx
-src/components/InvitationJoin.tsx
+src/baboon.ts
+src/components/BaboonTools.tsx
+src/components/ForgeCollaboration.tsx
+src/components/NativeTagIntegrity.tsx
+src/components/QuickForge.tsx
+src/components/RuntimeDock.tsx
+src/components/Runtimes.tsx
+src/components/Tags.tsx
+src/components/WorkingTagChanges.tsx
+src/editor.ts
 src/featureCatalog.ts
+src/forgeSession.test.ts
+src/forgeSession.ts
+src/nativeTagIntegrity.ts
+src/toolFindings.ts
+src/toolchainProfiles.ts
+src/workingTagSync.ts
 tests/ui/native-contract.spec.ts
 
-REMOVED FILES
-None.
-
-Owned maps, tags, binaries, private QA data and the uploaded latestspark.zip are excluded.
-All 29 currently present C35 release files (including sidecars/receipts) remain frozen and independently rehashed; absent older files are not reconstructed. Initial C36 r1 artifacts and sidecars are also retained unchanged.
+REMOVED

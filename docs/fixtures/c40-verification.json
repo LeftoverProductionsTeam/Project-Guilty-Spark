@@ -1,6 +1,11 @@
 {
   "schemaVersion": 1,
-  "standardRust": {
+  "startingCommit": "192b2f5cb8a845b17d48a7def66d96ae631bd67a",
+  "frozenC40": "72e9fe32d4ed5e8623d05caa3b10e8752456d54f",
+  "integrationMergeTip": "755a618309ae129e13782d7172c50a505c0e8402",
+  "verifiedSourceCommit": "f3649cdef9976dc095fe7b0246d0a6a23f87bf30",
+  "endingCommitLocation": "releases/GuiltySpark-C40-r2-artifacts.json and git rev-parse master",
+  "rust": {
     "passed": 518,
     "failed": 0,
     "ignored": 7
@@ -14,8 +19,10 @@
     "passed": 222
   },
   "browser": {
-    "passed": 82,
-    "syntheticContracts": true
+    "passed": 83,
+    "quiescentFullRun": true,
+    "syntheticContracts": true,
+    "closedControlsHandoffRegression": true
   },
   "offline": {
     "scripts": 59
@@ -24,12 +31,16 @@
   "windowsBuild": {
     "executable": true,
     "nsisInstaller": true,
-    "appSha256": "5a92f8bf9eb275a16329626f073d48a85d6b40956666824dde0fd187c6351776"
+    "appSha256": "1519d03aa0fa33fde802fdf55ded523310fa6b3c0a489af32255190660ddd90e",
+    "installerExecuted": false
   },
-  "nativeSource": {
-    "receipt": "c40-native-save-integrity.json",
-    "nativeBuildMs": 31289.45490000001,
-    "preservedInputFiles": 2240
+  "native": {
+    "save": "c40-native-save-integrity.json",
+    "managedOperations": "c40-native-operations.json",
+    "sparklink": "c40-sparklink-native.json",
+    "sameFinalExecutable": true,
+    "preservedSourceFiles": 2240,
+    "gameLaunched": false
   },
   "mantle": {
     "officialRepo": "https://github.com/SutlabSol/OpenCE-Mantle",
@@ -43,12 +54,11 @@
     "originalMapPassed": false
   },
   "gameplayAccepted": false,
-  "combinedIntegrationVerification": "pending",
-  "sparklink": {
-    "receipt": "c40-sparklink-native.json",
-    "nativeProcesses": 3,
-    "physicalMachines": 1,
-    "gamePeerReplicationTested": false,
-    "nativeBuildMs": 18940.7802
-  }
+  "combinedIntegrationVerification": "passed",
+  "retainedAttempts": [
+    "Initial final-fixture preparation failed because parent directories were absent; corrected and reseeded, no source changed.",
+    "Focused browser assertion first needed dialog scope; its next run exposed the real unbound details-open state, fixed and verified.",
+    "An attempted HEAD-derived file restore was rejected before execution; matching current-file backup and a complete patch were retained, and targeted edits were used instead.",
+    "Earlier native candidates passed their stated scopes and remain retained; r2 adds closed-controls acceptance."
+  ]
 }

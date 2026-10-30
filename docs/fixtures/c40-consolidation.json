@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "startingBranch": "codex/c39-sparklink-live-studio",
+  "startingHead": "192b2f5cb8a845b17d48a7def66d96ae631bd67a",
+  "startingMaster": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+  "frozenC40": "72e9fe32d4ed5e8623d05caa3b10e8752456d54f",
+  "integrationMergeTip": "755a618309ae129e13782d7172c50a505c0e8402",
+  "explicitMerges": [
+    "755a618309ae129e13782d7172c50a505c0e8402 Integrate C40 native-save integrity, CE companion route and acceptance records",
+    "48ab10c551b2f76c01e09a4e9651f253fb9bdcc5 Integrate verified C39 durable SparkLink source collaboration",
+    "ce7bd0f8a4f43c4f700ea8815c1b7ce4f033993f Integrate verified C38 source-aware native tools and recoverable revisions"
+  ],
+  "verifiedSourceCommit": "f3649cdef9976dc095fe7b0246d0a6a23f87bf30",
+  "followup": "f3649cdef9976dc095fe7b0246d0a6a23f87bf30 Keep native handoff checks active while returning to the map",
+  "runtimePathsMatchVerifiedSource": true,
+  "refsAtConsolidation": [
+    {
+      "ref": "refs/heads/codex/c37-modders-workbench",
+      "sha": "bde73ceb00f42f6dce916a93d9d4c0adb8dae207",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/c38-universal-workbench",
+      "sha": "45596d5072b1c115c71132b78e7798c3baa547d0",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/c39-sparklink-live-studio",
+      "sha": "192b2f5cb8a845b17d48a7def66d96ae631bd67a",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/c40-companions-and-consolidation",
+      "sha": "72e9fe32d4ed5e8623d05caa3b10e8752456d54f",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/c40-integration-start-20261030",
+      "sha": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/consolidation-start-20261030T001853Z",
+      "sha": "617d267a8dd8b1c504d47bdaef4c0f338615786e",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/continuation-33-donor-scenery",
+      "sha": "be3d3af6062700a768666d6ab5a652b21c668d68",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/continuation-33-hosting-collision",
+      "sha": "03686e920cbe2dcf71af7f333ed2de448910f408",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/continuation-33-native-gameplay",
+      "sha": "6610adf80f518d4e6a6e49379c990efe1eff0d14",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/continuation-33-resources-and-community",
+      "sha": "4da849efaffa9161a369cb1264c260214b5d0d4b",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/continuation-33-world-challenges",
+      "sha": "520b69c8b8654bd83ad456dce23a8e3a47f409d5",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/continuation-34-runtime-integration",
+      "sha": "d6bfe25666aad35aa63cd1fdd7082d71ca72119b",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/continuation-35-living-workbench",
+      "sha": "21804c191a918cbf8bd74efac60dfcec65c9083b",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/continuation-36-one-halo",
+      "sha": "489443d7b892b14bda553ed5f4f8d33480ffe78c",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/integration-all-continuations",
+      "sha": "755a618309ae129e13782d7172c50a505c0e8402",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/codex/one-halo-mcc-investigation",
+      "sha": "c9c92e33b97f9b85fce2fcccbab28e4bb3f2464b",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/heads/master",
+      "sha": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/remotes/origin/HEAD",
+      "sha": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/remotes/origin/codex/continuation-34-runtime-integration",
+      "sha": "d6bfe25666aad35aa63cd1fdd7082d71ca72119b",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    },
+    {
+      "ref": "refs/remotes/origin/dependabot/cargo/rusqlite-0.41.0",
+      "sha": "6dfce357b41d89ac6da7816ba9c1a90e97f60430",
+      "includedInIntegration": false,
+      "disposition": "Separate unvalidated dependency proposal, retained"
+    },
+    {
+      "ref": "refs/remotes/origin/dependabot/cargo/sha2-0.11.1",
+      "sha": "2d8c7bcbed99cbf19fbd0725d44618d5b133e9c0",
+      "includedInIntegration": false,
+      "disposition": "Separate unvalidated dependency proposal, retained"
+    },
+    {
+      "ref": "refs/remotes/origin/dependabot/npm_and_yarn/lucide-react-1.61.0",
+      "sha": "f8e0387b3a2b429f2fcbecbf10a1587a9eec6786",
+      "includedInIntegration": false,
+      "disposition": "Separate unvalidated dependency proposal, retained"
+    },
+    {
+      "ref": "refs/remotes/origin/dependabot/npm_and_yarn/three-0.186.1",
+      "sha": "763013dffdb852fc09625df0344e06626afb4f9d",
+      "includedInIntegration": false,
+      "disposition": "Separate unvalidated dependency proposal, retained"
+    },
+    {
+      "ref": "refs/remotes/origin/dependabot/npm_and_yarn/typescript-7.0.2",
+      "sha": "23e8df59a2d9fdbf281028e0e75ce7e23440a7aa",
+      "includedInIntegration": false,
+      "disposition": "Separate unvalidated dependency proposal, retained"
+    },
+    {
+      "ref": "refs/remotes/origin/dependabot/npm_and_yarn/vite-8.3.5",
+      "sha": "e5b86647d5eac892c260a5b26ceca1c45593e42f",
+      "includedInIntegration": false,
+      "disposition": "Separate unvalidated dependency proposal, retained"
+    },
+    {
+      "ref": "refs/remotes/origin/dependabot/npm_and_yarn/vitest-5.0.5",
+      "sha": "b35386e0ee797f0673bfa5328312bbca25ebec04",
+      "includedInIntegration": false,
+      "disposition": "Separate unvalidated dependency proposal, retained"
+    },
+    {
+      "ref": "refs/remotes/origin/master",
+      "sha": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+      "includedInIntegration": true,
+      "disposition": "Completed or recovery ancestry retained in integration"
+    }
+  ],
+  "excludedDependencyProposals": 7,
+  "otherUnmergedEngineeringBranches": [],
+  "preIntegrationBundleSha256": "cded16d4c19e21d26b46dd877a6554c25f4f81226d0f0115799db52cad2dd0ff",
+  "masterPromotion": "Fast-forward only after combined verification; exact final promoted/reporting commit is recorded in the local C40 r2 artifact manifest."
+}

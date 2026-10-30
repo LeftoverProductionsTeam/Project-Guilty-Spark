@@ -10,7 +10,7 @@
   "gamePeerReplicationTested": false,
   "nativeTagSharingTested": false,
   "binaryAssetTransferTested": false,
-  "appSha256": "5a92f8bf9eb275a16329626f073d48a85d6b40956666824dde0fd187c6351776",
+  "appSha256": "1519d03aa0fa33fde802fdf55ded523310fa6b3c0a489af32255190660ddd90e",
   "tlsLabelledJoinRefusesPlaintextInvitation": true,
   "threeNativeEditors": {
     "participants": [
@@ -19,11 +19,11 @@
         "role": "owner"
       },
       {
-        "name": "Creator B",
+        "name": "Creator C",
         "role": "editor"
       },
       {
-        "name": "Creator C",
+        "name": "Creator B",
         "role": "editor"
       }
     ],
@@ -57,8 +57,8 @@
   "nativeBuildSnapshot": {
     "revision": 14,
     "editingContinuedAt": 15,
-    "durationMs": 18940.7802,
-    "cacheSha256": "ab9e5fb1ac8eceee6575bed2a2ba0f3edf932731c645815d55b58ce04eb46fdb",
+    "durationMs": 16179.227600000002,
+    "cacheSha256": "80786817876c849e026cd912f7592343625920a6bdea71c418b76db4a81daf3e",
     "cacheVersion": 13,
     "frozenSnapshotOpened": true,
     "gameplayTested": false
@@ -70,7 +70,7 @@
     "authorIdentitiesRetained": true,
     "oldOperationReplayDeduplicated": true,
     "freshInvitation": true,
-    "durationMs": 7366.4086000000025
+    "durationMs": 7471.722099999999
   },
   "revocationKeepsOtherCreatorsAndSource": true,
   "originalOwnedCachesUnchanged": true,
@@ -81,12 +81,12 @@
   "measuredPropagationMs": {
     "samples": 6,
     "values": [
-      893.3479999999981,
-      513.0033000000003,
-      508.4279000000024,
-      521.6794999999984,
-      512.4589000000014,
-      510.82960000000094
+      444.99649999999747,
+      559.4942999999985,
+      546.3248999999996,
+      531.7393000000011,
+      541.2775999999976,
+      543.8751000000011
     ],
     "includesNativeIpcAndUiConvergence": true
   },

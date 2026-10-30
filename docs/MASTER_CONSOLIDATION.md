@@ -1,5 +1,7 @@
 # Master engineering consolidation — 30 October 2026
 
+The latest **C38–C40 consolidation and ending refs** are recorded in [C40 engineering](CONTINUATION_40_ENGINEERING.md), [its verification receipt](fixtures/c40-verification.json) and [the updated push description](C40_GITHUB_DESCRIPTION.md). The C35–C37 record below is historical and describes the earlier promotion to `8c0bed0`; its earlier test counts and publication state are not the C40 final results. Earlier source histories, experiments and artifacts remain preserved.
+
 C35 R12, C36, One Halo research and C37 were integrated in an isolated worktree. All completed engineering histories are reachable. No tracked source path was deleted, no development history was rewritten and no experimental research was discarded. Seven unvalidated dependency proposals remain separate.
 
 ## Commits and integration
