@@ -19,6 +19,8 @@ pub struct Invite {
     pub key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub game: Option<GameBinding>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub certificate:Option<String>,
 }
 pub fn steam_endpoint(value: &str) -> Result<(u64, u32)> {
     let Some(rest) = value.strip_prefix("steam:") else {
@@ -64,6 +66,10 @@ impl Invite {
         if let Some(game) = &self.game {
             game.validate()?;
         }
+        if let Some(certificate)=&self.certificate{
+            if self.transport!=Transport::Lan{return invalid("Spark TLS certificates are only used by the direct LAN/VPN transport");}
+            crate::studio_tls::client(certificate)?;
+        }
         Ok(())
     }
     pub fn encode(&self) -> Result<String> {
@@ -101,12 +107,12 @@ mod tests {
     #[test]
     fn private_invites_round_trip_without_accepting_wildcard_or_public_tcp_addresses() {
         let mut invite = Invite {
-            schema_version: 2,
+            schema_version: PROTOCOL_VERSION,
             session_id: uuid::Uuid::new_v4().to_string(),
             transport: Transport::Lan,
             endpoint: "192.168.1.2:12345".into(),
             key: "a".repeat(32),
-            game: None,
+            game: None, certificate:None,
         };
         assert_eq!(
             Invite::decode(&invite.encode().unwrap()).unwrap().endpoint,

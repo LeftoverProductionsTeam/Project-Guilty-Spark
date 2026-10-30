@@ -34,3 +34,7 @@ Direct/runtime/build dependencies and their actual license expressions are liste
 The interface artwork/CSS and example QuickForge arena are original project work. Rendered native screenshots may show user-owned Halo content to document behavior; they are not reusable asset packs. Historical mod fixtures stay local. Creator-contributed artwork requires explicit provenance and licensing before redistribution.
 
 Corrections are welcome through the **Historical attribution** issue type. Include an original readme, release thread, source repository or other traceable source. The in-app Community Thanks nominations remain local and unverified until reviewed.
+
+## SparkLink collaboration references
+
+C39 studied [Epic's Unreal Multi-User design](https://dev.epicgames.com/documentation/en-us/unreal-engine/multi-user-editing-overview-for-unreal-engine), [Blender Multi-User](https://multi-user.readthedocs.io/en/latest/), [Automerge](https://github.com/automerge/automerge) and [Yjs](https://docs.yjs.dev/). These are attributed architecture precedents, not copied engine or synchronization implementations. TLS uses [rustls](https://github.com/rustls/rustls), [rcgen](https://github.com/rustls/rcgen) and their separately licensed dependencies; resolved notices remain in the dependency inventory.

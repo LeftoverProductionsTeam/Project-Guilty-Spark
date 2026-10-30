@@ -32,7 +32,8 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
     if(JSON.stringify(before)===JSON.stringify(incoming))return state;
     const update=(p:Project)=>({...p,quickForge:p.quickForge?mergeForge(before,incoming,p.quickForge,true):p.quickForge});
     const current={...state.current,quickForge:action.document,modifiedAt:new Date().toISOString()};
-    const differs=(p:Project)=>JSON.stringify(p.quickForge)!==JSON.stringify(current.quickForge);
+    const comparable=(p:Project)=>JSON.stringify({...p,modifiedAt:'',history:[],builds:[]});
+    const differs=(p:Project)=>comparable(p)!==comparable(current);
     // Apply only the incoming properties across undo snapshots. Undo can then
     // reverse our own edit without restoring stale values from the other editor.
     return {...state,current,past:state.past.map(update).filter(differs),future:state.future.map(update).filter(differs),dirty:true};

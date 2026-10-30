@@ -1,5 +1,14 @@
 # Changelog
 
+## C39 — SparkLink shared QuickForge
+
+- Extend the existing session service with private invitation-pinned TLS, authenticated Owner/Editor/Viewer roles and bounded typed source messages.
+- Journal accepted revisions before acknowledgement; retain stable retry IDs, per-author inverse undo/redo, scoped brush structure ownership and recoverable pending drafts.
+- Add compact Live Studio header/drawer controls, explicit host recovery and owner-bound frozen native builds while later source editing continues.
+- Resolve shared native asset references against each creator's own source hash/tag identity; keep local library IDs and cameras private.
+- Fix selecting a brush without revealing its Inspector and preserve local unshared undo across remote source changes.
+- Keep native semantic-tag sharing, binary asset transfer, remote work-area indicators, collaborative game delivery and game-peer replication explicitly open. Preserve C35–C38 work and research.
+
 ## C38 — Source-aware native tools
 
 - Share the capability catalog between the desktop allowlist and tool UI; distinguish installation from source/runtime compatibility.

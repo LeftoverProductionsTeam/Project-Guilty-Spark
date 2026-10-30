@@ -1,5 +1,7 @@
 # Runtime and operation compatibility — Continuation 36
 
+C39 adds shared QuickForge Level A source sessions over private TLS. This row does not change any Level B native engine or Level C game-peer acceptance gate. [Exact shared-source scope and actual participant evidence](CONTINUATION_39_ENGINEERING.md).
+
 C38 shares the tool catalog across the backend/frontend and adds pinned MCC H1 native dependency checks, isolated radius edits, narrowly reviewed lens repair and recoverable source revisions. These are native-source operations, not new game/network adapters. [C38 evidence and limits](CONTINUATION_38_ENGINEERING.md).
 
 C37 adds source-bound Baboon 0.3.2/HCEEK handoff, pinned Invader structure checks, conflict-aware revisions and recovery. Exact tested scope and limits are in [C37](CONTINUATION_37_ENGINEERING.md). Legacy caches are not direct Baboon inputs.

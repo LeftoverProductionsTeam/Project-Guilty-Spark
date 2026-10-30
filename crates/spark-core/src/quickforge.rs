@@ -406,6 +406,14 @@ fn hash<T: Serialize>(value: &T) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
 }
 pub fn validate_document(doc: &QuickForgeDocument) -> Result<()> {
+    validate_document_scope(doc, false)
+}
+/// Network references preserve native tag/source hashes, never another PC's
+/// library UUID. This validator does not authorize local reads or compilation.
+pub fn validate_portable_document(doc: &QuickForgeDocument) -> Result<()> {
+    validate_document_scope(doc, true)
+}
+fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<()> {
     if doc.schema_version != SCHEMA_VERSION
         || doc.name.trim().is_empty()
         || doc.name.len() > 100
@@ -499,8 +507,14 @@ pub fn validate_document(doc: &QuickForgeDocument) -> Result<()> {
         {
             return invalid("Invalid asset placement class, transform or scenario values");
         }
-        if p.source_project_id.is_some() != p.source_sha256.is_some() {
+        if portable && p.source_project_id.is_some() {
+            return invalid("Portable source must not contain a local library identity");
+        }
+        if !portable && p.source_project_id.is_some() != p.source_sha256.is_some() {
             return invalid("Imported asset provenance needs both project ID and source SHA-256");
+        }
+        if portable && p.source_sha256.is_some() && p.tag_id.is_none() {
+            return invalid("A portable source reference requires an exact native tag identity");
         }
         if let Some(id) = &p.source_project_id {
             uuid::Uuid::parse_str(id)

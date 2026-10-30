@@ -1024,6 +1024,51 @@ test('shared QuickForge survives tool changes and pauses a divergent local draft
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='forge_session_leave'));expect(calls).toHaveLength(1);expect(calls[0].args).toEqual({projectId:'a',sessionId:'11111111-1111-4111-8111-111111111111'});
 });
 
+test('shared keyboard history waits for a poll and unfinished undo without losing order', async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('spark-test-forge', JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]})));
+  await mockDesktop(page);
+  await openFixture(page);
+  await chooseTool(page, 'Level editor');
+  await page.evaluate(() => {
+    const w=window as any, previous=w.__TAURI_INTERNALS__.invoke;
+    w.__sparkReverseCalls=[];
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='forge_session_host') {
+        await previous(command,args);
+        Object.assign(w.__sparkMock.session.view,{canUndo:true,canRedo:false,role:'owner',encrypted:true,durable:true});
+        return structuredClone(w.__sparkMock.session);
+      }
+      if(command==='forge_session_reverse') {
+        w.__sparkReverseCalls.push(args.redo);
+        if(!args.redo) await new Promise<void>(resolve=>{w.__sparkReleaseUndo=resolve;});
+        const view=w.__sparkMock.session.view;
+        view.revision++;view.document.name=args.redo?'Redone shared source':'Undone shared source';
+        view.canUndo=args.redo;view.canRedo=!args.redo;view.acknowledgedOperationId=args.operationId;
+        return structuredClone(view);
+      }
+      if(command==='forge_session_poll' && w.__sparkGatePoll) {
+        w.__sparkGatePoll=false;
+        await new Promise<void>(resolve=>{w.__sparkReleasePoll=resolve;});
+      }
+      return previous(command,args);
+    };
+  });
+  await page.getByRole('button',{name:'Live Studio · Solo',exact:true}).click();
+  await page.getByRole('button',{name:'Host editing session',exact:true}).click();
+  await page.locator('.forge-viewport canvas').click({position:{x:50,y:50}});
+  await page.evaluate(()=>{(window as any).__sparkGatePoll=true;});
+  await expect.poll(()=>page.evaluate(()=>typeof (window as any).__sparkReleasePoll)).toBe('function');
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+Shift+z');
+  expect(await page.evaluate(()=>(window as any).__sparkReverseCalls)).toEqual([]);
+  await page.evaluate(()=>(window as any).__sparkReleasePoll());
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkReverseCalls)).toEqual([false]);
+  expect(await page.evaluate(()=>(window as any).__sparkReverseCalls)).toEqual([false]);
+  await page.evaluate(()=>(window as any).__sparkReleaseUndo());
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkReverseCalls)).toEqual([false,true]);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.session.view.document.name)).toBe('Redone shared source');
+});
+
 test('live Ctrl+Z waits for an in-flight game receipt and then supports redo',async({page})=>{
   await mockDesktop(page);
   await page.evaluate(()=>{

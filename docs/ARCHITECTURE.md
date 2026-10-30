@@ -1,5 +1,7 @@
 # Architecture
 
+C39 extends the existing shared source service with typed version-3 messages, invitation-pinned TLS, authenticated roles, durable authoritative transactions, scoped generated-structure leases and per-author inverse operations. A session-bound frozen build is verified separately from the current draft. Native tags and custom binary imports remain outside this first shared document. [SparkLink architecture and design decision](SPARKLINK_ARCHITECTURE.md), [private transport boundary](SPARKLINK_SECURITY.md) and [application/native file distinctions](PROJECT_FILES.md).
+
 C38 uses a canonical tool capability catalog shared with the frontend. Managed Invader recipes operate on isolated candidates; the existing native parser verifies exposed fields and the existing complete-file transaction copier stages accepted/recovery revisions. Source publication compares the saved map, build and both native/Baboon selectors. Build startup, native acceptance and Baboon reconciliation share a source-operation guard. Native tags and compiler boundaries retain their formats. [C38 design and limits](CONTINUATION_38_ENGINEERING.md).
 
 C37 adds an external-editor boundary in `baboon_native`, reusing the native watcher and working-tag compiler. Native tool code/schemas stay external. Accepted whole-file revisions are staged as fresh inputs below the validated parent job; source/SDK copies are never overwritten. Native header/class/payload-CRC checking is read-only, content-hash cached and separate from semantic parser/compiler proof. [C37 detail](CONTINUATION_37_ENGINEERING.md).
@@ -18,7 +20,7 @@ C36 adds [native portability/preflight](NATIVE_PORTABILITY.md) through the exist
 See [C33 engineering](CONTINUATION_33_ENGINEERING.md), [runtime capabilities](RUNTIME_CAPABILITIES.md), [BSP pipeline](QUICKFORGE_BSP_PIPELINE.md) and [asset policy](ASSET_AND_COPYRIGHT_POLICY.md). The experimental exact-build MCC live adapter below is separate from the unimplemented game-peer AI/network translation paths.
 
 - **Live adapter:** exact-build MCC Halo 1 process reads and bounded object-position writes use map/object identity and readback checks. No code injection or game-file writes. See [adapter limits](LIVE_ADAPTER.md).
-- **Shared source:** private two-editor TCP sessions serialize host revisions, rebase disjoint axis/property edits and retain conflicting local drafts. Each editor binds its own runtime objects. Source sync does not certify game replication.
+- **Shared source:** SparkLink extends the private QuickForge service with bounded multi-editor TLS sessions, host revisions, disjoint field/axis rebasing, retained conflicting drafts and durable author history. Cameras stay local. Each editor's live-game adapter remains separate; source sync does not certify game replication.
 ## Integration provenance
 
 The C35–C37 consolidation retains the existing rendering/audio, document, Director, Portability Lab, runtime and native-tool boundaries. Four normal merges preserve their ancestry; the integrated production tree matches frozen C37. Combined regression runners and metadata add evidence without enabling experimental networking or widening compiler inputs. [Inventory and verification](MASTER_CONSOLIDATION.md).

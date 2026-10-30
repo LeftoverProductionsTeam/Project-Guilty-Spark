@@ -5,6 +5,7 @@ use serde::{Serialize,Deserialize};
 use sha2::{Digest,Sha256};
 use std::{fs,path::{Path,PathBuf}};
 const MAX_BYTES:u64=34*1024*1024;
+pub const BEFORE_SHARED_RECOVERY: &str = "before-shared-recovery";
 #[derive(Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 struct Snapshot {schema_version:u32,id:String,created_at:String,reason:String,project:Project}
@@ -43,7 +44,7 @@ pub fn list(project_dir:&Path)->Result<Vec<SnapshotInfo>> {
     out.sort_by(|a,b|b.created_at.cmp(&a.created_at));Ok(out)
 }
 pub fn create(project_dir:&Path,project:&Project,reason:&str,retention:usize)->Result<SnapshotInfo> {
-    if !(1..=100).contains(&retention) || !["manual","periodic","before-build","before-restore","before-upgrade","before-shared-session"].contains(&reason) {
+    if !(1..=100).contains(&retention) || !["manual","periodic","before-build","before-restore","before-upgrade","before-shared-session",BEFORE_SHARED_RECOVERY].contains(&reason) {
         return invalid("Snapshot retention must be 1–100 and the reason must be known");
     }
     project.validate()?;
@@ -86,6 +87,9 @@ pub fn preview(project_dir:&Path,current:&Project,id:&str,expected_sha256:&str)-
         assert!(preview(dir.path(),&p,&second.id,&"0".repeat(64)).is_err());
         let foreign=Project::new("Another");assert!(preview(dir.path(),&foreign,&first.id,&first.sha256).is_err());
         create(dir.path(),&p,"before-build",2).unwrap();assert_eq!(list(dir.path()).unwrap().len(),2);
+        let recovery=create(dir.path(),&p,BEFORE_SHARED_RECOVERY,2).unwrap();
+        assert_eq!(recovery.reason,BEFORE_SHARED_RECOVERY);
+        assert_eq!(preview(dir.path(),&p,&recovery.id,&recovery.sha256).unwrap().title,p.title);
         assert!(preview(dir.path(),&p,"../source.map",&first.sha256).is_err());
     }
 }

@@ -6,6 +6,8 @@ The original Project Guilty Spark code is [MIT](LICENSE). This does not relicens
 
 React, Three.js, React Three Fiber/Drei, Lucide, Tauri, Vite, TypeScript and their transitive packages retain their upstream licenses. Rust dependencies include serde, SHA-2, chrono, rusqlite, ZIP/Deflate and native platform bindings. SQLite's engine is public domain; its Rust wrapper and other bundled code have their own notices.
 
+C39 adds rustls 0.23.46, rcgen 0.14.10, their ring-based cryptographic provider and resolved certificate/cryptographic dependencies for private session TLS. Their individual license expressions and available notices are included in the regenerated inventory; Spark's MIT license does not replace those terms. Unreal Multi-User, Blender Multi-User, Automerge and Yjs were architecture references, not embedded implementations.
+
 The exact declared license expressions, versions and collected license texts are in [the dependency inventory](docs/DEPENDENCY_LICENSES.json) and [license texts](docs/licenses/). This inventory covers resolved/installed build packages, including platform and development packages that are not all bundled in the Windows executable. It is provenance evidence, not a legal compatibility certification. Lockfiles remain the source of exact dependency resolution. Regenerate with node scripts/generate-notices.mjs after dependency changes and review any missing notice files.
 
 WebView2 and OS/native prerequisites retain Microsoft/platform terms. System GTK/WebKit frameworks on Linux are not declared MIT by this project. Platform build recipes do not imply those frameworks are redistributed inside the Windows package.

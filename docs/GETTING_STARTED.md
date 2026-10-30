@@ -1,5 +1,7 @@
 # Connect your first Halo project
 
+To create together, open a QuickForge map and choose **Live Studio · Solo** in the header. The existing session drawer hosts or joins a private encrypted source session. Start with different brushes or player starts; keep native tags/custom imports as separate solo work until their shared phases are implemented. [SparkLink setup, recovery and first acceptance test](SPARKLINK_SETUP.md).
+
 For built QuickForge/native source, **Tag editor → Invader** offers a native-tag picker, dependency checks, isolated edit previews and retained recovery. Accept a source revision, then use **Runtime & Tools → Build working tag edits**. **Play & servers → Tools for this map** separates installed programs from actual source compatibility. [Tools and setup](COMPATIBLE_TOOLS.md).
 
 For full MCC H1 loose tags, open Runtime & Tools details or the selected tag’s Baboon panel. Choose the complete reviewed portable folder, save in the external editor, review stable-save integrity and field findings, keep a new revision and Build working tag edits. Failed integrity checks block acceptance/builds. Restore starting source creates a new verified recovery copy. See [C37 setup and limits](CONTINUATION_37_ENGINEERING.md).
