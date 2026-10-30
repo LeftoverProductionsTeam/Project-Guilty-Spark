@@ -197,6 +197,24 @@ fn registration_from_canonical_windows_path_is_detected_and_idempotent() {
     assert!(!fs::read_to_string(&manifest).unwrap().starts_with(r"\\?\"));
 }
 #[test]
+fn manifest_lookup_resolves_existing_root_aliases_without_rewriting_the_manifest() {
+    let d = tempfile::tempdir().unwrap();
+    let root = d.path().join("Owned Mods");
+    fs::create_dir_all(root.join("Child")).unwrap();
+    let alias = root.join("Child").join("..");
+    let manifest = d.path().join("ModManifest.txt");
+    mcc::register_root(&manifest, &alias).unwrap();
+    let registered = fs::read(&manifest).unwrap();
+    for spelling in [&root, &alias, &root.join(".")] {
+        assert!(mcc::manifest_contains(&manifest, spelling).unwrap());
+        assert!(mcc::register_root(&manifest, spelling).unwrap().is_none());
+    }
+    let other = d.path().join("Other Mods");
+    fs::create_dir(&other).unwrap();
+    assert!(!mcc::manifest_contains(&manifest, &other).unwrap());
+    assert_eq!(fs::read(&manifest).unwrap(), registered);
+}
+#[test]
 fn registration_lock_does_not_overwrite_manifest() {
     let d = tempfile::tempdir().unwrap();
     let root = d.path().join("Mods");

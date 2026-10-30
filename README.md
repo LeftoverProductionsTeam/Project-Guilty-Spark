@@ -1,5 +1,7 @@
 # Project Guilty Spark
 
+Windows CI manifest registration now resolves the selected mod folder consistently when Windows supplies a short path such as `RUNNER~1`. The reported three failures were reproduced locally before the fix; the full locked Windows workspace suite then passed with the same short-path condition. [Fix and verification](docs/WINDOWS_MANIFEST_CI_FIX.md). A new GitHub-hosted run is still required after pushing.
+
 ## C40 native-save integrity and CE companion
 
 Missed save notifications and preserved timestamps now have a bounded background content sweep. Native edits wait for semantic validation before reconciliation or compilation. Save diagnostics retain file hashes and tool launch associations without inventing a confirmed writer. [C40 audit, verification and consolidation](docs/CONTINUATION_40_ENGINEERING.md).

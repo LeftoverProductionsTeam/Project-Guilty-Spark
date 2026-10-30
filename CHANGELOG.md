@@ -1,5 +1,11 @@
 # Changelog
 
+## Windows CI — MCC manifest lookup
+
+- Resolve an existing mod root during manifest lookup, matching registration's canonical path handling. Short Windows directory aliases no longer make a successful registration appear missing.
+- Preserve DOS/UNC prefix normalization, UTF-8/UTF-16 encoding, existing manifest entries, backups, locking and registration idempotence.
+- Reproduce the reported three failures with a real Windows 8.3 temporary-folder alias; add an existing-directory alias regression. The focused suite passes 17 tests and the full locked Windows workspace suite passes 519, with seven existing opt-in tests ignored. Hosted CI awaits the next push.
+
 ## C40 — Native integrity, CE companion and consolidation
 
 - Add bounded rolling content checks for native saves that preserve metadata or lose filesystem notifications; retain the normal stable-save and full-build identity gates.

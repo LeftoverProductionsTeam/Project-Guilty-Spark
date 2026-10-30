@@ -165,7 +165,12 @@ pub fn manifest_contains(manifest: &Path, root: &Path) -> Result<bool> {
         return Ok(false);
     }
     let (text, _, _) = decode_manifest(&read_bounded(manifest, 1024 * 1024)?)?;
-    let path = root.to_string_lossy();
+    // Registration canonicalizes the selected directory. Resolve it here too:
+    // Windows temp roots can contain 8.3 aliases (e.g. RUNNER~1), which spelling
+    // normalization alone cannot equate with the registered long directory name.
+    // Keep lexical lookup for entries whose directories are currently unavailable.
+    let resolved = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    let path = resolved.to_string_lossy();
     Ok(text
         .lines()
         .any(|s| normalized_path(s) == normalized_path(&path)))
