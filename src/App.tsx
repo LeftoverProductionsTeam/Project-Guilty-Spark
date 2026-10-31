@@ -207,6 +207,11 @@ export default function App() {
   const buildRequest = useRef(0);
   const current = history.current;
   useEffect(()=>{
+    if(!native||!ready||current||!data.installation.mccPath)return;
+    const timer=setTimeout(()=>{void import('./homeShowcase').then(module=>module.preloadHomeModels(data)).catch(()=>{/* Optional showcase never blocks workbench startup. */});},250);
+    return()=>clearTimeout(timer);
+  },[ready,!!current,data.dataDirectory,data.installation.mccPath]);
+  useEffect(()=>{
     if(!native||!current?.source||current.source.audioResources)return;
     let disposed=false;
     void call<OpenProject|null>('auto_connect_sound_resources',{projectId:current.id}).then(open=>{

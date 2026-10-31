@@ -74,7 +74,9 @@ The scoped client observation lasts five seconds; the separate menu-only setup o
 | Optimized Windows executable / NSIS | Built |
 | Genuine direct/source, integrity, three-process, asset/GPU, first-load/default-texture and CE suites | Passed within the scopes above |
 
-Final bundled executable SHA-256: `9ccd6ed9939e38686e92deffae560652db5e17528a41b6854f4caf5bac74b886`. All six final native receipts above bind this exact executable. Packaging follows native acceptance; source and portable archives retain independent checksum verification. Clean-machine installation and hosted GitHub CI are not claimed.
+Consolidated integration executable SHA-256: `9ccd6ed9939e38686e92deffae560652db5e17528a41b6854f4caf5bac74b886`. All six final integration receipts above bind this exact executable. Source and portable archives retain independent checksum verification. Clean-machine installation and hosted GitHub CI are not claimed.
+
+The later home-presentation follow-through uses executable `1d68543d24ceb5769dd3303fe9c3d758555cab9aaa39ee95075532af7be17410`. It sharpens/softens/reorients the native monitor and shares source preparation across library visits. Its own native home check and full asset/animation/import/native-build regression pass, as do 262 frontend tests, 125 browser checks, TypeScript and 59 offline scripts. Core/native transaction/protocol code is unchanged by this UI follow-through; the six-suite results retain the integration executable identity above. [Exact presentation and timing evidence](NATIVE_ASSETS_AND_SHOWCASE.md#c41-clarity-and-loading-polish).
 
 ## Publication and next work
 

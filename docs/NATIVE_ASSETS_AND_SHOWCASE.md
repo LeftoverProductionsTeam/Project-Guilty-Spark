@@ -4,9 +4,19 @@ This continues `e8b5761` and preserves C35–C39 history, native reconciliation/
 
 ## Workflow
 
-Home renders the actual monitor from an owned installed MCC campaign cache directly over the page. It has a transparent background, source textures/reflections, presentation lighting and gentle cursor response. An available Chief/character stays visible while that source loads in the background. Spark does not bundle Halo art.
+Home renders the actual monitor from an owned installed MCC campaign cache directly over the page. It has a transparent background, source textures/reflections, presentation lighting and gentle cursor response. The C41 polish prioritizes an available monitor source directly; Chief/other characters remain fallbacks when that source is unavailable. Spark does not bundle Halo art.
 
 The monitor automatically plays **idle overlay**. Hover or focus its controls to pause/resume or select **monitor_talking-loop** or **stand unarmed idle**. These are native skeletal clips, separate from the cursor-facing presentation rotation. Reduced-motion preferences start playback paused. The base idle is an authored pose; selecting the talking clip does not play speech.
+
+## C41 clarity and loading polish
+
+The home presentation uses **1.5–2× canvas density** with antialiasing, a smaller bloom radius/strength, source-color grading and softer key/fill light. Its resting pose turns toward the left side of the page and its mouse-follow range now reaches both sides. Other model-inspection lighting, authored animation data and map environments retain their existing controls.
+
+A bounded source-identity promise cache shares background preparation with the home view. An existing preserved `c40` source is opened before scanning/reimporting its installed counterpart. Returning to the library reuses the chosen immutable identity; native model/texture readers still apply their existing hash and resource checks. No GPU objects or unchecked pixels are cached by this resolver. Missing-source results are retryable, and separate installations have separate cache keys.
+
+The [real desktop check](../scripts/test-home-showcase-native.mjs) verifies the same 1,126-triangle owned monitor, original texture/reflection, progressing native animation, actual render-buffer density, left/right screen heading and preserved source identity after a workspace round trip. Native screenshots were visually inspected. One fresh-load observation improved from **4,959 to 4,313 ms**; the return visit improved from **1,651 to 899 ms**. These are single local observations, not percentiles or a promise for every machine. Model discovery still reads and verifies owned files.
+
+The native invoke binding is immutable, so the failed attempt to count its calls remains a failed diagnostic. No zero-call native claim is based on an empty trace. Three separate unit tests verify deduplication, preserved-source priority and missing/changed-installation retry policy. [Exact polish receipt](fixtures/c41-home-showcase-polish.json). The earlier broad native acceptance below remains historical; the C41 integration report and its separate executable identity preserve the six-suite consolidation evidence.
 
 In **Asset library → Installed maps & downloads**, select a source and choose **Load assets**. Discovery covers registered runtimes, linked folders, Downloads and Spark's inbox. It reads bounded headers; asset payloads load on selection. Sources are preserved without replacing the current map or its unsaved draft. ZIP contents still pass the existing strict archive importer.
 

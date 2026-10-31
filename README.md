@@ -61,7 +61,9 @@ pnpm test:ui
 node scripts/desktop.mjs build
 ~~~
 
-The latest local consolidated checks pass **595 Rust tests (7 opt-in tests ignored), 259 frontend tests, 125 browser checks and 59 offline scripts**. The Windows executable and NSIS installer build. These are local results, not a claim that hosted GitHub CI has rerun. Exact native receipts, final package identities, branch preservation and unresolved gates are recorded in the [C41 integration report](docs/FINAL_CONSOLIDATION_C41.md).
+The latest local consolidated checks pass **595 Rust tests (7 opt-in tests ignored), 262 frontend tests, 125 browser checks and 59 offline scripts**. The Windows executable and NSIS installer build. These are local results, not a claim that hosted GitHub CI has rerun. Exact native receipts, final package identities, branch preservation and unresolved gates are recorded in the [C41 integration report](docs/FINAL_CONSOLIDATION_C41.md).
+
+The [home showcase polish](docs/NATIVE_ASSETS_AND_SHOWCASE.md#c41-clarity-and-loading-polish) sharpens the actual monitor, reduces its lighting/glow, extends its left-facing mouse response and shares source preparation across visits. Native animation, textures and reflections remain active; load timings and the later executable identity have their own evidence.
 
 ## Project and community
 

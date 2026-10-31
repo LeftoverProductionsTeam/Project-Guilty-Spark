@@ -4,10 +4,13 @@ const showcaseFeatures = {
   ...DEFAULT_RENDER_FEATURES,
   enabled: true,
   quality: 'full' as const,
-  bloomStrength: 0.15,
-  bloomThreshold: 1.5,
-  exposureEv: -0.25,
-  toneMapping: 'filmic' as const,
+  bloomStrength: 0.065,
+  bloomThreshold: 1.25,
+  bloomRadius: 0.16,
+  exposureEv: -0.15,
+  selfIllumStrength: 0.85,
+  specularStrength: 0.2,
+  toneMapping: 'source' as const,
 };
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -53,6 +56,7 @@ function Model({
 }) {
   const group = useRef<THREE.Group>(null),
     { camera, pointer, invalidate, gl } = useThree();
+  const poseSample = useRef(0);
   const motionAllowed = useMemo(() => !matchMedia('(prefers-reduced-motion: reduce)').matches, []);
   useEffect(() => {
     if (!showcase || !live || !motionAllowed) return;
@@ -94,7 +98,7 @@ function Model({
   }, [camera, fit, invalidate, showcase]);
   useFrame((_, dt) => {
     if (!group.current) return;
-    const target = live && motionAllowed ? pointer.x * 0.22 : 0;
+    const target = (showcase ? -0.6 : 0) + (live && motionAllowed ? pointer.x * (showcase ? 0.45 : 0.22) : 0);
     group.current.rotation.z = THREE.MathUtils.damp(group.current.rotation.z, target, 4, dt);
     group.current.rotation.x = THREE.MathUtils.damp(
       group.current.rotation.x,
@@ -102,6 +106,17 @@ function Model({
       4,
       dt,
     );
+    if (showcase && (poseSample.current += dt) > 0.1) {
+      poseSample.current = 0;
+      group.current.updateWorldMatrix(true, false);
+      const origin = new THREE.Vector3().project(camera),
+        front = new THREE.Vector3(fit.radius, 0, 0).applyMatrix4(group.current.matrixWorld).project(camera);
+      gl.domElement.dataset.gsShowcasePose = JSON.stringify({
+        yaw: group.current.rotation.z,
+        pitch: group.current.rotation.x,
+        screenHeading: front.x - origin.x,
+      });
+    }
   });
   return (
     <group ref={group}>
@@ -178,9 +193,9 @@ export default function NativeModelPreview({
       environment ?? {
         ...DEFAULT_ENVIRONMENT,
         ambientColor: [0.9, 0.95, 1],
-        ambientIntensity: showcase ? 0.9 : 0.85,
+        ambientIntensity: showcase ? 0.5 : 0.85,
         sunColor: [1, 0.95, 0.88],
-        sunIntensity: showcase ? 1.4 : 1.6,
+        sunIntensity: showcase ? 0.7 : 1.6,
         sunAzimuth: -30,
         sunElevation: 35,
       },
@@ -207,7 +222,7 @@ export default function NativeModelPreview({
       {view && visible ? (
         <Canvas
           camera={{ fov: 42, up: [0, 0, 1] }}
-          dpr={[1, 1.5]}
+          dpr={showcase ? [1.5, 2] : [1, 1.5]}
           gl={{
             antialias: true,
             alpha: true,

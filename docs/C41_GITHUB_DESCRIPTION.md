@@ -4,12 +4,14 @@ Integrate the preserved Smart Edit work into current master without replacing ne
 
 Fix standalone Zombie Demo first-load textures: embedded images retain priority, exact compatible installed-MCC images load independently, and original packs supersede compatible previews. Actual desktop acceptance renders 124/132 materials standalone (75 compatible) and 132/132 with its original pack. Unconfigured arena/brush surfaces gain owned metal/grass previews without compiler setup. These pixels do not become native extraction/build resources. Add owned CE window-visibility diagnostics and missing-window guidance while retaining the unresolved real-client join gate.
 
+The later home-showcase follow-through renders the actual animated monitor at higher density with softer lighting and tighter bloom, turns it toward the left, and shares asynchronous source preparation across visits. The native home test and asset/build regression bind the later executable separately from the six-suite consolidation. Frontend checks now total 262; source-identity caching does not bypass model/resource validation. See [showcase evidence](NATIVE_ASSETS_AND_SHOWCASE.md#c41-clarity-and-loading-polish).
+
 The original 42 source files are frozen in commit `229fe2f3c2af821ce8bc1b4621fcc344fe66e7d3` and merged through `edebfac`. All seven unique dependency proposals are retained as merge parents. Adapt SHA-2 output encoding without changing existing receipt/source identities, align the renderer/bundler type and plugin versions, and preserve all 391 earlier ledger IDs in the 398-record ledger. All 30 initially captured branch tips and all 24 current non-alias branch references are contained in local master; the original checkout's 146 dirty files still match verified backups. A separate push during the run already advanced the remote to `3a9dddb`; this handoff adds the final local fixes and verification.
 
 Validation:
 
 - Locked Windows Rust workspace: **595 passed**, seven existing opt-in tests ignored.
-- **259 frontend tests, 125 browser checks, 59 offline scripts and two interface-probe tests**; TypeScript and frozen pnpm lock pass.
+- **262 frontend tests, 125 browser checks, 59 offline scripts and two interface-probe tests**; TypeScript and frozen pnpm lock pass. The integration receipt retains its original 259-test frontend count; three later source-loading tests cover the home polish.
 - Optimized Windows executable and NSIS installer build.
 - Genuine direct MCC byte/semantic validation, actual rendered gizmo persistence and equivalent extraction/working-tag compilation, preserving 2,240 native source files.
 - Real normalization/corruption refusal, recoverable source and a valid Invader edit through native compilation. Deliberate QA corruption is not attributed to Baboon.

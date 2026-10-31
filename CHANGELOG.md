@@ -1,5 +1,11 @@
 # Changelog
 
+## C41 home showcase polish
+
+- Render the native monitor at 1.5–2× density with softer lighting, tighter glow and source-color grading. Bias the resting pose left and extend the actual mouse-follow range to both sides.
+- Share asynchronous source preparation with the home view, prefer an already preserved campaign source and avoid repeating discovery/import on library return. Retain fresh native model/resource validation and retryable missing-source behavior.
+- Verify actual native geometry, texture/reflection, skeletal playback, render density, left/right heading and source identity across workspace navigation. One local first-load sample improves 4,959→4,313 ms; return improves 1,651→899 ms. [Evidence and scope](docs/NATIVE_ASSETS_AND_SHOWCASE.md#c41-clarity-and-loading-polish).
+
 ## C41 final integration — verified local master
 
 - Merge the preserved 42-file Smart Edit source with the newer native asset/BSP/texture/CE work; retain all prior commits, requirements and failed experiments. Merge seven unique dependency branches and adapt digest encoding without changing persisted identities.
