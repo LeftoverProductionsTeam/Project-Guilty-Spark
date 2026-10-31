@@ -1,25 +1,31 @@
-Project Guilty Spark C41 startup follow-through — 2026-10-31
-Previous committed foundation: 4caf58439fa5a94298a390aea570b93c3d652304
-Validated implementation commit: 1f9351b406ef3e7c244ec5dbb9be57f01f711fb7
-Application SHA-256: 4b0695be6bd58a80a2540d9d32295c7efd29561bd468f1baf9d23fd9196decec
+Project Guilty Spark C41 measured map-loading performance — 2026-10-31
+Previous committed foundation: 68dc2c00556b6ecc22a5a7092338d9ad956bd21a
+Validated source/document commit: 6564eedfec192e4d24cd9e62c7f2edc0b2896e48
+Application SHA-256: aeb585c30adb495e3af45fd49c658e758c7c9b58e7e2fa733c790f8ee89a6ce6
 
-Overlap newly discovered MCC source inspection/copy with texture-pack pinning. Preserve existing sources, concurrent edits, ownership and newer resource choices. Read the first reflection alongside diffuse/detail data; retain normal identity decoding, cancellation and budgets. No source validation, pixels, geometry, decals, effects or monitor clips are omitted.
+Batch up to four source-exact cubemaps per native read transaction. Preserve source SHA checks, pre/post resource hashing, exact indexed spans, explicit refusals, source/resource epoch retirement and the existing resident budgets. Overlap asset source preparation and omit no renderer content.
 
-Two independent native runs per executable show process-to-ready showcase 5.949 to 4.345 seconds (27.0% faster), warm process 3.275 to 2.792 seconds (14.7%). Catalog and repeated switching are effectively unchanged. General memory/CPU improvement is not claimed. 604 locked Rust tests pass (7 opt-in ignored), 269 frontend, 126 browser, 59 offline scripts and 2 interface probes. Native asset/import/compiler and original-loop/corruption challenges pass again.
+Three native runs per executable measure repeated switching 4.583 to 4.187 seconds (8.6% faster), MCC revisits 4.899 to 4.315 seconds (11.9%), and catalog preparation 4.221 to 3.163 seconds (25.1%). All six runs and the slow initial startup are retained. Startup, first-load, frame-rate and general memory gains are not claimed.
 
-C35-C39 history, original sources, native transactions, prior releases/research and the structural direct-map backlog remain intact. CE visual/join/traversal, in-game MCC listening and community gameplay remain unaccepted. No remote push or repository-rule change.
+606 locked Windows Rust checks pass (7 opt-in ignored), 274 frontend, 126 browser, 59 offline and 2 interface probes; TypeScript and Windows/NSIS builds pass. Genuine native asset/reflection/animation/import/collision/cache and original-loop audio challenges pass against the exact executable.
+
+Original 146 dirty files, C35-C39 history, native transactions, all earlier releases/research and structural direct-map backlog remain intact. OpenCE/Chupathingy now have Xbox-format map headers; gameplay acceptance is separate. CE joined player/traversal and MCC in-game listening remain open. No remote publication or repository-rule change.
 
 Changed tracked paths:
 M	README.md
+M	crates/spark-core/src/bitmap_preview.rs
 M	docs/C41_GITHUB_DESCRIPTION.md
-M	docs/C41_NATIVE_AUDIO_PERFORMANCE.md
-A	docs/C41_STARTUP_FOLLOW_THROUGH.md
+A	docs/C41_MAP_LOADING_PERFORMANCE.md
 M	docs/CURRENT_FEATURES.md
-M	docs/UNIVERSAL_WORKBENCH_BACKLOG.md
-A	docs/fixtures/c41-startup-overlap-performance.json
-A	docs/fixtures/c41-startup-overlap-validation.json
-M	src-tauri/src/asset_sources_native.rs
-M	src/homeShowcase.test.ts
-M	src/homeShowcase.ts
+M	docs/GITHUB_HANDOFF.md
+A	docs/fixtures/c41-map-loading-performance.json
+A	docs/fixtures/c41-map-loading-validation.json
+M	scripts/compare-workbench-profiles.mjs
+M	scripts/test-assets-startup-native.mjs
+M	src-tauri/src/app.rs
+M	src/components/AssetSourceBrowser.tsx
+M	src/ownedReflectionCube.test.ts
 M	src/ownedReflectionCube.ts
-M	src/useOwnedForgeModels.ts
+A	src/reflectionTextureSession.test.ts
+A	src/reflectionTextureSession.ts
+M	src/useReflectionTextures.ts
