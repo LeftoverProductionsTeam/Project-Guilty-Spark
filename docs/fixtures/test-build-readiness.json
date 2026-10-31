@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-31",
+  "previousCommittedFoundation": "8fc2acc",
+  "application": {
+    "sha256": "d25321a05a4bd993d2887a0dc15b8c253df0791eb2ffbf12ae08de129f0fd7d0",
+    "bytes": 38328320,
+    "platform": "Windows x64",
+    "bundle": "NSIS-patched executable also tested directly"
+  },
+  "installer": {
+    "sha256": "5265afdd28e9e0d0614b78ed1b8ce6da8749a4909fefb39c843b08a8ff2566f7",
+    "bytes": 9403534,
+    "buildPassed": true,
+    "installationOnCleanMachineTested": false
+  },
+  "regressions": {
+    "rust": {
+      "passed": 570,
+      "ignored": 7,
+      "command": "cargo test --workspace --locked",
+      "mccSteamManifestTests": 17
+    },
+    "frontend": {
+      "passed": 253
+    },
+    "browser": {
+      "passed": 103,
+      "syntheticIpcContracts": true,
+      "newCustomEditionCases": 5
+    },
+    "offlineScripts": 59,
+    "typeScriptPassed": true
+  },
+  "nativeCaseReceiptIdentities": {
+    "customEditionSetup": {
+      "receiptSha256": "00590ebfe52e9c0901dc84cb2e10c3ea0cb7c2e04e59ae117ff25410d32a596d",
+      "exactExecutable": true
+    },
+    "bspWorkshop": {
+      "receiptSha256": "6e888cc5aa46aa46831a79249ec0613944e50e6fa8c5dde11f6f619f6a2d875c",
+      "exactExecutable": true
+    },
+    "assetsAndShowcase": {
+      "receiptSha256": "517b6cd5547870d7013c5b6f25055b7f8c638c54921736b33a66f4e5b36c145c",
+      "exactExecutable": true
+    },
+    "originalBitmaps": {
+      "receiptSha256": "8c3542c7755cd82a77f0be12c7b09030a261c786a50326b72da2b58767b87267",
+      "exactExecutable": true
+    },
+    "resourceRecovery": {
+      "receiptSha256": "157950f927256d49f12fa12f08068ff227c261857653c00478b38472fc5fb3f0",
+      "exactExecutable": true
+    },
+    "renderingWorkflow": {
+      "receiptSha256": "ce9f449bf0fbb88ba92d2b47e7b8150137d64f844e8c088238e0418685a87fdf",
+      "exactExecutable": true
+    },
+    "threeProcessSparkLink": {
+      "receiptSha256": "ce299921f9a0d28a8c0134fcf214d6534094e2539b79a50c4d880444f94262fb",
+      "exactExecutable": true
+    },
+    "nativeSourceIntegrity": {
+      "receiptSha256": "5c6e36b7d8eb1d7891461163cf0a228e33fbcaa53726c4bd58ca8b6c9bc433a1",
+      "exactExecutable": true
+    },
+    "reviewedCeSource": {
+      "receiptSha256": "5bae06b09f6bea23748319f28f9a8645392e1d1c53fb338fb002af6f57ad7ada",
+      "exactExecutable": true
+    }
+  },
+  "customEditionSetup": {
+    "complete": true,
+    "networkDownload": true,
+    "mockedIpc": false,
+    "archiveSha256": "33cf0e24551db62a08239d29077afbf9cdb2aec5c13234022c38ef144d486a3a",
+    "archiveBytes": 97046282,
+    "selectedFiles": 87,
+    "installDurationMs": 8531,
+    "existingGameFilesUnchanged": 127,
+    "nativeMap": {
+      "cacheVersion": 609,
+      "tags": 2455,
+      "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c"
+    },
+    "staleDetectionRefused": true,
+    "registrationSurvivesReload": true,
+    "publisherAuthenticated": false,
+    "bundledSetupExecutablesRun": false
+  },
+  "workshop": {
+    "nativeGeometry": true,
+    "guiCompiled": true,
+    "cacheVersion": 13,
+    "undoRedo": true,
+    "reopenPreservesTopology": true,
+    "gameplayVerified": false
+  },
+  "assets": {
+    "recursiveNativeImportCompiled": true,
+    "compiled": {
+      "sha256": "156fa24337158efa365b19c4d23aec2fc5577f482634b315f2cf2936c703ec12",
+      "nativeTagPath": "gs_assets_f648ad406fea4b3e98d83468a1346540\\scenery\\rocks\\boulder\\boulder",
+      "position": [1.5, -1.5, 0.01],
+      "collisionTriangles": 12
+    },
+    "matchingSourceMapAddition": {
+      "matchingEditableSource": true,
+      "outputSha256": "2ac17abbdaadd8ad9630c6fbbfef6240addd0fe6bfeb6f6853715114c8d740d7",
+      "nativeTag": "gs_assets_57ee2b1356ae4ab686b3fc91bd2bbd4d\\scenery\\rocks\\boulder\\boulder",
+      "position": [-3, 2, 0.01],
+      "originalSourcePreserved": true
+    },
+    "originalsPreserved": true,
+    "homeAnimation": {
+      "clips": [
+        {
+          "name": "idle overlay",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30
+        },
+        {
+          "name": "stand unarmed idle",
+          "frames": 10,
+          "bones": 2,
+          "fps": 30
+        },
+        {
+          "name": "monitor_talking-loop",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30
+        }
+      ],
+      "actualSkinnedVerticesMove": true,
+      "pauseFreezesTime": true
+    }
+  },
+  "textures": {
+    "coverage": {
+      "cacheGeneration": 6,
+      "resourceSha256": "5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea",
+      "verifiedImages": 510,
+      "missingOrMismatchedImages": 2,
+      "unsupportedImages": 32,
+      "internalImages": 142,
+      "sharedNativeImages": 45,
+      "cubemapImages": 27,
+      "volumeImages": 5
+    },
+    "newlyReadableOriginalImages": 57,
+    "unprovenImages": 2,
+    "corruptPrivatePackRefused": {
+      "aliasRefused": "Resource map differs from this project's recorded SHA-256",
+      "packedRefused": "Resource map differs from this project's recorded SHA-256",
+      "embeddedStillReadable": true
+    },
+    "exactResourceRelocationRetainsEditsAndCamera": true,
+    "wrongSoundPinRefused": true,
+    "partialAutomaticRuntimeSubstitutionRefused": true,
+    "renderedMapCases": 2,
+    "fullEngineParity": false
+  },
+  "sparklink": {
+    "nativeProcesses": 3,
+    "separateNativeTrees": 3,
+    "physicalMachines": 1,
+    "mockedIpc": false,
+    "threeAuthorNativeAcceptance": {
+      "revision": 3,
+      "documentSha256": "b7eba935d6db8c5faecc42f3ba66ce0e8b295d82101a3f301964d45138d55ea3",
+      "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+      "assetId": "06d7e3d7-85e9-40b4-95a4-15d4a731aeb5",
+      "assetBytes": 632,
+      "actualModelsInThreeViewports": true,
+      "simultaneousAuthorActions": true
+    },
+    "participantUndoAndReferencedAssetConflict": true,
+    "staleConflictAndDuplicateAck": true,
+    "permissions": true,
+    "workspaceChange": true,
+    "actualHaloToolchain": {
+      "jobId": "8eb1e09b-5c17-40e4-809f-7c76efe3d121",
+      "revision": 13,
+      "laterRevision": 14,
+      "nativeRadius": 0.2750000059604645,
+      "publishedAssetPath": "scenery\\sparklink\\06d7e3d7-85e9-40b4-95a4-15d4a731aeb5",
+      "compiledModelTriangles": 31,
+      "placement": [3, 2, 0.1],
+      "outputSha256": "cf35aaa2d2dec0e12c8254320625d28df2fdfb99ddeac4cc5a9877e09db55174",
+      "durationMs": 37204.88930000001,
+      "gameplayTested": false
+    },
+    "durableRecovery": {
+      "revision": 14,
+      "assetBytesIdentical": true,
+      "semanticFieldIntact": true,
+      "authorIdentitiesAndHistoryRetained": true,
+      "newInvitation": true,
+      "replayDeduplicated": true,
+      "durationMs": 12026.153300000005
+    },
+    "originalSources": {
+      "separateNativeTrees": 3,
+      "filesPerTree": 2240,
+      "templateUnchanged": true,
+      "importUnchanged": true
+    },
+    "synchronizationMeasurements": {
+      "samples": 7,
+      "valuesMs": [
+        7257.319300000003, 54.640199999994365, 246.19560000000638, 394.3715999999986, 376.97359999999753,
+        372.7711999999883, 386.51600000000326
+      ],
+      "physicalMachines": 1,
+      "includesNativeIpcAndReactConsumption": true
+    },
+    "gamePeerReplicationTested": false
+  },
+  "nativeIntegrity": {
+    "normalization": {
+      "changedBytes": 201,
+      "exposedFieldsEquivalent": true,
+      "acceptedAsEquivalent": true,
+      "scope": "Pinned Invader field-output comparison; opaque bytes/unprinted precision are not certified."
+    },
+    "semanticCorruption": {
+      "validChecksum": true,
+      "reconciliationRejected": true,
+      "actualControlledWriter": "QA Node process, intentionally malformed fixture; not Baboon or Invader",
+      "writerConfidence": "unknown"
+    },
+    "crcFailureDetected": true,
+    "recovery": {
+      "startingBytesRestored": true,
+      "damagedExternalEvidenceRetained": true,
+      "priorAcceptedSourceIntact": true
+    },
+    "validEdit": {
+      "writer": "Invader",
+      "toolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "field": "bounding_radius",
+      "before": 0.1,
+      "expected": 0.225,
+      "compiled": 0.22499999403953552,
+      "reconciled": true,
+      "nativeCompiled": true,
+      "compiledTagBytesPreserved": true
+    },
+    "compiledSha256": "8ba1a69df55bd1808e1f85a2343246f153caa97f33794f37a2bec3f7f0a3f5fb",
+    "compiledMapOpenedInSeparateTab": true,
+    "BaboonGuiLaunchedInThisTest": false
+  },
+  "reviewedCeSource": {
+    "nativeReadback": {
+      "version": 609,
+      "triangles": 58,
+      "objects": 4
+    },
+    "cacheSha256": "15e355da28a04c55fc59bec8eb354bd4ed4e1ef1f1275e2d53d27215f579361c",
+    "explicitReviewedBehaviorCorrections": true,
+    "lossless": false
+  },
+  "ceEngine": {
+    "serverSha256": "7789c4a0bd2c735e7fdc154d63f4bbb1134952e6904e5809eb00d4d1da94015f",
+    "privateLoopbackOnly": true,
+    "publicListingRequested": false,
+    "stockMap": {
+      "name": "bloodgulch",
+      "nativeQueryReportedOpenPlaying": true,
+      "receiptSha256": "c9236ca9d520e2dd154123b9bd51ce7099b09f689ffe198bbf484ae6f58bf8e7"
+    },
+    "currentWorkshopMap": {
+      "name": "reviewed_ce_source_recovery",
+      "sha256": "15e355da28a04c55fc59bec8eb354bd4ed4e1ef1f1275e2d53d27215f579361c",
+      "nativeQueryReportedOpenPlaying": true,
+      "authoredMapUnchanged": true,
+      "receiptSha256": "8f4b621df3bd4721ad40f991e9bc335dc1cfb6277b6935d0b111c00e859d6825"
+    },
+    "automatedClient": {
+      "attempted": true,
+      "joined": false,
+      "fullExistingRuntimeControlAlsoJoined": false,
+      "serverPlayersObserved": 0,
+      "complete": false,
+      "receiptSha256": "66a2a794978ecf2cdd7c389fbeed7e324f99391e3de3b041451cf4116141da2a"
+    },
+    "gameplayVerified": false
+  },
+  "preservation": {
+    "rootResearchFilesUnchanged": 146,
+    "originalCeTagsUnchanged": 2455,
+    "featureLedgerIdsRetained": 385,
+    "featureLedgerTotal": 387,
+    "mismatches": []
+  },
+  "limitations": [
+    "The full attached roadmap is not implemented.",
+    "Direct compiled-map editing remains a separate unfinished workflow.",
+    "Native source builds and CE server query reports do not prove client rendering, collision traversal, audio, combat or multiplayer gameplay.",
+    "Automated CE client join failed; do not claim success from process presence.",
+    "Arbitrary live spawning/BSP replacement, game-peer replication, independent dual wield/player sword/lunge and full render/audio parity remain open.",
+    "Cross-computer network acceptance, universal runtime conversion, native Mac/Linux/PowerPC/VR and larger co-op/player counts remain open."
+  ],
+  "remotePushPerformed": false,
+  "repositoryRulesChanged": false,
+  "allListedFeaturesComplete": false
+}

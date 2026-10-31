@@ -1,0 +1,91 @@
+.ce-setup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  border: 1px solid var(--line, #334155);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  background: color-mix(in srgb, var(--panel, #15212b) 85%, transparent);
+}
+.dependency-panel > .ce-setup,
+.dependency-panel > .baboon-tools {
+  grid-column: 1 / -1;
+}
+.ce-setup header,
+.ce-setup header strong,
+.ce-setup > p,
+.ce-setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ce-setup header {
+  justify-content: space-between;
+  grid-column: 1 / -1;
+}
+.ce-setup p {
+  margin: 7px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ce-setup-path {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  opacity: 0.8;
+}
+.ce-setup-actions {
+  grid-column: 2;
+  grid-row: 2;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ce-setup button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.ce-install-review {
+  grid-column: 1 / -1;
+  margin-top: 9px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line, #334155);
+}
+.ce-install-review a,
+.ce-install-review details {
+  font-size: 11px;
+}
+.ce-install-review code {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.ce-install-review .primary {
+  margin-top: 8px;
+}
+.ce-install-progress progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent, #72d4df);
+}
+.ce-install-progress,
+.ce-setup > [role='alert'],
+.ce-setup > small {
+  grid-column: 1 / -1;
+}
+.ce-install-progress small {
+  margin-right: 10px;
+  font-size: 10px;
+}
+.ce-setup [role='alert'] {
+  color: var(--danger, #ffb7aa);
+}
+@media (max-width: 700px) {
+  .ce-setup {
+    display: block;
+  }
+}

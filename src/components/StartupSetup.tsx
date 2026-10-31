@@ -1,6 +1,7 @@
 import { useEffect,useRef,useState } from 'react';
 import type { Bootstrap, RuntimeId, Settings, Workspace } from '../types';
 import ConnectGames from './ConnectGames';
+import CustomEditionSetup from './CustomEditionSetup';
 const halos: { id: RuntimeId; name: string; description: string }[] = [
   {
     id: 'mccSteam',
@@ -133,6 +134,7 @@ export default function StartupSetup({
             mode="tools"
             onDraftChange={setDraft}
           />
+          {choice === 'haloCustomEdition' && <CustomEditionSetup />}
           <div className="analysis-actions">
             <button disabled={busy} onClick={() => setStep(0)}>
               Back to Halo choice

@@ -13,6 +13,7 @@ import {
 } from '../dependencyGuide';
 import './dependencyPanel.css';
 import BaboonTools from './BaboonTools';
+import CustomEditionSetup from './CustomEditionSetup';
 
 export default function DependencyPanel({
   project,
@@ -146,6 +147,7 @@ export default function DependencyPanel({
   }
   return (
     <section className="dependency-panel" aria-label="Dependencies and setup">
+      {runtime === 'haloCustomEdition' && <CustomEditionSetup onConnected={async () => { await refresh(); if (onSetupChanged) onSetupChanged(await call<Bootstrap>('bootstrap')); }} />}
       <BaboonTools project={project}/>
       <header>
         <div>

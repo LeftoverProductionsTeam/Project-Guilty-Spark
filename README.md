@@ -1,5 +1,11 @@
 # Project Guilty Spark
 
+## Integrated Windows test build and Custom Edition setup
+
+Spark can now detect/connect Custom Edition or install the project's pinned community archive into a separate managed folder, with progress, identity/content checks and remembered registration. The genuine native test preserved all existing game files and reopened the downloaded Blood Gulch. Private CE engine trials loaded stock Blood Gulch and a reviewed-source Workshop cache; an automated client join remains unverified.
+
+The Windows executable and installer build, scoped native workflows and regression suites have been checked against the older feature checklist. **The full roadmap is not complete.** See the [current readiness report](docs/TEST_BUILD_READINESS.md) for supported workflows, repeat commands, exact receipts and remaining direct-map, gameplay, networking and platform gates. [Descriptive GitHub handoff](docs/TEST_BUILD_GITHUB_DESCRIPTION.md).
+
 ## More original pixels, with compact tag previews
 
 Original Zombie Apocalypse resources now supply **510 verified external images**, up from 453: 12 packed-color images and 45 proven shared-pixel references are newly readable. Bitmap tags show actual original artwork in the full editor and drawer, with native frame controls, retained image position, transparency and provenance. Changed resources and unproven references remain refused.

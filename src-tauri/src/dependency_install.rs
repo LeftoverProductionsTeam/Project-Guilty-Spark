@@ -90,7 +90,7 @@ fn probe(
     }
 }
 /// Read-only PE identity, not publisher authenticity or execution acceptance.
-fn pe_identity(path: &Path) -> Reply<(PathBuf, String, String)> {
+pub(super) fn pe_identity(path: &Path) -> Reply<(PathBuf, String, String)> {
     core::reject_links(path).map_err(error)?;
     if !path.is_file() {
         return Err("Required installed executable is missing".into());
@@ -362,6 +362,11 @@ fn observation(
             probe(deps::DependencyState::Ready,"Fresh Steam discovery found MCC Halo1. Source assets, editing-kit installation and exact live-game build are independent.",installed.mcc_path.as_deref())
         } else {
             probe(deps::DependencyState::SetupRequired,"Install/enable Halo: CE in the owned MCC installation, then refresh discovery. Finding Steam alone does not load Halo assets.",installed.mcc_path.as_deref())
+        }
+    } else if runtime_id == runtime::RuntimeId::HaloCustomEdition {
+        match ce_setup::discover(state)? {
+            Some(found) => probe(deps::DependencyState::Ready, "Custom Edition game, UI cache and resource headers checked. Use Custom Edition setup below to connect the detected folder; native builds and gameplay have separate acceptance.", Some(&found.root)),
+            None => probe(deps::DependencyState::SetupRequired, "Choose an existing Custom Edition folder or install the selected community archive below. MCC does not supply the CE executable or its exact resource maps.", None),
         }
     } else {
         let registrations: Vec<runtime::RuntimeRegistration> = lock(&state.library)?

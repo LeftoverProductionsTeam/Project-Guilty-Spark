@@ -45,6 +45,7 @@ use tauri::{Emitter, Manager, State};
 #[path="default_materials_native.rs"] mod default_materials_native;
 #[path="portability_native.rs"]mod portability_native;
 #[path="dependency_install.rs"] mod dependency_install;
+#[path="ce_setup.rs"] mod ce_setup;
 #[path="baboon_native.rs"] mod baboon_native;
 #[path="native_tag_parser.rs"] mod native_tag_parser;
 #[path="native_source_revisions.rs"] mod native_source_revisions;
@@ -2627,7 +2628,7 @@ pub fn run() {
         .on_window_event(|window,event|{director_native::window_event(window.app_handle(),window,event);if matches!(event,tauri::WindowEvent::Destroyed){
             if let Some(state)=window.app_handle().try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=window.label());}}
             let app=window.app_handle().clone();let label=window.label().to_owned();
-            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){shared_editing::release_window(&state,&label);external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);ce_source_recovery_native::release_window(&state,&label);}});
+            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){shared_editing::release_window(&state,&label);external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);ce_setup::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);ce_source_recovery_native::release_window(&state,&label);}});
         }})
         .invoke_handler(tauri::generate_handler![
             external_browser::open_external_url,
@@ -2636,6 +2637,10 @@ pub fn run() {
             map_download_status,
             cancel_map_download,
             dependency_install::dependency_report,
+            ce_setup::custom_edition_setup,
+            ce_setup::install_custom_edition,
+            ce_setup::cancel_custom_edition_setup,
+            ce_setup::connect_custom_edition,
             dependency_install::prepare_dependency_action,
             director_native::director_session,
             director_native::director_update,
