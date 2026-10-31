@@ -1,0 +1,518 @@
+{
+  "schemaVersion": 1,
+  "complete": true,
+  "baseCommit": "68dc2c00556b6ecc22a5a7092338d9ad956bd21a",
+  "applicationSha256": "aeb585c30adb495e3af45fd49c658e758c7c9b58e7e2fa733c790f8ee89a6ce6",
+  "mockedIpc": false,
+  "regressions": {
+    "rustPassed": 606,
+    "rustIgnored": 7,
+    "frontendPassed": 274,
+    "browserPassed": 126,
+    "offlinePassed": 59,
+    "interfaceProbePassed": 2,
+    "typeScriptPassed": true
+  },
+  "nativeAssets": {
+    "actualNativeGeometry": true,
+    "reflectionBatch": {
+      "complete": true,
+      "exactSingleFaceReadback": true,
+      "unknownIdRefused": true,
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102"
+    },
+    "reflection": {
+      "shader": "vehicles\\warthog\\shaders\\warthog hull",
+      "metadata": {
+        "bitmapTagId": 3786014774,
+        "perpendicularBrightness": 0.7,
+        "parallelBrightness": 1,
+        "perpendicularTint": [
+          0.69,
+          0.73,
+          0.65
+        ],
+        "parallelTint": [
+          0.6,
+          0.64,
+          0.57
+        ],
+        "falloff": 0,
+        "cutoff": 0
+      },
+      "faces": [
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "1e6c41e68a3bdaa908d6df6ac7b54ccc5e0ed08345e2d8ad377d52b9b23906e8"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "10b3fb898701506f74ff01521e408f276c9d523f92fb5933a8113de538e9bea1"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "54549bf82f8c5330e1af769ce64e92d7c792c2997aa10bd1e2470d47ad1b7e04"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "2050b2c597a635d18f64b0ff18ddbd851b0e85730af67cd92d9998ba7fec4834"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "f1a3876fb8de1d7649f8fafc3e978ff14f073bbbde163455e6406e4c37dcf424"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "3509206b2a795486d22a549c02f43365fa3d974cd7a8c0415331b8f8fe51c825"
+        }
+      ]
+    },
+    "home": {
+      "transparentBackground": "true",
+      "modelTag": "3785621552",
+      "modelSource": "b5a744da-b3f5-4ac9-86bd-57c4597f6cdc",
+      "modelSourceHash": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+      "modelTriangles": "1126",
+      "modelReady": "true",
+      "nativeAnimationCount": "3",
+      "modelTextures": "1",
+      "modelReflections": "1",
+      "caption": "monitor · actual Halo model\nNext model"
+    },
+    "animation": {
+      "nativeGraphTag": 3785949237,
+      "clips": [
+        {
+          "name": "idle overlay",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "ff627546b76e99d9b41abb711c238db9451d8f85d531121b2c1c33aec17b3a40"
+        },
+        {
+          "name": "stand unarmed idle",
+          "frames": 10,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "d53208c62aef100991d79998fbdabcc12ec95d0d2dbb0ae7287d5ffa69b2afff"
+        },
+        {
+          "name": "monitor_talking-loop",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "70ee3ebc6cd9d545dae59e5db87503fa9571b73e56ef133fc9765e526e4ab924"
+        }
+      ],
+      "firstVertex": [
+        0.06151499226689339,
+        -0.027118690311908722,
+        0.06504102796316147
+      ],
+      "laterVertex": [
+        0.06187263876199722,
+        -0.027118690311908722,
+        0.06881450116634369
+      ],
+      "actualSkinnedVerticesMove": true,
+      "pauseFreezesTime": true,
+      "nativeTalkingClipSelected": true,
+      "wrongSourceHashRejected": true
+    },
+    "defaultMaterials": {
+      "materials": [
+        {
+          "id": "surface",
+          "name": "halo_metal",
+          "shaderPath": "gs_assets_afef61d2f0e14b34b3ad8b7cb67b99af/levels/test/bloodgulch/shaders/gs_afef61d2f0e1_cap_metal",
+          "color": [
+            0.35,
+            0.4,
+            0.42
+          ]
+        },
+        {
+          "id": "grass",
+          "name": "halo_grass",
+          "shaderPath": "gs_assets_2ed2671da5ce4fcb9c7a13027fb56078/levels/test/bloodgulch/shaders/gs_2ed2671da5ce_blood ground",
+          "color": [
+            0.3,
+            0.42,
+            0.23
+          ]
+        }
+      ],
+      "bindings": [
+        {
+          "id": "afef61d2-f0e1-4b34-b3ad-8b7cb67b99af",
+          "sourceProjectId": "bc29cd85-88bd-42a8-b0b3-2aa45a6c3abb",
+          "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+          "tagId": 3939305815,
+          "tagClass": "senv",
+          "tagPath": "levels\\test\\bloodgulch\\shaders\\cap_metal",
+          "nativePath": "gs_assets_afef61d2f0e14b34b3ad8b7cb67b99af/levels/test/bloodgulch/shaders/gs_afef61d2f0e1_cap_metal",
+          "receiptSha256": "acec79db2e48198a33e0d466aabde3ae80f87459f4588864051dfba84766cf82",
+          "fileCount": 3
+        },
+        {
+          "id": "2ed2671d-a5ce-4fcb-9c7a-13027fb56078",
+          "sourceProjectId": "bc29cd85-88bd-42a8-b0b3-2aa45a6c3abb",
+          "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+          "tagId": 3939633500,
+          "tagClass": "senv",
+          "tagPath": "levels\\test\\bloodgulch\\shaders\\blood ground",
+          "nativePath": "gs_assets_2ed2671da5ce4fcb9c7a13027fb56078/levels/test/bloodgulch/shaders/gs_2ed2671da5ce_blood ground",
+          "receiptSha256": "160545593de19f145423afa0d3f52b7df6f6069cc678adb7216415ccf56a3b81",
+          "fileCount": 5
+        }
+      ],
+      "previewCount": 2
+    },
+    "actualPointerDrag": true,
+    "singleUndoRedo": true,
+    "build": {
+      "status": "validated",
+      "target": "mcc-cea",
+      "sha256": "7b579ff5f6d9e64e8d49f7e6262bb7cc01dd85b5db55d01a146b5110da92911f",
+      "projectFingerprint": "54f59751ec55d47cd5bfaf2d0c09a4c0bf26120f122d144525f2516d047d8cd8",
+      "toolIdentities": {
+        "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+        "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+        "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+      },
+      "durationMs": 20410
+    },
+    "compiled": {
+      "sha256": "7b579ff5f6d9e64e8d49f7e6262bb7cc01dd85b5db55d01a146b5110da92911f",
+      "nativeTagPath": "gs_assets_34bdac81ac494acca90ec158580fa8dd\\scenery\\rocks\\boulder\\boulder",
+      "position": [
+        1.5,
+        -1.5,
+        0.01
+      ],
+      "collisionTriangles": 12
+    },
+    "sourceMapBuild": {
+      "status": "validated",
+      "target": "mcc-cea",
+      "sha256": "414516178b1b7141341303e373ae53a14af6eaa873d1cf6d418d06126cbf2952"
+    },
+    "sourcePreserved": true,
+    "changedImportRejected": [
+      "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+    ],
+    "previousBuildPreserved": true,
+    "javascriptErrors": []
+  },
+  "nativeAudio": {
+    "build": {
+      "status": "validated",
+      "target": "mcc-cea",
+      "sha256": "25f62ddb58b3b27cef664ba26580bcecb8009606c40b57b8d2203d8fe07c8eec",
+      "projectFingerprint": "9859120887c00e6f4b53efed2cc9a32eba6ee5ee47c54c403ac987ea5148b837",
+      "toolIdentities": {
+        "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+        "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+        "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+      },
+      "durationMs": 17654
+    },
+    "compiled": {
+      "sha256": "25f62ddb58b3b27cef664ba26580bcecb8009606c40b57b8d2203d8fe07c8eec",
+      "sceneryPath": "spark\\audio\\966c2c075d494cab8d17b5f679b68264\\61a0f42489c0462dbb5ed92eb4031835",
+      "loopPath": "gs_assets_83888cabcb5a43aeaf2e784d2defb232\\sound\\sfx\\ambience\\b30\\b30computer_no_detail",
+      "position": [
+        2,
+        3,
+        1
+      ],
+      "wholeLoopPreserved": true,
+      "decoded": {
+        "frames": 186549,
+        "channels": 1,
+        "sampleRate": 48000,
+        "durationSeconds": 3.8864375,
+        "rms": 0.042309177263229476
+      }
+    },
+    "bankRecovery": {
+      "sourceSha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+      "inputSha256": "4a73a380cb27210ac78c1d4eae838e30750da33a30b8972eff2f3fe71015209e",
+      "soundCount": 2,
+      "sampleCount": 25,
+      "encodedBytes": 206856,
+      "sampleSha256": [
+        "07b2f62fde354f002ebd9c5e51b5d42380ed7cb7803da5dac1c9b7917e168646",
+        "2810f4d402467fa6f7dcd3e82e7baf42fbcd193baa416a319efd0da819e37bb3",
+        "1ee66651d5a199929ccdafca625d9a00a51df1713df6b8d4b5d5dc4b641ae5e0",
+        "eb75bf1d012485c74b8e6c18b73901757435b77e035eac3fb58416f69b58df28",
+        "b181114413b15acb96c6d7865db8c2e900746f090320387b1fa8977200b8f663",
+        "0d8da0685e509b0e0dfee94cb4af4ed3a91c7923d606b8e6bd53fff904c441db",
+        "8e39729f901478537c8e9626fd0d962a99a1aadb55769c84b5cbf404addc7cc6",
+        "ed00facae6633bbe7651dc63578dd82e0bb5a0aaea3bd940d1b8a6a336d39edd",
+        "dd631942a8e22f497d8b1e85d935dabfd5979241925c91f59ffa309fc0c852a7",
+        "cd6fbfa33ce8f54405eb9338c6344c4a3ce1c6deb5d0dfaba549a940416784ef",
+        "c85688b95adcc6872c559cbace15065b81edf9500a43fdd951de405828e9ad6c",
+        "c5a58a0b18baa9be66169c0576cf078db46a5293e75aa25112d9ce0f48b5f86d",
+        "410e4bda96342984bc62aa1464b20b86c759788bfc1f7b9f32b2d8cd70afe34d",
+        "80cfcda3739cb448dde056a159e19b6d29538f336ebd0f4f819ad42a149b9330",
+        "ec8d64387d6bf10c1043468f46c603ba6a8dd1c507008335ddd574d78d7831aa",
+        "89eb16ca0e18e0480b8b98546054ab0f087b5ebf76f3f70568f742086d41ba53",
+        "9cb479774692d536e35d9cfcee90ff8db0eb619d619d1e0ff9ef34a971ec5c8d",
+        "5e10df6baa5d035833ddf4b631cf4974b8421462f2012054ec4208cf1dbc27bb",
+        "91628055efed699256d2f5e8ea4e2c14d19d7f624811f9bfd150fbff92164de3",
+        "8252d6d1548536e12ddc19878cbe3686940bc0016bf85323a913acc0b7a539b7",
+        "89944cc8d32e17a87f48f15ed1329500621632aedcf555a7a6e334bd087432a6",
+        "e81865c1f1b6ae0fb2723a4fb8d050c1e32ad79eac52c76fad6f6e18db328664",
+        "1016531d69b56e014568af5e9a1392afa2f75d7ea9a8ead1f83295a5900f30a9",
+        "00cfc62054ccb8687d7afba9c462c4b6d126974c1bad018da356320e29ed0209",
+        "fbc3427936a527ec1550c50eb0bc48f7d341abdfec23bc68e8dc52180fd85e2e"
+      ],
+      "bankSha256": {
+        "sounds_adpcm.fsb": "d9a70adcb681bcb152a50ea61904fc921d2d94aff3000fe3d2827823c9e49e88",
+        "sounds_adpcm.lst.bin": "d469b6d72c7d8f6d141da2b61c14b29862a57d3563ebb195e3829f18db742a78"
+      },
+      "notice": "Extraction input only: exact pinned MCC classic ADPCM bytes embedded locally for native Invader serialization. Only raw-sample flags/offsets and declared length differ; original metadata/source remains intact. This input is not a playable map or a shared patch."
+    },
+    "sourceExactCompiledSamples": [
+      {
+        "sourceTagId": 3815637498,
+        "sourcePath": "sound\\sfx\\ambience\\interiors\\29lasercomputer",
+        "compiledPath": "gs_assets_83888cabcb5a43aeaf2e784d2defb232\\sound\\sfx\\ambience\\interiors\\29lasercomputer",
+        "permutations": [
+          {
+            "pitchRange": 0,
+            "permutation": 0,
+            "sha256": "1016531d69b56e014568af5e9a1392afa2f75d7ea9a8ead1f83295a5900f30a9",
+            "bytes": 48204
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 1,
+            "sha256": "00cfc62054ccb8687d7afba9c462c4b6d126974c1bad018da356320e29ed0209",
+            "bytes": 54108
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 2,
+            "sha256": "fbc3427936a527ec1550c50eb0bc48f7d341abdfec23bc68e8dc52180fd85e2e",
+            "bytes": 48348
+          }
+        ]
+      },
+      {
+        "sourceTagId": 3815703035,
+        "sourcePath": "sound\\sfx\\ambience\\interiors\\compdetail",
+        "compiledPath": "gs_assets_83888cabcb5a43aeaf2e784d2defb232\\sound\\sfx\\ambience\\interiors\\compdetail",
+        "permutations": [
+          {
+            "pitchRange": 0,
+            "permutation": 0,
+            "sha256": "07b2f62fde354f002ebd9c5e51b5d42380ed7cb7803da5dac1c9b7917e168646",
+            "bytes": 8388
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 1,
+            "sha256": "2810f4d402467fa6f7dcd3e82e7baf42fbcd193baa416a319efd0da819e37bb3",
+            "bytes": 1512
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 2,
+            "sha256": "1ee66651d5a199929ccdafca625d9a00a51df1713df6b8d4b5d5dc4b641ae5e0",
+            "bytes": 756
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 3,
+            "sha256": "eb75bf1d012485c74b8e6c18b73901757435b77e035eac3fb58416f69b58df28",
+            "bytes": 900
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 4,
+            "sha256": "b181114413b15acb96c6d7865db8c2e900746f090320387b1fa8977200b8f663",
+            "bytes": 4500
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 5,
+            "sha256": "0d8da0685e509b0e0dfee94cb4af4ed3a91c7923d606b8e6bd53fff904c441db",
+            "bytes": 540
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 6,
+            "sha256": "8e39729f901478537c8e9626fd0d962a99a1aadb55769c84b5cbf404addc7cc6",
+            "bytes": 612
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 7,
+            "sha256": "ed00facae6633bbe7651dc63578dd82e0bb5a0aaea3bd940d1b8a6a336d39edd",
+            "bytes": 720
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 8,
+            "sha256": "dd631942a8e22f497d8b1e85d935dabfd5979241925c91f59ffa309fc0c852a7",
+            "bytes": 2808
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 9,
+            "sha256": "cd6fbfa33ce8f54405eb9338c6344c4a3ce1c6deb5d0dfaba549a940416784ef",
+            "bytes": 7560
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 10,
+            "sha256": "c85688b95adcc6872c559cbace15065b81edf9500a43fdd951de405828e9ad6c",
+            "bytes": 1800
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 11,
+            "sha256": "c5a58a0b18baa9be66169c0576cf078db46a5293e75aa25112d9ce0f48b5f86d",
+            "bytes": 7416
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 12,
+            "sha256": "410e4bda96342984bc62aa1464b20b86c759788bfc1f7b9f32b2d8cd70afe34d",
+            "bytes": 1872
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 13,
+            "sha256": "80cfcda3739cb448dde056a159e19b6d29538f336ebd0f4f819ad42a149b9330",
+            "bytes": 6336
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 14,
+            "sha256": "ec8d64387d6bf10c1043468f46c603ba6a8dd1c507008335ddd574d78d7831aa",
+            "bytes": 2232
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 15,
+            "sha256": "89eb16ca0e18e0480b8b98546054ab0f087b5ebf76f3f70568f742086d41ba53",
+            "bytes": 3024
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 16,
+            "sha256": "9cb479774692d536e35d9cfcee90ff8db0eb619d619d1e0ff9ef34a971ec5c8d",
+            "bytes": 1764
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 17,
+            "sha256": "5e10df6baa5d035833ddf4b631cf4974b8421462f2012054ec4208cf1dbc27bb",
+            "bytes": 720
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 18,
+            "sha256": "91628055efed699256d2f5e8ea4e2c14d19d7f624811f9bfd150fbff92164de3",
+            "bytes": 540
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 19,
+            "sha256": "8252d6d1548536e12ddc19878cbe3686940bc0016bf85323a913acc0b7a539b7",
+            "bytes": 504
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 20,
+            "sha256": "89944cc8d32e17a87f48f15ed1329500621632aedcf555a7a6e334bd087432a6",
+            "bytes": 936
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 21,
+            "sha256": "e81865c1f1b6ae0fb2723a4fb8d050c1e32ad79eac52c76fad6f6e18db328664",
+            "bytes": 756
+          }
+        ]
+      }
+    ],
+    "ownerNativeFilesPreserved": 2240,
+    "sourcePreserved": true,
+    "previousAcceptedBuildPreserved": true,
+    "deliberateManagedImportCorruption": {
+      "rejected": true,
+      "blockers": [
+        "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+      ],
+      "attributedTool": null
+    },
+    "gameplayAudioVerified": false,
+    "gameReplicationVerified": false,
+    "pageErrors": []
+  },
+  "communityRuntimeSetup": [
+    {
+      "runtime": "opencehalo-windows-release",
+      "mapCount": 24,
+      "versions": {
+        "5": 24
+      },
+      "bloodgulch": {
+        "name": "bloodgulch.map",
+        "headerBytes": 2048,
+        "cacheVersion": 5,
+        "magic": "daeh"
+      },
+      "ui": {
+        "name": "ui.map",
+        "headerBytes": 2048,
+        "cacheVersion": 5,
+        "magic": "daeh"
+      },
+      "checks": "Read-only header inventory; no game launch or joined-player evidence",
+      "menuLogObserved": true
+    },
+    {
+      "runtime": "chupathingyce-windows64-release",
+      "mapCount": 24,
+      "versions": {
+        "5": 24
+      },
+      "bloodgulch": {
+        "name": "bloodgulch.map",
+        "headerBytes": 2048,
+        "cacheVersion": 5,
+        "magic": "daeh"
+      },
+      "ui": {
+        "name": "ui.map",
+        "headerBytes": 2048,
+        "cacheVersion": 5,
+        "magic": "daeh"
+      },
+      "checks": "Read-only header inventory; no game launch or joined-player evidence",
+      "menuLogObserved": false
+    }
+  ],
+  "limitations": [
+    "No native audio listening or joined-game acceptance is inferred from compilation or recovered samples.",
+    "The community runtime check inventories headers and existing logs; no new game launch or multiplayer connection was performed.",
+    "Performance medians include all six complete runs, including the slow first baseline startup. No startup or general memory gain is claimed."
+  ]
+}

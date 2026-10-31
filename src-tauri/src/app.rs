@@ -2218,6 +2218,22 @@ async fn preview_owned_reflection_cube(app:tauri::AppHandle,project_id:String,bi
         core::bitmap_preview::preview_owned_cube(&source.preserved_path,&source.sha256,&inspection,bitmap_tag_id,resource.as_ref().map(|(p,h)|(p.as_path(),h.as_str()))).map_err(error)
     }).await.map_err(error)?
 }
+#[tauri::command]
+async fn preview_owned_reflection_cube_batch(app:tauri::AppHandle,project_id:String,bitmap_tag_ids:Vec<u32>,source_sha256:String)->Reply<core::bitmap_preview::OwnedCubeBatch>{
+    // Bound the request before loading project metadata or reading a map.
+    if bitmap_tag_ids.is_empty() || bitmap_tag_ids.len()>core::bitmap_preview::MAX_CUBE_BATCH_REQUESTS {
+        return Err("Reflection batch requires 1 to 4 distinct bitmap IDs".into());
+    }
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("Reflection source map is unavailable")?;
+        if source.sha256!=source_sha256{return Err("Reflection source hash differs from its shader".into());}
+        let inspection=inspect(&state,&project)?;
+        let resource=if source.resource_sha256.contains_key("mcc-textures"){
+            source.resource_directory.as_ref().and_then(|p|p.parent()).and_then(Path::parent).map(|p|p.join("maps/bitmaps.map")).zip(source.resource_sha256.get("mcc-shared-bitmaps.map"))
+        }else{source.resource_directory.as_ref().map(|p|p.join("bitmaps.map")).zip(source.resource_sha256.get("bitmaps.map"))};
+        core::bitmap_preview::preview_owned_cube_batch(&source.preserved_path,&source.sha256,&inspection,&bitmap_tag_ids,resource.as_ref().map(|(p,h)|(p.as_path(),h.as_str()))).map_err(error)
+    }).await.map_err(error)?
+}
 #[derive(serde::Serialize)]
 #[serde(rename_all="camelCase")]
 struct OwnedModelPreview {
@@ -2880,6 +2896,7 @@ pub fn run() {
             preview_owned_object_model,
             preview_owned_object_animations,
             preview_owned_reflection_cube,
+            preview_owned_reflection_cube_batch,
             preview_owned_object_collision,
             preview_sound,
             compare_peer_manifest,

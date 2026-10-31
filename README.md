@@ -61,7 +61,7 @@ pnpm test:ui
 node scripts/desktop.mjs build
 ~~~
 
-The latest local checks pass **604 Rust tests (7 opt-in tests ignored), 269 frontend tests, 126 browser checks, 59 offline scripts and two interface-probe tests**. TypeScript, the Windows executable and NSIS installer build. These are local results, not a claim that hosted GitHub CI has rerun. [Startup and preview loading](docs/C41_STARTUP_FOLLOW_THROUGH.md) reduces time to the ready native monitor from 5.95 to 4.35 seconds and preserves the earlier [audio, performance and CE safeguards](docs/C41_NATIVE_AUDIO_PERFORMANCE.md).
+The latest local checks pass **606 Rust tests (7 opt-in tests ignored), 274 frontend tests, 126 browser checks, 59 offline scripts and two interface-probe tests**. TypeScript, the Windows executable and NSIS installer build. These are local results, not a claim that hosted GitHub CI has rerun. The latest [map-loading performance pass](docs/C41_MAP_LOADING_PERFORMANCE.md) measures **8.6% faster repeated map switching and 25.1% faster catalog preparation** across three native runs per executable, with identical rendering content and resolution. Startup and general memory use are effectively unchanged by this patch. The earlier [startup improvements](docs/C41_STARTUP_FOLLOW_THROUGH.md) and [audio, performance and CE safeguards](docs/C41_NATIVE_AUDIO_PERFORMANCE.md) remain preserved.
 
 The [home showcase polish](docs/NATIVE_ASSETS_AND_SHOWCASE.md#c41-clarity-and-loading-polish) sharpens the actual monitor, reduces its lighting/glow, extends its left-facing mouse response and shares source preparation across visits. Native animation, textures and reflections remain active; load timings and the later executable identity have their own evidence.
 

@@ -28,9 +28,12 @@ export default function AssetSourceBrowser({ onLoaded }: { onLoaded?: (source: O
     setBusy(true);
     setError('');
     try {
-      const sources = await call<OpenProject[]>('open_asset_source', { sourceId: selected });
+      const sources = await call<OpenProject[]>('open_asset_source', {
+        sourceId: selected, preparePreviewResources: true,
+      });
       for (let source of sources) {
-        if (source.inspection?.header.version === 13 || [6,7,609].includes(source.inspection?.header.version??0)) {
+        if ((source.inspection?.header.version === 13 && !source.project.source?.resourceSha256?.['mcc-textures']) ||
+          [6,7,609].includes(source.inspection?.header.version??0)) {
           try {
             source = await call<OpenProject|null>(source.inspection?.header.version===13?'connect_mcc_texture_resources':'auto_connect_classic_textures', {
               projectId: source.project.id,

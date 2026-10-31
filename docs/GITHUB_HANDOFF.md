@@ -1,4 +1,16 @@
-# Master consolidation handoff
+# C41 performance handoff
+
+Title: **C41: batch verified reflection reads and accelerate asset catalog loading**.
+
+Continue local master `68dc2c0`. Batch up to four source-exact reflection cubes per native read transaction, retain pre/post resource hashing and per-image refusals, and prevent late textures entering retired map/resource epochs. Reuse the existing parallel source/texture preparation in the asset drawer while preserving selected resources and current edits. No source checks, renderer features or native compiler guards are removed.
+
+Three complete before/after desktop runs measure median repeated switching **4.583 → 4.187 seconds** and catalog preparation **4.221 → 3.163 seconds**. All materials, decals, reflections, geometry and resolution match. Startup, first-map loads, frame rate and general memory use show little change; the slow initial baseline is retained. See [measurements and native evidence](C41_MAP_LOADING_PERFORMANCE.md).
+
+Validation: **606 Rust tests with seven opt-in cases ignored; 274 frontend, 126 browser, 59 offline and two interface checks; TypeScript; Windows/NSIS build; actual native asset/animation/import/collision/cache and original-loop audio recompilation**. In-game listening, genuine client join/traversal and broader gameplay gates remain open. OpenCE/Chupathingy now contain the expected Xbox-format map headers; their setup check is separate from gameplay acceptance.
+
+The owner controls publication. GitHub's master rules remain intact; no direct push, force-push, remote merge or hosted-CI success is claimed. Final local commit/artifact identities are recorded with the release. The older handoffs below are historical snapshots.
+
+# Master consolidation handoff (historical)
 
 The integration branch `codex/integration-all-continuations` retains the C35 R12, C36, One Halo research and frozen C37 histories through four ordinary merge commits. C37 is frozen at `bde73ceb00f42f6dce916a93d9d4c0adb8dae207`. Original development branches and the verified all-reference backups remain available. Seven unvalidated dependency-update proposals are retained separately.
 

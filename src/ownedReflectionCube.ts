@@ -8,6 +8,13 @@ export interface OwnedCubeResponse {
   bitmapTagId: number;
   faces: OwnedBitmapPreview[];
 }
+export const MAX_REFLECTION_BATCH = 4;
+export interface OwnedCubeBatchResponse {
+  sourceSha256: string;
+  items: { bitmapTagId: number; preview: OwnedCubeResponse | null; error: string | null }[];
+}
+export type DecodedReflectionCube = ReturnType<typeof decodeReflectionCube>;
+export type DecodedReflectionItem = { cube: DecodedReflectionCube | null; error: string | null };
 export function decodeReflectionCube(
   response: OwnedCubeResponse,
   source: string,
@@ -36,6 +43,82 @@ export function decodeReflectionCube(
   if (bytes > 16 * 1024 * 1024) throw Error('Reflection cube exceeds the 16 MiB decoded budget.');
   return { faces, bytes };
 }
+/** Validate the complete transaction before admitting any GPU textures. One
+ * malformed identity poisons the batch; explicit per-cube refusals stay visible. */
+export function decodeReflectionCubeBatch(
+  response: OwnedCubeBatchResponse,
+  source: string,
+  ids: readonly number[],
+  resourceHashes: Record<string, string>,
+): Map<number, DecodedReflectionItem> {
+  if (
+    !/^[a-f\d]{64}$/i.test(source) ||
+    response?.sourceSha256 !== source ||
+    !ids.length ||
+    ids.length > MAX_REFLECTION_BATCH ||
+    new Set(ids).size !== ids.length ||
+    ids.some((id) => !Number.isSafeInteger(id) || id < 0 || id > 0xffffffff) ||
+    !Array.isArray(response.items) ||
+    response.items.length !== ids.length
+  )
+    throw Error('Reflection batch identity or count differs from its request.');
+  let packed = 0,
+    rgba = 0;
+  for (let i = 0; i < ids.length; i++) {
+    const item = response.items[i];
+    if (!item || item.bitmapTagId !== ids[i] || (item.preview != null) === (item.error != null))
+      throw Error('Reflection batch contains a reordered, foreign or ambiguous result.');
+    if (!item.preview) {
+      if (typeof item.error !== 'string' || !item.error || item.error.length > 200)
+        throw Error('Reflection batch refusal is invalid.');
+      continue;
+    }
+    if (!Array.isArray(item.preview.faces) || item.preview.faces.length !== 6)
+      throw Error('Reflection batch has an invalid face count.');
+    for (const face of item.preview.faces) {
+      if (
+        !face ||
+        typeof face.ddsBase64 !== 'string' ||
+        face.ddsBase64.length > 23 * 1024 * 1024 ||
+        !Number.isInteger(face.width) ||
+        !Number.isInteger(face.height) ||
+        face.width <= 0 ||
+        face.height <= 0 ||
+        face.width > 1024 ||
+        face.height > 1024
+      )
+        throw Error('Reflection batch face exceeds its bounded image layout.');
+      packed += Math.floor(face.ddsBase64.length / 4) * 3;
+      rgba += face.width * face.height * 4;
+    }
+  }
+  if (packed > 64 * 1024 * 1024 + 128 * 6 * ids.length || rgba > 64 * 1024 * 1024)
+    throw Error('Reflection batch exceeds its packed or decoded 64 MiB budget.');
+  return new Map(
+    response.items.map((item) => [
+      item.bitmapTagId,
+      {
+        cube: item.preview
+          ? decodeReflectionCube(item.preview, source, item.bitmapTagId, resourceHashes)
+          : null,
+        error: item.error,
+      },
+    ]),
+  );
+}
+export async function loadReflectionCubeBatch(
+  projectId: string,
+  source: string,
+  ids: number[],
+  resourceHashes: Record<string, string>,
+) {
+  const response = await call<OwnedCubeBatchResponse>('preview_owned_reflection_cube_batch', {
+    projectId,
+    sourceSha256: source,
+    bitmapTagIds: ids,
+  });
+  return decodeReflectionCubeBatch(response, source, ids, resourceHashes);
+}
 export async function loadReflectionCube(
   projectId: string,
   source: string,
@@ -60,6 +143,9 @@ export function createReflectionCubeTexture(
   resourceHashes: Record<string, string>,
 ) {
   const decoded = decodeReflectionCube(response, source, tagId, resourceHashes);
+  return createDecodedReflectionCubeTexture(decoded, tagId);
+}
+export function createDecodedReflectionCubeTexture(decoded: DecodedReflectionCube, tagId: number) {
   const images = decoded.faces.map((face) => {
     const canvas = document.createElement('canvas');
     canvas.width = face.width;

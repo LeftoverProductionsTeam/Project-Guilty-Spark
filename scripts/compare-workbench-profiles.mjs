@@ -4,24 +4,25 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 const args = process.argv.slice(2);
-if (args.length !== 5)
+if (args.length < 5 || args.length > 13 || args.length % 2 !== 1)
   throw Error(
-    'compare-workbench-profiles <before1.json> <before2.json> <after1.json> <after2.json> <fresh-report.json>',
+    'compare-workbench-profiles <2 to 6 before.json files> <same count after.json files> <fresh-report.json>',
   );
+const inputs = args.slice(0, -1), pairCount = inputs.length / 2;
 const runs = await Promise.all(
-  args.slice(0, 4).map(async (file) => JSON.parse(await fs.readFile(file, 'utf8'))),
+  inputs.map(async (file) => JSON.parse(await fs.readFile(file, 'utf8'))),
 );
-assert.equal(new Set(args.slice(0, 4).map((file) => path.resolve(file))).size, 4,
-  'Four independent fresh-profile runs are required');
-assert.equal(runs[0].appSha256, runs[1].appSha256, 'Baseline executables differ');
-assert.equal(runs[2].appSha256, runs[3].appSha256, 'Final executables differ');
-const before = runs.slice(0, 2),
-  after = runs.slice(2),
+assert.equal(new Set(inputs.map((file) => path.resolve(file))).size, inputs.length,
+  'Every run must have its own independent fresh-profile result');
+const before = runs.slice(0, pairCount),
+  after = runs.slice(pairCount),
   median = (values) => {
     const sorted = [...values].sort((a, b) => a - b),
       middle = sorted.length >> 1;
     return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
   };
+assert.equal(new Set(before.map((run) => run.appSha256)).size, 1, 'Baseline executables differ');
+assert.equal(new Set(after.map((run) => run.appSha256)).size, 1, 'Final executables differ');
 const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const phase = (run, name) => {
   const found = run.phases.find((row) => row.name === name);
@@ -154,7 +155,7 @@ const report = {
   },
   beforeApplicationSha256: [...new Set(before.map((r) => r.appSha256))],
   afterApplicationSha256: [...new Set(after.map((r) => r.appSha256))],
-  sourceRuns: args.slice(0, 4).map((f) => path.basename(path.dirname(f))),
+  sourceRuns: inputs.map((f) => path.basename(path.dirname(f))),
   processColdShellMs: measure((run) => [run.coldStartup.shellMs]),
   warmProcessShellMs: measure((run) => [run.warmStartup.shellMs]),
   processColdShowcaseMs: measure((run) => [run.coldStartup.processToShowcaseReadyMs]),
@@ -167,22 +168,26 @@ const report = {
     totals(repeats(run), 'spark.decode.bitmap-batch').reduce((sum, e) => sum + e.ms, 0),
   ]),
   repeatCubeRequests: measure((run) => [
-    totals(repeats(run), 'spark.ipc.preview_owned_reflection_cube').length,
+    totals(repeats(run), 'spark.ipc.preview_owned_reflection_cube').length +
+      totals(repeats(run), 'spark.ipc.preview_owned_reflection_cube_batch').length,
+  ]),
+  repeatCubeBatchRequests: measure((run) => [
+    totals(repeats(run), 'spark.ipc.preview_owned_reflection_cube_batch').length,
   ]),
   renderingFps: measure((run) => repeats(run).map((r) => r.result.render.fps), true),
   counters,
   quality,
   notes: [
-    'Two complete independent fresh-profile runs for each executable; home/startup use 1440x900/DPR 1. Map content area is held at 1428x888: baseline outer viewport 1440x900 with 6-pixel gutter, final map viewport 1428x888 without gutter.',
+    `${pairCount} complete independent fresh-profile runs for each executable; home/startup use 1440x900/DPR 1. The same 1428x888 map work area and exact canvas dimensions are required for both executables.`,
     'Settled readiness includes every authored decal, zero pending materials and a stable signature for at least 750 ms.',
     'Process-cold does not mean a flushed Windows disk cache. Warm process reuses its own library/WebView profile.',
     'CPU/RAM/GPU are settled owned process-tree observations, not peak allocations or isolated whole-machine GPU benchmarks.',
     'Map canvas resolution, environment/effects, native source mesh/model/object counts, resident geometries and visible-pass triangles must all match. Compact layout/scrollbars can increase the home width; home may not use fewer pixels.',
     'Native read/hash/resource validation still executes on repeated preview requests; the bounded pixel cache reuses only identical freshly validated DDS bytes.',
-    'Preliminary baseline 1 failed due to Windows PowerShell policy; baseline 2 had premature readiness. Interim optimized runs 1/2 lost four reflection bindings and are excluded. Release runs 1/2 changed the map work-area aspect; normalized runs 1/2 reduced the home height and are excluded. Final accepted runs restore baseline map content and home height. All earlier trials remain preserved.',
+    'Reflection request counts include both single-cube and bounded four-cube native transactions. Batch count is reported separately; content parity checks still require the same final shader bindings.',
   ],
 };
-await fs.writeFile(args[4], JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });
+await fs.writeFile(args.at(-1), JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });
 console.log(
   JSON.stringify({
     complete: true,

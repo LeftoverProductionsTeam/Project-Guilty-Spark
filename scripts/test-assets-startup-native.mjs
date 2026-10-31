@@ -127,6 +127,16 @@ try {
     bitmapTagId: hull.shaderPreview.reflection.bitmapTagId,
   });
   expect(cube.faces).toHaveLength(6);
+  const cubeBatch = await call('preview_owned_reflection_cube_batch', {
+    projectId: source.id, sourceSha256: inspection.sha256,
+    bitmapTagIds: [hull.shaderPreview.reflection.bitmapTagId, 0xffffffff],
+  });
+  expect(cubeBatch.sourceSha256).toBe(inspection.sha256);
+  expect(cubeBatch.items[0].preview).toEqual(cube);
+  expect(cubeBatch.items[1].preview).toBeNull();
+  expect(cubeBatch.items[1].error).toContain('unavailable');
+  receipt.reflectionBatch = { complete: true, exactSingleFaceReadback: true,
+    unknownIdRefused: true, sourceSha256: cubeBatch.sourceSha256 };
   receipt.reflection = {
     shader: hull.path,
     metadata: hull.shaderPreview.reflection,

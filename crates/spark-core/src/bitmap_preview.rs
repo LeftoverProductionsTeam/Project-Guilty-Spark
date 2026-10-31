@@ -376,29 +376,97 @@ pub struct OwnedCubePreview {
     pub bitmap_tag_id:u32,
     pub faces:Vec<OwnedBitmapPreview>,
 }
+pub const MAX_CUBE_BATCH_REQUESTS: usize = 4;
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OwnedCubeBatchItem {
+    pub bitmap_tag_id: u32,
+    pub preview: Option<OwnedCubePreview>,
+    pub error: Option<String>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OwnedCubeBatch {
+    pub source_sha256: String,
+    pub items: Vec<OwnedCubeBatchItem>,
+}
 /// Classic/H1A linear cube top faces are mip-major: the six level-zero faces
 /// precede lower mipmaps. No face may escape the original declared image span.
 pub fn preview_owned_cube(path:&Path,expected:&str,inspection:&MapInspection,bitmap_tag_id:u32,resources:Option<(&Path,&str)>)->Result<OwnedCubePreview>{
+    let batch = preview_owned_cube_batch(path, expected, inspection, &[bitmap_tag_id], resources)?;
+    let item = batch.items.into_iter().next().unwrap();
+    item.preview.ok_or_else(|| SparkError::Invalid(item.error.unwrap()))
+}
+/// A short-lived read transaction, not a metadata-only resource cache. All
+/// faces share one exact source snapshot and one indexed resource handle.
+/// The resource is hashed before/after indexing AND after all range reads.
+pub fn preview_owned_cube_batch(path: &Path, expected: &str, inspection: &MapInspection,
+    ids: &[u32], resources: Option<(&Path, &str)>) -> Result<OwnedCubeBatch> {
+    if ids.is_empty() || ids.len() > MAX_CUBE_BATCH_REQUESTS ||
+        ids.iter().copied().collect::<HashSet<_>>().len() != ids.len() {
+        return invalid("Reflection batch requires 1 to 4 distinct bitmap IDs");
+    }
     let (header,bytes,actual)=maps::read_cache_snapshot(path)?;
-    if actual!=expected||actual!=inspection.sha256{return invalid("Reflection cube source identity changed");}
+    if actual!=expected||actual!=inspection.sha256||header.version!=inspection.header.version {
+        return invalid("Reflection cube source identity changed");
+    }
+    let mut resource_snapshot = None;
+    let mut resource_failure: Option<String> = None;
+    let mut items = Vec::with_capacity(ids.len());
+    let mut raw_bytes = 0usize;
+    let mut rgba_bytes = 0usize;
+    for &bitmap_tag_id in ids {
+        let result = cube_from_snapshot(&header, &bytes, &actual, inspection, bitmap_tag_id,
+            resources, &mut resource_snapshot, &mut resource_failure, &mut raw_bytes, &mut rgba_bytes);
+        match result {
+            Ok(preview) => items.push(OwnedCubeBatchItem { bitmap_tag_id, preview: Some(preview), error: None }),
+            Err(error) => items.push(OwnedCubeBatchItem { bitmap_tag_id, preview: None,
+                error: Some(bitmap_failure(&error).1) }),
+        }
+    }
+    // A change during any face read rejects the whole transaction, including
+    // earlier successful items. Never expose pixels from a failed final audit.
+    if let Some((file, _)) = resource_snapshot.as_mut() {
+        crate::resource_map::verify_open_handle_hash(file, resources.unwrap().1)?;
+    }
+    Ok(OwnedCubeBatch { source_sha256: actual, items })
+}
+#[allow(clippy::too_many_arguments)]
+fn cube_from_snapshot(header: &MapHeader, bytes: &[u8], actual: &str, inspection: &MapInspection,
+    bitmap_tag_id: u32, resources: Option<(&Path, &str)>,
+    resource_snapshot: &mut Option<(File, crate::resource_map::ResourceIndex)>,
+    resource_failure: &mut Option<String>, raw_bytes: &mut usize, rgba_bytes: &mut usize) -> Result<OwnedCubePreview> {
     let tag=inspection.tags.iter().find(|t|t.id==bitmap_tag_id&&t.class=="bitm"&&!t.external).ok_or_else(||SparkError::Invalid("Reflection cube tag is unavailable in the preserved map".into()))?;
     let at=tag.data_offset.ok_or_else(||SparkError::Invalid("Reflection cube tag has no bounded body".into()))?;
     let meta=read_image_metadata(&bytes,&header,at,0,true)?;
     let total=meta.size.checked_mul(6).ok_or_else(||SparkError::Invalid("Cube face byte count overflow".into()))?;
     if total>MAX_BATCH_RAW_BYTES||total>meta.declared_size{return invalid("Reflection cube faces exceed the declared image span or 16 MiB budget");}
+    let rgba = usize::from(meta.width) * usize::from(meta.height) * 4 * 6;
+    if total > 64 * 1024 * 1024 - *raw_bytes || rgba > 64 * 1024 * 1024 - *rgba_bytes {
+        return invalid("Reflection batch exceeds the 64 MiB packed or decoded budget");
+    }
     let mut resource_hash=None;
     let pixels=if meta.external {
         let (resource,hash)=resources.ok_or_else(||SparkError::Invalid("Reflection cube needs its exact original pinned bitmaps.map".into()))?;
-        let (mut file,index)=crate::resource_map::open_verified(resource,hash)?;
-        let pixels=crate::resource_map::read_external_top_mip_from_verified(&mut file,&index,&tag.path,meta.raw_offset as u64,meta.declared_size as u64,total,header.version,0)?;
-        crate::resource_map::verify_open_handle_hash(&mut file,hash)?;resource_hash=Some(hash.to_owned());pixels
+        if resource_snapshot.is_none() && resource_failure.is_none() {
+            match crate::resource_map::open_verified(resource, hash) {
+                Ok(snapshot) => *resource_snapshot = Some(snapshot),
+                Err(error) => *resource_failure = Some(bitmap_failure(&error).1),
+            }
+        }
+        let (file, index) = resource_snapshot.as_mut().ok_or_else(|| SparkError::Invalid(
+            resource_failure.clone().unwrap_or_else(|| "Reflection resource is unavailable".into())))?;
+        let pixels=crate::resource_map::read_external_top_mip_from_verified(file,index,&tag.path,meta.raw_offset as u64,meta.declared_size as u64,total,header.version,0)?;
+        resource_hash=Some(hash.to_owned());pixels
     }else{
         if meta.raw_offset<2048{return invalid("Reflection cube pixels overlap the cache header");}
         Reader(&bytes).bytes(meta.raw_offset,total)?.to_vec()
     };
     let mut faces=Vec::with_capacity(6);
-    for face in pixels.chunks_exact(meta.size){faces.push(OwnedBitmapPreview{bitmap_tag_id,image_index:0,image_count:1,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,face)?),source_kind:if meta.external{"verified-resource"}else{"internal-cache"}.into(),resource_sha256:resource_hash.clone()});}
-    Ok(OwnedCubePreview{source_sha256:actual,resource_sha256:resource_hash,bitmap_tag_id,faces})
+    for face in pixels.chunks_exact(meta.size){faces.push(OwnedBitmapPreview{bitmap_tag_id,image_index:0,image_count:1,shared_native_bitmap_path:None,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.to_owned(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,face)?),source_kind:if meta.external{"verified-resource"}else{"internal-cache"}.into(),resource_sha256:resource_hash.clone()});}
+    *raw_bytes += total;
+    *rgba_bytes += rgba;
+    Ok(OwnedCubePreview{source_sha256:actual.to_owned(),resource_sha256:resource_hash,bitmap_tag_id,faces})
 }
 fn checked_top_mip(bytes: &[u8], header: &MapHeader, tag_data: usize, index: usize) -> Result<(u16, u16, &'static str, Vec<u8>)> {
     let m = read_top_mip_metadata(bytes, header, tag_data, index)?;
@@ -970,6 +1038,74 @@ mod tests {
         assert!(preview_owned_bitmap(file.path(),&sha,&inspection,0x1234,0).is_err());
         bytes[0x99c..0x9a0].copy_from_slice(&16u32.to_le_bytes());std::fs::write(file.path(),bytes).unwrap();let changed=maps::hash_file(file.path()).unwrap();inspection.sha256=changed.clone();
         assert!(preview_owned_cube(file.path(),&changed,&inspection,0x1234,None).is_err());assert!(preview_owned_cube(file.path(),&sha,&inspection,0x1234,None).is_err());
+    }
+
+    fn cube_batch_fixture(external: bool) -> (tempfile::NamedTempFile, MapInspection) {
+        let (file, mut inspection) = compatibility_fixture(7, if external { 0x100 } else { 0 }, 1);
+        let mut bytes = std::fs::read(file.path()).unwrap();
+        bytes[0x98a..0x98c].copy_from_slice(&2u16.to_le_bytes());
+        bytes[0x998..0x99c].copy_from_slice(&(if external { 0x300u32 } else { 0x2000 }).to_le_bytes());
+        bytes[0x99c..0x9a0].copy_from_slice(&96u32.to_le_bytes());
+        for face in 0..6 { bytes[0x2000 + face * 16..0x2010 + face * 16].fill(face as u8); }
+        std::fs::write(file.path(), bytes).unwrap();
+        inspection.sha256 = maps::hash_file(file.path()).unwrap();
+        let mut second = inspection.tags[0].clone(); second.id = 2; second.index = 1;
+        second.path = "test/second".into(); inspection.tags.push(second);
+        (file, inspection)
+    }
+    #[test]
+    fn cube_batch_preserves_order_exact_faces_and_explicit_refusals() {
+        let (file, inspection) = cube_batch_fixture(false);
+        let original = std::fs::read(file.path()).unwrap();
+        let batch = preview_owned_cube_batch(file.path(), &inspection.sha256, &inspection, &[2, 99, 1], None).unwrap();
+        assert_eq!(batch.source_sha256, inspection.sha256);
+        assert_eq!(batch.items.iter().map(|item| item.bitmap_tag_id).collect::<Vec<_>>(), vec![2, 99, 1]);
+        assert!(batch.items[1].preview.is_none());
+        assert!(batch.items[1].error.as_ref().unwrap().contains("unavailable"));
+        for item in [&batch.items[0], &batch.items[2]] {
+            let single = preview_owned_cube(file.path(), &inspection.sha256, &inspection, item.bitmap_tag_id, None).unwrap();
+            assert_eq!(serde_json::to_value(item.preview.as_ref().unwrap()).unwrap(), serde_json::to_value(single).unwrap());
+            for (face, image) in item.preview.as_ref().unwrap().faces.iter().enumerate() {
+                assert_eq!(image.dds_base64, base64(&dds_top_mip(4, 4, "DXT3", &[face as u8; 16]).unwrap()));
+            }
+        }
+        assert_eq!(std::fs::read(file.path()).unwrap(), original);
+        for ids in [&[][..], &[1, 1], &[1, 2, 3, 4, 5]] {
+            assert!(preview_owned_cube_batch(file.path(), &inspection.sha256, &inspection, ids, None).is_err());
+        }
+        let mut corrupted = original; corrupted[0x2000] ^= 1;
+        std::fs::write(file.path(), corrupted).unwrap();
+        assert!(preview_owned_cube_batch(file.path(), &inspection.sha256, &inspection, &[1, 2], None).is_err());
+    }
+    #[test]
+    fn cube_batch_requires_exact_shared_index_and_rechecks_current_resource_bytes() {
+        let (file, inspection) = cube_batch_fixture(true);
+        let dir = tempfile::tempdir().unwrap(); let path = dir.path().join("bitmaps.map");
+        let mut resource = vec![0u8; 0x500];
+        let set = |b: &mut [u8], at: usize, v: u32| b[at..at+4].copy_from_slice(&v.to_le_bytes());
+        set(&mut resource, 0, 1); set(&mut resource, 4, 0x100);
+        set(&mut resource, 8, 0x40); set(&mut resource, 12, 2);
+        for (n, name) in ["test\\bitmap_0\0", "test\\second_0\0"].iter().enumerate() {
+            let at = 0x40 + n * 12;
+            set(&mut resource, at, (n * 32) as u32); set(&mut resource, at+4, 96); set(&mut resource, at+8, 0x300);
+            resource[0x100+n*32..0x100+n*32+name.len()].copy_from_slice(name.as_bytes());
+        }
+        for face in 0..6 { resource[0x300+face*16..0x310+face*16].fill(face as u8); }
+        std::fs::write(&path, &resource).unwrap(); let hash = maps::hash_file(&path).unwrap();
+        let batch = preview_owned_cube_batch(file.path(), &inspection.sha256, &inspection, &[1, 2], Some((&path, &hash))).unwrap();
+        assert!(batch.items.iter().all(|item| item.preview.as_ref().unwrap().resource_sha256.as_ref() == Some(&hash)));
+        let first = batch.items[0].preview.as_ref().unwrap();
+        assert_eq!(first.faces[5].dds_base64, base64(&dds_top_mip(4, 4, "DXT3", &[5; 16]).unwrap()));
+        // A fresh request must reject same-size corruption, even with a valid old pin.
+        resource[0x300] ^= 1; std::fs::write(&path, &resource).unwrap();
+        let refused = preview_owned_cube_batch(file.path(), &inspection.sha256, &inspection, &[1, 2], Some((&path, &hash))).unwrap();
+        assert!(refused.items.iter().all(|item| item.preview.is_none() && item.error.is_some()));
+        // With a new exact pin, only the mismatched path fails; no fuzzy substitution.
+        resource[0x120] = b'x'; std::fs::write(&path, &resource).unwrap(); let changed = maps::hash_file(&path).unwrap();
+        let partial = preview_owned_cube_batch(file.path(), &inspection.sha256, &inspection, &[1, 2], Some((&path, &changed))).unwrap();
+        assert!(partial.items[0].preview.is_some()); assert!(partial.items[1].preview.is_none());
+        let missing = preview_owned_cube_batch(file.path(), &inspection.sha256, &inspection, &[1, 2], None).unwrap();
+        assert!(missing.items.iter().all(|item| item.error.as_ref().unwrap().contains("pinned bitmaps.map")));
     }
 
 }
