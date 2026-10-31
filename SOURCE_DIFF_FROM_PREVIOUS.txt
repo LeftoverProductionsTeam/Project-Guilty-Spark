@@ -1,27 +1,25 @@
-Project Guilty Spark private CE hosting — 2026-10-31
-Base committed foundation: fbe1cbf
+Project Guilty Spark matching CE playtest client — 2026-10-31
+Base committed foundation: 306c6e5
 
-Adds direct validated CE project-build hosting, same-filename stock/project isolation, native revision/output/receipt guards, rebuild guidance and genuine native compilation/hosting acceptance. Preserves original games, all prior source history, C35-C39 source safeguards and separate unfinished direct compiled-map research. Client joining and gameplay remain open. See docs/CE_PROJECT_BUILD_HOSTING.md.
+Adds checked matching-client preparation/launch, separate test profiles, in-memory native copy identities, cancellation and scoped client/server cleanup. Retains existing native Tool/Invader builds, Baboon reconciliation, C35-C39 history and source safeguards. Original games and separate unfinished direct compiled-map research remain unchanged. Player joining, visual first-run acceptance and gameplay remain open. See docs/CE_MATCHING_CLIENT_PLAYTEST.md.
 
 Changed or added source members:
 README.md
 SOURCE_DIFF_FROM_PREVIOUS.txt
 SOURCE_MANIFEST_SHA256.txt
 SOURCE_SHA256SUMS.txt
-crates/spark-core/src/ce_host.rs
+docs/CE_CLIENT_GITHUB_DESCRIPTION.md
+docs/CE_MATCHING_CLIENT_PLAYTEST.md
 docs/CE_PROJECT_BUILD_HOSTING.md
-docs/CE_PROJECT_HOST_GITHUB_DESCRIPTION.md
-docs/CUSTOM_EDITION_PRIVATE_HOST.md
 docs/MASTER_FEATURE_LEDGER.csv
 docs/MASTER_FEATURE_LEDGER.md
 docs/UNIVERSAL_WORKBENCH_BACKLOG.md
-docs/fixtures/ce-project-host-native.json
+docs/fixtures/ce-matching-client-native.json
 scripts/test-build-evidence.mjs
 scripts/test-ce-host-native.mjs
-scripts/test-ce-server-native.mjs
+src-tauri/src/app.rs
+src-tauri/src/ce_host_client.rs
 src-tauri/src/ce_host_native.rs
 src/components/CustomEditionHost.css
 src/components/CustomEditionHost.tsx
-src/components/Runtimes.tsx
 tests/ui/ce-host.spec.ts
-tests/ui/fixtures/ceHost.tsx

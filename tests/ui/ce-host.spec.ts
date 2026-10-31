@@ -73,6 +73,39 @@ test.beforeEach(async ({ page }) => {
           w.ceHostSession.status = null;
           return;
         }
+        if (command === 'ce_host_client_action') {
+          if (location.search.includes('bad-client'))
+            throw Error('Private input failed integrity: haloce.exe');
+          const phase = args.action === 'prepare' ? 'ready' : args.action === 'launch' ? 'open' : 'stopped';
+          w.ceHostSession.client = {
+            phase,
+            detail:
+              phase === 'open'
+                ? 'CE playtest opened. Connection and gameplay unverified.'
+                : 'Matching files checked.',
+            processId: phase === 'open' ? 123 : null,
+            gameDirectory: 'owned/game',
+            profileDirectory: 'owned/client-profile',
+            verifiedFiles: 67,
+            verifiedBytes: 1000000,
+            verificationMs: 120,
+            executableSha256: 'f'.repeat(64),
+            launchCount: phase === 'open' ? 1 : 0,
+            exitCode: null,
+            connectionVerified: false,
+          };
+          if (args.action === 'prepare' && location.search.includes('slow-client')) {
+            const prepared = structuredClone(w.ceHostSession.client);
+            w.ceHostSession.client.phase = 'checking';
+            return new Promise((resolve) => {
+              w.releaseClient = () => {
+                w.ceHostSession.client = prepared;
+                resolve(structuredClone(w.ceHostSession));
+              };
+            });
+          }
+          return structuredClone(w.ceHostSession);
+        }
         throw Error('Unexpected command ' + command);
       },
     };
@@ -218,4 +251,64 @@ test('losing a project build keeps it unavailable instead of choosing its stock 
   await page.getByRole('button', { name: 'Refresh maps', exact: true }).click();
   await expect(page.getByLabel('Private CE map')).toHaveValue('build:55555555-5555-4555-8555-555555555555');
   await expect(page.getByRole('button', { name: 'Start private server', exact: true })).toBeEnabled();
+});
+
+async function loadedServer(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'Start private server', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Prepare matching client' })).toBeDisabled();
+  await page.evaluate(() => {
+    const session = (window as any).ceHostSession;
+    session.phase = 'running';
+    session.status = { players: 0, maximumPlayers: 2 };
+  });
+  await expect(page.getByRole('button', { name: 'Prepare matching client' })).toBeEnabled();
+}
+test('matching-client actions stay scoped, retain workspace state and do not claim a joined player', async ({
+  page,
+}) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html');
+  await loadedServer(page);
+  await page.getByRole('button', { name: 'Prepare matching client' }).click();
+  await expect(page.getByRole('button', { name: 'Launch CE playtest' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Switch workspace' }).click();
+  await page.getByRole('button', { name: 'Switch workspace' }).click();
+  await page.getByRole('button', { name: 'Launch CE playtest' }).click();
+  await expect(page.getByText('CE playtest opened. Connection and gameplay unverified.')).toBeVisible();
+  await expect(page.getByText('0 / 2 players', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Stop playtest', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Stop private server', exact: true })).toBeEnabled();
+  const calls = await page.evaluate(() =>
+    (window as any).ceHostCalls
+      .filter((c: any) => c.command === 'ce_host_client_action')
+      .map((c: any) => c.args),
+  );
+  expect(calls).toEqual(['prepare', 'launch', 'stop'].map((action) => ({ sessionId: 'owned-host', action })));
+});
+test('client integrity failure stays visible without changing the running server', async ({ page }) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html?bad-client');
+  await loadedServer(page);
+  await page.getByRole('button', { name: 'Prepare matching client' }).click();
+  await expect(page.getByRole('alert')).toContainText('integrity');
+  await expect(page.getByRole('button', { name: 'Launch CE playtest' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Stop private server', exact: true })).toBeEnabled();
+});
+test('client controls fit a narrow panel with the full status available', async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 800 });
+  await page.goto('/tests/ui/fixtures/ceHost.html');
+  await loadedServer(page);
+  await page.getByRole('button', { name: 'Prepare matching client' }).click();
+  const region = page.getByRole('region', { name: 'Matching CE playtest' });
+  expect(await region.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await expect(region.getByRole('button', { name: 'Launch CE playtest' })).toBeInViewport();
+});
+test('switching project during preparation does not leave client controls permanently busy', async ({
+  page,
+}) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html?project&slow-client');
+  await loadedServer(page);
+  await page.getByRole('button', { name: 'Prepare matching client' }).click();
+  await expect.poll(() => page.evaluate(() => !!(window as any).releaseClient)).toBe(true);
+  await page.getByRole('button', { name: 'Switch project', exact: true }).click();
+  await page.evaluate(() => (window as any).releaseClient());
+  await expect(page.getByRole('button', { name: 'Launch CE playtest' })).toBeEnabled();
 });

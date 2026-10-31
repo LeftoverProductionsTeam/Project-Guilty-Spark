@@ -1,13 +1,24 @@
 const source = 'docs/TEST_BUILD_READINESS.md';
 export const testBuildRequirements = [
   {
+    id: 'TBR-ce-matching-client',
+    feature: 'Prepare and launch a matching isolated CE playtest client',
+    source: 'docs/CE_MATCHING_CLIENT_PLAYTEST.md',
+    topic: 'server',
+    operation:
+      'Recheck the private server snapshot using in-memory file identities, prepare a separate client profile, launch only the owned matching CE executable with its local server address, hold checked files against write/delete sharing, support scoped cancellation and stop, and clean up owned client/server processes on window or abrupt parent exit. Genuine native source compilation and unchanged game/source inventories remain integrated.',
+    gap: 'First real client join and visual first-run acceptance, collision walkthrough, gameplay/render/audio parity, classic CE LAN/public exposure, game-peer/AI replication, expanded populations, universal conversion and direct compiled-map authoring remain open.',
+    previous:
+      'Continues committed 306c6e5 and retains earlier failed join attempts, C35-C39 native/source/reconciliation safeguards and separate experimental research.',
+  },
+  {
     id: 'TBR-ce-project-host',
     feature: 'Host a validated managed CE project build with isolated stock-map identity',
     source: 'docs/CE_PROJECT_BUILD_HOSTING.md',
     topic: 'server',
     operation:
       'Resolve a saved CE project/build through native ownership, revision, receipt, target and output checks; host the exact compiled bytes from a private copy. Keep same-filename stock/project choices distinct, preserve missing selections, guide rebuilding and retain a running frozen snapshot while source edits continue.',
-    gap: 'Matching-client preparation and join, walkthrough/gameplay parity, classic CE LAN/public exposure, other-runtime output routing, game-peer/AI replication and direct compiled-map authoring remain open.',
+    gap: 'Matching-client preparation/launch is accepted separately by TBR-ce-matching-client. A joined player, walkthrough/gameplay parity, classic CE LAN/public exposure, other-runtime output routing, game-peer/AI replication and direct compiled-map authoring remain open.',
     previous:
       'Continues fbe1cbf without replacing its prior native lifecycle evidence, C35-C39 source safeguards or unfinished research.',
   },
@@ -18,7 +29,7 @@ export const testBuildRequirements = [
     topic: 'server',
     operation:
       'Start a checked loopback-only classic CE dedicated process from a fresh private snapshot, observe matching native map/mode/player status, stop only the owning window session, retain controls across workspace reloads and kill owned children after abrupt Spark exit. Real native acceptance covers five stock game types and the unchanged compiled Workshop cache.',
-    gap: 'Client join and gameplay remain unaccepted. Managed build-output selection, this control’s LAN/public exposure, game-peer replication, networked AI, cross-runtime play, 128 players and direct compiled-map authoring are open.',
+    gap: 'Client join and gameplay remain unaccepted. Managed build-output selection and matching-client preparation/launch have separate later acceptance rows. This control’s LAN/public exposure, game-peer replication, networked AI, cross-runtime play, 128 players and direct compiled-map authoring remain open.',
     previous:
       'Extends the retained helper-only CE smoke tests without replacing their failed client attempts or any C35-C39 source safeguards.',
   },
@@ -81,5 +92,14 @@ testBuildOverrides['TBR-ce-project-host'] = {
   files:
     'crates/spark-core/src/ce_host.rs; src-tauri/src/ce_host_native.rs; src/components/CustomEditionHost.tsx; scripts/test-ce-host-native.mjs',
   level:
-    'Real Windows UI/native toolchain and dedicated-engine map acceptance; matching client and gameplay NOT ACCEPTED',
+    'Real Windows UI/native toolchain and dedicated-engine map acceptance; joined client and gameplay NOT ACCEPTED',
+};
+testBuildOverrides['TBR-ce-matching-client'] = {
+  ...testBuildOverrides['TBR-ce-matching-client'],
+  evidence:
+    'docs/CE_MATCHING_CLIENT_PLAYTEST.md; docs/fixtures/ce-matching-client-native.json; scripts/test-ce-host-native.mjs',
+  files:
+    'src-tauri/src/ce_host_client.rs; src-tauri/src/ce_host_native.rs; src/components/CustomEditionHost.tsx; scripts/test-ce-host-native.mjs; tests/ui/ce-host.spec.ts',
+  level:
+    'Real Windows UI/native IPC, Tool/Invader compilation and CE client/server lifetimes; player join, visual first-run and gameplay NOT ACCEPTED',
 };

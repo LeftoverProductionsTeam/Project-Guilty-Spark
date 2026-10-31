@@ -21,6 +21,20 @@ interface Catalog {
   projectId?: string | null;
   projectIssue?: string | null;
 }
+interface ClientView {
+  phase: string;
+  detail: string;
+  processId: number | null;
+  gameDirectory: string;
+  profileDirectory: string;
+  executableSha256: string;
+  verifiedFiles: number;
+  verifiedBytes: number;
+  verificationMs: number;
+  launchCount: number;
+  exitCode: number | null;
+  connectionVerified: boolean;
+}
 export interface CeHostView {
   id: string;
   phase: string;
@@ -40,6 +54,7 @@ export interface CeHostView {
   observations: number;
   elapsedMs: number;
   consoleTail: string;
+  client?: ClientView | null;
   status: {
     name: string;
     version: string;
@@ -86,6 +101,8 @@ export default function CustomEditionHost({
   const [name, setName] = useState('Spark private');
   const [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(native);
+  const [clientBusy, setClientBusy] = useState(false);
+  const clientGeneration = useRef(0);
   const [error, setError] = useState(''),
     [setupError, setSetupError] = useState('');
   const mounted = useRef(false),
@@ -210,7 +227,28 @@ export default function CustomEditionHost({
       if (mounted.current) setBusy(false);
     }
   }
+  async function clientAction(action: 'prepare' | 'launch' | 'stop') {
+    if (!view) return;
+    const token = ++generation.current;
+    const clientToken = ++clientGeneration.current;
+    setClientBusy(true);
+    setError('');
+    try {
+      const next = await call<CeHostView>('ce_host_client_action', { sessionId: view.id, action });
+      if (mounted.current && token === generation.current) setView(next);
+    } catch (e) {
+      if (mounted.current && token === generation.current) {
+        setError(String(e));
+        await poll();
+      }
+    } finally {
+      if (mounted.current && clientToken === clientGeneration.current) setClientBusy(false);
+    }
+  }
   const locked = busy || !!active(view);
+  const client = view?.client;
+  const clientOpen = client?.phase === 'open';
+  const clientChecking = clientBusy || client?.phase === 'checking';
   return (
     <section className="analysis-card ce-private-host" aria-label="Custom Edition private host">
       <div className="section-heading">
@@ -397,6 +435,37 @@ export default function CustomEditionHost({
               Direct IP: <code className="ce-host-address">127.0.0.1:{view.port}</code>
             </p>
           )}
+          {active(view) && (
+            <section className="ce-host-client" aria-label="Matching CE playtest">
+              <div className="button-row">
+                <strong>Playtest this copy</strong>
+                {!clientOpen && (
+                  <button
+                    disabled={!native || busy || clientChecking || view.phase !== 'running'}
+                    onClick={() => void clientAction('prepare')}
+                  >
+                    {clientChecking ? 'Checking client…' : 'Prepare matching client'}
+                  </button>
+                )}
+                {client?.phase === 'ready' && (
+                  <button
+                    disabled={!native || busy || clientChecking || view.phase !== 'running'}
+                    onClick={() => void clientAction('launch')}
+                  >
+                    <Play size={13} /> Launch CE playtest
+                  </button>
+                )}
+                {(clientOpen || clientChecking) && (
+                  <button disabled={!native || busy} onClick={() => void clientAction('stop')}>
+                    <Square size={13} /> Stop playtest
+                  </button>
+                )}
+              </div>
+              <p className="subtle" aria-live="polite">
+                {client?.detail ?? 'Use this exact map and its resources with a separate Halo test profile.'}
+              </p>
+            </section>
+          )}
           <details>
             <summary>Session details &amp; output</summary>
             <dl>
@@ -410,6 +479,21 @@ export default function CustomEditionHost({
               <dd>{view.status?.version ?? 'No current native reply'}</dd>
               <dt>Map identity</dt>
               <dd>{view.mapSha256}</dd>
+              {client && (
+                <>
+                  <dt>Client files checked</dt>
+                  <dd>
+                    {client.verifiedFiles} · {(client.verifiedBytes / 1048576).toFixed(1)} MiB ·{' '}
+                    {client.verificationMs} ms
+                  </dd>
+                  <dt>Test profile</dt>
+                  <dd>{client.profileDirectory}</dd>
+                  <dt>Client identity</dt>
+                  <dd>{client.executableSha256}</dd>
+                  <dt>Client process</dt>
+                  <dd>{client.processId ?? 'Not running'} · join unverified</dd>
+                </>
+              )}
               {view.sourceBuild && (
                 <>
                   <dt>Saved build</dt>

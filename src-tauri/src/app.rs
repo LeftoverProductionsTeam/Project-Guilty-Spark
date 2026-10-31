@@ -2671,6 +2671,7 @@ pub fn run() {
             ce_host_native::ce_host_start,
             ce_host_native::ce_host_status,
             ce_host_native::ce_host_stop,
+            ce_host_native::ce_host_client_action,
             community_host_native::community_host_save,
             community_host_native::community_control_connect,
             community_host_native::community_control_poll,

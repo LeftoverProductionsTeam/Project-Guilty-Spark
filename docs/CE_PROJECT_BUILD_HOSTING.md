@@ -1,5 +1,7 @@
 # Host a saved CE project build
 
+Current continuation: [Matching CE client playtests](CE_MATCHING_CLIENT_PLAYTEST.md) adds checked client preparation and launch to this server workflow. The evidence below records the earlier `306c6e5` acceptance; client joining and gameplay remain open.
+
 This continuation extends the checked private CE host from `fbe1cbf`. A validated Custom Edition project output can now be selected directly in **Online → Host game**, without copying it into or overwriting the registered game installation.
 
 ## Workflow

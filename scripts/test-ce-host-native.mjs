@@ -1,5 +1,6 @@
 // Opt-in real Spark -> checked private game copy -> CE dedicated process test.
 // No mocked IPC, original game writes, public host, client join or gameplay claim.
+// --client-seconds opts into actual GUI client launches and owned-child cleanup.
 import { chromium, expect as assertion } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -11,17 +12,33 @@ const expect = assertion.configure({ timeout: 45000 });
 const args = new Map();
 for (let i = 2; i < process.argv.length; i += 2) {
   if (
-    !['--app', '--runtime', '--output', '--map', '--kit', '--invader', '--recovery'].includes(
-      process.argv[i],
-    ) ||
+    ![
+      '--app',
+      '--runtime',
+      '--output',
+      '--map',
+      '--kit',
+      '--invader',
+      '--recovery',
+      '--client-seconds',
+    ].includes(process.argv[i]) ||
     !process.argv[i + 1] ||
     args.has(process.argv[i])
   )
     throw Error(
       'Use unique --app Spark.exe --runtime owned-CE --output fresh-short-folder [--map compiled-CE.map]',
     );
-  args.set(process.argv[i], path.resolve(process.argv[i + 1]));
+  args.set(
+    process.argv[i],
+    process.argv[i] === '--client-seconds' ? process.argv[i + 1] : path.resolve(process.argv[i + 1]),
+  );
 }
+const clientSeconds = Number(args.get('--client-seconds') ?? 0);
+if (
+  args.has('--client-seconds') &&
+  (!Number.isInteger(clientSeconds) || clientSeconds < 5 || clientSeconds > 120)
+)
+  throw Error('Client observation requires an integer from 5 to 120 seconds');
 for (const key of ['--app', '--runtime', '--output']) if (!args.has(key)) throw Error('Missing ' + key);
 const projectChallenge = ['--kit', '--invader', '--recovery'].some((key) => args.has(key));
 if (projectChallenge && !['--kit', '--invader', '--recovery'].every((key) => args.has(key)))
@@ -126,6 +143,24 @@ async function waitNative(page, previousSessionId) {
 async function stop(page, id) {
   await invoke(page, 'ce_host_stop', { sessionId: id });
   await expect.poll(async () => (await invoke(page, 'ce_host_status'))?.phase).toBe('stopped');
+}
+async function prepareClient(page, session) {
+  const ready = await invoke(page, 'ce_host_client_action', { sessionId: session.id, action: 'prepare' });
+  expect(ready.client.phase).toBe('ready');
+  expect(ready.client.connectionVerified).toBe(false);
+  expect(ready.client.gameDirectory).toBe(path.join(session.sessionDirectory, 'game'));
+  expect(ready.client.profileDirectory).toBe(path.join(session.sessionDirectory, 'client-profile'));
+  expect(ready.client.executableSha256).toBe(before['haloce.exe']);
+  expect(ready.client.verifiedFiles).toBeGreaterThan(16);
+  return ready;
+}
+async function launchClient(page, session) {
+  await prepareClient(page, session);
+  const opened = await invoke(page, 'ce_host_client_action', { sessionId: session.id, action: 'launch' });
+  expect(opened.client.phase).toBe('open');
+  expect(opened.client.connectionVerified).toBe(false);
+  expect(alive(opened.client.processId)).toBe(true);
+  return opened;
 }
 try {
   await expect
@@ -233,11 +268,101 @@ try {
     serverSha256: initial.executableSha256,
     copiedBytes: initial.copiedBytes,
   });
+  const clientBegan = performance.now();
+  expect(
+    await call('ce_host_client_action', { sessionId: initial.id, action: 'launch' }).then(() => '', String),
+  ).toContain('Prepare');
+  const preparing = panel.getByRole('button', { name: 'Prepare matching client', exact: true }).click();
+  const clientHeartbeatMs = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const began = performance.now();
+        setTimeout(() => resolve(Math.round(performance.now() - began)), 50);
+      }),
+  );
+  await preparing;
+  await expect(panel.getByRole('button', { name: 'Launch CE playtest', exact: true })).toBeEnabled();
+  const matched = await call('ce_host_status');
+  expect(matched.client.phase).toBe('ready');
+  expect(matched.client.executableSha256).toBe(before['haloce.exe']);
+  expect(matched.client.processId).toBeNull();
+  expect(await fs.readdir(matched.client.profileDirectory)).toEqual([]);
+  for (const file of [
+    'maps/bloodgulch.map',
+    'maps/bitmaps.map',
+    'maps/sounds.map',
+    'maps/loc.map',
+    'haloce.exe',
+  ])
+    expect(await hash(path.join(matched.client.gameDirectory, file))).toBe(before[file]);
+  step('real UI prepares the exact server map/resources and a fresh separate client profile', {
+    preparationMs: Math.round(performance.now() - clientBegan),
+    clientHeartbeatMs,
+    verifiedFiles: matched.client.verifiedFiles,
+    verifiedBytes: matched.client.verifiedBytes,
+    verificationMs: matched.client.verificationMs,
+    executableSha256: matched.client.executableSha256,
+  });
+  const privateClient = path.join(matched.client.gameDirectory, 'haloce.exe');
+  const clientBytes = await fs.readFile(privateClient);
+  const copyManifest = path.join(initial.sessionDirectory, 'copied-files.json');
+  const manifestBytes = await fs.readFile(copyManifest);
+  try {
+    const changed = Buffer.from(clientBytes);
+    changed[changed.length - 1] ^= 1;
+    await fs.writeFile(privateClient, changed);
+    const forged = JSON.parse(manifestBytes);
+    forged['haloce.exe'] = await hash(privateClient);
+    await fs.writeFile(copyManifest, JSON.stringify(forged));
+    expect(
+      await call('ce_host_client_action', { sessionId: initial.id, action: 'launch' }).then(() => '', String),
+    ).toContain('integrity');
+    const refused = await call('ce_host_status');
+    expect(refused.client.phase).toBe('failed');
+    expect(refused.client.processId).toBeNull();
+  } finally {
+    await fs.writeFile(privateClient, clientBytes);
+    await fs.writeFile(copyManifest, manifestBytes);
+  }
+  step('changed client bytes refuse even with a forged copy manifest and no client is launched');
+  const plugin = path.join(matched.client.gameDirectory, 'winmm.dll');
+  try {
+    await fs.writeFile(plugin, 'controlled QA invalid file', { flag: 'wx' });
+    expect(
+      await call('ce_host_client_action', { sessionId: initial.id, action: 'prepare' }).then(
+        () => '',
+        String,
+      ),
+    ).toContain('unapproved');
+  } finally {
+    await fs.unlink(plugin);
+  }
+  await prepareClient(page, initial);
+  step('unapproved private DLL refuses and restoring exact inputs allows matching-client preparation');
+  const pendingClient = call('ce_host_client_action', { sessionId: initial.id, action: 'prepare' }).then(
+    () => '',
+    String,
+  );
+  await expect
+    .poll(async () => (await call('ce_host_status')).client?.phase, { intervals: [5, 10] })
+    .toBe('checking');
+  expect(
+    await call('ce_host_client_action', { sessionId: initial.id, action: 'prepare' }).then(() => '', String),
+  ).toContain('already in progress');
+  await call('ce_host_client_action', { sessionId: initial.id, action: 'stop' });
+  expect(await pendingClient).toContain('cancelled');
+  expect((await call('ce_host_status')).client.phase).toBe('stopped');
+  await waitNative(page);
+  await prepareClient(page, initial);
+  step(
+    'concurrent preparation refuses and cancellation leaves the server running without launching a client',
+  );
   await panel.getByText('Session details & output', { exact: true }).click();
   await page.screenshot({ path: path.join(output, 'native-host.png') });
   // Reload preserves native ownership even though the React workspace remounts.
   await page.reload();
   expect((await call('ce_host_status')).id).toBe(initial.id);
+  expect((await call('ce_host_status')).client.phase).toBe('ready');
   step('workspace reload retains the owned native session');
   const priorPages = pages();
   await call('open_workspace_window', { workspace: 'runtimes', context: null });
@@ -245,6 +370,14 @@ try {
   const other = pages().find((candidate) => !priorPages.includes(candidate));
   await expect.poll(() => other.evaluate(() => !!window.__TAURI_INTERNALS__)).toBe(true);
   expect(await invoke(other, 'ce_host_status')).toBeNull();
+  for (const action of ['prepare', 'launch', 'stop'])
+    expect(
+      await invoke(other, 'ce_host_client_action', { sessionId: initial.id, action }).then(() => '', String),
+    ).toContain('another window');
+  expect(
+    await call('ce_host_client_action', { sessionId: 'stale', action: 'prepare' }).then(() => '', String),
+  ).toContain('no longer current');
+  step('client actions reject other windows and stale session IDs');
   expect(await invoke(other, 'ce_host_stop', { sessionId: initial.id }).then(() => '', String)).toContain(
     'another window',
   );
@@ -267,10 +400,15 @@ try {
   await expect(other.getByLabel('Private CE player limit')).toHaveValue('2');
   await other.getByText('Name & port', { exact: true }).click();
   await expect(other.getByLabel('Private CE server name')).toHaveValue('Spark second');
+  const secondaryClient = clientSeconds ? await launchClient(other, secondary) : null;
   await invoke(other, 'close_application').catch((e) => {
     if (!/closed|destroyed/i.test(String(e))) throw e;
   });
   await expect.poll(() => alive(secondary.processId)).toBe(false);
+  if (secondaryClient) {
+    await expect.poll(() => alive(secondaryClient.client.processId)).toBe(false);
+    step('closing the owning Spark window stops its actual CE client and server');
+  }
   expect((await call('ce_host_status')).id).toBe(initial.id);
   await waitNative(page);
   step('separate windows cannot stop each other and closing a window stops only its own server');
@@ -465,6 +603,77 @@ try {
         nativeStatus: hosted.status,
       },
     );
+    const preparedBuild = await prepareClient(page, hosted);
+    expect(await hash(path.join(preparedBuild.client.gameDirectory, 'maps/bloodgulch.map'))).toBe(
+      build.sha256,
+    );
+    expect(build.sha256).not.toBe(before['maps/bloodgulch.map']);
+    step('matching client uses the genuine newly compiled Workshop map rather than its stock namesake', {
+      mapSha256: build.sha256,
+      verifiedFiles: preparedBuild.client.verifiedFiles,
+      verificationMs: preparedBuild.client.verificationMs,
+    });
+    let stopWithServerClient;
+    if (clientSeconds) {
+      const opened = await launchClient(page, hosted);
+      const endpoint = path.join(output, 'active-client.json');
+      await fs.writeFile(
+        endpoint,
+        JSON.stringify(
+          {
+            processId: opened.client.processId,
+            map: opened.map,
+            gameDirectory: opened.client.gameDirectory,
+            port: opened.port,
+          },
+          null,
+          2,
+        ),
+      );
+      console.log(
+        JSON.stringify({ observingClient: opened.client.processId, seconds: clientSeconds, map: opened.map }),
+      );
+      const locked = await fs
+        .writeFile(path.join(opened.client.gameDirectory, 'haloce.exe'), clientBytes)
+        .then(
+          () => false,
+          () => true,
+        );
+      expect(locked).toBe(true);
+      expect(
+        await call('ce_host_client_action', { sessionId: hosted.id, action: 'launch' }).then(
+          () => '',
+          String,
+        ),
+      ).toContain('current CE playtest');
+      let maximumPlayersObserved = 0,
+        replies = 0;
+      const deadline = Date.now() + clientSeconds * 1000;
+      while (Date.now() < deadline) {
+        const observation = await call('ce_host_status');
+        if (observation.status) {
+          replies++;
+          maximumPlayersObserved = Math.max(maximumPlayersObserved, observation.status.players);
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      const observed = await call('ce_host_status');
+      await call('ce_host_client_action', { sessionId: hosted.id, action: 'stop' });
+      await expect.poll(() => alive(opened.client.processId)).toBe(false);
+      await waitNative(page);
+      step('actual CE client opens with matching native content, holds input locks and stops independently', {
+        executableSha256: opened.client.executableSha256,
+        mapSha256: build.sha256,
+        seconds: clientSeconds,
+        serverReplies: replies,
+        maximumPlayersObserved,
+        lastClientPhase: observed.client.phase,
+        visibleRequested: true,
+        clientJoinVerified: false,
+        gameplayVerified: false,
+      });
+      stopWithServerClient = await launchClient(page, hosted);
+    }
     await page.screenshot({ path: path.join(output, 'native-project-host.png') });
     const savedProject = (await call('open_project', { id: project.id })).project;
     const edited = structuredClone(savedProject);
@@ -475,6 +684,10 @@ try {
     expect(staleCatalog.maps.some((map) => map.sourceBuild)).toBe(false);
     expect((await waitNative(page)).mapSha256).toBe(build.sha256);
     await stop(page, hosted.id);
+    if (stopWithServerClient) {
+      await expect.poll(() => alive(stopWithServerClient.client.processId)).toBe(false);
+      step('stopping the private server also stops its actual matching client');
+    }
     expect(await call('ce_host_start', { request: managedRequest }).then(() => '', String)).toContain(
       'stale',
     );
@@ -523,8 +736,13 @@ try {
   }
   await call('ce_host_start', { request });
   const final = await waitNative(page);
+  const finalClient = clientSeconds ? await launchClient(page, final) : null;
   child.kill(); // Real abrupt parent exit tests Windows job-object cleanup.
   await expect.poll(() => alive(final.processId)).toBe(false);
+  if (finalClient) {
+    await expect.poll(() => alive(finalClient.client.processId)).toBe(false);
+    step('abrupt Spark exit kills its actual owned CE client as well as its server');
+  }
   step('abrupt Spark exit kills its owned dedicated server');
   expect(await inventory(original)).toEqual(before);
   expect(receipt.errors).toEqual([]);

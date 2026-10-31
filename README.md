@@ -1,10 +1,16 @@
 # Project Guilty Spark
 
+## Playtest the exact private CE map copy
+
+**Online → Host game → Prepare matching client → Launch CE playtest** now uses the server's exact map, shared resources and checked client files with a separate test profile. A validated project named `bloodgulch` uses its own compiled bytes. Changed files or an added plugin refuse launch, even if an editable receipt is altered. Stopping a playtest leaves its server available; server/window closure cleans up its owned client.
+
+Real native tests cover file matching, corruption refusal, genuine Workshop compilation and owned client/server lifetimes. **A joined player and gameplay remain unverified.** [Workflow, evidence and limits](docs/CE_MATCHING_CLIENT_PLAYTEST.md) · [Descriptive publication handoff](docs/CE_CLIENT_GITHUB_DESCRIPTION.md).
+
 ## Host your saved Custom Edition build
 
 **Online → Host game** can now select the current map's validated CE project output directly, alongside installed maps. Build IDs, saved revisions and native output integrity are checked before a private server copy is prepared. A project named `bloodgulch` stays separate from stock Blood Gulch; stale choices never silently fall back to stock content. Missing builds lead back to the map's build workspace.
 
-Real native acceptance compiles Workshop geometry through Halo Tool/Invader, hosts those exact bytes, refuses stale/corrupted/redirected outputs and preserves the installed game and reviewed source. Matching-client preparation, a joined player and collision walkthroughs remain open. [Workflow and evidence](docs/CE_PROJECT_BUILD_HOSTING.md) · [Descriptive publication handoff](docs/CE_PROJECT_HOST_GITHUB_DESCRIPTION.md).
+Real native acceptance compiles Workshop geometry through Halo Tool/Invader, hosts those exact bytes, refuses stale/corrupted/redirected outputs and preserves the installed game and reviewed source. Matching-client preparation and launch are available in the continuation above; a joined player and collision walkthroughs remain open. [Workflow and evidence](docs/CE_PROJECT_BUILD_HOSTING.md) · [Descriptive publication handoff](docs/CE_PROJECT_HOST_GITHUB_DESCRIPTION.md).
 
 ## Checked private Custom Edition hosting
 

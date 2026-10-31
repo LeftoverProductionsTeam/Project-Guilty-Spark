@@ -58,6 +58,15 @@
   user-select: all;
   color: var(--accent);
 }
+.ce-host-client {
+  margin: 10px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.ce-host-client .subtle {
+  font-size: 12px;
+  line-height: 1.5;
+}
 .ce-host-session .button-row {
   display: flex;
   flex-wrap: wrap;

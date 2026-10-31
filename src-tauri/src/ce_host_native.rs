@@ -13,6 +13,9 @@ use std::{
 const MAX_COPY_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_FILES: usize = 512;
 
+#[path = "ce_host_client.rs"]
+mod client;
+
 #[derive(Default)]
 pub(super) struct HostRegistry {
     jobs: HashMap<String, Arc<Job>>,
@@ -20,6 +23,7 @@ pub(super) struct HostRegistry {
 struct Job {
     stop: AtomicBool,
     view: Mutex<View>,
+    client: client::State,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +47,7 @@ pub(super) struct View {
     observations: u64,
     elapsed_ms: u64,
     console_tail: String,
+    client: Option<client::View>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -78,15 +83,26 @@ fn current(registry: &HostRegistry, owner: &str) -> Reply<Option<View>> {
     registry
         .jobs
         .get(owner)
-        .map(|job| Ok(lock(&job.view)?.clone()))
+        .map(|job| session_view(job))
         .transpose()
 }
-fn stop(registry: &HostRegistry, owner: &str, id: &str) -> Reply<()> {
-    let job = registry
+fn session_view(job: &Job) -> Reply<View> {
+    let mut view = lock(&job.view)?.clone();
+    view.client = job.client.view()?;
+    Ok(view)
+}
+fn owned_job(registry: &HostRegistry, owner: &str, id: &str) -> Reply<Arc<Job>> {
+    registry
         .jobs
         .get(owner)
         .filter(|job| job.view.lock().is_ok_and(|view| view.id == id))
-        .ok_or("This private server belongs to another window or is no longer current")?;
+        .cloned()
+        .ok_or_else(|| {
+            "This private server belongs to another window or is no longer current".into()
+        })
+}
+fn stop(registry: &HostRegistry, owner: &str, id: &str) -> Reply<()> {
+    let job = owned_job(registry, owner, id)?;
     job.stop.store(true, Ordering::Relaxed);
     let mut view = lock(&job.view)?;
     if active(&view) {
@@ -94,12 +110,16 @@ fn stop(registry: &HostRegistry, owner: &str, id: &str) -> Reply<()> {
         view.detail = "Stopping this window's private server…".into();
         view.status = None;
     }
+    drop(view);
+    job.client
+        .stop("Private server stopped; its matching playtest was closed")?;
     Ok(())
 }
 pub(super) fn release_window(state: &AppState, owner: &str) {
     if let Ok(mut registry) = state.ce_hosts.lock() {
         if let Some(job) = registry.jobs.remove(owner) {
             job.stop.store(true, Ordering::Relaxed);
+            let _ = job.client.stop("The owning Spark window closed");
         }
     }
 }
@@ -214,6 +234,9 @@ fn available_ports(requested: u16) -> Reply<u16> {
 fn selected(relative: &str, map: &str) -> bool {
     [
         "haloceded.exe",
+        "haloce.exe",
+        "Keystone.dll",
+        "ksimeui.dll",
         "strings.dll",
         "msvcr71.dll",
         "binkw32.dll",
@@ -232,6 +255,7 @@ fn selected(relative: &str, map: &str) -> bool {
         ]
         .contains(&relative)
         || relative == format!("maps/{map}.map")
+        || client::selected(relative)
 }
 fn collect(
     root: &Path,
@@ -254,7 +278,10 @@ fn collect(
             .replace('\\', "/");
         let metadata = fs::symlink_metadata(entry.path()).map_err(error)?;
         if metadata.is_dir()
-            && (name == "maps" || name == "shaders" || name.starts_with("shaders/"))
+            && (matches!(
+                name.as_str(),
+                "maps" | "shaders" | "controls" | "content" | "content/Gallery"
+            ) || name.starts_with("shaders/"))
         {
             collect(root, &path, map, files, seen)?;
         } else if selected(&name, map) {
@@ -366,7 +393,7 @@ fn snapshot(
         return Err("CE executable/map changed during preparation; nothing was launched".into());
     }
     // Validate the actual copied resource indices, UI and shaders too.
-    // inspect_root also requires the interactive client, so inspect shared resources separately.
+    // Both processes use the same checked copy, with separate writable profiles.
     for (name, kind) in [("bitmaps.map", 1), ("sounds.map", 2), ("loc.map", 3)] {
         let bytes = maps::read_range(&game.join("maps").join(name), 0, 16).map_err(error)?;
         let count = u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as u64;
@@ -401,6 +428,7 @@ fn snapshot(
     )
     .map_err(error)?;
     fs::create_dir(directory.join("profile")).map_err(error)?;
+    job.client.bind(&game, directory, hashes)?;
     Ok(game)
 }
 fn query(port: u16) -> Reply<ce::Status> {
@@ -458,7 +486,7 @@ impl ProcessJob {
                 || AssignProcessToJobObject(handle, child.as_raw_handle() as _) == 0
             {
                 return Err(format!(
-                    "Could not bind private server lifetime to Spark: {}",
+                    "Could not bind the private Halo process lifetime to Spark: {}",
                     std::io::Error::last_os_error()
                 ));
             }
@@ -519,12 +547,12 @@ fn launch(game: &Path, directory: &Path, port: u16) -> Reply<OwnedProcess> {
     })
 }
 fn persist(job: &Job, began: Instant) -> Reply<()> {
-    let mut view = lock(&job.view)?;
-    view.elapsed_ms = began.elapsed().as_millis().min(u64::MAX as u128) as u64;
+    lock(&job.view)?.elapsed_ms = began.elapsed().as_millis().min(u64::MAX as u128) as u64;
+    let view = session_view(job)?;
     if let Some(directory) = &view.session_directory {
         project::atomic_write(
             &directory.join("host-session.json"),
-            &serde_json::to_vec_pretty(&*view).map_err(error)?,
+            &serde_json::to_vec_pretty(&view).map_err(error)?,
             false,
         )
         .map_err(error)?;
@@ -568,6 +596,7 @@ fn run(
     let mut last_native = Instant::now();
     let mut ever_observed = false;
     loop {
+        job.client.observe()?;
         if job.stop.load(Ordering::Relaxed) {
             if let Some(input) = process.child.stdin.as_mut() {
                 let _ = input.write_all(b"quit\r\n");
@@ -716,6 +745,35 @@ pub(super) async fn ce_host_stop(
     )
 }
 #[tauri::command]
+pub(super) async fn ce_host_client_action(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    session_id: String,
+    action: client::Action,
+) -> Reply<View> {
+    let owner = window.label().to_owned();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let job = owned_job(&*lock(&state.ce_hosts)?, &owner, &session_id)?;
+        match action {
+            client::Action::Stop => job.client.stop("Matching CE playtest stopped; the private server is still available")?,
+            _ => {
+                let view = session_view(&job)?;
+                if job.stop.load(Ordering::Relaxed) || view.phase != "running" || view.status.is_none() {
+                    return Err("Wait for this private server's matching native map reply before preparing or launching its client".into());
+                }
+                job.client.perform(action, view.port, &job.stop)?;
+            }
+        }
+        // The session receipt is evidence, not an authority for executable paths or hashes.
+        let view = session_view(&job)?;
+        if let Some(directory) = &view.session_directory {
+            project::atomic_write(&directory.join("host-session.json"), &serde_json::to_vec_pretty(&view).map_err(error)?, false).map_err(error)?;
+        }
+        Ok(view)
+    }).await.map_err(error)?
+}
+#[tauri::command]
 pub(super) async fn ce_host_start(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
@@ -746,17 +804,21 @@ pub(super) async fn ce_host_start(
             port: request.port, process_id: None, executable_sha256: request.executable_sha256.clone(),
             map_sha256: request.map_sha256.clone(), source_build: input.source_build.clone(),
             session_directory: None, copied_bytes: 0,
-            status: None, observations: 0, elapsed_ms: 0, console_tail: String::new(),
+            status: None, observations: 0, elapsed_ms: 0, console_tail: String::new(), client: None,
         };
-        let job = Arc::new(Job { stop: AtomicBool::new(false), view: Mutex::new(view.clone()) });
+        let job = Arc::new(Job { stop: AtomicBool::new(false), view: Mutex::new(view.clone()), client: client::State::default() });
         registry.jobs.insert(owner, job.clone());
         drop(registry);
         std::thread::spawn(move || {
             let began = Instant::now();
             let result = run(&root, &directory, &request, &input, &job, began);
+            let requested_stop = job.stop.load(Ordering::Relaxed);
+            job.stop.store(true, Ordering::Relaxed);
+            let _ = job.client.stop("The private server ended; its matching playtest was closed");
             if let Ok(mut view) = job.view.lock() {
                 view.status = None;
-                view.phase = if job.stop.load(Ordering::Relaxed) || result.is_ok() { "stopped" } else { "failed" }.into();
+                view.phase = if requested_stop || result.is_ok() { "stopped" } else { "failed" }.into();
+                view.process_id = None;
                 view.detail = if view.phase == "stopped" { "Private server stopped. Copied inputs and session evidence are retained.".into() }
                     else { result.err().unwrap_or_default() };
             }
@@ -772,6 +834,7 @@ mod tests {
     fn job(id: &str) -> Arc<Job> {
         Arc::new(Job {
             stop: AtomicBool::new(false),
+            client: client::State::default(),
             view: Mutex::new(View {
                 id: id.into(),
                 phase: "preparing".into(),
@@ -792,6 +855,7 @@ mod tests {
                 observations: 0,
                 elapsed_ms: 0,
                 console_tail: String::new(),
+                client: None,
             }),
         })
     }
@@ -823,13 +887,7 @@ mod tests {
         assert!(selected("maps/bloodgulch.map", "bloodgulch"));
         assert!(selected("maps/sounds.map", "bloodgulch"));
         assert!(!selected("maps/sidewinder.map", "bloodgulch"));
-        for file in [
-            "init.txt",
-            "config.txt",
-            "haloce.exe",
-            "setup.exe",
-            "shaders/bad.dll",
-        ] {
+        for file in ["init.txt", "config.txt", "setup.exe", "shaders/bad.dll"] {
             assert!(!selected(file, "bloodgulch"));
         }
     }
