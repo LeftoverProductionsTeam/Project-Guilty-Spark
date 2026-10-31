@@ -1,30 +1,30 @@
-Project Guilty Spark Windows test build — 2026-10-31
-Base committed foundation: 8fc2acc
+Project Guilty Spark private CE hosting — 2026-10-31
+Base committed foundation: 9136a26
 
-Adds checked Custom Edition setup, native acceptance scripts and the integrated readiness audit. Original source, C35-C39 history and separate unfinished research are retained. This is not completion of every roadmap feature. See docs/TEST_BUILD_READINESS.md.
+Adds actual checked private CE dedicated start/status/stop controls inside Online, window ownership and abnormal-exit cleanup, native engine acceptance and compact workflow UI. Preserves original games, all prior source history, C35-C39 source safeguards and separate unfinished direct compiled-map research. Client joining and gameplay remain open. See docs/CUSTOM_EDITION_PRIVATE_HOST.md.
 
-Changed or added source members compared with that foundation (generated manifests include the complete source inventory):
+Changed or added source members:
 README.md
-SOURCE_DIFF_FROM_PREVIOUS.txt
-SOURCE_MANIFEST_SHA256.txt
-SOURCE_SHA256SUMS.txt
+crates/spark-core/src/ce_host.rs
+crates/spark-core/src/lib.rs
+crates/spark-core/src/runtime.rs
+crates/spark-core/src/runtime_adapters.rs
+docs/CE_HOST_GITHUB_DESCRIPTION.md
+docs/CUSTOM_EDITION_PRIVATE_HOST.md
 docs/MASTER_FEATURE_LEDGER.csv
 docs/MASTER_FEATURE_LEDGER.md
-docs/TEST_BUILD_GITHUB_DESCRIPTION.md
 docs/TEST_BUILD_READINESS.md
 docs/UNIVERSAL_WORKBENCH_BACKLOG.md
-docs/fixtures/test-build-readiness.json
+docs/fixtures/ce-private-host-native.json
 scripts/test-build-evidence.mjs
-scripts/test-ce-server-native.mjs
-scripts/test-custom-edition-native.mjs
-scripts/update-feature-ledger.mjs
+scripts/test-ce-host-native.mjs
+src-tauri/Cargo.toml
 src-tauri/src/app.rs
+src-tauri/src/ce_host_native.rs
 src-tauri/src/ce_setup.rs
-src-tauri/src/dependency_install.rs
-src/components/CustomEditionSetup.tsx
-src/components/DependencyPanel.tsx
-src/components/StartupSetup.tsx
-src/components/customEditionSetup.css
-tests/ui/custom-edition.spec.ts
-tests/ui/fixtures/customEdition.html
-tests/ui/fixtures/customEdition.tsx
+src/components/CustomEditionHost.css
+src/components/CustomEditionHost.tsx
+src/components/Runtimes.tsx
+tests/ui/ce-host.spec.ts
+tests/ui/fixtures/ceHost.html
+tests/ui/fixtures/ceHost.tsx

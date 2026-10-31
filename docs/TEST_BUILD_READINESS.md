@@ -1,5 +1,7 @@
 # Workbench test build — 31 October 2026
 
+**Follow-through:** [checked private CE hosting](CUSTOM_EDITION_PRIVATE_HOST.md) now implements the actual start/status/stop lifecycle inside Online, separately from the older helper-only observations in this historical build report. Its own final executable, timings and regression evidence are recorded independently; prior failed client joins are retained.
+
 The Windows workbench is built for the scoped workflows below. **The entire long-term feature checklist is not complete.** A launchable workspace, a successful native compilation and a playable multiplayer feature are different acceptance gates. This report replaces the older status sheet's "planned" descriptions where there is current implementation and evidence; it does not turn research targets into working features.
 
 The continuation retains C35–C39 history, the accepted native-source workflows and the unfinished direct-map research. The original game files and the separate experimental root checkout remain outside the release package.

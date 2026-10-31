@@ -25,6 +25,7 @@ import HostingWorkspace from './HostingWorkspace';
 import GameplayControls from './GameplayControls';
 import PlayAndServers from './PlayAndServers';
 import CommunityHostAdapter from './CommunityHostAdapter';
+import CustomEditionHost from './CustomEditionHost';
 import {useMapState} from '../mapSession';
 
 const editable = new Set<RuntimeId>(['chupathingyCe', 'openCe', 'haloPc', 'haloCustomEdition']);
@@ -187,7 +188,7 @@ export default function Runtimes({
             <details><summary>Advanced · installed tool identity &amp; separate launchers</summary><ToolchainShelf project={project} runtime={selected} settings={settings} onSettings={onSettings} onOpenWorkspace={onOpenWorkspace} /></details>
           </>
         ) : tab === 'hosting' ? (
-          <><CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')}/><HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/></>
+          selected === 'haloCustomEdition' ? <CustomEditionHost onSetup={onSettings}/> : <><CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')}/><HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/></>
         ) : (
           <Friends
             key={`${selected}:${project?.id ?? ''}`}

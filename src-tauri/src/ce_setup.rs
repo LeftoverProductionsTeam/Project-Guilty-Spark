@@ -200,7 +200,7 @@ fn safe_member(name: &str) -> bool {
                 && stem.as_bytes()[3].is_ascii_digit())
     })
 }
-fn selected_member(name: &str) -> bool {
+pub(super) fn selected_member(name: &str) -> bool {
     let Some(local) = name.strip_prefix(PREFIX) else {
         return false;
     };
@@ -237,7 +237,7 @@ fn archive_matches(bytes: u64, digest: &str) -> Reply<()> {
     }
     Ok(())
 }
-fn inspect_root(root: &Path) -> Reply<Installation> {
+pub(super) fn inspect_root(root: &Path) -> Reply<Installation> {
     core::reject_links(root).map_err(error)?;
     let root = fs::canonicalize(root).map_err(error)?;
     let (_, executable_sha256, architecture) =

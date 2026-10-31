@@ -913,7 +913,17 @@ pub fn capability_report(observation: &RuntimeObservation) -> RuntimeCapabilityR
     let mut join = capability(JoinGame, if community { Implemented } else { Unsupported }, if community && target_matches { SetupRequired } else { Unavailable }, "Typed halo://join handoff follows selected-server preflight for the matching community runtime, declared legacy version, source map/resources and listing freshness. The game must still verify its real wire protocol/content; planning is not a joined session.", "Select a fresh Delta listing and validate the registered client/content; hand the bounded invitation to the matching game for final verification.");
     join.gates.push(gate("selectedServerPreflightRequired", "A registry-wide ready flag cannot authorize a particular game invitation; the native community planner checks the selected listing and exact registered installation."));
     capabilities.push(join);
-    capabilities.push(capability(HostGame, if community { UpstreamDeclared } else { Unknown }, Unavailable, "Upstream private/dedicated hosting instructions exist. Spark has not accepted an owner-controlled running game-server launch, host/client agreement or rollback path for this target.", "Follow the pinned runtime's documented private hosting plan and retain the actual server and client evidence before enabling automation."));
+    let ce_private_host = observation.runtime_id == RuntimeId::HaloCustomEdition
+        && observation.target.platform == "windows" && target_matches;
+    capabilities.push(if ce_private_host {
+        capability(HostGame, Implemented, SetupRequired,
+            "Online can start, observe and stop an owned loopback CE dedicated server from a checked private copy. Native map status, workspace persistence and process cleanup are tested; client join and gameplay are separate open gates.",
+            "Open Online → Host game, select a native CE map and run the dedicated-file/content checks. Registration alone does not authorize a particular map or server executable.")
+    } else {
+        capability(HostGame, if community { UpstreamDeclared } else { Unknown }, Unavailable,
+            "Upstream private/dedicated hosting instructions exist. Spark has not accepted an owner-controlled running game-server launch, host/client agreement or rollback path for this target.",
+            "Follow the pinned runtime's documented private hosting plan and retain the actual server and client evidence before enabling automation.")
+    });
     let mut ai = capability(SynchronizeAi, if community { UpstreamDeclared } else { Unsupported }, Unavailable, if community { "Upstream community engine actor replication is separate from co-op script/encounter coverage. Spark has not accepted a real two-client authored AI scenario." } else { "No arbitrary multiplayer AI synchronization adapter is implemented for this runtime; official campaign co-op does not provide it." }, "Pin the engine implementation and validate host-authoritative lifecycle, damage/death, late join and map transitions in two real clients.");
     if community {
         ai.evidence.push(EvidenceReference { target: profile_id(observation.runtime_id).into(), procedure: "Inspect pinned upstream actor/netcode implementation, separate from Spark execution.".into(), result: "Upstream-declared implementation; no local or multiplayer acceptance in Spark.".into(), location: "docs/MCC_MULTIPLAYER_AI_FEASIBILITY.md".into() });

@@ -1,5 +1,11 @@
 # Project Guilty Spark
 
+## Checked private Custom Edition hosting
+
+**Online → Host game → Halo Custom Edition** now starts and stops an actual classic CE dedicated server from a verified private game copy. Choose a map, stock game type and player limit in one compact panel; native map status, a Direct IP address and recoverable workspace controls stay together. Separate windows own separate servers, and closing the owning window or abruptly exiting Spark stops its server.
+
+Real Windows acceptance covers Blood Gulch, all five stock modes, the unchanged compiled Workshop cache, changed-input refusal and process cleanup while preserving the original game. This control is loopback-only with public listing disabled. Client joining, walkthroughs, game-peer replication and the unfinished direct-map workflow remain separate open gates. [Capabilities, evidence and limits](docs/CUSTOM_EDITION_PRIVATE_HOST.md) · [Descriptive publication handoff](docs/CE_HOST_GITHUB_DESCRIPTION.md).
+
 ## Integrated Windows test build and Custom Edition setup
 
 Spark can now detect/connect Custom Edition or install the project's pinned community archive into a separate managed folder, with progress, identity/content checks and remembered registration. The genuine native test preserved all existing game files and reopened the downloaded Blood Gulch. Private CE engine trials loaded stock Blood Gulch and a reviewed-source Workshop cache; an automated client join remains unverified.

@@ -20,6 +20,7 @@ pub mod creative;
 pub mod connections;
 pub mod community_servers;
 pub mod community_host;
+pub mod ce_host;
 pub mod community_lan;
 pub mod tool_transaction;
 pub mod tool_ecosystem;

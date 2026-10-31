@@ -1,0 +1,84 @@
+.ce-private-host .section-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ce-private-host .section-heading h2 {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 0;
+}
+.ce-private-host .section-heading > button {
+  margin-left: auto;
+}
+.ce-private-host > p,
+.ce-host-session p {
+  margin: 8px 0;
+}
+.ce-host-fields {
+  display: grid;
+  grid-template-columns: minmax(140px, 2fr) minmax(125px, 1.5fr) minmax(65px, 0.6fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+.ce-host-fields label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+}
+.ce-host-fields :is(input, select) {
+  width: 100%;
+  min-width: 0;
+}
+.ce-host-options {
+  margin: 8px 0;
+}
+.ce-host-options .ce-host-fields {
+  grid-template-columns: 2fr 1fr;
+  margin-top: 8px;
+}
+.ce-host-session {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.ce-host-address {
+  user-select: all;
+  color: var(--accent);
+}
+.ce-host-session .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ce-host-session dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  font-size: 12px;
+}
+.ce-host-session dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ce-host-session pre {
+  max-height: 170px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ce-private-host > small {
+  display: block;
+  line-height: 1.5;
+}
+@media (max-width: 700px) {
+  .ce-host-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+}

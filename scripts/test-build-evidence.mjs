@@ -1,6 +1,17 @@
 const source = 'docs/TEST_BUILD_READINESS.md';
 export const testBuildRequirements = [
   {
+    id: 'TBR-ce-private-host',
+    feature: 'Owned private Custom Edition dedicated hosting inside Online',
+    source: 'docs/CUSTOM_EDITION_PRIVATE_HOST.md',
+    topic: 'server',
+    operation:
+      'Start a checked loopback-only classic CE dedicated process from a fresh private snapshot, observe matching native map/mode/player status, stop only the owning window session, retain controls across workspace reloads and kill owned children after abrupt Spark exit. Real native acceptance covers five stock game types and the unchanged compiled Workshop cache.',
+    gap: 'Client join and gameplay remain unaccepted. Managed build-output selection, this control’s LAN/public exposure, game-peer replication, networked AI, cross-runtime play, 128 players and direct compiled-map authoring are open.',
+    previous:
+      'Extends the retained helper-only CE smoke tests without replacing their failed client attempts or any C35-C39 source safeguards.',
+  },
+  {
     id: 'TBR-ce-setup',
     feature: 'Checked optional Custom Edition installation',
     source,
@@ -43,3 +54,12 @@ export const testBuildOverrides = Object.fromEntries(
     },
   ]),
 );
+testBuildOverrides['TBR-ce-private-host'] = {
+  ...testBuildOverrides['TBR-ce-private-host'],
+  evidence:
+    'docs/CUSTOM_EDITION_PRIVATE_HOST.md; docs/fixtures/ce-private-host-native.json; scripts/test-ce-host-native.mjs',
+  files:
+    'crates/spark-core/src/ce_host.rs; src-tauri/src/ce_host_native.rs; src/components/CustomEditionHost.tsx; scripts/test-ce-host-native.mjs',
+  level:
+    'Real Windows desktop UI/native IPC plus dedicated-engine lifecycle/status; client join and gameplay NOT ACCEPTED',
+};

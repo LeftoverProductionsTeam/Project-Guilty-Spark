@@ -191,6 +191,20 @@ pub fn hosting_plan_for(runtime_id: RuntimeId, action: HostingAction, scenario_t
         }
         plan.limitations.push("Official Halo: Combat Evolved MCC campaign co-op is limited to two players. This does not establish arbitrary multiplayer-map AI synchronization.".into());
         plan.limitations.push("The recovered zombie source currently has unresolved conversion errors; no playable MCC zombie package or Firefight integration has been demonstrated.".into());
+    } else if runtime_id == RuntimeId::HaloCustomEdition && action == DedicatedServer {
+        plan.status = SupportStatus::Supported;
+        plan.automatic = true;
+        plan.title = "Custom Edition — owned private dedicated host".into();
+        plan.steps = vec![
+            "Open Online → Host game and select Halo Custom Edition. Connect the installed game in Settings if needed.".into(),
+            "Choose a native CE multiplayer map, game type and 1–16 player limit. Start private server; Spark verifies and copies the selected game inputs into a separate session directory.".into(),
+            "Wait for the native map-loaded status, then use Custom Edition → Multiplayer → Direct IP with the displayed 127.0.0.1 address on this computer.".into(),
+            "Stop the private server in its owning window. Workspace switching retains it; closing that window stops it.".into(),
+        ];
+        plan.limitations = vec![
+            "Windows and loopback-only private CE dedicated hosting. No public listing, LAN/VPN exposure, MCC cross-play, expanded population or arbitrary console commands are enabled by this control.".into(),
+            "Real server map/status/lifecycle acceptance is separate from a joined client, movement, collision traversal or gameplay; those remain open.".into(),
+        ];
     } else {
         if !runtime_id.allows_registration() {
             plan.status = SupportStatus::Unsupported;
