@@ -54,6 +54,7 @@ use tauri::{Emitter, Manager, State};
 #[path="tool_ecosystem_native.rs"] mod tool_ecosystem_native;
 #[path="external_companions_native.rs"] mod external_companions_native;
 #[path="native_save_evidence.rs"] mod native_save_evidence;
+#[path="smart_edit_native.rs"] mod smart_edit_native;
 type Reply<T> = std::result::Result<T, String>;
 fn error(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -237,8 +238,12 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
         let state=app.state::<AppState>();
         let mut source=lock(&state.library)?.get(&project_id).map_err(error)?;
         let build=match verified_build(&state,&source,&build_id){Ok(build)=>build,Err(original)=>{
-            if !state.root.join("jobs").join(&build_id).join("studio-binding.json").is_file(){return Err(original);}
-            source=shared_editing::build_snapshot(&state,&source,&build_id)?;
+            if source.builds.iter().any(|b|b.id==build_id&&b.target=="mcc-direct") {
+                source=smart_edit_native::output_snapshot(&state,&source,&build_id)?;
+            }else{
+                if !state.root.join("jobs").join(&build_id).join("studio-binding.json").is_file(){return Err(original);}
+                source=shared_editing::build_snapshot(&state,&source,&build_id)?;
+            }
             verified_build(&state,&source,&build_id)?
         }};
         let inherited_tools=project_tools(&state,&source).ok();
@@ -253,7 +258,7 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
             let label=|value:&str|value.chars().filter(|c|c.is_alphanumeric()).flat_map(char::to_lowercase).collect::<String>();
             let mut base=if let Some(assembly)=&source.bsp_assembly{
                 if label(&source.title).contains(&label(&assembly.donor_title)){format!("{} · compiled",source.title)}else{format!("{} + {} · compiled",source.title,assembly.donor_title)}
-            }else{format!("{} · compiled",source.title)};
+            }else{format!("{} · {}",source.title,if build.target=="mcc-direct"{"edited copy"}else{"compiled"})};
             while base.len()>180{base.pop();}
             let mut title=base.clone();let mut ordinal=2;
             while entries.iter().any(|e|e.title==title){title=format!("{base} ({ordinal})");ordinal+=1;}
@@ -272,12 +277,18 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
     }).await.map_err(error)?
 }
 fn current_build(state: &AppState, project: &Project) -> Reply<BuildRecord> {
+    current_build_matching(state,project,None)
+}
+fn current_native_build(state:&AppState,project:&Project)->Reply<BuildRecord> {
+    current_build_matching(state,project,Some("mcc-cea"))
+}
+fn current_build_matching(state:&AppState,project:&Project,target:Option<&str>)->Reply<BuildRecord> {
     let mut message = "No validated build of the current saved project is available".to_string();
     for build in project
         .builds
         .iter()
         .rev()
-        .filter(|b| b.status == "validated")
+        .filter(|b| b.status == "validated" && target.is_none_or(|t|b.target==t))
     {
         match verified_build(state, project, &build.id) {
             Ok(record) => return Ok(record),
@@ -1638,6 +1649,13 @@ fn reveal_folder(state: State<AppState>, kind: String, id: Option<String>) -> Re
     let path = match kind.as_str() {
         "inbox" => state.root.join("Inbox"),
         "data" => state.root.clone(),
+        "buildOutput" => {
+            let ids=id.ok_or("Missing map and output IDs")?;
+            let(project_id,build_id)=ids.split_once(':').ok_or("Expected map and output IDs")?;
+            let project=lock(&state.library)?.get(project_id).map_err(error)?;
+            let record=verified_build(&state,&project,build_id).or_else(|_|smart_edit_native::output_snapshot(&state,&project,build_id).and_then(|snapshot|verified_build(&state,&snapshot,build_id)))?;
+            record.output.and_then(|p|p.parent().map(Path::to_path_buf)).ok_or("Validated map has no output folder")?
+        },
         "project" => lock(&state.library)?
             .project_dir(&id.ok_or("Missing project ID")?)
             .map_err(error)?,
@@ -2460,23 +2478,33 @@ async fn live_mcc_camera_shortcut(app:tauri::AppHandle,shortcut:core::live_adapt
 async fn live_mcc_camera_toggle(app:tauri::AppHandle,config:Option<core::live_adapter::camera::Config>)->Reply<crate::live_mcc::NativeCameraStatus>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let session=lock(&state.live_mcc)?.clone().ok_or("Connect MCC in Level editor → Live mode first")?;crate::live_mcc::camera_toggle(&session,config).map_err(error)}).await.map_err(error)?
 }
-#[derive(Deserialize)]
+#[derive(Clone,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 struct LiveBinding {placement_id:String,datum:u32,tag_datum:u32,expected_position:[f32;3]}
+fn live_moves_for(state:&AppState,project_id:&str,document:&quickforge::QuickForgeDocument,bindings:&[LiveBinding],expected_session:&str)->Reply<(crate::live_mcc::Session,Vec<core::live_adapter::MoveObject>)>{
+    let p=lock(&state.library)?.get(project_id).map_err(error)?;
+    if p.quick_forge.is_none()||document.runtime_id!=runtime::RuntimeId::MccSteam{return Err("Choose an MCC QuickForge project for live updates".into());}
+    quickforge::validate_document(document).map_err(error)?;
+    if bindings.is_empty()||bindings.len()>64{return Err("A live move plan requires 1–64 explicitly bound existing objects.".into());}
+    let session=lock(&state.live_mcc)?.clone().ok_or("Live adapter is disconnected")?;
+    crate::live_mcc::check_session_token(Some(&session),Some(expected_session)).map_err(error)?;
+    if !session.identity.scenario.eq_ignore_ascii_case(&quickforge::scenario_path(document).map_err(error)?.replace('\\',"/")){return Err("Loaded Halo scenario does not match this QuickForge map. Build and load this project's map before binding live objects.".into());}
+    let snapshot=crate::live_mcc::sample(&session).map_err(error)?;
+    let mut moves=vec![];
+    for binding in bindings {
+        if moves.iter().any(|m:&core::live_adapter::MoveObject|m.datum==binding.datum){return Err("A live object may occur only once in a move plan.".into());}
+        let placement=document.placements.iter().find(|p|p.id==binding.placement_id).ok_or("Bound placement was removed")?;
+        let object=snapshot.snapshot.objects.iter().find(|o|o.datum==binding.datum&&o.tag_datum==binding.tag_datum).ok_or("Bound live object disappeared or respawned")?;
+        let class=match object.kind{0=>"bipd",1=>"vehi",2=>"weap",3=>"eqip",6=>"scen",_=>""};
+        if !object.tag_path.eq_ignore_ascii_case(&placement.tag_path.replace('\\',"/"))||placement.tag_class!=class{return Err("Live object tag/class does not match this placement; item collections must bind their actual spawned weapon separately".into());}
+        if binding.expected_position.iter().any(|v|!v.is_finite()) || object.position.iter().zip(binding.expected_position).any(|(a,b)|(*a-b).abs()>0.005){return Err("Bound object moved after the captured revision. Refresh the live sample and bind again.".into());}
+        moves.push(core::live_adapter::MoveObject{datum:object.datum,tag_datum:object.tag_datum,expected_position:binding.expected_position,position:placement.position});
+    }
+    Ok((session,moves))
+}
 #[tauri::command]
 async fn live_mcc_apply(app:tauri::AppHandle,project_id:String,document:quickforge::QuickForgeDocument,bindings:Vec<LiveBinding>,expected_session:String)->Reply<Vec<core::live_adapter::MoveReceipt>>{
-    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;
-        if p.quick_forge.is_none()||document.runtime_id!=runtime::RuntimeId::MccSteam{return Err("Choose an MCC QuickForge project for live updates".into());}quickforge::validate_document(&document).map_err(error)?;
-        let session=lock(&state.live_mcc)?.clone().ok_or("Live adapter is disconnected")?;
-        crate::live_mcc::check_session_token(Some(&session),Some(&expected_session)).map_err(error)?;
-        if !session.identity.scenario.eq_ignore_ascii_case(&quickforge::scenario_path(&document).map_err(error)?.replace('\\',"/")){return Err("Loaded Halo scenario does not match this QuickForge map. Build and load this project's map before binding live objects.".into());}
-        let snapshot=crate::live_mcc::sample(&session).map_err(error)?;
-        let mut moves=vec![];for binding in bindings {let placement=document.placements.iter().find(|p|p.id==binding.placement_id).ok_or("Bound placement was removed")?;
-            let object=snapshot.snapshot.objects.iter().find(|o|o.datum==binding.datum&&o.tag_datum==binding.tag_datum).ok_or("Bound live object disappeared or respawned")?;
-            let class=match object.kind{0=>"bipd",1=>"vehi",2=>"weap",3=>"eqip",6=>"scen",_=>""};
-            if !object.tag_path.eq_ignore_ascii_case(&placement.tag_path.replace('\\',"/"))||placement.tag_class!=class{return Err("Live object tag/class does not match this placement; item collections must bind their actual spawned weapon separately".into());}
-            moves.push(core::live_adapter::MoveObject{datum:object.datum,tag_datum:object.tag_datum,expected_position:binding.expected_position,position:placement.position});
-        }
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let(session,moves)=live_moves_for(&state,&project_id,&document,&bindings,&expected_session)?;
         crate::live_mcc::moves(&session,&moves).map_err(error)
     }).await.map_err(error)?
 }
@@ -2703,6 +2731,9 @@ pub fn run() {
             native_operations_native::native_operation_accept,
             tool_ecosystem_native::tool_ecosystem_report,
             tool_ecosystem_native::launch_discovered_tool,
+            smart_edit_native::smart_edit_plan,
+            smart_edit_native::smart_edit_live_plan,
+            smart_edit_native::smart_edit_execute,
             external_companions_native::choose_external_companion_path,
             external_companions_native::register_external_companion,
             external_companions_native::forget_external_companion,
@@ -2925,6 +2956,19 @@ mod readiness_tests {
             asset_sources:Default::default(),
         };
         (temp, state, p, record)
+    }
+    #[test]
+    fn direct_outputs_do_not_hide_a_current_native_source_build() {
+        let(_temp,state,mut p,mut native)=fixture();
+        native.target="mcc-cea".into();p.builds[0]=native.clone();
+        fs::write(state.root.join("jobs").join(&native.id).join("receipt.json"),serde_json::to_vec(&native).unwrap()).unwrap();
+        let mut direct=native.clone();direct.id=uuid::Uuid::new_v4().to_string();direct.target="mcc-direct".into();
+        let dir=state.root.join("jobs").join(&direct.id);fs::create_dir_all(dir.join("output")).unwrap();
+        let output=dir.join("output/fixture.map");fs::copy(native.output.as_ref().unwrap(),&output).unwrap();direct.output=Some(output);
+        fs::write(dir.join("receipt.json"),serde_json::to_vec(&direct).unwrap()).unwrap();p.builds.push(direct.clone());
+        assert_eq!(current_build(&state,&p).unwrap().id,direct.id);
+        assert_eq!(current_native_build(&state,&p).unwrap().id,native.id);
+        fs::write(native.output.unwrap(),b"tampered").unwrap();assert!(current_native_build(&state,&p).is_err());
     }
     #[test]
     fn readiness_rejects_stale_current_content_and_tampered_artifact() {

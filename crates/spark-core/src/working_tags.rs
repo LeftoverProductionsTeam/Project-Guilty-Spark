@@ -13,6 +13,7 @@ use crate::{
     safe_relative, Result, SparkError,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest,Sha256};
 use std::{
     collections::BTreeMap,
     fs,
@@ -29,6 +30,8 @@ const MAX_RECEIPT_BYTES: u64 = 4 * 1024 * 1024;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkingTagsInput {
     #[serde(default,skip_serializing_if="Option::is_none")]
+    pub expected_tag_identity:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
     pub bsp_audio: Option<crate::bsp_audio::Request>,
     pub parent_build: BuildRecord,
     pub tags_directory: PathBuf,
@@ -41,6 +44,8 @@ pub struct WorkingTagsInput {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkingTagsReceipt {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub reviewed_tag_identity:Option<String>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub bsp_audio: Option<crate::bsp_audio::Request>,
     pub schema_version: u32,
@@ -535,6 +540,7 @@ fn run_with(
         event: &on_event,
     };
     let mut receipt = WorkingTagsReceipt {
+        reviewed_tag_identity:input.expected_tag_identity.clone(),
         bsp_audio: input.bsp_audio.clone(),
         schema_version: 1,
         job_id: job_id.into(),
@@ -575,6 +581,9 @@ fn run_with(
                 );
             },
         )?;
+        if let Some(expected)=&input.expected_tag_identity {
+            if &inventory_identity(&input_hashes)?!=expected{return invalid("Native working tags no longer match the reviewed edit plan; no compiler ran. Review the new source revision before building");}
+        }
         if tree_hashes(&prepared.tags, &cancel)? != input_hashes {
             return invalid(
                 "Working tags changed during staging; close/save the native editor and try again",
@@ -775,6 +784,15 @@ pub fn run_build_from_tags(
 
 pub use run_build_from_tags as run;
 
+fn inventory_identity(hashes:&BTreeMap<String,String>)->Result<String> {
+    Ok(format!("{:x}",Sha256::digest(serde_json::to_vec(hashes)?)))
+}
+/// Content identity of the same complete, bounded native tree staged by the
+/// compiler. This is application provenance, not a new native tag format.
+pub fn source_identity(root:&Path,cancel:&AtomicBool)->Result<String> {
+    inventory_identity(&tree_hashes(root,cancel)?)
+}
+
 #[cfg(test)]
 #[path = "../tests/common/mod.rs"]
 mod test_fixture;
@@ -852,6 +870,7 @@ mod tests {
         fs::write(&info, b"test verifier identity only; never executed").unwrap();
         fs::write(parent.join("conversion-manifest.json"), serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"compilerSha256":maps::hash_file(&tool).unwrap(),"sourceSha256":project.source.as_ref().unwrap().sha256,"sourcePreserved":true})).unwrap()).unwrap();
         let input = WorkingTagsInput {
+            expected_tag_identity:None,
             bsp_audio: None,
             parent_build: record,
             tags_directory: tags,
@@ -882,6 +901,23 @@ mod tests {
             assert_eq!(phase, "verify");
             Ok("0\n".into())
         }
+    }
+    #[test]
+    fn changed_reviewed_native_tree_never_reaches_the_compiler() {
+        let mut c=case();c.input.expected_tag_identity=Some(source_identity(&c.input.tags_directory,&AtomicBool::new(false)).unwrap());
+        fs::write(c.input.tags_directory.join("edited.weapon"),b"different source after review").unwrap();
+        let id=uuid::Uuid::new_v4().to_string();
+        let record=run_with(&c.project,&c.input,&c.jobs,&id,Arc::new(AtomicBool::new(false)),|_|{},|_,_,_,_,_,_|panic!("changed reviewed source ran a compiler")).unwrap();
+        // Post-staging refusals produce a durable failed job, just like the
+        // other build failures. They must never publish an output or success.
+        assert_eq!(record.status,"failed");
+        assert!(record.output.is_none());
+        assert!(record.sha256.is_none());
+        assert!(record.message.contains("reviewed edit plan"));
+        let receipt:WorkingTagsReceipt=serde_json::from_slice(&fs::read(c.jobs.join(&id).join("working-tags-receipt.json")).unwrap()).unwrap();
+        assert_eq!(receipt.status,"failed");
+        assert_eq!(receipt.reviewed_tag_identity,c.input.expected_tag_identity);
+        assert_eq!(fs::read(c.input.tags_directory.join("edited.weapon")).unwrap(),b"different source after review");
     }
     #[test]
     fn stale_bsp_audio_request_is_refused_before_staging_or_tool_execution() {

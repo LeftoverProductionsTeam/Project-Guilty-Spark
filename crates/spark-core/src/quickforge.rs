@@ -1926,28 +1926,9 @@ pub fn scenario_commands(doc: &QuickForgeDocument) -> Result<Vec<ForgeCommand>> 
     Ok(commands)
 }
 
-pub fn export_sources(doc: &QuickForgeDocument, output: &Path) -> Result<SourceExport> {
-    let validation = validate(doc)?;
-    if !validation.valid {
-        return invalid("QuickForge geometry validation failed; fix the reported geometry and scenario issues before export");
-    }
-    reject_links(output)?;
-    if output.exists() {
-        return invalid("QuickForge source export requires a fresh isolated output directory");
-    }
-    let scenario = scenario_path(doc)?;
-    let bsp_name = scenario.rsplit('\\').next().unwrap().to_string();
-    let scenario_dir = scenario.rsplit_once('\\').unwrap().0;
-    let jms = export_jms(doc)?;
-    let commands = scenario_commands(doc)?;
-    let document_path = output.join("quickforge-document.json");
-    let jms_path = output
-        .join("data")
-        .join(safe_relative(scenario_dir)?)
-        .join("models")
-        .join(format!("{bsp_name}.jms"));
-    let scenario_plan_path = output.join("scenario-plan.json");
-    let environment_plan_path = output.join("environment-intent.json");
+/// The same read-only dependency requirements used by export and edit routing.
+pub fn source_requirements(doc: &QuickForgeDocument) -> Result<(Vec<ForgeDependency>, Vec<String>)> {
+    validate_document(doc)?;
     let mut dependencies = vec![];
     let mut blockers = vec![];
     for m in &doc.materials {
@@ -2008,6 +1989,32 @@ pub fn export_sources(doc: &QuickForgeDocument, output: &Path) -> Result<SourceE
     if ["firefight", "zombie"].contains(&doc.game_mode.as_str()) {
         blockers.push("Firefight campaign geometry is exportable; encounter/script integration and runtime wave execution must be validated before a playable build is claimed".into());
     }
+    Ok((dependencies, blockers))
+}
+
+pub fn export_sources(doc: &QuickForgeDocument, output: &Path) -> Result<SourceExport> {
+    let validation = validate(doc)?;
+    if !validation.valid {
+        return invalid("QuickForge geometry validation failed; fix the reported geometry and scenario issues before export");
+    }
+    reject_links(output)?;
+    if output.exists() {
+        return invalid("QuickForge source export requires a fresh isolated output directory");
+    }
+    let scenario = scenario_path(doc)?;
+    let bsp_name = scenario.rsplit('\\').next().unwrap().to_string();
+    let scenario_dir = scenario.rsplit_once('\\').unwrap().0;
+    let jms = export_jms(doc)?;
+    let commands = scenario_commands(doc)?;
+    let document_path = output.join("quickforge-document.json");
+    let jms_path = output
+        .join("data")
+        .join(safe_relative(scenario_dir)?)
+        .join("models")
+        .join(format!("{bsp_name}.jms"));
+    let scenario_plan_path = output.join("scenario-plan.json");
+    let environment_plan_path = output.join("environment-intent.json");
+    let (dependencies, blockers) = source_requirements(doc)?;
     let export = SourceExport {
         directory: output.to_path_buf(),
         document_path,

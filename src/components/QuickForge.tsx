@@ -4,6 +4,7 @@ import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../na
 import {draggedAsset} from '../assetDragRegistry';
 import BuildTargets from './BuildTargets';
 import{WorkspacePanel,WorkspacePanelAddon,useRevealWorkspacePanel}from'./WorkspacePanels';
+import SmartEditPanel from './SmartEditPanel';
 import RenderFeatures from './RenderFeatures';
 import LiveForge from './LiveForge';
 import MapSounds from './MapSounds';
@@ -904,6 +905,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         )}
         <LiveForge project={project} document={doc} selected={selected} />
       </WorkspacePanelAddon>
+      <WorkspacePanelAddon id="forge-palette"><SmartEditPanel project={project} onSave={props.onSave} notify={notify}/></WorkspacePanelAddon>
       <div className="forge-main">
         {bspMode ? (
           <BspWorkshop

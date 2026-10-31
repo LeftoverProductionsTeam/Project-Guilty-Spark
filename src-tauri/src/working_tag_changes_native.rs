@@ -147,7 +147,7 @@ pub(super) async fn working_tag_watch_start(
         check_document_owner(&state, &project_id, &owner)?;
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
         let fingerprint = project.fingerprint().map_err(error)?;
-        let build = current_build(&state, &project)?;
+        let build = current_native_build(&state, &project)?;
         let tags = runtime_workbench::compiled_tags(&state, &project, &build)?;
         {
             let mut registry = lock(&state.working_tag_changes)?;

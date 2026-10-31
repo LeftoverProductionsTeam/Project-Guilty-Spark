@@ -1,5 +1,7 @@
 # Universal workbench continuation
 
+C41 implements the new “Every Way to Mod Halo” directive without replacing historical C38. Typed routing, reviewed direct MCC cells, shared save plans, native source adapters and bound live position plans extend consolidated master 9691111. [Current engineering and explicit acceptance](CONTINUATION_41_ENGINEERING.md). Next gates include additional edition/operation writers, actual custom asset game imports, semantic native tag/binary sharing, fresh live game presentation/peer proof and complete rendering/audio parity. All earlier requirements and experimental research remain intact.
+
 The [CE startup follow-through](CE_STARTUP_AND_FIRST_RUN.md) fixes omitted first-run files, adds explicit normal-window startup and a menu-only setup path, and names incomplete client dependencies without removing dedicated hosting. Native startup/process and extraction checks are accepted separately from the unresolved genuine join and visual walkthrough gates. Preserve the earlier zero-player trials and all direct compiled-map research.
 
 The [matching CE client continuation](CE_MATCHING_CLIENT_PLAYTEST.md) accepts checked preparation and owned process launch from the server's exact private game snapshot, with an isolated test profile, cancellation, integrity refusal and client/server cleanup. A real joined player, first-run visual acceptance and a Workshop collision walkthrough remain the next gates. Preserve the zero-player trial evidence; process launch is separate from a game connection.

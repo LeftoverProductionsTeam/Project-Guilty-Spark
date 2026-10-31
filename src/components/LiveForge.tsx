@@ -5,10 +5,10 @@ import type {QuickForgeDocument} from '../forge';
 import {Notice} from './ui';
 import LiveSessionRecovery from './LiveSessionRecovery';
 import { disconnectLiveSession } from '../liveSession';
+import type {EditPlan,EditExecution} from '../smartEdit';
 interface LiveObject {datum:number;tagDatum:number;tagPath:string;kind:number;position:[number,number,number];player:boolean}
 interface LiveStatus {pid:number;sessionToken:string;cleanupPending?:boolean;experimental:boolean;detail:string;snapshot:{profile:string;identity:{scenario:string;checksum:number};objects:LiveObject[]}}
 interface Binding {sessionToken:string;placementId:string;datum:number;tagDatum:number;expectedPosition:number[]}
-interface Receipt {datum:number;applied:boolean;observedPosition:number[]|null;message:string}
 /** Each binding is local to one process lifetime. Neither a peer's object datum
  * nor the mere presence of MCC enables writes on this machine. */
 export default function LiveForge({project,document:doc,selected}:{project:Project;document:QuickForgeDocument;selected:string[]}){
@@ -29,7 +29,9 @@ export default function LiveForge({project,document:doc,selected}:{project:Proje
       // Sample just before each batch; stale expected positions are refused by
       // the backend if physics or another player moves the object meanwhile.
       const sample=await refresh();if(boundSession?.cleanupPending||sample.cleanupPending)throw new Error('Finish live session cleanup and reconnect before sending positions.');if(!boundSession?.sessionToken||sample.sessionToken!==boundSession.sessionToken||changed.some(binding=>binding.sessionToken!==boundSession.sessionToken))throw new Error('Live connection changed. Reconnect and bind objects again before sending positions.');const ops=changed.map(b=>{const object=sample.snapshot.objects.find(o=>o.datum===b.datum&&o.tagDatum===b.tagDatum);if(!object)throw new Error('Bound object respawned or disappeared. Reconnect and bind its new instance.');return {placementId:b.placementId,datum:b.datum,tagDatum:b.tagDatum,expectedPosition:object.position};});
-      const receipts=await call<Receipt[]>('live_mcc_apply',{expectedSession:boundSession.sessionToken,projectId:project.id,document:doc,bindings:ops});
+      const plan=await call<EditPlan>('smart_edit_live_plan',{expectedSession:boundSession.sessionToken,projectId:project.id,document:doc,bindings:ops});
+      const result=await call<EditExecution>('smart_edit_execute',{planId:plan.id}),receipts=result.liveReceipts;
+      if(result.warning)setError(result.warning);
       for(const receipt of receipts){const b=changed.find(b=>b.datum===receipt.datum);if(receipt.applied&&b)applied.current.set(b.placementId,JSON.stringify(doc.placements.find(p=>p.id===b.placementId)!.position));}
       const confirmed=receipts.filter(r=>r.applied).length;setMessage(`${confirmed}/${changed.length} positions confirmed by game memory readback. ${receipts.find(r=>!r.applied)?.message??'In-game rendering, collision and other players still need verification.'}`);
       if(confirmed!==changed.length)setEnabled(false);await refresh();
@@ -49,6 +51,6 @@ export default function LiveForge({project,document:doc,selected}:{project:Proje
       <div className="analysis-actions"><button disabled={busy||!bindings.length} onClick={()=>void apply()}>Apply changed positions</button><button disabled={busy} onClick={async()=>{setEnabled(false);try{const report=await disconnectLiveSession(status.sessionToken);setStatus(null);setBindings([]);setMessage(report.detail);}catch(error){setError(String(error));}}}>Disconnect</button></div>
     </>}
     {message&&<p role="status">{message}</p>}{error&&<Notice tone="error">{error}</Notice>}
-    <p className="subtle">Position changes include undo and redo. Rotation, scale, creation, deletion, BSP/tunnel geometry, lighting, free camera and peer replication need additional game-side support; they are not sent by this adapter. CE/Chimera is not connected by this MCC profile.</p>
+    <p className="subtle">Bound moves, including undo and redo, use ten-second Smart Edit plans and native readback. Before/after positions are recorded locally. Disconnect does not restore positions; move them back or reload the original map. Persistent authoring saves and peer replication are separate. Rotation, scale, spawning and BSP changes are not sent by this placement adapter.</p>
   </details>;
 }

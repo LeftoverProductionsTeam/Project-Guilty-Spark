@@ -453,6 +453,7 @@ export default function World({
   edit,
   notify,
   onOpenTag,
+  onSelectMap,
   onResourcesConnected,
   onBeforeResources,
   selectedId,
@@ -471,6 +472,7 @@ export default function World({
   edit: (p: Project, description: string) => void;
   notify: (m: string) => void;
   onOpenTag?: (tagId: number, sourceProjectId?: string) => void;
+  onSelectMap?: (id:string)=>void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: () => Promise<void>;
   selectedId?: string | null;
@@ -1522,6 +1524,7 @@ export default function World({
                 inspection={tagContext.inspection}
                 requestedTagId={tagRequest}
                 requestRevision={tagRevision}
+                onSelectMap={onSelectMap}
                 edit={edit}
                 notify={notify}
                 onFullEditor={(id) => onOpenTag?.(id, tagContext.project.id)}

@@ -25,6 +25,7 @@ pub mod community_lan;
 pub mod tool_transaction;
 pub mod tool_ecosystem;
 pub mod native_operations;
+pub mod smart_edit;
 pub mod studio_journal;
 pub mod studio_tls;
 pub mod studio_session;

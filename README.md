@@ -1,5 +1,11 @@
 # Project Guilty Spark
 
+## C41 · Smart Edit and direct map copies
+
+Edit in the tag tree or object drawer, then **Save a map copy → Review save plan**. Spark resolves a direct native cache transaction or the matching source build, checks the saved revision and preserves the original. The first direct writer covers reviewed **MCC Halo 1 cache 13** scalar fields and existing placement transforms; it runs native checksum/cache checks and compares every unplanned byte, with **no extraction or compiler**. Native working-tag edits and bound temporary live moves use their existing guarded adapters. [Workflow guide](docs/SMART_EDIT_WORKFLOWS.md) · [C41 engineering, real tests and limits](docs/CONTINUATION_41_ENGINEERING.md).
+
+Custom-asset previews are not arbitrary native game imports. Native-tag/binary collaboration, game-peer replication, live spawning/BSP replacement and full rendering/audio parity retain their explicit acceptance gates. This continuation preserves the consolidated C37–C40 work and historical evidence.
+
 ## Checked CE startup and first-run help
 
 The CE client workflow now includes the EULA files Spark previously omitted, explicit normal-window startup, named missing-file guidance and **First-run help → Open CE setup** for the separate test profile. Setup opens Halo's menus before a connection is requested; prolonged playtests show recovery steps. Existing dedicated-server registrations and native source safeguards are preserved.
