@@ -76,7 +76,12 @@ test.beforeEach(async ({ page }) => {
         if (command === 'ce_host_client_action') {
           if (location.search.includes('bad-client'))
             throw Error('Private input failed integrity: haloce.exe');
-          const phase = args.action === 'prepare' ? 'ready' : args.action === 'launch' ? 'open' : 'stopped';
+          const phase =
+            args.action === 'prepare'
+              ? 'ready'
+              : ['launch', 'setup'].includes(args.action)
+                ? 'open'
+                : 'stopped';
           w.ceHostSession.client = {
             phase,
             detail:
@@ -93,6 +98,8 @@ test.beforeEach(async ({ page }) => {
             launchCount: phase === 'open' ? 1 : 0,
             exitCode: null,
             connectionVerified: false,
+            mode: args.action === 'setup' ? 'setup' : 'playtest',
+            elapsedMs: 0,
           };
           if (args.action === 'prepare' && location.search.includes('slow-client')) {
             const prepared = structuredClone(w.ceHostSession.client);
@@ -311,4 +318,24 @@ test('switching project during preparation does not leave client controls perman
   await page.getByRole('button', { name: 'Switch project', exact: true }).click();
   await page.evaluate(() => (window as any).releaseClient());
   await expect(page.getByRole('button', { name: 'Launch CE playtest' })).toBeEnabled();
+});
+test('first-run help opens only the owned setup mode and keeps installation guidance reachable', async ({
+  page,
+}) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html');
+  await loadedServer(page);
+  await page.getByText('First-run help', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open CE setup', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Prepare matching client', exact: true }).click();
+  await page.getByRole('button', { name: 'Open CE setup', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Stop playtest', exact: true })).toBeVisible();
+  const action = await page.evaluate(
+    () =>
+      (window as any).ceHostCalls.find(
+        (c: any) => c.command === 'ce_host_client_action' && c.args.action === 'setup',
+      ).args,
+  );
+  expect(action).toEqual({ sessionId: 'owned-host', action: 'setup' });
+  await page.getByRole('button', { name: 'Check CE installation', exact: true }).click();
+  await expect(page.getByText('Setup visits 1')).toBeVisible();
 });

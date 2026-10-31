@@ -3,10 +3,35 @@
 use super::*;
 use std::sync::atomic::AtomicU64;
 
+#[cfg(windows)]
+#[path = "ce_gui_process.rs"]
+mod gui;
+#[cfg(windows)]
+type ClientChild = gui::Child;
+#[cfg(not(windows))]
+struct ClientChild(OwnedProcess);
+#[cfg(not(windows))]
+impl ClientChild {
+    fn id(&self) -> u32 {
+        self.0.child.id()
+    }
+    fn try_wait(&mut self) -> Reply<Option<std::process::ExitStatus>> {
+        self.0.child.try_wait().map_err(error)
+    }
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum Mode {
+    Setup,
+    Playtest,
+}
+
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum Action {
     Prepare,
+    Setup,
     Launch,
     Stop,
 }
@@ -25,6 +50,8 @@ pub(crate) struct View {
     launch_count: u64,
     exit_code: Option<i32>,
     connection_verified: bool,
+    mode: Option<Mode>,
+    elapsed_ms: u64,
 }
 struct Pins {
     game: PathBuf,
@@ -32,7 +59,9 @@ struct Pins {
     files: BTreeMap<String, (u64, String)>,
 }
 struct Process {
-    owned: OwnedProcess,
+    child: ClientChild,
+    began: Instant,
+    mode: Mode,
     // Keep every checked input open without write/delete sharing until exit.
     _inputs: Vec<fs::File>,
 }
@@ -117,10 +146,12 @@ impl State {
             let process = lock(&self.process)?;
             self.check(epoch, stopped)?;
             if process.is_some() {
-                return Err("Close or stop this session's current CE playtest first".into());
+                return Err("Close or stop this session's current CE window first".into());
             }
             let old = self.view()?;
-            if matches!(action, Action::Launch) && old.as_ref().is_none_or(|v| v.phase != "ready") {
+            if matches!(action, Action::Launch | Action::Setup)
+                && old.as_ref().is_none_or(|v| v.phase != "ready")
+            {
                 return Err("Prepare this session's matching client before launching it".into());
             }
             let launches = old.map_or(0, |v| v.launch_count);
@@ -137,11 +168,14 @@ impl State {
                 launch_count: launches,
                 exit_code: None,
                 connection_verified: false,
+                mode: None,
+                elapsed_ms: 0,
             });
         }
         let began = Instant::now();
         let result: Reply<()> = (|| {
             let inputs = verify(&pins, || self.check(epoch, stopped))?;
+            ce_setup::require_startup(&pins.game)?;
             let (_, hash, architecture) =
                 dependency_install::pe_identity(&pins.game.join("haloce.exe"))?;
             if architecture != "x86" || hash != pins.files["haloce.exe"].1 {
@@ -162,14 +196,25 @@ impl State {
             view.verified_files = inputs.len();
             view.verified_bytes = pins.files.values().map(|(bytes, _)| bytes).sum();
             view.verification_ms = began.elapsed().as_millis().min(u64::MAX as u128) as u64;
-            if matches!(action, Action::Launch) {
-                let owned = launch(&pins.game, &pins.profile, port)?;
-                view.process_id = Some(owned.child.id());
+            if matches!(action, Action::Launch | Action::Setup) {
+                let mode = if matches!(action, Action::Setup) {
+                    Mode::Setup
+                } else {
+                    Mode::Playtest
+                };
+                let child = launch(&pins.game, &pins.profile, port, mode)?;
+                view.process_id = Some(child.id());
                 view.launch_count += 1;
                 view.phase = "open".into();
-                view.detail = "CE playtest process opened with this server's exact map and a separate test profile. Complete Halo's first-run/profile prompts if shown. A joined player and gameplay have not been verified.".into();
+                view.mode = Some(mode);
+                view.detail = match mode {
+                    Mode::Setup => "CE setup opened in the separate test profile with a normal-window request. Complete Halo's own license/profile prompts, then close Halo and prepare/launch the playtest. This step does not request a game connection.",
+                    Mode::Playtest => "CE playtest opened with this server's exact map and a separate test profile. A normal window was requested; a joined player and gameplay have not been verified.",
+                }.into();
                 *process = Some(Process {
-                    owned,
+                    child,
+                    began: Instant::now(),
+                    mode,
                     _inputs: inputs,
                 });
             } else {
@@ -207,7 +252,14 @@ impl State {
         let Some(current) = process.as_mut() else {
             return Ok(());
         };
-        if let Some(code) = current.owned.child.try_wait().map_err(error)? {
+        let elapsed = current.began.elapsed();
+        if let Some(view) = lock(&self.view)?.as_mut() {
+            view.elapsed_ms = elapsed.as_millis().min(u64::MAX as u128) as u64;
+            if matches!(current.mode, Mode::Playtest) && elapsed >= Duration::from_secs(30) {
+                view.detail = "CE is still running; a player join has not been verified. If startup is waiting, stop this window and use First-run help → Open CE setup to finish the test profile, then retry. You can also use Halo's Multiplayer → Direct IP with the address above.".into();
+            }
+        }
+        if let Some(code) = current.child.try_wait()? {
             drop(process.take());
             if let Some(view) = lock(&self.view)?.as_mut() {
                 view.phase = "closed".into();
@@ -306,48 +358,58 @@ fn verify(pins: &Pins, cancelled: impl Fn() -> Reply<()>) -> Reply<Vec<fs::File>
     cancelled()?;
     Ok(inputs)
 }
-fn launch(game: &Path, profile: &Path, port: u16) -> Reply<OwnedProcess> {
+fn arguments(profile: &Path, port: u16, mode: Mode) -> Reply<Vec<std::ffi::OsString>> {
     if !(1024..65535).contains(&port) {
         return Err("Private server has no valid local endpoint".into());
     }
-    let mut command = Command::new(game.join("haloce.exe"));
-    command
-        .current_dir(game)
-        .args(["-window", "-vidmode", "1280,720,60", "-novideo"])
-        .arg("-path")
-        .arg(profile)
-        .arg("-connect")
-        .arg(format!("127.0.0.1:{port}"))
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    // Do not request SW_HIDE. CREATE_NO_WINDOW suppresses a console only;
-    // Halo's GUI uses the documented -window option and normal startup state.
+    let mut arguments: Vec<std::ffi::OsString> =
+        ["-window", "-vidmode", "1280,720,60", "-novideo", "-path"]
+            .map(Into::into)
+            .into();
+    arguments.push(profile.as_os_str().to_owned());
+    if matches!(mode, Mode::Playtest) {
+        arguments.extend([
+            std::ffi::OsString::from("-connect"),
+            format!("127.0.0.1:{port}").into(),
+        ]);
+    }
+    Ok(arguments)
+}
+fn launch(game: &Path, profile: &Path, port: u16, mode: Mode) -> Reply<ClientChild> {
+    let arguments = arguments(profile, port, mode)?;
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
+        gui::Child::launch(&game.join("haloce.exe"), &arguments, game)
     }
-    let mut child = command.spawn().map_err(error)?;
-    #[cfg(windows)]
-    let process_job = match ProcessJob::attach(&child) {
-        Ok(job) => job,
-        Err(e) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(e);
-        }
-    };
-    Ok(OwnedProcess {
-        child,
-        #[cfg(windows)]
-        _job: process_job,
-    })
+    #[cfg(not(windows))]
+    {
+        let mut command = Command::new(game.join("haloce.exe"));
+        command
+            .current_dir(game)
+            .args(arguments)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        Ok(ClientChild(OwnedProcess {
+            child: command.spawn().map_err(error)?,
+        }))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn menu_setup_does_not_request_a_join_and_playtest_keeps_the_fixed_local_endpoint() {
+        let profile = Path::new("owned profile");
+        let menu = arguments(profile, 12345, Mode::Setup).unwrap();
+        assert_eq!(menu.last().unwrap(), profile.as_os_str());
+        assert!(!menu.iter().any(|a| a == "-connect" || a == "-devmode"));
+        let game = arguments(profile, 12345, Mode::Playtest).unwrap();
+        assert_eq!(game[game.len() - 2], "-connect");
+        assert_eq!(game.last().unwrap(), "127.0.0.1:12345");
+        assert!(arguments(profile, 0, Mode::Playtest).is_err());
+    }
     fn fixture() -> (tempfile::TempDir, Pins) {
         let directory = tempfile::tempdir().unwrap();
         let game = directory.path().join("game");

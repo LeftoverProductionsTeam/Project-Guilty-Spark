@@ -20,6 +20,7 @@ test.beforeEach(async ({ page }) => {
         registered: false,
       };
     if (params.has('no-tar')) w.ce.canExtract = false;
+    if (params.has('missing-startup')) w.ce.installation.startupIssues = ['Eula.dll', 'controls/loader.dll'];
     w.__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: any) => {
         w.ceCalls.push({ command, args });
@@ -120,4 +121,15 @@ test('a failed archive remains a failure and can be retried explicitly', async (
   await expect(page.getByRole('alert')).toContainText('differs from the reviewed archive');
   await expect(page.getByText('Connections 0', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Install Custom Edition…', exact: true })).toBeEnabled();
+});
+test('an incomplete client names startup files and offers a separate installation', async ({ page }) => {
+  await page.goto('/tests/ui/fixtures/customEdition.html?found&missing-startup');
+  await expect(page.getByRole('alert')).toContainText('Eula.dll, controls/loader.dll');
+  await page.getByRole('button', { name: 'Install separate copy…', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Download & install Custom Edition' })).toBeEnabled();
+  expect(
+    await page.evaluate(() =>
+      (window as any).ceCalls.some((c: any) => c.command === 'install_custom_edition'),
+    ),
+  ).toBe(false);
 });

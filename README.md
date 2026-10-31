@@ -1,5 +1,11 @@
 # Project Guilty Spark
 
+## Checked CE startup and first-run help
+
+The CE client workflow now includes the EULA files Spark previously omitted, explicit normal-window startup, named missing-file guidance and **First-run help → Open CE setup** for the separate test profile. Setup opens Halo's menus before a connection is requested; prolonged playtests show recovery steps. Existing dedicated-server registrations and native source safeguards are preserved.
+
+Real native checks distinguish startup files, process launch and compiler success from a joined player. **Visual first-run completion and a genuine client join remain unverified.** [Workflow and evidence](docs/CE_STARTUP_AND_FIRST_RUN.md) · [Descriptive publication handoff](docs/CE_STARTUP_GITHUB_DESCRIPTION.md).
+
 ## Playtest the exact private CE map copy
 
 **Online → Host game → Prepare matching client → Launch CE playtest** now uses the server's exact map, shared resources and checked client files with a separate test profile. A validated project named `bloodgulch` uses its own compiled bytes. Changed files or an added plugin refuse launch, even if an editable receipt is altered. Stopping a playtest leaves its server available; server/window closure cleans up its owned client.

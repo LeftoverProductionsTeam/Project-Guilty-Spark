@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-31",
+  "sourceFoundation": "d3b4d29",
+  "complete": true,
+  "scope": "Windows CE first-run files, explicit normal GUI startup, menu-only setup and preserved native client/server/build safeguards",
+  "application": {
+    "sha256": "9bb761dd042c6817e02e0549b70422f8f84e0cd17e12671ebd1b94454fa008d0",
+    "bytes": 38628864,
+    "bundledBeforeNativeAcceptance": true
+  },
+  "mockedIpc": false,
+  "physicalComputers": 1,
+  "independentSparkWindows": 2,
+  "publicListingRequested": false,
+  "clientJoinVerified": false,
+  "gameplayVerified": false,
+  "visualFirstRunAccepted": false,
+  "computerUse": "Helper failed to initialize, including after reset; no alternate desktop-control path used",
+  "cases": [
+    {
+      "name": "catalog and unsafe/stale request refusal",
+      "maps": 20,
+      "catalogMs": 429
+    },
+    {
+      "name": "real UI start and native Blood Gulch status",
+      "editorHeartbeatMs": 72,
+      "startupMs": 4228,
+      "status": {
+        "name": "Spark private",
+        "version": "01.00.10.0621",
+        "map": "bloodgulch",
+        "gameType": "Slayer",
+        "state": "openplaying",
+        "players": 0,
+        "maximumPlayers": 2,
+        "dedicated": true
+      },
+      "mapSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "serverSha256": "7789c4a0bd2c735e7fdc154d63f4bbb1134952e6904e5809eb00d4d1da94015f",
+      "copiedBytes": 192087787
+    },
+    {
+      "name": "real UI prepares the exact server map/resources and a fresh separate client profile",
+      "preparationMs": 396,
+      "clientHeartbeatMs": 54,
+      "verifiedFiles": 69,
+      "verifiedBytes": 192087787,
+      "verificationMs": 168,
+      "executableSha256": "7de68b02aa4d2ed521144db5f7d8ecdc2071dc7b2270f6a0c9b66a621c072a64"
+    },
+    {
+      "name": "changed client bytes refuse even with a forged copy manifest and no client is launched"
+    },
+    {
+      "name": "unapproved private DLL refuses and restoring exact inputs allows matching-client preparation"
+    },
+    {
+      "name": "concurrent preparation refuses and cancellation leaves the server running without launching a client"
+    },
+    {
+      "name": "actual CE menu-only setup has its first-run resources and uses the separate profile",
+      "mode": "setup",
+      "elapsedMs": 58564,
+      "lastPhase": "open",
+      "firstRunFiles": [
+        "Eula.dll",
+        "Eula.rtf"
+      ],
+      "clientJoinRequested": false,
+      "visualAcceptance": false
+    },
+    {
+      "name": "workspace reload retains the owned native session"
+    },
+    {
+      "name": "client actions reject other windows and stale session IDs"
+    },
+    {
+      "name": "closing the owning Spark window stops its actual CE client and server"
+    },
+    {
+      "name": "separate windows cannot stop each other and closing a window stops only its own server"
+    },
+    {
+      "name": "native game type ctf",
+      "reportedGameType": "CTF",
+      "observations": 1
+    },
+    {
+      "name": "native game type oddball",
+      "reportedGameType": "Oddball",
+      "observations": 1
+    },
+    {
+      "name": "native game type king",
+      "reportedGameType": "King",
+      "observations": 1
+    },
+    {
+      "name": "native game type race",
+      "reportedGameType": "Race",
+      "observations": 1
+    },
+    {
+      "name": "unchanged compiler-produced CE map loads",
+      "map": "reviewed_ce_source_recovery",
+      "mapSha256": "15e355da28a04c55fc59bec8eb354bd4ed4e1ef1f1275e2d53d27215f579361c",
+      "status": {
+        "name": "Spark private",
+        "version": "01.00.10.0621",
+        "map": "reviewed_ce_source_recovery",
+        "gameType": "Slayer",
+        "state": "openplaying",
+        "players": 0,
+        "maximumPlayers": 2,
+        "dedicated": true
+      }
+    },
+    {
+      "name": "occupied private port fails without launching a process"
+    },
+    {
+      "name": "actual changed selected cache refuses a stale start"
+    },
+    {
+      "name": "invalid client startup files get named setup guidance while dedicated hosting stays usable"
+    },
+    {
+      "name": "genuine Workshop source compiles a CE project cache through the native UI/toolchain",
+      "buildId": "28def741-8388-49f1-a1d1-51d345abc6eb",
+      "target": "gbx-custom",
+      "mapSha256": "d271c8f8fd8667cc2076eafd906a90355deb72ff58ba7335899b0e86467ae7f6",
+      "projectFingerprint": "9aee059c5d4755211852ca1b970229d7af69226afe26201076c255f8645b0332",
+      "compileMs": 15813,
+      "toolIdentities": {
+        "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+        "invaderBuild": "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a",
+        "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+        "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+      }
+    },
+    {
+      "name": "managed build with a stock filename loads from its own snapshot without replacing the installed map",
+      "projectStartupMs": 3545,
+      "mapSha256": "d271c8f8fd8667cc2076eafd906a90355deb72ff58ba7335899b0e86467ae7f6",
+      "sourceBuild": {
+        "projectId": "bffda090-9c37-428b-8d89-0a9dd5a4db2c",
+        "buildId": "28def741-8388-49f1-a1d1-51d345abc6eb",
+        "projectTitle": "bloodgulch",
+        "projectFingerprint": "9aee059c5d4755211852ca1b970229d7af69226afe26201076c255f8645b0332"
+      },
+      "nativeStatus": {
+        "name": "Spark private",
+        "version": "01.00.10.0621",
+        "map": "bloodgulch",
+        "gameType": "Slayer",
+        "state": "openplaying",
+        "players": 0,
+        "maximumPlayers": 2,
+        "dedicated": true
+      }
+    },
+    {
+      "name": "matching client uses the genuine newly compiled Workshop map rather than its stock namesake",
+      "mapSha256": "d271c8f8fd8667cc2076eafd906a90355deb72ff58ba7335899b0e86467ae7f6",
+      "verifiedFiles": 69,
+      "verificationMs": 197
+    },
+    {
+      "name": "actual CE client opens with matching native content, holds input locks and stops independently",
+      "executableSha256": "7de68b02aa4d2ed521144db5f7d8ecdc2071dc7b2270f6a0c9b66a621c072a64",
+      "mapSha256": "d271c8f8fd8667cc2076eafd906a90355deb72ff58ba7335899b0e86467ae7f6",
+      "seconds": 60,
+      "serverReplies": 60,
+      "maximumPlayersObserved": 0,
+      "lastClientPhase": "open",
+      "visibleRequested": true,
+      "clientJoinVerified": false,
+      "gameplayVerified": false
+    },
+    {
+      "name": "stopping the private server also stops its actual matching client"
+    },
+    {
+      "name": "saved edits invalidate new starts while the existing private snapshot remains unchanged"
+    },
+    {
+      "name": "unowned build IDs refuse without falling back to the stock map"
+    },
+    {
+      "name": "a genuinely corrupted managed cache refuses before process launch"
+    },
+    {
+      "name": "a redirected build receipt cannot select an output outside its owned job"
+    },
+    {
+      "name": "restored valid native output can host again and the reviewed base source remains byte-identical",
+      "preservedReviewedTags": 2455
+    },
+    {
+      "name": "abrupt Spark exit kills its actual owned CE client as well as its server"
+    },
+    {
+      "name": "abrupt Spark exit kills its owned dedicated server"
+    }
+  ],
+  "originalGameFilesUnchanged": 127,
+  "reviewedSourceTagsUnchanged": 2455,
+  "preservedResearchFilesUnchanged": 146,
+  "regressions": {
+    "rustWorkspaceLockedPassed": 585,
+    "rustOptInIgnored": 7,
+    "frontendPassed": 253,
+    "browserPassed": 119,
+    "offlineScriptsPassed": 59,
+    "typeScript": "passed",
+    "windowsReleaseAndNsis": "passed"
+  },
+  "preliminaryTrial": {
+    "cases": 31,
+    "complete": true,
+    "seconds": 45,
+    "serverReplies": 45,
+    "maximumPlayersObserved": 0,
+    "clientAliveAtEnd": true,
+    "clientJoinVerified": false,
+    "exactFinalApplication": false
+  },
+  "nativeGuiStartupContract": {
+    "subprocessReceivedExplicitShow": true,
+    "showState": 1,
+    "gameWindowVisuallyAccepted": false
+  },
+  "priorFailureEvidence": "Earlier zero-player and first-run evidence remains retained in prior receipts. The new native startup flag and dependency tests do not certify a joined player.",
+  "limits": [
+    "Actual player join, first-run visual acceptance, collision traversal and gameplay/render/audio parity remain unaccepted.",
+    "This CE control is loopback-only; existing SparkLink/community LAN/VPN workflows remain separate from game-peer replication.",
+    "Reviewed-source CE geometry retains seven explicit corrections, not lossless source restoration or universal conversion.",
+    "Local byte identities and read locks do not authenticate the publisher or defeat a privileged local program.",
+    "Direct compiled-map authoring remains unfinished; native loose-tag and client/server process tests do not complete it.",
+    "No clean-machine installation, remote CI, direct protected-master push or publication was performed."
+  ]
+}

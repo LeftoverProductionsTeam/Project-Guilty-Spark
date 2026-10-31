@@ -34,6 +34,8 @@ interface ClientView {
   launchCount: number;
   exitCode: number | null;
   connectionVerified: boolean;
+  mode?: 'setup' | 'playtest' | null;
+  elapsedMs?: number;
 }
 export interface CeHostView {
   id: string;
@@ -227,7 +229,7 @@ export default function CustomEditionHost({
       if (mounted.current) setBusy(false);
     }
   }
-  async function clientAction(action: 'prepare' | 'launch' | 'stop') {
+  async function clientAction(action: 'prepare' | 'launch' | 'setup' | 'stop') {
     if (!view) return;
     const token = ++generation.current;
     const clientToken = ++clientGeneration.current;
@@ -464,6 +466,29 @@ export default function CustomEditionHost({
               <p className="subtle" aria-live="polite">
                 {client?.detail ?? 'Use this exact map and its resources with a separate Halo test profile.'}
               </p>
+              <details className="ce-client-help">
+                <summary>First-run help</summary>
+                <p className="subtle">
+                  For a fresh test profile, open CE setup, complete Halo's own license/profile prompts, then
+                  close Halo. Prepare again and launch the playtest. You can also join through Halo →
+                  Multiplayer → Direct IP using the address above.
+                </p>
+                <div className="button-row">
+                  <button
+                    disabled={
+                      !native ||
+                      busy ||
+                      clientChecking ||
+                      client?.phase !== 'ready' ||
+                      view.phase !== 'running'
+                    }
+                    onClick={() => void clientAction('setup')}
+                  >
+                    Open CE setup
+                  </button>
+                  <button onClick={onSetup}>Check CE installation</button>
+                </div>
+              </details>
             </section>
           )}
           <details>
@@ -491,7 +516,11 @@ export default function CustomEditionHost({
                   <dt>Client identity</dt>
                   <dd>{client.executableSha256}</dd>
                   <dt>Client process</dt>
-                  <dd>{client.processId ?? 'Not running'} · join unverified</dd>
+                  <dd>
+                    {client.processId ?? 'Not running'} ·{' '}
+                    {client.mode === 'setup' ? 'profile setup' : 'join unverified'}
+                    {client.elapsedMs ? ` · ${Math.floor(client.elapsedMs / 1000)} s` : ''}
+                  </dd>
                 </>
               )}
               {view.sourceBuild && (

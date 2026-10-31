@@ -237,6 +237,8 @@ fn selected(relative: &str, map: &str) -> bool {
         "haloce.exe",
         "Keystone.dll",
         "ksimeui.dll",
+        "Eula.dll",
+        "Eula.rtf",
         "strings.dll",
         "msvcr71.dll",
         "binkw32.dll",
@@ -468,6 +470,9 @@ struct ProcessJob(isize);
 impl ProcessJob {
     fn attach(child: &Child) -> Reply<Self> {
         use std::os::windows::io::AsRawHandle;
+        Self::attach_handle(child.as_raw_handle() as _)
+    }
+    fn attach_handle(process: windows_sys::Win32::Foundation::HANDLE) -> Reply<Self> {
         use windows_sys::Win32::System::JobObjects::*;
         unsafe {
             let handle = CreateJobObjectW(std::ptr::null(), std::ptr::null());
@@ -483,7 +488,7 @@ impl ProcessJob {
                 &limits as *const _ as *const _,
                 std::mem::size_of_val(&limits) as u32,
             ) == 0
-                || AssignProcessToJobObject(handle, child.as_raw_handle() as _) == 0
+                || AssignProcessToJobObject(handle, process) == 0
             {
                 return Err(format!(
                     "Could not bind the private Halo process lifetime to Spark: {}",

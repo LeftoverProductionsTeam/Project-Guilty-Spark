@@ -159,6 +159,10 @@ try {
     'maps/bitmaps.map',
     'maps/sounds.map',
     'maps/loc.map',
+    'Eula.dll',
+    'Eula.rtf',
+    'controls/Controls.dll',
+    'controls/loader.dll',
   ])
     expect(await hash(path.join(installed, file))).toBe(installReceipt.files[`Halo Custom Edition/${file}`]);
   for (const file of ['GSArcade.exe', 'haloupdate.exe', 'Uninstal.exe', 'redist/msxmlenu.msi', 'Setup'])
@@ -189,6 +193,8 @@ try {
   await page.reload();
   expect((await call('custom_edition_setup')).installation.registered).toBe(true);
   receipt.registrationSurvivesReload = true;
+  expect((await call('custom_edition_setup')).installation.startupIssues).toEqual([]);
+  receipt.firstRunFilesVerified = ['Eula.dll', 'Eula.rtf', 'controls/Controls.dll', 'controls/loader.dll'];
   expect(await inventory(original)).toEqual(before);
   receipt.originalFilesUnchanged = Object.keys(before).length;
   expect(errors).toEqual([]);

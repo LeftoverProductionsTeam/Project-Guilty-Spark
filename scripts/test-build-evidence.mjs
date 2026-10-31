@@ -1,6 +1,17 @@
 const source = 'docs/TEST_BUILD_READINESS.md';
 export const testBuildRequirements = [
   {
+    id: 'TBR-ce-startup',
+    feature: 'Complete CE first-run files and checked normal-window/setup startup',
+    source: 'docs/CE_STARTUP_AND_FIRST_RUN.md',
+    topic: 'dependencyGuide',
+    operation:
+      'Retain the EULA module/text and known control DLLs in checked extraction/private snapshots; name incomplete startup files while preserving server-capable registrations; launch the owned client with an explicit normal-window request and cleanup job before resume; offer isolated menu-only setup, elapsed mode and prolonged-start guidance.',
+    gap: 'The underlying zero-player stall is not certified resolved. Visual first-run completion, a genuine joined client, collision traversal, gameplay/render/audio parity, other-runtime delivery, game-peer replication and direct compiled-map authoring remain open.',
+    previous:
+      'Continues d3b4d29 and preserves its failed join evidence, C35-C39 history, native source/reconciliation checks and separate research.',
+  },
+  {
     id: 'TBR-ce-matching-client',
     feature: 'Prepare and launch a matching isolated CE playtest client',
     source: 'docs/CE_MATCHING_CLIENT_PLAYTEST.md',
@@ -102,4 +113,13 @@ testBuildOverrides['TBR-ce-matching-client'] = {
     'src-tauri/src/ce_host_client.rs; src-tauri/src/ce_host_native.rs; src/components/CustomEditionHost.tsx; scripts/test-ce-host-native.mjs; tests/ui/ce-host.spec.ts',
   level:
     'Real Windows UI/native IPC, Tool/Invader compilation and CE client/server lifetimes; player join, visual first-run and gameplay NOT ACCEPTED',
+};
+testBuildOverrides['TBR-ce-startup'] = {
+  ...testBuildOverrides['TBR-ce-startup'],
+  evidence:
+    'docs/CE_STARTUP_AND_FIRST_RUN.md; docs/fixtures/ce-startup-native.json; docs/fixtures/ce-startup-install-native.json; scripts/test-ce-host-native.mjs; scripts/test-custom-edition-native.mjs',
+  files:
+    'src-tauri/src/ce_gui_process.rs; src-tauri/src/ce_host_client.rs; src-tauri/src/ce_setup.rs; src/components/CustomEditionHost.tsx; src/components/CustomEditionSetup.tsx',
+  level:
+    'Real Windows subprocess startup contract, desktop/native compiler/client/server and HTTPS extraction checks; visual first-run, joined player and gameplay NOT ACCEPTED',
 };

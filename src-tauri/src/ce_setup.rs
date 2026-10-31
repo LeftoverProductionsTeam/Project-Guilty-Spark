@@ -20,6 +20,7 @@ pub(super) struct Installation {
     pub(super) root: PathBuf,
     executable_sha256: String,
     registered: bool,
+    startup_issues: Vec<String>,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -213,6 +214,7 @@ pub(super) fn selected_member(name: &str) -> bool {
         "binkw32.dll",
         "Keystone.dll",
         "ksimeui.dll",
+        "Eula.dll",
         "msvcr71.dll",
         "ogg.dll",
         "strings.dll",
@@ -224,6 +226,7 @@ pub(super) fn selected_member(name: &str) -> bool {
         "xiph_license.txt",
     ];
     root_files.contains(&local)
+        || ["controls/Controls.dll", "controls/loader.dll"].contains(&local)
         || (["maps/", "shaders/", "controls/", "content/"]
             .iter()
             .any(|prefix| local.starts_with(prefix))
@@ -283,10 +286,43 @@ pub(super) fn inspect_root(root: &Path) -> Reply<Installation> {
         return Err("Custom Edition shaders folder is missing".into());
     }
     Ok(Installation {
+        startup_issues: startup_issues(&root),
         root,
         executable_sha256,
         registered: false,
     })
+}
+fn startup_issues(root: &Path) -> Vec<String> {
+    let mut issues = Vec::new();
+    for name in [
+        "Eula.dll",
+        "Keystone.dll",
+        "ksimeui.dll",
+        "msvcr71.dll",
+        "controls/Controls.dll",
+        "controls/loader.dll",
+    ] {
+        if !dependency_install::pe_identity(&root.join(name))
+            .is_ok_and(|(_, _, architecture)| architecture == "x86")
+        {
+            issues.push(name.into());
+        }
+    }
+    let license = root.join("Eula.rtf");
+    if core::reject_links(&license).is_err()
+        || !fs::metadata(&license).is_ok_and(|m| m.is_file() && (1..=256 * 1024).contains(&m.len()))
+    {
+        issues.push("Eula.rtf".into());
+    }
+    issues
+}
+pub(super) fn require_startup(root: &Path) -> Reply<()> {
+    let issues = startup_issues(root);
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("Custom Edition startup files are missing or invalid: {}. Connect a complete installation or use Settings → Dependencies & setup → Install separate copy. Existing server/source files were not changed.", issues.join(", ")))
+    }
 }
 fn registration(root: &Path) -> runtime::RuntimeRegistration {
     runtime::RuntimeRegistration {
@@ -497,6 +533,7 @@ fn install(app: &tauri::AppHandle, job: &Job) -> Reply<PathBuf> {
         inventory.insert(name.clone(), maps::hash_file(&path).map_err(error)?);
     }
     let found = inspect_root(&stage.join("Halo Custom Edition"))?;
+    require_startup(&found.root)?;
     dependency_install::pe_identity(&found.root.join("haloceded.exe"))?;
     let receipt = serde_json::json!({"schemaVersion":1,"sourceUrl":SOURCE,"archiveSha256":ARCHIVE_SHA256,"archiveBytes":bytes,
         "publisherAuthenticated":false,"extractorSha256":tool_hash,"files":inventory,"gameplayVerified":false,"createdAt":chrono::Utc::now().to_rfc3339()});
@@ -651,6 +688,9 @@ mod tests {
             "maps/bloodgulch.map",
             "shaders/pshader.bin",
             "msvcr71.dll",
+            "Eula.dll",
+            "controls/Controls.dll",
+            "controls/loader.dll",
         ] {
             assert!(selected_member(&format!("{PREFIX}{name}")));
         }

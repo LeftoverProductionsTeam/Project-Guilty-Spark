@@ -1,5 +1,7 @@
 # Matching Custom Edition playtests
 
+The later [startup and first-run continuation](CE_STARTUP_AND_FIRST_RUN.md) adds the omitted startup files, an explicit normal-window request and menu-only setup guidance. The measurements below retain the original `d3b4d29` acceptance; joining and gameplay remain separate open gates.
+
 This continues committed `306c6e5`. A private CE server can now prepare and launch its matching local client from **Online → Host game**. Installed maps and validated project builds use the same workflow, including a project cache with the same filename as a stock map.
 
 ## Use it

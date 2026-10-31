@@ -1,5 +1,7 @@
 # Universal workbench continuation
 
+The [CE startup follow-through](CE_STARTUP_AND_FIRST_RUN.md) fixes omitted first-run files, adds explicit normal-window startup and a menu-only setup path, and names incomplete client dependencies without removing dedicated hosting. Native startup/process and extraction checks are accepted separately from the unresolved genuine join and visual walkthrough gates. Preserve the earlier zero-player trials and all direct compiled-map research.
+
 The [matching CE client continuation](CE_MATCHING_CLIENT_PLAYTEST.md) accepts checked preparation and owned process launch from the server's exact private game snapshot, with an isolated test profile, cancellation, integrity refusal and client/server cleanup. A real joined player, first-run visual acceptance and a Workshop collision walkthrough remain the next gates. Preserve the zero-player trial evidence; process launch is separate from a game connection.
 
 The [CE project-build hosting follow-through](CE_PROJECT_BUILD_HOSTING.md) accepts direct managed-output selection, saved-revision/output checks and a real same-filename Workshop compilation/host challenge. It replaces the prior “managed build selection” gap for this scoped CE path. Client joining and a real Workshop walkthrough are still open after the matching-client follow-through. Other runtime formats, direct compiled-map authoring and game-peer/AI delivery remain open.

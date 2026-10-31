@@ -7,6 +7,7 @@ interface Installation {
   root: string;
   executableSha256: string;
   registered: boolean;
+  startupIssues?: string[];
 }
 interface InstallJob {
   id: string;
@@ -140,6 +141,12 @@ export default function CustomEditionSetup({ onConnected }: { onConnected?: () =
           </button>
         )}
       </div>
+      {!!found?.startupIssues?.length && (
+        <p role="alert" className="ce-startup-issues">
+          Client startup files missing or invalid: {found.startupIssues.join(', ')}. Choose a complete game
+          folder or install a separate copy. Your existing installation stays intact.
+        </p>
+      )}
       {review && setup && (
         <div className="ce-install-review">
           <p>

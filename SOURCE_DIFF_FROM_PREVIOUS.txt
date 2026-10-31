@@ -1,25 +1,29 @@
-Project Guilty Spark matching CE playtest client — 2026-10-31
-Base committed foundation: 306c6e5
+Project Guilty Spark CE startup and first-run workflow — 2026-10-31
+Base committed foundation: d3b4d29
 
-Adds checked matching-client preparation/launch, separate test profiles, in-memory native copy identities, cancellation and scoped client/server cleanup. Retains existing native Tool/Invader builds, Baboon reconciliation, C35-C39 history and source safeguards. Original games and separate unfinished direct compiled-map research remain unchanged. Player joining, visual first-run acceptance and gameplay remain open. See docs/CE_MATCHING_CLIENT_PLAYTEST.md.
+Adds complete first-run file selection/preflight, an explicit normal GUI startup request with owned suspended-process binding, separate menu-only setup and prolonged-start guidance. Retains existing native Tool/Invader builds, Baboon reconciliation, C35-C39 history and source safeguards. Original games and separate unfinished direct compiled-map research remain unchanged. Player joining, visual first-run acceptance and gameplay remain open. See docs/CE_STARTUP_AND_FIRST_RUN.md.
 
 Changed or added source members:
 README.md
 SOURCE_DIFF_FROM_PREVIOUS.txt
 SOURCE_MANIFEST_SHA256.txt
 SOURCE_SHA256SUMS.txt
-docs/CE_CLIENT_GITHUB_DESCRIPTION.md
 docs/CE_MATCHING_CLIENT_PLAYTEST.md
-docs/CE_PROJECT_BUILD_HOSTING.md
+docs/CE_STARTUP_AND_FIRST_RUN.md
+docs/CE_STARTUP_GITHUB_DESCRIPTION.md
 docs/MASTER_FEATURE_LEDGER.csv
 docs/MASTER_FEATURE_LEDGER.md
 docs/UNIVERSAL_WORKBENCH_BACKLOG.md
-docs/fixtures/ce-matching-client-native.json
+docs/fixtures/ce-startup-install-native.json
+docs/fixtures/ce-startup-native.json
 scripts/test-build-evidence.mjs
 scripts/test-ce-host-native.mjs
-src-tauri/src/app.rs
+scripts/test-custom-edition-native.mjs
+src-tauri/src/ce_gui_process.rs
 src-tauri/src/ce_host_client.rs
 src-tauri/src/ce_host_native.rs
-src/components/CustomEditionHost.css
+src-tauri/src/ce_setup.rs
 src/components/CustomEditionHost.tsx
+src/components/CustomEditionSetup.tsx
 tests/ui/ce-host.spec.ts
+tests/ui/custom-edition.spec.ts

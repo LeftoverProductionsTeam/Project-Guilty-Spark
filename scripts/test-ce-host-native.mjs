@@ -357,6 +357,30 @@ try {
   step(
     'concurrent preparation refuses and cancellation leaves the server running without launching a client',
   );
+  if (clientSeconds) {
+    const setup = await call('ce_host_client_action', { sessionId: initial.id, action: 'setup' });
+    expect(setup.client.mode).toBe('setup');
+    expect(setup.client.phase).toBe('open');
+    expect(alive(setup.client.processId)).toBe(true);
+    expect(await hash(path.join(setup.client.gameDirectory, 'Eula.dll'))).toBe(before['Eula.dll']);
+    expect(await hash(path.join(setup.client.gameDirectory, 'Eula.rtf'))).toBe(before['Eula.rtf']);
+    const setupSeconds = Math.max(60, clientSeconds);
+    console.log(JSON.stringify({ observingSetup: setup.client.processId, seconds: setupSeconds }));
+    await new Promise((resolve) => setTimeout(resolve, setupSeconds * 1000));
+    const observed = await call('ce_host_status');
+    expect(observed.client.mode).toBe('setup');
+    await call('ce_host_client_action', { sessionId: initial.id, action: 'stop' });
+    await expect.poll(() => alive(setup.client.processId)).toBe(false);
+    await prepareClient(page, initial);
+    step('actual CE menu-only setup has its first-run resources and uses the separate profile', {
+      mode: observed.client.mode,
+      elapsedMs: observed.client.elapsedMs,
+      lastPhase: observed.client.phase,
+      firstRunFiles: ['Eula.dll', 'Eula.rtf'],
+      clientJoinRequested: false,
+      visualAcceptance: false,
+    });
+  }
   await panel.getByText('Session details & output', { exact: true }).click();
   await page.screenshot({ path: path.join(output, 'native-host.png') });
   // Reload preserves native ownership even though the React workspace remounts.
@@ -466,6 +490,29 @@ try {
     await fs.writeFile(cache, bytes);
   }
   step('actual changed selected cache refuses a stale start');
+  const startupFile = path.join(runtime, 'Eula.dll'),
+    startupBytes = await fs.readFile(startupFile);
+  try {
+    const corrupt = Buffer.from(startupBytes);
+    corrupt[0] = 0;
+    await fs.writeFile(startupFile, corrupt);
+    const startup = await call('custom_edition_setup');
+    expect(startup.installation.startupIssues).toContain('Eula.dll');
+    await call('ce_host_start', { request });
+    const unaffected = await waitNative(page);
+    const refused = await call('ce_host_client_action', { sessionId: unaffected.id, action: 'prepare' }).then(
+      () => '',
+      String,
+    );
+    expect(refused).toContain('Eula.dll');
+    expect(refused).toContain('Dependencies & setup');
+    expect((await call('ce_host_status')).client.processId).toBeNull();
+    expect((await waitNative(page)).status.map).toBe('bloodgulch');
+    await stop(page, unaffected.id);
+  } finally {
+    await fs.writeFile(startupFile, startupBytes);
+  }
+  step('invalid client startup files get named setup guidance while dedicated hosting stays usable');
   if (projectChallenge) {
     await call('save_settings', {
       settings: {
@@ -645,7 +692,7 @@ try {
           () => '',
           String,
         ),
-      ).toContain('current CE playtest');
+      ).toContain('current CE window');
       let maximumPlayersObserved = 0,
         replies = 0;
       const deadline = Date.now() + clientSeconds * 1000;

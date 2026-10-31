@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-31",
+  "sourceFoundation": "d3b4d29",
+  "complete": true,
+  "applicationSha256": "9bb761dd042c6817e02e0549b70422f8f84e0cd17e12671ebd1b94454fa008d0",
+  "mockedIpc": false,
+  "networkDownload": true,
+  "setupExecutablesRun": false,
+  "gameLaunched": false,
+  "archiveSha256": "33cf0e24551db62a08239d29077afbf9cdb2aec5c13234022c38ef144d486a3a",
+  "executableSha256": "7de68b02aa4d2ed521144db5f7d8ecdc2071dc7b2270f6a0c9b66a621c072a64",
+  "copiedFiles": 90,
+  "firstRunFilesVerified": [
+    "Eula.dll",
+    "Eula.rtf",
+    "controls/Controls.dll",
+    "controls/loader.dll"
+  ],
+  "installationDurationMs": 7740,
+  "nativeMap": {
+    "cacheVersion": 609,
+    "tags": 2455,
+    "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c"
+  },
+  "registrationSurvivesReload": true,
+  "originalFilesUnchanged": 127,
+  "startupIssues": [],
+  "publisherAuthenticated": false,
+  "limitation": "Game-data extraction/registration is separate from first-run completion, a licensed game session, client joining and gameplay."
+}
