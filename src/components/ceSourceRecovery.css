@@ -1,0 +1,36 @@
+.ce-source-recovery {
+  margin-block: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+}
+.ce-source-recovery summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.ce-source-recovery p {
+  margin: 0.45rem 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.ce-source-recovery ul {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0.6rem 0;
+  padding: 0;
+}
+.ce-source-recovery li {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+.ce-source-recovery strong {
+  overflow-wrap: anywhere;
+}
+.ce-source-recovery small {
+  display: block;
+  margin-top: 0.4rem;
+  line-height: 1.4;
+}

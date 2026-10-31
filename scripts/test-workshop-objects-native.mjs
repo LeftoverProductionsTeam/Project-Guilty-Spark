@@ -195,6 +195,64 @@ try {
     .toBeLessThan(0.01);
   receipt.endToWorkshopFloorWithUndoRedo = true;
   await save();
+  const second = await call('import_asset', { id: created.project.id, path: obj });
+  await open();
+  await page.getByRole('button', { name: 'Objects & gameplay', exact: true }).click();
+  if (
+    !(await page.locator('.forge-tree-select').filter({ hasText: 'original_wedge.obj' }).last().isVisible())
+  )
+    await page.getByRole('button', { name: 'Toggle Build tools', exact: true }).click();
+  await page.locator('.forge-tree-select').filter({ hasText: 'original_wedge.obj' }).last().click();
+  await expect(page.getByRole('spinbutton', { name: 'Custom model position 0', exact: true })).toHaveValue(
+    '0',
+  );
+  for (const [axis, value] of [
+    [0, 4],
+    [1, 3],
+    [2, 4],
+  ]) {
+    const field = page.getByRole('spinbutton', { name: 'Custom model position ' + axis, exact: true });
+    await field.fill(String(value));
+    await field.press('Tab');
+  }
+  await save();
+  await expect.poll(async () => (await saved()).scene.at(-1).position).toEqual([4, 3, 4]);
+  const secondMaterials = page.locator('.custom-native-materials');
+  if (!(await secondMaterials.getByRole('combobox').isVisible()))
+    await secondMaterials.locator('summary').click();
+  if (a.length === 5)
+    await page
+      .getByRole('combobox', { name: 'Native shader for example_tutorial_metal_floor', exact: true })
+      .selectOption('surface');
+  await page.getByRole('button', { name: 'Remove custom model', exact: true }).focus();
+  await page.keyboard.press('End');
+  const z = page.getByRole('spinbutton', { name: 'Custom model position 2', exact: true });
+  await expect.poll(async () => Math.abs(Number(await z.inputValue()) - 1.0002)).toBeLessThan(0.00001);
+  await page.keyboard.press('Control+z');
+  await expect(z).toHaveValue('4');
+  await page.keyboard.press('Control+y');
+  await expect.poll(async () => Math.abs(Number(await z.inputValue()) - 1.0002)).toBeLessThan(0.00001);
+  receipt.exactSourceStackingWithUndoRedo = true;
+  await z.fill('4');
+  await z.press('Tab');
+  const lowerRaw = await fs.readFile(imported.asset.path);
+  try {
+    await fs.writeFile(imported.asset.path, 'isolated corrupt support OBJ');
+    await page.getByRole('button', { name: 'Remove custom model', exact: true }).focus();
+    await page.keyboard.press('End');
+    await expect(page.getByText(/Floor snap:.*changed|Floor snap:.*re.import/).last()).toBeVisible();
+    await expect(z).toHaveValue('4');
+    receipt.changedSupportRejectedAfterPreviousSuccess = true;
+  } finally {
+    await fs.writeFile(imported.asset.path, lowerRaw);
+  }
+  await page.getByRole('button', { name: 'Remove custom model', exact: true }).focus();
+  await page.keyboard.press('End');
+  await expect.poll(async () => Math.abs(Number(await z.inputValue()) - 1.0002)).toBeLessThan(0.00001);
+  await save();
+  receipt.stackedPlacements = (await saved()).scene.map((o) => o.position);
+  receipt.stackingSourceHashes = [imported.asset.sha256, second.asset.sha256];
+
   await page.getByRole('button', { name: 'BSP Workshop', exact: true }).click();
   await expect(page.getByLabel('Native BSP Workshop')).toBeVisible();
   await page.getByRole('button', { name: 'Objects & gameplay', exact: true }).click();
@@ -204,6 +262,36 @@ try {
   expect(after.quickForge.spawns).toEqual(source.spawns);
   expect(after.scene[0].position.slice(0, 2)).toEqual([4, 3]);
   receipt.geometryAndObjectsShareProject = true;
+  const xField = page.getByRole('spinbutton', { name: 'Custom model position 0', exact: true });
+  await xField.fill('4.25');
+  await xField.press('Tab');
+  const navigate = async (name) => {
+    const drawer = page.locator('.gs-navigation-drawer');
+    if (!(await drawer.isVisible()))
+      await page.getByRole('button', { name: 'Toggle workspace navigation', exact: true }).click();
+    await drawer.getByRole('button', { name, exact: true }).click();
+  };
+  await navigate('Map library');
+  await navigate('Features & workflows');
+  const back = page.getByRole('button', { name: 'Back to previous workspace', exact: true }),
+    forward = page.getByRole('button', { name: 'Forward to next workspace', exact: true });
+  await back.click();
+  await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.', exact: true })).toBeVisible();
+  await back.click();
+  await expect(xField).toHaveValue('4.25');
+  await forward.click();
+  await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.', exact: true })).toBeVisible();
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(xField).toHaveValue('4.25');
+  await page.keyboard.press('Control+z');
+  await expect(xField).toHaveValue('4');
+  await page.keyboard.press('Control+y');
+  await expect(xField).toHaveValue('4.25');
+  await page.keyboard.press('Control+z');
+  await expect(xField).toHaveValue('4');
+  await save();
+  receipt.workflowBackForwardPreservesDraftSelectionAndIndependentUndo = true;
+
   await page.screenshot({ path: path.join(root, 'workshop-custom-controls.png') });
   await page.getByRole('button', { name: 'Close Custom model', exact: true }).click();
   await expect

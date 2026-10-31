@@ -29,7 +29,22 @@ fn output<R: Read + Send + 'static>(mut reader: R) -> std::thread::JoinHandle<(S
         (String::from_utf8_lossy(&data).replace("\r\n", "\n"), cut)
     })
 }
-pub(super) fn fields(executable: &Path, tags: &Path, relative: &str) -> Reply<(bool, String, bool)> {
+fn reader_root(tags: &Path, relative: &str) -> Reply<PathBuf> {
+    core::safe_relative(relative).map_err(error)?;
+    if relative.starts_with('-') {
+        return Err("Native tag path cannot begin with a tool option".into());
+    }
+    core::reject_links(tags).map_err(error)?;
+    // On Windows canonicalization retains the extended-length prefix. Passing
+    // an ordinary 260-character tag filename makes this pinned Invader fail.
+    fs::canonicalize(tags).map_err(error)
+}
+pub(super) fn fields(
+    executable: &Path,
+    tags: &Path,
+    relative: &str,
+) -> Reply<(bool, String, bool)> {
+    let tags = reader_root(tags, relative)?;
     let mut command = Command::new(executable);
     command.args([
         "-t",
@@ -84,6 +99,33 @@ pub(super) fn fields(executable: &Path, tags: &Path, relative: &str) -> Reply<(b
         },
         out_cut || err_cut,
     ))
+}
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+    #[test]
+    fn reader_rejects_traversal_and_option_tags_before_process_launch() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(reader_root(dir.path(), "../outside.weapon").is_err());
+        assert!(reader_root(dir.path(), "-L").is_err());
+    }
+    #[test]
+    #[cfg(windows)]
+    fn reader_preserves_extended_length_native_tag_roots() {
+        let dir = tempfile::tempdir().unwrap();
+        let tags = dir
+            .path()
+            .join("deep source workspace".repeat(6))
+            .join("retained native revision".repeat(6))
+            .join("tags");
+        fs::create_dir_all(&tags).unwrap();
+        let relative = "owned.scenery";
+        fs::write(tags.join(relative), b"unchanged source").unwrap();
+        assert!(tags.join(relative).as_os_str().len() >= 260);
+        let root = reader_root(&tags, relative).unwrap();
+        assert!(root.to_string_lossy().starts_with("\\\\?\\"));
+        assert_eq!(fs::read(root.join(relative)).unwrap(), b"unchanged source");
+    }
 }
 pub(super) fn installed(state: &AppState, project: &Project) -> Reply<PathBuf> {
     let directory = project_tools(state, project)?

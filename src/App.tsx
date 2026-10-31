@@ -1,3 +1,5 @@
+import {useWorkflowHistory} from './useWorkflowHistory';
+import type {WorkflowRoute} from './workflowHistory';
 import {librarySoundEmitters} from './viewportAssets';
 import {projectMutationPending} from './projectMutation';
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from 'react';
@@ -7,6 +9,7 @@ import LiveStudioIndicator from './components/LiveStudioIndicator';
 import ForgeCollaboration from './components/ForgeCollaboration';
 import {
   ArrowLeft,
+  ArrowRight,
   ArrowLeftRight,
   ArrowUpRight,
   BookOpen,
@@ -157,13 +160,8 @@ export default function App() {
   useEffect(()=>{if(!sidebarOpen)return;const dismiss=(event:globalThis.PointerEvent)=>{if((event.target as HTMLElement).closest('#gs-workspace-navigation,.gs-navigation-toggle'))return;setSidebarOpen(false);};document.addEventListener('pointerdown',dismiss,true);return()=>document.removeEventListener('pointerdown',dismiss,true);},[sidebarOpen,setSidebarOpen]);
   useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape'&&sidebarOpen&&!document.querySelector('[role="dialog"]')){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(false);document.querySelector<HTMLButtonElement>('.gs-navigation-toggle')?.focus();}else if((event.ctrlKey||event.metaKey)&&event.code==='Backslash'&&!event.altKey&&!event.shiftKey){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(open=>!open);}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[sidebarOpen,setSidebarOpen]);
   const [settingsTab,setSettingsTabState]=useState<'tools'|'dependencies'>('tools');
-  type Route={workspace:Workspace;projectId:string|null;settingsTab:'tools'|'dependencies'};
-  const routeValue=useRef<Route>({workspace,projectId:activeMap?.id??null,settingsTab});routeValue.current={workspace,projectId:activeMap?.id??null,settingsTab};
-  const routeHistory=useRef<Route[]>([]),[backTarget,setBackTarget]=useState<Route|null>(null);
-  const recordRoute=useCallback(()=>{const route={...routeValue.current};routeHistory.current=[...routeHistory.current.slice(-31),route];setBackTarget(route);},[]);
-  const setWorkspace=useCallback((next:Workspace)=>{if(next===routeValue.current.workspace)return;recordRoute();window.dispatchEvent(new Event('gs:save-viewport-context'));routeValue.current={...routeValue.current,workspace:next};setWorkspaceState(next);},[recordRoute]);
-  const setSettingsTab=useCallback((next:'tools'|'dependencies')=>{if(next!==routeValue.current.settingsTab&&routeValue.current.workspace==='settings')recordRoute();routeValue.current={...routeValue.current,settingsTab:next};setSettingsTabState(next);},[recordRoute]);
-  function goBack(){let route=routeHistory.current.pop();while(route?.projectId&&mapWorkspaces.includes(route.workspace)&&!documentsRef.current.documents.some(d=>d.id===route!.projectId))route=routeHistory.current.pop();if(!route){setBackTarget(null);return;}window.dispatchEvent(new Event('gs:save-viewport-context'));if(route.projectId&&documentsRef.current.documents.some(d=>d.id===route!.projectId))dispatchDocument({type:'select',id:route.projectId});setSettingsTabState(route.settingsTab);setWorkspaceState(route.workspace);routeValue.current=route;setBackTarget(routeHistory.current.at(-1)??null);}
+  const setWorkspace=useCallback((next:Workspace)=>{if(next===workspaceRef.current)return;window.dispatchEvent(new Event('gs:save-viewport-context'));workspaceRef.current=next;setWorkspaceState(next);},[]);
+  const setSettingsTab=useCallback((next:'tools'|'dependencies')=>setSettingsTabState(next),[]);
   const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
   const bootRouteHandled=useRef(false);
   useEffect(()=>{if(!ready||bootRouteHandled.current)return;bootRouteHandled.current=true;if(data.settings.onboardingCompleted){markFirstVisitSeen();if(workspace==='get-started')setWorkspace('library');}},[ready,data.settings.onboardingCompleted]);
@@ -260,6 +258,17 @@ export default function App() {
   const historyRef = useRef(history);
   historyRef.current = history;
   const documentsRef=useRef(documents);documentsRef.current=documents;
+  const workflow=useWorkflowHistory({workspace,projectId:activeMap?.id??null,settingsTab},mapWorkspaces,route=>{
+    if(route.projectId&&documentsRef.current.documents.some(d=>d.id===route.projectId))dispatchDocument({type:'select',id:route.projectId});
+    setSettingsTabState(route.settingsTab);workspaceRef.current=route.workspace;setWorkspaceState(route.workspace);
+  },route=>!mapWorkspaces.includes(route.workspace)||(route.projectId?documentsRef.current.documents.some(d=>d.id===route.projectId):!documentsRef.current.activeId));
+  function routeTitle(route:WorkflowRoute|null,direction:'Back'|'Forward'){
+    if(!route)return direction==='Back'?'No previous workspace':'No next workspace';
+    const label=nav.find(item=>item.id===route.workspace)?.label??(route.workspace==='settings'?(route.settingsTab==='dependencies'?'Dependencies & setup':'Games & tools'):route.workspace);
+    const map=documents.documents.find(d=>d.id===route.projectId)?.history.current?.title;
+    return direction+' to '+label+(map?' · '+map:'')+' (Alt+'+(direction==='Back'?'Left':'Right')+')';
+  }
+
   const applyHistory=useCallback((type:'undo'|'redo')=>{
     const active=document.activeElement;
     const targetId=active instanceof HTMLElement?active.closest<HTMLElement>('[data-history-project]')?.dataset.historyProject??documentsRef.current.activeId:documentsRef.current.activeId;
@@ -1041,11 +1050,11 @@ export default function App() {
         </aside>
         <main className={`main-content workspace-${workspace}`}>
           <EditorAudioProvider project={current} inspection={inspection} active={!closing&&['world','quickforge','live','tags','assets','scenario','creator','firefight','build','preservation'].includes(workspace)} resourceScope={JSON.stringify(documents.documents.map(document=>[document.id,{map:document.history.current?.source?.resourceSha256,audio:document.history.current?.source?.audioResources?.sha256}]))}>
-          <WorkspacePanels onBack={goBack} backLabel={backTarget?nav.find(item=>item.id===backTarget.workspace)?.label??backTarget.workspace:undefined} onPopout={()=>void popoutWorkspace()} onNavigationToggle={toggleNavigation} navigationOpen={sidebarOpen} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace} actions={<>{current&&<EditorSoundControls projectId={current.id}/>}<IconButton label="Undo (Ctrl+Z)" onClick={()=>applyHistory('undo')} disabled={!history.past.length&&!sharedHistory[current?.id??'']?.undo}><Undo2 size={14}/></IconButton><IconButton label="Redo (Ctrl+Y / Ctrl+Shift+Z)" onClick={()=>applyHistory('redo')} disabled={!history.future.length&&!sharedHistory[current?.id??'']?.redo}><Redo2 size={14}/></IconButton></>}>
+          <WorkspacePanels onPopout={()=>void popoutWorkspace()} onNavigationToggle={toggleNavigation} navigationOpen={sidebarOpen} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace} actions={<>{current&&<EditorSoundControls projectId={current.id}/>}<div role="group" aria-label="Workflow navigation"><IconButton label="Back to previous workspace" title={routeTitle(workflow.back,'Back')} onClick={workflow.goBack} disabled={!workflow.back}><ArrowLeft size={14}/></IconButton><IconButton label="Forward to next workspace" title={routeTitle(workflow.forward,'Forward')} onClick={workflow.goForward} disabled={!workflow.forward}><ArrowRight size={14}/></IconButton></div></>}>
           {documents.documents.map(document=>{const project=document.history.current;return project?.quickForge?<ForgeCollaboration key={project.id} hidden={current?.id!==project.id} projectId={project.id} document={project.quickForge} entries={data.entries} onShared={next=>dispatch({type:'forge-remote',projectId:project.id,document:next})} onSave={()=>save(false,project.id)}/>:null;})}
-            {current&&<WorkspacePanel id="project-setup" label="Project setup"><MapTools key={current.id} project={current} settings={data.settings} edit={edit}/></WorkspacePanel>}
+            {current&&<WorkspacePanel id="project-setup" label="Project setup"><MapTools key={current.id} project={current} settings={data.settings} edit={edit} onSave={()=>save()}/></WorkspacePanel>}
           {['world','quickforge','live','machinima'].includes(workspace)&&<WorkspacePanel id="navigation" label="Camera"><NavigationSettings/></WorkspacePanel>}
-          <WorkspacePanel id="source-changes" label="Changes"><ExternalMapSync documents={documents.documents.flatMap(d=>d.history.current?[{project:d.history.current,inspection:d.inspection,dirty:d.history.dirty}]:[])} onRevision={adoptExternalRevision}/></WorkspacePanel>
+          <WorkspacePanel id="source-changes" label="Changes">{current&&<div className="gs-edit-history-controls" role="group" aria-label="Project edit history"><span>{current.title} · edit history</span><IconButton label="Undo (Ctrl+Z)" onClick={()=>applyHistory('undo')} disabled={!history.past.length&&!sharedHistory[current?.id??'']?.undo}><Undo2 size={14}/></IconButton><IconButton label="Redo (Ctrl+Y / Ctrl+Shift+Z)" onClick={()=>applyHistory('redo')} disabled={!history.future.length&&!sharedHistory[current?.id??'']?.redo}><Redo2 size={14}/></IconButton></div>}<ExternalMapSync documents={documents.documents.flatMap(d=>d.history.current?[{project:d.history.current,inspection:d.inspection,dirty:d.history.dirty}]:[])} onRevision={adoptExternalRevision}/></WorkspacePanel>
           {assetTransferOpen&&current&&<AssetTransfer key={current.id} data={data} documents={documents.documents} target={current} busy={busy} onTransfer={transferAsset} onClose={()=>setAssetTransferOpen(false)} onTags={()=>{setAssetTransferOpen(false);setWorkspace('tags');}}/>}
           {current && !['library','settings','community','get-started','world','quickforge','live'].includes(workspace) && (
             <div className="editor-bar">
@@ -1159,6 +1168,7 @@ export default function App() {
                   ['Find tools, BSP help or community maps', 'Ctrl + K'],
                   ['Workspace guidance', 'Help drawer'],
                   ['Workspace navigation', 'Ctrl + \\'],
+                  ['Back / Forward through your workflow', 'Alt + Left / Right or mouse side buttons'],
                   ['Window and project header', 'Ctrl + Shift + \\'],
                   ['Fullscreen / restore', 'F11 / Escape'],
                   ['Dismiss help tooltip', 'Esc while focused'],

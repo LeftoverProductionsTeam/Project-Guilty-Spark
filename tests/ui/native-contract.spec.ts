@@ -321,15 +321,52 @@ async function openFixture(page: Page) {
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
 
-test('one shared undo toolbar follows workspaces and Back restores the edited map',async({page})=>{
+
+test('one Back and Forward pair restores the workflow without undoing project edits',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('27');await field.press('Tab');
+  const back=page.getByRole('button',{name:'Back to previous workspace',exact:true}),forward=page.getByRole('button',{name:'Forward to next workspace',exact:true});
   for(const name of ['Compare variants','Firefight rules','Creator Studio','Build & playtest','Online','Settings & tools','Modding Academy','Tag editor']){
-    await chooseTool(page,name);await expect(page.getByRole('button',{name:'Undo (Ctrl+Z)',exact:true})).toHaveCount(1);await expect(page.getByRole('button',{name:'Redo (Ctrl+Y / Ctrl+Shift+Z)',exact:true})).toHaveCount(1);
+    await chooseTool(page,name);await expect(back).toHaveCount(1);await expect(forward).toHaveCount(1);
+    await expect(page.locator('.gs-workspace-tools').getByRole('button',{name:'Undo (Ctrl+Z)',exact:true})).toHaveCount(0);
   }
   await expect(field).toHaveValue('27');await chooseTool(page,'Map library');await chooseTool(page,'Features & workflows');
-  await page.getByRole('button',{name:'Back to previous workspace',exact:true}).click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Back to previous workspace',exact:true}).click();await expect(field).toHaveValue('27');await page.getByRole('button',{name:'Undo (Ctrl+Z)',exact:true}).click();await expect(field).toHaveValue('10');
+  await back.click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await back.click();await expect(field).toHaveValue('27');
+  await expect(forward).toHaveAttribute('title',/Map library/);
+  await forward.click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await forward.click();await expect(forward).toBeDisabled();
+  await page.keyboard.press('Alt+ArrowLeft');await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await page.keyboard.press('Alt+ArrowLeft');await expect(field).toHaveValue('27');
+  await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');await page.keyboard.press('Control+y');await expect(field).toHaveValue('27');
+  await page.getByRole('button',{name:'Toggle Changes',exact:true}).click();
+  const changes=page.getByRole('region',{name:'Changes panel',exact:true});await expect(changes.getByRole('group',{name:'Project edit history',exact:true})).toBeVisible();
+  await changes.getByRole('button',{name:'Undo (Ctrl+Z)',exact:true}).click();await expect(field).toHaveValue('10');await page.keyboard.press('Control+y');await expect(field).toHaveValue('27');
+  await page.getByRole('button',{name:'Close Changes',exact:true}).click();
+  await chooseTool(page,'Community Thanks');await expect(forward).toBeDisabled();
+});
+
+test('workflow navigation restores each map draft and skips a closed map',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('27');await field.press('Tab');
+  await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+  await chooseTool(page,'Tag editor');await expect(field).toHaveValue('25');await field.fill('39');await field.press('Tab');
+  await page.getByRole('tab',{name:/Synthetic baseline/}).click();await expect(field).toHaveValue('27');
+  const back=page.getByRole('button',{name:'Back to previous workspace',exact:true}),forward=page.getByRole('button',{name:'Forward to next workspace',exact:true});
+  await expect(back).toHaveAttribute('title',/Synthetic candidate/);await back.click();await expect(field).toHaveValue('39');
+  await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toHaveAttribute('aria-selected','true');
+  await forward.click();await expect(field).toHaveValue('27');
+  await page.getByRole('button',{name:'Save and close Synthetic candidate',exact:true}).click();await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toHaveCount(0);
+  await back.click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+});
+
+test('workflow navigation includes settings tabs and commits a typed field before keyboard Back',async({page})=>{
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Settings & tools');
+  const tools=page.getByRole('tab',{name:'Games & tools',exact:true}),deps=page.getByRole('tab',{name:'Dependencies & setup',exact:true});
+  await deps.click();await expect(deps).toHaveAttribute('aria-selected','true');await page.keyboard.press('Alt+ArrowLeft');await expect(tools).toHaveAttribute('aria-selected','true');
+  await page.keyboard.press('Alt+ArrowRight');await expect(deps).toHaveAttribute('aria-selected','true');
+  await chooseTool(page,'Tag editor');const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('28');
+  await page.keyboard.press('Alt+ArrowLeft');await expect(deps).toHaveAttribute('aria-selected','true');await page.keyboard.press('Alt+ArrowRight');await expect(field).toHaveValue('28');
 });
 
 test('C35 drawers remember each workspace and fullscreen preserves editing tools',async({page})=>{

@@ -7,12 +7,14 @@ export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?:
 }
 export function IconButton({
   label,
+  title,
   children,
   onClick,
   disabled = false,
   active = false,
 }: {
   label: string;
+  title?: string;
   children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
@@ -21,7 +23,7 @@ export function IconButton({
   return (
     <button
       className={`icon-button ${active ? 'active' : ''}`}
-      title={label}
+      title={title??label}
       aria-label={label}
       onClick={onClick}
       disabled={disabled}

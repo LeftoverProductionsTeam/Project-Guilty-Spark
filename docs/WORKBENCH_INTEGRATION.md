@@ -2,6 +2,8 @@
 
 This pass continues local master from the committed BSP Workshop and C39 foundation. It joins working systems; it does not replace the application or close unrelated runtime goals.
 
+The newer [CE recovery and workflow follow-through](CE_SOURCE_RECOVERY.md) now adds reviewed corrected-source CE compilation, source-model stacking and Back/Forward navigation. Its [native record](fixtures/ce-source-recovery-native.json) includes the deeper-directory C39 regression and current 549 Rust / 241 frontend / 90 browser / 59 offline results. Results below retain the earlier integration's exact measurements and negative evidence.
+
 ## What changed
 
 - Workshop geometry and **Objects & gameplay** now use the same evaluated level surface. Geometry examples retain authored starts, placements, objectives and game mode. Custom models appear in the hierarchy. Their drawer has compact XYZ controls and rotation in degrees.
@@ -45,7 +47,7 @@ Exact selected metadata and hashes: [native integration evidence](fixtures/workb
 
 The owner-selected Halo Custom Edition folder contains executable version **01.00.10.0621**, **20** native CE maps and **three** shared resource files. Core inspection classified the actual cache headers and repeated all hashes unchanged. It did not launch the game or infer that its editing kit was installed.
 
-The extracted stock Warthog gunner actor tag is identical across Blood Gulch, Sidewinder and Timberland and contains enum values rejected by Invader. On a separate copy, Invader's native invalid-enums repair resets three fields and updates its checksum. This changes semantic values; it is explicitly **not a lossless repair** or proof of the author's intended values. The original extracted tag/hash remains intact. Compilation then stops at the Scorpion headlight lens-flare/bitmap reference. Native invalid-indices repair changes no bytes and does not resolve that dependency. Both failed builds and all diagnostic sources remain retained; CE compilation/playability is not claimed.
+Earlier negative result, retained: the extracted stock Warthog gunner actor tag is identical across Blood Gulch, Sidewinder and Timberland and contains enum values rejected by Invader. On a separate copy, Invader's native invalid-enums repair resets three fields and updates its checksum. Compilation then stops at the Scorpion headlight lens-flare/bitmap reference; native invalid-indices repair changes no bytes and does not resolve that dependency. The newer [explicit recovery profile](CE_SOURCE_RECOVERY.md) also corrects the exact reviewed bitmap index and three invalid effect locations in a separate preserved copy. That copy now passes CE compilation. Its seven behaviour changes are **not lossless** or proof of original intent; playability remains unverified. The original failures and all diagnostic sources remain retained.
 
 For setup, use Online → Runtime adapters → Halo Custom Edition registration, choose the installed game folder, inspect and save. Configure the matching editing kit/tag source separately. The runtime and editable source tree are different dependencies.
 
@@ -55,7 +57,7 @@ The locked Windows workspace suite passed **543** tests with **seven** existing 
 
 The security review has five validated mechanisms corrected locally, including the real before/after session reproduction. Its broad source audit is still **partial: 82 fully reviewed files out of the initial 1380-file scope**. The existing managed scan/checkpoint retains the architecture, findings and remaining review; this is not repository-wide clearance or a completed penetration test. Measured security token usage is unavailable.
 
-Open gates include the deferred player walkthrough, retail runtime loads, CE editable-source recovery, original Zombie Apocalypse textures/decals, general animated/material/audio import, all supported native fields, direct compiled-map editing, live BSP replacement, arbitrary game object creation and game-peer replication. Local native OBJ compilation does not complete those workflows. See [the retained master backlog](UNIVERSAL_WORKBENCH_BACKLOG.md).
+Open gates include the deferred player walkthrough, retail runtime loads, general CE source recovery, original Zombie Apocalypse textures/decals, general animated/material/audio import, all supported native fields, direct compiled-map editing, live BSP replacement, arbitrary game object creation and game-peer replication. The bounded CE recovery and local native OBJ compilation do not complete those general workflows. See [the retained master backlog](UNIVERSAL_WORKBENCH_BACKLOG.md).
 
 ## Repeat the added checks
 

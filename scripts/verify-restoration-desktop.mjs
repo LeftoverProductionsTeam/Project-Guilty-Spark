@@ -110,11 +110,11 @@ try {
   await position.fill(String(original + 0.25));
   await position.press('Tab');
   await near(position, original + 0.25);
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+  await page.keyboard.press('Control+z');
   await near(position, original);
   await page.getByRole('button', { name: 'Redo (Ctrl+Shift+Z)', exact: true }).click();
   await near(position, original + 0.25);
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+  await page.keyboard.press('Control+z');
   await near(position, original);
   await mkdir('docs/screenshots', { recursive: true });
   await page.screenshot({ path: 'docs/screenshots/world-editor.png' });
@@ -138,7 +138,7 @@ try {
   await ready.fill(String(originalReady + 0.05));
   await ready.press('Tab');
   await near(ready, originalReady + 0.05);
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+  await page.keyboard.press('Control+z');
   await near(ready, originalReady);
   const reference = page.locator('.property-value select').first();
   const originalReference = await reference.inputValue();
@@ -147,7 +147,7 @@ try {
   if (!alternate) throw new Error('No alternate projectile in the actual source');
   await reference.selectOption(alternate);
   await expect(reference).toHaveValue(alternate);
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+  await page.keyboard.press('Control+z');
   await expect(reference).toHaveValue(originalReference);
   await page.screenshot({ path: 'docs/screenshots/tag-editor.png' });
   await ready.fill(String(originalReady + 0.05));

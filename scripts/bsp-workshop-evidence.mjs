@@ -18,8 +18,8 @@ const rows = [
     'native-build',
     'Genuine Workshop H1A structure and cache build',
     'geometry',
-    'Real GUI and CLI builds pass H1A Tool; independent native readback finds three clusters and two portals. The GUI-built exact texture is rendered back in the editor.',
-    'CE cache compilation is blocked by the unchanged extracted warthog gunner actor-variant grenade enum. A valid CE source tagset/recovery and separate runtime acceptance remain required.',
+    'Real GUI and CLI builds pass H1A Tool; native readback finds three clusters and two portals. A separate explicit recovery of three exact extracted CE tags now permits the tested source layout to compile to a validated version-609 cache. End snapping stacks verified imported source models with history and changed-source refusal.',
+    'CE recovery changes seven fields and is not lossless. Original-input failures remain retained. General source recovery, CE game loading/traversal and broad rendering/audio parity are still unverified.',
   ],
   [
     'gameplay',
@@ -57,10 +57,10 @@ export const bspWorkshopOverrides = Object.fromEntries(
       operation: r.operation,
       gap: r.gap,
       next: r.gap,
-      target: 'Windows Spark; owned Halo 1 source; H1A Tool/MCC v13 build. CE cache/game acceptance blocked.',
+      target: 'Windows Spark; owned Halo 1 source; H1A Tool/MCC v13 and reviewed corrected-source CE v609 builds. Actual game acceptance remains open.',
       level: 'Real native editor/compiler acceptance; player/game-peer acceptance separate',
       evidence:
-        'docs/BSP_WORKSHOP.md; docs/fixtures/bsp-workshop-native.json; scripts/test-bsp-workshop-native.mjs',
+        'docs/BSP_WORKSHOP.md; docs/fixtures/bsp-workshop-native.json; docs/CE_SOURCE_RECOVERY.md; docs/fixtures/ce-source-recovery-native.json; scripts/test-bsp-workshop-native.mjs; scripts/test-ce-source-recovery-native.mjs',
       files:
         'crates/spark-core/src/bsp_workshop.rs; crates/spark-core/src/quickforge.rs; src/bspWorkshop.ts; src/components/BspWorkshop.tsx',
     },

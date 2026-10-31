@@ -151,5 +151,6 @@ pub fn safe_relative(value: &str) -> Result<std::path::PathBuf> {
     Ok(std::path::PathBuf::from(normalized))
 }
 
+pub mod ce_source_recovery;
 pub mod bsp_audio;
 pub mod custom_sounds;

@@ -4,7 +4,7 @@ use crate::{
     assets,
     build::Runner,
     invalid, maps,
-    project::{self, Project},
+    project::{self, Asset, Project},
     quickforge::{ForgePlacement, QuickForgeDocument},
     safe_relative, Result, SparkError,
 };
@@ -76,6 +76,142 @@ fn shaders(doc: &QuickForgeDocument, names: &[String]) -> Result<Vec<String>> {
         Ok(name.to_string())
     }).collect()
 }
+fn read_source(asset: &Asset) -> Result<assets::ObjImport> {
+    if asset.kind != "obj"
+        || !asset
+            .path
+            .extension()
+            .is_some_and(|x| x.eq_ignore_ascii_case("obj"))
+    {
+        return invalid("Native custom scenery accepts preserved OBJ source only");
+    }
+    crate::reject_links(&asset.path)?;
+    let meta = fs::metadata(&asset.path)?;
+    if !meta.is_file() || meta.len() > 64 * 1024 * 1024 {
+        return invalid("Imported OBJ exceeds 64 MiB");
+    }
+    // Read once with a hard limit. Hash and parse the exact same bytes.
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(
+        &mut std::io::Read::take(fs::File::open(&asset.path)?, 64 * 1024 * 1024 + 1),
+        &mut bytes,
+    )?;
+    if bytes.len() > 64 * 1024 * 1024 || format!("{:x}", Sha256::digest(&bytes)) != asset.sha256 {
+        return invalid(format!(
+            "Imported OBJ '{}' changed; restore or re-import it before building",
+            asset.name
+        ));
+    }
+    let imported = assets::parse_obj(
+        std::str::from_utf8(&bytes).map_err(|_| fail("OBJ source must be UTF-8"))?,
+    )?;
+
+    Ok(imported)
+}
+fn checked_shape(
+    imported: &assets::ObjImport,
+    scale: [f32; 3],
+    rotation: [f32; 3],
+    name: &str,
+) -> Result<(Vec<[f32; 3]>, Vec<[f32; 3]>)> {
+    if scale.iter().any(|v| !v.is_finite() || *v <= 0.) || rotation.iter().any(|v| !v.is_finite()) {
+        return invalid("Source collision transform must be finite with positive scale");
+    }
+    if imported.mesh.indices.len() / 3 > 4096 || imported.mesh.positions.len() / 3 > 65535 {
+        return invalid("Custom collision source exceeds 4096 triangles or 65535 vertices; simplify it before compiling");
+    }
+    let positions = imported
+        .mesh
+        .positions
+        .chunks_exact(3)
+        .map(|p| transform([p[0], p[1], p[2]], scale, rotation, false))
+        .collect::<Vec<_>>();
+    if positions
+        .iter()
+        .flatten()
+        .any(|v| !v.is_finite() || v.abs() > 64.)
+    {
+        return invalid("Transformed scenery extends beyond ±64 Halo units; reduce/recenter the model before collision generation");
+    }
+    let normals = imported
+        .mesh
+        .normals
+        .chunks_exact(3)
+        .map(|p| transform([p[0], p[1], p[2]], scale, rotation, true))
+        .collect::<Vec<_>>();
+    let audit = crate::quickforge::ForgeMesh {
+        positions: positions.iter().flatten().copied().collect(),
+        normals: normals.iter().flatten().copied().collect(),
+        uvs: imported.mesh.uvs.clone(),
+        indices: imported.mesh.indices.clone(),
+        parts: vec![],
+    };
+    if crate::quickforge::validate_mesh(&audit)
+        .iter()
+        .any(|i| i.severity == "error" && i.code != "INVALID_NORMAL")
+    {
+        return invalid(format!(
+            "{} needs closed, consistently wound collision geometry. Original OBJ remains intact",
+            name
+        ));
+    }
+
+    // Smooth authored normals may be perpendicular at hard corners; do
+    // not replace them with BSP flat normals. Closure/winding is checked
+    // by edges, and the signed source volume must face outward.
+    let volume = imported
+        .mesh
+        .indices
+        .chunks_exact(3)
+        .map(|t| {
+            let a = positions[t[0] as usize];
+            let b = positions[t[1] as usize];
+            let c = positions[t[2] as usize];
+            (a[0] as f64 * (b[1] as f64 * c[2] as f64 - b[2] as f64 * c[1] as f64)
+                + a[1] as f64 * (b[2] as f64 * c[0] as f64 - b[0] as f64 * c[2] as f64)
+                + a[2] as f64 * (b[0] as f64 * c[1] as f64 - b[1] as f64 * c[0] as f64))
+                / 6.
+        })
+        .sum::<f64>();
+    if volume <= 1e-6 {
+        return invalid("Custom collision needs positive outward volume; repair inverted faces in the original model editor");
+    }
+
+    Ok((positions, normals))
+}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceCollision {
+    pub positions: Vec<f32>,
+    pub indices: Vec<u32>,
+}
+/// Reads the pinned original source again for every snap. A cached visual mesh
+/// cannot establish current source integrity or supply invented box collision.
+pub fn source_collision(
+    project: &Project,
+    asset_id: &str,
+    source_sha256: &str,
+    scale: [f32; 3],
+    rotation: [f32; 3],
+) -> Result<SourceCollision> {
+    let mut matches = project.assets.iter().filter(|a| a.id == asset_id);
+    let asset = matches
+        .next()
+        .ok_or_else(|| fail("Source collision asset does not belong to this project"))?;
+    if matches.next().is_some() || asset.sha256 != source_sha256 {
+        return invalid("Source collision identity changed; reload the selected model");
+    }
+    let imported = read_source(asset)?;
+    let _ = checked_shape(&imported, scale, rotation, &asset.name)?;
+    if maps::hash_file(&asset.path)? != asset.sha256 {
+        return invalid("Imported OBJ changed while its source collision was checked");
+    }
+    Ok(SourceCollision {
+        positions: imported.mesh.positions,
+        indices: imported.mesh.indices,
+    })
+}
+
 pub fn plan(project: &Project) -> Result<Plan> {
     if project.scene.iter().any(|o| o.source_model.is_some()) {
         return invalid("Recovered compiled-map previews need extracted, compiled Halo model and scenario tags. Preserve the source and use a verified native tag placement");
@@ -109,34 +245,7 @@ pub fn plan(project: &Project) -> Result<Plan> {
             return invalid("Custom placement references a missing or ambiguous imported asset");
         }
         let asset = candidates[0];
-        if asset.kind != "obj"
-            || !asset
-                .path
-                .extension()
-                .is_some_and(|x| x.eq_ignore_ascii_case("obj"))
-        {
-            return invalid("Native custom scenery accepts preserved OBJ source only");
-        }
-        crate::reject_links(&asset.path)?;
-        if fs::metadata(&asset.path)?.len() > 64 * 1024 * 1024 {
-            return invalid("Imported OBJ exceeds 64 MiB");
-        }
-        // Read once with a hard limit. Hash and parse the exact same bytes.
-        let mut bytes = Vec::new();
-        std::io::Read::read_to_end(
-            &mut std::io::Read::take(fs::File::open(&asset.path)?, 64 * 1024 * 1024 + 1),
-            &mut bytes,
-        )?;
-        if bytes.len() > 64 * 1024 * 1024 || format!("{:x}", Sha256::digest(&bytes)) != asset.sha256
-        {
-            return invalid(format!(
-                "Imported OBJ '{}' changed; restore or re-import it before building",
-                asset.name
-            ));
-        }
-        let imported = assets::parse_obj(
-            std::str::from_utf8(&bytes).map_err(|_| fail("OBJ source must be UTF-8"))?,
-        )?;
+        let imported = read_source(asset)?;
         if !imported.complete_uvs {
             return invalid(format!(
                 "{} needs complete UV coordinates before native scenery compilation",
@@ -173,59 +282,8 @@ pub fn plan(project: &Project) -> Result<Plan> {
                 "scenery/spark_{}/{name}/{name}",
                 &project.id.replace('-', "")[..12]
             );
-            let positions = imported
-                .mesh
-                .positions
-                .chunks_exact(3)
-                .map(|p| transform([p[0], p[1], p[2]], object.scale, object.rotation, false))
-                .collect::<Vec<_>>();
-            if positions
-                .iter()
-                .flatten()
-                .any(|v| !v.is_finite() || v.abs() > 64.)
-            {
-                return invalid("Transformed scenery extends beyond ±64 Halo units; reduce/recenter the model before collision generation");
-            }
-            let normals = imported
-                .mesh
-                .normals
-                .chunks_exact(3)
-                .map(|p| transform([p[0], p[1], p[2]], object.scale, object.rotation, true))
-                .collect::<Vec<_>>();
-            let audit = crate::quickforge::ForgeMesh {
-                positions: positions.iter().flatten().copied().collect(),
-                normals: normals.iter().flatten().copied().collect(),
-                uvs: imported.mesh.uvs.clone(),
-                indices: imported.mesh.indices.clone(),
-                parts: vec![],
-            };
-            if crate::quickforge::validate_mesh(&audit)
-                .iter()
-                .any(|i| i.severity == "error" && i.code != "INVALID_NORMAL")
-            {
-                return invalid(format!("{} needs closed, consistently wound collision geometry. Original OBJ remains intact",asset.name));
-            }
-
-            // Smooth authored normals may be perpendicular at hard corners; do
-            // not replace them with BSP flat normals. Closure/winding is checked
-            // by edges, and the signed source volume must face outward.
-            let volume = imported
-                .mesh
-                .indices
-                .chunks_exact(3)
-                .map(|t| {
-                    let a = positions[t[0] as usize];
-                    let b = positions[t[1] as usize];
-                    let c = positions[t[2] as usize];
-                    (a[0] as f64 * (b[1] as f64 * c[2] as f64 - b[2] as f64 * c[1] as f64)
-                        + a[1] as f64 * (b[2] as f64 * c[0] as f64 - b[0] as f64 * c[2] as f64)
-                        + a[2] as f64 * (b[0] as f64 * c[1] as f64 - b[1] as f64 * c[0] as f64))
-                        / 6.
-                })
-                .sum::<f64>();
-            if volume <= 1e-6 {
-                return invalid("Custom collision needs positive outward volume; repair inverted faces in the original model editor");
-            }
+            let (positions, normals) =
+                checked_shape(&imported, object.scale, object.rotation, &asset.name)?;
             let mut jms = String::from("8200\n0\n1\nframe\n-1\n-1\n0\t0\t0\t1\n0\t0\t0\n");
             writeln!(jms, "{}", bindings.len()).unwrap();
             for shader in &bindings {

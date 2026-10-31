@@ -121,3 +121,48 @@ fn native_transform_matches_z_up_yaw_and_incomplete_uvs_are_refused() {
         .to_string()
         .contains("UV"));
 }
+
+#[test]
+fn snapping_uses_pinned_closed_source_and_rechecks_after_every_external_save() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut p = source(dir.path());
+    let asset = p.assets[0].clone();
+    let original = std::fs::read(&asset.path).unwrap();
+    let raw = assets::parse_obj(std::str::from_utf8(&original).unwrap()).unwrap();
+    let collider =
+        model_build::source_collision(&p, &asset.id, &asset.sha256, [1.; 3], [0.; 3]).unwrap();
+    assert_eq!(collider.positions, raw.mesh.positions);
+    assert_eq!(collider.indices, raw.mesh.indices);
+    assert!(
+        model_build::source_collision(&p, &asset.id, &"0".repeat(64), [1.; 3], [0.; 3]).is_err()
+    );
+    assert!(model_build::source_collision(&p, "foreign", &asset.sha256, [1.; 3], [0.; 3]).is_err());
+    for scale in [[0., 1., 1.], [f32::NAN, 1., 1.], [1000.; 3]] {
+        assert!(
+            model_build::source_collision(&p, &asset.id, &asset.sha256, scale, [0.; 3]).is_err()
+        );
+    }
+    std::fs::write(&asset.path, b"external corrupt save").unwrap();
+    assert!(
+        model_build::source_collision(&p, &asset.id, &asset.sha256, [1.; 3], [0.; 3])
+            .unwrap_err()
+            .to_string()
+            .contains("changed")
+    );
+    std::fs::write(&asset.path, &original).unwrap();
+    assert!(model_build::source_collision(&p, &asset.id, &asset.sha256, [1.; 3], [0.; 3]).is_ok());
+    let open = String::from_utf8(original)
+        .unwrap()
+        .lines()
+        .filter(|s| *s != "f 1/1 4/4 3/3")
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(&asset.path, open).unwrap();
+    p.assets[0].sha256 = maps::hash_file(&asset.path).unwrap();
+    assert!(
+        model_build::source_collision(&p, &asset.id, &p.assets[0].sha256, [1.; 3], [0.; 3])
+            .unwrap_err()
+            .to_string()
+            .contains("closed")
+    );
+}

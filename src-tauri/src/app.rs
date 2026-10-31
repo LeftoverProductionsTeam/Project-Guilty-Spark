@@ -37,6 +37,7 @@ use tauri::{Emitter, Manager, State};
 #[path="director_recording.rs"]mod director_recording;
 #[path="working_tag_changes_native.rs"]mod working_tag_changes_native;
 #[path="conversion_resources_native.rs"]mod conversion_resources_native;
+#[path="ce_source_recovery_native.rs"]mod ce_source_recovery_native;
 #[path="portability_native.rs"]mod portability_native;
 #[path="dependency_install.rs"] mod dependency_install;
 #[path="baboon_native.rs"] mod baboon_native;
@@ -130,6 +131,7 @@ struct AppState {
     recordings:Mutex<director_recording::RecordingState>,
     working_tag_changes:Mutex<working_tag_changes_native::WorkingTagChangesState>,
     conversion_repairs:Mutex<conversion_resources_native::RepairState>,
+    ce_recovery:Mutex<ce_source_recovery_native::RecoveryState>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1511,6 +1513,16 @@ fn asset_mesh(state: State<AppState>, id: String, asset_id: String) -> Reply<Mes
     serde_json::from_slice(&bytes).map_err(error)
 }
 #[tauri::command]
+async fn preview_imported_collision(app:tauri::AppHandle,project_id:String,asset_id:String,source_sha256:String,scale:[f32;3],rotation:[f32;3])->Reply<core::model_build::SourceCollision>{
+    uuid::Uuid::parse_str(&asset_id).map_err(error)?;
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        let (project,expected)={let lib=lock(&state.library)?;(lib.get(&project_id).map_err(error)?,lib.project_dir(&project_id).map_err(error)?.join("assets").join(format!("{asset_id}.obj")))};
+        if !project.assets.iter().any(|a|a.id==asset_id&&a.path==expected){return Err("Reimport this model into this project's managed assets before checking its source collision".into());}
+        core::model_build::source_collision(&project,&asset_id,&source_sha256,scale,rotation).map_err(error)
+    }).await.map_err(error)?
+}
+#[tauri::command]
 fn inspect_template(state: State<AppState>, id: String) -> Reply<mcc::TemplateReport> {
     let p = lock(&state.library)?.get(&id).map_err(error)?;
     let (scenario,scenario_type) = if p.quick_forge.is_some() {(p.scenario_path().map_err(error)?,1)} else {let i=inspect(&state,&p)?;(i.scenario_path.clone(),i.header.scenario_type)};
@@ -2595,6 +2607,7 @@ pub fn run() {
                 recordings:Mutex::new(Default::default()),
             working_tag_changes:Mutex::new(Default::default()),
             conversion_repairs:Mutex::new(Default::default()),
+            ce_recovery:Mutex::new(Default::default()),
             });
             if let Err(e) = configure(app.handle(), &app.state::<AppState>(), settings) {
                 if let Ok(mut d) = app.state::<AppState>().diagnostics.lock() {
@@ -2612,7 +2625,7 @@ pub fn run() {
         .on_window_event(|window,event|{director_native::window_event(window.app_handle(),window,event);if matches!(event,tauri::WindowEvent::Destroyed){
             if let Some(state)=window.app_handle().try_state::<AppState>(){if let Ok(mut owners)=state.document_owners.lock(){owners.retain(|_,owner|owner!=window.label());}}
             let app=window.app_handle().clone();let label=window.label().to_owned();
-            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){shared_editing::release_window(&state,&label);external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);}});
+            tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){shared_editing::release_window(&state,&label);external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);ce_source_recovery_native::release_window(&state,&label);}});
         }})
         .invoke_handler(tauri::generate_handler![
             external_browser::open_external_url,
@@ -2633,6 +2646,10 @@ pub fn run() {
             working_tag_changes_native::working_tag_watch_start,
             working_tag_changes_native::working_tag_watch_poll,
             working_tag_changes_native::working_tag_watch_stop,
+            ce_source_recovery_native::prepare_ce_source_recovery,
+            ce_source_recovery_native::create_ce_source_recovery,
+            ce_source_recovery_native::ce_source_recovery_status,
+            ce_source_recovery_native::check_ce_source_recovery,
             conversion_resources_native::prepare_bitmap_tagset_repair,
             conversion_resources_native::create_bitmap_tagset_repair,
             conversion_resources_native::bitmap_tagset_repair_status,
@@ -2781,6 +2798,7 @@ pub fn run() {
             preview_animation_clip,
             copy_project_asset,
             asset_mesh,
+            preview_imported_collision,
             inspect_template,
             install_package,
             remove_package,
@@ -2877,6 +2895,7 @@ mod readiness_tests {
             recordings:Mutex::new(Default::default()),
             working_tag_changes:Mutex::new(Default::default()),
             conversion_repairs:Mutex::new(Default::default()),
+            ce_recovery:Mutex::new(Default::default()),
         };
         (temp, state, p, record)
     }

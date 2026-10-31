@@ -2,6 +2,9 @@
   margin: 6px 18px;
   padding: 9px 14px;
   flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .gs-map-tools > summary {
   cursor: pointer;
@@ -14,16 +17,30 @@
 }
 .gs-map-tools fieldset {
   display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 6px;
   margin: 12px 0;
+  min-width: 0;
 }
 .gs-map-tools fieldset > p,
-.gs-map-tools fieldset > small {
+.gs-map-tools fieldset > small,
+.gs-map-tools fieldset > details {
   grid-column: 1/-1;
 }
-.gs-map-tools input {
+.gs-map-tools input,
+.gs-map-tools select,
+.gs-map-tools label,
+.gs-map-tools .gs-build-targets {
+  min-width: 0;
   max-width: 100%;
+  box-sizing: border-box;
+}
+.gs-map-tools legend {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.gs-map-tools .gs-build-targets label:has(> input[type='checkbox']) {
+  display: block;
 }
 @media (max-width: 900px) {
   .gs-map-tools fieldset {

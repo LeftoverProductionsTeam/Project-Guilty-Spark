@@ -6,9 +6,11 @@ export default function MapTools({
   project,
   settings,
   edit,
+  onSave,
 }: {
   project: Project;
   settings: Settings;
+  onSave: () => Promise<void>;
   edit: (p: Project, description: string) => void;
 }) {
   const [open, setOpen] = useMapState(project.id, 'tools.open', false);
@@ -29,6 +31,7 @@ export default function MapTools({
       <BuildTargets
         project={project}
         defaults={settings}
+        onSave={onSave}
         onChange={(p) => edit(p, 'Configure tools and tags for this map')}
       />
       <p className="subtle">

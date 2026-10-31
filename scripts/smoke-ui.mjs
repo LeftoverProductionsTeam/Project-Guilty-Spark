@@ -19,11 +19,11 @@ const original = Number(await position.inputValue());
 await position.fill(String(original + 0.25));
 await position.press('Tab');
 await expect(position).toHaveValue(String(original + 0.25));
-await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+await page.keyboard.press('Control+z');
 await expect(position).toHaveValue(String(original));
 await page.getByRole('button', { name: 'Redo (Ctrl+Shift+Z)', exact: true }).click();
 await expect(position).toHaveValue(String(original + 0.25));
-await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+await page.keyboard.press('Control+z');
 await expect(position).toHaveValue(String(original));
 await page.screenshot({ path: 'docs/screenshots/world-editor.png' });
 await page.getByRole('button', { name: 'Tag editor', exact: true }).click();
@@ -34,7 +34,7 @@ if (await ready.count()) {
   await ready.fill(String(value + 0.05));
   await ready.press('Tab');
   await expect(ready).toHaveValue(String(value + 0.05));
-  await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+  await page.keyboard.press('Control+z');
   await expect(ready).toHaveValue(String(value));
 }
 const references = page.locator('.property-value select');
@@ -46,7 +46,7 @@ if (await references.count()) {
   if (alternate) {
     await reference.selectOption(alternate);
     await expect(reference).toHaveValue(alternate);
-    await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).click();
+    await page.keyboard.press('Control+z');
     await expect(reference).toHaveValue(original);
   }
 }

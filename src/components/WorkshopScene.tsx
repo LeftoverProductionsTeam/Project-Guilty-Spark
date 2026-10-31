@@ -133,7 +133,11 @@ export default function WorkshopScene({
 }) {
   const group = useRef<THREE.Group>(null),
     chosen = project.scene.find(
-      (object) => object.id === selected && object.assetId && meshes[object.assetId],
+      (object) =>
+        object.id === selected &&
+        object.assetId &&
+        meshes[object.assetId] &&
+        project.assets.some((a) => a.id === object.assetId),
     );
   const body = (object: SceneObject): DropBody => ({
     id: object.id,
@@ -146,6 +150,13 @@ export default function WorkshopScene({
       new THREE.Vector3(...object.scale),
     ),
     preview: meshes[object.assetId!],
+    imported: {
+      projectId: project.id,
+      assetId: object.assetId!,
+      sourceSha256: project.assets.find((a) => a.id === object.assetId)!.sha256,
+      scale: object.scale,
+      rotation: object.rotation,
+    },
   });
   const current =
     !!snapshot &&
@@ -155,7 +166,16 @@ export default function WorkshopScene({
     enabled: current && mode === 'translate',
     revision: JSON.stringify([project.quickForge, project.scene]),
     selected: chosen ? [body(chosen)] : [],
-    others: [],
+    others: project.scene
+      .filter(
+        (o) =>
+          o.id !== chosen?.id &&
+          o.visible &&
+          o.assetId &&
+          meshes[o.assetId] &&
+          project.assets.some((a) => a.id === o.assetId),
+      )
+      .map(body),
     terrain:
       current && snapshot
         ? {

@@ -8,7 +8,7 @@ The source/editor and MCC native compilation milestones are verified. **The requ
 | --- | --- |
 | A: editor/source | Implemented and native-UI tested within the documented convex-brush scope |
 | B: operations/validation | Initial room/corridor/solid, extrusion, axis clipping and per-face UV/material scope tested; advanced operations remain open |
-| C: native builds | MCC/H1A structure and cache verified; independent clusters/portals/texture readback passed; CE cache blocked |
+| C: native builds | MCC/H1A structure and cache verified; independent clusters/portals/texture readback passed; tested corrected-source CE v609 build now passes |
 | D: player validation | Launched in Standalone; walkthrough deferred by the user; no gameplay pass |
 | E: existing maps | Preserved as separate unfinished interoperability work |
 
@@ -53,7 +53,7 @@ Native admitted source is not converted by the Workshop controls. Workshop mutat
 - That GUI-built cache was imported as a separate source and its exact shader bitmap was decoded and rendered back in the Workshop. This proves the tested texture route, not full shader/lighting parity.
 - A separate CLI build of the same layout passed. Its JMS hash matches the GUI build. Independent Invader readback of **both** generated BSP tags reported **three clusters and two cluster portals**.
 - Standalone initially exposed the native filename-length assertion. The verified-playtest helper now keeps the existing temporary short content alias alive for the whole game process. Standalone remained responding and logged the scenario’s netgame validation. No rendered game frame or player movement was verified. The user deferred the player walkthrough; traversal/material acceptance remains unverified; retail MCC cache loading is also untested.
-- Custom Edition's separately extracted owned cache produced the structure but **failed** the final Invader cache build: `ActorVariant::grenade_type is out of range (28786 >= 4)` in `vehicles/warthog/warthog gunner.actor_variant`. The extracted input and staged tag have the same SHA-256. The Workshop did not change that dependency. No guessed value, removed dependency or disabled compiler check was used to turn the failure into a pass. A valid CE source tagset/reviewed recovery is still needed.
+- Original-input CE negative result, retained: the separately extracted owned cache produced the structure but **failed** the final Invader cache build: `ActorVariant::grenade_type is out of range (28786 >= 4)` in `vehicles/warthog/warthog gunner.actor_variant`. The extracted input and staged tag have the same SHA-256. The Workshop did not change that dependency. Subsequent lens-flare/effect failures are also retained. The new [explicit corrected-source recovery](CE_SOURCE_RECOVERY.md) preserves these originals and changes seven fields in a separate copy; that copy passes the CE build. It is not lossless and does not change this historical failed result.
 
 Regression results: **531 Rust tests passed, seven existing opt-in tests ignored; 234 frontend tests passed in 49 files; 59 offline scripts passed; TypeScript and the Windows release build passed.** All 88 browser interaction/IPC-contract regressions also passed. Native tests remain distinct from browser IPC-contract tests and historical C39 three-process acceptance.
 
@@ -68,7 +68,7 @@ All **146** inventoried files in the separate unfinished root checkout were reha
 - Workshop shared editing admission, dedicated crash/power-loss testing, complete render/audio parity, live BSP replacement and game-peer replication.
 - **Direct compiled-map editing remains a separate open workflow. Native loose-tag and Workshop builds do not complete it.**
 
-The [integration follow-through](WORKBENCH_INTEGRATION.md) adds shared object/geometry views, native OBJ scenery, floor/history/recovery tests, new CE failure evidence and the current regression counts. Earlier results above remain historical evidence.
+The [integration follow-through](WORKBENCH_INTEGRATION.md) adds shared object/geometry views, native OBJ scenery and floor/history/recovery tests. [Reviewed CE source recovery](CE_SOURCE_RECOVERY.md) adds a bounded corrected-source CE build and imported-object stacking. Earlier results above remain historical evidence; exact new regressions are recorded with the newer fixture.
 
 ## Repeat the native checks
 

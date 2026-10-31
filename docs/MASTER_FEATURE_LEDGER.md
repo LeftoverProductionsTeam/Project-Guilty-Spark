@@ -1,6 +1,6 @@
 # Living feature ledger — Native BSP Workshop
 
-The [connected source integration](WORKBENCH_INTEGRATION.md) records the new native static OBJ/object authoring acceptance and current regressions. Existing ledger IDs and historical requirements remain preserved; animated assets, direct compiled-map editing, arbitrary collaborative imports and runtime/game-peer goals keep their independent open gates.
+The [connected source integration](WORKBENCH_INTEGRATION.md) retains native static OBJ/object authoring and C39 three-process evidence. The [reviewed CE recovery and workflow follow-through](CE_SOURCE_RECOVERY.md) adds explicit corrected-source CE compilation, object stacking and Back/Forward navigation. Existing ledger IDs and historical requirements remain preserved; animated assets, direct compiled-map editing, arbitrary collaborative imports and runtime/game-peer goals keep independent open gates.
 
 [Complete cumulative ledger](MASTER_FEATURE_LEDGER.csv) retains all 92 original reconstructed requirements, 86 historical crosswalk rows, 16 C32 directive families, 23 C33 families and 6 workspace families. It adds 38 distinct later founder requests and 33 all-runtime directive entries and 9 newer runtime, lobby and setup requirements, plus 16 C35 workspace/director/catalog requirements and 17 C36 native preservation/interoperability requirements, for 371 evidence records. Source IDs are retained independently; overlapping rows are not unique-feature counts or completion totals.
 

@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "scope": "Reviewed CE source recovery, imported-model support and workflow navigation",
+  "nativeDesktop": {
+    "appSha256": "bb13c42f2e3de9bef0392fc99526cb438b7febc20f04f10e9e2d5711c84077de",
+    "mockedIpc": false,
+    "actualNativeGeometry": true,
+    "tests": [
+      "scripts/test-ce-source-recovery-native.mjs",
+      "scripts/test-workshop-objects-native.mjs"
+    ]
+  },
+  "ce": {
+    "sourceFiles": 2455,
+    "changedTags": [
+      {
+        "tag": "vehicles/warthog/warthog gunner.actor_variant",
+        "beforeSha256": "96fead28ec58a2ad7cf7a71c363bce5a311cd037c106bb3caf6fa574cf0ed635",
+        "afterSha256": "11d62f35c32952b44acd7d68602d493f909447aedf25b95099b4109f14ae7a3e",
+        "fields": 3,
+        "explanation": "Reset undefined grenade_type, trajectory_type and grenade_stimulus to human_fragmentation, toss and never. This changes undefined behaviour; the original values cannot be recovered as meaningful settings."
+      },
+      {
+        "tag": "vehicles/scorpion/headlights scorpion.lens_flare",
+        "beforeSha256": "ea922b11a81401005b1d6a79f3f0515a015a217bb7dd552937f7edacc9106c4f",
+        "afterSha256": "8156c34ece61bdb064df2763901882fb17a6ccd0c14e4bbb71ba3ce25ed0eaba",
+        "fields": 1,
+        "explanation": "Change reflection bitmap index 2 to image 0 in the exact known one-image headlight bitmap."
+      },
+      {
+        "tag": "vehicles/scorpion/secondary fire bullet.effect",
+        "beforeSha256": "84d8518bf452c7e92f5ffff76c950b95705687a29ac6bca8a908e11810f2fc9a",
+        "afterSha256": "c1f91648209a895d2514a82a984379a3380d2058886b1cfbeac5b1eacb11a447",
+        "fields": 3,
+        "explanation": "Clear three references to missing effect location 1 to the native null sentinel (65535). Those undefined attachment references are removed."
+      }
+    ],
+    "lossless": false,
+    "confirmedOnly": true,
+    "unknownTargetRefused": true,
+    "staleSourceReviewRefused": true,
+    "modifiedCandidateRefused": true,
+    "workspaceRemountPreservesResult": true,
+    "priorReadyResultRetained": true,
+    "drawerWidth": {
+      "scroll": 352,
+      "visible": 352
+    },
+    "originalSourceFiles": 2455,
+    "originalSourceMismatches": [],
+    "originalsPreserved": true,
+    "nativeToolSha256": [
+      "094c844b9bdc494341d0fd08c07bd0d23344ea224c71205ce9846e46452205f3",
+      "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12"
+    ],
+    "compiled": {
+      "target": "gbx-custom",
+      "sha256": "ac41e2b1df1a9df087185471f479eec7d0dee80da7c79a00a0d2de626e200499",
+      "durationMs": 16636,
+      "version": 609,
+      "collisionTriangles": 58,
+      "playerStarts": 4,
+      "nativeToolHashes": {
+        "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+        "invaderBuild": "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a",
+        "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+        "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+      }
+    },
+    "gameplayVerified": false
+  },
+  "sourceSupport": {
+    "sameAppSha256": true,
+    "pinnedSourceSha256": "f8b400a173a1eb6275325ebcd7751efefaa79bc1c4acf909a8ed24a08d49d7e1",
+    "positions": [
+      [
+        4,
+        3,
+        0.0001
+      ],
+      [
+        4,
+        3,
+        1.0002
+      ]
+    ],
+    "floorAndStackUndoRedo": true,
+    "changedSupportRefused": true,
+    "nativeModelReadback": [
+      {
+        "bounds": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            1,
+            1
+          ]
+        ],
+        "collisionTriangles": 8,
+        "jmsSha256": "b3af782cda0dee6d1053efeef544698f37d3bc68b3d45cafdfa20d87e4a6720f",
+        "renderTriangles": 8,
+        "sourceSha256": "f8b400a173a1eb6275325ebcd7751efefaa79bc1c4acf909a8ed24a08d49d7e1"
+      }
+    ],
+    "buildDurationMs": 18123,
+    "cacheSha256": "96b60f47fe190e06b44f32ae61888bd85b2e74177a4509781a6a0871ce716fb1",
+    "reopenPreservesSource": true
+  },
+  "workflow": {
+    "nativeUnsavedDraftSelectionAndUndoRetained": true,
+    "browserCoverage": [
+      "all workspaces have one Back/Forward pair",
+      "per-map drafts and skipped closed maps",
+      "Settings sections and blur/commit before keyboard travel"
+    ],
+    "historyBound": 200,
+    "perWindow": true,
+    "closedMapsSkipped": true,
+    "crashRecoveryClaimed": false
+  },
+  "preservation": {
+    "researchFiles": 146,
+    "researchMismatches": []
+  },
+  "regressions": {
+    "rustPassed": 549,
+    "rustOptInIgnored": 7,
+    "frontendPassed": 241,
+    "frontendFiles": 50,
+    "browserPassed": 90,
+    "offlineScripts": 59,
+    "typeScript": true,
+    "windowsReleaseBuild": true
+  },
+  "pageErrors": [],
+  "limits": [
+    "Seven CE field changes are not lossless and do not recover original intent.",
+    "Unknown CE source hashes are refused; other dependencies still need separate review.",
+    "Editor support uses nine footprint samples, bounded closed source and upward-facing triangles.",
+    "Native build/readback does not prove actual game loading or player traversal.",
+    "General protected-map recovery, direct compiled-map editing and game-peer replication remain open."
+  ],
+  "longWindowsPaths": {
+    "ordinaryPathLength": 260,
+    "sameTagSha256": "14ce65a6f68da1d7570d0a4e315969fee685b9c2c691388777f514a8fdb296e6",
+    "originalUnchanged": true,
+    "pinnedReaderSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "ordinaryStatus": 1,
+    "extendedPathStatus": 0,
+    "readbackLines": 110,
+    "readerGuards": [
+      "safe relative tag path",
+      "option path refusal",
+      "root link refusal",
+      "canonical root with extended Windows prefix",
+      "existing source hashes, native structure, time and output checks"
+    ]
+  },
+  "sparkLink": {
+    "nativeProcesses": 3,
+    "separateDataRoots": 3,
+    "physicalMachines": 1,
+    "transport": "private TCP + TLS 1.3, invitation-pinned certificate",
+    "simultaneousNativeAuthors": {
+      "revision": 3,
+      "documentSha256": "06c81c3ca9edea5bc2a3b7c34322bbcf1238e38e96dff4064771dd7eeb284411",
+      "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+      "assetId": "4b9b0c07-ea5c-451d-bbaf-3f5a97d9dfab",
+      "assetBytes": 632,
+      "actualModelsInThreeViewports": true,
+      "simultaneousAuthorActions": true
+    },
+    "participantUndoAndReferencedAssetConflict": true,
+    "sameFieldConflictCorruptBytesAndDuplicateAck": true,
+    "permissionsCoverNativeImportEditAndBuild": true,
+    "sourceIntegrity": {
+      "truncatedAdmittedTagRejected": true,
+      "exactRecoveryBytesRetained": true,
+      "unsharedWorkingTagsBuildRefused": true
+    },
+    "workspaceChange": true,
+    "compilation": {
+      "jobId": "0a25e841-b8ee-49b0-a68e-e5e3d2da03ce",
+      "revision": 13,
+      "laterRevision": 14,
+      "nativeRadius": 0.2750000059604645,
+      "publishedAssetPath": "scenery\\sparklink\\4b9b0c07-ea5c-451d-bbaf-3f5a97d9dfab",
+      "compiledModelTriangles": 31,
+      "placement": [
+        3,
+        2,
+        0.1
+      ],
+      "outputSha256": "6f82a6ece4e0aae776ed69260b5b2c07c721af6a36fbe87b37f4518dd3856f60",
+      "durationMs": 46249.701700000005,
+      "gameplayTested": false
+    },
+    "recovery": {
+      "revision": 14,
+      "assetBytesIdentical": true,
+      "semanticFieldIntact": true,
+      "authorIdentitiesAndHistoryRetained": true,
+      "newInvitation": true,
+      "replayDeduplicated": true,
+      "durationMs": 11570.054299999989
+    },
+    "originalSources": {
+      "separateNativeTrees": 3,
+      "filesPerTree": 2240,
+      "templateUnchanged": true,
+      "importUnchanged": true
+    },
+    "sync": {
+      "samples": 7,
+      "valuesMs": [
+        9789.186799999996,
+        68.8637000000017,
+        899.4308999999921,
+        887.8015999999916,
+        902.8943999999901,
+        539.4214999999967,
+        384.2710000000079
+      ],
+      "physicalMachines": 1,
+      "includesNativeIpcAndReactConsumption": true
+    },
+    "acceptanceComplete": true,
+    "appSha256": "bb13c42f2e3de9bef0392fc99526cb438b7febc20f04f10e9e2d5711c84077de"
+  }
+}

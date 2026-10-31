@@ -2,11 +2,13 @@
 
 ## Connected source editing and native custom scenery
 
-Workshop geometry and object placement now share one level view. Closed OBJ models with UVs and assigned Halo materials compile into real static scenery and collision; floor snapping, history, corrupt-save refusal and recovery pass in the native app. The three-process C39 tag/publication/placement workflow still passes actual Halo compilation and host recovery. Custom Edition 1.10 is locally inventoried; its separate editable-source build remains blocked. [Exact results, performance and limitations](docs/WORKBENCH_INTEGRATION.md).
+Back/Forward now restores your map, workspace and Settings section; edit undo/redo remains on its keyboard shortcuts and in Changes. Workshop geometry and object placement share one level view. Closed OBJ models with UVs and assigned Halo materials compile into real static scenery and collision; End snaps them onto the floor or another verified imported model, with undo/redo and changed-source refusal. The three-process C39 tag/publication/placement workflow retains its native compilation and host-recovery evidence. [Exact results, performance and limitations](docs/WORKBENCH_INTEGRATION.md).
+
+Custom Edition now has an optional **reviewed stock-source recovery** in its build target setup. It preserves originals and creates a separate tagset with seven explicit behaviour changes. The corrected source compiles to a validated CE version-609 cache; this is not lossless recovery or an in-game acceptance claim. Unknown inputs are refused. [Workflow, exact scope and native evidence](docs/CE_SOURCE_RECOVERY.md).
 
 ## Native BSP Workshop
 
-Build joined rooms, corridors and ramps inside Level Editor with four linked views, editable brush topology, extrusion/clipping, per-face UVs/materials and grouped Undo. Real Windows UI acceptance builds the source through Halo Tool and renders the compiled material back in the editor; native readback verifies three clusters and two portals. Player traversal is still pending, and CE cache compilation remains blocked by a documented extracted-tag dependency. [Capabilities, workflow, exact evidence and remaining work](docs/BSP_WORKSHOP.md).
+Build joined rooms, corridors and ramps inside Level Editor with four linked views, editable brush topology, extrusion/clipping, per-face UVs/materials and grouped Undo. Real Windows UI acceptance builds the source through Halo Tool and renders the compiled material back in the editor; native readback verifies three clusters and two portals. The separate corrected-source CE build now passes. Player traversal and target-game loading remain pending. [Capabilities, workflow, exact evidence and remaining work](docs/BSP_WORKSHOP.md).
 
 Windows CI manifest registration now resolves the selected mod folder consistently when Windows supplies a short path such as `RUNNER~1`. The reported three failures were reproduced locally before the fix; the full locked Windows workspace suite then passed with the same short-path condition. [Fix and verification](docs/WINDOWS_MANIFEST_CI_FIX.md). Hosted CI results remain separate from this local verification record.
 
@@ -155,7 +157,7 @@ Read the [C32 engineering report](docs/CONTINUATION_32_ENGINEERING.md), [living 
 
 # Project Guilty Spark — 07 Halo Modding Brain — Continuation 31 (SOURCE ONLY)
 
-**Current release: Continuation 31 (2026-10-26).** Built on the exact SHA-256-pinned C30 source. Adds a collapsed-by-default, **evidence-aware Field Guide** in all 19 workspaces, descriptive help for available vs unproven operations, keyboard/touch/escape-aware tooltips, better Ctrl/Cmd+K intent search, and a source-to-engine lesson inspired by HMT/Eschaton/SwordEdit/Tool's iterative build process. Owner-owned Halo bitmaps, optional legacy companions and Community Maps archive discovery remain as before.
+**Earlier release: Continuation 31 (2026-10-26).** Built on the exact SHA-256-pinned C30 source. Adds a collapsed-by-default, **evidence-aware Field Guide** in all 19 workspaces, descriptive help for available vs unproven operations, keyboard/touch/escape-aware tooltips, better Ctrl/Cmd+K intent search, and a source-to-engine lesson inspired by HMT/Eschaton/SwordEdit/Tool's iterative build process. Owner-owned Halo bitmaps, optional legacy companions and Community Maps archive discovery remain as before.
 
 **No Halo map compiler, playable .map, compiled EXE, stock game assets, bundled third-party tool or automatic remote map download is provided in this source ZIP.** No native Windows/Rust build, actual Halo Tool compile or in-game gameplay was completed in this release. Always keep original game sources and past ZIP releases separate; build only in isolated, authorized workspaces.
 
@@ -203,7 +205,7 @@ The existing **Tag Lineage Inspector** is now integrated into Tags and a tag-ref
 
 # Project Guilty Spark - 07 Halo Modding Brain - Continuation 27 (SOURCE ONLY)
 
-**Current release: Continuation 27 (2026-10-26).** This full-source continuation of the verified C26 ZIP adds a **Legacy Workflow Lab** integrated into Modding Academy, connecting Eschaton, HMT, SparkEdit/SwordEdit, log mods, BSP/tunnel work, Halo UI art and Zombie Apocalypse to the workbench's real, read-only source evidence. Users can navigate to the correct editor, see source-hash and inspection checks, and export a private path-free workflow plan. Research and named credits have been updated with verified original-community sources.
+**Earlier release: Continuation 27 (2026-10-26).** This full-source continuation of the verified C26 ZIP adds a **Legacy Workflow Lab** integrated into Modding Academy, connecting Eschaton, HMT, SparkEdit/SwordEdit, log mods, BSP/tunnel work, Halo UI art and Zombie Apocalypse to the workbench's real, read-only source evidence. Users can navigate to the correct editor, see source-hash and inspection checks, and export a private path-free workflow plan. Research and named credits have been updated with verified original-community sources.
 
 **This ZIP contains no prebuilt Windows EXE, compiler-ready Halo game map, modified stock map, third-party binaries or Halo copyrighted art/audio.** The historical workflows do not promise collision repair, cross-engine compatibility or gameplay proof. Windows/Rust/HEK tests remain open. Extract into a NEW empty folder. Start with [original modding lore](docs/CONTINUATION_27_ORIGINAL_HALO_LORE.md), [C27 engineering](docs/CONTINUATION_27_ENGINEERING.md), [current requirement trace](docs/CONTINUATION_27_REQUIREMENT_TRACE.md), and [C27 test card](docs/CONTINUATION_27_TEST_CARD.md).
 

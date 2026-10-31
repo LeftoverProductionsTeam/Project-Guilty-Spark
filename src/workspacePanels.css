@@ -252,6 +252,23 @@
 .gs-panel-content .gs-map-tools {
   margin: 0;
 }
+.gs-layout-actions [aria-label='Workflow navigation'] {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.gs-edit-history-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.gs-edit-history-controls > span {
+  flex: 1;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .gs-panel-content .analysis-card {
   padding: 10px;
 }

@@ -18,6 +18,15 @@ export const toolFindings = [
       'Separate byte rewrites from actual structure failures. Keep original opaque bytes; parser acceptance does not prove every unexposed field or gameplay behavior.',
   },
   {
+    tool: 'Invader · extracted stock CE source',
+    version: '0.55.0.r4134.33518109 / exact reviewed tag hashes',
+    status: 'Known extracted-source limitation · explicit recovery available',
+    detail:
+      'The tested CE extraction yields a Warthog gunner variant with three undefined enum values. The Scorpion headlight and secondary-fire effect also contain out-of-range references rejected by the CE compiler. This does not identify corruption in the playable original cache or certify every extracted tag.',
+    action:
+      'Select a CE build target, then review Stock CE source recovery. It retains originals and creates a separate copy with seven explicit behaviour changes. Unknown inputs are refused. Compile and test the corrected copy before use.',
+  },
+  {
     tool: 'Sapien · Halo 1 CE / H1A editing kits',
     version: 'Edition-specific preservation warning; exact offending binary not isolated',
     status: 'Reported detail-object loss/vertical shift · not a confirmed writer defect',

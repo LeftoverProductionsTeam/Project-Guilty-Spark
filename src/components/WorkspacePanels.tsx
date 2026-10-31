@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal, ArrowLeft, SquareArrowOutUpRight } from 'lucide-react';
+import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal, SquareArrowOutUpRight } from 'lucide-react';
 import { useMapState } from '../mapSession';
 import { useWindowFullscreen } from '../useWindowFullscreen';
 import { WindowControls } from './WindowFrame';
@@ -32,7 +32,7 @@ export default function WorkspacePanels({
   actions,
   onNavigationToggle,
   navigationOpen,
-  onBack,backLabel,onPopout,
+  onPopout,
 }: {
   id: string;
   workspace: string;
@@ -40,7 +40,7 @@ export default function WorkspacePanels({
   actions?: ReactNode;
   onNavigationToggle: () => void;
   navigationOpen: boolean;
-  onBack?:()=>void;backLabel?:string;onPopout?:()=>void;
+  onPopout?:()=>void;
 }) {
   const [raw, setRaw] = useMapState<WorkspaceLayout>(id, `layout.${workspace}`, () => ({
     version: 1,
@@ -159,7 +159,6 @@ export default function WorkspacePanels({
           >
             <Menu size={16} />
           </button>
-          <button aria-label="Back to previous workspace" title={backLabel?`Back to ${backLabel}`:'No previous workspace'} onClick={onBack} disabled={!onBack||!backLabel}><ArrowLeft size={15}/></button>
           <button
             aria-label={fullscreen ? 'Exit fullscreen editing' : 'Fullscreen editing'}
             aria-pressed={fullscreen}
