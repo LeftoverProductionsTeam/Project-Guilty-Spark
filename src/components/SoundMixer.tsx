@@ -18,6 +18,7 @@ import type { SoundEmitter, SoundEvent, SoundScene } from '../spatialAudio';
 import { Notice, NumberField } from './ui';
 import { useMapState } from '../mapSession';
 import {useEditorAudio} from './EditorAudio';
+import {includePreparedSound, nativeSoundUnavailable, prepareNativeSound} from '../nativeSoundPlacement';
 import '../soundMixer.css';
 export default function SoundMixer({
   project,
@@ -37,6 +38,9 @@ export default function SoundMixer({
     scene = project.audioPreview ?? fallback,
     sceneRef = useRef(scene);
   sceneRef.current = scene;
+  const projectRef=useRef(project);projectRef.current=project;
+  const authoringLife=useRef({projectId:project.id,active:true});
+  useEffect(()=>{const life={projectId:project.id,active:true};authoringLife.current=life;return()=>{life.active=false;};},[project.id]);
   const [selected, select] = useMapState(project.id, 'sound-emitter-selection', ''),
     [event, setEvent] = useState<SoundEvent>('manual'),
     [active, setActive] = useState(false),
@@ -141,6 +145,19 @@ export default function SoundMixer({
       working.current = false;
       if (mounted.current) setBusy(false);
     }
+  }
+  async function includeNativeLoop(before:SoundEmitter) {
+    if(working.current)return;
+    const life=authoringLife.current;
+    working.current=true;setBusy(true);setError('');
+    try {
+      const prepared=await prepareNativeSound(projectRef.current,before,sourceProjectId);
+      // Resource/player resets may retire an audio decoder while this same
+      // document's source transaction completes. They do not cancel authoring.
+      if(!life.active||projectRef.current.id!==life.projectId)return;
+      edit(includePreparedSound(projectRef.current,before,prepared),'Include native looping sound');
+    }catch(error){if(life.active)setError(String(error));}
+    finally{working.current=false;if(life.active)setBusy(false);}
   }
   async function ensure() {
     if(shared){const value=await shared.ensure();mixer.current=value;setActive(true);return value;}
@@ -479,6 +496,13 @@ export default function SoundMixer({
       {emitter && (
         <div className="sound-emitter-fields">
           <p>{emitter.customSound?`Custom sound · ${emitter.name}`:emitter.sourceProjectId&&emitter.sourceProjectId!==sourceProjectId?`Linked map sound · ${emitter.name}`:inspection?.tags.find((t) => t.id === emitter.tagId)?.path ?? 'Source sound unavailable'}</p>
+          <label className="sound-toggle" title={nativeSoundUnavailable(project,emitter)??'Build an MCC map with the original complete loop at this position. Editor mixer controls remain rehearsal only.'}>
+            <input type="checkbox" aria-label="Include original loop in native map" checked={!!emitter.nativePlacement}
+              disabled={busy||(!emitter.nativePlacement&&(!native||!!nativeSoundUnavailable(project,emitter)))}
+              onChange={event=>{if(!event.target.checked){update({nativePlacement:false});return;}void includeNativeLoop(emitter);}} />
+            {busy?'Preparing sound…':'Include original loop in map'}
+          </label>
+          {emitter.nativePlacement&&<small className="muted">Native MCC sound scenery · whole original loop and Halo settings. Build &amp; playtest to hear it in game. Controls below affect editor rehearsal.</small>}
           <label>
             Event
             <select
@@ -617,7 +641,8 @@ export default function SoundMixer({
       </p>
       {error && <Notice tone="error">{error}</Notice>}
       <p className="subtle">
-        These settings save the editor’s sound mix, including source main-track phases and fades.
+        Included original loops build into MCC QuickForge maps. Mixer controls save the editor’s rehearsal,
+        including source main-track phases and fades.
         Native sound classes, script events, alternate/detail behavior and acoustic occlusion/reverb remain
         separate. Drawers and editing tools share playback; leaving the active map or choosing Stop releases
         this window’s voices.

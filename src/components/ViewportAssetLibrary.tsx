@@ -63,51 +63,53 @@ export default function ViewportAssetLibrary({
         Drag a preview onto the map. Native models extract and import their recursive tags before placement.
       </p>
       <AssetSourceBrowser onLoaded={(open) => setSource(open.project.id)} />
-      <label>
-        Source map
-        <select
-          aria-label="Asset library map"
-          value={source}
-          onChange={(event) => setSource(event.target.value)}
-        >
-          <option value="all">All loaded sources</option>
-          {sources.map(([id, title]) => (
-            <option key={id} value={id}>
-              {title}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Show
-        <select
-          aria-label="Asset library type"
-          value={kind}
-          onChange={(event) => setKind(event.target.value)}
-        >
-          <option value="all">Models and sounds</option>
-          <option value="models">Models</option>
-          <option value="sounds">Sounds</option>
-        </select>
-      </label>
-      <input
-        aria-label="Search loaded assets"
-        type="search"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="warthog, pistol, wind…"
-      />
-      <div className="button-row">
-        {importModel && (
-          <button disabled={busy} onClick={importModel}>
-            Import OBJ model
-          </button>
-        )}
-        {importSound && (
-          <button disabled={busy} onClick={importSound}>
-            Import WAV / OGG sound
-          </button>
-        )}
+      <div className="asset-library-filters">
+        <label>
+          Source map
+          <select
+            aria-label="Asset library map"
+            value={source}
+            onChange={(event) => setSource(event.target.value)}
+          >
+            <option value="all">All loaded sources</option>
+            {sources.map(([id, title]) => (
+              <option key={id} value={id}>
+                {title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Show
+          <select
+            aria-label="Asset library type"
+            value={kind}
+            onChange={(event) => setKind(event.target.value)}
+          >
+            <option value="all">Models and sounds</option>
+            <option value="models">Models</option>
+            <option value="sounds">Sounds</option>
+          </select>
+        </label>
+        <input
+          aria-label="Search loaded assets"
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="warthog, pistol, wind…"
+        />
+        <div className="button-row">
+          {importModel && (
+            <button disabled={busy} onClick={importModel}>
+              Import OBJ model
+            </button>
+          )}
+          {importSound && (
+            <button disabled={busy} onClick={importSound}>
+              Import WAV / OGG sound
+            </button>
+          )}
+        </div>
       </div>
       <div className="viewport-asset-list">
         {shown.slice(0, 150).map((item) => (

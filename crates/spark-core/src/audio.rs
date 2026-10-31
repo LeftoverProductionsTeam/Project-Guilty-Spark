@@ -50,6 +50,7 @@ struct SoundData {
     bytes: Vec<u8>,
     ranges: Vec<(usize, usize)>,
     external:std::collections::BTreeMap<usize,Vec<u8>>,
+    descriptors: Vec<usize>,
 }
 
 fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(&Path,&str)>,audio:Option<&crate::mcc_audio::Binding>) -> Result<SoundData> {
@@ -118,6 +119,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
             bytes,
             ranges: vec![],
             external:Default::default(),
+            descriptors: vec![],
         });
     }
     let at = pointer(r.u32(tag + 20)?, 164)?;
@@ -141,6 +143,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
         pointer(r.u32(at + 156)?, pitch_count * 72)?
     };
     let mut ranges = vec![];
+    let mut descriptors = vec![];
     let mut external=std::collections::BTreeMap::new();
     let mut resource=resources.map(|(p,h)|crate::resource_map::open_verified_sound(p,h)).transpose();
     let mut inspected_sample_bytes = 0usize;
@@ -233,6 +236,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
                 Err(e) => item.reason = Some(e.to_string()),
             }
             ranges.push((offset, length));
+            descriptors.push(perm + 64);
             report.permutations.push(item);
         }
     }
@@ -245,7 +249,82 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
         bytes,
         ranges,
         external,
+        descriptors,
     })
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all="camelCase")]
+pub(crate) struct ExtractionSamples {
+    pub source_sha256: String,
+    pub input_sha256: String,
+    pub sound_count: usize,
+    pub sample_count: usize,
+    pub encoded_bytes: usize,
+    pub sample_sha256: Vec<String>,
+    pub bank_sha256: std::collections::BTreeMap<String,String>,
+    pub notice: String,
+}
+/// Materialize exact bank samples in a *derived extraction input*, without changing
+/// native sound metadata or authoring a new loose-tag serialization format.
+/// Invader then performs its normal native .sound/.sound_looping extraction.
+pub(crate) fn mcc_extraction_input(source:&crate::project::Source, inspection:&maps::MapInspection, root:u32)
+    -> Result<Option<(Vec<u8>,ExtractionSamples)>> {
+    let root_tag=inspection.tags.iter().find(|t|t.id==root).ok_or_else(||SparkError::Invalid("Missing audio extraction root".into()))?;
+    if source.cache_version!=13 || !matches!(root_tag.class.as_str(),"lsnd"|"snd!") { return Ok(None); }
+    let Some(bank)=source.audio_resources.as_ref().filter(|b|b.kind=="mccClassicAdpcm") else {return Ok(None)};
+    bank.validate(13)?;
+    if std::fs::metadata(&source.preserved_path)?.len()>128*1024*1024 {return invalid("Native bank materialization currently supports source caches up to 128 MiB");}
+    let mut todo=vec![root];let mut seen=std::collections::BTreeSet::new();let mut sounds=vec![];
+    while let Some(id)=todo.pop() {
+        if !seen.insert(id){continue;}
+        if seen.len()>64{return invalid("A native sound extraction is limited to 64 sound/loop dependencies");}
+        let tag=inspection.tags.iter().find(|t|t.id==id).ok_or_else(||SparkError::Invalid("Missing native sound dependency identity".into()))?;
+        if !matches!(tag.class.as_str(),"lsnd"|"snd!"){return invalid("This sound dependency class needs a separate native extraction path");}
+        if tag.class=="snd!"{sounds.push(id);}
+        todo.extend(tag.references.iter().map(|r|r.target_id));
+    }
+    let (header,mut bytes,hash)=maps::read_cache_snapshot(&source.preserved_path)?;
+    if hash!=source.sha256 || hash!=inspection.sha256 || header.legacy_tag_size_repair || header.extended {
+        return invalid("Native sound extraction source identity or layout changed");
+    }
+    let original_len=bytes.len();let mut descriptors=vec![];let mut sample_hashes=vec![];let mut encoded=0usize;
+    for id in &sounds {
+        let data=sound_data(&source.preserved_path,&source.sha256,*id,None,Some(bank))?;
+        if data.report.permutations.is_empty() || data.report.permutations.iter().any(|p|!p.available) {
+            return invalid(format!("{}: all original sound permutations must be recoverable from the pinned bank; CELT and unsupported codecs remain blocked",data.report.tag_path));
+        }
+        for (index,sample) in &data.external {
+            let descriptor=data.descriptors[*index];
+            if data.report.permutations[*index].format!="Xbox ADPCM" || descriptor+20>original_len {
+                return invalid("Only exact MCC classic ADPCM sample descriptors can be materialized");
+            }
+            encoded=encoded.checked_add(sample.len()).ok_or_else(||SparkError::Invalid("Native audio byte count overflow".into()))?;
+            if encoded>64*1024*1024 || sample_hashes.len()>=512 {return invalid("Native sound extraction exceeds 64 MiB or 512 bank samples");}
+            while bytes.len()%4!=0{bytes.push(0);}
+            let offset=u32::try_from(bytes.len()).map_err(|_|SparkError::Invalid("Native sound file offset overflow".into()))?;
+            bytes.extend_from_slice(sample);
+            if bytes.len() as u64>maps::MAX_CACHE_BYTES{return invalid("Native sound extraction input exceeds the bounded cache reader");}
+            // Keep encoded length, codec, all sound fields, pitch ranges and chains unchanged.
+            bytes[descriptor+4..descriptor+8].copy_from_slice(&0u32.to_le_bytes());
+            bytes[descriptor+8..descriptor+12].copy_from_slice(&offset.to_le_bytes());
+            descriptors.push(descriptor);
+            sample_hashes.push(crate::hex_bytes(Sha256::digest(sample)));
+        }
+    }
+    let size=u32::try_from(bytes.len()).map_err(|_|SparkError::Invalid("Native sound extraction size overflow".into()))?;
+    bytes[8..12].copy_from_slice(&size.to_le_bytes());
+    let (_,original,current_hash)=maps::read_cache_snapshot(&source.preserved_path)?;
+    if current_hash!=source.sha256 || original.len()!=original_len {return invalid("Original source changed during bank materialization");}
+    if bytes[..original_len].iter().zip(&original).enumerate().any(|(offset,(a,b))|a!=b &&
+        !(8..12).contains(&offset) && !descriptors.iter().any(|d|(*d+4..*d+12).contains(&offset))) {
+        return invalid("Native sound extraction changed bytes outside its reviewed sample-location footprint");
+    }
+    crate::mcc_audio::Bank::open(bank)?.verify()?;
+    let report=ExtractionSamples{source_sha256:source.sha256.clone(),input_sha256:crate::hex_bytes(Sha256::digest(&bytes)),
+        sound_count:sounds.len(),sample_count:sample_hashes.len(),encoded_bytes:encoded,sample_sha256:sample_hashes,bank_sha256:bank.sha256.clone(),
+        notice:"Extraction input only: exact pinned MCC classic ADPCM bytes embedded locally for native Invader serialization. Only raw-sample flags/offsets and declared length differ; original metadata/source remains intact. This input is not a playable map or a shared patch.".into()};
+    Ok(Some((bytes,report)))
 }
 
 pub fn inspect_sound(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<SoundInspection> {
@@ -480,6 +559,36 @@ mod tests {
         set(&mut bytes,0xb80+64,36);set(&mut bytes,0xb80+68,u32::from(external));
         set(&mut bytes,0xb80+72,if external{0x300}else{0x1100});
         bytes[0x1100..0x1102].copy_from_slice(&1000i16.to_le_bytes());bytes
+    }
+    #[test]
+    fn mcc_bank_extraction_embeds_exact_bytes_and_preserves_every_other_source_byte() {
+        let (bank_root,bank_bytes,_)=crate::mcc_audio::tests::fixture();
+        let bank=crate::mcc_audio::pin_mcc(bank_root.path()).unwrap();
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("owned-test.map");
+        let mut bytes=sound_fixture(true);
+        let tag=bytes[0x880..0x8a0].to_vec();bytes[0x828..0x848].copy_from_slice(&tag);
+        bytes[4..8].copy_from_slice(&13u32.to_le_bytes());bytes[0x800..0x804].copy_from_slice(&0x40440028u32.to_le_bytes());
+        bytes[0x900..0x920].fill(0);bytes[0x900..0x90f].copy_from_slice(b"sound\\sfx\\test\0");
+        bytes[0xb00..0xb20].fill(0);bytes[0xb00..0xb08].copy_from_slice(b"pitch_a\0");
+        bytes[0xb80..0xba0].fill(0);bytes[0xb80..0xb84].copy_from_slice(b"one\0");
+        std::fs::write(&path,&bytes).unwrap();let hash=crate::hex_bytes(Sha256::digest(&bytes));
+        let source=crate::project::Source{original_path:path.clone(),preserved_path:path.clone(),sha256:hash.clone(),cache_version:13,engine:"Halo MCC — Halo 1".into(),scenario_path:"test".into(),archive:None,resource_directory:None,resource_sha256:Default::default(),audio_resources:Some(bank)};
+        let inspection=maps::MapInspection{header:maps::parse_header(&bytes,bytes.len()as u64).unwrap(),tag_checksum:None,sha256:hash.clone(),
+            tags:vec![maps::Tag{id:0x1234,index:0,class:"snd!".into(),path:"sound/sfx/test".into(),data_offset:Some(0x980),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],
+            objects:vec![],decals:vec![],mesh:Default::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"test".into()};
+        let (input,report)=mcc_extraction_input(&source,&inspection,0x1234).unwrap().unwrap();
+        assert_eq!((report.sound_count,report.sample_count,report.encoded_bytes),(1,1,36));
+        for at in 0..bytes.len(){if !(8..12).contains(&at)&&!(0xb80+68..0xb80+76).contains(&at){assert_eq!(input[at],bytes[at],"unexpected offset {at}");}}
+        let output=dir.path().join("input-only.map");std::fs::write(&output,&input).unwrap();
+        let output_hash=maps::hash_file(&output).unwrap();assert_eq!(output_hash,report.input_sha256);
+        let decoded=inspect_sound(&output,&output_hash,0x1234).unwrap();
+        assert!(decoded.permutations[0].available&&decoded.permutations[0].embedded);
+        assert_eq!(decoded.permutations[0].sha256.as_ref(),report.sample_sha256.first());
+        assert_eq!(std::fs::read(&path).unwrap(),bytes);
+        let mut damaged=bank_bytes;*damaged.last_mut().unwrap()^=1;
+        std::fs::write(bank_root.path().join("sounds_adpcm.fsb"),damaged).unwrap();
+        assert!(mcc_extraction_input(&source,&inspection,0x1234).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(),bytes);
     }
     #[test]fn embedded_xbox_sample_converts_without_changing_source(){
         let dir=tempfile::tempdir().unwrap();let path=dir.path().join("source.map");let bytes=sound_fixture(false);std::fs::write(&path,&bytes).unwrap();

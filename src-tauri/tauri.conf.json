@@ -22,7 +22,7 @@
         "theme": "Dark",
         "decorations": false,
         "transparent": true,
-        "shadow": true
+        "shadow": false
       }
     ],
     "security": {

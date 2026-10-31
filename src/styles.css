@@ -3854,7 +3854,7 @@ small {
 
 /* Frameless native shell: transparent asymmetric curves, original controls. */
 :root[data-gs-native-frame='true'],:root[data-gs-native-frame='true'] body{background:transparent!important}
-:root[data-gs-native-frame='true'] .application{width:calc(100vw - 12px);height:calc(100vh - 12px);min-height:0;margin:6px;border:1px solid #96e9f07a;border-radius:36px 20px 32px 16px;overflow:hidden;box-shadow:inset 0 0 0 1px #c5a4ee24,0 0 4px #82dce533;box-sizing:border-box}
+:root[data-gs-native-frame='true'] .application{width:100vw;height:100vh;min-height:0;margin:0;border:1px solid #96e9f07a;border-radius:36px 20px 32px 16px;overflow:hidden;box-shadow:inset 0 0 0 1px #c5a4ee24;box-sizing:border-box}
 :root[data-gs-native-frame='true'] .app-header{padding-left:20px;border-radius:35px 19px 28px 5px;position:relative;user-select:none;cursor:grab}
 :root[data-gs-native-frame='true'] .app-header:active{cursor:grabbing}.gs-window-controls{display:flex;align-items:center;gap:7px;padding:0 4px 0 11px;margin-left:8px;border-left:1px solid #a7b9e12b;flex-shrink:0;cursor:default}
 .gs-window-button{display:grid;place-items:center;width:32px;height:32px;padding:4px;min-width:0;border:1px solid #8adce46b!important;border-radius:50% 45% 50% 35%;background:linear-gradient(145deg,#7154a035,#6bdbe70d)!important;color:#bdf1f5;box-shadow:inset 0 0 10px #98dfea0a;cursor:pointer}
@@ -3878,7 +3878,7 @@ small {
 
 .gs-window-content { width:100%;height:100%;opacity:var(--gs-window-opacity,1);position:relative;isolation:isolate; }
 .gs-window-tint { position:fixed;inset:0;z-index:2147483646;pointer-events:none;background:var(--gs-window-tint,#65c5ff);opacity:var(--gs-window-tint-strength,0); }
-:root[data-gs-native-frame='true'] .gs-window-tint { inset:6px;border-radius:36px 20px 32px 16px; }
+:root[data-gs-native-frame='true'] .gs-window-tint { inset:0;border-radius:36px 20px 32px 16px; }
 .gs-window-appearance label { display:flex;align-items:center;gap:14px;margin:14px 0;flex-wrap:wrap; }
 .gs-window-appearance input[type='range'] { width:min(420px,100%); }
 .gs-window-appearance small { display:block;margin-top:12px;color:var(--muted); }

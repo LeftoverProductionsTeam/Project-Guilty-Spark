@@ -235,6 +235,11 @@ pub fn run_prepared_job(
         if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
         emit("geometry","Validating editable geometry and writing JMS source".into(),5,"info");
         let sources=quickforge::export_sources(document,&directory.join("workspace"))?;
+        match crate::native_audio::plan(project) {
+            Ok(placements) if !placements.is_empty()=>{project::atomic_write(&sources.directory.join("native-audio-intent.json"),&serde_json::to_vec_pretty(&placements)?,false)?;},
+            Err(error)=>receipt.blockers.push(error.to_string()),
+            _=>(),
+        }
         receipt.blockers.extend(sources.blockers.clone());
         receipt.sources=Some(sources.clone());
         custom.export(&sources.directory)?;
@@ -327,6 +332,7 @@ pub fn run_prepared_job(
         }
         let output_dir=directory.join("output");fs::create_dir(&output_dir)?;
         crate::powerups::prepare(project,&sources.scenario_path,workspace,&stage,&invader(tools,"invader-edit").unwrap(),&runner)?;
+        crate::native_audio::prepare(project,&sources.scenario_path,workspace,&stage,&invader(tools,"invader-edit").unwrap(),&runner)?;
         let output=output_dir.join(format!("{}.map",sources.bsp_name));
         if document.runtime_id==RuntimeId::MccSteam {
             crate::engine_machinima::prepare(project,&sources.scenario_path,workspace,&invader(tools,"invader-edit").unwrap(),&runner,0)?;
@@ -342,7 +348,10 @@ pub fn run_prepared_job(
             runner.run(&invader(tools,"invader-build").unwrap(),&["-g".into(),engine.into(),"-t".into(),stage.to_string_lossy().into_owned(),"-m".into(),output_dir.to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),sources.scenario_path.clone()],workspace,"compile",82)?;
         }
         let inspected=maps::inspect_map(&output,None)?;
+        let sound_classes=crate::audio_rules::verify(&output,&inspected)?;
+        project::atomic_write(&workspace.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
+        crate::native_audio::verify_compiled(project,&inspected,&output)?;
         let _=crate::native_asset_imports::available_files(import_root,project)?;
         crate::powerups::verify_compiled(project,&inspected,workspace)?;
         custom.verify_cache(&inspected,&output)?;

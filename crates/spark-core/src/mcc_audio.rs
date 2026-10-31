@@ -347,9 +347,9 @@ impl Bank {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    fn fixture() -> (tempfile::TempDir, Vec<u8>, Vec<u8>) {
+    pub(crate) fn fixture() -> (tempfile::TempDir, Vec<u8>, Vec<u8>) {
         let root = tempfile::tempdir().unwrap();
         fs::create_dir(root.path().join("lst")).unwrap();
         let names = ["one_0_0", "two_1_0"];

@@ -653,6 +653,8 @@ fn run_with(
         let output = output_dir.join(&name);
         fs::copy(&compiled, &output)?;
         let inspected = maps::inspect_map(&output, None)?;
+        let sound_classes=crate::audio_rules::verify(&output,&inspected)?;
+        project::atomic_write(&workspace.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;
         if inspected.sha256 != compiled_hash
             || inspected.header.version != 13
             || inspected.header.extended

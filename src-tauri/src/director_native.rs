@@ -309,6 +309,7 @@ pub(super) async fn director_popout(
         .inner_size(1280., 720.)
         .min_inner_size(640., 360.)
         .decorations(false)
+        .shadow(false)
         .background_color(tauri::window::Color(0, 0, 0, 255))
         .build()
         .map_err(error)?;

@@ -1,5 +1,7 @@
 # CE startup and first-run follow-through
 
+**Later C41 diagnosis:** [native audio/performance follow-through](C41_NATIVE_AUDIO_PERFORMANCE.md#custom-edition-diagnosis) identifies the actual omitted `config.txt` and CE's exclusive shader-read conflict, with scoped private-copy repairs and full native error text. Historical counts below retain their original executable identity; menu/join/traversal remain separate gates.
+
 This continues committed `d3b4d29`. It fixes files omitted from Spark's checked CE extraction/private client copy and adds an explicit normal-window launch request, a separate menu-only setup action and actionable startup guidance. It does not establish the cause of every failed client join.
 
 ## Workflow

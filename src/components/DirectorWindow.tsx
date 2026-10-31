@@ -12,7 +12,7 @@ import { recordDirector, nextTakeName } from '../directorRecording';
 import type { ActiveRecording } from '../directorRecording';
 import type { DirectorBridge } from './MachinimaRig';
 import { SourceStage } from './MachinimaWorkspace';
-import { dragWindow, ResizeEdges } from './WindowFrame';
+import { ResizeEdges } from './WindowFrame';
 import { useWindowFullscreen } from '../useWindowFullscreen';
 import { observeWindowFocus } from '../windowFocus';
 import { matchesLiveMap, runtimeScene } from '../liveScene';
@@ -478,7 +478,7 @@ export default function DirectorWindow({
         </header>
       )}
       {!clean && !embedded && (
-        <header onPointerDown={(e) => void dragWindow(e).catch(() => {})}>
+        <header data-tauri-drag-region="deep">
           <strong>Recording Director · {opened?.project.title ?? 'Loading map'}</strong>
           <button onClick={() => void windowAction('dock')}>Dock back</button>
           <button onClick={() => void windowAction('maximize')}>Maximize / restore</button>

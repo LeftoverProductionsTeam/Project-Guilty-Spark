@@ -165,6 +165,15 @@ pub fn extract_selected_tag(
     let result=(||->Result<TagExtractReceipt>{
         let tags=staging.join("tags");fs::create_dir(&tags)?;
         let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
+        let prepared_audio=crate::audio::mcc_extraction_input(source,inspection,tag_id)?;
+        if cancel.load(std::sync::atomic::Ordering::Relaxed){return invalid("Native audio extraction cancelled before tool launch");}
+        let extraction_input=if let Some((bytes,report))=&prepared_audio {
+            let input=staging.join("mcc-audio-extraction-input.map");
+            project::atomic_write(&input,bytes,false)?;
+            if maps::hash_file(&input)?!=report.input_sha256{return invalid("Native audio extraction input failed exact byte readback");}
+            project::atomic_write(&staging.join("mcc-audio-extraction.json"),&serde_json::to_vec_pretty(report)?,false)?;
+            input
+        }else{source.preserved_path.clone()};
         let protected=runner.run(&info,&["-T".into(),"is_protected".into(),source.preserved_path.to_string_lossy().into_owned()],&staging,"verify",10)?;
         if !["false","0"].contains(&protected.trim().to_ascii_lowercase().as_str()){
             return invalid("Invader identifies the source cache as protected or unknown; extraction stopped");
@@ -173,13 +182,17 @@ pub fn extract_selected_tag(
             "--recursive".into(),"--search".into(),query.clone(),
             "--tags".into(),tags.to_string_lossy().into_owned(),
             "--maps".into(),resources.to_string_lossy().into_owned(),
-            source.preserved_path.to_string_lossy().into_owned(),
+            extraction_input.to_string_lossy().into_owned(),
         ],&staging,"extract",70)?;
         let (files,total_bytes)=inventory(&tags)?;
         if files.is_empty() || !files.iter().any(|f|f.path.eq_ignore_ascii_case(&expected.to_string_lossy().replace('\\',"/"))) {
             return invalid("Invader finished without producing the selected requested .tag file");
         }
         verify_source_snapshot(source,Some(resources))?;
+        if let Some((_,report))=&prepared_audio {
+            if maps::hash_file(&extraction_input)?!=report.input_sha256{return invalid("Native audio extraction input changed while the external tool was reading it");}
+            crate::mcc_audio::Bank::open(source.audio_resources.as_ref().unwrap())?.verify()?;
+        }
         let receipt_path=final_dir.join("extraction-receipt.json");
         let receipt=TagExtractReceipt{
             status:"extracted-unverified-import".into(),job_id:job_id.into(),

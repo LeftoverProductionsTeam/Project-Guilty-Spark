@@ -1571,7 +1571,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                     ))}
                   </select>
                 </label>
-                {sourceOpen?.inspection ? (
+                {sourceId&&!sourceOpen ? <p className="subtle" role="status">Loading source sound library…</p> : sourceOpen?.inspection ? (
                   <MapSounds
                     expanded
                     key={sourceOpen.project.id}

@@ -87,7 +87,7 @@ import AssetTransfer,{transferTag} from './components/AssetTransfer';
 import type {TransferSelection} from './components/AssetTransfer';
 import {readHistoryLimit,saveHistoryLimit} from './historyPreferences';
 import { firstVisitWorkspace, markFirstVisitSeen, WORKSPACE_TOOLTIPS } from './firstRun';
-import {ResizeEdges,dragWindow,maximizeWindow} from './components/WindowFrame';
+import {ResizeEdges} from './components/WindowFrame';
 import { Empty, IconButton, Pill, Toast } from './components/ui';
 import Library from './components/Library';
 import CommunityMaps from './components/CommunityMaps';
@@ -1020,10 +1020,7 @@ export default function App() {
           <header
             id="gs-window-header"
             className="app-header gs-compact-header"
-            onPointerDown={(event) => void dragWindow(event).catch((e) => notice(String(e), 'error'))}
-            onDoubleClick={(event) => {
-              if(!(event.target as HTMLElement).closest('button,a,input,select'))void maximizeWindow().catch(e=>notice(String(e),'error'));
-            }}
+            data-tauri-drag-region="deep"
             style={
               ownedHeaderArt && matchesOwnedInterfaceBitmap(bitmapPreference, current, inspection)
                 ? {

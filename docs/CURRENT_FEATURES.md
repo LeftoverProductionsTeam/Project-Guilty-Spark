@@ -20,7 +20,7 @@ This is the C41 integrated Windows development workbench. Features below describ
 - Assemble compatible source BSP sections with tunnels, generated collision and authored visibility portals. Compiler/clearance/PVS results do not certify a player walkthrough or independent BSP streaming.
 - Preview actual models in the asset drawer. Supported drag imports extract recursive native tags into isolated staging, verify dependencies and compile through the matching source route.
 - Import closed, material-assigned OBJ scenery through native model/collision compilation. Broader custom model classes and every runtime combination remain unaccepted.
-- Audition supported source sounds before editor placement. Compiled sound emitters remain a separate goal.
+- Audition supported source sounds before editor placement. Explicitly include original loops in local MCC QuickForge builds as native sound scenery, with verified recursive samples and placements. [Native audio scope](NATIVE_LOOPING_EMITTERS.md).
 
 ## Tags, safe external tools and builds
 
@@ -38,6 +38,7 @@ This is the C41 integrated Windows development workbench. Features below describ
 - Share actual Halo materials across map, tag, asset and machinima previews: supported diffuse/detail/lightmaps, model reflections, transparent shaders, decals, sky and atmosphere.
 - Recover original texture resources by exact identities. The Zombie Apocalypse reader supports 510 verified external images; unproven/non-flat cases remain reported rather than guessed. Standalone first-load acceptance renders 124 shader materials, including 75 from compatible installed MCC images, and 15 embedded lightmaps. Its original pack restores all 132 materials. Embedded pixels retain priority; compatible previews do not become compiler resources.
 - Configure preview anti-aliasing and resolution scale. Complete engine shading, animation, reflections and lighting/fog baking are not accepted as parity.
+- Reuse freshly validated identical decoded images in a bounded CPU cache; keep reflection cubes across incremental material arrival and invalidate them on source/resource changes. [Measured native performance and quality checks](C41_NATIVE_AUDIO_PERFORMANCE.md#performance-acceptance).
 - Find supported installed classic/MCC audio resources, decode verified supported samples, retain authored looping main tracks and rehearse spatial sound scenes.
 - Keep per-map mute/volume, channel mix and linked intro/loop/end segments; include the saved sound scene in editor recording. CELT and complete game event/acoustic parity remain open.
 
@@ -57,6 +58,7 @@ This is the C41 integrated Windows development workbench. Features below describ
 - Browse community listings and supported invitations with runtime-aware handoffs. MCC community-protocol bridging and expanded 8-player/128-player modes remain goals.
 - Connect or optionally install checked Custom Edition into a separate managed location. Prepare private loopback dedicated servers from installed maps or validated project outputs, with exact matching-client copies, startup-file guidance and owned-process cleanup.
 - Dedicated-engine map status and compiler/process tests pass. A genuine client join, visual first-run completion and Workshop collision walkthrough remain unverified.
+- Diagnose full startup errors from the owned CE child. The actual missing graphics configuration and exclusive shader-read conflict have scoped private-copy fixes. Newly extracted OpenCE/Chupathingy files are distinguished from admitted game content and verified playability. [Runtime evidence and limits](C41_NATIVE_AUDIO_PERFORMANCE.md#custom-edition-diagnosis).
 
 ## Next acceptance priorities
 

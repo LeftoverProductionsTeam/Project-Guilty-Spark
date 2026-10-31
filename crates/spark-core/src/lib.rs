@@ -61,6 +61,8 @@ pub mod project;
 pub mod portability;
 pub mod powerups;
 pub mod audio_preview;
+pub mod native_audio;
+pub mod audio_rules;
 pub mod mcc_audio;
 pub mod render;
 pub mod render_features;

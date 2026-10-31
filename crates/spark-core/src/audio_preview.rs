@@ -50,7 +50,11 @@ pub struct Emitter {
     pub looping_source: Option<LoopingSource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_sound: Option<CustomSound>,
+    /// Explicit native placement intent. The remaining fields describe editor rehearsal.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub native_placement: bool,
 }
+fn is_false(value: &bool) -> bool { !*value }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
 pub struct CustomSound { pub asset_id: String, pub sha256: String }
@@ -78,6 +82,9 @@ impl SoundScene {
         }
         let mut ids = HashSet::new();
         for e in &self.emitters {
+            if e.native_placement && (e.looping_source.is_none() || e.custom_sound.is_some() || e.source_project_id.is_none()) {
+                return invalid("Native sound placement needs the original looping tag and exact preserved source identity");
+            }
             if let Some(sound)=&e.custom_sound {
                 uuid::Uuid::parse_str(&sound.asset_id).map_err(|_|crate::SparkError::Invalid("Invalid custom sound asset".into()))?;
                 if sound.sha256.len()!=64 || !sound.sha256.bytes().all(|b|b.is_ascii_hexdigit()) || e.source_sha256.as_deref()!=Some(sound.sha256.as_str()) || e.source_project_id.is_none() || e.tag_id!=0 || e.looping_source.is_some() || e.pitch_range!=0 || e.permutation!=0 {

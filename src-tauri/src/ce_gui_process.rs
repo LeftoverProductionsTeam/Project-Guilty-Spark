@@ -18,10 +18,47 @@ use windows_sys::Win32::{
 
 /// Read-only observation of this owned child only. Window creation/visibility
 /// is distinct from process launch, first-run completion and a joined player.
-pub(super) fn visible_window(pid: u32) -> Option<bool> {
+pub(super) struct WindowObservation {
+    pub visible: bool,
+    pub startup_error: Option<String>,
+    pub startup_warning: Option<String>,
+    pub summary: String,
+}
+pub(super) fn observe_window(pid: u32) -> Option<WindowObservation> {
     struct Probe {
         pid: u32,
         visible: bool,
+        error: Option<String>,
+        warning: Option<String>,
+        windows: Vec<String>,
+    }
+    struct ErrorText { visited: usize, text: Option<String>, fatal: bool, began: Instant }
+    unsafe extern "system" fn read_error(window: HWND, data: LPARAM) -> i32 {
+        let probe = &mut *(data as *mut ErrorText);
+        probe.visited += 1;
+        if probe.visited > 32 || probe.began.elapsed() > Duration::from_millis(180) { return 0; }
+        let mut class = [0u16; 64];
+        let count = GetClassNameW(window, class.as_mut_ptr(), class.len() as i32);
+        let class = String::from_utf16_lossy(&class[..count.max(0) as usize]);
+        if !class.eq_ignore_ascii_case("Edit") && !class.eq_ignore_ascii_case("Static") { return 1; }
+        // Warnings expose static instructions only, never text entry fields.
+        if class.eq_ignore_ascii_case("Edit") && (!probe.fatal || GetWindowLongW(window, GWL_STYLE) & ES_READONLY == 0) { return 1; }
+        let mut text = [0u16; 2048];
+        let mut count = 0;
+        // Only the fatal dialog of this already-owned CE child is inspected.
+        // A bounded timeout avoids hanging Spark on an unresponsive game.
+        if SendMessageTimeoutW(window, WM_GETTEXT, text.len(), text.as_mut_ptr() as LPARAM,
+            SMTO_ABORTIFHUNG | SMTO_BLOCK, 50, &mut count) != 0 {
+            let end = text.iter().position(|c| *c == 0).unwrap_or(text.len());
+            let value = String::from_utf16_lossy(&text[..end]).trim().to_owned();
+            if !value.is_empty() && class.eq_ignore_ascii_case("Edit") {
+                probe.text = Some(value);
+                return 0;
+            } else if value.len() > probe.text.as_ref().map_or(0, String::len) {
+                probe.text = Some(value);
+            }
+        }
+        1
     }
     unsafe extern "system" fn visit(window: HWND, data: LPARAM) -> i32 {
         let probe = &mut *(data as *mut Probe);
@@ -34,6 +71,24 @@ pub(super) fn visible_window(pid: u32) -> Option<bool> {
                 && bounds.bottom > bounds.top
             {
                 probe.visible = true;
+                let mut title = [0u16; 256];
+                let count = GetWindowTextW(window, title.as_mut_ptr(), title.len() as i32);
+                let title = String::from_utf16_lossy(&title[..count.max(0) as usize]).trim().to_owned();
+                if probe.windows.len() < 8 {
+                    let mut class = [0u16; 64];
+                    let count = GetClassNameW(window, class.as_mut_ptr(), class.len() as i32);
+                    probe.windows.push(format!("{} [{}] {}×{} at {},{}", title,
+                        String::from_utf16_lossy(&class[..count.max(0) as usize]),
+                        bounds.right-bounds.left, bounds.bottom-bounds.top, bounds.left, bounds.top));
+                }
+                let fatal = title.eq_ignore_ascii_case("Halo - Fatal Error");
+                let warning = title.eq_ignore_ascii_case("Halo - Warning");
+                if (fatal && probe.error.is_none()) || (warning && probe.warning.is_none()) {
+                    let mut error = ErrorText { visited: 0, text: None, fatal, began: Instant::now() };
+                    EnumChildWindows(window, Some(read_error), &mut error as *mut ErrorText as LPARAM);
+                    let text = error.text.unwrap_or_else(|| format!("{title}; its message was unavailable."));
+                    if fatal { probe.error = Some(text); } else { probe.warning = Some(text); }
+                }
             }
         }
         1
@@ -41,9 +96,12 @@ pub(super) fn visible_window(pid: u32) -> Option<bool> {
     let mut probe = Probe {
         pid,
         visible: false,
+        error: None,
+        warning: None,
+        windows: Vec::new(),
     };
     (unsafe { EnumWindows(Some(visit), &mut probe as *mut Probe as LPARAM) } != 0)
-        .then_some(probe.visible)
+        .then_some(WindowObservation { visible: probe.visible, startup_error: probe.error, startup_warning: probe.warning, summary: probe.windows.join(" | ") })
 }
 
 pub(super) struct Child {
@@ -227,6 +285,8 @@ mod tests {
             result["ownedWindowVisibility"],
             serde_json::json!([false, true, false])
         );
+        assert_eq!(result["nativeWarning"], "A native startup warning needs review.");
+        assert_eq!(result["nativeFatal"], "Cannot find owned/config.txt");
     }
     #[test]
     fn startup_child_probe() {
@@ -259,15 +319,29 @@ mod tests {
             )
         };
         assert!(!window.is_null());
-        let hidden = visible_window(std::process::id()).unwrap();
+        let hidden = observe_window(std::process::id()).unwrap().visible;
         unsafe {
             ShowWindow(window, SW_SHOWNORMAL);
         }
-        let shown = visible_window(std::process::id()).unwrap();
+        let shown = observe_window(std::process::id()).unwrap().visible;
+        assert!(observe_window(std::process::id()).unwrap().startup_error.is_none());
+        let control = |class: &str, text: &str, style| {
+            let child = unsafe { CreateWindowExW(0, wide(OsStr::new(class)).unwrap().as_ptr(),
+                wide(OsStr::new(text)).unwrap().as_ptr(), style, 0, 0, 150, 30,
+                window, std::ptr::null_mut(), std::ptr::null_mut(), std::ptr::null()) };
+            assert!(!child.is_null());
+        };
+        control("STATIC", "A native startup warning needs review.", WS_CHILD | WS_VISIBLE);
+        control("EDIT", "Unrelated editable input must never be collected", WS_CHILD | WS_VISIBLE);
+        unsafe { SetWindowTextW(window, wide(OsStr::new("Halo - Warning")).unwrap().as_ptr()); }
+        let warning = observe_window(std::process::id()).unwrap().startup_warning.unwrap();
+        control("EDIT", "Cannot find owned/config.txt", WS_CHILD | WS_VISIBLE | ES_READONLY as u32);
+        unsafe { SetWindowTextW(window, wide(OsStr::new("Halo - Fatal Error")).unwrap().as_ptr()); }
+        let fatal = observe_window(std::process::id()).unwrap().startup_error.unwrap();
         unsafe {
             ShowWindow(window, SW_HIDE);
         }
-        let hidden_again = visible_window(std::process::id()).unwrap();
+        let hidden_again = observe_window(std::process::id()).unwrap().visible;
         unsafe {
             DestroyWindow(window);
         }
@@ -275,6 +349,7 @@ mod tests {
             "show": startup.wShowWindow, "explicitShow": startup.dwFlags & STARTF_USESHOWWINDOW != 0,
             "standardHandlesProvided": startup.dwFlags & STARTF_USESTDHANDLES != 0,
             "ownedWindowVisibility": [hidden,shown,hidden_again],
+            "nativeWarning": warning, "nativeFatal": fatal,
         })).unwrap()).unwrap();
     }
 }

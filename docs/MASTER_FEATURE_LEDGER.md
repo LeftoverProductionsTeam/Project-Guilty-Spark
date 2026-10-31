@@ -1,6 +1,6 @@
 # Living feature ledger — Integrated workbench
 
-C41 adds seven Smart Edit/direct/source/visual/live/workflow/asset records while preserving all prior IDs and gates. See [C41 routing and native evidence](CONTINUATION_41_ENGINEERING.md).
+C41 adds seven Smart Edit/direct/source/visual/live/workflow/asset records while preserving all prior IDs and gates. The later [native-loop follow-through](NATIVE_LOOPING_EMITTERS.md) updates the existing sound-event requirement with exact MCC bank/source/compiler evidence and keeps game acceptance open. See [C41 routing and native evidence](CONTINUATION_41_ENGINEERING.md).
 
 The [test-build readiness audit](TEST_BUILD_READINESS.md) adds checked Custom Edition setup and scoped private engine observations, preserves failed client joins, and keeps all roadmap gates explicit.
 

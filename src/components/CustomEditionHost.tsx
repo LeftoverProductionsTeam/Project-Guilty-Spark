@@ -37,6 +37,8 @@ interface ClientView {
   mode?: 'setup' | 'playtest' | null;
   elapsedMs?: number;
   visibleWindow?: boolean | null;
+  startupError?: string | null;
+  startupWarning?: string | null;
 }
 export interface CeHostView {
   id: string;
@@ -465,8 +467,18 @@ export default function CustomEditionHost({
                 )}
               </div>
               <p className="subtle" aria-live="polite">
-                {client?.detail ?? 'Use this exact map and its resources with a separate Halo test profile.'}
+                {client?.startupError
+                  ? 'Halo failed during startup. The installed game and prior builds are unchanged.'
+                  : (client?.detail ??
+                    'Use this exact map and its resources with a separate Halo test profile.')}
               </p>
+              {(client?.startupError || client?.startupWarning) && (
+                <div className="ce-host-startup-error" role="alert">
+                  <strong>{client.startupError ? 'Halo startup error' : 'Halo needs your attention'}</strong>
+                  <textarea aria-label={client.startupError ? 'Halo startup error' : 'Halo startup warning'} readOnly rows={2} value={client.startupError ?? client.startupWarning ?? ''} />
+                  <small>{client.startupError ? 'This is an error dialog, not a playable game. Stop playtest before retrying.' : 'Review this warning in Halo. Spark does not dismiss it automatically.'}</small>
+                </div>
+              )}
               {clientOpen && client?.visibleWindow === false && (client.elapsedMs ?? 0) >= 15000 && (
                 <div role="alert">
                   <Notice tone="warning">

@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "complete": true,
+  "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+  "mockedIpc": false,
+  "source": {
+    "sha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+    "cacheVersion": 13
+  },
+  "originalLoop": {
+    "tagId": 3815571961,
+    "tagPath": "sound\\sfx\\ambience\\b30\\b30computer_no_detail",
+    "sourceSha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+    "loops": true,
+    "tracks": [
+      {
+        "index": 0,
+        "gain": 0.25,
+        "fadeInSeconds": 1,
+        "fadeOutSeconds": 1,
+        "startTagId": null,
+        "loopTagId": 3815637498,
+        "endTagId": null
+      }
+    ],
+    "warnings": [
+      "Random detail sounds are not sequenced by main-track playback."
+    ]
+  },
+  "control": {
+    "elapsedMs": 3302.0282000000007,
+    "nativeLoopExplicitlyIncluded": true,
+    "editorMutePreserved": true,
+    "importedFileCount": 3,
+    "singleUndoRedo": true
+  },
+  "build": {
+    "id": "e63ddc63-f93b-46a7-8056-3d740798ff29",
+    "timestamp": "2026-10-31T20:10:04.293710500+00:00",
+    "status": "validated",
+    "target": "mcc-cea",
+    "sha256": "e0abb672b774f6dddf5b49bd3181cf6a607f2ae44e597d46cc7efb99dc55125d",
+    "message": "QuickForge BSP/scenario compiled and cache structure/CRC validated. Fast radiosity preview; target-game load, packaging and multiplayer remain untested.",
+    "projectFingerprint": "5ba9fe226def8d36504e9475dc50e18b092bd0a2081d56c5a70241c9c49eae73",
+    "durationMs": 24922,
+    "elapsedMs": 26793.674000000006,
+    "toolIdentities": {
+      "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+      "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+    }
+  },
+  "bankRecovery": {
+    "sourceSha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+    "inputSha256": "4a73a380cb27210ac78c1d4eae838e30750da33a30b8972eff2f3fe71015209e",
+    "soundCount": 2,
+    "sampleCount": 25,
+    "encodedBytes": 206856,
+    "sampleSha256": [
+      "07b2f62fde354f002ebd9c5e51b5d42380ed7cb7803da5dac1c9b7917e168646",
+      "2810f4d402467fa6f7dcd3e82e7baf42fbcd193baa416a319efd0da819e37bb3",
+      "1ee66651d5a199929ccdafca625d9a00a51df1713df6b8d4b5d5dc4b641ae5e0",
+      "eb75bf1d012485c74b8e6c18b73901757435b77e035eac3fb58416f69b58df28",
+      "b181114413b15acb96c6d7865db8c2e900746f090320387b1fa8977200b8f663",
+      "0d8da0685e509b0e0dfee94cb4af4ed3a91c7923d606b8e6bd53fff904c441db",
+      "8e39729f901478537c8e9626fd0d962a99a1aadb55769c84b5cbf404addc7cc6",
+      "ed00facae6633bbe7651dc63578dd82e0bb5a0aaea3bd940d1b8a6a336d39edd",
+      "dd631942a8e22f497d8b1e85d935dabfd5979241925c91f59ffa309fc0c852a7",
+      "cd6fbfa33ce8f54405eb9338c6344c4a3ce1c6deb5d0dfaba549a940416784ef",
+      "c85688b95adcc6872c559cbace15065b81edf9500a43fdd951de405828e9ad6c",
+      "c5a58a0b18baa9be66169c0576cf078db46a5293e75aa25112d9ce0f48b5f86d",
+      "410e4bda96342984bc62aa1464b20b86c759788bfc1f7b9f32b2d8cd70afe34d",
+      "80cfcda3739cb448dde056a159e19b6d29538f336ebd0f4f819ad42a149b9330",
+      "ec8d64387d6bf10c1043468f46c603ba6a8dd1c507008335ddd574d78d7831aa",
+      "89eb16ca0e18e0480b8b98546054ab0f087b5ebf76f3f70568f742086d41ba53",
+      "9cb479774692d536e35d9cfcee90ff8db0eb619d619d1e0ff9ef34a971ec5c8d",
+      "5e10df6baa5d035833ddf4b631cf4974b8421462f2012054ec4208cf1dbc27bb",
+      "91628055efed699256d2f5e8ea4e2c14d19d7f624811f9bfd150fbff92164de3",
+      "8252d6d1548536e12ddc19878cbe3686940bc0016bf85323a913acc0b7a539b7",
+      "89944cc8d32e17a87f48f15ed1329500621632aedcf555a7a6e334bd087432a6",
+      "e81865c1f1b6ae0fb2723a4fb8d050c1e32ad79eac52c76fad6f6e18db328664",
+      "1016531d69b56e014568af5e9a1392afa2f75d7ea9a8ead1f83295a5900f30a9",
+      "00cfc62054ccb8687d7afba9c462c4b6d126974c1bad018da356320e29ed0209",
+      "fbc3427936a527ec1550c50eb0bc48f7d341abdfec23bc68e8dc52180fd85e2e"
+    ],
+    "bankSha256": {
+      "sounds_adpcm.fsb": "d9a70adcb681bcb152a50ea61904fc921d2d94aff3000fe3d2827823c9e49e88",
+      "sounds_adpcm.lst.bin": "d469b6d72c7d8f6d141da2b61c14b29862a57d3563ebb195e3829f18db742a78"
+    },
+    "notice": "Extraction input only: exact pinned MCC classic ADPCM bytes embedded locally for native Invader serialization. Only raw-sample flags/offsets and declared length differ; original metadata/source remains intact. This input is not a playable map or a shared patch."
+  },
+  "sourceExactCompiledSamples": [
+    {
+      "sourceTagId": 3815637498,
+      "sourcePath": "sound\\sfx\\ambience\\interiors\\29lasercomputer",
+      "compiledPath": "gs_assets_33459a6173f34339ace15aa52591bebe\\sound\\sfx\\ambience\\interiors\\29lasercomputer",
+      "permutations": [
+        {
+          "pitchRange": 0,
+          "permutation": 0,
+          "sha256": "1016531d69b56e014568af5e9a1392afa2f75d7ea9a8ead1f83295a5900f30a9",
+          "bytes": 48204
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 1,
+          "sha256": "00cfc62054ccb8687d7afba9c462c4b6d126974c1bad018da356320e29ed0209",
+          "bytes": 54108
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 2,
+          "sha256": "fbc3427936a527ec1550c50eb0bc48f7d341abdfec23bc68e8dc52180fd85e2e",
+          "bytes": 48348
+        }
+      ]
+    },
+    {
+      "sourceTagId": 3815703035,
+      "sourcePath": "sound\\sfx\\ambience\\interiors\\compdetail",
+      "compiledPath": "gs_assets_33459a6173f34339ace15aa52591bebe\\sound\\sfx\\ambience\\interiors\\compdetail",
+      "permutations": [
+        {
+          "pitchRange": 0,
+          "permutation": 0,
+          "sha256": "07b2f62fde354f002ebd9c5e51b5d42380ed7cb7803da5dac1c9b7917e168646",
+          "bytes": 8388
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 1,
+          "sha256": "2810f4d402467fa6f7dcd3e82e7baf42fbcd193baa416a319efd0da819e37bb3",
+          "bytes": 1512
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 2,
+          "sha256": "1ee66651d5a199929ccdafca625d9a00a51df1713df6b8d4b5d5dc4b641ae5e0",
+          "bytes": 756
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 3,
+          "sha256": "eb75bf1d012485c74b8e6c18b73901757435b77e035eac3fb58416f69b58df28",
+          "bytes": 900
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 4,
+          "sha256": "b181114413b15acb96c6d7865db8c2e900746f090320387b1fa8977200b8f663",
+          "bytes": 4500
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 5,
+          "sha256": "0d8da0685e509b0e0dfee94cb4af4ed3a91c7923d606b8e6bd53fff904c441db",
+          "bytes": 540
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 6,
+          "sha256": "8e39729f901478537c8e9626fd0d962a99a1aadb55769c84b5cbf404addc7cc6",
+          "bytes": 612
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 7,
+          "sha256": "ed00facae6633bbe7651dc63578dd82e0bb5a0aaea3bd940d1b8a6a336d39edd",
+          "bytes": 720
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 8,
+          "sha256": "dd631942a8e22f497d8b1e85d935dabfd5979241925c91f59ffa309fc0c852a7",
+          "bytes": 2808
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 9,
+          "sha256": "cd6fbfa33ce8f54405eb9338c6344c4a3ce1c6deb5d0dfaba549a940416784ef",
+          "bytes": 7560
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 10,
+          "sha256": "c85688b95adcc6872c559cbace15065b81edf9500a43fdd951de405828e9ad6c",
+          "bytes": 1800
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 11,
+          "sha256": "c5a58a0b18baa9be66169c0576cf078db46a5293e75aa25112d9ce0f48b5f86d",
+          "bytes": 7416
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 12,
+          "sha256": "410e4bda96342984bc62aa1464b20b86c759788bfc1f7b9f32b2d8cd70afe34d",
+          "bytes": 1872
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 13,
+          "sha256": "80cfcda3739cb448dde056a159e19b6d29538f336ebd0f4f819ad42a149b9330",
+          "bytes": 6336
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 14,
+          "sha256": "ec8d64387d6bf10c1043468f46c603ba6a8dd1c507008335ddd574d78d7831aa",
+          "bytes": 2232
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 15,
+          "sha256": "89eb16ca0e18e0480b8b98546054ab0f087b5ebf76f3f70568f742086d41ba53",
+          "bytes": 3024
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 16,
+          "sha256": "9cb479774692d536e35d9cfcee90ff8db0eb619d619d1e0ff9ef34a971ec5c8d",
+          "bytes": 1764
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 17,
+          "sha256": "5e10df6baa5d035833ddf4b631cf4974b8421462f2012054ec4208cf1dbc27bb",
+          "bytes": 720
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 18,
+          "sha256": "91628055efed699256d2f5e8ea4e2c14d19d7f624811f9bfd150fbff92164de3",
+          "bytes": 540
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 19,
+          "sha256": "8252d6d1548536e12ddc19878cbe3686940bc0016bf85323a913acc0b7a539b7",
+          "bytes": 504
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 20,
+          "sha256": "89944cc8d32e17a87f48f15ed1329500621632aedcf555a7a6e334bd087432a6",
+          "bytes": 936
+        },
+        {
+          "pitchRange": 0,
+          "permutation": 21,
+          "sha256": "e81865c1f1b6ae0fb2723a4fb8d050c1e32ad79eac52c76fad6f6e18db328664",
+          "bytes": 756
+        }
+      ]
+    }
+  ],
+  "compiled": {
+    "sha256": "e0abb672b774f6dddf5b49bd3181cf6a607f2ae44e597d46cc7efb99dc55125d",
+    "sceneryPath": "spark\\audio\\b5ca99992fd54520ab11afaaa89223ad\\a14be24a795f40dca208a6b025683e87",
+    "loopPath": "gs_assets_33459a6173f34339ace15aa52591bebe\\sound\\sfx\\ambience\\b30\\b30computer_no_detail",
+    "position": [
+      2,
+      3,
+      1
+    ],
+    "wholeLoopPreserved": true,
+    "decoded": {
+      "frames": 186549,
+      "channels": 1,
+      "sampleRate": 48000,
+      "durationSeconds": 3.8864375,
+      "rms": 0.042309177263229476
+    }
+  },
+  "ownerNativeFilesPreserved": 2240,
+  "deliberateManagedImportCorruption": {
+    "rejected": true,
+    "blockers": [
+      "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+    ],
+    "attributedTool": null
+  },
+  "sourcePreserved": true,
+  "previousAcceptedBuildPreserved": true,
+  "musicClassConflict": {
+    "schemaVersion": 1,
+    "complete": true,
+    "actualNativeCompiler": true,
+    "unsafeMapLaunched": false,
+    "sourceSha256": "e0abb672b774f6dddf5b49bd3181cf6a607f2ae44e597d46cc7efb99dc55125d",
+    "audit": {
+      "complete": true,
+      "expected": "music-conflict",
+      "reason": "Unsafe Halo music-class combination: sound scenery 'gs_assets_33459a6173f34339ace15aa52591bebe\\sound\\sfx\\ambience\\b30\\b30computer_no_detail' and BSP background 'gs_assets_33459a6173f34339ace15aa52591bebe\\sound\\sfx\\ambience\\b30\\b30computer_no_detail' both reach music-class sounds. This combination is known to crash Halo/Sapien. Choose an ambient-class loop or explicitly review the authored source classes; Spark has not changed them.",
+      "rejected": true,
+      "sha256": "9341613cd999d624ae3e2fc0ce0c333834c434d0cb944bf66561af86ce85ce4b"
+    },
+    "nativeToolSha256": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+    "invaderEditSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "previousGoodUnchanged": true
+  },
+  "gameplayAudioVerified": false,
+  "gameReplicationVerified": false,
+  "pageErrors": [],
+  "notes": [
+    "All sample bytes and original game files remain private; only identities, native metadata and observed results are included.",
+    "Genuine native Tool compilation, native tag/cache readback and decoded sample energy are verified. Actual in-game audibility is not verified.",
+    "Earlier unsuccessful extraction and UI trials remain preserved; no known tool is blamed for deliberate QA corruption."
+  ],
+  "earlierAcceptedApplicationSha256": "7270d07fb06de40fb3207428edcda4932666e594c01bf8cab27304694f21730d"
+}

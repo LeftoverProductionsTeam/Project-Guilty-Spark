@@ -42,13 +42,33 @@
 .viewport-asset-library {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
   min-width: 0;
 }
-.viewport-asset-library > label {
+.asset-library-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 6px;
+  min-width: 0;
+}
+.asset-library-filters > label {
   display: flex;
   flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 11px;
+}
+.asset-library-filters > :is(input, .button-row) {
+  grid-column: 1 / -1;
+}
+.asset-library-filters .button-row {
   gap: 5px;
+  margin: 0;
+}
+.asset-library-filters button {
+  flex: 1;
+  padding: 5px 6px;
+  font-size: 11px;
 }
 .viewport-asset-library select,
 .viewport-asset-library input {
@@ -56,16 +76,58 @@
   min-width: 0;
 }
 .viewport-asset-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(144px, 100%), 1fr));
+  align-items: start;
+  gap: 7px;
 }
 .viewport-asset-list article {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--line);
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.viewport-asset-list .viewport-asset-source {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  padding: 5px 6px;
+}
+.viewport-asset-list article > button:last-child {
+  margin: 0;
+  font-size: 10px;
+  min-height: 26px;
+}
+.viewport-asset-source strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewport-asset-source code {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.viewport-asset-list .library-asset-preview:has(> img),
+.viewport-asset-list .library-asset-preview:has(> .native-model-preview) {
+  height: 96px;
+  min-height: 96px;
+}
+.viewport-asset-list .library-asset-preview img {
+  height: 96px;
+}
+.viewport-asset-list .native-model-preview {
+  min-height: 96px;
+}
+.viewport-asset-list .library-asset-preview .sound-inspector {
+  min-width: 0;
+  width: 100%;
 }
 .viewport-asset-list .viewport-asset-source {
   display: flex;

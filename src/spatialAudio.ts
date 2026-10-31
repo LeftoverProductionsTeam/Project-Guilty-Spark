@@ -40,6 +40,8 @@ export interface SoundEmitter {
   spatial: boolean;
   loopingSource?: { tagId: number; track: number } | null;
   customSound?: { assetId: string; sha256: string } | null;
+  /** Explicit native placement; all mixer controls continue to describe editor rehearsal. */
+  nativePlacement?: boolean;
 }
 export interface SoundScene {
   schemaVersion: 1;
@@ -195,6 +197,8 @@ export function validateSoundScene(s: SoundScene): string[] {
       typeof e.loop !== 'boolean' ||
       typeof e.enabled !== 'boolean' ||
       (e.followChain !== undefined && typeof e.followChain !== 'boolean') ||
+      (e.nativePlacement !== undefined && typeof e.nativePlacement !== 'boolean') ||
+      (e.nativePlacement === true && (!e.loopingSource || !!e.customSound || !e.sourceProjectId || !e.sourceSha256)) ||
       typeof e.spatial !== 'boolean' ||
       (e.loopingSource != null &&
         (!Number.isInteger(e.loopingSource.tagId) ||

@@ -1,0 +1,1461 @@
+{
+  "schemaVersion": 1,
+  "complete": true,
+  "qualityAccepted": true,
+  "conditions": {
+    "profile": "fresh library and WebView profile; process-cold, not flushed OS disk cache",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "focusEmulation": true,
+    "qualityUnchanged": true,
+    "contentViewport": {
+      "width": 1428,
+      "height": 888
+    },
+    "afterMapViewport": {
+      "width": 1428,
+      "height": 888
+    }
+  },
+  "beforeApplicationSha256": [
+    "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077"
+  ],
+  "afterApplicationSha256": [
+    "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47"
+  ],
+  "sourceRuns": [
+    "perf-baseline-3",
+    "perf-baseline-4",
+    "perf-accepted-1",
+    "perf-accepted-2"
+  ],
+  "processColdShellMs": {
+    "before": [
+      1002.1666999999999,
+      974.3995
+    ],
+    "after": [
+      1036.3876,
+      1624.1864
+    ],
+    "beforeMedian": 988.2830999999999,
+    "afterMedian": 1330.287,
+    "betterWhen": "lower",
+    "improvementPercent": -34.60586344135604
+  },
+  "warmProcessShellMs": {
+    "before": [
+      652.0755000000063,
+      668.8902999999991
+    ],
+    "after": [
+      767.4122000000061,
+      734.3989000000001
+    ],
+    "beforeMedian": 660.4829000000027,
+    "afterMedian": 750.9055500000031,
+    "betterWhen": "lower",
+    "improvementPercent": -13.690384717000253
+  },
+  "processColdShowcaseMs": {
+    "before": [
+      5646.271900000001,
+      5593.4979
+    ],
+    "after": [
+      5490.216799999999,
+      6408.4203
+    ],
+    "beforeMedian": 5619.884900000001,
+    "afterMedian": 5949.31855,
+    "betterWhen": "lower",
+    "improvementPercent": -5.861928773665792
+  },
+  "warmProcessShowcaseMs": {
+    "before": [
+      3242.5955000000104,
+      3227.9906000000046
+    ],
+    "after": [
+      3286.855500000005,
+      3262.432400000005
+    ],
+    "beforeMedian": 3235.2930500000075,
+    "afterMedian": 3274.643950000005,
+    "betterWhen": "lower",
+    "improvementPercent": -1.216300946833782
+  },
+  "pollingIpcMs": {
+    "before": [
+      4.225300000000061,
+      3.2079000000001088,
+      4.328499999999849,
+      2.2952999999999975,
+      1.8100999999999203,
+      1.7721000000001368,
+      1.8419999999998709,
+      1.518100000000004,
+      1.6140000000000327,
+      1.5670000000000073,
+      2.8623999999999796,
+      1.9626000000000658,
+      3.4345999999998185,
+      2.9528000000000247,
+      3.261600000000044,
+      3.181100000000015,
+      2.2601999999999407,
+      1.5729000000001179,
+      1.5632999999997992,
+      1.6847000000000207
+    ],
+    "after": [
+      2.9792999999999665,
+      4.611499999999978,
+      3.160699999999906,
+      2.9204999999999472,
+      3.0003999999998996,
+      2.363200000000006,
+      1.8428999999998723,
+      1.6670000000001437,
+      1.6014000000000124,
+      1.5835000000001855,
+      2.200700000000097,
+      1.8641999999999825,
+      1.8123000000000502,
+      1.786200000000008,
+      1.9707999999998265,
+      2.11649999999986,
+      2.8133000000000266,
+      2.4131999999999607,
+      4.9297999999998865,
+      2.9501000000000204
+    ],
+    "beforeMedian": 2.1114000000000033,
+    "afterMedian": 2.2819500000000517,
+    "betterWhen": "lower",
+    "improvementPercent": -8.077578857632288
+  },
+  "openProjectIpcMs": {
+    "before": [
+      2675.459799999997,
+      2575.696800000005,
+      2539.8122000000003,
+      2574.6861000000063,
+      2762.5380000000005,
+      2623.3358000000007,
+      2557.7683000000106,
+      2591.566200000001
+    ],
+    "after": [
+      2782.7793999999994,
+      2995.5979000000007,
+      2767.606500000009,
+      2695.267000000007,
+      2781.853600000002,
+      2694.613700000009,
+      2835.75450000001,
+      2645.4575999999943
+    ],
+    "beforeMedian": 2583.631500000003,
+    "afterMedian": 2774.7300500000056,
+    "betterWhen": "lower",
+    "improvementPercent": -7.396509525449051
+  },
+  "phaseTimes": {
+    "showcase-first-initialization": {
+      "before": [
+        4550.223599999999,
+        4503.657
+      ],
+      "after": [
+        4344.235500000001,
+        4657.8332
+      ],
+      "beforeMedian": 4526.9403,
+      "afterMedian": 4501.03435,
+      "betterWhen": "lower",
+      "improvementPercent": 0.5722617989903755
+    },
+    "native-import-1": {
+      "before": [
+        2903.6934999999994,
+        2922.4336000000003
+      ],
+      "after": [
+        3186.9905,
+        3125.9653
+      ],
+      "beforeMedian": 2913.06355,
+      "afterMedian": 3156.4779,
+      "betterWhen": "lower",
+      "improvementPercent": -8.355957424959028
+    },
+    "native-import-2": {
+      "before": [
+        3202.2523999999994,
+        3311.6123000000007
+      ],
+      "after": [
+        3300.8714,
+        3403.1426999999985
+      ],
+      "beforeMedian": 3256.93235,
+      "afterMedian": 3352.0070499999993,
+      "betterWhen": "lower",
+      "improvementPercent": -2.9191487505105598
+    },
+    "first-textured-map-1": {
+      "before": [
+        9067.5556,
+        9051.384899999997
+      ],
+      "after": [
+        8030.7605,
+        8003.829299999998
+      ],
+      "beforeMedian": 9059.470249999998,
+      "afterMedian": 8017.294899999999,
+      "betterWhen": "lower",
+      "improvementPercent": 11.503711820235843
+    },
+    "first-textured-map-2": {
+      "before": [
+        6748.852299999999,
+        6667.343500000003
+      ],
+      "after": [
+        5654.834300000002,
+        5473.1312
+      ],
+      "beforeMedian": 6708.097900000001,
+      "afterMedian": 5563.982750000001,
+      "betterWhen": "lower",
+      "improvementPercent": 17.055731252819065
+    },
+    "map-switch-1-to-1": {
+      "before": [
+        5950.932799999995,
+        6087.036800000002
+      ],
+      "after": [
+        5065.076100000006,
+        5068.895700000001
+      ],
+      "beforeMedian": 6018.984799999998,
+      "afterMedian": 5066.985900000003,
+      "betterWhen": "lower",
+      "improvementPercent": 15.816602494161396
+    },
+    "map-switch-2-to-2": {
+      "before": [
+        5429.605300000003,
+        5435.3110000000015
+      ],
+      "after": [
+        4089.527900000001,
+        4087.5132999999987
+      ],
+      "beforeMedian": 5432.458150000002,
+      "afterMedian": 4088.5206,
+      "betterWhen": "lower",
+      "improvementPercent": 24.73903181380241
+    },
+    "map-switch-3-to-1": {
+      "before": [
+        5885.2641,
+        5919.187700000002
+      ],
+      "after": [
+        5079.767700000004,
+        5063.702899999997
+      ],
+      "beforeMedian": 5902.225900000001,
+      "afterMedian": 5071.7353,
+      "betterWhen": "lower",
+      "improvementPercent": 14.070803355730604
+    },
+    "map-switch-4-to-2": {
+      "before": [
+        5501.964100000005,
+        5350.953499999996
+      ],
+      "after": [
+        4122.962999999996,
+        4015.9891999999963
+      ],
+      "beforeMedian": 5426.4588,
+      "afterMedian": 4069.476099999996,
+      "betterWhen": "lower",
+      "improvementPercent": 25.006781586547827
+    },
+    "large-asset-catalog": {
+      "before": [
+        4259.037499999991,
+        4181.993399999992
+      ],
+      "after": [
+        4110.574800000002,
+        4082.775600000008
+      ],
+      "beforeMedian": 4220.515449999992,
+      "afterMedian": 4096.675200000005,
+      "betterWhen": "lower",
+      "improvementPercent": 2.9342446785732488
+    },
+    "showcase-warm-return": {
+      "before": [
+        954.7861999999877,
+        958.230899999995
+      ],
+      "after": [
+        957.4919999999984,
+        947.7982000000047
+      ],
+      "beforeMedian": 956.5085499999914,
+      "afterMedian": 952.6451000000015,
+      "betterWhen": "lower",
+      "improvementPercent": 0.4039117057542099
+    },
+    "showcase-warm-process": {
+      "before": [
+        2541.171100000007,
+        2549.0039000000106
+      ],
+      "after": [
+        2499.9475000000093,
+        2507.809500000003
+      ],
+      "beforeMedian": 2545.0875000000087,
+      "afterMedian": 2503.878500000006,
+      "betterWhen": "lower",
+      "improvementPercent": 1.619158476869751
+    }
+  },
+  "repeatSwitchMs": {
+    "before": [
+      5950.932799999995,
+      5429.605300000003,
+      5885.2641,
+      5501.964100000005,
+      6087.036800000002,
+      5435.3110000000015,
+      5919.187700000002,
+      5350.953499999996
+    ],
+    "after": [
+      5065.076100000006,
+      4089.527900000001,
+      5079.767700000004,
+      4122.962999999996,
+      5068.895700000001,
+      4087.5132999999987,
+      5063.702899999997,
+      4015.9891999999963
+    ],
+    "beforeMedian": 5693.6141000000025,
+    "afterMedian": 4593.332949999996,
+    "betterWhen": "lower",
+    "improvementPercent": 19.32482831950282
+  },
+  "repeatBitmapDecodeMs": {
+    "before": [
+      3635.600000053644,
+      3672.9000000953674
+    ],
+    "after": [
+      2767.7000000178814,
+      2757.999999985099
+    ],
+    "beforeMedian": 3654.250000074506,
+    "afterMedian": 2762.85000000149,
+    "betterWhen": "lower",
+    "improvementPercent": 24.393514402540635
+  },
+  "repeatCubeRequests": {
+    "before": [
+      160,
+      160
+    ],
+    "after": [
+      42,
+      42
+    ],
+    "beforeMedian": 160,
+    "afterMedian": 42,
+    "betterWhen": "lower",
+    "improvementPercent": 73.75
+  },
+  "renderingFps": {
+    "before": [
+      55.99104143212493,
+      55.51149880981191,
+      55.79912315531054,
+      55.79912315862449,
+      55.949272660699314,
+      55.910543129659544,
+      55.68814637895018,
+      55.7768924302789
+    ],
+    "after": [
+      59.992500936712446,
+      60,
+      59.92509363295881,
+      60,
+      60.03752345215759,
+      60,
+      59.992500940064375,
+      59.952038372161006
+    ],
+    "beforeMedian": 55.79912315696751,
+    "afterMedian": 59.99625047003219,
+    "betterWhen": "higher",
+    "improvementPercent": 7.521851734583378
+  },
+  "counters": {
+    "showcase-process-cpu-gpu-memory": {
+      "cpuMachinePercent": {
+        "before": [
+          0.5069759896171318,
+          0.5470938375350141
+        ],
+        "after": [
+          1.057376256767208,
+          1.0324576193948232
+        ],
+        "beforeMedian": 0.5270349135760729,
+        "afterMedian": 1.0449169380810157,
+        "betterWhen": "lower",
+        "improvementPercent": -98.26332395912345
+      },
+      "residentMiB": {
+        "before": [
+          850.98828125,
+          636.796875
+        ],
+        "after": [
+          804.1171875,
+          646.4140625
+        ],
+        "beforeMedian": 743.892578125,
+        "afterMedian": 725.265625,
+        "betterWhen": "lower",
+        "improvementPercent": 2.5039842677217865
+      },
+      "privateMiB": {
+        "before": [
+          816.78125,
+          607.921875
+        ],
+        "after": [
+          768.03515625,
+          611.4296875
+        ],
+        "beforeMedian": 712.3515625,
+        "afterMedian": 689.732421875,
+        "betterWhen": "lower",
+        "improvementPercent": 3.175277744266898
+      },
+      "gpu3DPercent": {
+        "before": [
+          8,
+          7
+        ],
+        "after": [
+          9,
+          9
+        ],
+        "beforeMedian": 7.5,
+        "afterMedian": 9,
+        "betterWhen": "lower",
+        "improvementPercent": -20
+      },
+      "gpuDedicatedMiB": {
+        "before": [
+          162.90234375,
+          165.42578125
+        ],
+        "after": [
+          173.0703125,
+          172.1484375
+        ],
+        "beforeMedian": 164.1640625,
+        "afterMedian": 172.609375,
+        "betterWhen": "lower",
+        "improvementPercent": -5.144434397753772
+      }
+    },
+    "map-1-process-cpu-gpu-memory": {
+      "cpuMachinePercent": {
+        "before": [
+          2.2631012991573036,
+          2.53030899859944
+        ],
+        "after": [
+          2.5831190301249083,
+          2.734662859248342
+        ],
+        "beforeMedian": 2.3967051488783717,
+        "afterMedian": 2.6588909446866253,
+        "betterWhen": "lower",
+        "improvementPercent": -10.939426400905148
+      },
+      "residentMiB": {
+        "before": [
+          1441.6328125,
+          1192.1484375
+        ],
+        "after": [
+          1339.85546875,
+          1289.91796875
+        ],
+        "beforeMedian": 1316.890625,
+        "afterMedian": 1314.88671875,
+        "betterWhen": "lower",
+        "improvementPercent": 0.15216952812614942
+      },
+      "privateMiB": {
+        "before": [
+          1327.31640625,
+          1069.66015625
+        ],
+        "after": [
+          1236.4609375,
+          1193.5
+        ],
+        "beforeMedian": 1198.48828125,
+        "afterMedian": 1214.98046875,
+        "betterWhen": "lower",
+        "improvementPercent": -1.3760824997636998
+      },
+      "gpu3DPercent": {
+        "before": [
+          4,
+          4
+        ],
+        "after": [
+          11,
+          11
+        ],
+        "beforeMedian": 4,
+        "afterMedian": 11,
+        "betterWhen": "lower",
+        "improvementPercent": -175
+      },
+      "gpuDedicatedMiB": {
+        "before": [
+          176.4375,
+          174.453125
+        ],
+        "after": [
+          192.29296875,
+          192.4296875
+        ],
+        "beforeMedian": 175.4453125,
+        "afterMedian": 192.361328125,
+        "betterWhen": "lower",
+        "improvementPercent": -9.641759807632365
+      }
+    },
+    "map-2-process-cpu-gpu-memory": {
+      "cpuMachinePercent": {
+        "before": [
+          1.2370249824067558,
+          1.1724267302259888
+        ],
+        "after": [
+          1.8724649705014749,
+          1.7663921188630491
+        ],
+        "beforeMedian": 1.2047258563163723,
+        "afterMedian": 1.819428544682262,
+        "betterWhen": "lower",
+        "improvementPercent": -51.02427951911269
+      },
+      "residentMiB": {
+        "before": [
+          1331.09765625,
+          1339.7421875
+        ],
+        "after": [
+          1359.16015625,
+          1455.23046875
+        ],
+        "beforeMedian": 1335.419921875,
+        "afterMedian": 1407.1953125,
+        "betterWhen": "lower",
+        "improvementPercent": -5.37474313878915
+      },
+      "privateMiB": {
+        "before": [
+          1172.31640625,
+          1173.1171875
+        ],
+        "after": [
+          1202.27734375,
+          1311.0859375
+        ],
+        "beforeMedian": 1172.716796875,
+        "afterMedian": 1256.681640625,
+        "betterWhen": "lower",
+        "improvementPercent": -7.159856836172683
+      },
+      "gpu3DPercent": {
+        "before": [
+          4,
+          4
+        ],
+        "after": [
+          8,
+          8
+        ],
+        "beforeMedian": 4,
+        "afterMedian": 8,
+        "betterWhen": "lower",
+        "improvementPercent": -100
+      },
+      "gpuDedicatedMiB": {
+        "before": [
+          121.92578125,
+          122.109375
+        ],
+        "after": [
+          128.328125,
+          128.44140625
+        ],
+        "beforeMedian": 122.017578125,
+        "afterMedian": 128.384765625,
+        "betterWhen": "lower",
+        "improvementPercent": -5.218254285851488
+      }
+    },
+    "repeat-switch-memory": {
+      "cpuMachinePercent": {
+        "before": [
+          1.2444690265486724,
+          2.108178098885794
+        ],
+        "after": [
+          2.1167225385745776,
+          2.0578211645101665
+        ],
+        "beforeMedian": 1.6763235627172333,
+        "afterMedian": 2.087271851542372,
+        "betterWhen": "lower",
+        "improvementPercent": -24.51485488630924
+      },
+      "residentMiB": {
+        "before": [
+          1288.74609375,
+          1458.640625
+        ],
+        "after": [
+          1528.7890625,
+          1497.828125
+        ],
+        "beforeMedian": 1373.693359375,
+        "afterMedian": 1513.30859375,
+        "betterWhen": "lower",
+        "improvementPercent": -10.163493433390537
+      },
+      "privateMiB": {
+        "before": [
+          1128.15625,
+          1287.1953125
+        ],
+        "after": [
+          1387.4375,
+          1337.51953125
+        ],
+        "beforeMedian": 1207.67578125,
+        "afterMedian": 1362.478515625,
+        "betterWhen": "lower",
+        "improvementPercent": -12.81823621690683
+      },
+      "gpu3DPercent": {
+        "before": [
+          4,
+          4
+        ],
+        "after": [
+          9,
+          9
+        ],
+        "beforeMedian": 4,
+        "afterMedian": 9,
+        "betterWhen": "lower",
+        "improvementPercent": -125
+      },
+      "gpuDedicatedMiB": {
+        "before": [
+          121.30859375,
+          121.82421875
+        ],
+        "after": [
+          128.25390625,
+          128.3203125
+        ],
+        "beforeMedian": 121.56640625,
+        "afterMedian": 128.287109375,
+        "betterWhen": "lower",
+        "improvementPercent": -5.528421323222261
+      }
+    },
+    "after-maps-home-memory": {
+      "cpuMachinePercent": {
+        "before": [
+          0.8912118287118287,
+          0.7917143990130419
+        ],
+        "after": [
+          1.0826635254988914,
+          0.6476833087693441
+        ],
+        "beforeMedian": 0.8414631138624353,
+        "afterMedian": 0.8651734171341178,
+        "betterWhen": "lower",
+        "improvementPercent": -2.8177471930823894
+      },
+      "residentMiB": {
+        "before": [
+          1464.171875,
+          1375.38671875
+        ],
+        "after": [
+          1607.69140625,
+          1343.29296875
+        ],
+        "beforeMedian": 1419.779296875,
+        "afterMedian": 1475.4921875,
+        "betterWhen": "lower",
+        "improvementPercent": -3.924052896645743
+      },
+      "privateMiB": {
+        "before": [
+          1476.9296875,
+          1365.23828125
+        ],
+        "after": [
+          1668.84765625,
+          1394.9609375
+        ],
+        "beforeMedian": 1421.083984375,
+        "afterMedian": 1531.904296875,
+        "betterWhen": "lower",
+        "improvementPercent": -7.798294380802507
+      },
+      "gpu3DPercent": {
+        "before": [
+          8,
+          7
+        ],
+        "after": [
+          9,
+          9
+        ],
+        "beforeMedian": 7.5,
+        "afterMedian": 9,
+        "betterWhen": "lower",
+        "improvementPercent": -20
+      },
+      "gpuDedicatedMiB": {
+        "before": [
+          175.9296875,
+          174.36328125
+        ],
+        "after": [
+          194.98046875,
+          198.8671875
+        ],
+        "beforeMedian": 175.146484375,
+        "afterMedian": 196.923828125,
+        "betterWhen": "lower",
+        "improvementPercent": -12.433788681349316
+      }
+    },
+    "warm-process-memory": {
+      "cpuMachinePercent": {
+        "before": [
+          0.6172094452247191,
+          0.6903941322021916
+        ],
+        "after": [
+          1.0093669250645994,
+          0.858202123764189
+        ],
+        "beforeMedian": 0.6538017887134553,
+        "afterMedian": 0.9337845244143942,
+        "betterWhen": "lower",
+        "improvementPercent": -42.823794693478305
+      },
+      "residentMiB": {
+        "before": [
+          610.77734375,
+          781.0625
+        ],
+        "after": [
+          785.890625,
+          783.12109375
+        ],
+        "beforeMedian": 695.919921875,
+        "afterMedian": 784.505859375,
+        "betterWhen": "lower",
+        "improvementPercent": -12.72932915346425
+      },
+      "privateMiB": {
+        "before": [
+          617.96484375,
+          776.23046875
+        ],
+        "after": [
+          767.1171875,
+          763.5078125
+        ],
+        "beforeMedian": 697.09765625,
+        "afterMedian": 765.3125,
+        "betterWhen": "lower",
+        "improvementPercent": -9.785550580812185
+      },
+      "gpu3DPercent": {
+        "before": [
+          7,
+          7
+        ],
+        "after": [
+          9,
+          10
+        ],
+        "beforeMedian": 7,
+        "afterMedian": 9.5,
+        "betterWhen": "lower",
+        "improvementPercent": -35.714285714285715
+      },
+      "gpuDedicatedMiB": {
+        "before": [
+          155.54296875,
+          155.5703125
+        ],
+        "after": [
+          170.95703125,
+          164.734375
+        ],
+        "beforeMedian": 155.556640625,
+        "afterMedian": 167.845703125,
+        "betterWhen": "lower",
+        "improvementPercent": -7.900056500721954
+      }
+    }
+  },
+  "quality": [
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "first-textured-map-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 148,
+      "reflectionBindings": 65,
+      "reflectionIssues": 3,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "map-switch-1-to-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 148,
+      "reflectionBindings": 65,
+      "reflectionIssues": 3,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "map-switch-3-to-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 148,
+      "reflectionBindings": 65,
+      "reflectionIssues": 3,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "first-textured-map-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "map-switch-2-to-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "map-switch-4-to-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "first-textured-map-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 148,
+      "reflectionBindings": 65,
+      "reflectionIssues": 3,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "map-switch-1-to-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 148,
+      "reflectionBindings": 65,
+      "reflectionIssues": 3,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "map-switch-3-to-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 148,
+      "reflectionBindings": 65,
+      "reflectionIssues": 3,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "first-textured-map-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "map-switch-2-to-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "8764a2c4b712724e88339dc9b0432ea788a671f48f9d41e570bc1041689fe077",
+      "phase": "map-switch-4-to-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "first-textured-map-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 151,
+      "reflectionBindings": 68,
+      "reflectionIssues": 0,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "map-switch-1-to-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 151,
+      "reflectionBindings": 68,
+      "reflectionIssues": 0,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "map-switch-3-to-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 151,
+      "reflectionBindings": 68,
+      "reflectionIssues": 0,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "first-textured-map-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "map-switch-2-to-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "map-switch-4-to-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "first-textured-map-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 151,
+      "reflectionBindings": 68,
+      "reflectionIssues": 0,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "map-switch-1-to-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 151,
+      "reflectionBindings": 68,
+      "reflectionIssues": 0,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "map-switch-3-to-1",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "sourceShaders": 151,
+      "compatibleShaders": 0,
+      "shaderIdsSha256": "6e3a430dff855258e39df56b9ee1da392c07a462bbf27d88f2ba720af62352c8",
+      "lightmaps": 15,
+      "materialExtras": 151,
+      "reflectionBindings": 68,
+      "reflectionIssues": 0,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 68,
+      "residentGeometries": 72,
+      "visiblePassTriangles": 92598,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "first-textured-map-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "map-switch-2-to-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    },
+    {
+      "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+      "phase": "map-switch-4-to-2",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "sourceShaders": 124,
+      "compatibleShaders": 75,
+      "shaderIdsSha256": "121d57b213740b2d2a37561178f4fdf40264966de0d7cd0314037ffbb33070ff",
+      "lightmaps": 15,
+      "materialExtras": 56,
+      "reflectionBindings": 8,
+      "reflectionIssues": 43,
+      "decals": {
+        "source": 8,
+        "rendered": 8,
+        "omitted": 0
+      },
+      "nativeSourceRenderTriangles": 5503,
+      "nativeModelTypes": 74,
+      "residentGeometries": 38,
+      "visiblePassTriangles": 53498,
+      "canvas": [
+        1426,
+        616
+      ]
+    }
+  ],
+  "notes": [
+    "Two complete independent fresh-profile runs for each executable; home/startup use 1440x900/DPR 1. Map content area is held at 1428x888: baseline outer viewport 1440x900 with 6-pixel gutter, final map viewport 1428x888 without gutter.",
+    "Settled readiness includes every authored decal, zero pending materials and a stable signature for at least 750 ms.",
+    "Process-cold does not mean a flushed Windows disk cache. Warm process reuses its own library/WebView profile.",
+    "CPU/RAM/GPU are settled owned process-tree observations, not peak allocations or isolated whole-machine GPU benchmarks.",
+    "Map canvas resolution, environment/effects, native source mesh/model/object counts, resident geometries and visible-pass triangles must all match. Compact layout/scrollbars can increase the home width; home may not use fewer pixels.",
+    "Native read/hash/resource validation still executes on repeated preview requests; the bounded pixel cache reuses only identical freshly validated DDS bytes.",
+    "Preliminary baseline 1 failed due to Windows PowerShell policy; baseline 2 had premature readiness. Interim optimized runs 1/2 lost four reflection bindings and are excluded. Release runs 1/2 changed the map work-area aspect; normalized runs 1/2 reduced the home height and are excluded. Final accepted runs restore baseline map content and home height. All earlier trials remain preserved."
+  ]
+}

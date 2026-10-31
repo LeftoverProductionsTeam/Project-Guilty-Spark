@@ -53,6 +53,9 @@ pub(crate) struct View {
     mode: Option<Mode>,
     elapsed_ms: u64,
     visible_window: Option<bool>,
+    startup_error: Option<String>,
+    startup_warning: Option<String>,
+    window_summary: Option<String>,
 }
 struct Pins {
     game: PathBuf,
@@ -63,8 +66,32 @@ struct Process {
     child: ClientChild,
     began: Instant,
     mode: Mode,
-    // Keep every checked input open without write/delete sharing until exit.
-    _inputs: Vec<fs::File>,
+    // Executables, maps and ordinary resources stay pinned against writes.
+    // CE opens its four encrypted shader data files with share mode zero;
+    // those isolated copies are read-only and audited again when it exits.
+    _inputs: Inputs,
+    pins: Arc<Pins>,
+}
+#[derive(Debug)]
+struct Inputs {
+    _shared: Vec<fs::File>,
+    verified_files: usize,
+}
+fn exclusive_shader(name: &str) -> bool {
+    ce_setup::EXCLUSIVE_SHADER_FILES.contains(&name)
+}
+fn verify_exclusive_shaders(pins: &Pins) -> Reply<()> {
+    for (name, (size, hash)) in &pins.files {
+        if !exclusive_shader(name) { continue; }
+        let file = pins.game.join(name);
+        core::reject_links(&file).map_err(error)?;
+        let metadata = fs::metadata(&file).map_err(error)?;
+        if !metadata.is_file() || metadata.len() != *size || !metadata.permissions().readonly()
+            || maps::hash_file(&file).map_err(error)? != *hash {
+            return Err(format!("Private shader input changed: {name}. Stop and prepare a new private copy; gameplay integrity was not certified."));
+        }
+    }
+    Ok(())
 }
 #[derive(Default)]
 pub(super) struct State {
@@ -172,6 +199,9 @@ impl State {
                 mode: None,
                 elapsed_ms: 0,
                 visible_window: None,
+                startup_error: None,
+                startup_warning: None,
+                window_summary: None,
             });
         }
         let began = Instant::now();
@@ -195,7 +225,7 @@ impl State {
             self.check(epoch, stopped)?;
             let mut view = lock(&self.view)?;
             let view = view.as_mut().ok_or("Missing matching client state")?;
-            view.verified_files = inputs.len();
+            view.verified_files = inputs.verified_files;
             view.verified_bytes = pins.files.values().map(|(bytes, _)| bytes).sum();
             view.verification_ms = began.elapsed().as_millis().min(u64::MAX as u128) as u64;
             if matches!(action, Action::Launch | Action::Setup) {
@@ -218,6 +248,7 @@ impl State {
                     began: Instant::now(),
                     mode,
                     _inputs: inputs,
+                    pins: pins.clone(),
                 });
             } else {
                 view.phase = "ready".into();
@@ -241,14 +272,19 @@ impl State {
     pub(super) fn stop(&self, detail: &str) -> Reply<()> {
         let mut process = lock(&self.process)?;
         self.epoch.fetch_add(1, Ordering::Relaxed);
+        let pins = process.as_ref().map(|p| p.pins.clone());
         drop(process.take()); // Only this owned child; no process-name/PID search.
+        let integrity = pins.map_or(Ok(()), |p| verify_exclusive_shaders(&p));
         if let Some(view) = lock(&self.view)?.as_mut() {
             view.phase = "stopped".into();
             view.process_id = None;
             view.visible_window = None;
-            view.detail = detail.into();
+            view.startup_error = None;
+            view.startup_warning = None;
+            view.window_summary = None;
+            view.detail = integrity.as_ref().err().cloned().unwrap_or_else(|| detail.into());
         }
-        Ok(())
+        integrity
     }
     pub(super) fn observe(&self) -> Reply<()> {
         let mut process = lock(&self.process)?;
@@ -259,8 +295,19 @@ impl State {
         if let Some(view) = lock(&self.view)?.as_mut() {
             view.elapsed_ms = elapsed.as_millis().min(u64::MAX as u128) as u64;
             #[cfg(windows)]
-            { view.visible_window = gui::visible_window(current.child.id()); }
-            if view.visible_window == Some(false) && elapsed >= Duration::from_secs(15) {
+            { if let Some(observed) = gui::observe_window(current.child.id()) {
+                view.visible_window = Some(observed.visible);
+                // A fatal dialog can close before the next status request.
+                // Retain its captured message until the next explicit action.
+                view.startup_error = observed.startup_error.or_else(|| view.startup_error.take());
+                view.startup_warning = observed.startup_warning;
+                view.window_summary = Some(observed.summary);
+            } }
+            if let Some(detail) = &view.startup_error {
+                view.detail = format!("Halo reported a startup error: {detail}. This dialog is not a playable game or a joined client. Stop playtest before retrying.");
+            } else if let Some(detail) = &view.startup_warning {
+                view.detail = format!("Halo is waiting at a startup warning: {detail}. Review it in the Halo window; Spark does not dismiss warnings automatically. A playable game and a joined client remain unverified.");
+            } else if view.visible_window == Some(false) && elapsed >= Duration::from_secs(15) {
                 view.detail = "Halo's process is running, but no visible game window was detected. Check the taskbar in case it is minimized. If no window appears, Stop playtest, then Check CE installation before retrying. First-run completion and a player join are not verified.".into();
             } else if matches!(current.mode, Mode::Playtest) && elapsed >= Duration::from_secs(30) {
                 view.detail = "CE is still running; a player join has not been verified. If startup is waiting, stop this window and use First-run help → Open CE setup to finish the test profile, then retry. You can also use Halo's Multiplayer → Direct IP with the address above.".into();
@@ -274,20 +321,21 @@ impl State {
             }
         }
         if let Some(code) = current.child.try_wait()? {
+            let integrity = verify_exclusive_shaders(&current.pins);
             drop(process.take());
             if let Some(view) = lock(&self.view)?.as_mut() {
                 view.phase = "closed".into();
                 view.process_id = None;
                 view.visible_window = None;
                 view.exit_code = code.code();
-                view.detail = format!("CE playtest closed ({code}). The private server remains available; prepare again to retry. Connection and gameplay were not certified by process exit.");
+                view.detail = integrity.err().unwrap_or_else(|| format!("CE playtest closed ({code}). The private server remains available; prepare again to retry. Connection and gameplay were not certified by process exit."));
             }
         }
         Ok(())
     }
 }
 
-fn verify(pins: &Pins, cancelled: impl Fn() -> Reply<()>) -> Reply<Vec<fs::File>> {
+fn verify(pins: &Pins, cancelled: impl Fn() -> Reply<()>) -> Reply<Inputs> {
     let mut found = BTreeMap::new();
     fn inventory(
         root: &Path,
@@ -368,10 +416,18 @@ fn verify(pins: &Pins, cancelled: impl Fn() -> Reply<()>) -> Reply<Vec<fs::File>
         if count != *size || spark_core::hex_bytes(digest.finalize()) != *hash {
             return Err(format!("Private input failed integrity: {name}. No client was launched. Stop and prepare a new private server copy."));
         }
-        inputs.push(input);
+        if exclusive_shader(name) {
+            // Only exact encrypted shader DATA names need CE's exclusive read.
+            // Set the private copy read-only before releasing the data-read pin.
+            let mut permissions = input.metadata().map_err(error)?.permissions();
+            permissions.set_readonly(true);
+            fs::set_permissions(&file, permissions).map_err(error)?;
+        } else {
+            inputs.push(input);
+        }
     }
     cancelled()?;
-    Ok(inputs)
+    Ok(Inputs { _shared: inputs, verified_files: pins.files.len() })
 }
 fn arguments(profile: &Path, port: u16, mode: Mode) -> Reply<Vec<std::ffi::OsString>> {
     if !(1024..65535).contains(&port) {
@@ -442,7 +498,7 @@ mod tests {
     #[test]
     fn byte_identity_and_inventory_are_required_not_editable_receipts() {
         let (_directory, pins) = fixture();
-        assert_eq!(verify(&pins, || Ok(())).unwrap().len(), 1);
+        assert_eq!(verify(&pins, || Ok(())).unwrap().verified_files, 1);
         fs::write(pins.game.join("test"), b"corrupted native data").unwrap();
         assert!(verify(&pins, || Ok(())).unwrap_err().contains("integrity"));
         fs::write(pins.game.join("test"), b"original native bytes").unwrap();
@@ -462,6 +518,41 @@ mod tests {
         assert!(fs::write(pins.game.join("test"), b"replaced").is_err());
         drop(files);
         fs::write(pins.game.join("test"), b"original native bytes").unwrap();
+    }
+    #[cfg(windows)]
+    #[test]
+    fn native_exclusive_shader_reads_keep_other_inputs_pinned_and_detect_shader_changes() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let (_directory, mut pins) = fixture();
+        fs::create_dir(pins.game.join("shaders")).unwrap();
+        let name = "shaders/vsh.enc";
+        let shader = pins.game.join(name);
+        let bytes = b"isolated encrypted shader fixture";
+        fs::write(&shader, bytes).unwrap();
+        pins.files.insert(name.into(), (bytes.len() as u64, spark_core::hex_bytes(Sha256::digest(bytes))));
+        let inputs = verify(&pins, || Ok(())).unwrap();
+        assert_eq!(inputs.verified_files, 2);
+        assert_eq!(inputs._shared.len(), 1);
+        let mut read = fs::OpenOptions::new().read(true).share_mode(0).open(&shader).unwrap();
+        let mut actual = Vec::new();
+        read.read_to_end(&mut actual).unwrap();
+        assert_eq!(actual, bytes);
+        drop(read);
+        assert!(fs::write(&shader, b"changed").is_err());
+        assert!(fs::write(pins.game.join("test"), b"changed").is_err());
+        verify_exclusive_shaders(&pins).unwrap();
+        // Read-only data copies are not a security boundary against someone
+        // deliberately changing their attributes. Such a candidate must fail
+        // the exit audit and the next launch's full byte-identity check.
+        let mut permissions = fs::metadata(&shader).unwrap().permissions();
+        permissions.set_readonly(false);
+        fs::set_permissions(&shader, permissions).unwrap();
+        fs::write(&shader, b"corrupted encrypted shader bytes").unwrap();
+        assert!(verify_exclusive_shaders(&pins).unwrap_err().contains("shader input changed"));
+        drop(inputs);
+        assert!(verify(&pins, || Ok(())).is_err());
+        assert!(!exclusive_shader("shaders/arbitrary.enc"));
+        assert!(!exclusive_shader("shaders/vsh.dll"));
     }
     #[test]
     fn only_known_chat_resources_are_admitted() {

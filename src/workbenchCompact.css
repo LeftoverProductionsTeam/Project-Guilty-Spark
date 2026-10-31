@@ -1,11 +1,11 @@
 /* Shared workbench density. Keep controls legible and give content the width
    of its workspace; only lists and genuinely overflowing content scroll. */
-.application :is(.analysis-page,.library-page,.build-page,.settings-page,.preservation-page,.scenario-page) {padding:14px 18px;max-width:none;}
-.application .page-title {gap:12px;margin-bottom:12px;align-items:center;}
-.application .page-title h1 {font-size:22px;line-height:1.2;margin:0;}
+.application :is(.analysis-page,.library-page,.build-page,.settings-page,.preservation-page,.scenario-page) {padding:12px 14px;max-width:none;}
+.application .page-title {gap:10px;margin-bottom:9px;align-items:center;}
+.application .page-title h1 {font-size:20px;line-height:1.2;margin:0;}
 .application .page-title p {margin:5px 0 0;line-height:1.4;max-width:90ch;}
 .application .page-title .eyebrow {margin-bottom:5px;letter-spacing:1.2px;}
-.application :is(.analysis-card,.analysis-coverage) {padding:12px;margin:10px 0;}
+.application :is(.analysis-card,.analysis-coverage) {padding:10px;margin:8px 0;}
 .application .analysis-card h2 {font-size:15px;margin-bottom:8px;}
 .application :is(.analysis-card,.analysis-coverage) p {line-height:1.45;margin:6px 0;}
 .application :is(.analysis-actions,.analysis-summary) {gap:7px;margin:8px 0;}

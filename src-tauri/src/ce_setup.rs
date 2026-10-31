@@ -292,6 +292,10 @@ pub(super) fn inspect_root(root: &Path) -> Reply<Installation> {
         registered: false,
     })
 }
+pub(super) const EXCLUSIVE_SHADER_FILES: [&str; 4] = [
+    "shaders/vsh.enc", "shaders/EffectCollection_ps_1_1.enc",
+    "shaders/EffectCollection_ps_1_4.enc", "shaders/EffectCollection_ps_2_0.enc",
+];
 fn startup_issues(root: &Path) -> Vec<String> {
     let mut issues = Vec::new();
     for name in [
@@ -308,11 +312,20 @@ fn startup_issues(root: &Path) -> Vec<String> {
             issues.push(name.into());
         }
     }
-    let license = root.join("Eula.rtf");
-    if core::reject_links(&license).is_err()
-        || !fs::metadata(&license).is_ok_and(|m| m.is_file() && (1..=256 * 1024).contains(&m.len()))
-    {
-        issues.push("Eula.rtf".into());
+    for name in ["Eula.rtf", "config.txt"] {
+        let resource = root.join(name);
+        if core::reject_links(&resource).is_err()
+            || !fs::metadata(&resource).is_ok_and(|m| m.is_file() && (1..=256 * 1024).contains(&m.len()))
+        {
+            issues.push(name.into());
+        }
+    }
+    for name in EXCLUSIVE_SHADER_FILES {
+        let resource = root.join(name);
+        if core::reject_links(&resource).is_err()
+            || !fs::metadata(&resource).is_ok_and(|m| m.is_file() && (1..=4 * 1024 * 1024).contains(&m.len())) {
+            issues.push(name.into());
+        }
     }
     issues
 }
@@ -680,6 +693,32 @@ pub(super) async fn connect_custom_edition(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn shader_directory_alone_does_not_prove_native_startup_resources() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir(root.path().join("shaders")).unwrap();
+        for name in EXCLUSIVE_SHADER_FILES {
+            let file = root.path().join(name);
+            assert!(startup_issues(root.path()).iter().any(|issue| issue == name));
+            fs::write(&file, b"").unwrap();
+            assert!(startup_issues(root.path()).iter().any(|issue| issue == name));
+            fs::write(&file, b"bounded native data fixture").unwrap();
+            assert!(!startup_issues(root.path()).iter().any(|issue| issue == name));
+        }
+    }
+    #[test]
+    fn required_graphics_configuration_cannot_be_missing_empty_or_oversized() {
+        let root = tempfile::tempdir().unwrap();
+        let config = root.path().join("config.txt");
+        assert!(startup_issues(root.path()).iter().any(|name| name == "config.txt"));
+        fs::write(&config, b"").unwrap();
+        assert!(startup_issues(root.path()).iter().any(|name| name == "config.txt"));
+        fs::write(&config, vec![b' '; 256 * 1024 + 1]).unwrap();
+        assert!(startup_issues(root.path()).iter().any(|name| name == "config.txt"));
+        fs::write(&config, b"// preserved native device configuration\n").unwrap();
+        assert!(!startup_issues(root.path()).iter().any(|name| name == "config.txt"));
+        assert_eq!(fs::read(&config).unwrap(), b"// preserved native device configuration\n");
+    }
     #[test]
     fn only_reviewed_game_members_are_selected() {
         for name in [

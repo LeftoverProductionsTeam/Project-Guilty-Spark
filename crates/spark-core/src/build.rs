@@ -103,6 +103,9 @@ pub fn compatibility(
 ) -> CompatibilityReport {
     let mut blockers = vec![];
     let mut warnings = vec![];
+    if crate::native_audio::requested(project) {
+        blockers.push("Native looping emitters currently require the MCC QuickForge source build; existing-map conversion cannot add them".into());
+    }
     if let Some(profile)=crate::portability::profiles().into_iter().find(|p|p.profile_id=="halo1-mcc-steam") {
         for finding in crate::portability::target_findings(inspection,&profile) {
             if finding.code=="MODEL_CLASS" {blockers.push(format!("{}: {}",finding.title,finding.next_action));}
@@ -747,6 +750,8 @@ pub fn run_build(
             output = output_dir.join(format!("{}.map", stem.to_ascii_lowercase()));
         }
         let validated = maps::inspect_map(&output, Some(resource_dir))?;
+        let sound_classes=crate::audio_rules::verify(&output,&validated)?;
+        project::atomic_write(&dir.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;
         crate::native_asset_imports::verify_compiled(project,&validated)?;
         if !project.native_asset_imports.is_empty(){let _=crate::native_asset_imports::available_files(jobs_root.parent().unwrap(),project)?;}
         crate::tag_duplicates::verify_compiled(project,inspection,&validated)?;

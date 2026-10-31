@@ -48,8 +48,8 @@
   margin-top: 8px;
 }
 .ce-host-session {
-  margin: 10px 0;
-  padding: 10px;
+  margin: 6px 0;
+  padding: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -59,19 +59,50 @@
   color: var(--accent);
 }
 .ce-host-client {
-  margin: 10px 0;
-  padding-top: 10px;
+  margin: 6px 0;
+  padding-top: 6px;
   border-top: 1px solid var(--line);
 }
 .ce-host-client .subtle {
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 11px;
+  line-height: 1.4;
 }
 .ce-host-session .button-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
+}
+.ce-private-host .section-heading h2 {
+  font-size: 15px;
+}
+.ce-private-host :is(input, select, button) {
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+.ce-private-host > p,
+.ce-host-session p {
+  margin: 5px 0;
+  line-height: 1.4;
+}
+.ce-host-startup-error {
+  display: grid;
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid var(--amber);
+  border-radius: 6px;
+}
+.ce-host-startup-error textarea {
+  width: 100%;
+  min-height: 48px;
+  max-height: 120px;
+  padding: 5px;
+  resize: vertical;
+  font: 11px/1.4 monospace;
+}
+.ce-host-startup-error small {
+  font-size: 10px;
 }
 .ce-host-session dl {
   display: grid;

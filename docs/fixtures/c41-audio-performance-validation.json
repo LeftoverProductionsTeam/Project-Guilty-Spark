@@ -1,0 +1,438 @@
+{
+  "schemaVersion": 1,
+  "complete": true,
+  "applicationSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+  "regressions": {
+    "rustPassed": 603,
+    "rustIgnored": 7,
+    "frontendPassed": 269,
+    "browserPassed": 126,
+    "offlinePassed": 59,
+    "interfaceProbePassed": 2,
+    "typeScriptPassed": true,
+    "optimizedWindowsBuild": true,
+    "nsisBuild": true,
+    "remoteCiRunVerified": false
+  },
+  "nativeAudioReceipt": "c41-native-loop-emitter.json",
+  "nativeFrame": {
+    "schemaVersion": 1,
+    "applicationSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+    "mockedIpc": false,
+    "complete": true,
+    "errors": [],
+    "restored": {
+      "x": 0,
+      "y": 0,
+      "width": 1500,
+      "height": 920,
+      "viewport": [
+        1500,
+        920
+      ],
+      "margin": "0px",
+      "borderRadius": "36px 20px 32px 16px"
+    },
+    "doubleClickMaximized": true,
+    "frameworkDoubleClickRoundTrip": true,
+    "nativeShadowEnabledInSource": false,
+    "osCompositeVisualVerification": false
+  },
+  "nativeAssets": {
+    "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+    "complete": true,
+    "mockedIpc": false,
+    "actualNativeGeometry": true,
+    "startup": {
+      "phase": "Workbench ready",
+      "completed": 3,
+      "total": 3,
+      "ready": true,
+      "elapsedMs": 399,
+      "statusRoundTripMs": [
+        3.4021999999999935,
+        2.8865999999998166,
+        2.0709999999999127,
+        1.874900000000025,
+        1.7381000000000313,
+        1.7265999999999622,
+        1.75649999999996,
+        1.8395000000000437,
+        3.4464000000000397,
+        2.955699999999979,
+        2.533300000000054,
+        2.8786999999999807
+      ]
+    },
+    "home": {
+      "transparentBackground": "true",
+      "modelTag": "3785621552",
+      "modelSource": "5fdc6d58-e7bd-4cda-88b5-ae4d66c36184",
+      "modelSourceHash": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+      "modelTriangles": "1126",
+      "modelReady": "true",
+      "nativeAnimationCount": "3",
+      "modelTextures": "1",
+      "modelReflections": "1",
+      "caption": "monitor · actual Halo model\nNext model"
+    },
+    "homeAnimation": {
+      "nativeGraphTag": 3785949237,
+      "clips": [
+        {
+          "name": "idle overlay",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "ff627546b76e99d9b41abb711c238db9451d8f85d531121b2c1c33aec17b3a40"
+        },
+        {
+          "name": "stand unarmed idle",
+          "frames": 10,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "d53208c62aef100991d79998fbdabcc12ec95d0d2dbb0ae7287d5ffa69b2afff"
+        },
+        {
+          "name": "monitor_talking-loop",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "70ee3ebc6cd9d545dae59e5db87503fa9571b73e56ef133fc9765e526e4ab924"
+        }
+      ],
+      "firstVertex": [
+        0.06243647262454033,
+        -0.027118690311908722,
+        0.075137197971344
+      ],
+      "laterVertex": [
+        0.06269241869449615,
+        -0.027118690311908722,
+        0.07819587737321854
+      ],
+      "actualSkinnedVerticesMove": true,
+      "pauseFreezesTime": true,
+      "nativeTalkingClipSelected": true,
+      "wrongSourceHashRejected": true
+    },
+    "reflection": {
+      "shader": "vehicles\\warthog\\shaders\\warthog hull",
+      "metadata": {
+        "bitmapTagId": 3786014774,
+        "perpendicularBrightness": 0.7,
+        "parallelBrightness": 1,
+        "perpendicularTint": [
+          0.69,
+          0.73,
+          0.65
+        ],
+        "parallelTint": [
+          0.6,
+          0.64,
+          0.57
+        ],
+        "falloff": 0,
+        "cutoff": 0
+      },
+      "faces": [
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "1e6c41e68a3bdaa908d6df6ac7b54ccc5e0ed08345e2d8ad377d52b9b23906e8"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "10b3fb898701506f74ff01521e408f276c9d523f92fb5933a8113de538e9bea1"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "54549bf82f8c5330e1af769ce64e92d7c792c2997aa10bd1e2470d47ad1b7e04"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "2050b2c597a635d18f64b0ff18ddbd851b0e85730af67cd92d9998ba7fec4834"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "f1a3876fb8de1d7649f8fafc3e978ff14f073bbbde163455e6406e4c37dcf424"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "3509206b2a795486d22a549c02f43365fa3d974cd7a8c0415331b8f8fe51c825"
+        }
+      ]
+    },
+    "compiled": {
+      "sha256": "39e15f2456fdc7979bffe17611d22cf177facd87cb38f639df34043f7ebd7c30",
+      "nativeTagPath": "gs_assets_31303f022a6640d69d5fac2dc542f3a5\\scenery\\rocks\\boulder\\boulder",
+      "position": [
+        1.5,
+        -1.5,
+        0.01
+      ],
+      "collisionTriangles": 12
+    },
+    "sourcePreserved": true,
+    "changedImportRejected": [
+      "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+    ],
+    "previousBuildPreserved": true,
+    "javascriptErrors": []
+  },
+  "customEdition": {
+    "complete": true,
+    "appSha256": "ef5dadecc51dfc7d341cb358ae5b3dbbed8a247321e6f4009cdf63ef9a536b47",
+    "mockedIpc": false,
+    "network": "127.0.0.1 only",
+    "publicListingRequested": false,
+    "clientJoined": false,
+    "gameplayVerified": false,
+    "originalFilesUnchanged": 127,
+    "cases": [
+      {
+        "name": "catalog and unsafe/stale request refusal",
+        "maps": 19,
+        "catalogMs": 406
+      },
+      {
+        "name": "real UI start and native Blood Gulch status",
+        "editorHeartbeatMs": 51,
+        "startupMs": 4248,
+        "status": {
+          "name": "Spark private",
+          "version": "01.00.10.0621",
+          "map": "bloodgulch",
+          "gameType": "Slayer",
+          "state": "openplaying",
+          "players": 0,
+          "maximumPlayers": 2,
+          "dedicated": true
+        },
+        "mapSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "serverSha256": "7789c4a0bd2c735e7fdc154d63f4bbb1134952e6904e5809eb00d4d1da94015f",
+        "copiedBytes": 192110465
+      },
+      {
+        "name": "real UI prepares the exact server map/resources and a fresh separate client profile",
+        "preparationMs": 407,
+        "clientHeartbeatMs": 52,
+        "verifiedFiles": 70,
+        "verifiedBytes": 192110465,
+        "verificationMs": 165,
+        "executableSha256": "7de68b02aa4d2ed521144db5f7d8ecdc2071dc7b2270f6a0c9b66a621c072a64"
+      },
+      {
+        "name": "changed isolated shader bytes refuse before launch; exact read-only restoration is accepted"
+      },
+      {
+        "name": "changed client bytes refuse even with a forged copy manifest and no client is launched"
+      },
+      {
+        "name": "unapproved private DLL refuses and restoring exact inputs allows matching-client preparation"
+      },
+      {
+        "name": "concurrent preparation refuses and cancellation leaves the server running without launching a client"
+      },
+      {
+        "name": "actual CE menu-only setup has its first-run resources and uses the separate profile",
+        "mode": "setup",
+        "elapsedMs": 58579,
+        "lastPhase": "open",
+        "firstRunFiles": [
+          "Eula.dll",
+          "Eula.rtf",
+          "config.txt"
+        ],
+        "clientJoinRequested": false,
+        "visualAcceptance": false,
+        "visibleWindowDetected": true,
+        "missingWindowWarningVerified": false,
+        "startupError": null,
+        "startupExitCode": null,
+        "normalStartupVerified": false
+      },
+      {
+        "name": "workspace reload retains the owned native session"
+      },
+      {
+        "name": "client actions reject other windows and stale session IDs"
+      },
+      {
+        "name": "closing the owning Spark window stops its actual CE client and server"
+      },
+      {
+        "name": "separate windows cannot stop each other and closing a window stops only its own server"
+      },
+      {
+        "name": "native game type ctf",
+        "reportedGameType": "CTF",
+        "observations": 1
+      },
+      {
+        "name": "native game type oddball",
+        "reportedGameType": "Oddball",
+        "observations": 1
+      },
+      {
+        "name": "native game type king",
+        "reportedGameType": "King",
+        "observations": 1
+      },
+      {
+        "name": "native game type race",
+        "reportedGameType": "Race",
+        "observations": 1
+      },
+      {
+        "name": "occupied private port fails without launching a process"
+      },
+      {
+        "name": "actual changed selected cache refuses a stale start"
+      },
+      {
+        "name": "invalid client startup files get named setup guidance while dedicated hosting stays usable"
+      },
+      {
+        "name": "genuine Workshop source compiles a CE project cache through the native UI/toolchain",
+        "buildId": "9378f8ea-23ee-4ef0-8da0-09faf8233740",
+        "target": "gbx-custom",
+        "mapSha256": "a57e0efbf9a085f660482bd07bb7bb73a37b40d312ca4356a6b1a43905edc06b",
+        "projectFingerprint": "8c4ffed9a6c47580631d216a28be78c7b58821a97d90b6e64360810db3f9e29c",
+        "compileMs": 18024,
+        "toolIdentities": {
+          "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+          "invaderBuild": "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a",
+          "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+          "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+        }
+      },
+      {
+        "name": "managed build with a stock filename loads from its own snapshot without replacing the installed map",
+        "projectStartupMs": 3545,
+        "mapSha256": "a57e0efbf9a085f660482bd07bb7bb73a37b40d312ca4356a6b1a43905edc06b",
+        "sourceBuild": {
+          "projectId": "3b9d96c1-79c0-4891-956f-02e4e0c5fba2",
+          "buildId": "9378f8ea-23ee-4ef0-8da0-09faf8233740",
+          "projectTitle": "bloodgulch",
+          "projectFingerprint": "8c4ffed9a6c47580631d216a28be78c7b58821a97d90b6e64360810db3f9e29c"
+        },
+        "nativeStatus": {
+          "name": "Spark private",
+          "version": "01.00.10.0621",
+          "map": "bloodgulch",
+          "gameType": "Slayer",
+          "state": "openplaying",
+          "players": 0,
+          "maximumPlayers": 2,
+          "dedicated": true
+        }
+      },
+      {
+        "name": "matching client uses the genuine newly compiled Workshop map rather than its stock namesake",
+        "mapSha256": "a57e0efbf9a085f660482bd07bb7bb73a37b40d312ca4356a6b1a43905edc06b",
+        "verifiedFiles": 70,
+        "verificationMs": 185
+      },
+      {
+        "name": "actual CE client opens with matching native content, holds input locks and stops independently",
+        "executableSha256": "7de68b02aa4d2ed521144db5f7d8ecdc2071dc7b2270f6a0c9b66a621c072a64",
+        "mapSha256": "a57e0efbf9a085f660482bd07bb7bb73a37b40d312ca4356a6b1a43905edc06b",
+        "seconds": 5,
+        "serverReplies": 5,
+        "maximumPlayersObserved": 0,
+        "lastClientPhase": "open",
+        "visibleRequested": true,
+        "clientJoinVerified": false,
+        "gameplayVerified": false
+      },
+      {
+        "name": "stopping the private server also stops its actual matching client"
+      },
+      {
+        "name": "saved edits invalidate new starts while the existing private snapshot remains unchanged"
+      },
+      {
+        "name": "unowned build IDs refuse without falling back to the stock map"
+      },
+      {
+        "name": "a genuinely corrupted managed cache refuses before process launch"
+      },
+      {
+        "name": "a redirected build receipt cannot select an output outside its owned job"
+      },
+      {
+        "name": "restored valid native output can host again and the reviewed base source remains byte-identical",
+        "preservedReviewedTags": 2455
+      },
+      {
+        "name": "abrupt Spark exit kills its actual owned CE client as well as its server"
+      },
+      {
+        "name": "abrupt Spark exit kills its owned dedicated server"
+      }
+    ],
+    "errors": [],
+    "extendedWindowObservation": {
+      "name": "actual CE menu-only setup has its first-run resources and uses the separate profile",
+      "mode": "setup",
+      "elapsedMs": 615827,
+      "lastPhase": "open",
+      "firstRunFiles": [
+        "Eula.dll",
+        "Eula.rtf",
+        "config.txt"
+      ],
+      "clientJoinRequested": false,
+      "visualAcceptance": false,
+      "visibleWindowDetected": true,
+      "missingWindowWarningVerified": false,
+      "startupError": null,
+      "startupExitCode": null,
+      "normalStartupVerified": false,
+      "durationMs": 615827,
+      "menuHumanVerified": false,
+      "readOnlyDiagnosticReview": true,
+      "ownerVisibleMenuVerified": false,
+      "ownerReply": "No visible Halo window; timed trial had ended before reply"
+    },
+    "diagnoses": [
+      {
+        "resource": "config.txt",
+        "confirmed": "Missing from the private session copy; installed original preserved and exact copy restored"
+      },
+      {
+        "resource": "shaders/vsh.enc",
+        "gameErrorLabel": "shaders/vsh.bin",
+        "confirmed": "Owned executable opens the encrypted file with GENERIC_READ and sharing mode zero; retained Spark data-read pin conflicts",
+        "fix": "Four exact private shader data files use verified read-only copies with exit audit; other file pins remain",
+        "attributeOnlyHandleExperiment": "Rejected after the real write-protection test failed; preserved in private research"
+      }
+    ],
+    "manualFollowup": {
+      "userStartedShortcutPrepared": true,
+      "ownerRequestedGameplayDeferral": true,
+      "manualClientObserved": false,
+      "gameplayVerified": false,
+      "followupComplete": false,
+      "followupResult": "Spark test page closed before manual game acceptance; owned private host stopped. No client join certified."
+    }
+  },
+  "gameplayAudioVerified": false,
+  "gamePeerReplicationVerified": false,
+  "notes": [
+    "Metadata only; no game/tool payloads, encoded samples, source caches, profile data or private absolute paths.",
+    "Native source, asset and compiler tests remain distinct from actual player join, listening and collision acceptance."
+  ]
+}

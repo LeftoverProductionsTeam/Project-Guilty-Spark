@@ -176,6 +176,7 @@ pub fn analyze(project: &Project, map: &MapInspection) -> Result<Analysis> {
             "animation replacement",
         ),
         (!project.powerups.is_empty(), "custom power-ups"),
+        (crate::native_audio::requested(project), "native sound emitters"),
         (project.firefight.is_some(), "Firefight wave rules"),
         (
             project

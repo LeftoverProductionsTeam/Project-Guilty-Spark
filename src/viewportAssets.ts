@@ -3,6 +3,7 @@ import type { Asset, Project, SceneObject, Vec3, MapInspection } from './types';
 import { catalogAssets, placeAsset, pointInsideForgeRoom } from './forge';
 import type { ForgeAsset, ForgePlacement } from './forge';
 import { call } from './api';
+import { profileStart, profileEnd } from './profiling.ts';
 import { createEmitter } from './spatialAudio';
 import type { SoundEmitter } from './spatialAudio';
 import type { SoundInspection } from './types';
@@ -38,7 +39,19 @@ export type ViewportAsset =
       sourceSha256: string;
       looping: boolean;
     };
-export function viewportAssetCatalog(documents: {history:{current:Project|null};inspection:MapInspection|null}[]): ViewportAsset[] {
+export function viewportAssetCatalog(
+  documents: { history: { current: Project | null }; inspection: MapInspection | null }[],
+): ViewportAsset[] {
+  const start = profileStart();
+  try {
+    return buildCatalog(documents);
+  } finally {
+    profileEnd('spark.catalog.assets', start);
+  }
+}
+function buildCatalog(
+  documents: { history: { current: Project | null }; inspection: MapInspection | null }[],
+): ViewportAsset[] {
   return documents.flatMap((document) => {
     const project = document.history.current;
     if (!project) return [];
@@ -203,9 +216,16 @@ export async function librarySoundEmitters(
     return [emitter];
   }
   if (item.kind !== 'sound') throw Error('Choose a sound asset.');
-  if (item.looping) return loopingSoundEmitters({
-    projectId: item.sourceId, sha256: item.sourceSha256, tagId: item.tagId, name: item.name,
-  }, position);
+  if (item.looping)
+    return loopingSoundEmitters(
+      {
+        projectId: item.sourceId,
+        sha256: item.sourceSha256,
+        tagId: item.tagId,
+        name: item.name,
+      },
+      position,
+    );
   const soundId = item.tagId;
   const report = await call<SoundInspection>('inspect_sound', { projectId: item.sourceId, tagId: soundId });
   if (report.sourceSha256 !== item.sourceSha256 || report.tagId !== soundId)

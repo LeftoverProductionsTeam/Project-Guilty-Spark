@@ -80,6 +80,8 @@ export function editRevisionKey(p: Project) {
     p.conversionProfile,
     p.activeBuildTarget,
     p.buildTargets?.find((t) => t.id === p.activeBuildTarget) ?? null,
+    p.nativeAssetImports ?? [],
+    p.audioPreview?.emitters.filter(e=>e.nativePlacement).map(e=>[e.id,e.sourceProjectId,e.sourceSha256,e.loopingSource?.tagId,e.position]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))) ?? [],
   ]);
 }
 /** Local UI diagnostics only; native fingerprints remain authoritative. */
@@ -101,6 +103,8 @@ export function changedEditInputs(before: string, after: string): string[] {
     'Conversion profile',
     'Active build target',
     'Build tools',
+    'Recursive tag imports',
+    'Native sound emitters',
   ];
   const old = JSON.parse(before) as unknown[],
     next = JSON.parse(after) as unknown[];

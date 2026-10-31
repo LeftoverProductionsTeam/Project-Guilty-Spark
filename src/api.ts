@@ -1,12 +1,18 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { Bootstrap } from './types';
+import { profileEnd, profileStart } from './profiling.ts';
 export const native = isTauri();
 export async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!native)
     throw new Error(
       'This operation needs the Guilty Spark desktop application. The browser preview has no filesystem or Steam access.',
     );
-  return invoke<T>(command, args);
+  const started = profileStart();
+  try {
+    return await invoke<T>(command, args);
+  } finally {
+    profileEnd('spark.ipc.' + command, started);
+  }
 }
 export const browserBootstrap: Bootstrap = {
   apiVersion: 1,

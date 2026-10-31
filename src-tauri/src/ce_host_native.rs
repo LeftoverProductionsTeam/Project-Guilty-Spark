@@ -239,6 +239,8 @@ fn selected(relative: &str, map: &str) -> bool {
         "ksimeui.dll",
         "Eula.dll",
         "Eula.rtf",
+        // Native graphics/device capability data, not a console startup script.
+        "config.txt",
         "strings.dll",
         "msvcr71.dll",
         "binkw32.dll",
@@ -891,8 +893,9 @@ mod tests {
     fn copy_selection_never_includes_console_scripts_installers_or_unrelated_maps() {
         assert!(selected("maps/bloodgulch.map", "bloodgulch"));
         assert!(selected("maps/sounds.map", "bloodgulch"));
+        assert!(selected("config.txt", "bloodgulch"));
         assert!(!selected("maps/sidewinder.map", "bloodgulch"));
-        for file in ["init.txt", "config.txt", "setup.exe", "shaders/bad.dll"] {
+        for file in ["init.txt", "server-init.txt", "setup.exe", "shaders/bad.dll"] {
             assert!(!selected(file, "bloodgulch"));
         }
     }

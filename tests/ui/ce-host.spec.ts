@@ -354,3 +354,20 @@ test('a running client without a visible window warns in setup and keeps stop an
   await page.evaluate(()=>{(window as any).ceHostSession.client.visibleWindow=true;});
   await expect(warning).toHaveCount(0);
 });
+
+test('a visible fatal dialog exposes the complete startup error and keeps independent stop controls usable', async ({page}) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html');
+  await loadedServer(page);
+  await page.getByRole('button',{name:'Prepare matching client',exact:true}).click();
+  await page.getByRole('button',{name:'Launch CE playtest',exact:true}).click();
+  const error = "Cannot find 'D:\\owned long workspace\\private game\\config.txt'";
+  await page.evaluate(error=>{const c=(window as any).ceHostSession.client;c.visibleWindow=true;c.startupError=error;c.detail='Halo reported a fatal startup error.';},error);
+  const field=page.getByRole('textbox',{name:'Halo startup error',exact:true});
+  await expect(field).toHaveValue(error);
+  await expect(field).toHaveAttribute('readonly','');
+  await expect(page.getByText('This is an error dialog, not a playable game. Stop playtest before retrying.')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Stop playtest',exact:true})).toBeEnabled();
+  await page.getByRole('button',{name:'Stop playtest',exact:true}).click();
+  await expect(field).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Stop private server',exact:true})).toBeEnabled();
+});

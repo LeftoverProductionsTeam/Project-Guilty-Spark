@@ -1835,7 +1835,7 @@ async fn open_project_window(app:tauri::AppHandle,window:tauri::WebviewWindow,id
     let url=tauri::WebviewUrl::App(format!("index.html?project={}{}",project.id,route.map(|w|format!("&workspace={w}")).unwrap_or_default()).into());
     // Only a registered UUID project may select the local app page. No arbitrary URL or script.
     if uuid::Uuid::parse_str(&project.id).is_err(){return Err("Invalid project identity".into());}
-    let child=tauri::WebviewWindowBuilder::new(&app,&label,url).title(format!("{} · Project Guilty Spark",project.title)).inner_size(1440.,900.).min_inner_size(1000.,640.).decorations(false).transparent(true).shadow(true).theme(Some(tauri::Theme::Dark)).build().map_err(error)?;
+    let child=tauri::WebviewWindowBuilder::new(&app,&label,url).title(format!("{} · Project Guilty Spark",project.title)).inner_size(1440.,900.).min_inner_size(1000.,640.).decorations(false).transparent(true).shadow(false).theme(Some(tauri::Theme::Dark)).build().map_err(error)?;
     lock(&state.document_owners)?.insert(id,child.label().into());Ok(label)
 }
 #[tauri::command]

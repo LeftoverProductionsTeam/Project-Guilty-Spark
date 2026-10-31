@@ -7,7 +7,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
 import dgram from 'node:dgram';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 const expect = assertion.configure({ timeout: 45000 });
 const args = new Map();
 for (let i = 2; i < process.argv.length; i += 2) {
@@ -111,6 +112,43 @@ const child = spawn(exe, [], {
   },
 });
 let browser;
+async function diagnoseClient(label, client) {
+  if (process.platform !== 'win32') return;
+  let diagnostic;
+  if (client.processId == null) {
+    await fs.writeFile(
+      path.join(output, `${label}-diagnostics.json`),
+      JSON.stringify({ client, diagnostic: { processExited: true } }, null, 2),
+      { flag: 'wx' },
+    );
+    return;
+  }
+  try {
+    const result = await promisify(execFile)(
+      'pwsh.exe',
+      [
+        '-NoProfile',
+        '-File',
+        path.resolve('scripts/diagnose-ce-process.ps1'),
+        '-GameProcessId',
+        String(client.processId),
+        '-GameDirectory',
+        client.gameDirectory,
+        '-ProfileDirectory',
+        client.profileDirectory,
+      ],
+      { windowsHide: true, maxBuffer: 2 * 1024 * 1024 },
+    );
+    diagnostic = JSON.parse(result.stdout);
+  } catch (error) {
+    diagnostic = { error: String(error) };
+  }
+  await fs.writeFile(
+    path.join(output, `${label}-diagnostics.json`),
+    JSON.stringify({ client, diagnostic }, null, 2),
+    { flag: 'wx' },
+  );
+}
 const invoke = (page, command, a = {}) =>
   page.evaluate(({ command, a }) => window.__TAURI_INTERNALS__.invoke(command, a), { command, a });
 const alive = (pid) => {
@@ -303,6 +341,23 @@ try {
     verificationMs: matched.client.verificationMs,
     executableSha256: matched.client.executableSha256,
   });
+  const shader = path.join(matched.client.gameDirectory, 'shaders/vsh.enc');
+  const shaderBytes = await fs.readFile(shader);
+  expect(await hash(shader)).toBe(before['shaders/vsh.enc']);
+  try {
+    await fs.chmod(shader, 0o666);
+    const changed = Buffer.from(shaderBytes);
+    changed[changed.length - 1] ^= 1;
+    await fs.writeFile(shader, changed);
+    expect(await call('ce_host_client_action', { sessionId: initial.id, action: 'prepare' })
+      .then(() => '', String)).toContain('integrity');
+    expect((await call('ce_host_status')).client.processId).toBeNull();
+  } finally {
+    await fs.writeFile(shader, shaderBytes);
+    await fs.chmod(shader, 0o444);
+  }
+  await prepareClient(page, initial);
+  step('changed isolated shader bytes refuse before launch; exact read-only restoration is accepted');
   const privateClient = path.join(matched.client.gameDirectory, 'haloce.exe');
   const clientBytes = await fs.readFile(privateClient);
   const copyManifest = path.join(initial.sessionDirectory, 'copied-files.json');
@@ -364,16 +419,27 @@ try {
     expect(alive(setup.client.processId)).toBe(true);
     expect(await hash(path.join(setup.client.gameDirectory, 'Eula.dll'))).toBe(before['Eula.dll']);
     expect(await hash(path.join(setup.client.gameDirectory, 'Eula.rtf'))).toBe(before['Eula.rtf']);
+    expect(await hash(path.join(setup.client.gameDirectory, 'config.txt'))).toBe(before['config.txt']);
     const setupSeconds = Math.max(60, clientSeconds);
     console.log(JSON.stringify({ observingSetup: setup.client.processId, seconds: setupSeconds }));
-    await new Promise((resolve) => setTimeout(resolve, setupSeconds * 1000));
+    await fs.writeFile(path.join(output, 'active-setup.json'), JSON.stringify(setup, null, 2));
+    await new Promise((resolve) => setTimeout(resolve, 15000));
+    await diagnoseClient('setup-15s', (await call('ce_host_status')).client);
+    await new Promise((resolve) => setTimeout(resolve, (setupSeconds - 15) * 1000));
     const observed = await call('ce_host_status');
+    await diagnoseClient('setup-final', observed.client);
     expect(observed.client.mode).toBe('setup');
-    expect(typeof observed.client.visibleWindow).toBe('boolean');
-    if(!observed.client.visibleWindow) {
+    if (observed.client.phase === 'open') expect(typeof observed.client.visibleWindow).toBe('boolean');
+    else {
+      expect(observed.client.phase).toBe('closed');
+      expect(Number.isInteger(observed.client.exitCode)).toBe(true);
+    }
+    if (observed.client.visibleWindow === false) {
       expect(observed.client.detail).toContain('no visible game window');
-      await expect(panel.getByRole('alert').filter({hasText:'Halo has no visible game window'})).toBeVisible();
-      await expect(panel.getByRole('button',{name:'Stop playtest',exact:true})).toBeEnabled();
+      await expect(
+        panel.getByRole('alert').filter({ hasText: 'Halo has no visible game window' }),
+      ).toBeVisible();
+      await expect(panel.getByRole('button', { name: 'Stop playtest', exact: true })).toBeEnabled();
     }
     await call('ce_host_client_action', { sessionId: initial.id, action: 'stop' });
     await expect.poll(() => alive(setup.client.processId)).toBe(false);
@@ -382,11 +448,14 @@ try {
       mode: observed.client.mode,
       elapsedMs: observed.client.elapsedMs,
       lastPhase: observed.client.phase,
-      firstRunFiles: ['Eula.dll', 'Eula.rtf'],
+      firstRunFiles: ['Eula.dll', 'Eula.rtf', 'config.txt'],
       clientJoinRequested: false,
       visualAcceptance: false,
       visibleWindowDetected: observed.client.visibleWindow,
-      missingWindowWarningVerified: !observed.client.visibleWindow,
+      missingWindowWarningVerified: observed.client.visibleWindow === false,
+      startupError: observed.client.startupError ?? null,
+      startupExitCode: observed.client.exitCode,
+      normalStartupVerified: false,
     });
   }
   await panel.getByText('Session details & output', { exact: true }).click();
@@ -704,8 +773,10 @@ try {
       let maximumPlayersObserved = 0,
         replies = 0;
       const deadline = Date.now() + clientSeconds * 1000;
+      const observations = [];
       while (Date.now() < deadline) {
         const observation = await call('ce_host_status');
+        observations.push({ client: observation.client, status: observation.status });
         if (observation.status) {
           replies++;
           maximumPlayersObserved = Math.max(maximumPlayersObserved, observation.status.players);
@@ -713,6 +784,11 @@ try {
         await new Promise((r) => setTimeout(r, 1000));
       }
       const observed = await call('ce_host_status');
+      await diagnoseClient('workshop-client', observed.client);
+      await fs.writeFile(
+        path.join(output, 'client-observations.json'),
+        JSON.stringify(observations, null, 2),
+      );
       await call('ce_host_client_action', { sessionId: hosted.id, action: 'stop' });
       await expect.poll(() => alive(opened.client.processId)).toBe(false);
       await waitNative(page);
