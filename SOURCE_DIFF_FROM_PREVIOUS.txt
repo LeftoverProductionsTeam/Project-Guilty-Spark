@@ -1,29 +1,135 @@
-Project Guilty Spark CE startup and first-run workflow — 2026-10-31
-Base committed foundation: d3b4d29
+Project Guilty Spark C41 integrated source — 2026-10-31
+Base committed foundation: 5d67390a2b0819145fb148f589593ae65308e938
+Validated implementation commit: f291377ca7b0ba9b840af7848b4c3ff7025ebc7d
 
-Adds complete first-run file selection/preflight, an explicit normal GUI startup request with owned suspended-process binding, separate menu-only setup and prolonged-start guidance. Retains existing native Tool/Invader builds, Baboon reconciliation, C35-C39 history and source safeguards. Original games and separate unfinished direct compiled-map research remain unchanged. Player joining, visual first-run acceptance and gameplay remain open. See docs/CE_STARTUP_AND_FIRST_RUN.md.
+Integrates the preserved C41 Smart Edit source and seven dependency updates with existing C35–C39 native workflows, BSP/asset handling and CE controls. Fixes direct-save dependency navigation, SHA-2 output encoding, standalone Zombie compatible-runtime textures and unconfigured metal/grass previews. Adds owned CE window diagnostics without claiming a successful client join.
 
-Changed or added source members:
-README.md
-SOURCE_DIFF_FROM_PREVIOUS.txt
-SOURCE_MANIFEST_SHA256.txt
-SOURCE_SHA256SUMS.txt
-docs/CE_MATCHING_CLIENT_PLAYTEST.md
-docs/CE_STARTUP_AND_FIRST_RUN.md
-docs/CE_STARTUP_GITHUB_DESCRIPTION.md
-docs/MASTER_FEATURE_LEDGER.csv
-docs/MASTER_FEATURE_LEDGER.md
-docs/UNIVERSAL_WORKBENCH_BACKLOG.md
-docs/fixtures/ce-startup-install-native.json
-docs/fixtures/ce-startup-native.json
-scripts/test-build-evidence.mjs
-scripts/test-ce-host-native.mjs
-scripts/test-custom-edition-native.mjs
-src-tauri/src/ce_gui_process.rs
-src-tauri/src/ce_host_client.rs
-src-tauri/src/ce_host_native.rs
-src-tauri/src/ce_setup.rs
-src/components/CustomEditionHost.tsx
-src/components/CustomEditionSetup.tsx
-tests/ui/ce-host.spec.ts
-tests/ui/custom-edition.spec.ts
+595 locked Windows Rust tests pass (7 existing opt-in cases ignored), plus 259 frontend tests, 125 browser checks, 59 offline scripts and two interface-probe tests. Six genuine native suites bind the same bundled executable. All 30 captured branch tips remain ancestors; the original 146 dirty files and all 391 prior requirements survive. See docs/FINAL_CONSOLIDATION_C41.md and the metadata receipt.
+
+General direct structures, universal conversion, game-peer/live rendering/audio parity, CE visual/join acceptance and other gameplay gates remain open. No game assets, external tools, source caches or private invitation credentials are packaged.
+
+Changed tracked paths from the foundation:
+M	CHANGELOG.md
+M	Cargo.lock
+M	Cargo.toml
+M	README.md
+M	crates/spark-core/Cargo.toml
+M	crates/spark-core/examples/verify_source_archive.rs
+M	crates/spark-core/src/asset_transfer.rs
+M	crates/spark-core/src/audio.rs
+M	crates/spark-core/src/baboon.rs
+M	crates/spark-core/src/bitmap_preview.rs
+M	crates/spark-core/src/bsp_audio.rs
+M	crates/spark-core/src/bsp_detail.rs
+M	crates/spark-core/src/bsp_workshop.rs
+M	crates/spark-core/src/build.rs
+M	crates/spark-core/src/community_lan.rs
+M	crates/spark-core/src/community_servers.rs
+M	crates/spark-core/src/custom_sounds.rs
+M	crates/spark-core/src/firefight.rs
+M	crates/spark-core/src/forge_build.rs
+M	crates/spark-core/src/invitations.rs
+M	crates/spark-core/src/lib.rs
+M	crates/spark-core/src/library.rs
+M	crates/spark-core/src/maps.rs
+M	crates/spark-core/src/mcc_content_probe.rs
+M	crates/spark-core/src/mcc_textures.rs
+M	crates/spark-core/src/model_build.rs
+M	crates/spark-core/src/native_asset_imports.rs
+M	crates/spark-core/src/native_tag_integrity.rs
+M	crates/spark-core/src/portability.rs
+M	crates/spark-core/src/project.rs
+M	crates/spark-core/src/quickforge.rs
+M	crates/spark-core/src/resource_map.rs
+A	crates/spark-core/src/smart_edit.rs
+M	crates/spark-core/src/snapshots.rs
+M	crates/spark-core/src/studio_journal.rs
+M	crates/spark-core/src/studio_native.rs
+M	crates/spark-core/src/working_tag_changes.rs
+M	crates/spark-core/src/working_tags.rs
+A	crates/spark-core/tests/smart_edit.rs
+M	crates/spark-steam-bridge/src/loopback.rs
+M	docs/ARCHITECTURE.md
+A	docs/C41_GITHUB_DESCRIPTION.md
+M	docs/COMPATIBILITY_MATRIX.md
+M	docs/COMPATIBLE_TOOLS.md
+A	docs/CONTINUATION_41_ENGINEERING.md
+A	docs/CURRENT_FEATURES.md
+M	docs/DEPENDENCY_LICENSES.json
+A	docs/FINAL_CONSOLIDATION_C41.md
+M	docs/KNOWN_LIMITATIONS.md
+M	docs/MASTER_FEATURE_LEDGER.csv
+M	docs/MASTER_FEATURE_LEDGER.md
+M	docs/ORIGINAL_BITMAP_RESTORATION.md
+A	docs/REPOSITORY_ABOUT.md
+M	docs/RUNTIME_CAPABILITIES.md
+A	docs/SMART_EDIT_WORKFLOWS.md
+M	docs/TEST_BUILD_READINESS.md
+M	docs/UNIVERSAL_WORKBENCH_BACKLOG.md
+A	docs/fixtures/c41-final-consolidation.json
+A	docs/licenses/04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551.txt
+A	docs/licenses/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt
+A	docs/licenses/70c9d40f1f9545c3f133b8a67206e89da850f6468eed072281bb3701514114a9.txt
+A	docs/licenses/73b9dc2e79c7308998dd30296e073aefaefb944a68fb89aa412c23c0edcabcaa.txt
+A	docs/licenses/78fbac9e571c2ee260deb2a1941a8a18f0a85e3f39c23d08e2dcee6da4841998.txt
+A	docs/licenses/831e0f43ad0bf014c1c4fec5767aae470434c1d66d6e671be2d823e729063e25.txt
+A	docs/licenses/8a4b6c44eebfb026d23719a348145a661a555568dbfdc11618ff2d0dd9306b00.txt
+A	docs/licenses/8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc.txt
+A	docs/licenses/95ced5ecf1133fbf41d409b5555c86c344f83f3b019926057ddbc07cfdcc27b3.txt
+A	docs/licenses/98181e7249d0c01737645ec982499ce99a0f07eb8f7d625b8840d799d10dbc01.txt
+A	docs/licenses/a22152baa1aef74402443008e767e7c689a524c0909d19b0431d97f5ab066a13.txt
+A	docs/licenses/af59cea35d7f5e2777a713b8d155d65efa2c339eb43f3c14e868c6ac8506edad.txt
+A	docs/licenses/b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57.txt
+A	docs/licenses/d2e7ec5355c96eeade56b09187ceb48a6a30299da3ce7531a66d3d11405ab963.txt
+A	docs/licenses/e1919b3b98b8bf6c1b99fcc60a0ed46027c97ac947432e1278446c9606f50161.txt
+A	docs/licenses/ee48679d379ca6b4493d5e231094d85f818dd9be40b1a4f234fb7ff657ee35d9.txt
+A	docs/licenses/f03037ca7bad1e3eb7f4a63fa6084a8baabd5ba30d3c239a9a7f35705d873e26.txt
+A	docs/licenses/f5c708b59114507b8b27b48181b6883d106bbca0c1634bbee45b5e344237b66b.txt
+M	package.json
+M	pnpm-lock.yaml
+A	scripts/continuation41-evidence.mjs
+M	scripts/test-ce-host-native.mjs
+A	scripts/test-runtime-textures-native.mjs
+A	scripts/test-smart-edit-native.mjs
+M	scripts/test-sparklink-content-native.mjs
+M	scripts/update-feature-ledger.mjs
+M	src-tauri/src/app.rs
+M	src-tauri/src/asset_sources_native.rs
+M	src-tauri/src/baboon_native.rs
+M	src-tauri/src/ce_gui_process.rs
+M	src-tauri/src/ce_host_client.rs
+M	src-tauri/src/ce_host_native.rs
+M	src-tauri/src/ce_setup.rs
+M	src-tauri/src/default_materials_native.rs
+M	src-tauri/src/dependency_install.rs
+M	src-tauri/src/map_download.rs
+M	src-tauri/src/native_operations_native.rs
+M	src-tauri/src/runtime_workbench.rs
+M	src-tauri/src/shared_editing.rs
+A	src-tauri/src/smart_edit_native.rs
+M	src-tauri/src/tool_cache.rs
+M	src-tauri/src/tool_ecosystem_native.rs
+M	src-tauri/src/working_tag_changes_native.rs
+M	src/App.tsx
+M	src/components/Build.tsx
+M	src/components/CustomEditionHost.tsx
+M	src/components/LiveForge.tsx
+M	src/components/QuickForge.tsx
+A	src/components/SmartEditPanel.tsx
+M	src/components/Tags.tsx
+M	src/components/ViewportTags.tsx
+M	src/components/World.tsx
+A	src/components/smartEdit.css
+M	src/featureCatalog.ts
+M	src/mapSession.ts
+M	src/ownedBitmapBatch.ts
+A	src/runtimeTexturePreview.test.ts
+A	src/runtimeTexturePreview.ts
+A	src/smartEdit.test.ts
+A	src/smartEdit.ts
+M	src/useOwnedForgeModels.ts
+M	tests/ui/ce-host.spec.ts
+A	tests/ui/fixtures/smartEdit.html
+A	tests/ui/fixtures/smartEdit.tsx
+M	tests/ui/native-contract.spec.ts
+A	tests/ui/smart-edit.spec.ts
