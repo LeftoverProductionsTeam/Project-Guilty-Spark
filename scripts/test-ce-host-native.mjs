@@ -11,7 +11,9 @@ const expect = assertion.configure({ timeout: 45000 });
 const args = new Map();
 for (let i = 2; i < process.argv.length; i += 2) {
   if (
-    !['--app', '--runtime', '--output', '--map'].includes(process.argv[i]) ||
+    !['--app', '--runtime', '--output', '--map', '--kit', '--invader', '--recovery'].includes(
+      process.argv[i],
+    ) ||
     !process.argv[i + 1] ||
     args.has(process.argv[i])
   )
@@ -21,6 +23,9 @@ for (let i = 2; i < process.argv.length; i += 2) {
   args.set(process.argv[i], path.resolve(process.argv[i + 1]));
 }
 for (const key of ['--app', '--runtime', '--output']) if (!args.has(key)) throw Error('Missing ' + key);
+const projectChallenge = ['--kit', '--invader', '--recovery'].some((key) => args.has(key));
+if (projectChallenge && !['--kit', '--invader', '--recovery'].every((key) => args.has(key)))
+  throw Error('The project challenge requires --kit, --invader and a genuine prior --recovery receipt');
 const output = args.get('--output'),
   original = args.get('--runtime');
 if (output.length > 115) throw Error('Choose a short fresh output directory for CE');
@@ -36,7 +41,7 @@ async function inventory(root, relative = '', result = {}) {
     const name = path.join(relative, entry.name);
     if (entry.isDirectory()) await inventory(root, name, result);
     else if (entry.isFile()) result[name.replaceAll('\\', '/')] = await hash(path.join(root, name));
-    if (Object.keys(result).length > 2000) throw Error('Owned input exceeds the QA inventory bound');
+    if (Object.keys(result).length > 5000) throw Error('Owned input exceeds the QA inventory bound');
   }
   return result;
 }
@@ -53,6 +58,14 @@ const before = await inventory(original),
     cases: [],
     errors: [],
   };
+let recovery, recoveredBefore;
+if (projectChallenge) {
+  recovery = JSON.parse(await fs.readFile(args.get('--recovery'), 'utf8'));
+  if (recovery.schemaVersion !== 1 || !recovery.tagsDirectory || !recovery.recoveredInventory)
+    throw Error('Select a genuine reviewed CE source-recovery receipt');
+  recoveredBefore = await inventory(recovery.tagsDirectory);
+  expect(recoveredBefore).toEqual(recovery.recoveredInventory);
+}
 const runtime = path.join(output, 'runtime');
 await fs.cp(original, runtime, { recursive: true, force: false, errorOnExist: true });
 if (args.has('--map'))
@@ -95,12 +108,13 @@ const step = (name, data = {}) => {
   receipt.cases.push({ name, ...data });
   console.log(JSON.stringify({ passed: name, ...data }));
 };
-async function waitNative(page) {
+async function waitNative(page, previousSessionId) {
   let view;
   await expect
     .poll(
       async () => {
         view = await invoke(page, 'ce_host_status');
+        if (previousSessionId && view?.id === previousSessionId) return false;
         if (view?.phase === 'failed') throw Error(view.detail + '\n' + view.consoleTail);
         return view?.phase === 'running' && !!view.status;
       },
@@ -314,6 +328,199 @@ try {
     await fs.writeFile(cache, bytes);
   }
   step('actual changed selected cache refuses a stale start');
+  if (projectChallenge) {
+    await call('save_settings', {
+      settings: {
+        ...boot.settings,
+        preferredHalo: 'haloCustomEdition',
+        onboardingCompleted: true,
+        autoBuild: false,
+        hekDirectory: args.get('--kit'),
+        hekTagsDirectory: recovery.tagsDirectory,
+        hekFlavor: 'h1aEk',
+        invaderDirectory: args.get('--invader'),
+      },
+    });
+    const showWorkspace = async (name) => {
+      const drawer = page.locator('.gs-navigation-drawer');
+      if (!(await drawer.isVisible()))
+        await page.getByRole('button', { name: 'Toggle workspace navigation', exact: true }).click();
+      await drawer.getByRole('button', { name, exact: true }).click();
+    };
+    const created = await call('create_quickforge_project', {
+      title: 'bloodgulch',
+      template: 'customBlank',
+      target: 'mccSteam',
+    });
+    const openCreated = async () => {
+      await page.reload();
+      await showWorkspace('Map library');
+      await page
+        .locator('.map-card')
+        .filter({ has: page.getByRole('heading', { name: created.project.title, exact: true }) })
+        .filter({ has: page.getByText('WORKSPACE', { exact: true }) })
+        .click();
+    };
+    await openCreated();
+    await page.getByRole('button', { name: 'BSP Workshop', exact: true }).click();
+    await page.getByRole('button', { name: 'Two rooms + corridor + ramp', exact: true }).click();
+    await expect(page.getByLabel('Native BSP Workshop', { exact: true })).toBeVisible();
+    await page.keyboard.press('Control+s');
+    await expect(page.getByText('Saved', { exact: true }).last()).toBeVisible();
+    await expect
+      .poll(
+        async () => !!(await call('open_project', { id: created.project.id })).project.quickForge?.workshop,
+      )
+      .toBe(true);
+    const project = (await call('open_project', { id: created.project.id })).project;
+    expect(project.quickForge.workshop).toBeTruthy();
+    const targetId = crypto.randomUUID();
+    project.quickForge.runtimeId = 'haloCustomEdition';
+    project.quickForge.skyPath = 'levels/test/bloodgulch/bloodgulch';
+    project.quickForge.materials[0].name = 'cap_metal';
+    project.quickForge.materials[0].shaderPath = 'levels/test/bloodgulch/shaders/cap_metal';
+    project.activeBuildTarget = targetId;
+    project.buildTargets = [
+      {
+        id: targetId,
+        name: 'Previously reviewed CE source',
+        runtimeId: 'haloCustomEdition',
+        builder: 'invader-ce',
+        hekDirectory: args.get('--kit'),
+        hekFlavor: 'h1aEk',
+        tagsDirectory: recovery.tagsDirectory,
+        invaderDirectory: args.get('--invader'),
+        ceCompatibleTagset: true,
+        openSauce: false,
+      },
+    ];
+    await call('save_project', { project });
+    await page.reload();
+    await openCreated();
+    await page.getByRole('button', { name: 'Objects & gameplay', exact: true }).click();
+    const compileBegan = performance.now();
+    await page.getByRole('button', { name: 'Build & check playtest', exact: true }).click();
+    let nativeBuild;
+    await expect
+      .poll(
+        async () => {
+          nativeBuild = await call('quickforge_build_report', { projectId: project.id });
+          if (nativeBuild?.status === 'failed') throw Error(JSON.stringify(nativeBuild.blockers));
+          return nativeBuild?.status;
+        },
+        { timeout: 180000, intervals: [500, 1000] },
+      )
+      .toBe('validated');
+    const build = nativeBuild.build;
+    expect(nativeBuild.current).toBe(true);
+    expect(build.target).toBe('gbx-custom');
+    expect(await hash(build.output)).toBe(build.sha256);
+    expect(build.sha256).not.toBe(bloodgulch.sha256);
+    const header = (await fs.readFile(build.output)).subarray(0, 2048);
+    expect(header.readUInt32LE(4)).toBe(609);
+    expect(header.toString('ascii', 32, 64).split(String.fromCharCode(0))[0]).toBe('bloodgulch');
+    step('genuine Workshop source compiles a CE project cache through the native UI/toolchain', {
+      buildId: build.id,
+      target: build.target,
+      mapSha256: build.sha256,
+      projectFingerprint: build.projectFingerprint,
+      compileMs: Math.round(performance.now() - compileBegan),
+      toolIdentities: nativeBuild.toolIdentities,
+    });
+    const projectCatalog = await call('ce_host_catalog', { projectId: project.id });
+    const managed = projectCatalog.maps.find((map) => map.sourceBuild?.buildId === build.id);
+    expect(managed?.sha256).toBe(build.sha256);
+    expect(projectCatalog.maps.filter((map) => map.name === 'bloodgulch')).toHaveLength(2);
+    const managedRequest = {
+      ...request,
+      map: managed.name,
+      mapSha256: managed.sha256,
+      sourceBuild: { projectId: project.id, buildId: build.id },
+    };
+    await showWorkspace('Online');
+    await page.getByRole('button', { name: 'Host game', exact: true }).click();
+    await page
+      .getByRole('combobox', { name: 'Runtime adapter', exact: true })
+      .selectOption('haloCustomEdition');
+    await expect(page.getByLabel('Private CE map')).toHaveValue('build:' + build.id);
+    const managedBegan = performance.now();
+    const previousSession = await call('ce_host_status');
+    await page.getByRole('button', { name: 'Start private server', exact: true }).click();
+    const hosted = await waitNative(page, previousSession?.id);
+    expect(hosted.sourceBuild.buildId).toBe(build.id);
+    expect(hosted.sourceBuild.projectFingerprint).toBe(build.projectFingerprint);
+    await expect(
+      page.getByText('CE clients need this saved map copy to join. The installed stock map is unchanged.', {
+        exact: true,
+      }),
+    ).toBeVisible();
+    expect(await hash(path.join(hosted.sessionDirectory, 'game/maps/bloodgulch.map'))).toBe(build.sha256);
+    expect(await hash(path.join(runtime, 'maps/bloodgulch.map'))).toBe(bloodgulch.sha256);
+    step(
+      'managed build with a stock filename loads from its own snapshot without replacing the installed map',
+      {
+        projectStartupMs: Math.round(performance.now() - managedBegan),
+        mapSha256: hosted.mapSha256,
+        sourceBuild: hosted.sourceBuild,
+        nativeStatus: hosted.status,
+      },
+    );
+    await page.screenshot({ path: path.join(output, 'native-project-host.png') });
+    const savedProject = (await call('open_project', { id: project.id })).project;
+    const edited = structuredClone(savedProject);
+    edited.quickForge.spawns[0].position[0] += 0.25;
+    await call('save_project', { project: edited });
+    const staleCatalog = await call('ce_host_catalog', { projectId: project.id });
+    expect(staleCatalog.projectIssue).not.toBeNull();
+    expect(staleCatalog.maps.some((map) => map.sourceBuild)).toBe(false);
+    expect((await waitNative(page)).mapSha256).toBe(build.sha256);
+    await stop(page, hosted.id);
+    expect(await call('ce_host_start', { request: managedRequest }).then(() => '', String)).toContain(
+      'stale',
+    );
+    step('saved edits invalidate new starts while the existing private snapshot remains unchanged');
+    await call('save_project', { project: savedProject });
+    expect(
+      await call('ce_host_start', {
+        request: { ...managedRequest, sourceBuild: { projectId: project.id, buildId: crypto.randomUUID() } },
+      }).then(() => '', String),
+    ).not.toBe('');
+    step('unowned build IDs refuse without falling back to the stock map');
+    const builtBytes = await fs.readFile(build.output);
+    try {
+      const corrupt = Buffer.from(builtBytes);
+      corrupt[corrupt.length - 1] ^= 1;
+      await fs.writeFile(build.output, corrupt);
+      expect(await call('ce_host_start', { request: managedRequest }).then(() => '', String)).toContain(
+        'integrity',
+      );
+    } finally {
+      await fs.writeFile(build.output, builtBytes);
+    }
+    step('a genuinely corrupted managed cache refuses before process launch');
+    const buildReceipt = path.join(path.dirname(path.dirname(build.output)), 'receipt.json');
+    const receiptBytes = await fs.readFile(buildReceipt);
+    try {
+      const forged = JSON.parse(receiptBytes);
+      forged.output = path.join(runtime, 'maps/bloodgulch.map');
+      forged.sha256 = bloodgulch.sha256;
+      await fs.writeFile(buildReceipt, JSON.stringify(forged));
+      expect(await call('ce_host_start', { request: managedRequest }).then(() => '', String)).toContain(
+        'integrity',
+      );
+    } finally {
+      await fs.writeFile(buildReceipt, receiptBytes);
+    }
+    step('a redirected build receipt cannot select an output outside its owned job');
+    await call('ce_host_start', { request: managedRequest });
+    const restored = await waitNative(page);
+    expect(restored.mapSha256).toBe(build.sha256);
+    await stop(page, restored.id);
+    expect(await inventory(recovery.tagsDirectory)).toEqual(recoveredBefore);
+    step('restored valid native output can host again and the reviewed base source remains byte-identical', {
+      preservedReviewedTags: Object.keys(recoveredBefore).length,
+    });
+  }
   await call('ce_host_start', { request });
   const final = await waitNative(page);
   child.kill(); // Real abrupt parent exit tests Windows job-object cleanup.
@@ -325,6 +532,7 @@ try {
   receipt.complete = true;
 } catch (e) {
   receipt.errors.push(String(e));
+  receipt.failureStack = e.stack;
   process.exitCode = 1;
 } finally {
   if (browser) await browser.close().catch(() => {});

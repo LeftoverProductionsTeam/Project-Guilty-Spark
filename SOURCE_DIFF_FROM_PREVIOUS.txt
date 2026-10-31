@@ -1,30 +1,27 @@
 Project Guilty Spark private CE hosting — 2026-10-31
-Base committed foundation: 9136a26
+Base committed foundation: fbe1cbf
 
-Adds actual checked private CE dedicated start/status/stop controls inside Online, window ownership and abnormal-exit cleanup, native engine acceptance and compact workflow UI. Preserves original games, all prior source history, C35-C39 source safeguards and separate unfinished direct compiled-map research. Client joining and gameplay remain open. See docs/CUSTOM_EDITION_PRIVATE_HOST.md.
+Adds direct validated CE project-build hosting, same-filename stock/project isolation, native revision/output/receipt guards, rebuild guidance and genuine native compilation/hosting acceptance. Preserves original games, all prior source history, C35-C39 source safeguards and separate unfinished direct compiled-map research. Client joining and gameplay remain open. See docs/CE_PROJECT_BUILD_HOSTING.md.
 
 Changed or added source members:
 README.md
+SOURCE_DIFF_FROM_PREVIOUS.txt
+SOURCE_MANIFEST_SHA256.txt
+SOURCE_SHA256SUMS.txt
 crates/spark-core/src/ce_host.rs
-crates/spark-core/src/lib.rs
-crates/spark-core/src/runtime.rs
-crates/spark-core/src/runtime_adapters.rs
-docs/CE_HOST_GITHUB_DESCRIPTION.md
+docs/CE_PROJECT_BUILD_HOSTING.md
+docs/CE_PROJECT_HOST_GITHUB_DESCRIPTION.md
 docs/CUSTOM_EDITION_PRIVATE_HOST.md
 docs/MASTER_FEATURE_LEDGER.csv
 docs/MASTER_FEATURE_LEDGER.md
-docs/TEST_BUILD_READINESS.md
 docs/UNIVERSAL_WORKBENCH_BACKLOG.md
-docs/fixtures/ce-private-host-native.json
+docs/fixtures/ce-project-host-native.json
 scripts/test-build-evidence.mjs
 scripts/test-ce-host-native.mjs
-src-tauri/Cargo.toml
-src-tauri/src/app.rs
+scripts/test-ce-server-native.mjs
 src-tauri/src/ce_host_native.rs
-src-tauri/src/ce_setup.rs
 src/components/CustomEditionHost.css
 src/components/CustomEditionHost.tsx
 src/components/Runtimes.tsx
 tests/ui/ce-host.spec.ts
-tests/ui/fixtures/ceHost.html
 tests/ui/fixtures/ceHost.tsx

@@ -1,5 +1,7 @@
 # Universal workbench continuation
 
+The [CE project-build hosting follow-through](CE_PROJECT_BUILD_HOSTING.md) accepts direct managed-output selection, saved-revision/output checks and a real same-filename Workshop compilation/host challenge. It replaces the prior “managed build selection” gap for this scoped CE path. Matching-client preparation/join and a real Workshop walkthrough are the next gates. Other runtime formats, direct compiled-map authoring and game-peer/AI delivery remain open.
+
 The [private CE host continuation](CUSTOM_EDITION_PRIVATE_HOST.md) adds an actual owned dedicated-server lifecycle inside Online: native map selection, checked private copies, five stock modes, observed engine status, independent window ownership and scoped/abrupt-exit cleanup. It preserves the helper-only and failed-client evidence. **Open:** first real client join and Workshop walkthrough, direct selection of managed CE build outputs, LAN/public hosting acceptance for this classic CE control, game-peer/AI replication and all direct compiled-map authoring gates below.
 
 The [integrated test-build audit](TEST_BUILD_READINESS.md) compares the older feature checklist with the committed workbench, adds checked optional Custom Edition installation, and separates native editor/compiler acceptance from engine/client/gameplay evidence. Private CE dedicated-engine tests load stock Blood Gulch and the reviewed-source Workshop cache; an automated client did not join. Full multiplayer acceptance and all other open goals below remain in the backlog.

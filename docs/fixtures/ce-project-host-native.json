@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-31",
+  "sourceFoundation": "fbe1cbf",
+  "complete": true,
+  "scope": "Windows loopback-only classic CE dedicated-server lifecycle and native map status",
+  "application": {
+    "sha256": "f40ec2aa7c4ada73900575e53b92daf986b633b2b7c262aa8ef8d3841e176875",
+    "bytes": 38633472,
+    "bundledBeforeNativeAcceptance": true
+  },
+  "mockedIpc": false,
+  "physicalComputers": 1,
+  "independentSparkWindows": 2,
+  "publicListingRequested": false,
+  "clientJoined": false,
+  "gameplayVerified": false,
+  "cases": [
+    {
+      "name": "catalog and unsafe/stale request refusal",
+      "maps": 20,
+      "catalogMs": 350
+    },
+    {
+      "name": "real UI start and native Blood Gulch status",
+      "editorHeartbeatMs": 55,
+      "startupMs": 4101,
+      "status": {
+        "name": "Spark private",
+        "version": "01.00.10.0621",
+        "map": "bloodgulch",
+        "gameType": "Slayer",
+        "state": "openplaying",
+        "players": 0,
+        "maximumPlayers": 2,
+        "dedicated": true
+      },
+      "mapSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "serverSha256": "7789c4a0bd2c735e7fdc154d63f4bbb1134952e6904e5809eb00d4d1da94015f",
+      "copiedBytes": 187509852
+    },
+    {
+      "name": "workspace reload retains the owned native session"
+    },
+    {
+      "name": "separate windows cannot stop each other and closing a window stops only its own server"
+    },
+    {
+      "name": "native game type ctf",
+      "reportedGameType": "CTF",
+      "observations": 1
+    },
+    {
+      "name": "native game type oddball",
+      "reportedGameType": "Oddball",
+      "observations": 1
+    },
+    {
+      "name": "native game type king",
+      "reportedGameType": "King",
+      "observations": 1
+    },
+    {
+      "name": "native game type race",
+      "reportedGameType": "Race",
+      "observations": 1
+    },
+    {
+      "name": "unchanged compiler-produced CE map loads",
+      "map": "reviewed_ce_source_recovery",
+      "mapSha256": "15e355da28a04c55fc59bec8eb354bd4ed4e1ef1f1275e2d53d27215f579361c",
+      "status": {
+        "name": "Spark private",
+        "version": "01.00.10.0621",
+        "map": "reviewed_ce_source_recovery",
+        "gameType": "Slayer",
+        "state": "openplaying",
+        "players": 0,
+        "maximumPlayers": 2,
+        "dedicated": true
+      }
+    },
+    {
+      "name": "occupied private port fails without launching a process"
+    },
+    {
+      "name": "actual changed selected cache refuses a stale start"
+    },
+    {
+      "name": "genuine Workshop source compiles a CE project cache through the native UI/toolchain",
+      "buildId": "6b7a7506-ebc0-4095-bbe8-71c410fa5e89",
+      "target": "gbx-custom",
+      "mapSha256": "4c5810b87f3ce812aa35522e627ffcd8c48eb9cae93a742cfa8c6a6b510b6778",
+      "projectFingerprint": "09cbf984c4a4403970247c4ca6e1f4c833a4d0753b64047b1ff1a71322608cc2",
+      "compileMs": 16376,
+      "toolIdentities": {
+        "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+        "invaderBuild": "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a",
+        "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+        "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+      }
+    },
+    {
+      "name": "managed build with a stock filename loads from its own snapshot without replacing the installed map",
+      "projectStartupMs": 2999,
+      "mapSha256": "4c5810b87f3ce812aa35522e627ffcd8c48eb9cae93a742cfa8c6a6b510b6778",
+      "sourceBuild": {
+        "projectId": "e1594890-adfa-4135-8e33-b10277b0c881",
+        "buildId": "6b7a7506-ebc0-4095-bbe8-71c410fa5e89",
+        "projectTitle": "bloodgulch",
+        "projectFingerprint": "09cbf984c4a4403970247c4ca6e1f4c833a4d0753b64047b1ff1a71322608cc2"
+      },
+      "nativeStatus": {
+        "name": "Spark private",
+        "version": "01.00.10.0621",
+        "map": "bloodgulch",
+        "gameType": "Slayer",
+        "state": "openplaying",
+        "players": 0,
+        "maximumPlayers": 2,
+        "dedicated": true
+      }
+    },
+    {
+      "name": "saved edits invalidate new starts while the existing private snapshot remains unchanged"
+    },
+    {
+      "name": "unowned build IDs refuse without falling back to the stock map"
+    },
+    {
+      "name": "a genuinely corrupted managed cache refuses before process launch"
+    },
+    {
+      "name": "a redirected build receipt cannot select an output outside its owned job"
+    },
+    {
+      "name": "restored valid native output can host again and the reviewed base source remains byte-identical",
+      "preservedReviewedTags": 2455
+    },
+    {
+      "name": "abrupt Spark exit kills its owned dedicated server"
+    }
+  ],
+  "originalGameFilesUnchanged": 127,
+  "preservedResearchFilesUnchanged": 146,
+  "regressions": {
+    "rustWorkspaceLockedPassed": 578,
+    "rustOptInIgnored": 7,
+    "frontendPassed": 253,
+    "browserPassed": 113,
+    "offlineScriptsPassed": 59,
+    "typeScript": "passed",
+    "windowsReleaseAndNsis": "passed"
+  },
+  "retainedFailedClientTrial": {
+    "nativeReplies": 101,
+    "serverPlayers": 0,
+    "joinAccepted": false,
+    "clientWindowInspection": "Windows computer-use helper failed to initialize, including after reset"
+  },
+  "limits": [
+    "No accepted client join, walkthrough, game audiovisual parity, multiplayer/AI replication or expanded population.",
+    "This new classic CE control is loopback-only; existing SparkLink/community LAN/VPN paths remain separate.",
+    "Direct managed CE project-build selection is accepted; matching-client preparation and join remain open.",
+    "Header/hash/resource-index/copy checks do not certify every tag semantic or publisher authenticity.",
+    "The Workshop cache uses the documented reviewed-source changes, not lossless recovery.",
+    "Direct compiled-map authoring remains unfinished; native loose-tag and server tests do not complete it.",
+    "No clean-machine installer installation, remote CI or publication was performed."
+  ],
+  "reviewedSourceTagsUnchanged": 2455,
+  "visibleClientTrial": {
+    "visibleRequested": true,
+    "serverReplies": 91,
+    "joined": false,
+    "durationSeconds": 90
+  }
+}

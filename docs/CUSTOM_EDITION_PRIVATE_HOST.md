@@ -1,5 +1,7 @@
 # Custom Edition private dedicated host
 
+**Follow-through:** [saved project build hosting](CE_PROJECT_BUILD_HOSTING.md) now adds direct selection of validated managed CE outputs, revision/output checks and same-filename isolation. The original standalone-host acceptance below remains historical evidence; client joining and gameplay remain open.
+
 Continue from the committed Windows workbench. This milestone adds a genuine Spark-controlled **classic CE dedicated-server lifecycle**, separately from SparkLink editor synchronization and game-client acceptance.
 
 ## Use it

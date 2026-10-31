@@ -4,9 +4,22 @@ import { call, native } from '../api';
 import { Notice, Pill } from './ui';
 import './CustomEditionHost.css';
 
+interface BuildSource {
+  projectId: string;
+  buildId: string;
+  projectTitle?: string;
+  projectFingerprint?: string;
+}
+interface MapChoice {
+  name: string;
+  sha256: string;
+  sourceBuild?: BuildSource | null;
+}
 interface Catalog {
   executableSha256: string;
-  maps: { name: string; sha256: string }[];
+  maps: MapChoice[];
+  projectId?: string | null;
+  projectIssue?: string | null;
 }
 export interface CeHostView {
   id: string;
@@ -21,6 +34,7 @@ export interface CeHostView {
   processId: number | null;
   executableSha256: string;
   mapSha256: string;
+  sourceBuild?: BuildSource | null;
   sessionDirectory: string | null;
   copiedBytes: number;
   observations: number;
@@ -38,6 +52,7 @@ export interface CeHostView {
   } | null;
 }
 const active = (view: CeHostView | null) => view && !['stopped', 'failed'].includes(view.phase);
+const mapKey = (name: string, build?: BuildSource | null) => (build ? 'build:' + build.buildId : name);
 const phaseNames: Record<string, string> = {
   preparing: 'Preparing private copy',
   starting: 'Starting',
@@ -49,7 +64,19 @@ const phaseNames: Record<string, string> = {
   failed: 'Needs attention',
 };
 
-export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) {
+export default function CustomEditionHost({
+  onSetup,
+  projectId,
+  dirty = false,
+  onBuild,
+  savedRevision,
+}: {
+  onSetup: () => void;
+  projectId?: string;
+  dirty?: boolean;
+  onBuild?: () => void;
+  savedRevision?: string | null;
+}) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [view, setView] = useState<CeHostView | null>(null);
   const [map, setMap] = useState('bloodgulch'),
@@ -63,30 +90,41 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
     [setupError, setSetupError] = useState('');
   const mounted = useRef(false),
     polling = useRef(false);
-  const generation = useRef(0),
-    currentView = useRef(view);
-  currentView.current = view;
+  const generation = useRef(0);
+  const catalogGeneration = useRef(0),
+    catalogProject = useRef<string | null | undefined>(undefined);
   const refresh = useCallback(async () => {
     setLoading(true);
     setSetupError('');
+    const token = ++catalogGeneration.current;
     try {
-      const next = await call<Catalog>('ce_host_catalog');
-      if (mounted.current) {
+      const next = await call<Catalog>('ce_host_catalog', { projectId: projectId ?? null });
+      if (mounted.current && token === catalogGeneration.current) {
         setCatalog(next);
-        if (!active(currentView.current))
-          setMap((previous) =>
-            next.maps.some((item) => item.name === previous) ? previous : (next.maps[0]?.name ?? ''),
-          );
       }
     } catch (e) {
-      if (mounted.current) {
+      if (mounted.current && token === catalogGeneration.current) {
         setCatalog(null);
         setSetupError(String(e));
       }
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && token === catalogGeneration.current) setLoading(false);
     }
-  }, []);
+  }, [projectId, savedRevision]);
+  useEffect(() => {
+    if (!catalog || active(view)) return;
+    const projectChanged = catalogProject.current !== (catalog.projectId ?? null);
+    catalogProject.current = catalog.projectId ?? null;
+    const built = catalog.maps.find((item) => item.sourceBuild);
+    setMap((previous) => {
+      if (projectChanged && catalog.projectId)
+        return built ? mapKey(built.name, built.sourceBuild) : 'unbuilt:' + catalog.projectId;
+      if (catalog.maps.some((item) => mapKey(item.name, item.sourceBuild) === previous)) return previous;
+      if (catalog.projectId && (previous.startsWith('build:') || previous.startsWith('unbuilt:')))
+        return built ? mapKey(built.name, built.sourceBuild) : previous; // Never select a stock namesake.
+      return mapKey((built ?? catalog.maps[0])?.name ?? '', (built ?? catalog.maps[0])?.sourceBuild);
+    });
+  }, [catalog, view]);
   const poll = useCallback(async () => {
     if (polling.current) return;
     polling.current = true;
@@ -96,7 +134,7 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
       if (mounted.current && token === generation.current) {
         setView(next);
         if (active(next) && next) {
-          setMap(next.map);
+          setMap(mapKey(next.map, next.sourceBuild));
           setGameType(next.gameType);
           setMaximumPlayers(next.maximumPlayers);
           setName(next.name);
@@ -121,12 +159,13 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
     return () => {
       mounted.current = false;
       generation.current++;
+      catalogGeneration.current++;
       window.clearInterval(timer);
     };
   }, [refresh, poll]);
-  const selected = catalog?.maps.find((item) => item.name === map);
+  const selected = catalog?.maps.find((item) => mapKey(item.name, item.sourceBuild) === map);
   async function start() {
-    if (!selected || !catalog) return;
+    if (!selected || !catalog || (selected.sourceBuild && dirty)) return;
     const token = ++generation.current;
     setBusy(true);
     setError('');
@@ -140,6 +179,14 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
           maximumPlayers,
           port,
           name,
+          ...(selected.sourceBuild
+            ? {
+                sourceBuild: {
+                  projectId: selected.sourceBuild.projectId,
+                  buildId: selected.sourceBuild.buildId,
+                },
+              }
+            : {}),
         },
       });
       if (mounted.current && token === generation.current) setView(next);
@@ -198,6 +245,16 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
           game's maps folder, then refresh.
         </Notice>
       )}
+      {projectId && (catalog?.projectIssue || dirty) && (
+        <div className="ce-host-project">
+          <small>
+            {dirty
+              ? 'Save and build your changes before hosting this project version.'
+              : catalog?.projectIssue}
+          </small>
+          {onBuild && <button onClick={onBuild}>Build this map</button>}
+        </div>
+      )}
       {catalog && catalog.maps.length > 0 && (
         <div className="ce-host-fields">
           <label>
@@ -208,14 +265,39 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
               value={map}
               onChange={(e) => setMap(e.target.value)}
             >
-              {catalog.maps.map((item) => (
-                <option key={item.name} value={item.name}>
-                  {item.name}
+              {!selected && !active(view) && map && (
+                <option value={map} disabled>
+                  Project build unavailable · rebuild this map
                 </option>
-              ))}
-              {active(view) && view && !catalog.maps.some((item) => item.name === view.map) && (
-                <option value={view.map}>Active snapshot · {view.map}</option>
               )}
+              {catalog.maps.some((item) => item.sourceBuild) && (
+                <optgroup label="Validated project build">
+                  {catalog.maps
+                    .filter((item) => item.sourceBuild)
+                    .map((item) => (
+                      <option
+                        key={mapKey(item.name, item.sourceBuild)}
+                        value={mapKey(item.name, item.sourceBuild)}
+                      >
+                        {item.sourceBuild?.projectTitle ?? item.name} · saved CE build
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+              <optgroup label="Installed CE maps">
+                {catalog.maps
+                  .filter((item) => !item.sourceBuild)
+                  .map((item) => (
+                    <option key={item.name} value={item.name}>
+                      {item.name}
+                    </option>
+                  ))}
+              </optgroup>
+              {active(view) &&
+                view &&
+                !catalog.maps.some(
+                  (item) => mapKey(item.name, item.sourceBuild) === mapKey(view.map, view.sourceBuild),
+                ) && <option value={mapKey(view.map, view.sourceBuild)}>Active snapshot · {view.map}</option>}
             </select>
           </label>
           <label>
@@ -245,7 +327,10 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
               onChange={(e) => setMaximumPlayers(Number(e.target.value))}
             />
           </label>
-          <button disabled={!native || loading || locked || !selected} onClick={() => void start()}>
+          <button
+            disabled={!native || loading || locked || !selected || (!!selected.sourceBuild && dirty)}
+            onClick={() => void start()}
+          >
             <Play size={14} /> Start private server
           </button>
         </div>
@@ -289,6 +374,7 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
           <div className="button-row">
             <strong role="status">{phaseNames[view.phase] ?? view.phase}</strong>
             <span>{view.map}</span>
+            {view.sourceBuild && <Pill>Saved project snapshot</Pill>}
             {view.status && (
               <Pill>
                 {view.status.players} / {view.status.maximumPlayers} players
@@ -301,6 +387,11 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
             )}
           </div>
           <p>{view.detail}</p>
+          {view.sourceBuild && (
+            <p className="subtle">
+              CE clients need this saved map copy to join. The installed stock map is unchanged.
+            </p>
+          )}
           {!!view.port && active(view) && (
             <p>
               Direct IP: <code className="ce-host-address">127.0.0.1:{view.port}</code>
@@ -319,6 +410,16 @@ export default function CustomEditionHost({ onSetup }: { onSetup: () => void }) 
               <dd>{view.status?.version ?? 'No current native reply'}</dd>
               <dt>Map identity</dt>
               <dd>{view.mapSha256}</dd>
+              {view.sourceBuild && (
+                <>
+                  <dt>Saved build</dt>
+                  <dd>
+                    {view.sourceBuild.projectTitle} · {view.sourceBuild.buildId}
+                  </dd>
+                  <dt>Saved revision</dt>
+                  <dd>{view.sourceBuild.projectFingerprint}</dd>
+                </>
+              )}
               <dt>Dedicated executable</dt>
               <dd>{view.executableSha256}</dd>
             </dl>

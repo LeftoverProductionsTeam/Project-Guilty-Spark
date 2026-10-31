@@ -1,5 +1,11 @@
 # Project Guilty Spark
 
+## Host your saved Custom Edition build
+
+**Online → Host game** can now select the current map's validated CE project output directly, alongside installed maps. Build IDs, saved revisions and native output integrity are checked before a private server copy is prepared. A project named `bloodgulch` stays separate from stock Blood Gulch; stale choices never silently fall back to stock content. Missing builds lead back to the map's build workspace.
+
+Real native acceptance compiles Workshop geometry through Halo Tool/Invader, hosts those exact bytes, refuses stale/corrupted/redirected outputs and preserves the installed game and reviewed source. Matching-client preparation, a joined player and collision walkthroughs remain open. [Workflow and evidence](docs/CE_PROJECT_BUILD_HOSTING.md) · [Descriptive publication handoff](docs/CE_PROJECT_HOST_GITHUB_DESCRIPTION.md).
+
 ## Checked private Custom Edition hosting
 
 **Online → Host game → Halo Custom Edition** now starts and stops an actual classic CE dedicated server from a verified private game copy. Choose a map, stock game type and player limit in one compact panel; native map status, a Direct IP address and recoverable workspace controls stay together. Separate windows own separate servers, and closing the owning window or abruptly exiting Spark stops its server.

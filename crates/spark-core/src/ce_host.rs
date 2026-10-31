@@ -38,6 +38,22 @@ impl GameType {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProjectBuild {
+    pub project_id: String,
+    pub build_id: String,
+}
+impl ProjectBuild {
+    pub fn validate(&self) -> Result<()> {
+        if uuid::Uuid::parse_str(&self.project_id).is_err()
+            || uuid::Uuid::parse_str(&self.build_id).is_err()
+        {
+            return invalid("Select an owned project and its validated build");
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Request {
     pub map: String,
     pub map_sha256: String,
@@ -47,6 +63,9 @@ pub struct Request {
     /// Zero selects an available private port pair.
     pub port: u16,
     pub name: String,
+    /// A native lookup key only. No remote/local output path is supplied by the UI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_build: Option<ProjectBuild>,
 }
 pub fn map_selector(value: &str) -> bool {
     !value.is_empty()
@@ -61,6 +80,9 @@ fn hash(value: &str) -> bool {
 }
 impl Request {
     pub fn validate(&self) -> Result<()> {
+        if let Some(source) = &self.source_build {
+            source.validate()?;
+        }
         if !map_selector(&self.map) {
             return invalid(
                 "Select an actual short native CE map name (letters, digits, underscore)",
@@ -199,9 +221,24 @@ mod tests {
             maximum_players: 2,
             port: 0,
             name: "Spark private".into(),
+            source_build: None,
         }
     }
     const STATUS: &[u8] = br"\hostname\Spark private\gamever\01.00.10.0621\mapname\bloodgulch\dedicated\1\gamemode\openplaying\numplayers\0\maxplayers\2\gametype\Slayer\final\\queryid\1.1";
+    #[test]
+    fn project_build_selection_accepts_ids_only_and_rejects_paths() {
+        let mut value = request();
+        value.source_build = Some(ProjectBuild {
+            project_id: uuid::Uuid::new_v4().to_string(),
+            build_id: uuid::Uuid::new_v4().to_string(),
+        });
+        assert!(value.validate().is_ok());
+        let mut encoded = serde_json::to_value(&value).unwrap();
+        encoded["sourceBuild"]["output"] = "C:/unowned/map.map".into();
+        assert!(serde_json::from_value::<Request>(encoded).is_err());
+        value.source_build.as_mut().unwrap().build_id = "../other".into();
+        assert!(value.validate().is_err());
+    }
     #[test]
     fn real_native_status_shape_requires_a_matching_running_game() {
         let mut status = parse_status(STATUS).unwrap();

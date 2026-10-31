@@ -1,6 +1,17 @@
 const source = 'docs/TEST_BUILD_READINESS.md';
 export const testBuildRequirements = [
   {
+    id: 'TBR-ce-project-host',
+    feature: 'Host a validated managed CE project build with isolated stock-map identity',
+    source: 'docs/CE_PROJECT_BUILD_HOSTING.md',
+    topic: 'server',
+    operation:
+      'Resolve a saved CE project/build through native ownership, revision, receipt, target and output checks; host the exact compiled bytes from a private copy. Keep same-filename stock/project choices distinct, preserve missing selections, guide rebuilding and retain a running frozen snapshot while source edits continue.',
+    gap: 'Matching-client preparation and join, walkthrough/gameplay parity, classic CE LAN/public exposure, other-runtime output routing, game-peer/AI replication and direct compiled-map authoring remain open.',
+    previous:
+      'Continues fbe1cbf without replacing its prior native lifecycle evidence, C35-C39 source safeguards or unfinished research.',
+  },
+  {
     id: 'TBR-ce-private-host',
     feature: 'Owned private Custom Edition dedicated hosting inside Online',
     source: 'docs/CUSTOM_EDITION_PRIVATE_HOST.md',
@@ -62,4 +73,13 @@ testBuildOverrides['TBR-ce-private-host'] = {
     'crates/spark-core/src/ce_host.rs; src-tauri/src/ce_host_native.rs; src/components/CustomEditionHost.tsx; scripts/test-ce-host-native.mjs',
   level:
     'Real Windows desktop UI/native IPC plus dedicated-engine lifecycle/status; client join and gameplay NOT ACCEPTED',
+};
+testBuildOverrides['TBR-ce-project-host'] = {
+  ...testBuildOverrides['TBR-ce-project-host'],
+  evidence:
+    'docs/CE_PROJECT_BUILD_HOSTING.md; docs/fixtures/ce-project-host-native.json; scripts/test-ce-host-native.mjs',
+  files:
+    'crates/spark-core/src/ce_host.rs; src-tauri/src/ce_host_native.rs; src/components/CustomEditionHost.tsx; scripts/test-ce-host-native.mjs',
+  level:
+    'Real Windows UI/native toolchain and dedicated-engine map acceptance; matching client and gameplay NOT ACCEPTED',
 };

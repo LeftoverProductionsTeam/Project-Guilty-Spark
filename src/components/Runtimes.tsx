@@ -188,7 +188,7 @@ export default function Runtimes({
             <details><summary>Advanced · installed tool identity &amp; separate launchers</summary><ToolchainShelf project={project} runtime={selected} settings={settings} onSettings={onSettings} onOpenWorkspace={onOpenWorkspace} /></details>
           </>
         ) : tab === 'hosting' ? (
-          selected === 'haloCustomEdition' ? <CustomEditionHost onSetup={onSettings}/> : <><CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')}/><HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/></>
+          selected === 'haloCustomEdition' ? <CustomEditionHost onSetup={onSettings} projectId={project?.id} dirty={dirty} savedRevision={dirty ? null : project?.modifiedAt} onBuild={()=>onOpenWorkspace(project?.quickForge ? 'quickforge' : 'build')}/> : <><CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')}/><HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/></>
         ) : (
           <Friends
             key={`${selected}:${project?.id ?? ''}`}

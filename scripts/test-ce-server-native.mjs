@@ -9,16 +9,18 @@ import dgram from 'node:dgram';
 const args = new Map();
 for (let i = 2; i < process.argv.length; i += 2) {
   if (
-    !['--runtime', '--output', '--client', '--map'].includes(process.argv[i]) ||
+    !['--runtime', '--output', '--client', '--map', '--client-seconds'].includes(process.argv[i]) ||
     !process.argv[i + 1] ||
     args.has(process.argv[i])
   )
     throw Error(
-      'Use --runtime checked-CE-folder --output fresh-short-folder [--client true] [--map native-CE.map]',
+      'Use --runtime checked-CE-folder --output fresh-short-folder [--client true] [--client-seconds 5..120] [--map native-CE.map]',
     );
   args.set(
     process.argv[i],
-    process.argv[i] === '--client' ? process.argv[i + 1] : path.resolve(process.argv[i + 1]),
+    ['--client', '--client-seconds'].includes(process.argv[i])
+      ? process.argv[i + 1]
+      : path.resolve(process.argv[i + 1]),
   );
 }
 if (
@@ -27,6 +29,14 @@ if (
   (args.has('--client') && args.get('--client') !== 'true')
 )
   throw Error('Runtime/output required; optional client must be true');
+const clientSeconds = Number(args.get('--client-seconds') ?? 24);
+if (
+  !Number.isInteger(clientSeconds) ||
+  clientSeconds < 5 ||
+  clientSeconds > 120 ||
+  (args.has('--client-seconds') && !args.has('--client'))
+)
+  throw Error('Client seconds requires --client true and an integer from 5 to 120');
 const root = args.get('--output'),
   runtime = args.get('--runtime');
 if (root.length > 130) throw Error('Use a short fresh output folder for this legacy game');
@@ -156,10 +166,16 @@ try {
         '-connect',
         `127.0.0.1:${port}`,
       ],
-      { cwd: game, windowsHide: true, stdio: 'ignore' },
+      { cwd: game, windowsHide: false, stdio: 'ignore' },
     );
     receipt.clientProcessId = client.pid;
-    for (let n = 0; n < 24; n++) {
+    receipt.clientVisibleRequested = true;
+    await fs.writeFile(
+      path.join(root, 'client-process.json'),
+      JSON.stringify({ pid: client.pid, game, port, visibleRequested: true }, null, 2),
+    );
+    const clientDeadline = Date.now() + clientSeconds * 1000;
+    while (Date.now() < clientDeadline) {
       await new Promise((r) => setTimeout(r, 500));
       await query(port);
       if (replies.some((text) => /\\numplayers\\[1-9]/.test(text))) break;

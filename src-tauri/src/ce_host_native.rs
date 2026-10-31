@@ -36,6 +36,7 @@ pub(super) struct View {
     process_id: Option<u32>,
     executable_sha256: String,
     map_sha256: String,
+    source_build: Option<BuildProvenance>,
     session_directory: Option<PathBuf>,
     copied_bytes: u64,
     status: Option<ce::Status>,
@@ -48,12 +49,27 @@ pub(super) struct View {
 pub(super) struct Catalog {
     executable_sha256: String,
     maps: Vec<MapChoice>,
+    project_id: Option<String>,
+    project_issue: Option<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct MapChoice {
     name: String,
     sha256: String,
+    source_build: Option<BuildProvenance>,
+}
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BuildProvenance {
+    #[serde(flatten)]
+    source: ce::ProjectBuild,
+    project_title: String,
+    project_fingerprint: String,
+}
+struct PinnedMap {
+    file: PathBuf,
+    source_build: Option<BuildProvenance>,
 }
 fn active(view: &View) -> bool {
     !matches!(view.phase.as_str(), "stopped" | "failed")
@@ -117,25 +133,61 @@ fn server_identity(root: &Path) -> Reply<String> {
     Ok(hash)
 }
 fn map_file(root: &Path, name: &str) -> Reply<PathBuf> {
+    checked_map_file(&root.join("maps").join(format!("{name}.map")), name)
+}
+fn checked_map_file(file: &Path, name: &str) -> Reply<PathBuf> {
     if !ce::map_selector(name) {
         return Err("Invalid native map selector".into());
     }
-    let file = root.join("maps").join(format!("{name}.map"));
-    core::reject_links(&file).map_err(error)?;
-    let header = maps::inspect_header(&file).map_err(error)?;
+    core::reject_links(file).map_err(error)?;
+    let header = maps::inspect_header(file).map_err(error)?;
     if header.version != 609 || header.scenario_type != 1 || header.name != name || header.extended
     {
         return Err("Choose an unextended native CE version-609 multiplayer map with its original filename. Header rewriting is not conversion.".into());
     }
-    Ok(file)
+    Ok(file.into())
 }
 fn map_identity(root: &Path, name: &str) -> Reply<String> {
     maps::hash_file(&map_file(root, name)?).map_err(error)
 }
-fn check_request(root: &Path, request: &ce::Request) -> Reply<()> {
+fn project_build(state: &AppState, source: &ce::ProjectBuild) -> Reply<PinnedMap> {
+    source.validate().map_err(error)?;
+    let project = lock(&state.library)?
+        .get(&source.project_id)
+        .map_err(error)?;
+    let build = verified_build(state, &project, &source.build_id)?;
+    if build.target != "gbx-custom" {
+        return Err("Build this saved project for Custom Edition before hosting it; another runtime's output cannot substitute".into());
+    }
+    let file = build
+        .output
+        .as_ref()
+        .ok_or("Validated CE build has no output")?;
+    let header = maps::inspect_header(file).map_err(error)?;
+    checked_map_file(file, &header.name)?;
+    Ok(PinnedMap {
+        file: file.clone(),
+        source_build: Some(BuildProvenance {
+            source: source.clone(),
+            project_title: project.title,
+            project_fingerprint: build.project_fingerprint,
+        }),
+    })
+}
+fn resolve_map(state: &AppState, root: &Path, request: &ce::Request) -> Reply<PinnedMap> {
+    match &request.source_build {
+        Some(source) => project_build(state, source),
+        None => Ok(PinnedMap {
+            file: map_file(root, &request.map)?,
+            source_build: None,
+        }),
+    }
+}
+fn check_request(root: &Path, request: &ce::Request, file: &Path) -> Reply<()> {
     request.validate().map_err(error)?;
     if server_identity(root)? != request.executable_sha256
-        || map_identity(root, &request.map)? != request.map_sha256
+        || maps::hash_file(&checked_map_file(file, &request.map)?).map_err(error)?
+            != request.map_sha256
     {
         return Err("The selected CE executable or map changed. Refresh before starting; no server was launched.".into());
     }
@@ -267,9 +319,26 @@ fn copy_checked(source: &Path, target: &Path, bytes: u64, job: &Job) -> Reply<St
     }
     Ok(hash)
 }
-fn snapshot(root: &Path, directory: &Path, request: &ce::Request, job: &Job) -> Reply<PathBuf> {
+fn snapshot(
+    root: &Path,
+    directory: &Path,
+    request: &ce::Request,
+    input: &PinnedMap,
+    job: &Job,
+) -> Reply<PathBuf> {
     let mut files = Vec::new();
     collect(root, Path::new(""), &request.map, &mut files, &mut 0)?;
+    let map_relative = format!("maps/{}.map", request.map);
+    // The native build can share a filename with a stock map. Explicit source
+    // selection replaces only the new private copy, never the installed cache.
+    files.retain(|(name, _)| name != &map_relative);
+    files.push((
+        map_relative.clone(),
+        fs::metadata(&input.file).map_err(error)?.len(),
+    ));
+    if files.len() > MAX_FILES {
+        return Err("CE host file count exceeds its limit".into());
+    }
     let bytes: u64 = files.iter().map(|(_, size)| size).sum();
     if bytes > MAX_COPY_BYTES {
         return Err("Private CE game copy exceeds 512 MiB".into());
@@ -282,7 +351,12 @@ fn snapshot(root: &Path, directory: &Path, request: &ce::Request, job: &Job) -> 
     fs::create_dir(&game).map_err(error)?;
     let mut hashes = BTreeMap::new();
     for (name, bytes) in files {
-        let hash = copy_checked(&root.join(&name), &game.join(&name), bytes, job)?;
+        let source = if name == map_relative {
+            input.file.clone()
+        } else {
+            root.join(&name)
+        };
+        let hash = copy_checked(&source, &game.join(&name), bytes, job)?;
         hashes.insert(name, hash);
         lock(&job.view)?.copied_bytes += bytes;
     }
@@ -461,12 +535,13 @@ fn run(
     root: &Path,
     directory: &Path,
     request: &ce::Request,
+    input: &PinnedMap,
     job: &Job,
     began: Instant,
 ) -> Reply<()> {
     cancelled(job)?;
-    check_request(root, request)?;
-    let game = snapshot(root, directory, request, job)?;
+    check_request(root, request, &input.file)?;
+    let game = snapshot(root, directory, request, input, job)?;
     {
         let mut view = lock(&job.view)?;
         view.session_directory = Some(directory.into());
@@ -554,7 +629,10 @@ fn run(
 }
 
 #[tauri::command]
-pub(super) async fn ce_host_catalog(app: tauri::AppHandle) -> Reply<Catalog> {
+pub(super) async fn ce_host_catalog(
+    app: tauri::AppHandle,
+    project_id: Option<String>,
+) -> Reply<Catalog> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let root = runtime_root(&state)?;
@@ -577,6 +655,7 @@ pub(super) async fn ce_host_catalog(app: tauri::AppHandle) -> Reply<Catalog> {
                     choices.push(MapChoice {
                         name,
                         sha256: sha256.clone(),
+                        source_build: None,
                     });
                 }
             }
@@ -584,9 +663,34 @@ pub(super) async fn ce_host_catalog(app: tauri::AppHandle) -> Reply<Catalog> {
                 return Err("Choose a smaller CE maps collection for this host".into());
             }
         }
+        let mut project_issue = None;
+        if let Some(project_id) = &project_id {
+            let result = (|| {
+                uuid::Uuid::parse_str(project_id).map_err(error)?;
+                let project = lock(&state.library)?.get(project_id).map_err(error)?;
+                let build = current_build(&state, &project)?;
+                let source = ce::ProjectBuild {
+                    project_id: project_id.clone(),
+                    build_id: build.id,
+                };
+                let pinned = project_build(&state, &source)?;
+                let header = maps::inspect_header(&pinned.file).map_err(error)?;
+                Ok::<_, String>(MapChoice {
+                    name: header.name,
+                    sha256: maps::hash_file(&pinned.file).map_err(error)?,
+                    source_build: pinned.source_build,
+                })
+            })();
+            match result {
+                Ok(choice) => choices.insert(0, choice),
+                Err(detail) => project_issue = Some(detail),
+            }
+        }
         Ok(Catalog {
             executable_sha256,
             maps: choices,
+            project_id,
+            project_issue,
         })
     })
     .await
@@ -621,7 +725,9 @@ pub(super) async fn ce_host_start(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let root = runtime_root(&state)?;
-        check_request(&root, &request)?;
+        request.validate().map_err(error)?;
+        let input = resolve_map(&state, &root, &request)?;
+        check_request(&root, &request, &input.file)?;
         let mut registry = lock(&state.ce_hosts)?;
         if app.get_webview_window(&owner).is_none() { return Err("The requesting window closed".into()); }
         if current(&registry, &owner)?.is_some_and(|view| active(&view)) { return Err("Stop this window's existing private CE server first".into()); }
@@ -638,7 +744,8 @@ pub(super) async fn ce_host_start(
             map: request.map.clone(), game_type: request.game_type, maximum_players: request.maximum_players,
             name: request.name.clone(), requested_port: request.port,
             port: request.port, process_id: None, executable_sha256: request.executable_sha256.clone(),
-            map_sha256: request.map_sha256.clone(), session_directory: None, copied_bytes: 0,
+            map_sha256: request.map_sha256.clone(), source_build: input.source_build.clone(),
+            session_directory: None, copied_bytes: 0,
             status: None, observations: 0, elapsed_ms: 0, console_tail: String::new(),
         };
         let job = Arc::new(Job { stop: AtomicBool::new(false), view: Mutex::new(view.clone()) });
@@ -646,7 +753,7 @@ pub(super) async fn ce_host_start(
         drop(registry);
         std::thread::spawn(move || {
             let began = Instant::now();
-            let result = run(&root, &directory, &request, &job, began);
+            let result = run(&root, &directory, &request, &input, &job, began);
             if let Ok(mut view) = job.view.lock() {
                 view.status = None;
                 view.phase = if job.stop.load(Ordering::Relaxed) || result.is_ok() { "stopped" } else { "failed" }.into();
@@ -678,6 +785,7 @@ mod tests {
                 process_id: None,
                 executable_sha256: "a".repeat(64),
                 map_sha256: "b".repeat(64),
+                source_build: None,
                 session_directory: None,
                 copied_bytes: 0,
                 status: None,

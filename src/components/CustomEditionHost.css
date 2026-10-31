@@ -36,6 +36,13 @@
 .ce-host-options {
   margin: 8px 0;
 }
+.ce-host-project {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
 .ce-host-options .ce-host-fields {
   grid-template-columns: 2fr 1fr;
   margin-top: 8px;

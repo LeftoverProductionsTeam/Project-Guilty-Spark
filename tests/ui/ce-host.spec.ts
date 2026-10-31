@@ -11,13 +11,41 @@ test.beforeEach(async ({ page }) => {
         if (command === 'ce_host_catalog') {
           if (location.search.includes('missing'))
             throw Error('Register a separately installed runtime first');
-          return {
+          const catalog = {
             executableSha256: 'a'.repeat(64),
+            projectId: args?.projectId ?? null,
+            projectIssue:
+              w.projectBuildMissing || location.search.includes('needs-build')
+                ? 'No validated build of the current saved project is available'
+                : null,
             maps: [
               { name: 'bloodgulch', sha256: 'b'.repeat(64) },
               { name: 'sidewinder', sha256: 'c'.repeat(64) },
             ],
-          };
+          } as any;
+          if (args?.projectId && !catalog.projectIssue)
+            catalog.maps.unshift({
+              name: 'bloodgulch',
+              sha256: 'd'.repeat(64),
+              sourceBuild: {
+                projectId: args.projectId,
+                buildId:
+                  w.newProjectBuildId ??
+                  (args.projectId === '33333333-3333-4333-8333-333333333333'
+                    ? '44444444-4444-4444-8444-444444444444'
+                    : '22222222-2222-4222-8222-222222222222'),
+                projectTitle: 'My Workshop',
+                projectFingerprint: 'e'.repeat(64),
+              },
+            });
+          if (
+            location.search.includes('delayed') &&
+            args?.projectId === '11111111-1111-4111-8111-111111111111'
+          )
+            return new Promise((resolve) => {
+              w.releaseOldCatalog = () => resolve(catalog);
+            });
+          return catalog;
         }
         if (command === 'ce_host_status') return structuredClone(w.ceHostSession);
         if (command === 'ce_host_start') {
@@ -119,4 +147,75 @@ test('host controls fit a narrow workspace without horizontal overflow', async (
   const panel = page.getByRole('region', { name: 'Custom Edition private host' });
   expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await expect(panel.getByRole('button', { name: 'Stop private server', exact: true })).toBeInViewport();
+});
+test('managed builds with stock filenames remain distinct and send only native lookup IDs', async ({
+  page,
+}) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html?project');
+  await expect(page.getByLabel('Private CE map')).toHaveValue('build:22222222-2222-4222-8222-222222222222');
+  await page.getByRole('button', { name: 'Start private server', exact: true }).click();
+  const request = await page.evaluate(
+    () => (window as any).ceHostCalls.find((c: any) => c.command === 'ce_host_start').args.request,
+  );
+  expect(request.mapSha256).toBe('d'.repeat(64));
+  expect(request.sourceBuild).toEqual({
+    projectId: '11111111-1111-4111-8111-111111111111',
+    buildId: '22222222-2222-4222-8222-222222222222',
+  });
+  await page.getByRole('button', { name: 'Switch workspace' }).click();
+  await page.getByRole('button', { name: 'Switch workspace' }).click();
+  await expect(page.getByLabel('Private CE map')).toHaveValue('build:22222222-2222-4222-8222-222222222222');
+});
+test('unsaved changes block the project snapshot and keep installed-map hosting available', async ({
+  page,
+}) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html?project');
+  await expect(page.getByLabel('Private CE map')).toHaveValue('build:22222222-2222-4222-8222-222222222222');
+  await page.getByRole('button', { name: 'Toggle unsaved changes' }).click();
+  await expect(page.getByRole('button', { name: 'Start private server', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Build this map', exact: true }).click();
+  await expect(page.getByText('Build visits 1')).toBeVisible();
+  await page.getByLabel('Private CE map').selectOption('bloodgulch');
+  await expect(page.getByRole('button', { name: 'Start private server', exact: true })).toBeEnabled();
+});
+test('missing current builds guide the user back to their map build workspace', async ({ page }) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html?project&needs-build');
+  await page.getByRole('button', { name: 'Build this map', exact: true }).click();
+  await expect(page.getByText('Build visits 1')).toBeVisible();
+  await expect(page.getByRole('option', { name: /saved CE build/ })).toHaveCount(0);
+});
+test('a late catalog cannot replace the newly selected project build', async ({ page }) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html?project&delayed');
+  await expect.poll(() => page.evaluate(() => !!(window as any).releaseOldCatalog)).toBe(true);
+  await page.getByRole('button', { name: 'Switch project', exact: true }).click();
+  await expect(page.getByLabel('Private CE map')).toHaveValue('build:44444444-4444-4444-8444-444444444444');
+  await page.evaluate(() => (window as any).releaseOldCatalog());
+  await page.getByRole('button', { name: 'Start private server', exact: true }).click();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).ceHostCalls.find((c: any) => c.command === 'ce_host_start').args.request.sourceBuild
+          .projectId,
+    ),
+  ).toBe('33333333-3333-4333-8333-333333333333');
+});
+test('losing a project build keeps it unavailable instead of choosing its stock namesake', async ({
+  page,
+}) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html?project');
+  await expect(page.getByLabel('Private CE map')).toHaveValue('build:22222222-2222-4222-8222-222222222222');
+  await page.evaluate(() => {
+    (window as any).projectBuildMissing = true;
+  });
+  await page.getByRole('button', { name: 'Refresh maps', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Build this map', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start private server', exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Private CE map')).toHaveValue('build:22222222-2222-4222-8222-222222222222');
+  await page.evaluate(() => {
+    (window as any).projectBuildMissing = false;
+    (window as any).newProjectBuildId = '55555555-5555-4555-8555-555555555555';
+  });
+  await page.getByRole('button', { name: 'Refresh maps', exact: true }).click();
+  await expect(page.getByLabel('Private CE map')).toHaveValue('build:55555555-5555-4555-8555-555555555555');
+  await expect(page.getByRole('button', { name: 'Start private server', exact: true })).toBeEnabled();
 });
