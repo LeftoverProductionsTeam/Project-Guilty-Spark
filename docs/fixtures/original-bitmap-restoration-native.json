@@ -1,0 +1,724 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "1d5077f",
+  "scope": "Read-only original bitmap interpretation and native editor canvas acceptance; not full game rendering/audio or compiled-map editing",
+  "appSha256": "58a0edbdc079b41ff081dfd4e2804f3c61d689e148401d92dbf9315b94ae6b81",
+  "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+  "resourceSha256": "5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea",
+  "mockedIpc": false,
+  "originalPixelReads": {
+    "elapsedMs": 916.8616000000002,
+    "restored": [
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\fire cloud++",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\fire cloud",
+        "rawTopSha256": "e60bfc0dd357a4b34d84917fdd43807b099169ae4526de775b6a8e5e132e6d9d",
+        "bytes": 32768
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\fire cloud++",
+        "image": 1,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\fire cloud",
+        "rawTopSha256": "5fde0cf5d450374c456bc8b61a7c8982cbad9d9989eb3eafd87c7a908e05fb41",
+        "bytes": 32768
+      },
+      {
+        "path": "effects\\particles\\air\\bitmaps\\smoke cloud++",
+        "image": 0,
+        "format": "DXT3",
+        "sharedNativeBitmapPath": "effects\\particles\\air\\bitmaps\\smoke cloud",
+        "rawTopSha256": "49e8c304a2a1f00e53391b74983ac57144403d9eb4f498b3a122669757cb1231",
+        "bytes": 65536
+      },
+      {
+        "path": "effects\\particles\\air\\bitmaps\\smoke cloud++",
+        "image": 1,
+        "format": "DXT3",
+        "sharedNativeBitmapPath": "effects\\particles\\air\\bitmaps\\smoke cloud",
+        "rawTopSha256": "59156efc7b281989d70a2b4530fa4b13feb12ecf1367a0787e7d21edfef433a2",
+        "bytes": 65536
+      },
+      {
+        "path": "effects\\decals\\bullet holes\\bitmaps\\dirt pistol++++",
+        "image": 0,
+        "format": "DXT5",
+        "sharedNativeBitmapPath": "effects\\decals\\bullet holes\\bitmaps\\dirt pistol",
+        "rawTopSha256": "08c34ec2c430fc28820da2463719bc1f6c9c7c7e48cb923e7fcef946ffc4f745",
+        "bytes": 4096
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2++++",
+        "image": 0,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "b8b1c5f367b6cf588a3040f375de299ea58f53c892e4511b796bc9b217159d3e",
+        "bytes": 65536
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2++++",
+        "image": 1,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "8f009bc350de2ce9e8f9ea33691479f72c06c02d5ab007e309a380eef34e512e",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2++++",
+        "image": 2,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "9d9a5f445a57e49901ef8e446f45be50016cb3005b9908d7fe33955785a96022",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2++++",
+        "image": 3,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "b26c48102bb8735b6b0171a288bfe62a28941a63a7795d6eefbd92970ff3bd03",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2+++",
+        "image": 0,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "b8b1c5f367b6cf588a3040f375de299ea58f53c892e4511b796bc9b217159d3e",
+        "bytes": 65536
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2+++",
+        "image": 1,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "8f009bc350de2ce9e8f9ea33691479f72c06c02d5ab007e309a380eef34e512e",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2+++",
+        "image": 2,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "9d9a5f445a57e49901ef8e446f45be50016cb3005b9908d7fe33955785a96022",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2+++",
+        "image": 3,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "b26c48102bb8735b6b0171a288bfe62a28941a63a7795d6eefbd92970ff3bd03",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\air\\bitmaps\\smoke tank cannon++++",
+        "image": 0,
+        "format": "DXT3",
+        "sharedNativeBitmapPath": "effects\\particles\\air\\bitmaps\\smoke tank cannon",
+        "rawTopSha256": "76728308cff9de22f3b458ed6f3a217afb5d59bb7f3a8b6861900439b42c06dc",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\air\\bitmaps\\smoke tank cannon++++",
+        "image": 1,
+        "format": "DXT3",
+        "sharedNativeBitmapPath": "effects\\particles\\air\\bitmaps\\smoke tank cannon",
+        "rawTopSha256": "e4d3d1b3e496e56aa93d3cf1dbcc0611ec24f4db6f2466ffbb3bbefb2a75e41e",
+        "bytes": 4096
+      },
+      {
+        "path": "effects\\particles\\air\\bitmaps\\smoke tank cannon+++++",
+        "image": 0,
+        "format": "DXT3",
+        "sharedNativeBitmapPath": "effects\\particles\\air\\bitmaps\\smoke tank cannon",
+        "rawTopSha256": "76728308cff9de22f3b458ed6f3a217afb5d59bb7f3a8b6861900439b42c06dc",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\air\\bitmaps\\smoke tank cannon+++++",
+        "image": 1,
+        "format": "DXT3",
+        "sharedNativeBitmapPath": "effects\\particles\\air\\bitmaps\\smoke tank cannon",
+        "rawTopSha256": "e4d3d1b3e496e56aa93d3cf1dbcc0611ec24f4db6f2466ffbb3bbefb2a75e41e",
+        "bytes": 4096
+      },
+      {
+        "path": "effects\\decals\\blood splats\\bitmaps\\blood splat hunter+",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\decals\\blood splats\\bitmaps\\blood splat hunter",
+        "rawTopSha256": "228616d9047593d217b2ae165cea9cd6e27412dc5f143c0be81335948624bc9a",
+        "bytes": 8192
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\sparks++",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\sparks",
+        "rawTopSha256": "32490c12a30bca9b48cf494e39e894d1e04465a73e20a9f414535a825c627e03",
+        "bytes": 2048
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\sparks++",
+        "image": 1,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\sparks",
+        "rawTopSha256": "85640fa03e34a650476c10dad34be1620ef4fa26f1d73187750a81a2f654b549",
+        "bytes": 2048
+      },
+      {
+        "path": "effects\\particles\\air\\bitmaps\\smoke warthog gun++",
+        "image": 0,
+        "format": "DXT3",
+        "sharedNativeBitmapPath": "effects\\particles\\air\\bitmaps\\smoke warthog gun",
+        "rawTopSha256": "a2e2a6b191dde550fc1f915aeb4791f2bc112e7a29023f611b62cc57708a2a27",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\zmaps\\zmap_noisy_small++",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\zmaps\\zmap_noisy_small",
+        "rawTopSha256": "445679891f2dacf68936966380e2dd9e447b46bee7f5c5563621ae7ccbdaf6ee",
+        "bytes": 8192
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\burning flame+",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\burning flame",
+        "rawTopSha256": "ef777b797e36aa78c9b2ad39789be42d6af078bd7a371a1ded10792646fe0c35",
+        "bytes": 8192
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\burning flame+",
+        "image": 1,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\burning flame",
+        "rawTopSha256": "cdd562332a3c06aeb1728983c0e15f0aec59afb55254f4718de6edafcbccae68",
+        "bytes": 8192
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\sparks impact++",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\sparks impact",
+        "rawTopSha256": "a9d089b68d29e1387c38cf69867fc75e234f16bd00abbc3cac4aacdc60eb992d",
+        "bytes": 2048
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h shield impact++",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\flash h shield impact",
+        "rawTopSha256": "93174fa994ea7d18e43c85a51728d74f8e1ba64d8a931c12962997b9a3773ff4",
+        "bytes": 512
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h shield impact++",
+        "image": 1,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\flash h shield impact",
+        "rawTopSha256": "0754c6f4c553c8d4bf3a99d01426ed1f58c7ce52b6fbe3724c98a584eb15e7cb",
+        "bytes": 512
+      },
+      {
+        "path": "effects\\zmaps\\zmap_noisy_large++",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\zmaps\\zmap_noisy_large",
+        "rawTopSha256": "a0ee537ab3c1b114476d983893883fd756089e260ce0b28195d22abfe88e119b",
+        "bytes": 8192
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic+++++",
+        "image": 0,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic",
+        "rawTopSha256": "9b06d4a03db7f61b4cfeb05f2c89d3a7ee8abf40ca5b712fbb6f57c004e760b1",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic+++++",
+        "image": 1,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic",
+        "rawTopSha256": "43d03b5787ed096f66c847a54b3cba74a2351497a85fe77f7adec9e8a55c47ca",
+        "bytes": 4096
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic+++++",
+        "image": 2,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic",
+        "rawTopSha256": "a3b639c008ff94eabac0c9960dc3587af7da0fe5c8279c591f88ed1cd375c385",
+        "bytes": 1024
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic+++++",
+        "image": 3,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic",
+        "rawTopSha256": "fc2ec9434a1a93d00d7e5a23ad84fb1ef79ee05862b0ec85b92da0bf3ceee6f9",
+        "bytes": 4096
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic+++++",
+        "image": 4,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic",
+        "rawTopSha256": "abe6149581827b04a1f98c62ecc7bbd065ebe440a4869944243a4394503c2b7b",
+        "bytes": 4096
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic+++++",
+        "image": 5,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic",
+        "rawTopSha256": "bb774fe473f7dc01e64255e4fa928f344b81f28cfd9f68e067238f7d19d2254b",
+        "bytes": 1024
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic+++++",
+        "image": 6,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic",
+        "rawTopSha256": "12306410d559664d8cddf64d32368c46bc7a0437a2f690487910ddff4ffa556f",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\solid\\bitmaps\\water burst++",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\solid\\bitmaps\\water burst",
+        "rawTopSha256": "8e1d9c2c996176520c4209e063b7067f2d80815126e7a87a8106a461d538b3f0",
+        "bytes": 8192
+      },
+      {
+        "path": "effects\\particles\\solid\\bitmaps\\grass impact++",
+        "image": 0,
+        "format": "DXT3",
+        "sharedNativeBitmapPath": "effects\\particles\\solid\\bitmaps\\grass impact",
+        "rawTopSha256": "763ed6907c3beb9a7e8863bda31734c355f0b1ee74cc5a1763bfb72bbe2e2778",
+        "bytes": 4096
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h generic muzzle+",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\flash h generic muzzle",
+        "rawTopSha256": "376769966ba33982a43fbd5b4023a490109718f3fac17e5031ddb598be06d453",
+        "bytes": 32768
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h generic muzzle+",
+        "image": 1,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\flash\\bitmaps\\flash h generic muzzle",
+        "rawTopSha256": "f70310ab12d86705080c5273eb7fd0fa24cdb8c5136a3f38ccdc61bbc30a37ae",
+        "bytes": 32768
+      },
+      {
+        "path": "effects\\particles\\energy\\bitmaps\\shield jackal bolt+",
+        "image": 0,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\energy\\bitmaps\\shield jackal bolt",
+        "rawTopSha256": "29093de8532c77a9351b75604e5a4a835463969bf55d5851bb00105e6940625e",
+        "bytes": 8192
+      },
+      {
+        "path": "effects\\particles\\energy\\bitmaps\\shield jackal bolt+",
+        "image": 1,
+        "format": "DXT1",
+        "sharedNativeBitmapPath": "effects\\particles\\energy\\bitmaps\\shield jackal bolt",
+        "rawTopSha256": "9a2027505ded54c104423cac67418f898598b6cf30e80c77fb607944e4e5833d",
+        "bytes": 8192
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2+",
+        "image": 0,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "b8b1c5f367b6cf588a3040f375de299ea58f53c892e4511b796bc9b217159d3e",
+        "bytes": 65536
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2+",
+        "image": 1,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "8f009bc350de2ce9e8f9ea33691479f72c06c02d5ab007e309a380eef34e512e",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2+",
+        "image": 2,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "9d9a5f445a57e49901ef8e446f45be50016cb3005b9908d7fe33955785a96022",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\lens flare\\bitmaps\\flares_generic2+",
+        "image": 3,
+        "format": "BGRX8",
+        "sharedNativeBitmapPath": "effects\\particles\\lens flare\\bitmaps\\flares_generic2",
+        "rawTopSha256": "b26c48102bb8735b6b0171a288bfe62a28941a63a7795d6eefbd92970ff3bd03",
+        "bytes": 16384
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h ar fp",
+        "image": 0,
+        "format": "A1R5G5B5",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "dc6702790b7bda6cdf7b73eaebf9c22f3fb38c2ffb6d1fe7f03d0c31b03ebd36",
+        "bytes": 131072
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h ar fp",
+        "image": 1,
+        "format": "A1R5G5B5",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "0cece98e772da79bc128fbc466b53bdc397fc79e61eeb82b5e3bc05c62f565da",
+        "bytes": 131072
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h pistol detonate",
+        "image": 0,
+        "format": "A1R5G5B5",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "d35c5ad9335cfbd0440c87e1b0498dca1e68fad727911868abe74c2ab2f3deb9",
+        "bytes": 32768
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h pistol detonate",
+        "image": 1,
+        "format": "A1R5G5B5",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "2f1f64fdaa0bf6c6481ae4db75514424f609a2937c6b92d33f49dfdcd32285c9",
+        "bytes": 32768
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h pistol",
+        "image": 0,
+        "format": "A1R5G5B5",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "fb67909358d775e7eea450d0cc7d4c0e71f76cbb745122292c057dda34ead6e8",
+        "bytes": 131072
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\flash h pistol",
+        "image": 1,
+        "format": "A1R5G5B5",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "dcf195f0d4c06b9c3c75aebaa9dcf2c65f61e5ba9c832c012a24ab2b1b0493e9",
+        "bytes": 131072
+      },
+      {
+        "path": "ui\\shell\\bitmaps\\text_button_background",
+        "image": 0,
+        "format": "A4R4G4B4",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "c4adbf954d5e546071c76f731e932a38ef7a9febf8917fd83e9ad0a3e9091813",
+        "bytes": 8192
+      },
+      {
+        "path": "ui\\shell\\bitmaps\\text_button_background",
+        "image": 1,
+        "format": "A4R4G4B4",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "e9c73eceaf937f10996bb54bcd07ad8e175433a532400bf76dea2c936fae5ab2",
+        "bytes": 8192
+      },
+      {
+        "path": "ui\\shell\\bitmaps\\option_bkds",
+        "image": 0,
+        "format": "A4R4G4B4",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "43d73ca8da2c128ee07b3453975effbf190ecd356ca3e88bb71adb92a17c52a5",
+        "bytes": 32768
+      },
+      {
+        "path": "ui\\shell\\bitmaps\\option_bkds",
+        "image": 1,
+        "format": "A4R4G4B4",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "e8962f28670a37991a422abccced9421c0bff13903a42f56e0beeb14bb9851fa",
+        "bytes": 32768
+      },
+      {
+        "path": "ui\\shell\\bitmaps\\option_bkds_sm",
+        "image": 0,
+        "format": "A4R4G4B4",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "ca5d83f99104d69fa60045b3e40016234279ebb1b623c35ea7d0d99edff81cc7",
+        "bytes": 16384
+      },
+      {
+        "path": "ui\\shell\\bitmaps\\option_bkds_sm",
+        "image": 1,
+        "format": "A4R4G4B4",
+        "sharedNativeBitmapPath": null,
+        "rawTopSha256": "9112c9681b49f5cefe1211a81e07da810bbc6609e6937891749d7bc0078a5be5",
+        "bytes": 16384
+      }
+    ],
+    "refused": [
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\shield charge rings+",
+        "image": 0,
+        "error": "No exact tag/image path in the selected resource index; fuzzy matching refused",
+        "code": "verification-failed"
+      },
+      {
+        "path": "effects\\particles\\flash\\bitmaps\\shield charge flares+",
+        "image": 0,
+        "error": "No exact tag/image path in the selected resource index; fuzzy matching refused",
+        "code": "verification-failed"
+      }
+    ]
+  },
+  "coverage": [
+    {
+      "reason": "Previously selected resources",
+      "sha256": "5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea",
+      "coverage": {
+        "cacheGeneration": 6,
+        "resourceSha256": "5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea",
+        "verifiedImages": 510,
+        "missingOrMismatchedImages": 2,
+        "unsupportedImages": 32,
+        "internalImages": 142,
+        "sharedNativeImages": 45,
+        "cubemapImages": 27,
+        "volumeImages": 5
+      },
+      "error": null
+    },
+    {
+      "reason": "MCC legacy resources; coverage must be checked",
+      "sha256": "74e2436eda3ca9f6d166fb7930ed018c892f206d49a3a6fe063506cbb621d97e",
+      "coverage": {
+        "cacheGeneration": 6,
+        "resourceSha256": "74e2436eda3ca9f6d166fb7930ed018c892f206d49a3a6fe063506cbb621d97e",
+        "verifiedImages": 1,
+        "missingOrMismatchedImages": 511,
+        "unsupportedImages": 32,
+        "internalImages": 142,
+        "sharedNativeImages": 0,
+        "cubemapImages": 27,
+        "volumeImages": 5
+      },
+      "error": null
+    },
+    {
+      "reason": "MCC Custom Edition compatibility resources",
+      "sha256": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+      "coverage": null,
+      "error": "This resource file proves no external image ranges for the selected map. Choose that map's original bitmaps.map; self-contained maps do not need it"
+    }
+  ],
+  "nativeUi": [
+    {
+      "path": "effects\\particles\\flash\\bitmaps\\flash h ar fp",
+      "format": "A1R5G5B5",
+      "width": 256,
+      "height": 256,
+      "alphaLevels": [
+        0,
+        255
+      ],
+      "opaquePixelsChecked": 35544,
+      "canvasSha256": "6eda08317b8f3ae6ec9de4f32d461221186e6df728dce6a90892d6eb4d789349"
+    },
+    {
+      "path": "ui\\shell\\bitmaps\\text_button_background",
+      "format": "A4R4G4B4",
+      "width": 128,
+      "height": 32,
+      "alphaLevels": [
+        0,
+        68,
+        85,
+        102,
+        153,
+        170,
+        187,
+        204,
+        238,
+        255
+      ],
+      "opaquePixelsChecked": 2180,
+      "canvasSha256": "73d1282379ffbc6afb03944a6916897cf4e4c9f806f9e45522ad5b545029b6f5"
+    }
+  ],
+  "drawerPreviewAndFrameState": true,
+  "changedPrivatePack": {
+    "aliasRefused": "Resource map differs from this project's recorded SHA-256",
+    "packedRefused": "Resource map differs from this project's recorded SHA-256",
+    "embeddedStillReadable": true
+  },
+  "originalMapResourceAndPreservedSourceUnchanged": true,
+  "javascriptOrGpuErrors": [],
+  "preservation": {
+    "rootResearchFiles": 146,
+    "originalCeTags": 2455,
+    "mismatches": []
+  },
+  "previousWorkflowRegressions": {
+    "checkpoint": "Precedes only the final read-only bitmap panel compaction; reader, provenance, source, frame and renderer logic unchanged.",
+    "appSha256": "e7424a47e973b2bde9b65b1efcf6b1a05c738109f3303a667603a35f893270fa",
+    "locationRecovery": {
+      "complete": true,
+      "pinsUnchanged": true,
+      "editsPreserved": true,
+      "cameraBspAndDisplayModePreserved": true,
+      "wrongSoundPinRefused": true,
+      "partialRuntimeAutoSelectionRefused": true,
+      "corruptCopyRefused": {
+        "externalRefused": true,
+        "error": "Resource map differs from this project's recorded SHA-256",
+        "embeddedImageStillVerified": true
+      },
+      "errors": []
+    },
+    "rendering": {
+      "appSha256": "e7424a47e973b2bde9b65b1efcf6b1a05c738109f3303a667603a35f893270fa",
+      "maps": [
+        {
+          "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+          "viewport": {
+            "sourceShaders": "132",
+            "sourceLightmaps": "15",
+            "sourceDetails": "73",
+            "sourceReflections": "14",
+            "reflectionIssues": "",
+            "skyTriangles": "308",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "checkedImages": [
+            {
+              "id": 3867149580,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3866952969,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3793551529,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3793617066,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3915843571,
+              "ok": true,
+              "error": null
+            }
+          ],
+          "authoredDecals": 8
+        },
+        {
+          "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+          "viewport": {
+            "sourceShaders": "151",
+            "sourceLightmaps": "15",
+            "sourceDetails": "104",
+            "sourceReflections": "21",
+            "reflectionIssues": "",
+            "skyTriangles": "183",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "checkedImages": [
+            {
+              "id": 3886220847,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3885827625,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3788636254,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3788701791,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3788767328,
+              "ok": true,
+              "error": null
+            },
+            {
+              "id": 3940682092,
+              "ok": true,
+              "error": null
+            }
+          ],
+          "authoredDecals": 8
+        }
+      ],
+      "errors": [],
+      "windowControls": {
+        "normal": {
+          "x": 1498,
+          "y": 5.5,
+          "width": 96,
+          "height": 28
+        },
+        "combinedHeader": {
+          "x": 1498,
+          "y": 5.5,
+          "width": 96,
+          "height": 28
+        },
+        "fullscreen": {
+          "x": 1498,
+          "y": 3.5,
+          "width": 96,
+          "height": 26
+        }
+      },
+      "tagTree": {
+        "classes": 59,
+        "weaponTags": 20,
+        "editableFields": 7
+      }
+    }
+  },
+  "regressions": {
+    "rustPassed": 566,
+    "rustIgnored": 7,
+    "frontendPassed": 253,
+    "frontendFiles": 54,
+    "browserPassed": 98,
+    "finalFocusedBrowserChecks": 8,
+    "offlineChecks": 59,
+    "typescript": true,
+    "windowsRelease": true
+  },
+  "gameLaunched": false,
+  "newHaloCompilation": false,
+  "gamePeerReplicationTested": false,
+  "completeRenderingAudioParity": false,
+  "directCompiledMapEditingComplete": false,
+  "complete": true
+}

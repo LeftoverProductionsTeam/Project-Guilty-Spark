@@ -4,6 +4,7 @@ import {textureResourceScope} from '../textureResourceScope';
 import type {OpenProject,Project} from '../types';
 interface Candidate {path:string;reason:string;sha256?:string|null;error?:string|null;coverage?:{
   verifiedImages:number;missingOrMismatchedImages:number;unsupportedImages:number;internalImages:number;
+  sharedNativeImages?:number;cubemapImages?:number;volumeImages?:number;
 }|null}
 interface CandidateReview {projectId:string;sourceSha256:string;candidates:Candidate[]}
 export default function HaloTextures({project,onConnected,onBeforeConnect,notify}:{project:Project;
@@ -52,7 +53,9 @@ export default function HaloTextures({project,onConnected,onBeforeConnect,notify
         <button disabled={busy||!candidates.length} className="small-button" onClick={()=>void review()}>{reviewed?'Recheck image coverage':'Check image coverage'}</button>
         <div className="gs-texture-candidates">{candidates.map(c=><article key={c.path}>
           <strong>{c.reason}</strong><code className="path-text">{c.path}</code>
-          {c.coverage?<p className="gs-texture-coverage">{c.coverage.verifiedImages} verified · {c.coverage.missingOrMismatchedImages} missing / mismatched · {c.coverage.unsupportedImages} unsupported · {c.coverage.internalImages} embedded</p>:reviewed&&<p role="note">No verified external images. {c.error}</p>}
+          {c.coverage?<><p className="gs-texture-coverage">{c.coverage.verifiedImages} verified · {c.coverage.missingOrMismatchedImages} missing / mismatched · {c.coverage.unsupportedImages} outside flat preview · {c.coverage.internalImages} embedded</p>
+            {!!(c.coverage.sharedNativeImages||c.coverage.cubemapImages||c.coverage.volumeImages)&&<small title="Shared pixels require identical complete native image arrays in this map and an exact original resource entry. Cubemaps use the separate reflection preview; volume textures remain outside flat preview.">{c.coverage.sharedNativeImages??0} reuse native pixels · {c.coverage.cubemapImages??0} cube · {c.coverage.volumeImages??0} volume</small>}
+          </>:reviewed&&<p role="note">No verified external images. {c.error}</p>}
           <button disabled={busy||(reviewed&&!c.coverage)} className="small-button" onClick={()=>void connect('path',c.path)}>{c.coverage&&(c.coverage.missingOrMismatchedImages>0||c.coverage.unsupportedImages>0)?'Connect partial resources':'Verify and connect'}</button>
         </article>)}</div>
       </details>

@@ -3,6 +3,7 @@ import { classNames, effectiveReferenceId, setTagValue, shortPath } from '../edi
 import { useMapState } from '../mapSession';
 import type { MapInspection, Project, TagField } from '../types';
 import TagFields from './TagFields';
+import BitmapPreview from './BitmapPreview';
 import { Notice, Pill } from './ui';
 import '../viewportAssets.css';
 
@@ -53,13 +54,14 @@ export default function ViewportTags({
         <Pill>{classNames[tag.class] ?? tag.class}</Pill>
       </div>
       <code className="viewport-tag-path">{tag.path}</code>
-      <p className="subtle">
+      {(tag.class!=='bitm'||tag.fields.length>0)&&<><p className="subtle">
         Tag changes affect every object using this tag. Save and rebuild to apply them in the game.
       </p>
       <label className="checkbox-label">
         <input type="checkbox" checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} />
         Show offsets
-      </label>
+      </label></>}
+      {tag.class==='bitm'&&<BitmapPreview key={`${project.id}:${tag.id}`} project={project} tagId={tag.id}/>}
       <TagFields project={project} tag={tag} tags={inspection.tags} advanced={advanced} change={change} />
       {tag.external && (
         <Notice>
@@ -92,7 +94,7 @@ export default function ViewportTags({
         <button onClick={() => select(requestedTagId)}>Back to object tag</button>
       )}
       {onFullEditor && <button onClick={() => onFullEditor(tag.id)}>Open in full Tag editor</button>}
-      {onSave && (
+      {onSave && (tag.class!=='bitm'||tag.fields.length>0) && (
         <button onClick={() => void onSave().catch((reason) => notify(String(reason)))}>
           Save tag changes
         </button>

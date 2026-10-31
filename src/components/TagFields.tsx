@@ -92,6 +92,8 @@ export default function TagFields({
         );
       })}
     </>
+  ) : tag.class==='bitm' ? (
+    <p className="subtle">Original pixels are read-only. Full field editing requires compatible source tags and tools; unknown bytes stay preserved.</p>
   ) : (
     <div className="read-only-tag">
       <FileCode2 size={24} />

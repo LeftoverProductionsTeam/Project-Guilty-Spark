@@ -1,4 +1,5 @@
 import NativeModelPreview from './NativeModelPreview';
+import BitmapPreview from './BitmapPreview';
 import { catalogAssets } from '../forge';
 import TagFields from './TagFields';
 import { useEffect, useMemo, useState } from 'react';
@@ -274,6 +275,7 @@ export default function Tags({
                   {selectedTag.fields.length ? 'Typed fields available' : 'Inspection only'}
                 </Pill>
               </div>
+            {selectedTag.class==='bitm'&&<BitmapPreview key={`${project.id}:${selectedTag.id}`} project={project} tagId={selectedTag.id}/>}
               <details className="tag-secondary-actions">
                 <summary>Extract, export or transfer tags</summary>
                 <div className="tag-exchange-actions">

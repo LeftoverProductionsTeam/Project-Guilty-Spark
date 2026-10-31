@@ -1,5 +1,11 @@
 # Project Guilty Spark
 
+## More original pixels, with compact tag previews
+
+Original Zombie Apocalypse resources now supply **510 verified external images**, up from 453: 12 packed-color images and 45 proven shared-pixel references are newly readable. Bitmap tags show actual original artwork in the full editor and drawer, with native frame controls, retained image position, transparency and provenance. Changed resources and unproven references remain refused.
+
+Two external images still lack proof. The 32 non-flat cases are 27 cubemaps and five volume textures; reflections use a separate reader. This is read-only inspection, not full engine parity or direct compiled-map authoring. [Native evidence and limits](docs/ORIGINAL_BITMAP_RESTORATION.md) · [Descriptive publication handoff](docs/ORIGINAL_BITMAP_GITHUB_DESCRIPTION.md).
+
 ## Original texture recovery without losing your place
 
 Classic maps can recover a lost original resource location using the existing exact hashes. New imports remember absolute locations. Inspector now offers a compact, explicit image-coverage check; partial runtime candidates remain labelled and are not selected automatically. Reconnecting the same textures or adding a secondary MCC resource refreshes dependent previews while keeping your camera, BSP selection, display mode and edits.

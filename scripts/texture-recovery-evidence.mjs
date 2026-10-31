@@ -5,7 +5,7 @@ const rows=[
     'Genuine native acceptance is scoped to the exact owned Zombie Apocalypse Demo map and original pack. General relocation of every runtime/content layout is not certified. A present changed resource is refused by preview reads; it is not silently substituted.'],
   ['coverage','Explain exact image coverage before connecting partial resources',
     'An explicit read-only candidate review reports verified external, missing/mismatched, unsupported and embedded images. Automatic unpinned selection requires positive coverage and zero missing supported external images; manual partial connections remain explicit.',
-    'The original Zombie pack still has 47 missing/mismatched and 44 unsupported images. A compatible-runtime donor binding and full render/audio parity remain open; a filename/path alone proves no image compatibility.'],
+    'The current original-bitmap follow-up leaves two unproven images and 32 cases outside flat preview (27 cubes, five volumes). A compatible-runtime donor binding and full render/audio parity remain open; a filename/path alone proves no image compatibility.'],
   ['refresh','Refresh every dependent texture preview without resetting the map view',
     'Use the complete sorted resource pins and location for world material retries, model/reflection/source previews and bounded thumbnail cache identities. Discard older asynchronous results. Same-pin relocation redraws native shaders/lightmaps while retaining camera, selected BSP and display mode.',
     'The renderer retains bounded texture/cubemap budgets, with explicit omissions. Broader large-library performance, every shader/resource layout, real game loading and gameplay fidelity remain separate acceptance gates.'],

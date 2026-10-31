@@ -1,5 +1,7 @@
 # Original texture recovery and honest resource coverage
 
+**Current follow-up:** [Original bitmap restoration](ORIGINAL_BITMAP_RESTORATION.md) raises verified external coverage to 510, with two unproven images and 32 cases outside flat preview (27 cubes, five volumes). It adds compact native bitmap inspection. The measurements below preserve the earlier `1d5077f` recovery checkpoint rather than rewriting its historical receipt.
+
 This continues committed `b6fbfe8` in the existing isolated integration worktree. Native source transactions, C35–C39 history, Baboon/Invader reconciliation, the compiler pipeline and unfinished research remain intact. Direct compiled-map editing remains an independent unfinished workflow.
 
 ## What changed

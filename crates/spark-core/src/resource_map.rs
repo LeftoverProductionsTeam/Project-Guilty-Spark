@@ -166,6 +166,9 @@ fn open_verified_kind(path:&Path,expected_sha256:&str,name:&str,kind:u32)->Resul
     Ok((file, index))
 }
 impl ResourceIndex {
+    pub(crate) fn has_external_image_key(&self, tag: &str, generation: u32, image: usize) -> Result<bool> {
+        Ok(self.count_exact(&bitmap_image_key(tag,generation,image)?)>0)
+    }
     fn new(kind_code:u32,file_size:u64,entries:Vec<ResourceEntry>)->Self {
         let mut by_path=BTreeMap::new();
         for (i,entry) in entries.iter().enumerate() {
@@ -250,12 +253,7 @@ pub(crate) fn prove_external_image_range(index: &ResourceIndex, tag_path: &str,
     // Gearbox retail/Demo indexes each image as <tag>_<image>, while CE
     // groups the tag's images in <tag>__pixels. These are format-defined keys,
     // never filename guesses. See Invader resource.cpp and C33 research notes.
-    let key = match generation {
-        6 | 7 | 13 => format!("{tag_path}_{image_index}"),
-        609 => format!("{tag_path}__pixels"),
-        0 => tag_path.to_owned(), // explicit low-level span API, not auto discovery
-        _ => return invalid("Unsupported resource-map generation; MCC ipaks need a separate reader"),
-    };
+    let key = bitmap_image_key(tag_path,generation,image_index)?;
     let entry = index.exact(&key)?;
     let entry_end = entry.data_offset.checked_add(entry.data_size)
         .ok_or_else(|| SparkError::Invalid("External resource span overflow".into()))?;
@@ -265,6 +263,15 @@ pub(crate) fn prove_external_image_range(index: &ResourceIndex, tag_path: &str,
         return invalid("Pixel range not proven to belong to the exact bitmap resource entry");
     }
     Ok(())
+}
+
+fn bitmap_image_key(tag_path:&str,generation:u32,image_index:usize)->Result<String>{
+    Ok(match generation {
+        6 | 7 | 13 => format!("{tag_path}_{image_index}"),
+        609 => format!("{tag_path}__pixels"),
+        0 => tag_path.to_owned(),
+        _ => return invalid("Unsupported resource-map generation; MCC ipaks need a separate reader"),
+    })
 }
 
 /// Returns one precisely bounded top-mip byte range only when its raw offset

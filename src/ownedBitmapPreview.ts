@@ -12,6 +12,8 @@ export interface OwnedBitmapPreview {
   ddsBase64: string;
   /** A resource read additionally requires the exact project-pinned SHA. */
   sourceKind?: 'internal-cache' | 'verified-resource';
+  imageCount?:number;
+  sharedNativeBitmapPath?:string|null;
   resourceSha256?: string | null;
 }
 export interface OwnedBitmapTarget {
@@ -22,7 +24,7 @@ export interface OwnedBitmapTarget {
   resourceSha256?: string | null;
 }
 const MAX_PREVIEW_BASE64 = 23 * 1024 * 1024; // 16 MiB top mip plus DDS header, base64 expansion
-const SUPPORTED_FORMATS = new Set(['DXT1', 'DXT3', 'DXT5', 'BGRA8', 'BGRX8', 'R5G6B5','A8','Y8','A8Y8']);
+const SUPPORTED_FORMATS = new Set(['DXT1', 'DXT3', 'DXT5', 'BGRA8', 'BGRX8', 'R5G6B5','A1R5G5B5','A4R4G4B4','A8','Y8','A8Y8']);
 
 /** Validate *both* tag and source identity before revealing any returned pixel buffer. */
 export function decodeOwnedBitmapPreview(preview: OwnedBitmapPreview, target: OwnedBitmapTarget) {
@@ -39,6 +41,8 @@ export function decodeOwnedBitmapPreview(preview: OwnedBitmapPreview, target: Ow
   if (preview.sourceKind && preview.sourceKind !== 'internal-cache' && preview.sourceKind !== 'verified-resource') {
     throw new Error('Unexpected bitmap storage kind');
   }
+  if(preview.imageCount!==undefined&&(!Number.isSafeInteger(preview.imageCount)||preview.imageCount<1||preview.imageCount>2048||imageIndex>=preview.imageCount))throw Error('Invalid native bitmap image count');
+  if(preview.sharedNativeBitmapPath!=null&&(preview.sourceKind!=='verified-resource'||typeof preview.sharedNativeBitmapPath!=='string'||!preview.sharedNativeBitmapPath.length||preview.sharedNativeBitmapPath.length>1024||/[\u0000-\u001f]/.test(preview.sharedNativeBitmapPath)))throw Error('Invalid shared native bitmap provenance');
   if (preview.sourceKind === 'verified-resource') {
     if (!target.resourceSha256 || !/^[a-f0-9]{64}$/i.test(target.resourceSha256) ||
         preview.resourceSha256?.toLowerCase() !== target.resourceSha256.toLowerCase()) {

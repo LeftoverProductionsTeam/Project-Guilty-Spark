@@ -340,6 +340,7 @@ mod tests {
             missing_or_mismatched_images: 499,
             unsupported_images: 44,
             internal_images: 142,
+            shared_native_images:0,cubemap_images:0,volume_images:0,
         };
         assert!(!automatic_coverage(&coverage));
         coverage.missing_or_mismatched_images = 0;
