@@ -186,7 +186,7 @@ pub fn import(lib: &Library, project_id: &str, path: &Path) -> Result<(Project, 
             .take(120)
             .collect(),
         kind: "custom-sound".into(),
-        sha256: format!("{:x}", Sha256::digest(&bytes)),
+        sha256: crate::hex_bytes(Sha256::digest(&bytes)),
         path: stored,
         vertices: 0,
         triangles: 0,
@@ -232,7 +232,7 @@ pub fn preview(
         return invalid("Custom sound escaped its managed asset folder");
     }
     let bytes = read(&file)?;
-    let sha256 = format!("{:x}", Sha256::digest(&bytes));
+    let sha256 = crate::hex_bytes(Sha256::digest(&bytes));
     if sha256 != expected_sha256 {
         return invalid("Stored custom sound bytes changed");
     }

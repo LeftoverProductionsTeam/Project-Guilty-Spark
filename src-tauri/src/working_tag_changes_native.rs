@@ -72,7 +72,7 @@ pub(super) fn baseline(job: &Path) -> Reply<Option<Hashes>> {
     core::reject_links(&path).map_err(error)?;
     let bytes = bounded_read(&path, 4 * 1024 * 1024)?;
     use sha2::Digest;
-    if format!("{:x}", sha2::Sha256::digest(&bytes)) != manifest.sha256 {
+    if spark_core::hex_bytes(sha2::Sha256::digest(&bytes)) != manifest.sha256 {
         return Err("Compiled working tag inventory was changed; restore its original receipt before monitoring".into());
     }
     let hashes: Hashes = serde_json::from_slice(&bytes).map_err(error)?;

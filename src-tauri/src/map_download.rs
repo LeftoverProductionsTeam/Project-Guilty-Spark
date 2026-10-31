@@ -502,7 +502,7 @@ async fn save_response(
         }
     }
     check_cancel(job)?;
-    let sha256 = format!("{:x}", hash.finalize());
+    let sha256 = spark_core::hex_bytes(hash.finalize());
     // Pin the completed local bytes before publishing a path for import.
     let mut file = File::open(&path)?;
     let mut verified = Sha256::new();
@@ -521,7 +521,7 @@ async fn save_response(
         verified.update(&buffer[..n]);
     }
     drop(file);
-    if checked != bytes || format!("{:x}", verified.finalize()) != sha256 {
+    if checked != bytes || spark_core::hex_bytes(verified.finalize()) != sha256 {
         return invalid("Downloaded bytes changed during validation");
     }
     let final_path = directory.join(format!("download.{}", job.kind.extension()));
@@ -907,7 +907,7 @@ mod tests {
                 ))
             })
             .unwrap();
-        assert_eq!(receipt.sha256, format!("{:x}", Sha256::digest(&bytes)));
+        assert_eq!(receipt.sha256, spark_core::hex_bytes(Sha256::digest(&bytes)));
         assert_eq!(fs::read(&receipt.path).unwrap(), bytes);
         assert!(!receipt.path.with_file_name("download.partial").exists());
         let library = spark_core::library::Library::open(&root.path().join("library")).unwrap();

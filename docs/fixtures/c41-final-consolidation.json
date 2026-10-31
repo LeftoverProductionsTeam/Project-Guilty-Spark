@@ -1,0 +1,1117 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-31",
+  "sourceFoundation": "5d67390a2b0819145fb148f589593ae65308e938",
+  "complete": true,
+  "allRoadmapFeaturesComplete": false,
+  "application": {
+    "sha256": "9ccd6ed9939e38686e92deffae560652db5e17528a41b6854f4caf5bac74b886",
+    "bytes": 40375296,
+    "bundledBeforeNativeAcceptance": true
+  },
+  "regressions": {
+    "rustWorkspaceLockedPassed": 595,
+    "rustOptInIgnored": 7,
+    "frontendPassed": 259,
+    "browserPassed": 125,
+    "offlineScripts": 59,
+    "interfaceProbeTests": 2,
+    "typeScript": "passed",
+    "frozenPnpmLock": "passed",
+    "windowsExecutableAndNsis": "passed",
+    "hostedCi": "not run by this task"
+  },
+  "preservation": {
+    "originalDirtyFilesVerified": 146,
+    "originalSourceFiles": 42,
+    "originalRuntimeFiles": 104,
+    "uniqueDependencyBranchesMerged": 7,
+    "sourceSnapshot": "229fe2f3c2af821ce8bc1b4621fcc344fe66e7d3",
+    "previousLedgerRows": 391,
+    "currentLedgerRows": 398,
+    "originalRequirementIdsPreserved": true,
+    "branches": [
+      {
+        "ref": "refs/heads/codex/c37-modders-workbench",
+        "commit": "bde73ceb00f42f6dce916a93d9d4c0adb8dae207",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c38-universal-workbench",
+        "commit": "45596d5072b1c115c71132b78e7798c3baa547d0",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c39-native-asset-transactions",
+        "commit": "2a3e779bf7784463df68a24f372aa4b1e5439ccd",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c39-sparklink-live-studio",
+        "commit": "192b2f5cb8a845b17d48a7def66d96ae631bd67a",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c40-companions-and-consolidation",
+        "commit": "72e9fe32d4ed5e8623d05caa3b10e8752456d54f",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c40-integration-start-20261030",
+        "commit": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c41-smart-edit-routing",
+        "commit": "96911112af1e9c0f88aa8f94e23ab2f43d870e48",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/consolidation-start-20261030T001853Z",
+        "commit": "617d267a8dd8b1c504d47bdaef4c0f338615786e",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-donor-scenery",
+        "commit": "be3d3af6062700a768666d6ab5a652b21c668d68",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-hosting-collision",
+        "commit": "03686e920cbe2dcf71af7f333ed2de448910f408",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-native-gameplay",
+        "commit": "6610adf80f518d4e6a6e49379c990efe1eff0d14",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-resources-and-community",
+        "commit": "4da849efaffa9161a369cb1264c260214b5d0d4b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-world-challenges",
+        "commit": "520b69c8b8654bd83ad456dce23a8e3a47f409d5",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-34-runtime-integration",
+        "commit": "d6bfe25666aad35aa63cd1fdd7082d71ca72119b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-35-living-workbench",
+        "commit": "21804c191a918cbf8bd74efac60dfcec65c9083b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-36-one-halo",
+        "commit": "489443d7b892b14bda553ed5f4f8d33480ffe78c",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/fix-windows-manifest-paths",
+        "commit": "2a3e779bf7784463df68a24f372aa4b1e5439ccd",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/integration-all-continuations",
+        "commit": "2a3e779bf7784463df68a24f372aa4b1e5439ccd",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/one-halo-mcc-investigation",
+        "commit": "c9c92e33b97f9b85fce2fcccbab28e4bb3f2464b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/pre-ci-master-20261030",
+        "commit": "96911112af1e9c0f88aa8f94e23ab2f43d870e48",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/master",
+        "commit": "5d67390a2b0819145fb148f589593ae65308e938",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/codex/continuation-34-runtime-integration",
+        "commit": "d6bfe25666aad35aa63cd1fdd7082d71ca72119b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/dependabot/cargo/rusqlite-0.41.0",
+        "commit": "a353870269ff6fb708d7fb083f800d2b57647d5d",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/dependabot/cargo/sha2-0.11.1",
+        "commit": "2025a9043a7af86501861529c789789763b0d16c",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/dependabot/npm_and_yarn/lucide-react-1.61.0",
+        "commit": "f8e0387b3a2b429f2fcbecbf10a1587a9eec6786",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/dependabot/npm_and_yarn/three-0.186.1",
+        "commit": "763013dffdb852fc09625df0344e06626afb4f9d",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/dependabot/npm_and_yarn/typescript-7.0.2",
+        "commit": "23e8df59a2d9fdbf281028e0e75ce7e23440a7aa",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/dependabot/npm_and_yarn/vite-8.3.5",
+        "commit": "e5b86647d5eac892c260a5b26ceca1c45593e42f",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/dependabot/npm_and_yarn/vitest-5.0.5",
+        "commit": "b35386e0ee797f0673bfa5328312bbca25ebec04",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/master",
+        "commit": "e8b5761311fb0f3f50a1626187fe1e8f75da1f17",
+        "containedInMaster": true
+      }
+    ],
+    "allCapturedBranchTipsContained": 30,
+    "currentNonAliasBranchReferencesContained": 24,
+    "removedRemoteReferences": [
+      "refs/remotes/origin/dependabot/cargo/rusqlite-0.41.0",
+      "refs/remotes/origin/dependabot/cargo/sha2-0.11.1",
+      "refs/remotes/origin/dependabot/npm_and_yarn/lucide-react-1.61.0",
+      "refs/remotes/origin/dependabot/npm_and_yarn/three-0.186.1",
+      "refs/remotes/origin/dependabot/npm_and_yarn/typescript-7.0.2",
+      "refs/remotes/origin/dependabot/npm_and_yarn/vite-8.3.5"
+    ],
+    "currentBranches": [
+      {
+        "ref": "refs/heads/codex/c37-modders-workbench",
+        "commit": "bde73ceb00f42f6dce916a93d9d4c0adb8dae207",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c38-universal-workbench",
+        "commit": "45596d5072b1c115c71132b78e7798c3baa547d0",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c39-native-asset-transactions",
+        "commit": "2a3e779bf7784463df68a24f372aa4b1e5439ccd",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c39-sparklink-live-studio",
+        "commit": "192b2f5cb8a845b17d48a7def66d96ae631bd67a",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c40-companions-and-consolidation",
+        "commit": "72e9fe32d4ed5e8623d05caa3b10e8752456d54f",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c40-integration-start-20261030",
+        "commit": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/c41-smart-edit-routing",
+        "commit": "96911112af1e9c0f88aa8f94e23ab2f43d870e48",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/consolidation-start-20261030T001853Z",
+        "commit": "617d267a8dd8b1c504d47bdaef4c0f338615786e",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-donor-scenery",
+        "commit": "be3d3af6062700a768666d6ab5a652b21c668d68",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-hosting-collision",
+        "commit": "03686e920cbe2dcf71af7f333ed2de448910f408",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-native-gameplay",
+        "commit": "6610adf80f518d4e6a6e49379c990efe1eff0d14",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-resources-and-community",
+        "commit": "4da849efaffa9161a369cb1264c260214b5d0d4b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-world-challenges",
+        "commit": "520b69c8b8654bd83ad456dce23a8e3a47f409d5",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-34-runtime-integration",
+        "commit": "d6bfe25666aad35aa63cd1fdd7082d71ca72119b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-35-living-workbench",
+        "commit": "21804c191a918cbf8bd74efac60dfcec65c9083b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-36-one-halo",
+        "commit": "489443d7b892b14bda553ed5f4f8d33480ffe78c",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/fix-windows-manifest-paths",
+        "commit": "2a3e779bf7784463df68a24f372aa4b1e5439ccd",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/integration-all-continuations",
+        "commit": "2a3e779bf7784463df68a24f372aa4b1e5439ccd",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/one-halo-mcc-investigation",
+        "commit": "c9c92e33b97f9b85fce2fcccbab28e4bb3f2464b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/codex/pre-ci-master-20261030",
+        "commit": "96911112af1e9c0f88aa8f94e23ab2f43d870e48",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/heads/master",
+        "commit": "3a9dddb9683f5517b53f8200e716199bb3e87022",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/codex/continuation-34-runtime-integration",
+        "commit": "d6bfe25666aad35aa63cd1fdd7082d71ca72119b",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/dependabot/npm_and_yarn/vitest-5.0.5",
+        "commit": "b35386e0ee797f0673bfa5328312bbca25ebec04",
+        "containedInMaster": true
+      },
+      {
+        "ref": "refs/remotes/origin/master",
+        "commit": "3a9dddb9683f5517b53f8200e716199bb3e87022",
+        "containedInMaster": true
+      }
+    ]
+  },
+  "nativeSourceIntegrity": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gameplayAccepted": false,
+    "parentSha256": "fa75952cdf222f5cf8a26554471e33cf5efc37d4843bf52dedb8e8d700ba7975",
+    "normalization": {
+      "changedBytes": 201,
+      "exposedFieldsEquivalent": true,
+      "acceptedAsEquivalent": true,
+      "scope": "Pinned Invader field-output comparison; opaque bytes/unprinted precision are not certified."
+    },
+    "backgroundHandoffMonitoring": {
+      "dialogClosedDuringWrite": true,
+      "automaticDockWarning": true
+    },
+    "semanticCorruption": {
+      "validChecksum": true,
+      "invalidDependencyLength": true,
+      "detectedByNativeParser": true,
+      "reconciliationRejected": true,
+      "writerContext": "Baboon handoff; actual writer unconfirmed. Other programs can also write this folder. Filesystem notifications supply no writer PID.",
+      "writerEvidence": {
+        "observedAt": "2026-10-31T15:10:29.137624200+00:00",
+        "revision": 2,
+        "writerConfidence": "unknown",
+        "explanation": "Tool associations describe a prepared handoff or Spark-observed launch, not a confirmed file writer. Filesystem events contain no writer PID; a read-only validator is not the writer. Hashes describe the last stable observation, while file metadata may reflect a newer save.",
+        "associations": [
+          {
+            "tool": "Baboon",
+            "version": "0.3.2 (prepared reviewed binary)",
+            "executableSha256": "051d5a849d4cb3c60c7a9554f88b7d551f74e2925e6d4a671f2d23f32973fe2e",
+            "basis": "Prepared handoff only; no Spark-observed launch in this watch, actual writer unknown"
+          }
+        ],
+        "files": [
+          {
+            "path": "weapons/pistol/pistol.weapon",
+            "kind": "modified",
+            "previousSha256": "50df9677812206c61ca8cd85d2cc1eeb94e69c1ffe8c873578d88580bd5a62a5",
+            "observedSha256": "6db1bee0fbbdf7d30055f652fecc62aee363170f7c09857db1d8806c24cf4310",
+            "bytes": 2978,
+            "modifiedUnixMs": 1793459421333
+          }
+        ],
+        "listTruncated": false
+      },
+      "actualControlledWriter": "QA Node process, intentionally malformed fixture; not Baboon or Invader"
+    },
+    "crcFailureDetected": true,
+    "recovery": {
+      "startingBytesRestored": true,
+      "damagedExternalEvidenceRetained": true,
+      "priorAcceptedSourceIntact": true
+    },
+    "validEditDetectionMs": 5093.630100000009,
+    "nativeBuildMs": 33772.325500000006,
+    "validEdit": {
+      "writer": "Invader",
+      "toolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "field": "bounding_radius",
+      "before": 0.1,
+      "expected": 0.225,
+      "compiled": 0.22499999403953552,
+      "reconciled": true,
+      "nativeCompiled": true,
+      "compiledTagBytesPreserved": true
+    },
+    "nativeRecoveryInventoryVerified": 2240,
+    "compiledSha256": "8ba1a69df55bd1808e1f85a2343246f153caa97f33794f37a2bec3f7f0a3f5fb",
+    "appSha256": "9ccd6ed9939e38686e92deffae560652db5e17528a41b6854f4caf5bac74b886",
+    "errors": [],
+    "compiledMapOpenedInSeparateTab": true
+  },
+  "nativeAssets": {
+    "complete": true,
+    "appSha256": "9ccd6ed9939e38686e92deffae560652db5e17528a41b6854f4caf5bac74b886",
+    "startup": {
+      "phase": "Workbench ready",
+      "completed": 3,
+      "total": 3,
+      "ready": true,
+      "elapsedMs": 451,
+      "statusRoundTripMs": [
+        3.1423999999999523,
+        2.546199999999999,
+        2.4628999999999905,
+        2.6838000000000193,
+        2.8349000000000615,
+        2.5211000000001604,
+        2.44620000000009,
+        2.3859000000002197,
+        1.937099999999873,
+        2.0567000000000917,
+        3.897100000000137,
+        3.4734000000000833
+      ]
+    },
+    "reflection": {
+      "shader": "vehicles\\warthog\\shaders\\warthog hull",
+      "metadata": {
+        "bitmapTagId": 3786014774,
+        "perpendicularBrightness": 0.7,
+        "parallelBrightness": 1,
+        "perpendicularTint": [
+          0.69,
+          0.73,
+          0.65
+        ],
+        "parallelTint": [
+          0.6,
+          0.64,
+          0.57
+        ],
+        "falloff": 0,
+        "cutoff": 0
+      },
+      "faces": [
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "1e6c41e68a3bdaa908d6df6ac7b54ccc5e0ed08345e2d8ad377d52b9b23906e8"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "10b3fb898701506f74ff01521e408f276c9d523f92fb5933a8113de538e9bea1"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "54549bf82f8c5330e1af769ce64e92d7c792c2997aa10bd1e2470d47ad1b7e04"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "2050b2c597a635d18f64b0ff18ddbd851b0e85730af67cd92d9998ba7fec4834"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "f1a3876fb8de1d7649f8fafc3e978ff14f073bbbde163455e6406e4c37dcf424"
+        },
+        {
+          "width": 64,
+          "height": 64,
+          "format": "DXT1",
+          "ddsSha256": "3509206b2a795486d22a549c02f43365fa3d974cd7a8c0415331b8f8fe51c825"
+        }
+      ]
+    },
+    "home": {
+      "transparentBackground": "true",
+      "modelTag": "3785621552",
+      "modelSource": "2f0bdc06-8809-4933-a4bf-f18617816f9d",
+      "modelSourceHash": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+      "modelTriangles": "1126",
+      "modelReady": "true",
+      "nativeAnimationCount": "3",
+      "modelTextures": "1",
+      "modelReflections": "1",
+      "caption": "monitor · actual Halo model\nNext model"
+    },
+    "homeAnimation": {
+      "nativeGraphTag": 3785949237,
+      "clips": [
+        {
+          "name": "idle overlay",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "ff627546b76e99d9b41abb711c238db9451d8f85d531121b2c1c33aec17b3a40"
+        },
+        {
+          "name": "stand unarmed idle",
+          "frames": 10,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "d53208c62aef100991d79998fbdabcc12ec95d0d2dbb0ae7287d5ffa69b2afff"
+        },
+        {
+          "name": "monitor_talking-loop",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "70ee3ebc6cd9d545dae59e5db87503fa9571b73e56ef133fc9765e526e4ab924"
+        }
+      ],
+      "firstVertex": [
+        0.06118970736861229,
+        -0.027118690311908722,
+        0.06175314262509346
+      ],
+      "laterVertex": [
+        0.06141167879104614,
+        -0.027118690311908722,
+        0.06398093700408936
+      ],
+      "actualSkinnedVerticesMove": true,
+      "pauseFreezesTime": true,
+      "nativeTalkingClipSelected": true,
+      "wrongSourceHashRejected": true
+    },
+    "defaultMaterials": {
+      "materials": [
+        {
+          "id": "surface",
+          "name": "halo_metal",
+          "shaderPath": "gs_assets_58350c756d6c43f78709931b43cac77b/levels/test/bloodgulch/shaders/gs_58350c756d6c_cap_metal",
+          "color": [
+            0.35,
+            0.4,
+            0.42
+          ]
+        },
+        {
+          "id": "grass",
+          "name": "halo_grass",
+          "shaderPath": "gs_assets_4cc7019ee0a643a1aeab1ec60b80ab60/levels/test/bloodgulch/shaders/gs_4cc7019ee0a6_blood ground",
+          "color": [
+            0.3,
+            0.42,
+            0.23
+          ]
+        }
+      ],
+      "previewCount": 2
+    },
+    "drop": {
+      "imports": [
+        {
+          "id": "58350c75-6d6c-43f7-8709-931b43cac77b",
+          "sourceProjectId": "1ae9376a-e397-48de-ae9c-23726e49fd3d",
+          "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+          "tagId": 3939305815,
+          "tagClass": "senv",
+          "tagPath": "levels\\test\\bloodgulch\\shaders\\cap_metal",
+          "nativePath": "gs_assets_58350c756d6c43f78709931b43cac77b/levels/test/bloodgulch/shaders/gs_58350c756d6c_cap_metal",
+          "receiptSha256": "f15565e35c34c4031a537be0be9b1433f26547f9c5944b9ce9478d31e23007fe",
+          "fileCount": 3
+        },
+        {
+          "id": "4cc7019e-e0a6-43a1-aeab-1ec60b80ab60",
+          "sourceProjectId": "1ae9376a-e397-48de-ae9c-23726e49fd3d",
+          "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+          "tagId": 3939633500,
+          "tagClass": "senv",
+          "tagPath": "levels\\test\\bloodgulch\\shaders\\blood ground",
+          "nativePath": "gs_assets_4cc7019ee0a643a1aeab1ec60b80ab60/levels/test/bloodgulch/shaders/gs_4cc7019ee0a6_blood ground",
+          "receiptSha256": "1f266acb80e8d9972b97d6f3a5ec743351ad2cdf1b5e0fdbdd8d41f180004e44",
+          "fileCount": 5
+        },
+        {
+          "id": "96e81592-d95e-4101-9051-95b84bd6e7b1",
+          "sourceProjectId": "1ae9376a-e397-48de-ae9c-23726e49fd3d",
+          "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+          "tagId": 3783655442,
+          "tagClass": "scen",
+          "tagPath": "scenery\\rocks\\boulder\\boulder",
+          "nativePath": "gs_assets_96e81592d95e4101905195b84bd6e7b1/scenery/rocks/boulder/boulder",
+          "receiptSha256": "397772faf01094565d68e451c9482a8dcee2c2f9e54a0d95643c2c85846049e3",
+          "fileCount": 5
+        }
+      ],
+      "placement": {
+        "id": "3561bbae-6cc5-4cb2-8e59-359ad0109483",
+        "name": "boulder",
+        "tagPath": "scenery\\rocks\\boulder\\boulder",
+        "tagClass": "scen",
+        "position": [
+          1.5,
+          -1.5,
+          0.01
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "team": -1,
+        "respawnSeconds": 30,
+        "tagId": 3783655442,
+        "sourceProjectId": "1ae9376a-e397-48de-ae9c-23726e49fd3d",
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "visible": true,
+        "locked": false
+      },
+      "actualPointerDrag": true,
+      "singleUndoRedo": true
+    },
+    "compiled": {
+      "sha256": "fa970e1333d52f14b943028b386838430c6f60c240e60aa6e27971fc63f2217d",
+      "nativeTagPath": "gs_assets_96e81592d95e4101905195b84bd6e7b1\\scenery\\rocks\\boulder\\boulder",
+      "position": [
+        1.5,
+        -1.5,
+        0.01
+      ],
+      "collisionTriangles": 12
+    },
+    "sourcePreserved": true,
+    "changedImportRejected": [
+      "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+    ],
+    "previousBuildPreserved": true,
+    "sourceMapAddition": {
+      "matchingEditableSource": true,
+      "outputSha256": "865b9700694ad97d5c5eeb96e4e42e2e746f2af5a3e73ea6ed1dd76f4bd3ba90",
+      "nativeTag": "gs_assets_47497c66e064402ca2b9c637ff2ea2d4\\scenery\\rocks\\boulder\\boulder",
+      "position": [
+        -3,
+        2,
+        0.01
+      ],
+      "originalSourcePreserved": true
+    },
+    "javascriptErrors": []
+  },
+  "retainedFailures": [
+    "Original native-tree test expected an exception instead of the durable failed-job contract; production refusal retained and the test strengthened.",
+    "C41 unfinished harness contained recursive navigation, exact float display and drawer/frame timing assumptions; all attempts retained.",
+    "Real dependency navigation reset to the root on each session render; product fixed with a new browser regression.",
+    "First CE invocation selected the acceptance summary instead of the actual source recovery receipt; rejected before tool/game launch.",
+    "Windows linker refused to replace the QA seeder while that executable was running; sequential rerun passed the unchanged locked workspace.",
+    "A later three-process harness left the shared world tab; it now explicitly selects the intended real tab before local admission. Fresh three-process runs pass.",
+    "First-load texture harness initially assumed tabs survived reload and unique Blood Gulch titles; real map-library navigation and source-family selection corrected the harness. Failed attempts remain private."
+  ],
+  "limits": [
+    "General direct-map references/arrays/BSP relocation and other-edition writers remain unfinished.",
+    "No MCC direct-output game load, Workshop walkthrough or complete renderer/audio parity accepted.",
+    "SparkLink covers the reviewed native pistol field and admitted scenery templates; arbitrary uploads and game-peer AI/edit replication remain open.",
+    "CE dedicated status and owned client startup are accepted; zero joined players, first-run visual acceptance and gameplay remain unverified.",
+    "Historical human Baboon acceptance retained; this run used genuine Invader plus a deliberately corrupted QA write, not a new human Baboon save.",
+    "One physical Windows machine; no new cross-computer or hosted-CI acceptance.",
+    "GitHub connector/browser helper unavailable; repository About text prepared locally, no online metadata change, push or ruleset modification.",
+    "Standalone Zombie Demo uses 75 compatible MCC shader images and retains embedded pixels, for 124/132 shader materials. Eight and missing external cubemaps require original resources. Preview compatibility is not native build compatibility.",
+    "Owner still reported no usable CE window. Owned-window OS visibility is observed but does not prove a visible menu or a joined player."
+  ],
+  "nativeDirectCache": {
+    "schemaVersion": 1,
+    "nativeDesktop": true,
+    "executableSha256": "9ccd6ed9939e38686e92deffae560652db5e17528a41b6854f4caf5bac74b886",
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gameplayAccepted": false,
+    "assetGameImportAccepted": false,
+    "automaticSourceDiscovery": {
+      "ms": 9129.999199999998,
+      "texturePackSha256": "353ad10eaa3caa6c11bc83dd49b49937f97444b2f090bb92125cea01350b7695",
+      "originalCacheUnchanged": true
+    },
+    "sourceBindingRefreshes": [],
+    "uiPlanMs": 1936.1700999999994,
+    "directUiMs": 7793.9892,
+    "direct": {
+      "jobId": "965fd8d0-f9ca-424d-9b4d-b80219217ca6",
+      "sha256": "45c596247b213ddb1532f2c3dadd6e3d484c5b1d2fabef4f177b376b7280f5c7",
+      "changedNativeBytes": 4,
+      "totalChangedBytes": 8,
+      "compilerRan": false,
+      "extractedTags": false,
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102"
+    },
+    "stalePlanRejected": true,
+    "unsafeReferenceRefused": true,
+    "editionOverrideRefused": true,
+    "crossView": {
+      "vehicleId": "Vehicle-0",
+      "tagId": 3822387809,
+      "value": 1.225000023841858,
+      "modelTagId": 3822453346,
+      "modelPath": "vehicles\\warthog\\warthog",
+      "sharedProject": true
+    },
+    "lastGizmoSample": {
+      "space": "world",
+      "mode": "translate",
+      "axis": null,
+      "dragging": false,
+      "objectPosition": [
+        37.9339,
+        -88.6921,
+        0.0875717
+      ],
+      "origin": [
+        -1.9368854176176565e-15,
+        -0.17370070185670683
+      ],
+      "handles": {
+        "X": [
+          0.0515694451528108,
+          -0.23782313535365068
+        ],
+        "Y": [
+          -0.05156944515281515,
+          -0.23782313535365188
+        ],
+        "Z": [
+          -2.0128955234976204e-15,
+          -0.028214589554436655
+        ]
+      }
+    },
+    "viewport": {
+      "actualGizmoDrag": true,
+      "axis": "X",
+      "id": "Scenery-0",
+      "before": [
+        37.9339,
+        -88.6921,
+        0.0875717
+      ],
+      "after": [
+        38.14475,
+        -88.6921,
+        0.0875717
+      ],
+      "reopened": [
+        38.14475,
+        -88.6921,
+        0.0875717
+      ],
+      "jobId": "d71742c3-65bb-4522-8713-769a541787a8"
+    },
+    "extractionRebuild": {
+      "jobId": "10853543-664d-4742-bcf2-bf1274337f32",
+      "ms": 24519.870200000005,
+      "actualNativeCompiler": true,
+      "value": 0.22499999403953552
+    },
+    "nativeToolsSurviveDirectSave": true,
+    "nativeBuildMs": 38547.7859,
+    "equivalent": {
+      "directJobId": "69f747d2-fa1f-4e34-bef2-c791396b2eb5",
+      "nativeJobId": "a5406390-e43a-4bd5-9da0-77cd3e50a24a",
+      "operation": "bounding-radius",
+      "value": 0.22499999403953552,
+      "sameOriginalParent": true,
+      "binaryIdentical": false,
+      "originalTagFilesPreserved": 2240
+    },
+    "legacyDirectWriteRefused": true,
+    "originalMccMapUnchanged": true,
+    "pageErrors": [],
+    "status": "passed"
+  },
+  "sparklink": {
+    "schemaVersion": 1,
+    "nativeProcesses": 3,
+    "separateDataRoots": 3,
+    "physicalMachines": 1,
+    "transport": "private TCP + TLS 1.3, invitation-pinned certificate",
+    "mockedIpc": false,
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gamePeerReplicationTested": false,
+    "nativeTagSharingTested": true,
+    "binaryAssetTransferTested": true,
+    "appSha256": "9ccd6ed9939e38686e92deffae560652db5e17528a41b6854f4caf5bac74b886",
+    "threeAuthorNativeAcceptance": {
+      "revision": 3,
+      "documentSha256": "bfa7de6a034c565cf946b0dc949af661e646069d96c87fa553d8744f6b3b2435",
+      "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+      "assetId": "b6f3c784-7517-4213-a7bc-0692cda4de5d",
+      "assetBytes": 632,
+      "actualModelsInThreeViewports": true,
+      "simultaneousAuthorActions": true
+    },
+    "participantUndoAndReferencedAssetConflict": true,
+    "sameFieldConflictCorruptBytesAndDuplicateAck": true,
+    "permissionsCoverNativeImportEditAndBuild": true,
+    "nativeSourceIntegrityAndIndependentToolBuildGuard": {
+      "truncatedAdmittedTagRejected": true,
+      "exactRecoveryBytesRetained": true,
+      "unsharedWorkingTagsBuildRefused": true
+    },
+    "synchronizationSurvivesWorkspaceChange": true,
+    "committedRevision": {
+      "sessionId": "5c13ef73-6793-4be1-bf98-d77ea6ee9be3",
+      "revision": 13,
+      "documentSha256": "ce051308ccc597c3020cdbeeff01af0bb26cba667947730bde641a9b4339a696",
+      "localProjects": [
+        "aec67820-237b-4e06-9f71-ebea08c5332b",
+        "aec67820-237b-4e06-9f71-ebea08c5332b",
+        "aec67820-237b-4e06-9f71-ebea08c5332b"
+      ]
+    },
+    "actualHaloToolchain": {
+      "jobId": "d50b6b76-e9b4-47b2-83e4-7fd828c17208",
+      "revision": 13,
+      "laterRevision": 14,
+      "nativeRadius": 0.2750000059604645,
+      "publishedAssetPath": "scenery\\sparklink\\b6f3c784-7517-4213-a7bc-0692cda4de5d",
+      "compiledModelTriangles": 31,
+      "placement": [
+        3,
+        2,
+        0.1
+      ],
+      "outputSha256": "55ad248abb974408eff3823cf777c6e177c8f9780d05bad68b2c383604cfbbe4",
+      "durationMs": 40367.923099999985,
+      "gameplayTested": false
+    },
+    "durableNativeRecovery": {
+      "revision": 14,
+      "assetBytesIdentical": true,
+      "semanticFieldIntact": true,
+      "authorIdentitiesAndHistoryRetained": true,
+      "newInvitation": true,
+      "replayDeduplicated": true,
+      "durationMs": 11255.466599999985
+    },
+    "revocationRetainsOtherParticipants": true,
+    "originalSourcesUnchanged": {
+      "separateNativeTrees": 3,
+      "filesPerTree": 2240,
+      "templateUnchanged": true,
+      "importUnchanged": true
+    },
+    "synchronizationMeasurements": {
+      "samples": 7,
+      "valuesMs": [
+        7690.534199999995,
+        75.96379999999772,
+        893.7397999999957,
+        882.3323000000091,
+        881.4968999999983,
+        875.854399999982,
+        890.5630000000237
+      ],
+      "physicalMachines": 1,
+      "includesNativeIpcAndReactConsumption": true
+    },
+    "pageErrors": [],
+    "acceptanceComplete": true
+  },
+  "nativeCe": {
+    "schemaVersion": 1,
+    "appSha256": "9ccd6ed9939e38686e92deffae560652db5e17528a41b6854f4caf5bac74b886",
+    "mockedIpc": false,
+    "network": "127.0.0.1 only",
+    "publicListingRequested": false,
+    "clientJoined": false,
+    "gameplayVerified": false,
+    "complete": true,
+    "cases": [
+      {
+        "name": "catalog and unsafe/stale request refusal",
+        "maps": 19,
+        "catalogMs": 416
+      },
+      {
+        "name": "real UI start and native Blood Gulch status",
+        "editorHeartbeatMs": 95,
+        "startupMs": 4099,
+        "id": "2ab096c1-08a8-48a4-9be4-c1ca19898d1b",
+        "port": 61129,
+        "status": {
+          "name": "Spark private",
+          "version": "01.00.10.0621",
+          "map": "bloodgulch",
+          "gameType": "Slayer",
+          "state": "openplaying",
+          "players": 0,
+          "maximumPlayers": 2,
+          "dedicated": true
+        },
+        "mapSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "serverSha256": "7789c4a0bd2c735e7fdc154d63f4bbb1134952e6904e5809eb00d4d1da94015f",
+        "copiedBytes": 192087787
+      },
+      {
+        "name": "real UI prepares the exact server map/resources and a fresh separate client profile",
+        "preparationMs": 423,
+        "clientHeartbeatMs": 58,
+        "verifiedFiles": 69,
+        "verifiedBytes": 192087787,
+        "verificationMs": 226,
+        "executableSha256": "7de68b02aa4d2ed521144db5f7d8ecdc2071dc7b2270f6a0c9b66a621c072a64"
+      },
+      {
+        "name": "changed client bytes refuse even with a forged copy manifest and no client is launched"
+      },
+      {
+        "name": "unapproved private DLL refuses and restoring exact inputs allows matching-client preparation"
+      },
+      {
+        "name": "concurrent preparation refuses and cancellation leaves the server running without launching a client"
+      },
+      {
+        "name": "actual CE menu-only setup has its first-run resources and uses the separate profile",
+        "mode": "setup",
+        "elapsedMs": 59081,
+        "lastPhase": "open",
+        "firstRunFiles": [
+          "Eula.dll",
+          "Eula.rtf"
+        ],
+        "clientJoinRequested": false,
+        "visualAcceptance": false,
+        "visibleWindowDetected": true,
+        "missingWindowWarningVerified": false
+      },
+      {
+        "name": "workspace reload retains the owned native session"
+      },
+      {
+        "name": "client actions reject other windows and stale session IDs"
+      },
+      {
+        "name": "closing the owning Spark window stops its actual CE client and server"
+      },
+      {
+        "name": "separate windows cannot stop each other and closing a window stops only its own server"
+      },
+      {
+        "name": "native game type ctf",
+        "reportedGameType": "CTF",
+        "observations": 1
+      },
+      {
+        "name": "native game type oddball",
+        "reportedGameType": "Oddball",
+        "observations": 1
+      },
+      {
+        "name": "native game type king",
+        "reportedGameType": "King",
+        "observations": 1
+      },
+      {
+        "name": "native game type race",
+        "reportedGameType": "Race",
+        "observations": 1
+      },
+      {
+        "name": "occupied private port fails without launching a process"
+      },
+      {
+        "name": "actual changed selected cache refuses a stale start"
+      },
+      {
+        "name": "invalid client startup files get named setup guidance while dedicated hosting stays usable"
+      },
+      {
+        "name": "genuine Workshop source compiles a CE project cache through the native UI/toolchain",
+        "buildId": "affa6844-8cc2-4a84-b593-2c82a3fe3a5f",
+        "target": "gbx-custom",
+        "mapSha256": "c6b883f1ca116711b09b9750ff5aed491e15fbafbd51c38346d23a37fcddc54c",
+        "projectFingerprint": "e10d50823fc0b56fe14778edd3d75d7aebf621099795aed87172d275ab04ca50",
+        "compileMs": 24801,
+        "toolIdentities": {
+          "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+          "invaderBuild": "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a",
+          "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+          "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+        }
+      },
+      {
+        "name": "managed build with a stock filename loads from its own snapshot without replacing the installed map",
+        "projectStartupMs": 4567,
+        "mapSha256": "c6b883f1ca116711b09b9750ff5aed491e15fbafbd51c38346d23a37fcddc54c",
+        "sourceBuild": {
+          "projectId": "51e8540b-7cb7-469b-a390-b49c66cc9319",
+          "buildId": "affa6844-8cc2-4a84-b593-2c82a3fe3a5f",
+          "projectTitle": "bloodgulch",
+          "projectFingerprint": "e10d50823fc0b56fe14778edd3d75d7aebf621099795aed87172d275ab04ca50"
+        },
+        "nativeStatus": {
+          "name": "Spark private",
+          "version": "01.00.10.0621",
+          "map": "bloodgulch",
+          "gameType": "Slayer",
+          "state": "openplaying",
+          "players": 0,
+          "maximumPlayers": 2,
+          "dedicated": true
+        }
+      },
+      {
+        "name": "matching client uses the genuine newly compiled Workshop map rather than its stock namesake",
+        "mapSha256": "c6b883f1ca116711b09b9750ff5aed491e15fbafbd51c38346d23a37fcddc54c",
+        "verifiedFiles": 69,
+        "verificationMs": 212
+      },
+      {
+        "name": "actual CE client opens with matching native content, holds input locks and stops independently",
+        "executableSha256": "7de68b02aa4d2ed521144db5f7d8ecdc2071dc7b2270f6a0c9b66a621c072a64",
+        "mapSha256": "c6b883f1ca116711b09b9750ff5aed491e15fbafbd51c38346d23a37fcddc54c",
+        "seconds": 5,
+        "serverReplies": 5,
+        "maximumPlayersObserved": 0,
+        "lastClientPhase": "open",
+        "visibleRequested": true,
+        "clientJoinVerified": false,
+        "gameplayVerified": false
+      },
+      {
+        "name": "stopping the private server also stops its actual matching client"
+      },
+      {
+        "name": "saved edits invalidate new starts while the existing private snapshot remains unchanged"
+      },
+      {
+        "name": "unowned build IDs refuse without falling back to the stock map"
+      },
+      {
+        "name": "a genuinely corrupted managed cache refuses before process launch"
+      },
+      {
+        "name": "a redirected build receipt cannot select an output outside its owned job"
+      },
+      {
+        "name": "restored valid native output can host again and the reviewed base source remains byte-identical",
+        "preservedReviewedTags": 2455
+      },
+      {
+        "name": "abrupt Spark exit kills its actual owned CE client as well as its server"
+      },
+      {
+        "name": "abrupt Spark exit kills its owned dedicated server"
+      }
+    ],
+    "errors": [],
+    "originalFilesUnchanged": 127
+  },
+  "runtimeTextureDefaults": {
+    "schemaVersion": 1,
+    "appSha256": "9ccd6ed9939e38686e92deffae560652db5e17528a41b6854f4caf5bac74b886",
+    "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+    "mockedIpc": false,
+    "complete": true,
+    "errors": [],
+    "limitations": [
+      "Compatible pixels are editor previews. They are not compiler resources or a lossless runtime conversion.",
+      "No game rendering, physics, audio or peer replication acceptance is claimed."
+    ],
+    "standalone": {
+      "elapsedMs": 9644.0966,
+      "viewport": {
+        "sourceShaders": "124",
+        "compatibleShaders": "75",
+        "sourceLightmaps": "15",
+        "sourceDetails": "56",
+        "sourceReflections": "8",
+        "skyTriangles": "308",
+        "materialLoading": "false",
+        "pendingMaterials": "0"
+      }
+    },
+    "embeddedSourceRetainsPriority": true,
+    "defaultMaterials": {
+      "materials": [
+        {
+          "id": "surface",
+          "name": "quickforge_surface",
+          "shaderPath": "levels/test/bloodgulch/shaders/cap_metal",
+          "color": [
+            0.25,
+            0.38,
+            0.48
+          ]
+        },
+        {
+          "id": "grass",
+          "name": "halo_grass",
+          "shaderPath": "levels/test/bloodgulch/shaders/blood ground",
+          "color": [
+            0.3,
+            0.42,
+            0.23
+          ]
+        }
+      ],
+      "gpuPreviewCount": 2,
+      "nativeToolsConfigured": false,
+      "nativeImportsCreated": 0
+    },
+    "originalPack": {
+      "viewport": {
+        "sourceShaders": "132",
+        "compatibleShaders": "0",
+        "sourceLightmaps": "15",
+        "sourceDetails": "73",
+        "sourceReflections": "14",
+        "skyTriangles": "308",
+        "materialLoading": "false",
+        "pendingMaterials": "0"
+      },
+      "compatiblePreviewsReplacedByOriginals": true
+    },
+    "originalsUnchanged": true
+  }
+}

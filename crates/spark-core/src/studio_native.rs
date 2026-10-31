@@ -46,7 +46,7 @@ pub struct Document {
     pub fields: Vec<Field>,
     pub assets: Vec<Asset>,
 }
-pub fn digest(bytes: &[u8]) -> String { format!("{:x}", Sha256::digest(bytes)) }
+pub fn digest(bytes: &[u8]) -> String { crate::hex_bytes(Sha256::digest(bytes)) }
 pub fn inventory_hash(files: &BTreeMap<String, String>) -> Result<String> {
     Ok(digest(&serde_json::to_vec(files)?))
 }

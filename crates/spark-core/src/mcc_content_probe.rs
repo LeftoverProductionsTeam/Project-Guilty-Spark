@@ -229,7 +229,7 @@ fn cache_inventory(file: &mut File, budget: &mut Budget) -> Result<CacheInventor
         tag_count: count,
         tag_classes: classes,
         external_tag_classes: external,
-        header_sha256: format!("{:x}", Sha256::digest(header_bytes)),
+        header_sha256: crate::hex_bytes(Sha256::digest(header_bytes)),
     })
 }
 

@@ -289,7 +289,7 @@ fn read_with_listener(
             } else {
                 r.bytes(space.ptr(r.u32(at + 12)?, size)?, size)?
             };
-            Ok(format!("{:x}", Sha256::digest(data)))
+            Ok(crate::hex_bytes(Sha256::digest(data)))
         };
         let portal_count = r.u32(root + 0x154)? as usize;
         if portal_count > 65536 {

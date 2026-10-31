@@ -199,7 +199,7 @@ pub(crate) fn stage_tags(source:&Path,destination:&Path,cancel:&AtomicBool,mut p
         }
         drop(target);drop(input);
         if count!=expected_size {return invalid("Source tag size changed while staging");}
-        let hash=format!("{:x}",digest.finalize());
+        let hash=crate::hex_bytes(digest.finalize());
         #[cfg(windows)]{let mut p=fs::metadata(&output)?.permissions();p.set_readonly(false);fs::set_permissions(&output,p)?;}
         if maps::hash_file(&output)?!=hash || maps::hash_file(&path)?!=hash{return invalid("Source tags changed while staging");}
         hashes.insert(relative.to_string_lossy().replace('\\',"/"),hash);

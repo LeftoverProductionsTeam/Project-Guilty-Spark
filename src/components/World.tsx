@@ -1,5 +1,6 @@
 import { useReflectionTextures } from '../useReflectionTextures';
 import { textureResourceScope } from '../textureResourceScope';
+import {fillRuntimeTexturePreviews} from '../runtimeTexturePreview';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
 import Mesh from './HaloMesh';
@@ -31,7 +32,7 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
-import type { MapInspection, MeshData, Project, SceneObject, Vec3,ShaderPreview } from '../types';
+import type { MapInspection, MeshData, Project, SceneObject, Vec3,ShaderPreview,RuntimeId } from '../types';
 import { extraTextureKey } from '../haloMaterial';
 import {configureSourceTexture} from '../sourceTexture';
 import {playerStartCamera} from '../sourceCamera';
@@ -663,7 +664,7 @@ export default function World({
     if (!inspection || !native || autoPreviewBusy.current || !inspection.renderMesh) return;
     const source = inspection.sha256;
     const projectAtStart = project.id;
-    const resourceScopeAtStart = textureResourceScope(project.source);
+    const resourceScopeAtStart = textureScope;
     const recordedResource = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
     let tasks: MaterialTask[];
     try {
@@ -710,7 +711,8 @@ export default function World({
       if(!isCurrent())return;
       // Reject the WHOLE payload on one stale ID, changed hash, unsolicited
       // image, oversized DDS, or malformed success/refusal pair.
-      const decoded=decodeOwnedBitmapBatch(response,targets);
+      const decoded=await fillRuntimeTexturePreviews(project,inspection,targets,decodeOwnedBitmapBatch(response,targets));
+      if(!isCurrent())return;
       let textureBytes=0;
       for(const task of tasks){
         if(!isCurrent()){discard();return;}
@@ -732,8 +734,9 @@ export default function World({
         if(task.kind==='shader') {const metadata=inspection.tags.find(t=>t.id===task.shaderTagId)?.shaderPreview;
           if(metadata){texture.userData.alphaTest=metadata.alphaTest;texture.repeat.set(...metadata.uvScale);}}
         texture.userData.rgbaBytes=byteCount;
+        if(found.compatibleRuntime)texture.userData.runtimePreview={runtime:found.compatibleRuntime,sourceSha256:found.compatibleSourceSha256,bitmapTagId:found.compatibleBitmapTagId};
         texture.name=`Verified Halo ${task.kind} bitmap ${task.bitmapTagId} image ${task.imageIndex}`;
-        const label=`Read-only ${found.sourceKind==='verified-resource'?'verified resource':'cache'} `+
+        const label=`Read-only ${found.compatibleRuntime?'compatible '+found.compatibleRuntime:found.sourceKind==='verified-resource'?'verified resource':'cache'} `+
           `#${task.bitmapTagId} image ${task.imageIndex} (${image.format})`;
         if(task.kind==='shader')shaderLoaded.set(task.shaderTagId,{texture,label});
         else if(task.kind==='lightmap')lightmapLoaded.set(task.key,{texture,label});
@@ -969,7 +972,8 @@ export default function World({
   currentProjectRef.current = project.id;
   const currentResourceRef = useRef((project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null);
   currentResourceRef.current = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
-  const textureScope=textureResourceScope(project.source);
+  const [previewRuntime]=useMapState<RuntimeId>(project.id,'hosting.runtime','mccSteam');
+  const textureScope=textureResourceScope(project.source)+':'+previewRuntime;
   const currentTextureScopeRef=useRef(textureScope);
   currentTextureScopeRef.current=textureScope;
   const chosen = project.scene.find((o) => o.id === selected);
@@ -1098,6 +1102,7 @@ export default function World({
     <div
       className="world-layout"
       data-source-shaders={Object.keys(shaderTextures).length}
+      data-compatible-shaders={Object.values(shaderTextures).filter(t=>t.userData.runtimePreview).length}
       data-source-shader-ids={Object.keys(shaderTextures).join(',')}
       data-source-lightmaps={Object.keys(lightmapTextures).length}
       data-source-details={Object.keys(extraTextures).length}
@@ -1447,7 +1452,9 @@ export default function World({
             [6, 7, 609].includes(inspection.header.version) &&
             !project.source?.resourceSha256?.['bitmaps.map'] && (
               <div className="gs-texture-setup" role="status">
-                <strong>Map textures need their original bitmaps.map.</strong>
+                <strong>{Object.values(shaderTextures).some(t=>t.userData.runtimePreview)
+                  ? 'Compatible runtime textures loaded. Original resources complete the remaining images.'
+                  : 'Map textures need their original bitmaps.map.'}</strong>
                 <button
                   disabled={!native || connectingTextures || !onResourcesConnected}
                   onClick={() => void locateTextures()}

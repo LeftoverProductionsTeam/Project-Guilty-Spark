@@ -580,10 +580,7 @@ pub(super) async fn dependency_report(
 }
 fn settings_hash(state: &AppState) -> Reply<String> {
     use sha2::{Digest, Sha256};
-    Ok(format!(
-        "{:x}",
-        Sha256::digest(serde_json::to_vec(&*lock(&state.settings)?).map_err(error)?)
-    ))
+    Ok(spark_core::hex_bytes(Sha256::digest(serde_json::to_vec(&*lock(&state.settings)?).map_err(error)?)))
 }
 fn project_fingerprint(state: &AppState, id: Option<&str>, owner: &str) -> Reply<Option<String>> {
     id.map(|id| {

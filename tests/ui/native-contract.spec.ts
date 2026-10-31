@@ -413,6 +413,16 @@ test('object tags open in a hideable drawer without changing workspace, camera l
  await page.getByRole('button',{name:'Toggle Object tags',exact:true}).click();await expect(drawer).toBeVisible();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
 });
 
+test('object tag dependencies stay selected through session updates until a new object request',async({page})=>{
+ await mockDesktop(page);await page.evaluate(()=>{const open=(window as any).__sparkMock.projects.a;open.project.scene=[{id:'dependency-object',name:'Dependency test weapon',kind:'Weapon',tagId:1,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:8,rotationOffset:null,assetId:null}];open.inspection.objects=structuredClone(open.project.scene);open.inspection.tags[0].references=[{label:'Model',targetId:2}];open.inspection.tags.push({id:2,index:1,class:'mod2',path:'models/dependency',external:false,fields:[],references:[]});});
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await page.getByRole('button',{name:'Toggle Objects',exact:true}).click();await page.getByRole('button',{name:'Dependency test weapon',exact:true}).click();
+ const drawer=page.getByRole('region',{name:'Object tags panel',exact:true});
+ await drawer.getByRole('button',{name:'Model → dependency',exact:true}).click();await expect(drawer.locator('.viewport-tag-path')).toHaveText('models/dependency');
+ await page.getByRole('slider',{name:'Map sound volume',exact:true}).fill('0.52');await expect(drawer.locator('.viewport-tag-path')).toHaveText('models/dependency');
+ await drawer.getByRole('button',{name:'Back to object tag',exact:true}).click();await expect(drawer.getByLabel('Velocity',{exact:true})).toBeVisible();
+});
+
 test('map audio preferences survive tag drawers, fullscreen and map switches independently',async({page})=>{
  await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
  const volume=page.getByRole('slider',{name:'Map sound volume',exact:true});await expect(volume).toHaveValue('0.35');

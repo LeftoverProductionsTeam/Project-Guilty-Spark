@@ -5,6 +5,8 @@ import {draggedAsset} from '../assetDragRegistry';
 import BuildTargets from './BuildTargets';
 import{WorkspacePanel,WorkspacePanelAddon,useRevealWorkspacePanel}from'./WorkspacePanels';
 import SmartEditPanel from './SmartEditPanel';
+import {runtimeTextureSource,defaultPreviewMaterials} from '../runtimeTexturePreview';
+import {retainAssetSource} from '../assetSources';
 import RenderFeatures from './RenderFeatures';
 import LiveForge from './LiveForge';
 import MapSounds from './MapSounds';
@@ -314,6 +316,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [assets, setAssets] = useState<ForgeAsset[]>([]),
     [assetError, setAssetError] = useState('');
   const [sourceOpen, setSourceOpen] = useState<OpenProject | null>(null);
+  const defaultPreviewAttempt=useRef('');
   const sourceResourceScope=useTextureResourceScope(sourceId);
   const lastLoadedSource=useRef('');
   const [referenceFilter, setReferenceFilter] = useState<Set<number> | null>(null);
@@ -480,6 +483,19 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [expandedBuild, setExpandedBuild] = useState(false);
   const latestProject = useRef(project);
   latestProject.current = project;
+  useEffect(()=>{
+    if(studioRole!=null||!native||props.library?.busy||props.activeJob||!doc.materials.some(m=>!m.shaderPath)||defaultPreviewAttempt.current===project.id)return;
+    defaultPreviewAttempt.current=project.id;let alive=true;
+    void runtimeTextureSource(doc.runtimeId).then(open=>{
+      if(!alive)return;const materials=defaultPreviewMaterials(open);
+      const metal=materials.find(m=>m.id==='surface'),grass=materials.find(m=>m.id==='grass');if(!metal)return;
+      const latest=latestProject.current;const current=latest.quickForge;if(!current)return;
+      edit({...latest,quickForge:{...current,materials:[...current.materials.map(m=>m.shaderPath?m:{...m,shaderPath:(m.id==='grass'?grass:metal)?.shaderPath??metal.shaderPath}),...materials.filter(m=>!current.materials.some(old=>old.id===m.id))]}},'Assign owned runtime defaults to untextured surfaces');
+      writeMapSession(project.id,'forge.assetSource',open.project.id);retainAssetSource(open);
+    }).catch(reason=>{if(alive)notify('Default materials need an owned runtime map: '+String(reason),'info');});
+    return()=>{alive=false;if(defaultPreviewAttempt.current===project.id)defaultPreviewAttempt.current="";};
+  },[studioRole,project.id,doc.runtimeId,props.library?.busy,props.activeJob,doc.materials.some(m=>!m.shaderPath)]);
+
   const mutableNodes = chosen.filter((node) => !node.value.locked);
   const errors = useMemo(
     () =>
@@ -527,7 +543,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     setAssetError('');
     if (!sourceId) return;
     call<OpenProject>('open_project', { id: sourceId })
-      .then((open) => {
+      .then(async (initial) => {
+        let open=initial;
+        if(native&&open.inspection?.header.version===13&&!open.project.source?.resourceSha256?.['mcc-textures']){
+          try{open=await call<OpenProject>('connect_mcc_texture_resources',{projectId:open.project.id});}catch{/* Embedded images remain usable; missing dependencies stay explicit. */}
+        } else if(native&&[6,7,609].includes(open.inspection?.header.version??0)) {
+          try{open=await call<OpenProject|null>('auto_connect_classic_textures',{projectId:open.project.id})??open;}catch{/* Preview source can be owned by another map window. */}
+        }
         if (alive) { publishTextureResources(open.project);setSourceOpen(open); setAssets(catalogAssets(open)); }
       })
       .catch((e) => {

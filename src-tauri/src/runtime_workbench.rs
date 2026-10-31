@@ -858,10 +858,7 @@ pub(super) fn client_profile(
         "registration".into(),
         Some(serde_json::to_string(&registration).map_err(error)?),
     );
-    let content_identity = format!(
-        "{:x}",
-        sha2::Sha256::digest(serde_json::to_vec(&identities).map_err(error)?)
-    );
+    let content_identity = spark_core::hex_bytes(sha2::Sha256::digest(serde_json::to_vec(&identities).map_err(error)?));
     Ok((
         registration,
         profile,

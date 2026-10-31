@@ -25,7 +25,7 @@ fn read(project_dir:&Path,id:&str)->Result<(Snapshot,SnapshotInfo)> {
     if snapshot.schema_version!=1 || snapshot.id!=id {return invalid("Unsupported or mismatched snapshot");}
     snapshot.project.validate()?;
     let info=SnapshotInfo{id:id.into(),created_at:snapshot.created_at.clone(),reason:snapshot.reason.clone(),
-        sha256:format!("{:x}",Sha256::digest(bytes)),title:snapshot.project.title.clone(),scene_objects:snapshot.project.scene.len(),
+        sha256:crate::hex_bytes(Sha256::digest(bytes)),title:snapshot.project.title.clone(),scene_objects:snapshot.project.scene.len(),
         tag_edits:snapshot.project.tag_edits.len(),source_sha256:snapshot.project.source.as_ref().map(|s|s.sha256.clone())};
     Ok((snapshot,info))
 }

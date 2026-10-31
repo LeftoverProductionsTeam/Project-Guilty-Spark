@@ -653,7 +653,7 @@ fn direct(app: &tauri::AppHandle, owner: &str, plan: Plan, analysis: Analysis) -
         let changed = router::verify_footprint(&bytes, &after, &analysis.cells).map_err(error)?;
         let inspected =
             maps::inspect_map(&candidate, source.resource_directory.as_deref()).map_err(error)?;
-        if inspected.sha256 != format!("{:x}", Sha256::digest(&after)) {
+        if inspected.sha256 != spark_core::hex_bytes(Sha256::digest(&after)) {
             return Err(
                 "Candidate changed between byte-footprint verification and reopening.".into(),
             );

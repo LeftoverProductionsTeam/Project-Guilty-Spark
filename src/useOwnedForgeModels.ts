@@ -3,12 +3,14 @@ import {useEffect,useState} from 'react';
 import * as THREE from 'three';
 import {call,native} from './api';
 import type {ForgePlacement} from './forge';
-import type {MeshData,Tag,ShaderPreview} from './types';
+import type {MeshData,Tag,ShaderPreview,OpenProject} from './types';
+import {fillRuntimeTexturePreviews} from './runtimeTexturePreview';
 import {decodeOwnedBitmapBatch,MAX_NATIVE_BATCH_RGBA_BYTES} from './ownedBitmapBatch';
 import type {OwnedBitmapBatchResponse} from './ownedBitmapBatch';
 import {configureSourceTexture} from './sourceTexture';
 import {extraTextureKey} from './haloMaterial';
 import {useTextureResourceScopes} from './textureResourceScope';
+import {useMapSessionValues} from './mapSession';
 
 export interface OwnedModelView {
   ready?: boolean;
@@ -40,10 +42,12 @@ export function useOwnedForgeModels(
   const [failures,setFailures]=useState<Record<string,string>>({});
   const sources=[...new Map(placements.map(p=>[forgeModelKey(p),p])).values()];
   const resourceIdentity=useTextureResourceScopes(sources.flatMap(p=>p.sourceProjectId?[p.sourceProjectId]:[]));
+  const previewRuntimes=useMapSessionValues(sources.flatMap(p=>p.sourceProjectId?[p.sourceProjectId]:[]),'hosting.runtime','mccSteam');
   const scope=JSON.stringify(sources.map(p=>[p.sourceProjectId,p.sourceSha256,p.tagId,resourceScopes[p.sourceProjectId??'']??'']));
   useEffect(() => {
     let live=true,textureBytes=0,geometryBytes=0;
     const pool=new Map<string,THREE.Texture>(),loaded:Record<string,OwnedModelView>={},errors:Record<string,string>={};
+    const previewSources=new Map<string,OpenProject>();
     setModels({});
     setFailures({});
     async function load() {
@@ -85,7 +89,13 @@ export function useOwnedForgeModels(
               }));
             const response=await call<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch',{projectId:placement.sourceProjectId,requests:targets.map(t=>({bitmapTagId:t.bitmapTagId,imageIndex:0}))});
             if(!live)return;
-            const images=decodeOwnedBitmapBatch(response,targets);
+            let images=decodeOwnedBitmapBatch(response,targets);
+            if([...images.values()].some(i=>!i.image&&['missing-resource','resource-mismatch','resource-unavailable'].includes(i.errorCode??''))){
+              let source=previewSources.get(placement.sourceProjectId);
+              if(!source){source=await call<OpenProject>('open_project',{id:placement.sourceProjectId});previewSources.set(placement.sourceProjectId,source);}
+              if(source.inspection?.sha256===placement.sourceSha256)images=await fillRuntimeTexturePreviews(source.project,source.inspection,targets,images);
+            }
+            if(!live)return;
             for(const image of images.values())if(image.image){
             const raw=image.image,bytes=Math.ceil(raw.pixels.byteLength*4/3);
             if(textureBytes+bytes>MAX_NATIVE_BATCH_RGBA_BYTES){errors[key]='Some model textures exceed the 64 MiB viewport budget';continue;}
@@ -136,6 +146,6 @@ export function useOwnedForgeModels(
     }
     void load();
     return()=>{live=false;for(const texture of pool.values())texture.dispose();};
-  }, [scope,resourceIdentity]);
+  }, [scope,resourceIdentity,previewRuntimes]);
   return {models,failures};
 }

@@ -1,4 +1,28 @@
 use super::*;
+#[tauri::command]
+pub(super) async fn runtime_texture_source(app:tauri::AppHandle,window:tauri::WebviewWindow,runtime_id:runtime::RuntimeId)->Reply<OpenProject>{
+    let handle=app.clone();
+    let open=tauri::async_runtime::spawn_blocking(move||{
+        let state=handle.state::<AppState>();
+        let path=asset_sources_native::default_material_map(&state,runtime_id)?;
+        let (project,inspection)=lock(&state.library)?.import_map(&path,path.parent()).map_err(error)?;
+        lock(&state.inspections)?.insert(project.id.clone(),Arc::new(inspection.clone()));
+        Ok::<_,String>(OpenProject{project,inspection:Some(inspection)})
+    }).await.map_err(error)??;
+    if open.project.source.as_ref().is_some_and(|s|s.cache_version==13){connect_mcc_texture_resources(app,window,open.project.id).await}
+    else {Ok(texture_resources_native::auto_connect(app,window,open.project.id.clone()).await?.unwrap_or(open))}
+}
+
+#[tauri::command]
+pub(super) async fn compatible_bitmap_targets(app:tauri::AppHandle,project_id:String,runtime_project_id:String,requests:Vec<core::bitmap_preview::OwnedBitmapRequest>)->Reply<Vec<core::bitmap_preview::CompatibleBitmapTarget>>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        let library=lock(&state.library)?;let source=library.get(&project_id).map_err(error)?;let runtime=library.get(&runtime_project_id).map_err(error)?;drop(library);
+        let a=source.source.as_ref().ok_or("Missing preserved source")?;let b=runtime.source.as_ref().ok_or("Missing runtime source")?;
+        let source_inspection=inspect(&state,&source)?;let target_inspection=inspect(&state,&runtime)?;
+        core::bitmap_preview::compatible_runtime_targets(&a.preserved_path,&source_inspection,&b.preserved_path,&target_inspection,&requests).map_err(error)
+    }).await.map_err(error)?
+}
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Defaults {

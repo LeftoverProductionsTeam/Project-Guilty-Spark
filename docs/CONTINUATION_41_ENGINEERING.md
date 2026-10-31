@@ -1,6 +1,6 @@
 # C41 — Smart Edit routing, continuing the new “Every Way to Mod Halo” directive
 
-The attached directive is labeled Continuation 38. Historical C38 already exists in the consolidated history; this implementation is C41 so neither source nor evidence is overwritten. Starting HEAD/master: `96911112af1e9c0f88aa8f94e23ab2f43d870e48`. Development branch: `codex/c41-smart-edit-routing`. C37–C40, all research branches, prior native fixtures and releases remain preserved. The verified C40 final all-ref recovery bundle was rechecked before development. No reset, source deletion, automatic dependency merge or force push is used.
+The attached directive is labeled Continuation 38; historical C38 remains unchanged. Original C41 development started from 96911112af1e9c0f88aa8f94e23ab2f43d870e48 in the existing C41 checkout. The final continuation integrates its preserved source snapshot into the newer local master foundation 5d67390, retaining C35–C40 history and subsequent native assets/CE workflows. [Final integration, native acceptance and branch preservation](FINAL_CONSOLIDATION_C41.md).
 
 ## What changed
 
@@ -25,11 +25,11 @@ The [official Invader project](https://github.com/SnowyMouse/invader) and [autho
 
 Native rebuilds keep compatibility, dependency, geometry, source identity and compiler gates. Accepted Baboon/Invader revisions block stale regeneration and can route through Build working tags. QuickForge preview and export share one read-only dependency-requirements function; routing checks real geometry, kit generation, tag dependencies and provenance before offering its source build. Unsupported preview assets/custom atmosphere/Firefight bridges are not silently omitted.
 
-Tag tree and object-tag drawer reuse TagFields and the same saved project. The compact save-plan panel also appears in Build & playtest and QuickForge session. Plan/result UI is map-bound; actual authoring changes expire a plan, while automatic audio-only metadata does not. Delayed responses from another map cannot replace the active plan. User-visible native testing exposed a first-use save/refresh race; its diagnosis and final verification are recorded below rather than counted as success.
+Tag tree and object-tag drawer reuse TagFields and the same saved project. The compact save-plan panel also appears in Build & playtest and the QuickForge Build tools drawer. Plan/result UI is map-bound; actual authoring changes expire a plan, while automatic audio-only metadata does not. Delayed responses from another map cannot replace the active plan. The final fresh executable acceptance passes the first saved plan after canonical source discovery, shared tag fields, dependency navigation and actual gizmo persistence. A genuine root-request replay bug is fixed; source-binding changes still invalidate a prior plan.
 
 LiveForge uses Smart Edit live plans over the existing MCC adapter. Explicit local bindings, source scenario, exact session/map, datum salt, tag/class and expected positions are checked again at execution; the original stationary/detached/readback checks remain. Before/observed entries use one bounded per-project append journal, not a directory per drag frame. A memory readback does not certify rendering, collision relinking or peers. Disconnect does not restore moved positions; the journal records restoration coordinates, and reloading the original restores the authored map. Fresh C41 gameplay remains a separate acceptance gate.
 
-SparkLink's authenticated QuickForge source transport, roles, frozen builds and per-author history remain intact. Direct cache cells, loose native tags and binary custom assets are not broadcast by claiming that source convergence proves tag sharing or game-peer replication.
+SparkLink's authenticated transport, roles, frozen builds and per-author history remain intact. Its bounded C39 native pistol-field/admitted-scenery workflow also passes a fresh three-process native regression. Direct cache cells and arbitrary loose tags/binary uploads are not broadcast, and editor convergence is never reported as game-peer replication.
 
 ## Real acceptance and regression record
 
@@ -37,7 +37,7 @@ The opt-in `scripts/test-smart-edit-native.mjs` uses a genuine compiled Windows 
 
 An intermediate real run verified: four intended scalar bytes plus four checksum bytes changed in Blood Gulch; source SHA-256 stayed `1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102`. A real scenery X-axis gizmo drag reopened at its edited position. A radius edit reached `0.22499999403953552` through both direct cache and accepted native working-tag compilation from the same parent. Their binary hashes differed legitimately. All 2,240 original native files remained unchanged. The run did not launch a game or establish custom-asset/game-peer acceptance. Failed setup/selectors and the first-use UI failures remain private evidence and are not passes.
 
-Final executable-bound receipts, expanded acceptance and combined regression totals are recorded here after code verification. Historical C37 founder-operated Baboon edit proof remains historical; automated normalization/corruption/native compile tests are separately identified. No fresh human Baboon interaction is claimed.
+Final executable-bound acceptance now passes direct/source/extraction equivalence, refusal cases, shared inspector/dependency navigation and actual rendered gizmo persistence. All five fresh native suites bind the same bundled executable. The [C41 final report](FINAL_CONSOLIDATION_C41.md) and [public metadata receipt](fixtures/c41-final-consolidation.json) record exact hashes, timings, 593 Rust / 255 frontend / 124 browser / 59 offline results and remaining boundaries. Historical C37 founder-operated Baboon edit proof remains historical; automated normalization/corruption/native compile tests are separately identified. No fresh human Baboon interaction is claimed.
 
 ## Acceptance boundaries retained
 
@@ -56,6 +56,6 @@ Final executable-bound receipts, expanded acceptance and combined regression tot
 
 ## Delivery and next acceptance
 
-Keep this development branch reviewable until its combined checks pass. The consolidated master and isolated integration worktree remain intact. Source-only publication, executable/installer hashes, final source inventory, a descriptive founder-controlled push and exact unsupported operations belong in the final handoff. Do not claim a remote update when only local files/commits changed.
+The user-directed local master consolidation retains the original C41 checkout and all source history. Combined checks and fresh native suites pass; publication remains owner-controlled from the verified master worktree. Source manifests and package checksums identify the delivered files. No remote push or ruleset modification is performed. GitHub About metadata remains a separate manual step because its connector/browser was unavailable.
 
 Founder test: open owned MCC Blood Gulch → Tag editor → Weapon/pistol → change Bounding radius → Save a map copy → Review save plan → Direct map copy → Save → Open edited copy in a new tab. Check the new value and preserved original tab, then test the output in the matching game separately. [Workflow guide](SMART_EDIT_WORKFLOWS.md).

@@ -1,5 +1,7 @@
 # Workbench test build — 31 October 2026
 
+Current follow-through: [C41 final integration](FINAL_CONSOLIDATION_C41.md) adds genuine reviewed MCC direct scalar/placement copies and preserves all native asset/CE workflows. Its fresh regression totals supersede the older test counts below; general direct compiled-map editing, game loading and the remaining runtime goals stay open.
+
 **Follow-through:** [checked private CE hosting](CUSTOM_EDITION_PRIVATE_HOST.md) now implements the actual start/status/stop lifecycle inside Online, separately from the older helper-only observations in this historical build report. Its own final executable, timings and regression evidence are recorded independently; prior failed client joins are retained.
 
 The Windows workbench is built for the scoped workflows below. **The entire long-term feature checklist is not complete.** A launchable workspace, a successful native compilation and a playable multiplayer feature are different acceptance gates. This report replaces the older status sheet's "planned" descriptions where there is current implementation and evidence; it does not turn research targets into working features.

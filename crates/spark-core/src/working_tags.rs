@@ -785,7 +785,7 @@ pub fn run_build_from_tags(
 pub use run_build_from_tags as run;
 
 fn inventory_identity(hashes:&BTreeMap<String,String>)->Result<String> {
-    Ok(format!("{:x}",Sha256::digest(serde_json::to_vec(hashes)?)))
+    Ok(crate::hex_bytes(Sha256::digest(serde_json::to_vec(hashes)?)))
 }
 /// Content identity of the same complete, bounded native tree staged by the
 /// compiler. This is application provenance, not a new native tag format.

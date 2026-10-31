@@ -108,10 +108,7 @@ fn scan(roots: &[(PathBuf, String, usize)]) -> Inventory {
                 let Ok(canonical) = fs::canonicalize(&path) else {
                     continue;
                 };
-                let id = format!(
-                    "{:x}",
-                    Sha256::digest(canonical.to_string_lossy().to_ascii_lowercase().as_bytes())
-                );
+                let id = spark_core::hex_bytes(Sha256::digest(canonical.to_string_lossy().to_ascii_lowercase().as_bytes()));
                 result.maps.push(Candidate {
                     id,
                     name: path

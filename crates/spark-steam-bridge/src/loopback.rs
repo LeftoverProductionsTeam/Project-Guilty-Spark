@@ -122,7 +122,7 @@ pub(super) fn run(client: &Client) -> Result<(), Error> {
     }
     println!(
         "SPARK_STEAM_SELF_TEST {}",
-        serde_json::json!({"status":"PASS","appId":480,"scope":"local SDK socket pair; remote two-account relay remains untested","bytes":payload.len(),"packets":count,"sha256":format!("{:x}",Sha256::digest(&payload)),"elapsedMs":start.elapsed().as_secs_f64()*1000.})
+        serde_json::json!({"status":"PASS","appId":480,"scope":"local SDK socket pair; remote two-account relay remains untested","bytes":payload.len(),"packets":count,"sha256":spark_core::hex_bytes(Sha256::digest(&payload)),"elapsedMs":start.elapsed().as_secs_f64()*1000.})
     );
     Ok(())
 }

@@ -158,3 +158,28 @@ pub mod bsp_audio;
 pub mod custom_sounds;
 
 pub mod native_asset_imports;
+
+/// Stable lowercase byte encoding for persisted identities. Keep this separate
+/// from a digest library's output wrapper so upgrades cannot change receipts.
+pub fn hex_bytes(bytes: impl AsRef<[u8]>) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let bytes = bytes.as_ref();
+    let mut text = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        text.push(DIGITS[(byte >> 4) as usize] as char);
+        text.push(DIGITS[(byte & 15) as usize] as char);
+    }
+    text
+}
+
+#[cfg(test)]
+mod digest_identity_tests {
+    use sha2::{Digest, Sha256};
+
+    #[test]
+    fn digest_upgrade_preserves_lowercase_width_and_known_identities() {
+        assert_eq!(super::hex_bytes([0, 1, 15, 16, 128, 255]), "00010f1080ff");
+        assert_eq!(super::hex_bytes(Sha256::digest([])), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assert_eq!(super::hex_bytes(Sha256::digest(b"abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    }
+}

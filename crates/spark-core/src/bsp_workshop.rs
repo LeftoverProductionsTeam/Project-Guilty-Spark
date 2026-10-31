@@ -552,7 +552,7 @@ pub fn report(doc: &QuickForgeDocument) -> Result<GeometryReport> {
         vertices: mesh.positions.len() / 3,
         triangles: mesh.indices.len() / 3,
         closed_components: components,
-        source_sha256: format!("{:x}", Sha256::digest(serde_json::to_vec(doc)?)),
+        source_sha256: crate::hex_bytes(Sha256::digest(serde_json::to_vec(doc)?)),
     })
 }
 fn components(m: &ForgeMesh) -> usize {

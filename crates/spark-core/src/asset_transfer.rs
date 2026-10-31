@@ -44,7 +44,7 @@ pub fn copy_obj(
     if bytes.len() > 64 * 1024 * 1024 {
         return invalid("Source OBJ exceeds 64 MiB");
     }
-    let hash = format!("{:x}", Sha256::digest(&bytes));
+    let hash = crate::hex_bytes(Sha256::digest(&bytes));
     if hash != original.sha256 {
         return invalid("Source asset changed since import; transfer refused");
     }

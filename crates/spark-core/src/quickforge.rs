@@ -411,7 +411,7 @@ fn netgame_flag_issues(doc: &QuickForgeDocument) -> Vec<GeometryIssue> {
 }
 
 fn hash<T: Serialize>(value: &T) -> Result<String> {
-    Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(value)?)))
+    Ok(crate::hex_bytes(Sha256::digest(serde_json::to_vec(value)?)))
 }
 pub fn validate_document(doc: &QuickForgeDocument) -> Result<()> {
     validate_document_scope(doc, false)
@@ -2022,7 +2022,7 @@ pub fn export_sources(doc: &QuickForgeDocument, output: &Path) -> Result<SourceE
         scenario_plan_path,
         environment_plan_path:Some(environment_plan_path),
         source_sha256: validation.source_sha256.clone(),
-        jms_sha256: format!("{:x}", Sha256::digest(jms.as_bytes())),
+        jms_sha256: crate::hex_bytes(Sha256::digest(jms.as_bytes())),
         scenario_path: scenario,
         bsp_name,
         validation,

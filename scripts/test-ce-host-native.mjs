@@ -369,6 +369,12 @@ try {
     await new Promise((resolve) => setTimeout(resolve, setupSeconds * 1000));
     const observed = await call('ce_host_status');
     expect(observed.client.mode).toBe('setup');
+    expect(typeof observed.client.visibleWindow).toBe('boolean');
+    if(!observed.client.visibleWindow) {
+      expect(observed.client.detail).toContain('no visible game window');
+      await expect(panel.getByRole('alert').filter({hasText:'Halo has no visible game window'})).toBeVisible();
+      await expect(panel.getByRole('button',{name:'Stop playtest',exact:true})).toBeEnabled();
+    }
     await call('ce_host_client_action', { sessionId: initial.id, action: 'stop' });
     await expect.poll(() => alive(setup.client.processId)).toBe(false);
     await prepareClient(page, initial);
@@ -379,6 +385,8 @@ try {
       firstRunFiles: ['Eula.dll', 'Eula.rtf'],
       clientJoinRequested: false,
       visualAcceptance: false,
+      visibleWindowDetected: observed.client.visibleWindow,
+      missingWindowWarningVerified: !observed.client.visibleWindow,
     });
   }
   await panel.getByText('Session details & output', { exact: true }).click();

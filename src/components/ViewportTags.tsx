@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { classNames, effectiveReferenceId, setTagValue, shortPath } from '../editor';
 import { useMapState } from '../mapSession';
 import type { MapInspection, Project, TagField } from '../types';
@@ -32,10 +32,17 @@ export default function ViewportTags({
 }) {
   const [selected, select] = useMapState<number | null>(project.id, 'viewport.tags.selected', null);
   const [advanced, setAdvanced] = useMapState(project.id, 'viewport.tags.offsets', false);
+  const appliedRequest = useRef<string | null>(null);
+  const request = JSON.stringify([project.id, inspection.sha256, requestedTagId, requestRevision]);
   useEffect(() => {
-    if (requestedTagId !== null && inspection.tags.some((tag) => tag.id === requestedTagId))
+    // A request selects the object's root once. Session-store renders and tag
+    // dependency clicks must not replay it and immediately hide the dependency.
+    if (appliedRequest.current === request) return;
+    if (requestedTagId !== null && inspection.tags.some((tag) => tag.id === requestedTagId)) {
+      appliedRequest.current = request;
       select(requestedTagId);
-  }, [requestedTagId, requestRevision, inspection.sha256, select]);
+    }
+  }, [request, inspection.tags, requestedTagId, select]);
   const tag = inspection.tags.find((tag) => tag.id === selected);
   if (!tag) return <p>Select a map object to inspect its tags. The viewport and camera stay in place.</p>;
   const change = (field: TagField, value: number) => {

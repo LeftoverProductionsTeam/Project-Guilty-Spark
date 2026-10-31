@@ -41,14 +41,14 @@ const rows = [
     'Compact save plans and map-bound asynchronous results',
     'interface',
     'Shared folded save-plan controls in Tags, object drawer, Build and QuickForge; review actual changes, route blockers, required tools and recovery before execution.',
-    'Native first-use/save-refresh behavior must pass a fresh final executable acceptance; synthetic UI tests are separate evidence.',
+    'The fresh final executable passes save/review, canonical resource bindings, shared inspectors, actual gizmo persistence and independent native rebuilds. Immediate resource identity changes still require a new review; synthetic UI tests remain separate evidence.',
   ],
   [
     'native-assets-peers',
     'Remaining native asset import and collaborative runtime parity',
     'assets',
     'Preserve existing native source authoring, actual-model previews, source collaboration, integrity recovery, BSP and audio/render research.',
-    'Actual custom scenery game import, semantic native-tag/binary sharing, arbitrary live spawning/BSP replacement, full render/audio parity and game-peer acceptance remain open.',
+    'Custom scenery native compilation and bounded C39 field/template sharing are accepted separately. Actual game loading, general native schemas/binary uploads, arbitrary live spawning/BSP replacement, full render/audio parity and game-peer acceptance remain open.',
   ],
 ];
 export const continuation41Requirements = rows.map(([id, feature, topic, operation, gap]) => ({

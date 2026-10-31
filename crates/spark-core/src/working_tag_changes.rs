@@ -304,7 +304,7 @@ impl TagChangeMonitor {
                     break;
                 }
                 if !self.dirty_paths.contains(&part.path)
-                    && self.hashes.get(&part.path) != Some(&format!("{:x}", part.sha.finalize()))
+                    && self.hashes.get(&part.path) != Some(&crate::hex_bytes(part.sha.finalize()))
                 {
                     self.mark_changed([part.path.clone()])?;
                 }

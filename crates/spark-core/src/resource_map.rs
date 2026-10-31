@@ -132,7 +132,7 @@ fn verify_handle_hash(file: &mut File, expected_sha256: &str) -> Result<()> {
         if n == 0 { break; }
         hasher.update(&buf[..n]);
     }
-    if format!("{:x}",hasher.finalize()) != expected_sha256.to_ascii_lowercase() {
+    if crate::hex_bytes(hasher.finalize()) != expected_sha256.to_ascii_lowercase() {
         return invalid("Resource map differs from this project's recorded SHA-256");
     }
     Ok(())
@@ -306,7 +306,7 @@ mod tests {
         bytes[0x100..0x100+18].copy_from_slice(b"test\\wall\\albedo\0\0");
         bytes[0x300..0x340].fill(0x5a);
         let mut f = File::create(&path).unwrap();f.write_all(&bytes).unwrap();f.sync_all().unwrap();
-        let sha = format!("{:x}",Sha256::digest(&bytes));
+        let sha = crate::hex_bytes(Sha256::digest(&bytes));
         // Keep the directory alive while returning a NamedTempFile-like handle.
         let copy = tempfile::NamedTempFile::new().unwrap();
         std::fs::copy(&path,copy.path()).unwrap();

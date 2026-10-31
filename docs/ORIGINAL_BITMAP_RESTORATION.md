@@ -2,6 +2,14 @@
 
 Continues `1d5077f` without restarting the workbench. This pass improves read-only image interpretation and inspection; native source transactions, Baboon/Invader reconciliation, compilation, C35–C39 history and experimental research remain intact.
 
+## C41 first-load follow-through
+
+When a classic map has unavailable external pixels, the viewer can open the selected installed runtime's owned Blood Gulch resources independently. It matches unique native bitmap paths, image index/count, dimensions and encoding, then verifies the runtime's own pinned pixels. Embedded images always win; changed-resource verification failures do not authorize substitution. Source tag IDs, original resource pins and extraction/compiler bindings remain unchanged. Runtime selection invalidates cached viewport material attempts.
+
+Real desktop acceptance imports the exact Zombie Demo map alone in a fresh download folder, configures no original pack or compiler tools, and opens the normal editor. It loads **124 shader materials**, including **75 compatible MCC previews**, and **15 embedded lightmaps**. The eight other shader materials still need the original pack; connecting it reloads **132 materials with zero runtime substitutions**. The map and preserved copy remain byte-identical. Missing external cubemap reflections remain explicit and are not guessed.
+
+The same test opens an unconfigured arena: its surfaces acquire the actual owned metal shader, terrain can use the owned grass shader, and both native preview materials render without compiler tools or extraction. Custom assigned shaders remain intact. Native builds still need prepared imports or a matching tagset/toolchain. See [native first-load test](../scripts/test-runtime-textures-native.mjs) and [consolidation evidence](FINAL_CONSOLIDATION_C41.md). Earlier exact-original image coverage and test counts below describe their historical run.
+
 ## What is now readable
 
 | Exact original Zombie Demo resource coverage | Before | Now |

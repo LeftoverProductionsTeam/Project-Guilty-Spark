@@ -246,7 +246,7 @@ fn copy_verified_source(source: &Path, expected_sha256: &str, output: &Path) -> 
     file.take(maps::MAX_CACHE_BYTES + 1)
         .read_to_end(&mut bytes)?;
     if bytes.len() as u64 > maps::MAX_CACHE_BYTES
-        || format!("{:x}", Sha256::digest(&bytes)) != expected_sha256
+        || crate::hex_bytes(Sha256::digest(&bytes)) != expected_sha256
     {
         return invalid("Source changed during the validated cache copy");
     }

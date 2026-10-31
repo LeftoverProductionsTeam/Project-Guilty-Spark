@@ -1,5 +1,15 @@
 # Changelog
 
+## C41 final integration — verified local master
+
+- Merge the preserved 42-file Smart Edit source with the newer native asset/BSP/texture/CE work; retain all prior commits, requirements and failed experiments. Merge seven unique dependency branches and adapt digest encoding without changing persisted identities.
+- Fix object-tag dependency navigation being reset by session renders; add a browser regression. Refresh the README, current/in-app feature catalog and explicit remaining gates.
+- Load compatible installed-runtime pixels on standalone classic-map first open while retaining embedded/original priority and strict source/resource checks. Automatically texture unconfigured arena/brush surfaces from owned grass/metal shaders even without compiler setup; retain separate native-import/build gates.
+- Observe only Spark-owned CE client window visibility and show a missing-window notice with reachable setup/stop controls. OS visibility is not visual first-run or joined-game acceptance.
+- Pass genuine direct MCC byte/semantic editing, rendered gizmo persistence, native extraction/working-tag equivalence, corrupt-save rejection/recovery, three-process native collaboration/frozen builds, actual asset/reflection/animation builds and 30 CE native cases.
+- Verify all 30 captured branch tips and 24 current non-alias references are contained, all 146 original dirty files remain unchanged, and 391 prior ledger IDs survive in 398 records. Local checks: 595 Rust, 259 frontend, 125 browser, 59 offline and two interface-probe tests; seven opt-in Rust cases ignored.
+- Build Windows/NSIS and retain game-load/join/parity/protocol gaps. No remote push, hosted-CI success or GitHub About update is claimed. [Full report](docs/FINAL_CONSOLIDATION_C41.md).
+
 ## C41 — Smart Edit routing and direct MCC map copies
 
 - Add typed, expiring, window/map-owned edit plans that resolve exact source/runtime/tool capabilities and recheck them before execution; manual choices cannot bypass hard gates.

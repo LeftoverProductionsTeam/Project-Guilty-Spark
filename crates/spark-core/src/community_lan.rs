@@ -112,7 +112,7 @@ pub fn decode_advertisement(bytes: &[u8], nonce: [u8; 8]) -> Result<Advertisemen
         distributed_netcode: body[92] & 1 != 0,
         in_progress: body[92] & 2 != 0,
         advertised_kind: body[93],
-        extension_bytes_sha256: format!("{:x}", Sha256::digest(&body[94..116])),
+        extension_bytes_sha256: crate::hex_bytes(Sha256::digest(&body[94..116])),
         game_name,
         map_name: String::from_utf8(map.to_vec())
             .map_err(|_| SparkError::Invalid("Invalid map encoding".into()))?,
@@ -186,7 +186,7 @@ pub fn probe_private(host: SocketAddrV4, timeout: Duration) -> Result<Observatio
                             ignored_datagrams: ignored,
                             elapsed_ms: start.elapsed().as_millis(),
                             response_bytes: length,
-                            response_sha256: format!("{:x}", Sha256::digest(&buffer[..length])),
+                            response_sha256: crate::hex_bytes(Sha256::digest(&buffer[..length])),
                             authenticated: false,
                             session_admission_attempted: false,
                         })

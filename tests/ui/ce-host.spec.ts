@@ -339,3 +339,18 @@ test('first-run help opens only the owned setup mode and keeps installation guid
   await page.getByRole('button', { name: 'Check CE installation', exact: true }).click();
   await expect(page.getByText('Setup visits 1')).toBeVisible();
 });
+test('a running client without a visible window warns in setup and keeps stop and checks available', async ({page}) => {
+  await page.goto('/tests/ui/fixtures/ceHost.html');
+  await loadedServer(page);
+  await page.getByRole('button', {name:'Prepare matching client',exact:true}).click();
+  await page.getByRole('button', {name:'Launch CE playtest',exact:true}).click();
+  await page.evaluate(()=>{const c=(window as any).ceHostSession.client;c.visibleWindow=false;c.elapsedMs=18000;c.mode='setup';c.detail='Process running; no visible window detected.';});
+  const warning=page.getByRole('alert').filter({hasText:'Halo has no visible game window'});
+  await expect(warning).toBeVisible();
+  await expect(page.getByRole('button',{name:'Stop playtest',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Stop private server',exact:true})).toBeEnabled();
+  await warning.getByRole('button',{name:'Open CE checks',exact:true}).click();
+  await expect(page.getByText('Setup visits 1')).toBeVisible();
+  await page.evaluate(()=>{(window as any).ceHostSession.client.visibleWindow=true;});
+  await expect(warning).toHaveCount(0);
+});

@@ -268,6 +268,11 @@ try {
   }));
   // Three deliberate local native verifications. No remote request launches a utility.
   for(const x of actors) {
+      // Opening source-map libraries must not make this test operate on a
+      // different document. Select the real shared-world tab through the UI.
+      const tab=x.page.getByRole('tab',{name:x.fixture.title,exact:true});
+      await tab.click();
+      await expect(x.page.locator('.forge-workspace')).toBeVisible();
     await x.page.getByRole('button',{name:/Live Studio ·/}).click();
     await expect(x.panel).toBeVisible();
     if(!x.map.scenery||!x.map.pistol)throw Error('Owned map must contain the real boulder and pistol');

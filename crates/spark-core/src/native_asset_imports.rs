@@ -398,7 +398,7 @@ pub fn prepare(
         tag_class: tag.class.clone(),
         tag_path: tag.path.clone(),
         native_path,
-        receipt_sha256: format!("{:x}", Sha256::digest(&bytes)),
+        receipt_sha256: crate::hex_bytes(Sha256::digest(&bytes)),
         file_count: receipt.files.len(),
     };
     validate(std::slice::from_ref(&binding))?;

@@ -2386,10 +2386,7 @@ async fn create_peer_manifest(
                         .is_some_and(|m| mcc::manifest_contains(&m, &root.mods).unwrap_or(false))
                     {
                         use sha2::{Digest, Sha256};
-                        package_sha256 = Some(format!(
-                            "{:x}",
-                            Sha256::digest(serde_json::to_vec(&receipt.files).map_err(error)?)
-                        ));
+                        package_sha256 = Some(spark_core::hex_bytes(Sha256::digest(serde_json::to_vec(&receipt.files).map_err(error)?)));
                     }
                 }
             }
@@ -2416,7 +2413,7 @@ async fn create_peer_manifest(
         let mut manifest=multiplayer::create_manifest(&inspection, context, resource_ids).map_err(error)?;
         if let Some(document)=&p.quick_forge {
             use sha2::{Digest,Sha256};
-            manifest.gameplay=Some(multiplayer::PeerGameplay{game_mode:document.game_mode.clone(),expected_players:p.firefight.as_ref().map_or(4,|f|f.player_count),configuration_sha256:p.firefight.as_ref().map(|f|serde_json::to_vec(f).map(|bytes|format!("{:x}",Sha256::digest(bytes)))).transpose().map_err(error)?});
+            manifest.gameplay=Some(multiplayer::PeerGameplay{game_mode:document.game_mode.clone(),expected_players:p.firefight.as_ref().map_or(4,|f|f.player_count),configuration_sha256:p.firefight.as_ref().map(|f|serde_json::to_vec(f).map(|bytes|spark_core::hex_bytes(Sha256::digest(bytes)))).transpose().map_err(error)?});
             multiplayer::validate_manifest(&manifest).map_err(error)?;
         }
         Ok(manifest)
@@ -2801,6 +2798,8 @@ pub fn run() {
             asset_sources_native::open_asset_source,
             asset_import_native::prepare_native_asset_import,
             default_materials_native::prepare_default_halo_materials,
+            default_materials_native::runtime_texture_source,
+            default_materials_native::compatible_bitmap_targets,
             open_project,
             connect_mcc_texture_resources,
             create_project,

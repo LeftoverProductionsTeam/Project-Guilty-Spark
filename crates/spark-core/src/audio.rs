@@ -222,7 +222,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
                     if actual_channels!=channels||actual_rate!=sample_rate{return invalid("Vorbis identification disagrees with the sound tag's rate or channels");}duration
                 }else{crate::audio_pcm::frame_count(samples,codec,channels)? as f64/sample_rate as f64};
                 if flags==1{external.insert(ranges.len(),samples.to_vec());}
-                Ok((format!("{:x}", Sha256::digest(samples)), duration))
+                Ok((crate::hex_bytes(Sha256::digest(samples)), duration))
             })();
             match validation {
                 Ok((hash, duration)) => {
@@ -289,7 +289,7 @@ pub fn preview_sound_with_bindings(path:&Path,expected_sha256:&str,tag_id:u32,pi
     Ok(AudioPreview {
         name: item.name.clone(),
         mime: mime.into(),
-        sha256:format!("{:x}",Sha256::digest(&bytes)),bytes,
+        sha256:crate::hex_bytes(Sha256::digest(&bytes)),bytes,
         source_sha256:data.report.source_sha256.clone(),source_sample_sha256:item.sha256.clone().unwrap(),
     })
 }
@@ -483,7 +483,7 @@ mod tests {
     }
     #[test]fn embedded_xbox_sample_converts_without_changing_source(){
         let dir=tempfile::tempdir().unwrap();let path=dir.path().join("source.map");let bytes=sound_fixture(false);std::fs::write(&path,&bytes).unwrap();
-        let hash=format!("{:x}",Sha256::digest(&bytes));let report=inspect_sound(&path,&hash,0x1234).unwrap();
+        let hash=crate::hex_bytes(Sha256::digest(&bytes));let report=inspect_sound(&path,&hash,0x1234).unwrap();
         assert!(report.permutations[0].available);let preview=preview_sound(&path,&hash,0x1234,0,0).unwrap();
         assert_eq!(preview.mime,"audio/wav");assert_eq!(preview.bytes.len(),172);assert_eq!(preview.source_sha256,hash);
         assert_eq!(&preview.bytes[44..46],&1000i16.to_le_bytes());assert_eq!(std::fs::read(&path).unwrap(),bytes);
@@ -498,30 +498,30 @@ mod tests {
         bytes[0xb80+42..0xb80+44].copy_from_slice(&1u16.to_le_bytes());
         bytes[0xb80+124+42..0xb80+124+44].copy_from_slice(&u16::MAX.to_le_bytes());
         let dir=tempfile::tempdir().unwrap();let path=dir.path().join("linked.map");std::fs::write(&path,&bytes).unwrap();
-        let hash=format!("{:x}",Sha256::digest(&bytes));let report=inspect_sound(&path,&hash,0x1234).unwrap();
+        let hash=crate::hex_bytes(Sha256::digest(&bytes));let report=inspect_sound(&path,&hash,0x1234).unwrap();
         assert!(report.permutations.iter().all(|p|p.available));
         assert!(report.permutations[0].chain_start);assert_eq!(report.permutations[0].next_permutation,Some(1));
         assert!(!report.permutations[1].chain_start);assert_eq!(report.permutations[1].next_permutation,None);
         assert_eq!(std::fs::read(&path).unwrap(),bytes);
         bytes[0xb00+44..0xb00+46].copy_from_slice(&3u16.to_le_bytes());std::fs::write(&path,&bytes).unwrap();
-        let hash=format!("{:x}",Sha256::digest(&bytes));assert!(inspect_sound(&path,&hash,0x1234).is_err());
+        let hash=crate::hex_bytes(Sha256::digest(&bytes));assert!(inspect_sound(&path,&hash,0x1234).is_err());
     }
     #[test]fn mcc_audio_uses_the_map_specific_tag_base_and_preserves_verified_samples(){
         let mut bytes=sound_fixture(false);let set=|b:&mut[u8],at:usize,n:u32|b[at..at+4].copy_from_slice(&n.to_le_bytes());let base=0x52000000;
         let entry=bytes[0x880..0x8a0].to_vec();bytes[0x828..0x848].copy_from_slice(&entry);set(&mut bytes,4,13);set(&mut bytes,0x800,base+0x28);set(&mut bytes,0x838,base+0x100);set(&mut bytes,0x83c,base+0x180);set(&mut bytes,0x980+156,base+0x300);set(&mut bytes,0xb00+64,base+0x380);
-        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("mcc.map");std::fs::write(&path,&bytes).unwrap();let hash=format!("{:x}",Sha256::digest(&bytes));let sound=inspect_sound(&path,&hash,0x1234).unwrap();assert!(sound.permutations[0].available);let clip=preview_sound(&path,&hash,0x1234,0,0).unwrap();assert_eq!(&clip.bytes[44..46],&1000i16.to_le_bytes());assert_eq!(std::fs::read(&path).unwrap(),bytes);
-        set(&mut bytes,0x980+156,0x40440300);std::fs::write(&path,&bytes).unwrap();let hash=format!("{:x}",Sha256::digest(&bytes));assert!(inspect_sound(&path,&hash,0x1234).is_err());
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("mcc.map");std::fs::write(&path,&bytes).unwrap();let hash=crate::hex_bytes(Sha256::digest(&bytes));let sound=inspect_sound(&path,&hash,0x1234).unwrap();assert!(sound.permutations[0].available);let clip=preview_sound(&path,&hash,0x1234,0,0).unwrap();assert_eq!(&clip.bytes[44..46],&1000i16.to_le_bytes());assert_eq!(std::fs::read(&path).unwrap(),bytes);
+        set(&mut bytes,0x980+156,0x40440300);std::fs::write(&path,&bytes).unwrap();let hash=crate::hex_bytes(Sha256::digest(&bytes));assert!(inspect_sound(&path,&hash,0x1234).is_err());
     }
     #[test]fn shared_samples_require_kind_hash_and_exact_permutation_span(){
         let dir=tempfile::tempdir().unwrap();let path=dir.path().join("source.map");let bytes=sound_fixture(true);std::fs::write(&path,&bytes).unwrap();
-        let hash=format!("{:x}",Sha256::digest(&bytes));let resource=dir.path().join("sounds.map");let mut raw=vec![0u8;0x400];
+        let hash=crate::hex_bytes(Sha256::digest(&bytes));let resource=dir.path().join("sounds.map");let mut raw=vec![0u8;0x400];
         let set=|b:&mut[u8],at:usize,n:u32|b[at..at+4].copy_from_slice(&n.to_le_bytes());
         set(&mut raw,0,2);set(&mut raw,4,0x100);set(&mut raw,8,0x40);set(&mut raw,12,1);set(&mut raw,0x44,36);set(&mut raw,0x48,0x300);
         raw[0x100..0x111].copy_from_slice(b"test\\sound__0__0\0");std::fs::write(&resource,&raw).unwrap();
-        let pinned=format!("{:x}",Sha256::digest(&raw));assert!(!inspect_sound(&path,&hash,0x1234).unwrap().permutations[0].available);
+        let pinned=crate::hex_bytes(Sha256::digest(&raw));assert!(!inspect_sound(&path,&hash,0x1234).unwrap().permutations[0].available);
         let preview=preview_sound_with_resources(&path,&hash,0x1234,0,0,Some((&resource,&pinned))).unwrap();assert_eq!(preview.bytes.len(),172);
         assert!(preview_sound_with_resources(&path,&hash,0x1234,0,0,Some((&resource,&"0".repeat(64)))).is_err());
-        raw[0x10e]=b'1';std::fs::write(&resource,&raw).unwrap();let changed=format!("{:x}",Sha256::digest(&raw));
+        raw[0x10e]=b'1';std::fs::write(&resource,&raw).unwrap();let changed=crate::hex_bytes(Sha256::digest(&raw));
         assert!(preview_sound_with_resources(&path,&hash,0x1234,0,0,Some((&resource,&changed))).is_err());
     }
 }

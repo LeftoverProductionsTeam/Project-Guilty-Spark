@@ -11,9 +11,40 @@ use std::{
     process::ExitStatus,
 };
 use windows_sys::Win32::{
-    Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT},
+    Foundation::{HWND, LPARAM, RECT, WAIT_OBJECT_0, WAIT_TIMEOUT},
     System::Threading::*,
+    UI::WindowsAndMessaging::*,
 };
+
+/// Read-only observation of this owned child only. Window creation/visibility
+/// is distinct from process launch, first-run completion and a joined player.
+pub(super) fn visible_window(pid: u32) -> Option<bool> {
+    struct Probe {
+        pid: u32,
+        visible: bool,
+    }
+    unsafe extern "system" fn visit(window: HWND, data: LPARAM) -> i32 {
+        let probe = &mut *(data as *mut Probe);
+        let mut owner = 0;
+        GetWindowThreadProcessId(window, &mut owner);
+        if owner == probe.pid && IsWindowVisible(window) != 0 && IsIconic(window) == 0 {
+            let mut bounds: RECT = std::mem::zeroed();
+            if GetWindowRect(window, &mut bounds) != 0
+                && bounds.right > bounds.left
+                && bounds.bottom > bounds.top
+            {
+                probe.visible = true;
+            }
+        }
+        1
+    }
+    let mut probe = Probe {
+        pid,
+        visible: false,
+    };
+    (unsafe { EnumWindows(Some(visit), &mut probe as *mut Probe as LPARAM) } != 0)
+        .then_some(probe.visible)
+}
 
 pub(super) struct Child {
     process: OwnedHandle,
@@ -192,6 +223,10 @@ mod tests {
         assert_eq!(result["show"], 1);
         assert_eq!(result["explicitShow"], true);
         assert_eq!(result["standardHandlesProvided"], false);
+        assert_eq!(
+            result["ownedWindowVisibility"],
+            serde_json::json!([false, true, false])
+        );
     }
     #[test]
     fn startup_child_probe() {
@@ -205,9 +240,41 @@ mod tests {
         unsafe {
             GetStartupInfoW(&mut startup);
         }
+        let window = unsafe {
+            CreateWindowExW(
+                0,
+                wide(OsStr::new("STATIC")).unwrap().as_ptr(),
+                wide(OsStr::new("Spark owned visibility probe"))
+                    .unwrap()
+                    .as_ptr(),
+                WS_OVERLAPPEDWINDOW,
+                0,
+                0,
+                160,
+                100,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null(),
+            )
+        };
+        assert!(!window.is_null());
+        let hidden = visible_window(std::process::id()).unwrap();
+        unsafe {
+            ShowWindow(window, SW_SHOWNORMAL);
+        }
+        let shown = visible_window(std::process::id()).unwrap();
+        unsafe {
+            ShowWindow(window, SW_HIDE);
+        }
+        let hidden_again = visible_window(std::process::id()).unwrap();
+        unsafe {
+            DestroyWindow(window);
+        }
         fs::write("startup-probe.json", serde_json::to_vec(&serde_json::json!({
             "show": startup.wShowWindow, "explicitShow": startup.dwFlags & STARTF_USESHOWWINDOW != 0,
             "standardHandlesProvided": startup.dwFlags & STARTF_USESTDHANDLES != 0,
+            "ownedWindowVisibility": [hidden,shown,hidden_again],
         })).unwrap()).unwrap();
     }
 }

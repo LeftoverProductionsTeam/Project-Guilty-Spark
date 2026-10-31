@@ -147,7 +147,7 @@ pub fn inspect(directory: &Path, game: &str) -> Result<Installation> {
         digest.update(hash.as_bytes());
         digest.update(b"\n");
     }
-    let definitions_sha256 = format!("{:x}", digest.finalize());
+    let definitions_sha256 = crate::hex_bytes(digest.finalize());
     if files.len() != expected.file_count || definitions_sha256 != expected.sha256 {
         return invalid("Baboon's required definitions are missing or differ from the reviewed release. Restore its matching definitions folder before editing these tags");
     }

@@ -28,11 +28,11 @@ For supported existing persistent placements in MCC 13, the save plan can publis
 
 ## Assets and audio
 
-The existing Asset library can place source-linked previews from open maps, import custom OBJ and WAV/OGG, and retain source provenance. Native QuickForge tag placements use the matching source compiler. Arbitrary imported-cache/custom-model compilation and actual game acceptance are not established by seeing a preview. Full rendering, animation, acoustic and event parity remain separate goals.
+The Asset library finds linked/discovered owned map assets, shows actual models and auditions supported sounds. Supported scenery drags extract recursive native tags into verified staging and compile through the matching QuickForge or MCC source-map route. Closed, material-assigned OBJ scenery has a bounded native model/collision path. Other asset/runtime combinations, arbitrary replacement, native sound emitters and actual game loading retain separate gates. A preview alone establishes none of those. Full rendering, animation, acoustic and event parity remain open.
 
 ## Temporary edits in a running MCC session
 
-Use **QuickForge session → Live Halo adapter** in the official anti-cheat-disabled test environment. The installed executable/module must match the existing reviewed profile; build and load the matching scenario first. Bind a selected placement to an actual existing game object. Apply changed positions manually, or explicitly enable continuous bound updates.
+Use **Level editor → Live mode → Game connection** in the official anti-cheat-disabled test environment. The installed executable/module must match the existing reviewed profile; build and load the matching scenario first. Bind a selected placement to an actual existing game object. Apply changed positions manually, or explicitly enable continuous bound updates.
 
 Each update now uses a typed Smart Edit live plan. It binds the saved project, process/session, map identity, datum/tag identity, before position and desired position. It expires after ten seconds and rechecks the existing adapter's stationary/detached-object and readback gates. No direct-map save silently writes game memory.
 

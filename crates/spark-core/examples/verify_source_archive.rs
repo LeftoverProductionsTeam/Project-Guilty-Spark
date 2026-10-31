@@ -23,7 +23,7 @@ fn main()->Result<(),Box<dyn std::error::Error>> {
         let entry=zip.by_index(index(name)?)?;if entry.size()>32*1024*1024{return Err("Source member exceeds 32 MiB".into());}
         let mut bytes=vec![];entry.take(32*1024*1024+1).read_to_end(&mut bytes)?;total+=bytes.len();
         if bytes.len()>32*1024*1024||total>128*1024*1024{return Err("Source archive exceeds bounds".into());}
-        if format!("{:x}",Sha256::digest(&bytes))!=expected{return Err(format!("Source checksum mismatch: {name}").into());}
+        if spark_core::hex_bytes(Sha256::digest(&bytes))!=expected{return Err(format!("Source checksum mismatch: {name}").into());}
         if let Some(root)=&destination{spark_core::project::atomic_write(&root.join(relative),&bytes,false)?;}
     }
     if zip.len()!=names.len()+2{return Err("Manifest does not cover all source members".into());}

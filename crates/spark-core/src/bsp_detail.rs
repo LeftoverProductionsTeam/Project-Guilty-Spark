@@ -87,7 +87,7 @@ fn native_hash(path: &Path) -> Result<String> {
     {
         return invalid("Detail preservation requires a native version-5 Halo 1 BSP tag, not a cache pointer layout");
     }
-    Ok(format!("{:x}", Sha256::digest(&bytes)))
+    Ok(crate::hex_bytes(Sha256::digest(&bytes)))
 }
 
 fn inspector_hash(path: &Path) -> Result<String> {
@@ -244,8 +244,8 @@ pub(crate) fn snapshot(
         instances: sizes[1],
         layer_counts: sizes[2],
         z_reference_vectors: sizes[3],
-        integer_fields_sha256: format!("{:x}", integer.finalize()),
-        z_reference_display_sha256: format!("{:x}", floats.finalize()),
+        integer_fields_sha256: crate::hex_bytes(integer.finalize()),
+        z_reference_display_sha256: crate::hex_bytes(floats.finalize()),
     };
     snapshot.validate()?;
     Ok(snapshot)

@@ -146,10 +146,7 @@ pub fn parse(value: &str) -> Result<Invitation> {
     } else {
         return invalid("Supported invitations: halo://join/, MCC steam://joinlobby/976730/, or the official OpenCE web client's ?join= / ?room= links. Other web forks need their own adapter.");
     };
-    let id = format!(
-        "invite-{:x}",
-        Sha256::digest(format!("{kind:?}:{secret}").as_bytes())
-    );
+    let id = format!("invite-{}", crate::hex_bytes(Sha256::digest(format!("{kind:?}:{secret}").as_bytes())));
     Ok(Invitation { id, kind, secret })
 }
 

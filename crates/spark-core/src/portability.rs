@@ -413,7 +413,7 @@ pub fn verify_preservation(
             ));
         }
     }
-    let receipt=Preservation{source_sha256:hash,derived_sha256:format!("{:x}",Sha256::digest(&derived)),bytes:derived.len(),changed_bytes:changed,permitted_ranges:ranges,untouched_bytes_preserved:true,byte_identical:changed==0,scope:"Derived cache extraction input only; original source is never written. All bytes outside reviewed changes are identical, including unknown data. Native extraction/serialization/repacking and final game validity require separate checks.".into()};
+    let receipt=Preservation{source_sha256:hash,derived_sha256:crate::hex_bytes(Sha256::digest(&derived)),bytes:derived.len(),changed_bytes:changed,permitted_ranges:ranges,untouched_bytes_preserved:true,byte_identical:changed==0,scope:"Derived cache extraction input only; original source is never written. All bytes outside reviewed changes are identical, including unknown data. Native extraction/serialization/repacking and final game validity require separate checks.".into()};
     Ok((derived, receipt))
 }
 pub fn markdown(report: &Report) -> String {

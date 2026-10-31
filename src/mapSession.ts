@@ -56,6 +56,14 @@ export function readMapSession<T>(id: string, key: string, fallback: T): T {
   const value = record(id);
   return Object.hasOwn(value, key) ? (value[key] as T) : fallback;
 }
+/** One stable subscription for source maps in a multi-map asset viewport. */
+export function useMapSessionValues(ids: readonly string[], key: string, fallback: string): string {
+  return useSyncExternalStore(
+    listener => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    () => JSON.stringify(ids.map(id => [id, readMapSession(id, key, fallback)])),
+    () => '',
+  );
+}
 export function writeMapSession<T>(id: string, key: string, value: T) {
   if (!id || id.length > 128 || !/^[\w.:-]{1,80}$/.test(key)) return;
   // Another native WebView may have saved a different key since this cache loaded.

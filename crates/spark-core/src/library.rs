@@ -313,7 +313,7 @@ impl Library {
                 let extension=asset.path.extension().and_then(|value|value.to_str()).unwrap_or("").to_ascii_lowercase();
                 crate::custom_sounds::inspect(&bytes,&extension)?;
                 use sha2::{Digest,Sha256};
-                if format!("{:x}",Sha256::digest(&bytes))!=asset.sha256{return invalid("Referenced custom sound checksum changed");}
+                if crate::hex_bytes(Sha256::digest(&bytes))!=asset.sha256{return invalid("Referenced custom sound checksum changed");}
                 crate::reject_links(&dir)?;fs::create_dir_all(&dir)?;
                 let new_id=uuid::Uuid::new_v4().to_string();let raw=dir.join(format!("{new_id}.{extension}"));project::atomic_write(&raw,&bytes,false)?;
                 if let Some(scene)=&mut p.audio_preview {for emitter in &mut scene.emitters {if emitter.source_project_id.as_deref()==Some(p.id.as_str()){if let Some(sound)=&mut emitter.custom_sound {if sound.asset_id==asset.id {sound.asset_id=new_id.clone();}}}}}
@@ -325,7 +325,7 @@ impl Library {
             let mut bytes=Vec::new();
             std::io::Read::read_to_end(&mut std::io::Read::take(fs::File::open(&asset.path)?,64*1024*1024+1),&mut bytes)?;
             use sha2::{Digest,Sha256};
-            if bytes.len()>64*1024*1024 || format!("{:x}",Sha256::digest(&bytes))!=asset.sha256 {
+            if bytes.len()>64*1024*1024 || crate::hex_bytes(Sha256::digest(&bytes))!=asset.sha256 {
                 return invalid(format!("Referenced asset checksum changed or exceeds 64 MiB: {}",asset.name));
             }
             let parsed=crate::assets::parse_obj(std::str::from_utf8(&bytes).map_err(|_|crate::SparkError::Invalid("Referenced OBJ must be UTF-8".into()))?)?;

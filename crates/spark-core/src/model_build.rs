@@ -96,7 +96,7 @@ fn read_source(asset: &Asset) -> Result<assets::ObjImport> {
         &mut std::io::Read::take(fs::File::open(&asset.path)?, 64 * 1024 * 1024 + 1),
         &mut bytes,
     )?;
-    if bytes.len() > 64 * 1024 * 1024 || format!("{:x}", Sha256::digest(&bytes)) != asset.sha256 {
+    if bytes.len() > 64 * 1024 * 1024 || crate::hex_bytes(Sha256::digest(&bytes)) != asset.sha256 {
         return invalid(format!(
             "Imported OBJ '{}' changed; restore or re-import it before building",
             asset.name
@@ -257,15 +257,12 @@ pub fn plan(project: &Project) -> Result<Plan> {
             return invalid("Custom collision source exceeds 4096 triangles or 65535 vertices; simplify it before compiling");
         }
         let bindings = shaders(&doc, &imported.materials)?;
-        let recipe = format!(
-            "{:x}",
-            Sha256::digest(serde_json::to_vec(&(
+        let recipe = crate::hex_bytes(Sha256::digest(serde_json::to_vec(&(
                 &asset.sha256,
                 object.scale,
                 object.rotation,
                 &bindings
-            ))?)
-        );
+            ))?));
         let tag = if let Some(tag) = recipes.get(&recipe) {
             tag.clone()
         } else {
@@ -329,7 +326,7 @@ pub fn plan(project: &Project) -> Result<Plan> {
                     writeln!(jms, "0\n{slot}\n{}\t{}\t{}", t[0], t[1], t[2]).unwrap();
                 }
             }
-            let jms_sha256 = format!("{:x}", Sha256::digest(jms.as_bytes()));
+            let jms_sha256 = crate::hex_bytes(Sha256::digest(jms.as_bytes()));
             models.push(Model {
                 tag: tag.clone(),
                 source: asset.path.clone(),
@@ -348,7 +345,7 @@ pub fn plan(project: &Project) -> Result<Plan> {
         doc.placements.push(ForgePlacement {
             id: format!(
                 "obj_{}",
-                &format!("{:x}", Sha256::digest(object.id.as_bytes()))[..24]
+                &crate::hex_bytes(Sha256::digest(object.id.as_bytes()))[..24]
             ),
             name: object.name.clone(),
             tag_id: None,

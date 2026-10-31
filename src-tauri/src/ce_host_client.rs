@@ -52,6 +52,7 @@ pub(crate) struct View {
     connection_verified: bool,
     mode: Option<Mode>,
     elapsed_ms: u64,
+    visible_window: Option<bool>,
 }
 struct Pins {
     game: PathBuf,
@@ -170,6 +171,7 @@ impl State {
                 connection_verified: false,
                 mode: None,
                 elapsed_ms: 0,
+                visible_window: None,
             });
         }
         let began = Instant::now();
@@ -208,8 +210,8 @@ impl State {
                 view.phase = "open".into();
                 view.mode = Some(mode);
                 view.detail = match mode {
-                    Mode::Setup => "CE setup opened in the separate test profile with a normal-window request. Complete Halo's own license/profile prompts, then close Halo and prepare/launch the playtest. This step does not request a game connection.",
-                    Mode::Playtest => "CE playtest opened with this server's exact map and a separate test profile. A normal window was requested; a joined player and gameplay have not been verified.",
+                    Mode::Setup => "CE setup process started in the separate test profile. Waiting for its game window; complete Halo's own prompts only if it appears. This step does not request a game connection.",
+                    Mode::Playtest => "CE playtest process started with this server's exact map and a separate test profile. Waiting for its game window; a joined player and gameplay have not been verified.",
                 }.into();
                 *process = Some(Process {
                     child,
@@ -243,6 +245,7 @@ impl State {
         if let Some(view) = lock(&self.view)?.as_mut() {
             view.phase = "stopped".into();
             view.process_id = None;
+            view.visible_window = None;
             view.detail = detail.into();
         }
         Ok(())
@@ -255,8 +258,19 @@ impl State {
         let elapsed = current.began.elapsed();
         if let Some(view) = lock(&self.view)?.as_mut() {
             view.elapsed_ms = elapsed.as_millis().min(u64::MAX as u128) as u64;
-            if matches!(current.mode, Mode::Playtest) && elapsed >= Duration::from_secs(30) {
+            #[cfg(windows)]
+            { view.visible_window = gui::visible_window(current.child.id()); }
+            if view.visible_window == Some(false) && elapsed >= Duration::from_secs(15) {
+                view.detail = "Halo's process is running, but no visible game window was detected. Check the taskbar in case it is minimized. If no window appears, Stop playtest, then Check CE installation before retrying. First-run completion and a player join are not verified.".into();
+            } else if matches!(current.mode, Mode::Playtest) && elapsed >= Duration::from_secs(30) {
                 view.detail = "CE is still running; a player join has not been verified. If startup is waiting, stop this window and use First-run help → Open CE setup to finish the test profile, then retry. You can also use Halo's Multiplayer → Direct IP with the address above.".into();
+            } else if view.visible_window == Some(true) {
+                view.detail = match current.mode {
+                    Mode::Setup => "A CE window was detected. Complete Halo's own license/profile prompts, then close Halo and prepare the playtest. First-run completion is not certified by window visibility.",
+                    Mode::Playtest => "A CE window was detected with the matching client running. A joined player and gameplay remain unverified.",
+                }.into();
+            } else {
+                view.detail = "CE process is running; waiting for its game window. A visible game, completed startup and a joined player have not been verified.".into();
             }
         }
         if let Some(code) = current.child.try_wait()? {
@@ -264,6 +278,7 @@ impl State {
             if let Some(view) = lock(&self.view)?.as_mut() {
                 view.phase = "closed".into();
                 view.process_id = None;
+                view.visible_window = None;
                 view.exit_code = code.code();
                 view.detail = format!("CE playtest closed ({code}). The private server remains available; prepare again to retry. Connection and gameplay were not certified by process exit.");
             }
@@ -350,7 +365,7 @@ fn verify(pins: &Pins, cancelled: impl Fn() -> Reply<()>) -> Reply<Vec<fs::File>
             }
             digest.update(&buffer[..n]);
         }
-        if count != *size || format!("{:x}", digest.finalize()) != *hash {
+        if count != *size || spark_core::hex_bytes(digest.finalize()) != *hash {
             return Err(format!("Private input failed integrity: {name}. No client was launched. Stop and prepare a new private server copy."));
         }
         inputs.push(input);
@@ -416,7 +431,7 @@ mod tests {
         fs::create_dir(&game).unwrap();
         let bytes = b"original native bytes";
         fs::write(game.join("test"), bytes).unwrap();
-        let hash = format!("{:x}", Sha256::digest(bytes));
+        let hash = spark_core::hex_bytes(Sha256::digest(bytes));
         let pins = Pins {
             game,
             profile: directory.path().join("profile"),

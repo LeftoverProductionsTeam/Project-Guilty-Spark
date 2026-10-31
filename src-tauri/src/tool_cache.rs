@@ -27,7 +27,7 @@ fn sha256_file(path: &Path) -> Result<String, String> {
         if read > MAX_SINGLE_FILE { return Err("Tool exceeded the configured cache size limit".into()); }
         hash.update(&buffer[..n]);
     }
-    Ok(format!("{:x}", hash.finalize()))
+    Ok(spark_core::hex_bytes(hash.finalize()))
 }
 
 fn executable_name(name: &str) -> bool {
@@ -84,7 +84,7 @@ pub fn cache_invader(source: &Path, data_root: &Path) -> Result<PathBuf, String>
         overall.update(digest.as_bytes());
         overall.update(size.to_le_bytes());
     }
-    let id = format!("{:x}", overall.finalize());
+    let id = spark_core::hex_bytes(overall.finalize());
     let target = cache_root.join(&id[..24]);
     if target.exists() {
         // Refuse directory symlinks/junction-style redirections to unrelated data.

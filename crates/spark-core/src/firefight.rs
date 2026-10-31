@@ -959,7 +959,7 @@ impl<'a> Director<'a> {
     fn report(mut self, preview: bool) -> Result<SimulationReport> {
         self.state.actors = self.actors.into_values().collect();
         self.state.queued_enemies = self.queue.len() as u16;
-        Ok(SimulationReport{schema_version:SCHEMA_VERSION,scope:"authoringSimulationOnly".into(),runtime_integrated:false,gameplay_verified:false,config_sha256:format!("{:x}",Sha256::digest(serde_json::to_vec(self.config)?)),state:self.state,events:self.events,diagnostics:vec![
+        Ok(SimulationReport{schema_version:SCHEMA_VERSION,scope:"authoringSimulationOnly".into(),runtime_integrated:false,gameplay_verified:false,config_sha256:crate::hex_bytes(Sha256::digest(serde_json::to_vec(self.config)?)),state:self.state,events:self.events,diagnostics:vec![
             if preview{"This preview scripts successful virtual spawn acknowledgements and kills. It tests rules, not AI or a game engine."}else{"Commands were replayed in a deterministic offline simulation. No game actor or network packet was observed."}.into(),
             "No Halo script/tag generation or runtime Firefight bridge is implemented. Spawn zones still require collision, navigation and gameplay validation. Revive/equipment/supply events are authoring intents only.".into(),
             "MCC Halo1 campaign co-op is a separate two-player target; authored player counts do not expand runtime limits or synchronize arbitrary multiplayer AI.".into()]})

@@ -124,7 +124,7 @@ fn inspect(root: &Path, relative: &str, expected: &str) -> Result<Finding> {
         sha.update(&buffer[..size]);
     }
     if bytes != before.len()
-        || format!("{:x}", sha.finalize()) != expected
+        || crate::hex_bytes(sha.finalize()) != expected
         || fs::metadata(&path)?.modified()? != before.modified()?
     {
         return Ok(finding(

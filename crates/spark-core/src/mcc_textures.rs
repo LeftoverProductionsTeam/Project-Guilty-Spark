@@ -106,10 +106,7 @@ pub fn bundle_id(hashes: &BTreeMap<String, String>) -> Result<String> {
     {
         return invalid("MCC resources are not SHA-256 pinned");
     }
-    Ok(format!(
-        "{:x}",
-        Sha256::digest(serde_json::to_vec(&selected)?)
-    ))
+    Ok(crate::hex_bytes(Sha256::digest(serde_json::to_vec(&selected)?)))
 }
 pub fn pin(directory: &Path, name: &str) -> Result<BTreeMap<String, String>> {
     let name = map_name(name)?;
@@ -191,7 +188,7 @@ impl Pak {
             }
             sha.update(&buffer[..n]);
         }
-        if format!("{:x}", sha.finalize()) != expected {
+        if crate::hex_bytes(sha.finalize()) != expected {
             return invalid("Pinned MCC texture pack SHA-256 changed");
         }
         file.seek(SeekFrom::Start(0))?;
@@ -360,7 +357,7 @@ impl TextureBundle {
         File::open(&path)?
             .take((8 + 8192 * STRIDE + 1) as u64)
             .read_to_end(&mut bytes)?;
-        if bytes.len() > 8 + 8192 * STRIDE || format!("{:x}", Sha256::digest(&bytes)) != *expected {
+        if bytes.len() > 8 + 8192 * STRIDE || crate::hex_bytes(Sha256::digest(&bytes)) != *expected {
             return invalid("MCC map texture index changed or exceeds limits");
         }
         let entries = entries(&bytes)?;

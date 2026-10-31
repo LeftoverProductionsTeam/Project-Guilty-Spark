@@ -326,19 +326,19 @@ impl Project {
             // Keep historical hashes when no new native inputs are enabled.
         ))?);
         let base=if self.active_build_target.is_none() {
-            format!("{:x}", Sha256::digest(bytes))
+            crate::hex_bytes(Sha256::digest(bytes))
         } else {
             let mut hash=Sha256::new();hash.update(bytes);
             let active=self.build_targets.iter().find(|t|Some(&t.id)==self.active_build_target.as_ref())
                 .ok_or_else(||crate::SparkError::Invalid("Active engine build target missing".into()))?;
             hash.update(serde_json::to_vec(active)?);
-            format!("{:x}",hash.finalize())
+            crate::hex_bytes(hash.finalize())
         };
         let camera=self.studio.as_ref().and_then(|s|s.engine_machinima.as_ref().filter(|o|o.enabled).map(|o|(o,&s.shots)));
         let profile=self.conversion_profile.as_deref().filter(|p|*p!="faithful");
         if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none()&&self.powerups.is_empty()&&self.tag_duplicates.is_empty()&&self.native_asset_imports.is_empty(){return Ok(base);}
         let used:Vec<_>=self.animations.iter().filter(|asset|self.animation_assignments.iter().any(|a|a.asset_id==asset.id)).collect();
-        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}if !self.powerups.is_empty(){hash.update(b"custom-powerups-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.powerups)?));}if !self.tag_duplicates.is_empty(){hash.update(b"tag-duplicates-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_duplicates)?));}if !self.native_asset_imports.is_empty(){hash.update(b"native-asset-imports-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.native_asset_imports)?));}Ok(format!("{:x}",hash.finalize()))
+        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}if !self.powerups.is_empty(){hash.update(b"custom-powerups-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.powerups)?));}if !self.tag_duplicates.is_empty(){hash.update(b"tag-duplicates-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_duplicates)?));}if !self.native_asset_imports.is_empty(){hash.update(b"native-asset-imports-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.native_asset_imports)?));}Ok(crate::hex_bytes(hash.finalize()))
     }
 }
 

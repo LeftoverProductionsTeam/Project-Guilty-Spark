@@ -333,7 +333,7 @@ fn parse_server(row: &Value, fetched_at_unix: u64) -> Result<CommunityServer> {
         return invalid("Community invitation is not a 64-digit hexadecimal token");
     }
     let invite = invite.to_ascii_lowercase();
-    let id = format!("delta-{:x}", Sha256::digest(invite.as_bytes()));
+    let id = format!("delta-{}", crate::hex_bytes(Sha256::digest(invite.as_bytes())));
     let players = integer(row, "players", 1024)? as u16;
     // 1024 is a parser allocation/display limit, not an engine capacity claim.
     let advertised_capacity = integer(row, "maximum_players", 1024)? as u16;
@@ -541,7 +541,7 @@ pub fn prepare_join(
         return invalid("Community advertisement is stale; refresh before joining");
     }
     if !valid_invite(&server.invite)
-        || server.id != format!("delta-{:x}", Sha256::digest(server.invite.as_bytes()))
+        || server.id != format!("delta-{}", crate::hex_bytes(Sha256::digest(server.invite.as_bytes())))
     {
         return invalid("Community invitation identity changed; refresh before joining");
     }

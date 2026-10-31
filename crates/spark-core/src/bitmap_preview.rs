@@ -127,6 +127,52 @@ pub struct OwnedBitmapRequest {
     pub image_index: usize,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct CompatibleBitmapTarget {
+    pub source_bitmap_tag_id: u32,
+    pub bitmap_tag_id: u32,
+    pub image_index: usize,
+    pub width:u16,
+    pub height:u16,
+    pub format:String,
+}
+
+/// Viewer-only substitutions, never extraction/build resources. Embedded
+/// source pixels always win. Match exact unique native paths and flat image
+/// layouts before allowing an independently pinned runtime's actual pixels.
+pub fn compatible_runtime_targets(
+    source_path:&Path, source:&MapInspection,
+    runtime_path:&Path, runtime:&MapInspection,
+    requests:&[OwnedBitmapRequest],
+) -> Result<Vec<CompatibleBitmapTarget>> {
+    if requests.is_empty() || requests.len()>MAX_BATCH_REQUESTS {return invalid("Compatibility preview requires 1 to 24 images");}
+    let (a,bytes,hash)=maps::read_cache_snapshot(source_path)?;
+    let (b,target_bytes,target_hash)=maps::read_cache_snapshot(runtime_path)?;
+    if hash!=source.sha256 || target_hash!=runtime.sha256 {return invalid("Compatibility source snapshot changed");}
+    if !matches!(a.version,6|7|609) || !matches!(b.version,6|7|609|13) || a.extended || a.compressed || b.extended || b.compressed {
+        return invalid("Compatible runtime previews require reviewed classic sources and native PC-family image layouts");
+    }
+    let normalize=|p:&str|p.replace('\\',"/").to_lowercase();
+    let mut seen=HashSet::new();let mut result=vec![];
+    for request in requests {
+        if !seen.insert((request.bitmap_tag_id,request.image_index)) || request.image_index>=MAX_IMAGES_PER_TAG {return invalid("Compatibility requests must be unique and bounded");}
+        let Some(tag)=source.tags.iter().find(|t|t.id==request.bitmap_tag_id&&t.class=="bitm"&&!t.external) else {continue};
+        let Some(offset)=tag.data_offset else {continue};
+        let Ok(meta)=read_top_mip_metadata(&bytes,&a,offset,request.image_index) else {continue};
+        if !meta.external {continue;}
+        let key=normalize(&tag.path);
+        if source.tags.iter().filter(|t|t.class=="bitm"&&normalize(&t.path)==key).count()!=1 {continue;}
+        let matches:Vec<_>=runtime.tags.iter().filter(|t|t.class=="bitm"&&!t.external&&normalize(&t.path)==key).collect();
+        if matches.len()!=1 {continue;}
+        let target=matches[0];let Some(offset)=target.data_offset else {continue};
+        let Ok(other)=read_top_mip_metadata(&target_bytes,&b,offset,request.image_index) else {continue};
+        if (meta.width,meta.height,meta.format,meta.image_count)!=(other.width,other.height,other.format,other.image_count) {continue;}
+        result.push(CompatibleBitmapTarget{source_bitmap_tag_id:tag.id,bitmap_tag_id:target.id,image_index:request.image_index,width:meta.width,height:meta.height,format:meta.format.into()});
+    }
+    Ok(result)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OwnedBitmapBatchItem {
@@ -596,6 +642,44 @@ mod tests {
         assert_eq!(&dds[..4],b"DDS ");assert_eq!(&dds[84..88],b"DXT3");
         assert_eq!(dds.len(),144);
     }
+    fn compatibility_fixture(version:u32,flags:u16,id:u32)->(tempfile::NamedTempFile,MapInspection){
+        use crate::maps::{Tag,MeshData};
+        let (mut bytes,mut header)=fixture(15,flags);header.version=version;
+        let put=|b:&mut[u8],at:usize,v:u32|b[at..at+4].copy_from_slice(&v.to_le_bytes());
+        bytes[..4].copy_from_slice(b"daeh");bytes[0x7fc..0x800].copy_from_slice(b"toof");
+        put(&mut bytes,4,version);let size=bytes.len()as u32;put(&mut bytes,8,size);
+        put(&mut bytes,0x10,0x800);put(&mut bytes,0x14,0x400);put(&mut bytes,0x800,0x40440028);
+        bytes[0x20..0x28].copy_from_slice(b"fixture\0");bytes[0x40..0x4a].copy_from_slice(b"synthetic\0");bytes[0x60..0x62].copy_from_slice(&1u16.to_le_bytes());
+        let file=tempfile::NamedTempFile::new().unwrap();std::fs::write(file.path(),bytes).unwrap();
+        let sha=maps::hash_file(file.path()).unwrap();
+        let inspection=MapInspection{header,sha256:sha,tag_checksum:None,decals:vec![],tags:vec![Tag{id,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
+        (file,inspection)
+    }
+    #[test] fn compatible_previews_require_unique_native_paths_layouts_and_unchanged_snapshots(){
+        let (a,source)=compatibility_fixture(7,0x100,1);let(b,mut runtime)=compatibility_fixture(13,0,9);
+        runtime.tags[0].path="TEST\\BITMAP".into();
+        let request=OwnedBitmapRequest{bitmap_tag_id:1,image_index:0};
+        let matches=compatible_runtime_targets(a.path(),&source,b.path(),&runtime,&[request]).unwrap();
+        assert_eq!(matches.len(),1);assert_eq!((matches[0].source_bitmap_tag_id,matches[0].bitmap_tag_id,matches[0].width,matches[0].format.as_str()),(1,9,4,"DXT3"));
+        let mut duplicate=runtime.clone();let mut tag=duplicate.tags[0].clone();tag.id=10;duplicate.tags.push(tag);
+        assert!(compatible_runtime_targets(a.path(),&source,b.path(),&duplicate,&[request]).unwrap().is_empty());
+        let mut wrong=runtime.clone();wrong.tags[0].path="test/other".into();
+        assert!(compatible_runtime_targets(a.path(),&source,b.path(),&wrong,&[request]).unwrap().is_empty());
+        assert!(compatible_runtime_targets(a.path(),&source,b.path(),&runtime,&[request,request]).is_err());
+        let mut bytes=std::fs::read(b.path()).unwrap();bytes[0x984..0x986].copy_from_slice(&8u16.to_le_bytes());std::fs::write(b.path(),&bytes).unwrap();
+        assert!(compatible_runtime_targets(a.path(),&source,b.path(),&runtime,&[request]).is_err());
+        runtime.sha256=maps::hash_file(b.path()).unwrap();
+        assert!(compatible_runtime_targets(a.path(),&source,b.path(),&runtime,&[request]).unwrap().is_empty());
+        assert_eq!(maps::hash_file(a.path()).unwrap(),source.sha256);
+    }
+    #[test] fn compatible_previews_never_replace_embedded_images_or_guess_unsupported_layouts(){
+        let (a,source)=compatibility_fixture(7,0,1);let (b,runtime)=compatibility_fixture(13,0,9);
+        let request=OwnedBitmapRequest{bitmap_tag_id:1,image_index:0};
+        assert!(compatible_runtime_targets(a.path(),&source,b.path(),&runtime,&[request]).unwrap().is_empty());
+        let (a,mut source)=compatibility_fixture(7,0x100,1);let mut bytes=std::fs::read(a.path()).unwrap();
+        bytes[0x98a..0x98c].copy_from_slice(&2u16.to_le_bytes());std::fs::write(a.path(),&bytes).unwrap();source.sha256=maps::hash_file(a.path()).unwrap();
+        assert!(compatible_runtime_targets(a.path(),&source,b.path(),&runtime,&[request]).unwrap().is_empty());
+    }
     #[test] fn self_contained_mcc_images_need_no_installed_pack(){
         use crate::maps::{MapInspection,Tag,MeshData};
         let(mut bytes,mut header)=fixture(15,0);header.version=13;
@@ -668,7 +752,7 @@ mod tests {
         bytes[0x40..0x4a].copy_from_slice(b"synthetic\0");
         bytes[0x60..0x62].copy_from_slice(&1u16.to_le_bytes());
         header.name = "fixture".into();
-        let expected = format!("{:x}", Sha256::digest(&bytes));
+        let expected = crate::hex_bytes(Sha256::digest(&bytes));
         let file = tempfile::NamedTempFile::new().unwrap();
         let mut writer = file.reopen().unwrap();
         writer.write_all(&bytes).unwrap();
@@ -710,7 +794,7 @@ mod tests {
         // Synthetic external DXT3 pixels are known to occupy a unique indexed
         // span at 0x300 in the resource, NOT the map's original raw area.
         cache[0x980+24..0x980+28].copy_from_slice(&0x300u32.to_le_bytes());
-        let expected=format!("{:x}",Sha256::digest(&cache));
+        let expected=crate::hex_bytes(Sha256::digest(&cache));
         let cache_file=tempfile::NamedTempFile::new().unwrap();
         cache_file.reopen().unwrap().write_all(&cache).unwrap();
         let inspection = MapInspection { tag_checksum:None, decals:vec![],
@@ -731,7 +815,7 @@ mod tests {
         resource[0x100..0x10e].copy_from_slice(b"test\\bitmap_0\0");
         resource[0x300..0x310].fill(0x42);
         std::fs::write(&resource_path,&resource).unwrap();
-        let resource_hash=format!("{:x}",Sha256::digest(&resource));
+        let resource_hash=crate::hex_bytes(Sha256::digest(&resource));
         assert!(preview_owned_bitmap(cache_file.path(),&expected,&inspection,0x1234,0).is_err());
         let result=preview_owned_bitmap_with_resources(cache_file.path(),&expected,&inspection,
             0x1234,0,Some((&resource_path,&resource_hash))).unwrap();
@@ -742,7 +826,7 @@ mod tests {
         // A present-but-unrelated index path cannot be substituted.
         resource[0x100..0x10b].copy_from_slice(b"test\\other\0");
         std::fs::write(&resource_path,&resource).unwrap();
-        let changed_hash=format!("{:x}",Sha256::digest(&resource));
+        let changed_hash=crate::hex_bytes(Sha256::digest(&resource));
         assert!(preview_owned_bitmap_with_resources(cache_file.path(),&expected,&inspection,
             0x1234,0,Some((&resource_path,&changed_hash))).is_err());
     }
@@ -776,7 +860,7 @@ mod tests {
         bytes[0x9be..0x9c0].copy_from_slice(&0x100u16.to_le_bytes());
         bytes[0x9b0+24..0x9b0+28].copy_from_slice(&0x310u32.to_le_bytes());
         bytes[0x9b0+28..0x9b0+32].copy_from_slice(&16u32.to_le_bytes());
-        let expected=format!("{:x}",Sha256::digest(&bytes));
+        let expected=crate::hex_bytes(Sha256::digest(&bytes));
         let map=tempfile::NamedTempFile::new().unwrap();
         std::fs::write(map.path(),&bytes).unwrap();
         let inspected=MapInspection { tag_checksum:None, decals:vec![],
@@ -798,7 +882,7 @@ mod tests {
         resource[0x300..0x310].fill(0x51);
         resource[0x310..0x320].fill(0x62);
         std::fs::write(&path,&resource).unwrap();
-        let resource_hash=format!("{:x}",Sha256::digest(&resource));
+        let resource_hash=crate::hex_bytes(Sha256::digest(&resource));
         let requests=[OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:0},
             OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:1}];
         let report=preview_owned_bitmap_batch_with_resources(
@@ -833,7 +917,7 @@ mod tests {
         bytes[0x20..0x28].copy_from_slice(b"fixture\0");
         bytes[0x40..0x4a].copy_from_slice(b"synthetic\0");
         bytes[0x60..0x62].copy_from_slice(&1u16.to_le_bytes());
-        let expected = format!("{:x}", Sha256::digest(&bytes));
+        let expected = crate::hex_bytes(Sha256::digest(&bytes));
         let file = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(file.path(), &bytes).unwrap();
         let inspected = MapInspection { tag_checksum:None, decals:vec![],

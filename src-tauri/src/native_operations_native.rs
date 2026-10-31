@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, process::Command, sync::OnceLock};
 
 const MAX_TAG: u64 = 64 * 1024 * 1024;
 fn hash_bytes(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    spark_core::hex_bytes(Sha256::digest(bytes))
 }
 fn gate() -> &'static Mutex<()> {
     static GATE: OnceLock<Mutex<()>> = OnceLock::new();

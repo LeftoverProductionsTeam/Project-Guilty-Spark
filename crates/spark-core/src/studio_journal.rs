@@ -39,7 +39,7 @@ fn fail(s: impl Into<String>) -> SparkError {
     SparkError::Invalid(s.into())
 }
 fn digest(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    crate::hex_bytes(Sha256::digest(bytes))
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

@@ -455,7 +455,7 @@ fn install(app: &tauri::AppHandle, job: &Job) -> Reply<PathBuf> {
     }
     file.sync_all().map_err(error)?;
     drop(file);
-    archive_matches(bytes, &format!("{:x}", digest.finalize()))?;
+    archive_matches(bytes, &spark_core::hex_bytes(digest.finalize()))?;
     check_cancel(job)?;
     // Keep a read-only sharing handle across listing/extraction so another
     // Windows process cannot replace or change the just-verified archive.

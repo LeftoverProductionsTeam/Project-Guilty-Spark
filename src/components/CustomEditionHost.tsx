@@ -36,6 +36,7 @@ interface ClientView {
   connectionVerified: boolean;
   mode?: 'setup' | 'playtest' | null;
   elapsedMs?: number;
+  visibleWindow?: boolean | null;
 }
 export interface CeHostView {
   id: string;
@@ -466,6 +467,16 @@ export default function CustomEditionHost({
               <p className="subtle" aria-live="polite">
                 {client?.detail ?? 'Use this exact map and its resources with a separate Halo test profile.'}
               </p>
+              {clientOpen && client?.visibleWindow === false && (client.elapsedMs ?? 0) >= 15000 && (
+                <div role="alert">
+                  <Notice tone="warning">
+                    Halo has no visible game window. Its process is running, but startup has not been
+                    confirmed. Stop playtest, check the CE installation and retry. Your private server stays
+                    available.
+                    <button onClick={onSetup}>Open CE checks</button>
+                  </Notice>
+                </div>
+              )}
               <details className="ce-client-help">
                 <summary>First-run help</summary>
                 <p className="subtle">

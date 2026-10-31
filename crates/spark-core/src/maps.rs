@@ -367,7 +367,7 @@ pub fn hash_file(path: &Path) -> Result<String> {
         }
         hash.update(&buf[..n]);
     }
-    Ok(format!("{:x}", hash.finalize()))
+    Ok(crate::hex_bytes(hash.finalize()))
 }
 pub fn inspect_header(path: &Path) -> Result<MapHeader> {
     let mut f = File::open(path)?;
@@ -397,7 +397,7 @@ pub(crate) fn read_cache_snapshot(path: &Path) -> Result<(MapHeader, Vec<u8>, St
     if header.declared_size as u64 > MAX_CACHE_BYTES {
         return invalid("Declared cache size exceeds the memory safety limit");
     }
-    let sha256 = format!("{:x}", Sha256::digest(&bytes));
+    let sha256 = crate::hex_bytes(Sha256::digest(&bytes));
     if header.legacy_tag_size_repair {
         bytes[0x14..0x18].copy_from_slice(&header.tag_size.to_le_bytes());
     }

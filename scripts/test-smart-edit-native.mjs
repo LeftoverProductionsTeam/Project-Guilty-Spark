@@ -335,9 +335,9 @@ try {
   await page.getByRole('textbox', { name: 'Search scene objects' }).fill(vehicle.name);
   await page.locator('.object-name').filter({ hasText: vehicle.name }).first().click();
   const vehicleDrawer = page.getByRole('region', { name: 'Object tags panel', exact: true });
-  await expect(vehicleDrawer.getByRole('spinbutton', { name: 'Bounding radius', exact: true })).toHaveValue(
-    String(vehicleRadius),
-  );
+  // Numeric controls deliberately shorten insignificant float32 tail digits.
+  // Verify the shared native value rather than a particular display spelling.
+  await expect.poll(async () => Number(await vehicleDrawer.getByRole('spinbutton', { name: 'Bounding radius', exact: true }).inputValue())).toBeCloseTo(vehicleRadius, 6);
   const modelRef = vehicleTag.references.find((r) => r.label === 'Model'),
     modelTag = stock.inspection.tags.find((t) => t.id === modelRef?.targetId);
   if (!modelTag) throw Error('Actual vehicle model dependency required');
@@ -357,6 +357,8 @@ try {
     (o) => o.kind === 'Scenery' && o.sourceOffset !== null && stock.inspection.modelMeshes?.[String(o.tagId)],
   );
   if (!scenery) throw Error('Actual rendered source scenery required');
+  if (!(await page.getByRole('textbox', { name: 'Search scene objects' }).isVisible()))
+    await page.getByRole('button', { name: 'Toggle Objects', exact: true }).click();
   await page.getByRole('textbox', { name: 'Search scene objects' }).fill(scenery.name);
   await page.locator('.object-name').filter({ hasText: scenery.name }).first().click();
   const objectTags = page.getByRole('region', { name: 'Object tags panel', exact: true });
@@ -365,7 +367,13 @@ try {
   const canvas = page.locator('.viewport canvas').first();
   await canvas.focus();
   await page.keyboard.press('f');
-  await expect.poll(() => canvas.getAttribute('data-gs-gizmo')).not.toBe(null);
+  await expect.poll(async () => {
+    const raw=await canvas.getAttribute('data-gs-gizmo');
+    if(!raw)return false;
+    const sample=JSON.parse(raw);
+    receipt.lastGizmoSample=sample;
+    return sample.mode==='translate' && ['X','Y','Z'].some(a=>sample.handles[a]?.every(v=>Number.isFinite(v)&&Math.abs(v)<0.85));
+  }).toBe(true);
   // Rendered native object and transform controls determine the drag coordinates.
   let gizmo = JSON.parse(await canvas.getAttribute('data-gs-gizmo')),
     box = await canvas.boundingBox();

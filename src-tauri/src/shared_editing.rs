@@ -258,12 +258,9 @@ pub(super) struct BuildBinding {
 }
 fn document_hash(document: &quickforge::QuickForgeDocument) -> Reply<String> {
     use sha2::Digest;
-    Ok(format!(
-        "{:x}",
-        sha2::Sha256::digest(
+    Ok(spark_core::hex_bytes(sha2::Sha256::digest(
             serde_json::to_vec(&core::forge_session::portable(document.clone())).map_err(error)?
-        )
-    ))
+        )))
 }
 pub(super) fn build_binding(state: &AppState, project: &Project) -> Reply<Option<BuildBinding>> {
     let peer = {

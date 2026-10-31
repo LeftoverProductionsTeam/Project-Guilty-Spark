@@ -342,7 +342,7 @@ fn copy_checked(source: &Path, target: &Path, bytes: u64, job: &Job) -> Reply<St
         return Err("CE source was truncated during copying".into());
     }
     output.sync_all().map_err(error)?;
-    let hash = format!("{:x}", digest.finalize());
+    let hash = spark_core::hex_bytes(digest.finalize());
     if maps::hash_file(target).map_err(error)? != hash {
         return Err("Private game copy failed readback".into());
     }
