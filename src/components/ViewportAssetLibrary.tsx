@@ -150,8 +150,7 @@ export default function ViewportAssetLibrary({
         <small>150 of {shown.length} shown. Narrow the search to find another asset.</small>
       )}
       <p className="subtle">
-        QuickForge model placements use source tags when built. Imported-map model additions/replacements and
-        custom meshes are source previews until supported scenario/model tags are compiled. Sounds here use
+        QuickForge/Workshop builds native tag placements and closed OBJ static scenery with assigned Halo materials. Imported compiled-map model additions/replacements still require a supported rebuild. Sounds here use
         the editor’s saved spatial mix.
       </p>
     </div>

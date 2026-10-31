@@ -10,6 +10,30 @@ use std::{
     path::{Path, PathBuf},
 };
 
+fn descriptor_local_path(path:&Path)->Result<()> {
+    let text=path.to_string_lossy();
+    let normalized=text.replace('/',"\\");
+    let bytes=normalized.as_bytes();
+    let local_verbatim=normalized.starts_with("\\\\?\\") && bytes.len()>=7 && bytes[4].is_ascii_alphabetic() && bytes[5]==b':' && bytes[6]==b'\\';
+    let device_component=normalized.split('\\').any(|part| {
+        let part=part.trim_end_matches(['.',' ']);let stem=part.split('.').next().unwrap_or("").to_ascii_uppercase();
+        ["CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9"].contains(&stem.as_str()) || (part.contains(':')&&!(part.len()==2&&part.as_bytes()[0].is_ascii_alphabetic()&&part.as_bytes()[1]==b':'))
+    });
+    if !path.is_absolute() || text.len()>32767 || device_component || text.contains("://") ||
+        (normalized.starts_with("\\\\")&&!local_verbatim) ||
+        normalized.starts_with("\\??\\") || normalized.to_ascii_lowercase().starts_with("\\device\\") {
+        return invalid("Project descriptor references a network, device or relative location. No referenced input was opened. Rebind the source, resources and assets to reviewed local absolute paths, then import again");
+    }
+    #[cfg(windows)]
+    {
+        #[link(name="kernel32")] unsafe extern "system" {fn GetDriveTypeW(root:*const u16)->u32;}
+        let drive=if local_verbatim {bytes[4]}else{bytes[0]};
+        let root=[drive as u16,b':' as u16,b'\\' as u16,0];
+        if unsafe{GetDriveTypeW(root.as_ptr())}==4 {return invalid("Project descriptor references a mapped network drive. Rebind inputs to reviewed local files before importing");}
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryEntry {
@@ -155,11 +179,14 @@ impl Library {
         path: &Path,
         resources: Option<&Path>,
     ) -> Result<(Project, maps::MapInspection)> {
+        self.import_map_internal(path,resources,true)
+    }
+    fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:bool)->Result<(Project,maps::MapInspection)> {
         let inspection = maps::inspect_map(path, resources)?;
         if let Some(entry) = self
             .list()?
             .into_iter()
-            .find(|e| e.sha256.as_deref() == Some(&inspection.sha256))
+            .find(|e| reuse && e.sha256.as_deref() == Some(&inspection.sha256))
         {
             let project = self.get(&entry.id)?;
             let source = project.source.as_ref().ok_or_else(|| {
@@ -223,6 +250,22 @@ impl Library {
     }
     pub fn import_project(&self, path: &Path) -> Result<Project> {
         let incoming = project::load_project(path)?;
+        // A descriptor is data, not approval to contact a file server/device.
+        // Admit every referenced input before metadata/hash/open can touch one.
+        let mut references = incoming.assets.iter().map(|a|a.path.as_path()).collect::<Vec<_>>();
+        if let Some(source)=&incoming.source {
+            references.push(&source.original_path);
+            if let Some(directory)=&source.resource_directory {references.push(directory);}
+            if let Some(audio)=&source.audio_resources {references.push(&audio.directory);}
+        }
+        for reference in &references {descriptor_local_path(reference)?;}
+        for reference in references {crate::reject_links(reference)?;}
+        let transaction=self.db.unchecked_transaction()?;
+        let result=self.import_project_admitted(incoming);
+        if result.is_ok(){transaction.commit()?;}
+        result
+    }
+    fn import_project_admitted(&self,incoming:Project)->Result<Project> {
         let mut p = if let Some(src) = &incoming.source {
             if maps::hash_file(&src.original_path)? != src.sha256 {
                 return invalid("The project source file is missing or changed; restore the original file before opening this project");
@@ -239,7 +282,7 @@ impl Library {
                     return invalid("Project resources changed; restore them or select resources in the original project before exporting");
                 }
             }
-            let mut imported=self.import_map(&src.original_path, src.resource_directory.as_deref())?.0;
+            let mut imported=self.import_map_internal(&src.original_path, src.resource_directory.as_deref(),false)?.0;
             if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();source.audio_resources=src.audio_resources.clone();}imported
         } else {
             self.create(&incoming.title)?
@@ -252,6 +295,12 @@ impl Library {
         p.firefight = incoming.firefight;
         p.history = incoming.history;
         p.audio_preview = incoming.audio_preview;
+        p.studio=incoming.studio;
+        p.world_environment=incoming.world_environment;
+        p.render_features=incoming.render_features;
+        p.powerups=incoming.powerups;
+        p.gameplay_controls=incoming.gameplay_controls;
+        p.conversion_profile=incoming.conversion_profile;
         for object in &mut p.scene {if let Some(reference)=&mut object.source_model {if reference.project_id==incoming.id&&p.source.as_ref().is_some_and(|source|source.sha256==reference.source_sha256){reference.project_id=p.id.clone();}}}
         if let Some(scene)=&mut p.audio_preview {for emitter in &mut scene.emitters {if emitter.custom_sound.is_some()&&emitter.source_project_id.as_deref()==Some(incoming.id.as_str()){emitter.source_project_id=Some(p.id.clone());}}}
         // Re-ingest referenced OBJ files with integrity checks; never trust a descriptor's compiled mesh or receipt paths.
@@ -272,15 +321,18 @@ impl Library {
             if asset.kind != "obj" || fs::metadata(&asset.path)?.len() > 64 * 1024 * 1024 {
                 return invalid("Referenced asset is not a supported OBJ or exceeds 64 MiB");
             }
-            if maps::hash_file(&asset.path)? != asset.sha256 {
-                return invalid(format!("Referenced asset checksum changed: {}", asset.name));
+            let mut bytes=Vec::new();
+            std::io::Read::read_to_end(&mut std::io::Read::take(fs::File::open(&asset.path)?,64*1024*1024+1),&mut bytes)?;
+            use sha2::{Digest,Sha256};
+            if bytes.len()>64*1024*1024 || format!("{:x}",Sha256::digest(&bytes))!=asset.sha256 {
+                return invalid(format!("Referenced asset checksum changed or exceeds 64 MiB: {}",asset.name));
             }
-            let parsed = crate::assets::parse_obj(&fs::read_to_string(&asset.path)?)?;
+            let parsed=crate::assets::parse_obj(std::str::from_utf8(&bytes).map_err(|_|crate::SparkError::Invalid("Referenced OBJ must be UTF-8".into()))?)?;
             fs::create_dir_all(&dir)?;
             crate::reject_links(&dir)?;
             let new_id = uuid::Uuid::new_v4().to_string();
             let raw = dir.join(format!("{new_id}.obj"));
-            fs::copy(&asset.path, &raw)?;
+            project::atomic_write(&raw,&bytes,false)?;
             project::atomic_write(
                 &dir.join(format!("{new_id}.mesh.json")),
                 &serde_json::to_vec(&parsed.mesh)?,

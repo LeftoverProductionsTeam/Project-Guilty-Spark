@@ -572,7 +572,7 @@ fn quickforge_build_report(state:State<AppState>,project_id:String)->Reply<Optio
     let project=lock(&state.library)?.get(&project_id).map_err(error)?;
     let receipt:Option<forge_build::QuickForgeBuildReceipt>=lock(&state.library)?.setting(&format!("quickforge.receipt.{project_id}")).map_err(error)?;
     // A prior receipt is useful evidence but must never describe current edits as built.
-    Ok(receipt.map(|mut r|{if r.project_fingerprint!=project.fingerprint().unwrap_or_default(){r.warnings.push("This receipt is for an earlier project revision; export or build the current saved edits.".into());}r}))
+    Ok(receipt.map(|mut r|{r.current=Some(r.project_fingerprint==project.fingerprint().unwrap_or_default());if r.current==Some(false){r.warnings.push("This receipt is for an earlier project revision; export or build the current saved edits.".into());}r}))
 }
 #[tauri::command]
 fn create_project(state: State<AppState>, title: String) -> Reply<OpenProject> {
@@ -861,7 +861,7 @@ async fn validate_setting_path(key:String,path:PathBuf)->Reply<String> {
                 if !file.is_file(){return Ok("No classic bitmaps.map found. MCC ipak resources require a separate reader; supported source images can be matched in World.".into());}
                 let hash=maps::hash_file(&file).map_err(error)?;
                 let (_,index)=core::resource_map::open_verified(&file,&hash).map_err(error)?;
-                Ok(format!("Classic resource index checked: {} entries. Connect it to an open map to verify image compatibility.",index.entries.len()))
+                Ok(format!("Classic resource index checked: {} entries. Connect it to an open map to verify image compatibility.",index.entries().len()))
             },
             "steamDirectory"=>{let libs=steam::libraries(&path).map_err(error)?;
                 if !path.join("steamapps").is_dir(){return Err("This folder has no Steam steamapps directory".into());}

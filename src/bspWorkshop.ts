@@ -246,9 +246,8 @@ export function workshopExample(doc: QuickForgeDocument): QuickForgeDocument {
       'Create a separate source project for Workshop geometry. The admitted native collaboration revision remains unchanged',
     );
   d.geometry = [];
-  d.placements = [];
-  d.objectives = [];
-  d.gameMode = 'slayer';
+  // Geometry replacement retains authored gameplay. Validation reports content
+  // outside the new space so the user can move it rather than lose it.
   d.workshop = {
     schemaVersion: 1,
     brushes: [
@@ -259,7 +258,7 @@ export function workshopExample(doc: QuickForgeDocument): QuickForgeDocument {
     ],
     portals: [],
   };
-  d.spawns = [
+  if (!d.spawns.length) d.spawns = [
     [-5, -4, 0.1],
     [-5, 4, 0.1],
     [32, -4, 0.1],
@@ -308,4 +307,18 @@ export function workshopFromPrimitives(doc: QuickForgeDocument): QuickForgeDocum
   if (!brushes.some((b) => b.role === 'space'))
     throw Error('Create a room shell in QuickForge first, or use the two-room source example');
   return { ...structuredClone(doc), geometry: [], workshop: { schemaVersion: 1, brushes, portals: [] } };
+}
+
+/** Convex source containment for placement. Native Halo collision remains authoritative. */
+export function pointInsideWorkshop(source: BspWorkshopSource, point: Vec3): boolean {
+  if (!point.every(Number.isFinite)) return false;
+  const inside = (brush: BspBrush, inclusive: boolean) => {
+    const local = localVertex(brush, point);
+    return local.every(Number.isFinite) && brush.faces.every(face => {
+      const distance = dot(sub(local, brush.vertices[face.vertices[0]]), faceNormal(brush, face));
+      return inclusive ? distance <= 1e-5 : distance < -1e-5;
+    });
+  };
+  return source.brushes.some(b => b.role === 'space' && inside(b, true)) &&
+    !source.brushes.some(b => b.role === 'solid' && inside(b, false));
 }

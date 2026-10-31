@@ -1,3 +1,4 @@
+import { pointInsideWorkshop } from './bspWorkshop';
 import type { BuildRecord, OpenProject, RuntimeId, Vec3 } from './types';
 import type { EditorEnvironment } from './environment';
 
@@ -111,6 +112,8 @@ export interface ForgeSourceExport {
   blockers: string[];
 }
 export interface QuickForgeBuildReceipt {
+  current?: boolean;
+  sourceDocumentSha256?: string;
   schemaVersion: number;
   jobId: string;
   projectId: string;
@@ -334,13 +337,19 @@ export function placeAsset(asset: ForgeAsset, position: Vec3): ForgePlacement {
  * This is source containment, not model contact or compiled Halo collision. */
 export function pointInsideForgeRoom(document:QuickForgeDocument,point:Vec3):boolean {
   if(!point.every(Number.isFinite))return false;
+  if(document.workshop)return pointInsideWorkshop(document.workshop,point);
   const room=document.geometry.find(brush=>brush.kind==='room');
   if(!room)return true; // Incomplete blank projects remain editable.
   const local=point.map((value,index)=>value-room.position[index]) as Vec3;
-  for(let axis=0;axis<3;axis++){
+  for(let axis=2;axis>=0;axis--){
     const [a,b]=axis===0?[1,2]:axis===1?[2,0]:[0,1];
     const c=Math.cos(-room.rotation[axis]),s=Math.sin(-room.rotation[axis]);
     const value=local[a];local[a]=c*value-s*local[b];local[b]=s*value+c*local[b];
   }
   return local.every((value,index)=>Math.abs(value)<room.dimensions[index]/2);
+}
+
+/** Source inputs affecting mesh buffers. Shader/material bindings and gameplay are validated separately for every revision. */
+export function forgeGeometryKey(document: QuickForgeDocument): string {
+  return JSON.stringify([document.geometry, document.workshop ?? null]);
 }

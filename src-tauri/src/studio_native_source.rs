@@ -88,6 +88,8 @@ pub(super) async fn studio_native_admit(app:tauri::AppHandle,window:tauri::Webvi
             if transaction::inventory(&base).map_err(error)?!=expected {return Err("Reconcile external native saves before admission. The retained source differs from its validated native build; no edits were discarded.".into());}
         }
         let asset_root=template_tags_directory.unwrap_or_else(||base.clone());core::reject_links(&asset_root).map_err(error)?;
+        let template_file=asset_root.join(core::safe_relative(&template_tag).map_err(error)?);core::reject_links(&template_file).map_err(error)?;
+        if !template_file.is_file(){return Err(format!("The chosen native template folder does not contain {template_tag}. Select the matching extracted tags folder; the preview map alone does not supply loose tag files."));}
         let dep=dependencies(&state,&p,&asset_root,&template_tag)?;
         let bytes=bounded_read(&asset_root.join(core::safe_relative(&template_tag).map_err(error)?),content::MAX_ASSET_BYTES as u64)?;
         let template_sha256=content::digest(&bytes);

@@ -14,3 +14,28 @@ describe('QuickForge source placement containment',()=>{
     expect(pointInsideForgeRoom({...document,geometry:[]},[100,100,1])).toBe(true);
   });
 });
+
+import {boxBrush, worldVertex, workshopExample} from './bspWorkshop';
+import {forgeGeometryKey} from './forge';
+describe('shared Workshop object authoring',()=>{
+  it('places into transformed space and rejects solid interiors and the exterior',()=>{
+    const room=boxBrush('space','space',[-4,-4,0],[4,4,5],'m');room.position=[12,-3,2];room.rotation=[.3,-.4,.8];room.scale=[2,.5,1.5];
+    const solid={...boxBrush('solid','solid',[-1,-1,0],[1,1,2],'m'),position:room.position,rotation:room.rotation,scale:room.scale};
+    const doc={...document,geometry:[],workshop:{schemaVersion:1 as const,brushes:[room,solid],portals:[]}};
+    expect(pointInsideForgeRoom(doc,worldVertex(room,[3,0,1]))).toBe(true);
+    expect(pointInsideForgeRoom(doc,worldVertex(room,[0,0,1]))).toBe(false);
+    expect(pointInsideForgeRoom(doc,worldVertex(room,[0,0,3]))).toBe(true);
+    expect(pointInsideForgeRoom(doc,worldVertex(room,[5,0,1]))).toBe(false);
+  });
+  it('keeps gameplay when generating example geometry and invalidates mesh only for source changes',()=>{
+    const doc={...structuredClone(document),materials:[{id:'m',name:'surface',shaderPath:null,color:[.2,.3,.4] as [number,number,number]}],gameMode:'king' as const,spawns:[{id:'authored-start',name:'Keep me',position:[1,2,1] as [number,number,number],facing:.3,team:1,gameModes:['king'],visible:true,locked:false}],objectives:[{id:'hill',kind:'hill' as const,name:'Keep hill',position:[2,2,1] as [number,number,number],facing:0,team:0,sequence:0,visible:true,locked:false}]};
+    const next=workshopExample(doc);expect(next.spawns).toEqual(doc.spawns);expect(next.objectives).toEqual(doc.objectives);expect(next.gameMode).toBe('king');expect(doc.geometry.length).toBe(1);
+    const key=forgeGeometryKey(next);next.materials[0].name='bound material';next.materials[0].shaderPath='levels/test/tutorial/shaders/example_tutorial_metal_floor';expect(forgeGeometryKey(next)).toBe(key);next.spawns[0].position[0]+=1;expect(forgeGeometryKey(next)).toBe(key);next.workshop!.brushes[0].position[0]+=1;expect(forgeGeometryKey(next)).not.toBe(key);
+  });
+  it('inverts multi-axis legacy room rotation in the correct order',()=>{
+    const doc=structuredClone(document),b=doc.geometry[0];b.rotation=[.7,-.5,.9];
+    const brush={...boxBrush('b','space',[-12,-16,-4],[12,16,4],'m'),position:b.position,rotation:b.rotation};
+    expect(pointInsideForgeRoom(doc,worldVertex(brush,[11,15,3]))).toBe(true);
+    expect(pointInsideForgeRoom(doc,worldVertex(brush,[13,15,3]))).toBe(false);
+  });
+});

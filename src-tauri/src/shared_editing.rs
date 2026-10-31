@@ -521,6 +521,12 @@ pub(super) fn status(state: &AppState, owner: &str, project_id: &str) -> Reply<O
     response.detail = detail;
     Ok(Some(response))
 }
+fn scoped_identity_setting(project: &str, invite: Option<&Invite>) -> Option<String> {
+    let invite=invite?;
+    if invite.transport!=Transport::Lan || invite.certificate.is_none() {return None;}
+    Some(format!("studio-identity-v2-{project}-tls-{}",invite.session_id))
+}
+
 pub(super) fn join(
     state: &AppState,
     owner: &str,
@@ -570,9 +576,13 @@ pub(super) fn join(
         .as_ref()
         .and_then(|b| b.ready.local_endpoint.clone())
         .unwrap_or_else(|| endpoint.clone());
-    let identity: Option<Identity> = lock(&state.library)?
-        .setting(&format!("studio-identity-{project_id}"))
-        .map_err(error)?;
+    // Only an explicitly supplied certificate-pinned invitation can resume a
+    // durable author. Legacy plaintext identities are ephemeral and never reused.
+    // Session UUID remains stable when owner recovery rotates certificate/port.
+    let identity_setting = scoped_identity_setting(&project_id, invite.as_ref());
+    let identity: Option<Identity> = if let Some(setting)=&identity_setting {
+        lock(&state.library)?.setting(setting).map_err(error)?
+    } else {None};
     let (guest, view) = Guest::join_studio(
         &local,
         &key,
@@ -586,26 +596,17 @@ pub(super) fn join(
         },
     )
     .map_err(error)?;
+    if invite.as_ref().is_some_and(|i|i.session_id!=view.session_id || i.game!=view.game) {
+        Peer::Guest(guest).leave();return Err("This invite belongs to a different or replaced session".into());
+    }
     if view.document.runtime_id != p.quick_forge.as_ref().unwrap().runtime_id {
         Peer::Guest(guest).leave();
         return Err("This project's runtime differs from the shared source. Open a matching QuickForge target before joining.".into());
     }
     if let Err(e)=studio_native_source::matches(state,&project_id,&view.document){ Peer::Guest(guest).leave(); return Err(e); }
     let (client, credential) = guest.identity();
-    lock(&state.library)?
-        .set_setting(
-            &format!("studio-identity-{project_id}"),
-            &Some(Identity { client, credential }),
-        )
-        .map_err(error)?;
+    if let Some(setting)=identity_setting {lock(&state.library)?.set_setting(&setting,&Some(Identity {client,credential})).map_err(error)?;}
     let peer = Peer::Guest(guest);
-    if invite
-        .as_ref()
-        .is_some_and(|i| i.session_id != view.session_id || i.game != view.game)
-    {
-        peer.leave();
-        return Err("This invite belongs to a different or replaced session".into());
-    }
     if let Err(error) = if view.durable {
         Ok(())
     } else {
@@ -778,6 +779,18 @@ pub(super) fn invite(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn guest_credentials_are_scoped_to_durable_tls_session_and_never_plaintext() {
+        let project=uuid::Uuid::new_v4().to_string();let mut invite=Invite{schema_version:spark_core::forge_session::PROTOCOL_VERSION,session_id:uuid::Uuid::new_v4().to_string(),transport:Transport::Lan,endpoint:"127.0.0.1:1024".into(),key:"a".repeat(32),game:None,certificate:Some("owner certificate".into())};
+        let first=scoped_identity_setting(&project,Some(&invite)).unwrap();
+        invite.endpoint="127.0.0.1:2048".into();invite.certificate=Some("new owner recovery certificate".into());
+        assert_eq!(scoped_identity_setting(&project,Some(&invite)).unwrap(),first);
+        invite.session_id=uuid::Uuid::new_v4().to_string();assert_ne!(scoped_identity_setting(&project,Some(&invite)).unwrap(),first);
+        invite.certificate=None;assert!(scoped_identity_setting(&project,Some(&invite)).is_none());assert!(scoped_identity_setting(&project,None).is_none());
+        invite.transport=Transport::SteamSpacewar;assert!(scoped_identity_setting(&project,Some(&invite)).is_none());
+        assert_ne!(first,format!("studio-identity-{project}"));
+    }
+
     #[test]
     fn frozen_build_reads_the_existing_export_workspace_and_rejects_changed_input() {
         let temp = tempfile::tempdir().unwrap();

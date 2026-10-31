@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "kind": "workbench-native-integration",
+  "gameplayVerified": false,
+  "appSha256": "a894126d639e2f73acdd8a7d58fb7d64ef54d8c39b7a64f081a2bb5235a3618a",
+  "sourceBaseCommit": "5b1a9c2ffd0226f3ed0f98bd6afbfba36bcf5c4f",
+  "workshop": {
+    "objSourceSha256": "f8b400a173a1eb6275325ebcd7751efefaa79bc1c4acf909a8ed24a08d49d7e1",
+    "endUndoRedo": true,
+    "sharedGeometryAndObjects": true,
+    "buildMs": 20410,
+    "outputSha256": "447c5a981b447a1b05e1f8581eadfbd4b0ece98d427bb21ede0af952c507e611",
+    "renderTriangles": 8,
+    "collisionTriangles": 8,
+    "corruptSourceRejected": true,
+    "sourceRecovered": true,
+    "reopen": true,
+    "gpu": {
+      "fps": 59.59475566167819,
+      "frameMs": 16.77999999995033,
+      "drawCalls": 28,
+      "triangles": 292,
+      "geometries": 21,
+      "textures": 0,
+      "sampledAt": 1793406402973
+    }
+  },
+  "collaboration": {
+    "nativeProcesses": 3,
+    "separateDataRoots": 3,
+    "physicalMachines": 1,
+    "acceptance": {
+      "revision": 3,
+      "documentSha256": "77e1deb97af27f8f6d344efd4a03cdc7b1e22418a2049fcc6867e64d6a971ea4",
+      "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+      "assetId": "f8b64207-d2e1-4b9e-97ee-28726981d5c4",
+      "assetBytes": 632,
+      "actualModelsInThreeViewports": true,
+      "simultaneousAuthorActions": true
+    },
+    "nativeToolchain": {
+      "jobId": "52483b68-5039-4209-8ad6-b250f2b15e61",
+      "revision": 13,
+      "laterRevision": 14,
+      "nativeRadius": 0.2750000059604645,
+      "publishedAssetPath": "scenery\\sparklink\\f8b64207-d2e1-4b9e-97ee-28726981d5c4",
+      "compiledModelTriangles": 31,
+      "placement": [
+        3,
+        2,
+        0.1
+      ],
+      "outputSha256": "544b67a0a51814cbb58a76b862a32420e1a8cd159f8a091880c4227ba04acd91",
+      "durationMs": 37400.086400000015,
+      "gameplayTested": false
+    },
+    "recovery": {
+      "revision": 14,
+      "assetBytesIdentical": true,
+      "semanticFieldIntact": true,
+      "authorIdentitiesAndHistoryRetained": true,
+      "newInvitation": true,
+      "replayDeduplicated": true,
+      "durationMs": 12046.987200000003
+    },
+    "originals": {
+      "separateNativeTrees": 3,
+      "filesPerTree": 2240,
+      "templateUnchanged": true,
+      "importUnchanged": true
+    },
+    "synchronization": {
+      "samples": 7,
+      "valuesMs": [
+        7146.85990000001,
+        60.389200000005076,
+        372.8781000000017,
+        357.30800000000454,
+        376.9771000000037,
+        399.07279999999446,
+        385.43180000000575
+      ],
+      "physicalMachines": 1,
+      "includesNativeIpcAndReactConsumption": true
+    },
+    "gamePeerReplication": false
+  },
+  "identity": {
+    "previousExecutableAcceptedEarlierPlaintextCredentials": true,
+    "patchedExecutableRejectsThem": true,
+    "independentSessions": true,
+    "sameSessionResume": true,
+    "durableRecovery": true
+  },
+  "performance": {
+    "brushes": 29,
+    "triangles": 462,
+    "warmSamples": 30,
+    "oldAppSha256": "66ff657a1a7267da0eca75ceebc68a71c30070906d34dcd530fe3b7a84e1a4b8",
+    "newAppSha256": "edbd03c7580463cfcb664db3668273ebc7860563dfa029c074321498f113e3c8",
+    "baselineMedianMs": 10.800000000745058,
+    "baselineP95Ms": 13.699999999254942,
+    "currentMedianMs": 4.5,
+    "currentP95Ms": 7.399999998509884,
+    "method": "WebView performance.now: concurrent real native preview + validation; full mesh remains inside WebView; one discarded cold sample; 30 warm samples"
+  },
+  "customEdition": {
+    "fileVersion": "01.00.10.0621",
+    "nativeMaps": 20,
+    "sharedResources": 3,
+    "unchangedAcrossRepeatedHashes": true,
+    "gameplayVerified": false,
+    "nativeMapBuildVerified": false
+  },
+  "regressions": {
+    "rustPassed": 543,
+    "rustFailed": 0,
+    "rustIgnored": 7,
+    "frontendTests": 237,
+    "frontendFiles": 49,
+    "browserTests": 88,
+    "offlineScripts": 59
+  },
+  "research": {
+    "files": 146,
+    "unchanged": true
+  },
+  "securityReview": {
+    "partial": true,
+    "fullyReviewedFiles": 82,
+    "initialScopeFiles": 1380,
+    "repositoryWideClearance": false,
+    "measuredTokenUsage": "unavailable"
+  },
+  "remaining": [
+    "Manual Workshop/game traversal and retail runtime acceptance",
+    "CE stock-extraction lens-flare incompatibility after explicit non-lossless actor enum repair",
+    "Zombie Apocalypse original external bitmap/decal recovery",
+    "Direct compiled-map editing",
+    "General arbitrary model/sound/animation collaboration",
+    "Live arbitrary spawning/BSP replacement/game-peer replication",
+    "Complete rendering/audio parity"
+  ],
+  "nativeOutputIdentityRefusal": {
+    "passed": true,
+    "realCompilerAndThreeQueries": true,
+    "previousGoodCacheUnchanged": true,
+    "originalSourcePreserved": true,
+    "writer": "explicit private QA harness",
+    "failure": [
+      "Compiled output changed during verification; the modified artifact is rejected and the previous build is retained"
+    ],
+    "semanticCorruptionInferred": false
+  },
+  "projectImportSameSourcePreservesExistingEdits": true
+}

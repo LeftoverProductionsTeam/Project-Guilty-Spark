@@ -45,6 +45,7 @@ import {
   createBrush,
   duplicateForgeNodes,
   forgeModes,
+  forgeGeometryKey,
   forgeNodes,
   forgeTargets,
   mapForgeNodes,
@@ -446,19 +447,21 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       ),
     [report],
   );
+  const previewMeshCache = useRef<{key: string; mesh: ForgeMesh} | null>(null);
   useEffect(() => {
     let alive = true;
+    const geometryKey = forgeGeometryKey(doc);
     setPreviewBusy(true);
     setGeometryError('');
     setReport(null);
     setValidatedDoc(null);
     const timer = setTimeout(() => {
       void Promise.allSettled([
-        call<ForgeMesh>('quickforge_preview', { document: doc }),
+        previewMeshCache.current?.key === geometryKey ? Promise.resolve(previewMeshCache.current.mesh) : call<ForgeMesh>('quickforge_preview', { document: doc }),
         call<GeometryReport>('quickforge_validate', { document: doc }),
       ]).then(([mesh, validation]) => {
         if (!alive) return;
-        if (mesh.status === 'fulfilled') setSnapshot({ mesh: mesh.value, document: doc });
+        if (mesh.status === 'fulfilled') { previewMeshCache.current = {key: geometryKey, mesh: mesh.value}; setSnapshot({ mesh: mesh.value, document: doc }); }
         if (validation.status === 'fulfilled') { setReport(validation.value); setValidatedDoc(doc); }
         const failures = [mesh, validation]
           .filter((result) => result.status === 'rejected')
@@ -607,7 +610,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       if (cameraMode !== 'orbit') return;
       if (event.key.toLowerCase() === 'w') setMode('translate');
       if (event.key.toLowerCase() === 'e') setMode('rotate');
-      if (event.key.toLowerCase() === 'r' && mutableNodes.length === 1 && mutableNodes[0].type === 'brush')
+      if (event.key.toLowerCase() === 'r' && (workshop || mutableNodes.length === 1 && mutableNodes[0].type === 'brush'))
         setMode('scale');
       if (event.key.toLowerCase() === 'f') {setWrlFocus(false);setFrame((value) => value + 1);}
       if (event.key.toLowerCase() === 'g') setGridSnap((value) => !value);
@@ -615,7 +618,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [doc, selected, selectedZone, project.firefight, cameraMode,bspMode]);
+  }, [doc, selected, selectedZone, project.firefight, cameraMode,bspMode,workshop]);
   function addPolygonHill(rawPoint: Vec3 = [0, 0, 0]) {
     const usageId=nextFreeUsageId(doc,'hill');
     if(usageId===null || doc.objectives.length+4>200){notify('No free hill index or not enough Halo CE netgame flag slots (200 maximum).','error');return;}
@@ -645,8 +648,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   }
   function add(item: PaletteItem, rawPoint: Vec3 = [0, 0, 0]) {
     const point = snapPoint(rawPoint, gridSnap ? snap : 0);
+    if(item.type==='brush'&&doc.workshop){notify('Use BSP Workshop to add or reshape volumes. Objects & gameplay places assets, starts and objectives on that geometry.','error');return;}
     if(item.type!=='brush'&&!pointInsideForgeRoom(doc,[point[0],point[1],point[2]+0.1])){
-      notify('Choose a surface inside the sealed room. This drop is outside its source boundaries; no object was added.','error');return;
+      notify('Choose a surface inside the playable source space and outside solid volumes. No object was added.','error');return;
     }
     if (item.type === 'hillPolygon') { addPolygonHill(point); return; }
     if (item.type === 'teleportPair') { addTeleportPair(point); return; }
@@ -828,10 +832,10 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     lastLog = projectLogs.at(-1);
   const staleReceipt =
     !!receipt &&
-    (props.dirty || (!!receipt.sources && !!report && receipt.sources.sourceSha256 !== report.sourceSha256));
+    (props.dirty || receipt.current === false || (!!receipt.sources && !!report && (receipt.sourceDocumentSha256 ?? receipt.sources.sourceSha256) !== report.sourceSha256));
   return (
     <div className={`forge-workspace ${bspMode?'bsp-active':''}`}>
-      <div className="bsp-editor-switch" role="group" aria-label="Geometry authoring mode"><button className={!bspMode?'selected':''} disabled={!!doc.workshop} title={doc.workshop?'This source contains Workshop topology. Use Undo to reverse conversion or open a separate QuickForge project.':'Original QuickForge primitives, asset placement and source preview'} onClick={()=>setBspMode(false)}>QuickForge</button><button className={bspMode?'selected':''} onClick={()=>setBspMode(true)}>BSP Workshop</button></div>
+      <div className="bsp-editor-switch" role="group" aria-label="Geometry authoring mode"><button className={!bspMode?'selected':''} title="Place assets, player starts and objectives against the same editable geometry. Both views share this map and undo history." onClick={()=>setBspMode(false)}>{doc.workshop?'Objects & gameplay':'QuickForge'}</button><button className={bspMode?'selected':''} onClick={()=>setBspMode(true)}>BSP Workshop</button></div>
       <WorkspacePanelAddon id="connection">
         {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
         <LiveForge project={project} document={doc} selected={selected}/>
@@ -908,6 +912,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                 ))}
             </div>
           ))}
+          {project.scene.some(object=>object.assetId)&&<div className="forge-tree-group"><h3>Custom models</h3>{project.scene.filter(object=>object.assetId).map(object=><div className={`forge-tree-row ${workshopSelected===object.id?'selected':''}`} key={object.id}><button className="forge-tree-select" title={object.name} onClick={()=>{setWorkshopSelected(object.id);setSelected([]);setSelectedZone(null);revealPanel('workshop-object');}}><Box size={13}/><span>{object.name}</span></button><button aria-label={`${object.visible?'Hide':'Show'} ${object.name}`} onClick={()=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?{...value,visible:!value.visible}:value)},'Toggle custom model visibility')}>{object.visible?<Eye size={12}/>:<EyeOff size={12}/>}</button></div>)}</div>}
           {!!project.firefight?.spawnZones.length && (
             <div className="forge-tree-group">
               <h3>AI spawn zones</h3>
@@ -945,9 +950,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         </aside></WorkspacePanel>
         <section className="forge-center">
           <div className="forge-toolbar">
-            <span className="forge-source-summary" title="Original QuickForge geometry · brushes, tag references and player starts">
+            <span className="forge-source-summary" title="Shared level source · geometry, Halo references, custom models and player starts">
               <Layers3 size={14}/><strong>QuickForge</strong>
-              <span>{doc.geometry.length} brushes · {doc.placements.length} references · {doc.spawns.length} starts</span>
+              <span>{doc.workshop ? `${doc.workshop.brushes.length} volumes` : `${doc.geometry.length} brushes`} · {doc.placements.length} references{project?.scene.some(o=>o.assetId)?` · ${project.scene.filter(o=>o.assetId).length} custom models`:''} · {doc.spawns.length} starts</span>
             </span>
             <IconButton
               label="Translate (W)"
@@ -1024,6 +1029,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
           </div>
           <div
             ref={viewportElement}
+            tabIndex={0}
             className={`forge-viewport ${dragging || assetDrag.dragging ? 'drag-active' : ''}`}
             onDragOver={(event) => {
               if (!dragging && !event.dataTransfer.types.includes(dragType)) return;
@@ -1061,11 +1067,12 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             }}
           >
             <ForgeViewport
+              materialSource={sourceOpen}
               sessionId={project.id}
               resourceScopes={Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})]))}
               renderFeatures={project.renderFeatures}
               document={doc}
-              viewportChildren={<><WorkshopScene project={project} meshes={workshopMeshes} selected={workshopSelected} onSelect={id=>{setWorkshopSelected(id);setSelected([]);revealPanel('workshop-object');}} onTransform={object=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?object:value)},'Transform custom model')} mode={mode} snap={gridSnap?snap:0}/>{project.audioPreview?.emitters.filter(emitter=>emitter.spatial).map(emitter=><mesh key={emitter.id} position={emitter.position} onClick={event=>{event.stopPropagation();writeMapSession(project.id,'sound-emitter-selection',emitter.id);revealPanel('map-sounds');}}><sphereGeometry args={[.12,10,6]}/><meshBasicMaterial color="#89e4ef" wireframe/></mesh>)}</>}
+              viewportChildren={textures=><><WorkshopScene textures={textures} project={project} snapshot={snapshot} onError={message=>notify(message,'error')} meshes={workshopMeshes} selected={workshopSelected} onSelect={id=>{setWorkshopSelected(id);setSelected([]);revealPanel('workshop-object');}} onTransform={object=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?object:value)},'Transform custom model')} mode={mode} snap={gridSnap?snap:0}/>{project.audioPreview?.emitters.filter(emitter=>emitter.spatial).map(emitter=><mesh key={emitter.id} position={emitter.position} onClick={event=>{event.stopPropagation();writeMapSession(project.id,'sound-emitter-selection',emitter.id);revealPanel('map-sounds');}}><sphereGeometry args={[.12,10,6]}/><meshBasicMaterial color="#89e4ef" wireframe/></mesh>)}</>}
               showHillAreas={showHillAreas}
               showGameRoutes={showGameRoutes}
               snapshot={snapshot}
@@ -1148,7 +1155,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         {library&&<WorkspacePanel id="asset-library" label="Asset library" defaultDock="left"><ViewportAssetLibrary projectId={project.id} assets={catalog} begin={assetDrag.begin} activate={assetDrag.activate} canReplace={!!workshop||selected.length===1&&doc.placements.some(value=>value.id===selected[0])} replace={item=>{const placement=doc.placements.find(value=>value.id===selected[0]);if(item.kind==='mesh'&&workshop)void dropLibraryAsset(item.key,workshop.position,workshop.id);else if(item.kind==='model'&&placement)void dropLibraryAsset(item.key,placement.position,placement.id);else notify('Choose a placed Halo model or a custom mesh of the same placement kind.','error');}} importModel={()=>void library.onImportModel(viewPoint())} importSound={()=>void library.onImportSound(viewPoint()).then(added=>{if(added)revealPanel('map-sounds');})} busy={library.busy||assetBusy}/></WorkspacePanel>}
         {library&&<WorkspacePanel id="object-tags" label="Object tags">{tagProject&&tagDocument?.inspection?<><p className="subtle">{tagProject.title} · source tags</p><ViewportTags project={tagProject} inspection={tagDocument.inspection} requestedTagId={tagRequest} requestRevision={tagRevision} edit={edit} notify={notify} onSave={()=>library.onSaveMap(tagProject.id)}/></>:<p>Open this placement’s source map in a tab to edit its tags in this drawer.</p>}</WorkspacePanel>}
         {library&&<WorkspacePanel id="map-sounds" label="Map sounds"><label>Sound source map<select aria-label="QuickForge sound source map" value={sourceId} onChange={event=>setSourceId(event.target.value)}><option value="">Choose an imported source map</option>{sources.map(source=><option key={source.id} value={source.id}>{source.title}</option>)}</select></label>{sourceOpen?.inspection?<MapSounds expanded key={sourceOpen.project.id} project={project} edit={edit} projectId={sourceOpen.project.id} inspection={sourceOpen.inspection}/>:<SoundMixer project={project} inspection={null} sourceProjectId={project.id} tagId={null} edit={edit}/>}</WorkspacePanel>}
-        {workshop&&<WorkspacePanel id="workshop-object" label="Custom model"><WorkshopObjectFields object={workshop} update={object=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?object:value)},'Edit custom model')} remove={()=>{edit({...latestProject.current,scene:latestProject.current.scene.filter(value=>value.id!==workshop.id)},'Remove custom model');setWorkshopSelected(null);}}/></WorkspacePanel>}
+        {workshop&&<WorkspacePanel id="workshop-object" label="Custom model"><WorkshopObjectFields object={workshop} project={project} onMaterialBinding={(name,materialId)=>{const current=latestProject.current, doc=current.quickForge, material=doc?.materials.find(m=>m.id===materialId);if(!doc||!material?.shaderPath)return;const existing=doc.materials.find(m=>m.name.toLowerCase()===name.toLowerCase());edit({...current,quickForge:{...doc,materials:existing?doc.materials.map(m=>m.id===existing.id?{...m,shaderPath:material.shaderPath,color:material.color}:m):[...doc.materials,{...material,id:crypto.randomUUID(),name}]}},'Bind imported model material');}} update={object=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?object:value)},'Edit custom model')} remove={()=>{edit({...latestProject.current,scene:latestProject.current.scene.filter(value=>value.id!==workshop.id)},'Remove custom model');setWorkshopSelected(null);}}/></WorkspacePanel>}
         <WorkspacePanel id="forge-inspector" label="Inspector"><aside className="forge-inspector">
           <div className="forge-panel-tabs">
             <button className={tab === 'palette' ? 'selected' : ''} onClick={() => setTab('palette')}>
@@ -1168,12 +1175,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             {tab === 'palette' && (
               <>
                 <div className="forge-panel-heading">
-                  <strong>Original geometry</strong>
+                  <strong>{doc.workshop?'Workshop geometry':'Original geometry'}</strong>
                   <Pill>Editable</Pill>
                   <HelpTip help="Drag to place a source brush, or click to add at the origin. Snap G/M governs alignment. All primitives regenerate a source mesh and undergo bounded validation; only Halo Tool/Invader can create verified game collision."/>
                 </div>
+                {doc.workshop&&<button onClick={()=>setBspMode(true)}>Edit volumes in BSP Workshop</button>}
                 <div className="forge-brush-palette">
-                  {(Object.keys(brushNames) as BrushKind[]).map((kind) => (
+                  {(doc.workshop?[]:Object.keys(brushNames) as BrushKind[]).map((kind) => (
                     <button
                       key={kind}
                       {...draggable({ type: 'brush', kind })}

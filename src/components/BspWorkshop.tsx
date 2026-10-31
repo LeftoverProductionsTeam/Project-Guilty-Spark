@@ -7,6 +7,7 @@ import TransformControls from './HaloTransformControls';
 import RightMouseFly from './RightMouseFly';
 import ViewportSession from './ViewportSession';
 import { WrlErrorOverlay } from './ForgeViewport';
+import BspSurfaces from './BspSurfaces';
 import type { WrlDiagnostics } from '../haloWrl';
 import { useWorkshopTextures } from '../useWorkshopTextures';
 import RendererQuality from './RendererQuality';
@@ -75,85 +76,6 @@ function sourceGeometry(b: BspBrush) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
   g.computeVertexNormals();
   return g;
-}
-function Surfaces({
-  mesh,
-  doc,
-  selection,
-  onSelect,
-  wire,
-  textures,
-}: {
-  mesh: ForgeMesh;
-  doc: QuickForgeDocument;
-  selection: Selection | null;
-  onSelect: (s: Selection) => void;
-  wire: boolean;
-  textures: Record<string, THREE.Texture>;
-}) {
-  const surface = useMemo(() => {
-    const geometry = new THREE.BufferGeometry(),
-      indices: number[] = [],
-      hits: ForgeMesh['parts'] = [],
-      colors = Array(mesh.positions.length).fill(1),
-      materials: THREE.MeshStandardMaterial[] = [];
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(mesh.positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(mesh.normals, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(mesh.uvs, 2));
-    for (const [slot, m] of doc.materials.entries()) {
-      const first = indices.length;
-      for (const part of mesh.parts.filter((p) => p.materialId === m.id)) {
-        for (let i = part.indexStart; i < part.indexStart + part.indexCount; i += 3) {
-          indices.push(...mesh.indices.slice(i, i + 3));
-          hits.push(part);
-        }
-        if (selection?.brushId === part.brushId && (!selection.faceId || selection.faceId === part.faceId)) {
-          const c = new THREE.Color('#9ee9d8');
-          for (const i of mesh.indices.slice(part.indexStart, part.indexStart + part.indexCount)) {
-            colors[i * 3] = c.r;
-            colors[i * 3 + 1] = c.g;
-            colors[i * 3 + 2] = c.b;
-          }
-        }
-      }
-      geometry.addGroup(first, indices.length - first, slot);
-      const portal = m.name === '+portal' || m.name === '+exactportal';
-      materials.push(
-        new THREE.MeshStandardMaterial({
-          color: textures[m.id] ? '#ffffff' : new THREE.Color(...m.color),
-          map: textures[m.id] ?? null,
-          side: portal ? THREE.DoubleSide : THREE.FrontSide,
-          vertexColors: true,
-          wireframe: wire,
-          roughness: 0.85,
-          transparent: portal,
-          opacity: portal ? 0.18 : 1,
-          depthWrite: !portal,
-        }),
-      );
-    }
-    geometry.setIndex(indices);
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    return { geometry, materials, hits };
-  }, [mesh, doc.materials, selection, wire, textures]);
-  useEffect(
-    () => () => {
-      surface.geometry.dispose();
-      surface.materials.forEach((m) => m.dispose());
-    },
-    [surface],
-  );
-  return (
-    <mesh
-      geometry={surface.geometry}
-      material={surface.materials}
-      onClick={(e) => {
-        e.stopPropagation();
-        const hit = surface.hits[e.faceIndex ?? -1];
-        if (hit) onSelect({ brushId: hit.brushId, faceId: hit.faceId });
-      }}
-    />
-  );
 }
 function BrushOutline({
   brush,
@@ -664,7 +586,7 @@ export default function BspWorkshop(props: Props) {
           <button onClick={props.onBack}>Back to QuickForge</button>
         </div>
         <p>
-          Starting the example replaces this document’s geometry and scenario placements as one undoable edit.
+          Starting the example replaces the geometry as one undoable edit. Existing assets, starts, objectives and game mode are kept; validation identifies anything that needs moving.
           Save a separate project copy to keep both versions. Admitted native collaboration source requires a
           separate Workshop project.
         </p>
@@ -768,7 +690,7 @@ export default function BspWorkshop(props: Props) {
                     <ambientLight intensity={1.2} />
                     <directionalLight position={[0, -10, 35]} intensity={2} />
                     {props.mesh && (
-                      <Surfaces
+                      <BspSurfaces
                         mesh={props.mesh}
                         doc={doc}
                         selection={selection}

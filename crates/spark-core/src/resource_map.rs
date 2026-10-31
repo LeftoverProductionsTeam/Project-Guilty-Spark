@@ -14,6 +14,7 @@ use crate::{invalid, reject_links, Result, SparkError};
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::{Read, Seek, SeekFrom}, path::Path};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 
 const MAX_RESOURCE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_RESOURCES: usize = 65_535;
@@ -29,7 +30,9 @@ pub struct ResourceEntry {
 pub struct ResourceIndex {
     pub kind_code: u32,
     pub file_size: u64,
-    pub entries: Vec<ResourceEntry>,
+    entries: Vec<ResourceEntry>,
+    // Immutable alongside entries; duplicates retain their count and are never silently resolved.
+    by_path: BTreeMap<String, (usize, usize)>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -115,7 +118,7 @@ fn parse_index_kind(file: &mut File, len: u64,expected_kind:u32) -> Result<Resou
         let path = normalize_path(raw_path)?;
         entries.push(ResourceEntry {path, data_offset, data_size});
     }
-    Ok(ResourceIndex { kind_code: kind, file_size: len, entries })
+    Ok(ResourceIndex::new(kind, len, entries))
 }
 #[cfg(test)]
 fn parse_index(file:&mut File,len:u64)->Result<ResourceIndex>{parse_index_kind(file,len,1)}
@@ -163,18 +166,26 @@ fn open_verified_kind(path:&Path,expected_sha256:&str,name:&str,kind:u32)->Resul
     Ok((file, index))
 }
 impl ResourceIndex {
+    fn new(kind_code:u32,file_size:u64,entries:Vec<ResourceEntry>)->Self {
+        let mut by_path=BTreeMap::new();
+        for (i,entry) in entries.iter().enumerate() {
+            let record=by_path.entry(entry.path.clone()).or_insert((i,0usize));record.1+=1;
+        }
+        Self{kind_code,file_size,entries,by_path}
+    }
+    pub fn entries(&self)->&[ResourceEntry]{&self.entries}
     fn exact(&self, requested: &str) -> Result<&ResourceEntry> {
         let name = normalize_path(requested)?;
-        let mut found = self.entries.iter().filter(|e| e.path == name);
-        let first = found.next().ok_or_else(|| SparkError::Invalid(
+        let (first,count)=self.by_path.get(&name).ok_or_else(||SparkError::Invalid(
             "No exact tag/image path in the selected resource index; fuzzy matching refused".into()))?;
-        if found.next().is_some() { return invalid("Multiple shared-resource entries use the same tag/image path"); }
-        Ok(first)
+        if *count!=1{return invalid("Multiple shared-resource entries use the same tag/image path");}
+        Ok(&self.entries[*first])
     }
     fn count_exact(&self, name: &str) -> usize {
-        normalize_path(name).map(|p| self.entries.iter().filter(|e| e.path == p).count()).unwrap_or(0)
+        normalize_path(name).ok().and_then(|p|self.by_path.get(&p).map(|(_,count)|*count)).unwrap_or(0)
     }
 }
+
 pub(crate) fn read_external_sound_from_verified(file:&mut File,index:&ResourceIndex,tag:&str,pitch:usize,permutation:usize,generation:u32,offset:u64,length:usize)->Result<Vec<u8>>{
     if index.kind_code!=2||length==0||length>16*1024*1024{return invalid("Unsupported or oversized sound resource span");}
     let key=match generation{6|7=>format!("{tag}__{pitch}__{permutation}"),609=>format!("{tag}__samples"),_=>return invalid("Unsupported sound resource generation")};
@@ -324,12 +335,22 @@ mod tests {
     }
     #[test]
     fn mcc_shared_pixels_require_the_exact_image_key_and_entire_declared_span() {
-        let index=ResourceIndex{kind_code:1,file_size:2048,entries:vec![ResourceEntry{
-            path:"scenery\\teleporter\\mask_0".into(),data_offset:512,data_size:64}]};
+        let index=ResourceIndex::new(1,2048,vec![ResourceEntry{
+            path:"scenery\\teleporter\\mask_0".into(),data_offset:512,data_size:64}]);
         assert!(prove_external_image_range(&index,"scenery/teleporter/mask",512,64,16,13,0).is_ok());
         for (path,offset,length,image) in [("scenery/teleporter/mask",512,65,0),("scenery/teleporter/mask",511,64,0),
             ("scenery/teleporter/mask",512,64,1),("scenery/teleporter/other",512,64,0)] {
             assert!(prove_external_image_range(&index,path,offset,length,16,13,image).is_err());
         }
     }
+    #[test]
+    fn full_sized_path_index_preserves_unique_and_ambiguous_entries() {
+        let mut entries=(0..MAX_RESOURCES-1).map(|i|ResourceEntry{path:format!("bitmap_{i}"),data_offset:i as u64+16,data_size:1}).collect::<Vec<_>>();
+        entries.push(entries[0].clone());let index=ResourceIndex::new(1,MAX_RESOURCE_BYTES,entries);
+        assert_eq!(index.entries().len(),MAX_RESOURCES);assert_eq!(index.by_path.len(),MAX_RESOURCES-1);
+        assert_eq!(index.count_exact("BITMAP_0"),2);assert!(index.exact("bitmap_0").is_err());
+        for i in 1..MAX_RESOURCES-1 {assert_eq!(index.count_exact(&format!("bitmap_{i}")),1);assert_eq!(index.exact(&format!("BITMAP_{i}")).unwrap().data_offset,i as u64+16);}
+        assert_eq!(index.count_exact("absent"),0);assert!(index.exact("../bitmap_1").is_err());
+    }
+
 }

@@ -336,8 +336,49 @@ fn point_triangle(p: V, t: [V; 3]) -> bool {
     }
     (0..3).all(|i| dot(cross(sub(t[(i + 1) % 3], t[i]), sub(p, t[i])), n) >= -0.0001)
 }
+/// Only deterministic derived geometry is cached. Source validation, scenario
+/// checks, project fingerprints, native input hashes and compiler checks always run.
+/// Two recently used meshes share a bounded 16 MiB cache across preview/validation.
+static MESH_CACHE: std::sync::Mutex<std::collections::VecDeque<(Vec<u8>, ForgeMesh, usize)>> =
+    std::sync::Mutex::new(std::collections::VecDeque::new());
 pub fn mesh(doc: &QuickForgeDocument) -> Result<ForgeMesh> {
     validate_source(doc)?;
+    let key = serde_json::to_vec(&doc.workshop)?;
+    let mut cache = MESH_CACHE.lock().map_err(|_| {
+        crate::SparkError::Invalid(
+            "Workshop derived mesh cache is unavailable; reopen Spark".into(),
+        )
+    })?;
+    if let Some(index) = cache.iter().position(|(k, _, _)| k == &key) {
+        let entry = cache.remove(index).unwrap();
+        let result = entry.1.clone();
+        cache.push_back(entry);
+        return Ok(result);
+    }
+    let result = mesh_uncached(doc)?;
+    let bytes = key.len()
+        + (result.positions.len() + result.normals.len() + result.uvs.len() + result.indices.len())
+            * 4
+        + result
+            .parts
+            .iter()
+            .map(|p| {
+                64 + p.brush_id.len()
+                    + p.material_id.len()
+                    + p.face_id.as_ref().map_or(0, String::len)
+            })
+            .sum::<usize>();
+    if bytes <= 16 * 1024 * 1024 {
+        while cache.len() >= 2
+            || cache.iter().map(|e| e.2).sum::<usize>() + bytes > 16 * 1024 * 1024
+        {
+            cache.pop_front();
+        }
+        cache.push_back((key, result.clone(), bytes));
+    }
+    Ok(result)
+}
+fn mesh_uncached(doc: &QuickForgeDocument) -> Result<ForgeMesh> {
     let w = doc.workshop.as_ref().unwrap();
     let mut slots = vec![];
     let mut space: Option<Manifold> = None;

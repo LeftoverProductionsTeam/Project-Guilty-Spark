@@ -431,7 +431,12 @@ function Registration({
   async function browse(kind: 'executable' | 'root' | 'dataRoot') {
     try {
       const value = await call<string | null>('choose_runtime_path', { kind });
-      if (value) setDraft((d) => ({ ...d, [kind]: value }));
+      if (value) setDraft((d) => {
+        const executable=report.id==='haloCustomEdition'?'haloce.exe':report.id==='haloPc'?'halo.exe':null;
+        return kind==='root'&&executable
+          ? {...d,root:value,executable:value.replace(/[\\/]$/,'')+'/'+executable,dataRoot:value}
+          : {...d,[kind]:value};
+      });
     } catch (e) {
       setError(String(e));
     }
@@ -471,6 +476,7 @@ function Registration({
         mod archive.
       </p>
       <fieldset disabled={busy}>
+        {['haloCustomEdition','haloPc'].includes(report.id)&&<p className="subtle">Choose your installed game folder once. Spark fills in its executable and maps location; inspect and save below. The game and its editing kit are separate installations.</p>}
         {(['root', 'executable', 'dataRoot'] as const).map((kind) => (
           <label key={kind}>
             {kind === 'root'

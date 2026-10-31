@@ -38,6 +38,7 @@ pub mod invitations;
 pub mod dependencies;
 pub mod dual_wield;
 pub mod forge_build;
+pub mod model_build;
 pub mod forge_session;
 pub mod gameplay;
 pub mod session_frames;

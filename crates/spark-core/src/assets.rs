@@ -5,19 +5,23 @@
 //! output vertex. No external materials, shaders or game tags are executed.
 use crate::{invalid, maps::{MeshData, MeshPart}, Result, SparkError};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjImport {
     pub mesh: MeshData,
     pub has_uvs: bool,
+    #[serde(default)]
+    pub complete_uvs: bool,
     pub materials: Vec<String>,
     pub warnings: Vec<String>,
 }
 
 const MAX_VERTICES: usize = 1_000_000;
 const MAX_INDICES: usize = 6_000_000;
+const MAX_MATERIALS: usize = 256;
+const MAX_PARTS: usize = 8192;
 
 fn point(words: &mut std::str::SplitWhitespace<'_>, n: usize, line: usize) -> Result<Vec<f32>> {
     let mut coords = Vec::with_capacity(n);
@@ -97,6 +101,7 @@ pub fn parse_obj(text: &str) -> Result<ObjImport> {
     let mut raw_uvs: Vec<[f32;2]> = Vec::new();
     let mut raw_normals: Vec<[f32;3]> = Vec::new();
     let mut material_names: Vec<String> = Vec::new();
+    let mut known_materials = HashSet::<String>::new();
     let mut vertex_map = HashMap::<(usize,Option<usize>,Option<usize>), u32>::new();
     let mut declared_normals = Vec::<bool>::new();
     let mut warnings = Vec::new();
@@ -128,18 +133,22 @@ pub fn parse_obj(text: &str) -> Result<ObjImport> {
             }
             Some("mtllib") => has_external_material_library = true,
             Some("usemtl") => {
-                if mesh.indices.len() > active_part_start {
-                    mesh.parts.push(MeshPart {
-                        name: active_material.clone(),
-                        index_start: active_part_start,
-                        index_count: mesh.indices.len() - active_part_start,
-                    });
+                let next = words.next().unwrap_or("default");
+                if next.len()>128 {return invalid("OBJ material name exceeds 128 bytes");}
+                if !known_materials.contains(next) {
+                    if known_materials.len()>=MAX_MATERIALS{return invalid("OBJ exceeds 256 materials; consolidate unused material directives");}
+                    known_materials.insert(next.to_string());material_names.push(next.to_string());
                 }
-                active_part_start = mesh.indices.len();
-                active_material = words.next().unwrap_or("default").chars().take(128).collect();
-                if !material_names.contains(&active_material) { material_names.push(active_material.clone()); }
+                if next != active_material {
+                    if mesh.indices.len() > active_part_start {
+                        if mesh.parts.len()>=MAX_PARTS{return invalid("OBJ exceeds 8192 material groups; consolidate source groups");}
+                        mesh.parts.push(MeshPart {name:active_material.clone(),index_start:active_part_start,index_count:mesh.indices.len()-active_part_start});
+                    }
+                    active_part_start=mesh.indices.len();active_material=next.to_string();
+                }
             }
             Some("f") => {
+                if !known_materials.contains(&active_material) {if known_materials.len()>=MAX_MATERIALS{return invalid("OBJ exceeds 256 materials");}known_materials.insert(active_material.clone());material_names.push(active_material.clone());}
                 let mut indices = Vec::<u32>::new();
                 for token in words {
                     if token.starts_with('#') { break; }
@@ -178,6 +187,7 @@ pub fn parse_obj(text: &str) -> Result<ObjImport> {
     }
     if !any_faces || mesh.indices.is_empty() {return invalid("OBJ contains no usable mesh triangles");}
     if mesh.indices.len() > active_part_start {
+        if mesh.parts.len()>=MAX_PARTS{return invalid("OBJ exceeds 8192 material groups");}
         mesh.parts.push(MeshPart {
             name: active_material.clone(),
             index_start: active_part_start,
@@ -189,6 +199,6 @@ pub fn parse_obj(text: &str) -> Result<ObjImport> {
     if polygons {warnings.push("Polygon faces were fan-triangulated. Concave polygons should be triangulated in the source DCC tool.".into());}
     if referenced_uvs && partial_uvs {warnings.push("Some face corners lack UVs; untextured corners received (0, 0).".into());}
     if has_external_material_library {warnings.push("Material group names are preserved; external MTL/texture image files are not automatically loaded.".into());}
-    warnings.push("Preview asset only. Converting workshop meshes into Halo render/collision tags is not implemented.".into());
-    Ok(ObjImport {mesh,has_uvs:referenced_uvs,materials:material_names,warnings})
+    warnings.push("OBJ source preserved. QuickForge/Workshop can compile closed static scenery with complete UVs and assigned Halo materials; animated assets and compiled-map additions need their native source workflows.".into());
+    Ok(ObjImport {mesh,has_uvs:referenced_uvs,complete_uvs:referenced_uvs && !partial_uvs,materials:material_names,warnings})
 }

@@ -208,3 +208,22 @@ fn boolean_floor_keeps_distinct_material_and_authored_uv_coordinates() {
         .filter(|p| p.material_id == "floor-two")
         .all(|p| p.brush_id == "room-a" && p.face_id.as_deref() == Some("face-0")));
 }
+
+#[test]
+fn derived_geometry_reuse_never_reuses_scenario_validation_or_corrupt_topology() {
+    let d=w::example().unwrap();let mesh=q::preview_mesh(&d).unwrap();let old=q::validate(&d).unwrap();let mut edited=d.clone();
+    edited.spawns[0].position=[999.,999.,1.];
+    assert_eq!(serde_json::to_vec(&mesh).unwrap(),serde_json::to_vec(&q::preview_mesh(&edited).unwrap()).unwrap());
+    let report=q::validate(&edited).unwrap();assert!(!report.valid);assert!(report.issues.iter().any(|i|i.code=="WORKSHOP_SPAWN_CLEARANCE"));assert_ne!(old.source_sha256,report.source_sha256);
+    edited=d.clone();edited.workshop.as_mut().unwrap().brushes[0].position[0]+=0.25;assert_ne!(mesh.positions,q::preview_mesh(&edited).unwrap().positions);
+    let mut corrupt=d.clone();corrupt.spawns[0].id=corrupt.workshop.as_ref().unwrap().brushes[0].id.clone();assert!(q::preview_mesh(&corrupt).is_err());
+    assert_eq!(mesh.positions,q::preview_mesh(&d).unwrap().positions);
+}
+
+#[test]
+fn material_only_edits_reuse_geometry_but_never_bypass_material_validation() {
+    let mut d=w::example().unwrap();let original=q::preview_mesh(&d).unwrap();
+    d.materials[0].name="assigned_surface".into();d.materials[0].color=[0.8,0.2,0.1];d.materials[0].shader_path=Some("levels/test/tutorial/shaders/example_tutorial_metal_floor".into());
+    assert_eq!(serde_json::to_vec(&original).unwrap(),serde_json::to_vec(&q::preview_mesh(&d).unwrap()).unwrap());
+    d.materials.clear();assert!(q::preview_mesh(&d).is_err());
+}

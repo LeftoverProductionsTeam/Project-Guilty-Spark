@@ -38,6 +38,10 @@ pub struct QuickForgeBuildReceipt {
     pub job_id: String,
     pub project_id: String,
     pub project_fingerprint: String,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub source_document_sha256: Option<String>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub current: Option<bool>,
     pub status: String,
     pub duration_ms: u64,
     pub sources: Option<SourceExport>,
@@ -45,6 +49,12 @@ pub struct QuickForgeBuildReceipt {
     pub warnings: Vec<String>,
     pub build: Option<BuildRecord>,
     pub tool_identities: BTreeMap<String,String>,
+}
+// Re-derive console grammar from the validated document. Receipt metadata is not authority.
+fn workshop_playtest_scenario(document:&quickforge::QuickForgeDocument,receipt_path:&str)->Result<String>{
+    let expected=quickforge::scenario_path(document)?;
+    if receipt_path!=expected{return invalid("Workshop receipt scenario differs from its verified source document");}
+    Ok(expected)
 }
 /// Owner-run Standalone acceptance. Keep the existing short-path alias alive for
 /// the whole game process; dropping it after spawn makes lazy tag reads fail.
@@ -58,10 +68,11 @@ pub fn workshop_playtest(receipt:&QuickForgeBuildReceipt,kit:&Path)->Result<()> 
     if build.sha256.as_deref()!=Some(maps::hash_file(output)?.as_str())||sources.jms_sha256!=maps::hash_file(&sources.jms_path)? {return invalid("Workshop output or source JMS changed since compilation");}
     let project=project::load_project(&sources.directory.join("project.gsproject"))?;
     if project.fingerprint()?!=receipt.project_fingerprint||project.quick_forge.as_ref().is_none_or(|d|d.workshop.is_none()||d.runtime_id!=RuntimeId::MccSteam) {return invalid("Workshop source is not the exact compiled MCC project");}
+    let scenario=workshop_playtest_scenario(project.quick_forge.as_ref().unwrap(),&sources.scenario_path)?;
     let exe=kit.join("halo_tag_test.exe");crate::reject_links(&exe)?;
     let alias=crate::native_workspace::Alias::new(&sources.directory)?;
     let init_name=format!("spark-workshop-{}.txt",uuid::Uuid::new_v4());
-    project::atomic_write(&sources.directory.join(&init_name),format!("game_variant slayer\r\nmap_name \"{}\"\r\n",sources.scenario_path).as_bytes(),false)?;
+    project::atomic_write(&sources.directory.join(&init_name),format!("game_variant slayer\r\nmap_name \"{}\"\r\n",scenario).as_bytes(),false)?;
     let mut command=std::process::Command::new(exe);
     command.current_dir(kit).args(["-window","-vidmode","1280,720","-tags_dir"]).arg(alias.path().join("tags")).arg("-data_dir").arg(alias.path().join("data")).arg("-exec").arg(alias.path().join(init_name));
     use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);
@@ -210,19 +221,23 @@ pub fn run_prepared_job(
     extra_blockers:Vec<String>,cancel:Arc<AtomicBool>,prepared:Option<&BTreeMap<String,String>>,on_event:impl Fn(JobEvent)+Send+Sync,
 ) -> Result<QuickForgeBuildReceipt> {
     project.validate()?;
-    if project.scene.iter().any(|object|object.source_model.is_some()||object.asset_id.is_some()) {return invalid("Custom/source preview meshes need compiled Halo model and scenario tags before a QuickForge game build. Remove the preview placements or compile their source models first.");}
+    let custom=crate::model_build::plan(project)?;
+    let generated=custom.generated();
     uuid::Uuid::parse_str(job_id).map_err(|_|SparkError::Invalid("Job ID is not a UUID".into()))?;
-    let document=project.quick_forge.as_ref().ok_or_else(||SparkError::Invalid("This project has no QuickForge document".into()))?;
-    let started=Instant::now(); let directory=jobs_root.join(job_id);
-    crate::reject_links(&directory)?;fs::create_dir_all(jobs_root)?;fs::create_dir(&directory)?;
+    let document=&custom.document;
+    let started=Instant::now();
+    crate::reject_links(jobs_root)?;fs::create_dir_all(jobs_root)?;
+    let jobs_root=jobs_root.canonicalize()?;let directory=jobs_root.join(job_id);
+    crate::reject_links(&directory)?;fs::create_dir(&directory)?;
     let emit=|phase:&str,message:String,progress:u8,severity:&str|on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:phase.into(),severity:severity.into(),message,progress,timestamp:chrono::Utc::now().to_rfc3339()});
-    let mut receipt=QuickForgeBuildReceipt{schema_version:1,job_id:job_id.into(),project_id:project.id.clone(),project_fingerprint:project.fingerprint()?,status:"failed".into(),duration_ms:0,sources:None,blockers:extra_blockers,warnings:vec!["Compiler integration requires an owner-installed HCEEK and extracted legal tags. Source exports and structural validation do not prove game loading or multiplayer.".into()],build:None,tool_identities:BTreeMap::new()};
+    let mut receipt=QuickForgeBuildReceipt{schema_version:1,job_id:job_id.into(),project_id:project.id.clone(),project_fingerprint:project.fingerprint()?,source_document_sha256:if custom.models.is_empty(){None}else{Some(quickforge::validate(project.quick_forge.as_ref().unwrap())?.source_sha256)},current:None,status:"failed".into(),duration_ms:0,sources:None,blockers:extra_blockers,warnings:vec!["Compiler integration requires an owner-installed HCEEK and extracted legal tags. Source exports and structural validation do not prove game loading or multiplayer.".into()],build:None,tool_identities:BTreeMap::new()};
     let result=(||->Result<()> {
         if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
         emit("geometry","Validating editable geometry and writing JMS source".into(),5,"info");
         let sources=quickforge::export_sources(document,&directory.join("workspace"))?;
         receipt.blockers.extend(sources.blockers.clone());
         receipt.sources=Some(sources.clone());
+        custom.export(&sources.directory)?;
         project::save_project(&sources.directory.join("project.gsproject"),project)?;
         if let Some(config)=&project.firefight {project::atomic_write(&sources.directory.join("firefight-authoring.json"),&serde_json::to_vec_pretty(config)?,false)?;}
         if export_only {receipt.status="exported".into();return Ok(());}
@@ -247,6 +262,7 @@ pub fn run_prepared_job(
         for name in ["invader-edit","invader-build","invader-info"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
         if let Some(tags)=tags.as_ref().filter(|p|p.is_dir()) {
             for dependency in &sources.dependencies {
+                if generated.contains(&format!("{}.scenery",dependency.tag_path.replace('\\',"/"))) && dependency.tag_class=="scenery" {continue;}
                 match dependency_path(tags,&dependency.tag_path,&dependency.tag_class) {
                     Ok(p) if p.is_file()=>{},
                     Ok(_)=>receipt.blockers.push(format!("Missing editable dependency {} ({}) in selected tags",dependency.tag_path,dependency.tag_class)),
@@ -276,6 +292,7 @@ pub fn run_prepared_job(
         let scenario_file=stage.join(safe_relative(&format!("{}.scenario",sources.scenario_path))?);
         if scenario_file.parent().is_some_and(|p|p.exists()){return invalid("Generated scenario namespace already exists in the supplied tags. Choose a unique project name; stale BSP/lightmap/item tags cannot be accepted as new output.");}
         let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
+        custom.compile(workspace,&tool,&halo_tool_prefix(tools.hek_flavor.as_deref(),workspace,&stage)?,&invader(tools,"invader-edit").unwrap(),&runner)?;
         for (index,command) in sources.commands.iter().enumerate() {
             if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
             for expected in &command.expected_outputs {
@@ -321,6 +338,7 @@ pub fn run_prepared_job(
         }
         let inspected=maps::inspect_map(&output,None)?;
         crate::powerups::verify_compiled(project,&inspected,workspace)?;
+        custom.verify_cache(&inspected,&output)?;
         if inspected.header.version!=version || !inspected.scenario_path.replace('\\',"/").eq_ignore_ascii_case(&sources.scenario_path.replace('\\',"/")) || inspected.header.scenario_type!=1 || inspected.mesh.indices.is_empty() {return invalid("Compiled map has wrong engine/scenario/type or no collision BSP");}
         for check in ["crc32_mismatched","is_protected","stub_count"] {
             let value=runner.run(&invader(tools,"invader-info").unwrap(),&["-T".into(),check.into(),output.to_string_lossy().into_owned()],workspace,"verify",94)?;
@@ -331,10 +349,12 @@ pub fn run_prepared_job(
             let source=tags.as_ref().unwrap().join(safe_relative(relative)?);
             if maps::hash_file(&source)?!=*expected{return invalid("Owner-selected source tag identity changed during compilation");}
         }
+        custom.verify_sources()?;
         for placement in &document.placements {
             if !inspected.tags.iter().any(|tag|tag.class==placement.tag_class&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&placement.tag_path.replace('\\',"/"))) {return invalid(format!("Built cache omits placed asset {}",placement.name));}
         }
-        let record=BuildRecord{id:job_id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:engine.into(),output:Some(output.clone()),sha256:Some(maps::hash_file(&output)?),message:"QuickForge BSP/scenario compiled and cache structure/CRC validated. Fast radiosity preview; target-game load, packaging and multiplayer remain untested.".into(),project_fingerprint:project.fingerprint()?};
+        if maps::hash_file(&output)?!=inspected.sha256 {return invalid("Compiled output changed during verification; the modified artifact is rejected and the previous build is retained");}
+        let record=BuildRecord{id:job_id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:engine.into(),output:Some(output.clone()),sha256:Some(inspected.sha256.clone()),message:"QuickForge BSP/scenario compiled and cache structure/CRC validated. Fast radiosity preview; target-game load, packaging and multiplayer remain untested.".into(),project_fingerprint:project.fingerprint()?};
         project::atomic_write(&directory.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
         receipt.build=Some(record);receipt.status="validated".into();Ok(())
     })();
@@ -348,6 +368,12 @@ pub fn run_prepared_job(
 #[cfg(test)]
 mod tool_generation_tests {
     use super::*;
+    #[test]
+    fn workshop_receipt_cannot_inject_console_grammar_or_select_another_scenario(){
+        let doc=crate::bsp_workshop::example().unwrap();let expected=quickforge::scenario_path(&doc).unwrap();
+        assert_eq!(workshop_playtest_scenario(&doc,&expected).unwrap(),expected);
+        for value in ["levels/test/bloodgulch/bloodgulch", "foo\"\r\nquit\r\n", "foo;quit", "../foo"] {assert!(workshop_playtest_scenario(&doc,value).is_err());}
+    }
     #[test]
     fn staging_verifies_copied_bytes_preserves_sources_and_reports_completion() {
         let root=tempfile::tempdir().unwrap();let source=root.path().join("source");fs::create_dir(&source).unwrap();

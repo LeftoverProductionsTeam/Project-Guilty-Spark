@@ -127,7 +127,7 @@ export function Assets({
       />
       <Notice tone="info">
         OBJ import now preserves vertex normals, UV seams and material-group boundaries in the preview mesh.
-        External MTL textures, Halo render/collision tag generation, glTF and automatic animation import are not implemented here. Import WAV/OGG sounds through the Level editor’s Asset library.
+        QuickForge/Workshop can build closed OBJ meshes as native static scenery: place the model, assign its Halo materials in the Custom model drawer, then Build & check playtest. External MTL textures, rigging and glTF are not imported. Add WAV/OGG sounds through the Level editor’s Asset library.
       </Notice>
       {modelAssets.length ? (
         <div className="asset-layout">

@@ -17,7 +17,7 @@ Implementation files: `crates/spark-core/src/bsp_workshop.rs` owns source valida
 ## Use it
 
 1. Open a QuickForge source project in Level Editor and choose **BSP Workshop**.
-2. Convert an existing room/box/ramp source, or choose **Two rooms + corridor + ramp**. Starting the example replaces that document's geometry and scenario placements as one Undo step; save another project copy to retain both.
+2. Convert an existing room/box/ramp source, or choose **Two rooms + corridor + ramp**. Starting the example replaces that document's geometry as one Undo step while retaining authored placements, starts, objectives and game mode. Save another project copy to retain both layouts.
 3. Use the four linked views. Room draws playable air; Solid draws geometry that removes air. Overlap a corridor into adjoining rooms to remove the internal walls. Middle-drag pans an orthographic view; wheel zooms. Drag the dividers, or maximize one view and restore the layout.
 4. Select a volume and use Move, Rotate, Scale, precise fields, or supported vertex/edge/face drags. Choose a source face for extrusion, material assignment and UV controls. Clip keeps one side of a local axis plane and creates a closing cap.
 5. In **Halo material paths & player starts**, assign real shader and sky tags from your matching editing kit. An imported map can supply an exact matching shader/bitmap preview. The preview does not replace the editable shader dependencies required by Halo Tool.
@@ -64,9 +64,11 @@ All **146** inventoried files in the separate unfinished root checkout were reha
 - Actual player movement through both doorways, floor support, ramp traversal and material inspection; then retail MCC cache acceptance and an independently validated Custom Edition build/playtest.
 - General portal drawing, face deletion/merge, arbitrary clip planes, concave source editing, source material symbols and full surface metadata.
 - Original JMS import and honest reconstructed/source-backed editing of existing BSPs; metadata/detail/environment reconciliation when recompilation remaps surfaces or clusters.
-- General BSP-combiner interoperability, asset-placement controls within Workshop worlds and larger-scene performance acceptance.
+- General BSP-combiner interoperability and larger-scene performance acceptance. Workshop object placement and bounded native custom scenery now pass the [connected-source acceptance](WORKBENCH_INTEGRATION.md).
 - Workshop shared editing admission, dedicated crash/power-loss testing, complete render/audio parity, live BSP replacement and game-peer replication.
 - **Direct compiled-map editing remains a separate open workflow. Native loose-tag and Workshop builds do not complete it.**
+
+The [integration follow-through](WORKBENCH_INTEGRATION.md) adds shared object/geometry views, native OBJ scenery, floor/history/recovery tests, new CE failure evidence and the current regression counts. Earlier results above remain historical evidence.
 
 ## Repeat the native checks
 

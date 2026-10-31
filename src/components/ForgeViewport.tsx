@@ -1,4 +1,8 @@
 import TransformControls from './HaloTransformControls';
+import BspSurfaces from './BspSurfaces';
+import { useWorkshopTextures } from '../useWorkshopTextures';
+import { forgeGeometryKey } from '../forge';
+import type { OpenProject } from '../types';
 import useEndToFloor from '../useEndToFloor';
 import type {DropBody} from '../useEndToFloor';
 import {useRendererQuality} from './RendererQuality';
@@ -42,6 +46,8 @@ export interface ForgeSnapshot {
 }
 export type ForgeCamera = 'orbit' | 'fly' | 'walk' | 'machinima';
 export interface ForgeViewportProps {
+  materialSource?: OpenProject | null;
+  surfaceTextures?: Record<string, THREE.Texture>;
   resourceScopes?:Record<string,string>;
   sessionId?:string;
   actorAnimation?:import('../animation').AnimationPreview|null;
@@ -80,7 +86,7 @@ export interface ForgeViewportProps {
   wrlOverlay?: WrlDiagnostics | null;
   showWrlOverlay?: boolean;
   focusWrlOverlay?: boolean;
-  viewportChildren?:React.ReactNode;
+  viewportChildren?:React.ReactNode | ((textures:Record<string,THREE.Texture>)=>React.ReactNode);
   cameraLocked?:boolean;
   cinema?:boolean;
   externalCameraAuthority?:boolean;
@@ -418,14 +424,14 @@ function ForgeScene(props: ForgeViewportProps) {
   const zoneGroup = useRef<THREE.Group>(null);
   const nodes = forgeNodes(doc).filter((node) => node.value.visible);
   const chosen = nodes.filter((node) => selected.includes(node.value.id) && !node.value.locked);
-  const geometryCurrent=JSON.stringify(snapshot?.document.geometry)===JSON.stringify(doc.geometry);
+  const geometryCurrent=!!snapshot && forgeGeometryKey(snapshot.document)===forgeGeometryKey(doc);
   const brushMesh=(id:string)=>snapshot?{positions:snapshot.mesh.positions,indices:snapshot.mesh.parts.filter(p=>p.brushId===id).flatMap(p=>snapshot.mesh.indices.slice(p.indexStart,p.indexStart+p.indexCount))}:undefined;
   const selectedBrushes=new Set(chosen.filter(n=>n.type==='brush').map(n=>n.value.id));
   const dropBody=(node:ForgeNode):DropBody=>{
     const placement=node.type==='placement'?node.value:undefined,preview=node.type==='brush'?brushMesh(node.value.id):placement?props.ownedModels?.[forgeModelKey(placement)]?.mesh:{positions:[0,0,node.type==='spawn'?-.2:0],indices:[]};
     return {id:node.value.id,name:node.value.name,preview,collision:node.type==='brush'?preview:undefined,source:placement?.sourceProjectId&&placement.sourceSha256&&placement.tagId!=null?{projectId:placement.sourceProjectId,sourceSha256:placement.sourceSha256,tagId:placement.tagId}:undefined,matrix:node.type==='brush'?new THREE.Matrix4():new THREE.Matrix4().compose(new THREE.Vector3(...node.value.position),new THREE.Quaternion().setFromEuler(new THREE.Euler(...nodeRotation(node),'XYZ')),new THREE.Vector3(1,1,1))};
   };
-  useEndToFloor({enabled:cameraMode==='orbit'&&geometryCurrent,revision:JSON.stringify(doc),selected:chosen.map(dropBody),others:nodes.filter(n=>n.type==='placement'&&!selected.includes(n.value.id)).map(dropBody),terrain:snapshot?{positions:snapshot.mesh.positions,indices:snapshot.mesh.parts.filter(p=>!selectedBrushes.has(p.brushId)).flatMap(p=>snapshot.mesh.indices.slice(p.indexStart,p.indexStart+p.indexCount))}:null,onDrop:delta=>onTransform(chosen.map(node=>({...node,value:{...node.value,position:[node.value.position[0],node.value.position[1],node.value.position[2]+delta]}} as ForgeNode))),onError:props.onError});
+  useEndToFloor({enabled:cameraMode==='orbit'&&geometryCurrent,revision:JSON.stringify(doc),selected:chosen.map(dropBody),others:nodes.filter(n=>n.type==='placement'&&!selected.includes(n.value.id)).map(dropBody),terrain:snapshot?{positions:snapshot.mesh.positions,indices:snapshot.mesh.parts.filter(p=>!selectedBrushes.has(p.brushId)&&!snapshot.document.workshop?.portals.some(portal=>portal.id===p.brushId)).flatMap(p=>snapshot.mesh.indices.slice(p.indexStart,p.indexStart+p.indexCount))}:null,onDrop:delta=>onTransform(chosen.map(node=>({...node,value:{...node.value,position:[node.value.position[0],node.value.position[1],node.value.position[2]+delta]}} as ForgeNode))),onError:props.onError});
   const selectionBasis=chosen.map(node=>[node.value.id,...node.value.position,...nodeRotation(node)].join(':')).join('|');
   // Keep the gizmo's declarative basis stable while preview/material state
   // changes. New Vector3/Euler props would reset an in-progress native drag.
@@ -516,6 +522,7 @@ function ForgeScene(props: ForgeViewportProps) {
           position={[0, 0, 0.025]}
         />
       )}
+      {doc.workshop && snapshot && geometryCurrent && <BspSurfaces mesh={snapshot.mesh} doc={doc} wire={wireframe} textures={props.surfaceTextures ?? {}} />}
       {props.showHillAreas && <HillRegions objectives={doc.objectives} />}
       {props.showGameRoutes && <NetgameRoutes objectives={doc.objectives} />}
       {nodes.filter((node) => !chosen.includes(node)).map((node) => visual(node))}
@@ -609,6 +616,7 @@ function ForgeScene(props: ForgeViewportProps) {
 }
 export default function ForgeViewport(props: ForgeViewportProps) {
   const selectionGuard=useRef(0);
+  const surfacePreview=useWorkshopTextures(props.document, props.document.workshop ? props.materialSource : null);
   const {models,failures}=useOwnedForgeModels([...props.document.placements,...(props.spawnModelSource?[props.spawnModelSource]:[])],props.resourceScopes);
   const [recording,setRecording]=useState(false),take=useRef<RehearsalFrame[]>([]);
   useEffect(()=>{if(props.cameraMode!=='machinima')setRecording(false);},[props.cameraMode]);
@@ -627,9 +635,9 @@ export default function ForgeViewport(props: ForgeViewportProps) {
       >
         <ViewportActivity continuous={!!props.cinema}/>
         <Suspense fallback={null}>
-          <ForgeScene {...props} ownedModels={models} recording={recording} rehearsalTake={take} selectionGuard={selectionGuard}/>
+          <ForgeScene {...props} surfaceTextures={surfacePreview.textures} ownedModels={models} recording={recording} rehearsalTake={take} selectionGuard={selectionGuard}/>
           {props.sessionId&&<ViewportSession id={props.sessionId} channel={props.cinema?'machinima':'forge'} paused={props.cameraLocked||props.externalCameraAuthority} ready={!!props.snapshot} requiresControls={props.cameraMode==='orbit'}/>}
-          {props.viewportChildren}
+          {typeof props.viewportChildren==='function'?props.viewportChildren(surfacePreview.textures):props.viewportChildren}
         </Suspense>
       </Canvas>
     </ViewportBoundary>
