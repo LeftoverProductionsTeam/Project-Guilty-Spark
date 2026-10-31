@@ -183,6 +183,12 @@ async function mockDesktop(page: Page) {
         if(command==='plugin:window|maximize'){mock.maximized=true;return null;}
         if (command === 'bootstrap') return structuredClone(bootstrap);
         if (command === 'open_project') {if(mock.delayOpen){const delay=mock.delayOpen;mock.delayOpen=0;await new Promise(resolve=>setTimeout(resolve,delay));}return structuredClone(projects[args.id]);}
+        if (command === 'prepare_native_asset_import') {
+          const source = projects[args.sourceProjectId];
+          const tag = source?.inspection.tags.find((tag: any) => tag.id === args.tagId);
+          if (!tag || source.inspection.sha256 !== args.sourceSha256) throw Error('Synthetic asset identity mismatch');
+          return {id:'synthetic-import', sourceProjectId:args.sourceProjectId,sourceSha256:args.sourceSha256,tagId:tag.id,tagClass:tag.class,tagPath:tag.path,nativePath:'synthetic-import/'+tag.path,receiptSha256:'c'.repeat(64),fileCount:1};
+        }
         if (command === 'claim_project_document' || command === 'release_project_document') return null;
         if (command === 'auto_connect_classic_textures') return null;
         if (command === 'auto_connect_sound_resources') return null;
@@ -425,6 +431,7 @@ test('cross-map model placement opens source tags and keeps undo and save in tha
  const library=page.getByRole('region',{name:'Asset library panel',exact:true});await library.getByLabel('Asset library map',{exact:true}).selectOption('b');
  await expect(page.getByTestId('viewport').locator('canvas')).toBeVisible();
  await library.getByRole('button',{name:'Add test at view',exact:true}).click();await expect(page.locator('.viewport-object-actions strong')).toHaveText('test');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call: any)=>call.command==='prepare_native_asset_import').length)).toBe(1);
  await page.getByRole('button',{name:'Close Asset library',exact:true}).click();await page.locator('.viewport-object-actions').getByRole('button',{name:'Object tags',exact:true}).click();
  const tags=page.getByRole('region',{name:'Object tags panel',exact:true});await expect(tags).toContainText('Synthetic candidate');const value=tags.getByLabel('Velocity',{exact:true});await expect(value).toHaveValue('25');await value.fill('39');await value.press('Enter');await value.focus();await page.keyboard.press('Control+z');await expect(value).toHaveValue('25');await value.focus();await page.keyboard.press('Control+y');await expect(value).toHaveValue('39');await value.focus();await page.keyboard.press('Control+s');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.id)).toBe('b');await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');

@@ -1,1 +1,33 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#0b0f14"/><title>Project Guilty Spark</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0f14" />
+    <title>Project Guilty Spark</title>
+  </head>
+  <body>
+    <div id="root">
+      <div
+        style="
+          position: fixed;
+          inset: 0;
+          display: grid;
+          place-content: center;
+          background: #0b111b;
+          color: #eaf8ff;
+          font: 14px system-ui;
+          text-align: center;
+        "
+      >
+        <strong style="letter-spacing: 0.18em; font-size: 18px">GUILTY SPARK</strong
+        ><span style="margin-top: 14px; color: #83d9d5">Opening your workbench…</span
+        ><progress
+          aria-label="Loading application"
+          style="width: 260px; height: 4px; margin-top: 22px; accent-color: #83d9d5"
+        ></progress>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -48,7 +48,7 @@ it('preserves donor identity and replacement pose in a source-bound model previe
   expect(p.scene[0].sourceModel?.tagId).toBe(7);
 });
 it('creates native forge placements, retains gameplay settings on swap, and respects locks and limits', () => {
-  let p = { ...project(), quickForge: { placements: [] } } as unknown as Project;
+  let p = { ...project(), quickForge: { placements: [], geometry: [] } } as unknown as Project;
   const added = placeLibraryModel(p, asset, [1, 2, 3]);
   p = added.project;
   Object.assign(p.quickForge!.placements[0], {

@@ -38,6 +38,10 @@ use tauri::{Emitter, Manager, State};
 #[path="working_tag_changes_native.rs"]mod working_tag_changes_native;
 #[path="conversion_resources_native.rs"]mod conversion_resources_native;
 #[path="ce_source_recovery_native.rs"]mod ce_source_recovery_native;
+#[path="startup_native.rs"]mod startup_native;
+#[path="asset_sources_native.rs"] mod asset_sources_native;
+#[path="asset_import_native.rs"] mod asset_import_native;
+#[path="default_materials_native.rs"] mod default_materials_native;
 #[path="portability_native.rs"]mod portability_native;
 #[path="dependency_install.rs"] mod dependency_install;
 #[path="baboon_native.rs"] mod baboon_native;
@@ -132,6 +136,8 @@ struct AppState {
     working_tag_changes:Mutex<working_tag_changes_native::WorkingTagChangesState>,
     conversion_repairs:Mutex<conversion_resources_native::RepairState>,
     ce_recovery:Mutex<ce_source_recovery_native::RecoveryState>,
+    startup:startup_native::Startup,
+    asset_sources:Mutex<asset_sources_native::Catalog>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -412,9 +418,11 @@ async fn audit_owned_bitmap_resources(
 }
 
 #[tauri::command]
-fn bootstrap(state: State<AppState>) -> Reply<Bootstrap> {
-    bootstrap_state(&state)
+async fn bootstrap(app:tauri::AppHandle) -> Reply<Bootstrap> {
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();state.startup.wait()?;bootstrap_state(&state)}).await.map_err(error)?
 }
+#[tauri::command]
+fn startup_status(state:State<AppState>)->Reply<startup_native::Status>{state.startup.snapshot()}
 fn bootstrap_state(state:&AppState)->Reply<Bootstrap> {
     // Drop each guard before acquiring another: background discovery/imports
     // must not create a lock-order cycle with this UI snapshot.
@@ -1134,6 +1142,7 @@ fn configure(app: &tauri::AppHandle, state: &AppState, mut settings: Settings) -
             });
     *lock(&state.installation)? = installation;
     *lock(&state.managed)? = root;
+    state.startup.progress(2,"Connecting your maps and tools");
     start_watcher(app, state)?;
     Ok(())
 }
@@ -1202,7 +1211,7 @@ fn cache_invader_installation(state: State<AppState>, source_directory: String) 
 fn refresh_installation(app: tauri::AppHandle, state: State<AppState>) -> Reply<Bootstrap> {
     let settings = lock(&state.settings)?.clone();
     configure(&app, &state, settings)?;
-    bootstrap(state)
+    bootstrap_state(&state)
 }
 #[tauri::command]
 async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::CompatibilityReport> {
@@ -1849,7 +1858,7 @@ fn initialize_mcc_inbox(app: tauri::AppHandle, state: State<AppState>) -> Reply<
         .ok_or("MCC installation is not available")?;
     *lock(&state.managed)? = Some(mcc::initialize(&path).map_err(error)?);
     start_watcher(&app, &state)?;
-    bootstrap(state)
+    bootstrap_state(&state)
 }
 // Only exact, known tool executable filenames are eligible; no shell, arbitrary
 // arguments or user-provided executable path can be launched via this API.
@@ -2206,11 +2215,23 @@ async fn inspect_sound(
     .map_err(error)?
 }
 
+#[tauri::command]
+async fn preview_owned_reflection_cube(app:tauri::AppHandle,project_id:String,bitmap_tag_id:u32,source_sha256:String)->Reply<core::bitmap_preview::OwnedCubePreview>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("Reflection source map is unavailable")?;
+        if source.sha256!=source_sha256{return Err("Reflection source hash differs from its shader".into());}
+        let inspection=inspect(&state,&project)?;
+        let resource=if source.resource_sha256.contains_key("mcc-textures"){
+            source.resource_directory.as_ref().and_then(|p|p.parent()).and_then(Path::parent).map(|p|p.join("maps/bitmaps.map")).zip(source.resource_sha256.get("mcc-shared-bitmaps.map"))
+        }else{source.resource_directory.as_ref().map(|p|p.join("bitmaps.map")).zip(source.resource_sha256.get("bitmaps.map"))};
+        core::bitmap_preview::preview_owned_cube(&source.preserved_path,&source.sha256,&inspection,bitmap_tag_id,resource.as_ref().map(|(p,h)|(p.as_path(),h.as_str()))).map_err(error)
+    }).await.map_err(error)?
+}
 #[derive(serde::Serialize)]
 #[serde(rename_all="camelCase")]
 struct OwnedModelPreview {
     source_sha256:String,resource_sha256:Option<String>,object_tag_id:u32,model_tag_id:u32,
-    mesh:maps::MeshData,tags:Vec<maps::Tag>,
+    mesh:maps::MeshData,tags:Vec<maps::Tag>,resource_hashes:std::collections::BTreeMap<String,String>,
 }
 #[tauri::command]
 async fn preview_owned_object_model(app:tauri::AppHandle,project_id:String,tag_id:u32,source_sha256:String)->Reply<OwnedModelPreview>{
@@ -2223,7 +2244,18 @@ async fn preview_owned_object_model(app:tauri::AppHandle,project_id:String,tag_i
         let mut ids:std::collections::HashSet<u32>=mesh.material_ranges.iter().map(|r|r.shader_tag_id).collect();
         for shader in inspection.tags.iter().filter(|t|ids.contains(&t.id)).collect::<Vec<_>>(){for reference in &shader.references{ids.insert(reference.target_id);}}
         let tags=inspection.tags.iter().filter(|t|ids.contains(&t.id)).cloned().collect();
-        Ok(OwnedModelPreview{source_sha256:source.sha256.clone(),resource_sha256:source.resource_sha256.get("mcc-textures").or_else(||source.resource_sha256.get("bitmaps.map")).cloned(),object_tag_id:tag_id,model_tag_id:model_id,mesh,tags})
+        Ok(OwnedModelPreview{source_sha256:source.sha256.clone(),resource_sha256:source.resource_sha256.get("mcc-textures").or_else(||source.resource_sha256.get("bitmaps.map")).cloned(),object_tag_id:tag_id,model_tag_id:model_id,mesh,tags,resource_hashes:source.resource_sha256.clone()})
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn preview_owned_object_animations(app:tauri::AppHandle,project_id:String,tag_id:u32,source_sha256:String)->Reply<serde_json::Value>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let source=project.source.as_ref().ok_or("Animation source has no preserved map")?;
+        if source.sha256!=source_sha256{return Err("Animation reference source SHA-256 differs from the project".into());}
+        let inspection=inspect(&state,&project)?;
+        let animations=core::render::preview_owned_object_animations(&source.preserved_path,&source.sha256,&inspection,tag_id).map_err(error)?;
+        Ok(serde_json::json!({"sourceSha256":source.sha256,"animations":animations}))
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -2578,10 +2610,7 @@ pub fn run() {
                 .unwrap_or(app.path().app_local_data_dir()?);
             let library = Library::open(&root)?;
             let settings: Settings = library.setting("preferences")?;
-            let installation = steam::discover(
-                settings.steam_directory.as_deref(),
-                settings.mcc_directory.as_deref(),
-            );
+            let installation = steam::Installation::default();
             app.manage(AppState {
                 root,
                 library: Mutex::new(library),
@@ -2608,18 +2637,21 @@ pub fn run() {
             working_tag_changes:Mutex::new(Default::default()),
             conversion_repairs:Mutex::new(Default::default()),
             ce_recovery:Mutex::new(Default::default()),
+            startup:Default::default(),
+            asset_sources:Default::default(),
             });
-            if let Err(e) = configure(app.handle(), &app.state::<AppState>(), settings) {
-                if let Ok(mut d) = app.state::<AppState>().diagnostics.lock() {
-                    d.push(e);
+            let worker=app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move||{
+                let state=worker.state::<AppState>();
+                state.startup.progress(1,"Finding your Halo installations");
+                let result=std::panic::catch_unwind(std::panic::AssertUnwindSafe(||configure(&worker,&state,settings)));
+                let issue=match result {Ok(Ok(()))=>None,Ok(Err(message))=>Some(message),Err(_)=>Some("Local setup could not finish. Check your Halo and tool folders in Settings.".into())};
+                if let Some(issue)=issue {
+                    if let Ok(mut d)=state.diagnostics.lock(){d.push(issue);}
+                    if let Err(e)=start_watcher(&worker,&state){if let Ok(mut d)=state.diagnostics.lock(){d.push(e);}}
                 }
-                // Missing optional tool/resource folders must not disable the independent local Inbox.
-                if let Err(e) = start_watcher(app.handle(), &app.state::<AppState>()) {
-                    if let Ok(mut d) = app.state::<AppState>().diagnostics.lock() {
-                        d.push(e);
-                    }
-                }
-            }
+                state.startup.finish();
+            });
             Ok(())
         })
         .on_window_event(|window,event|{director_native::window_event(window.app_handle(),window,event);if matches!(event,tauri::WindowEvent::Destroyed){
@@ -2749,6 +2781,12 @@ pub fn run() {
             list_tag_exchanges,
             stage_tag_exchange_into_project,
             bootstrap,
+            startup_status,
+            asset_sources_native::discover_asset_sources,
+            asset_sources_native::link_asset_source_folder,
+            asset_sources_native::open_asset_source,
+            asset_import_native::prepare_native_asset_import,
+            default_materials_native::prepare_default_halo_materials,
             open_project,
             connect_mcc_texture_resources,
             create_project,
@@ -2826,6 +2864,8 @@ pub fn run() {
             inspect_sound,
             inspect_looping_sound,
             preview_owned_object_model,
+            preview_owned_object_animations,
+            preview_owned_reflection_cube,
             preview_owned_object_collision,
             preview_sound,
             compare_peer_manifest,
@@ -2896,6 +2936,8 @@ mod readiness_tests {
             working_tag_changes:Mutex::new(Default::default()),
             conversion_repairs:Mutex::new(Default::default()),
             ce_recovery:Mutex::new(Default::default()),
+            startup:Default::default(),
+            asset_sources:Default::default(),
         };
         (temp, state, p, record)
     }

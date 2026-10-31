@@ -1668,7 +1668,7 @@ fn angle(v: f32) -> String {
 }
 /// Convert the editor's intrinsic XYZ rotation to Halo's yaw/pitch/roll order.
 /// Reordering components alone is incorrect when multiple axes are rotated.
-fn scenario_rotation(xyz: [f32; 3]) -> [f32; 3] {
+pub(crate) fn scenario_rotation(xyz: [f32; 3]) -> [f32; 3] {
     let basis = |mut v: [f32; 3]| {
         for axis in (0..3).rev() {
             v = rotate_axis(v, axis, xyz[axis]);

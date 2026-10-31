@@ -68,6 +68,48 @@ fn native_noop_and_one_field_keep_every_unrelated_byte_including_signed_zero() {
 }
 
 #[test]
+fn native_scenario_additions_do_not_expand_the_original_cache_write_footprint() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("source.map");
+    write_map(&path, 13);
+    let original = std::fs::read(&path).unwrap();
+    let library = Library::open(&root.path().join("library")).unwrap();
+    let (mut project, inspection) = library.import_map(&path, None).unwrap();
+    let id = uuid::Uuid::new_v4().to_string();
+    let binding = spark_core::native_asset_imports::Binding {
+        id: id.clone(), source_project_id: uuid::Uuid::new_v4().to_string(),
+        source_sha256: "a".repeat(64), tag_id: 17, tag_class: "scen".into(),
+        tag_path: "scenery/rock".into(),
+        native_path: format!("gs_assets_{}/scenery/rock", id.replace('-', "")),
+        receipt_sha256: "b".repeat(64), file_count: 5,
+    };
+    let mut added = project.scene[0].clone();
+    added.id = uuid::Uuid::new_v4().to_string();
+    added.source_offset = None;
+    added.rotation_offset = None;
+    added.tag_id = None;
+    added.asset_id = None;
+    added.scale = [1.; 3];
+    added.visible = true;
+    added.source_model = Some(maps::SourceModelReference {
+        project_id: binding.source_project_id.clone(), source_sha256: binding.source_sha256.clone(),
+        tag_id: binding.tag_id, path: binding.tag_path.clone(), class: binding.tag_class.clone(),
+    });
+    project.native_asset_imports.push(binding);
+    project.scene.push(added);
+    let (input, proof) = portability::verify_preservation(&project, &inspection).unwrap();
+    assert_eq!(input, original);
+    assert!(proof.byte_identical && proof.untouched_bytes_preserved);
+    assert!(proof.permitted_ranges.is_empty());
+    project.scene.last_mut().unwrap().scale = [2.; 3];
+    assert!(portability::verify_preservation(&project, &inspection).is_err());
+    project.scene.last_mut().unwrap().scale = [1.; 3];
+    project.native_asset_imports.clear();
+    assert!(portability::verify_preservation(&project, &inspection).is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+}
+
+#[test]
 fn reference_changes_leave_dependency_padding_untouched_and_changed_sources_fail() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("source.map");

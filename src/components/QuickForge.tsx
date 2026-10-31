@@ -1,3 +1,5 @@
+import { useAssetLibrarySources } from '../useAssetLibrarySources';
+import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
 import {draggedAsset} from '../assetDragRegistry';
 import BuildTargets from './BuildTargets';
 import{WorkspacePanel,WorkspacePanelAddon,useRevealWorkspacePanel}from'./WorkspacePanels';
@@ -300,7 +302,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const [query, setQuery] = useMapState(project.id,'forge.query',''),
     [category, setCategory] = useMapState(project.id,'forge.category','all');
   const sources = data.entries.filter((entry) => entry.version !== null);
-  const [sourceId, setSourceId] = useMapState(project.id,'forge.assetSource',sources[0]?.id ?? ''),
+  const [sourceId, setSourceId] = useMapState(
+      project.id,
+      'forge.assetSource',
+      project.nativeAssetImports?.find((binding) => binding.tagClass === 'senv')?.sourceProjectId ??
+        sources[0]?.id ??
+        '',
+    ),
     [assets, setAssets] = useState<ForgeAsset[]>([]),
     [assetError, setAssetError] = useState('');
   const [sourceOpen, setSourceOpen] = useState<OpenProject | null>(null);
@@ -334,19 +342,48 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const library=props.library,revealPanel=useRevealWorkspacePanel(),viewportElement=useRef<HTMLDivElement|null>(null),assetAlive=useRef(true);
   const [studioRole,setStudioRole]=useState<string|null>(null);
   useEffect(()=>{const status=(event:Event)=>{const value=(event as CustomEvent<{projectId:string;view?:{role?:string}|null}>).detail;if(value?.projectId===project.id)setStudioRole(value.view?.role??null);};const open=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project.id)revealPanel('sparklink');};window.addEventListener('guilty-spark-studio-status',status);window.addEventListener('guilty-spark-live-studio-open',open);if(readMapSession(project.id,'studio.openRequest',false)){revealPanel('sparklink');requestAnimationFrame(()=>writeMapSession(project.id,'studio.openRequest',false));}return()=>{window.removeEventListener('guilty-spark-studio-status',status);window.removeEventListener('guilty-spark-live-studio-open',open);};},[project.id,revealPanel]);
-  const catalog=useMemo(()=>viewportAssetCatalog(library?.documents??[]),[library?.documents]);
+  const librarySources = useAssetLibrarySources(library?.documents ?? []);
+  const catalog = useMemo(() => viewportAssetCatalog(librarySources), [librarySources]);
   const [assetBusy,setAssetBusy]=useState(false),[workshopSelected,setWorkshopSelected]=useMapState<string|null>(project.id,'forge.workshopSelection',null);
   const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',''),[tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null),[tagRevision,setTagRevision]=useState(0);
   const tagDocument=library?.documents.find(document=>document.id===tagSource),tagProject=tagDocument?.history.current;
   const workshop=project.scene.find(object=>object.id===workshopSelected&&object.assetId),workshopMeshes=library?.documents.find(document=>document.id===project.id)?.meshes??{};
   useEffect(()=>{assetAlive.current=true;return()=>{assetAlive.current=false;};},[project.id]);
   function openPlacementTag(id:string){const placement=latestProject.current.quickForge?.placements.find(value=>value.id===id);if(!placement?.sourceProjectId||placement.tagId===null)return;setTagSource(placement.sourceProjectId);setTagRequest(placement.tagId);setTagRevision(value=>value+1);revealPanel('object-tags');}
-  async function dropLibraryAsset(key:string,point:Vec3,replaceId?:string|null){
-    if(!library||assetBusy||library.busy)return;const item=catalog.find(value=>value.key===key);if(!item){notify('Reopen the source map before placing this asset.','error');return;}setAssetBusy(true);
-    try{if(item.kind==='model'){const placed=placeLibraryModel(latestProject.current,item.asset,snapPoint(point,gridSnap?snap:0),replaceId);edit(placed.project,`${replaceId?'Replace':'Place'} ${item.name}`);setSelected([placed.selectedId]);setWorkshopSelected(null);}
-      else if(item.kind==='mesh'){await library.onPlaceMesh(item,point,replaceId);setSelected([]);}
-      else{const emitters=await librarySoundEmitters(item,point);if(!assetAlive.current)return;const latest=latestProject.current,scene=latest.audioPreview??emptySoundScene();if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,...emitters]}},'Place sound '+item.name);writeMapSession(project.id,'sound-emitter-selection',emitters[0].id);revealPanel('map-sounds');}
-    }catch(reason){if(assetAlive.current)notify(String(reason),'error');}finally{if(assetAlive.current)setAssetBusy(false);}
+  async function dropLibraryAsset(key: string, point: Vec3, replaceId?: string | null) {
+    if(!library||assetBusy||library.busy)return;
+    const item = catalog.find((value) => value.key === key) ?? draggedAsset(key);
+    if(!item){notify('Reopen the source map before placing this asset.','error');return;}
+    setAssetBusy(true);
+    try {
+      if (item.kind === 'model') {
+        const binding = await prepareAssetImport(latestProject.current, item.asset);
+        if(!assetAlive.current)return;
+        const placed = placeLibraryModel(
+          attachAssetImport(latestProject.current, binding),
+          item.asset,
+          snapPoint(point, gridSnap ? snap : 0),
+          replaceId,
+        );
+        edit(placed.project,`${replaceId?'Replace':'Place'} ${item.name}`);
+        setSelected([placed.selectedId]);
+        setWorkshopSelected(null);
+      } else if (item.kind === 'mesh') {await library.onPlaceMesh(item,point,replaceId);setSelected([]);} else {
+        const binding = await prepareSoundImport(latestProject.current, item);
+        const emitters=await librarySoundEmitters(item,point);
+        if(!assetAlive.current)return;
+        const latest = binding ? attachAssetImport(latestProject.current, binding) : latestProject.current,
+          scene = latest.audioPreview ?? emptySoundScene();
+        if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
+        edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,...emitters]}},'Place sound '+item.name);
+        writeMapSession(project.id,'sound-emitter-selection',emitters[0].id);
+        revealPanel('map-sounds');
+      }
+    } catch (reason) {
+      if(assetAlive.current)notify(String(reason),'error');
+    } finally {
+      if(assetAlive.current)setAssetBusy(false);
+    }
   }
   async function dropFiles(paths:string[],point:Vec3){if(!library||library.busy)return;for(const path of paths){if(!assetAlive.current)return;if(/\.obj$/i.test(path))await library.onImportModel(point,path);else if(await library.onImportSound(point,path))revealPanel('map-sounds');}}
   const assetDrag=useViewportAssetDrop(project.id,viewportElement,dropPoint,(key,point)=>void dropLibraryAsset(key,point),library?(paths,point)=>void dropFiles(paths,point):undefined);
@@ -548,7 +585,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         description,
       );
     } catch (e) {
-      notify(String(e), 'error');
+      notify(String(e),'error');
     }
   }
   function duplicate() {
@@ -661,7 +698,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         notify('QuickForge currently supports at most 256 brushes.', 'error');
         return;
       }
-      let brush = createBrush(item.kind, point, doc.materials[0]?.id ?? 'default');
+      let brush = createBrush(
+        item.kind,
+        point,
+        item.kind === 'terrain' && doc.materials.some((m) => m.id === 'grass')
+          ? 'grass'
+          : (doc.materials[0]?.id ?? 'default'),
+      );
       if (meshSnap) {
         try {
           const hit = snapBrushToAuthoredMesh(brush, doc.geometry);
@@ -834,579 +877,1283 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     !!receipt &&
     (props.dirty || receipt.current === false || (!!receipt.sources && !!report && (receipt.sourceDocumentSha256 ?? receipt.sources.sourceSha256) !== report.sourceSha256));
   return (
-    <div className={`forge-workspace ${bspMode?'bsp-active':''}`}>
-      <div className="bsp-editor-switch" role="group" aria-label="Geometry authoring mode"><button className={!bspMode?'selected':''} title="Place assets, player starts and objectives against the same editable geometry. Both views share this map and undo history." onClick={()=>setBspMode(false)}>{doc.workshop?'Objects & gameplay':'QuickForge'}</button><button className={bspMode?'selected':''} onClick={()=>setBspMode(true)}>BSP Workshop</button></div>
+    <div className={`forge-workspace ${bspMode ? 'bsp-active' : ''}`}>
+      <div className="bsp-editor-switch" role="group" aria-label="Geometry authoring mode">
+        <button
+          className={!bspMode ? 'selected' : ''}
+          title="Place assets, player starts and objectives against the same editable geometry. Both views share this map and undo history."
+          onClick={() => setBspMode(false)}
+        >
+          {doc.workshop ? 'Objects & gameplay' : 'QuickForge'}
+        </button>
+        <button className={bspMode ? 'selected' : ''} onClick={() => setBspMode(true)}>
+          BSP Workshop
+        </button>
+      </div>
       <WorkspacePanelAddon id="connection">
-        {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
-        <LiveForge project={project} document={doc} selected={selected}/>
+        {props.onLive && (
+          <button className="small-button" onClick={props.onLive}>
+            Open live 3D mode
+          </button>
+        )}
+        <LiveForge project={project} document={doc} selected={selected} />
       </WorkspacePanelAddon>
       <div className="forge-main">
-        {bspMode?<BspWorkshop projectId={project.id} document={doc} mesh={snapshot?.document===doc?snapshot.mesh:null} report={validatedDoc===doc?report:null} onCommit={commit} onBusy={setBspBusy} onBack={()=>setBspMode(false)} readOnly={studioRole!=null} materialSource={sourceOpen} textureSources={sources.map(s=>({id:s.id,title:s.title}))} onTextureSource={setSourceId} wrlOverlay={wrlVisible&&!wrlStale?wrlParse.value:null}/>:<>
-        <WorkspacePanel id="forge-palette" label="Build tools"><aside className="forge-hierarchy">
-          <div className="forge-panel-heading">
-            <strong>Scene hierarchy</strong>
-            <Pill>{nodes.length}</Pill>
-          </div>
-          <p className="forge-hint">
-            Shift-click to select several. Locked items cannot be moved or deleted.
-          </p>
-          {[...new Set(nodes.map(nodeCategory))].map((group) => (
-            <div className="forge-tree-group" key={group}>
-              <h3>{group}</h3>
-              {nodes
-                .filter((node) => nodeCategory(node) === group)
-                .map((node) => (
-                  <div
-                    className={`forge-tree-row ${selected.includes(node.value.id) ? 'selected' : ''} ${errors.has(node.value.id) ? 'invalid' : ''}`}
-                    key={node.value.id}
-                  >
-                    <button
-                      className="forge-tree-select"
-                      onClick={(event) =>
-                        select(node.value.id, event.shiftKey || event.ctrlKey || event.metaKey)
-                      }
-                      title={node.value.name}
-                    >
-                      <span>
-                        {node.type === 'brush' ? (
-                          <Box size={13} />
-                        ) : node.type === 'spawn' ? (
-                          <Users size={13} />
-                        ) : (
-                          <Flag size={13} />
-                        )}
-                      </span>
-                      <span>{node.value.name || node.value.id.slice(0, 8)}</span>
-                    </button>
-                    <button
-                      aria-label={`${node.value.visible ? 'Hide' : 'Show'} ${node.value.name}`}
-                      onClick={() =>
-                        commit(
-                          mapForgeNodes(doc, (n) =>
-                            n.value.id === node.value.id
-                              ? patchForgeNode(n, { visible: !n.value.visible })
-                              : n,
-                          ),
-                          'Toggle editor visibility',
-                        )
-                      }
-                    >
-                      {node.value.visible ? <Eye size={12} /> : <EyeOff size={12} />}
-                    </button>
-                    <button
-                      aria-label={`${node.value.locked ? 'Unlock' : 'Lock'} ${node.value.name}`}
-                      onClick={() =>
-                        commit(
-                          mapForgeNodes(doc, (n) =>
-                            n.value.id === node.value.id
-                              ? patchForgeNode(n, { locked: !n.value.locked })
-                              : n,
-                          ),
-                          'Toggle object lock',
-                        )
-                      }
-                    >
-                      {node.value.locked ? <Lock size={12} /> : <Unlock size={12} />}
-                    </button>
+        {bspMode ? (
+          <BspWorkshop
+            projectId={project.id}
+            document={doc}
+            mesh={snapshot?.document === doc ? snapshot.mesh : null}
+            report={validatedDoc === doc ? report : null}
+            onCommit={commit}
+            onBusy={setBspBusy}
+            onBack={() => setBspMode(false)}
+            readOnly={studioRole != null}
+            materialSource={sourceOpen}
+            materialBindings={project.nativeAssetImports}
+            textureSources={sources.map((s) => ({ id: s.id, title: s.title }))}
+            onTextureSource={setSourceId}
+            wrlOverlay={wrlVisible && !wrlStale ? wrlParse.value : null}
+          />
+        ) : (
+          <>
+            <WorkspacePanel id="forge-palette" label="Build tools">
+              <aside className="forge-hierarchy">
+                <div className="forge-panel-heading">
+                  <strong>Scene hierarchy</strong>
+                  <Pill>{nodes.length}</Pill>
+                </div>
+                <p className="forge-hint">
+                  Shift-click to select several. Locked items cannot be moved or deleted.
+                </p>
+                {[...new Set(nodes.map(nodeCategory))].map((group) => (
+                  <div className="forge-tree-group" key={group}>
+                    <h3>{group}</h3>
+                    {nodes
+                      .filter((node) => nodeCategory(node) === group)
+                      .map((node) => (
+                        <div
+                          className={`forge-tree-row ${selected.includes(node.value.id) ? 'selected' : ''} ${errors.has(node.value.id) ? 'invalid' : ''}`}
+                          key={node.value.id}
+                        >
+                          <button
+                            className="forge-tree-select"
+                            onClick={(event) =>
+                              select(node.value.id, event.shiftKey || event.ctrlKey || event.metaKey)
+                            }
+                            title={node.value.name}
+                          >
+                            <span>
+                              {node.type === 'brush' ? (
+                                <Box size={13} />
+                              ) : node.type === 'spawn' ? (
+                                <Users size={13} />
+                              ) : (
+                                <Flag size={13} />
+                              )}
+                            </span>
+                            <span>{node.value.name || node.value.id.slice(0, 8)}</span>
+                          </button>
+                          <button
+                            aria-label={`${node.value.visible ? 'Hide' : 'Show'} ${node.value.name}`}
+                            onClick={() =>
+                              commit(
+                                mapForgeNodes(doc, (n) =>
+                                  n.value.id === node.value.id
+                                    ? patchForgeNode(n, { visible: !n.value.visible })
+                                    : n,
+                                ),
+                                'Toggle editor visibility',
+                              )
+                            }
+                          >
+                            {node.value.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                          </button>
+                          <button
+                            aria-label={`${node.value.locked ? 'Unlock' : 'Lock'} ${node.value.name}`}
+                            onClick={() =>
+                              commit(
+                                mapForgeNodes(doc, (n) =>
+                                  n.value.id === node.value.id
+                                    ? patchForgeNode(n, { locked: !n.value.locked })
+                                    : n,
+                                ),
+                                'Toggle object lock',
+                              )
+                            }
+                          >
+                            {node.value.locked ? <Lock size={12} /> : <Unlock size={12} />}
+                          </button>
+                        </div>
+                      ))}
                   </div>
                 ))}
-            </div>
-          ))}
-          {project.scene.some(object=>object.assetId)&&<div className="forge-tree-group"><h3>Custom models</h3>{project.scene.filter(object=>object.assetId).map(object=><div className={`forge-tree-row ${workshopSelected===object.id?'selected':''}`} key={object.id}><button className="forge-tree-select" title={object.name} onClick={()=>{setWorkshopSelected(object.id);setSelected([]);setSelectedZone(null);revealPanel('workshop-object');}}><Box size={13}/><span>{object.name}</span></button><button aria-label={`${object.visible?'Hide':'Show'} ${object.name}`} onClick={()=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?{...value,visible:!value.visible}:value)},'Toggle custom model visibility')}>{object.visible?<Eye size={12}/>:<EyeOff size={12}/>}</button></div>)}</div>}
-          {!!project.firefight?.spawnZones.length && (
-            <div className="forge-tree-group">
-              <h3>AI spawn zones</h3>
-              {project.firefight.spawnZones.map((zone, i) => (
-                <button
-                  className={`forge-tree-select ${selectedZone === zone.id ? 'selected' : ''}`}
-                  key={zone.id}
+                {project.scene.some((object) => object.assetId) && (
+                  <div className="forge-tree-group">
+                    <h3>Custom models</h3>
+                    {project.scene
+                      .filter((object) => object.assetId)
+                      .map((object) => (
+                        <div
+                          className={`forge-tree-row ${workshopSelected === object.id ? 'selected' : ''}`}
+                          key={object.id}
+                        >
+                          <button
+                            className="forge-tree-select"
+                            title={object.name}
+                            onClick={() => {
+                              setWorkshopSelected(object.id);
+                              setSelected([]);
+                              setSelectedZone(null);
+                              revealPanel('workshop-object');
+                            }}
+                          >
+                            <Box size={13} />
+                            <span>{object.name}</span>
+                          </button>
+                          <button
+                            aria-label={`${object.visible ? 'Hide' : 'Show'} ${object.name}`}
+                            onClick={() =>
+                              edit(
+                                {
+                                  ...latestProject.current,
+                                  scene: latestProject.current.scene.map((value) =>
+                                    value.id === object.id ? { ...value, visible: !value.visible } : value,
+                                  ),
+                                },
+                                'Toggle custom model visibility',
+                              )
+                            }
+                          >
+                            {object.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {!!project.firefight?.spawnZones.length && (
+                  <div className="forge-tree-group">
+                    <h3>AI spawn zones</h3>
+                    {project.firefight.spawnZones.map((zone, i) => (
+                      <button
+                        className={`forge-tree-select ${selectedZone === zone.id ? 'selected' : ''}`}
+                        key={zone.id}
+                        onClick={() => {
+                          setSelectedZone(zone.id);
+                          setSelected([]);
+                          setTab('firefight');
+                        }}
+                      >
+                        <Flag size={13} />
+                        Zone {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!nodes.length && <p className="forge-hint">Add a sealed room from the palette to begin.</p>}
+                <div className="forge-hierarchy-footer">
+                  <button className="small-button" disabled={!mutableNodes.length} onClick={duplicate}>
+                    <Copy size={13} />
+                    Duplicate
+                  </button>
+                  <button
+                    className="small-button"
+                    disabled={!mutableNodes.length && !selectedZone}
+                    onClick={remove}
+                  >
+                    <Trash2 size={13} />
+                    Delete
+                  </button>
+                </div>
+              </aside>
+            </WorkspacePanel>
+            <section className="forge-center">
+              <div className="forge-toolbar">
+                <span
+                  className="forge-source-summary"
+                  title="Shared level source · geometry, Halo references, custom models and player starts"
+                >
+                  <Layers3 size={14} />
+                  <strong>QuickForge</strong>
+                  <span>
+                    {doc.workshop
+                      ? `${doc.workshop.brushes.length} volumes`
+                      : `${doc.geometry.length} brushes`}{' '}
+                    · {doc.placements.length} references
+                    {project?.scene.some((o) => o.assetId)
+                      ? ` · ${project.scene.filter((o) => o.assetId).length} custom models`
+                      : ''}{' '}
+                    · {doc.spawns.length} starts
+                  </span>
+                </span>
+                <IconButton
+                  label="Translate (W)"
+                  active={mode === 'translate'}
+                  onClick={() => setMode('translate')}
+                >
+                  <Move3D size={17} />
+                </IconButton>
+                <IconButton label="Rotate (E)" active={mode === 'rotate'} onClick={() => setMode('rotate')}>
+                  <Rotate3D size={17} />
+                </IconButton>
+                <IconButton
+                  label="Resize brush (R)"
+                  active={mode === 'scale'}
+                  disabled={mutableNodes.length !== 1 || mutableNodes[0]?.type !== 'brush'}
+                  onClick={() => setMode('scale')}
+                >
+                  <Scaling size={17} />
+                </IconButton>
+                <span className="toolbar-divider" />
+                <IconButton label="Show grid" active={grid} onClick={() => setGrid(!grid)}>
+                  <Grid2X2 size={16} />
+                </IconButton>
+                <IconButton
+                  label="Frame arena (F)"
                   onClick={() => {
-                    setSelectedZone(zone.id);
+                    setWrlFocus(false);
+                    setFrame(v=>v+1);
+                  }}
+                >
+                  <Focus size={16} />
+                </IconButton>
+                <button
+                  type="button"
+                  className={gridSnap ? 'small-button active' : 'small-button'}
+                  aria-label="Toggle grid snapping (G)"
+                  aria-pressed={gridSnap}
+                  title="G: snap placements and transforms to an adjustable world-coordinate grid. Turn off for unrestricted positioning. Mesh Snap is independent."
+                  onClick={() => setGridSnap(!gridSnap)}
+                >
+                  Grid snap {gridSnap ? 'on' : 'off'}
+                </button>
+                <select
+                  aria-label="Grid snap spacing"
+                  title="Distance between grid lines, in Halo world units. Applies only while Grid Snap is on."
+                  value={snap}
+                  onChange={(e) => setSnap(Number(e.target.value))}
+                >
+                  <option value={0}>No grid interval</option>
+                  <option value={0.25}>¼ unit</option>
+                  <option value={0.5}>½ unit</option>
+                  <option value={1}>1 unit</option>
+                  <option value={2}>2 units</option>
+                </select>
+                <button
+                  type="button"
+                  className={meshSnap ? 'small-button active' : 'small-button'}
+                  aria-label="Toggle source mesh face, cave rim, and terrain edge snapping (M)"
+                  aria-pressed={meshSnap}
+                  title="M: align rectangular brush faces, matching cave rings and equal-height terrain borders. Exact cave and terrain seams lose duplicate source walls. No compiled Halo collision is created."
+                  onClick={() => setMeshSnap(!meshSnap)}
+                >
+                  Mesh snap {meshSnap ? 'on' : 'off'}
+                </button>
+                <HelpTip help="Select an asset or brush to show the transform gizmo: red X, green Y and blue Z arrows. W move, E rotate, R resize brush. Hold RIGHT MOUSE to look; RMB + WASD flies; R/F up/down, Shift boost. Grid Snap and Mesh Snap are independent. Terrain/cave joints only qualify when exact; Halo Tool remains authoritative." />
+                <select
+                  title="Hold RMB to look and use WASD to fly (R/F up/down, Shift boost) in Orbit and Free fly. First person previews your map with optional collision based on regenerated source triangles—not Halo engine physics."
+                  aria-label="QuickForge camera"
+                  value={cameraMode}
+                  onChange={(e) => setCameraMode(e.target.value as ForgeCamera)}
+                >
+                  <option value="orbit">Orbit</option>
+                  <option value="fly">Free fly</option>
+                  <option value="walk">First person</option>
+                  <option value="machinima">Machinima director</option>
+                </select>
+                {cameraMode === 'machinima' && (
+                  <select
+                    aria-label="Machinima actor starting point"
+                    value={actorId || doc.spawns[0]?.id || ''}
+                    onChange={(event) => setActorId(event.target.value)}
+                  >
+                    {doc.spawns.map((spawn) => (
+                      <option key={spawn.id} value={spawn.id}>
+                        {spawn.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {cameraMode === 'walk' && (
+                  <label title="Walk uses source triangle surfaces for bounded body collision and gravity. Changes are rebuilt during editing; this is not compiled Halo collision.">
+                    <input
+                      type="checkbox"
+                      checked={walkCollision}
+                      onChange={(e) => setWalkCollision(e.target.checked)}
+                    />
+                    Source collision
+                  </label>
+                )}
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={wireframe}
+                    onChange={(e) => setWireframe(e.target.checked)}
+                  />
+                  Wire
+                </label>
+                <label title="Show actual authored 1-point (2×2) or 3–8-point convex King-of-the-Hill zones as NON-COLLIDING editor overlays. Halo compiles the actual netgame flag records.">
+                  <input
+                    type="checkbox"
+                    checked={showHillAreas}
+                    onChange={(event) => setShowHillAreas(event.target.checked)}
+                  />
+                  Hill zones
+                </label>
+                <label title="Visualize ordered Race checkpoint paths and source-only teleporter channel links. These lines are never exported as Halo geometry or collision.">
+                  <input
+                    type="checkbox"
+                    checked={showGameRoutes}
+                    onChange={(event) => setShowGameRoutes(event.target.checked)}
+                  />
+                  Race / teleport paths
+                </label>
+                <label>
+                  <input type="checkbox" checked={cutaway} onChange={(e) => setCutaway(e.target.checked)} />
+                  Cutaway roof
+                </label>
+              </div>
+              <div
+                ref={viewportElement}
+                tabIndex={0}
+                className={`forge-viewport ${dragging || assetDrag.dragging ? 'drag-active' : ''}`}
+                onDragOver={(event) => {
+                  if (!dragging && !event.dataTransfer.types.includes(dragType)) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'copy';
+                  const point = dropPoint.current?.(event.clientX, event.clientY);
+                  if (point) {
+                    const gridPoint = snapPoint(point, gridSnap ? snap : 0);
+                    if (meshSnap && dragging?.type === 'brush') {
+                      const ghostBrush = createBrush(
+                        dragging.kind,
+                        gridPoint,
+                        doc.materials[0]?.id ?? 'default',
+                      );
+                      try {
+                        const hit = snapBrushToAuthoredMesh(ghostBrush, doc.geometry);
+                        setGhost(hit?.position ?? gridPoint);
+                      } catch {
+                        setGhost(gridPoint);
+                      }
+                    } else setGhost(gridPoint);
+                  }
+                }}
+                onDragLeave={() => setGhost(null)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  try {
+                    const text = event.dataTransfer.getData(dragType);
+                    const item: PaletteItem = text ? JSON.parse(text) : dragging;
+                    if (
+                      item &&
+                      [
+                        'brush',
+                        'spawn',
+                        'objective',
+                        'asset',
+                        'zone',
+                        'hillPolygon',
+                        'teleportPair',
+                      ].includes(item.type)
+                    ) {
+                      const hit = dropPoint.current?.(event.clientX, event.clientY) ?? ghost;
+                      if (item.type === 'hillPolygon' && !hit)
+                        throw new Error(
+                          'Point to an editable map surface to place a King hill. No geometry is changed.',
+                        );
+                      add(item, hit ?? [0, 0, 0]);
+                    }
+                  } catch (e) {
+                    notify(`Drop could not be applied: ${String(e)}`, 'error');
+                  } finally {
+                    setGhost(null);
+                    setDragging(null);
+                  }
+                }}
+              >
+                <ForgeViewport
+                  materialSource={sourceOpen}
+                  materialBindings={project.nativeAssetImports}
+                  sessionId={project.id}
+                  resourceScopes={Object.fromEntries(
+                    (library?.documents ?? []).map((document) => [
+                      document.id,
+                      JSON.stringify(document.history.current?.source?.resourceSha256 ?? {}),
+                    ]),
+                  )}
+                  renderFeatures={project.renderFeatures}
+                  document={doc}
+                  viewportChildren={(textures) => (
+                    <>
+                      <WorkshopScene
+                        textures={textures}
+                        project={project}
+                        snapshot={snapshot}
+                        onError={(message) => notify(message, 'error')}
+                        meshes={workshopMeshes}
+                        selected={workshopSelected}
+                        onSelect={(id) => {
+                          setWorkshopSelected(id);
+                          setSelected([]);
+                          revealPanel('workshop-object');
+                        }}
+                        onTransform={(object) =>
+                          edit(
+                            {
+                              ...latestProject.current,
+                              scene: latestProject.current.scene.map((value) =>
+                                value.id === object.id ? object : value,
+                              ),
+                            },
+                            'Transform custom model',
+                          )
+                        }
+                        mode={mode}
+                        snap={gridSnap ? snap : 0}
+                      />
+                      {project.audioPreview?.emitters
+                        .filter((emitter) => emitter.spatial)
+                        .map((emitter) => (
+                          <mesh
+                            key={emitter.id}
+                            position={emitter.position}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              writeMapSession(project.id, 'sound-emitter-selection', emitter.id);
+                              revealPanel('map-sounds');
+                            }}
+                          >
+                            <sphereGeometry args={[0.12, 10, 6]} />
+                            <meshBasicMaterial color="#89e4ef" wireframe />
+                          </mesh>
+                        ))}
+                    </>
+                  )}
+                  showHillAreas={showHillAreas}
+                  showGameRoutes={showGameRoutes}
+                  snapshot={snapshot}
+                  selected={selected}
+                  onSelect={select}
+                  onTransform={(updated) => {
+                    try {
+                      let snapped: ForgeNode[] = updated;
+                      const only = updated[0];
+                      if (meshSnap && mode === 'translate' && updated.length === 1 && only.type === 'brush') {
+                        const hit = snapBrushToAuthoredMesh(only.value, doc.geometry);
+                        if (hit) {
+                          notify(
+                            `Aligned ${hit.kind === 'cave-rim' ? 'matching cave rims' : hit.kind === 'terrain-edge' ? 'matching terrain tile edges' : 'source brush faces'}; exact matching cave rims and terrain borders are joined by the source generator. Halo collision remains unverified.`,
+                          );
+                          snapped = [{ type: 'brush', value: { ...only.value, position: hit.position } }];
+                        }
+                      }
+                      const byId = new Map(snapped.map((node) => [node.value.id, node]));
+                      commit(
+                        mapForgeNodes(doc, (node) => byId.get(node.value.id) ?? node),
+                        `Transform ${updated.length} object(s)`,
+                      );
+                    } catch (e) {
+                      notify(String(e),'error');
+                    }
+                  }}
+                  mode={mode}
+                  snap={gridSnap ? snap : 0}
+                  grid={grid}
+                  wireframe={wireframe}
+                  cutaway={cutaway}
+                  cameraMode={cameraMode}
+                  spawnModelSource={spawnModelSource ?? undefined}
+                  actorId={actorId}
+                  walkCollision={walkCollision}
+                  wrlOverlay={wrlStale ? null : wrlParse.value}
+                  showWrlOverlay={wrlVisible && !wrlStale}
+                  focusWrlOverlay={wrlFocus && !wrlStale}
+                  frame={frame}
+                  errors={errors}
+                  dropPoint={dropPoint}
+                  ghost={ghost}
+                  zones={project.firefight?.spawnZones ?? []}
+                  selectedZone={selectedZone}
+                  onZoneSelect={(id) => {
+                    setSelectedZone(id);
                     setSelected([]);
                     setTab('firefight');
                   }}
-                >
-                  <Flag size={13} />
-                  Zone {i + 1}
-                </button>
-              ))}
-            </div>
-          )}
-          {!nodes.length && <p className="forge-hint">Add a sealed room from the palette to begin.</p>}
-          <div className="forge-hierarchy-footer">
-            <button className="small-button" disabled={!mutableNodes.length} onClick={duplicate}>
-              <Copy size={13} />
-              Duplicate
-            </button>
-            <button
-              className="small-button"
-              disabled={!mutableNodes.length && !selectedZone}
-              onClick={remove}
-            >
-              <Trash2 size={13} />
-              Delete
-            </button>
-          </div>
-        </aside></WorkspacePanel>
-        <section className="forge-center">
-          <div className="forge-toolbar">
-            <span className="forge-source-summary" title="Shared level source · geometry, Halo references, custom models and player starts">
-              <Layers3 size={14}/><strong>QuickForge</strong>
-              <span>{doc.workshop ? `${doc.workshop.brushes.length} volumes` : `${doc.geometry.length} brushes`} · {doc.placements.length} references{project?.scene.some(o=>o.assetId)?` · ${project.scene.filter(o=>o.assetId).length} custom models`:''} · {doc.spawns.length} starts</span>
-            </span>
-            <IconButton
-              label="Translate (W)"
-              active={mode === 'translate'}
-              onClick={() => setMode('translate')}
-            >
-              <Move3D size={17} />
-            </IconButton>
-            <IconButton label="Rotate (E)" active={mode === 'rotate'} onClick={() => setMode('rotate')}>
-              <Rotate3D size={17} />
-            </IconButton>
-            <IconButton
-              label="Resize brush (R)"
-              active={mode === 'scale'}
-              disabled={mutableNodes.length !== 1 || mutableNodes[0]?.type !== 'brush'}
-              onClick={() => setMode('scale')}
-            >
-              <Scaling size={17} />
-            </IconButton>
-            <span className="toolbar-divider" />
-            <IconButton label="Show grid" active={grid} onClick={() => setGrid(!grid)}>
-              <Grid2X2 size={16} />
-            </IconButton>
-            <IconButton label="Frame arena (F)" onClick={() => {setWrlFocus(false);setFrame((v) => v + 1);}}>
-              <Focus size={16} />
-            </IconButton>
-            <button type="button" className={gridSnap ? 'small-button active' : 'small-button'}
-              aria-label="Toggle grid snapping (G)" aria-pressed={gridSnap} title="G: snap placements and transforms to an adjustable world-coordinate grid. Turn off for unrestricted positioning. Mesh Snap is independent."
-              onClick={() => setGridSnap(!gridSnap)}>Grid snap {gridSnap ? 'on' : 'off'}</button>
-            <select aria-label="Grid snap spacing" title="Distance between grid lines, in Halo world units. Applies only while Grid Snap is on." value={snap} onChange={(e) => setSnap(Number(e.target.value))}>
-              <option value={0}>No grid interval</option>
-              <option value={0.25}>¼ unit</option>
-              <option value={0.5}>½ unit</option>
-              <option value={1}>1 unit</option>
-              <option value={2}>2 units</option>
-            </select>
-            <button type="button" className={meshSnap ? 'small-button active' : 'small-button'}
-              aria-label="Toggle source mesh face, cave rim, and terrain edge snapping (M)" aria-pressed={meshSnap}
-              title="M: align rectangular brush faces, matching cave rings and equal-height terrain borders. Exact cave and terrain seams lose duplicate source walls. No compiled Halo collision is created."
-              onClick={() => setMeshSnap(!meshSnap)}>Mesh snap {meshSnap ? 'on' : 'off'}</button>
-            <HelpTip help="Select an asset or brush to show the transform gizmo: red X, green Y and blue Z arrows. W move, E rotate, R resize brush. Hold RIGHT MOUSE to look; RMB + WASD flies; R/F up/down, Shift boost. Grid Snap and Mesh Snap are independent. Terrain/cave joints only qualify when exact; Halo Tool remains authoritative."/>
-            <select
-              title="Hold RMB to look and use WASD to fly (R/F up/down, Shift boost) in Orbit and Free fly. First person previews your map with optional collision based on regenerated source triangles—not Halo engine physics."
-              aria-label="QuickForge camera"
-              value={cameraMode}
-              onChange={(e) => setCameraMode(e.target.value as ForgeCamera)}
-            >
-              <option value="orbit">Orbit</option>
-              <option value="fly">Free fly</option>
-              <option value="walk">First person</option>
-              <option value="machinima">Machinima director</option>
-            </select>
-            {cameraMode==='machinima'&&<select aria-label="Machinima actor starting point" value={actorId||doc.spawns[0]?.id||''} onChange={event=>setActorId(event.target.value)}>{doc.spawns.map(spawn=><option key={spawn.id} value={spawn.id}>{spawn.name}</option>)}</select>}
-            {cameraMode === 'walk' && <label title="Walk uses source triangle surfaces for bounded body collision and gravity. Changes are rebuilt during editing; this is not compiled Halo collision.">
-              <input type="checkbox" checked={walkCollision} onChange={e=>setWalkCollision(e.target.checked)}/>
-              Source collision
-            </label>}
-            <label>
-              <input type="checkbox" checked={wireframe} onChange={(e) => setWireframe(e.target.checked)} />
-              Wire
-            </label>
-            <label title="Show actual authored 1-point (2×2) or 3–8-point convex King-of-the-Hill zones as NON-COLLIDING editor overlays. Halo compiles the actual netgame flag records.">
-              <input type="checkbox" checked={showHillAreas} onChange={event=>setShowHillAreas(event.target.checked)}/>
-              Hill zones
-            </label>
-            <label title="Visualize ordered Race checkpoint paths and source-only teleporter channel links. These lines are never exported as Halo geometry or collision.">
-              <input type="checkbox" checked={showGameRoutes} onChange={event=>setShowGameRoutes(event.target.checked)}/>
-              Race / teleport paths
-            </label>
-            <label>
-              <input type="checkbox" checked={cutaway} onChange={(e) => setCutaway(e.target.checked)} />
-              Cutaway roof
-            </label>
-          </div>
-          <div
-            ref={viewportElement}
-            tabIndex={0}
-            className={`forge-viewport ${dragging || assetDrag.dragging ? 'drag-active' : ''}`}
-            onDragOver={(event) => {
-              if (!dragging && !event.dataTransfer.types.includes(dragType)) return;
-              event.preventDefault();
-              event.dataTransfer.dropEffect = 'copy';
-              const point = dropPoint.current?.(event.clientX, event.clientY);
-              if (point) {
-                const gridPoint = snapPoint(point, gridSnap ? snap : 0);
-                if (meshSnap && dragging?.type === 'brush') {
-                  const ghostBrush = createBrush(dragging.kind, gridPoint, doc.materials[0]?.id ?? 'default');
-                  try {
-                    const hit = snapBrushToAuthoredMesh(ghostBrush, doc.geometry);
-                    setGhost(hit?.position ?? gridPoint);
-                  } catch { setGhost(gridPoint); }
-                } else setGhost(gridPoint);
-              }
-            }}
-            onDragLeave={() => setGhost(null)}
-            onDrop={(event) => {
-              event.preventDefault();
-              try {
-                const text = event.dataTransfer.getData(dragType);
-                const item: PaletteItem = text ? JSON.parse(text) : dragging;
-                if (item && ['brush', 'spawn', 'objective', 'asset', 'zone', 'hillPolygon', 'teleportPair'].includes(item.type)) {
-                  const hit=dropPoint.current?.(event.clientX, event.clientY) ?? ghost;
-                  if (item.type==='hillPolygon' && !hit) throw new Error('Point to an editable map surface to place a King hill. No geometry is changed.');
-                  add(item, hit ?? [0, 0, 0]);
-                }
-              } catch (e) {
-                notify(`Drop could not be applied: ${String(e)}`, 'error');
-              } finally {
-                setGhost(null);
-                setDragging(null);
-              }
-            }}
-          >
-            <ForgeViewport
-              materialSource={sourceOpen}
-              sessionId={project.id}
-              resourceScopes={Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})]))}
-              renderFeatures={project.renderFeatures}
-              document={doc}
-              viewportChildren={textures=><><WorkshopScene textures={textures} project={project} snapshot={snapshot} onError={message=>notify(message,'error')} meshes={workshopMeshes} selected={workshopSelected} onSelect={id=>{setWorkshopSelected(id);setSelected([]);revealPanel('workshop-object');}} onTransform={object=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?object:value)},'Transform custom model')} mode={mode} snap={gridSnap?snap:0}/>{project.audioPreview?.emitters.filter(emitter=>emitter.spatial).map(emitter=><mesh key={emitter.id} position={emitter.position} onClick={event=>{event.stopPropagation();writeMapSession(project.id,'sound-emitter-selection',emitter.id);revealPanel('map-sounds');}}><sphereGeometry args={[.12,10,6]}/><meshBasicMaterial color="#89e4ef" wireframe/></mesh>)}</>}
-              showHillAreas={showHillAreas}
-              showGameRoutes={showGameRoutes}
-              snapshot={snapshot}
-              selected={selected}
-              onSelect={select}
-              onTransform={(updated) => {
-                try {
-                  let snapped: ForgeNode[] = updated;
-                  const only = updated[0];
-                  if (meshSnap && mode === 'translate' && updated.length === 1 && only.type === 'brush') {
-                    const hit = snapBrushToAuthoredMesh(only.value, doc.geometry);
-                    if (hit) {
-                      notify(`Aligned ${hit.kind === 'cave-rim' ? 'matching cave rims' : hit.kind === 'terrain-edge' ? 'matching terrain tile edges' : 'source brush faces'}; exact matching cave rims and terrain borders are joined by the source generator. Halo collision remains unverified.`);
-                      snapped = [{type: 'brush', value: {...only.value, position: hit.position}}];
-                    }
-                  }
-                  const byId = new Map(snapped.map((node) => [node.value.id, node]));
-                  commit(
-                    mapForgeNodes(doc, (node) => byId.get(node.value.id) ?? node),
-                    `Transform ${updated.length} object(s)`,
-                  );
-                } catch (e) {
-                  notify(String(e), 'error');
-                }
-              }}
-              mode={mode}
-              snap={gridSnap ? snap : 0}
-              grid={grid}
-              wireframe={wireframe}
-              cutaway={cutaway}
-              cameraMode={cameraMode}
-              spawnModelSource={spawnModelSource??undefined}
-              actorId={actorId}
-              walkCollision={walkCollision}
-              wrlOverlay={wrlStale ? null : wrlParse.value}
-              showWrlOverlay={wrlVisible && !wrlStale}
-              focusWrlOverlay={wrlFocus && !wrlStale}
-              frame={frame}
-              errors={errors}
-              dropPoint={dropPoint}
-              ghost={ghost}
-              zones={project.firefight?.spawnZones ?? []}
-            selectedZone={selectedZone}
-            onZoneSelect={(id) => { setSelectedZone(id); setSelected([]); setTab('firefight'); }}
-            onZoneMove={(id, position) => { if (project.firefight) edit({ ...project, firefight: { ...project.firefight, spawnZones: project.firefight.spawnZones.map((zone) => zone.id === id ? { ...zone, position } : zone) } }, 'Move AI spawn zone'); }}
-            onError={(message) => notify(message, 'error')}
-            />
-            {assetDrag.dragging&&<div className="viewport-asset-drop-hint">Drop a model or sound onto the map · Esc cancels</div>}
-            <div className="forge-viewport-badges">
-              <Pill tone={preflight.ready ? 'green' : 'amber'}>
-                {previewBusy
-                  ? 'Updating geometry…'
-                  : preflight.ready
-                    ? 'Current geometry validated'
-                    : 'Source preflight pending / blocked'}
-              </Pill>
-              {wrlSource && <Pill tone={wrlStale ? 'amber' : 'green'}>Halo Tool WRL {wrlStale ? 'STALE · reimport after build' : `${wrlParse.value?.segments.length ?? 0} edges / ${wrlParse.value?.faces.length ?? 0} faces`}</Pill>}
-              {cutaway && <Pill>Roof hidden in editor only</Pill>}
-              {cameraMode === 'walk' && <Pill tone={walkCollision && snapshot ? 'green' : 'amber'}>Source collision {walkCollision && snapshot ? 'simulation ON' : 'OFF / pending'} · NOT Halo physics</Pill>}
-              <Pill>Grid snap {gridSnap ? `${snap}u` : 'off'} · Mesh snap {meshSnap ? 'on' : 'off'}</Pill>
-              <span className="forge-axis-legend" aria-label="Move gizmo: X red, Y green, Z blue" title="Select a brush or asset, choose Move (W), and drag one colored arrow to adjust a single coordinate. Changes update source geometry and the next live collision preview."><b className="gs-axis-x">X</b><b className="gs-axis-y">Y</b><b className="gs-axis-z">Z</b> gizmo</span>
-              {terrainJoins.length>0 && <><Pill tone="green">{terrainJoins.length} terrain source seam{terrainJoins.length===1?'':'s'}</Pill><HelpTip help={describeTerrainJoins(doc)}/></>}
-            </div>
-            {cameraMode === 'walk' && (
-              <button className="forge-enter-walk" title="Click to lock mouse and walk on locally generated source mesh. W/A/S/D moves; Shift sprints; Escape releases. No live connection to Halo.">Enter walk sandbox · Esc releases</button>
-            )}
-            <div className="forge-viewport-note">
-              {cameraMode === 'fly'
-                ? 'Hold RMB + drag to look · RMB + WASD fly · R/F up/down · Shift boost'
-                : cameraMode === 'walk'
-                  ? walkCollision ? 'WASD walk · Shift sprint · Esc releases pointer · source mesh collision/gravity simulated (not Halo runtime).' : 'WASD move · Source collision disabled: free camera translation.'
-                  : 'Orbit: left-drag · Hold RMB + WASD to fly/look · wheel zoom · Shift-click multi-select'}
-              <br />
-              G: grid snap · M: mesh snap. Mesh snapping moves source geometry only; it never recompiles collision or portals.
-              <br />
-              Halo placements load their actual world models from the preserved source map. Unavailable model dependencies appear in the viewport status.
-            </div>
-          </div>
-        </section>
-        {library&&<WorkspacePanel id="asset-library" label="Asset library" defaultDock="left"><ViewportAssetLibrary projectId={project.id} assets={catalog} begin={assetDrag.begin} activate={assetDrag.activate} canReplace={!!workshop||selected.length===1&&doc.placements.some(value=>value.id===selected[0])} replace={item=>{const placement=doc.placements.find(value=>value.id===selected[0]);if(item.kind==='mesh'&&workshop)void dropLibraryAsset(item.key,workshop.position,workshop.id);else if(item.kind==='model'&&placement)void dropLibraryAsset(item.key,placement.position,placement.id);else notify('Choose a placed Halo model or a custom mesh of the same placement kind.','error');}} importModel={()=>void library.onImportModel(viewPoint())} importSound={()=>void library.onImportSound(viewPoint()).then(added=>{if(added)revealPanel('map-sounds');})} busy={library.busy||assetBusy}/></WorkspacePanel>}
-        {library&&<WorkspacePanel id="object-tags" label="Object tags">{tagProject&&tagDocument?.inspection?<><p className="subtle">{tagProject.title} · source tags</p><ViewportTags project={tagProject} inspection={tagDocument.inspection} requestedTagId={tagRequest} requestRevision={tagRevision} edit={edit} notify={notify} onSave={()=>library.onSaveMap(tagProject.id)}/></>:<p>Open this placement’s source map in a tab to edit its tags in this drawer.</p>}</WorkspacePanel>}
-        {library&&<WorkspacePanel id="map-sounds" label="Map sounds"><label>Sound source map<select aria-label="QuickForge sound source map" value={sourceId} onChange={event=>setSourceId(event.target.value)}><option value="">Choose an imported source map</option>{sources.map(source=><option key={source.id} value={source.id}>{source.title}</option>)}</select></label>{sourceOpen?.inspection?<MapSounds expanded key={sourceOpen.project.id} project={project} edit={edit} projectId={sourceOpen.project.id} inspection={sourceOpen.inspection}/>:<SoundMixer project={project} inspection={null} sourceProjectId={project.id} tagId={null} edit={edit}/>}</WorkspacePanel>}
-        {workshop&&<WorkspacePanel id="workshop-object" label="Custom model"><WorkshopObjectFields key={workshop.id} object={workshop} project={project} onMaterialBinding={(name,materialId)=>{const current=latestProject.current, doc=current.quickForge, material=doc?.materials.find(m=>m.id===materialId);if(!doc||!material?.shaderPath)return;const existing=doc.materials.find(m=>m.name.toLowerCase()===name.toLowerCase());edit({...current,quickForge:{...doc,materials:existing?doc.materials.map(m=>m.id===existing.id?{...m,shaderPath:material.shaderPath,color:material.color}:m):[...doc.materials,{...material,id:crypto.randomUUID(),name}]}},'Bind imported model material');}} update={object=>edit({...latestProject.current,scene:latestProject.current.scene.map(value=>value.id===object.id?object:value)},'Edit custom model')} remove={()=>{edit({...latestProject.current,scene:latestProject.current.scene.filter(value=>value.id!==workshop.id)},'Remove custom model');setWorkshopSelected(null);}}/></WorkspacePanel>}
-        <WorkspacePanel id="forge-inspector" label="Inspector"><aside className="forge-inspector">
-          <div className="forge-panel-tabs">
-            <button className={tab === 'palette' ? 'selected' : ''} onClick={() => setTab('palette')}>
-              Palette
-            </button>
-            <button className={tab === 'properties' ? 'selected' : ''} onClick={() => setTab('properties')}>
-              Properties
-            </button>
-            <button className={tab === 'firefight' ? 'selected' : ''} onClick={() => setTab('firefight')}>
-              Firefight
-            </button>
-            <button className={tab === 'sound' ? 'selected' : ''} onClick={() => {setTab('sound');if(library)revealPanel('map-sounds');}}>Sound</button>
-          </div>
-          <div className="forge-inspector-scroll">
-            <RenderFeatures project={project} edit={props.edit}/>
-            {tab==='sound'&&!library&&<><label>Sound source map<select aria-label="QuickForge sound source map" value={sourceId} onChange={e=>setSourceId(e.target.value)}><option value="">Choose an imported source map</option>{sources.map(source=><option key={source.id} value={source.id}>{source.title}</option>)}</select></label>{sourceOpen?.inspection?<MapSounds key={sourceOpen.project.id} project={project} edit={props.edit} projectId={sourceOpen.project.id} inspection={sourceOpen.inspection}/>:<p>Open an imported map as a sound source. Emitter positions belong to this QuickForge map; original audio stays in its preserved source project.</p>}</>}
-            {tab === 'palette' && (
-              <>
-                <div className="forge-panel-heading">
-                  <strong>{doc.workshop?'Workshop geometry':'Original geometry'}</strong>
-                  <Pill>Editable</Pill>
-                  <HelpTip help="Drag to place a source brush, or click to add at the origin. Snap G/M governs alignment. All primitives regenerate a source mesh and undergo bounded validation; only Halo Tool/Invader can create verified game collision."/>
-                </div>
-                {doc.workshop&&<button onClick={()=>setBspMode(true)}>Edit volumes in BSP Workshop</button>}
-                <div className="forge-brush-palette">
-                  {(doc.workshop?[]:Object.keys(brushNames) as BrushKind[]).map((kind) => (
-                    <button
-                      key={kind}
-                      {...draggable({ type: 'brush', kind })}
-                      title={kind==='terrain' ? 'Editable gridded terrain. Sculpt hills and align identical boundary samples with Mesh Snap (M). The walk sandbox uses its generated triangles; Halo collision needs Tool.' : kind==='caveTunnel' ? 'Hollow annular cave tunnel. Matching opposite-facing rims can source-weld. A cave-to-room entrance still needs CSG, portals and collision compilation.' : `${brushNames[kind]}: editable source geometry; choose this brush, then use Properties or the transform gizmo. Build requires compatible Halo Tool.`}
-                      onClick={() => add({ type: 'brush', kind })}
-                    >
-                      <Box size={19} />
-                      <span>{brushNames[kind]}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="forge-hint">
-                  Click to add at the origin, or drag onto a floor or surface. Resize using Properties or the
-                  scale gizmo.
-                </p>
-                <div className="forge-panel-heading">
-                  <strong>Scenario tools</strong>
-                  <HelpTip help="Spawn points, objective markers and AI zones author scenario metadata. They do not create game entities until the scenario/tag pipeline compiles them."/>
-                </div>
-                <div className="forge-brush-palette">
-                  <button title="Add a player starting marker to the scenario source; the Halo scenario must be compiled and tested for spawn validity." {...draggable({ type: 'spawn' })} onClick={() => add({ type: 'spawn' })}>
-                    <Users size={18} />
-                    Player start
-                  </button>
-                  {(
-                    [
-                      ['ctfFlag', 'CTF flag'],
-                      ['hill', 'Hill'],
-                      ['oddball', 'Oddball'],
-                      ['raceCheckpoint', 'Race checkpoint'],
-                      ['raceVehicle', 'Race vehicle start'],
-                      ['teleportFrom', 'Teleporter entrance'],
-                      ['teleportTo', 'Teleporter exit'],
-                    ] as const
-                  ).map(([kind, title]) => (
-                    <button
-                      key={kind}
-                      {...draggable({ type: 'objective', kind })}
-                      title={`Add a ${title} objective marker to the source scenario. Requires a compatible gametype and engine validation.`}
-                      onClick={() => add({ type: 'objective', kind })}
-                    >
-                      <Flag size={17} />
-                      {title}
-                    </button>
-                  ))}
-                  <button title="Place an editor Firefight AI zone. Actual AI encounters, navigation and networking must be built into the Halo scenario and verified in-game." {...draggable({ type: 'zone' })} onClick={() => add({ type: 'zone' })}>
-                    <Flag size={17} />
-                    AI spawn zone
-                  </button>
-                </div>
-                <div className="forge-gametype-panel">
-                  <div className="forge-panel-heading"><strong>Halo CE game modes</strong><HelpTip help="A Halo 1 multiplayer scenario can support all five classic modes simultaneously. Map objective flags define actual gameplay areas; selection of a game type alone does not add flags or native game rules." /></div>
-                  <p className="forge-hint">Click a mode to work on it. These checks reflect EDITABLE source only; Sapien, Tool and real gameplay must still confirm the netgame records.</p>
-                  <button type="button" className="small-button" title="Create a read-only five-mode manual QA checklist for Sapien, Tool, live map loading and two-client tests. Every test is NOT RUN; no game results are invented."
-                    onClick={()=>{try{
-                      const plan=makeFiveModeTestPlan(doc);
-                      const name=doc.name.replace(/[^A-Za-z0-9_-]/g,'_').slice(0,48)||'guilty_spark';
-                      downloadLocalText(`${name}_five_mode_test_plan.json`,JSON.stringify(plan,null,2),'application/json;charset=utf-8');
-                      notify('Five stock Halo 1 game-mode QA plan exported. All 20 live checks are NOT RUN; use Creator Studio to record real evidence.');
-                    }catch(e){notify(`Five-mode QA plan refused: ${String(e)}`,'error');}}}>
-                    Export five-mode manual QA plan (.json)
-                  </button>
-                  <div className="forge-panel-heading"><strong>Spawn layout · source review</strong><HelpTip help="Reclaimers/Bungie spawn design guidance, not a simulation of Halo spawn collision or CTF scoring. Historic recommendation: 16 per team, with real game testing required."/></div>
-                  <p className="forge-hint">{doc.spawns.length} authored starts · CTF red {spawnReview.ctfTeamEligible.red} / blue {spawnReview.ctfTeamEligible.blue} · {spawnReview.totalFindings} advisory finding(s). <strong>Not tested in Halo.</strong></p>
-                  <button type="button" className="small-button" title="Export a bounded, non-executable source-only spawn layout review; does not include coordinates or copied game content."
-                    onClick={()=>{try{
-                      const filename=doc.name.replace(/[^A-Za-z0-9_-]/g,'_').slice(0,48)||'guilty_spark';
-                      downloadLocalText(`${filename}_spawn_review.json`,JSON.stringify(spawnReview,null,2),'application/json;charset=utf-8');
-                      notify('Spawn source-review JSON exported; validate real spawns and CTF team safety in Halo before signoff.');
-                    }catch(e){notify(`Spawn review export failed: ${String(e)}`,'error');}}}>Export spawn layout review (.json)</button>
-                  {spawnReview.findings.length>0&&<details><summary>Spawn design cautions · {spawnReview.totalFindings}</summary>
-                    {spawnReview.findings.map((finding,index)=><button type="button" className="forge-issue" key={`${finding.code}-${index}`} title="Focus the source marker(s), then manually verify in Sapien and Halo" onClick={()=>{if(finding.ids.length){setSelected(finding.ids);setTab('properties');}}}><strong>{finding.severity}: {finding.code}</strong><span>{finding.message}</span></button>)}
-                    {spawnReview.omittedFindings>0&&<p className="forge-hint">{spawnReview.omittedFindings} additional cautions not displayed.</p>}
-                  </details>}
-                  <div className="forge-gametype-matrix">
-                    {gameChecklist.map(entry=><button type="button" key={entry.mode} className={doc.gameMode===entry.mode?'active':''} title={entry.notes.length?entry.notes.join('; '):'Source-only marker checklist passes; game not yet tested.'} onClick={()=>commit({...doc,gameMode:entry.mode},`Select ${entry.label} map rules`)}>
-                      <span>{entry.label}</span><span>{entry.ready?'Source checks ✓':`${entry.notes.length} checks`}</span>
-                    </button>)}
+                  onZoneMove={(id, position) => {
+                    if (project.firefight)
+                      edit(
+                        {
+                          ...project,
+                          firefight: {
+                            ...project.firefight,
+                            spawnZones: project.firefight.spawnZones.map((zone) =>
+                              zone.id === id ? { ...zone, position } : zone,
+                            ),
+                          },
+                        },
+                        'Move AI spawn zone',
+                      );
+                  }}
+                  onError={(message) => notify(message, 'error')}
+                />
+                {assetDrag.dragging && (
+                  <div className="viewport-asset-drop-hint">
+                    Drop a model or sound onto the map · Esc cancels
                   </div>
-                  <div className="forge-brush-palette">
-                    <button type="button" title="Place four editable hill boundary markers as a 5×5 convex square with one shared usage ID. Each corner is movable with XYZ arrows. Compiled Halo CE King game rules read these flags." {...draggable({type:'hillPolygon'})} onClick={()=>addPolygonHill()}><Flag size={17}/> Add four-corner hill · drag into map</button>
-                    <button type="button" title="Create one entrance and one exit on a fresh Halo CE teleporter channel, in a single undoable project edit. Endpoints must be moved and verified for collision and loop safety." {...draggable({type:'teleportPair'})} onClick={()=>addTeleportPair()}><Flag size={17}/> Add linked teleporter pair</button>
-                    <button type="button" title="Opt all existing player starts into the five stock Halo CE multiplayer modes. Review teams/locations; this does not validate engine spawn clearance." disabled={!doc.spawns.length} onClick={enableAllGameStarts}><Users size={17}/> Starts: all five modes</button>
-                  </div>
-                  <p className="forge-hint">King: one marker = 2×2 zone; 3–8 markers with the same hill ID = convex area. <strong>Never use exactly two.</strong> Crazy King needs multiple hill groups. Race checkpoints use consecutive IDs (0–31); Race vehicle markers are separate (maximum 16). Teleporter entrances/exits share channel 0–15; both ends are required.</p>
-                  {hillAreas(doc.objectives).map(a=><p key={a.usageId} className="forge-hint">Hill {a.usageId}: {a.markerIds.length} point{a.markerIds.length===1?'':'s'} · {a.valid?(a.shape==='single'?'2×2 single point':'convex polygon'):'INVALID / cannot export'}</p>)}
-                  {netgameIssues.length>0&&<details open={netgameBlocked}><summary title="Review engine-critical netgame flag integrity. Severe errors block safe export.">Netgame check · {netgameIssues.filter(i=>i.severity==='error').length} blockers / {netgameIssues.filter(i=>i.severity==='warning').length} cautions</summary>
-                    {netgameIssues.map((i,n)=><button type="button" key={`${i.code}-${n}`} className={`forge-issue ${i.severity}`} onClick={()=>{if(i.ids.length){setSelected(i.ids);setTab('properties');}}}><strong>{i.severity}: {i.code}</strong><span>{i.message}</span></button>)}
-                  </details>}
-                </div>
-                <div className="forge-panel-heading">
-                  <strong>Imported Halo tag references</strong>
-                  <HelpTip help="Imported .map cache references identify real weapon, vehicle, character and scenery tag paths. A tag reference is not a .tag file; use verified extraction and build workflows to transfer game assets."/>
-                </div>
-                <label className="forge-field">
-                  Source project
-                  <select
-                    aria-label="Asset source project"
-                    value={sourceId}
-                    onChange={(e) => setSourceId(e.target.value)}
+                )}
+                <div className="forge-viewport-badges">
+                  <Pill tone={preflight.ready ? 'green' : 'amber'}>
+                    {previewBusy
+                      ? 'Updating geometry…'
+                      : preflight.ready
+                        ? 'Current geometry validated'
+                        : 'Source preflight pending / blocked'}
+                  </Pill>
+                  {wrlSource && (
+                    <Pill tone={wrlStale ? 'amber' : 'green'}>
+                      Halo Tool WRL{' '}
+                      {wrlStale
+                        ? 'STALE · reimport after build'
+                        : `${wrlParse.value?.segments.length ?? 0} edges / ${wrlParse.value?.faces.length ?? 0} faces`}
+                    </Pill>
+                  )}
+                  {cutaway && <Pill>Roof hidden in editor only</Pill>}
+                  {cameraMode === 'walk' && (
+                    <Pill tone={walkCollision && snapshot ? 'green' : 'amber'}>
+                      Source collision {walkCollision && snapshot ? 'simulation ON' : 'OFF / pending'} · NOT
+                      Halo physics
+                    </Pill>
+                  )}
+                  <Pill>
+                    Grid snap {gridSnap ? `${snap}u` : 'off'} · Mesh snap {meshSnap ? 'on' : 'off'}
+                  </Pill>
+                  <span
+                    className="forge-axis-legend"
+                    aria-label="Move gizmo: X red, Y green, Z blue"
+                    title="Select a brush or asset, choose Move (W), and drag one colored arrow to adjust a single coordinate. Changes update source geometry and the next live collision preview."
                   >
-                    <option value="">Import a Halo map first</option>
-                    {sources.map((entry) => (
-                      <option key={entry.id} value={entry.id}>
-                        {entry.title} · cache {entry.version}
+                    <b className="gs-axis-x">X</b>
+                    <b className="gs-axis-y">Y</b>
+                    <b className="gs-axis-z">Z</b> gizmo
+                  </span>
+                  {terrainJoins.length > 0 && (
+                    <>
+                      <Pill tone="green">
+                        {terrainJoins.length} terrain source seam{terrainJoins.length === 1 ? '' : 's'}
+                      </Pill>
+                      <HelpTip help={describeTerrainJoins(doc)} />
+                    </>
+                  )}
+                </div>
+                {cameraMode === 'walk' && (
+                  <button
+                    className="forge-enter-walk"
+                    title="Click to lock mouse and walk on locally generated source mesh. W/A/S/D moves; Shift sprints; Escape releases. No live connection to Halo."
+                  >
+                    Enter walk sandbox · Esc releases
+                  </button>
+                )}
+                <div className="forge-viewport-note">
+                  {cameraMode === 'fly'
+                    ? 'Hold RMB + drag to look · RMB + WASD fly · R/F up/down · Shift boost'
+                    : cameraMode === 'walk'
+                      ? walkCollision
+                        ? 'WASD walk · Shift sprint · Esc releases pointer · source mesh collision/gravity simulated (not Halo runtime).'
+                        : 'WASD move · Source collision disabled: free camera translation.'
+                      : 'Orbit: left-drag · Hold RMB + WASD to fly/look · wheel zoom · Shift-click multi-select'}
+                  <br />
+                  G: grid snap · M: mesh snap. Mesh snapping moves source geometry only; it never recompiles
+                  collision or portals.
+                  <br />
+                  Halo placements load their actual world models from the preserved source map. Unavailable
+                  model dependencies appear in the viewport status.
+                </div>
+              </div>
+            </section>
+            {library && (
+              <WorkspacePanel id="asset-library" label="Asset library" defaultDock="left">
+                <ViewportAssetLibrary
+                  projectId={project.id}
+                  assets={catalog}
+                  begin={assetDrag.begin}
+                  activate={assetDrag.activate}
+                  canReplace={
+                    !!workshop ||
+                    (selected.length === 1 && doc.placements.some((value) => value.id === selected[0]))
+                  }
+                  replace={(item) => {
+                    const placement = doc.placements.find((value) => value.id === selected[0]);
+                    if (item.kind === 'mesh' && workshop)
+                      void dropLibraryAsset(item.key, workshop.position, workshop.id);
+                    else if (item.kind === 'model' && placement)
+                      void dropLibraryAsset(item.key, placement.position, placement.id);
+                    else
+                      notify(
+                        'Choose a placed Halo model or a custom mesh of the same placement kind.',
+                        'error',
+                      );
+                  }}
+                  importModel={() => void library.onImportModel(viewPoint())}
+                  importSound={() =>
+                    void library.onImportSound(viewPoint()).then((added) => {
+                      if (added) revealPanel('map-sounds');
+                    })
+                  }
+                  busy={library.busy || assetBusy}
+                />
+              </WorkspacePanel>
+            )}
+            {library && (
+              <WorkspacePanel id="object-tags" label="Object tags">
+                {tagProject && tagDocument?.inspection ? (
+                  <>
+                    <p className="subtle">{tagProject.title} · source tags</p>
+                    <ViewportTags
+                      project={tagProject}
+                      inspection={tagDocument.inspection}
+                      requestedTagId={tagRequest}
+                      requestRevision={tagRevision}
+                      edit={edit}
+                      notify={notify}
+                      onSave={() => library.onSaveMap(tagProject.id)}
+                    />
+                  </>
+                ) : (
+                  <p>Open this placement’s source map in a tab to edit its tags in this drawer.</p>
+                )}
+              </WorkspacePanel>
+            )}
+            {library && (
+              <WorkspacePanel id="map-sounds" label="Map sounds">
+                <label>
+                  Sound source map
+                  <select
+                    aria-label="QuickForge sound source map"
+                    value={sourceId}
+                    onChange={(event) => setSourceId(event.target.value)}
+                  >
+                    <option value="">Choose an imported source map</option>
+                    {sources.map((source) => (
+                      <option key={source.id} value={source.id}>
+                        {source.title}
                       </option>
                     ))}
                   </select>
                 </label>
-                <div className="forge-source-transfer">
-                  <p className="forge-hint">Transfer references between compatible local maps. Exact source SHA-256, cache version, class, path, and tag ID are checked. This does <strong>not</strong> extract binary Halo tags.</p>
-                  <div className="forge-transfer-buttons">
-                    <button title="Export tag identities and dependency metadata, not the .tag bytes. Compatible maps must verify the original source SHA-256." type="button" className="small-button" disabled={!sourceOpen || !filteredAssets.length} onClick={() => {
-                      try {
-                        if (!sourceOpen) throw new Error('Select an imported map');
-                        const bundle=createTagExchangeBundle(sourceOpen,filteredAssets.slice(0,128).map(asset=>asset.tagId));
-                        downloadLocalText(`gs_tag_refs_${sourceOpen.inspection!.sha256.slice(0,10)}.json`,JSON.stringify(bundle,null,2),'application/json');
-                        notify(`Exported ${bundle.tags.length} tag identities and dependencies (references only, not game data).`);
-                      } catch (e) { notify(`Export rejected: ${String(e)}`,'error'); }
-                    }}>Export visible refs</button>
-                    <button title="Load a previously exported tag-reference JSON and verify it against this exact source map. Does not import model/tag binaries." type="button" className="small-button" disabled={!sourceOpen} onClick={() => exchangePicker.current?.click()}>Import refs</button>
-                    {referenceFilter && <button type="button" className="small-button" onClick={() => setReferenceFilter(null)}>Clear filter</button>}
-                  </div>
-                  <input ref={exchangePicker} type="file" accept=".json,application/json" hidden aria-label="Import tag reference JSON"
-                    onChange={(event) => {
-                      const file=event.currentTarget.files?.[0];event.currentTarget.value='';
-                      if (!file) return;
-                      if (!sourceOpen || file.size>524288 || !file.size) {notify('Select a source map and a JSON manifest under 512 KiB.','error');return;}
-                      const expected=sourceOpen.inspection?.sha256;
-                      void file.text().then(text=>{
-                        if (currentSourceId.current !== sourceOpen.project.id || sourceOpen.inspection?.sha256!==expected) throw new Error('Map source changed during import');
-                        const bundle=parseTagExchangeBundle(text);
-                        const resolved=resolveTagExchangeBundle(bundle,sourceOpen);
-                        if (resolved.missing.length) throw new Error(`${resolved.missing.length} tag identities could not be verified against this exact map`);
-                        const allowable=new Set(resolved.matched.filter(tag=>assets.some(a=>a.tagId===tag.id)).map(tag=>tag.id));
-                        if (!allowable.size) throw new Error('No placeable tag references in this bundle');
-                        setReferenceFilter(allowable);
-                        notify(`${allowable.size} exact source tag references available in the palette. ${resolved.unresolvedDependencies} dependencies need extraction/review; game content was not imported.`);
-                      }).catch(error=>notify(`Reference import rejected: ${String(error)}`,'error'));
-                    }} />
-                  {referenceFilter && <p className="forge-hint">Reference shelf: {referenceFilter.size} verified tags. Click or drag a tag below to place its source reference.</p>}
-                </div>
-                <div className="search-input">
-                  <Search size={13} />
-                  <input
-                    aria-label="Search asset palette"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search actual tag paths…"
+                {sourceOpen?.inspection ? (
+                  <MapSounds
+                    expanded
+                    key={sourceOpen.project.id}
+                    project={project}
+                    edit={edit}
+                    projectId={sourceOpen.project.id}
+                    inspection={sourceOpen.inspection}
                   />
-                </div>
-                <select
-                  aria-label="Asset class"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                >
-                  <option value="all">All placeable classes</option>
-                  {(
-                    [
-                      ['weap', 'Weapons'],
-                      ['eqip', 'Equipment / powerups'],
-                      ['vehi', 'Vehicles'],
-                      ['scen', 'Scenery'],
-                      ['bipd', 'Characters'],
-                      ['itmc', 'Item collections'],
-                    ] as const
-                  ).map(([id, name]) => (
-                    <option key={id} value={id}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-                {assetError && <Notice>{assetError}</Notice>}
-                <p className="forge-hint">
-                  These are real source tag references. Extraction, dependencies and target compatibility are
-                  checked by the build; no Halo model is substituted.
-                </p>
-                <div className="forge-asset-palette">
-                  {filteredAssets.slice(0, 150).map((asset) => (
-                    <button
-                      key={asset.key}
-                      {...draggable({ type: 'asset', key: asset.key })}
-                      onClick={() => add({ type: 'asset', key: asset.key })}
-                      title={asset.path}
-                    >
-                      <span className="tag-class">{asset.class}</span>
-                      <span>
-                        <strong>{asset.name}</strong>
-                        <small>{asset.path}</small>
-                        <em>Cache {asset.cacheVersion} · source world model</em>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {filteredAssets.length > 150 && (
-                  <p className="forge-hint">
-                    Showing 150 of {filteredAssets.length}. Narrow the search to find another tag.
-                  </p>
+                ) : (
+                  <SoundMixer
+                    project={project}
+                    inspection={null}
+                    sourceProjectId={project.id}
+                    tagId={null}
+                    edit={edit}
+                  />
                 )}
-                {!filteredAssets.length && (
-                  <p className="forge-hint">
-                    No matching placeable tags. Select an imported source with the required content.
-                  </p>
-                )}
-              </>
+              </WorkspacePanel>
             )}
-            {tab === 'properties' && (
-              <ForgeProperties document={doc} chosen={chosen} changeNode={changeNode} commit={commit} notify={notify} />
+            {workshop && (
+              <WorkspacePanel id="workshop-object" label="Custom model">
+                <WorkshopObjectFields
+                  key={workshop.id}
+                  object={workshop}
+                  project={project}
+                  onMaterialBinding={(name, materialId) => {
+                    const current = latestProject.current,
+                      doc = current.quickForge,
+                      material = doc?.materials.find((m) => m.id === materialId);
+                    if (!doc || !material?.shaderPath) return;
+                    const existing = doc.materials.find((m) => m.name.toLowerCase() === name.toLowerCase());
+                    edit(
+                      {
+                        ...current,
+                        quickForge: {
+                          ...doc,
+                          materials: existing
+                            ? doc.materials.map((m) =>
+                                m.id === existing.id
+                                  ? { ...m, shaderPath: material.shaderPath, color: material.color }
+                                  : m,
+                              )
+                            : [...doc.materials, { ...material, id: crypto.randomUUID(), name }],
+                        },
+                      },
+                      'Bind imported model material',
+                    );
+                  }}
+                  update={(object) =>
+                    edit(
+                      {
+                        ...latestProject.current,
+                        scene: latestProject.current.scene.map((value) =>
+                          value.id === object.id ? object : value,
+                        ),
+                      },
+                      'Edit custom model',
+                    )
+                  }
+                  remove={() => {
+                    edit(
+                      {
+                        ...latestProject.current,
+                        scene: latestProject.current.scene.filter((value) => value.id !== workshop.id),
+                      },
+                      'Remove custom model',
+                    );
+                    setWorkshopSelected(null);
+                  }}
+                />
+              </WorkspacePanel>
             )}
-            {tab === 'firefight' && (
-              <Firefight
-                project={project}
-                entries={data.entries}
-                edit={edit}
-                compact
-                selectedZone={selectedZone}
-                onSelectZone={(id) => {
-                  setSelectedZone(id);
-                  setSelected([]);
-                }}
-              />
-            )}
-          </div>
-        </aside></WorkspacePanel>
-        </>}
+            <WorkspacePanel id="forge-inspector" label="Inspector">
+              <aside className="forge-inspector">
+                <div className="forge-panel-tabs">
+                  <button className={tab === 'palette' ? 'selected' : ''} onClick={() => setTab('palette')}>
+                    Palette
+                  </button>
+                  <button
+                    className={tab === 'properties' ? 'selected' : ''}
+                    onClick={() => setTab('properties')}
+                  >
+                    Properties
+                  </button>
+                  <button
+                    className={tab === 'firefight' ? 'selected' : ''}
+                    onClick={() => setTab('firefight')}
+                  >
+                    Firefight
+                  </button>
+                  <button
+                    className={tab === 'sound' ? 'selected' : ''}
+                    onClick={() => {
+                      setTab('sound');
+                      if (library) revealPanel('map-sounds');
+                    }}
+                  >
+                    Sound
+                  </button>
+                </div>
+                <div className="forge-inspector-scroll">
+                  <RenderFeatures project={project} edit={props.edit} />
+                  {tab === 'sound' && !library && (
+                    <>
+                      <label>
+                        Sound source map
+                        <select
+                          aria-label="QuickForge sound source map"
+                          value={sourceId}
+                          onChange={(e) => setSourceId(e.target.value)}
+                        >
+                          <option value="">Choose an imported source map</option>
+                          {sources.map((source) => (
+                            <option key={source.id} value={source.id}>
+                              {source.title}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {sourceOpen?.inspection ? (
+                        <MapSounds
+                          key={sourceOpen.project.id}
+                          project={project}
+                          edit={props.edit}
+                          projectId={sourceOpen.project.id}
+                          inspection={sourceOpen.inspection}
+                        />
+                      ) : (
+                        <p>
+                          Open an imported map as a sound source. Emitter positions belong to this QuickForge
+                          map; original audio stays in its preserved source project.
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {tab === 'palette' && (
+                    <>
+                      <div className="forge-panel-heading">
+                        <strong>{doc.workshop ? 'Workshop geometry' : 'Original geometry'}</strong>
+                        <Pill>Editable</Pill>
+                        <HelpTip help="Drag to place a source brush, or click to add at the origin. Snap G/M governs alignment. All primitives regenerate a source mesh and undergo bounded validation; only Halo Tool/Invader can create verified game collision." />
+                      </div>
+                      {doc.workshop && (
+                        <button onClick={() => setBspMode(true)}>Edit volumes in BSP Workshop</button>
+                      )}
+                      <div className="forge-brush-palette">
+                        {(doc.workshop ? [] : (Object.keys(brushNames) as BrushKind[])).map((kind) => (
+                          <button
+                            key={kind}
+                            {...draggable({ type: 'brush', kind })}
+                            title={
+                              kind === 'terrain'
+                                ? 'Editable gridded terrain. Sculpt hills and align identical boundary samples with Mesh Snap (M). The walk sandbox uses its generated triangles; Halo collision needs Tool.'
+                                : kind === 'caveTunnel'
+                                  ? 'Hollow annular cave tunnel. Matching opposite-facing rims can source-weld. A cave-to-room entrance still needs CSG, portals and collision compilation.'
+                                  : `${brushNames[kind]}: editable source geometry; choose this brush, then use Properties or the transform gizmo. Build requires compatible Halo Tool.`
+                            }
+                            onClick={() => add({ type: 'brush', kind })}
+                          >
+                            <Box size={19} />
+                            <span>{brushNames[kind]}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="forge-hint">
+                        Click to add at the origin, or drag onto a floor or surface. Resize using Properties
+                        or the scale gizmo.
+                      </p>
+                      <div className="forge-panel-heading">
+                        <strong>Scenario tools</strong>
+                        <HelpTip help="Spawn points, objective markers and AI zones author scenario metadata. They do not create game entities until the scenario/tag pipeline compiles them." />
+                      </div>
+                      <div className="forge-brush-palette">
+                        <button
+                          title="Add a player starting marker to the scenario source; the Halo scenario must be compiled and tested for spawn validity."
+                          {...draggable({ type: 'spawn' })}
+                          onClick={() => add({ type: 'spawn' })}
+                        >
+                          <Users size={18} />
+                          Player start
+                        </button>
+                        {(
+                          [
+                            ['ctfFlag', 'CTF flag'],
+                            ['hill', 'Hill'],
+                            ['oddball', 'Oddball'],
+                            ['raceCheckpoint', 'Race checkpoint'],
+                            ['raceVehicle', 'Race vehicle start'],
+                            ['teleportFrom', 'Teleporter entrance'],
+                            ['teleportTo', 'Teleporter exit'],
+                          ] as const
+                        ).map(([kind, title]) => (
+                          <button
+                            key={kind}
+                            {...draggable({ type: 'objective', kind })}
+                            title={`Add a ${title} objective marker to the source scenario. Requires a compatible gametype and engine validation.`}
+                            onClick={() => add({ type: 'objective', kind })}
+                          >
+                            <Flag size={17} />
+                            {title}
+                          </button>
+                        ))}
+                        <button
+                          title="Place an editor Firefight AI zone. Actual AI encounters, navigation and networking must be built into the Halo scenario and verified in-game."
+                          {...draggable({ type: 'zone' })}
+                          onClick={() => add({ type: 'zone' })}
+                        >
+                          <Flag size={17} />
+                          AI spawn zone
+                        </button>
+                      </div>
+                      <div className="forge-gametype-panel">
+                        <div className="forge-panel-heading">
+                          <strong>Halo CE game modes</strong>
+                          <HelpTip help="A Halo 1 multiplayer scenario can support all five classic modes simultaneously. Map objective flags define actual gameplay areas; selection of a game type alone does not add flags or native game rules." />
+                        </div>
+                        <p className="forge-hint">
+                          Click a mode to work on it. These checks reflect EDITABLE source only; Sapien, Tool
+                          and real gameplay must still confirm the netgame records.
+                        </p>
+                        <button
+                          type="button"
+                          className="small-button"
+                          title="Create a read-only five-mode manual QA checklist for Sapien, Tool, live map loading and two-client tests. Every test is NOT RUN; no game results are invented."
+                          onClick={() => {
+                            try {
+                              const plan = makeFiveModeTestPlan(doc);
+                              const name =
+                                doc.name.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 48) || 'guilty_spark';
+                              downloadLocalText(
+                                `${name}_five_mode_test_plan.json`,
+                                JSON.stringify(plan, null, 2),
+                                'application/json;charset=utf-8',
+                              );
+                              notify(
+                                'Five stock Halo 1 game-mode QA plan exported. All 20 live checks are NOT RUN; use Creator Studio to record real evidence.',
+                              );
+                            } catch (e) {
+                              notify(`Five-mode QA plan refused: ${String(e)}`, 'error');
+                            }
+                          }}
+                        >
+                          Export five-mode manual QA plan (.json)
+                        </button>
+                        <div className="forge-panel-heading">
+                          <strong>Spawn layout · source review</strong>
+                          <HelpTip help="Reclaimers/Bungie spawn design guidance, not a simulation of Halo spawn collision or CTF scoring. Historic recommendation: 16 per team, with real game testing required." />
+                        </div>
+                        <p className="forge-hint">
+                          {doc.spawns.length} authored starts · CTF red {spawnReview.ctfTeamEligible.red} /
+                          blue {spawnReview.ctfTeamEligible.blue} · {spawnReview.totalFindings} advisory
+                          finding(s). <strong>Not tested in Halo.</strong>
+                        </p>
+                        <button
+                          type="button"
+                          className="small-button"
+                          title="Export a bounded, non-executable source-only spawn layout review; does not include coordinates or copied game content."
+                          onClick={() => {
+                            try {
+                              const filename =
+                                doc.name.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 48) || 'guilty_spark';
+                              downloadLocalText(
+                                `${filename}_spawn_review.json`,
+                                JSON.stringify(spawnReview, null, 2),
+                                'application/json;charset=utf-8',
+                              );
+                              notify(
+                                'Spawn source-review JSON exported; validate real spawns and CTF team safety in Halo before signoff.',
+                              );
+                            } catch (e) {
+                              notify(`Spawn review export failed: ${String(e)}`, 'error');
+                            }
+                          }}
+                        >
+                          Export spawn layout review (.json)
+                        </button>
+                        {spawnReview.findings.length > 0 && (
+                          <details>
+                            <summary>Spawn design cautions · {spawnReview.totalFindings}</summary>
+                            {spawnReview.findings.map((finding, index) => (
+                              <button
+                                type="button"
+                                className="forge-issue"
+                                key={`${finding.code}-${index}`}
+                                title="Focus the source marker(s), then manually verify in Sapien and Halo"
+                                onClick={() => {
+                                  if (finding.ids.length) {
+                                    setSelected(finding.ids);
+                                    setTab('properties');
+                                  }
+                                }}
+                              >
+                                <strong>
+                                  {finding.severity}: {finding.code}
+                                </strong>
+                                <span>{finding.message}</span>
+                              </button>
+                            ))}
+                            {spawnReview.omittedFindings > 0 && (
+                              <p className="forge-hint">
+                                {spawnReview.omittedFindings} additional cautions not displayed.
+                              </p>
+                            )}
+                          </details>
+                        )}
+                        <div className="forge-gametype-matrix">
+                          {gameChecklist.map((entry) => (
+                            <button
+                              type="button"
+                              key={entry.mode}
+                              className={doc.gameMode === entry.mode ? 'active' : ''}
+                              title={
+                                entry.notes.length
+                                  ? entry.notes.join('; ')
+                                  : 'Source-only marker checklist passes; game not yet tested.'
+                              }
+                              onClick={() =>
+                                commit({ ...doc, gameMode: entry.mode }, `Select ${entry.label} map rules`)
+                              }
+                            >
+                              <span>{entry.label}</span>
+                              <span>{entry.ready ? 'Source checks ✓' : `${entry.notes.length} checks`}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="forge-brush-palette">
+                          <button
+                            type="button"
+                            title="Place four editable hill boundary markers as a 5×5 convex square with one shared usage ID. Each corner is movable with XYZ arrows. Compiled Halo CE King game rules read these flags."
+                            {...draggable({ type: 'hillPolygon' })}
+                            onClick={() => addPolygonHill()}
+                          >
+                            <Flag size={17} /> Add four-corner hill · drag into map
+                          </button>
+                          <button
+                            type="button"
+                            title="Create one entrance and one exit on a fresh Halo CE teleporter channel, in a single undoable project edit. Endpoints must be moved and verified for collision and loop safety."
+                            {...draggable({ type: 'teleportPair' })}
+                            onClick={() => addTeleportPair()}
+                          >
+                            <Flag size={17} /> Add linked teleporter pair
+                          </button>
+                          <button
+                            type="button"
+                            title="Opt all existing player starts into the five stock Halo CE multiplayer modes. Review teams/locations; this does not validate engine spawn clearance."
+                            disabled={!doc.spawns.length}
+                            onClick={enableAllGameStarts}
+                          >
+                            <Users size={17} /> Starts: all five modes
+                          </button>
+                        </div>
+                        <p className="forge-hint">
+                          King: one marker = 2×2 zone; 3–8 markers with the same hill ID = convex area.{' '}
+                          <strong>Never use exactly two.</strong> Crazy King needs multiple hill groups. Race
+                          checkpoints use consecutive IDs (0–31); Race vehicle markers are separate (maximum
+                          16). Teleporter entrances/exits share channel 0–15; both ends are required.
+                        </p>
+                        {hillAreas(doc.objectives).map((a) => (
+                          <p key={a.usageId} className="forge-hint">
+                            Hill {a.usageId}: {a.markerIds.length} point{a.markerIds.length === 1 ? '' : 's'}{' '}
+                            ·{' '}
+                            {a.valid
+                              ? a.shape === 'single'
+                                ? '2×2 single point'
+                                : 'convex polygon'
+                              : 'INVALID / cannot export'}
+                          </p>
+                        ))}
+                        {netgameIssues.length > 0 && (
+                          <details open={netgameBlocked}>
+                            <summary title="Review engine-critical netgame flag integrity. Severe errors block safe export.">
+                              Netgame check · {netgameIssues.filter((i) => i.severity === 'error').length}{' '}
+                              blockers / {netgameIssues.filter((i) => i.severity === 'warning').length}{' '}
+                              cautions
+                            </summary>
+                            {netgameIssues.map((i, n) => (
+                              <button
+                                type="button"
+                                key={`${i.code}-${n}`}
+                                className={`forge-issue ${i.severity}`}
+                                onClick={() => {
+                                  if (i.ids.length) {
+                                    setSelected(i.ids);
+                                    setTab('properties');
+                                  }
+                                }}
+                              >
+                                <strong>
+                                  {i.severity}: {i.code}
+                                </strong>
+                                <span>{i.message}</span>
+                              </button>
+                            ))}
+                          </details>
+                        )}
+                      </div>
+                      <div className="forge-panel-heading">
+                        <strong>Imported Halo tag references</strong>
+                        <HelpTip help="Imported .map cache references identify real weapon, vehicle, character and scenery tag paths. A tag reference is not a .tag file; use verified extraction and build workflows to transfer game assets." />
+                      </div>
+                      <label className="forge-field">
+                        Source project
+                        <select
+                          aria-label="Asset source project"
+                          value={sourceId}
+                          onChange={(e) => setSourceId(e.target.value)}
+                        >
+                          <option value="">Import a Halo map first</option>
+                          {sources.map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                              {entry.title} · cache {entry.version}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="forge-source-transfer">
+                        <p className="forge-hint">
+                          Transfer references between compatible local maps. Exact source SHA-256, cache
+                          version, class, path, and tag ID are checked. This does <strong>not</strong> extract
+                          binary Halo tags.
+                        </p>
+                        <div className="forge-transfer-buttons">
+                          <button
+                            title="Export tag identities and dependency metadata, not the .tag bytes. Compatible maps must verify the original source SHA-256."
+                            type="button"
+                            className="small-button"
+                            disabled={!sourceOpen || !filteredAssets.length}
+                            onClick={() => {
+                              try {
+                                if (!sourceOpen) throw new Error('Select an imported map');
+                                const bundle = createTagExchangeBundle(
+                                  sourceOpen,
+                                  filteredAssets.slice(0, 128).map((asset) => asset.tagId),
+                                );
+                                downloadLocalText(
+                                  `gs_tag_refs_${sourceOpen.inspection!.sha256.slice(0, 10)}.json`,
+                                  JSON.stringify(bundle, null, 2),
+                                  'application/json',
+                                );
+                                notify(
+                                  `Exported ${bundle.tags.length} tag identities and dependencies (references only, not game data).`,
+                                );
+                              } catch (e) {
+                                notify(`Export rejected: ${String(e)}`, 'error');
+                              }
+                            }}
+                          >
+                            Export visible refs
+                          </button>
+                          <button
+                            title="Load a previously exported tag-reference JSON and verify it against this exact source map. Does not import model/tag binaries."
+                            type="button"
+                            className="small-button"
+                            disabled={!sourceOpen}
+                            onClick={() => exchangePicker.current?.click()}
+                          >
+                            Import refs
+                          </button>
+                          {referenceFilter && (
+                            <button
+                              type="button"
+                              className="small-button"
+                              onClick={() => setReferenceFilter(null)}
+                            >
+                              Clear filter
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          ref={exchangePicker}
+                          type="file"
+                          accept=".json,application/json"
+                          hidden
+                          aria-label="Import tag reference JSON"
+                          onChange={(event) => {
+                            const file=event.currentTarget.files?.[0];
+                            event.currentTarget.value='';
+                            if (!file) return;
+                            if (!sourceOpen || file.size > 524288 || !file.size) {
+                              notify('Select a source map and a JSON manifest under 512 KiB.', 'error');
+                              return;
+                            }
+                            const expected = sourceOpen.inspection?.sha256;
+                            void file
+                              .text()
+                              .then((text) => {
+                                if (
+                                  currentSourceId.current !== sourceOpen.project.id ||
+                                  sourceOpen.inspection?.sha256 !== expected
+                                )
+                                  throw new Error('Map source changed during import');
+                                const bundle = parseTagExchangeBundle(text);
+                                const resolved = resolveTagExchangeBundle(bundle, sourceOpen);
+                                if (resolved.missing.length)
+                                  throw new Error(
+                                    `${resolved.missing.length} tag identities could not be verified against this exact map`,
+                                  );
+                                const allowable = new Set(
+                                  resolved.matched
+                                    .filter((tag) => assets.some((a) => a.tagId === tag.id))
+                                    .map((tag) => tag.id),
+                                );
+                                if (!allowable.size)
+                                  throw new Error('No placeable tag references in this bundle');
+                                setReferenceFilter(allowable);
+                                notify(
+                                  `${allowable.size} exact source tag references available in the palette. ${resolved.unresolvedDependencies} dependencies need extraction/review; game content was not imported.`,
+                                );
+                              })
+                              .catch((error) =>
+                                notify(`Reference import rejected: ${String(error)}`, 'error'),
+                              );
+                          }}
+                        />
+                        {referenceFilter && (
+                          <p className="forge-hint">
+                            Reference shelf: {referenceFilter.size} verified tags. Click or drag a tag below
+                            to place its source reference.
+                          </p>
+                        )}
+                      </div>
+                      <div className="search-input">
+                        <Search size={13} />
+                        <input
+                          aria-label="Search asset palette"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder="Search actual tag paths…"
+                        />
+                      </div>
+                      <select
+                        aria-label="Asset class"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                      >
+                        <option value="all">All placeable classes</option>
+                        {(
+                          [
+                            ['weap', 'Weapons'],
+                            ['eqip', 'Equipment / powerups'],
+                            ['vehi', 'Vehicles'],
+                            ['scen', 'Scenery'],
+                            ['bipd', 'Characters'],
+                            ['itmc', 'Item collections'],
+                          ] as const
+                        ).map(([id, name]) => (
+                          <option key={id} value={id}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      {assetError && <Notice>{assetError}</Notice>}
+                      <p className="forge-hint">
+                        These are real source tag references. Extraction, dependencies and target
+                        compatibility are checked by the build; no Halo model is substituted.
+                      </p>
+                      <div className="forge-asset-palette">
+                        {filteredAssets.slice(0, 150).map((asset) => (
+                          <button
+                            key={asset.key}
+                            {...draggable({ type: 'asset', key: asset.key })}
+                            onClick={() => add({ type: 'asset', key: asset.key })}
+                            title={asset.path}
+                          >
+                            <span className="tag-class">{asset.class}</span>
+                            <span>
+                              <strong>{asset.name}</strong>
+                              <small>{asset.path}</small>
+                              <em>Cache {asset.cacheVersion} · source world model</em>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      {filteredAssets.length > 150 && (
+                        <p className="forge-hint">
+                          Showing 150 of {filteredAssets.length}. Narrow the search to find another tag.
+                        </p>
+                      )}
+                      {!filteredAssets.length && (
+                        <p className="forge-hint">
+                          No matching placeable tags. Select an imported source with the required content.
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {tab === 'properties' && (
+                    <ForgeProperties
+                      document={doc}
+                      chosen={chosen}
+                      changeNode={changeNode}
+                      commit={commit}
+                      notify={notify}
+                    />
+                  )}
+                  {tab === 'firefight' && (
+                    <Firefight
+                      project={project}
+                      entries={data.entries}
+                      edit={edit}
+                      compact
+                      selectedZone={selectedZone}
+                      onSelectZone={(id) => {
+                        setSelectedZone(id);
+                        setSelected([]);
+                      }}
+                    />
+                  )}
+                </div>
+              </aside>
+            </WorkspacePanel>
+          </>
+        )}
       </div>
       <section className={`forge-build-panel ${expandedBuild ? 'expanded' : ''}`}>
         <div className="forge-build-heading">
@@ -1427,14 +2174,30 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             </span>
           </button>
           <div className="forge-build-actions">
-            <button disabled={exporting || !!props.activeJob || !preflight.ready || scenarioRiskErrors || netgameBlocked} title={preflight.ready && !scenarioRiskErrors && !netgameBlocked ? 'Export validated JMS sources in an isolated staging folder; not a playable Halo cache.' : preflight.blockers.join(' ')} onClick={() => void exportSources()}>
+            <button
+              disabled={
+                exporting || !!props.activeJob || !preflight.ready || scenarioRiskErrors || netgameBlocked
+              }
+              title={
+                preflight.ready && !scenarioRiskErrors && !netgameBlocked
+                  ? 'Export validated JMS sources in an isolated staging folder; not a playable Halo cache.'
+                  : preflight.blockers.join(' ')
+              }
+              onClick={() => void exportSources()}
+            >
               <Download size={14} />
               {exporting ? 'Exporting…' : 'Export JMS sources'}
             </button>
             <button
               className="primary"
-              disabled={exporting || !!props.activeJob || !preflight.ready || scenarioRiskErrors || netgameBlocked}
-              title={preflight.ready && !scenarioRiskErrors && !netgameBlocked ? 'Run the configured Halo Tool against an isolated build; compiler and game evidence remain required.' : preflight.blockers.join(' ')}
+              disabled={
+                exporting || !!props.activeJob || !preflight.ready || scenarioRiskErrors || netgameBlocked
+              }
+              title={
+                preflight.ready && !scenarioRiskErrors && !netgameBlocked
+                  ? 'Run the configured Halo Tool against an isolated build; compiler and game evidence remain required.'
+                  : preflight.blockers.join(' ')
+              }
               onClick={() => {
                 if (!preflight.ready || scenarioRiskErrors || netgameBlocked) { setBuildError([...preflight.blockers,...scenarioRisks.filter(x=>x.severity==='error').map(x=>x.message)].join(' | ')); return; }
                 setBuildError('');
@@ -1454,7 +2217,14 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         )}
         {(expandedBuild || !!geometryError || !!buildError) && (
           <div className="forge-build-content">
-            {project&&<BuildTargets project={project} defaults={data.settings} onSave={props.onSave} onChange={p=>props.edit(p,'Configure engine build targets')}/> }
+            {project && (
+              <BuildTargets
+                project={project}
+                defaults={data.settings}
+                onSave={props.onSave}
+                onChange={(p) => props.edit(p, 'Configure engine build targets')}
+              />
+            )}
             <div>
               <div className="forge-build-config">
                 <label>
@@ -1518,127 +2288,401 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   </button>
                 )}
               </div>
-              {caveReview.ports.length > 0 && <Notice tone="info">
-                Cave topology preflight: {caveReview.ports.length} tunnel mouths, {caveReview.weldedPairs} matching source seam pairs, {caveReview.unpaired.length} unmatched mouths.
-                Matching polygon rims are welded during Rust preview/JMS generation by removing duplicate annular cap faces. This does not cut through a room or terrain, nor compile Halo collision, portals, PVS, lighting or navigation.
-                {caveReview.candidates.some(c=>!c.sourceWeldEligible) && ' Some neighboring mouths have incompatible geometry or ambiguous matching.'}
-              </Notice>}
-              {(caveSafety.error || (caveSafety.result?.issues.length ?? 0) > 0) && <details className="forge-tool-diagnostics" open>
-                <summary title="Source-only extension collision guard. Repairs are limited to a unique, exact polygon rim translation, never compiled BSP mutation.">Tunnel extension / collision safety · {caveSafety.result?.issues.length ?? 0} issue(s)</summary>
-                {caveSafety.error && <Notice tone="warning">Cave inspection failed closed: {caveSafety.error}</Notice>}
-                {caveSafety.result?.issues.slice(0,16).map((issue,index)=><div key={`${issue.code}-${index}`} className={`forge-issue ${issue.severity}`}>
-                  <strong>{issue.code}</strong><span>{issue.message}</span>
-                  <button type="button" className="small-button" onClick={()=>{setSelected(issue.brushIds);setTab('properties');}}>Select related brushes</button>
-                </div>)}
-                {caveSafety.result?.corrections.map((proposal,index)=><button key={`${proposal.movingBrushId}-${proposal.targetBrushId}-${index}`}
-                  type="button" className="small-button" title="Recheck the current source, then translate only the unlocked tunnel. Creates a normal undoable QuickForge edit. Does NOT repair Halo collision tags."
-                  disabled={exporting || !!props.activeJob}
-                  onClick={()=>{try{
-                    const next=applyCaveSeamSnap(doc,proposal);
-                    commit(next,`Snap tunnel ${proposal.movingBrushId} to exact source rim`);
-                    setSelected([proposal.movingBrushId]);setTab('properties');
-                    notify('Source tunnel rim snapped. Revalidate generated mesh and compile with Halo Tool to check BSP collision.');
-                  }catch(e){notify(`Tunnel source correction refused: ${String(e)}`,'error');}}}>
-                  Snap verified source seam · {proposal.distance.toFixed(3)} units (undoable)
-                </button>)}
-                <p className="forge-hint">A tunnel touching a solid room wall is NOT a carved doorway. Unsupported room/terrain Boolean cuts and compiled BSP collision must be rebuilt and tested in Halo Tool.</p>
-              </details>}
+              {caveReview.ports.length > 0 && (
+                <Notice tone="info">
+                  Cave topology preflight: {caveReview.ports.length} tunnel mouths, {caveReview.weldedPairs}{' '}
+                  matching source seam pairs, {caveReview.unpaired.length} unmatched mouths. Matching polygon
+                  rims are welded during Rust preview/JMS generation by removing duplicate annular cap faces.
+                  This does not cut through a room or terrain, nor compile Halo collision, portals, PVS,
+                  lighting or navigation.
+                  {caveReview.candidates.some((c) => !c.sourceWeldEligible) &&
+                    ' Some neighboring mouths have incompatible geometry or ambiguous matching.'}
+                </Notice>
+              )}
+              {(caveSafety.error || (caveSafety.result?.issues.length ?? 0) > 0) && (
+                <details className="forge-tool-diagnostics" open>
+                  <summary title="Source-only extension collision guard. Repairs are limited to a unique, exact polygon rim translation, never compiled BSP mutation.">
+                    Tunnel extension / collision safety · {caveSafety.result?.issues.length ?? 0} issue(s)
+                  </summary>
+                  {caveSafety.error && (
+                    <Notice tone="warning">Cave inspection failed closed: {caveSafety.error}</Notice>
+                  )}
+                  {caveSafety.result?.issues.slice(0, 16).map((issue, index) => (
+                    <div key={`${issue.code}-${index}`} className={`forge-issue ${issue.severity}`}>
+                      <strong>{issue.code}</strong>
+                      <span>{issue.message}</span>
+                      <button
+                        type="button"
+                        className="small-button"
+                        onClick={() => {
+                          setSelected(issue.brushIds);
+                          setTab('properties');
+                        }}
+                      >
+                        Select related brushes
+                      </button>
+                    </div>
+                  ))}
+                  {caveSafety.result?.corrections.map((proposal, index) => (
+                    <button
+                      key={`${proposal.movingBrushId}-${proposal.targetBrushId}-${index}`}
+                      type="button"
+                      className="small-button"
+                      title="Recheck the current source, then translate only the unlocked tunnel. Creates a normal undoable QuickForge edit. Does NOT repair Halo collision tags."
+                      disabled={exporting || !!props.activeJob}
+                      onClick={() => {
+                        try {
+                          const next = applyCaveSeamSnap(doc, proposal);
+                          commit(next, `Snap tunnel ${proposal.movingBrushId} to exact source rim`);
+                          setSelected([proposal.movingBrushId]);
+                          setTab('properties');
+                          notify(
+                            'Source tunnel rim snapped. Revalidate generated mesh and compile with Halo Tool to check BSP collision.',
+                          );
+                        } catch (e) {
+                          notify(`Tunnel source correction refused: ${String(e)}`, 'error');
+                        }
+                      }}
+                    >
+                      Snap verified source seam · {proposal.distance.toFixed(3)} units (undoable)
+                    </button>
+                  ))}
+                  <p className="forge-hint">
+                    A tunnel touching a solid room wall is NOT a carved doorway. Unsupported room/terrain
+                    Boolean cuts and compiled BSP collision must be rebuilt and tested in Halo Tool.
+                  </p>
+                </details>
+              )}
               <p className="forge-hint">
                 Source export is not a compiled BSP or playable map. Packaging and launch require a validated
                 target output. No host or lobby is simulated.
               </p>
             </div>
             <div className="forge-build-diagnostics">
-              <Notice tone={preflight.ready ? 'info' : 'warning'}>Source integrity preflight: {preflight.ready ? `${preflight.triangles} validated source triangles; editing session matches current Rust geometry report. Export is permitted, but playability is not verified.` : preflight.blockers.join(' | ')}</Notice>
-              {scenarioRisks.length > 0 && <details className="forge-tool-diagnostics" open={scenarioRiskErrors}>
-                <summary title="Conservative checks against old scenario-editor failure modes: colliding player starts, conflicting tag origins, AI budgets and missing resources. Real game validation is still required.">Legacy scenario safety · {scenarioRisks.filter(r=>r.severity==='error').length} blockers / {scenarioRisks.filter(r=>r.severity==='warning').length} cautions</summary>
-                {scenarioRisks.map((risk,index)=><div key={`${risk.code}-${index}`} className={`forge-issue ${risk.severity}`}>
-                  <strong>{risk.severity} · {risk.code}</strong><span>{risk.message}</span>
-                </div>)}
-              </details>}
-              {preflight.warnings.length > 0 && <p className="forge-hint" title={preflight.warnings.join(' | ')}>Source cautions: {preflight.warnings.length} · hover to read</p>}
-              {meshReview && <details className="forge-tool-diagnostics" aria-label="BSP source topology review">
-                <summary title="Position-based seam analysis of current QuickForge source mesh; the Halo BSP compiler remains the authority.">
-                  BSP source topology · {meshReview.boundaryEdges} open / {meshReview.nonManifoldEdges} non-manifold / {meshReview.windingConflicts} winding-conflicted / {meshReview.tJunctionEdges} possible T-junction edges
-                </summary>
-                <p className="forge-hint">{meshReview.checkedTriangles} triangles across {meshReview.connectedShellCandidates} connected source shell candidates ({meshReview.edgeClosedShellCandidates} edge-closed; {meshReview.openShellCandidates} with exposed edges). {meshReview.degenerateTriangles} collapsed triangles; {meshReview.duplicateFaces} duplicate faces; {meshReview.shortEdges} short edges. Vertex-on-edge T-junction scan: {meshReview.tJunctionScanComplete ? 'complete within bounded budget' : 'INCOMPLETE — do not interpret zero as clean'} ({meshReview.tJunctionCandidatesChecked.toLocaleString()} point candidates checked).</p>
-                <p className="forge-hint">Flat-shaded vertices are matched by position for this read-only check. Open edges can be intentional with special Halo materials; even an edge-closed source is NOT proven watertight, collision-safe, portal-valid or playable. Inspect actual Halo Tool structure logs and WRL results.</p>
-                <div className="analysis-actions">
-                  <button className="small-button" title="Export source-only counts and triangle indices tied to the current Rust source SHA-256. No map, coordinates, tag paths or game data are included." onClick={() => {
-                    try {
-                      const payload = makeHaloBspSourceReport(report?.sourceSha256 ?? '', preflight);
-                      const safeName = (doc.name || 'source').replace(/[^A-Za-z0-9_-]/g,'_').slice(0,48) || 'source';
-                      downloadLocalText(`${safeName}_bsp_topology_review.json`, JSON.stringify(payload,null,2), 'application/json;charset=utf-8');
-                    } catch(e) { notify(String(e),'error'); }
-                  }}>Export BSP topology review</button>
-                  {([['Open edge',meshReview.exampleBoundaryTriangles],['Non-manifold edge',meshReview.exampleNonManifoldTriangles],['Winding conflict',meshReview.exampleWindingTriangles],['Possible T-junction',meshReview.exampleTJunctionTriangles],['Degenerate triangle',meshReview.exampleDegenerateTriangles],['Duplicate face',meshReview.exampleDuplicateTriangles]] as [string,number[]][]).map(([label,examples]) => examples.length ?
-                    <button className="small-button" key={label} title={`Select the editable brush containing source triangle ${examples[0]}. No geometry is modified.`} onClick={() => selectMeshDiagnosticTriangle(examples)}>Select {label.toLowerCase()} brush</button> : null)}
-                </div>
-              </details>}
+              <Notice tone={preflight.ready ? 'info' : 'warning'}>
+                Source integrity preflight:{' '}
+                {preflight.ready
+                  ? `${preflight.triangles} validated source triangles; editing session matches current Rust geometry report. Export is permitted, but playability is not verified.`
+                  : preflight.blockers.join(' | ')}
+              </Notice>
+              {scenarioRisks.length > 0 && (
+                <details className="forge-tool-diagnostics" open={scenarioRiskErrors}>
+                  <summary title="Conservative checks against old scenario-editor failure modes: colliding player starts, conflicting tag origins, AI budgets and missing resources. Real game validation is still required.">
+                    Legacy scenario safety · {scenarioRisks.filter((r) => r.severity === 'error').length}{' '}
+                    blockers / {scenarioRisks.filter((r) => r.severity === 'warning').length} cautions
+                  </summary>
+                  {scenarioRisks.map((risk, index) => (
+                    <div key={`${risk.code}-${index}`} className={`forge-issue ${risk.severity}`}>
+                      <strong>
+                        {risk.severity} · {risk.code}
+                      </strong>
+                      <span>{risk.message}</span>
+                    </div>
+                  ))}
+                </details>
+              )}
+              {preflight.warnings.length > 0 && (
+                <p className="forge-hint" title={preflight.warnings.join(' | ')}>
+                  Source cautions: {preflight.warnings.length} · hover to read
+                </p>
+              )}
+              {meshReview && (
+                <details className="forge-tool-diagnostics" aria-label="BSP source topology review">
+                  <summary title="Position-based seam analysis of current QuickForge source mesh; the Halo BSP compiler remains the authority.">
+                    BSP source topology · {meshReview.boundaryEdges} open / {meshReview.nonManifoldEdges}{' '}
+                    non-manifold / {meshReview.windingConflicts} winding-conflicted /{' '}
+                    {meshReview.tJunctionEdges} possible T-junction edges
+                  </summary>
+                  <p className="forge-hint">
+                    {meshReview.checkedTriangles} triangles across {meshReview.connectedShellCandidates}{' '}
+                    connected source shell candidates ({meshReview.edgeClosedShellCandidates} edge-closed;{' '}
+                    {meshReview.openShellCandidates} with exposed edges). {meshReview.degenerateTriangles}{' '}
+                    collapsed triangles; {meshReview.duplicateFaces} duplicate faces; {meshReview.shortEdges}{' '}
+                    short edges. Vertex-on-edge T-junction scan:{' '}
+                    {meshReview.tJunctionScanComplete
+                      ? 'complete within bounded budget'
+                      : 'INCOMPLETE — do not interpret zero as clean'}{' '}
+                    ({meshReview.tJunctionCandidatesChecked.toLocaleString()} point candidates checked).
+                  </p>
+                  <p className="forge-hint">
+                    Flat-shaded vertices are matched by position for this read-only check. Open edges can be
+                    intentional with special Halo materials; even an edge-closed source is NOT proven
+                    watertight, collision-safe, portal-valid or playable. Inspect actual Halo Tool structure
+                    logs and WRL results.
+                  </p>
+                  <div className="analysis-actions">
+                    <button
+                      className="small-button"
+                      title="Export source-only counts and triangle indices tied to the current Rust source SHA-256. No map, coordinates, tag paths or game data are included."
+                      onClick={() => {
+                        try {
+                          const payload = makeHaloBspSourceReport(report?.sourceSha256 ?? '', preflight);
+                          const safeName =
+                            (doc.name || 'source').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 48) || 'source';
+                          downloadLocalText(
+                            `${safeName}_bsp_topology_review.json`,
+                            JSON.stringify(payload, null, 2),
+                            'application/json;charset=utf-8',
+                          );
+                        } catch (e) {
+                          notify(String(e),'error');
+                        }
+                      }}
+                    >
+                      Export BSP topology review
+                    </button>
+                    {(
+                      [
+                        ['Open edge', meshReview.exampleBoundaryTriangles],
+                        ['Non-manifold edge', meshReview.exampleNonManifoldTriangles],
+                        ['Winding conflict', meshReview.exampleWindingTriangles],
+                        ['Possible T-junction', meshReview.exampleTJunctionTriangles],
+                        ['Degenerate triangle', meshReview.exampleDegenerateTriangles],
+                        ['Duplicate face', meshReview.exampleDuplicateTriangles],
+                      ] as [string, number[]][]
+                    ).map(([label, examples]) =>
+                      examples.length ? (
+                        <button
+                          className="small-button"
+                          key={label}
+                          title={`Select the editable brush containing source triangle ${examples[0]}. No geometry is modified.`}
+                          onClick={() => selectMeshDiagnosticTriangle(examples)}
+                        >
+                          Select {label.toLowerCase()} brush
+                        </button>
+                      ) : null,
+                    )}
+                  </div>
+                </details>
+              )}
               <div className="forge-tool-diagnostics">
                 <div className="forge-panel-heading">
                   <strong>Halo Tool error geometry</strong>
                   <HelpTip help="Load a .wrl produced by Halo 1 Tool after a structure build. Its red/green/yellow error edges and faces appear on top of QuickForge. This is independent of the editor's simulated collision; repair source geometry and rerun Tool. Halo 2+ VRML 2 is not supported." />
                 </div>
                 <div className="analysis-actions">
-                  <button className="small-button" title="Read a local Halo 1 Tool .wrl (VRML 1.0). Never writes to source maps or runs Tool." onClick={() => wrlPicker.current?.click()}>Import Tool .wrl</button>
-                  <button className="small-button" title="Read a saved local Halo Tool stdout/stderr log and associate it with the currently validated source revision. Editing the source invalidates this association." onClick={() => toolLogPicker.current?.click()}>Inspect Tool log</button>
-                  {wrlSource && <>
-                    <button className="small-button" title="Show or hide the read-only compiler error overlay." disabled={wrlStale} onClick={() => setWrlVisible(v => !v)}>{wrlVisible ? 'Hide errors' : 'Show errors'}</button>
-                    <button className="small-button" title="Move the camera to imported compiler error geometry; press Frame arena to return." disabled={wrlStale || !wrlParse.value} onClick={() => {setWrlFocus(true);setFrame(v=>v+1);}}>Frame WRL</button>
-                    <button className="small-button" title="Forget local compiler diagnostic geometry, not the actual source files." onClick={() => {setWrlSource(null);setWrlFocus(false);setWrlLoadedSourceHash(null);setFrame(v=>v+1);}}>Clear WRL</button>
-                  </>}
-                  {toolLog && <button className="small-button" onClick={() => {setToolLog(null);setToolLogLoadedSourceHash(null);}} title="Clear in-memory log classification and its source association only.">Clear log</button>}
+                  <button
+                    className="small-button"
+                    title="Read a local Halo 1 Tool .wrl (VRML 1.0). Never writes to source maps or runs Tool."
+                    onClick={() => wrlPicker.current?.click()}
+                  >
+                    Import Tool .wrl
+                  </button>
+                  <button
+                    className="small-button"
+                    title="Read a saved local Halo Tool stdout/stderr log and associate it with the currently validated source revision. Editing the source invalidates this association."
+                    onClick={() => toolLogPicker.current?.click()}
+                  >
+                    Inspect Tool log
+                  </button>
+                  {wrlSource && (
+                    <>
+                      <button
+                        className="small-button"
+                        title="Show or hide the read-only compiler error overlay."
+                        disabled={wrlStale}
+                        onClick={() => setWrlVisible((v) => !v)}
+                      >
+                        {wrlVisible ? 'Hide errors' : 'Show errors'}
+                      </button>
+                      <button
+                        className="small-button"
+                        title="Move the camera to imported compiler error geometry; press Frame arena to return."
+                        disabled={wrlStale || !wrlParse.value}
+                        onClick={() => {
+                          setWrlFocus(true);
+                          setFrame(v=>v+1);
+                        }}
+                      >
+                        Frame WRL
+                      </button>
+                      <button
+                        className="small-button"
+                        title="Forget local compiler diagnostic geometry, not the actual source files."
+                        onClick={() => {
+                          setWrlSource(null);
+                          setWrlFocus(false);
+                          setWrlLoadedSourceHash(null);
+                          setFrame(v=>v+1);
+                        }}
+                      >
+                        Clear WRL
+                      </button>
+                    </>
+                  )}
+                  {toolLog && (
+                    <button
+                      className="small-button"
+                      onClick={() => {
+                        setToolLog(null);
+                        setToolLogLoadedSourceHash(null);
+                      }}
+                      title="Clear in-memory log classification and its source association only."
+                    >
+                      Clear log
+                    </button>
+                  )}
                 </div>
-                <input hidden type="file" accept=".wrl" ref={wrlPicker} aria-label="Import Halo 1 Tool WRL diagnostic" onChange={event => {
-                  const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void loadWrl(file);
-                }}/>
-                <input hidden type="file" accept=".txt,.log,text/plain" ref={toolLogPicker} aria-label="Import Halo Tool log" onChange={event => {
-                  const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)void loadToolLog(file);
-                }}/>
-                {wrlSource && <label className="forge-hint" title="Halo 1 Tool WRL coordinates normally use source centimetres, while Guilty Spark works in world metres.">
-                  <input type="checkbox" checked={wrlCentimetres} onChange={event => setWrlCentimetres(event.target.checked)} /> Convert WRL centimetres into editor units (÷100)
-                </label>}
-                {wrlSource && !wrlStale && <p className="forge-hint">Compiler diagnostic source association is user-selected, not cryptographically verified. Confirm the WRL came from your current build before treating its markings as relevant.</p>}
-                {wrlStale && <Notice tone="warning">The source geometry has changed since this WRL was loaded. Its overlay is hidden until you recompile and import fresh error geometry.</Notice>}
-                {toolLogStale && <Notice tone="warning">The source geometry changed after importing this Tool log (or validation was still pending). Its findings are hidden until you recompile and import a current log.</Notice>}
-                {wrlBrushMatch.value && <details className="forge-tool-diagnostics" aria-label="WRL source brush association">
-                  <summary title="Approximate match of imported Tool WRL error geometry to current authored brush bounds; does not identify an exact fault or repair a BSP.">Locate possible WRL issue brushes · {wrlBrushMatch.value.candidates.length} candidate(s)</summary>
-                  <p className="forge-hint">Reviewed {wrlBrushMatch.value.sampledPrimitives} of {wrlBrushMatch.value.totalPrimitives} Tool error primitives. {wrlBrushMatch.value.ambiguousPrimitives} ambiguous and {wrlBrushMatch.value.unmatchedPrimitives} outside the 0.25-unit search radius. Matching is an unverified proximity hint, not source attribution; reimport after every geometry change.</p>
-                  <div className="analysis-actions">
-                    {wrlBrushMatch.value.candidates.map(candidate => <button type="button" className="small-button" key={candidate.brushId} title={`Select probable source brush. ${candidate.diagnosticSamples} diagnostic samples; nearest ${candidate.closestDistance.toFixed(3)} editor units. This does not edit geometry.`} onClick={() => {
-                      setSelected([candidate.brushId]); setTab('properties');
-                      notify('Selected a source brush near imported Tool WRL geometry. Check the actual Tool error and verify the source and units before editing.');
-                    }}>Inspect {doc.geometry.find(brush=>brush.id===candidate.brushId)?.name ?? 'source brush'} ({candidate.diagnosticSamples})</button>)}
-                  </div>
-                </details>}
-                {wrlBrushMatch.error && <Notice tone="warning">WRL-to-brush matching skipped: {wrlBrushMatch.error}</Notice>}
+                <input
+                  hidden
+                  type="file"
+                  accept=".wrl"
+                  ref={wrlPicker}
+                  aria-label="Import Halo 1 Tool WRL diagnostic"
+                  onChange={(event) => {
+                    const file=event.currentTarget.files?.[0];
+                    event.currentTarget.value='';
+                    if(file)void loadWrl(file);
+                  }}
+                />
+                <input
+                  hidden
+                  type="file"
+                  accept=".txt,.log,text/plain"
+                  ref={toolLogPicker}
+                  aria-label="Import Halo Tool log"
+                  onChange={(event) => {
+                    const file=event.currentTarget.files?.[0];
+                    event.currentTarget.value='';
+                    if(file)void loadToolLog(file);
+                  }}
+                />
+                {wrlSource && (
+                  <label
+                    className="forge-hint"
+                    title="Halo 1 Tool WRL coordinates normally use source centimetres, while Guilty Spark works in world metres."
+                  >
+                    <input
+                      type="checkbox"
+                      checked={wrlCentimetres}
+                      onChange={(event) => setWrlCentimetres(event.target.checked)}
+                    />{' '}
+                    Convert WRL centimetres into editor units (÷100)
+                  </label>
+                )}
+                {wrlSource && !wrlStale && (
+                  <p className="forge-hint">
+                    Compiler diagnostic source association is user-selected, not cryptographically verified.
+                    Confirm the WRL came from your current build before treating its markings as relevant.
+                  </p>
+                )}
+                {wrlStale && (
+                  <Notice tone="warning">
+                    The source geometry has changed since this WRL was loaded. Its overlay is hidden until you
+                    recompile and import fresh error geometry.
+                  </Notice>
+                )}
+                {toolLogStale && (
+                  <Notice tone="warning">
+                    The source geometry changed after importing this Tool log (or validation was still
+                    pending). Its findings are hidden until you recompile and import a current log.
+                  </Notice>
+                )}
+                {wrlBrushMatch.value && (
+                  <details className="forge-tool-diagnostics" aria-label="WRL source brush association">
+                    <summary title="Approximate match of imported Tool WRL error geometry to current authored brush bounds; does not identify an exact fault or repair a BSP.">
+                      Locate possible WRL issue brushes · {wrlBrushMatch.value.candidates.length} candidate(s)
+                    </summary>
+                    <p className="forge-hint">
+                      Reviewed {wrlBrushMatch.value.sampledPrimitives} of{' '}
+                      {wrlBrushMatch.value.totalPrimitives} Tool error primitives.{' '}
+                      {wrlBrushMatch.value.ambiguousPrimitives} ambiguous and{' '}
+                      {wrlBrushMatch.value.unmatchedPrimitives} outside the 0.25-unit search radius. Matching
+                      is an unverified proximity hint, not source attribution; reimport after every geometry
+                      change.
+                    </p>
+                    <div className="analysis-actions">
+                      {wrlBrushMatch.value.candidates.map((candidate) => (
+                        <button
+                          type="button"
+                          className="small-button"
+                          key={candidate.brushId}
+                          title={`Select probable source brush. ${candidate.diagnosticSamples} diagnostic samples; nearest ${candidate.closestDistance.toFixed(3)} editor units. This does not edit geometry.`}
+                          onClick={() => {
+                            setSelected([candidate.brushId]);
+                            setTab('properties');
+                            notify(
+                              'Selected a source brush near imported Tool WRL geometry. Check the actual Tool error and verify the source and units before editing.',
+                            );
+                          }}
+                        >
+                          Inspect{' '}
+                          {doc.geometry.find((brush) => brush.id === candidate.brushId)?.name ??
+                            'source brush'}{' '}
+                          ({candidate.diagnosticSamples})
+                        </button>
+                      ))}
+                    </div>
+                  </details>
+                )}
+                {wrlBrushMatch.error && (
+                  <Notice tone="warning">WRL-to-brush matching skipped: {wrlBrushMatch.error}</Notice>
+                )}
                 {wrlParse.error && <Notice>{wrlParse.error}</Notice>}
                 {diagnosticError && <Notice>{diagnosticError}</Notice>}
-                {toolLog && !toolLogStale && <>
-                  <p className="forge-hint">Tool log: {toolLog.diagnostics.length} known geometry messages; {toolLog.unclassified} other warnings/errors. No parsed output establishes a playable map.</p>
-                  {toolLog.diagnostics.slice(0,40).map((item,index) => <div className={`forge-issue ${item.level}`} key={`${item.line}-${index}`}>
-                    <strong>Line {item.line} · {item.code}</strong>
-                    <span>{item.message}</span>
-                    <small>{item.action}</small>
-                  </div>)}
-                </>}
-                {compilerTriage && <details className="forge-tool-diagnostics" aria-label="Halo Tool compiler attempt triage">
-                  <summary title="User-associated local diagnostics; this report is NOT a verified build receipt or game-success certificate.">
-                    Compiler triage · {compilerTriage.status === 'source-export-blocked' ? 'Source blocked' :
-                      compilerTriage.status === 'compiler-errors-observed' ? 'Tool errors observed' : 'Needs compiler/game verification'}
-                  </summary>
-                  <p className="forge-hint">Source SHA-256: {compilerTriage.sourceSha256.slice(0,12)}… · {compilerTriage.toolLog.knownMessages} recognized Tool messages · {compilerTriage.toolLog.unclassifiedMessages} unclassified · {compilerTriage.wrl.errorEdges} WRL edges / {compilerTriage.wrl.errorFaces} WRL faces. Imported files are associated with the source by your selection, NOT cryptographically linked to one native compiler run.</p>
-                  {compilerTriage.nextActions.map((action,i)=><p key={i} className="forge-hint">{i+1}. {action}</p>)}
-                  <div className="analysis-actions">
-                    <button className="small-button" title="Export bounded failure counts and classifier codes, current source hash and next review actions. Excludes raw logs, filenames, paths, WRL coordinates, map bytes and assets. Does not claim the BSP compiled." onClick={() => {
-                      try {
-                        const safeName = (doc.name || 'source').replace(/[^A-Za-z0-9_-]/g,'_').slice(0,48) || 'source';
-                        downloadLocalText(`${safeName}_compiler_triage.json`,JSON.stringify(compilerTriage,null,2),'application/json;charset=utf-8');
-                      } catch(e) {notify(String(e),'error');}
-                    }}>Export sanitized compiler triage</button>
-                  </div>
-                </details>}
+                {toolLog && !toolLogStale && (
+                  <>
+                    <p className="forge-hint">
+                      Tool log: {toolLog.diagnostics.length} known geometry messages; {toolLog.unclassified}{' '}
+                      other warnings/errors. No parsed output establishes a playable map.
+                    </p>
+                    {toolLog.diagnostics.slice(0, 40).map((item, index) => (
+                      <div className={`forge-issue ${item.level}`} key={`${item.line}-${index}`}>
+                        <strong>
+                          Line {item.line} · {item.code}
+                        </strong>
+                        <span>{item.message}</span>
+                        <small>{item.action}</small>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {compilerTriage && (
+                  <details className="forge-tool-diagnostics" aria-label="Halo Tool compiler attempt triage">
+                    <summary title="User-associated local diagnostics; this report is NOT a verified build receipt or game-success certificate.">
+                      Compiler triage ·{' '}
+                      {compilerTriage.status === 'source-export-blocked'
+                        ? 'Source blocked'
+                        : compilerTriage.status === 'compiler-errors-observed'
+                          ? 'Tool errors observed'
+                          : 'Needs compiler/game verification'}
+                    </summary>
+                    <p className="forge-hint">
+                      Source SHA-256: {compilerTriage.sourceSha256.slice(0, 12)}… ·{' '}
+                      {compilerTriage.toolLog.knownMessages} recognized Tool messages ·{' '}
+                      {compilerTriage.toolLog.unclassifiedMessages} unclassified ·{' '}
+                      {compilerTriage.wrl.errorEdges} WRL edges / {compilerTriage.wrl.errorFaces} WRL faces.
+                      Imported files are associated with the source by your selection, NOT cryptographically
+                      linked to one native compiler run.
+                    </p>
+                    {compilerTriage.nextActions.map((action, i) => (
+                      <p key={i} className="forge-hint">
+                        {i + 1}. {action}
+                      </p>
+                    ))}
+                    <div className="analysis-actions">
+                      <button
+                        className="small-button"
+                        title="Export bounded failure counts and classifier codes, current source hash and next review actions. Excludes raw logs, filenames, paths, WRL coordinates, map bytes and assets. Does not claim the BSP compiled."
+                        onClick={() => {
+                          try {
+                            const safeName =
+                              (doc.name || 'source').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 48) || 'source';
+                            downloadLocalText(
+                              `${safeName}_compiler_triage.json`,
+                              JSON.stringify(compilerTriage, null, 2),
+                              'application/json;charset=utf-8',
+                            );
+                          } catch (e) {
+                            notify(String(e),'error');
+                          }
+                        }}
+                      >
+                        Export sanitized compiler triage
+                      </button>
+                    </div>
+                  </details>
+                )}
               </div>
 
               {geometryError && <Notice>{geometryError}</Notice>}

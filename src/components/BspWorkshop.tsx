@@ -1,3 +1,5 @@
+import SceneEnvironment from './SceneEnvironment';
+import { sourceSurfaceEnvironment } from '../environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -42,6 +44,7 @@ interface Props {
   onBack: () => void;
   readOnly?: boolean;
   materialSource?: OpenProject | null;
+  materialBindings?: import('../types').NativeAssetImport[];
   wrlOverlay?: WrlDiagnostics | null;
   textureSources?: { id: string; title: string }[];
   onTextureSource?: (id: string) => void;
@@ -427,7 +430,7 @@ export default function BspWorkshop(props: Props) {
     q = useRendererQuality(projectId),
     latest = useRef(doc);
   latest.current = doc;
-  const materialPreview = useWorkshopTextures(doc, props.materialSource);
+  const materialPreview = useWorkshopTextures(doc, props.materialSource, props.materialBindings);
   const [selection, setSelection] = useMapState<Selection | null>(projectId, 'bsp.selection', () => null),
     [tool, setTool] = useMapState<BspTool>(projectId, 'bsp.tool', 'select'),
     [maximized, setMaximized] = useMapState<BspView | null>(projectId, 'bsp.maximized', null),
@@ -687,8 +690,7 @@ export default function BspWorkshop(props: Props) {
                     <ViewportSession id={projectId} channel="bsp" requiresControls />
                     <RightMouseFly />
                     {props.wrlOverlay && <WrlErrorOverlay diagnostics={props.wrlOverlay} />}
-                    <ambientLight intensity={1.2} />
-                    <directionalLight position={[0, -10, 35]} intensity={2} />
+                    <SceneEnvironment value={sourceSurfaceEnvironment(doc.environment)} overrideLighting />
                     {props.mesh && (
                       <BspSurfaces
                         mesh={props.mesh}
@@ -697,6 +699,7 @@ export default function BspWorkshop(props: Props) {
                         onSelect={setSelection}
                         wire={wire}
                         textures={materialPreview.textures}
+                        views={materialPreview.views}
                       />
                     )}
                     {w.brushes.map((b) => (

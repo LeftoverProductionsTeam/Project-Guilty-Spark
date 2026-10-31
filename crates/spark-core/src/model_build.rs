@@ -67,7 +67,7 @@ fn shaders(doc: &QuickForgeDocument, names: &[String]) -> Result<Vec<String>> {
         .collect::<Vec<_>>();
     names.iter().map(|name| {
         let matches=surfaces.iter().filter(|m|m.name.eq_ignore_ascii_case(name)).collect::<Vec<_>>();
-        let material=if matches.len()==1 {matches[0]} else if matches.is_empty() && names.len()==1 && name=="default" && surfaces.len()==1 {&surfaces[0]} else {
+        let material=if matches.len()==1 {matches[0]} else if matches.is_empty() && names.len()==1 && name=="default" && surfaces.iter().any(|m|m.id=="surface") {surfaces.iter().find(|m|m.id=="surface").unwrap()} else if matches.is_empty() && names.len()==1 && name=="default" && surfaces.len()==1 {&surfaces[0]} else {
             return invalid(format!("OBJ material '{name}' needs one matching named surface with an assigned Halo shader in Build tools → Materials. No native files were changed"));
         };
         let path=material.shader_path.as_ref().unwrap();safe_relative(path)?;
@@ -220,6 +220,7 @@ pub fn plan(project: &Project) -> Result<Plan> {
         .quick_forge
         .clone()
         .ok_or_else(|| fail("Custom scenery builds need a QuickForge/Workshop source map"))?;
+    crate::native_asset_imports::rewrite_document(project,&mut doc)?;
     let objects = project
         .scene
         .iter()

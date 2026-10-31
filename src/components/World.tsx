@@ -1,3 +1,7 @@
+import { useReflectionTextures } from '../useReflectionTextures';
+import { useAssetLibrarySources } from '../useAssetLibrarySources';
+import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
+import Mesh from './HaloMesh';
 import TransformControls from './HaloTransformControls';
 import useEndToFloor from '../useEndToFloor';
 import type {DropBody} from '../useEndToFloor';
@@ -27,8 +31,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { MapInspection, MeshData, Project, SceneObject, Vec3,ShaderPreview } from '../types';
-import {createHaloMaterial,extraTextureKey,updateHaloMaterial} from '../haloMaterial';
-import {renderIndices} from '../haloGeometry';
+import { extraTextureKey } from '../haloMaterial';
 import {configureSourceTexture} from '../sourceTexture';
 import {playerStartCamera} from '../sourceCamera';
 import {sourceSpartan} from '../sourceSpartan';
@@ -43,7 +46,7 @@ import {renderFeatures} from '../renderFeatures';
 import MapDecals from './MapDecals';
 import {decalTextureRequests} from '../mapDecals';
 import { formatNumber, replaceVector } from '../editor';
-import { hasRenderGeometry, resolveBspMesh, resolveObjectMesh, shaderForTriangle, shaderLegend } from '../renderView';
+import { hasRenderGeometry, resolveBspMesh, resolveObjectMesh, shaderLegend } from '../renderView';
 import { createPreviewEvidence } from '../qaEvidence';
 import { loadUserShaderTexture } from '../haloTexture';
 import { decodeHaloDds } from '../haloDds';
@@ -68,7 +71,7 @@ import { encodeHaloSourceTiff } from '../haloTiff';
 import { matchLocalShaderTextures } from '../shaderTextureMatching';
 import { buildMaterialAudit } from '../materialAudit';
 import { auditHaloBspRender } from '../bspRenderAudit';
-import { inspectLightmapPages, matchLocalLightmapPages, lightmapPageKey, materialLightmapKey } from '../haloLightmap';
+import { inspectLightmapPages, matchLocalLightmapPages, lightmapPageKey } from '../haloLightmap';
 import { exportMeshObj } from '../haloObj';
 import { downloadLocalText } from '../exportHelpers';
 import { validateSceneTransform } from '../sourcePreflight';
@@ -141,112 +144,7 @@ export class ViewportBoundary extends Component<{ children: ReactNode }, { error
     );
   }
 }
-export function Mesh({
-  data,
-  wireframe = false,
-  flatShading = false,
-  color = '#526e79',
-  materialLens = false,
-  shaderTextures = EMPTY_SHADER_TEXTURES,
-  lightmapTextures = EMPTY_LIGHTMAP_TEXTURES,
-  onShaderClick,
-  shaderMetadata={},extraTextures={},sky=false,
-}: {
-  data: MeshData;
-  wireframe?: boolean;
-  flatShading?: boolean;
-  color?: string;
-  materialLens?: boolean;
-  shaderTextures?: Record<number, THREE.Texture>;
-  lightmapTextures?: Record<string, THREE.Texture>;
-  onShaderClick?: (tagId: number) => void;
-  shaderMetadata?:Record<number,ShaderPreview>;
-  extraTextures?:Record<string,THREE.Texture>;
-  sky?:boolean;
-}) {
-  const legend = useMemo(() => (materialLens || Object.keys(shaderTextures).length || Object.keys(lightmapTextures).length) ? shaderLegend(data) : [], [data, materialLens, shaderTextures, lightmapTextures]);
-  const hasSecondUvs = !!data.lightmapUvs && data.lightmapUvs.length === data.positions.length / 3 * 2 &&
-    data.lightmapUvs.every(value => Number.isFinite(value) && Math.abs(value) <= 32);
-  const materialKey = (range:NonNullable<MeshData['materialRanges']>[number]) => {
-    const pageKey = materialLightmapKey(range, hasSecondUvs, lightmapTextures) ?? '';
-    return `${range.shaderTagId}|${pageKey}`;
-  };
-  const materialKeys = useMemo(() => [...new Set((data.materialRanges ?? []).map(materialKey))], [data, lightmapTextures, hasSecondUvs]);
-  const materials = useMemo(() => legend.length ? [
-    new THREE.MeshStandardMaterial({ color: '#526e79', side: THREE.DoubleSide, roughness: 0.85 }),
-    ...materialKeys.map(key => {
-      const [tagText, lightPageKey] = key.split('|');
-      const tag = Number(tagText);
-      const entry = legend.find(item => item.tagId===tag);
-      const lightMap = lightPageKey ? lightmapTextures[lightPageKey] ?? null : null;
-      if(shaderTextures[tag]&&!materialLens&&!wireframe){const extra:Record<string,THREE.Texture>={};
-        for(const [key,texture] of Object.entries(extraTextures))if(key.startsWith(`${tag}:`))extra[key.slice(key.indexOf(':')+1)]=texture;
-        return createHaloMaterial(shaderTextures[tag],lightMap,shaderMetadata[tag],extra,sky);}
-      return new THREE.MeshStandardMaterial({
-        color: shaderTextures[tag] || lightMap ? '#ffffff' : materialLens ? entry?.color ?? '#8c9292' : '#8c9292',
-        map:shaderTextures[tag] ?? null, lightMap, lightMapIntensity:1,
-        alphaTest:shaderTextures[tag]?.userData.alphaTest?0.5:0,
-        side:THREE.DoubleSide, roughness:0.85,
-      });
-    }),
-  ] : null, [legend, materialKeys, shaderTextures, lightmapTextures, materialLens,shaderMetadata,extraTextures,sky,wireframe]);
-  const geometry = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
-    g.setIndex(renderIndices(data));
-    if (data.normals?.length === data.positions.length) {
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
-    } else {
-      g.computeVertexNormals();
-    }
-    if (data.uvs?.length === data.positions.length / 3 * 2) {
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));
-    }
-    if (hasSecondUvs && data.lightmapUvs?.every(v=>Number.isFinite(v)&&Math.abs(v)<=32)) {
-      // Modern Three uses channel=1/uv1 for lightMap; also set uv2 for
-      // older renderer integrations. These are original cached UVs.
-      g.setAttribute('uv1', new THREE.Float32BufferAttribute(data.lightmapUvs, 2));
-      g.setAttribute('uv2', new THREE.Float32BufferAttribute(data.lightmapUvs, 2));
-    }else g.setAttribute('uv1',new THREE.Float32BufferAttribute(new Float32Array(data.positions.length/3*2),2));
-    if (legend.length && data.materialRanges?.length) {
-      const materialIndex = new Map(materialKeys.map((key, i) => [key, i + 1]));
-      let next = 0;
-      for (const range of [...data.materialRanges].sort((a, b) => a.indexStart - b.indexStart)) {
-        const start = Math.max(next, range.indexStart);
-        const end = Math.min(data.indices.length, range.indexStart + range.indexCount);
-        if (start > next) g.addGroup(next, start - next, 0);
-        if (end > start) g.addGroup(start, end - start, materialIndex.get(materialKey(range)) ?? 0);
-        next = Math.max(next, end);
-      }
-      if (next < data.indices.length) g.addGroup(next, data.indices.length - next, 0);
-    }
-    return g;
-  }, [data, legend, materialKeys, hasSecondUvs]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
-  useEffect(() => () => materials?.forEach((material) => material.dispose()), [materials]);
-  return (
-    <mesh geometry={geometry} material={materials ?? undefined} frustumCulled={!sky}
-      onBeforeRender={(_renderer,scene,camera,_geometry,material)=>updateHaloMaterial(material,scene,camera)} raycast={sky?()=>null:undefined} onClick={(event) => {
-      if (!onShaderClick || !materialLens || event.faceIndex == null || event.button!==0 || event.delta>5) return;
-      const tagId = shaderForTriangle(data, event.faceIndex);
-      if (tagId === null) return;
-      event.stopPropagation();
-      onShaderClick(tagId);
-    }}>
-      {!materials && <meshStandardMaterial
-        color={color}
-        side={THREE.DoubleSide}
-        roughness={0.85}
-        metalness={0.1}
-        wireframe={wireframe}
-        flatShading={flatShading}
-        transparent={wireframe}
-        opacity={wireframe ? 0.65 : 1}
-      />}
-    </mesh>
-  );
-}
-const colors: Record<string, string> = {
+export const colors: Record<string, string> = {
   'Player spawn': '#8fe1bc',
   Biped: '#f1b073',
   Vehicle: '#81b5e8',
@@ -556,8 +454,14 @@ export default function World({
   onOpenTag,
   onResourcesConnected,
   onBeforeResources,
-  selectedId,onSelectObject,viewportChildren,onSceneDragStart,onSceneDragEnd,
-  cinematic=false,cameraLocked=false,externalCameraAuthority=false,
+  selectedId,
+  onSelectObject,
+  viewportChildren,
+  onSceneDragStart,
+  onSceneDragEnd,
+  cinematic = false,
+  cameraLocked = false,
+  externalCameraAuthority = false,
   library,
 }: {
   project: Project;
@@ -565,12 +469,18 @@ export default function World({
   assetMeshes: Record<string, MeshData>;
   edit: (p: Project, description: string) => void;
   notify: (m: string) => void;
-  onOpenTag?: (tagId: number,sourceProjectId?:string) => void;
+  onOpenTag?: (tagId: number, sourceProjectId?: string) => void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: () => Promise<void>;
-  selectedId?:string|null;onSelectObject?:(id:string|null)=>void;viewportChildren?:React.ReactNode;onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
-  cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;
-  library?:ViewportLibraryControls;
+  selectedId?: string | null;
+  onSelectObject?: (id: string | null) => void;
+  viewportChildren?: React.ReactNode;
+  onSceneDragStart?: () => void;
+  onSceneDragEnd?: () => void;
+  cinematic?: boolean;
+  cameraLocked?: boolean;
+  externalCameraAuthority?: boolean;
+  library?: ViewportLibraryControls;
 }) {
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
   const [tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null);
@@ -588,7 +498,8 @@ export default function World({
   const setSelected=(id:string|null)=>{setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
   const tagDocument=library?.documents.find(document=>document.id===tagSource);
   const tagContext=tagSource===project.id?{project,inspection}:tagDocument?.history.current?{project:tagDocument.history.current,inspection:tagDocument.inspection}:null;
-  const catalog=useMemo(()=>viewportAssetCatalog(library?.documents??[]),[library?.documents]);
+  const librarySources = useAssetLibrarySources(library?.documents ?? []);
+  const catalog = useMemo(() => viewportAssetCatalog(librarySources), [librarySources]);
   const viewportElement=useRef<HTMLDivElement|null>(null),dropPoint=useRef<((x:number,y:number)=>Vec3|null)|null>(null),projectValue=useRef(project),alive=useRef(true);
   projectValue.current=project;
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[project.id]);
@@ -598,21 +509,40 @@ export default function World({
   const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
   const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
   const {models:ownedModels,failures:modelIssues}=useOwnedForgeModels(linked,resourceScopes);
-  async function dropAsset(key:string,position:Vec3,replaceId?:string|null){
+  async function dropAsset(key: string, position: Vec3, replaceId?: string | null) {
     if(!library||library.busy||assetBusy)return;
-    const item=catalog.find(candidate=>candidate.key===key)??draggedAsset(key);if(!item){notify('The source map is no longer open. Reopen it before placing this asset.');return;}
+    const item=catalog.find(candidate=>candidate.key===key)??draggedAsset(key);
+    if(!item){notify('The source map is no longer open. Reopen it before placing this asset.');return;}
     setAssetBusy(true);
-    try{
-      if(item.kind==='model'){
-        const placed=placeLibraryModel(projectValue.current,item.asset,position,replaceId);
-        edit(placed.project,`${replaceId?'Replace':'Place'} source model ${item.name}`);setLocalSelected(placed.selectedId);
-      }else if(item.kind==='mesh')await library.onPlaceMesh(item,position,replaceId);
-      else{
-        const emitters=await librarySoundEmitters(item,position);if(!alive.current)return;
-        const latest=projectValue.current,scene=latest.audioPreview??emptySoundScene();if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
-        edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,...emitters]}},'Place sound '+item.name);writeMapSession(project.id,'sound-emitter-selection',emitters[0].id);revealPanel('map-sounds');
+    try {
+      if (item.kind === 'model') {
+        const binding = await prepareAssetImport(projectValue.current, item.asset);
+        if(!alive.current)return;
+        const placed = placeLibraryModel(
+          attachAssetImport(projectValue.current, binding),
+          item.asset,
+          position,
+          replaceId,
+        );
+        edit(placed.project,`${replaceId?'Replace':'Place'} source model ${item.name}`);
+        setLocalSelected(placed.selectedId);
+      } else if (item.kind === 'mesh') await library.onPlaceMesh(item,position,replaceId);
+      else {
+        const binding = await prepareSoundImport(projectValue.current, item);
+        const emitters=await librarySoundEmitters(item,position);
+        if(!alive.current)return;
+        const latest = binding ? attachAssetImport(projectValue.current, binding) : projectValue.current,
+          scene = latest.audioPreview ?? emptySoundScene();
+        if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
+        edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,...emitters]}},'Place sound '+item.name);
+        writeMapSession(project.id,'sound-emitter-selection',emitters[0].id);
+        revealPanel('map-sounds');
       }
-    }catch(reason){if(alive.current)notify(String(reason));}finally{if(alive.current)setAssetBusy(false);}
+    } catch (reason) {
+      if(alive.current)notify(String(reason));
+    } finally {
+      if(alive.current)setAssetBusy(false);
+    }
   }
   async function dropFiles(paths:string[],position:Vec3){if(!library||library.busy)return;for(const path of paths){if(!alive.current)return;if(/\.obj$/i.test(path))await library.onImportModel(position,path);else if(await library.onImportSound(position,path))revealPanel('map-sounds');}}
   const assetDrag=useViewportAssetDrop(project.id,viewportElement,dropPoint,(key,position)=>void dropAsset(key,position),library?(paths,position)=>void dropFiles(paths,position):undefined);
@@ -632,7 +562,8 @@ export default function World({
   const [exportModelId, setExportModelId] = useState('');
   const [environment, setEnvironment] = useState<EditorEnvironment>(() => project.worldEnvironment??structuredClone(DEFAULT_ENVIRONMENT));
   const [sourceAppearance,setSourceAppearance]=useState<SourceAppearance|null>(null);
-  const overrideRef=useRef(project.worldEnvironment);overrideRef.current=project.worldEnvironment;
+  const overrideRef=useRef(project.worldEnvironment);
+  overrideRef.current=project.worldEnvironment;
   useEffect(()=>{let live=true;setSourceAppearance(null);if(native&&inspection)void call<SourceAppearance>('inspect_source_appearance',{projectId:project.id}).then(value=>{if(live&&value.sourceSha256===inspection.sha256){setSourceAppearance(value);setEnvironment(overrideRef.current??value.environment??structuredClone(DEFAULT_ENVIRONMENT));}}).catch(()=>{});return()=>{live=false;};},[project.id,inspection?.sha256]);
   const [shaderTextures, setShaderTextures] = useState<Record<number, THREE.Texture>>({});
   const [loadingOwnedBitmap, setLoadingOwnedBitmap] = useState<Record<number, boolean>>({});
@@ -653,8 +584,14 @@ export default function World({
   } | null>(null);
   const [textureNames, setTextureNames] = useState<Record<number, string>>({});
   const [lightmapTextures,setLightmapTextures] = useState<Record<string, THREE.Texture>>({});
-  const [extraTextures,setExtraTextures]=useState<Record<string,THREE.Texture>>({});
-  const extrasRef=useRef(extraTextures);extrasRef.current=extraTextures;
+  const [detailTextures, setExtraTextures] = useState<Record<string, THREE.Texture>>({});
+  const reflectionPreview = useReflectionTextures(project, inspection, shaderTextures);
+  const extraTextures = useMemo(
+    () => ({ ...detailTextures, ...reflectionPreview.textures }),
+    [detailTextures, reflectionPreview.textures],
+  );
+  const extrasRef=useRef(extraTextures);
+  extrasRef.current=extraTextures;
   const residentTextures=useRef(new Set<THREE.Texture>());
   useEffect(()=>()=>{Object.values(extrasRef.current).forEach(t=>t.dispose());},[]);
   const [lightmapNames,setLightmapNames] = useState<Record<string, string>>({});
@@ -1149,94 +1086,151 @@ export default function World({
     return () => window.removeEventListener('keydown', key);
   }, [fly,project.id]);
   return (
-    <div className="world-layout" data-source-shaders={Object.keys(shaderTextures).length} data-source-shader-ids={Object.keys(shaderTextures).join(',')} data-source-lightmaps={Object.keys(lightmapTextures).length}
-      data-source-details={Object.keys(extraTextures).length} data-sky-triangles={(sourceAppearance?.skyMesh?.indices.length??0)/3}
+    <div
+      className="world-layout"
+      data-source-shaders={Object.keys(shaderTextures).length}
+      data-source-shader-ids={Object.keys(shaderTextures).join(',')}
+      data-source-lightmaps={Object.keys(lightmapTextures).length}
+      data-source-details={Object.keys(extraTextures).length}
+      data-source-reflections={Object.keys(reflectionPreview.textures).length}
+      data-reflection-issues={reflectionPreview.issues.join(' | ')}
+      data-sky-triangles={(sourceAppearance?.skyMesh?.indices.length ?? 0) / 3}
       data-material-loading={!!autoPreviewProgress?.active}
-      data-pending-materials={ownedPreviewPlan?[...ownedPreviewPlan.shaderTasks,...ownedPreviewPlan.lightmapTasks,...ownedPreviewPlan.detailTasks].filter(t=>!automaticAttempts.current.has(t.key)).length:0}>
-      <WorkspacePanel id="objects" label="Objects"><aside className="panel hierarchy">
-        <div className="panel-heading">
-          <strong>Scene hierarchy</strong>
-          <Pill>{project.scene.length}</Pill>
-        </div>
-        <div className="panel-search">
-          <Search size={14} />
-          <input
-            placeholder="Find an object…"
-            aria-label="Search scene objects"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        <div className="hierarchy-group">
-          <Box size={14} />
-          {inspection?.header.name ?? 'Workshop scene'}
-        </div>
-        <div className="object-list">
-          {project.scene
-            .filter(
-              (o) =>
-                o.name.toLowerCase().includes(query.toLowerCase()) ||
-                o.kind.toLowerCase().includes(query.toLowerCase()),
-            )
-            .map((o) => (
-              <div className={`object-row ${selected === o.id ? 'selected' : ''}`} key={o.id}>
-                <button className="object-name" onClick={() => setSelected(o.id)}>
-                  <Box size={13} style={{ color: colors[o.kind] }} />
-                  <span>{o.name}</span>
-                </button>
-                <button
-                  className="visibility"
-                  aria-label={`${o.visible ? 'Hide' : 'Show'} ${o.name}`}
-                  onClick={() =>
-                    edit(
-                      {
-                        ...project,
-                        scene: project.scene.map((s) => (s.id === o.id ? { ...s, visible: !s.visible } : s)),
-                      },
-                      `Toggle visibility: ${o.name}`,
-                    )
+      data-pending-materials={
+        ownedPreviewPlan
+          ? [
+              ...ownedPreviewPlan.shaderTasks,
+              ...ownedPreviewPlan.lightmapTasks,
+              ...ownedPreviewPlan.detailTasks,
+            ].filter((t) => !automaticAttempts.current.has(t.key)).length
+          : 0
+      }
+    >
+      <WorkspacePanel id="objects" label="Objects">
+        <aside className="panel hierarchy">
+          <div className="panel-heading">
+            <strong>Scene hierarchy</strong>
+            <Pill>{project.scene.length}</Pill>
+          </div>
+          <div className="panel-search">
+            <Search size={14} />
+            <input
+              placeholder="Find an object…"
+              aria-label="Search scene objects"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <div className="hierarchy-group">
+            <Box size={14} />
+            {inspection?.header.name ?? 'Workshop scene'}
+          </div>
+          <div className="object-list">
+            {project.scene
+              .filter(
+                (o) =>
+                  o.name.toLowerCase().includes(query.toLowerCase()) ||
+                  o.kind.toLowerCase().includes(query.toLowerCase()),
+              )
+              .map((o) => (
+                <div className={`object-row ${selected === o.id ? 'selected' : ''}`} key={o.id}>
+                  <button className="object-name" onClick={() => setSelected(o.id)}>
+                    <Box size={13} style={{ color: colors[o.kind] }} />
+                    <span>{o.name}</span>
+                  </button>
+                  <button
+                    className="visibility"
+                    aria-label={`${o.visible ? 'Hide' : 'Show'} ${o.name}`}
+                    onClick={() =>
+                      edit(
+                        {
+                          ...project,
+                          scene: project.scene.map((s) =>
+                            s.id === o.id ? { ...s, visible: !s.visible } : s,
+                          ),
+                        },
+                        `Toggle visibility: ${o.name}`,
+                      )
+                    }
+                  >
+                    {o.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                  </button>
+                </div>
+              ))}
+          </div>
+          <div className="panel-foot">
+            {Object.keys(inspection?.modelMeshes ?? {}).length} native model types in static/bind-pose
+            preview. Game objects use their source models. Unavailable models are not drawn; select their
+            hierarchy entry to inspect the dependency. Skeletal animation remains unavailable.
+            {inspection && (
+              <button
+                type="button"
+                className="small-button full"
+                onClick={() => {
+                  const evidence = createPreviewEvidence(inspection, new Date().toISOString());
+                  if (!navigator.clipboard?.writeText) {
+                    notify('Clipboard API unavailable. Use the map validation scripts in the source ZIP.');
+                    return;
                   }
-                >
-                  {o.visible ? <Eye size={12} /> : <EyeOff size={12} />}
-                </button>
-              </div>
-            ))}
-        </div>
-        <div className="panel-foot">
-          {Object.keys(inspection?.modelMeshes ?? {}).length} native model types in static/bind-pose preview.
-          Game objects use their source models. Unavailable models are not drawn; select their hierarchy entry to inspect the dependency. Skeletal animation remains unavailable.
-          {inspection && <button
-            type="button" className="small-button full"
-            onClick={() => {
-              const evidence = createPreviewEvidence(inspection, new Date().toISOString());
-              if (!navigator.clipboard?.writeText) {
-                notify('Clipboard API unavailable. Use the map validation scripts in the source ZIP.');
-                return;
-              }
-              void navigator.clipboard.writeText(evidence)
-                .then(() => notify('Read-only map QA evidence copied. No game files were changed.'))
-                .catch(() => notify('Clipboard permission denied. Use the bundled validation scripts instead.'));
-            }}
-          >Copy map QA report</button>}
-          {inspection && <>
-            <button type="button" className="small-button full" disabled={!previewMesh?.indices.length}
-              onClick={() => exportInspectedMesh(previewMesh,`${inspection.header.name}_bsp_${bsp}`)}>
-              Export viewed BSP as OBJ
-            </button>
-            {!!Object.keys(inspection.modelMeshes ?? {}).length && <>
-              <select aria-label="Static model to export" value={exportModelId} onChange={e=>setExportModelId(e.target.value)}>
-                <option value="">Choose inspected static model…</option>
-                {Object.keys(inspection.modelMeshes ?? {}).map(id=><option key={id} value={id}>Tag model #{id}</option>)}
-              </select>
-              <button type="button" className="small-button full" disabled={!exportModelId}
-                onClick={() => exportInspectedMesh(inspection.modelMeshes?.[exportModelId],`halo_model_${exportModelId}`)}>
-                Export selected model OBJ
+                  void navigator.clipboard
+                    .writeText(evidence)
+                    .then(() => notify('Read-only map QA evidence copied. No game files were changed.'))
+                    .catch(() =>
+                      notify('Clipboard permission denied. Use the bundled validation scripts instead.'),
+                    );
+                }}
+              >
+                Copy map QA report
               </button>
-            </>}
-            <p className="subtle">Exported geometry can be imported into Asset Workshop in another project. This does not make an imported BSP editable or gameplay-ready.</p>
-          </>}
-        </div>
-      </aside></WorkspacePanel>
+            )}
+            {inspection && (
+              <>
+                <button
+                  type="button"
+                  className="small-button full"
+                  disabled={!previewMesh?.indices.length}
+                  onClick={() => exportInspectedMesh(previewMesh, `${inspection.header.name}_bsp_${bsp}`)}
+                >
+                  Export viewed BSP as OBJ
+                </button>
+                {!!Object.keys(inspection.modelMeshes ?? {}).length && (
+                  <>
+                    <select
+                      aria-label="Static model to export"
+                      value={exportModelId}
+                      onChange={(e) => setExportModelId(e.target.value)}
+                    >
+                      <option value="">Choose inspected static model…</option>
+                      {Object.keys(inspection.modelMeshes ?? {}).map((id) => (
+                        <option key={id} value={id}>
+                          Tag model #{id}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="small-button full"
+                      disabled={!exportModelId}
+                      onClick={() =>
+                        exportInspectedMesh(
+                          inspection.modelMeshes?.[exportModelId],
+                          `halo_model_${exportModelId}`,
+                        )
+                      }
+                    >
+                      Export selected model OBJ
+                    </button>
+                  </>
+                )}
+                <p className="subtle">
+                  Exported geometry can be imported into Asset Workshop in another project. This does not make
+                  an imported BSP editable or gameplay-ready.
+                </p>
+              </>
+            )}
+          </div>
+        </aside>
+      </WorkspacePanel>
       <section className="viewport-shell">
         <div className="viewport-toolbar">
           <div className="button-group">
@@ -1255,16 +1249,39 @@ export default function World({
             </IconButton>
           </div>
           <span className="toolbar-divider" />
-          <button title="Toggle 0.5-world-unit XYZ translation snapping. Disabling it permits precise free placement without editing the source map cache." aria-pressed={snap} className={snap ? 'small-button active' : 'small-button'} onClick={() => setSnap(!snap)}>
+          <button
+            title="Toggle 0.5-world-unit XYZ translation snapping. Disabling it permits precise free placement without editing the source map cache."
+            aria-pressed={snap}
+            className={snap ? 'small-button active' : 'small-button'}
+            onClick={() => setSnap(!snap)}
+          >
             Snap {snap ? '0.5' : 'off'}
           </button>
           <IconButton label="Toggle grid" active={grid} onClick={() => setGrid(!grid)}>
             <Grid2X2 size={16} />
           </IconButton>
           <span className="toolbar-spacer" />
-          {project.scene.some(o=>o.kind==='Player spawn')&&<select aria-label="View from player start" value={playerView?(startId||project.scene.find(o=>o.kind==='Player spawn')!.id):''} onChange={event=>{
-            setStartId(event.target.value);setOrtho(false);setPlayerView(!!event.target.value);setFrame(f=>f+1);
-          }}><option value="">Map overview</option>{project.scene.filter(o=>o.kind==='Player spawn').map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select>}
+          {project.scene.some((o) => o.kind === 'Player spawn') && (
+            <select
+              aria-label="View from player start"
+              value={playerView ? startId || project.scene.find((o) => o.kind === 'Player spawn')!.id : ''}
+              onChange={(event) => {
+                setStartId(event.target.value);
+                setOrtho(false);
+                setPlayerView(!!event.target.value);
+                setFrame((f) => f + 1);
+              }}
+            >
+              <option value="">Map overview</option>
+              {project.scene
+                .filter((o) => o.kind === 'Player spawn')
+                .map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+            </select>
+          )}
           <select
             aria-label="Camera projection"
             value={ortho ? 'ortho' : 'perspective'}
@@ -1273,7 +1290,12 @@ export default function World({
             <option value="perspective">Perspective</option>
             <option value="ortho">Orthographic</option>
           </select>
-          <button title="Orbit on: left-drag to orbit, wheel zoom. Orbit off: no automatic orbit while flying. In both modes, hold RIGHT MOUSE to look and hold WASD to fly, R/F ascend/descend, Shift boosts." aria-pressed={fly} className={fly ? 'small-button active' : 'small-button'} onClick={() => setFly(!fly)}>
+          <button
+            title="Orbit on: left-drag to orbit, wheel zoom. Orbit off: no automatic orbit while flying. In both modes, hold RIGHT MOUSE to look and hold WASD to fly, R/F ascend/descend, Shift boosts."
+            aria-pressed={fly}
+            className={fly ? 'small-button active' : 'small-button'}
+            onClick={() => setFly(!fly)}
+          >
             {fly ? 'RMB flight · orbit off' : 'RMB flight · orbit on'}
           </button>
           <select
@@ -1281,28 +1303,44 @@ export default function World({
             value={viewMode}
             onChange={(e) => setViewMode(e.target.value as typeof viewMode)}
           >
-            <option value="render" disabled={!renderAvailable}>BSP render · optional local textures</option>
+            <option value="render" disabled={!renderAvailable}>
+              BSP render · optional local textures
+            </option>
             <option value="smooth">Smooth shaded</option>
             <option value="solid">Flat shaded</option>
             <option value="wireframe">Wireframe</option>
             <option value="collision">Collision geometry</option>
-            <option value="materials" disabled={!renderAvailable}>Material Lens · debug shader IDs</option>
+            <option value="materials" disabled={!renderAvailable}>
+              Material Lens · debug shader IDs
+            </option>
           </select>
           <HelpTip help="Select a placed object to see the translation gizmo. Red X, green Y, blue Z arrows move it on one world axis. W moves, E rotates, R scales. Hold RMB to look around, RMB+WASD to fly; changes are staged in the project, not written into original Halo caches." />
-          <IconButton label="Frame scene (F)" onClick={() => {setPlayerView(false);setFrame((f) => f + 1);}}>
+          <IconButton
+            label="Frame scene (F)"
+            onClick={() => {
+              setPlayerView(false);
+              setFrame((f) => f + 1);
+            }}
+          >
             <Focus size={17} />
           </IconButton>
         </div>
-        <div ref={viewportElement} className={`viewport${assetDrag.dragging?' viewport-asset-drop-active':''}`} data-testid="viewport">
+        <div
+          ref={viewportElement}
+          className={`viewport${assetDrag.dragging ? ' viewport-asset-drop-active' : ''}`}
+          data-testid="viewport"
+        >
           <ViewportBoundary>
             <Suspense fallback={<div className="loading">Preparing geometry…</div>}>
               <Canvas
                 key={String(rendererQuality.antialias)}
                 dpr={rendererQuality.dpr}
                 gl={{ antialias: rendererQuality.antialias, alpha: false, preserveDrawingBuffer: true }}
-                onPointerMissed={(event) => { if (event.button === 0 && event.type === 'click') {setSelected(null);setZoneSelection(null);} }}
+                onPointerMissed={(event) => {
+                  if (event.button === 0 && event.type === 'click') {setSelected(null);setZoneSelection(null);}
+                }}
               >
-                <ViewportActivity continuous={cinematic}/>
+                <ViewportActivity continuous={cinematic} />
                 <Scene
                   {...{
                     project,
@@ -1317,36 +1355,111 @@ export default function World({
                     ortho,
                     fly,
                     frame,
-                    playerView,startId,
-                    environment,sourceAppearance,extraTextures,
-                    onSceneDragStart,onSceneDragEnd,
-                    cinematic,cameraLocked,externalCameraAuthority,
+                    playerView,
+                    startId,
+                    environment,
+                    sourceAppearance,
+                    extraTextures,
+                    onSceneDragStart,
+                    onSceneDragEnd,
+                    cinematic,
+                    cameraLocked,
+                    externalCameraAuthority,
                     ownedModels,
                   }}
                   inspection={inspection}
                   onSnapError={notify}
                   onTransform={update}
-                  onOpenTag={cinematic?onOpenTag:openObjectTag}
+                  onOpenTag={cinematic ? onOpenTag : openObjectTag}
                   shaderTextures={shaderTextures}
                   lightmapTextures={lightmapTextures}
                 />
-                <ViewportSession id={project.id} channel={cinematic?'machinima':'world'} paused={cameraLocked||externalCameraAuthority} requiresControls={!cinematic&&!fly}/>
-                {library&&<ViewportDropPoint point={dropPoint} onReady={setDropReady}/>}
-                {!cinematic&&project.audioPreview?.emitters.filter(emitter=>emitter.spatial).map(emitter=><mesh key={emitter.id} position={emitter.position} onClick={event=>{event.stopPropagation();writeMapSession(project.id,'sound-emitter-selection',emitter.id);revealPanel('map-sounds');}}><sphereGeometry args={[.12,10,6]}/><meshBasicMaterial color={emitter.enabled?'#89e4ef':'#777777'} wireframe/></mesh>)}
-                {!cinematic&&<VisibilityZoneOverlay project={project} edit={edit} enabled={!fly&&!cameraLocked&&!selected} onSelectScene={()=>setSelected(null)} onSceneDragStart={onSceneDragStart} onSceneDragEnd={onSceneDragEnd}/>}
+                <ViewportSession
+                  id={project.id}
+                  channel={cinematic ? 'machinima' : 'world'}
+                  paused={cameraLocked || externalCameraAuthority}
+                  requiresControls={!cinematic && !fly}
+                />
+                {library && <ViewportDropPoint point={dropPoint} onReady={setDropReady} />}
+                {!cinematic &&
+                  project.audioPreview?.emitters
+                    .filter((emitter) => emitter.spatial)
+                    .map((emitter) => (
+                      <mesh
+                        key={emitter.id}
+                        position={emitter.position}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          writeMapSession(project.id, 'sound-emitter-selection', emitter.id);
+                          revealPanel('map-sounds');
+                        }}
+                      >
+                        <sphereGeometry args={[0.12, 10, 6]} />
+                        <meshBasicMaterial color={emitter.enabled ? '#89e4ef' : '#777777'} wireframe />
+                      </mesh>
+                    ))}
+                {!cinematic && (
+                  <VisibilityZoneOverlay
+                    project={project}
+                    edit={edit}
+                    enabled={!fly && !cameraLocked && !selected}
+                    onSelectScene={() => setSelected(null)}
+                    onSceneDragStart={onSceneDragStart}
+                    onSceneDragEnd={onSceneDragEnd}
+                  />
+                )}
                 {viewportChildren}
               </Canvas>
             </Suspense>
           </ViewportBoundary>
-          {!cinematic&&chosen&&<div className="viewport-object-actions"><strong>{chosen.name}</strong>{(chosen.tagId!==null||chosen.sourceModel)&&<button onClick={()=>chosen.sourceModel?openObjectTag(chosen.sourceModel.tagId,chosen.sourceModel.projectId):openObjectTag(chosen.tagId!)}>Object tags</button>}<button onClick={()=>revealPanel('inspector')}>Transform</button><button onClick={()=>setSelected(null)}>Deselect object</button></div>}
-          {assetDrag.dragging&&<div className="viewport-asset-drop-hint">Drop to place at the surface · Esc cancels</div>}
-          {!cinematic&&inspection&&[6,7,609].includes(inspection.header.version)&&!project.source?.resourceSha256?.['bitmaps.map']&&<div className="gs-texture-setup" role="status"><strong>Map textures need their original bitmaps.map.</strong><button disabled={!native||connectingTextures||!onResourcesConnected} onClick={()=>void locateTextures()}>{connectingTextures?'Verifying textures…':'Locate Halo Textures'}</button>{textureSetupError&&<span role="alert">{textureSetupError}</span>}</div>}
+          {!cinematic && chosen && (
+            <div className="viewport-object-actions">
+              <strong>{chosen.name}</strong>
+              {(chosen.tagId !== null || chosen.sourceModel) && (
+                <button
+                  onClick={() =>
+                    chosen.sourceModel
+                      ? openObjectTag(chosen.sourceModel.tagId, chosen.sourceModel.projectId)
+                      : openObjectTag(chosen.tagId!)
+                  }
+                >
+                  Object tags
+                </button>
+              )}
+              <button onClick={() => revealPanel('inspector')}>Transform</button>
+              <button onClick={() => setSelected(null)}>Deselect object</button>
+            </div>
+          )}
+          {assetDrag.dragging && (
+            <div className="viewport-asset-drop-hint">Drop to place at the surface · Esc cancels</div>
+          )}
+          {!cinematic &&
+            inspection &&
+            [6, 7, 609].includes(inspection.header.version) &&
+            !project.source?.resourceSha256?.['bitmaps.map'] && (
+              <div className="gs-texture-setup" role="status">
+                <strong>Map textures need their original bitmaps.map.</strong>
+                <button
+                  disabled={!native || connectingTextures || !onResourcesConnected}
+                  onClick={() => void locateTextures()}
+                >
+                  {connectingTextures ? 'Verifying textures…' : 'Locate Halo Textures'}
+                </button>
+                {textureSetupError && <span role="alert">{textureSetupError}</span>}
+              </div>
+            )}
           <div className="viewport-label">
             <span className="live-dot" />
             {previewMesh?.positions.length
               ? viewMode === 'collision' || !renderAvailable
                 ? 'Actual collision geometry · game textures not available'
-                : viewMode === 'materials' ? 'Actual shader-tag regions · debug colors, not Halo textures' : Object.keys(lightmapTextures).length ? 'Actual BSP geometry · local lightmap-page preview, game shader effects unverified' : Object.keys(shaderTextures).length ? 'Actual BSP geometry · local texture previews (lighting incomplete)' : 'Actual BSP geometry · choose a local DDS/image in Shader Inspector'
+                : viewMode === 'materials'
+                  ? 'Actual shader-tag regions · debug colors, not Halo textures'
+                  : Object.keys(lightmapTextures).length
+                    ? 'Actual BSP geometry · local lightmap-page preview, game shader effects unverified'
+                    : Object.keys(shaderTextures).length
+                      ? 'Actual BSP geometry · local texture previews (lighting incomplete)'
+                      : 'Actual BSP geometry · choose a local DDS/image in Shader Inspector'
               : project.assets.length
                 ? 'Imported workshop geometry'
                 : 'Empty project scene'}
@@ -1366,7 +1479,11 @@ export default function World({
               <option value={-1}>All BSPs</option>
             </select>
           )}
-          <div className="axis-hint" aria-label="Gizmo axis colors: X red, Y green, Z blue" title="Select an asset to drag these axis-colored gizmo arrows: red X, green Y, blue Z. Hold RMB to navigate; release to transform.">
+          <div
+            className="axis-hint"
+            aria-label="Gizmo axis colors: X red, Y green, Z blue"
+            title="Select an asset to drag these axis-colored gizmo arrows: red X, green Y, blue Z. Hold RMB to navigate; release to transform."
+          >
             <span className="gs-axis-x">X</span>
             <span className="gs-axis-y">Y</span>
             <span className="gs-axis-z">Z ↑</span>
@@ -1381,270 +1498,721 @@ export default function World({
           <span>{formatNumber((previewMesh?.indices.length ?? 0) / 3)} visible triangles</span>
           <span>{Object.keys(inspection?.modelMeshes ?? {}).length} object model types resolved</span>
           <span>{project.scene.length} objects</span>
-          {!!inspection?.decals?.length&&<span>{inspection.decals.length} authored decals</span>}
+          {!!inspection?.decals?.length && <span>{inspection.decals.length} authored decals</span>}
           <span>Halo coordinates · Z up</span>
-          <ViewportPerformance projectId={project.id}/>
+          <ViewportPerformance projectId={project.id} />
           <Pill tone="blue">Editor preview</Pill>
         </div>
       </section>
-      {!cinematic&&selectedId===undefined&&<WorkspacePanel id="object-tags" label="Object tags">{tagContext?.inspection?<><p className="subtle">{tagContext.project.title} · source tags</p><ViewportTags key={tagContext.project.id} project={tagContext.project} inspection={tagContext.inspection} requestedTagId={tagRequest} requestRevision={tagRevision} edit={edit} notify={notify} onFullEditor={id=>onOpenTag?.(id,tagContext.project.id)} onSave={library?()=>library.onSaveMap(tagContext.project.id):onBeforeResources}/></>:<p>Open this model’s source map in a tab to edit its tags. Its preview keeps the original source identity.</p>}</WorkspacePanel>}
-      {!cinematic&&library&&<WorkspacePanel id="asset-library" label="Asset library" defaultDock="left"><ViewportAssetLibrary projectId={project.id} assets={catalog} begin={assetDrag.begin} activate={assetDrag.activate} canReplace={!!chosen} replace={item=>{if(chosen)void dropAsset(item.key,chosen.position,chosen.id);}} importModel={()=>void library.onImportModel(viewPoint())} importSound={()=>void library.onImportSound(viewPoint()).then(added=>{if(added)revealPanel('map-sounds');})} busy={library.busy||assetBusy||!dropReady}/></WorkspacePanel>}
-      {!cinematic&&selectedId===undefined&&<WorkspacePanel id="map-sounds" label="Map sounds">{inspection?<MapSounds expanded key={project.source?.resourceSha256?.['sounds.map']} projectId={project.id} project={project} edit={edit} inspection={inspection} onOpenTag={openObjectTag} onResources={()=>void (async()=>{try{await onBeforeResources?.();const open=await call<OpenProject|null>('choose_project_resources',{projectId:project.id});if(open)await onResourcesConnected?.(open);}catch(error){notify(String(error));}})()}/>:<SoundMixer project={project} inspection={null} sourceProjectId={project.id} tagId={null} edit={edit}/>}</WorkspacePanel>}
-      <WorkspacePanel id="inspector" label="Inspector"><aside className="panel inspector">
-        {!cinematic&&<VisibilityZones project={project} edit={edit} onSelectScene={()=>setSelected(null)} onSave={onBeforeResources}/>}
-        <RenderFeatures project={project} edit={edit}/>
-        <div className="panel-heading">
-          <strong>Inspector</strong>
-          {chosen && <Pill>{chosen.kind}</Pill>}
-        </div>
-        <details className="gs-world-environment-panel">
-          <summary title="Temporary local fog, sun and ambient preview for comparing your owned map. Never modifies or exports a compiled Halo map.">Environment · preview sun, ambient &amp; fog</summary>
-          <p>{project.worldEnvironment?'Saved editor override':sourceAppearance?.skyPath?`Map sky: ${sourceAppearance.skyPath}`:'Reading the map’s authored environment…'}</p>
-          <EnvironmentControls value={environment} persisted onChange={next=>{setEnvironment(next);edit({...project,worldEnvironment:next},'Change world lighting and fog');}}/>
-          {project.worldEnvironment&&<button className="small-button" onClick={()=>{setEnvironment(sourceAppearance?.environment??structuredClone(DEFAULT_ENVIRONMENT));edit({...project,worldEnvironment:null},'Use map-authored environment');}}>Use map lighting and fog</button>}
-        </details>
-        {!chosen && (viewMode === 'materials' || viewMode === 'render') && materials.length > 0 && (
-          <div className="material-lens">
-            <p>Shader IDs originate from this map. Internal mipmaps and exact pixels from pinned classic resources or MCC texture packs are loaded read-only. Missing entries and unsupported formats remain explicit. Engine shader effects and animation can still differ from gameplay.</p>
-            {inspection?.header.version===13&&<div className="gs-resource-audit"><p>{project.source?.resourceSha256?.['mcc-textures']?'MCC texture bundle pinned · exact imeta / ipak entries · original pixels':'Connect the installed MCC texture packs to load external map materials.'}</p><button className="small-button" disabled={autoPreviewLocked} onClick={()=>void(async()=>{try{await onBeforeResources?.();const opened=await call<OpenProject>('connect_mcc_texture_resources',{projectId:project.id});if(onResourcesConnected)await onResourcesConnected(opened);else notify('MCC resources reconnected. Reopen this map to refresh its texture identity.');}catch(e){notify(String(e));}})()}>Reconnect MCC texture packs</button></div>}
-            {native && inspection && matchesClassicBitmapRuntime(inspection.header.version) && <div className="gs-resource-audit" role="status">
-              <button type="button" className="small-button" disabled={auditingResources || !(project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map'])}
-                title="Checks the original project-selected bitmaps.map hash, bounded header, index paths and resource offsets. Does not extract, copy, or alter textures. Select resources in Build first."
-                onClick={() => void checkResourceIndex()}>{auditingResources ? 'Checking original resource index…' : 'Verify selected bitmaps.map index'}</button>
-              {!(project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) && <small>Use Build → Choose source resources to select and hash the matching bitmaps.map first.</small>}
-              {resourceAudit && <div><small>{resourceAudit.resourceCount} indexed resources · {resourceAudit.exactBitmapPathMatches} exact bitmap paths · {resourceAudit.missingBitmapPathMatches} unmatched · {resourceAudit.ambiguousBitmapPaths} duplicate paths</small><small>{resourceAudit.warning}</small></div>}
-            </div>}
-            <label className="shader-file-pick">Convert an owned local DDS texture to an uncompressed Halo Editing Kit TIFF source (.tif; no game writes)
-              <input type="file" accept=".dds" aria-label="Convert selected DDS to TIFF source"
-                onChange={event => {const file=event.target.files?.[0]; if(file)void exportLocalDdsTiff(file); event.target.value='';}} />
-            </label>
-            <strong>{materials.length} unique shader tags in visible BSP</strong>
-            {native && inspection?.renderMesh && <div className="gs-owned-material-batch" role="status">
-              <label><input type="checkbox" checked={automaticTextures} onChange={e=>setAutomaticTextures(e.target.checked)}/> Load map appearance automatically</label>
-              <p title="One read-only SHA-verified cache snapshot per click and, if necessary, one exact pinned bitmaps.map index. Bounded output and decoded textures; nothing written to a Halo installation.">
-                Verified classic materials · one batch, up to {MAX_OWNED_PREVIEWS_PER_CLICK} image slots
-              </p>
-              <div className="gs-owned-material-actions">
-                <button type="button" className="small-button"
-                  title="Preview verified shader_environment base maps and shader_model diffuse maps from one SHA-256-pinned batch. Manually selected images are preserved."
-                  disabled={autoPreviewLocked || !ownedPreviewPlan?.shaderTasks.length}
-                  onClick={() => void previewVerifiedMaterialBatch('shader')}>
-                  Preview verified diffuse ({ownedPreviewPlan?.shaderTasks.length ?? 0} eligible)
-                </button>
-                <button type="button" className="small-button"
-                  title="Use each BSP's exact lightmap bitm dependency and its page index, only when secondary UVs are verified and all sections agree. Does not imply engine-authentic radiosity."
-                  disabled={autoPreviewLocked || !ownedPreviewPlan?.lightmapTasks.length}
-                  onClick={() => void previewVerifiedMaterialBatch('lightmap')}>
-                  Preview verified lightmaps ({ownedPreviewPlan?.lightmapTasks.length ?? 0} eligible)
-                </button>
-                <button type="button" className="small-button"
-                  title="Auto-preview both exact diffuse maps and BSP-local lightmap pages using one source-verified batch. Halo lighting and shader blends remain approximate."
-                  disabled={autoPreviewLocked || !(ownedPreviewPlan?.shaderTasks.length || ownedPreviewPlan?.lightmapTasks.length || ownedPreviewPlan?.detailTasks.length)}
-                  onClick={() => void previewVerifiedMaterialBatch('both')}>
-                  Auto-preview verified materials
-                </button>
-                {autoPreviewProgress?.active && <button type="button" className="small-button"
-                  title="Discard the pending results of the in-flight read-only batch. Another batch cannot begin until that native operation ends."
-                  onClick={cancelAutoPreview}>Cancel queued previews</button>}
-              </div>
-              <small>{autoPreviewProgress
-                ? `${autoPreviewProgress.done}/${autoPreviewProgress.total} texture slots loaded${autoPreviewProgress.active?' · loading':' · finished'}${textureFailures.length ? ` · ${summarizeTextureFailures(textureFailures)}`:''}`
-                : autoPreviewLocked ? 'Finishing the canceled read-only native batch before another may start.'
-                : 'Exact source tag IDs only. Unavailable and unsupported formats are skipped, never replaced with guessed images.'}</small>
-            </div>}
-            {native && <HaloTextures project={project} onConnected={onResourcesConnected} onBeforeConnect={onBeforeResources} notify={notify}/>}
-            {textureFailures.length>0 && <details className="forge-tool-diagnostics"><summary>View texture details · Advanced Diagnostics</summary>
-              <p>{summarizeTextureFailures(textureFailures)}</p>
-              <button className="small-button" disabled={autoPreviewLocked} onClick={()=>void previewVerifiedMaterialBatch('both')}>Try again</button>
-              <button className="small-button" onClick={()=>downloadLocalText('halo-texture-diagnostics.json',JSON.stringify({sourceSha256:inspection?.sha256,resourceSha256:(project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']),failures:textureFailures},null,2),'application/json')}>Save diagnostics</button>
-              <ul>{textureFailures.map((item,i)=><li key={i}><code>{item.bitmapTagId}:{item.imageIndex} · {item.code}</code> {item.reason}</li>)}</ul>
-            </details>}
-            {materialAudit && <div className="gs-material-audit" role="status">
-              <p title="Bounded native cache-reader lookup of shader_environment base maps and shader_model diffuse maps. Does not extract pixel data or render game shaders.">
-                Bitmap references: {materialAudit.summary.resolved} exact primary maps, {materialAudit.summary.missing} empty,
-                {' '}{materialAudit.summary.invalid} invalid, {materialAudit.summary.unavailable} unavailable,
-                {' '}{materialAudit.summary.legacyUnverified} from older metadata.
-              </p>
-              <button className="small-button" type="button" onClick={exportMaterialAudit}
-                title="Save shader IDs, exact primary bitmap tag paths and lightmap sections as JSON. Read-only source metadata. This does not export game pixels or guarantee game shader compatibility.">
-                Export material dependency report (.json)
-              </button>
-            </div>}
-            {bspAudit.review && <div className="gs-material-audit" aria-label="Compiled BSP render preflight">
-              <strong>Compiled BSP render preflight · source metadata</strong>
-              <p>{bspAudit.review.checked.vertices} vertices / {bspAudit.review.checked.triangles} triangles across {bspAudit.review.checked.materialRanges} material spans;
-                {' '}{bspAudit.review.checked.lightmapPages} BSP-specific lightmap pages. {bspAudit.review.checked.degenerateTriangles} degenerate triangles.
-              </p>
-              <p>{bspAudit.review.summary.errors} attribution errors / {bspAudit.review.summary.warnings} cautions.
-                {bspAudit.review.summary.omittedFindings>0 ? ` (${bspAudit.review.summary.omittedFindings} additional findings summarized but not listed)` : ''}
-                {' '}This checks render-buffer consistency, <strong>not</strong> Halo collision, sealed portals, radiosity or actual game loading.</p>
-              <div className="analysis-actions">
-                <button className="small-button" type="button" onClick={exportBspReview}
-                  title="Export only source SHA-256, render counts, material tag IDs and bounded findings. Does not export source map paths, bitmap bytes, geometry or gameplay claims.">
-                  Export BSP preflight (.json)
-                </button>
-              </div>
-              {bspAudit.review.findings.length>0 && <details className="forge-tool-diagnostics">
-                <summary>Inspect {bspAudit.review.findings.length} BSP preview findings</summary>
-                {bspAudit.review.findings.map((issue,i)=><p key={`${issue.code}-${i}`} className="forge-hint">
-                  <strong>{issue.severity} · {issue.code}</strong>: {issue.message}{issue.bspIndex!==null?` (BSP ${issue.bspIndex+1})`:''}
-                </p>)}
-              </details>}
-            </div>}
-            {bspAudit.error && <Notice tone="warning">BSP preflight unavailable: {bspAudit.error}. The source cache was not modified.</Notice>}
-            {availableLightmapPages.length>0&&<div className="gs-lightmap-pages">
-              <strong>Compiled BSP lightmap pages (local image preview)</strong>
-              <p>These page indices and UV coverage come from the imported cache, not guessed lighting. Choose your own extracted page image. Halo's actual radiosity, blending and animated shaders still need native rendering work.</p>
-              <label className="shader-file-pick" title="Use bsp_0_page_0.png and bsp_1_page_0.png when BSPs share a page number. A filename like page_3.png is accepted only if that page is unique across the entire map.">Batch match BSP-specific lightmap images
-                <input type="file" multiple accept=".dds,.png,.jpg,.jpeg,.webp" aria-label="Batch attach extracted local lightmap page images"
-                  onChange={event=>{const files=Array.from(event.target.files??[]);if(files.length)void attachLocalLightmapBatch(files);event.target.value='';}}/>
-              </label>
-              {availableLightmapPages.map(page=><div className="material-lens-assignment" key={page.key}>
-                <div><strong>BSP {page.bspIndex + 1} · Page {page.page}</strong><small>{page.triangles} triangles · {page.materials} materials · {page.withRealUvs?'real lightmap UVs':'secondary UV unavailable'}</small></div>
-                <label className="shader-file-pick">{lightmapNames[page.key]??`Choose image for bsp_${page.bspIndex}_page_${page.page}`}
-                  <input type="file" disabled={!page.withRealUvs} accept=".dds,.png,.jpg,.jpeg,.webp"
-                    aria-label={`Local lightmap image for BSP ${page.bspIndex + 1} page ${page.page}`} onChange={event=>{const file=event.target.files?.[0];if(file)void attachLightmapPage(page.bspIndex,page.page,file);event.target.value='';}}/>
-                </label>
-                {lightmapTextures[page.key]&&<button className="small-button" onClick={()=>{
-                  setLightmapTextures(old=>{const next={...old};next[page.key]?.dispose();delete next[page.key];return next;});
-                  setLightmapNames(old=>{const next={...old};delete next[page.key];return next;});
-                }}>Remove page</button>}
-              </div>)}
-            </div>}
-            <label className="shader-file-pick">Batch match local exported DDS/PNG/JPEG/WebP textures (exact names only)
-              <input type="file" multiple accept=".dds,.png,.jpg,.jpeg,.webp" aria-label="Choose local textures to auto match shader paths"
-                onChange={event => {const files=Array.from(event.target.files ?? []); if(files.length) void attachLocalTextureBatch(files); event.target.value='';}} />
-            </label>
-            <div className="material-lens-list">
-              {materials.map((entry) => {
-                const tag = inspection?.tags.find((item) => item.id === entry.tagId);
-                const bitmapRef=tag?.references?.find(r=>/^(base map|diffuse map)$/i.test(r.label));
-                const bitmapTag=inspection?.tags.find(t=>t.id===bitmapRef?.targetId&&t.class==='bitm');
-                return (
-                  <div className="material-lens-assignment" key={entry.tagId}>
-                    <button type="button" disabled={!onOpenTag || !tag}
-                      onClick={() => onOpenTag?.(entry.tagId)} title="Open actual shader tag">
-                      <span className="material-chip" style={{ backgroundColor: entry.color }} />
-                      <span><strong>{tag?.path ?? `Tag 0x${entry.tagId.toString(16)}`}</strong>
-                        <small>{Math.round(entry.triangles)} triangles · {tag?.class ?? 'unresolved'}</small>
-                        <small title="The cache reader validates each primary bitmap datum against the original source tag table. You can still manually preview a texture for unsupported shaders.">
-                          {tag?.primaryBitmapStatus==='resolved' && bitmapTag ? `Primary bitmap: ${bitmapTag.path}` :
-                            tag?.primaryBitmapStatus ? `Primary bitmap: ${tag.primaryBitmapStatus} (manual preview only)` :
-                            tag&&!tag.shaderPreview?`Automatic ${tag.class} shader blending is unsupported; use a local exported image`:
-                            'Primary bitmap: legacy/unverified (filename matching is not authoritative)'}
-                        </small></span>
-                    </button>
-                    {native && tag?.primaryBitmapStatus === 'resolved' && bitmapTag && !bitmapTag.external && (
-                      <button className="small-button" type="button" disabled={!!loadingOwnedBitmap[entry.tagId]}
-                        title="Read one SHA-256-verified classic Halo bitmap top mipmap. Internal data comes from the preserved cache. External raw data is only read if a matching, unique bitmaps.map index entry fully contains the range and the project pinned its SHA-256. External tag bodies, ambiguous entries, MCC and unsupported pixel layouts fail closed."
-                        onClick={() => void previewInternalBitmap(entry.tagId, bitmapTag.id)}>
-                        {loadingOwnedBitmap[entry.tagId] ? 'Verifying bitmap source…' : 'Preview verified map bitmap'}
-                      </button>
-                    )}
-                    {bitmapTag?.external && <small title="The bitmap tag *body* is external. The new resource bridge only handles external raw pixels whose tag metadata remains internal and whose byte range can be proven. Use an authorized tag extraction workflow for external tag metadata.">External bitmap tag metadata · local extraction required</small>}
-                    <label className="shader-file-pick">{textureNames[entry.tagId] ? `Texture: ${textureNames[entry.tagId]}` : 'Choose local DDS/image'}
-                      <input type="file" accept=".dds,.png,.jpg,.jpeg,.webp" aria-label={`Local texture for shader ${entry.tagId}`}
-                        onChange={event => { const file=event.target.files?.[0]; if(file) void attachShaderTexture(entry.tagId,file); event.target.value=''; }}/>
-                    </label>
-                    {shaderTextures[entry.tagId] && <button type="button" aria-label={`Remove shader texture ${entry.tagId}`} onClick={() => {
-                      setShaderTextures(previous => { const next={...previous}; next[entry.tagId]?.dispose(); delete next[entry.tagId]; return next; });
-                      setTextureNames(previous => { const next={...previous}; delete next[entry.tagId]; return next; });
-                    }}>Remove image</button>}
-                  </div>
-                );
-              })}
-            </div>
+      {!cinematic && selectedId === undefined && (
+        <WorkspacePanel id="object-tags" label="Object tags">
+          {tagContext?.inspection ? (
+            <>
+              <p className="subtle">{tagContext.project.title} · source tags</p>
+              <ViewportTags
+                key={tagContext.project.id}
+                project={tagContext.project}
+                inspection={tagContext.inspection}
+                requestedTagId={tagRequest}
+                requestRevision={tagRevision}
+                edit={edit}
+                notify={notify}
+                onFullEditor={(id) => onOpenTag?.(id, tagContext.project.id)}
+                onSave={library ? () => library.onSaveMap(tagContext.project.id) : onBeforeResources}
+              />
+            </>
+          ) : (
+            <p>
+              Open this model’s source map in a tab to edit its tags. Its preview keeps the original source
+              identity.
+            </p>
+          )}
+        </WorkspacePanel>
+      )}
+      {!cinematic && library && (
+        <WorkspacePanel id="asset-library" label="Asset library" defaultDock="left">
+          <ViewportAssetLibrary
+            projectId={project.id}
+            assets={catalog}
+            begin={assetDrag.begin}
+            activate={assetDrag.activate}
+            canReplace={!!chosen}
+            replace={(item) => {
+              if (chosen) void dropAsset(item.key, chosen.position, chosen.id);
+            }}
+            importModel={() => void library.onImportModel(viewPoint())}
+            importSound={() =>
+              void library.onImportSound(viewPoint()).then((added) => {
+                if (added) revealPanel('map-sounds');
+              })
+            }
+            busy={library.busy || assetBusy || !dropReady}
+          />
+        </WorkspacePanel>
+      )}
+      {!cinematic && selectedId === undefined && (
+        <WorkspacePanel id="map-sounds" label="Map sounds">
+          {inspection ? (
+            <MapSounds
+              expanded
+              key={project.source?.resourceSha256?.['sounds.map']}
+              projectId={project.id}
+              project={project}
+              edit={edit}
+              inspection={inspection}
+              onOpenTag={openObjectTag}
+              onResources={() =>
+                void (async () => {
+                  try {
+                    await onBeforeResources?.();
+                    const open = await call<OpenProject | null>('choose_project_resources', {
+                      projectId: project.id,
+                    });
+                    if (open) await onResourcesConnected?.(open);
+                  } catch (error) {
+                    notify(String(error));
+                  }
+                })()
+              }
+            />
+          ) : (
+            <SoundMixer
+              project={project}
+              inspection={null}
+              sourceProjectId={project.id}
+              tagId={null}
+              edit={edit}
+            />
+          )}
+        </WorkspacePanel>
+      )}
+      <WorkspacePanel id="inspector" label="Inspector">
+        <aside className="panel inspector">
+          {!cinematic && (
+            <VisibilityZones
+              project={project}
+              edit={edit}
+              onSelectScene={() => setSelected(null)}
+              onSave={onBeforeResources}
+            />
+          )}
+          <RenderFeatures project={project} edit={edit} />
+          <div className="panel-heading">
+            <strong>Inspector</strong>
+            {chosen && <Pill>{chosen.kind}</Pill>}
           </div>
-        )}
-        {chosen ? (
-          <div className="inspector-body">
-            {chosen.sourceModel&&<><p className="subtle">Source-linked model preview · compile editable scenario/model tags before a game build.</p>{modelIssues[forgeModelKey(sourcePlacement(chosen)!)]&&<Notice>{modelIssues[forgeModelKey(sourcePlacement(chosen)!)]}</Notice>}<button onClick={()=>openObjectTag(chosen.sourceModel!.tagId,chosen.sourceModel!.projectId)}>Edit model source tags</button></>}
-            {chosen.tagId!==null&&!resolveObjectMesh(inspection,chosen.tagId,chosen.assetId,assetMeshes)&&<Notice tone="warning">This source model is unavailable in the current reader. Its item is not drawn. The placement remains editable in the hierarchy.</Notice>}
-            <label className="field-label">
-              Object name
-              <input value={chosen.name} onChange={(e) => update({ ...chosen, name: e.target.value })} />
-            </label>
-            <div className="inspector-section">
-              <div className="section-label">Transform</div>
-              {(['position', 'rotation', 'scale'] as const).map((property) => (
-                <div className="transform-field" key={property}>
-                  <label>
-                    {property === 'rotation'
-                      ? 'Yaw / pitch / roll'
-                      : property[0].toUpperCase() + property.slice(1)}
-                    {property === 'rotation' && <small>degrees</small>}
-                  </label>
-                  <div className="vector-inputs">
-                    {chosen[property].map((value, i) => (
-                      <div key={i}>
-                        <span className={`axis-${i}`}>
-                          {property === 'rotation' ? ['Y', 'P', 'R'][i] : ['X', 'Y', 'Z'][i]}
-                        </span>
-                        <NumberField
-                          value={
-                            property === 'rotation' ? Number(((value * 180) / Math.PI).toFixed(3)) : value
-                          }
-                          label={`${property} ${i}`}
-                          disabled={property==='rotation'&&i>0&&['Player spawn','Netgame item'].includes(chosen.kind)}
-                          min={property === 'scale' ? 0.001 : -1e6}
-                          step={property==='rotation'?1:property==='scale'?0.01:0.1}
-                          onCommit={(v) => {
-                            try {
-                              update({
-                                ...chosen,
-                                [property]: replaceVector(
-                                  chosen[property],
-                                  i,
-                                  property === 'rotation' ? (v * Math.PI) / 180 : v,
-                                ),
-                              });
-                            } catch (e) {
-                              notify(String(e));
-                            }
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {chosen.sourceOffset !== null && (
-              <Notice>
-                Position and rotation can be rebuilt through Invader. Per-instance scale and new Halo
-                instances are editor-only.
-              </Notice>
-            )}
-            <div className="inspector-actions">
-              <button onClick={duplicate}>
-                <Copy size={14} />
-                Duplicate
-              </button>
+          <details className="gs-world-environment-panel">
+            <summary title="Temporary local fog, sun and ambient preview for comparing your owned map. Never modifies or exports a compiled Halo map.">
+              Environment · preview sun, ambient &amp; fog
+            </summary>
+            <p>
+              {project.worldEnvironment
+                ? 'Saved editor override'
+                : sourceAppearance?.skyPath
+                  ? `Map sky: ${sourceAppearance.skyPath}`
+                  : 'Reading the map’s authored environment…'}
+            </p>
+            <EnvironmentControls
+              value={environment}
+              persisted
+              onChange={(next) => {
+                setEnvironment(next);
+                edit({ ...project, worldEnvironment: next }, 'Change world lighting and fog');
+              }}
+            />
+            {project.worldEnvironment && (
               <button
+                className="small-button"
                 onClick={() => {
-                  edit(
-                    { ...project, scene: project.scene.filter((o) => o.id !== chosen.id) },
-                    `Remove ${chosen.name} from editor`,
-                  );
-                  setSelected(null);
+                  setEnvironment(sourceAppearance?.environment ?? structuredClone(DEFAULT_ENVIRONMENT));
+                  edit({ ...project, worldEnvironment: null }, 'Use map-authored environment');
                 }}
               >
-                <Trash2 size={14} />
-                Remove
+                Use map lighting and fog
               </button>
+            )}
+          </details>
+          {!chosen && (viewMode === 'materials' || viewMode === 'render') && materials.length > 0 && (
+            <div className="material-lens">
+              <p>
+                Shader IDs originate from this map. Internal mipmaps and exact pixels from pinned classic
+                resources or MCC texture packs are loaded read-only. Missing entries and unsupported formats
+                remain explicit. Engine shader effects and animation can still differ from gameplay.
+              </p>
+              {inspection?.header.version === 13 && (
+                <div className="gs-resource-audit">
+                  <p>
+                    {project.source?.resourceSha256?.['mcc-textures']
+                      ? 'MCC texture bundle pinned · exact imeta / ipak entries · original pixels'
+                      : 'Connect the installed MCC texture packs to load external map materials.'}
+                  </p>
+                  <button
+                    className="small-button"
+                    disabled={autoPreviewLocked}
+                    onClick={() =>
+                      void (async () => {
+                        try {
+                          await onBeforeResources?.();
+                          const opened = await call<OpenProject>('connect_mcc_texture_resources', {
+                            projectId: project.id,
+                          });
+                          if (onResourcesConnected) await onResourcesConnected(opened);
+                          else
+                            notify(
+                              'MCC resources reconnected. Reopen this map to refresh its texture identity.',
+                            );
+                        } catch (e) {
+                          notify(String(e));
+                        }
+                      })()
+                    }
+                  >
+                    Reconnect MCC texture packs
+                  </button>
+                </div>
+              )}
+              {native && inspection && matchesClassicBitmapRuntime(inspection.header.version) && (
+                <div className="gs-resource-audit" role="status">
+                  <button
+                    type="button"
+                    className="small-button"
+                    disabled={
+                      auditingResources ||
+                      !(
+                        project.source?.resourceSha256?.['mcc-textures'] ??
+                        project.source?.resourceSha256?.['bitmaps.map']
+                      )
+                    }
+                    title="Checks the original project-selected bitmaps.map hash, bounded header, index paths and resource offsets. Does not extract, copy, or alter textures. Select resources in Build first."
+                    onClick={() => void checkResourceIndex()}
+                  >
+                    {auditingResources
+                      ? 'Checking original resource index…'
+                      : 'Verify selected bitmaps.map index'}
+                  </button>
+                  {!(
+                    project.source?.resourceSha256?.['mcc-textures'] ??
+                    project.source?.resourceSha256?.['bitmaps.map']
+                  ) && (
+                    <small>
+                      Use Build → Choose source resources to select and hash the matching bitmaps.map first.
+                    </small>
+                  )}
+                  {resourceAudit && (
+                    <div>
+                      <small>
+                        {resourceAudit.resourceCount} indexed resources ·{' '}
+                        {resourceAudit.exactBitmapPathMatches} exact bitmap paths ·{' '}
+                        {resourceAudit.missingBitmapPathMatches} unmatched ·{' '}
+                        {resourceAudit.ambiguousBitmapPaths} duplicate paths
+                      </small>
+                      <small>{resourceAudit.warning}</small>
+                    </div>
+                  )}
+                </div>
+              )}
+              <label className="shader-file-pick">
+                Convert an owned local DDS texture to an uncompressed Halo Editing Kit TIFF source (.tif; no
+                game writes)
+                <input
+                  type="file"
+                  accept=".dds"
+                  aria-label="Convert selected DDS to TIFF source"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void exportLocalDdsTiff(file);
+                    event.target.value = '';
+                  }}
+                />
+              </label>
+              <strong>{materials.length} unique shader tags in visible BSP</strong>
+              {native && inspection?.renderMesh && (
+                <div className="gs-owned-material-batch" role="status">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={automaticTextures}
+                      onChange={(e) => setAutomaticTextures(e.target.checked)}
+                    />{' '}
+                    Load map appearance automatically
+                  </label>
+                  <p title="One read-only SHA-verified cache snapshot per click and, if necessary, one exact pinned bitmaps.map index. Bounded output and decoded textures; nothing written to a Halo installation.">
+                    Verified classic materials · one batch, up to {MAX_OWNED_PREVIEWS_PER_CLICK} image slots
+                  </p>
+                  <div className="gs-owned-material-actions">
+                    <button
+                      type="button"
+                      className="small-button"
+                      title="Preview verified shader_environment base maps and shader_model diffuse maps from one SHA-256-pinned batch. Manually selected images are preserved."
+                      disabled={autoPreviewLocked || !ownedPreviewPlan?.shaderTasks.length}
+                      onClick={() => void previewVerifiedMaterialBatch('shader')}
+                    >
+                      Preview verified diffuse ({ownedPreviewPlan?.shaderTasks.length ?? 0} eligible)
+                    </button>
+                    <button
+                      type="button"
+                      className="small-button"
+                      title="Use each BSP's exact lightmap bitm dependency and its page index, only when secondary UVs are verified and all sections agree. Does not imply engine-authentic radiosity."
+                      disabled={autoPreviewLocked || !ownedPreviewPlan?.lightmapTasks.length}
+                      onClick={() => void previewVerifiedMaterialBatch('lightmap')}
+                    >
+                      Preview verified lightmaps ({ownedPreviewPlan?.lightmapTasks.length ?? 0} eligible)
+                    </button>
+                    <button
+                      type="button"
+                      className="small-button"
+                      title="Auto-preview both exact diffuse maps and BSP-local lightmap pages using one source-verified batch. Halo lighting and shader blends remain approximate."
+                      disabled={
+                        autoPreviewLocked ||
+                        !(
+                          ownedPreviewPlan?.shaderTasks.length ||
+                          ownedPreviewPlan?.lightmapTasks.length ||
+                          ownedPreviewPlan?.detailTasks.length
+                        )
+                      }
+                      onClick={() => void previewVerifiedMaterialBatch('both')}
+                    >
+                      Auto-preview verified materials
+                    </button>
+                    {autoPreviewProgress?.active && (
+                      <button
+                        type="button"
+                        className="small-button"
+                        title="Discard the pending results of the in-flight read-only batch. Another batch cannot begin until that native operation ends."
+                        onClick={cancelAutoPreview}
+                      >
+                        Cancel queued previews
+                      </button>
+                    )}
+                  </div>
+                  <small>
+                    {autoPreviewProgress
+                      ? `${autoPreviewProgress.done}/${autoPreviewProgress.total} texture slots loaded${autoPreviewProgress.active ? ' · loading' : ' · finished'}${textureFailures.length ? ` · ${summarizeTextureFailures(textureFailures)}` : ''}`
+                      : autoPreviewLocked
+                        ? 'Finishing the canceled read-only native batch before another may start.'
+                        : 'Exact source tag IDs only. Unavailable and unsupported formats are skipped, never replaced with guessed images.'}
+                  </small>
+                </div>
+              )}
+              {native && (
+                <HaloTextures
+                  project={project}
+                  onConnected={onResourcesConnected}
+                  onBeforeConnect={onBeforeResources}
+                  notify={notify}
+                />
+              )}
+              {textureFailures.length > 0 && (
+                <details className="forge-tool-diagnostics">
+                  <summary>View texture details · Advanced Diagnostics</summary>
+                  <p>{summarizeTextureFailures(textureFailures)}</p>
+                  <button
+                    className="small-button"
+                    disabled={autoPreviewLocked}
+                    onClick={() => void previewVerifiedMaterialBatch('both')}
+                  >
+                    Try again
+                  </button>
+                  <button
+                    className="small-button"
+                    onClick={() =>
+                      downloadLocalText(
+                        'halo-texture-diagnostics.json',
+                        JSON.stringify(
+                          {
+                            sourceSha256: inspection?.sha256,
+                            resourceSha256:
+                              project.source?.resourceSha256?.['mcc-textures'] ??
+                              project.source?.resourceSha256?.['bitmaps.map'],
+                            failures: textureFailures,
+                          },
+                          null,
+                          2,
+                        ),
+                        'application/json',
+                      )
+                    }
+                  >
+                    Save diagnostics
+                  </button>
+                  <ul>
+                    {textureFailures.map((item, i) => (
+                      <li key={i}>
+                        <code>
+                          {item.bitmapTagId}:{item.imageIndex} · {item.code}
+                        </code>{' '}
+                        {item.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {materialAudit && (
+                <div className="gs-material-audit" role="status">
+                  <p title="Bounded native cache-reader lookup of shader_environment base maps and shader_model diffuse maps. Does not extract pixel data or render game shaders.">
+                    Bitmap references: {materialAudit.summary.resolved} exact primary maps,{' '}
+                    {materialAudit.summary.missing} empty, {materialAudit.summary.invalid} invalid,{' '}
+                    {materialAudit.summary.unavailable} unavailable, {materialAudit.summary.legacyUnverified}{' '}
+                    from older metadata.
+                  </p>
+                  <button
+                    className="small-button"
+                    type="button"
+                    onClick={exportMaterialAudit}
+                    title="Save shader IDs, exact primary bitmap tag paths and lightmap sections as JSON. Read-only source metadata. This does not export game pixels or guarantee game shader compatibility."
+                  >
+                    Export material dependency report (.json)
+                  </button>
+                </div>
+              )}
+              {bspAudit.review && (
+                <div className="gs-material-audit" aria-label="Compiled BSP render preflight">
+                  <strong>Compiled BSP render preflight · source metadata</strong>
+                  <p>
+                    {bspAudit.review.checked.vertices} vertices / {bspAudit.review.checked.triangles}{' '}
+                    triangles across {bspAudit.review.checked.materialRanges} material spans;{' '}
+                    {bspAudit.review.checked.lightmapPages} BSP-specific lightmap pages.{' '}
+                    {bspAudit.review.checked.degenerateTriangles} degenerate triangles.
+                  </p>
+                  <p>
+                    {bspAudit.review.summary.errors} attribution errors / {bspAudit.review.summary.warnings}{' '}
+                    cautions.
+                    {bspAudit.review.summary.omittedFindings > 0
+                      ? ` (${bspAudit.review.summary.omittedFindings} additional findings summarized but not listed)`
+                      : ''}{' '}
+                    This checks render-buffer consistency, <strong>not</strong> Halo collision, sealed
+                    portals, radiosity or actual game loading.
+                  </p>
+                  <div className="analysis-actions">
+                    <button
+                      className="small-button"
+                      type="button"
+                      onClick={exportBspReview}
+                      title="Export only source SHA-256, render counts, material tag IDs and bounded findings. Does not export source map paths, bitmap bytes, geometry or gameplay claims."
+                    >
+                      Export BSP preflight (.json)
+                    </button>
+                  </div>
+                  {bspAudit.review.findings.length > 0 && (
+                    <details className="forge-tool-diagnostics">
+                      <summary>Inspect {bspAudit.review.findings.length} BSP preview findings</summary>
+                      {bspAudit.review.findings.map((issue, i) => (
+                        <p key={`${issue.code}-${i}`} className="forge-hint">
+                          <strong>
+                            {issue.severity} · {issue.code}
+                          </strong>
+                          : {issue.message}
+                          {issue.bspIndex !== null ? ` (BSP ${issue.bspIndex + 1})` : ''}
+                        </p>
+                      ))}
+                    </details>
+                  )}
+                </div>
+              )}
+              {bspAudit.error && (
+                <Notice tone="warning">
+                  BSP preflight unavailable: {bspAudit.error}. The source cache was not modified.
+                </Notice>
+              )}
+              {availableLightmapPages.length > 0 && (
+                <div className="gs-lightmap-pages">
+                  <strong>Compiled BSP lightmap pages (local image preview)</strong>
+                  <p>
+                    These page indices and UV coverage come from the imported cache, not guessed lighting.
+                    Choose your own extracted page image. Halo's actual radiosity, blending and animated
+                    shaders still need native rendering work.
+                  </p>
+                  <label
+                    className="shader-file-pick"
+                    title="Use bsp_0_page_0.png and bsp_1_page_0.png when BSPs share a page number. A filename like page_3.png is accepted only if that page is unique across the entire map."
+                  >
+                    Batch match BSP-specific lightmap images
+                    <input
+                      type="file"
+                      multiple
+                      accept=".dds,.png,.jpg,.jpeg,.webp"
+                      aria-label="Batch attach extracted local lightmap page images"
+                      onChange={(event) => {
+                        const files = Array.from(event.target.files ?? []);
+                        if (files.length) void attachLocalLightmapBatch(files);
+                        event.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {availableLightmapPages.map((page) => (
+                    <div className="material-lens-assignment" key={page.key}>
+                      <div>
+                        <strong>
+                          BSP {page.bspIndex + 1} · Page {page.page}
+                        </strong>
+                        <small>
+                          {page.triangles} triangles · {page.materials} materials ·{' '}
+                          {page.withRealUvs ? 'real lightmap UVs' : 'secondary UV unavailable'}
+                        </small>
+                      </div>
+                      <label className="shader-file-pick">
+                        {lightmapNames[page.key] ?? `Choose image for bsp_${page.bspIndex}_page_${page.page}`}
+                        <input
+                          type="file"
+                          disabled={!page.withRealUvs}
+                          accept=".dds,.png,.jpg,.jpeg,.webp"
+                          aria-label={`Local lightmap image for BSP ${page.bspIndex + 1} page ${page.page}`}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) void attachLightmapPage(page.bspIndex, page.page, file);
+                            event.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {lightmapTextures[page.key] && (
+                        <button
+                          className="small-button"
+                          onClick={() => {
+                            setLightmapTextures((old) => {
+                              const next={...old};
+                              next[page.key]?.dispose();
+                              delete next[page.key];
+                              return next;
+                            });
+                            setLightmapNames((old) => {
+                              const next={...old};
+                              delete next[page.key];
+                              return next;
+                            });
+                          }}
+                        >
+                          Remove page
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <label className="shader-file-pick">
+                Batch match local exported DDS/PNG/JPEG/WebP textures (exact names only)
+                <input
+                  type="file"
+                  multiple
+                  accept=".dds,.png,.jpg,.jpeg,.webp"
+                  aria-label="Choose local textures to auto match shader paths"
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    if (files.length) void attachLocalTextureBatch(files);
+                    event.target.value = '';
+                  }}
+                />
+              </label>
+              <div className="material-lens-list">
+                {materials.map((entry) => {
+                  const tag = inspection?.tags.find((item) => item.id === entry.tagId);
+                  const bitmapRef = tag?.references?.find((r) => /^(base map|diffuse map)$/i.test(r.label));
+                  const bitmapTag = inspection?.tags.find(
+                    (t) => t.id === bitmapRef?.targetId && t.class === 'bitm',
+                  );
+                  return (
+                    <div className="material-lens-assignment" key={entry.tagId}>
+                      <button
+                        type="button"
+                        disabled={!onOpenTag || !tag}
+                        onClick={() => onOpenTag?.(entry.tagId)}
+                        title="Open actual shader tag"
+                      >
+                        <span className="material-chip" style={{ backgroundColor: entry.color }} />
+                        <span>
+                          <strong>{tag?.path ?? `Tag 0x${entry.tagId.toString(16)}`}</strong>
+                          <small>
+                            {Math.round(entry.triangles)} triangles · {tag?.class ?? 'unresolved'}
+                          </small>
+                          <small title="The cache reader validates each primary bitmap datum against the original source tag table. You can still manually preview a texture for unsupported shaders.">
+                            {tag?.primaryBitmapStatus === 'resolved' && bitmapTag
+                              ? `Primary bitmap: ${bitmapTag.path}`
+                              : tag?.primaryBitmapStatus
+                                ? `Primary bitmap: ${tag.primaryBitmapStatus} (manual preview only)`
+                                : tag && !tag.shaderPreview
+                                  ? `Automatic ${tag.class} shader blending is unsupported; use a local exported image`
+                                  : 'Primary bitmap: legacy/unverified (filename matching is not authoritative)'}
+                          </small>
+                        </span>
+                      </button>
+                      {native &&
+                        tag?.primaryBitmapStatus === 'resolved' &&
+                        bitmapTag &&
+                        !bitmapTag.external && (
+                          <button
+                            className="small-button"
+                            type="button"
+                            disabled={!!loadingOwnedBitmap[entry.tagId]}
+                            title="Read one SHA-256-verified classic Halo bitmap top mipmap. Internal data comes from the preserved cache. External raw data is only read if a matching, unique bitmaps.map index entry fully contains the range and the project pinned its SHA-256. External tag bodies, ambiguous entries, MCC and unsupported pixel layouts fail closed."
+                            onClick={() => void previewInternalBitmap(entry.tagId, bitmapTag.id)}
+                          >
+                            {loadingOwnedBitmap[entry.tagId]
+                              ? 'Verifying bitmap source…'
+                              : 'Preview verified map bitmap'}
+                          </button>
+                        )}
+                      {bitmapTag?.external && (
+                        <small title="The bitmap tag *body* is external. The new resource bridge only handles external raw pixels whose tag metadata remains internal and whose byte range can be proven. Use an authorized tag extraction workflow for external tag metadata.">
+                          External bitmap tag metadata · local extraction required
+                        </small>
+                      )}
+                      <label className="shader-file-pick">
+                        {textureNames[entry.tagId]
+                          ? `Texture: ${textureNames[entry.tagId]}`
+                          : 'Choose local DDS/image'}
+                        <input
+                          type="file"
+                          accept=".dds,.png,.jpg,.jpeg,.webp"
+                          aria-label={`Local texture for shader ${entry.tagId}`}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) void attachShaderTexture(entry.tagId, file);
+                            event.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {shaderTextures[entry.tagId] && (
+                        <button
+                          type="button"
+                          aria-label={`Remove shader texture ${entry.tagId}`}
+                          onClick={() => {
+                            setShaderTextures((previous) => {
+                              const next={...previous};
+                              next[entry.tagId]?.dispose();
+                              delete next[entry.tagId];
+                              return next;
+                            });
+                            setTextureNames((previous) => {
+                              const next={...previous};
+                              delete next[entry.tagId];
+                              return next;
+                            });
+                          }}
+                        >
+                          Remove image
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="subtle">
-              Source object ID <code>{chosen.id}</code>
+          )}
+          {chosen ? (
+            <div className="inspector-body">
+              {chosen.sourceModel && (
+                <>
+                  <p className="subtle">
+                    Source-linked model preview · compile editable scenario/model tags before a game build.
+                  </p>
+                  {modelIssues[forgeModelKey(sourcePlacement(chosen)!)] && (
+                    <Notice>{modelIssues[forgeModelKey(sourcePlacement(chosen)!)]}</Notice>
+                  )}
+                  <button
+                    onClick={() => openObjectTag(chosen.sourceModel!.tagId, chosen.sourceModel!.projectId)}
+                  >
+                    Edit model source tags
+                  </button>
+                </>
+              )}
+              {chosen.tagId !== null &&
+                !resolveObjectMesh(inspection, chosen.tagId, chosen.assetId, assetMeshes) && (
+                  <Notice tone="warning">
+                    This source model is unavailable in the current reader. Its item is not drawn. The
+                    placement remains editable in the hierarchy.
+                  </Notice>
+                )}
+              <label className="field-label">
+                Object name
+                <input value={chosen.name} onChange={(e) => update({ ...chosen, name: e.target.value })} />
+              </label>
+              <div className="inspector-section">
+                <div className="section-label">Transform</div>
+                {(['position', 'rotation', 'scale'] as const).map((property) => (
+                  <div className="transform-field" key={property}>
+                    <label>
+                      {property === 'rotation'
+                        ? 'Yaw / pitch / roll'
+                        : property[0].toUpperCase() + property.slice(1)}
+                      {property === 'rotation' && <small>degrees</small>}
+                    </label>
+                    <div className="vector-inputs">
+                      {chosen[property].map((value, i) => (
+                        <div key={i}>
+                          <span className={`axis-${i}`}>
+                            {property === 'rotation' ? ['Y', 'P', 'R'][i] : ['X', 'Y', 'Z'][i]}
+                          </span>
+                          <NumberField
+                            value={
+                              property === 'rotation' ? Number(((value * 180) / Math.PI).toFixed(3)) : value
+                            }
+                            label={`${property} ${i}`}
+                            disabled={
+                              property === 'rotation' &&
+                              i > 0 &&
+                              ['Player spawn', 'Netgame item'].includes(chosen.kind)
+                            }
+                            min={property === 'scale' ? 0.001 : -1e6}
+                            step={property === 'rotation' ? 1 : property === 'scale' ? 0.01 : 0.1}
+                            onCommit={(v) => {
+                              try {
+                                update({
+                                  ...chosen,
+                                  [property]: replaceVector(
+                                    chosen[property],
+                                    i,
+                                    property === 'rotation' ? (v * Math.PI) / 180 : v,
+                                  ),
+                                });
+                              } catch (e) {
+                                notify(String(e));
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {chosen.sourceOffset !== null && (
+                <Notice>
+                  Position and rotation can be rebuilt through Invader. Per-instance scale and new Halo
+                  instances are editor-only.
+                </Notice>
+              )}
+              <div className="inspector-actions">
+                <button onClick={duplicate}>
+                  <Copy size={14} />
+                  Duplicate
+                </button>
+                <button
+                  onClick={() => {
+                    edit(
+                      { ...project, scene: project.scene.filter((o) => o.id !== chosen.id) },
+                      `Remove ${chosen.name} from editor`,
+                    );
+                    setSelected(null);
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Remove
+                </button>
+              </div>
+              <div className="subtle">
+                Source object ID <code>{chosen.id}</code>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="inspector-placeholder">
-            <Move3D size={26} />
-            <p>Select an object in the scene or hierarchy to edit its transform.</p>
-            <small>W · translate &nbsp; E · rotate &nbsp; R · scale</small>
-          </div>
-        )}
-      </aside></WorkspacePanel>
+          ) : (
+            <div className="inspector-placeholder">
+              <Move3D size={26} />
+              <p>Select an object in the scene or hierarchy to edit its transform.</p>
+              <small>W · translate &nbsp; E · rotate &nbsp; R · scale</small>
+            </div>
+          )}
+        </aside>
+      </WorkspacePanel>
     </div>
   );
 }
+
+export { default as Mesh } from './HaloMesh';

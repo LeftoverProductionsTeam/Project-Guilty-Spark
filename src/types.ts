@@ -84,8 +84,32 @@ export interface ShaderLayer {bitmapTagId:number;uvScale:[number,number];uvOffse
 export interface ShaderStage {flags:number;constant0Source:number;constant0Function:number;constant0Period:number;
   constant0Lower:[number,number,number,number];constant0Upper:[number,number,number,number];constant1:[number,number,number,number];
   colorInputs:number[];colorOutputs:number[];alphaInputs:number[];alphaOutputs:number[]}
-export interface ShaderPreview {alphaTest:boolean;twoSided:boolean;uvScale:[number,number];kind?:string;shaderType?:number;detailFunction?:number;multipurposeXbox?:boolean;bumpScale?:number;
-  microDetailFunction?:number;detailScales?:[number,number,number];framebufferBlend?:number;layers?:ShaderLayer[];stages?:ShaderStage[];decal?:boolean;alphaBlended?:boolean}
+export interface ShaderPreview {
+  reflection?: {
+    bitmapTagId: number;
+    perpendicularBrightness: number;
+    parallelBrightness: number;
+    perpendicularTint: Vec3;
+    parallelTint: Vec3;
+    falloff: number;
+    cutoff: number;
+  } | null;
+  alphaTest: boolean;
+  twoSided: boolean;
+  uvScale: [number, number];
+  kind?: string;
+  shaderType?: number;
+  detailFunction?: number;
+  multipurposeXbox?: boolean;
+  bumpScale?: number;
+  microDetailFunction?: number;
+  detailScales?: [number, number, number];
+  framebufferBlend?: number;
+  layers?: ShaderLayer[];
+  stages?: ShaderStage[];
+  decal?: boolean;
+  alphaBlended?: boolean;
+}
 export interface SceneObject {
   id: string;
   name: string;
@@ -173,20 +197,32 @@ export interface EngineBuildTarget {
   hekDirectory:string|null;hekFlavor:'h1aEk'|'legacyHek'|null;tagsDirectory:string|null;
   invaderDirectory:string|null;ceCompatibleTagset:boolean;openSauce:boolean;
 }
+export interface NativeAssetImport {
+  id: string;
+  sourceProjectId: string;
+  sourceSha256: string;
+  tagId: number;
+  tagClass: string;
+  tagPath: string;
+  nativePath: string;
+  receiptSha256: string;
+  fileCount: number;
+}
 export interface Project {
+  nativeAssetImports?: NativeAssetImport[];
   tagDuplicates?: import('./tagDuplicates').TagDuplicate[];
-  audioPreview?:import('./spatialAudio').SoundScene|null;
-  powerups?:import('./powerups').CustomPowerup[];
-  gameplayControls?:import('./gameplay').GameplayControls|null;
-  bspAssembly?:import('./bspAssembly').BspAssembly|null;
-  animations?:import('./animation').AnimationAsset[];
-  animationAssignments?:import('./animation').AnimationAssignment[];
-  renderFeatures?:import('./renderFeatures').RenderFeatures|null;
-  conversionProfile?:'faithful'|'zombie-recovery'|'mcc-multiplayer-ui'|null;
-  sourceSceneVersion?:number;
-  worldEnvironment?:import('./environment').EditorEnvironment|null;
-  buildTargets?:EngineBuildTarget[];
-  activeBuildTarget?:string|null;
+  audioPreview?: import('./spatialAudio').SoundScene | null;
+  powerups?: import('./powerups').CustomPowerup[];
+  gameplayControls?: import('./gameplay').GameplayControls | null;
+  bspAssembly?: import('./bspAssembly').BspAssembly | null;
+  animations?: import('./animation').AnimationAsset[];
+  animationAssignments?: import('./animation').AnimationAssignment[];
+  renderFeatures?: import('./renderFeatures').RenderFeatures | null;
+  conversionProfile?: 'faithful' | 'zombie-recovery' | 'mcc-multiplayer-ui' | null;
+  sourceSceneVersion?: number;
+  worldEnvironment?: import('./environment').EditorEnvironment | null;
+  buildTargets?: EngineBuildTarget[];
+  activeBuildTarget?: string | null;
   quickForge?: QuickForgeDocument | null;
   firefight?: FirefightConfig | null;
   studio?: CreatorStudioDocument | null;
@@ -204,7 +240,11 @@ export interface Project {
     scenarioPath: string;
     archive?: { originalPath: string; sha256: string; entryPath: string } | null;
     resourceDirectory?: string | null;
-    audioResources?: {kind:'classic'|'mccClassicAdpcm';directory:string;sha256:Record<string,string>} | null;
+    audioResources?: {
+      kind: 'classic' | 'mccClassicAdpcm';
+      directory: string;
+      sha256: Record<string, string>;
+    } | null;
     resourceSha256?: Record<string, string>;
   } | null;
   provenance: Provenance;

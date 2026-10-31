@@ -1,5 +1,11 @@
 # Project Guilty Spark
 
+## Native assets and an animated Halo showcase
+
+Home now features the actual floating Guilty Spark model, with source textures/reflections and native idle/talking animation controls. Startup shows real loading progress while installation discovery runs in the background. The asset drawer finds installed/linked maps and downloads; dragging a model preview extracts and validates its recursive native tags before placement. New QuickForge source uses owned Halo grass/metal defaults, and map objects, thumbnails, tag models and source surfaces share the Halo material renderer.
+
+Real Windows editor/GPU tests prove native monitor vertex motion, pause/clip selection, recursive scenery import with undo/redo, native QuickForge compilation and an added placement in a matching MCC source-map rebuild. A separate three-process C39 regression retains publication, conflicts, permissions, frozen builds and recovery. Game loading, full render/audio parity, compressed animation playback and direct compiled-map editing remain separate open gates. [Exact evidence and limits](docs/NATIVE_ASSETS_AND_SHOWCASE.md) · [Descriptive handoff](docs/NATIVE_ASSETS_GITHUB_DESCRIPTION.md).
+
 ## Connected source editing and native custom scenery
 
 Back/Forward now restores your map, workspace and Settings section; edit undo/redo remains on its keyboard shortcuts and in Changes. Workshop geometry and object placement share one level view. Closed OBJ models with UVs and assigned Halo materials compile into real static scenery and collision; End snaps them onto the floor or another verified imported model, with undo/redo and changed-source refusal. The three-process C39 tag/publication/placement workflow retains its native compilation and host-recovery evidence. [Exact results, performance and limitations](docs/WORKBENCH_INTEGRATION.md).

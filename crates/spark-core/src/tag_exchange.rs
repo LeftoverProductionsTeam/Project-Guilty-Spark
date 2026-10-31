@@ -69,7 +69,7 @@ fn tag_query(path:&str,class:&str)->Result<(String,PathBuf)>{
     let expected=safe_relative(&query)?;
     Ok((query,expected))
 }
-fn inventory(root:&Path)->Result<(Vec<ExtractedFile>,u64)> {
+pub(crate) fn inventory(root:&Path)->Result<(Vec<ExtractedFile>,u64)> {
     let mut files=vec![];
     let mut total=0u64;
     let mut directories=vec![root.to_path_buf()];
@@ -116,6 +116,17 @@ pub fn extract_selected_tag(
     job_id:&str,tag_id:u32,cancel:Arc<AtomicBool>,on_event:impl Fn(JobEvent)+Send+Sync,
 )->Result<TagExtractReceipt>{
     uuid::Uuid::parse_str(job_id).map_err(|_|SparkError::Invalid("Invalid extraction job id".into()))?;
+    let mut extraction_project=project.clone();
+    if let Some(source)=extraction_project.source.as_mut().filter(|s|s.resource_sha256.contains_key("mcc-textures")) {
+        if source.cache_version!=13{return invalid("MCC preview texture pins cannot authorize extraction of a classic cache");}
+        let paks=source.resource_directory.as_ref().ok_or_else(||SparkError::Invalid("MCC texture pin has no resource folder".into()))?;
+        let maps=paks.parent().and_then(Path::parent).ok_or_else(||SparkError::Invalid("MCC maps folder is unavailable".into()))?.join("maps");
+        reject_links(&maps)?;if !maps.is_dir(){return invalid("MCC native extraction needs its original halo1/maps resources");}
+        // Preview pack hashes and native resource-map hashes are distinct identities.
+        // The actual resource maps used by Invader are captured and checked before/after.
+        source.resource_sha256=project::resource_hashes(&maps)?;source.resource_directory=Some(maps);
+    }
+    let project=&extraction_project;
     let source=project.source.as_ref().ok_or_else(||SparkError::Invalid("No imported Halo source cache".into()))?;
     if source.sha256!=inspection.sha256 || source.cache_version!=inspection.header.version ||
         source.engine!=inspection.header.engine {return invalid("Inspection is not the preserved source cache");}
@@ -220,7 +231,7 @@ fn job_dir(root:&Path,job_id:&str)->Result<PathBuf>{
     reject_links(&path)?;
     Ok(path)
 }
-fn load_receipt(root:&Path,job_id:&str)->Result<TagExtractReceipt>{
+pub(crate) fn load_receipt(root:&Path,job_id:&str)->Result<TagExtractReceipt>{
     let folder=job_dir(root,job_id)?;
     let path=folder.join("extraction-receipt.json");
     reject_links(&path)?;

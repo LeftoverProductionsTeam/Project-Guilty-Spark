@@ -1,0 +1,88 @@
+.gs-launch {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-height: min(580px, 70vh);
+  padding: 28px;
+  gap: 12px;
+  text-align: center;
+  background: radial-gradient(
+    ellipse at 50% 35%,
+    color-mix(in srgb, var(--cyan) 11%, transparent),
+    transparent 60%
+  );
+}
+.gs-launch-monitor {
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: var(--cyan);
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--cyan) 45%, transparent));
+}
+.gs-launch-monitor svg:first-child {
+  animation: gs-launch-orbit 8s linear infinite;
+}
+.gs-launch-monitor svg:last-child {
+  position: absolute;
+}
+.gs-launch .gs-launch-eyebrow {
+  margin: 8px 0 0;
+  letter-spacing: 0.22em;
+  font-size: 11px;
+  color: var(--cyan);
+}
+.gs-launch h1 {
+  margin: 0;
+  font-size: clamp(21px, 3vw, 34px);
+  color: var(--text);
+}
+.gs-launch p {
+  margin: 0;
+}
+.gs-launch small {
+  max-width: 470px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.gs-launch-track {
+  position: relative;
+  overflow: hidden;
+  width: min(480px, 85vw);
+  height: 8px;
+  margin-top: 12px;
+  border-radius: 8px;
+  background: var(--line);
+}
+.gs-launch-track span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), #baf8e7);
+  box-shadow: 0 0 14px var(--cyan);
+  transition: width 0.3s ease;
+}
+.gs-launch-track i {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, #fff4, transparent);
+  transform: translateX(-100%);
+  animation: gs-launch-sweep 2s ease-in-out infinite;
+}
+@keyframes gs-launch-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes gs-launch-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gs-launch-monitor svg:first-child,
+  .gs-launch-track i {
+    animation: none;
+  }
+  .gs-launch-track span {
+    transition: none;
+  }
+}

@@ -186,6 +186,7 @@ pub struct Tag {
 #[derive(Clone,Debug,Default,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ShaderPreview {
+    #[serde(default,skip_serializing_if="Option::is_none")] pub reflection:Option<ShaderReflection>,
     #[serde(default)] pub multipurpose_xbox:bool,
     #[serde(default)] pub bump_scale:f32,
     pub alpha_test:bool,pub two_sided:bool,pub uv_scale:[f32;2],
@@ -199,6 +200,17 @@ pub struct ShaderPreview {
     #[serde(default)] pub stages:Vec<ShaderStage>,
     #[serde(default)] pub decal:bool,
     #[serde(default)] pub alpha_blended:bool,
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ShaderReflection {
+    pub bitmap_tag_id:u32,
+    pub perpendicular_brightness:f32,
+    pub parallel_brightness:f32,
+    pub perpendicular_tint:[f32;3],
+    pub parallel_tint:[f32;3],
+    pub falloff:f32,
+    pub cutoff:f32,
 }
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -841,11 +853,13 @@ fn shader_bitmap_references(
             (0xCC, "Secondary detail map"),
             (0xFC, "Micro detail map"),
             (0x128, "Bump map"),
+            (0x324, "Reflection cube map"),
         ]),
         "soso" => (440, &[
             (0xA4, "Diffuse map"),
             (0xBC, "Multipurpose map"),
             (0xDC, "Detail map"),
+            (0x164, "Reflection cube map"),
         ]),
         _ => return Ok(()),
     };
@@ -882,7 +896,16 @@ fn shader_bitmap_references(
         if !u.is_finite() || !v.is_finite() || u.abs()>1024. || v.abs()>1024. {return invalid("Unsupported model shader UV scale");}
         [if u==0.{1.}else{u},if v==0.{1.}else{v}]
     }else{[1.,1.]};
-    tag.shader_preview=Some(ShaderPreview{alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
+    let reflection=if let Some(reference)=tag.references.iter().find(|v|v.label=="Reflection cube map"){
+        let model=tag.class=="soso";let perpendicular=r.f32(at+if model{0x144}else{0x2f4})?;let parallel=r.f32(at+if model{0x154}else{0x2f8})?;
+        let tint=|offset:usize|->[f32;3]{std::array::from_fn(|i|r.f32(at+offset+i*4).unwrap_or(f32::NAN))};
+        let perp=if model{tint(0x148)}else{[1.;3]};let para=if model{tint(0x158)}else{[1.;3]};
+        let falloff=if model{r.f32(at+0x13c)?}else{0.};let cutoff=if model{r.f32(at+0x140)?}else{0.};
+        if [perpendicular,parallel].iter().all(|v|v.is_finite()&&(0.0..=1.0).contains(v))&&perp.iter().chain(&para).all(|v|v.is_finite()&&(0.0..=1.0).contains(v))&&[falloff,cutoff].iter().all(|v|v.is_finite()&&(0.0..=1e6).contains(v)){
+            Some(ShaderReflection{bitmap_tag_id:reference.target_id,perpendicular_brightness:perpendicular,parallel_brightness:parallel,perpendicular_tint:perp,parallel_tint:para,falloff,cutoff})
+        }else{None}
+    }else{None};
+    tag.shader_preview=Some(ShaderPreview{reflection,alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
         multipurpose_xbox:tag.class=="soso"&&flags&64!=0,bump_scale:if tag.class=="senv"{r.f32(at+0x124).ok().filter(|v|v.abs()<=1024.&&*v!=0.).unwrap_or(1.)}else{1.},
         two_sided:tag.class=="soso"&&flags&2!=0,uv_scale,
         alpha_blended:tag.class=="soso"&&flags&8!=0,decal:tag.class=="soso"&&flags&8!=0,

@@ -105,6 +105,8 @@ pub struct EngineBuildTarget {
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub native_asset_imports:Vec<crate::native_asset_imports::Binding>,
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub tag_duplicates:Vec<crate::tag_duplicates::TagDuplicate>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub audio_preview:Option<crate::audio_preview::SoundScene>,
@@ -159,6 +161,7 @@ impl Project {
     pub fn new(title: &str) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
+            native_asset_imports:vec![],
             tag_duplicates:vec![],
             audio_preview:None,
             powerups:vec![],
@@ -197,6 +200,7 @@ impl Project {
         next.active_build_target=Some(id);next.validate()?;*self=next;Ok(true)
     }
     pub fn validate(&self) -> Result<()> {
+        crate::native_asset_imports::validate(&self.native_asset_imports)?;
         crate::tag_duplicates::validate(&self.tag_duplicates)?;
         if !self.tag_duplicates.is_empty()&&(self.source.is_none()||self.quick_forge.is_some()){
             return invalid("Tag duplication requires a preserved source map; build and open a QuickForge cache before duplicating its tags");
@@ -332,9 +336,9 @@ impl Project {
         };
         let camera=self.studio.as_ref().and_then(|s|s.engine_machinima.as_ref().filter(|o|o.enabled).map(|o|(o,&s.shots)));
         let profile=self.conversion_profile.as_deref().filter(|p|*p!="faithful");
-        if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none()&&self.powerups.is_empty()&&self.tag_duplicates.is_empty(){return Ok(base);}
+        if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none()&&self.powerups.is_empty()&&self.tag_duplicates.is_empty()&&self.native_asset_imports.is_empty(){return Ok(base);}
         let used:Vec<_>=self.animations.iter().filter(|asset|self.animation_assignments.iter().any(|a|a.asset_id==asset.id)).collect();
-        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}if !self.powerups.is_empty(){hash.update(b"custom-powerups-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.powerups)?));}if !self.tag_duplicates.is_empty(){hash.update(b"tag-duplicates-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_duplicates)?));}Ok(format!("{:x}",hash.finalize()))
+        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}if !self.powerups.is_empty(){hash.update(b"custom-powerups-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.powerups)?));}if !self.tag_duplicates.is_empty(){hash.update(b"tag-duplicates-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_duplicates)?));}if !self.native_asset_imports.is_empty(){hash.update(b"native-asset-imports-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.native_asset_imports)?));}Ok(format!("{:x}",hash.finalize()))
     }
 }
 
@@ -464,6 +468,7 @@ pub fn validate_edits(project: &Project, inspection: &MapInspection) -> Result<(
 }
 pub fn patched_cache(project: &Project, inspection: &MapInspection) -> Result<Vec<u8>> {
     if project.scene.iter().any(|object| object.source_model.is_some()) {
+        if project.scene.iter().filter(|o|o.source_model.is_some()).all(|o|crate::native_asset_imports::allowed_addition(project,o,inspection)){let mut native=project.clone();native.scene.retain(|o|o.source_model.is_none());return patched_cache(&native,inspection); }
         return invalid("Source-linked preview models require editable scenario placement tags before a game build. Use QuickForge source placements or remove the preview placement.");
     }
     validate_edits(project, inspection)?;

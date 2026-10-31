@@ -1,0 +1,287 @@
+{
+  "schemaVersion": 1,
+  "scope": "Native editor/GPU/source-toolchain acceptance; game loading and peer replication untested",
+  "mockedIpc": false,
+  "appSha256": "717deac3369f6d9f41abdc9cf63bd30ada4ad53bb6ad2d070e60a3f15345c1ca",
+  "startup": {
+    "phase": "Workbench ready",
+    "completed": 3,
+    "total": 3,
+    "ready": true,
+    "elapsedMs": 653,
+    "statusRoundTripMs": [
+      3.4838999999999487,
+      3.1568999999999505,
+      3.037700000000086,
+      2.639799999999923,
+      2.9208000000000993,
+      3.50019999999995,
+      3.147699999999986,
+      4.38799999999992,
+      4.657500000000027,
+      4.39650000000006,
+      3.376800000000003,
+      2.9017999999998665
+    ]
+  },
+  "discovery": {
+    "candidates": 51,
+    "elapsedMs": 46,
+    "notices": []
+  },
+  "reflection": {
+    "shader": "vehicles\\warthog\\shaders\\warthog hull",
+    "metadata": {
+      "bitmapTagId": 3786014774,
+      "perpendicularBrightness": 0.7,
+      "parallelBrightness": 1,
+      "perpendicularTint": [
+        0.69,
+        0.73,
+        0.65
+      ],
+      "parallelTint": [
+        0.6,
+        0.64,
+        0.57
+      ],
+      "falloff": 0,
+      "cutoff": 0
+    },
+    "faces": [
+      {
+        "width": 64,
+        "height": 64,
+        "format": "DXT1",
+        "ddsSha256": "1e6c41e68a3bdaa908d6df6ac7b54ccc5e0ed08345e2d8ad377d52b9b23906e8"
+      },
+      {
+        "width": 64,
+        "height": 64,
+        "format": "DXT1",
+        "ddsSha256": "10b3fb898701506f74ff01521e408f276c9d523f92fb5933a8113de538e9bea1"
+      },
+      {
+        "width": 64,
+        "height": 64,
+        "format": "DXT1",
+        "ddsSha256": "54549bf82f8c5330e1af769ce64e92d7c792c2997aa10bd1e2470d47ad1b7e04"
+      },
+      {
+        "width": 64,
+        "height": 64,
+        "format": "DXT1",
+        "ddsSha256": "2050b2c597a635d18f64b0ff18ddbd851b0e85730af67cd92d9998ba7fec4834"
+      },
+      {
+        "width": 64,
+        "height": 64,
+        "format": "DXT1",
+        "ddsSha256": "f1a3876fb8de1d7649f8fafc3e978ff14f073bbbde163455e6406e4c37dcf424"
+      },
+      {
+        "width": 64,
+        "height": 64,
+        "format": "DXT1",
+        "ddsSha256": "3509206b2a795486d22a549c02f43365fa3d974cd7a8c0415331b8f8fe51c825"
+      }
+    ]
+  },
+  "home": {
+    "transparentBackground": "true",
+    "modelTag": "3785621552",
+    "modelSourceHash": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+    "modelTriangles": "1126",
+    "modelReady": "true",
+    "nativeAnimationCount": "3",
+    "modelTextures": "1",
+    "modelReflections": "1",
+    "caption": "monitor · actual Halo model\nNext model"
+  },
+  "homeAnimation": {
+    "nativeGraphTag": 3785949237,
+    "clips": [
+      {
+        "name": "idle overlay",
+        "frames": 55,
+        "bones": 2,
+        "fps": 30,
+        "sha256": "ff627546b76e99d9b41abb711c238db9451d8f85d531121b2c1c33aec17b3a40"
+      },
+      {
+        "name": "stand unarmed idle",
+        "frames": 10,
+        "bones": 2,
+        "fps": 30,
+        "sha256": "d53208c62aef100991d79998fbdabcc12ec95d0d2dbb0ae7287d5ffa69b2afff"
+      },
+      {
+        "name": "monitor_talking-loop",
+        "frames": 55,
+        "bones": 2,
+        "fps": 30,
+        "sha256": "70ee3ebc6cd9d545dae59e5db87503fa9571b73e56ef133fc9765e526e4ab924"
+      }
+    ],
+    "firstVertex": [
+      0.06185707077383995,
+      -0.027118690311908722,
+      0.0686461478471756
+    ],
+    "laterVertex": [
+      0.06204647570848465,
+      -0.027118690311908722,
+      0.07070975005626678
+    ],
+    "actualSkinnedVerticesMove": true,
+    "pauseFreezesTime": true,
+    "nativeTalkingClipSelected": true,
+    "wrongSourceHashRejected": true
+  },
+  "defaultMaterials": {
+    "nativePreviewCount": 2,
+    "dependencyFiles": [
+      3,
+      5
+    ]
+  },
+  "drop": {
+    "actualPointerDrag": true,
+    "singleUndoRedo": true,
+    "importedDependencyFiles": 5
+  },
+  "quickforge": {
+    "sha256": "c012c9c9b73f262cf057dfd2cde5ae376df083b091fd8a51c193be8ea7295e72",
+    "nativeTagPath": "gs_assets_a45fc21b9fc3417394aafc401d545f83\\scenery\\rocks\\boulder\\boulder",
+    "position": [
+      1.5,
+      -1.5,
+      0.01
+    ],
+    "collisionTriangles": 12
+  },
+  "sourceMapAddition": {
+    "matchingEditableSource": true,
+    "outputSha256": "fcd8b3d6536cc2624264d41920a74b9bc00c43461c821b6b136ed67588842bdf",
+    "nativeTag": "gs_assets_b50939f8f40046bf8c5030a62a57d99d\\scenery\\rocks\\boulder\\boulder",
+    "position": [
+      -3,
+      2,
+      0.01
+    ],
+    "originalSourcePreserved": true
+  },
+  "sourceMapBuild": {
+    "status": "validated",
+    "sha256": "fcd8b3d6536cc2624264d41920a74b9bc00c43461c821b6b136ed67588842bdf",
+    "target": "mcc-cea"
+  },
+  "sourcePreserved": true,
+  "changedImportRejected": [
+    "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+  ],
+  "previousBuildPreserved": true,
+  "javascriptErrors": [],
+  "toolIdentities": {
+    "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+    "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+  },
+  "preservation": {
+    "rootResearchFiles": 146,
+    "rootResearchMismatches": [],
+    "originalCeTags": 2455,
+    "originalCeMismatches": []
+  },
+  "c39Regression": {
+    "acceptanceComplete": true,
+    "appSha256": "aabf14e7609191859f17ea3362fe18450781ee2570a3a0be6c5380f60378bde6",
+    "nativeProcesses": 3,
+    "physicalMachines": 1,
+    "separateDataRoots": 3,
+    "transport": "private TCP + TLS 1.3, invitation-pinned certificate",
+    "committedRevision": 13,
+    "nativeTagSharingTested": true,
+    "binaryAssetTransferTested": true,
+    "participantUndoAndReferencedAssetConflict": true,
+    "sameFieldConflictCorruptBytesAndDuplicateAck": true,
+    "permissionsCoverNativeImportEditAndBuild": true,
+    "nativeSourceIntegrityAndIndependentToolBuildGuard": {
+      "truncatedAdmittedTagRejected": true,
+      "exactRecoveryBytesRetained": true,
+      "unsharedWorkingTagsBuildRefused": true
+    },
+    "synchronizationSurvivesWorkspaceChange": true,
+    "actualHaloToolchain": {
+      "jobId": "cffba764-4ca3-494c-acef-681109c22fbc",
+      "revision": 13,
+      "laterRevision": 14,
+      "nativeRadius": 0.2750000059604645,
+      "publishedAssetPath": "scenery\\sparklink\\dc1148d8-65f1-44a3-af71-9cca0f6f8878",
+      "compiledModelTriangles": 31,
+      "placement": [
+        3,
+        2,
+        0.1
+      ],
+      "outputSha256": "14119a0dc8603ae2a117f1f1534e5bbb0f0a2601395c0e2f920851cc6cd44a58",
+      "durationMs": 37300.230099999986,
+      "gameplayTested": false
+    },
+    "durableNativeRecovery": {
+      "revision": 14,
+      "assetBytesIdentical": true,
+      "semanticFieldIntact": true,
+      "authorIdentitiesAndHistoryRetained": true,
+      "newInvitation": true,
+      "replayDeduplicated": true,
+      "durationMs": 11305.702099999995
+    },
+    "revocationRetainsOtherParticipants": true,
+    "originalSourcesUnchanged": {
+      "separateNativeTrees": 3,
+      "filesPerTree": 2240,
+      "templateUnchanged": true,
+      "importUnchanged": true
+    },
+    "synchronizationMeasurements": {
+      "samples": 7,
+      "valuesMs": [
+        6990.297999999995,
+        63.82489999997779,
+        983.3540999999968,
+        878.6374000000069,
+        882.0059000000183,
+        886.7185999999929,
+        897.2186999999976
+      ],
+      "physicalMachines": 1,
+      "includesNativeIpcAndReactConsumption": true
+    },
+    "pageErrors": [],
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gamePeerReplicationTested": false,
+    "checkpoint": "Precedes subsequent native-animation and byte-preservation-only follow-up; no collaboration protocol change in that follow-up."
+  },
+  "complete": true,
+  "regressions": {
+    "windowsRustWorkspace": {
+      "passed": 556,
+      "ignoredExistingOptIn": 7,
+      "command": "cargo test --workspace --locked"
+    },
+    "frontend": {
+      "passed": 246,
+      "files": 52
+    },
+    "browserContracts": {
+      "passed": 90
+    },
+    "offlineRecipes": {
+      "passed": 59
+    },
+    "typescriptPassed": true,
+    "windowsReleaseBuildPassed": true
+  }
+}

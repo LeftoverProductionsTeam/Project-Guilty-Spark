@@ -35,6 +35,13 @@ export function environmentValue(value?: EditorEnvironment | null): EditorEnviro
   validateEnvironment(value);
   return structuredClone(value);
 }
+/** Neutral inspection lighting for unbaked source surfaces. A user's explicit
+ * environment remains untouched; this rig is never written into native tags. */
+export function sourceSurfaceEnvironment(value?: EditorEnvironment | null): EditorEnvironment {
+  return value ? environmentValue(value) : {
+    ...environmentValue(), ambientIntensity: 0.5, sunIntensity: 0.65,
+  };
+}
 export function validateEnvironment(value: EditorEnvironment): void {
   if (!value || typeof value!=='object') throw Error('Environment profile is missing.');
   if (typeof value.previewEnabled!=='boolean' || typeof value.fogEnabled!=='boolean')

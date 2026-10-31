@@ -3,12 +3,21 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { createVisualPipeline } from '../visualPipeline';
 import { renderFeatures } from '../renderFeatures';
 import type { RenderFeatures } from '../renderFeatures';
-export default function SceneEffects({ settings }: { settings?: RenderFeatures | null }) {
+export default function SceneEffects({
+  settings,
+  transparentBackground = false,
+}: {
+  settings?: RenderFeatures | null;
+  transparentBackground?: boolean;
+}) {
   const profile = renderFeatures(settings),
     { gl, scene, camera, size, viewport } = useThree();
   const pipeline = useMemo(
-    () => (profile.enabled ? createVisualPipeline(gl, scene, camera, profile.bloom, false) : null),
-    [gl, scene, camera, profile.enabled, profile.bloom],
+    () =>
+      profile.enabled
+        ? createVisualPipeline(gl, scene, camera, profile.bloom, false, transparentBackground)
+        : null,
+    [gl, scene, camera, profile.enabled, profile.bloom, transparentBackground],
   );
   useEffect(() => () => pipeline?.dispose(), [pipeline]);
   useEffect(() => {

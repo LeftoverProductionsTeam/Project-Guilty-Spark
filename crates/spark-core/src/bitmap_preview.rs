@@ -242,6 +242,9 @@ struct TopMipMetadata {
     external: bool,
 }
 fn read_top_mip_metadata(bytes: &[u8], header: &MapHeader, tag_data: usize, index: usize) -> Result<TopMipMetadata> {
+    read_image_metadata(bytes,header,tag_data,index,false)
+}
+fn read_image_metadata(bytes: &[u8], header: &MapHeader, tag_data: usize, index: usize, cube:bool) -> Result<TopMipMetadata> {
     let r = Reader(bytes);
     let region = TagRegion::from_header(bytes, header)?;
     region.contains(tag_data, 108)?;
@@ -266,7 +269,8 @@ fn read_top_mip_metadata(bytes: &[u8], header: &MapHeader, tag_data: usize, inde
         u32::from(width) * u32::from(height) > MAX_IMAGE_PIXELS {
         return invalid("Bitmap preview dimensions are invalid or exceed the 16-Mpixel limit");
     }
-    if depth != 1 || kind != 0 { return invalid("Only 2D single-slice classic bitmap images are currently previewable"); }
+    if depth != 1 || kind != if cube {2}else{0} { return invalid("Bitmap image dimensionality differs from the requested 2D/cube preview"); }
+    if cube && (width!=height || width>1024) {return invalid("Reflection cubes must be square and no larger than 1024 pixels per face");}
     if (flags & 0x8) != 0 { return invalid("Swizzled bitmap pixels cannot be decoded by the linear DDS preview path"); }
     let (format, block, stride) = match encoding {
         0 => ("A8",false,1usize),
@@ -294,6 +298,38 @@ fn read_top_mip_metadata(bytes: &[u8], header: &MapHeader, tag_data: usize, inde
     let declared_size = r.u32(image + 28)? as usize;
     if declared_size < size { return invalid("Bitmap raw pixel metadata is shorter than the top mipmap"); }
     Ok(TopMipMetadata { width, height, format, size, raw_offset, declared_size, external: flags & 0x100 != 0 })
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct OwnedCubePreview {
+    pub source_sha256:String,
+    pub resource_sha256:Option<String>,
+    pub bitmap_tag_id:u32,
+    pub faces:Vec<OwnedBitmapPreview>,
+}
+/// Classic/H1A linear cube top faces are mip-major: the six level-zero faces
+/// precede lower mipmaps. No face may escape the original declared image span.
+pub fn preview_owned_cube(path:&Path,expected:&str,inspection:&MapInspection,bitmap_tag_id:u32,resources:Option<(&Path,&str)>)->Result<OwnedCubePreview>{
+    let (header,bytes,actual)=maps::read_cache_snapshot(path)?;
+    if actual!=expected||actual!=inspection.sha256{return invalid("Reflection cube source identity changed");}
+    let tag=inspection.tags.iter().find(|t|t.id==bitmap_tag_id&&t.class=="bitm"&&!t.external).ok_or_else(||SparkError::Invalid("Reflection cube tag is unavailable in the preserved map".into()))?;
+    let at=tag.data_offset.ok_or_else(||SparkError::Invalid("Reflection cube tag has no bounded body".into()))?;
+    let meta=read_image_metadata(&bytes,&header,at,0,true)?;
+    let total=meta.size.checked_mul(6).ok_or_else(||SparkError::Invalid("Cube face byte count overflow".into()))?;
+    if total>MAX_BATCH_RAW_BYTES||total>meta.declared_size{return invalid("Reflection cube faces exceed the declared image span or 16 MiB budget");}
+    let mut resource_hash=None;
+    let pixels=if meta.external {
+        let (resource,hash)=resources.ok_or_else(||SparkError::Invalid("Reflection cube needs its exact original pinned bitmaps.map".into()))?;
+        let (mut file,index)=crate::resource_map::open_verified(resource,hash)?;
+        let pixels=crate::resource_map::read_external_top_mip_from_verified(&mut file,&index,&tag.path,meta.raw_offset as u64,meta.declared_size as u64,total,header.version,0)?;
+        crate::resource_map::verify_open_handle_hash(&mut file,hash)?;resource_hash=Some(hash.to_owned());pixels
+    }else{
+        if meta.raw_offset<2048{return invalid("Reflection cube pixels overlap the cache header");}
+        Reader(&bytes).bytes(meta.raw_offset,total)?.to_vec()
+    };
+    let mut faces=Vec::with_capacity(6);
+    for face in pixels.chunks_exact(meta.size){faces.push(OwnedBitmapPreview{bitmap_tag_id,image_index:0,width:meta.width,height:meta.height,format:meta.format.into(),source_sha256:actual.clone(),dds_base64:base64(&dds_top_mip(meta.width,meta.height,meta.format,face)?),source_kind:if meta.external{"verified-resource"}else{"internal-cache"}.into(),resource_sha256:resource_hash.clone()});}
+    Ok(OwnedCubePreview{source_sha256:actual,resource_sha256:resource_hash,bitmap_tag_id,faces})
 }
 fn checked_top_mip(bytes: &[u8], header: &MapHeader, tag_data: usize, index: usize) -> Result<(u16, u16, &'static str, Vec<u8>)> {
     let m = read_top_mip_metadata(bytes, header, tag_data, index)?;
@@ -793,4 +829,23 @@ mod tests {
             file.path(), &expected, &inspected, &[], None,
         ).is_err());
     }
+    #[test]
+    fn reflection_cube_reads_all_six_level_zero_faces_and_rejects_a_short_declared_span(){
+        use crate::maps::{MapInspection,Tag,MeshData};
+        let (mut bytes,mut header)=fixture(15,0);
+        bytes.resize(0x2200,0);header.name="fixture".into();
+        bytes[..4].copy_from_slice(b"daeh");bytes[0x7fc..0x800].copy_from_slice(b"toof");
+        for (at,value)in [(4,7),(8,bytes.len()as u32),(0x10,0x800),(0x14,0x400)]{bytes[at..at+4].copy_from_slice(&value.to_le_bytes());}
+        bytes[0x20..0x28].copy_from_slice(b"fixture\0");bytes[0x40..0x4a].copy_from_slice(b"synthetic\0");bytes[0x60..0x62].copy_from_slice(&1u16.to_le_bytes());
+        bytes[0x98a..0x98c].copy_from_slice(&2u16.to_le_bytes());bytes[0x99c..0x9a0].copy_from_slice(&96u32.to_le_bytes());
+        for face in 0..6 {bytes[0x2000+face*16..0x2010+face*16].fill(face as u8);}
+        let file=tempfile::NamedTempFile::new().unwrap();std::fs::write(file.path(),&bytes).unwrap();let sha=maps::hash_file(file.path()).unwrap();
+        let mut inspection=MapInspection{header,sha256:sha.clone(),tag_checksum:None,decals:vec![],tags:vec![Tag{id:0x1234,index:0,class:"bitm".into(),path:"test/bitmap".into(),data_offset:Some(0x900),external:false,fields:vec![],references:vec![],primary_bitmap_status:None,shader_preview:None}],objects:vec![],mesh:MeshData::default(),render_mesh:None,model_meshes:Default::default(),encounters:vec![],scripts:vec![],resources:vec![],diagnostics:vec![],scenario_path:"fixture".into()};
+        let cube=preview_owned_cube(file.path(),&sha,&inspection,0x1234,None).unwrap();assert_eq!(cube.faces.len(),6);
+        for (face,image)in cube.faces.iter().enumerate(){assert_eq!(image.dds_base64,base64(&dds_top_mip(4,4,"DXT3",&vec![face as u8;16]).unwrap()));}
+        assert!(preview_owned_bitmap(file.path(),&sha,&inspection,0x1234,0).is_err());
+        bytes[0x99c..0x9a0].copy_from_slice(&16u32.to_le_bytes());std::fs::write(file.path(),bytes).unwrap();let changed=maps::hash_file(file.path()).unwrap();inspection.sha256=changed.clone();
+        assert!(preview_owned_cube(file.path(),&changed,&inspection,0x1234,None).is_err());assert!(preview_owned_cube(file.path(),&sha,&inspection,0x1234,None).is_err());
+    }
+
 }

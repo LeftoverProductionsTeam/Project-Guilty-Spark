@@ -361,6 +361,12 @@ pub fn verify_preservation(
         }
     }
     for object in &project.scene {
+        // These additions have no cache byte span: the exact checked import is
+        // authored later through the native scenario schema. They must never
+        // grant extra byte-write ranges in the preserved extraction input.
+        if crate::native_asset_imports::allowed_addition(project, object, inspection) {
+            continue;
+        }
         let old = inspection
             .objects
             .iter()

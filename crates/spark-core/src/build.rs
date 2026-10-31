@@ -199,14 +199,15 @@ pub fn compatibility(
     if let Err(e) = project::validate_edits(project, inspection) {
         blockers.push(e.to_string());
     }
-    if project.scene.len() != inspection.objects.len()
+    if project.scene.iter().filter(|o|!crate::native_asset_imports::allowed_addition(project,o,inspection)).count() != inspection.objects.len()
         || project
             .scene
             .iter()
-            .any(|o| !inspection.objects.iter().any(|v| v.id == o.id) || o.scale != [1.0; 3] || o.source_model.is_some() || o.asset_id.is_some())
+            .any(|o| !crate::native_asset_imports::allowed_addition(project,o,inspection)&&(!inspection.objects.iter().any(|v| v.id == o.id) || o.scale != [1.0; 3] || o.source_model.is_some() || o.asset_id.is_some()))
     {
         blockers.push("Editor-only instances, duplication, deletion and per-instance scale cannot be compiled into Halo tags yet".into());
     }
+    if !native&&project.scene.iter().any(|o|o.source_model.is_some()){blockers.push("Imported native placements in compiled source maps require the native MCC source rebuild path".into());}
     if !project.assets.is_empty() {
         warnings
             .push("Workshop assets are preview-only and are not baked into the Halo map".into());
@@ -306,13 +307,15 @@ impl Runner<'_> {
         let native_alias = if executable.file_name().is_some_and(|s|{
             let name=s.to_string_lossy();
             (name.eq_ignore_ascii_case("tool.exe") && args.iter().any(|s|s=="-tags_dir"))
-                || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"))
+                || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"|"asset-references"))
                 || (name.eq_ignore_ascii_case("invader-extract.exe") && phase=="extract")
+                || (name.eq_ignore_ascii_case("invader-edit.exe")&&matches!(phase,"asset-native-readback"|"asset-placement"))
+                || (name.eq_ignore_ascii_case("invader-dependency.exe")&&phase=="asset-dependencies")
         }) {
             Some(crate::native_workspace::Alias::new(cwd)?)
         } else {None};
         #[cfg(windows)]
-        let extraction_args = if phase=="extract" {
+        let extraction_args = if matches!(phase,"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies") {
             native_alias.as_ref().map(|alias|crate::native_workspace::extraction_arguments(args,cwd,alias.path())).transpose()?
         } else {None};
         #[cfg(windows)]
@@ -716,6 +719,7 @@ pub fn run_build(
         {
             return invalid("Extractor did not produce the indexed scenario; refusing to compile a different map");
         }
+        if !project.native_asset_imports.is_empty(){let root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed job root is missing".into()))?;crate::native_asset_imports::stage(root,project,&tag_dir)?;}
         if native.is_some(){crate::conversion::compile_native(project,inspection,tools,&runner,&dir,&tag_dir,&output_dir)?;}else{runner.run(
             build.as_ref().ok_or_else(||SparkError::Invalid("Invader builder missing".into()))?,
             &[
@@ -743,6 +747,8 @@ pub fn run_build(
             output = output_dir.join(format!("{}.map", stem.to_ascii_lowercase()));
         }
         let validated = maps::inspect_map(&output, Some(resource_dir))?;
+        crate::native_asset_imports::verify_compiled(project,&validated)?;
+        if !project.native_asset_imports.is_empty(){let _=crate::native_asset_imports::available_files(jobs_root.parent().unwrap(),project)?;}
         crate::tag_duplicates::verify_compiled(project,inspection,&validated)?;
         crate::powerups::verify_compiled(project,&validated,&dir)?;
         if let Some(assembly)=&project.bsp_assembly{

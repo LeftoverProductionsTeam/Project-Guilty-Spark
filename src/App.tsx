@@ -1,3 +1,8 @@
+import { retainAssetSource } from './assetSources';
+import type { NativeAssetImport } from './types';
+import type { ForgeMaterial } from './forge';
+import { prepareAssetImport, attachAssetImport, prepareSoundImport } from './nativeAssetImport';
+import LaunchProgress from './components/LaunchProgress';
 import {useWorkflowHistory} from './useWorkflowHistory';
 import type {WorkflowRoute} from './workflowHistory';
 import {librarySoundEmitters} from './viewportAssets';
@@ -162,7 +167,8 @@ export default function App() {
   const [settingsTab,setSettingsTabState]=useState<'tools'|'dependencies'>('tools');
   const setWorkspace=useCallback((next:Workspace)=>{if(next===workspaceRef.current)return;window.dispatchEvent(new Event('gs:save-viewport-context'));workspaceRef.current=next;setWorkspaceState(next);},[]);
   const setSettingsTab=useCallback((next:'tools'|'dependencies')=>setSettingsTabState(next),[]);
-  const workspaceRef=useRef(workspace);workspaceRef.current=workspace;
+  const workspaceRef=useRef(workspace);
+  workspaceRef.current=workspace;
   const bootRouteHandled=useRef(false);
   useEffect(()=>{if(!ready||bootRouteHandled.current)return;bootRouteHandled.current=true;if(data.settings.onboardingCompleted){markFirstVisitSeen();if(workspace==='get-started')setWorkspace('library');}},[ready,data.settings.onboardingCompleted]);
   const [focusTagId, setFocusTagId] = useMapState<number | null>(activeMap?.id??'no-map','tags.focus',null);
@@ -257,7 +263,8 @@ export default function App() {
      current?.source?.resourceSha256?.['bitmaps.map']]);
   const historyRef = useRef(history);
   historyRef.current = history;
-  const documentsRef=useRef(documents);documentsRef.current=documents;
+  const documentsRef=useRef(documents);
+  documentsRef.current=documents;
   const workflow=useWorkflowHistory({workspace,projectId:activeMap?.id??null,settingsTab},mapWorkspaces,route=>{
     if(route.projectId&&documentsRef.current.documents.some(d=>d.id===route.projectId))dispatchDocument({type:'select',id:route.projectId});
     setSettingsTabState(route.settingsTab);workspaceRef.current=route.workspace;setWorkspaceState(route.workspace);
@@ -297,7 +304,7 @@ export default function App() {
         else if (typeof result === 'string') notice(result, 'info');
         await refresh();
       } catch (e) {
-        notice(String(e), 'error');
+        notice(String(e),'error');
       }
     },
     [notice, refresh],
@@ -479,7 +486,7 @@ export default function App() {
         }
       })
       .catch((e) => {
-        notice(String(e), 'error');
+        notice(String(e),'error');
         setReady(true);
       });
     return () => {
@@ -662,12 +669,38 @@ export default function App() {
     setBusy(true);try{await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id);window.dispatchEvent(new Event('gs:save-viewport-context'));if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call('open_project_window',{id,workspace:workspaceRef.current});}else if(native)await call('release_project_document',{id});const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});}catch(e){notice(String(e),'error');}finally{setBusy(false);}
   }
   async function popoutWorkspace(){if(!native){notice('Workspace windows require the desktop application.');return;}if(current&&mapWorkspaces.includes(workspaceRef.current)){if(busy||activeJob){notice('Finish the current map operation before moving its workspace to another window.');return;}await closeMap(current.id,true);return;}try{await call('open_workspace_window',{workspace:workspaceRef.current,context:null});}catch(e){notice(String(e),'error');}}
-  async function transferAsset(selection:TransferSelection){
-    const target=historyRef.current.current;if(!target)return;setBusy(true);
-    try{if(selection.kind==='tag'){const next=transferTag(target,selection.asset);edit(next,'Transfer source-linked '+selection.asset.name);notice('Source-linked model added to the map. Its original map and tag identities are preserved.','success');}
-      else if(selection.kind==='sound'){const emitters=await librarySoundEmitters(selection.item,[0,0,0]);const scene=target.audioPreview??emptySoundScene();if(scene.emitters.length+emitters.length>64)throw Error('The map sound emitter limit is full');edit({...target,audioPreview:{...scene,emitters:[...scene.emitters,...emitters]}},'Place transferred sound '+selection.item.name);}
-      else{await save(false,target.id);const result=await call<AssetResult>('copy_project_asset',{sourceId:selection.sourceId,assetId:selection.assetId,targetId:target.id});dispatch({type:'assets',project:result.project});dispatchDocument({type:'mesh',id:target.id,assetId:result.asset.id,mesh:result.mesh});const latest=documentsRef.current.documents.find(d=>d.id===target.id)?.history.current??target;edit({...latest,assets:result.project.assets,scene:[...latest.scene,{id:crypto.randomUUID(),name:result.asset.name,kind:'Workshop mesh',tagId:null,assetId:result.asset.id,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:null,rotationOffset:null}]},'Place transferred OBJ '+result.asset.name);await refresh();notice('Verified OBJ copied and placed. Ctrl+Z removes the placement.','success');}
-    }finally{setBusy(false);}
+  async function transferAsset(selection: TransferSelection) {
+    const target=historyRef.current.current;
+    if(!target)return;
+    setBusy(true);
+    try {
+      if (selection.kind === 'tag') {
+        const binding = await prepareAssetImport(target, selection.asset);
+        const latest = documentsRef.current.documents.find((d) => d.id === target.id)?.history.current;
+        if (!latest)
+          throw Error('The target map was closed during import. Extracted tags remain in managed storage.');
+        const next = transferTag(attachAssetImport(latest, binding), selection.asset);
+        edit(next, 'Import and place ' + selection.asset.name);
+        notice(
+          `${binding.fileCount} native tags imported with their dependencies. Build the map copy to use the placement in Halo.`,
+          'success',
+        );
+      } else if (selection.kind === 'sound') {
+        const binding = await prepareSoundImport(target, selection.item);
+        const emitters=await librarySoundEmitters(selection.item,[0,0,0]);
+        const latest = documentsRef.current.documents.find((d) => d.id === target.id)?.history.current;
+        if (!latest) throw Error('The target map was closed during sound import');
+        const next = binding ? attachAssetImport(latest, binding) : latest;
+        const scene = next.audioPreview ?? emptySoundScene();
+        if(scene.emitters.length+emitters.length>64)throw Error('The map sound emitter limit is full');
+        edit(
+          { ...next, audioPreview: { ...scene, emitters: [...scene.emitters, ...emitters] } },
+          'Place transferred sound ' + selection.item.name,
+        );
+      } else {await save(false,target.id);const result=await call<AssetResult>('copy_project_asset',{sourceId:selection.sourceId,assetId:selection.assetId,targetId:target.id});dispatch({type:'assets',project:result.project});dispatchDocument({type:'mesh',id:target.id,assetId:result.asset.id,mesh:result.mesh});const latest=documentsRef.current.documents.find(d=>d.id===target.id)?.history.current??target;edit({...latest,assets:result.project.assets,scene:[...latest.scene,{id:crypto.randomUUID(),name:result.asset.name,kind:'Workshop mesh',tagId:null,assetId:result.asset.id,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:null,rotationOffset:null}]},'Place transferred OBJ '+result.asset.name);await refresh();notice('Verified OBJ copied and placed. Ctrl+Z removes the placement.','success');}
+    } finally {
+      setBusy(false);
+    }
   }
   async function create() {
     if (!newTitle.trim()) return;
@@ -679,7 +712,7 @@ export default function App() {
       setWorkspace('assets');
       await refresh();
     } catch (e) {
-      notice(String(e), 'error');
+      notice(String(e),'error');
     } finally {
       setBusy(false);
     }
@@ -689,11 +722,61 @@ export default function App() {
     try {
       if (historyRef.current.dirty) await save();
       const open = await call<OpenProject>('create_quickforge_project', { title, template, target });
-      await load(open); setWorkspace('quickforge'); await refresh();
-    } finally { setBusy(false); }
+      await load(open);
+      setWorkspace('quickforge');
+      await refresh();
+      if (native) {
+        try {
+          notice('Preparing your runtime’s real grass and metal materials…', 'info');
+          const defaults = await call<{
+            source: OpenProject;
+            materials: ForgeMaterial[];
+            bindings: NativeAssetImport[];
+          }>('prepare_default_halo_materials', { projectId: open.project.id });
+          const latest = documentsRef.current.documents.find((d) => d.id === open.project.id)?.history
+            .current;
+          if (latest?.quickForge) {
+            let next = latest;
+            for (const binding of defaults.bindings) next = attachAssetImport(next, binding);
+            edit(
+              {
+                ...next,
+                quickForge: {
+                  ...latest.quickForge,
+                  materials: [
+                    ...defaults.materials.map((material) => {
+                      const current = latest.quickForge!.materials.find((value) => value.id === material.id);
+                      const initial = open.project.quickForge!.materials.find(
+                        (value) => value.id === material.id,
+                      );
+                      return current && current.shaderPath !== initial?.shaderPath ? current : material;
+                    }),
+                    ...latest.quickForge.materials.filter(
+                      (material) => !defaults.materials.some((value) => value.id === material.id),
+                    ),
+                  ],
+                },
+              },
+              'Assign native Halo grass and metal defaults',
+            );
+            writeMapSession(latest.id, 'forge.assetSource', defaults.source.project.id);
+            retainAssetSource(defaults.source);
+            await refresh();
+            notice(
+              'Real grass and metal are ready. Terrain uses grass; new walls and boxes use metal.',
+              'success',
+            );
+          }
+        } catch (error) {
+          notice('Native defaults need source setup: ' + String(error), 'info');
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
   }
   async function buildQuickForge() {
-    const project = historyRef.current.current;
+    const project=historyRef.current.current;
     if (!project?.quickForge) return;
     await save();
     const jobId = await call<string>('quickforge_build', { projectId: project.id });
@@ -754,7 +837,7 @@ export default function App() {
       setActiveJob(job);
       notice('Conversion started. The build log records tool output and validation results.', 'success');
     } catch (e) {
-      notice(String(e), 'error');
+      notice(String(e),'error');
     }
   }
   async function applySettings(settings: Settings) {
@@ -925,289 +1008,538 @@ export default function App() {
   return (
     <>
       <div className="gs-window-content">
-      <div className="application gs-drawers" inert={closing || undefined}>
-        <header id="gs-window-header" className="app-header gs-compact-header" onPointerDown={event=>void dragWindow(event).catch(e=>notice(String(e),'error'))}
-          onDoubleClick={event=>{if(!(event.target as HTMLElement).closest('button,a,input,select'))void maximizeWindow().catch(e=>notice(String(e),'error'));}}
-          style={ownedHeaderArt && matchesOwnedInterfaceBitmap(bitmapPreference,current,inspection)
-          ? { backgroundImage: `linear-gradient(90deg,rgba(7,17,26,.96) 0%,rgba(9,24,35,.9) 44%,rgba(8,22,33,.58) 100%),url("${ownedHeaderArt.url}")`,backgroundSize:'cover',backgroundPosition:'center' }
-          : undefined}>
-          <button className="brand" onClick={() => setWorkspace('library')} aria-label="Guilty Spark home">
-            <img src="/spark.svg" alt="" />
-            <div>
-              <strong>GUILTY SPARK</strong>
-              <span>HALO MODERN EVOLVED</span>
-            </div>
-            <Pill>0.4.0 · C40 dev</Pill>
-          </button>
-          {documents.documents.length?<MapTabs state={documents} disabled={busy||closing} onSelect={selectMap} onClose={id=>void closeMap(id)} onWindow={id=>void closeMap(id,true)} onAssets={()=>{setAssetTransferOpen(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'asset-transfer'}})));}}/>:<div className="header-context">
-            <span>LOCAL WORKBENCH</span>
-            <ChevronRight size={12} />
-            <strong>{current?.title ?? nav.find(item=>item.id===workspace)?.label ?? 'Guilty Spark'}</strong>
-            {current && (
-              <span
-                className={history.dirty ? 'unsaved-dot' : 'saved-dot'}
-                title={history.dirty ? 'Unsaved changes' : 'Saved'}
-              />
-            )}
-          </div>}
-          <div className="header-actions">
-            <LiveStudioIndicator projectId={current?.id??null} canHost={!!current?.quickForge} onOpen={id=>{writeMapSession(id,'studio.openRequest',true);void openProject(id,'quickforge').then(()=>requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-live-studio-open',{detail:{projectId:id}}))));}}/>
-            <Pill tone={data.installation.mccPath ? 'green' : 'muted'}>
-              <span className="live-dot" />
-              {data.installation.mccPath ? 'MCC found' : native ? 'Runtime not found' : 'Browser preview'}
-            </Pill>
-            <button className="gs-header-find" title="Search all Spark tools and workspaces (Ctrl+K)" onClick={()=>{setHelp(false);setCreateModal(false);setShowFinder(true);}}><Search size={15}/>Find tools <kbd>Ctrl K</kbd></button>
-            <IconButton label="Help & shortcuts" onClick={() => setHelp(true)}>
-              <CircleHelp size={18} />
-            </IconButton>
-          </div>
-          <div id="gs-window-actions" className="gs-window-actions" />
-        </header>
-        <aside id="gs-workspace-navigation" className="sidebar gs-navigation-drawer" aria-label="Workspace navigation" hidden={!sidebarOpen} onClickCapture={e=>{if((e.target as HTMLElement).closest('.nav-item'))setSidebarOpen(false);}}>
-          <div className="sidebar-label">WORKSPACES</div>
-          <nav aria-label="Workspaces">
-            {navGroups.map(([group,ids])=><div className="gs-nav-group" key={group}><div className="sidebar-label">{group}</div>{nav.filter(item=>(ids as readonly string[]).includes(item.id)).map(({ id, label, icon: Icon }) => (
-              <button
-                className={workspace === id || (id==='quickforge'&&(workspace==='world'||workspace==='live')) ? 'nav-item selected' : 'nav-item'}
-                key={id}
-                title={WORKSPACE_TOOLTIPS[id]}
-                aria-label={label}
-                aria-description={WORKSPACE_TOOLTIPS[id]}
-                onClick={() => {markFirstVisitSeen(); setWorkspace(id); playInterfaceCue('select'); }}
-              >
-                <Icon size={17} />
-                <span>{label}</span>
-                {id === 'library' && <small>{data.entries.length}</small>}
-                {id === 'build' && activeJob && <span className="live-dot pulse" />}
-              </button>
-            ))}</div>)}
-          </nav>
-          <div className="sidebar-project">
-            <div className="sidebar-label">CURRENT PROJECT</div>
-            {current ? (
-              <>
-                <div className="current-project-name">
-                  <span className="project-glyph">
-                    <Box size={17} />
-                  </span>
-                  <span>
-                    <strong title={current.title}>{current.title}</strong>
-                    <small>
-                      {current.source
-                        ? `Cache ${current.source.cacheVersion} · source preserved`
-                        : 'Asset workspace'}
-                    </small>
-                  </span>
-                </div>
-                <button
-                  className="small-button full"
-                  aria-label="Export .gsproject"
-                  title="Save and export this project's descriptor"
-                  onClick={() =>
-                    void action(async () => {
-                      await save();
-                      return call('export_project', { id: current.id });
-                    }, 'Project descriptor exported. Referenced source and asset files must remain available.')
+        <div className="application gs-drawers" inert={closing || undefined}>
+          <header
+            id="gs-window-header"
+            className="app-header gs-compact-header"
+            onPointerDown={(event) => void dragWindow(event).catch((e) => notice(String(e), 'error'))}
+            onDoubleClick={(event) => {
+              if(!(event.target as HTMLElement).closest('button,a,input,select'))void maximizeWindow().catch(e=>notice(String(e),'error'));
+            }}
+            style={
+              ownedHeaderArt && matchesOwnedInterfaceBitmap(bitmapPreference, current, inspection)
+                ? {
+                    backgroundImage: `linear-gradient(90deg,rgba(7,17,26,.96) 0%,rgba(9,24,35,.9) 44%,rgba(8,22,33,.58) 100%),url("${ownedHeaderArt.url}")`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
                   }
-                >
-                  <Save size={13} />
-                  <span className="sidebar-export-label">Export .gsproject</span>
-                </button>
-              </>
+                : undefined
+            }
+          >
+            <button className="brand" onClick={() => setWorkspace('library')} aria-label="Guilty Spark home">
+              <img src="/spark.svg" alt="" />
+              <div>
+                <strong>GUILTY SPARK</strong>
+                <span>HALO MODERN EVOLVED</span>
+              </div>
+              <Pill>0.4.0 · C40 dev</Pill>
+            </button>
+            {documents.documents.length ? (
+              <MapTabs
+                state={documents}
+                disabled={busy || closing}
+                onSelect={selectMap}
+                onClose={(id) => void closeMap(id)}
+                onWindow={(id) => void closeMap(id, true)}
+                onAssets={() => {
+                  setAssetTransferOpen(true);
+                  requestAnimationFrame(() =>
+                    window.dispatchEvent(
+                      new CustomEvent('guilty-spark-reveal-drawer', { detail: { id: 'asset-transfer' } }),
+                    ),
+                  );
+                }}
+              />
             ) : (
-              <p>No project open.</p>
-            )}
-          </div>
-          <div className="sidebar-bottom">
-            <div className="restoration-card">
-              <div>
-                <span className="pending-dot" />
-                PRESERVATION TARGET
-              </div>
-              <strong>Zombie Apocalypse</strong>
-              <span>Historical restoration · pending</span>
-              <small>Fonzie / Fonzeh · MacGamingMods</small>
-            </div>
-            <button
-              className={workspace === 'preservation' ? 'nav-item selected' : 'nav-item'}
-              onClick={() => setWorkspace('preservation')}
-            >
-              <BookOpen size={17} />
-              <span>Preservation record</span>
-            </button>
-            <button
-              className={workspace === 'settings'||workspace==='interface' ? 'nav-item selected' : 'nav-item'}
-              onClick={() => setWorkspace('settings')}
-            >
-              <Settings2 size={17} />
-              <span>Settings &amp; tools</span>
-            </button>
-            <div className="local-only">
-              <ShieldCheck size={13} />
-              Local. Source-safe. Yours.
-            </div>
-          </div>
-        </aside>
-        <main className={`main-content workspace-${workspace}`}>
-          <EditorAudioProvider project={current} inspection={inspection} active={!closing&&['world','quickforge','live','tags','assets','scenario','creator','firefight','build','preservation'].includes(workspace)} resourceScope={JSON.stringify(documents.documents.map(document=>[document.id,{map:document.history.current?.source?.resourceSha256,audio:document.history.current?.source?.audioResources?.sha256}]))}>
-          <WorkspacePanels onPopout={()=>void popoutWorkspace()} onNavigationToggle={toggleNavigation} navigationOpen={sidebarOpen} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace} actions={<>{current&&<EditorSoundControls projectId={current.id}/>}<div role="group" aria-label="Workflow navigation"><IconButton label="Back to previous workspace" title={routeTitle(workflow.back,'Back')} onClick={workflow.goBack} disabled={!workflow.back}><ArrowLeft size={14}/></IconButton><IconButton label="Forward to next workspace" title={routeTitle(workflow.forward,'Forward')} onClick={workflow.goForward} disabled={!workflow.forward}><ArrowRight size={14}/></IconButton></div></>}>
-          {documents.documents.map(document=>{const project=document.history.current;return project?.quickForge?<ForgeCollaboration key={project.id} hidden={current?.id!==project.id} projectId={project.id} document={project.quickForge} entries={data.entries} onShared={next=>dispatch({type:'forge-remote',projectId:project.id,document:next})} onSave={()=>save(false,project.id)}/>:null;})}
-            {current&&<WorkspacePanel id="project-setup" label="Project setup"><MapTools key={current.id} project={current} settings={data.settings} edit={edit} onSave={()=>save()}/></WorkspacePanel>}
-          {['world','quickforge','live','machinima'].includes(workspace)&&<WorkspacePanel id="navigation" label="Camera"><NavigationSettings/></WorkspacePanel>}
-          <WorkspacePanel id="source-changes" label="Changes">{current&&<div className="gs-edit-history-controls" role="group" aria-label="Project edit history"><span>{current.title} · edit history</span><IconButton label="Undo (Ctrl+Z)" onClick={()=>applyHistory('undo')} disabled={!history.past.length&&!sharedHistory[current?.id??'']?.undo}><Undo2 size={14}/></IconButton><IconButton label="Redo (Ctrl+Y / Ctrl+Shift+Z)" onClick={()=>applyHistory('redo')} disabled={!history.future.length&&!sharedHistory[current?.id??'']?.redo}><Redo2 size={14}/></IconButton></div>}<ExternalMapSync documents={documents.documents.flatMap(d=>d.history.current?[{project:d.history.current,inspection:d.inspection,dirty:d.history.dirty}]:[])} onRevision={adoptExternalRevision}/></WorkspacePanel>
-          {assetTransferOpen&&current&&<AssetTransfer key={current.id} data={data} documents={documents.documents} target={current} busy={busy} onTransfer={transferAsset} onClose={()=>setAssetTransferOpen(false)} onTags={()=>{setAssetTransferOpen(false);setWorkspace('tags');}}/>}
-          {current && !['library','settings','community','get-started','world','quickforge','live'].includes(workspace) && (
-            <div className="editor-bar">
-              <div className="breadcrumb">
-                <button onClick={() => setWorkspace('library')}>Library</button>
+              <div className="header-context">
+                <span>LOCAL WORKBENCH</span>
                 <ChevronRight size={12} />
-                <span>{current.title}</span>
-                <Pill>{current.source?.engine ?? 'Asset workspace'}</Pill>
+                <strong>
+                  {current?.title ?? nav.find((item) => item.id === workspace)?.label ?? 'Guilty Spark'}
+                </strong>
+                {current && (
+                  <span
+                    className={history.dirty ? 'unsaved-dot' : 'saved-dot'}
+                    title={history.dirty ? 'Unsaved changes' : 'Saved'}
+                  />
+                )}
               </div>
-              <div>
-                <button className="small-button" onClick={() => void save(true).catch(() => {})}>
-                  <Save size={14} />
-                  {history.dirty ? 'Save changes' : 'Saved'}
+            )}
+            <div className="header-actions">
+              <LiveStudioIndicator
+                projectId={current?.id ?? null}
+                canHost={!!current?.quickForge}
+                onOpen={(id) => {
+                  writeMapSession(id,'studio.openRequest',true);
+                  void openProject(id,'quickforge').then(()=>requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-live-studio-open',{detail:{projectId:id}}))));
+                }}
+              />
+              <Pill tone={data.installation.mccPath ? 'green' : 'muted'}>
+                <span className="live-dot" />
+                {data.installation.mccPath ? 'MCC found' : native ? 'Runtime not found' : 'Browser preview'}
+              </Pill>
+              <button
+                className="gs-header-find"
+                title="Search all Spark tools and workspaces (Ctrl+K)"
+                onClick={() => {
+                  setHelp(false);
+                  setCreateModal(false);
+                  setShowFinder(true);
+                }}
+              >
+                <Search size={15} />
+                Find tools <kbd>Ctrl K</kbd>
+              </button>
+              <IconButton label="Help & shortcuts" onClick={() => setHelp(true)}>
+                <CircleHelp size={18} />
+              </IconButton>
+            </div>
+            <div id="gs-window-actions" className="gs-window-actions" />
+          </header>
+          <aside
+            id="gs-workspace-navigation"
+            className="sidebar gs-navigation-drawer"
+            aria-label="Workspace navigation"
+            hidden={!sidebarOpen}
+            onClickCapture={(e) => {
+              if((e.target as HTMLElement).closest('.nav-item'))setSidebarOpen(false);
+            }}
+          >
+            <div className="sidebar-label">WORKSPACES</div>
+            <nav aria-label="Workspaces">
+              {navGroups.map(([group, ids]) => (
+                <div className="gs-nav-group" key={group}>
+                  <div className="sidebar-label">{group}</div>
+                  {nav
+                    .filter((item) => (ids as readonly string[]).includes(item.id))
+                    .map(({ id, label, icon: Icon }) => (
+                      <button
+                        className={
+                          workspace === id ||
+                          (id === 'quickforge' && (workspace === 'world' || workspace === 'live'))
+                            ? 'nav-item selected'
+                            : 'nav-item'
+                        }
+                        key={id}
+                        title={WORKSPACE_TOOLTIPS[id]}
+                        aria-label={label}
+                        aria-description={WORKSPACE_TOOLTIPS[id]}
+                        onClick={() => {
+                          markFirstVisitSeen();
+                          setWorkspace(id);
+                          playInterfaceCue('select');
+                        }}
+                      >
+                        <Icon size={17} />
+                        <span>{label}</span>
+                        {id === 'library' && <small>{data.entries.length}</small>}
+                        {id === 'build' && activeJob && <span className="live-dot pulse" />}
+                      </button>
+                    ))}
+                </div>
+              ))}
+            </nav>
+            <div className="sidebar-project">
+              <div className="sidebar-label">CURRENT PROJECT</div>
+              {current ? (
+                <>
+                  <div className="current-project-name">
+                    <span className="project-glyph">
+                      <Box size={17} />
+                    </span>
+                    <span>
+                      <strong title={current.title}>{current.title}</strong>
+                      <small>
+                        {current.source
+                          ? `Cache ${current.source.cacheVersion} · source preserved`
+                          : 'Asset workspace'}
+                      </small>
+                    </span>
+                  </div>
+                  <button
+                    className="small-button full"
+                    aria-label="Export .gsproject"
+                    title="Save and export this project's descriptor"
+                    onClick={() =>
+                      void action(async () => {
+                        await save();
+                        return call('export_project', { id: current.id });
+                      }, 'Project descriptor exported. Referenced source and asset files must remain available.')
+                    }
+                  >
+                    <Save size={13} />
+                    <span className="sidebar-export-label">Export .gsproject</span>
+                  </button>
+                </>
+              ) : (
+                <p>No project open.</p>
+              )}
+            </div>
+            <div className="sidebar-bottom">
+              <div className="restoration-card">
+                <div>
+                  <span className="pending-dot" />
+                  PRESERVATION TARGET
+                </div>
+                <strong>Zombie Apocalypse</strong>
+                <span>Historical restoration · pending</span>
+                <small>Fonzie / Fonzeh · MacGamingMods</small>
+              </div>
+              <button
+                className={workspace === 'preservation' ? 'nav-item selected' : 'nav-item'}
+                onClick={() => setWorkspace('preservation')}
+              >
+                <BookOpen size={17} />
+                <span>Preservation record</span>
+              </button>
+              <button
+                className={
+                  workspace === 'settings' || workspace === 'interface' ? 'nav-item selected' : 'nav-item'
+                }
+                onClick={() => setWorkspace('settings')}
+              >
+                <Settings2 size={17} />
+                <span>Settings &amp; tools</span>
+              </button>
+              <div className="local-only">
+                <ShieldCheck size={13} />
+                Local. Source-safe. Yours.
+              </div>
+            </div>
+          </aside>
+          <main className={`main-content workspace-${workspace}`}>
+            <EditorAudioProvider
+              project={current}
+              inspection={inspection}
+              active={
+                !closing &&
+                [
+                  'world',
+                  'quickforge',
+                  'live',
+                  'tags',
+                  'assets',
+                  'scenario',
+                  'creator',
+                  'firefight',
+                  'build',
+                  'preservation',
+                ].includes(workspace)
+              }
+              resourceScope={JSON.stringify(
+                documents.documents.map((document) => [
+                  document.id,
+                  {
+                    map: document.history.current?.source?.resourceSha256,
+                    audio: document.history.current?.source?.audioResources?.sha256,
+                  },
+                ]),
+              )}
+            >
+              <WorkspacePanels
+                onPopout={() => void popoutWorkspace()}
+                onNavigationToggle={toggleNavigation}
+                navigationOpen={sidebarOpen}
+                id={current?.id ?? 'global'}
+                workspace={['world', 'quickforge', 'live'].includes(workspace) ? 'level' : workspace}
+                actions={
+                  <>
+                    {current && <EditorSoundControls projectId={current.id} />}
+                    <div role="group" aria-label="Workflow navigation">
+                      <IconButton
+                        label="Back to previous workspace"
+                        title={routeTitle(workflow.back, 'Back')}
+                        onClick={workflow.goBack}
+                        disabled={!workflow.back}
+                      >
+                        <ArrowLeft size={14} />
+                      </IconButton>
+                      <IconButton
+                        label="Forward to next workspace"
+                        title={routeTitle(workflow.forward, 'Forward')}
+                        onClick={workflow.goForward}
+                        disabled={!workflow.forward}
+                      >
+                        <ArrowRight size={14} />
+                      </IconButton>
+                    </div>
+                  </>
+                }
+              >
+                {documents.documents.map((document) => {
+                  const project=document.history.current;
+                  return project?.quickForge?<ForgeCollaboration key={project.id} hidden={current?.id!==project.id} projectId={project.id} document={project.quickForge} entries={data.entries} onShared={next=>dispatch({type:'forge-remote',projectId:project.id,document:next})} onSave={()=>save(false,project.id)}/>:null;
+                })}
+                {current && (
+                  <WorkspacePanel id="project-setup" label="Project setup">
+                    <MapTools
+                      key={current.id}
+                      project={current}
+                      settings={data.settings}
+                      edit={edit}
+                      onSave={() => save()}
+                    />
+                  </WorkspacePanel>
+                )}
+                {['world', 'quickforge', 'live', 'machinima'].includes(workspace) && (
+                  <WorkspacePanel id="navigation" label="Camera">
+                    <NavigationSettings />
+                  </WorkspacePanel>
+                )}
+                <WorkspacePanel id="source-changes" label="Changes">
+                  {current && (
+                    <div className="gs-edit-history-controls" role="group" aria-label="Project edit history">
+                      <span>{current.title} · edit history</span>
+                      <IconButton
+                        label="Undo (Ctrl+Z)"
+                        onClick={() => applyHistory('undo')}
+                        disabled={!history.past.length && !sharedHistory[current?.id ?? '']?.undo}
+                      >
+                        <Undo2 size={14} />
+                      </IconButton>
+                      <IconButton
+                        label="Redo (Ctrl+Y / Ctrl+Shift+Z)"
+                        onClick={() => applyHistory('redo')}
+                        disabled={!history.future.length && !sharedHistory[current?.id ?? '']?.redo}
+                      >
+                        <Redo2 size={14} />
+                      </IconButton>
+                    </div>
+                  )}
+                  <ExternalMapSync
+                    documents={documents.documents.flatMap((d) =>
+                      d.history.current
+                        ? [{ project: d.history.current, inspection: d.inspection, dirty: d.history.dirty }]
+                        : [],
+                    )}
+                    onRevision={adoptExternalRevision}
+                  />
+                </WorkspacePanel>
+                {assetTransferOpen && current && (
+                  <AssetTransfer
+                    key={current.id}
+                    data={data}
+                    documents={documents.documents}
+                    target={current}
+                    busy={busy}
+                    onTransfer={transferAsset}
+                    onClose={() => setAssetTransferOpen(false)}
+                    onTags={() => {
+                      setAssetTransferOpen(false);
+                      setWorkspace('tags');
+                    }}
+                  />
+                )}
+                {current &&
+                  ![
+                    'library',
+                    'settings',
+                    'community',
+                    'get-started',
+                    'world',
+                    'quickforge',
+                    'live',
+                  ].includes(workspace) && (
+                    <div className="editor-bar">
+                      <div className="breadcrumb">
+                        <button onClick={() => setWorkspace('library')}>Library</button>
+                        <ChevronRight size={12} />
+                        <span>{current.title}</span>
+                        <Pill>{current.source?.engine ?? 'Asset workspace'}</Pill>
+                      </div>
+                      <div>
+                        <button className="small-button" onClick={() => void save(true).catch(() => {})}>
+                          <Save size={14} />
+                          {history.dirty ? 'Save changes' : 'Saved'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                {ready && (
+                  <WorkspacePanel id="help" label="Help">
+                    <WorkbenchGuide
+                      key={workspace}
+                      workspace={workspace}
+                      evidence={{
+                        desktop: native,
+                        project: !!current,
+                        source: !!current?.source,
+                        inspectedSource:
+                          !!current?.source &&
+                          !!inspection &&
+                          inspection.sha256.toLowerCase() === current.source.sha256.toLowerCase(),
+                        forge: !!current?.quickForge,
+                        toolFolder: !!data.settings.hekDirectory || !!data.settings.invaderDirectory,
+                        unsaved: history.dirty,
+                        runningJob: !!activeJob,
+                      }}
+                      onNavigate={(target) => {
+                        markFirstVisitSeen();
+                        setWorkspace(target);
+                        playInterfaceCue('select');
+                      }}
+                    />
+                  </WorkspacePanel>
+                )}
+                {!ready ? (
+                  <LaunchProgress />
+                ) : (
+                  <Suspense fallback={<div className="loading">Loading workspace…</div>}>
+                    <WorkspaceSession
+                      key={`${current?.id ?? 'global'}:${['world', 'quickforge', 'live'].includes(workspace) ? 'level' : workspace}`}
+                      id={current?.id ?? 'global'}
+                      workspace={['world', 'quickforge', 'live'].includes(workspace) ? 'level' : workspace}
+                    >
+                      {content()}
+                    </WorkspaceSession>
+                  </Suspense>
+                )}
+              </WorkspacePanels>
+            </EditorAudioProvider>
+          </main>
+          <RuntimeDock
+            project={current}
+            settings={data.settings}
+            dirty={history.dirty}
+            working={busy || !!activeJob}
+            epoch={epoch}
+            onSave={() => save()}
+            onNavigate={(next) => (next === 'settings' ? openDependencySetup() : setWorkspace(next))}
+            onOpenCompiled={(buildId) => {
+              if(current)void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});await load(opened);await refresh();setWorkspace('quickforge');},'Working tag changes compiled, preserved and opened in a new map tab.');
+            }}
+          />
+          {busy && (
+            <div className="busy-indicator">
+              <LoaderCircle className="spin" size={17} />
+              Processing source data…
+            </div>
+          )}
+          {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+          {dragging && (
+            <div className="drag-overlay">
+              <UploadGlyph />
+              <h2>Bring a world into your workbench.</h2>
+              <p>Drop Halo .map files, ZIP archives or .gsproject descriptors to import.</p>
+            </div>
+          )}
+          {showFinder && !help && !createModal && (
+            <WorkspaceFinder
+              items={finderItems}
+              project={current}
+              settings={data.settings}
+              onSettings={openDependencySetup}
+              onNavigate={(target) => {
+                markFirstVisitSeen();
+                setWorkspace(target);
+              }}
+              onClose={() => setShowFinder(false)}
+            />
+          )}
+          {createModal && (
+            <div className="modal-backdrop">
+              <form
+                className="modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="new-workspace-title"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void create();
+                }}
+              >
+                <button
+                  className="modal-close"
+                  type="button"
+                  onClick={() => setCreateModal(false)}
+                  aria-label="Close new workspace"
+                >
+                  <X size={18} />
+                </button>
+                <div className="empty-icon">
+                  <Plus size={24} />
+                </div>
+                <div className="eyebrow">NEW ASSET WORKSPACE</div>
+                <h2 id="new-workspace-title">Make room for an idea.</h2>
+                <p>
+                  A persistent scene for your own geometry. Halo maps can be imported as separate source
+                  projects.
+                </p>
+                <label>
+                  Workspace name
+                  <input
+                    autoFocus
+                    value={newTitle}
+                    maxLength={200}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                  />
+                </label>
+                <button className="primary full" disabled={busy || !newTitle.trim()}>
+                  Create workspace
+                  <ArrowUpRight size={15} />
+                </button>
+              </form>
+            </div>
+          )}
+          {help && (
+            <div className="modal-backdrop">
+              <div className="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
+                <button className="modal-close" onClick={() => setHelp(false)} aria-label="Close help">
+                  <X size={18} />
+                </button>
+                <div className="eyebrow">QUICK REFERENCE</div>
+                <h2 id="help-title">A familiar spark of possibility.</h2>
+                <p>
+                  Import your own Halo map, inspect its tags and placements, then configure Invader in
+                  Settings to build an MCC cache. Excession metadata is required before packaging.
+                </p>
+                <div className="shortcut-list">
+                  {[
+                    ['Find tools, BSP help or community maps', 'Ctrl + K'],
+                    ['Workspace guidance', 'Help drawer'],
+                    ['Workspace navigation', 'Ctrl + \\'],
+                    ['Back / Forward through your workflow', 'Alt + Left / Right or mouse side buttons'],
+                    ['Window and project header', 'Ctrl + Shift + \\'],
+                    ['Fullscreen / restore', 'F11 / Escape'],
+                    ['Dismiss help tooltip', 'Esc while focused'],
+                    ['Save project', 'Ctrl + S'],
+                    ['Undo / redo', 'Ctrl + Z / Ctrl + Shift + Z'],
+                    ['Move / rotate / scale', 'W / E / R'],
+                    ['Fly camera', 'Hold RMB + WASD; Q down / E up; wheel changes speed'],
+                    ['Grid / mesh snap', 'G / M'],
+                    ['Clear selection', 'Esc'],
+                  ].map(([label, key]) => (
+                    <div key={label}>
+                      <span>{label}</span>
+                      <kbd>{key}</kbd>
+                    </div>
+                  ))}
+                </div>
+                <p className="subtle">
+                  QuickForge refreshes editable source meshes and simulated collision. Compiled Halo
+                  collision, portals, AI synchronization and live engine editing remain separate and require
+                  real runtime testing.
+                </p>
+                <button className="primary full" onClick={() => setHelp(false)}>
+                  Back to the workbench
+                  <ArrowLeft size={15} />
                 </button>
               </div>
             </div>
           )}
-          {ready && <WorkspacePanel id="help" label="Help"><WorkbenchGuide key={workspace} workspace={workspace}
-            evidence={{ desktop:native, project:!!current, source:!!current?.source,
-              inspectedSource:!!current?.source && !!inspection && inspection.sha256.toLowerCase()===current.source.sha256.toLowerCase(),
-              forge:!!current?.quickForge,
-              toolFolder:!!data.settings.hekDirectory || !!data.settings.invaderDirectory,
-              unsaved:history.dirty, runningJob:!!activeJob }}
-            onNavigate={target=>{markFirstVisitSeen();setWorkspace(target);playInterfaceCue('select');}} /></WorkspacePanel>}
-          {!ready ? (
-            <div className="loading">
-              <LoaderCircle className="spin" size={22} />
-              Connecting to the local workbench…
-            </div>
-          ) : (
-            <Suspense fallback={<div className="loading">Loading workspace…</div>}><WorkspaceSession key={`${current?.id??'global'}:${['world','quickforge','live'].includes(workspace)?'level':workspace}`} id={current?.id??'global'} workspace={['world','quickforge','live'].includes(workspace)?'level':workspace}>{content()}</WorkspaceSession></Suspense>
-          )}
-          </WorkspacePanels>
-          </EditorAudioProvider>
-        </main>
-        <RuntimeDock project={current} settings={data.settings} dirty={history.dirty} working={busy || !!activeJob} epoch={epoch} onSave={() => save()} onNavigate={next=>next==='settings'?openDependencySetup():setWorkspace(next)} onOpenCompiled={buildId=>{if(current)void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});await load(opened);await refresh();setWorkspace('quickforge');},'Working tag changes compiled, preserved and opened in a new map tab.');}}/>
-        {busy && (
-          <div className="busy-indicator">
-            <LoaderCircle className="spin" size={17} />
-            Processing source data…
-          </div>
-        )}
-        {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-        {dragging && (
-          <div className="drag-overlay">
-            <UploadGlyph />
-            <h2>Bring a world into your workbench.</h2>
-            <p>Drop Halo .map files, ZIP archives or .gsproject descriptors to import.</p>
-          </div>
-        )}
-        {showFinder && !help && !createModal && <WorkspaceFinder items={finderItems} project={current} settings={data.settings} onSettings={openDependencySetup} onNavigate={target=>{markFirstVisitSeen();setWorkspace(target);}} onClose={()=>setShowFinder(false)}/>}
-        {createModal && (
-          <div className="modal-backdrop">
-            <form
-              className="modal"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="new-workspace-title"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void create();
-              }}
-            >
-              <button
-                className="modal-close"
-                type="button"
-                onClick={() => setCreateModal(false)}
-                aria-label="Close new workspace"
-              >
-                <X size={18} />
-              </button>
-              <div className="empty-icon">
-                <Plus size={24} />
-              </div>
-              <div className="eyebrow">NEW ASSET WORKSPACE</div>
-              <h2 id="new-workspace-title">Make room for an idea.</h2>
-              <p>
-                A persistent scene for your own geometry. Halo maps can be imported as separate source
-                projects.
-              </p>
-              <label>
-                Workspace name
-                <input
-                  autoFocus
-                  value={newTitle}
-                  maxLength={200}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                />
-              </label>
-              <button className="primary full" disabled={busy || !newTitle.trim()}>
-                Create workspace
-                <ArrowUpRight size={15} />
-              </button>
-            </form>
-          </div>
-        )}
-        {help && (
-          <div className="modal-backdrop">
-            <div className="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
-              <button className="modal-close" onClick={() => setHelp(false)} aria-label="Close help">
-                <X size={18} />
-              </button>
-              <div className="eyebrow">QUICK REFERENCE</div>
-              <h2 id="help-title">A familiar spark of possibility.</h2>
-              <p>
-                Import your own Halo map, inspect its tags and placements, then configure Invader in Settings
-                to build an MCC cache. Excession metadata is required before packaging.
-              </p>
-              <div className="shortcut-list">
-                {[
-                  ['Find tools, BSP help or community maps', 'Ctrl + K'],
-                  ['Workspace guidance', 'Help drawer'],
-                  ['Workspace navigation', 'Ctrl + \\'],
-                  ['Back / Forward through your workflow', 'Alt + Left / Right or mouse side buttons'],
-                  ['Window and project header', 'Ctrl + Shift + \\'],
-                  ['Fullscreen / restore', 'F11 / Escape'],
-                  ['Dismiss help tooltip', 'Esc while focused'],
-                  ['Save project', 'Ctrl + S'],
-                  ['Undo / redo', 'Ctrl + Z / Ctrl + Shift + Z'],
-                  ['Move / rotate / scale', 'W / E / R'],
-                  ['Fly camera', 'Hold RMB + WASD; Q down / E up; wheel changes speed'],
-                  ['Grid / mesh snap', 'G / M'],
-                  ['Clear selection', 'Esc'],
-                ].map(([label, key]) => (
-                  <div key={label}>
-                    <span>{label}</span>
-                    <kbd>{key}</kbd>
-                  </div>
-                ))}
-              </div>
-              <p className="subtle">
-                QuickForge refreshes editable source meshes and simulated collision. Compiled Halo collision, portals, AI synchronization and live engine editing remain separate and require real runtime testing.
-              </p>
-              <button className="primary full" onClick={() => setHelp(false)}>
-                Back to the workbench
-                <ArrowLeft size={15} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      <ResizeEdges/>
-      {closing && (
-        <div className="modal-backdrop">
-          <div className="modal" role="status">
-            <LoaderCircle className="spin" size={24} />
-            <h2>Saving before closing…</h2>
-            <p>Your project will finish saving before the window closes.</p>
-          </div>
         </div>
-      )}
+        <ResizeEdges />
+        {closing && (
+          <div className="modal-backdrop">
+            <div className="modal" role="status">
+              <LoaderCircle className="spin" size={24} />
+              <h2>Saving before closing…</h2>
+              <p>Your project will finish saving before the window closes.</p>
+            </div>
+          </div>
+        )}
       </div>
-      <div className="gs-window-tint" aria-hidden="true"/>
+      <div className="gs-window-tint" aria-hidden="true" />
     </>
   );
 }

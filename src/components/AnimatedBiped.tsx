@@ -4,7 +4,7 @@ import { Group, Mesh as ThreeMesh, BufferAttribute } from 'three';
 import { animationDeformer } from '../animation';
 import type { AnimationPreview } from '../animation';
 import type { OwnedModelView } from '../useOwnedForgeModels';
-import { Mesh } from './World';
+import Mesh from './HaloMesh';
 export default function AnimatedBiped({
   model,
   animation,
@@ -63,6 +63,7 @@ export default function AnimatedBiped({
         bones: animation.clip.nodes.length,
         playing: animation.playing,
         source: 'verified-skeletal-animation',
+        samplePosition: Array.from(frame.positions.subarray(0, 3)),
       });
     } catch (e) {
       failed.current = true;

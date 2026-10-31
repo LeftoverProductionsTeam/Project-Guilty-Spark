@@ -1,3 +1,5 @@
+import NativeModelPreview from './NativeModelPreview';
+import { catalogAssets } from '../forge';
 import TagFields from './TagFields';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownToLine, ArrowRight, ChevronRight, FileCode2, GitBranch, RotateCcw, Search, Sparkles } from 'lucide-react';
@@ -42,11 +44,11 @@ export default function Tags({
   edit: (p: Project, d: string) => void;
   notify: (m: string) => void;
   focusTagId?: number | null;
-  onFocusHandled?:()=>void;
+  onFocusHandled?: () => void;
   onAssignSound?: (cue: CueName, ref: LocalCueReference) => void;
-  onResources?:()=>void;
-  onNativeEditor?:()=>void;
-  hasUnsavedChanges?:boolean;
+  onResources?: () => void;
+  onNativeEditor?: () => void;
+  hasUnsavedChanges?: boolean;
 }) {
   const [query, setQuery] = useMapState(project.id,'tags.query','');
   const [filter, setFilter] = useMapState(project.id,'tags.filter','all');
@@ -94,6 +96,13 @@ export default function Tags({
   }, [focusTagId, inspection?.sha256]);
   const tags = inspection?.tags ?? [];
   const selectedTag = tags.find((t) => t.id === selected);
+  const selectedModel = useMemo(
+    () =>
+      selectedTag?.class === 'mod2' && project.source
+        ? { tagId: selectedTag.id, sourceProjectId: project.id, sourceSha256: project.source.sha256 }
+        : catalogAssets({ project, inspection }).find((asset) => asset.tagId === selectedTag?.id),
+    [project.id, inspection, selectedTag?.id],
+  );
   const classes = useMemo(() => [...new Set(tags.map((t) => t.class))].sort(), [tags]);
   const shown = useMemo(
     () =>
@@ -145,19 +154,25 @@ export default function Tags({
           <strong>Tag browser</strong>
           <Pill>{formatNumber(tags.length)}</Pill>
         </div>
-        <label className="section-label" htmlFor="tag-map-select">Map source</label>
+        <label className="section-label" htmlFor="tag-map-select">
+          Map source
+        </label>
         <select
           id="tag-map-select"
           className="class-filter"
           aria-label="Select Halo map"
           value={project.id}
-          onChange={(e) => { if (e.target.value !== project.id) onSelectMap(e.target.value); }}
+          onChange={(e) => {
+            if (e.target.value !== project.id) onSelectMap(e.target.value);
+          }}
         >
-          {entries.filter((entry) => entry.tagCount > 0 || entry.id === project.id).map((entry) => (
-            <option key={entry.id} value={entry.id}>
-              {entry.title} · {entry.engine}
-            </option>
-          ))}
+          {entries
+            .filter((entry) => entry.tagCount > 0 || entry.id === project.id)
+            .map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.title} · {entry.engine}
+              </option>
+            ))}
         </select>
         <div className="panel-search">
           <Search size={14} />
@@ -167,7 +182,8 @@ export default function Tags({
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              const value=e.target.value.toLowerCase();if(value.trim())setExpanded(old=>({...old,...Object.fromEntries(tags.filter(tag=>tag.path.toLowerCase().includes(value)||tag.class.toLowerCase().includes(value)).map(tag=>[tag.class,true]))}));
+              const value=e.target.value.toLowerCase();
+              if(value.trim())setExpanded(old=>({...old,...Object.fromEntries(tags.filter(tag=>tag.path.toLowerCase().includes(value)||tag.class.toLowerCase().includes(value)).map(tag=>[tag.class,true]))}));
             }}
           />
         </div>
@@ -187,9 +203,18 @@ export default function Tags({
             </option>
           ))}
         </select>
-        <div className="tag-tree-actions"><button className="small-button" onClick={()=>setExpanded(Object.fromEntries(classes.map(c=>[c,false])))}>Collapse all classes</button></div>
+        <div className="tag-tree-actions">
+          <button
+            className="small-button"
+            onClick={() => setExpanded(Object.fromEntries(classes.map((c) => [c, false])))}
+          >
+            Collapse all classes
+          </button>
+        </div>
         <div className="tag-list" aria-label="Tags by class">
-          {grouped.map(([c,members])=>{const open=expanded[c]??(!!query.trim()||filter===c||selectedTag?.class===c);return <div className="tag-class-group" key={c}>
+          {grouped.map(([c, members]) => {
+            const open=expanded[c]??(!!query.trim()||filter===c||selectedTag?.class===c);
+            return <div className="tag-class-group" key={c}>
             <button className="tag-class-toggle" aria-label={`Toggle ${classNames[c]??c} class (${c})`} aria-expanded={open} aria-controls={`tag-class-${c}`} onClick={()=>setExpanded(old=>({...old,[c]:!open}))}>
               <ChevronRight size={14} className={open?'expanded':''}/><strong>{classNames[c]??c}</strong><code>{c}</code><span>{formatNumber(members.length)}</span>
             </button>
@@ -208,18 +233,34 @@ export default function Tags({
               {project.tagEdits.some((e) => e.tagId === t.id) && <span className="edit-dot" />}
             </button>
           ))}</div>}
-          </div>;})}
+          </div>;
+          })}
           {shown.length === 0 && <div className="list-empty">No tags match this search.</div>}
         </div>
         <div className="panel-foot">{shown.length} matching · indexed from cache</div>
       </aside>
       <section className="tag-detail">
-        {inspection.header.scenarioType===2&&<Notice>
-          Interface map · browse its actual widgets, HUD definitions, fonts, strings and bitmap dependencies here.
-          Widget links are followed one at a time, including cyclic collections. Game event handlers remain engine-controlled.
-        </Notice>}
+        {inspection.header.scenarioType === 2 && (
+          <Notice>
+            Interface map · browse its actual widgets, HUD definitions, fonts, strings and bitmap dependencies
+            here. Widget links are followed one at a time, including cyclic collections. Game event handlers
+            remain engine-controlled.
+          </Notice>
+        )}
         {selectedTag ? (
           <>
+            {selectedModel && (
+              <details className="tag-model-preview" open>
+                <summary>Actual model preview</summary>
+                <div style={{ height: 210 }}>
+                  <NativeModelPreview
+                    key={selectedModel.tagId}
+                    asset={selectedModel}
+                    environment={project.worldEnvironment}
+                  />
+                </div>
+              </details>
+            )}
             <div className="tag-detail-heading">
               <div className="eyebrow">
                 {classNames[selectedTag.class] ?? 'Tag'} · {selectedTag.class}
@@ -233,71 +274,185 @@ export default function Tags({
                   {selectedTag.fields.length ? 'Typed fields available' : 'Inspection only'}
                 </Pill>
               </div>
-              <details className="tag-secondary-actions"><summary>Extract, export or transfer tags</summary><div className="tag-exchange-actions">
-                <button type="button" className="small-button" title="Exports tag identities and dependency references in JSON, not actual Halo tag or texture bytes. Importers must verify source hash and cache version." onClick={() => {
-                  try {
-                    const bundle=createTagExchangeBundle({project,inspection},[selectedTag.id]);
-                    downloadLocalText(`gs_tag_${selectedTag.class.replace(/[^A-Za-z0-9]/g,'_')}_${selectedTag.id.toString(16)}.json`,JSON.stringify(bundle,null,2),'application/json');
-                    notify('Tag identity and dependency references exported. This is not an extracted .tag file.');
-                  } catch (error) {notify(`Reference export failed: ${String(error)}`);}
-                }}>Export tag reference + dependencies</button>
-                <button type="button" className="small-button" title="Opt-in Invader process extracts actual compatible tag files to a separate managed directory; this never edits the original .map or target scenario." disabled={!native || !project.source || extractingTag!==null}
-                  onClick={async()=>{
-                    if (!selectedTag) return;
-                    setExtractingTag(selectedTag.id);
-                    setExtractionReceipt(null);
-                    try {
-                      const receipt=await call<NonNullable<typeof extractionReceipt>>('extract_selected_tag_tree', {
-                        projectId:project.id,tagId:selectedTag.id,
-                      });
-                      setExtractionReceipt(receipt);
-                      await refreshTagExchanges();
-                      notify(`Invader extracted ${receipt.files.length} real tag files to an isolated local folder. Not imported into any other map.`);
-                    } catch(error){notify(`Actual tag extraction rejected: ${String(error)}`);}
-                    finally{setExtractingTag(null);}
-                  }}>{extractingTag===selectedTag.id ? 'Extracting…' : 'Extract real .tag + dependencies (Invader)'}</button>
-                <span className="subtle">Requires owner-installed Invader in Settings and matching original resource maps. Actual extraction is opt-in and never overwrites game tags.</span>
-                {extractionReceipt &&
-                  <div className="tag-extraction-receipt" role="status">
-                    <strong>{extractionReceipt.files.length} files / {formatNumber(extractionReceipt.totalBytes)} bytes · {extractionReceipt.status}</strong>
-                    <code>{extractionReceipt.tagRoot}</code>
-                    <button type="button" className="small-button" onClick={async()=>{
-                      try{await call('reveal_folder',{kind:'tagExchange',id:extractionReceipt.jobId});}
-                      catch(error){notify(`Cannot open extracted folder: ${String(error)}`);}
-                    }}>Open isolated extracted tags</button>
-                    <span>{extractionReceipt.notice}</span>
-                  </div>}
-                {native && project.source && <div className="tag-staging-panel">
-                  <strong>Cross-map .tag staging (isolated, no scenario edits)</strong>
-                  <button type="button" className="small-button" title="Re-check extraction job receipts stored in Guilty Spark managed storage. No files are copied." disabled={stagingTag} onClick={()=>void refreshTagExchanges()}>Refresh extracted source jobs</button>
-                  <select aria-label="Select extracted tag tree from another compatible map" value={selectedExchange}
-                    onChange={e=>{setSelectedExchange(e.target.value);setStagedReceipt(null);}}>
-                    <option value="">Choose extracted tags from another map</option>
-                    {exchangeJobs.filter(j=>j.sourceProjectId!==project.id && j.sourceEngine===project.source?.engine && j.sourceVersion===project.source?.cacheVersion).map(j=>(
-                      <option key={j.jobId} value={j.jobId}>{j.requestedTag} · {j.fileCount} files · {j.sourceSha256.slice(0,12)}</option>
-                    ))}
-                  </select>
-                  <button type="button" className="small-button" title="Verify original tag and dependency hashes, then copy the tag tree into a new isolated destination folder. Never merges into a scenario or stock installation." disabled={!selectedExchange || stagingTag} onClick={async()=>{
-                    setStagingTag(true);setStagedReceipt(null);
-                    try {
-                      const result=await call<NonNullable<typeof stagedReceipt>>('stage_tag_exchange_into_project',{projectId:project.id,sourceJobId:selectedExchange});
-                      setStagedReceipt(result);
-                      notify(`Copied ${result.fileCount} verified .tag files into an isolated local staging area. Scenario unchanged.`);
-                    }catch(error){notify(`Cross-map tag staging refused: ${String(error)}`);}
-                    finally{setStagingTag(false);}
-                  }}>{stagingTag ? 'Verifying and staging…' : 'Stage verified tags in this project'}</button>
-                  {stagedReceipt && <div className="tag-extraction-receipt" role="status">
-                    <strong>{stagedReceipt.status} · {stagedReceipt.fileCount} verified tag files</strong>
-                    <code>{stagedReceipt.tagRoot}</code>
-                    <button type="button" className="small-button" onClick={async()=>{
-                      try{await call('reveal_folder',{kind:'tagImport',id:`${project.id}:${stagedReceipt.jobId}`});}
-                      catch(error){notify(`Could not open staging directory: ${String(error)}`);}
-                    }}>Open isolated imported tags</button>
-                    <span>{stagedReceipt.notice}</span>
-                  </div>}
-                  <span className="subtle">Same Halo engine/cache version only. All tag bytes are re-hashed before and after copying into new managed storage. You must still resolve dependencies and compile a compatible scenario.</span>
-                </div>}
-              </div></details>
+              <details className="tag-secondary-actions">
+                <summary>Extract, export or transfer tags</summary>
+                <div className="tag-exchange-actions">
+                  <button
+                    type="button"
+                    className="small-button"
+                    title="Exports tag identities and dependency references in JSON, not actual Halo tag or texture bytes. Importers must verify source hash and cache version."
+                    onClick={() => {
+                      try {
+                        const bundle = createTagExchangeBundle({ project, inspection }, [selectedTag.id]);
+                        downloadLocalText(
+                          `gs_tag_${selectedTag.class.replace(/[^A-Za-z0-9]/g, '_')}_${selectedTag.id.toString(16)}.json`,
+                          JSON.stringify(bundle, null, 2),
+                          'application/json',
+                        );
+                        notify(
+                          'Tag identity and dependency references exported. This is not an extracted .tag file.',
+                        );
+                      } catch (error) {
+                        notify(`Reference export failed: ${String(error)}`);
+                      }
+                    }}
+                  >
+                    Export tag reference + dependencies
+                  </button>
+                  <button
+                    type="button"
+                    className="small-button"
+                    title="Opt-in Invader process extracts actual compatible tag files to a separate managed directory; this never edits the original .map or target scenario."
+                    disabled={!native || !project.source || extractingTag !== null}
+                    onClick={async () => {
+                      if (!selectedTag) return;
+                      setExtractingTag(selectedTag.id);
+                      setExtractionReceipt(null);
+                      try {
+                        const receipt = await call<NonNullable<typeof extractionReceipt>>(
+                          'extract_selected_tag_tree',
+                          {
+                            projectId: project.id,
+                            tagId: selectedTag.id,
+                          },
+                        );
+                        setExtractionReceipt(receipt);
+                        await refreshTagExchanges();
+                        notify(
+                          `Invader extracted ${receipt.files.length} real tag files to an isolated local folder. Not imported into any other map.`,
+                        );
+                      } catch (error) {
+                        notify(`Actual tag extraction rejected: ${String(error)}`);
+                      } finally {
+                        setExtractingTag(null);
+                      }
+                    }}
+                  >
+                    {extractingTag === selectedTag.id
+                      ? 'Extracting…'
+                      : 'Extract real .tag + dependencies (Invader)'}
+                  </button>
+                  <span className="subtle">
+                    Requires owner-installed Invader in Settings and matching original resource maps. Actual
+                    extraction is opt-in and never overwrites game tags.
+                  </span>
+                  {extractionReceipt && (
+                    <div className="tag-extraction-receipt" role="status">
+                      <strong>
+                        {extractionReceipt.files.length} files / {formatNumber(extractionReceipt.totalBytes)}{' '}
+                        bytes · {extractionReceipt.status}
+                      </strong>
+                      <code>{extractionReceipt.tagRoot}</code>
+                      <button
+                        type="button"
+                        className="small-button"
+                        onClick={async () => {
+                          try {
+                            await call('reveal_folder', { kind: 'tagExchange', id: extractionReceipt.jobId });
+                          } catch (error) {
+                            notify(`Cannot open extracted folder: ${String(error)}`);
+                          }
+                        }}
+                      >
+                        Open isolated extracted tags
+                      </button>
+                      <span>{extractionReceipt.notice}</span>
+                    </div>
+                  )}
+                  {native && project.source && (
+                    <div className="tag-staging-panel">
+                      <strong>Cross-map .tag staging (isolated, no scenario edits)</strong>
+                      <button
+                        type="button"
+                        className="small-button"
+                        title="Re-check extraction job receipts stored in Guilty Spark managed storage. No files are copied."
+                        disabled={stagingTag}
+                        onClick={() => void refreshTagExchanges()}
+                      >
+                        Refresh extracted source jobs
+                      </button>
+                      <select
+                        aria-label="Select extracted tag tree from another compatible map"
+                        value={selectedExchange}
+                        onChange={(e) => {
+                          setSelectedExchange(e.target.value);
+                          setStagedReceipt(null);
+                        }}
+                      >
+                        <option value="">Choose extracted tags from another map</option>
+                        {exchangeJobs
+                          .filter(
+                            (j) =>
+                              j.sourceProjectId !== project.id &&
+                              j.sourceEngine === project.source?.engine &&
+                              j.sourceVersion === project.source?.cacheVersion,
+                          )
+                          .map((j) => (
+                            <option key={j.jobId} value={j.jobId}>
+                              {j.requestedTag} · {j.fileCount} files · {j.sourceSha256.slice(0, 12)}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="small-button"
+                        title="Verify original tag and dependency hashes, then copy the tag tree into a new isolated destination folder. Never merges into a scenario or stock installation."
+                        disabled={!selectedExchange || stagingTag}
+                        onClick={async () => {
+                          setStagingTag(true);
+                          setStagedReceipt(null);
+                          try {
+                            const result = await call<NonNullable<typeof stagedReceipt>>(
+                              'stage_tag_exchange_into_project',
+                              { projectId: project.id, sourceJobId: selectedExchange },
+                            );
+                            setStagedReceipt(result);
+                            notify(
+                              `Copied ${result.fileCount} verified .tag files into an isolated local staging area. Scenario unchanged.`,
+                            );
+                          } catch (error) {
+                            notify(`Cross-map tag staging refused: ${String(error)}`);
+                          } finally {
+                            setStagingTag(false);
+                          }
+                        }}
+                      >
+                        {stagingTag ? 'Verifying and staging…' : 'Stage verified tags in this project'}
+                      </button>
+                      {stagedReceipt && (
+                        <div className="tag-extraction-receipt" role="status">
+                          <strong>
+                            {stagedReceipt.status} · {stagedReceipt.fileCount} verified tag files
+                          </strong>
+                          <code>{stagedReceipt.tagRoot}</code>
+                          <button
+                            type="button"
+                            className="small-button"
+                            onClick={async () => {
+                              try {
+                                await call('reveal_folder', {
+                                  kind: 'tagImport',
+                                  id: `${project.id}:${stagedReceipt.jobId}`,
+                                });
+                              } catch (error) {
+                                notify(`Could not open staging directory: ${String(error)}`);
+                              }
+                            }}
+                          >
+                            Open isolated imported tags
+                          </button>
+                          <span>{stagedReceipt.notice}</span>
+                        </div>
+                      )}
+                      <span className="subtle">
+                        Same Halo engine/cache version only. All tag bytes are re-hashed before and after
+                        copying into new managed storage. You must still resolve dependencies and compile a
+                        compatible scenario.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </details>
             </div>
             <div className="field-table">
               <div className="field-table-title">
@@ -307,12 +462,36 @@ export default function Tags({
                   Show offsets
                 </label>
               </div>
-              <TagFields project={project} tag={selectedTag} tags={tags} advanced={advanced} change={(field,value)=>change(selectedTag,field,value)} />
-              <details className="tag-native-editing"><summary>Complete native tag editing</summary><p>Spark edits the typed fields indexed above. Extract this tag and its dependencies for a full source tagset, then open the matching native tag editor. Unknown cache fields remain preserved. Build the working tags to apply full-schema changes.</p>{onNativeEditor&&<button disabled={!native} onClick={onNativeEditor}>Open native tag editor</button>}</details>
+              <TagFields
+                project={project}
+                tag={selectedTag}
+                tags={tags}
+                advanced={advanced}
+                change={(field, value) => change(selectedTag, field, value)}
+              />
+              <details className="tag-native-editing">
+                <summary>Complete native tag editing</summary>
+                <p>
+                  Spark edits the typed fields indexed above. Extract this tag and its dependencies for a full
+                  source tagset, then open the matching native tag editor. Unknown cache fields remain
+                  preserved. Build the working tags to apply full-schema changes.
+                </p>
+                {onNativeEditor && (
+                  <button disabled={!native} onClick={onNativeEditor}>
+                    Open native tag editor
+                  </button>
+                )}
+              </details>
             </div>
-            <BaboonTools project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges}/>
-            <NativeTagOperations project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges}/>
-            <TagDuplicatePanel key={`duplicate:${project.id}:${selectedTag.id}`} project={project} inspection={inspection} source={selectedTag} edit={edit} />
+            <BaboonTools project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} />
+            <NativeTagOperations project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} />
+            <TagDuplicatePanel
+              key={`duplicate:${project.id}:${selectedTag.id}`}
+              project={project}
+              inspection={inspection}
+              source={selectedTag}
+              edit={edit}
+            />
             {projectile && rocket && (
               <div className="preset-bar">
                 <div>
@@ -329,7 +508,20 @@ export default function Tags({
               </div>
             )}
             {selectedTag.class === 'snd!' && (
-              <>{onResources&&<button className="small-button" onClick={onResources}>Locate Halo Sounds folder</button>}<Sound key={`${selectedTag.id}:${JSON.stringify(project.source?.audioResources??project.source?.resourceSha256)}`} projectId={project.id} tagId={selectedTag.id} sourceHash={project.source?.sha256 ?? ''} onAssign={onAssignSound} /></>
+              <>
+                {onResources && (
+                  <button className="small-button" onClick={onResources}>
+                    Locate Halo Sounds folder
+                  </button>
+                )}
+                <Sound
+                  key={`${selectedTag.id}:${JSON.stringify(project.source?.audioResources ?? project.source?.resourceSha256)}`}
+                  projectId={project.id}
+                  tagId={selectedTag.id}
+                  sourceHash={project.source?.sha256 ?? ''}
+                  onAssign={onAssignSound}
+                />
+              </>
             )}
             {selectedTag.references.length > 0 && (
               <div className="reference-list">
@@ -354,8 +546,20 @@ export default function Tags({
                 })}
               </div>
             )}
-            <TagLineageInspector key={`lineage:${project.id}:${selectedTag.id}`} project={project} inspection={inspection} tag={selectedTag} onNavigate={navigateToTag} notify={notify} />
-            <TagMigrationReviewPanel key={`migration:${project.id}:${inspection.sha256}`} project={project} inspection={inspection} notify={notify} />
+            <TagLineageInspector
+              key={`lineage:${project.id}:${selectedTag.id}`}
+              project={project}
+              inspection={inspection}
+              tag={selectedTag}
+              onNavigate={navigateToTag}
+              notify={notify}
+            />
+            <TagMigrationReviewPanel
+              key={`migration:${project.id}:${inspection.sha256}`}
+              project={project}
+              inspection={inspection}
+              notify={notify}
+            />
             <Notice tone="info">
               Edits are stored in your .gsproject. The source map stays unchanged. Use Build &amp; Playtest to
               extract, rebuild and validate the edited cache.

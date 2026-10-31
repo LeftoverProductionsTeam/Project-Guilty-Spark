@@ -1,6 +1,15 @@
 /** Version-specific observations; unknown writers are not promoted to tool defects. */
 export const toolFindings = [
   {
+    tool: 'Invader · recursive native tag rename',
+    version: '0.55.0.r4134.33518109 / Windows',
+    status: 'Long-path failure observed · guarded import',
+    detail:
+      'The real recursive asset-drop test reported file-copy failures on long names while invader-refactor returned zero. Spark rejected the missing native output; no map placement was committed. This is a path-handling failure, not evidence that original map bytes were corrupted.',
+    action:
+      'Spark uses an owned temporary short-path alias, checks per-tag diagnostics and verifies every renamed dependency before accepting an import. Failed research jobs remain separate from project edits.',
+  },
+  {
     tool: 'Baboon',
     version: '0.3.2 / reviewed Windows build',
     status: 'Passed scoped test',

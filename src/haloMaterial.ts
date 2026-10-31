@@ -7,11 +7,22 @@ import type {ShaderPreview} from './types';
 import {sunlightPosition} from './environment';
 import {applyHaloBlend,genericCombiner,haloWaveGlsl} from './haloTransparency';
 export const extraTextureKey=(id:number,role:string)=>`${id}:${role}`;
-const vertex=`varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;
+const vertex = `varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;
 attribute vec2 uv1;
-void main(){haloUv=uv;haloLightUv=uv1;haloNormal=normalize(normalMatrix*normal);vec4 view=modelViewMatrix*vec4(position,1.0);haloView=view.xyz;haloDepth=-view.z;gl_Position=projectionMatrix*view;}`;
-const fragment=`
+#ifdef USE_COLOR
+varying vec3 haloVertexColor;
+#endif
+void main(){
+#ifdef USE_COLOR
+haloVertexColor=color;
+#endif
+haloUv=uv;haloLightUv=uv1;haloNormal=normalize(normalMatrix*normal);vec4 view=modelViewMatrix*vec4(position,1.0);haloView=view.xyz;haloDepth=-view.z;gl_Position=projectionMatrix*view;}`;
+const fragment = `
 varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;
+#ifdef USE_COLOR
+varying vec3 haloVertexColor;
+#endif
+uniform samplerCube reflectionCube;uniform bool hasReflection;uniform mat3 viewToWorld;uniform vec2 reflectionBrightness,reflectionRange;uniform vec3 reflectionPerpTint,reflectionParallelTint;
 uniform sampler2D baseMap,lightMap,primaryDetail,secondaryDetail,microDetail,alphaMask,layer1,layer2,layer3;
 uniform bool hasLight,hasPrimary,hasSecondary,hasMicro,hasMask,alphaTest,baseEncoded,alphaBlended;
 uniform int kind,shaderType,detailFunction,microFunction,layerCount;
@@ -78,14 +89,26 @@ void main(){
       if(enhancedSelfIllum)base.rgb+=surface*masks.g*selfIllumStrength;
       if(enhancedSpecular){float mask=multipurposeXbox?masks.r:masks.b;vec3 halfVector=normalize(normalize(lightDirection)+normalize(-haloView));base.rgb+=sunFill*mask*pow(max(0.0,dot(n,halfVector)),32.0)*specularStrength;}}
     if(overrideLighting)base.rgb*=ambientFill+sunFill*max(0.0,dot(n,normalize(lightDirection)));
+    if(hasReflection){vec3 reflected=viewToWorld*reflect(normalize(haloView),n);float grazing=1.0-clamp(dot(normalize(-haloView),n),0.0,1.0);float brightness=mix(reflectionBrightness.x,reflectionBrightness.y,grazing);vec3 tint=mix(reflectionPerpTint,reflectionParallelTint,grazing);
+      float mask=1.0;if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);mask=multipurposeXbox?masks.r:masks.b;}
+      float fade=reflectionRange.y>0.0?1.0-clamp((length(haloView)-reflectionRange.x)/max(.001,reflectionRange.y-reflectionRange.x),0.0,1.0):1.0;
+      base.rgb+=textureCube(reflectionCube,reflected).rgb*tint*brightness*mask*fade;}
     if(!alphaBlended)base.a=1.0;
   }
   if(fogEnabled){float amount=clamp((haloDepth-fogNear)/max(0.001,fogFar-fogNear),0.0,1.0)*fogMaximum;
     if(kind>=2){/* TRANSPARENT_FOG */}else base.rgb=mix(base.rgb,fogColor,amount);}
+  #ifdef USE_COLOR
+  base.rgb*=haloVertexColor;
+  #endif
   gl_FragColor=linearOutput?sRGBTransferEOTF(base):base;
 }`;
-export function createHaloMaterial(base:THREE.Texture,light:THREE.Texture|null,metadata:ShaderPreview|undefined,
-  extra:Record<string,THREE.Texture>,sky=false):THREE.ShaderMaterial {
+export function createHaloMaterial(
+  base: THREE.Texture,
+  light: THREE.Texture | null,
+  metadata: ShaderPreview | undefined,
+  extra: Record<string, THREE.Texture>,
+  sky = false,
+): THREE.ShaderMaterial {
   const m=metadata,layerCount=Math.min(4,m?.layers?.length??1),kind=m?.kind==='generic'?3:m?.kind==='chicago'?2:m?.kind==='model'?1:0;
   const blend=m?.framebufferBlend??0;
   const fogCode=blend===1||blend===2?`base.rgb=mix(base.rgb,vec3(${blend===1?'1.0':'0.5'}),amount);`:
@@ -102,37 +125,105 @@ export function createHaloMaterial(base:THREE.Texture,light:THREE.Texture|null,m
     if(flags&1){texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestMipmapNearestFilter;}
     texture.needsUpdate=true;samplers.push(texture);return texture;
   };
-  const material=new THREE.ShaderMaterial({vertexShader:vertex,fragmentShader:fragment.replace('/* GENERIC_COMBINER */',genericCombiner(m)).replace('/* TRANSPARENT_FOG */',fogCode),
-    side:m?.twoSided===false?THREE.FrontSide:THREE.DoubleSide,toneMapped:false,transparent:kind>=2||!!m?.alphaBlended,
-    depthWrite:!sky&&kind<2&&!m?.alphaBlended,polygonOffset:!!m?.decal,polygonOffsetFactor:-1,polygonOffsetUnits:-1,
-    uniforms:{baseMap:{value:kind>=2?stageTexture(base,0):base},lightMap:{value:light??base},
-      primaryDetail:{value:extra.primaryDetail??base},secondaryDetail:{value:extra.secondaryDetail??base},microDetail:{value:extra.microDetail??base},alphaMask:{value:extra.alphaMask??base},
-      layer1:{value:stageTexture(extra.layer1??base,1)},layer2:{value:stageTexture(extra.layer2??base,2)},layer3:{value:stageTexture(extra.layer3??base,3)},
-      hasLight:{value:!!light},hasPrimary:{value:!!extra.primaryDetail},hasSecondary:{value:!!extra.secondaryDetail},hasMicro:{value:!!extra.microDetail},hasMask:{value:!!extra.alphaMask},
-      alphaTest:{value:!!m?.alphaTest},alphaBlended:{value:!!m?.alphaBlended},baseEncoded:{value:!!base.userData.sourceEncoded},kind:{value:kind},shaderType:{value:m?.shaderType??0},
-      detailFunction:{value:m?.detailFunction??0},microFunction:{value:m?.microDetailFunction??0},detailScales:{value:new THREE.Vector3(...(m?.detailScales??[1,1,1]))},
-      baseScale:{value:new THREE.Vector2(...(m?.uvScale??[1,1]))},layerCount:{value:layerCount},
-      layerScale:{value:Array.from({length:4},(_,i)=>new THREE.Vector2(...(m?.layers?.[i]?.uvScale??[1,1])))},
-      layerOffset:{value:Array.from({length:4},(_,i)=>new THREE.Vector2(...(m?.layers?.[i]?.uvOffset??[0,0])))},
-      layerRotation:{value:Array.from({length:4},(_,i)=>m?.layers?.[i]?.rotation??0)},
-      rotationCenter:{value:Array.from({length:4},(_,i)=>new THREE.Vector2(...(m?.layers?.[i]?.rotationCenter??[.5,.5])))},
-      motionU:{value:motion(0)},motionV:{value:motion(1)},motionRotation:{value:motion(2)},time:{value:0},
-      layerFlags:{value:Array.from({length:4},(_,i)=>m?.layers?.[i]?.flags??0)},
-      colorFunction:{value:Array.from({length:4},(_,i)=>m?.layers?.[i]?.colorFunction??0)},alphaFunction:{value:Array.from({length:4},(_,i)=>m?.layers?.[i]?.alphaFunction??0)},
-      fogEnabled:{value:false},fogColor:{value:new THREE.Color()},fogNear:{value:0},fogFar:{value:1},fogMaximum:{value:1},
-      overrideLighting:{value:false},lightDirection:{value:new THREE.Vector3()},ambientFill:{value:new THREE.Vector3()},sunFill:{value:new THREE.Vector3()}}});
+  const reflection = m?.reflection;
+  const material = new THREE.ShaderMaterial({
+    vertexShader: vertex,
+    fragmentShader: fragment
+      .replace('/* GENERIC_COMBINER */', genericCombiner(m))
+      .replace('/* TRANSPARENT_FOG */', fogCode),
+    side: m?.twoSided === false ? THREE.FrontSide : THREE.DoubleSide,
+    toneMapped: false,
+    transparent: kind >= 2 || !!m?.alphaBlended,
+    depthWrite: !sky && kind < 2 && !m?.alphaBlended,
+    polygonOffset: !!m?.decal,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+    uniforms: {
+      reflectionCube: { value: extra.reflectionCube ?? null },
+      hasReflection: { value: !!extra.reflectionCube && !!reflection },
+      viewToWorld: { value: new THREE.Matrix3() },
+      reflectionBrightness: {
+        value: new THREE.Vector2(
+          reflection?.perpendicularBrightness ?? 0,
+          reflection?.parallelBrightness ?? 0,
+        ),
+      },
+      reflectionRange: { value: new THREE.Vector2(reflection?.falloff ?? 0, reflection?.cutoff ?? 0) },
+      reflectionPerpTint: { value: new THREE.Vector3(...(reflection?.perpendicularTint ?? [1, 1, 1])) },
+      reflectionParallelTint: { value: new THREE.Vector3(...(reflection?.parallelTint ?? [1, 1, 1])) },
+      baseMap: { value: kind >= 2 ? stageTexture(base, 0) : base },
+      lightMap: { value: light ?? base },
+      primaryDetail: { value: extra.primaryDetail ?? base },
+      secondaryDetail: { value: extra.secondaryDetail ?? base },
+      microDetail: { value: extra.microDetail ?? base },
+      alphaMask: { value: extra.alphaMask ?? base },
+      layer1: { value: stageTexture(extra.layer1 ?? base, 1) },
+      layer2: { value: stageTexture(extra.layer2 ?? base, 2) },
+      layer3: { value: stageTexture(extra.layer3 ?? base, 3) },
+      hasLight: { value: !!light },
+      hasPrimary: { value: !!extra.primaryDetail },
+      hasSecondary: { value: !!extra.secondaryDetail },
+      hasMicro: { value: !!extra.microDetail },
+      hasMask: { value: !!extra.alphaMask },
+      alphaTest: { value: !!m?.alphaTest },
+      alphaBlended: { value: !!m?.alphaBlended },
+      baseEncoded: { value: !!base.userData.sourceEncoded },
+      kind: { value: kind },
+      shaderType: { value: m?.shaderType ?? 0 },
+      detailFunction: { value: m?.detailFunction ?? 0 },
+      microFunction: { value: m?.microDetailFunction ?? 0 },
+      detailScales: { value: new THREE.Vector3(...(m?.detailScales ?? [1, 1, 1])) },
+      baseScale: { value: new THREE.Vector2(...(m?.uvScale ?? [1, 1])) },
+      layerCount: { value: layerCount },
+      layerScale: {
+        value: Array.from({ length: 4 }, (_, i) => new THREE.Vector2(...(m?.layers?.[i]?.uvScale ?? [1, 1]))),
+      },
+      layerOffset: {
+        value: Array.from(
+          { length: 4 },
+          (_, i) => new THREE.Vector2(...(m?.layers?.[i]?.uvOffset ?? [0, 0])),
+        ),
+      },
+      layerRotation: { value: Array.from({ length: 4 }, (_, i) => m?.layers?.[i]?.rotation ?? 0) },
+      rotationCenter: {
+        value: Array.from(
+          { length: 4 },
+          (_, i) => new THREE.Vector2(...(m?.layers?.[i]?.rotationCenter ?? [0.5, 0.5])),
+        ),
+      },
+      motionU: { value: motion(0) },
+      motionV: { value: motion(1) },
+      motionRotation: { value: motion(2) },
+      time: { value: 0 },
+      layerFlags: { value: Array.from({ length: 4 }, (_, i) => m?.layers?.[i]?.flags ?? 0) },
+      colorFunction: { value: Array.from({ length: 4 }, (_, i) => m?.layers?.[i]?.colorFunction ?? 0) },
+      alphaFunction: { value: Array.from({ length: 4 }, (_, i) => m?.layers?.[i]?.alphaFunction ?? 0) },
+      fogEnabled: { value: false },
+      fogColor: { value: new THREE.Color() },
+      fogNear: { value: 0 },
+      fogFar: { value: 1 },
+      fogMaximum: { value: 1 },
+      overrideLighting: { value: false },
+      lightDirection: { value: new THREE.Vector3() },
+      ambientFill: { value: new THREE.Vector3() },
+      sunFill: { value: new THREE.Vector3() },
+    },
+  });
   Object.assign(material.uniforms,{normalMap:{value:extra.normalMap??base},multipurpose:{value:extra.multipurpose??base},
     hasNormal:{value:!!extra.normalMap},hasMultipurpose:{value:!!extra.multipurpose},multipurposeXbox:{value:!!m?.multipurposeXbox},linearOutput:{value:false},
     enhancedNormal:{value:false},enhancedSpecular:{value:false},enhancedSelfIllum:{value:false},normalScale:{value:m?.bumpScale||1},normalStrength:{value:1},specularStrength:{value:.35},selfIllumStrength:{value:1}});
   if(extra.normalMap&&!extra.alphaMask){material.uniforms.alphaMask.value=extra.normalMap;material.uniforms.hasMask.value=true;}
-  material.userData.haloSource=true;material.userData.sky=sky;
+  material.userData.haloSource=true;
+  material.userData.sky=sky;
   material.addEventListener('dispose',()=>samplers.forEach(texture=>texture.dispose()));
   if(kind>=2||m?.alphaBlended)applyHaloBlend(material,blend);
   return material;
 }
-export function updateHaloMaterial(material:THREE.Material,scene:THREE.Scene,camera:THREE.Camera){
-  if(!material.userData.haloSource)return;const m=material as THREE.ShaderMaterial,fog=scene.fog as (THREE.Fog&{maximumDensity?:number})|null;
+export function updateHaloMaterial(material: THREE.Material, scene: THREE.Scene, camera: THREE.Camera) {
+  if(!material.userData.haloSource)return;
+  const m=material as THREE.ShaderMaterial,fog=scene.fog as (THREE.Fog&{maximumDensity?:number})|null;
   m.uniforms.time.value=performance.now()/1000;
+  m.uniforms.viewToWorld.value.setFromMatrix4(camera.matrixWorld);
   m.uniforms.fogEnabled.value=!!fog&&!material.userData.sky;
   if(fog){m.uniforms.fogColor.value.copy(fog.color).convertLinearToSRGB();m.uniforms.fogNear.value=fog.near;m.uniforms.fogFar.value=fog.far;m.uniforms.fogMaximum.value=fog.maximumDensity??1;}
   const environment=scene.userData.gsEnvironment;
@@ -141,7 +232,9 @@ export function updateHaloMaterial(material:THREE.Material,scene:THREE.Scene,cam
   m.uniforms.enhancedNormal.value=!!features?.enabled&&!!features.normalMaps;
   m.uniforms.enhancedSpecular.value=!!features?.enabled&&!!features.specular;
   m.uniforms.enhancedSelfIllum.value=!!features?.enabled&&!!features.selfIllumination;
-  m.uniforms.normalStrength.value=features?.normalStrength??1;m.uniforms.specularStrength.value=features?.specularStrength??.35;m.uniforms.selfIllumStrength.value=features?.selfIllumStrength??1;
+  m.uniforms.normalStrength.value=features?.normalStrength??1;
+  m.uniforms.specularStrength.value=features?.specularStrength??.35;
+  m.uniforms.selfIllumStrength.value=features?.selfIllumStrength??1;
   m.uniforms.overrideLighting.value=!!environment?.overrideLighting&&!!environment?.value?.previewEnabled&&!material.userData.sky;
   if(environment?.value){const v=environment.value;m.uniforms.lightDirection.value.fromArray(sunlightPosition(v)).transformDirection(camera.matrixWorldInverse);
     m.uniforms.ambientFill.value.fromArray(v.ambientColor).multiplyScalar(v.ambientIntensity);m.uniforms.sunFill.value.fromArray(v.sunColor).multiplyScalar(v.sunIntensity);}

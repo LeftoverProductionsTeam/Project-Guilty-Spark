@@ -1,3 +1,4 @@
+import { SavePass } from 'three/examples/jsm/postprocessing/SavePass.js';
 import { Vector2,WebGLRenderTarget,HalfFloatType } from 'three';
 import type { WebGLRenderer, Scene, Camera } from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -14,6 +15,7 @@ export function createVisualPipeline(
   camera: Camera,
   withBloom: boolean,
   withDof: boolean,
+  preserveAlpha = false,
 ) {
   const target=new WebGLRenderTarget(1,1,{type:HalfFloatType});
   target.samples=gl.getContext().getContextAttributes()?.antialias?Math.min(4,gl.capabilities.maxSamples):0;
@@ -23,9 +25,12 @@ export function createVisualPipeline(
   const bokeh = withDof
     ? new BokehPass(scene, camera, { focus: 20, aperture: 0.0001, maxblur: 0.005 })
     : null;
+  const alpha = preserveAlpha ? new SavePass(new WebGLRenderTarget(1, 1, { type: HalfFloatType })) : null;
   const grade = new ShaderPass({
     uniforms: {
       tDiffuse: { value: null },
+      tAlpha: { value: alpha?.renderTarget.texture ?? null },
+      preserveAlpha: { value: preserveAlpha },
       exposure: { value: 1 },
       saturation: { value: 1 },
       contrast: { value: 1 },
@@ -34,15 +39,16 @@ export function createVisualPipeline(
     },
     vertexShader:
       'varying vec2 effectUv;void main(){effectUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-    fragmentShader: `varying vec2 effectUv;uniform sampler2D tDiffuse;uniform float exposure,saturation,contrast,vignette;uniform bool filmic;
+    fragmentShader: `varying vec2 effectUv;uniform sampler2D tDiffuse,tAlpha;uniform bool preserveAlpha;uniform float exposure,saturation,contrast,vignette;uniform bool filmic;
     vec3 displayColor(vec3 c){return mix(c*12.92,1.055*pow(max(c,vec3(0.0)),vec3(1.0/2.4))-.055,step(vec3(.0031308),c));}
     void main(){vec4 original=texture2D(tDiffuse,effectUv);vec3 c=max(original.rgb*exposure,vec3(0.0));
       if(filmic)c=clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.0,1.0);
       c=mix(vec3(dot(c,vec3(.2126,.7152,.0722))),c,saturation);c=(c-.18)*contrast+.18;
-      vec2 p=effectUv*2.0-1.0;c*=1.0-vignette*smoothstep(.25,1.4,dot(p,p));gl_FragColor=vec4(displayColor(c),original.a);}`,
+      vec2 p=effectUv*2.0-1.0;c*=1.0-vignette*smoothstep(.25,1.4,dot(p,p));float a=preserveAlpha?max(texture2D(tAlpha,effectUv).a,clamp(max(c.r,max(c.g,c.b))*1.3,0.0,.45)):original.a;gl_FragColor=vec4(displayColor(c),a);}`,
   });
   grade.material.toneMapped = false;
   composer.addPass(render);
+  if (alpha) composer.addPass(alpha);
   if (bloom) composer.addPass(bloom);
   if (bokeh) composer.addPass(bokeh);
   composer.addPass(grade);
@@ -78,6 +84,7 @@ export function createVisualPipeline(
       composer.setSize(width, height);
     },
     dispose() {
+      alpha?.dispose();
       render.dispose();
       bloom?.dispose();
       bokeh?.dispose();

@@ -11,6 +11,9 @@ use crate::{
     Result,
 };
 use std::collections::{HashMap, HashSet};
+#[path = "render_animation.rs"]
+mod animation;
+pub use animation::{object_animation_clips, NativeAnimations};
 
 const MAX_BSP_VERTICES: usize = 500_000;
 const MAX_MODEL_VERTICES: usize = 350_000;
@@ -465,6 +468,7 @@ pub fn object_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id:u32
     let r=Reader(bytes);let region=tag_space(&r,header)?;
     let mut object=tags.iter().find(|t|t.id==object_id&&!t.external)
         .ok_or_else(||crate::SparkError::Invalid("Object tag is missing or external".into()))?;
+    if object.class=="mod2" {return Ok((object.id,cached_model_mesh(bytes,header,tags,object.id)?));}
     if object.class=="itmc" {
         let at=object.data_offset.ok_or_else(||crate::SparkError::Invalid("Item collection body unavailable".into()))?;
         if at<region.begin||at.checked_add(12).is_none_or(|end|end>region.end){return invalid("Item collection body escapes tag region");}
@@ -486,6 +490,11 @@ pub fn preview_owned_object_model(path:&std::path::Path,expected:&str,inspection
     let (header,bytes,actual)=crate::maps::read_cache_snapshot(path)?;
     if actual!=expected||actual!=inspection.sha256{return invalid("Model source changed during inspection");}
     object_model_mesh(&bytes,&header,&inspection.tags,object_id,0)
+}
+pub fn preview_owned_object_animations(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<NativeAnimations>{
+    let (header,bytes,actual)=crate::maps::read_cache_snapshot(path)?;
+    if actual!=expected||actual!=inspection.sha256{return invalid("Animation source changed during inspection");}
+    object_animation_clips(&bytes,&header,&inspection.tags,object_id)
 }
 
 /// Read the actual first-permutation collision BSPs in the model's default

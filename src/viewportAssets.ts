@@ -1,6 +1,6 @@
 import type { MapDocument } from './mapDocuments';
 import type { Asset, Project, SceneObject, Vec3, MapInspection } from './types';
-import { catalogAssets, placeAsset } from './forge';
+import { catalogAssets, placeAsset, pointInsideForgeRoom } from './forge';
 import type { ForgeAsset, ForgePlacement } from './forge';
 import { call } from './api';
 import { createEmitter } from './spatialAudio';
@@ -113,7 +113,11 @@ export function placeLibraryModel(
   position: Vec3,
   replaceId?: string | null,
 ): { project: Project; selectedId: string } {
-  const point = checkedDropPoint(position);
+  let point = checkedDropPoint(position);
+  if (project.quickForge && !pointInsideForgeRoom(project.quickForge, point)) {
+    const lifted: [number, number, number] = [point[0], point[1], point[2] + 0.01];
+    if (pointInsideForgeRoom(project.quickForge, lifted)) point = lifted;
+  }
   if (!asset.sourceProjectId || !/^[a-f\d]{64}$/i.test(asset.sourceSha256) || !Number.isInteger(asset.tagId))
     throw Error('The model needs its original map and tag identity.');
   if (project.quickForge) {

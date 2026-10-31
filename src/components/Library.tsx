@@ -1,3 +1,4 @@
+import HomeModel from './HomeModel';
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -54,8 +55,17 @@ export default function Library({
         description="Discover, restore, and make something wonderfully unexpected."
         actions={
           <>
-            <button onClick={onFindMaps} title="Browse verified community archive homepages; download only in your browser"><Globe2 size={15} />Find community maps</button>
-            <button onClick={onNewMap}><Box size={15} />Create a map</button>
+            <button
+              onClick={onFindMaps}
+              title="Browse verified community archive homepages; download only in your browser"
+            >
+              <Globe2 size={15} />
+              Find community maps
+            </button>
+            <button onClick={onNewMap}>
+              <Box size={15} />
+              Create a map
+            </button>
             <button onClick={onNew}>
               <Plus size={15} />
               New workspace
@@ -74,8 +84,7 @@ export default function Library({
             THE PRESERVATION WORKBENCH
           </Pill>
           <h2>
-            Old worlds.{' '}
-            <br />
+            Old worlds. <br />
             <span>New possibilities.</span>
           </h2>
           <p>
@@ -83,27 +92,20 @@ export default function Library({
             workspace built for discovery.
           </p>
           <div className="gs-hero-actions">
-            <button className="hero-link" onClick={onImport} disabled={busy}>Open a .map or ZIP archive <ArrowRight size={17} /></button>
-            <button className="gs-hero-secondary" onClick={onFindMaps} title="Browse old HaloMods and current Halo map archives in an external browser">Find classic maps <Globe2 size={17}/></button>
+            <button className="hero-link" onClick={onImport} disabled={busy}>
+              Open a .map or ZIP archive <ArrowRight size={17} />
+            </button>
+            <button
+              className="gs-hero-secondary"
+              onClick={onFindMaps}
+              title="Browse old HaloMods and current Halo map archives in an external browser"
+            >
+              Find classic maps <Globe2 size={17} />
+            </button>
           </div>
         </div>
-        <div className="hero-art" aria-hidden="true">
-          <div className="orbital orbit-one" />
-          <div className="orbital orbit-two" />
-          <div className="orbital orbit-three" />
-          <div className="hero-orb">
-            <div className="orb-band" />
-            <div className="orb-eye">
-              <span />
-            </div>
-          </div>
-          <div className="art-coordinate">
-            GS / 001
-            <br />
-            ARCHIVE · EDIT · EVOLVE
-          </div>
-          <div className="art-cross cross-one">+</div>
-          <div className="art-cross cross-two">+</div>
+        <div className="hero-art" aria-label="Live Halo model showcase">
+          <HomeModel data={data} />
         </div>
       </section>
       {!data.installation.mccPath && (
@@ -245,8 +247,14 @@ export default function Library({
               : 'Drop a .map or ZIP archive into this window, browse for one, or place it in the local Inbox. Original files are always preserved.'}
           </p>
           <div className="gs-empty-map-actions">
-            <button onClick={onImport} disabled={busy}><FolderOpen size={15} />{busy ? 'Reading cache…' : 'Browse local maps'}</button>
-            <button onClick={onFindMaps}><Globe2 size={15}/>Find maps online</button>
+            <button onClick={onImport} disabled={busy}>
+              <FolderOpen size={15} />
+              {busy ? 'Reading cache…' : 'Browse local maps'}
+            </button>
+            <button onClick={onFindMaps}>
+              <Globe2 size={15} />
+              Find maps online
+            </button>
           </div>
           <div className="supported-formats">
             <span>Xbox 5</span>

@@ -260,9 +260,12 @@ pub fn run_prepared_job(
         let tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
         if tags.as_ref().is_none_or(|p|!p.is_dir()){receipt.blockers.push("Legal editable base tags are missing. Select the extracted HCEEK tags folder in Settings.".into());}
         for name in ["invader-edit","invader-build","invader-info"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
+        let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
+        let imported=crate::native_asset_imports::available_files(import_root,project)?;
         if let Some(tags)=tags.as_ref().filter(|p|p.is_dir()) {
             for dependency in &sources.dependencies {
                 if generated.contains(&format!("{}.scenery",dependency.tag_path.replace('\\',"/"))) && dependency.tag_class=="scenery" {continue;}
+                if imported.contains(&format!("{}.{}",dependency.tag_path.replace('\\',"/"),dependency.tag_class)){continue;}
                 match dependency_path(tags,&dependency.tag_path,&dependency.tag_class) {
                     Ok(p) if p.is_file()=>{},
                     Ok(_)=>receipt.blockers.push(format!("Missing editable dependency {} ({}) in selected tags",dependency.tag_path,dependency.tag_class)),
@@ -287,7 +290,9 @@ pub fn run_prepared_job(
             project::atomic_write(&directory.join("native-source-binding.json"),&serde_json::to_vec_pretty(&(document.native.as_ref(),&hashes))?,false)?;
         }
         project::atomic_write(&directory.join("input-tags.json"),&serde_json::to_vec_pretty(&hashes)?,false)?;
-        let material_blockers=audit_material_bindings(document,hashes.keys())?;
+        let import_hashes=crate::native_asset_imports::stage(import_root,project,&stage)?;
+        let mut combined_hashes=hashes.clone();combined_hashes.extend(import_hashes);
+        let material_blockers=audit_material_bindings(document,combined_hashes.keys())?;
         if !material_blockers.is_empty(){receipt.blockers.extend(material_blockers);receipt.status="blocked".into();return Ok(());}
         let scenario_file=stage.join(safe_relative(&format!("{}.scenario",sources.scenario_path))?);
         if scenario_file.parent().is_some_and(|p|p.exists()){return invalid("Generated scenario namespace already exists in the supplied tags. Choose a unique project name; stale BSP/lightmap/item tags cannot be accepted as new output.");}
@@ -337,6 +342,8 @@ pub fn run_prepared_job(
             runner.run(&invader(tools,"invader-build").unwrap(),&["-g".into(),engine.into(),"-t".into(),stage.to_string_lossy().into_owned(),"-m".into(),output_dir.to_string_lossy().into_owned(),"--resource-usage".into(),"none".into(),sources.scenario_path.clone()],workspace,"compile",82)?;
         }
         let inspected=maps::inspect_map(&output,None)?;
+        crate::native_asset_imports::verify_compiled(project,&inspected)?;
+        let _=crate::native_asset_imports::available_files(import_root,project)?;
         crate::powerups::verify_compiled(project,&inspected,workspace)?;
         custom.verify_cache(&inspected,&output)?;
         if inspected.header.version!=version || !inspected.scenario_path.replace('\\',"/").eq_ignore_ascii_case(&sources.scenario_path.replace('\\',"/")) || inspected.header.scenario_type!=1 || inspected.mesh.indices.is_empty() {return invalid("Compiled map has wrong engine/scenario/type or no collision BSP");}

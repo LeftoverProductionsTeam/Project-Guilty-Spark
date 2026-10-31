@@ -154,3 +154,5 @@ pub fn safe_relative(value: &str) -> Result<std::path::PathBuf> {
 pub mod ce_source_recovery;
 pub mod bsp_audio;
 pub mod custom_sounds;
+
+pub mod native_asset_imports;

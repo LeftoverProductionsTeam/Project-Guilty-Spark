@@ -1,3 +1,4 @@
+import AssetSourceBrowser from './AssetSourceBrowser';
 import LibraryAssetPreview from './LibraryAssetPreview';
 import { useMemo } from 'react';
 import type { PointerEvent } from 'react';
@@ -58,15 +59,18 @@ export default function ViewportAssetLibrary({
   );
   return (
     <div className="viewport-asset-library">
-      <p>Drag a model or sound onto the view, or choose Add at view. Looping sounds include all authored main tracks. Sources are the maps you have open.</p>
+      <p>
+        Drag a preview onto the map. Native models extract and import their recursive tags before placement.
+      </p>
+      <AssetSourceBrowser onLoaded={(open) => setSource(open.project.id)} />
       <label>
-        Open map
+        Source map
         <select
           aria-label="Asset library map"
           value={source}
           onChange={(event) => setSource(event.target.value)}
         >
-          <option value="all">All open maps</option>
+          <option value="all">All loaded sources</option>
           {sources.map(([id, title]) => (
             <option key={id} value={id}>
               {title}
@@ -107,7 +111,14 @@ export default function ViewportAssetLibrary({
       </div>
       <div className="viewport-asset-list">
         {shown.slice(0, 150).map((item) => (
-          <article key={item.key}><LibraryAssetPreview item={item}/>
+          <article key={item.key}>
+            <div
+              onPointerDown={(event) => {
+                if (!busy && !(event.target as HTMLElement).closest('button,input,a')) begin(item, event);
+              }}
+            >
+              <LibraryAssetPreview item={item} />
+            </div>
             <button
               className="viewport-asset-source"
               disabled={busy}
@@ -150,8 +161,9 @@ export default function ViewportAssetLibrary({
         <small>150 of {shown.length} shown. Narrow the search to find another asset.</small>
       )}
       <p className="subtle">
-        QuickForge/Workshop builds native tag placements and closed OBJ static scenery with assigned Halo materials. Imported compiled-map model additions/replacements still require a supported rebuild. Sounds here use
-        the editor’s saved spatial mix.
+        QuickForge/Workshop builds native tag placements and closed OBJ static scenery with assigned Halo
+        materials. Imported compiled-map model additions/replacements still require a supported rebuild.
+        Sounds here use the editor’s saved spatial mix.
       </p>
     </div>
   );
