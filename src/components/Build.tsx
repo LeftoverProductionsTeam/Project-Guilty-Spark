@@ -17,6 +17,7 @@ import type { Bootstrap, CompatibilityReport, JobEvent, Project, Readiness, Temp
 import { call, native } from '../api';
 import { CheckRow, Notice, PageTitle, Pill } from './ui';
 import BuildTargets from './BuildTargets';
+import SmartEditPanel from './SmartEditPanel';
 import ConversionBitmapRepair from './ConversionBitmapRepair';
 import {useMapState,writeMapSession} from '../mapSession';
 import './portabilityLab.css';
@@ -107,7 +108,7 @@ export default function Build({
         description="A traceable pipeline. A separate package. Your installation protected."
         actions={
           <>
-            {validated && <><button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>Open compiled map</button><button onClick={()=>{writeMapSession(project.id,'portability.compare-build',validated.id);setView('portability');}}>Review native changes</button></>}
+            {validated && <><button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>{validated.target==='mcc-direct'?'Open edited map copy':'Open compiled map'}</button><button onClick={()=>{writeMapSession(project.id,'portability.compare-build',validated.id);setView('portability');}}>Review native changes</button></>}
             <button onClick={()=>void onAction(async()=>{if(dirty)await onSave();onRefresh();})}>
               <RefreshCw size={14} />
               {dirty?'Save & refresh checks':'Refresh checks'}
@@ -119,6 +120,7 @@ export default function Build({
           </>
         }
       />
+      <SmartEditPanel project={project} onSave={onSave} notify={message=>{void onAction(async()=>{onRefresh();return message;},message);}}/>
       <div className="build-workflow-tabs" role="tablist" aria-label="Build workflows"><button role="tab" aria-selected={view==='build'} onClick={()=>setView('build')}>Build & playtest</button><button role="tab" aria-selected={view==='portability'} onClick={()=>setView('portability')}>Portability Lab</button></div>
       {view==='portability'&&<Suspense fallback={<p role="status">Loading Portability Lab…</p>}><PortabilityLab project={project} dirty={dirty} onSave={onSave} onBuild={()=>setView('build')} onSettings={onSettings}/></Suspense>}
       {view==='build'&&checking&&<p role="status">Checking saved map dependencies…</p>}

@@ -92,7 +92,7 @@ pub(super) async fn native_tag_inventory(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
-        let build = current_build(&state, &project)?;
+        let build = current_native_build(&state, &project)?;
         let _ = runtime_workbench::compiled_tags(&state, &project, &build)?;
         let inspection = if project.source.is_some() {
             inspect(&state, &project)?
@@ -123,7 +123,7 @@ pub(super) async fn native_tag_inventory(
 }
 fn source(state: &AppState, id: &str, tag_id: Option<u32>) -> Reply<Source> {
     let project = lock(&state.library)?.get(id).map_err(error)?;
-    let build = current_build(state, &project)?;
+    let build = current_native_build(state, &project)?;
     let tags = runtime_workbench::compiled_tags(state, &project, &build)?;
     let (tag, class) = if let Some(id) = tag_id {
         let inspection = if project.source.is_some() {
@@ -465,7 +465,7 @@ pub(super) async fn native_operation_accept(
     let owner = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
     let _gate=source_guard()?;let state=app.state::<AppState>();require_idle(&state)?;check_document_owner(&state,&project_id,&owner)?;let receipt=read_receipt(&state,&operation_id,&owner,&project_id)?;
-    let project=lock(&state.library)?.get(&project_id).map_err(error)?;let build=current_build(&state,&project)?;
+    let project=lock(&state.library)?.get(&project_id).map_err(error)?;let build=current_native_build(&state,&project)?;
     if project.fingerprint().map_err(error)?!=receipt.fingerprint||(!restore&&build.id!=receipt.parent_build_id){return Err("The saved map/build changed after this preview. No source was selected; preview the current saved map again.".into());}
     if baboon_native::has_running(&project_id)?||runtime_workbench::has_running(&state,&project_id)?{return Err("Close this map's native editor/test process before selecting a new source revision".into());}
     let exe=executable(&state,&project,&receipt.tool_id)?;if maps::hash_file(&exe).map_err(error)?!=receipt.executable_sha256{return Err("The native writer changed after preview; review its identity again".into());}

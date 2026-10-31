@@ -1,5 +1,14 @@
 # Changelog
 
+## C41 — Smart Edit routing and direct MCC map copies
+
+- Add typed, expiring, window/map-owned edit plans that resolve exact source/runtime/tool capabilities and recheck them before execution; manual choices cannot bypass hard gates.
+- Publish reviewed MCC 13 native scalar/placement edits as independent validated copies, using pinned CRC/info tools, complete byte-footprint comparison and semantic reopen without extraction or compilation.
+- Reuse native extraction, accepted working-tag revisions and QuickForge source compilation; preserve the native source guardian and refuse unsupported preview/structural publication.
+- Share compact save-plan controls across Tags, object drawers, Build and QuickForge. Keep the existing Eschaton class/tag tree, source preservation, undo, map tabs and camera state.
+- Route explicitly bound MCC position updates through temporary live plans with before/observed journals and existing adapter/readback guards; persistent maps and peers remain separate.
+- Add real desktop direct/source/viewport/refusal acceptance and focused asynchronous UI contracts. [Exact evidence and remaining gates](docs/CONTINUATION_41_ENGINEERING.md).
+
 ## C40 — Native integrity, CE companion and consolidation
 
 - Add bounded rolling content checks for native saves that preserve metadata or lose filesystem notifications; retain the normal stable-save and full-build identity gates.

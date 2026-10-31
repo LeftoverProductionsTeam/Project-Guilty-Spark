@@ -1,4 +1,14 @@
-# Runtime and operation compatibility — Continuation 40
+# Runtime and operation compatibility — Continuation 41
+
+| C41 operation | Verified implementation boundary | Required separate acceptance |
+| --- | --- | --- |
+| Direct cache copy | Windows MCC H1 cache 13; reviewed internal object/weapon scalars and existing placement transforms; pinned Invader CRC/info, complete byte footprint and semantic reopen | Actual target-game load/gameplay; other direct-write editions |
+| Native source | Existing compatible MCC extraction/Tool, accepted working-tag revisions and reviewed QuickForge targets; native integrity/dependencies retained | Specific asset/scenario/game behavior; unsupported source imports |
+| Visual editing | Same Project/TagFields in class tree and drawer; actual source-placement transforms can publish through direct routing | New imported-cache arrays/models and arbitrary custom native import |
+| Live position plan | Explicit existing-object bindings, exact reviewed MCC session/map, ten-second expiry, before/readback journal | Fresh game presentation, collision relinking and peer agreement; persistent save separate |
+| SparkLink | Existing authenticated QuickForge source service and frozen owner builds | Native tag/binary transfer and game-peer replication |
+
+[C41 evidence and workflow](CONTINUATION_41_ENGINEERING.md). A route's validation is not blanket runtime/game compatibility.
 
 C40 strengthens native-save detection and semantic acceptance without adding a game transport. Its optional OpenCE Mantle companion route is specifically Windows Custom Edition PC cache 609, with separate runtime/cache checks and no map arguments. Actual Mantle startup/save acceptance remains unverified; it is not an MCC/Xbox/Demo/retail/HaloMD integration. [Exact evidence and remaining runtime limits](CONTINUATION_40_ENGINEERING.md).
 

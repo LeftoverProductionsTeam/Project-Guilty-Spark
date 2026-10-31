@@ -21,6 +21,7 @@ import { call, native } from '../api';
 import {useMapState} from '../mapSession';
 import BaboonTools from './BaboonTools';
 import NativeTagOperations from './NativeTagOperations';
+import SmartEditPanel from './SmartEditPanel';
 export default function Tags({
   project,
   inspection,
@@ -34,6 +35,7 @@ export default function Tags({
   onResources,
   onNativeEditor,
   hasUnsavedChanges = false,
+  onSave,
 }: {
   project: Project;
   inspection: MapInspection | null;
@@ -47,6 +49,7 @@ export default function Tags({
   onResources?:()=>void;
   onNativeEditor?:()=>void;
   hasUnsavedChanges?:boolean;
+  onSave?:()=>Promise<void>;
 }) {
   const [query, setQuery] = useMapState(project.id,'tags.query','');
   const [filter, setFilter] = useMapState(project.id,'tags.filter','all');
@@ -308,6 +311,7 @@ export default function Tags({
                 </label>
               </div>
               <TagFields project={project} tag={selectedTag} tags={tags} advanced={advanced} change={(field,value)=>change(selectedTag,field,value)} />
+              <SmartEditPanel project={project} onSave={onSave} onSelectMap={onSelectMap} notify={notify}/>
               <details className="tag-native-editing"><summary>Complete native tag editing</summary><p>Spark edits the typed fields indexed above. Extract this tag and its dependencies for a full source tagset, then open the matching native tag editor. Unknown cache fields remain preserved. Build the working tags to apply full-schema changes.</p>{onNativeEditor&&<button disabled={!native} onClick={onNativeEditor}>Open native tag editor</button>}</details>
             </div>
             <BaboonTools project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges}/>
@@ -357,8 +361,8 @@ export default function Tags({
             <TagLineageInspector key={`lineage:${project.id}:${selectedTag.id}`} project={project} inspection={inspection} tag={selectedTag} onNavigate={navigateToTag} notify={notify} />
             <TagMigrationReviewPanel key={`migration:${project.id}:${inspection.sha256}`} project={project} inspection={inspection} notify={notify} />
             <Notice tone="info">
-              Edits are stored in your .gsproject. The source map stays unchanged. Use Build &amp; Playtest to
-              extract, rebuild and validate the edited cache.
+              Edits stay in this project until you publish a map copy. Review the save plan above for a
+              direct cache edit or the matching native build route. Your original map stays unchanged.
             </Notice>
           </>
         ) : (

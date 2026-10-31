@@ -1,5 +1,7 @@
 # Compatible tools and native source setup
 
+For C41 direct MCC map copies, configure the separately installed reviewed **Invader 0.55.0** folder containing `invader-crc.exe` and `invader-info.exe`. Both binaries are hash-checked against the exact reviewed Windows identities in [C41 engineering](CONTINUATION_41_ENGINEERING.md). The route invokes CRC `--fix-header` only on its owned candidate; independent info checks and a complete byte diff follow. It needs no loose-tag/SDK preparation. A different version is unavailable until reviewed. Native source routes keep their additional compatible editing-kit/tag dependencies. [Save and recovery guide](SMART_EDIT_WORKFLOWS.md).
+
 Spark's canonical tool catalog is `crates/spark-core/data/tool_ecosystem.json`. **Tools for this map** assesses the current source, runtime, editing-kit generation and configured exact executable. Open **Dependencies & setup** to configure installations. Tool detection performs no automatic executable download or launch.
 
 | Tool | Current Spark route | Suitable input / limitations |

@@ -1,0 +1,55 @@
+.smart-edit {
+  margin-block: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  min-width: 0;
+}
+.smart-edit summary {
+  cursor: pointer;
+}
+.smart-edit p {
+  margin-block: 0.45rem;
+}
+.smart-edit-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0.5rem;
+}
+.smart-edit-options label {
+  display: grid;
+  gap: 0.25rem;
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+.smart-edit-options select {
+  width: 100%;
+  min-width: 0;
+}
+.smart-edit-plan,
+.smart-edit-result {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  min-width: 0;
+}
+.smart-edit-routes {
+  display: grid;
+  gap: 0.5rem;
+}
+.smart-edit-routes > div {
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border);
+}
+.smart-edit code,
+.smart-edit li {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.85em;
+}
+.smart-edit ul {
+  padding-left: 1rem;
+  max-height: 13rem;
+  overflow: auto;
+}

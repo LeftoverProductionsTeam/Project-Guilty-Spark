@@ -60,7 +60,7 @@ pub(super) async fn tool_ecosystem_report(
             }
         });
         let (owned_native_tags, source_issue) = if let Some(p) = &project {
-            match current_build(&state, p)
+            match current_native_build(&state, p)
                 .and_then(|b| runtime_workbench::compiled_tags(&state, p, &b))
             {
                 Ok(_) => (true, None),

@@ -540,6 +540,7 @@ export default function World({
   edit,
   notify,
   onOpenTag,
+  onSelectMap,
   onResourcesConnected,
   onBeforeResources,
   selectedId,onSelectObject,viewportChildren,onSceneDragStart,onSceneDragEnd,
@@ -552,6 +553,7 @@ export default function World({
   edit: (p: Project, description: string) => void;
   notify: (m: string) => void;
   onOpenTag?: (tagId: number,sourceProjectId?:string) => void;
+  onSelectMap?: (id:string)=>void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: () => Promise<void>;
   selectedId?:string|null;onSelectObject?:(id:string|null)=>void;viewportChildren?:React.ReactNode;onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
@@ -1370,7 +1372,7 @@ export default function World({
           <Pill tone="blue">Editor preview</Pill>
         </div>
       </section>
-      {!cinematic&&selectedId===undefined&&<WorkspacePanel id="object-tags" label="Object tags">{tagContext?.inspection?<><p className="subtle">{tagContext.project.title} · source tags</p><ViewportTags key={tagContext.project.id} project={tagContext.project} inspection={tagContext.inspection} requestedTagId={tagRequest} requestRevision={tagRevision} edit={edit} notify={notify} onFullEditor={id=>onOpenTag?.(id,tagContext.project.id)} onSave={library?()=>library.onSaveMap(tagContext.project.id):onBeforeResources}/></>:<p>Open this model’s source map in a tab to edit its tags. Its preview keeps the original source identity.</p>}</WorkspacePanel>}
+      {!cinematic&&selectedId===undefined&&<WorkspacePanel id="object-tags" label="Object tags">{tagContext?.inspection?<><p className="subtle">{tagContext.project.title} · source tags</p><ViewportTags key={tagContext.project.id} project={tagContext.project} inspection={tagContext.inspection} requestedTagId={tagRequest} requestRevision={tagRevision} onSelectMap={onSelectMap} edit={edit} notify={notify} onFullEditor={id=>onOpenTag?.(id,tagContext.project.id)} onSave={library?()=>library.onSaveMap(tagContext.project.id):onBeforeResources}/></>:<p>Open this model’s source map in a tab to edit its tags. Its preview keeps the original source identity.</p>}</WorkspacePanel>}
       {!cinematic&&library&&<WorkspacePanel id="asset-library" label="Asset library" defaultDock="left"><ViewportAssetLibrary projectId={project.id} assets={catalog} begin={assetDrag.begin} activate={assetDrag.activate} canReplace={!!chosen} replace={item=>{if(chosen)void dropAsset(item.key,chosen.position,chosen.id);}} importModel={()=>void library.onImportModel(viewPoint())} importSound={()=>void library.onImportSound(viewPoint()).then(added=>{if(added)revealPanel('map-sounds');})} busy={library.busy||assetBusy||!dropReady}/></WorkspacePanel>}
       {!cinematic&&selectedId===undefined&&<WorkspacePanel id="map-sounds" label="Map sounds">{inspection?<MapSounds expanded key={project.source?.resourceSha256?.['sounds.map']} projectId={project.id} project={project} edit={edit} inspection={inspection} onOpenTag={openObjectTag} onResources={()=>void (async()=>{try{await onBeforeResources?.();const open=await call<OpenProject|null>('choose_project_resources',{projectId:project.id});if(open)await onResourcesConnected?.(open);}catch(error){notify(String(error));}})()}/>:<SoundMixer project={project} inspection={null} sourceProjectId={project.id} tagId={null} edit={edit}/>}</WorkspacePanel>}
       <WorkspacePanel id="inspector" label="Inspector"><aside className="panel inspector">

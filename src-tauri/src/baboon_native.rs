@@ -139,6 +139,10 @@ fn latest_key(project: &str) -> String {
 fn source_key(project: &str) -> String {
     format!("baboon-source-{project}")
 }
+pub(super) fn has_accepted_source(state: &AppState, project_id: &str) -> Reply<bool> {
+    let active: Option<ActiveSource> = lock(&state.library)?.setting(&source_key(project_id)).map_err(error)?;
+    Ok(active.is_some() || native_source_revisions::retained(state, project_id)?)
+}
 /// Procedural/cache rebuilds do not consume accepted native revisions. Refuse
 /// that route before staging, rather than silently replacing authored tags.
 pub(super) fn guard_regeneration(state: &AppState, project: &Project) -> Reply<()> {
@@ -271,7 +275,7 @@ pub(super) async fn baboon_report(
         let mut source_issue=None;let mut source_ready=false;let mut session_id=None;let mut sessions:Vec<SessionSummary>=vec![];
         if let Some(id)=project_id {
             check_document_owner(&state,&id,&owner)?;let p=lock(&state.library)?.get(&id).map_err(error)?;
-            match current_build(&state,&p).and_then(|b|runtime_workbench::compiled_tags(&state,&p,&b)){Ok(_)=>source_ready=true,Err(e)=>source_issue=Some(format!("Baboon edits loose MCC H1 tags, not this preserved compiled cache. Build or convert this map to a validated MCC working tag tree first. {e}"))}
+            match current_native_build(&state,&p).and_then(|b|runtime_workbench::compiled_tags(&state,&p,&b)){Ok(_)=>source_ready=true,Err(e)=>source_issue=Some(format!("Baboon edits loose MCC H1 tags, not this preserved compiled cache. Build or convert this map to a validated MCC working tag tree first. {e}"))}
             let recent:Option<String>=lock(&state.library)?.setting(&latest_key(&id)).map_err(error)?;
             if let Some(id)=recent {if load(&state,&id,&owner,&p.id).is_ok(){session_id=Some(id);}}
             sessions=lock(&state.library)?.setting(&history_key(&p.id)).map_err(error)?;
@@ -316,7 +320,7 @@ pub(super) async fn baboon_prepare(
     let owner = window.label().to_string();
     tauri::async_runtime::spawn_blocking(move||{
         let started=Instant::now();let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
-        let p=lock(&state.library)?.get(&project_id).map_err(error)?;let build=current_build(&state,&p)?;
+        let p=lock(&state.library)?.get(&project_id).map_err(error)?;let build=current_native_build(&state,&p)?;
         let tags=runtime_workbench::compiled_tags(&state,&p,&build)?;let installed=installation(&state)?;
         let fingerprint=p.fingerprint().map_err(error)?;
         let mut history:Vec<SessionSummary>=lock(&state.library)?.setting(&history_key(&project_id)).map_err(error)?;
@@ -568,7 +572,7 @@ pub(super) async fn baboon_reconcile(
         let observed=poll(&state,&session)?;
         if observed.changes.status=="saving" {return Err("Baboon is still saving. Wait for the stable saved change before keeping a revision".into());}
         if observed.integrity.blocked(){return Err(format!("Native tag integrity check failed or is pending. Review the live warning and restore/re-save the affected file before keeping it. {}",observed.writer_context));}
-        let build=current_build(&state,&p)?;let current=runtime_workbench::compiled_tags(&state,&p,&build)?;
+        let build=current_native_build(&state,&p)?;let current=runtime_workbench::compiled_tags(&state,&p,&build)?;
         let directory=root(&state,&session.id)?;let external=directory.join("HCEEK/tags");let working=transaction::inventory(&current).map_err(error)?;let edited=transaction::inventory(&external).map_err(error)?;
         let watched=watched(&state,&session)?;if lock(&watched)?.monitor.accepted_hashes()!=&edited {return Err("The external source changed after its stable observation; scan it again before keeping the revision".into());}
         let review=transaction::compare(&session.baseline,&working,&edited);
@@ -621,7 +625,7 @@ pub(super) async fn baboon_restore_start(
         let p=lock(&state.library)?.get(&project_id).map_err(error)?;
         if p.fingerprint().map_err(error)?!=session.fingerprint{return Err("Open the matching saved project revision before restoring this native source. Both sources and old builds remain preserved.".into());}
         if session.revisions.len()>=100{return Err("Native revision history is full; previous sources remain available.".into());}
-        let build=current_build(&state,&p)?;
+        let build=current_native_build(&state,&p)?;
         let directory=root(&state,&session_id)?;
         let revision=uuid::Uuid::new_v4().to_string();let parent=directory.join("revisions");fs::create_dir_all(&parent).map_err(error)?;
         let revision_root=parent.join(&revision);fs::create_dir(&revision_root).map_err(error)?;

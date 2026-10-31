@@ -3,6 +3,7 @@ import { classNames, effectiveReferenceId, setTagValue, shortPath } from '../edi
 import { useMapState } from '../mapSession';
 import type { MapInspection, Project, TagField } from '../types';
 import TagFields from './TagFields';
+import SmartEditPanel from './SmartEditPanel';
 import { Notice, Pill } from './ui';
 import '../viewportAssets.css';
 
@@ -16,6 +17,7 @@ export default function ViewportTags({
   notify,
   onFullEditor,
   onSave,
+  onSelectMap,
 }: {
   project: Project;
   inspection: MapInspection;
@@ -25,6 +27,7 @@ export default function ViewportTags({
   notify: (message: string) => void;
   onFullEditor?: (tagId: number) => void;
   onSave?: () => Promise<void>;
+  onSelectMap?: (id:string)=>void;
 }) {
   const [selected, select] = useMapState<number | null>(project.id, 'viewport.tags.selected', null);
   const [advanced, setAdvanced] = useMapState(project.id, 'viewport.tags.offsets', false);
@@ -54,13 +57,14 @@ export default function ViewportTags({
       </div>
       <code className="viewport-tag-path">{tag.path}</code>
       <p className="subtle">
-        Tag changes affect every object using this tag. Save and rebuild to apply them in the game.
+        Tag changes affect every object using this tag. Review the save plan to create a validated game map.
       </p>
       <label className="checkbox-label">
         <input type="checkbox" checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} />
         Show offsets
       </label>
       <TagFields project={project} tag={tag} tags={inspection.tags} advanced={advanced} change={change} />
+      <SmartEditPanel project={project} onSave={onSave} onSelectMap={onSelectMap} notify={notify}/>
       {tag.external && (
         <Notice>
           This tag is stored in the map’s shared resources. Editing requires matching source tags and a

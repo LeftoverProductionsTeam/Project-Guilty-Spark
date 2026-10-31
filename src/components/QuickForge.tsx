@@ -1,4 +1,5 @@
 import BuildTargets from './BuildTargets';
+import SmartEditPanel from './SmartEditPanel';
 import{WorkspacePanel,useRevealWorkspacePanel}from'./WorkspacePanels';
 import RenderFeatures from './RenderFeatures';
 import LiveForge from './LiveForge';
@@ -828,6 +829,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   return (
     <div className="forge-workspace">
       <WorkspacePanel id="forge-session" label="QuickForge session">
+        <SmartEditPanel project={project} onSave={props.onSave} notify={notify}/>
         {props.onLive&&<button className="small-button" onClick={props.onLive}>Open live 3D mode</button>}
         <ForgeCollaboration projectId={project.id} document={doc} entries={data.entries} onShared={props.onSharedDocument} onSave={props.onSave}/>
         <LiveForge project={project} document={doc} selected={selected}/>
