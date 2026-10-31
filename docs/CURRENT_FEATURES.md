@@ -2,6 +2,8 @@
 
 This is the C41 integrated Windows development workbench. Features below describe actual operations, with native compilation and gameplay kept separate. See the [consolidation report](FINAL_CONSOLIDATION_C41.md) for fresh verification and [398-row ledger](MASTER_FEATURE_LEDGER.csv) for the full requested scope.
 
+The latest [measured loading pass](C41_MAP_LOADING_PERFORMANCE.md) batches fully verified reflection reads and overlaps asset-source preparation. Three native runs per build retain identical rendering content while improving repeated map switching by 8.6% and catalog preparation by 25.1%. Startup and general memory gains are not claimed. The original-loop audio and native asset/compiler checks pass again against the measured executable.
+
 ## Maps and workflow
 
 - Preserve original map/archive bytes and record exact identities, resources and provenance.
