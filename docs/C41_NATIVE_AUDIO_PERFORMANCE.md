@@ -1,5 +1,7 @@
 # C41 native audio, performance and runtime follow-through
 
+**Later startup follow-through:** [overlapped source/preview loading](C41_STARTUP_FOLLOW_THROUGH.md) reduces time to the ready native monitor from 5.95 to 4.35 seconds while preserving this pass's content and safeguards. Measurements below retain their original executable identities.
+
 Continues the committed `c5bd78e` foundation in the existing local master worktree. Source recovery, C35–C39 history, native transactions, Baboon/Invader reconciliation, Smart Edit, SparkLink, four-view BSP Workshop and the earlier research/release artifacts remain preserved.
 
 ## Native audio acceptance

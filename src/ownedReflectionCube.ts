@@ -42,11 +42,23 @@ export async function loadReflectionCube(
   tagId: number,
   resourceHashes: Record<string, string>,
 ) {
-  const response = await call<OwnedCubeResponse>('preview_owned_reflection_cube', {
+  const response = await readReflectionCube(projectId, source, tagId);
+  return createReflectionCubeTexture(response, source, tagId, resourceHashes);
+}
+/** Raw bytes only; callers must validate/decode before creating any texture. */
+export function readReflectionCube(projectId: string, source: string, tagId: number) {
+  return call<OwnedCubeResponse>('preview_owned_reflection_cube', {
     projectId,
     bitmapTagId: tagId,
     sourceSha256: source,
   });
+}
+export function createReflectionCubeTexture(
+  response: OwnedCubeResponse,
+  source: string,
+  tagId: number,
+  resourceHashes: Record<string, string>,
+) {
   const decoded = decodeReflectionCube(response, source, tagId, resourceHashes);
   const images = decoded.faces.map((face) => {
     const canvas = document.createElement('canvas');

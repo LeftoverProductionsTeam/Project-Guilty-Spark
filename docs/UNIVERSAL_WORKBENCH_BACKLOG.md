@@ -1,5 +1,7 @@
 # Universal workbench continuation
 
+The [startup follow-through](C41_STARTUP_FOLLOW_THROUGH.md) overlaps native source/texture preparation and first-reflection reads, with measured cold/warm showcase improvements and complete source/render quality checks. Catalog preparation, memory/CPU reduction, gameplay acceptance and all larger native/direct-map goals remain open; existing native/audio/source safeguards are preserved.
+
 The [native looping-emitter follow-through](NATIVE_LOOPING_EMITTERS.md) adds verified MCC classic-bank recovery, explicit native inclusion and local QuickForge sound-scenery compilation. It preserves the original loop and distinguishes editor rehearsal controls from native settings. This narrows the earlier compiled-sound gap: custom clips/events, other formats, existing-map additions, SparkLink audio, in-game listening and full acoustic/game-peer parity still have separate open gates.
 
 C41 integrates the preserved Smart Edit work with the newer native-asset/CE workflows and all seven unique dependency branches. Genuine native acceptance now covers direct MCC scalar/placement copies, complete byte-footprint checks, shared inspectors, actual gizmo persistence and equivalent native source compilation. [Current verification](FINAL_CONSOLIDATION_C41.md). This narrows the direct-map gap; it does not complete arbitrary compiled-map editing, other-edition writers, general binary sharing, game-peer delivery or rendering/audio parity. All earlier source, feature IDs and experimental research remain preserved.

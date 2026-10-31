@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "complete": true,
+  "baseCommit": "4caf58439fa5a94298a390aea570b93c3d652304",
+  "applicationSha256": "4b0695be6bd58a80a2540d9d32295c7efd29561bd468f1baf9d23fd9196decec",
+  "mockedIpc": false,
+  "regressions": {
+    "rustPassed": 604,
+    "rustIgnored": 7,
+    "frontendPassed": 269,
+    "browserPassed": 126,
+    "offlinePassed": 59,
+    "interfaceProbePassed": 2,
+    "typeScriptPassed": true
+  },
+  "nativeAssets": {
+    "actualNativeGeometry": true,
+    "home": {
+      "transparentBackground": "true",
+      "modelTag": "3785621552",
+      "modelSource": "87d2d9ce-a675-4622-9db9-b7f7ce75d786",
+      "modelSourceHash": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+      "modelTriangles": "1126",
+      "modelReady": "true",
+      "nativeAnimationCount": "3",
+      "modelTextures": "1",
+      "modelReflections": "1",
+      "caption": "monitor · actual Halo model\nNext model"
+    },
+    "animation": {
+      "nativeGraphTag": 3785949237,
+      "clips": [
+        {
+          "name": "idle overlay",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "ff627546b76e99d9b41abb711c238db9451d8f85d531121b2c1c33aec17b3a40"
+        },
+        {
+          "name": "stand unarmed idle",
+          "frames": 10,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "d53208c62aef100991d79998fbdabcc12ec95d0d2dbb0ae7287d5ffa69b2afff"
+        },
+        {
+          "name": "monitor_talking-loop",
+          "frames": 55,
+          "bones": 2,
+          "fps": 30,
+          "sha256": "70ee3ebc6cd9d545dae59e5db87503fa9571b73e56ef133fc9765e526e4ab924"
+        }
+      ],
+      "firstVertex": [
+        0.06243005767464638,
+        -0.027118690311908722,
+        0.07506243139505386
+      ],
+      "laterVertex": [
+        0.06268740445375443,
+        -0.027118690311908722,
+        0.07813515514135361
+      ],
+      "actualSkinnedVerticesMove": true,
+      "pauseFreezesTime": true,
+      "nativeTalkingClipSelected": true,
+      "wrongSourceHashRejected": true
+    },
+    "compiled": {
+      "sha256": "6d46472c4b66e39b393390aeabb750b996de675768f49c13fc3bb3c0f1d4a5b7",
+      "nativeTagPath": "gs_assets_a583deb5e26a4b978088298882b23920\\scenery\\rocks\\boulder\\boulder",
+      "position": [
+        1.5,
+        -1.5,
+        0.01
+      ],
+      "collisionTriangles": 12
+    },
+    "sourcePreserved": true,
+    "changedImportRejected": [
+      "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+    ],
+    "previousBuildPreserved": true,
+    "javascriptErrors": []
+  },
+  "nativeAudio": {
+    "build": {
+      "id": "ec677a51-507f-4451-a32e-5707eba3f5f6",
+      "timestamp": "2026-10-31T21:05:48.036600200+00:00",
+      "status": "validated",
+      "target": "mcc-cea",
+      "sha256": "c9eca13585a04d8d12b55eaddc37bf4debc7baa47328c9df377b2248d9529ebf",
+      "message": "QuickForge BSP/scenario compiled and cache structure/CRC validated. Fast radiosity preview; target-game load, packaging and multiplayer remain untested.",
+      "projectFingerprint": "c3da25693bc112c6c5b776e5c7532cde8086baca1c98d91835eee84a36e11984",
+      "toolIdentities": {
+        "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+        "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+        "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+      }
+    },
+    "control": {
+      "elapsedMs": 3295.9585000000006,
+      "nativeLoopExplicitlyIncluded": true,
+      "editorMutePreserved": true,
+      "importedFileCount": 3,
+      "singleUndoRedo": true
+    },
+    "compiled": {
+      "sha256": "c9eca13585a04d8d12b55eaddc37bf4debc7baa47328c9df377b2248d9529ebf",
+      "sceneryPath": "spark\\audio\\455e90fc09bd42b08e598f5b2be19e65\\a3d2e046af52406fb06b2c6f619de7fc",
+      "loopPath": "gs_assets_6db0245ff92d440194495438990c7639\\sound\\sfx\\ambience\\b30\\b30computer_no_detail",
+      "position": [
+        2,
+        3,
+        1
+      ],
+      "wholeLoopPreserved": true,
+      "decoded": {
+        "frames": 186549,
+        "channels": 1,
+        "sampleRate": 48000,
+        "durationSeconds": 3.8864375,
+        "rms": 0.042309177263229476
+      }
+    },
+    "exactSoundDependencies": 2,
+    "exactSamples": 25,
+    "encodedBytes": 206856,
+    "sampleIdentitiesSha256": "72b16d2df1afcc8c0d04399804a3dc1256dc0ce6d1458fd06f7080c9d0275cc2",
+    "nativeBaseFilesPreserved": 2240,
+    "sourcePreserved": true,
+    "corruptedImport": {
+      "rejected": true,
+      "blockers": [
+        "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+      ],
+      "attributedTool": null
+    },
+    "previousAcceptedBuildPreserved": true,
+    "pageErrors": []
+  },
+  "gameplayAudioVerified": false,
+  "customEditionMenuJoinAndTraversalVerified": false,
+  "communityGameplayVerified": false,
+  "remotePublicationVerified": false
+}

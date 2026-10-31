@@ -1,4 +1,4 @@
-import { loadReflectionCube } from './ownedReflectionCube';
+import { loadReflectionCube, readReflectionCube, createReflectionCubeTexture } from './ownedReflectionCube';
 import {useEffect,useState} from 'react';
 import * as THREE from 'three';
 import {call,native} from './api';
@@ -77,6 +77,14 @@ export function useOwnedForgeModels(
                 tasks.push({shader:tag.id,bitmap:reference.targetId,role});
             }
           }
+          // Read one reflection concurrently with diffuse/detail batches.
+          // Keep raw data bounded to one cube and consume the result through
+          // the same identity decoder and shared texture budget below.
+          const firstReflection = Object.values(view.shaderMetadata).find(metadata => metadata.reflection
+            && !pool.has(`${placement.sourceProjectId}:cube:${metadata.reflection.bitmapTagId}`))?.reflection?.bitmapTagId;
+          const firstCube = firstReflection === undefined ? undefined : readReflectionCube(
+            placement.sourceProjectId, result.sourceSha256, firstReflection,
+          ).then(response => ({ok:true as const,response}), error => ({ok:false as const,error}));
           const missing=[...new Set(tasks.map(t=>t.bitmap))].filter(id=>!pool.has(`${placement.sourceProjectId}:${id}`));
           for (let offset = 0; offset < missing.length; offset += 24) {
             const targets = missing
@@ -111,12 +119,14 @@ export function useOwnedForgeModels(
               const cubeKey = `${placement.sourceProjectId}:cube:${metadata.reflection.bitmapTagId}`;
               try {
                 if (!pool.has(cubeKey)) {
-                  const cube = await loadReflectionCube(
-                    placement.sourceProjectId!,
-                    result.sourceSha256,
-                    metadata.reflection.bitmapTagId,
-                    result.resourceHashes ?? {},
-                  );
+                  const prefetched = metadata.reflection.bitmapTagId === firstReflection && firstCube
+                    ? await firstCube : null;
+                  if (prefetched && !prefetched.ok) throw prefetched.error;
+                  const cube = prefetched?.ok
+                    ? createReflectionCubeTexture(prefetched.response, result.sourceSha256,
+                        metadata.reflection.bitmapTagId, result.resourceHashes ?? {})
+                    : await loadReflectionCube(placement.sourceProjectId!, result.sourceSha256,
+                        metadata.reflection.bitmapTagId, result.resourceHashes ?? {});
                   if (!live) {
                     cube.dispose();
                     return;

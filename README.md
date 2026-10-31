@@ -61,7 +61,7 @@ pnpm test:ui
 node scripts/desktop.mjs build
 ~~~
 
-The latest local checks pass **603 Rust tests (7 opt-in tests ignored), 269 frontend tests, 126 browser checks, 59 offline scripts and two interface-probe tests**. TypeScript, the Windows executable and NSIS installer build. These are local results, not a claim that hosted GitHub CI has rerun. [Native audio, performance and CE diagnosis](docs/C41_NATIVE_AUDIO_PERFORMANCE.md) continues the preserved [C41 integration report](docs/FINAL_CONSOLIDATION_C41.md), with exact capabilities and remaining game acceptance gates.
+The latest local checks pass **604 Rust tests (7 opt-in tests ignored), 269 frontend tests, 126 browser checks, 59 offline scripts and two interface-probe tests**. TypeScript, the Windows executable and NSIS installer build. These are local results, not a claim that hosted GitHub CI has rerun. [Startup and preview loading](docs/C41_STARTUP_FOLLOW_THROUGH.md) reduces time to the ready native monitor from 5.95 to 4.35 seconds and preserves the earlier [audio, performance and CE safeguards](docs/C41_NATIVE_AUDIO_PERFORMANCE.md).
 
 The [home showcase polish](docs/NATIVE_ASSETS_AND_SHOWCASE.md#c41-clarity-and-loading-polish) sharpens the actual monitor, reduces its lighting/glow, extends its left-facing mouse response and shares source preparation across visits. Native animation, textures and reflections remain active; load timings and the later executable identity have their own evidence.
 

@@ -253,8 +253,11 @@ pub(super) async fn link_asset_source_folder(app: tauri::AppHandle) -> Reply<Opt
 #[tauri::command]
 pub(super) async fn open_asset_source(
     app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
     source_id: String,
+    prepare_preview_resources: Option<bool>,
 ) -> Reply<Vec<OpenProject>> {
+    let owner = window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let candidate = lock(&state.asset_sources)?
@@ -272,10 +275,48 @@ pub(super) async fn open_asset_source(
         if candidate.archive {
             return import_file(&state, &candidate.path);
         }
-        // A map's adjacent resources take precedence over unrelated global preferences.
-        let (project, inspection) = lock(&state.library)?
-            .import_map(&candidate.path, candidate.path.parent())
-            .map_err(error)?;
+        // Home can overlap independent pack hashing with source inspection/copy.
+        // This is opt-in and only binds a NEW source, never an existing map's
+        // selected resources. Every later pixel read still validates its pins.
+        let preview = if prepare_preview_resources == Some(true) && candidate.cache_version == Some(13) {
+            maps::inspect_header(&candidate.path).ok().filter(|h| h.version == 13)
+                .zip(lock(&state.installation)?.mcc_path.clone())
+                .map(|(header, root)| (header.name, root.join("halo1/prebuild/paks")))
+        } else { None };
+        let (imported, prepared) = std::thread::scope(|scope| {
+            let worker = preview.map(|(name, directory)| scope.spawn(move || {
+                core::mcc_textures::pin(&directory, &name).map(|pins| (name, directory, pins))
+            }));
+            let imported = (|| -> Reply<_> {
+                let library = lock(&state.library)?;
+                let existing = library.list().map_err(error)?;
+                // Adjacent original resources keep their normal precedence.
+                let (project, inspection) = library.import_map(&candidate.path, candidate.path.parent()).map_err(error)?;
+                let fresh = !existing.iter().any(|row| row.id == project.id);
+                Ok((project, inspection, fresh))
+            })();
+            let prepared = worker.and_then(|thread| thread.join().ok()).and_then(Result::ok);
+            (imported, prepared)
+        });
+        let (mut project, inspection, fresh) = imported?;
+        if let Some((_, directory, hashes)) = prepared.filter(|(name, _, _)|
+            fresh && inspection.header.version == 13 && *name == inspection.header.name) {
+            if core::bitmap_preview::mcc_uses_external_bitmaps(
+                &project.source.as_ref().ok_or("Missing imported source")?.preserved_path,
+                &inspection.sha256, &inspection).map_err(error)? {
+                let library = lock(&state.library)?;
+                let mut latest = library.get(&project.id).map_err(error)?;
+                // Retain current edits; a new resource/source choice wins.
+                if preview_binding_unchanged(&project, &latest, &inspection.sha256)
+                    && check_document_owner(&state, &project.id, &owner).is_ok() {
+                    let source = latest.source.as_mut().ok_or("Missing imported source")?;
+                    source.resource_directory = Some(directory);
+                    source.resource_sha256 = hashes;
+                    library.save(&latest, None).map_err(error)?;
+                }
+                project = latest;
+            }
+        }
         lock(&state.inspections)?.insert(project.id.clone(), Arc::new(inspection.clone()));
         Ok(vec![OpenProject {
             project,
@@ -285,9 +326,38 @@ pub(super) async fn open_asset_source(
     .await
     .map_err(error)?
 }
+fn preview_binding_unchanged(imported: &Project, latest: &Project, sha256: &str) -> bool {
+    imported.id == latest.id && imported.source.as_ref().zip(latest.source.as_ref()).is_some_and(|(old, new)|
+        old.cache_version == 13 && new.cache_version == 13 && old.sha256 == sha256 && new.sha256 == sha256
+        && old.preserved_path == new.preserved_path && old.resource_directory == new.resource_directory
+        && old.resource_sha256 == new.resource_sha256)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn automatic_preview_binding_preserves_newer_resource_choices_and_map_edits() {
+        let mut imported = Project::new("original");
+        imported.source = Some(core::project::Source {
+            original_path: "original.map".into(), preserved_path: "owned/source.map".into(),
+            sha256: "a".repeat(64), cache_version: 13, engine: "MCC".into(),
+            scenario_path: "levels/test/map".into(), archive: None, audio_resources: None,
+            resource_directory: Some("original-resources".into()), resource_sha256: BTreeMap::new(),
+        });
+        let mut latest = imported.clone();
+        latest.title = "newer user edit".into();
+        assert!(preview_binding_unchanged(&imported, &latest, &"a".repeat(64)));
+        assert_eq!(latest.title, "newer user edit");
+        latest.source.as_mut().unwrap().resource_directory = Some("chosen-resources".into());
+        assert!(!preview_binding_unchanged(&imported, &latest, &"a".repeat(64)));
+        latest = imported.clone();
+        latest.source.as_mut().unwrap().resource_sha256.insert("bitmaps.map".into(), "b".repeat(64));
+        assert!(!preview_binding_unchanged(&imported, &latest, &"a".repeat(64)));
+        latest = imported.clone();
+        latest.source.as_mut().unwrap().preserved_path = "different/source.map".into();
+        assert!(!preview_binding_unchanged(&imported, &latest, &"a".repeat(64)));
+        assert!(!preview_binding_unchanged(&imported, &imported, &"b".repeat(64)));
+    }
     #[test]
     fn discovery_is_header_only_bounded_and_excludes_shared_resources_and_executables() {
         let folder = tempfile::tempdir().unwrap();

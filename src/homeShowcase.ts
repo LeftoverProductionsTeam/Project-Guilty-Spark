@@ -53,7 +53,10 @@ export function preloadHomeModels(data: Bootstrap): Promise<ForgeAsset[]> {
         (row) => !row.archive && row.cacheVersion === 13 && /^c40\.map$/i.test(row.name),
       );
       if (monitor) {
-        const source = (await call<OpenProject[]>('open_asset_source', { sourceId: monitor.id }))[0];
+        const source = (await call<OpenProject[]>('open_asset_source', {
+          sourceId: monitor.id,
+          preparePreviewResources: true,
+        }))[0];
         if (source) {
           const found = await connect(source);
           if (found.some(isMonitor)) return found;
