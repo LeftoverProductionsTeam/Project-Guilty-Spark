@@ -5,6 +5,7 @@ import { decodeOwnedBitmapBatch, uniqueBitmapTargets, MAX_NATIVE_BATCH_RGBA_BYTE
 import type { OwnedBitmapBatchResponse } from './ownedBitmapBatch';
 import { configureSourceTexture } from './sourceTexture';
 import { loadReflectionCube } from './ownedReflectionCube';
+import { textureResourceScope } from './textureResourceScope';
 import type { OpenProject, NativeAssetImport, ShaderPreview } from './types';
 import type { QuickForgeDocument } from './forge';
 export interface WorkshopMaterialView {
@@ -36,7 +37,7 @@ export function useWorkshopTextures(
   const key = JSON.stringify([
     source?.project.id,
     source?.inspection?.sha256,
-    source?.project.source?.resourceSha256,
+    textureResourceScope(source?.project.source),
     doc.materials.map((m) => [m.id, m.shaderPath]),
     bindings,
   ]);

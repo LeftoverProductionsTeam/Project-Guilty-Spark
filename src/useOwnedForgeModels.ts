@@ -8,6 +8,7 @@ import {decodeOwnedBitmapBatch,MAX_NATIVE_BATCH_RGBA_BYTES} from './ownedBitmapB
 import type {OwnedBitmapBatchResponse} from './ownedBitmapBatch';
 import {configureSourceTexture} from './sourceTexture';
 import {extraTextureKey} from './haloMaterial';
+import {useTextureResourceScopes} from './textureResourceScope';
 
 export interface OwnedModelView {
   ready?: boolean;
@@ -38,6 +39,7 @@ export function useOwnedForgeModels(
   const [models,setModels]=useState<Record<string,OwnedModelView>>({});
   const [failures,setFailures]=useState<Record<string,string>>({});
   const sources=[...new Map(placements.map(p=>[forgeModelKey(p),p])).values()];
+  const resourceIdentity=useTextureResourceScopes(sources.flatMap(p=>p.sourceProjectId?[p.sourceProjectId]:[]));
   const scope=JSON.stringify(sources.map(p=>[p.sourceProjectId,p.sourceSha256,p.tagId,resourceScopes[p.sourceProjectId??'']??'']));
   useEffect(() => {
     let live=true,textureBytes=0,geometryBytes=0;
@@ -134,6 +136,6 @@ export function useOwnedForgeModels(
     }
     void load();
     return()=>{live=false;for(const texture of pool.values())texture.dispose();};
-  }, [scope]);
+  }, [scope,resourceIdentity]);
   return {models,failures};
 }

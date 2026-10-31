@@ -1,4 +1,5 @@
 import type { MapInspection, OpenProject, Project } from './types';
+import { publishTextureResources } from './textureResourceScope';
 export interface AssetSourceDocument {
   history: { current: Project | null };
   inspection: MapInspection | null;
@@ -19,6 +20,7 @@ export interface AssetSourceInventory {
 }
 export const assetSourceEvent = 'guilty-spark-asset-source-ready';
 export function retainAssetSource(open: OpenProject) {
+  publishTextureResources(open.project);
   window.dispatchEvent(new CustomEvent(assetSourceEvent, { detail: open }));
 }
 export function mergeAssetSources(

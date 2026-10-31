@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn descriptor_local_path(path:&Path)->Result<()> {
+pub fn validate_local_input_path(path:&Path)->Result<()> {
     let text=path.to_string_lossy();
     let normalized=text.replace('/',"\\");
     let bytes=normalized.as_bytes();
@@ -182,7 +182,12 @@ impl Library {
         self.import_map_internal(path,resources,true)
     }
     fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:bool)->Result<(Project,maps::MapInspection)> {
-        let inspection = maps::inspect_map(path, resources)?;
+        // Persist the location now, so later app working directories cannot
+        // reinterpret a relative map/resource selection. Missing resources are
+        // still allowed; their absolute location remains explicit.
+        let resource_directory=std::path::absolute(resources.or(path.parent()).filter(|p|!p.as_os_str().is_empty()).unwrap_or(Path::new(".")))?;
+        let resource_directory=if resource_directory.is_dir(){fs::canonicalize(resource_directory)?}else{resource_directory};
+        let inspection = maps::inspect_map(path, Some(&resource_directory))?;
         if let Some(entry) = self
             .list()?
             .into_iter()
@@ -236,13 +241,9 @@ impl Library {
             engine: inspection.header.engine.clone(),
             scenario_path: inspection.scenario_path.clone(),
             archive: None,
-            resource_directory: resources.or(path.parent()).map(Path::to_path_buf),
+            resource_directory: Some(resource_directory.clone()),
             audio_resources: None,
-            resource_sha256: resources
-                .or(path.parent())
-                .map(project::resource_hashes)
-                .transpose()?
-                .unwrap_or_default(),
+            resource_sha256: project::resource_hashes(&resource_directory)?,
         });
         p.scene = inspection.objects.clone();
         self.save(&p, Some(&inspection))?;
@@ -258,7 +259,7 @@ impl Library {
             if let Some(directory)=&source.resource_directory {references.push(directory);}
             if let Some(audio)=&source.audio_resources {references.push(&audio.directory);}
         }
-        for reference in &references {descriptor_local_path(reference)?;}
+        for reference in &references {validate_local_input_path(reference)?;}
         for reference in references {crate::reject_links(reference)?;}
         let transaction=self.db.unchecked_transaction()?;
         let result=self.import_project_admitted(incoming);

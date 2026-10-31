@@ -3,14 +3,20 @@ import type {ViewportAsset} from '../viewportAssets';
 import Sound from './Sound';
 import NativeModelPreview from './NativeModelPreview';
 import {librarySoundEmitters} from '../viewportAssets';
+import {useTextureResourceScope} from '../textureResourceScope';
 const thumbs=new Map<string,string>();
 let running=0;
 const queue:(()=>void)[]=[];
 function schedule(action:()=>Promise<void>){return new Promise<void>((resolve,reject)=>{const start=()=>{running++;void action().then(resolve,reject).finally(()=>{running--;queue.shift()?.();});};if(running<2)start();else queue.push(start);});}
 export default function LibraryAssetPreview({ item }: { item: ViewportAsset }) {
+  const scope=useTextureResourceScope(item.sourceId);
+  const cacheKey=item.key+':'+scope;
+  return <AssetPreview key={cacheKey} item={item} cacheKey={cacheKey}/>;
+}
+function AssetPreview({item,cacheKey}:{item:ViewportAsset;cacheKey:string}) {
   const host = useRef<HTMLDivElement>(null),
     complete = useRef<((url: string) => void) | null>(null);
-  const [src, setSrc] = useState(thumbs.get(item.key) ?? ''),
+  const [src, setSrc] = useState(thumbs.get(cacheKey) ?? ''),
     [error, setError] = useState(''),
     [render, setRender] = useState(false),
     [audition, setAudition] = useState(false),
@@ -33,7 +39,7 @@ export default function LibraryAssetPreview({ item }: { item: ViewportAsset }) {
             clearTimeout(timer);
             if (active) {
               if (url) {
-                thumbs.set(item.key,url);
+                thumbs.set(cacheKey,url);
                 while(thumbs.size>128)thumbs.delete(thumbs.keys().next().value!);
                 setSrc(url);
               }
@@ -54,7 +60,7 @@ export default function LibraryAssetPreview({ item }: { item: ViewportAsset }) {
       observer.disconnect();
       complete.current?.('');
     };
-  }, [item.key, src]);
+  }, [cacheKey, src]);
   async function previewSound(){try{setError('');if(item.kind==='sound'){if(item.looping){const emitters=await librarySoundEmitters(item,[0,0,0]);setTracks([...new Map(emitters.map(e=>[e.tagId,{tagId:e.tagId,sourceId:e.sourceProjectId??item.sourceId}])).values()]);}else setTracks([{tagId:item.tagId,sourceId:item.sourceId}]);}setAudition(true);}catch(e){setError(String(e));}}
   return (
     <div className="library-asset-preview" ref={host}>

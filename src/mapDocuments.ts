@@ -16,7 +16,7 @@ export interface MapDocuments {
 export type DocumentAction =
   | { type: 'open'; open: OpenProject }
   | { type: 'external-revision'; previousId: string; open: OpenProject; replaceClean: boolean }
-  | { type: 'resources'; project: Project; kind?:'audio' }
+  | { type: 'resources'; project: Project; inspection?:MapInspection|null; kind?:'audio' }
   | { type: 'select'; id: string }
   | { type: 'close'; id: string }
   | { type: 'history'; action: HistoryAction; id?: string }
@@ -46,7 +46,7 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
     const source=action.project.source;
     if(!source)return state;
     const merge=(p:Project)=>p.source?.sha256===source.sha256?{...p,source:{...p.source,...(action.kind==='audio'?{}:{resourceDirectory:source.resourceDirectory,resourceSha256:source.resourceSha256}),...(source.audioResources===undefined?{}:{audioResources:source.audioResources})}}:p;
-    return {...state,documents:state.documents.map(d=>d.id!==action.project.id?d:{...d,history:{...d.history,current:d.history.current?merge(d.history.current):null,past:d.history.past.map(merge),future:d.history.future.map(merge)}})};
+    return {...state,documents:state.documents.map(d=>d.id!==action.project.id?d:{...d,inspection:d.history.current?.source?.sha256===source.sha256&&action.inspection?.sha256===source.sha256?action.inspection:d.inspection,history:{...d.history,current:d.history.current?merge(d.history.current):null,past:d.history.past.map(merge),future:d.history.future.map(merge)}})};
   }
   if (action.type === 'open') {
     const id = action.open.project.id,

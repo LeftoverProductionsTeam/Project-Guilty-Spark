@@ -1,0 +1,231 @@
+{
+  "schemaVersion": 1,
+  "scope": "Bounded native editor/resource/GPU acceptance; game loading and full fidelity remain unverified",
+  "mockedIpc": false,
+  "baseCommit": "b6fbfe8",
+  "appSha256": "d0e7df78854525eb2dbbcc33c86d097c892111d522b46f9b7e0a5464cc49cd3c",
+  "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+  "legacyPathRecovery": {
+    "elapsedMs": 10093.842600000002,
+    "pinsUnchanged": true,
+    "sceneAndTagEditsPreserved": true,
+    "viewport": {
+      "sourceShaders": "132",
+      "sourceLightmaps": "15",
+      "sourceDetails": "109",
+      "sourceReflections": "50",
+      "reflectionIssues": "scenery\\debris\\banshee_crashed\\shaders\\banshee_crashed: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget. | characters\\cyborg\\shaders\\visor: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget. | weapons\\flag\\shaders\\flag blade: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget. | levels\\b30\\shaders\\metal panels generic ext clean: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget. | levels\\b30\\shaders\\metal panels generic ext: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget.",
+      "skyTriangles": "308",
+      "materialLoading": "false",
+      "pendingMaterials": "0"
+    }
+  },
+  "coverageReviewElapsedMs": 1057.3348000000005,
+  "candidates": [
+    {
+      "reason": "Previously selected resources",
+      "sha256": "5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea",
+      "coverage": {
+        "cacheGeneration": 6,
+        "resourceSha256": "5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea",
+        "verifiedImages": 453,
+        "missingOrMismatchedImages": 47,
+        "unsupportedImages": 44,
+        "internalImages": 142
+      },
+      "error": null
+    },
+    {
+      "reason": "MCC legacy resources; coverage must be checked",
+      "sha256": "74e2436eda3ca9f6d166fb7930ed018c892f206d49a3a6fe063506cbb621d97e",
+      "coverage": {
+        "cacheGeneration": 6,
+        "resourceSha256": "74e2436eda3ca9f6d166fb7930ed018c892f206d49a3a6fe063506cbb621d97e",
+        "verifiedImages": 1,
+        "missingOrMismatchedImages": 499,
+        "unsupportedImages": 44,
+        "internalImages": 142
+      },
+      "error": null
+    },
+    {
+      "reason": "MCC Custom Edition compatibility resources",
+      "sha256": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+      "coverage": null,
+      "error": "This resource file proves no external image ranges for the selected map. Choose that map's original bitmaps.map; self-contained maps do not need it"
+    }
+  ],
+  "samePinRelocation": {
+    "elapsedMs": 6549.155200000001,
+    "cameraBspAndDisplayModePreserved": true,
+    "materialAssignmentsClearedAndReloaded": true,
+    "observedTransitions": 32,
+    "viewport": {
+      "sourceShaders": "132",
+      "sourceLightmaps": "15",
+      "sourceDetails": "109",
+      "sourceReflections": "50",
+      "reflectionIssues": "scenery\\debris\\banshee_crashed\\shaders\\banshee_crashed: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget. | characters\\cyborg\\shaders\\visor: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget. | weapons\\flag\\shaders\\flag blade: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget. | levels\\b30\\shaders\\metal panels generic ext clean: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget. | levels\\b30\\shaders\\metal panels generic ext: Error: Eight reflection cubes are loaded; remaining cubes exceed the active preview budget.",
+      "skyTriangles": "308",
+      "materialLoading": "false",
+      "pendingMaterials": "0"
+    }
+  },
+  "editorSaveCannotOverwritePins": true,
+  "wrongSoundPinRefused": true,
+  "partialRuntimeAutoSelectionRefused": true,
+  "corruptPrivateCopy": {
+    "externalRefused": true,
+    "error": "Resource map differs from this project's recorded SHA-256",
+    "embeddedImageStillVerified": true
+  },
+  "originalInputsAndPreservedMapUnchanged": true,
+  "renderRegression": {
+    "appSha256": "4182bfc971d4439c899a2c5f00be5a65d121c65fd1a6cfe8790628e381ac7961",
+    "checkpoint": "Precedes only the final resource-card spacing refinement. Native/resource/renderer code is unchanged.",
+    "maps": [
+      {
+        "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+        "authoredDecals": 8,
+        "checkedImages": [
+          {
+            "id": 3867149580,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3866952969,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3793551529,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3793617066,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3915843571,
+            "ok": true,
+            "error": null
+          }
+        ],
+        "viewport": {
+          "sourceShaders": "132",
+          "sourceLightmaps": "15",
+          "sourceDetails": "73",
+          "sourceReflections": "14",
+          "reflectionIssues": "",
+          "skyTriangles": "308",
+          "materialLoading": "false",
+          "pendingMaterials": "0"
+        }
+      },
+      {
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "authoredDecals": 8,
+        "checkedImages": [
+          {
+            "id": 3886220847,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3885827625,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3788636254,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3788701791,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3788767328,
+            "ok": true,
+            "error": null
+          },
+          {
+            "id": 3940682092,
+            "ok": true,
+            "error": null
+          }
+        ],
+        "viewport": {
+          "sourceShaders": "151",
+          "sourceLightmaps": "15",
+          "sourceDetails": "104",
+          "sourceReflections": "21",
+          "reflectionIssues": "",
+          "skyTriangles": "183",
+          "materialLoading": "false",
+          "pendingMaterials": "0"
+        }
+      }
+    ],
+    "javascriptOrGpuErrors": [],
+    "windowControls": {
+      "normal": {
+        "x": 1491,
+        "y": 12.5,
+        "width": 96,
+        "height": 28
+      },
+      "combinedHeader": {
+        "x": 1491,
+        "y": 12.5,
+        "width": 96,
+        "height": 28
+      },
+      "fullscreen": {
+        "x": 1498,
+        "y": 3.5,
+        "width": 96,
+        "height": 26
+      }
+    },
+    "tagTree": {
+      "classes": 59,
+      "weaponTags": 20,
+      "editableFields": 7
+    }
+  },
+  "preservation": {
+    "rootResearchFiles": 146,
+    "originalCeTags": 2455,
+    "mismatches": []
+  },
+  "regressions": {
+    "rust": {
+      "passed": 560,
+      "ignored": 7
+    },
+    "frontend": {
+      "passed": 249,
+      "files": 53
+    },
+    "browser": {
+      "passed": 93,
+      "finalCompactDrawerChecks": 3
+    },
+    "offlineChecks": 59,
+    "typescript": true,
+    "windowsRelease": true
+  },
+  "javascriptOrGpuErrors": [],
+  "gameLaunched": false,
+  "newHaloCompilerAcceptance": false,
+  "gamePeerReplicationTested": false,
+  "completeRenderingAudioParity": false,
+  "unfinishedDirectCompiledMapEditing": true,
+  "complete": true
+}

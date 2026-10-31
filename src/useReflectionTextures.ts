@@ -3,6 +3,7 @@ import type * as THREE from 'three';
 import type { MapInspection, Project } from './types';
 import { loadReflectionCube } from './ownedReflectionCube';
 import { extraTextureKey } from './haloMaterial';
+import { textureResourceScope } from './textureResourceScope';
 export function useReflectionTextures(
   project: Project,
   inspection: MapInspection | null,
@@ -15,7 +16,7 @@ export function useReflectionTextures(
   const scope = JSON.stringify([
     project.id,
     inspection?.sha256,
-    project.source?.resourceSha256,
+    textureResourceScope(project.source),
     shaders.map((tag) => tag.id),
   ]);
   useEffect(() => {

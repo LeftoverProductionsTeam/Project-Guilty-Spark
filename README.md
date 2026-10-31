@@ -1,5 +1,11 @@
 # Project Guilty Spark
 
+## Original texture recovery without losing your place
+
+Classic maps can recover a lost original resource location using the existing exact hashes. New imports remember absolute locations. Inspector now offers a compact, explicit image-coverage check; partial runtime candidates remain labelled and are not selected automatically. Reconnecting the same textures or adding a secondary MCC resource refreshes dependent previews while keeping your camera, BSP selection, display mode and edits.
+
+Real native Zombie Apocalypse testing recovers 132 shader assignments and 15 lightmap pages and rejects changed private resource bytes. Its original bitmap pack proves 453 external image ranges; 47 missing/mismatched and 44 unsupported images remain open. Source/compiler safeguards, the C35–C39 history and unfinished direct-map editing backlog remain preserved. [Evidence, performance and limits](docs/TEXTURE_RESOURCE_RECOVERY.md) · [Descriptive publication handoff](docs/TEXTURE_RECOVERY_GITHUB_DESCRIPTION.md).
+
 ## Native assets and an animated Halo showcase
 
 Home now features the actual floating Guilty Spark model, with source textures/reflections and native idle/talking animation controls. Startup shows real loading progress while installation discovery runs in the background. The asset drawer finds installed/linked maps and downloads; dragging a model preview extracts and validates its recursive native tags before placement. New QuickForge source uses owned Halo grass/metal defaults, and map objects, thumbnails, tag models and source surfaces share the Halo material renderer.

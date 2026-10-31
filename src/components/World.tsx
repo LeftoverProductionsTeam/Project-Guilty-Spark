@@ -1,4 +1,5 @@
 import { useReflectionTextures } from '../useReflectionTextures';
+import { textureResourceScope } from '../textureResourceScope';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
 import Mesh from './HaloMesh';
@@ -660,6 +661,7 @@ export default function World({
     if (!inspection || !native || autoPreviewBusy.current || !inspection.renderMesh) return;
     const source = inspection.sha256;
     const projectAtStart = project.id;
+    const resourceScopeAtStart = textureResourceScope(project.source);
     const recordedResource = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
     let tasks: MaterialTask[];
     try {
@@ -696,7 +698,7 @@ export default function World({
     };
     const isCurrent=()=>epoch===autoPreviewEpoch.current &&
       currentInspectionRef.current===source && currentProjectRef.current===projectAtStart &&
-      currentResourceRef.current===recordedResource;
+      currentTextureScopeRef.current===resourceScopeAtStart;
     try {
       const targets=uniqueBitmapTargets(tasks,source,recordedResource);
       const response=await call<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch', {
@@ -771,7 +773,7 @@ export default function World({
         });
       }
       if(extraLoaded.size)setExtraTextures(previous=>({...previous,...Object.fromEntries([...extraLoaded].map(([key,item])=>[key,item.texture]))}));
-      if(done)setViewMode('render');
+      if(done&&!automatic)setViewMode('render');
       setTextureFailures(previous=>automatic?[...new Map([...previous,...failures].map(f=>[`${f.bitmapTagId}:${f.imageIndex}:${f.code}`,f])).values()]:failures);
       if(!automatic)notify(`${done} texture slots loaded${failures.length ? `; ${summarizeTextureFailures(failures)}` : ''}. More images can be loaded with another click.`);
     } catch(error) {
@@ -965,13 +967,18 @@ export default function World({
   currentProjectRef.current = project.id;
   const currentResourceRef = useRef((project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null);
   currentResourceRef.current = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
+  const textureScope=textureResourceScope(project.source);
+  const currentTextureScopeRef=useRef(textureScope);
+  currentTextureScopeRef.current=textureScope;
   const chosen = project.scene.find((o) => o.id === selected);
   const renderAvailable = hasRenderGeometry(inspection);
+  useEffect(()=>{
+    setViewMode(renderAvailable ? 'render' : 'smooth');
+    setBsp(0);
+  },[inspection?.sha256,renderAvailable,project.id]);
   useEffect(() => {
     autoPreviewEpoch.current++;
     setAutoPreviewProgress(null);
-    setViewMode(renderAvailable ? 'render' : 'smooth');
-    setBsp(0);
     setLoadingOwnedBitmap({});
     setShaderTextures(previous => { Object.values(previous).forEach(t=>t.dispose()); return {}; });
     setTextureNames({});
@@ -979,7 +986,7 @@ export default function World({
     setLightmapNames({});
     setExtraTextures(previous=>{Object.values(previous).forEach(t=>t.dispose());return {};});
     setTextureFailures([]);
-  }, [inspection?.sha256, renderAvailable, project.id, (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map'])]);
+  }, [inspection?.sha256, project.id, textureScope]);
   const previewMesh = useMemo(
     () => resolveBspMesh(inspection, viewMode, bsp),
     [inspection, viewMode, bsp],
@@ -993,12 +1000,12 @@ export default function World({
     catch {return null;}
   }, [inspection,shaderTextures,lightmapTextures,extraTextures,sourceAppearance,project.renderFeatures]);
   useEffect(()=>{
-    const scope=`${project.id}:${inspection?.sha256}:${(project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map'])??''}`;
+    const scope=`${project.id}:${inspection?.sha256}:${textureScope}`;
     if(automaticScope.current!==scope){automaticScope.current=scope;automaticAttempts.current.clear();}
     if(!native||!automaticTextures||autoPreviewLocked||!ownedPreviewPlan||!inspection?.renderMesh)return;
     const remaining=[...ownedPreviewPlan.shaderTasks,...ownedPreviewPlan.lightmapTasks,...ownedPreviewPlan.detailTasks].some(t=>!automaticAttempts.current.has(t.key));
     if(!remaining)return;let live=true;queueMicrotask(()=>{if(live)void previewVerifiedMaterialBatch('both',true);});return()=>{live=false;};
-  },[project.id,inspection?.sha256,project.source?.resourceSha256,automaticTextures,ownedPreviewPlan,autoPreviewLocked]);
+  },[project.id,inspection?.sha256,textureScope,automaticTextures,ownedPreviewPlan,autoPreviewLocked]);
   const materialAudit = useMemo(() => {
     if(!inspection || !previewMesh?.materialRanges?.length) return null;
     try { return buildMaterialAudit(inspection, previewMesh); }

@@ -1,4 +1,5 @@
 use notify::Watcher;
+#[path="texture_resources_native.rs"] mod texture_resources_native;
 #[path="workspace_windows.rs"] mod workspace_windows;
 use serde::{Deserialize, Serialize};
 use spark_core::{
@@ -935,29 +936,11 @@ async fn halo_setup_report(app:tauri::AppHandle)->Reply<serde_json::Value> {
 }
 
 #[tauri::command]
-async fn bitmap_resource_candidates(app:tauri::AppHandle,project_id:String)->Reply<Vec<serde_json::Value>> {
+async fn bitmap_resource_candidates(app:tauri::AppHandle,project_id:String)->Reply<Vec<texture_resources_native::Candidate>> {
     tauri::async_runtime::spawn_blocking(move || {
         let state=app.state::<AppState>();
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
-        let settings=lock(&state.settings)?.clone();
-        let installed=lock(&state.installation)?.clone();
-        let mut roots:Vec<(PathBuf,&str)>=vec![];
-        if let Some(s)=project.source.as_ref() {
-            if let Some(p)=&s.resource_directory {roots.push((p.clone(),"Previously selected resources"));}
-            if let Some(p)=s.original_path.parent(){roots.push((p.to_path_buf(),"Beside the original map"));}
-            let library=lock(&state.library)?;
-            for entry in library.list().map_err(error)?.into_iter().filter(|entry|entry.id!=project_id&&entry.sha256.as_deref()==Some(s.sha256.as_str())).take(24){
-                if let Ok(other)=library.get(&entry.id){if let Some(other)=other.source{if let Some(p)=other.resource_directory{roots.push((p,"Resources used by an identical preserved map"));}if let Some(p)=other.original_path.parent(){roots.push((p.to_path_buf(),"Beside an identical preserved map"));}}}
-            }
-        }
-        if let Some(p)=settings.resource_directory {roots.push((p,"Configured resource folder"));}
-        if let Some(p)=installed.mcc_path {roots.push((p.join("halo1/maps"),"Detected MCC legacy compatibility resources; ipak is separate"));roots.push((p.join("halo1/maps/custom_edition"),"Detected MCC Custom Edition compatibility resources"));}
-        let registrations:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
-        for r in registrations {roots.push((r.root.join("maps"),"Registered Halo installation"));
-            if let Some(p)=r.data_root {roots.push((p.join("maps"),"Registered runtime data"));}}
-        let mut seen=std::collections::HashSet::new();
-        Ok(roots.into_iter().filter_map(|(root,reason)|{let file=root.join("bitmaps.map");
-            (file.is_file()&&seen.insert(file.clone())).then(||serde_json::json!({"path":file,"reason":reason}))}).collect())
+        texture_resources_native::candidates(&state,&project)
     }).await.map_err(error)?
 }
 
@@ -974,32 +957,26 @@ async fn connect_halo_textures(app:tauri::AppHandle,window:tauri::WebviewWindow,
     };
     let Some(chosen)=chosen else{return Ok(None)};
     tauri::async_runtime::spawn_blocking(move || {
+        core::library::validate_local_input_path(&chosen).map_err(error)?;
         core::reject_links(&chosen).map_err(error)?;
         let file=if chosen.is_dir(){chosen.join("bitmaps.map")}else{chosen};
-        if !file.is_absolute(){return Err("Choose an absolute path to your original bitmaps.map".into());}
+        core::reject_links(&file).map_err(error)?;
+        let file=fs::canonicalize(file).map_err(error)?;
         let folder=file.parent().ok_or("Resource folder unavailable")?.to_path_buf();
         let state=app.state::<AppState>();
         check_document_owner(&state,&project_id,&owner)?;
         let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;
         let before=serde_json::to_vec(&p).map_err(error)?;
-        let s=p.source.as_ref().ok_or("Open a Halo map before connecting its shared textures")?;
+        let source=p.source.as_ref().ok_or("Open a Halo map before connecting its shared textures")?;
         let inspected=inspect(&state,&p)?;
         let hash=maps::hash_file(&file).map_err(error)?;
-        core::bitmap_preview::verify_resource_for_source(&s.preserved_path,&s.sha256,&inspected,&file,&hash).map_err(error)?;
+        core::bitmap_preview::verify_resource_for_source(&source.preserved_path,&source.sha256,&inspected,&file,&hash).map_err(error)?;
         let hashes=project::resource_hashes(&folder).map_err(error)?;
         if hashes.get("bitmaps.map")!=Some(&hash){return Err("Resource changed during verification; try again".into());}
-        let lib=lock(&state.library)?;
-        if serde_json::to_vec(&lib.get(&project_id).map_err(error)?).map_err(error)?!=before {
-            return Err("Project changed while verifying textures; try again".into());
-        }
         let source=p.source.as_mut().ok_or("Source disappeared")?;
         source.resource_directory=Some(folder);source.resource_sha256=hashes;
         p.modified_at=chrono::Utc::now().to_rfc3339();
-        lib.save(&p,Some(&inspected)).map_err(error)?;
-        drop(lib);
-        lock(&state.inspections)?.remove(&project_id);
-        let _=app.emit("spark:project-saved",&project_id);
-        Ok(Some(OpenProject{project:p,inspection:Some((*inspected).clone())}))
+        texture_resources_native::save_binding(&app,&owner,&before,p).map(Some)
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -1045,14 +1022,7 @@ async fn auto_connect_sound_resources(app:tauri::AppHandle,window:tauri::Webview
 }
 #[tauri::command]
 async fn auto_connect_classic_textures(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<Option<OpenProject>>{
-    {let state=app.state::<AppState>();check_document_owner(&state,&project_id,window.label())?;let project=lock(&state.library)?.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("No map source")?;
-        if ![6,7,609].contains(&source.cache_version)||source.resource_sha256.contains_key("bitmaps.map"){return Ok(None);}
-    }
-    // Use the same bounded discovery as the resource picker, including owned
-    // runtime installations. Compatibility is still proved by the exact
-    // source bitmap index; an installed MCC folder alone grants no match.
-    let candidates=bitmap_resource_candidates(app.clone(),project_id.clone()).await?;
-    for candidate in candidates.into_iter().take(12){if let Some(path)=candidate.get("path").and_then(|p|p.as_str()){if let Ok(Some(open))=connect_halo_textures(app.clone(),window.clone(),project_id.clone(),"path".into(),path.into()).await{return Ok(Some(open));}}}Ok(None)
+    texture_resources_native::auto_connect(app,window,project_id).await
 }
 
 #[tauri::command]
@@ -2812,6 +2782,7 @@ pub fn run() {
             validate_setting_path,
             choose_project_resources,
             bitmap_resource_candidates,
+            texture_resources_native::review_bitmap_resource_candidates,
             halo_setup_report,
             connect_halo_textures,
             auto_connect_classic_textures,

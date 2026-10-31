@@ -1,4 +1,5 @@
 import { retainAssetSource } from './assetSources';
+import {publishTextureResources,textureResourceScope} from './textureResourceScope';
 import type { NativeAssetImport } from './types';
 import type { ForgeMaterial } from './forge';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from './nativeAssetImport';
@@ -153,6 +154,8 @@ export default function App() {
   const [data, setData] = useState<Bootstrap>(browserBootstrap);
   const [ready, setReady] = useState(!native);
   const [documents,dispatchDocument]=useReducer(documentReducer,readHistoryLimit(),emptyMapDocuments);
+  const resourceIdentities=JSON.stringify(documents.documents.map(d=>[d.id,textureResourceScope(d.history.current?.source)]));
+  useEffect(()=>{for(const doc of documents.documents){if(doc.history.current)publishTextureResources(doc.history.current);}},[resourceIdentities]);
   const activeMap=activeDocument(documents),history=activeMap?.history??{...initialHistory,limit:documents.limit};
   const dispatch=useCallback((action:HistoryAction)=>dispatchDocument({type:'history',action}),[]);
   useEffect(()=>saveHistoryLimit(history.limit),[history.limit]);
@@ -260,7 +263,7 @@ export default function App() {
     })();
     return()=>{disposed=true;if(ownedUrl)URL.revokeObjectURL(ownedUrl);};
   },[bitmapPreference,current?.id,current?.source?.sha256,inspection?.sha256,
-     current?.source?.resourceSha256?.['bitmaps.map']]);
+     textureResourceScope(current?.source)]);
   const historyRef = useRef(history);
   historyRef.current = history;
   const documentsRef=useRef(documents);
@@ -413,8 +416,8 @@ export default function App() {
       if(native)await call('claim_project_document',{id:open.project.id});
       dispatchDocument({type:'open',open});
       if(native&&open.project.source){const version=open.project.source.cacheVersion;
-        const command=[6,7,609].includes(version)&&!open.project.source.resourceSha256?.['bitmaps.map']?'auto_connect_classic_textures':version===13&&(!open.project.source.resourceSha256?.['mcc-textures']||!open.project.source.resourceSha256?.['mcc-shared-bitmaps.map'])?'connect_mcc_texture_resources':null;
-        if(command)void call<OpenProject|null>(command,{projectId:open.project.id}).then(result=>{if(result)dispatchDocument({type:'resources',project:result.project});}).catch(e=>{if(version===13)notice('MCC texture resources: '+String(e),'error');});
+        const command=[6,7,609].includes(version)?'auto_connect_classic_textures':version===13&&(!open.project.source.resourceSha256?.['mcc-textures']||!open.project.source.resourceSha256?.['mcc-shared-bitmaps.map'])?'connect_mcc_texture_resources':null;
+        if(command)void call<OpenProject|null>(command,{projectId:open.project.id}).then(result=>{if(result)dispatchDocument({type:'resources',project:result.project,inspection:result.inspection});}).catch(e=>{if(version===13)notice('MCC texture resources: '+String(e),'error');});
       }
       if (open.inspection) {
         try {
@@ -436,12 +439,12 @@ export default function App() {
     },
     [notice],
   );
-  const applyResourceMetadata=useCallback(async(open:OpenProject)=>{const existing=documentsRef.current.documents.find(d=>d.id===open.project.id);if(existing)dispatchDocument({type:'resources',project:open.project});else await load(open);},[load]);
+  const applyResourceMetadata=useCallback(async(open:OpenProject)=>{const existing=documentsRef.current.documents.find(d=>d.id===open.project.id);if(existing)dispatchDocument({type:'resources',project:open.project,inspection:open.inspection});else await load(open);},[load]);
   const applyDependencyChoice=useCallback((open:OpenProject)=>{
     const existing=documentsRef.current.documents.find(d=>d.id===open.project.id);
     if(!existing)return;
     dispatchDocument({type:'history',id:open.project.id,action:{type:'edit',project:open.project,description:'Update map dependency setup'}});
-    if(open.inspection)dispatchDocument({type:'resources',project:open.project});
+    if(open.inspection)dispatchDocument({type:'resources',project:open.project,inspection:open.inspection});
     setEpoch(value=>value+1);
   },[]);
   const adoptExternalRevision=useCallback(async(previousId:string,opened:OpenProject,mode:'replaceClean'|'openSeparate')=>{

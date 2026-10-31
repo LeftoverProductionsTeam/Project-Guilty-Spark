@@ -1,4 +1,5 @@
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
+import {publishTextureResources,useTextureResourceScope} from '../textureResourceScope';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
 import {draggedAsset} from '../assetDragRegistry';
 import BuildTargets from './BuildTargets';
@@ -312,6 +313,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [assets, setAssets] = useState<ForgeAsset[]>([]),
     [assetError, setAssetError] = useState('');
   const [sourceOpen, setSourceOpen] = useState<OpenProject | null>(null);
+  const sourceResourceScope=useTextureResourceScope(sourceId);
+  const lastLoadedSource=useRef('');
   const [referenceFilter, setReferenceFilter] = useState<Set<number> | null>(null);
   const exchangePicker = useRef<HTMLInputElement>(null);
   const currentSourceId = useRef(sourceId);
@@ -514,14 +517,17 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   }, [doc]);
   useEffect(() => {
     let alive = true;
-    setAssets([]);
-    setSourceOpen(null);
-    setReferenceFilter(null);
+    if(lastLoadedSource.current!==sourceId){
+      lastLoadedSource.current=sourceId;
+      setAssets([]);
+      setSourceOpen(null);
+      setReferenceFilter(null);
+    }
     setAssetError('');
     if (!sourceId) return;
     call<OpenProject>('open_project', { id: sourceId })
       .then((open) => {
-        if (alive) { setSourceOpen(open); setAssets(catalogAssets(open)); }
+        if (alive) { publishTextureResources(open.project);setSourceOpen(open); setAssets(catalogAssets(open)); }
       })
       .catch((e) => {
         if (alive) setAssetError(String(e));
@@ -529,7 +535,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     return () => {
       alive = false;
     };
-  }, [sourceId]);
+  }, [sourceId,sourceResourceScope]);
   useEffect(() => {
     let alive = true;
     call<QuickForgeBuildReceipt | null>('quickforge_build_report', { projectId: project.id })
