@@ -1,10 +1,10 @@
 Project Guilty Spark C41 integrated source — 2026-10-31
 Base committed foundation: 5d67390a2b0819145fb148f589593ae65308e938
-Validated implementation commit: f291377ca7b0ba9b840af7848b4c3ff7025ebc7d
+Validated implementation commit: 8365fa42dd401bf176a0a40755f3227cda21c790
 
-Integrates the preserved C41 Smart Edit source and seven dependency updates with existing C35–C39 native workflows, BSP/asset handling and CE controls. Fixes direct-save dependency navigation, SHA-2 output encoding, standalone Zombie compatible-runtime textures and unconfigured metal/grass previews. Adds owned CE window diagnostics without claiming a successful client join.
+Integrates the preserved C41 Smart Edit source and seven dependency updates with existing C35–C39 native workflows, BSP/asset handling and CE controls. Fixes direct-save dependency navigation, SHA-2 output encoding, standalone Zombie compatible-runtime textures and unconfigured metal/grass previews. Adds the sharper, softer-lit, left-facing native monitor and shared source preparation across home visits. Adds owned CE window diagnostics without claiming a successful client join.
 
-595 locked Windows Rust tests pass (7 existing opt-in cases ignored), plus 259 frontend tests, 125 browser checks, 59 offline scripts and two interface-probe tests. Six genuine native suites bind the same bundled executable. All 30 captured branch tips remain ancestors; the original 146 dirty files and all 391 prior requirements survive. See docs/FINAL_CONSOLIDATION_C41.md and the metadata receipt.
+595 locked Windows Rust tests pass (7 existing opt-in cases ignored), plus 262 frontend tests, 125 browser checks, 59 offline scripts and two interface-probe tests. Six native integration suites retain their earlier executable identity. The current home/GPU and full asset/import/animation/native-build regressions bind this later presentation-polish executable. All 30 captured branch tips remain ancestors; the original 146 dirty files and all 391 prior requirements survive. See docs/FINAL_CONSOLIDATION_C41.md and the metadata receipt.
 
 General direct structures, universal conversion, game-peer/live rendering/audio parity, CE visual/join acceptance and other gameplay gates remain open. No game assets, external tools, source caches or private invitation credentials are packaged.
 
@@ -13,6 +13,9 @@ M	CHANGELOG.md
 M	Cargo.lock
 M	Cargo.toml
 M	README.md
+M	SOURCE_DIFF_FROM_PREVIOUS.txt
+M	SOURCE_MANIFEST_SHA256.txt
+M	SOURCE_SHA256SUMS.txt
 M	crates/spark-core/Cargo.toml
 M	crates/spark-core/examples/verify_source_archive.rs
 M	crates/spark-core/src/asset_transfer.rs
@@ -60,6 +63,7 @@ A	docs/FINAL_CONSOLIDATION_C41.md
 M	docs/KNOWN_LIMITATIONS.md
 M	docs/MASTER_FEATURE_LEDGER.csv
 M	docs/MASTER_FEATURE_LEDGER.md
+M	docs/NATIVE_ASSETS_AND_SHOWCASE.md
 M	docs/ORIGINAL_BITMAP_RESTORATION.md
 A	docs/REPOSITORY_ABOUT.md
 M	docs/RUNTIME_CAPABILITIES.md
@@ -67,6 +71,7 @@ A	docs/SMART_EDIT_WORKFLOWS.md
 M	docs/TEST_BUILD_READINESS.md
 M	docs/UNIVERSAL_WORKBENCH_BACKLOG.md
 A	docs/fixtures/c41-final-consolidation.json
+A	docs/fixtures/c41-home-showcase-polish.json
 A	docs/licenses/04575fc5bfae19a9b63100f8691f901a2e15a399011ac02db435a9ef27295551.txt
 A	docs/licenses/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt
 A	docs/licenses/70c9d40f1f9545c3f133b8a67206e89da850f6468eed072281bb3701514114a9.txt
@@ -89,6 +94,7 @@ M	package.json
 M	pnpm-lock.yaml
 A	scripts/continuation41-evidence.mjs
 M	scripts/test-ce-host-native.mjs
+A	scripts/test-home-showcase-native.mjs
 A	scripts/test-runtime-textures-native.mjs
 A	scripts/test-smart-edit-native.mjs
 M	scripts/test-sparklink-content-native.mjs
@@ -113,7 +119,9 @@ M	src-tauri/src/working_tag_changes_native.rs
 M	src/App.tsx
 M	src/components/Build.tsx
 M	src/components/CustomEditionHost.tsx
+M	src/components/HomeModel.tsx
 M	src/components/LiveForge.tsx
+M	src/components/NativeModelPreview.tsx
 M	src/components/QuickForge.tsx
 A	src/components/SmartEditPanel.tsx
 M	src/components/Tags.tsx
@@ -121,6 +129,8 @@ M	src/components/ViewportTags.tsx
 M	src/components/World.tsx
 A	src/components/smartEdit.css
 M	src/featureCatalog.ts
+A	src/homeShowcase.test.ts
+A	src/homeShowcase.ts
 M	src/mapSession.ts
 M	src/ownedBitmapBatch.ts
 A	src/runtimeTexturePreview.test.ts
