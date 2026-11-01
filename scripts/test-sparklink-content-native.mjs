@@ -468,6 +468,7 @@ try {
   await fs.writeFile(path.join(output,'sparklink-native-content-receipt.json'),JSON.stringify(receipt,null,2));
   console.log('PASS real three-process native tag, asset publication, placement, durability and Halo compilation');
 } catch(error) {
+  receipt.visibleNotices=await Promise.all(actors.map(async x=>({actor:x.slug,notices:await x.page?.locator('.notice.error').allTextContents().catch(()=>[])??[]})));
   for(const x of actors)if(x.page)await x.page.screenshot({path:path.join(output,`failure-${x.slug}.png`)}).catch(()=>{});
   await fs.writeFile(path.join(output,'failure.json'),JSON.stringify({...receipt,error:String(error),stack:error.stack,pageErrors:errors},null,2));throw error;
 } finally {

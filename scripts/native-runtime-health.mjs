@@ -1,5 +1,13 @@
 // Classify native engine faults separately from a successful join or zero exit.
 // Original parser; no engine code or game content is included.
+export function nativeSoundStreamingFailures(text) {
+  if (typeof text !== 'string' || Buffer.byteLength(text) > 16 * 1024 * 1024)
+    throw Error('Native compiler output exceeds bound');
+  return text.split(/\r?\n/).filter((line) =>
+    /failed to load sound for adding to cache file/i.test(line),
+  );
+}
+
 export function parseRuntimeHealth(text) {
   if (typeof text !== 'string' || Buffer.byteLength(text) > 8 * 1024 * 1024)
     throw Error('Native debug log exceeds bound');
@@ -15,13 +23,30 @@ export function parseRuntimeHealth(text) {
     let kind,
       source = null;
     const assertion = line.match(/EXCEPTION assert in .*?[\\/]SOURCE[\\/]([\w\\/ .-]{1,160}),#(\d{1,7}):/i);
+    const correction = line.match(/the map '[^']{1,512}' is corrected: tag '([^']{1,512})' \(([^)]{1,4})\):/i);
     if (assertion) {
       kind = 'nativeAssertion';
       source = assertion[1].replaceAll('\\', '/') + ':' + assertion[2];
     } else if (/\b(?:[a-f\d]{1,8}) is not a tag index: an empty tag is used\b/i.test(line))
       kind = 'invalidTagReference';
+    else if (/#[+-]?\d+ is not a block element index in \[#[+-]?\d+,#[+-]?\d+\): an empty one is used/i.test(line))
+      kind = 'invalidBlockReference';
     else if (/expected tag group '.{1,4}' but got '.{1,4}'/i.test(line)) kind = 'tagClassMismatch';
     else if (/OUT OF OBJECTS: cannot create /i.test(line)) kind = 'objectCreationFailed';
+    else if (/couldn't teleport the biped out far enough from the vehicle\.\.\./i.test(line))
+      kind = 'bipedExitPlacementFailed';
+    else if (/WARNING: cannot create mounted weapons for .{1,512}, exceeded MAXIMUM_NUMBER_OF_MOUNTED_WEAPON_UNITS/i.test(line))
+      kind = 'mountedActorCapacityExceeded';
+    else if (/samples has \d+ bytes, more than the game's \d+: cut to \d+/i.test(line)) {
+      kind = 'nativeSoundSampleTruncated';
+      if (correction) source = correction[1].replaceAll('\\', '/') + ' (' + correction[2] + ')';
+    } else if (/not a tag of .{1,512}: none$/i.test(line)) {
+      kind = 'nativeDependencyCleared';
+      if (correction) source = correction[1].replaceAll('\\', '/') + ' (' + correction[2] + ')';
+    } else if (/animation_graph_check has (?:the root node's sibling \d+: none|node \d+ unreached from the root: made the root's child)/i.test(line)) {
+      kind = 'nativeAnimationHierarchyCorrected';
+      if (correction) source = correction[1].replaceAll('\\', '/') + ' (' + correction[2] + ')';
+    }
     else if (/\bcrash: exception [a-f\d]{8}\b/i.test(line)) kind = 'nativeCrash';
     else if (/\b(?:EXCEPTION (?:halt|access violation)|unhandled exception)\b/i.test(line))
       kind = 'nativeException';

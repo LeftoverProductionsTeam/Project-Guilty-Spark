@@ -1,0 +1,1869 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": "C46",
+  "startingCommit": "7fb89201ae16df0279fb31b5f52aff72bd65c937",
+  "checkedAt": "2026-11-01T14:04:48.837Z",
+  "appSha256": "7ccc0e6ee4432b957058caba064cc5e1af77a27090133a76131002e9ee21ae1c",
+  "installerSha256": "bdb9e5cf5635aab2a908e6262ba5750d2ddc54b3123827dacbd22273aa27aeb8",
+  "sourceIntegrity": {
+    "reviewedTags": 3739,
+    "baselineTreeSha256": "ee9e307640523674d30700e754365c903d1306bbd5116ac84eb0dd023f2764f7",
+    "recipeChanges": 12,
+    "soundChanges": 3,
+    "expectedFinalFootprint": 15,
+    "originalsUnchanged": true,
+    "toolsUnchanged": true
+  },
+  "nativeAudio": {
+    "originalSampleDecoder": "libsndfile-1.0.31",
+    "decoderSha256": "e32d3ceef6f1975b09bbdb3ac2ea7664e20f74fb183cbcd2fa5f5762aae92c82",
+    "completeNativeChunks": 331,
+    "rate": 44100,
+    "channels": 2,
+    "preparation": "Append 0..63 explicit silent frames to complete a 64-frame native ADPCM block; original PCM prefix is byte-identical. Native encoding remains lossy.",
+    "results": [
+      {
+        "tag": "sound\\dialog\\multiplayer1\\game_over",
+        "originalOggSha256": "065138d8c89610477cb4cda4f595bec7158bd62d9c17a3fef7ad51bb0f1bb9db",
+        "originalDecodedPcmSha256": "a840d4ca6e8fa3af9cf77b5034fb0ae459298ca2cbc62cc13a1a4e4fd7bc29e9",
+        "chunks": 133,
+        "frames": 7726080,
+        "originalFrames": 7726080,
+        "paddingFrames": 0,
+        "channels": 2,
+        "sampleRate": 44100,
+        "decodedPcmSha256": "68f00383a7b4d400994364587cb32e2189cefc12f5dc23811b8f854bca3bbbef",
+        "framesPreserved": true,
+        "rateAndChannelsPreserved": true,
+        "losslessEncodingClaimed": false,
+        "playbackAccepted": false
+      },
+      {
+        "tag": "sound\\dialog\\multiplayer1\\ghost",
+        "originalOggSha256": "1d7fd059c0b2b4608ca108965b0973617dd66ef633ec7a3e2eed4d988470b6df",
+        "originalDecodedPcmSha256": "a90443ac40f98c736e45f1a90b08b65399de7c89c4c8968b851eb996abd32dfd",
+        "chunks": 127,
+        "frames": 7392384,
+        "originalFrames": 7392384,
+        "paddingFrames": 0,
+        "channels": 2,
+        "sampleRate": 44100,
+        "decodedPcmSha256": "3e33eb7c24cb1273d8c48ddf8f5b6fa196a6100aeae0398c74f4a3dd372ba289",
+        "framesPreserved": true,
+        "rateAndChannelsPreserved": true,
+        "losslessEncodingClaimed": false,
+        "playbackAccepted": false
+      },
+      {
+        "tag": "sparky\\sound\\sparkmusic\\v1_hit_themes\\killer_tracks_invaders",
+        "originalOggSha256": "1e01df20b18bcae0b903ba27308dd78e2feffffa63bff8f7afbcb63d98c7d281",
+        "originalDecodedPcmSha256": "e4d75792fe63fc970ee5642d5d07d1cb4a77789af86be1a1d67ec895cdbd2401",
+        "chunks": 71,
+        "frames": 4127104,
+        "originalFrames": 4127091,
+        "paddingFrames": 13,
+        "channels": 2,
+        "sampleRate": 44100,
+        "decodedPcmSha256": "79b0fff165d827c886e22f3d9747db7f15eaa187f5cc1ac8c244745756336033",
+        "framesPreserved": true,
+        "rateAndChannelsPreserved": true,
+        "losslessEncodingClaimed": false,
+        "playbackAccepted": false
+      }
+    ],
+    "ceCache": {
+      "bytes": 98275315,
+      "sha256": "f523cd46309c3c82658dce06658ae5e21382f4b3e04c22516ff484fceb0404ad",
+      "version": 609
+    },
+    "mccCache": {
+      "bytes": 98556963,
+      "sha256": "3b1788a41f797d44cae8cc90ade81175d684dd45c877935572efc48b5f6ca1f4",
+      "version": 13
+    },
+    "nativeToolSha256": {
+      "classic": "63181136d89194a0910a767e03c0a34a8c334b09f3146901e1be2fa70b574892",
+      "h1a": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa"
+    },
+    "all331EncodedSamplesAndDecodedWaveFilesEquivalent": true,
+    "sampleIdentitySha256": "807ddc9be005bb964f2cd4dad0eac617916e7a40fda7fddaac1511588eea4637",
+    "strictCeSoundTagsMatched": 3,
+    "strictMccSoundTagsMatched": 1,
+    "strictSoundTagsCompared": 3,
+    "mccDistanceDifferences": {
+      "tags": [
+        "sound\\dialog\\multiplayer1\\game_over",
+        "sound\\dialog\\multiplayer1\\ghost"
+      ],
+      "source": {
+        "minimum": 0,
+        "maximum": 0
+      },
+      "compiled": {
+        "minimum": 2,
+        "maximum": 5
+      },
+      "equivalenceAccepted": false
+    },
+    "initialAdpcmRefusal": "Error: Native chain is missing chunks or frames",
+    "lostFramesInRejectedInitialCandidate": 51,
+    "actualPcmFalseSuccess": {
+      "cache": {
+        "bytes": 93132415,
+        "sha256": "a5bdddea293be92bf63fd3e80d1d25660db854374f0b21304a5eedbbf8b6d363"
+      },
+      "compilerExit": 0,
+      "soundFailures": 2,
+      "rawReaderRefused": true,
+      "refusedReaderReceiptSha256": "8398478180527f57b28af436cddd07a12b68360b94f58d974dc7d79ce2190cb4",
+      "refusedReaderReason": "Audio sample range overlaps the cache header"
+    },
+    "gamePlaybackAccepted": false,
+    "losslessEncodingClaimed": false
+  },
+  "nativeLoopEmitter": {
+    "complete": true,
+    "source": {
+      "sha256": "6195dcd1b8438c66e1a550ea5926462939f5f967eda178b0a627dfb64a89b295",
+      "cacheVersion": 13
+    },
+    "originalLoop": {
+      "path": "sound\\sfx\\ambience\\computers\\covy_uplink",
+      "tagId": 3791126660,
+      "tagPath": "sound\\sfx\\ambience\\computers\\covy_uplink",
+      "sourceSha256": "6195dcd1b8438c66e1a550ea5926462939f5f967eda178b0a627dfb64a89b295",
+      "loops": true,
+      "tracks": [
+        {
+          "index": 0,
+          "gain": 1,
+          "fadeInSeconds": 1,
+          "fadeOutSeconds": 1,
+          "startTagId": null,
+          "loopTagId": 3791192197,
+          "endTagId": null
+        }
+      ],
+      "warnings": []
+    },
+    "control": {
+      "elapsedMs": 4274.8678999999975,
+      "nativeLoopExplicitlyIncluded": true,
+      "editorMutePreserved": true,
+      "importedFileCount": 2,
+      "singleUndoRedo": true
+    },
+    "compiled": {
+      "sha256": "fed81a8b25c5e262edeefc431c7c804e3c9fcde0922cfa2cf3aaf7ebe845ce93",
+      "sceneryPath": "spark\\audio\\c0c81725e2c94747b2373bf49f7734f6\\3cbcfbfe69704afc9b65fca912df4dbd",
+      "loopPath": "gs_assets_40c1717dda7f44fabf510d514960eaac\\sound\\sfx\\ambience\\computers\\covy_uplink",
+      "position": [
+        2,
+        3,
+        1
+      ],
+      "wholeLoopPreserved": true,
+      "decoded": {
+        "frames": 283933,
+        "channels": 1,
+        "sampleRate": 48000,
+        "durationSeconds": 5.9152708333333335,
+        "rms": 0.06778462606604833
+      }
+    },
+    "bankRecovery": {
+      "sourceSha256": "6195dcd1b8438c66e1a550ea5926462939f5f967eda178b0a627dfb64a89b295",
+      "inputSha256": "e651b94e352a02339b60bf60d2f56308a03cf801b65365769a8fc54d72da2cca",
+      "soundCount": 1,
+      "sampleCount": 3,
+      "encodedBytes": 200520,
+      "sampleSha256": [
+        "009efc8aa1c12f0fc97824538c4b8397530d2af062c3d8243a9788903365ab12",
+        "f8f106a1649bb982b638abf1eac77d3e5bf31741efcb8744b0d4e93876d8e843",
+        "f5676ab46dce16b9700edbb8c7cc9ccd6401eac56a52c8a9cf0c388aaefaff67"
+      ],
+      "bankSha256": {
+        "sounds_adpcm.fsb": "d9a70adcb681bcb152a50ea61904fc921d2d94aff3000fe3d2827823c9e49e88",
+        "sounds_adpcm.lst.bin": "d469b6d72c7d8f6d141da2b61c14b29862a57d3563ebb195e3829f18db742a78"
+      },
+      "notice": "Extraction input only: exact pinned MCC classic ADPCM bytes embedded locally for native Invader serialization. Only raw-sample flags/offsets and declared length differ; original metadata/source remains intact. This input is not a playable map or a shared patch."
+    },
+    "sourceExactCompiledSamples": [
+      {
+        "sourceTagId": 3791192197,
+        "sourcePath": "sound\\sfx\\ambience\\computers\\covey_uplink",
+        "compiledPath": "gs_assets_40c1717dda7f44fabf510d514960eaac\\sound\\sfx\\ambience\\computers\\covey_uplink",
+        "permutations": [
+          {
+            "pitchRange": 0,
+            "permutation": 0,
+            "sha256": "009efc8aa1c12f0fc97824538c4b8397530d2af062c3d8243a9788903365ab12",
+            "bytes": 73368
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 1,
+            "sha256": "f8f106a1649bb982b638abf1eac77d3e5bf31741efcb8744b0d4e93876d8e843",
+            "bytes": 59004
+          },
+          {
+            "pitchRange": 0,
+            "permutation": 2,
+            "sha256": "f5676ab46dce16b9700edbb8c7cc9ccd6401eac56a52c8a9cf0c388aaefaff67",
+            "bytes": 68148
+          }
+        ]
+      }
+    ],
+    "sourcePermutations": 3,
+    "ownerNativeFilesPreserved": 2240,
+    "deliberateManagedImportCorruption": {
+      "rejected": true,
+      "blockers": [
+        "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+      ],
+      "attributedTool": null
+    },
+    "sourcePreserved": true,
+    "previousAcceptedBuildPreserved": true,
+    "receiptSha256": "6d565ec05f6eceb96843ea98e32970c3b20991381b19e73b474db980b38f626a",
+    "gameplayAudioVerified": false
+  },
+  "nativeMusicConflict": {
+    "complete": true,
+    "actualNativeCompiler": true,
+    "unsafeMapLaunched": false,
+    "audit": {
+      "complete": true,
+      "expected": "music-conflict",
+      "reason": "Unsafe Halo music-class combination: sound scenery 'gs_assets_40c1717dda7f44fabf510d514960eaac\\sound\\sfx\\ambience\\computers\\covy_uplink' and BSP background 'gs_assets_40c1717dda7f44fabf510d514960eaac\\sound\\sfx\\ambience\\computers\\covy_uplink' both reach music-class sounds. This combination is known to crash Halo/Sapien. Choose an ambient-class loop or explicitly review the authored source classes; Spark has not changed them.",
+      "rejected": true,
+      "sha256": "30397b1f2b45e2f4b75d49beff8c7c852051aa83e7c0fbd16a76e4aeb36adaf5"
+    },
+    "previousGoodUnchanged": true,
+    "receiptSha256": "e7c6f4d679010d4139734012bd2146517d880865263793c528491b340aee50e3"
+  },
+  "nativeAnimation": {
+    "sourceSha256": "13c1e3aa64759f0b1ab3a477962600368b2371ef04f1e9fb14f5e3386138a3f8",
+    "outputSha256": "43b97cb0f310afba6520a6c83c9738d0c16350c1e8444ca46aa38dada527fdf7",
+    "frames": 2,
+    "fps": 30,
+    "nodes": [
+      {
+        "name": "frame gun",
+        "parent": -1,
+        "child": 1,
+        "sibling": -1
+      },
+      {
+        "name": "frame spinner",
+        "parent": 0,
+        "child": 2,
+        "sibling": -1
+      },
+      {
+        "name": "frame nose01",
+        "parent": 1,
+        "child": -1,
+        "sibling": 3
+      },
+      {
+        "name": "frame nose02",
+        "parent": 1,
+        "child": -1,
+        "sibling": 4
+      },
+      {
+        "name": "frame nose03",
+        "parent": 1,
+        "child": -1,
+        "sibling": -1
+      }
+    ],
+    "nativeCompilerExit": 0,
+    "nativeHierarchyVerified": true,
+    "nativeTagSha256": "1d0fec1bd51cfba782b7f11d7f30f39f15383841434c522a8caa64a774cc7e4b",
+    "sourceUnchanged": true,
+    "playbackAccepted": false
+  },
+  "performance": {
+    "schemaVersion": 1,
+    "workload": "Complete 133-chunk native game_over sound export from the same 98,275,315-byte CE cache; original full-file and codec validation retained",
+    "cacheSha256": "f523cd46309c3c82658dce06658ae5e21382f4b3e04c22516ff484fceb0404ad",
+    "variants": {
+      "before": {
+        "path": "sound-export-sequential.exe",
+        "sha256": "ddf45078433d4ff0f294fdf670b7149a43afe9943fb24c8ed556e2ed87ff141c"
+      },
+      "after": {
+        "path": "sound-export-batched.exe",
+        "sha256": "f697805dc6c87ed52cd5fa1e6f6bf411a18f3efb2c91eecc0489f66f09b98551"
+      }
+    },
+    "order": [
+      "pair-1-before",
+      "pair-1-after",
+      "pair-2-after",
+      "pair-2-before",
+      "pair-3-before",
+      "pair-3-after"
+    ],
+    "results": [
+      {
+        "pair": 1,
+        "variant": "before",
+        "elapsedMs": 298083.666,
+        "exportedChunks": 133,
+        "exportedBytes": 30910172,
+        "contentSha256": "23a69a1bfe92e896f279a775998b4487dcc5081b1d466588d5974f424a048327",
+        "receiptSha256": "a02fa57efcf6d3e588e46613b280a80df3476c71e1274192be68d1d811cb8fcb",
+        "exitCode": 0
+      },
+      {
+        "pair": 1,
+        "variant": "after",
+        "elapsedMs": 10426.848,
+        "exportedChunks": 133,
+        "exportedBytes": 30910172,
+        "contentSha256": "23a69a1bfe92e896f279a775998b4487dcc5081b1d466588d5974f424a048327",
+        "receiptSha256": "a02fa57efcf6d3e588e46613b280a80df3476c71e1274192be68d1d811cb8fcb",
+        "exitCode": 0
+      },
+      {
+        "pair": 2,
+        "variant": "after",
+        "elapsedMs": 10447.288,
+        "exportedChunks": 133,
+        "exportedBytes": 30910172,
+        "contentSha256": "23a69a1bfe92e896f279a775998b4487dcc5081b1d466588d5974f424a048327",
+        "receiptSha256": "a02fa57efcf6d3e588e46613b280a80df3476c71e1274192be68d1d811cb8fcb",
+        "exitCode": 0
+      },
+      {
+        "pair": 2,
+        "variant": "before",
+        "elapsedMs": 299765.691,
+        "exportedChunks": 133,
+        "exportedBytes": 30910172,
+        "contentSha256": "23a69a1bfe92e896f279a775998b4487dcc5081b1d466588d5974f424a048327",
+        "receiptSha256": "a02fa57efcf6d3e588e46613b280a80df3476c71e1274192be68d1d811cb8fcb",
+        "exitCode": 0
+      },
+      {
+        "pair": 3,
+        "variant": "before",
+        "elapsedMs": 293818.436,
+        "exportedChunks": 133,
+        "exportedBytes": 30910172,
+        "contentSha256": "23a69a1bfe92e896f279a775998b4487dcc5081b1d466588d5974f424a048327",
+        "receiptSha256": "a02fa57efcf6d3e588e46613b280a80df3476c71e1274192be68d1d811cb8fcb",
+        "exitCode": 0
+      },
+      {
+        "pair": 3,
+        "variant": "after",
+        "elapsedMs": 10323.618,
+        "exportedChunks": 133,
+        "exportedBytes": 30910172,
+        "contentSha256": "23a69a1bfe92e896f279a775998b4487dcc5081b1d466588d5974f424a048327",
+        "receiptSha256": "a02fa57efcf6d3e588e46613b280a80df3476c71e1274192be68d1d811cb8fcb",
+        "exitCode": 0
+      }
+    ],
+    "contentEquivalent": true,
+    "complete": true,
+    "scope": "Warm OS filesystem cache; fresh export directory per run. Wall-clock export time only. No claim about desktop startup, renderer, GPU, memory or native game playback.",
+    "medianMs": {
+      "before": 298083.666,
+      "after": 10426.848
+    },
+    "improvementPercent": 96.50203979979231,
+    "sourceUnchanged": true
+  },
+  "openCe": {
+    "executionSha256": "1d28e73de84aad273d9492f3cfaf14aa8c20d648574850a838a6c013d8b26f8b",
+    "identities": [
+      {
+        "role": "host",
+        "pid": 23304,
+        "observerSha256": "4667aa9df1c910b9db3165b6c14d8c83d1114a20788af71313b7dab96a848374",
+        "logSha256": "902a87690d401079e24041a65940ef01b48752f0d64239a5c9e27f6c72baba3e",
+        "samples": 716,
+        "readErrors": {
+          "bounded address rejected": 1,
+          "map not initialized": 11,
+          "crossed tick while reading": 29,
+          "invalid datum pool": 3
+        },
+        "maximumActorPool": 39,
+        "maximumNetworkActors": 31,
+        "readTimingMs": {
+          "count": 716,
+          "median": 1.0892,
+          "p95": 8.3145,
+          "maximum": 10.193999999999999
+        },
+        "detailedCensus": {
+          "frames": 53,
+          "readTimingMs": {
+            "count": 53,
+            "median": 8.718,
+            "p95": 9.7877,
+            "maximum": 10.193999999999999
+          },
+          "last": {
+            "tick": 1819,
+            "actors": 29,
+            "activeActors": 26,
+            "bipeds": 40,
+            "vehicles": 0
+          },
+          "peakActiveActors": 28
+        }
+      },
+      {
+        "role": "client",
+        "pid": 27036,
+        "observerSha256": "4667aa9df1c910b9db3165b6c14d8c83d1114a20788af71313b7dab96a848374",
+        "logSha256": "7de6762fdffe2416120e2c57ba3d367cc7adf5ec12036e2b201a44c90255d0ae",
+        "samples": 542,
+        "readErrors": {
+          "bounded address rejected": 2,
+          "map not initialized": 10,
+          "crossed tick while reading": 23,
+          "invalid datum pool": 3
+        },
+        "maximumActorPool": 0,
+        "maximumNetworkActors": 30,
+        "readTimingMs": {
+          "count": 542,
+          "median": 0.9018999999999999,
+          "p95": 7.865,
+          "maximum": 9.8414
+        },
+        "detailedCensus": {
+          "frames": 41,
+          "readTimingMs": {
+            "count": 41,
+            "median": 8.0232,
+            "p95": 9.3808,
+            "maximum": 9.8414
+          },
+          "last": {
+            "tick": 1512,
+            "actors": 0,
+            "activeActors": 0,
+            "bipeds": 50,
+            "vehicles": 24
+          },
+          "peakActiveActors": 0
+        }
+      }
+    ],
+    "actorControlsObserved": true,
+    "nativeFaultsObserved": true,
+    "comparison": {
+      "exactTickFrames": 271,
+      "sharedActualActorIds": 40,
+      "movingActorIds": 28,
+      "firingActorIds": 0,
+      "position": {
+        "count": 3458,
+        "median": 0.02343445323239743,
+        "p95": 0.9531791013441152,
+        "maximum": 221.3427597491165
+      },
+      "worldSpacePosition": {
+        "count": 3458,
+        "median": 0.02343445323239743,
+        "p95": 0.9531791013441152,
+        "maximum": 221.3427597491165
+      },
+      "sameParentLocalPosition": null,
+      "positionCoordinateScope": {
+        "rawObjectPairs": 3458,
+        "worldSpacePairs": 3458,
+        "sameParentLocalPairs": 0,
+        "differentParentPairs": 0,
+        "note": "Raw object coordinates are parent-local while attached. Different-parent deltas remain in position but cannot establish a world-space distance or parity."
+      },
+      "observationCoverage": {
+        "hostObservations": 716,
+        "clientObservations": 542,
+        "hostDistinctTicks": 616,
+        "clientDistinctTicks": 525,
+        "hostRepeatedTickObservations": 100,
+        "clientRepeatedTickObservations": 17,
+        "hostTicksWithoutClientPair": 345,
+        "clientTicksWithoutHostPair": 254,
+        "selection": "Last validated observation per distinct server tick on each side; raw observations and errors remain retained."
+      },
+      "identityCoverage": {
+        "hostAiUnitTicks": 3858,
+        "matchedAiUnitTicks": 3458,
+        "missingClientUnitTicks": 400,
+        "knownAiMissingHostUnitTicks": 342,
+        "unclassifiedClientUnitTicks": 0,
+        "mismatchedTagUnitTicks": 0,
+        "examples": [
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815964928,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815899391,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815833854,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815768317,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815702780,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815637243,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815571706,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815506169,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815440632,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815375095,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815309558,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815244021,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815178484,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815112947,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3815047410,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3814981873,
+            "tag": 3875603853
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3814916336,
+            "tag": 3875603853
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3814785262,
+            "tag": 3802661172
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3814719725,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 32,
+            "id": 3814588651,
+            "tag": 3795058880
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815964928,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815899391,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815833854,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815768317,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815702780,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815637243,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815571706,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815506169,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815440632,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815375095,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815309558,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 35,
+            "id": 3815244021,
+            "tag": 3790930049
+          }
+        ]
+      },
+      "health": {
+        "count": 3458,
+        "median": 0,
+        "p95": 0.000030159950256347656,
+        "maximum": 0.09360039234161377
+      },
+      "shield": {
+        "count": 3458,
+        "median": 0,
+        "p95": 0,
+        "maximum": 0
+      },
+      "throttle": {
+        "count": 3458,
+        "median": 0,
+        "p95": 0,
+        "maximum": 1
+      },
+      "receivedControlAgeTicks": {
+        "count": 3458,
+        "median": 1,
+        "p95": 3,
+        "maximum": 4
+      },
+      "parentOrSeatDifferences": 0,
+      "largePositionDifferences": {
+        "total": 168,
+        "examples": [
+          {
+            "tick": 1243,
+            "id": 3826843917,
+            "tag": 3790930049,
+            "distance": 2.157239511732108,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1243,
+            "id": 3826450695,
+            "tag": 3790930049,
+            "distance": 2.70274459523918,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1243,
+            "id": 3826909454,
+            "tag": 3790930049,
+            "distance": 1.0934060286838168,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1243,
+            "id": 3826778380,
+            "tag": 3790930049,
+            "distance": 2.992145947824942,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1243,
+            "id": 3826712843,
+            "tag": 3790930049,
+            "distance": 4.00585888446406,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1243,
+            "id": 3826516232,
+            "tag": 3790930049,
+            "distance": 1.1147189118179466,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1243,
+            "id": 3826647306,
+            "tag": 3790930049,
+            "distance": 4.459943983706703,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1246,
+            "id": 3827106065,
+            "tag": 3790930049,
+            "distance": 221.3427597491165,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1246,
+            "id": 3826843917,
+            "tag": 3790930049,
+            "distance": 1.2075202355028951,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1246,
+            "id": 3826581769,
+            "tag": 3790930049,
+            "distance": 218.01321451552113,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1246,
+            "id": 3826450695,
+            "tag": 3790930049,
+            "distance": 2.1837167304139644,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1246,
+            "id": 3826909454,
+            "tag": 3790930049,
+            "distance": 1.0828931347541488,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1246,
+            "id": 3826778380,
+            "tag": 3790930049,
+            "distance": 2.5871057885982083,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1246,
+            "id": 3826712843,
+            "tag": 3790930049,
+            "distance": 3.9759901460934506,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1246,
+            "id": 3826516232,
+            "tag": 3790930049,
+            "distance": 1.1062914102843318,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1246,
+            "id": 3826647306,
+            "tag": 3790930049,
+            "distance": 4.4289765486378965,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1249,
+            "id": 3827106065,
+            "tag": 3790930049,
+            "distance": 147.4906107922652,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1249,
+            "id": 3826581769,
+            "tag": 3790930049,
+            "distance": 145.3005574935874,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1249,
+            "id": 3826450695,
+            "tag": 3790930049,
+            "distance": 2.138363463251949,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1249,
+            "id": 3826909454,
+            "tag": 3790930049,
+            "distance": 1.0723860298889052,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1249,
+            "id": 3826778380,
+            "tag": 3790930049,
+            "distance": 2.609471202126045,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1249,
+            "id": 3826712843,
+            "tag": 3790930049,
+            "distance": 3.9461550607326696,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1249,
+            "id": 3826516232,
+            "tag": 3790930049,
+            "distance": 1.0979135679191172,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1249,
+            "id": 3826647306,
+            "tag": 3790930049,
+            "distance": 4.398030231403511,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1252,
+            "id": 3827106065,
+            "tag": 3790930049,
+            "distance": 73.70970138714814,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1252,
+            "id": 3826581769,
+            "tag": 3790930049,
+            "distance": 72.62944160415533,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1252,
+            "id": 3826450695,
+            "tag": 3790930049,
+            "distance": 1.8109225939105753,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1252,
+            "id": 3826909454,
+            "tag": 3790930049,
+            "distance": 1.0618886144190587,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1252,
+            "id": 3826778380,
+            "tag": 3790930049,
+            "distance": 2.6324913840417588,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1252,
+            "id": 3826712843,
+            "tag": 3790930049,
+            "distance": 3.9163303955613515,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1252,
+            "id": 3826516232,
+            "tag": 3790930049,
+            "distance": 1.0895855956425917,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1252,
+            "id": 3826647306,
+            "tag": 3790930049,
+            "distance": 4.367117198208065,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          }
+        ]
+      },
+      "hostAuthorityObserved": true,
+      "aiActorAcceptance": false,
+      "fullLifecycleAcceptance": false,
+      "twoComputerAcceptance": false,
+      "note": "Every distinct-tick matched pair remains in the raw distributions; missing identities and coordinate-space differences are reported separately. Same-tick process reads are not atomic engine packets; counters advance separately from position, damage, seat and control updates. No parity or latency threshold is approved here."
+    },
+    "nativeHealth": [
+      {
+        "role": "host",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "zombie_apocalypse (scnr)",
+            "firstLine": 27637,
+            "loggedRecords": 3,
+            "minimumOccurrences": 3
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/evolved zombie (bipd)",
+            "firstLine": 27640,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/alpha zombieorigshot (bipd)",
+            "firstLine": 27641,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "weapons/pistol/melee (jpt!)",
+            "firstLine": 27642,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/player/survivor (bipd)",
+            "firstLine": 27643,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/alpha zombieorig (bipd)",
+            "firstLine": 27644,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "globals/globals (matg)",
+            "firstLine": 27645,
+            "loggedRecords": 3,
+            "minimumOccurrences": 3
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/kiyoshi/broke/tags/equipment/molotov (proj)",
+            "firstLine": 27648,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "mountedActorCapacityExceeded",
+            "source": null,
+            "firstLine": 27716,
+            "loggedRecords": 4,
+            "minimumOccurrences": 6
+          },
+          {
+            "kind": "invalidBlockReference",
+            "source": null,
+            "firstLine": 27720,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "bipedExitPlacementFailed",
+            "source": null,
+            "firstLine": 27721,
+            "loggedRecords": 3,
+            "minimumOccurrences": 17
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 27723,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 27724,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 27725,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          }
+        ],
+        "unclassifiedErrorRecords": 0
+      },
+      {
+        "role": "client",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "zombie_apocalypse (scnr)",
+            "firstLine": 11586,
+            "loggedRecords": 3,
+            "minimumOccurrences": 3
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/evolved zombie (bipd)",
+            "firstLine": 11589,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/alpha zombieorigshot (bipd)",
+            "firstLine": 11590,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "weapons/pistol/melee (jpt!)",
+            "firstLine": 11591,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/player/survivor (bipd)",
+            "firstLine": 11592,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/alpha zombieorig (bipd)",
+            "firstLine": 11593,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "globals/globals (matg)",
+            "firstLine": 11594,
+            "loggedRecords": 3,
+            "minimumOccurrences": 3
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/kiyoshi/broke/tags/equipment/molotov (proj)",
+            "firstLine": 11597,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "mountedActorCapacityExceeded",
+            "source": null,
+            "firstLine": 11663,
+            "loggedRecords": 9,
+            "minimumOccurrences": 21
+          },
+          {
+            "kind": "invalidBlockReference",
+            "source": null,
+            "firstLine": 11674,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 11675,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 11676,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 11677,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          }
+        ],
+        "unclassifiedErrorRecords": 0
+      }
+    ],
+    "gameplayAccepted": false,
+    "fullLifecycleAccepted": false,
+    "twoComputers": false
+  },
+  "chupathingy": {
+    "verdict": {
+      "status": "invalid-or-failed-evidence",
+      "selectedComparison": "exactTicks",
+      "joinMarkersObserved": true,
+      "bidirectionalPacketCountersObserved": true,
+      "atLeastTwoMachinePlayersObserved": true,
+      "completeInventoryParity": false,
+      "humanPlayAccepted": false,
+      "aiActorAcceptance": false,
+      "twoComputerAcceptance": false,
+      "renderingOrAudioAcceptance": false,
+      "nativeDebugLogsChecked": true,
+      "nativeContentAcceptance": false,
+      "universalCrossRuntimeCompatibility": false,
+      "listingGateChangeAuthorized": false
+    },
+    "issues": {
+      "total": 4,
+      "truncated": false,
+      "examples": [
+        {
+          "kind": "runnerReportedErrors",
+          "count": 1
+        },
+        {
+          "role": "host",
+          "kind": "nativeRuntimeFaults",
+          "faultGroups": 10,
+          "unclassifiedErrorRecords": 0
+        },
+        {
+          "role": "client",
+          "kind": "nativeRuntimeFaults",
+          "faultGroups": 18,
+          "unclassifiedErrorRecords": 2
+        },
+        {
+          "role": "host",
+          "kind": "abnormalOrUnestablishedExit"
+        }
+      ]
+    },
+    "nativeHealth": [
+      {
+        "role": "host",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "mountedActorCapacityExceeded",
+            "source": null,
+            "firstLine": 117,
+            "loggedRecords": 4,
+            "minimumOccurrences": 6
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "tag_files/tag_groups.c:3089",
+            "firstLine": 121,
+            "loggedRecords": 2,
+            "minimumOccurrences": 10
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "tag_files/tag_groups.c:3090",
+            "firstLine": 122,
+            "loggedRecords": 2,
+            "minimumOccurrences": 10
+          },
+          {
+            "kind": "invalidBlockReference",
+            "source": null,
+            "firstLine": 123,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "bipedExitPlacementFailed",
+            "source": null,
+            "firstLine": 127,
+            "loggedRecords": 2,
+            "minimumOccurrences": 10
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 130,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 131,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 132,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "memory/data.c:412",
+            "firstLine": 208,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeCrash",
+            "source": null,
+            "firstLine": 212,
+            "loggedRecords": 2,
+            "minimumOccurrences": 2
+          }
+        ],
+        "unclassifiedErrorRecords": 0
+      },
+      {
+        "role": "client",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "mountedActorCapacityExceeded",
+            "source": null,
+            "firstLine": 90,
+            "loggedRecords": 9,
+            "minimumOccurrences": 38
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "tag_files/tag_groups.c:3089",
+            "firstLine": 101,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "tag_files/tag_groups.c:3090",
+            "firstLine": 102,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "invalidBlockReference",
+            "source": null,
+            "firstLine": 103,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 107,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 108,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 109,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "objects/object_lights.c:443",
+            "firstLine": 174,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "objects/object_lights.c:444",
+            "firstLine": 175,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "objects/object_lights.c:445",
+            "firstLine": 176,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "objects/object_lights.c:494",
+            "firstLine": 177,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "objects/object_lights.c:495",
+            "firstLine": 178,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "objects/object_lights.c:496",
+            "firstLine": 179,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "rasterizer/rasterizer_lights.c:241",
+            "firstLine": 180,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "rasterizer/rasterizer_lights.c:242",
+            "firstLine": 181,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "rasterizer/rasterizer_lights.c:243",
+            "firstLine": 182,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "rasterizer/rasterizer_geometry.c:42",
+            "firstLine": 184,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "rasterizer/xbox/rasterizer_xbox_environment.c:732",
+            "firstLine": 185,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          }
+        ],
+        "unclassifiedErrorRecords": 2
+      }
+    ],
+    "accepted": false
+  },
+  "nativeCollaboration": {
+    "receiptSha256": "803ccd4900f6a2547bd4d5a715632a865b4374f4a497b3e1a75c65ebc5ced421",
+    "schemaVersion": 1,
+    "nativeProcesses": 3,
+    "separateDataRoots": 3,
+    "physicalMachines": 1,
+    "transport": "private TCP + TLS 1.3, invitation-pinned certificate",
+    "mockedIpc": false,
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gamePeerReplicationTested": false,
+    "nativeTagSharingTested": true,
+    "binaryAssetTransferTested": true,
+    "appSha256": "7ccc0e6ee4432b957058caba064cc5e1af77a27090133a76131002e9ee21ae1c",
+    "processes": [
+      {
+        "projectId": "aec67820-237b-4e06-9f71-ebea08c5332b",
+        "data": "D:\\Project Guilty Spark\\.local\\C46-SharedTools\\owner",
+        "pid": 17396
+      },
+      {
+        "projectId": "aec67820-237b-4e06-9f71-ebea08c5332b",
+        "data": "D:\\Project Guilty Spark\\.local\\C46-SharedTools\\editor-b",
+        "pid": 29088
+      },
+      {
+        "projectId": "aec67820-237b-4e06-9f71-ebea08c5332b",
+        "data": "D:\\Project Guilty Spark\\.local\\C46-SharedTools\\editor-c",
+        "pid": 21608
+      }
+    ],
+    "threeAuthorNativeAcceptance": {
+      "revision": 3,
+      "documentSha256": "be263fd8e7be65da9f2f5cc6486cbfe9cf456d302aa33de71200c0006a9a0f44",
+      "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+      "assetId": "f0adef48-4854-494d-9e9f-e75a01d447ca",
+      "assetBytes": 632,
+      "actualModelsInThreeViewports": true,
+      "simultaneousAuthorActions": true
+    },
+    "participantUndoAndReferencedAssetConflict": true,
+    "sameFieldConflictCorruptBytesAndDuplicateAck": true,
+    "permissionsCoverNativeImportEditAndBuild": true,
+    "nativeSourceIntegrityAndIndependentToolBuildGuard": {
+      "truncatedAdmittedTagRejected": true,
+      "exactRecoveryBytesRetained": true,
+      "unsharedWorkingTagsBuildRefused": true
+    },
+    "synchronizationSurvivesWorkspaceChange": true,
+    "externalToolInterop": {
+      "mockedIpc": false,
+      "simultaneousEditors": 3,
+      "externalTool": "Invader",
+      "sharedSessionStayedConnected": true,
+      "corruptSaveRejected": true,
+      "corruptedCandidateRetained": true,
+      "externalExecutableSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invalidCrcRejectedBeforeNativeNormalization": true,
+      "otherExposedFieldNotSilentlyMerged": true,
+      "externalEditAndConcurrentWorldEditConverged": true,
+      "convergedRevision": 14,
+      "elapsedMs": 14654.412700000015,
+      "forkId": "32fa6c0f-e020-43cc-922d-77ae07e6edc9",
+      "candidateSha256": "15640d68228399293ba8d335839df25394f232c82d2f9f46e958f0f2563d99b2",
+      "alreadyCommittedEditDoesNotCreateAnotherTransaction": true,
+      "finalBoundingRadius": 0.375,
+      "sameFieldConflictRejectedWithoutReplacingSource": true,
+      "participantUndoPreservesExternalAndOtherAuthorEdits": true,
+      "viewerCannotCreateToolFork": true,
+      "retainedAcrossActualHostRestart": true
+    },
+    "committedRevision": {
+      "sessionId": "70d9185d-a3e1-4178-95a5-186edd47bad4",
+      "revision": 17,
+      "documentSha256": "6a143a4a202fe5483a263961bf09131cafe1309e1366032d112ebe0a3a762dbc",
+      "localProjects": [
+        "aec67820-237b-4e06-9f71-ebea08c5332b",
+        "aec67820-237b-4e06-9f71-ebea08c5332b",
+        "aec67820-237b-4e06-9f71-ebea08c5332b"
+      ]
+    },
+    "actualHaloToolchain": {
+      "jobId": "8044b028-8b9c-4863-a59c-c4df9a1b118a",
+      "revision": 17,
+      "laterRevision": 18,
+      "nativeRadius": 0.375,
+      "publishedAssetPath": "scenery\\sparklink\\f0adef48-4854-494d-9e9f-e75a01d447ca",
+      "compiledModelTriangles": 31,
+      "placement": [
+        3,
+        2,
+        0.1
+      ],
+      "outputSha256": "b0462541f57e50d12011453cf0ee1ef0885b39d5159c7939b0ad7e6ee56f2a4f",
+      "durationMs": 37396.461700000014,
+      "gameplayTested": false
+    },
+    "durableNativeRecovery": {
+      "revision": 18,
+      "assetBytesIdentical": true,
+      "semanticFieldIntact": true,
+      "authorIdentitiesAndHistoryRetained": true,
+      "newInvitation": true,
+      "replayDeduplicated": true,
+      "durationMs": 13301.830100000021
+    },
+    "revocationRetainsOtherParticipants": true,
+    "originalSourcesUnchanged": {
+      "separateNativeTrees": 3,
+      "filesPerTree": 2240,
+      "templateUnchanged": true,
+      "importUnchanged": true
+    },
+    "synchronizationMeasurements": {
+      "samples": 7,
+      "valuesMs": [
+        6611.214299999992,
+        63.49900000001071,
+        294.7030999999988,
+        387.3214999999909,
+        404.25620000000345,
+        377.6030000000028,
+        377.28429999999935
+      ],
+      "physicalMachines": 1,
+      "includesNativeIpcAndReactConsumption": true
+    },
+    "pageErrors": [],
+    "acceptanceComplete": true
+  },
+  "tests": {
+    "rustPassed": 619,
+    "rustIgnored": 7,
+    "frontendPassed": 284,
+    "browserPassed": 136,
+    "offlineScriptsPassed": 59,
+    "nativeDiagnosticsAndSourceTestsPassed": 28,
+    "nativeWindowCasesPassed": 7,
+    "nativeLoopEmitterPassed": true,
+    "nativeMusicConflictRefused": true,
+    "threeProcessNativeContentAndExternalToolsPassed": true
+  },
+  "proof": {
+    "complete-ce-sound-audit.json": "3fa5bfdf4b72bd2009c582993e3bd03e42a909b266590e6aea628915564fc256",
+    "complete-mcc-sound-audit.json": "2d2547ecc08f1f2b2b66e32e48e6a33df37b318c9b6574c271e5ab7c292c8518",
+    "complete-ce-native-sound-compare.log": "fb926d607175bf4ecf820c9ec19eebc1e4d9bdee72798d87071557ed3c654c2f",
+    "complete-mcc-native-sound-compare.log": "749904070d8880c4912b40d226fb98cc1e5edb03a46f9eb14768ebfd3d932c1e",
+    "native-core-animation/native-roundtrip-receipt.json": "f42f1593e6965c3d52295a6ad76fd4705ae85b34648fbedca0cddc9322e537f5",
+    "complete-opence-ai-final.json": "6ce39a2b51fa9195df70d7439348cdb171f47a16b6036300dda2aa950a8f7ae3",
+    "complete-chupa-analysis-final.json": "7744949c30e5562299c5fa9e69d81f1c9d828d9da30f78db6c9cbdc6f225c688",
+    "paired-sound-export-performance/benchmark-receipt.json": "1247d41cec51ca122dde713fc7dc3cb83c74be51995e4a8b361260c47f1d7f3a",
+    "workspace-tests.log": "6d14b02e0c12b0958a6018bd4cbf5bdc5ec32c38ddafdb86ef2259d445b8781a",
+    "frontend-tests.log": "1e233ca25ab1ae949866ea05bc2a243b144e637d36fd566f51b2e13fde763198",
+    "browser-tests.log": "46019c60b749e5c886627f70e89a296af6dbf5c2ce647f267c0e0e1c6c206938",
+    "offline-tests.log": "1fcf48cf642d77944f81cf597da5beaff1cafefc6e65ca72276d223512102b34",
+    "native-diagnostics-final.log": "0e9cf04f8debd58af939ec9ee908a82c10dbdc3a96551e5dc6b2ab1f48d99b29",
+    "desktop-build.log": "91945e9f9a07692914c5d6fd4d9dff6e01bedfc9e4b8be6ae435134e5bc74d07",
+    "native-window-history/acceptance.json": "d22cb7d7032bfb8f2a5f5490c191e14dbd81213a339927588b9d93cb83d1c8d5"
+  },
+  "remaining": [
+    "Actual in-game listening, complete Zombie Apocalypse conversion and fault-free target gameplay are not accepted.",
+    "MCC changes minimum/maximum distance defaults on two long-sound tags; strict whole-tag equivalence remains open.",
+    "Native invalid tag/block calls, mounted actor limits and large OpenCE state differences remain; final Chupathingy host fails.",
+    "Two original custom audio cues remain unavailable in the inherited baseline.",
+    "Human Timberland-Sidewinder traversal, full AI lifecycle, late join, reconnect and cross-computer LAN/VPN remain separate open gates.",
+    "Direct compiled-map structural editing, arbitrary live BSP replacement and full audiovisual parity remain unfinished.",
+    "Export timing does not establish a new desktop startup, map rendering, GPU or memory improvement.",
+    "Installer creation does not certify a fresh-machine install. No remote publication is claimed."
+  ],
+  "remotePublished": false,
+  "preservation": {
+    "checkedAt": "2026-11-01T14:16:16.437Z",
+    "rootDirtyPatchesUnchanged": true,
+    "rootUntrackedFiles": 160,
+    "allRootUntrackedBytesUnchanged": true,
+    "originalZombieFiles": 67,
+    "originalZombieBytesUnchanged": true,
+    "originalInstalledMaps": 94,
+    "originalInstalledMapsUnchanged": true,
+    "priorReferences": 28,
+    "priorReferencesRetained": true,
+    "priorLocalAndTagReferencesUnchanged": true,
+    "remoteTrackingAdvances": [
+      {
+        "ref": "refs/remotes/origin/HEAD",
+        "before": "a3e0ea6bc7c869f09ea3fe993cff481f9feca86e",
+        "after": "7fb89201ae16df0279fb31b5f52aff72bd65c937",
+        "priorTipRetainedAsAncestor": true
+      },
+      {
+        "ref": "refs/remotes/origin/master",
+        "before": "a3e0ea6bc7c869f09ea3fe993cff481f9feca86e",
+        "after": "7fb89201ae16df0279fb31b5f52aff72bd65c937",
+        "priorTipRetainedAsAncestor": true
+      }
+    ],
+    "priorBranchTipsContained": 21,
+    "priorReleaseArtifacts": 14,
+    "priorReleaseArtifactsUnchanged": true,
+    "prior413LedgerRowsUnchanged": true,
+    "ledgerRows": 418,
+    "nativeOriginalTags": 3739,
+    "nativeOriginalTagTreeUnchanged": true,
+    "finalNativeChangedOrAddedTags": 15,
+    "finalNativeTagCount": 3742,
+    "mccCompilationDidNotAlterTags": true,
+    "authoredPhysicsUnchanged": true,
+    "artifacts": [
+      {
+        "folder": ".local/releases/C42-shared-tools-ce697fd",
+        "file": "portable\\GuiltySpark.exe",
+        "sha256": "de24bd7dac9430e16006034761f320f32f38e3327fdcf0c5a960d782d5cd56a6"
+      },
+      {
+        "folder": ".local/releases/C42-shared-tools-ce697fd",
+        "file": "Project_Guilty_Spark_C42_ce697fd_Setup.exe",
+        "sha256": "e9e68ca14ffee5c3b6a30540cfdc779b639dbc2a9299c2dc061679de8f1a5aed"
+      },
+      {
+        "folder": ".local/releases/C42-shared-tools-ce697fd",
+        "file": "Project_Guilty_Spark_C42_ce697fd_SOURCE.zip",
+        "sha256": "8b3a39bc11d8f5d0d98848ba75e3d333b20d9eb8c75a5f7de858144049a4fc4b"
+      },
+      {
+        "folder": ".local/releases/C42-shared-tools-ce697fd",
+        "file": "Project_Guilty_Spark_C42_ce697fd_PORTABLE.zip",
+        "sha256": "1bfb54189e5e7d6bd8097561295dc75af98ec7becee09240cdedef29e14973ec"
+      },
+      {
+        "folder": ".local/releases/C43-megaworld-de8922f",
+        "file": "portable\\GuiltySpark.exe",
+        "sha256": "87065a1922a20a8731e50bcd97b1fe0e5d22a9d0a347906fd6f39743c1843262"
+      },
+      {
+        "folder": ".local/releases/C43-megaworld-de8922f",
+        "file": "Project_Guilty_Spark_C43_de8922f_Setup.exe",
+        "sha256": "fa768c10e163fd8faa77f3814cac6473f5fa635fe2ab02d981f4c4f2028e4b24"
+      },
+      {
+        "folder": ".local/releases/C43-megaworld-de8922f",
+        "file": "Project_Guilty_Spark_C43_de8922f_SOURCE.zip",
+        "sha256": "0226208a4db16aa5a30be76eb1645aec63f78f244db60b575adc9de5b91568b7"
+      },
+      {
+        "folder": ".local/releases/C43-megaworld-de8922f",
+        "file": "Project_Guilty_Spark_C43_de8922f_PORTABLE.zip",
+        "sha256": "2cc32d0e50c416fd2f963c4f310a9d4f04dab8d13c47c3ce4b8c64df873c61be"
+      },
+      {
+        "folder": ".local/releases/C44-performance-ai-c2af5ef",
+        "file": "portable/GuiltySpark.exe",
+        "sha256": "ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22"
+      },
+      {
+        "folder": ".local/releases/C44-performance-ai-c2af5ef",
+        "file": "Project_Guilty_Spark_C44_c2af5ef_Setup.exe",
+        "sha256": "8c95d9395b0399d55d033d8a962827540c2f1ecc01ccbec487f05016c0469517"
+      },
+      {
+        "folder": ".local/releases/C44-performance-ai-c2af5ef",
+        "file": "Project_Guilty_Spark_C44_c2af5ef_SOURCE.zip",
+        "sha256": "cc90c78356a79c88cacd7286daf4cdc3db288a8b1228945452105f692a1e6f21"
+      },
+      {
+        "folder": ".local/releases/C44-performance-ai-c2af5ef",
+        "file": "Project_Guilty_Spark_C44_c2af5ef_PORTABLE.zip",
+        "sha256": "a854f228b1f62a1b4563f767de10844430f1703bccfad4e59a3d9e299cfa0f6f"
+      },
+      {
+        "folder": ".local/releases/C45-native-recovery-7fb8920",
+        "file": "Project_Guilty_Spark_C45_7fb8920_SOURCE.zip",
+        "sha256": "65a20e3d3d2755863f709ca57efd57b893bc46918bf7a43f61f61ef5df87b049"
+      },
+      {
+        "folder": ".local/releases/C45-native-recovery-7fb8920",
+        "file": "PUSH_DESCRIPTION.md",
+        "sha256": "e6931ac3277f3bbd50df160e105ce02976f7c79cc60ec6972b0f9b7daff4515e"
+      }
+    ],
+    "nativeChanges": [
+      [
+        "gs_compat/carrier_idle/carrier_idle.model_animations",
+        "acf210702864e038e519f687791edcfd3a17a9585645cce0c9c70d8753f4c201"
+      ],
+      [
+        "gs_compat/recovered_carrier_0/recovered_carrier_0.model_collision_geometry",
+        "907d5854acf1205ed8f36a91cf0c81b5beab7c5307ab04a5b093ee465267b69e"
+      ],
+      [
+        "gs_compat/recovered_carrier_1/recovered_carrier_1.model_collision_geometry",
+        "ec0295f4afe13c713ffa15c42cd3a31d60dbd4473ae542eb4575446427c8b6d5"
+      ],
+      [
+        "gs_compat/zombie_spawn_0.effect",
+        "fcf6b47d162eabb3fa2cde684f49d6512b4678d172dc946ebf8243add9917864"
+      ],
+      [
+        "gs_compat/zombie_spawn_1.effect",
+        "bb07a753b1af64c14f95bb5d779c6dc531c9a125ccad39ef3570d2d4b4523733"
+      ],
+      [
+        "gs_compat/zombie_spawn_2.effect",
+        "2ab33e47e91454b8615af782a79bf5f432720b0aacbe46de6731822b294b1753"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/ai respawning/evolved zombie spawnerorig.weapon",
+        "c2f8a4f2ee088113290518c5458748224dcc8e9e98ceb2e6063a40c91ffebc5e"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/ai respawning/zombie spawner.weapon",
+        "bebeaedac988b2fd9af1e30db728d30250b3ce489686627399649c04ba9c6712"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/alpha zombie containerorig.vehicle",
+        "20876d8e14db2e28905be6a0f3b69229a425c1ddc1c4d9b35343d63244feae66"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/evolved zombie container.vehicle",
+        "b0d7950f935724d964c826e6cf53613c932b013ff2b237ef432af1ff75294ef9"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/zombie container.vehicle",
+        "6f29b88a037fe6f93d794ee6c2a2d0223dc730c0205854f066c0a64436ed9542"
+      ],
+      [
+        "origmgm/fonzie/sparky/tags/ai respawning/alpha zombie spawner.weapon",
+        "7a4ceb98a27445a3c9aa916c6fb6447eded8bff974cda7a53d08f6d0c0f1ff26"
+      ],
+      [
+        "sound/dialog/multiplayer1/game_over.sound",
+        "ff46c2944869d2b52733b0bd30f8f718ccb16c53f34fde510f61f5f0b5651367"
+      ],
+      [
+        "sound/dialog/multiplayer1/ghost.sound",
+        "0df3921726e899fd8bfc81df582965f5d36df5a3a0e44137d714db0723f36dac"
+      ],
+      [
+        "sparky/sound/sparkmusic/v1_hit_themes/killer_tracks_invaders.sound",
+        "45270c0b104436eb0f967ec52a2cbf860b0b8427db72d4f2a999a7ab73a560cc"
+      ]
+    ],
+    "remotePublished": false,
+    "evidenceSha256": "845b661a9fdcaee446f4db2a32eeda3af0dda53bb4f758022187c51aca6fdbd0"
+  }
+}

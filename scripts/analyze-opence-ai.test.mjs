@@ -87,6 +87,74 @@ test('a player unit or missing client control does not establish an AI identity'
   assert.equal(compareActorObservations({ samples: [state] }, { samples: [] }).hostAuthorityObserved, false);
 });
 
+test('repeated frozen ticks do not inflate pairs or weight an unchanged frame repeatedly', () => {
+  const at = (tick, position, client = false) => ({
+    ...state,
+    localTick: tick,
+    serverTick: tick,
+    actorPoolCount: client ? 0 : 1,
+    actors: [{ ...actor, actorId: client ? none : actor.actorId, position }],
+  });
+  const h = { samples: [at(60, [0, 0, 0]), at(61, [0, 0, 0]), at(61, [1, 0, 0])] };
+  const c = { samples: [at(60, [0, 0, 0], true), ...new Array(20).fill(at(61, [6, 0, 0], true))] };
+  const r = compareActorObservations(h, c);
+  assert.equal(r.exactTickFrames, 2);
+  assert.equal(r.position.count, 2);
+  assert.equal(r.position.maximum, 5);
+  assert.equal(r.observationCoverage.hostRepeatedTickObservations, 1);
+  assert.equal(r.observationCoverage.clientRepeatedTickObservations, 19);
+  assert.equal(r.aiActorAcceptance, false);
+});
+
+test('missing and mismatched identities are reported outside matched-pair distributions', () => {
+  const second = { ...actor, id: actor.id + 1 };
+  const h = { samples: [{ ...state, actors: [actor, second] }, { ...state, serverTick: 61, actors: [actor] }] };
+  const c = { samples: [
+    { ...state, actors: [{ ...actor, actorId: none, tag: actor.tag + 1 }] },
+    { ...state, serverTick: 61, actors: [{ ...second, actorId: none }, { ...second, id: 99, actorId: none }] },
+    { ...state, serverTick: 62, actors: [] },
+  ] };
+  const r = compareActorObservations(h, c);
+  assert.equal(r.sharedActualActorIds, 0);
+  assert.equal(r.identityCoverage.hostAiUnitTicks, 3);
+  assert.equal(r.identityCoverage.missingClientUnitTicks, 2);
+  assert.equal(r.identityCoverage.mismatchedTagUnitTicks, 1);
+  assert.equal(r.identityCoverage.knownAiMissingHostUnitTicks, 1);
+  assert.equal(r.identityCoverage.unclassifiedClientUnitTicks, 1);
+  assert.equal(r.observationCoverage.clientTicksWithoutHostPair, 1);
+  assert.equal(r.fullLifecycleAcceptance, false);
+});
+
+test('parent-local and world positions remain distinguished without hiding raw deltas', () => {
+  const h = { samples: [
+    state,
+    { ...state, serverTick: 61, actors: [{ ...actor, parentId: 45 }] },
+    { ...state, serverTick: 62, actors: [{ ...actor, parentId: 45 }] },
+  ] };
+  const c = { samples: [
+    { ...state, actors: [{ ...actor, actorId: none, position: [1, 0, 0] }] },
+    { ...state, serverTick: 61, actors: [{ ...actor, actorId: none, parentId: 45, position: [2, 0, 0] }] },
+    { ...state, serverTick: 62, actors: [{ ...actor, actorId: none, position: [200, 0, 0] }] },
+  ] };
+  const r = compareActorObservations(h, c);
+  assert.equal(r.position.count, 3);
+  assert.equal(r.position.maximum, 200);
+  assert.equal(r.worldSpacePosition.maximum, 1);
+  assert.equal(r.sameParentLocalPosition.maximum, 2);
+  assert.equal(r.positionCoordinateScope.differentParentPairs, 1);
+  assert.equal(r.parentOrSeatDifferences, 1);
+});
+
+test('a bad repeated-tick observation is rejected before comparison selection', () => {
+  const log = [header,
+    { sample: 0, elapsedMs: 5, state },
+    { sample: 1, elapsedMs: 6, state: { ...state, actors: [{ ...actor, position: [2000000, 0, 0] }] } },
+    { sample: 2, elapsedMs: 7, state },
+    { completed: true, inputsRechecked: true },
+  ].map(JSON.stringify).join('\n');
+  assert.throws(() => parseActorObservation(log, record), /Invalid native actor position at sample 1/);
+});
+
 test('optional detailed native census validates identities, field widths and contents', () => {
   const details = {
     aiProfileDisabled: 0,

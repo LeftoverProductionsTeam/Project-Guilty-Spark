@@ -49,6 +49,7 @@ test('native source retains material and bind-space volume in different weighted
   assert.equal(vertices[0][1], vertices[3][1]);
   assert.deepEqual(lines.slice(69), ['2', '0', '0', '0\t1\t2', '1', '0', '3\t4\t5']);
   assert.deepEqual(jma.split('\n').slice(0, 7), ['16392', '2', '30', '1', 'carrier', '2', '123']);
+  assert.deepEqual(jma.split('\n').slice(7, 13), ['root', '1', '-1', 'wheel', '-1', '-1']);
 });
 test('unreviewed roots, bad node links and invalid material/source values are refused', () => {
   assert.throws(

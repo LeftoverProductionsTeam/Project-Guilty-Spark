@@ -183,7 +183,15 @@ const distribution = (a) => {
 };
 export function compareActorObservations(host, client) {
   const byTick = new Map(host.samples.map((s) => [s.serverTick, s]));
+  const clientByTick = new Map(client.samples.map((s) => [s.serverTick, s]));
+  const hostAiIds = new Set(
+    host.samples.flatMap((s) =>
+      s.actors.filter((a) => a.actorId !== NONE && a.playerId === NONE).map((a) => a.id),
+    ),
+  );
   const distances = [],
+    worldDistances = [],
+    parentLocalDistances = [],
     health = [],
     shields = [],
     throttle = [],
@@ -192,21 +200,63 @@ export function compareActorObservations(host, client) {
     moving = new Set(),
     firing = new Set();
   const outliers = [];
+  const coverage = {
+    hostAiUnitTicks: 0,
+    matchedAiUnitTicks: 0,
+    missingClientUnitTicks: 0,
+    knownAiMissingHostUnitTicks: 0,
+    unclassifiedClientUnitTicks: 0,
+    mismatchedTagUnitTicks: 0,
+    examples: [],
+  };
+  const remember = (kind, tick, a) => {
+    if (coverage.examples.length < 32)
+      coverage.examples.push({ kind, tick, id: a.id, tag: a.tag });
+  };
   let frames = 0,
-    parentChanges = 0;
-  for (const c of client.samples) {
+    parentChanges = 0,
+    positionParentMismatches = 0;
+  // Parsing validates every observation, including repeated frozen ticks.
+  // Select the last observation per tick on BOTH sides for the comparison;
+  // repeated postgame observations must not inflate evidence or weight medians.
+  for (const c of clientByTick.values()) {
     const h = byTick.get(c.serverTick);
     if (!h) continue;
     frames++;
     const ai = new Map(
       h.actors.filter((a) => a.actorId !== NONE && a.playerId === NONE).map((a) => [a.id, a]),
     );
+    const clientUnits = new Map(c.actors.map((a) => [a.id, a]));
+    coverage.hostAiUnitTicks += ai.size;
+    for (const ha of ai.values()) {
+      const ca = clientUnits.get(ha.id);
+      if (!ca) {
+        coverage.missingClientUnitTicks++;
+        remember('host-ai-missing-client', c.serverTick, ha);
+      } else if (ca.tag !== ha.tag) {
+        coverage.mismatchedTagUnitTicks++;
+        remember('same-id-different-tag', c.serverTick, ca);
+      }
+    }
     for (const ca of c.actors) {
       const ha = ai.get(ca.id);
+      if (!ha && ca.playerId === NONE) {
+        if (hostAiIds.has(ca.id)) {
+          coverage.knownAiMissingHostUnitTicks++;
+          remember('known-ai-missing-host', c.serverTick, ca);
+        } else {
+          coverage.unclassifiedClientUnitTicks++;
+          remember('unclassified-client-unit', c.serverTick, ca);
+        }
+      }
       if (!ha || ca.tag !== ha.tag) continue;
+      coverage.matchedAiUnitTicks++;
       ids.add(ca.id);
       const d = distance(ha.position, ca.position);
       distances.push(d);
+      if (ha.parentId === NONE && ca.parentId === NONE) worldDistances.push(d);
+      else if (ha.parentId === ca.parentId) parentLocalDistances.push(d);
+      else positionParentMismatches++;
       health.push(Math.abs(ha.health - ca.health));
       shields.push(Math.abs(ha.shield - ca.shield));
       throttle.push(distance(ha.throttle, ca.throttle));
@@ -234,6 +284,27 @@ export function compareActorObservations(host, client) {
     movingActorIds: moving.size,
     firingActorIds: firing.size,
     position: distribution(distances),
+    worldSpacePosition: distribution(worldDistances),
+    sameParentLocalPosition: distribution(parentLocalDistances),
+    positionCoordinateScope: {
+      rawObjectPairs: distances.length,
+      worldSpacePairs: worldDistances.length,
+      sameParentLocalPairs: parentLocalDistances.length,
+      differentParentPairs: positionParentMismatches,
+      note: 'Raw object coordinates are parent-local while attached. Different-parent deltas remain in position but cannot establish a world-space distance or parity.',
+    },
+    observationCoverage: {
+      hostObservations: host.samples.length,
+      clientObservations: client.samples.length,
+      hostDistinctTicks: byTick.size,
+      clientDistinctTicks: clientByTick.size,
+      hostRepeatedTickObservations: host.samples.length - byTick.size,
+      clientRepeatedTickObservations: client.samples.length - clientByTick.size,
+      hostTicksWithoutClientPair: byTick.size - frames,
+      clientTicksWithoutHostPair: clientByTick.size - frames,
+      selection: 'Last validated observation per distinct server tick on each side; raw observations and errors remain retained.',
+    },
+    identityCoverage: coverage,
     health: distribution(health),
     shield: distribution(shields),
     throttle: distribution(throttle),
@@ -247,7 +318,7 @@ export function compareActorObservations(host, client) {
     aiActorAcceptance: false,
     fullLifecycleAcceptance: false,
     twoComputerAcceptance: false,
-    note: 'All pairs remain in the distributions. Same-tick process reads are not atomic engine packets; counters advance separately from position, damage, seat and control updates. No parity or latency threshold is approved here.',
+    note: 'Every distinct-tick matched pair remains in the raw distributions; missing identities and coordinate-space differences are reported separately. Same-tick process reads are not atomic engine packets; counters advance separately from position, damage, seat and control updates. No parity or latency threshold is approved here.',
   };
 }
 export function analyzeActors(directory) {

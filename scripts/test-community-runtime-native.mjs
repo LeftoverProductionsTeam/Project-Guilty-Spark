@@ -23,6 +23,7 @@ for (let at = 2; at < process.argv.length; at += 2) {
       '--ce-map',
       '--ai-symbols',
       '--ai-details',
+      '--diagnostic-no-audio',
     ].includes(process.argv[at]) ||
     !process.argv[at + 1] ||
     args.has(process.argv[at])
@@ -50,6 +51,13 @@ if (
   throw Error('Use the exact pinned test releases and reviewed game modes');
 if ((mode === 'ce:slayer') !== args.has('--ce-map'))
   throw Error('ce:slayer requires an explicitly selected native Custom Edition cache');
+const noAudio = args.get('--diagnostic-no-audio') === 'true';
+if (
+  args.has('--diagnostic-no-audio') &&
+  (!['true', 'false'].includes(args.get('--diagnostic-no-audio')) ||
+    hostId !== 'opence-build-335' || clientId !== hostId)
+)
+  throw Error('Audio isolation requires an explicit true/false value and two exact OpenCE build-335 copies');
 const output = path.resolve(args.get('--output')),
   fixtures = path.resolve(args.get('--maps')),
   label = path.basename(output);
@@ -184,6 +192,7 @@ const report = {
   routerFirewallChanges: false,
   executed: [],
   errors: [],
+  diagnosticAudioDisabled: noAudio,
   ...(ceMap
     ? { customEditionMap: ceMap, compatibilityDeployment: true, nativeCompilationPerformedByRunner: false }
     : {}),
@@ -280,6 +289,9 @@ async function launch(role, id) {
     },
   );
   if (isOpenCe(id)) env.SDL_VIDEO_DRIVER = 'dummy';
+  // One-run fault isolation only. Never modify a map's sound properties or
+  // count a diagnostic run without audio as audiovisual acceptance.
+  if (noAudio) env.HALO_NO_AUDIO = '1';
   const log = createWriteStream(path.join(root, 'stdio.log'), { flags: 'wx' });
   const child = spawn(executable, [], {
     cwd: root,

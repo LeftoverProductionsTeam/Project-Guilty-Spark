@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { nativeSoundStreamingFailures } from './native-runtime-health.mjs';
 const hash = (b) => createHash('sha256').update(b).digest('hex');
 const none = (n) => (n === 65535 ? -1 : n);
 const finiteVector = (v, size) =>
@@ -151,7 +152,7 @@ export function carrierSources(nodes, checksum, mesh, regions, nodeByRegion) {
     for (const t of mesh.triangles)
       jms.push(String(region), '0', t.map((i) => i + region * mesh.points.length).join('\t'));
   const jma = ['16392', '2', '30', '1', 'carrier', String(nodes.length), String(checksum)];
-  for (const n of nodes) jma.push(n.name, String(n.sibling), String(n.child));
+  for (const n of nodes) jma.push(n.name, String(n.child), String(n.sibling));
   for (let frame = 0; frame < 2; frame++)
     for (const n of nodes) jma.push(n.translation.map((v) => v * 100).join('\t'), n.rotation.join('\t'), '1');
   return { jms: jms.join('\n') + '\n', jma: jma.join('\n') + '\n' };
@@ -272,6 +273,8 @@ async function execute(argv) {
     // Synchronous writes keep every failed native invocation reviewable too.
     return fs.writeFile(path.join(output, file), text, { flag: 'wx' }).then(() => {
       if (r.status !== 0 || r.error) throw Error(`Native ${label} refused; inspect ${file}`);
+      if (nativeSoundStreamingFailures(text).length)
+        throw Error(`Native ${label} omitted sound data despite its status; inspect ${file}`);
       return (r.stdout ?? '').trim();
     });
   }
@@ -394,6 +397,12 @@ async function execute(argv) {
         await native(path.join(output, 'tool.exe'), ['animations', 'gs_compat\\carrier_idle'], 'animation');
         if ((await count('gs_compat/carrier_idle/carrier_idle.model_animations', 'nodes')) !== nodes.length)
           throw Error('Native animation rig differs');
+        for (const [j, node] of nodes.entries()) {
+          const graph = 'gs_compat/carrier_idle/carrier_idle.model_animations';
+          if (none(Number(await get(graph, `nodes[${j}].first_child_node_index`))) !== node.child ||
+              none(Number(await get(graph, `nodes[${j}].next_sibling_node_index`))) !== node.sibling)
+            throw Error('Native animation child/sibling readback differs');
+        }
       }
     }
     for (const name of ['evolved zombie container', 'zombie container', 'alpha zombie containerorig']) {
@@ -402,6 +411,19 @@ async function execute(argv) {
       if (name === 'zombie container')
         args.push('-S', 'animation_graph', 'gs_compat/carrier_idle/carrier_idle.model_animations');
       await invader(args, tag);
+    }
+    // These three original spawners also use the five-node gravity-rifle
+    // model. Tool drops their unrelated ammunition collider. Reuse the
+    // native-generated small collider with the matching five-node hierarchy.
+    const spawners = [
+      'mgm/fonzie/sparky/tags/ai respawning/evolved zombie spawnerorig.weapon',
+      'origmgm/fonzie/sparky/tags/ai respawning/alpha zombie spawner.weapon',
+      'mgm/fonzie/sparky/tags/ai respawning/zombie spawner.weapon',
+    ];
+    for (const tag of spawners) {
+      if ((await get(tag, 'model')).replaceAll('\\', '/') !== 'weapons/gravity rifle/gravity rifle.gbxmodel')
+        throw Error('Spawner model differs from reviewed carrier collider');
+      await invader(['-S', 'collision_model', colliderTags[1]], tag);
     }
     const log = await native(
       path.join(output, 'tool.exe'),
@@ -431,13 +453,14 @@ async function execute(argv) {
       ...['evolved zombie container', 'zombie container', 'alpha zombie containerorig'].map(
         (n) => `mgm/fonzie/sparky/tags/${n}.vehicle`,
       ),
+      ...spawners,
     ]);
     if (
       before.some(([tag]) => !new Map(after).has(tag)) ||
       report.changes.some((c) => !permitted.has(c.tag)) ||
-      report.changes.length !== 9
+      report.changes.length !== 12
     )
-      throw Error('Native recipe changed content outside its reviewed nine-tag footprint');
+      throw Error('Native recipe changed content outside its reviewed twelve-tag footprint');
     report.cache = { bytes: cache.length, sha256: hash(cache), version: 609 };
     report.complete = true;
   } catch (error) {

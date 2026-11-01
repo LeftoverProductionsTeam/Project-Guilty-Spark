@@ -269,6 +269,14 @@ pub fn extraction_errors(output: &str) -> Vec<String> {
         .map(str::to_string)
         .collect()
 }
+/// Halo Tool can return zero and print a successful cache footer after it
+/// failed to stream a sound. Such a cache contains missing sample ranges.
+/// Keep ordinary missing optional resource-pack notices separate.
+pub fn native_compile_errors(output: &str) -> Vec<String> {
+    output.lines().filter(|line| {
+        line.to_ascii_lowercase().contains("failed to load sound for adding to cache file")
+    }).map(|line| line.chars().take(512).collect()).collect()
+}
 impl Runner<'_> {
     pub(crate) fn emit(&self, phase: &str, message: impl Into<String>, progress: u8, severity: &str) {
         (self.event)(JobEvent {
@@ -399,6 +407,7 @@ impl Runner<'_> {
         let mut deferred_timeout = false;
         let mut output = String::new();
         let mut errors = vec![];
+        let mut compile_errors = vec![];
         let result = loop {
             let mut interactive_shader=false;
             for (err, line) in rx.try_iter() {
@@ -409,6 +418,9 @@ impl Runner<'_> {
                 }
                 if phase == "extract" {
                     errors.extend(extraction_errors(&line));
+                }
+                if compile_errors.len() < 4 {
+                    compile_errors.extend(native_compile_errors(&line));
                 }
                 if (phase!="bsp-detail"||err)&&(phase!="bsp-index"||err||!line.bytes().all(|b|b.is_ascii_digit())){
                     self.emit(phase, line, progress, if err { "tool" } else { "info" });
@@ -471,11 +483,17 @@ impl Runner<'_> {
             if phase == "extract" {
                 errors.extend(extraction_errors(&line));
             }
+            if compile_errors.len() < 4 {
+                compile_errors.extend(native_compile_errors(&line));
+            }
             if phase!="bsp-detail"||err {self.emit(phase, line, progress, if err { "tool" } else { "info" });}
         }
         result?;
         if incomplete_output.load(Ordering::Relaxed) {
             return invalid("External tool output was truncated or unreadable. Validation cannot establish success from incomplete diagnostics; build stopped.");
+        }
+        if !compile_errors.is_empty() {
+            return invalid(format!("Native compiler omitted sound data despite its exit status or success footer. This output is not validated or publishable; repair the source sound format/chunks and rebuild in a new job.\n{}", compile_errors.join("\n")));
         }
         if !errors.is_empty() {
             return invalid(format!("Tag extraction was incomplete ({} errors), even though the tool returned exit code 0. Build stopped before compilation.\n{}\nProvide the source runtime's original resources or editing-kit tags. Stock MCC remastered assets are not recoverable from a map header alone.",errors.len(),errors.iter().take(4).cloned().collect::<Vec<_>>().join("\n")));
@@ -855,6 +873,31 @@ fn core_check_reused_tag(file:&Path,relative:&str)->Result<()>{crate::reject_lin
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sound_stream_failure_overrides_success_footer_without_rejecting_optional_pack_notices() {
+        assert!(native_compile_errors("Failed to read data file header sounds\n### FAILED TO OPEN DATA-CACHE FILE.\nsuccessfully built cache file.").is_empty());
+        let errors = native_compile_errors("streaming tags...failed to load sound for adding to cache file.\nsuccessfully built cache file.");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("failed to load sound"));
+    }
+    #[cfg(windows)]
+    #[test]
+    fn zero_exit_sound_failure_on_either_stream_refuses_the_build_and_retains_previous_output() {
+        let dir = tempfile::tempdir().unwrap();
+        let previous = dir.path().join("previous-good.map");
+        fs::write(&previous, b"previous verified output").unwrap();
+        let hash = maps::hash_file(&previous).unwrap();
+        let cancel = AtomicBool::new(false);
+        let runner = Runner { id: "native-sound-failure", project: "test", cancel: &cancel, event: &|_| {} };
+        for stream in ["Out", "Error"] {
+            let result = runner.run(Path::new("powershell.exe"), &[
+                "-NoProfile".into(), "-NonInteractive".into(), "-Command".into(),
+                format!("[Console]::{stream}.WriteLine('streaming tags...failed to load sound for adding to cache file.'); [Console]::Out.WriteLine('successfully built cache file.'); exit 0"),
+            ], dir.path(), "compile", 0);
+            assert!(result.unwrap_err().to_string().contains("omitted sound data"));
+            assert_eq!(maps::hash_file(&previous).unwrap(), hash);
+        }
+    }
     #[cfg(windows)]
     #[test]
     fn unresolved_native_shader_prompt_stops_instead_of_looping_on_eof() {

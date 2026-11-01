@@ -97,6 +97,9 @@ impl AnimationClip {
             return invalid("Animation exceeds the supported frame, node or transform budget");
         }
         let mut names = HashSet::new();
+        if self.nodes[0].parent != -1 || self.nodes.iter().skip(1).any(|n| n.parent == -1) {
+            return invalid("Native animations require one root at node zero. Reimport the preserved original JMA if an earlier Spark version imported its hierarchy incorrectly");
+        }
         for (i, node) in self.nodes.iter().enumerate() {
             if !valid_name(&node.name)
                 || !names.insert(node.name.to_ascii_lowercase())
@@ -185,8 +188,8 @@ pub fn parse_jma(text: &str, name: &str) -> Result<AnimationClip> {
             .next()
             .ok_or_else(|| bad("Animation node is missing"))?
             .to_string();
-        let sibling = integer(&mut lines)?;
         let child = integer(&mut lines)?;
+        let sibling = integer(&mut lines)?;
         if sibling < -1 || sibling >= count || child < -1 || child >= count {
             return invalid("Animation node link is out of range");
         }
@@ -284,7 +287,7 @@ pub fn jma_source(clip: &AnimationClip) -> Result<String> {
             .position(|n| n.parent == i as i16)
             .map(|j| j as i16)
             .unwrap_or(-1);
-        writeln!(text, "{}\n{sibling}\n{child}", node.name)
+        writeln!(text, "{}\n{child}\n{sibling}", node.name)
             .map_err(|_| bad("Animation source formatting failed"))?;
     }
     for transform in clip.transforms.chunks_exact(8) {
@@ -731,7 +734,7 @@ pub(crate) fn import_source(
 mod tests {
     use super::*;
     fn source() -> String {
-        "16392\n2\n30\n1\nactor\n2\n123\nroot\n-1\n1\narm\n-1\n-1\n0 0 0\n0 0 0 1\n1\n100 0 0\n0 0 0 1\n1\n0 0 0\n0 0 0 1\n1\n200 0 0\n0 0 0 1\n1\n".into()
+        "16392\n2\n30\n1\nactor\n2\n123\nroot\n1\n-1\narm\n-1\n-1\n0 0 0\n0 0 0 1\n1\n100 0 0\n0 0 0 1\n1\n0 0 0\n0 0 0 1\n1\n200 0 0\n0 0 0 1\n1\n".into()
     }
     #[test]
     fn imports_local_hierarchy_and_converts_centimetres() {
@@ -740,12 +743,17 @@ mod tests {
         assert_eq!(c.transforms[8], 1.);
         assert_eq!(c.transforms[24], 2.);
         assert_eq!(c.frame_count, 2);
+        assert_eq!(jma_source(&c).unwrap().lines().skip(7).take(6).collect::<Vec<_>>(),
+            vec!["root", "1", "-1", "arm", "-1", "-1"]);
+        let mut legacy = c.clone();
+        legacy.nodes[1].parent = -1;
+        assert!(jma_source(&legacy).unwrap_err().to_string().contains("Reimport the preserved original JMA"));
     }
     #[test]
     fn refuses_truncation_cycles_nonfinite_and_excess() {
         let s = source();
         assert!(parse_jma(&s.replace("100 0 0", "NaN 0 0"), "x").is_err());
-        assert!(parse_jma(&s.replace("root\n-1\n1", "root\n-1\n0"), "x").is_err());
+        assert!(parse_jma(&s.replace("root\n1\n-1", "root\n0\n-1"), "x").is_err());
         assert!(parse_jma(&(s.clone() + "1"), "x").is_err());
         assert!(parse_jma(&s[..s.len() - 8], "x").is_err());
     }

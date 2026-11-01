@@ -350,6 +350,41 @@ pub fn preview_sound_with_resources(path:&Path,expected_sha256:&str,tag_id:u32,p
 }
 pub fn preview_sound_with_bindings(path:&Path,expected_sha256:&str,tag_id:u32,pitch_range:usize,permutation:usize,resources:Option<(&Path,&str)>,audio:Option<&crate::mcc_audio::Binding>)->Result<AudioPreview>{
     let data = sound_data(path, expected_sha256, tag_id,resources,audio)?;
+    preview_from_data(&data, pitch_range, permutation)
+}
+
+/// Export selected chunks from one verified cache snapshot instead of reading
+/// and hashing that cache again for every linked permutation. This does not
+/// join chunks, resample audio, alter native classes or substitute missing data.
+pub fn preview_sound_batch(
+    path: &Path,
+    expected_sha256: &str,
+    tag_id: u32,
+    requests: &[(usize, usize)],
+) -> Result<Vec<AudioPreview>> {
+    if requests.is_empty() || requests.len() > 256 {
+        return invalid("An audio batch requires 1 to 256 explicit permutations");
+    }
+    let unique: std::collections::BTreeSet<_> = requests.iter().copied().collect();
+    if unique.len() != requests.len() {
+        return invalid("Duplicate audio batch permutation");
+    }
+    let data = sound_data(path, expected_sha256, tag_id, None, None)?;
+    let mut total = 0usize;
+    let mut previews = Vec::with_capacity(requests.len());
+    for &(pitch, permutation) in requests {
+        let preview = preview_from_data(&data, pitch, permutation)?;
+        total = total.checked_add(preview.bytes.len())
+            .ok_or_else(|| SparkError::Invalid("Audio batch size overflow".into()))?;
+        if total > 64 * 1024 * 1024 {
+            return invalid("Audio batch exceeds 64 MiB of decoded output");
+        }
+        previews.push(preview);
+    }
+    Ok(previews)
+}
+
+fn preview_from_data(data: &SoundData, pitch_range: usize, permutation: usize) -> Result<AudioPreview> {
     let index = data
         .report
         .permutations

@@ -28,7 +28,7 @@ jobs:
       - run: pnpm test
       - run: pnpm test:offline
       - run: node --test scripts/probe-mcc-h1-interface.test.mjs
-      - run: node --test scripts/analyze-opence-ai.test.mjs scripts/native-runtime-health.test.mjs scripts/recover-zombie-carriers-native.test.mjs
+      - run: node --test scripts/analyze-opence-ai.test.mjs scripts/native-runtime-health.test.mjs scripts/recover-zombie-carriers-native.test.mjs scripts/verify-native-sound-chains.test.mjs scripts/prepare-native-adpcm-waves.test.mjs
   windows-native:
     name: Windows native build and UI
     runs-on: windows-latest
@@ -44,7 +44,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable, verified 2026-10-26
       - run: pnpm install --frozen-lockfile
       - run: cargo test --workspace --locked
-      - run: node --test scripts/probe-mcc-h1-interface.test.mjs scripts/analyze-opence-ai.test.mjs scripts/native-runtime-health.test.mjs scripts/recover-zombie-carriers-native.test.mjs
+      - run: node --test scripts/probe-mcc-h1-interface.test.mjs scripts/analyze-opence-ai.test.mjs scripts/native-runtime-health.test.mjs scripts/recover-zombie-carriers-native.test.mjs scripts/verify-native-sound-chains.test.mjs scripts/prepare-native-adpcm-waves.test.mjs
       - run: pnpm exec playwright install msedge
       - run: pnpm test:ui
       - run: node scripts/desktop.mjs build
