@@ -210,8 +210,7 @@ export function compareActorObservations(host, client) {
     examples: [],
   };
   const remember = (kind, tick, a) => {
-    if (coverage.examples.length < 32)
-      coverage.examples.push({ kind, tick, id: a.id, tag: a.tag });
+    if (coverage.examples.length < 32) coverage.examples.push({ kind, tick, id: a.id, tag: a.tag });
   };
   let frames = 0,
     parentChanges = 0,
@@ -302,7 +301,8 @@ export function compareActorObservations(host, client) {
       clientRepeatedTickObservations: client.samples.length - clientByTick.size,
       hostTicksWithoutClientPair: byTick.size - frames,
       clientTicksWithoutHostPair: clientByTick.size - frames,
-      selection: 'Last validated observation per distinct server tick on each side; raw observations and errors remain retained.',
+      selection:
+        'Last validated observation per distinct server tick on each side; raw observations and errors remain retained.',
     },
     identityCoverage: coverage,
     health: distribution(health),
@@ -321,7 +321,8 @@ export function compareActorObservations(host, client) {
     note: 'Every distinct-tick matched pair remains in the raw distributions; missing identities and coordinate-space differences are reported separately. Same-tick process reads are not atomic engine packets; counters advance separately from position, damage, seat and control updates. No parity or latency threshold is approved here.',
   };
 }
-export function analyzeActors(directory) {
+export function analyzeActors(directory, { diagnosticOnly = false } = {}) {
+  if (typeof diagnosticOnly !== 'boolean') throw Error('Explicit diagnostic mode required');
   const root = path.resolve(directory),
     receiptBytes = boundedFile(path.join(root, 'execution.json'), 1024 * 1024),
     receipt = JSON.parse(receiptBytes);
@@ -332,7 +333,10 @@ export function analyzeActors(directory) {
     receipt.originalInputMapsUnchanged !== true ||
     !Array.isArray(receipt.executed) ||
     receipt.executed.length !== 2 ||
-    receipt.errors?.length
+    !Array.isArray(receipt.errors) ||
+    receipt.errors.length > 128 ||
+    receipt.errors.some((error) => typeof error !== 'string' || error.length > 1000) ||
+    (!diagnosticOnly && receipt.errors.length)
   )
     throw Error('Private native execution and preserved source receipt required');
   const observations = [];
@@ -345,7 +349,8 @@ export function analyzeActors(directory) {
     if (
       r.runtime !== 'opence-build-335' ||
       r.exeSha256 !== OPEN_CE_AI.exe ||
-      r.exitCode !== 0 ||
+      !uint(r.exitCode) ||
+      (!diagnosticOnly && r.exitCode !== 0) ||
       r.forced ||
       !r.inputsUnchanged ||
       !ai ||
@@ -399,6 +404,11 @@ export function analyzeActors(directory) {
     throw Error('Two independent matching observers required');
   const native = analyzeRun(root),
     comparison = compareActorObservations(...observations);
+  const sampledControls =
+    comparison.hostAuthorityObserved &&
+    comparison.movingActorIds > 0 &&
+    native.verdict.joinMarkersObserved &&
+    native.verdict.bidirectionalPacketCountersObserved;
   return {
     schemaVersion: 1,
     analyzer: 'analyze-opence-ai',
@@ -407,14 +417,19 @@ export function analyzeActors(directory) {
     executionSha256: digest(receiptBytes),
     runtime: 'opence-build-335',
     mode: receipt.mode,
+    diagnosticOnly,
+    failedExecution: diagnosticOnly
+      ? {
+          processes: receipt.executed.map(({ role, pid, exitCode }) => ({ role, pid, exitCode })),
+          runnerErrors: receipt.errors,
+          acceptanceEligible: false,
+        }
+      : null,
     nativeJoin: native.verdict,
     identities,
     comparison,
-    actorControlsObserved:
-      comparison.hostAuthorityObserved &&
-      comparison.movingActorIds > 0 &&
-      native.verdict.joinMarkersObserved &&
-      native.verdict.bidirectionalPacketCountersObserved,
+    sampledActorControlsObserved: sampledControls,
+    actorControlsObserved: !diagnosticOnly && sampledControls,
     nativeHealth: native.nativeHealth,
     nativeFaultsObserved: native.nativeHealth.some((h) => h.status === 'native-faults-observed'),
     aiActorAcceptance: false,
@@ -427,11 +442,12 @@ export function analyzeActors(directory) {
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    if (process.argv.length !== 4 || process.argv[2] !== '--run')
-      throw Error('Usage: node scripts/analyze-opence-ai.mjs --run <private-native-pair>');
-    const r = analyzeActors(process.argv[3]);
+    if (process.argv.length !== 4 || !['--run', '--diagnostic-run'].includes(process.argv[2]))
+      throw Error('Usage: node scripts/analyze-opence-ai.mjs --run|--diagnostic-run <private-native-pair>');
+    const r = analyzeActors(process.argv[3], { diagnosticOnly: process.argv[2] === '--diagnostic-run' });
     process.stdout.write(JSON.stringify(r, null, 2) + '\n');
     if (
+      r.diagnosticOnly ||
       !r.actorControlsObserved ||
       r.nativeFaultsObserved ||
       r.nativeJoin.status === 'invalid-or-failed-evidence'

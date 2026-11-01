@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { nativeSoundStreamingFailures } from './native-runtime-health.mjs';
+import { readNativeTagValues } from './native-tag-readback.mjs';
 const hash = (b) => createHash('sha256').update(b).digest('hex');
 const none = (n) => (n === 65535 ? -1 : n);
 const finiteVector = (v, size) =>
@@ -242,6 +243,12 @@ async function execute(argv) {
   const report = {
     schemaVersion: 1,
     recipeSourceSha256: hash(await fs.readFile(fileURLToPath(import.meta.url))),
+    nativeReadbackSourceSha256: hash(
+      await fs.readFile(new URL('./native-tag-readback.mjs', import.meta.url)),
+    ),
+    nativeHealthSourceSha256: hash(
+      await fs.readFile(new URL('./native-runtime-health.mjs', import.meta.url)),
+    ),
     pinsSourceSha256: hash(pinBytes),
     experimental: true,
     source,
@@ -259,7 +266,7 @@ async function execute(argv) {
     ],
   };
   let sequence = 0;
-  function native(exe, args, label) {
+  function native(exe, args, label, raw = false) {
     const r = spawnSync(exe, args, {
       cwd: output,
       encoding: 'utf8',
@@ -275,7 +282,7 @@ async function execute(argv) {
       if (r.status !== 0 || r.error) throw Error(`Native ${label} refused; inspect ${file}`);
       if (nativeSoundStreamingFailures(text).length)
         throw Error(`Native ${label} omitted sound data despite its status; inspect ${file}`);
-      return (r.stdout ?? '').trim();
+      return raw ? (r.stdout ?? '') : (r.stdout ?? '').trim();
     });
   }
   try {
@@ -296,31 +303,73 @@ async function execute(argv) {
     await fs.mkdir(path.join(output, 'tools'));
     const localEdit = path.join(output, 'tools', 'invader-edit.exe');
     await fs.writeFile(localEdit, await regular(edit, 16 * 1024 * 1024), { flag: 'wx' });
-    const invader = (args, tag) => native(localEdit, ['-t', tags, ...args, tag], 'invader');
-    const get = (tag, key) => invader(['-G', key], tag),
-      count = async (tag, key) => Number(await invader(['-C', key], tag));
+    const invader = (args, tag, raw = false) => native(localEdit, ['-t', tags, ...args, tag], 'invader', raw);
+    const readValues = (tag, requests) =>
+      readNativeTagValues(requests, {
+        read: () => regular(path.join(tags, tag)),
+        run: (args) => invader(args, tag, true),
+      });
+    const getMany = (tag, keys) =>
+      readValues(
+        tag,
+        keys.map((key) => ({ op: 'get', key })),
+      );
+    const get = async (tag, key) => (await getMany(tag, [key]))[0];
+    const counts = async (tag, keys) =>
+      (
+        await readValues(
+          tag,
+          keys.map((key) => ({ op: 'count', key })),
+        )
+      ).map(Number);
+    const count = async (tag, key) => (await counts(tag, [key]))[0];
     const collision = 'powerups/sniper rifle ammo/sniper rifle ammo.model_collision_geometry',
       base = 'nodes[0].bsps[0]';
     const points = [],
       edges = [],
       surfaces = [];
-    for (let i = 0, n = await count(collision, base + '.vertices'); i < n; i++)
-      points.push((await get(collision, `${base}.vertices[${i}].point`)).split(',').map(Number));
-    for (let i = 0, n = await count(collision, base + '.edges'); i < n; i++) {
-      const edge = {};
-      for (const k of [
-        'start_vertex',
-        'end_vertex',
-        'forward_edge',
-        'reverse_edge',
-        'left_surface',
-        'right_surface',
-      ])
-        edge[k] = Number(await get(collision, `${base}.edges[${i}].${k}`));
-      edges.push(edge);
-    }
-    for (let i = 0, n = await count(collision, base + '.surfaces'); i < n; i++)
-      surfaces.push(Number(await get(collision, `${base}.surfaces[${i}].first_edge`)));
+    const [pointCount, edgeCount, surfaceCount] = await counts(collision, [
+      base + '.vertices',
+      base + '.edges',
+      base + '.surfaces',
+    ]);
+    if (
+      pointCount < 1 ||
+      pointCount > 4096 ||
+      edgeCount < 1 ||
+      edgeCount > 8192 ||
+      surfaceCount < 1 ||
+      surfaceCount > 4096
+    )
+      throw Error('Native collider counts exceed reviewed bounds');
+    const edgeKeys = [
+      'start_vertex',
+      'end_vertex',
+      'forward_edge',
+      'reverse_edge',
+      'left_surface',
+      'right_surface',
+    ];
+    // Query each bounded logical array without spawning a tool for every scalar.
+    // Large valid edge arrays are split so the per-snapshot request cap still applies.
+    const readArray = async (size, fields, prefix) => {
+      const rows = [];
+      for (let start = 0; start < size; start += Math.floor(4096 / fields.length)) {
+        const end = Math.min(size, start + Math.floor(4096 / fields.length));
+        const keys = [];
+        for (let i = start; i < end; i++) for (const field of fields) keys.push(`${prefix}[${i}].${field}`);
+        const values = await getMany(collision, keys);
+        for (let at = 0; at < values.length; at += fields.length)
+          rows.push(values.slice(at, at + fields.length));
+      }
+      return rows;
+    };
+    for (const [point] of await readArray(pointCount, ['point'], base + '.vertices'))
+      points.push(point.split(',').map(Number));
+    for (const values of await readArray(edgeCount, edgeKeys, base + '.edges'))
+      edges.push(Object.fromEntries(edgeKeys.map((key, i) => [key, Number(values[i])])));
+    for (const [edge] of await readArray(surfaceCount, ['first_edge'], base + '.surfaces'))
+      surfaces.push(Number(edge));
     const mesh = {
       points,
       triangles: triangulateCollider(points, edges, surfaces),
@@ -345,25 +394,34 @@ async function execute(argv) {
       'vehicles/rwarthog/rwarthog.gbxmodel',
       'weapons/gravity rifle/gravity rifle.gbxmodel',
     ].entries()) {
-      const nodes = [];
-      for (let j = 0, n = await count(model, 'nodes'); j < n; j++)
+      const [nodeCount, regionCount] = await counts(model, ['nodes', 'regions']);
+      if (nodeCount < 1 || nodeCount > 64 || regionCount < 1 || regionCount > 8)
+        throw Error('Native model counts exceed reviewed bounds');
+      const nodeKeys = [
+        'name',
+        'first_child_node_index',
+        'next_sibling_node_index',
+        'default_translation',
+        'default_rotation',
+      ];
+      const keys = [];
+      for (let j = 0; j < nodeCount; j++) for (const key of nodeKeys) keys.push(`nodes[${j}].${key}`);
+      for (let j = 0; j < regionCount; j++) keys.push(`regions[${j}].name`);
+      keys.push('node_list_checksum');
+      const values = await getMany(model, keys),
+        nodes = [];
+      for (let j = 0; j < nodeCount; j++) {
+        const [name, child, sibling, translation, rotation] = values.slice(j * 5, j * 5 + 5);
         nodes.push({
-          name: await get(model, `nodes[${j}].name`),
-          child: none(Number(await get(model, `nodes[${j}].first_child_node_index`))),
-          sibling: none(Number(await get(model, `nodes[${j}].next_sibling_node_index`))),
-          translation: (await get(model, `nodes[${j}].default_translation`)).split(',').map(Number),
-          rotation: (await get(model, `nodes[${j}].default_rotation`)).split(',').map(Number),
+          name,
+          child: none(Number(child)),
+          sibling: none(Number(sibling)),
+          translation: translation.split(',').map(Number),
+          rotation: rotation.split(',').map(Number),
         });
-      const regions = [];
-      for (let j = 0, n = await count(model, 'regions'); j < n; j++)
-        regions.push(await get(model, `regions[${j}].name`));
-      const sources = carrierSources(
-        nodes,
-        Number(await get(model, 'node_list_checksum')),
-        mesh,
-        regions,
-        i === 0 ? [0, 14] : [0],
-      );
+      }
+      const regions = values.slice(nodeCount * 5, nodeCount * 5 + regionCount);
+      const sources = carrierSources(nodes, Number(values.at(-1)), mesh, regions, i === 0 ? [0, 14] : [0]);
       const stem = `gs_compat/recovered_carrier_${i}`,
         name = `recovered_carrier_${i}`,
         tag = `${stem}/${name}.model_collision_geometry`,
@@ -399,8 +457,10 @@ async function execute(argv) {
           throw Error('Native animation rig differs');
         for (const [j, node] of nodes.entries()) {
           const graph = 'gs_compat/carrier_idle/carrier_idle.model_animations';
-          if (none(Number(await get(graph, `nodes[${j}].first_child_node_index`))) !== node.child ||
-              none(Number(await get(graph, `nodes[${j}].next_sibling_node_index`))) !== node.sibling)
+          if (
+            none(Number(await get(graph, `nodes[${j}].first_child_node_index`))) !== node.child ||
+            none(Number(await get(graph, `nodes[${j}].next_sibling_node_index`))) !== node.sibling
+          )
             throw Error('Native animation child/sibling readback differs');
         }
       }

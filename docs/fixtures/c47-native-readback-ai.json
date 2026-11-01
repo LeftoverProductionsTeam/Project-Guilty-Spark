@@ -1,0 +1,1032 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": "C47",
+  "startingCommit": "04bd714c64df35c56ed7af4d74853b113cc96c9b",
+  "checkedAt": "2026-11-01T16:04:42.901Z",
+  "scope": "Native conversion and diagnostic source continuation; desktop artifacts remain C46.",
+  "performance": {
+    "schemaVersion": 1,
+    "benchmarkSourceSha256": "d7465f6dce601d4ac3198416f2a4be598844a090083f55b8df258236293c6d81",
+    "nativeReadbackSourceSha256": "8fa209136491e8ee3bd180aeb1349d174e4029efc378c9dc3e754d16d7939054",
+    "measuredAt": "2026-11-01T15:56:47.629Z",
+    "nativeToolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "readReceiptSha256": "6bd739b5183c7f104f07347ee26e46e2b96492654fe54ae6a8e2fb64a0e3470e",
+    "sourceTags": [
+      [
+        "powerups/sniper rifle ammo/sniper rifle ammo.model_collision_geometry",
+        "c128e2deb39ad909e991615a577a8ef8c84d60b6936b46730464e23ef47e5ab1"
+      ],
+      ["gs_compat/zombie_spawn_0.effect", "fcf6b47d162eabb3fa2cde684f49d6512b4678d172dc946ebf8243add9917864"],
+      ["gs_compat/zombie_spawn_1.effect", "bb07a753b1af64c14f95bb5d779c6dc531c9a125ccad39ef3570d2d4b4523733"],
+      ["gs_compat/zombie_spawn_2.effect", "2ab33e47e91454b8615af782a79bf5f432720b0aacbe46de6731822b294b1753"],
+      [
+        "vehicles/rwarthog/rwarthog.gbxmodel",
+        "d8943df9a321b1359070ee798c6c810f3e302f7bd1fe65e859d0b2db87451005"
+      ],
+      [
+        "gs_compat/recovered_carrier_0/recovered_carrier_0.model_collision_geometry",
+        "907d5854acf1205ed8f36a91cf0c81b5beab7c5307ab04a5b093ee465267b69e"
+      ],
+      [
+        "weapons/gravity rifle/gravity rifle.gbxmodel",
+        "22038ff04d405a79283c0bdc0f7f3f79eddbe339a87eb7e5c40e9999962562e0"
+      ],
+      [
+        "gs_compat/recovered_carrier_1/recovered_carrier_1.model_collision_geometry",
+        "ec0295f4afe13c713ffa15c42cd3a31d60dbd4473ae542eb4575446427c8b6d5"
+      ],
+      [
+        "gs_compat/carrier_idle/carrier_idle.model_animations",
+        "acf210702864e038e519f687791edcfd3a17a9585645cce0c9c70d8753f4c201"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/ai respawning/evolved zombie spawnerorig.weapon",
+        "c2f8a4f2ee088113290518c5458748224dcc8e9e98ceb2e6063a40c91ffebc5e"
+      ],
+      [
+        "origmgm/fonzie/sparky/tags/ai respawning/alpha zombie spawner.weapon",
+        "7a4ceb98a27445a3c9aa916c6fb6447eded8bff974cda7a53d08f6d0c0f1ff26"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/ai respawning/zombie spawner.weapon",
+        "bebeaedac988b2fd9af1e30db728d30250b3ce489686627399649c04ba9c6712"
+      ]
+    ],
+    "runs": [
+      {
+        "pair": 0,
+        "mode": "sequential",
+        "elapsedMs": 6012.1674,
+        "invocations": 338,
+        "values": 338,
+        "valuesSha256": "e543ee464bda4917b0d1f6b8f6c044df055d4a420af0c71d588efe1fa246c884"
+      },
+      {
+        "pair": 0,
+        "mode": "batch",
+        "elapsedMs": 498.10729999999967,
+        "invocations": 29,
+        "values": 338,
+        "valuesSha256": "e543ee464bda4917b0d1f6b8f6c044df055d4a420af0c71d588efe1fa246c884"
+      },
+      {
+        "pair": 1,
+        "mode": "batch",
+        "elapsedMs": 483.1929,
+        "invocations": 29,
+        "values": 338,
+        "valuesSha256": "e543ee464bda4917b0d1f6b8f6c044df055d4a420af0c71d588efe1fa246c884"
+      },
+      {
+        "pair": 1,
+        "mode": "sequential",
+        "elapsedMs": 5445.9685,
+        "invocations": 338,
+        "values": 338,
+        "valuesSha256": "e543ee464bda4917b0d1f6b8f6c044df055d4a420af0c71d588efe1fa246c884"
+      },
+      {
+        "pair": 2,
+        "mode": "sequential",
+        "elapsedMs": 5437.317000000001,
+        "invocations": 338,
+        "values": 338,
+        "valuesSha256": "e543ee464bda4917b0d1f6b8f6c044df055d4a420af0c71d588efe1fa246c884"
+      },
+      {
+        "pair": 2,
+        "mode": "batch",
+        "elapsedMs": 466.2907000000014,
+        "invocations": 29,
+        "values": 338,
+        "valuesSha256": "e543ee464bda4917b0d1f6b8f6c044df055d4a420af0c71d588efe1fa246c884"
+      }
+    ],
+    "sequentialMedianMs": 5445.9685,
+    "batchMedianMs": 483.1929,
+    "improvementPercent": 91.12751203022933,
+    "everyValueIdentical": true,
+    "sourceTagsUnchanged": true,
+    "gameLaunched": false,
+    "scope": "Native conversion readback phase under a warm OS file cache. Fresh output, alternating order; all native outputs retained. Not total conversion time or desktop/rendering performance."
+  },
+  "nativeRecovery": {
+    "sourceTreeSha256": "ee9e307640523674d30700e754365c903d1306bbd5116ac84eb0dd023f2764f7",
+    "sourceFiles": 3739,
+    "recipeSourceSha256": "e37716b314cfc7d81893a7474040595a2ba768d28e5d0a873358d2b27818fdda",
+    "nativeReadbackSourceSha256": "8fa209136491e8ee3bd180aeb1349d174e4029efc378c9dc3e754d16d7939054",
+    "nativeHealthSourceSha256": "feb5c4b14ee3dd9032f629e41aaafe54231fc0882eb3442fe94d1303fafee7ea",
+    "baselineNativeCalls": 351,
+    "currentNativeCalls": 65,
+    "changedOrAddedTags": 12,
+    "changes": [
+      {
+        "tag": "gs_compat/carrier_idle/carrier_idle.model_animations",
+        "beforeSha256": null,
+        "afterSha256": "e6cba32d071301030d20a01b892af33066de285b9cb7b0d551c605b34d37dda5"
+      },
+      {
+        "tag": "gs_compat/recovered_carrier_0/recovered_carrier_0.model_collision_geometry",
+        "beforeSha256": null,
+        "afterSha256": "8a560b4899b6c90ea01764b6e5e2319dadd1f169a905175a29f206d33f15c2a4"
+      },
+      {
+        "tag": "gs_compat/recovered_carrier_1/recovered_carrier_1.model_collision_geometry",
+        "beforeSha256": null,
+        "afterSha256": "dc48ac61b054aa2cc451f29d8ef567d81f82f19a12181fe986c3ac1178497c7d"
+      },
+      {
+        "tag": "gs_compat/zombie_spawn_0.effect",
+        "beforeSha256": "33b3e194f0c94992c67d54677569ed076a76bd5b2fcd1ce5cd731a49ffd071a3",
+        "afterSha256": "fcf6b47d162eabb3fa2cde684f49d6512b4678d172dc946ebf8243add9917864"
+      },
+      {
+        "tag": "gs_compat/zombie_spawn_1.effect",
+        "beforeSha256": "c03ff26572c38d874d9031624304770a849cf300bbb8b8232cc95e672281e087",
+        "afterSha256": "bb07a753b1af64c14f95bb5d779c6dc531c9a125ccad39ef3570d2d4b4523733"
+      },
+      {
+        "tag": "gs_compat/zombie_spawn_2.effect",
+        "beforeSha256": "bb9dc1f943d7b7cbb0c5e06563d50345eefa6ec78daac3f1701812625d01ab1e",
+        "afterSha256": "2ab33e47e91454b8615af782a79bf5f432720b0aacbe46de6731822b294b1753"
+      },
+      {
+        "tag": "mgm/fonzie/sparky/tags/ai respawning/evolved zombie spawnerorig.weapon",
+        "beforeSha256": "7e4461c1f35535bba51e60fed8af18b6fac053cb03f11a818c730702d0fac528",
+        "afterSha256": "c2f8a4f2ee088113290518c5458748224dcc8e9e98ceb2e6063a40c91ffebc5e"
+      },
+      {
+        "tag": "mgm/fonzie/sparky/tags/ai respawning/zombie spawner.weapon",
+        "beforeSha256": "591509795f7726162f935c2b74bc9cd393ac4a3b97a0dd7a5210dc829489df47",
+        "afterSha256": "bebeaedac988b2fd9af1e30db728d30250b3ce489686627399649c04ba9c6712"
+      },
+      {
+        "tag": "mgm/fonzie/sparky/tags/alpha zombie containerorig.vehicle",
+        "beforeSha256": "819e618567122dc5205ace1936b4e0a497f8ada94369e28338579466dd3c09b9",
+        "afterSha256": "20876d8e14db2e28905be6a0f3b69229a425c1ddc1c4d9b35343d63244feae66"
+      },
+      {
+        "tag": "mgm/fonzie/sparky/tags/evolved zombie container.vehicle",
+        "beforeSha256": "76e93dd8df794c87ddd348b4a4321b9b6d2a2a5b7926c25cb27db7ec9a30315b",
+        "afterSha256": "b0d7950f935724d964c826e6cf53613c932b013ff2b237ef432af1ff75294ef9"
+      },
+      {
+        "tag": "mgm/fonzie/sparky/tags/zombie container.vehicle",
+        "beforeSha256": "e2904fb8fab3ee57c1a0a4ed5f96f2ad7ff4b478f127f4c026c900363ed7c467",
+        "afterSha256": "6f29b88a037fe6f93d794ee6c2a2d0223dc730c0205854f066c0a64436ed9542"
+      },
+      {
+        "tag": "origmgm/fonzie/sparky/tags/ai respawning/alpha zombie spawner.weapon",
+        "beforeSha256": "c755b83cd7d5aac2f72339e1f958576359d250dde570843992e74abea8f87eb2",
+        "afterSha256": "7a4ceb98a27445a3c9aa916c6fb6447eded8bff974cda7a53d08f6d0c0f1ff26"
+      }
+    ],
+    "cache": {
+      "bytes": 89421930,
+      "sha256": "b27265ed18e04aeec51ed6a455fbba22b3473f9c30c63c1f105ded6959ad1981",
+      "version": 609
+    },
+    "strictLooseTagMatches": 12,
+    "strictCompiledTagMatches": 12,
+    "strictComparedTags": 12,
+    "precisionRelaxed": false,
+    "functionalRelaxed": false,
+    "sourceAndToolsPreserved": true,
+    "previousCompleteAudioBuildsPreserved": true,
+    "gameplayAccepted": false,
+    "faithfulConversionAccepted": false,
+    "resourceComparisonBoundary": "Selected support tags only. Separate Invader missing-resource notices retained; no complete resource/audio equivalence claim."
+  },
+  "carrierStateExperiment": {
+    "cache": {
+      "version": 609,
+      "bytes": 98275795,
+      "sha256": "4a7268a8f640688677c3ff91413ca7babd2c74e306633e8a239bfb642f4cf249"
+    },
+    "changes": [
+      [
+        "gs_compat/carrier_state/carrier_state.model_animations",
+        "9af6310266a383c6eb2583693ed0072c6d231e384964da5dfeb7c90b08105549"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/zombie container.vehicle",
+        "280ff00550bf1484c355fd3829a6f4c55cceae4ce8f50f8a17fe93d1504724e9"
+      ]
+    ],
+    "readback": ["stand", "unarmed", "0", "stand unarmed idle", "1344912864", "5", "1", "1"],
+    "strictCompiledAnimationMatches": 1,
+    "changedOrAddedTags": 2,
+    "authoredBipedAnimationsReplaced": false,
+    "authoredPhysicsChanged": false,
+    "promotedToAutomaticRecovery": false,
+    "gameplayAccepted": false,
+    "emptyBlockWarningAbsentInTestedPairs": true
+  },
+  "opence": {
+    "diagnosticOnly": true,
+    "executionSha256": "bebc3bcaca0c6edb48803e6eefab1956562b8731c2eccb96dada8bbaa8051c68",
+    "processes": [
+      {
+        "role": "host",
+        "pid": 14656,
+        "exitCode": 3221225477
+      },
+      {
+        "role": "client",
+        "pid": 30292,
+        "exitCode": 0
+      }
+    ],
+    "runnerErrors": ["host did not exit cleanly with unchanged map input"],
+    "observerIdentities": [
+      {
+        "role": "host",
+        "pid": 14656,
+        "observerSha256": "c03ee89d9152b4e638bd71232659b6bcdfc64fd546c2aa4194ca3852d85dc8ef",
+        "logSha256": "3b09f4de088d14ae93fe522694bd35361992e2839dca3ffc8d1ffaba387eab80",
+        "samples": 455,
+        "readErrors": {
+          "bounded address rejected": 1,
+          "map not initialized": 11,
+          "crossed tick while reading": 21,
+          "invalid datum pool": 3
+        },
+        "maximumActorPool": 43,
+        "maximumNetworkActors": 20,
+        "readTimingMs": {
+          "count": 455,
+          "median": 0.9358,
+          "p95": 8.2519,
+          "maximum": 9.9257
+        },
+        "detailedCensus": {
+          "frames": 37,
+          "readTimingMs": {
+            "count": 37,
+            "median": 8.3347,
+            "p95": 9.1611,
+            "maximum": 9.9257
+          },
+          "last": {
+            "tick": 1211,
+            "actors": 43,
+            "activeActors": 13,
+            "bipeds": 52,
+            "vehicles": 24
+          },
+          "peakActiveActors": 20
+        }
+      },
+      {
+        "role": "client",
+        "pid": 30292,
+        "observerSha256": "c03ee89d9152b4e638bd71232659b6bcdfc64fd546c2aa4194ca3852d85dc8ef",
+        "logSha256": "4c493763daff53ea93b4cb052466bf2a4ec4f9c61cca85abbe3a948e603f172a",
+        "samples": 543,
+        "readErrors": {
+          "bounded address rejected": 1,
+          "map not initialized": 11,
+          "invalid datum pool": 6,
+          "crossed tick while reading": 21
+        },
+        "maximumActorPool": 0,
+        "maximumNetworkActors": 20,
+        "readTimingMs": {
+          "count": 543,
+          "median": 0.8582000000000001,
+          "p95": 7.8253,
+          "maximum": 10.512799999999999
+        },
+        "detailedCensus": {
+          "frames": 48,
+          "readTimingMs": {
+            "count": 48,
+            "median": 8.0506,
+            "p95": 8.902099999999999,
+            "maximum": 10.512799999999999
+          },
+          "last": {
+            "tick": 312,
+            "actors": 0,
+            "activeActors": 0,
+            "bipeds": 0,
+            "vehicles": 0
+          },
+          "peakActiveActors": 0
+        }
+      }
+    ],
+    "comparison": {
+      "exactTickFrames": 84,
+      "sharedActualActorIds": 17,
+      "movingActorIds": 10,
+      "firingActorIds": 1,
+      "position": {
+        "count": 484,
+        "median": 0.013695723922107767,
+        "p95": 0.12791153523372725,
+        "maximum": 0.764781540769106
+      },
+      "worldSpacePosition": {
+        "count": 484,
+        "median": 0.013695723922107767,
+        "p95": 0.12791153523372725,
+        "maximum": 0.764781540769106
+      },
+      "sameParentLocalPosition": null,
+      "positionCoordinateScope": {
+        "rawObjectPairs": 484,
+        "worldSpacePairs": 484,
+        "sameParentLocalPairs": 0,
+        "differentParentPairs": 0,
+        "note": "Raw object coordinates are parent-local while attached. Different-parent deltas remain in position but cannot establish a world-space distance or parity."
+      },
+      "observationCoverage": {
+        "hostObservations": 455,
+        "clientObservations": 543,
+        "hostDistinctTicks": 420,
+        "clientDistinctTicks": 450,
+        "hostRepeatedTickObservations": 35,
+        "clientRepeatedTickObservations": 93,
+        "hostTicksWithoutClientPair": 336,
+        "clientTicksWithoutHostPair": 366,
+        "selection": "Last validated observation per distinct server tick on each side; raw observations and errors remain retained."
+      },
+      "identityCoverage": {
+        "hostAiUnitTicks": 1224,
+        "matchedAiUnitTicks": 484,
+        "missingClientUnitTicks": 740,
+        "knownAiMissingHostUnitTicks": 300,
+        "unclassifiedClientUnitTicks": 0,
+        "mismatchedTagUnitTicks": 0,
+        "examples": [
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815964928,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815899391,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815833854,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815768317,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815702780,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815637243,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815571706,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815506169,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815440632,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815375095,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815309558,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815244021,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815178484,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815112947,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3815047410,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3814981873,
+            "tag": 3875603853
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3814916336,
+            "tag": 3875603853
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3814785262,
+            "tag": 3802661172
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3814719725,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 60,
+            "id": 3814588651,
+            "tag": 3795058880
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815964928,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815899391,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815833854,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815768317,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815702780,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815637243,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815571706,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815506169,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815440632,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815375095,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815309558,
+            "tag": 3790930049
+          },
+          {
+            "kind": "host-ai-missing-client",
+            "tick": 70,
+            "id": 3815244021,
+            "tag": 3790930049
+          }
+        ]
+      },
+      "health": {
+        "count": 484,
+        "median": 0.000006496906280517578,
+        "p95": 0.000029534101486206055,
+        "maximum": 0.08773642778396606
+      },
+      "shield": {
+        "count": 484,
+        "median": 0,
+        "p95": 0,
+        "maximum": 0
+      },
+      "throttle": {
+        "count": 484,
+        "median": 0,
+        "p95": 0,
+        "maximum": 1
+      },
+      "receivedControlAgeTicks": {
+        "count": 484,
+        "median": 0,
+        "p95": 2,
+        "maximum": 2
+      },
+      "parentOrSeatDifferences": 0,
+      "largePositionDifferences": {
+        "total": 0,
+        "examples": []
+      },
+      "hostAuthorityObserved": true,
+      "aiActorAcceptance": false,
+      "fullLifecycleAcceptance": false,
+      "twoComputerAcceptance": false,
+      "note": "Every distinct-tick matched pair remains in the raw distributions; missing identities and coordinate-space differences are reported separately. Same-tick process reads are not atomic engine packets; counters advance separately from position, damage, seat and control updates. No parity or latency threshold is approved here."
+    },
+    "nativeHealth": [
+      {
+        "role": "host",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "zombie_apocalypse (scnr)",
+            "firstLine": 28609,
+            "loggedRecords": 3,
+            "minimumOccurrences": 3
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/evolved zombie (bipd)",
+            "firstLine": 28612,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/alpha zombieorigshot (bipd)",
+            "firstLine": 28613,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "weapons/pistol/melee (jpt!)",
+            "firstLine": 28614,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/player/survivor (bipd)",
+            "firstLine": 28615,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/alpha zombieorig (bipd)",
+            "firstLine": 28616,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "globals/globals (matg)",
+            "firstLine": 28617,
+            "loggedRecords": 3,
+            "minimumOccurrences": 3
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/kiyoshi/broke/tags/equipment/molotov (proj)",
+            "firstLine": 28620,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "mountedActorCapacityExceeded",
+            "source": null,
+            "firstLine": 28688,
+            "loggedRecords": 4,
+            "minimumOccurrences": 6
+          },
+          {
+            "kind": "bipedExitPlacementFailed",
+            "source": null,
+            "firstLine": 28692,
+            "loggedRecords": 2,
+            "minimumOccurrences": 14
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 28694,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 28695,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 28696,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "memory/data.c:412",
+            "firstLine": 28704,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeCrash",
+            "source": null,
+            "firstLine": 28706,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          }
+        ],
+        "unclassifiedErrorRecords": 0
+      },
+      {
+        "role": "client",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "zombie_apocalypse (scnr)",
+            "firstLine": 12406,
+            "loggedRecords": 3,
+            "minimumOccurrences": 3
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/evolved zombie (bipd)",
+            "firstLine": 12409,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/alpha zombieorigshot (bipd)",
+            "firstLine": 12410,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "weapons/pistol/melee (jpt!)",
+            "firstLine": 12411,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/player/survivor (bipd)",
+            "firstLine": 12412,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/fonzie/sparky/tags/zombies/alpha zombieorig (bipd)",
+            "firstLine": 12413,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "globals/globals (matg)",
+            "firstLine": 12414,
+            "loggedRecords": 3,
+            "minimumOccurrences": 3
+          },
+          {
+            "kind": "nativeDependencyCleared",
+            "source": "mgm/kiyoshi/broke/tags/equipment/molotov (proj)",
+            "firstLine": 12417,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "mountedActorCapacityExceeded",
+            "source": null,
+            "firstLine": 12483,
+            "loggedRecords": 9,
+            "minimumOccurrences": 38
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 12494,
+            "loggedRecords": 5,
+            "minimumOccurrences": 10000
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 12495,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 12496,
+            "loggedRecords": 5,
+            "minimumOccurrences": 10000
+          }
+        ],
+        "unclassifiedErrorRecords": 0
+      }
+    ],
+    "crashNearestSymbols": [
+      {
+        "displacement": 1501,
+        "rva": 1789133,
+        "symbol": "object_cause_damage"
+      },
+      {
+        "displacement": 18132,
+        "rva": 2022852,
+        "symbol": "physics_update"
+      },
+      {
+        "displacement": 623,
+        "rva": 2821631,
+        "symbol": "update_human_tank_physics"
+      },
+      {
+        "displacement": 3210,
+        "rva": 2817370,
+        "symbol": "vehicle_update"
+      },
+      {
+        "displacement": 505,
+        "rva": 1895593,
+        "symbol": "object_update"
+      },
+      {
+        "displacement": 13260,
+        "rva": 718716,
+        "symbol": "game_tick"
+      },
+      {
+        "displacement": 2699,
+        "rva": 911899,
+        "symbol": "game_time_update"
+      }
+    ],
+    "actorControlsAccepted": false,
+    "fullAiReplicationAccepted": false,
+    "damagePhysicsCauseRepaired": false
+  },
+  "chupathingy": {
+    "executionSha256": "24980d30bd068c5ae588767d5a2e51d3b568feef2a293b893c11c79d32df6c8f",
+    "processes": [
+      {
+        "role": "host",
+        "pid": 33192,
+        "exitCode": 0,
+        "forced": false,
+        "inputsUnchanged": true
+      },
+      {
+        "role": "client",
+        "pid": 25516,
+        "exitCode": 0,
+        "forced": false,
+        "inputsUnchanged": true
+      }
+    ],
+    "verdict": {
+      "status": "invalid-or-failed-evidence",
+      "selectedComparison": "exactTicks",
+      "joinMarkersObserved": true,
+      "bidirectionalPacketCountersObserved": true,
+      "atLeastTwoMachinePlayersObserved": true,
+      "completeInventoryParity": false,
+      "humanPlayAccepted": false,
+      "aiActorAcceptance": false,
+      "twoComputerAcceptance": false,
+      "renderingOrAudioAcceptance": false,
+      "nativeDebugLogsChecked": true,
+      "nativeContentAcceptance": false,
+      "universalCrossRuntimeCompatibility": false,
+      "listingGateChangeAuthorized": false
+    },
+    "nativeHealth": [
+      {
+        "role": "host",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "mountedActorCapacityExceeded",
+            "source": null,
+            "firstLine": 116,
+            "loggedRecords": 4,
+            "minimumOccurrences": 6
+          },
+          {
+            "kind": "bipedExitPlacementFailed",
+            "source": null,
+            "firstLine": 121,
+            "loggedRecords": 3,
+            "minimumOccurrences": 4
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 124,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 125,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 126,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          }
+        ],
+        "unclassifiedErrorRecords": 0
+      },
+      {
+        "role": "client",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "mountedActorCapacityExceeded",
+            "source": null,
+            "firstLine": 86,
+            "loggedRecords": 9,
+            "minimumOccurrences": 38
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 99,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 100,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 101,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          }
+        ],
+        "unclassifiedErrorRecords": 0
+      }
+    ],
+    "matchingActorObserverAvailable": false
+  },
+  "c46Regression": {
+    "sameActorComparison": true,
+    "existingNativeRefusalsRetained": true,
+    "sourceCheckpointRetained": true
+  },
+  "offlineSymbolHelper": {
+    "readOnly": true,
+    "offline": true,
+    "exactExecutableSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+    "exactPdbSha256": "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800",
+    "literalNamesResolved": [
+      {
+        "symbol": "release_assert_failed",
+        "rva": 582592
+      },
+      {
+        "symbol": "cache_get_tag_instance",
+        "rva": 517456
+      }
+    ],
+    "expressionRefused": true
+  },
+  "privateDebuggerResearch": {
+    "attemptsRetained": ["A", "B", "C", "D", "E"],
+    "diagnosticOnly": true,
+    "timingPerturbed": true,
+    "hardwareExecutionBreakpoints": true,
+    "engineCodePatched": false,
+    "acceptedGameplayOrPerformanceEvidence": false
+  },
+  "tests": {
+    "rustPassed": 619,
+    "rustIgnored": 7,
+    "frontendPassed": 284,
+    "browserPassed": 136,
+    "offlineScriptsPassed": 59,
+    "nativeDiagnosticsAndSourceTestsPassed": 32,
+    "typescriptPassed": true,
+    "windowsDiagnosticExampleBuilt": true,
+    "hostedCiRerun": false
+  },
+  "desktopArtifacts": {
+    "checkpoint": "C46",
+    "sourceCommit": "04bd714c64df35c56ed7af4d74853b113cc96c9b",
+    "unchanged": true,
+    "newC47InstallerBuilt": false,
+    "newC47PortableBuilt": false,
+    "appSha256": "7ccc0e6ee4432b957058caba064cc5e1af77a27090133a76131002e9ee21ae1c",
+    "installerSha256": "bdb9e5cf5635aab2a908e6262ba5750d2ddc54b3123827dacbd22273aa27aeb8"
+  },
+  "proof": {
+    "native-readback-performance-final/benchmark.json": "564edd67700de1908f49c85d6e281d3558781f30ef913bcc0a54ecacecc3ac10",
+    "final-batched-recovery-compare.log": "4cfd144ad34c0da842ddab3fae168f8e28383a273bd07996ddfb7d6031d1655f",
+    "final-batched-cache-compare.log": "39719521d03b95c15824c8654249cf274015b78efd30252ca7015199681a0106",
+    "final-state-compiled-compare.log": "ff357301e98d935327e2c7ec467d9aa9934ec27971fd571b5b0b77ec8d3112d8",
+    "carrier-state-opence-diagnostic-final.json": "5cb2ce7eab9ff14b5e9029da8879d52719d15926327200a0683793fc9c3d2122",
+    "carrier-state-chupa-analysis.json": "46b36580c4ff46785008d021e2d1ae578f679352c963ec9e3ea7c4013103376c",
+    "carrier-state-crash-symbols-final.json": "9ee47dfc454953496e3ff758de3ca75a348a642ac2cf3655d72ea62a1244a54d",
+    "c46-ai-regression.json": "81f18e3001854061054a5fc72d8833d899803cf4338ebba28b1ed0684b109a54",
+    "final-symbol-lookup.json": "8fe686827d2122e77ea2b2b3b413090ab8950df1424aa10a817582801f04a57c",
+    "refused-symbol-expression.log": "418c2e903a22e435f0f43d7efe2a2a8a486570618e5c684648de01eec7b66fa9",
+    "workspace-tests.log": "95592e74949beb9c12d600e1bd5c2c0f5df7c83f9fb7c2802ef4ffaad4089a4f",
+    "frontend-tests.log": "70b6e68ad2399002ed4d2ec42356e7c9304e2f307d23ab57eeaa25a7105c7a20",
+    "browser-tests.log": "34c14d3dd83bef0363eaafb224e3c192fe6489cb2eb99abd8e1842c9188e0bd5",
+    "offline-tests.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+    "final-native-diagnostic-tests.log": "8b09bbb0c35695050d34971bf14ce9f7da8310a01f641ceb5e4fc0bb90514025",
+    "final-symbol-helper-build.log": "2bc421b19225c4a1d60e35422a35bb68992a859aad8e1eedf0df373de523e805"
+  },
+  "remaining": [
+    "OpenCE stale damage/physics object crash and mounted actor/biped exit/tag faults block complete native gameplay.",
+    "Carrier-state experiment is not automatically promoted; source data and previous good audio remain intact.",
+    "Full AI damage/death/respawn, late join, reconnection and real cross-computer testing remain open.",
+    "MCC sound-distance review, two original missing custom cues and target-runtime listening remain separate gates.",
+    "Timberland-Sidewinder walkthrough remains unverified.",
+    "Direct compiled-map structural editing, arbitrary live BSP replacement and complete rendering/audio parity remain unfinished.",
+    "The measured readback improvement is not full conversion or desktop startup/rendering/GPU/memory improvement.",
+    "C47 source-only archive; C46 Windows desktop artifacts unchanged. No remote publication."
+  ],
+  "remotePublished": false
+}

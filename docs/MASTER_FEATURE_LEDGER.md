@@ -1,5 +1,7 @@
 # Living feature ledger — Integrated workbench
 
+C47 adds three records for bounded native conversion readback, explicit failed-run AI diagnostics and the isolated carrier-state experiment. All previous 418 rows are preserved; the ledger now has 421 rows. Native source/cache equivalence and partial actor observations do not certify gameplay. The desktop packages remain C46. See [C47 results and remaining gates](CONTINUATION_47_ENGINEERING.md).
+
 C46 adds five records for complete native sound chains, compiler false-success refusal, corrected JMA hierarchy, measured complete export and precise AI coverage. Native compiler/readback acceptance remains separate from game listening and replication; final native runtime faults remain. See [C46 evidence and gates](CONTINUATION_46_ENGINEERING.md).
 
 C45 adds five source-only native recovery, fault reporting, semantic comparison and measured diagnostic records. CE/MCC compilation is verified; the final zombie runtime trial is refused for an extreme actor position and native tag faults remain. The verified desktop packages remain C44. See [C45 evidence and open gates](CONTINUATION_45_ENGINEERING.md).

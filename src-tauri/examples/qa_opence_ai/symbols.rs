@@ -174,7 +174,7 @@ pub fn run() {
     let args: Vec<_> = std::env::args().collect();
     assert!(
         args.len() == 3 || args.len() == 5 || (args.len() == 6 && args[5] == "--details"),
-        "<publisher exe> <local symbols directory> [<owned pid> <host|client> [--details] | --resolve-rvas <comma-separated hexadecimal RVAs>]"
+        "<publisher exe> <local symbols directory> [<owned pid> <host|client> [--details] | --resolve-rvas <hex RVAs> | --resolve-symbols <names>]"
     );
     verify(std::path::Path::new(&args[1]), EXE_SHA256);
     verify(&std::path::Path::new(&args[2]).join("halo.pdb"), PDB_SHA256);
@@ -206,6 +206,27 @@ pub fn run() {
         assert_ne!(SymGetModuleInfo64(h, base, &mut module), 0);
         assert_eq!(module.PdbUnmatched, 0, "Mismatched PDB");
         assert_eq!(module.SymType, SymPdb, "Missing private PDB type metadata");
+        if args.len() == 5 && args[3] == "--resolve-symbols" {
+            let names: Vec<_> = args[4].split(',').collect();
+            assert!(
+                !names.is_empty() && names.len() <= 16,
+                "at most 16 symbol names"
+            );
+            assert!(
+                names.iter().all(|name| !name.is_empty()
+                    && name.len() <= 128
+                    && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')),
+                "bounded literal symbols only"
+            );
+            verify(std::path::Path::new(&args[1]), EXE_SHA256);
+            verify(&std::path::Path::new(&args[2]).join("halo.pdb"), PDB_SHA256);
+            println!(
+                "{}",
+                json!({"readOnly":true,"offline":true,"exeSha256":EXE_SHA256,
+                "pdbSha256":PDB_SHA256,"resolved":names.into_iter().map(|name|s.symbol(name)).collect::<Vec<_>>()})
+            );
+            return;
+        }
         if args.len() == 5 && args[3] == "--resolve-rvas" {
             let rvas: Vec<_> = args[4]
                 .split(',')
