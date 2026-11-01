@@ -27,7 +27,7 @@ The release ZIP contains only `GuiltySpark.exe`, `LICENSE`, `THIRD_PARTY_NOTICES
 
 Required acceptance: the real extracted portable app starts with a fresh library and returns native bootstrap/version responses; its embedded frontend bytes match the build. The actual NSIS package installs, the installed executable hash matches, and that installed app also starts. A local installation test is distinguished from a fresh hosted runner or independently tested end-user machine.
 
-The test gate runs the complete Rust workspace with `--locked`, TypeScript, frontend tests, all offline checks, browser regressions (including focused cross-project Ctrl+S), diagnostic tests and release-pipeline tests. Native Halo/compiler tests requiring privately owned data retain their separate evidence and are not simulated by generic hosted runners.
+The test gate runs the complete Rust workspace with `--locked`, TypeScript, frontend tests, all offline checks, browser regressions (including focused cross-project Ctrl+S), diagnostic tests and release-pipeline tests. Release browser checks start their own strict loopback server on a free port; they never reuse another checkout's running preview. Native Halo/compiler tests requiring privately owned data retain their separate evidence and are not simulated by generic hosted runners.
 
 Public candidate names:
 

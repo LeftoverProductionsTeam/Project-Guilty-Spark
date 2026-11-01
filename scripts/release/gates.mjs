@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import net from 'node:net';
 import { spawn, execFileSync } from 'node:child_process';
 const [commit, output] = process.argv.slice(2);
 if (!/^[a-f0-9]{40}$/.test(commit ?? '') || !output) throw Error('gates <full commit> <fresh log directory>');
@@ -49,7 +50,14 @@ for (const [id, executable, args] of commands) {
   const chunks = [],
     started = performance.now();
   console.log('Running release gate:', id);
-  const child = spawn(executable, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const env = { ...process.env, SPARK_RELEASE_GATES: '1' };
+  if (id === 'browser') {
+    const server = net.createServer();
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    env.SPARK_UI_TEST_PORT = String(server.address().port);
+    await new Promise((resolve) => server.close(resolve));
+  }
+  const child = spawn(executable, args, { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   for (const stream of [child.stdout, child.stderr])
     stream.on('data', (b) => {
       chunks.push(b);
