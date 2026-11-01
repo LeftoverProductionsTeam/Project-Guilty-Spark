@@ -1,0 +1,777 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": "C48",
+  "continuedFrom": "04034b8b1e1cb03a789cec2a36878d75e2d7abf1",
+  "recordedAt": "2026-11-01T19:56:56.757Z",
+  "appSha256": "f9c7555000e5e37b57720df5f9d6dfb44192c4b8145120f30b624a43eb547a37",
+  "installerSha256": "0ea57694943ebd658a9f88f73ce4b9b372b9d8dbbecd3a6ea4330a44a87699d3",
+  "nativeWorkshop": {
+    "complete": true,
+    "receiptSha256": "0a974e065274d63b49be6687eff60d8fc239c425c5b0c3917dce2973f1903926",
+    "harness": "scripts/test-sparklink-workshop-native.mjs",
+    "harnessSha256": "6d0b66689e16dad65b4d55d6354d1177a60660bb1a059ef1064bd9160acac9ea",
+    "physicalMachines": 1,
+    "nativeProcesses": 3,
+    "separateLibraries": 3,
+    "mockedIpc": false,
+    "gameLaunched": false,
+    "elapsedMs": 173961.75379999998,
+    "stages": {
+      "threeIndependentWorkshopEditors": {
+        "tls": true,
+        "durable": true,
+        "network": "actual private LAN interface",
+        "participants": 3
+      },
+      "simultaneousUiBrushEdits": true,
+      "participantSpecificBspUndoRedo": true,
+      "actualMouseDragGhosts": {
+        "perspectiveAndOrthographic": true,
+        "uncommittedRevisionUnchanged": true,
+        "clearedAfterGesture": true,
+        "actualGeometryCommittedAndRenderedByAllEditors": true
+      },
+      "conflictsReplayViewerAndBuildPermissions": true,
+      "expiredEditorLeaseReauthenticatesSameIdentity": {
+        "pausedNativeEditorJavaScriptMs": 11500,
+        "networkOutageSimulated": false
+      },
+      "sustainedNativeBspEditing": {
+        "commits": 240,
+        "durationMs": 78294.33559999999,
+        "history": 100,
+        "revision": 247,
+        "acknowledgedOperations": 247,
+        "journalBytes": 1140153
+      },
+      "frozenSharedBspNativeBuild": {
+        "jobId": "1bb84368-b23e-4124-b026-93a228109c13",
+        "durationMs": 38903.40849999999,
+        "sessionRevision": 247,
+        "newerRevision": 248,
+        "cacheVersion": 13,
+        "compiledCollisionTriangles": 58,
+        "cacheSha256": "f94cbbbbf0643fb5accb2211f5930273e547891e48c1617ec285b706d8ca4b1e",
+        "cacheBytes": 88880670,
+        "portals": 2,
+        "readbackTags": 2239
+      },
+      "twoGenuineOfflineUiEditsRetained": {
+        "operationId": "33ee0b30-3331-48c2-ad92-b142cd7bab17",
+        "baseline": 248,
+        "pendingSourceSha256": "763a3393312fb826c68ae5c208608d5359bab40779b0c1815854550bb24a80be",
+        "newerDraftSourceSha256": "6cbab9c26a46a62f015381a2773606dc16e2a07236c5f3df44b07aeb25a8cdd6"
+      },
+      "ownerProcessDeathRecoversSourceHistoryAndPendingIdentity": {
+        "originalOperationId": "33ee0b30-3331-48c2-ad92-b142cd7bab17",
+        "author": "696bba19-cb37-4eb4-9440-ea77ac7f003b",
+        "beforeRevision": 248,
+        "afterRevision": 250,
+        "genuineOfflineUiEdits": 2,
+        "originalOperationAppliedOnce": true,
+        "newerLocalDraftPreserved": true
+      },
+      "radminInterfaceThreeProcessConvergence": {
+        "scope": "Radmin adapter, same physical machine",
+        "crossComputer": false,
+        "remoteVpnTunnelTested": false,
+        "revision": 3
+      },
+      "revokedParticipantCannotReconnect": true
+    }
+  },
+  "nativeWorkshopUi": {
+    "schemaVersion": 1,
+    "appSha256": "f9c7555000e5e37b57720df5f9d6dfb44192c4b8145120f30b624a43eb547a37",
+    "mockedIpc": false,
+    "actualNativeGeometry": true,
+    "gameplayVerified": false,
+    "complete": true,
+    "projectId": "70560381-2b95-4587-811f-29ea1a04070e",
+    "compactAxisRow": true,
+    "runtimeMaterialResolutionPreservesAuthoredUndo": {
+      "waitedForActualRuntimeResponse": true,
+      "shaderPath": "levels/test/bloodgulch/shaders/cap_metal",
+      "authoredTransformPreserved": true,
+      "noExtraUndoStep": true
+    },
+    "nativeTransformUndoRedo": true,
+    "orthographicBrushDrawing": true,
+    "clippedSourceRetained": true,
+    "invalidEditRefusedWithoutSourceMutation": true,
+    "reopenPreservesTopology": true,
+    "geometry": {
+      "valid": true,
+      "issues": [],
+      "vertices": 174,
+      "triangles": 58,
+      "closedComponents": 1,
+      "sourceSha256": "d780865e50afb07d31f64cfa65220f816e15dac4fe26b037a9b9d761f5f2f2fd"
+    },
+    "pageErrors": [],
+    "receiptSha256": "66cb5af737d879920c86f26e28f220ecb7514474cc0a6309f1a97d31c2dacbe5",
+    "harness": "scripts/test-bsp-workshop-native.mjs"
+  },
+  "nativeContentRegression": {
+    "schemaVersion": 1,
+    "nativeProcesses": 3,
+    "separateDataRoots": 3,
+    "physicalMachines": 1,
+    "transport": "private TCP + TLS 1.3, invitation-pinned certificate",
+    "mockedIpc": false,
+    "gameLaunched": false,
+    "gameMemoryTouched": false,
+    "gamePeerReplicationTested": false,
+    "nativeTagSharingTested": true,
+    "binaryAssetTransferTested": true,
+    "appSha256": "f9c7555000e5e37b57720df5f9d6dfb44192c4b8145120f30b624a43eb547a37",
+    "processes": [
+      {
+        "participant": 1,
+        "independentPid": 45404,
+        "separateLocalLibrary": true
+      },
+      {
+        "participant": 2,
+        "independentPid": 47620,
+        "separateLocalLibrary": true
+      },
+      {
+        "participant": 3,
+        "independentPid": 39256,
+        "separateLocalLibrary": true
+      }
+    ],
+    "threeAuthorNativeAcceptance": {
+      "revision": 3,
+      "documentSha256": "6ac373c065e093798d7c7ef471c5295ade415d83be2098a6fde85690b6fffb27",
+      "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+      "assetId": "8db214f1-d606-4e84-9cf5-9298beaf1215",
+      "assetBytes": 632,
+      "actualModelsInThreeViewports": true,
+      "simultaneousAuthorActions": true
+    },
+    "participantUndoAndReferencedAssetConflict": true,
+    "sameFieldConflictCorruptBytesAndDuplicateAck": true,
+    "permissionsCoverNativeImportEditAndBuild": true,
+    "nativeSourceIntegrityAndIndependentToolBuildGuard": {
+      "truncatedAdmittedTagRejected": true,
+      "exactRecoveryBytesRetained": true,
+      "unsharedWorkingTagsBuildRefused": true
+    },
+    "synchronizationSurvivesWorkspaceChange": true,
+    "externalToolInterop": {
+      "mockedIpc": false,
+      "simultaneousEditors": 3,
+      "externalTool": "Invader",
+      "sharedSessionStayedConnected": true,
+      "corruptSaveRejected": true,
+      "corruptedCandidateRetained": true,
+      "externalExecutableSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invalidCrcRejectedBeforeNativeNormalization": true,
+      "otherExposedFieldNotSilentlyMerged": true,
+      "externalEditAndConcurrentWorldEditConverged": true,
+      "convergedRevision": 14,
+      "elapsedMs": 19897.279699999985,
+      "forkId": "b797db27-18c1-49b5-9993-34950ae06dbc",
+      "candidateSha256": "15640d68228399293ba8d335839df25394f232c82d2f9f46e958f0f2563d99b2",
+      "alreadyCommittedEditDoesNotCreateAnotherTransaction": true,
+      "finalBoundingRadius": 0.5,
+      "baboonSavedFileReplay": {
+        "newGuiSession": false,
+        "priorHumanEditedSave": true,
+        "rawSha256": "6dc893d2375864e4648d45cd161d2e73a5b4ab18442fcb8d6fdb6a6e401d9d95",
+        "rawFileRetainedUnchanged": true,
+        "serialization": "equivalentNativeSerialization",
+        "convergedRevision": 15
+      },
+      "sameFieldConflictRejectedWithoutReplacingSource": true,
+      "participantUndoPreservesExternalAndOtherAuthorEdits": true,
+      "viewerCannotCreateToolFork": true,
+      "retainedAcrossActualHostRestart": true
+    },
+    "committedRevision": {
+      "sessionId": "480112e1-3ab6-4e7f-b08d-148cd2442bf1",
+      "revision": 18,
+      "documentSha256": "a731405aa2d253712a42cb5c04a7b22284eef18eba12b63eb8ac8375a9a9e165",
+      "localProjects": [
+        "aec67820-237b-4e06-9f71-ebea08c5332b",
+        "aec67820-237b-4e06-9f71-ebea08c5332b",
+        "aec67820-237b-4e06-9f71-ebea08c5332b"
+      ]
+    },
+    "actualHaloToolchain": {
+      "jobId": "abc30e15-2dfc-4b59-81b3-7e13ecd27fbb",
+      "revision": 18,
+      "laterRevision": 19,
+      "nativeRadius": 0.5,
+      "publishedAssetPath": "scenery\\sparklink\\8db214f1-d606-4e84-9cf5-9298beaf1215",
+      "compiledModelTriangles": 31,
+      "placement": [
+        3,
+        2,
+        0.1
+      ],
+      "outputSha256": "306dab98fe301af0bb40b2d088ab890bb15d71258072d80fe29e23bb4a259dfa",
+      "durationMs": 82302.94909999997,
+      "gameplayTested": false
+    },
+    "durableNativeRecovery": {
+      "revision": 19,
+      "assetBytesIdentical": true,
+      "semanticFieldIntact": true,
+      "authorIdentitiesAndHistoryRetained": true,
+      "newInvitation": true,
+      "replayDeduplicated": true,
+      "durationMs": 22145.074199999974
+    },
+    "revocationRetainsOtherParticipants": true,
+    "originalSourcesUnchanged": {
+      "separateNativeTrees": 3,
+      "filesPerTree": 2240,
+      "templateUnchanged": true,
+      "importUnchanged": true
+    },
+    "synchronizationMeasurements": {
+      "samples": 7,
+      "valuesMs": [
+        10601.8407,
+        116.28260000000591,
+        934.9419000000053,
+        941.4956999999995,
+        431.2109000000055,
+        469.1996999999974,
+        363.0253999999841
+      ],
+      "physicalMachines": 1,
+      "includesNativeIpcAndReactConsumption": true
+    },
+    "pageErrors": [],
+    "acceptanceComplete": true,
+    "receiptSha256": "91720f117aa91477939dbae9ef27192b3b7f6c289e103e466d68bd77c13d8c64",
+    "harness": "scripts/test-sparklink-content-native.mjs",
+    "harnessSha256": "ee2ffb472afa5d17002cf5adb327997850c7f9e34fed226f26ed404d8b01386b",
+    "controlledCorruptionWriter": "QA Node process; not attributed to Baboon or Invader",
+    "newBaboonGuiInteraction": false
+  },
+  "synchronizationMeasurements": {
+    "scope": "One-PC native IPC, authoritative source validation, React/native CSG consumption and acceptance polling; not network RTT or a before/after speedup claim",
+    "pollCadenceMs": 500,
+    "testPollingIntervalMs": 600,
+    "dragPreviewExpiryMs": 1800,
+    "sustainedCommits": 240,
+    "durationMs": 78294.33559999999,
+    "earlySamplesMs": [
+      501.2727999999988,
+      986.9517000000051,
+      981.5659999999989,
+      961.4164999999994,
+      984.6136000000042,
+      486.74259999999776,
+      530.2874000000011,
+      994.7828999999983,
+      968.5272999999943,
+      944.9917999999961,
+      1006.639900000002,
+      1002.9693000000043
+    ],
+    "lateSamplesMs": [
+      453.5255000000034,
+      962.4165999999968,
+      935.6313999999984,
+      937.5535999999993,
+      987.0404999999882,
+      971.4144000000088,
+      985.8399999999965,
+      981.9393000000127,
+      941.6753999999928,
+      929.5994000000064,
+      1001.9066999999923,
+      973.829899999997
+    ],
+    "earlyMedianMs": 975.0466499999966,
+    "lateMedianMs": 966.9155000000028,
+    "nativeCompilerConcurrentWithSustainedMeasurement": false
+  },
+  "stability": {
+    "coreSourceTransactions": 1100,
+    "coreTest": "sustained_workshop_edits_bound_history_and_recover_acknowledged_author_undo",
+    "nativeSourceCommits": 240,
+    "historyTransactions": 100,
+    "acknowledgedOperationLimit": 4096,
+    "journalLimitBytes": 25165824,
+    "runningSessionLimitHours": 24,
+    "retainedHostSessionsPerProject": 32,
+    "multiHourSoakVerified": false,
+    "webViewHeap": {
+      "scope": "Retained JavaScript heap after forced collection, not Rust or GPU memory. Small growth remains; no zero-leak claim.",
+      "samples": [
+        {
+          "label": "before sustained edits",
+          "elapsedMs": 36613.7238,
+          "samples": [
+            {
+              "actor": "owner",
+              "Documents": 2,
+              "Nodes": 9341,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.051371,
+              "JSHeapUsedSize": 84313384,
+              "JSHeapTotalSize": 86306816
+            },
+            {
+              "actor": "editor-b",
+              "Documents": 2,
+              "Nodes": 9491,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.092577,
+              "JSHeapUsedSize": 86000144,
+              "JSHeapTotalSize": 86831104
+            },
+            {
+              "actor": "editor-c",
+              "Documents": 2,
+              "Nodes": 9418,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.055231,
+              "JSHeapUsedSize": 82163032,
+              "JSHeapTotalSize": 83587072
+            }
+          ]
+        },
+        {
+          "label": "mid sustained edits",
+          "elapsedMs": 76008.1814,
+          "samples": [
+            {
+              "actor": "owner",
+              "Documents": 2,
+              "Nodes": 9388,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.048965,
+              "JSHeapUsedSize": 85484464,
+              "JSHeapTotalSize": 87093248
+            },
+            {
+              "actor": "editor-b",
+              "Documents": 2,
+              "Nodes": 9538,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.058436,
+              "JSHeapUsedSize": 87083356,
+              "JSHeapTotalSize": 88141824
+            },
+            {
+              "actor": "editor-c",
+              "Documents": 2,
+              "Nodes": 9465,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.042861,
+              "JSHeapUsedSize": 83286564,
+              "JSHeapTotalSize": 85422080
+            }
+          ]
+        },
+        {
+          "label": "after sustained edits",
+          "elapsedMs": 114895.1866,
+          "samples": [
+            {
+              "actor": "owner",
+              "Documents": 2,
+              "Nodes": 9388,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.044802,
+              "JSHeapUsedSize": 86071368,
+              "JSHeapTotalSize": 88403968
+            },
+            {
+              "actor": "editor-b",
+              "Documents": 2,
+              "Nodes": 9538,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.050323,
+              "JSHeapUsedSize": 87491932,
+              "JSHeapTotalSize": 88928256
+            },
+            {
+              "actor": "editor-c",
+              "Documents": 2,
+              "Nodes": 9465,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.045655,
+              "JSHeapUsedSize": 83674708,
+              "JSHeapTotalSize": 85946368
+            }
+          ]
+        }
+      ],
+      "summary": [
+        {
+          "actor": "owner",
+          "beforeHeapBytes": 84313384,
+          "midHeapBytes": 85484464,
+          "afterHeapBytes": 86071368,
+          "heapChangeBytes": 1757984,
+          "domNodes": [
+            9341,
+            9388,
+            9388
+          ],
+          "documents": [
+            2,
+            2,
+            2
+          ]
+        },
+        {
+          "actor": "editor-b",
+          "beforeHeapBytes": 86000144,
+          "midHeapBytes": 87083356,
+          "afterHeapBytes": 87491932,
+          "heapChangeBytes": 1491788,
+          "domNodes": [
+            9491,
+            9538,
+            9538
+          ],
+          "documents": [
+            2,
+            2,
+            2
+          ]
+        },
+        {
+          "actor": "editor-c",
+          "beforeHeapBytes": 82163032,
+          "midHeapBytes": 83286564,
+          "afterHeapBytes": 83674708,
+          "heapChangeBytes": 1511676,
+          "domNodes": [
+            9418,
+            9465,
+            9465
+          ],
+          "documents": [
+            2,
+            2,
+            2
+          ]
+        }
+      ]
+    }
+  },
+  "steam": {
+    "moduleBuilt": true,
+    "sdkVersion": "1.64",
+    "appId": 480,
+    "testMode": true,
+    "files": [
+      {
+        "name": "SparkSteamBridge.exe",
+        "sha256": "7981c9ce11a0c87c08da8e9ae77ad7c0b58e1cba85df90928b6b07ae1dadfbfc",
+        "bytes": 2496512
+      },
+      {
+        "name": "steam_api64.dll",
+        "sha256": "eb17909a76668cf9ae0b92a618a34a50f6c73d3a6787cb4dd8ce36a8b10bfb75",
+        "bytes": 317080
+      }
+    ],
+    "probeExitCode": 0,
+    "probeDetail": "Steam initialized for app 480 after the owner launched it; remote peer/relay remains unverified.",
+    "relayVerified": false,
+    "hostRecoveryVerified": false,
+    "incompatibleTlsFramedBridgeExperimentRetained": true,
+    "initialProbe": {
+      "exitCode": 1,
+      "detail": "Spark Steam bridge: We cannot connect to Steam, steam probably isn't running"
+    },
+    "liveProbe": {
+      "appId": 480,
+      "testMode": true,
+      "relayStatus": "Ok(Attempting)",
+      "receiptSha256": "5d29c5d115dfb2da39bc9c61b146605d91cfbeed4a7c40a5aeb35132c25431d0",
+      "accountIdentityRedacted": true
+    },
+    "sdkLocalSelfTest": {
+      "appId": 480,
+      "bytes": 4194304,
+      "elapsedMs": 6.1917,
+      "packets": 69,
+      "scope": "local SDK socket pair; remote two-account relay remains untested",
+      "sha256": "a117210941a0b00dcb2d8577e680d84b6fa0eaf760d2afc654c953b9859d54fa",
+      "status": "PASS",
+      "receiptSha256": "98ebf1b36630efa88e10727c9f6204b5c05e4721bd18c7b0f4141c46d607330c"
+    },
+    "nativeDesktopTest": {
+      "schemaVersion": 1,
+      "appSha256": "f9c7555000e5e37b57720df5f9d6dfb44192c4b8145120f30b624a43eb547a37",
+      "harnessSha256": "f69bd65653105605d9d45f12d34df4bff094d82c348799aff87a46a911e4124c",
+      "nativeProcesses": 2,
+      "physicalMachines": 1,
+      "steamAccounts": 1,
+      "appId": 480,
+      "mockedIpc": false,
+      "gameLaunched": false,
+      "remoteRelayTested": false,
+      "complete": true,
+      "nativeAppSteamProbe": {
+        "initialized": true,
+        "relayStatus": "Ok(Attempting)",
+        "remotePeerVerified": false
+      },
+      "actualDesktopSteamHost": {
+        "started": true,
+        "durableSource": true,
+        "framedSdkTransport": true,
+        "invitationProtocol": 5,
+        "invitationHasTlsCertificate": false
+      },
+      "sameAccountJoinRefused": true,
+      "sameAccountVerifiedByBothSdkProbes": true,
+      "joinRefusalDiagnostic": "Desktop reports a generic initialization failure; the Steam panel separately states that a second account is required. More precise failure reporting remains open.",
+      "unverifiedSteamRecoveryGatedWithoutChangingSource": true,
+      "ownedHostAndBridgeClosed": true,
+      "receiptSha256": "fcb9d0129e7e988f72424fbb99956a4b72a145d5d76616354e839605ab6ee987"
+    }
+  },
+  "tests": {
+    "rustPassed": 629,
+    "rustIgnored": 7,
+    "frontend": 300,
+    "browser": 136,
+    "offlineScripts": 59,
+    "nativeDiagnosticsAndInterface": 32,
+    "typeScript": true,
+    "windowsExecutableAndNsis": true,
+    "logSha256": {
+      "rust-c48-release.log": "374b194912381ac0ff01e6fb1e69c55be2040a03ccd15680a0c0d0495cbb95d0",
+      "frontend-c48-release.log": "80c27dba23e2e7b3bad766aed6165e09ce724c8f3d1e8852f8ad7c2c3d0f6d1b",
+      "browser-c48-release.log": "32c9c33c552e4a408a27b979693cf7b4f97559207b900e9d43d085a3306411b2",
+      "offline-c48-release.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+      "native-diagnostics-c48-final.log": "6d0aa3ccca84551cee3858cd537bee5fdb27907da9cdf201e837d471cd0d1091",
+      "offline-postdocs.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+      "typecheck-final.log": "1f345e6ac1f9e6ae7c4e70d1f0c8c9f8b8f80218269a1b4473f9ac63a9d4a253"
+    }
+  },
+  "gamePeerReplicationTested": false,
+  "remotePublished": false,
+  "remaining": [
+    "Cross-computer LAN, remote VPN tunnel delivery, second Steam account/relay and multi-hour soak remain unverified.",
+    "Steam SDK initialization, a 4 MiB local socket-pair transfer and actual desktop hosting pass. Same-account joining is refused with a generic diagnostic; a real second-account peer/relay connection and Steam recovery remain unverified.",
+    "Sessions retain 100 undo transactions, 4096 acknowledged operations, a 24 MiB journal, a 24-hour lifetime and 32 host sessions per project; automatic rollover remains open.",
+    "Measurements cover one-PC native source/UI convergence and retained WebView heap, not global load time, CPU/GPU usage, Rust working sets or a multi-day leak test.",
+    "Editor source sharing does not provide game/AI replication or arbitrary live BSP replacement.",
+    "Direct compiled-map structural editing, complete cross-runtime Zombie lifecycle/conversion, native OpenCE/Chupathingy faults, in-game sound listening, two missing cues, full render/audio parity and the physical connected-world walkthrough remain open.",
+    "The native BSP compile fixture explicitly uses owned tutorial metal for all ordinary material definitions; arbitrary preview shaders still need compatible local native dependencies.",
+    "Installer is built and packaged; fresh-machine installation and remote publication are not verified."
+  ],
+  "ledgerRegeneration": {
+    "all426RecordsByteIdentical": true,
+    "newContinuationRowsPreserved": 8,
+    "isolatedCwd": true,
+    "originalLedgerNotWritten": true,
+    "receiptSha256": "1f95190caa7027764f3d5472b157fe00b58c51d8a7476016e9703653873a8b38"
+  },
+  "preservation": {
+    "checkedAt": "2026-11-01T19:55:10.126Z",
+    "rootDirtyPatchesUnchanged": true,
+    "rootUntrackedFiles": 160,
+    "allRootUntrackedBytesUnchanged": true,
+    "originalZombieFiles": 67,
+    "originalZombieBytesUnchanged": true,
+    "originalInstalledMaps": 94,
+    "originalInstalledMapsUnchanged": true,
+    "priorReferences": 28,
+    "priorReferencesRetained": true,
+    "priorLocalAndTagReferencesUnchanged": true,
+    "remoteTrackingAdvances": [
+      {
+        "ref": "refs/remotes/origin/HEAD",
+        "before": "7fb89201ae16df0279fb31b5f52aff72bd65c937",
+        "after": "04034b8b1e1cb03a789cec2a36878d75e2d7abf1",
+        "priorTipRetainedAsAncestor": true
+      },
+      {
+        "ref": "refs/remotes/origin/master",
+        "before": "7fb89201ae16df0279fb31b5f52aff72bd65c937",
+        "after": "04034b8b1e1cb03a789cec2a36878d75e2d7abf1",
+        "priorTipRetainedAsAncestor": true
+      }
+    ],
+    "priorBranchTipsContained": 21,
+    "priorReleaseArtifacts": 19,
+    "priorReleaseArtifactsUnchanged": true,
+    "prior421LedgerRowsUnchanged": true,
+    "ledgerRows": 426,
+    "nativeOriginalTags": 3739,
+    "nativeOriginalTagTreeUnchanged": true,
+    "finalNativeChangedOrAddedTags": 15,
+    "finalNativeTagCount": 3742,
+    "mccCompilationDidNotAlterTags": true,
+    "authoredPhysicsUnchanged": true,
+    "artifacts": [
+      {
+        "folder": ".local/releases/C42-shared-tools-ce697fd",
+        "file": "portable\\GuiltySpark.exe",
+        "sha256": "de24bd7dac9430e16006034761f320f32f38e3327fdcf0c5a960d782d5cd56a6"
+      },
+      {
+        "folder": ".local/releases/C42-shared-tools-ce697fd",
+        "file": "Project_Guilty_Spark_C42_ce697fd_Setup.exe",
+        "sha256": "e9e68ca14ffee5c3b6a30540cfdc779b639dbc2a9299c2dc061679de8f1a5aed"
+      },
+      {
+        "folder": ".local/releases/C42-shared-tools-ce697fd",
+        "file": "Project_Guilty_Spark_C42_ce697fd_SOURCE.zip",
+        "sha256": "8b3a39bc11d8f5d0d98848ba75e3d333b20d9eb8c75a5f7de858144049a4fc4b"
+      },
+      {
+        "folder": ".local/releases/C42-shared-tools-ce697fd",
+        "file": "Project_Guilty_Spark_C42_ce697fd_PORTABLE.zip",
+        "sha256": "1bfb54189e5e7d6bd8097561295dc75af98ec7becee09240cdedef29e14973ec"
+      },
+      {
+        "folder": ".local/releases/C43-megaworld-de8922f",
+        "file": "portable\\GuiltySpark.exe",
+        "sha256": "87065a1922a20a8731e50bcd97b1fe0e5d22a9d0a347906fd6f39743c1843262"
+      },
+      {
+        "folder": ".local/releases/C43-megaworld-de8922f",
+        "file": "Project_Guilty_Spark_C43_de8922f_Setup.exe",
+        "sha256": "fa768c10e163fd8faa77f3814cac6473f5fa635fe2ab02d981f4c4f2028e4b24"
+      },
+      {
+        "folder": ".local/releases/C43-megaworld-de8922f",
+        "file": "Project_Guilty_Spark_C43_de8922f_SOURCE.zip",
+        "sha256": "0226208a4db16aa5a30be76eb1645aec63f78f244db60b575adc9de5b91568b7"
+      },
+      {
+        "folder": ".local/releases/C43-megaworld-de8922f",
+        "file": "Project_Guilty_Spark_C43_de8922f_PORTABLE.zip",
+        "sha256": "2cc32d0e50c416fd2f963c4f310a9d4f04dab8d13c47c3ce4b8c64df873c61be"
+      },
+      {
+        "folder": ".local/releases/C44-performance-ai-c2af5ef",
+        "file": "portable/GuiltySpark.exe",
+        "sha256": "ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22"
+      },
+      {
+        "folder": ".local/releases/C44-performance-ai-c2af5ef",
+        "file": "Project_Guilty_Spark_C44_c2af5ef_Setup.exe",
+        "sha256": "8c95d9395b0399d55d033d8a962827540c2f1ecc01ccbec487f05016c0469517"
+      },
+      {
+        "folder": ".local/releases/C44-performance-ai-c2af5ef",
+        "file": "Project_Guilty_Spark_C44_c2af5ef_SOURCE.zip",
+        "sha256": "cc90c78356a79c88cacd7286daf4cdc3db288a8b1228945452105f692a1e6f21"
+      },
+      {
+        "folder": ".local/releases/C44-performance-ai-c2af5ef",
+        "file": "Project_Guilty_Spark_C44_c2af5ef_PORTABLE.zip",
+        "sha256": "a854f228b1f62a1b4563f767de10844430f1703bccfad4e59a3d9e299cfa0f6f"
+      },
+      {
+        "folder": ".local/releases/C45-native-recovery-7fb8920",
+        "file": "Project_Guilty_Spark_C45_7fb8920_SOURCE.zip",
+        "sha256": "65a20e3d3d2755863f709ca57efd57b893bc46918bf7a43f61f61ef5df87b049"
+      },
+      {
+        "folder": ".local/releases/C45-native-recovery-7fb8920",
+        "file": "PUSH_DESCRIPTION.md",
+        "sha256": "e6931ac3277f3bbd50df160e105ce02976f7c79cc60ec6972b0f9b7daff4515e"
+      },
+      {
+        "folder": ".local/releases/C46-native-audio-04bd714",
+        "file": "portable/GuiltySpark.exe",
+        "sha256": "7ccc0e6ee4432b957058caba064cc5e1af77a27090133a76131002e9ee21ae1c"
+      },
+      {
+        "folder": ".local/releases/C46-native-audio-04bd714",
+        "file": "Project_Guilty_Spark_C46_04bd714_Setup.exe",
+        "sha256": "bdb9e5cf5635aab2a908e6262ba5750d2ddc54b3123827dacbd22273aa27aeb8"
+      },
+      {
+        "folder": ".local/releases/C46-native-audio-04bd714",
+        "file": "Project_Guilty_Spark_C46_04bd714_SOURCE.zip",
+        "sha256": "4bec0d9c6b5d2bf675d16935e8a4609c5ba36299ceb1955b79f1f74dbddb6148"
+      },
+      {
+        "folder": ".local/releases/C46-native-audio-04bd714",
+        "file": "Project_Guilty_Spark_C46_04bd714_PORTABLE.zip",
+        "sha256": "b859aab0847848acb9cea9e72d684b14187ad3af866bf55beec908bb17a2ef89"
+      },
+      {
+        "folder": ".local/releases/C47-native-readback-04034b8",
+        "file": "Project_Guilty_Spark_C47_04034b8_SOURCE.zip",
+        "sha256": "5da2b2b5ae61da89e43fcd30c21c1c71d2b5cd5843db1c3dfed026c41ca695ab"
+      }
+    ],
+    "nativeChanges": [
+      [
+        "gs_compat/carrier_idle/carrier_idle.model_animations",
+        "acf210702864e038e519f687791edcfd3a17a9585645cce0c9c70d8753f4c201"
+      ],
+      [
+        "gs_compat/recovered_carrier_0/recovered_carrier_0.model_collision_geometry",
+        "907d5854acf1205ed8f36a91cf0c81b5beab7c5307ab04a5b093ee465267b69e"
+      ],
+      [
+        "gs_compat/recovered_carrier_1/recovered_carrier_1.model_collision_geometry",
+        "ec0295f4afe13c713ffa15c42cd3a31d60dbd4473ae542eb4575446427c8b6d5"
+      ],
+      [
+        "gs_compat/zombie_spawn_0.effect",
+        "fcf6b47d162eabb3fa2cde684f49d6512b4678d172dc946ebf8243add9917864"
+      ],
+      [
+        "gs_compat/zombie_spawn_1.effect",
+        "bb07a753b1af64c14f95bb5d779c6dc531c9a125ccad39ef3570d2d4b4523733"
+      ],
+      [
+        "gs_compat/zombie_spawn_2.effect",
+        "2ab33e47e91454b8615af782a79bf5f432720b0aacbe46de6731822b294b1753"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/ai respawning/evolved zombie spawnerorig.weapon",
+        "c2f8a4f2ee088113290518c5458748224dcc8e9e98ceb2e6063a40c91ffebc5e"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/ai respawning/zombie spawner.weapon",
+        "bebeaedac988b2fd9af1e30db728d30250b3ce489686627399649c04ba9c6712"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/alpha zombie containerorig.vehicle",
+        "20876d8e14db2e28905be6a0f3b69229a425c1ddc1c4d9b35343d63244feae66"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/evolved zombie container.vehicle",
+        "b0d7950f935724d964c826e6cf53613c932b013ff2b237ef432af1ff75294ef9"
+      ],
+      [
+        "mgm/fonzie/sparky/tags/zombie container.vehicle",
+        "6f29b88a037fe6f93d794ee6c2a2d0223dc730c0205854f066c0a64436ed9542"
+      ],
+      [
+        "origmgm/fonzie/sparky/tags/ai respawning/alpha zombie spawner.weapon",
+        "7a4ceb98a27445a3c9aa916c6fb6447eded8bff974cda7a53d08f6d0c0f1ff26"
+      ],
+      [
+        "sound/dialog/multiplayer1/game_over.sound",
+        "ff46c2944869d2b52733b0bd30f8f718ccb16c53f34fde510f61f5f0b5651367"
+      ],
+      [
+        "sound/dialog/multiplayer1/ghost.sound",
+        "0df3921726e899fd8bfc81df582965f5d36df5a3a0e44137d714db0723f36dac"
+      ],
+      [
+        "sparky/sound/sparkmusic/v1_hit_themes/killer_tracks_invaders.sound",
+        "45270c0b104436eb0f967ec52a2cbf860b0b8427db72d4f2a999a7ab73a560cc"
+      ]
+    ],
+    "remotePublished": false,
+    "evidenceSha256": "fac2b419ca672dcb5996b0aaf24e57bcbb2b68008dcb38bb300a079b617383fa",
+    "remoteReferenceNote": "The saved reference baseline precedes an externally observed origin tracking update to C47. This continuation made no Git network operation; prior tracking tips remain ancestors."
+  }
+}

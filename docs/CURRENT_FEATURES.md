@@ -1,6 +1,6 @@
 # Current Spark capabilities
 
-This is the C47 source/tooling continuation; the tested C46 Windows executable and installer remain unchanged. Features below describe actual operations, with native compilation and gameplay kept separate. See [C47 native conversion measurements and failed lifecycle evidence](CONTINUATION_47_ENGINEERING.md), [C46 sound-chain, animation and native-process evidence](CONTINUATION_46_ENGINEERING.md), [C45 native recovery, fault reporting and measured diagnostics](CONTINUATION_45_ENGINEERING.md), [C44 measurements and native AI limits](CONTINUATION_44_ENGINEERING.md), [C43 evidence and limits](CONTINUATION_43_ENGINEERING.md), the [earlier consolidation report](FINAL_CONSOLIDATION_C41.md) and the [complete requirement ledger](MASTER_FEATURE_LEDGER.csv).
+This is the C48 shared BSP and stability continuation, with new verified Windows packages. Features below describe actual operations, with editor synchronization, native compilation and gameplay kept separate. See [C48 acceptance and limits](CONTINUATION_48_ENGINEERING.md), [C47 native readback and failed AI evidence](CONTINUATION_47_ENGINEERING.md), and [C46 sound-chain results](CONTINUATION_46_ENGINEERING.md).
 
 C43 adds durable revisioned local-window history, explicit editing ownership and observed views, independent drawer layouts, the original BSP Atlas and a reviewed native two-region CE assembly. The combined map loads on a private CE server with a player present; its new physical two-way walkthrough remains unaccepted. Initial Atlas inventory is about 63% faster in three paired debug scans with identical metadata; repeated full-byte verification remains about 5.6 seconds. These results do not establish faster full map rendering or four-region gameplay.
 
@@ -62,7 +62,10 @@ New arenas assign owned Halo preview defaults before entering the editor. Materi
 
 ## Collaboration and runtime controls
 
-- SparkLink uses private invitation-pinned TLS, roles, authoritative ordering, acknowledged revisions, conflicts, participant-specific undo/redo, durable host recovery and frozen shared builds.
+- SparkLink shares BSP Workshop brushes, portals and transform drag previews through its four views. Stable-ID merges retain conflicting topology/material drafts; per-author undo, roles, authoritative acknowledgments and frozen builds remain enforced.
+- Three actual processes retain both an uncertain operation and newer offline UI work through owner-process failure and rejoin. Local LAN and the actual Radmin interface are verified on one computer. Cross-PC/VPN tunnel delivery and Steam relay/recovery remain open.
+- A 1,100-edit core test and 240 native commits cover bounded history/recovery and measured WebView retention. Sessions keep explicit 100-history / 4,096-acknowledgment / 24 MiB / 24-hour bounds; this does not establish multi-day stability.
+- JSON object order no longer invents portal edits, owned texture resolution preserves undo/redo, and invalid local drafts remain unaccepted recovery evidence.
 - The bounded native-content workflow is proven with three independent Windows processes and separate libraries: supported native pistol edit, validated scenery publication and placement, convergence, permission/refusal checks and native compilation. Each participant explicitly admits matching local source; peers cannot request tools or arbitrary raw patches.
 - Existing-object MCC live controls include reviewed movement/scale readback, shared vehicle physics scaling, Shift sprint and editable first/third-person switching on the supported native profile. Historical owner observations remain distinguished from new gameplay tests.
 - Smart Edit wraps explicitly bound temporary positions in expiring live plans and a local before/readback journal. It does not make persistent cache edits replicate to the game.

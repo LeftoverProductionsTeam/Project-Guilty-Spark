@@ -35,7 +35,11 @@ it('the older-WebView byte loop preserves every byte for large canonical input',
   try {
     const bytes = Buffer.alloc(2 * 1024 * 1024 + 1);
     for (let i = 0; i < bytes.length; i++) bytes[i] = i % 256;
-    expect(decodeBoundedBase64(bytes.toString('base64'), bytes.length)).toEqual(new Uint8Array(bytes));
+    const decoded=decodeBoundedBase64(bytes.toString('base64'), bytes.length);
+    expect(decoded.byteLength).toBe(bytes.byteLength);
+    // Compare every byte without millions of JavaScript assertion-property
+    // visits, which intermittently time out before testing the decoder itself.
+    expect(Buffer.from(decoded).equals(bytes)).toBe(true);
   } finally {
     if (descriptor) Object.defineProperty(Uint8Array, 'fromBase64', descriptor);
     else Reflect.deleteProperty(Uint8Array, 'fromBase64');

@@ -1,5 +1,7 @@
 # Living feature ledger — Integrated workbench
 
+C48 appends five records for shared BSP source, recoverable pending edits, scoped Radmin networking, bounded endurance and local history integrity. All prior 421 rows remain byte-identical; the ledger now has 426 rows. Three-process compiler/UI acceptance remains separate from cross-computer, Steam and gameplay gates. See [C48 evidence and limits](CONTINUATION_48_ENGINEERING.md).
+
 C47 adds three records for bounded native conversion readback, explicit failed-run AI diagnostics and the isolated carrier-state experiment. All previous 418 rows are preserved; the ledger now has 421 rows. Native source/cache equivalence and partial actor observations do not certify gameplay. The desktop packages remain C46. See [C47 results and remaining gates](CONTINUATION_47_ENGINEERING.md).
 
 C46 adds five records for complete native sound chains, compiler false-success refusal, corrected JMA hierarchy, measured complete export and precise AI coverage. Native compiler/readback acceptance remains separate from game listening and replication; final native runtime faults remain. See [C46 evidence and gates](CONTINUATION_46_ENGINEERING.md).

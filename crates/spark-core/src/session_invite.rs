@@ -1,5 +1,5 @@
 use crate::{
-    forge_session::{private_endpoint, GameBinding, PROTOCOL_VERSION},
+    forge_session::{GameBinding, PROTOCOL_VERSION},
     invalid, Result,
 };
 use serde::{Deserialize, Serialize};
@@ -19,8 +19,13 @@ pub struct Invite {
     pub key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub game: Option<GameBinding>,
-    #[serde(default,skip_serializing_if="Option::is_none")]
-    pub certificate:Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub certificate: Option<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::studio_network::NetworkScope::is_private"
+    )]
+    pub network_scope: crate::studio_network::NetworkScope,
 }
 pub fn steam_endpoint(value: &str) -> Result<(u64, u32)> {
     let Some(rest) = value.strip_prefix("steam:") else {
@@ -57,17 +62,27 @@ impl Invite {
         }
         match self.transport {
             Transport::Lan => {
-                private_endpoint(&self.endpoint)?;
+                self.network_scope.endpoint(&self.endpoint)?;
+                if self.network_scope == crate::studio_network::NetworkScope::RadminVpn
+                    && self.certificate.is_none()
+                {
+                    return invalid("Radmin invitations require pinned TLS");
+                }
             }
             Transport::SteamSpacewar => {
+                // The existing SDK bridge carries complete RPC frames, not TLS
+                // stream records. Never advertise an incompatible invitation.
+                if self.certificate.is_some(){return invalid("This Steam invitation is incompatible with the installed module. Request a standard Steam invite, or use Private LAN / VPN.");}
+                if !self.network_scope.is_private() {
+                    return invalid("Steam invitations cannot choose a LAN/VPN scope");
+                }
                 steam_endpoint(&self.endpoint)?;
             }
         }
         if let Some(game) = &self.game {
             game.validate()?;
         }
-        if let Some(certificate)=&self.certificate{
-            if self.transport!=Transport::Lan{return invalid("Spark TLS certificates are only used by the direct LAN/VPN transport");}
+        if let Some(certificate) = &self.certificate {
             crate::studio_tls::client(certificate)?;
         }
         Ok(())
@@ -105,6 +120,39 @@ impl Invite {
 mod tests {
     use super::*;
     #[test]
+    fn vpn_and_steam_invites_pin_tls_and_reject_a_mismatched_protocol() {
+        use crate::studio_network::NetworkScope;
+        let mut invite = Invite {
+            schema_version: PROTOCOL_VERSION,
+            session_id: uuid::Uuid::new_v4().to_string(),
+            transport: Transport::Lan,
+            endpoint: "26.10.20.30:12345".into(),
+            key: "b".repeat(32),
+            game: None,
+            certificate: None,
+            network_scope: NetworkScope::RadminVpn,
+        };
+        assert!(invite.validate().is_err());
+        invite.certificate = Some(crate::studio_tls::identity().unwrap().certificate);
+        assert_eq!(
+            Invite::decode(&invite.encode().unwrap())
+                .unwrap()
+                .network_scope,
+            NetworkScope::RadminVpn
+        );
+        invite.network_scope = NetworkScope::Private;
+        assert!(invite.validate().is_err());
+        invite.endpoint = "steam:76561197960265729:12345".into();
+        invite.transport = Transport::SteamSpacewar;
+        assert!(invite.encode().is_err());
+        invite.certificate=None;assert!(invite.encode().is_ok());
+        invite.network_scope = NetworkScope::RadminVpn;
+        assert!(invite.validate().is_err());
+        invite.network_scope = NetworkScope::Private;
+        invite.schema_version = PROTOCOL_VERSION - 1;
+        assert!(invite.validate().is_err());
+    }
+    #[test]
     fn private_invites_round_trip_without_accepting_wildcard_or_public_tcp_addresses() {
         let mut invite = Invite {
             schema_version: PROTOCOL_VERSION,
@@ -112,7 +160,9 @@ mod tests {
             transport: Transport::Lan,
             endpoint: "192.168.1.2:12345".into(),
             key: "a".repeat(32),
-            game: None, certificate:None,
+            game: None,
+            certificate: None,
+            network_scope: crate::studio_network::NetworkScope::Private,
         };
         assert_eq!(
             Invite::decode(&invite.encode().unwrap()).unwrap().endpoint,

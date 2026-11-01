@@ -6,6 +6,7 @@ import type { OwnedBitmapBatchResponse, VerifiedBatchImage } from './ownedBitmap
 import type { OwnedBitmapTarget } from './ownedBitmapPreview';
 import type { ForgeMaterial } from './forge';
 import { publishTextureResources } from './textureResourceScope';
+export { withPreviewDefaults } from './forgeDefaultMaterials';
 
 const sources = new Map<RuntimeId, Promise<OpenProject>>();
 export function runtimeTextureSource(runtimeId: RuntimeId): Promise<OpenProject> {

@@ -2573,6 +2573,14 @@ async fn live_mcc_import_map(app:tauri::AppHandle)->Reply<OpenProject>{
 }
 
 #[tauri::command]
+async fn forge_session_networks()->Reply<Vec<crate::studio_network::Interface>> {
+    tauri::async_runtime::spawn_blocking(crate::studio_network::interfaces).await.map_err(error)?
+}
+#[tauri::command]
+async fn forge_session_preview(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,session_id:String,revision:u64,brush:Option<core::studio_workshop::BrushTransform>)->Reply<core::forge_session::View>{
+    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::preview(&app.state::<AppState>(),&owner,&project_id,&session_id,revision,brush)).await.map_err(error)?
+}
+#[tauri::command]
 async fn forge_session_host(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,document:quickforge::QuickForgeDocument,lan:bool,transport:Option<core::session_invite::Transport>,link_game:Option<bool>,studio:Option<bool>,display_name:Option<String>,bind_address:Option<String>)->Reply<shared_editing::Info>{
     let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::host(&app.state::<AppState>(),&owner,project_id,document,lan,transport.unwrap_or(core::session_invite::Transport::Lan),link_game.unwrap_or(false),studio.unwrap_or(false),display_name.unwrap_or_else(||"Host".into()),bind_address)).await.map_err(error)?
 }
@@ -2599,7 +2607,7 @@ async fn forge_session_role(app:tauri::AppHandle,window:tauri::WebviewWindow,pro
 #[tauri::command]
 async fn forge_studio_history(app:tauri::AppHandle,project_id:String)->Reply<Vec<shared_editing::StudioRecord>>{tauri::async_runtime::spawn_blocking(move||shared_editing::history(&app.state::<AppState>(),&project_id)).await.map_err(error)?}
 #[tauri::command]
-async fn forge_studio_recover(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,directory_id:String,address:String,display_name:String)->Reply<shared_editing::Info>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::recover(&app.state::<AppState>(),&owner,project_id,directory_id,address,display_name)).await.map_err(error)?}
+async fn forge_studio_recover(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,directory_id:String,address:String,display_name:String,transport:Option<core::session_invite::Transport>)->Reply<shared_editing::Info>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::recover(&app.state::<AppState>(),&owner,project_id,directory_id,address,display_name,transport.unwrap_or(core::session_invite::Transport::Lan))).await.map_err(error)?}
 #[tauri::command]
 async fn forge_studio_pending(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<Option<shared_editing::Pending>>{let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||shared_editing::pending(&app.state::<AppState>(),&owner,&project_id)).await.map_err(error)?}
 #[tauri::command]
@@ -2815,6 +2823,8 @@ pub fn run() {
             choose_steam_module,
             steam_session_probe,
             forge_session_host,
+            forge_session_networks,
+            forge_session_preview,
             forge_session_join,
             forge_session_poll,
             forge_session_update,

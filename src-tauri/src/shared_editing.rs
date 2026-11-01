@@ -36,6 +36,7 @@ pub(super) struct Info {
     detail: Option<String>,
     owned: bool,
     directory_id: Option<String>,
+    network_scope: core::studio_network::NetworkScope,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -52,13 +53,19 @@ struct Identity {
     client: String,
     credential: String,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Pending {
     session_id: String,
     operation_id: String,
     revision: u64,
     document: quickforge::QuickForgeDocument,
+}
+fn preserve_pending(old: Option<&Pending>, next: &Pending) -> Reply<()> {
+    if old.is_some_and(|old| old != next) {
+        return Err("An unresolved edit is already retained. Retry its original operation, or explicitly review and clear it before replacing it.".into());
+    }
+    Ok(())
 }
 pub(super) fn pending(state: &AppState, owner: &str, project: &str) -> Reply<Option<Pending>> {
     check_document_owner(state, project, owner)?;
@@ -86,12 +93,7 @@ pub(super) fn save_pending(
     let retained: Option<Pending> = library
         .setting(&format!("studio-pending-{project}"))
         .map_err(error)?;
-    if retained
-        .as_ref()
-        .is_some_and(|old| old.session_id != value.session_id)
-    {
-        return Err("An unacknowledged edit from another session is retained. Export or restore it, then explicitly clear it before submitting a new session's draft.".into());
-    }
+    preserve_pending(retained.as_ref(), &value)?;
     let p = library.get(project).map_err(error)?;
     if p.quick_forge
         .as_ref()
@@ -166,7 +168,11 @@ pub(super) fn history(state: &AppState, project: &str) -> Reply<Vec<StudioRecord
     if rows.len() > 32 {
         return Err("SparkLink history exceeds 32 retained sessions".into());
     }
-    rows.sort_by(|a,b|b.created_at.cmp(&a.created_at).then_with(||a.directory_id.cmp(&b.directory_id)));
+    rows.sort_by(|a, b| {
+        b.created_at
+            .cmp(&a.created_at)
+            .then_with(|| a.directory_id.cmp(&b.directory_id))
+    });
     Ok(rows)
 }
 pub(super) fn recover(
@@ -176,8 +182,12 @@ pub(super) fn recover(
     directory_id: String,
     address: String,
     display_name: String,
+    transport: Transport,
 ) -> Reply<Info> {
     check_document_owner(state, &project_id, owner)?;
+    if transport != Transport::Lan {
+        return Err("Recover the retained source with Private LAN / VPN. Steam session recovery is not verified with this module; the saved session remains intact.".into());
+    }
     let p = lock(&state.library)?.get(&project_id).map_err(error)?;
     let record = history(state, &project_id)?
         .into_iter()
@@ -191,8 +201,16 @@ pub(super) fn recover(
     let ip = address
         .parse::<std::net::Ipv4Addr>()
         .map_err(|_| "Use a private recovery bind address")?;
-    let host =
-        Host::recover(&directory(state, &directory_id)?, ip, None, &display_name).map_err(error)?;
+    let scope = crate::studio_network::bind_scope(ip)?;
+    let host = Host::recover_scoped(
+        &directory(state, &directory_id)?,
+        ip,
+        None,
+        &display_name,
+        scope,
+    )
+    .map_err(error)?;
+    let endpoint = host.endpoint.to_string();
     let peer = Peer::Host(host);
     let view = peer.poll().map_err(error)?;
     if view.session_id != record.session_id
@@ -206,9 +224,9 @@ pub(super) fn recover(
     let session = Session {
         project_id: project_id.clone(),
         id: view.session_id.clone(),
-        endpoint: peer.endpoint().to_string(),
+        endpoint,
         peer,
-        transport: Transport::Lan,
+        transport,
         lan: !ip.is_loopback(),
         game: None,
         owner: owner.into(),
@@ -259,8 +277,8 @@ pub(super) struct BuildBinding {
 fn document_hash(document: &quickforge::QuickForgeDocument) -> Reply<String> {
     use sha2::Digest;
     Ok(spark_core::hex_bytes(sha2::Sha256::digest(
-            serde_json::to_vec(&core::forge_session::portable(document.clone())).map_err(error)?
-        )))
+        serde_json::to_vec(&core::forge_session::portable(document.clone())).map_err(error)?,
+    )))
 }
 pub(super) fn build_binding(state: &AppState, project: &Project) -> Reply<Option<BuildBinding>> {
     let peer = {
@@ -370,7 +388,7 @@ pub(super) fn host(
     if p.quick_forge.is_none() {
         return Err("Open a QuickForge project first".into());
     }
-    studio_native_source::matches(state,&project_id,&document)?;
+    studio_native_source::matches(state, &project_id, &document)?;
     let mut slot = lock(&state.forge_session)?;
     if slot.is_some() {
         return Err("Another editing session is active. Open its map to manage it.".into());
@@ -393,18 +411,26 @@ pub(super) fn host(
             std::net::Ipv4Addr::LOCALHOST
         };
         let id = uuid::Uuid::new_v4().to_string();
-        let host = Host::persistent(
+        let network_scope = crate::studio_network::bind_scope(address)?;
+        let host = Host::persistent_scoped(
             document,
             address,
             binding.clone(),
             &directory(state, &id)?,
             &host_name,
             transport == Transport::Lan,
+            network_scope,
         )
         .map_err(error)?;
         directory_id = Some(id);
         host
     } else {
+        if bind_address
+            .as_deref()
+            .is_some_and(|a| a.starts_with("26."))
+        {
+            return Err("Use a modern encrypted SparkLink session for Radmin VPN".into());
+        }
         Host::start_with_game(
             document,
             lan && transport == Transport::Lan,
@@ -477,6 +503,7 @@ fn info(session: &Session, title: String, view: Option<View>, own: bool) -> Info
         detail: None,
         owned: own,
         directory_id: own.then(|| session.directory_id.clone()).flatten(),
+        network_scope: session.peer.network_scope(),
     }
 }
 pub(super) fn status(state: &AppState, owner: &str, project_id: &str) -> Reply<Option<Info>> {
@@ -519,9 +546,17 @@ pub(super) fn status(state: &AppState, owner: &str, project_id: &str) -> Reply<O
     Ok(Some(response))
 }
 fn scoped_identity_setting(project: &str, invite: Option<&Invite>) -> Option<String> {
-    let invite=invite?;
-    if invite.transport!=Transport::Lan || invite.certificate.is_none() {return None;}
-    Some(format!("studio-identity-v2-{project}-tls-{}",invite.session_id))
+    let invite = invite?;
+    if invite.certificate.is_none() {
+        return None;
+    }
+    match invite.transport {
+        Transport::Lan => Some(format!(
+            "studio-identity-v2-{project}-tls-{}",
+            invite.session_id
+        )),
+        Transport::SteamSpacewar => None,
+    }
 }
 
 pub(super) fn join(
@@ -548,7 +583,7 @@ pub(super) fn join(
         .as_ref()
         .is_some_and(|i| i.transport == Transport::Lan && i.certificate.is_none())
     {
-        return Err("This LAN invitation has no TLS certificate. Request a modern private invitation, or explicitly use Advanced legacy address/key mode for unencrypted sessions.".into());
+        return Err("This invitation has no TLS certificate. Request a modern private invitation, or explicitly use Advanced legacy address/key mode for unencrypted sessions.".into());
     }
     let (endpoint, key, transport) = invite
         .as_ref()
@@ -559,6 +594,8 @@ pub(super) fn join(
         return Err("Leave the current editing session before joining another".into());
     }
     snapshot_project_state(state, &p, "before-shared-session")?;
+    let network_scope = invite.as_ref().map(|i| i.network_scope).unwrap_or_default();
+    crate::studio_network::require_client_scope(network_scope)?;
     let bridge = if transport == Transport::SteamSpacewar {
         let (dir, hash) = module(state)?;
         Some(crate::steam_bridge::Bridge::start(
@@ -577,10 +614,12 @@ pub(super) fn join(
     // durable author. Legacy plaintext identities are ephemeral and never reused.
     // Session UUID remains stable when owner recovery rotates certificate/port.
     let identity_setting = scoped_identity_setting(&project_id, invite.as_ref());
-    let identity: Option<Identity> = if let Some(setting)=&identity_setting {
+    let identity: Option<Identity> = if let Some(setting) = &identity_setting {
         lock(&state.library)?.setting(setting).map_err(error)?
-    } else {None};
-    let (guest, view) = Guest::join_studio(
+    } else {
+        None
+    };
+    let (guest, view) = Guest::join_studio_scoped(
         &local,
         &key,
         invite.as_ref().and_then(|i| i.certificate.as_deref()),
@@ -591,18 +630,30 @@ pub(super) fn join(
         } else {
             Duration::from_secs(3)
         },
+        network_scope,
     )
     .map_err(error)?;
-    if invite.as_ref().is_some_and(|i|i.session_id!=view.session_id || i.game!=view.game) {
-        Peer::Guest(guest).leave();return Err("This invite belongs to a different or replaced session".into());
+    if invite
+        .as_ref()
+        .is_some_and(|i| i.session_id != view.session_id || i.game != view.game)
+    {
+        Peer::Guest(guest).leave();
+        return Err("This invite belongs to a different or replaced session".into());
     }
     if view.document.runtime_id != p.quick_forge.as_ref().unwrap().runtime_id {
         Peer::Guest(guest).leave();
         return Err("This project's runtime differs from the shared source. Open a matching QuickForge target before joining.".into());
     }
-    if let Err(e)=studio_native_source::matches(state,&project_id,&view.document){ Peer::Guest(guest).leave(); return Err(e); }
+    if let Err(e) = studio_native_source::matches(state, &project_id, &view.document) {
+        Peer::Guest(guest).leave();
+        return Err(e);
+    }
     let (client, credential) = guest.identity();
-    if let Some(setting)=identity_setting {lock(&state.library)?.set_setting(&setting,&Some(Identity {client,credential})).map_err(error)?;}
+    if let Some(setting) = identity_setting {
+        lock(&state.library)?
+            .set_setting(&setting, &Some(Identity { client, credential }))
+            .map_err(error)?;
+    }
     let peer = Peer::Guest(guest);
     if let Err(error) = if view.durable {
         Ok(())
@@ -701,6 +752,24 @@ pub(super) fn update(
     }
     Ok(view)
 }
+pub(super) fn preview(
+    state: &AppState,
+    owner: &str,
+    project_id: &str,
+    session_id: &str,
+    revision: u64,
+    brush: Option<core::studio_workshop::BrushTransform>,
+) -> Reply<View> {
+    let (id, peer, _) = peer(state, owner, project_id, Some(session_id))?;
+    let view = peer.preview(revision, brush).map_err(error)?;
+    if lock(&state.forge_session)?
+        .as_ref()
+        .is_none_or(|s| s.id != id)
+    {
+        return Err("Session changed while sending the Workshop preview".into());
+    }
+    Ok(view)
+}
 pub(super) fn leave(
     state: &AppState,
     owner: &str,
@@ -767,6 +836,7 @@ pub(super) fn invite(
             _ => return Err("Only the owner can issue invitations".into()),
         },
         certificate: session.peer.certificate(),
+        network_scope: session.peer.network_scope(),
         game: session.game.clone(),
     }
     .encode()
@@ -777,15 +847,60 @@ pub(super) fn invite(
 mod tests {
     use super::*;
     #[test]
+    fn an_unacknowledged_operation_cannot_be_rebound_or_replaced() {
+        let pending = Pending {
+            session_id: uuid::Uuid::new_v4().to_string(),
+            operation_id: uuid::Uuid::new_v4().to_string(),
+            revision: 7,
+            document: quickforge::create_arena("Pending", "emptyArena").unwrap(),
+        };
+        assert!(preserve_pending(None, &pending).is_ok());
+        assert!(preserve_pending(Some(&pending), &pending.clone()).is_ok());
+        let mut altered = pending.clone();
+        altered.operation_id = uuid::Uuid::new_v4().to_string();
+        assert!(preserve_pending(Some(&pending), &altered).is_err());
+        altered = pending.clone();
+        altered.document.name = "Later local edit".into();
+        assert!(preserve_pending(Some(&pending), &altered).is_err());
+        altered = pending.clone();
+        altered.revision += 1;
+        assert!(preserve_pending(Some(&pending), &altered).is_err());
+        assert_eq!(pending.revision, 7);
+    }
+    #[test]
     fn guest_credentials_are_scoped_to_durable_tls_session_and_never_plaintext() {
-        let project=uuid::Uuid::new_v4().to_string();let mut invite=Invite{schema_version:spark_core::forge_session::PROTOCOL_VERSION,session_id:uuid::Uuid::new_v4().to_string(),transport:Transport::Lan,endpoint:"127.0.0.1:1024".into(),key:"a".repeat(32),game:None,certificate:Some("owner certificate".into())};
-        let first=scoped_identity_setting(&project,Some(&invite)).unwrap();
-        invite.endpoint="127.0.0.1:2048".into();invite.certificate=Some("new owner recovery certificate".into());
-        assert_eq!(scoped_identity_setting(&project,Some(&invite)).unwrap(),first);
-        invite.session_id=uuid::Uuid::new_v4().to_string();assert_ne!(scoped_identity_setting(&project,Some(&invite)).unwrap(),first);
-        invite.certificate=None;assert!(scoped_identity_setting(&project,Some(&invite)).is_none());assert!(scoped_identity_setting(&project,None).is_none());
-        invite.transport=Transport::SteamSpacewar;assert!(scoped_identity_setting(&project,Some(&invite)).is_none());
-        assert_ne!(first,format!("studio-identity-{project}"));
+        let project = uuid::Uuid::new_v4().to_string();
+        let mut invite = Invite {
+            schema_version: spark_core::forge_session::PROTOCOL_VERSION,
+            session_id: uuid::Uuid::new_v4().to_string(),
+            transport: Transport::Lan,
+            endpoint: "127.0.0.1:1024".into(),
+            key: "a".repeat(32),
+            game: None,
+            certificate: Some("owner certificate".into()),
+            network_scope: Default::default(),
+        };
+        let first = scoped_identity_setting(&project, Some(&invite)).unwrap();
+        invite.endpoint = "127.0.0.1:2048".into();
+        invite.certificate = Some("new owner recovery certificate".into());
+        assert_eq!(
+            scoped_identity_setting(&project, Some(&invite)).unwrap(),
+            first
+        );
+        invite.session_id = uuid::Uuid::new_v4().to_string();
+        assert_ne!(
+            scoped_identity_setting(&project, Some(&invite)).unwrap(),
+            first
+        );
+        invite.certificate = None;
+        assert!(scoped_identity_setting(&project, Some(&invite)).is_none());
+        assert!(scoped_identity_setting(&project, None).is_none());
+        invite.transport = Transport::SteamSpacewar;
+        assert!(scoped_identity_setting(&project, Some(&invite)).is_none());
+        invite.certificate = Some("recovered certificate".into());
+        invite.endpoint = "steam:76561197960265729:10000".into();
+        assert!(scoped_identity_setting(&project, Some(&invite)).is_none());
+        assert_ne!(first, format!("studio-identity-{project}"));
     }
 
     #[test]

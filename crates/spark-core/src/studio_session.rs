@@ -5,6 +5,7 @@ use crate::{
     invalid,
     quickforge::{self, QuickForgeDocument},
     studio_journal::{credential_hash, Journal, Member, Role, Storage},
+    studio_network::NetworkScope,
     studio_tls, Result, SparkError,
 };
 use serde::{Deserialize, Serialize};
@@ -19,7 +20,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 pub const MAX_FRAME_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_PARTICIPANTS: usize = 8;
 fn fail(s: impl Into<String>) -> SparkError {
@@ -112,6 +113,13 @@ pub struct LeaseView {
     pub remaining_ms: u128,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WorkshopPreview {
+    pub author: String,
+    pub brush: crate::studio_workshop::BrushTransform,
+    pub remaining_ms: u128,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct View {
     pub session_id: String,
@@ -132,6 +140,9 @@ pub struct View {
     pub acknowledged_operation_id: Option<String>,
     pub durable: bool,
     pub leases: Vec<LeaseView>,
+    pub workshop_previews: Vec<WorkshopPreview>,
+    pub acknowledged_operations: usize,
+    pub operation_limit: usize,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -146,6 +157,9 @@ struct Heartbeat {
     can_undo: bool,
     can_redo: bool,
     leases: Vec<LeaseView>,
+    workshop_previews: Vec<WorkshopPreview>,
+    acknowledged_operations: usize,
+    operation_limit: usize,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
@@ -164,6 +178,10 @@ enum Command {
     Reverse {
         operation_id: String,
         redo: bool,
+    },
+    Preview {
+        revision: u64,
+        brush: Option<crate::studio_workshop::BrushTransform>,
     },
     Leave,
 }
@@ -194,6 +212,7 @@ struct Room {
     game: Option<GameBinding>,
     encrypted: bool,
     leases: BTreeMap<String, (String, Instant)>,
+    previews: BTreeMap<String, (crate::studio_workshop::BrushTransform, Instant)>,
 }
 impl Room {
     fn publish(&mut self, next: Journal) -> Result<()> {
@@ -217,11 +236,48 @@ impl Room {
             }
         }
         self.publish(next)?;
+        self.previews.clear();
         for target in targets {
             self.leases.insert(
                 target,
                 (author.into(), Instant::now() + Duration::from_secs(3)),
             );
+        }
+        Ok(())
+    }
+    fn preview(
+        &mut self,
+        author: &str,
+        revision: u64,
+        brush: Option<crate::studio_workshop::BrushTransform>,
+    ) -> Result<()> {
+        if author != "host"
+            && self
+                .journal
+                .members
+                .get(author)
+                .is_none_or(|m| m.revoked || m.role != Role::Editor)
+        {
+            return invalid("Viewing permission cannot publish Workshop drag previews");
+        }
+        self.previews
+            .retain(|_, (_, until)| *until > Instant::now());
+        if let Some(brush) = brush {
+            // A stale drag never overlays a replacement source revision.
+            if revision != self.journal.revision {
+                self.previews.remove(author);
+                return Ok(());
+            }
+            brush.validate(&self.journal.document)?;
+            if !self.previews.contains_key(author) && self.previews.len() >= MAX_PARTICIPANTS {
+                return invalid("Too many active Workshop previews");
+            }
+            self.previews.insert(
+                author.into(),
+                (brush, Instant::now() + Duration::from_millis(1800)),
+            );
+        } else {
+            self.previews.remove(author);
         }
         Ok(())
     }
@@ -266,7 +322,26 @@ impl Room {
         } else {
             "viewer"
         };
-        View{session_id:self.journal.session_id.clone(),revision:self.journal.revision,document:self.journal.document.clone(),peers:participants.iter().filter(|p|p.online).count(),last_author:self.journal.transactions.back().map_or("host",|t|t.author.as_str()).into(),detail:"Shared QuickForge source only. Native tag/assets and game-side replication have separate acceptance gates.".into(),game:self.game.clone(),author_id:author.into(),role:role.into(),encrypted:self.encrypted,durable:self.storage.is_some(),leases:self.leases.iter().filter(|(_,(_,until))|*until>Instant::now()).map(|(target,(author,until))|LeaseView{target:target.clone(),author:author.clone(),remaining_ms:until.saturating_duration_since(Instant::now()).as_millis()}).collect(),participants,history:self.journal.transactions.iter().rev().take(12).map(|t|Activity{id:t.id.clone(),author:t.author.clone(),kind:format!("{:?}",t.kind).to_ascii_lowercase(),revision:t.revision,accepted_at:t.accepted_at.clone()}).collect(),can_undo:role!="viewer"&&self.journal.can_undo(author),can_redo:role!="viewer"&&self.journal.can_redo(author),acknowledged_operation_id:ack}
+        let workshop_previews = self
+            .previews
+            .iter()
+            .filter(|(id, _)| {
+                **id == "host"
+                    || self
+                        .journal
+                        .members
+                        .get(*id)
+                        .is_some_and(|m| !m.revoked && m.role == Role::Editor)
+                        && self.online(id)
+            })
+            .filter(|(_, (_, until))| *until > Instant::now())
+            .map(|(author, (brush, until))| WorkshopPreview {
+                author: author.clone(),
+                brush: brush.clone(),
+                remaining_ms: until.saturating_duration_since(Instant::now()).as_millis(),
+            })
+            .collect();
+        View{session_id:self.journal.session_id.clone(),revision:self.journal.revision,document:self.journal.document.clone(),peers:participants.iter().filter(|p|p.online).count(),last_author:self.journal.transactions.back().map_or("host",|t|t.author.as_str()).into(),detail:"Shared source, including bounded Workshop brush edits. Native/game-side replication has separate acceptance gates.".into(),game:self.game.clone(),author_id:author.into(),role:role.into(),encrypted:self.encrypted,durable:self.storage.is_some(),leases:self.leases.iter().filter(|(_,(_,until))|*until>Instant::now()).map(|(target,(author,until))|LeaseView{target:target.clone(),author:author.clone(),remaining_ms:until.saturating_duration_since(Instant::now()).as_millis()}).collect(),workshop_previews,acknowledged_operations:self.journal.acknowledged_operations(),operation_limit:self.journal.operation_limit(),participants,history:self.journal.transactions.iter().rev().take(12).map(|t|Activity{id:t.id.clone(),author:t.author.clone(),kind:format!("{:?}",t.kind).to_ascii_lowercase(),revision:t.revision,accepted_at:t.accepted_at.clone()}).collect(),can_undo:role!="viewer"&&self.journal.can_undo(author),can_redo:role!="viewer"&&self.journal.can_redo(author),acknowledged_operation_id:ack}
     }
     fn heartbeat(view: View) -> Heartbeat {
         Heartbeat {
@@ -280,6 +355,9 @@ impl Room {
             can_undo: view.can_undo,
             can_redo: view.can_redo,
             leases: view.leases,
+            workshop_previews: view.workshop_previews,
+            acknowledged_operations: view.acknowledged_operations,
+            operation_limit: view.operation_limit,
         }
     }
     fn rate(&mut self, id: &str) -> Result<()> {
@@ -375,8 +453,13 @@ impl Room {
             Command::Leave => {
                 self.online.remove(&r.client);
                 self.rates.remove(&r.client);
+                self.previews.remove(&r.client);
             }
             Command::Poll { revision } => unchanged = revision == Some(self.journal.revision),
+            Command::Preview { revision, brush } => {
+                self.preview(&r.client, revision, brush)?;
+                unchanged = revision == self.journal.revision;
+            }
             Command::Propose {
                 operation_id,
                 revision,
@@ -419,6 +502,7 @@ impl Room {
 pub struct Host {
     room: Mutex<Room>,
     pub endpoint: SocketAddr,
+    pub network_scope: NetworkScope,
     stop: AtomicBool,
     started: Instant,
     tls: Option<Arc<rustls::ServerConfig>>,
@@ -445,6 +529,7 @@ impl Host {
             None,
             None,
             "Host",
+            NetworkScope::Private,
         )
     }
     pub fn persistent(
@@ -455,8 +540,27 @@ impl Host {
         host_name: &str,
         secure: bool,
     ) -> Result<Arc<Self>> {
-        if !private_ipv4(bind) {
-            return invalid("Bind SparkLink to a specific private or loopback IPv4 address");
+        Self::persistent_scoped(
+            document,
+            bind,
+            game,
+            root,
+            host_name,
+            secure,
+            NetworkScope::Private,
+        )
+    }
+    pub fn persistent_scoped(
+        document: QuickForgeDocument,
+        bind: Ipv4Addr,
+        game: Option<GameBinding>,
+        root: &Path,
+        host_name: &str,
+        secure: bool,
+        network_scope: NetworkScope,
+    ) -> Result<Arc<Self>> {
+        if !network_scope.allows(bind) || (network_scope == NetworkScope::RadminVpn && !secure) {
+            return invalid("Use the selected LAN/VPN address; Radmin sessions require pinned TLS");
         }
         let journal = Journal::new(document)?;
         let storage = Storage::create(root, &journal)?;
@@ -471,6 +575,7 @@ impl Host {
                 None
             },
             host_name,
+            network_scope,
         )
     }
     pub fn recover(
@@ -479,8 +584,17 @@ impl Host {
         game: Option<GameBinding>,
         host_name: &str,
     ) -> Result<Arc<Self>> {
-        if !private_ipv4(bind) {
-            return invalid("Use a private recovery bind address");
+        Self::recover_scoped(root, bind, game, host_name, NetworkScope::Private)
+    }
+    pub fn recover_scoped(
+        root: &Path,
+        bind: Ipv4Addr,
+        game: Option<GameBinding>,
+        host_name: &str,
+        network_scope: NetworkScope,
+    ) -> Result<Arc<Self>> {
+        if !network_scope.allows(bind) {
+            return invalid("Use the selected LAN/VPN recovery address");
         }
         let (storage, journal) = Storage::open(root)?;
         Self::start_room(
@@ -490,6 +604,7 @@ impl Host {
             Some(storage),
             Some(studio_tls::identity()?),
             host_name,
+            network_scope,
         )
     }
     fn start_room(
@@ -499,6 +614,7 @@ impl Host {
         storage: Option<Storage>,
         tls: Option<studio_tls::Identity>,
         host_name: &str,
+        network_scope: NetworkScope,
     ) -> Result<Arc<Self>> {
         journal.validate()?;
         if serde_json::to_vec(&journal.document)?.len() > MAX_FRAME_BYTES / 2 {
@@ -512,6 +628,7 @@ impl Host {
         listener.set_nonblocking(true)?;
         let host = Arc::new(Self {
             endpoint: listener.local_addr()?,
+            network_scope,
             stop: AtomicBool::new(false),
             started: Instant::now(),
             tls: tls.as_ref().map(|t| t.config.clone()),
@@ -528,6 +645,7 @@ impl Host {
                 game,
                 encrypted: false,
                 leases: BTreeMap::new(),
+                previews: BTreeMap::new(),
             }),
         });
         locked(&host.room)?.encrypted = host.tls.is_some();
@@ -539,7 +657,7 @@ impl Host {
             }
             match listener.accept() {
                 Ok((socket, address)) => {
-                    if !matches!(address,SocketAddr::V4(v)if private_ipv4(*v.ip()))
+                    if !matches!(address,SocketAddr::V4(v)if host.network_scope.allows(*v.ip()))
                         || host.in_flight.load(Ordering::Relaxed) >= 8
                     {
                         continue;
@@ -648,6 +766,7 @@ impl Drop for Host {
 #[derive(Clone)]
 pub struct Guest {
     address: SocketAddr,
+    network_scope: NetworkScope,
     key: String,
     client: String,
     credential: String,
@@ -673,7 +792,29 @@ impl Guest {
         identity: Option<(String, String)>,
         timeout: Duration,
     ) -> Result<(Self, View)> {
-        let address = private_endpoint(endpoint)?;
+        Self::join_studio_scoped(
+            endpoint,
+            key,
+            certificate,
+            display_name,
+            identity,
+            timeout,
+            NetworkScope::Private,
+        )
+    }
+    pub fn join_studio_scoped(
+        endpoint: &str,
+        key: &str,
+        certificate: Option<&str>,
+        display_name: &str,
+        identity: Option<(String, String)>,
+        timeout: Duration,
+        network_scope: NetworkScope,
+    ) -> Result<(Self, View)> {
+        if network_scope == NetworkScope::RadminVpn && certificate.is_none() {
+            return invalid("Radmin VPN sessions require a certificate-pinned invitation");
+        }
+        let address = network_scope.endpoint(endpoint)?;
         let key = key.trim().to_ascii_lowercase();
         if key.len() != 32 || !key.bytes().all(|b| b.is_ascii_hexdigit()) {
             return invalid("A session key must contain 32 hexadecimal characters");
@@ -684,6 +825,7 @@ impl Guest {
         credential_hash(&credential)?;
         let mut guest = Self {
             address,
+            network_scope,
             key,
             client,
             credential,
@@ -704,6 +846,9 @@ impl Guest {
         (self.client.clone(), self.credential.clone())
     }
     fn request(&self, command: Command) -> Result<View> {
+        self.request_once(command, true)
+    }
+    fn request_once(&self, command: Command, rejoin: bool) -> Result<View> {
         if self.closed.load(Ordering::Relaxed) && !matches!(command, Command::Leave) {
             return invalid("This editing session is closed");
         }
@@ -726,6 +871,13 @@ impl Guest {
             receive(&mut socket)?
         };
         if let Some(error) = response.error {
+            if rejoin && self.tls.is_some() && error=="Your participant lease expired. Rejoin to reconcile the retained local draft."
+                && !matches!(&request.command,Command::Join{..}|Command::Leave) {
+                // Reauthenticate the SAME durable identity, then replay exactly
+                // the retained command/operation ID once. Revocation still fails.
+                self.request_once(Command::Join{name:self.name.clone()},false)?;
+                return self.request_once(request.command,false);
+            }
             return invalid(error);
         }
         let mut cache = locked(&self.cached)?;
@@ -753,9 +905,29 @@ impl Guest {
             view.can_undo = update.can_undo;
             view.can_redo = update.can_redo;
             view.leases = update.leases;
+            view.workshop_previews = update.workshop_previews;
+            view.acknowledged_operations = update.acknowledged_operations;
+            view.operation_limit = update.operation_limit;
             view.acknowledged_operation_id = None;
             view
         };
+        if view.workshop_previews.len() > MAX_PARTICIPANTS
+            || view.operation_limit != 4096
+            || view.acknowledged_operations > view.operation_limit
+        {
+            return invalid("Host returned invalid bounded Workshop/session metadata");
+        }
+        for preview in &view.workshop_previews {
+            if preview.remaining_ms > 1800
+                || !view
+                    .participants
+                    .iter()
+                    .any(|p| p.id == preview.author && p.role != "viewer" && p.online)
+            {
+                return invalid("Host returned an invalid Workshop preview author/lifetime");
+            }
+            preview.brush.validate(&view.document)?;
+        }
         if !self.session_id.is_empty() && view.session_id != self.session_id {
             return invalid("Host session changed; join its new invitation");
         }
@@ -780,6 +952,27 @@ pub enum Peer {
     Guest(Guest),
 }
 impl Peer {
+    pub fn preview(
+        &self,
+        revision: u64,
+        brush: Option<crate::studio_workshop::BrushTransform>,
+    ) -> Result<View> {
+        match self {
+            Self::Host(h) => {
+                h.open()?;
+                let mut room = locked(&h.room)?;
+                room.preview("host", revision, brush)?;
+                Ok(room.view("host", None))
+            }
+            Self::Guest(g) => g.request(Command::Preview { revision, brush }),
+        }
+    }
+    pub fn network_scope(&self) -> NetworkScope {
+        match self {
+            Self::Host(h) => h.network_scope,
+            Self::Guest(g) => g.network_scope,
+        }
+    }
     pub fn poll(&self) -> Result<View> {
         match self {
             Self::Host(h) => {
@@ -876,6 +1069,95 @@ impl Peer {
 }
 #[cfg(test)]
 mod studio_tests {
+    #[test]
+    fn workshop_drag_previews_are_ephemeral_bounded_and_viewers_cannot_publish_them() {
+        let temp = tempfile::tempdir().unwrap();
+        let doc = crate::bsp_workshop::example().unwrap();
+        let directory = temp.path().join("session");
+        let host = Host::persistent(
+            doc.clone(),
+            Ipv4Addr::LOCALHOST,
+            None,
+            &directory,
+            "Owner",
+            true,
+        )
+        .unwrap();
+        let (guest, view) = Guest::join_studio(
+            &host.endpoint.to_string(),
+            &host.key(),
+            host.certificate.as_deref(),
+            "Artist",
+            None,
+            Duration::from_secs(3),
+        )
+        .unwrap();
+        let artist = Peer::Guest(guest);
+        let owner = Peer::Host(host.clone());
+        let head = std::fs::read(directory.join("head.json")).unwrap();
+        let b = &doc.workshop.as_ref().unwrap().brushes[0];
+        let preview = crate::studio_workshop::BrushTransform {
+            brush_id: b.id.clone(),
+            position: [0.125, 0., 0.],
+            rotation: b.rotation,
+            scale: b.scale,
+        };
+        artist
+            .preview(view.revision, Some(preview.clone()))
+            .unwrap();
+        let current = owner.poll().unwrap();
+        assert_eq!(current.revision, 0);
+        assert_eq!(current.acknowledged_operations, 0);
+        assert_eq!(current.workshop_previews.len(), 1);
+        assert_eq!(std::fs::read(directory.join("head.json")).unwrap(), head);
+        let mut invalid = preview.clone();
+        invalid.scale[0] = 2000.;
+        assert!(artist.preview(0, Some(invalid)).is_err());
+        let (viewer, _) = Guest::join_studio(
+            &host.endpoint.to_string(),
+            &host.key_for(true),
+            host.certificate.as_deref(),
+            "Viewer",
+            None,
+            Duration::from_secs(3),
+        )
+        .unwrap();
+        assert!(Peer::Guest(viewer).preview(0, Some(preview)).is_err());
+        for (_, (_, until)) in &mut host.room.lock().unwrap().previews {
+            *until = Instant::now() - Duration::from_millis(1);
+        }
+        assert!(owner.poll().unwrap().workshop_previews.is_empty());
+        let mut next = doc;
+        next.workshop.as_mut().unwrap().brushes[0].position[0] = 0.25;
+        assert_eq!(artist.propose(0, next).unwrap().revision, 1);
+        owner.leave();
+    }
+    #[test]
+    fn expired_presence_reauthenticates_same_author_and_replays_the_retained_id_once() {
+        let doc = crate::bsp_workshop::example().unwrap();
+        let temp=tempfile::tempdir().unwrap();
+        let host = Host::persistent(doc.clone(),std::net::Ipv4Addr::LOCALHOST,None,&temp.path().join("session"),"Owner",true).unwrap();
+        let (guest, first) = Guest::join_studio(&host.endpoint.to_string(), &host.key(),host.certificate.as_deref(),"Artist",None,Duration::from_secs(3)).unwrap();
+        let peer = Peer::Guest(guest);
+        host.room.lock().unwrap().online.insert(
+            first.author_id.clone(),
+            Instant::now() - Duration::from_secs(11),
+        );
+        let mut next = doc;
+        next.workshop.as_mut().unwrap().brushes[0].position[0] = 0.5;
+        let operation = uuid::Uuid::new_v4().to_string();
+        let result = peer.propose_with_id(&operation, 0, next.clone()).unwrap();
+        assert_eq!(result.author_id, first.author_id);
+        assert_eq!(result.revision, 1);
+        assert_eq!(
+            peer.propose_with_id(&operation, 0, next).unwrap().revision,
+            1
+        );
+        assert_eq!(host.room.lock().unwrap().journal.members.len(), 1);
+        host.role(&first.author_id, Role::Editor, true).unwrap();
+        assert!(peer.poll().is_err());
+        host.close();
+    }
     use super::*;
     #[test]
     fn structure_ownership_is_scoped_and_expires_without_a_project_lock() {

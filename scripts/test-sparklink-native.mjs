@@ -250,7 +250,9 @@ try {
     }),
   );
   await a.panel.getByRole('textbox', { name: 'Studio display name', exact: true }).fill(a.name);
-  await a.panel.getByRole('textbox', { name: 'Studio bind address', exact: true }).fill('127.0.0.1');
+  const network=a.panel.getByRole('combobox',{name:'Session network',exact:true});
+  if(await network.count())await network.selectOption('127.0.0.1');
+  else await a.panel.getByRole('textbox', { name: 'Studio bind address', exact: true }).fill('127.0.0.1');
   await a.panel.getByRole('button', { name: 'Host editing session', exact: true }).click();
   await expect(a.page.getByRole('button', { name: 'Live Studio · Hosting', exact: true })).toBeVisible();
   const hosted = await status(a);

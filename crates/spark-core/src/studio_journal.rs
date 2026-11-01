@@ -85,6 +85,12 @@ pub struct Journal {
     pub members: BTreeMap<String, Member>,
 }
 impl Journal {
+    pub fn acknowledged_operations(&self) -> usize {
+        self.acknowledged.len()
+    }
+    pub fn operation_limit(&self) -> usize {
+        MAX_OPERATIONS
+    }
     pub fn new(document: QuickForgeDocument) -> Result<Self> {
         let document = portable(document);
         quickforge::validate_portable_document(&document)?;
@@ -466,7 +472,8 @@ mod tests {
     #[test]
     fn portable_native_asset_reference_never_grants_local_build_provenance() {
         let mut document = quickforge::create_arena("assets", "emptyArena").unwrap();
-        document.placements.push(quickforge::ForgePlacement { published_asset_id: None,
+        document.placements.push(quickforge::ForgePlacement {
+            published_asset_id: None,
             id: id(),
             name: "Owned Warthog".into(),
             tag_path: "vehicles/warthog/mp_warthog".into(),

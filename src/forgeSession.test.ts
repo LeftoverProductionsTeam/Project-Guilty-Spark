@@ -3,8 +3,34 @@ import {mergeForge,portableForge,localForge} from './forgeSession';
 import {historyReducer,initialHistory} from './editor';
 import type {Project} from './types';
 import type {QuickForgeDocument} from './forge';
+import {workshopExample} from './bspWorkshop';
+import {semanticJson} from './semanticJson';
 const base:QuickForgeDocument={schemaVersion:1,name:'shared',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[{id:'room',name:'Room',kind:'room',position:[0,0,0],rotation:[0,0,0],dimensions:[10,10,10],steps:4,visible:true,locked:false,materialId:'m'}],materials:[{id:'m',name:'Material',shaderPath:null,color:[1,1,1]}],placements:[],spawns:[],objectives:[]};
+it('does not retrofit unchanged native portal fields into pre-portal history just because object keys were reordered',()=>{
+  const early=workshopExample(base),later=structuredClone(early);
+  later.materials.push({id:'portal',name:'+exactportal',shaderPath:null,color:[0,1,1]});
+  later.workshop!.portals.push({id:'door',materialId:'portal',points:[[8,-2,0],[8,2,0],[8,2,3],[8,-2,3]]});
+  let state=historyReducer(initialHistory,{type:'load',project:project(early)});
+  state=historyReducer(state,{type:'edit',project:project(later),description:'Add portal'});
+  const remote=JSON.parse(semanticJson(later)!) as QuickForgeDocument;remote.workshop!.brushes[0].name='Peer rename';
+  state=historyReducer(state,{type:'forge-remote',projectId:'shared-project',document:remote});
+  expect(state.past[0].quickForge?.workshop?.portals).toEqual([]);expect(state.past[0].quickForge?.materials.some(m=>m.name.startsWith('+'))).toBe(false);
+  expect(state.current?.quickForge?.workshop?.portals).toEqual(later.workshop!.portals);
+  const noOp=historyReducer(state,{type:'forge-remote',projectId:'shared-project',document:JSON.parse(JSON.stringify(remote,(_k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v).reverse()):v))});
+  expect(noOp).toBe(state);
+});
 function project(doc:QuickForgeDocument):Project{return {schemaVersion:1,id:'shared-project',title:'shared',createdAt:'',modifiedAt:'',source:null,provenance:{creator:'',community:'',releaseYear:null,description:'',sourceUrl:'',permissions:''},scene:[],assets:[],tagEdits:[],history:[],builds:[],quickForge:doc};}
+it('retains complete pre-Workshop undo snapshots when a peer edits a brush after portal creation',()=>{
+  let state=historyReducer(initialHistory,{type:'load',project:project(base)});
+  const workshop=workshopExample(base);workshop.materials.push({id:'portal',name:'+exactportal',shaderPath:null,color:[0,1,1]});
+  workshop.workshop!.portals.push({id:'door',materialId:'portal',points:[[8,-2,0],[8,2,0],[8,2,3],[8,-2,3]]});
+  state=historyReducer(state,{type:'edit',project:project(workshop),description:'Author BSP with portal'});
+  const remote=structuredClone(workshop);remote.workshop!.brushes[0].name='Peer room';
+  state=historyReducer(state,{type:'forge-remote',projectId:'shared-project',document:remote});
+  expect(state.past[0].quickForge).toEqual(base);expect(state.past[0].quickForge?.workshop).toBeUndefined();
+  expect(state.current?.quickForge?.workshop?.portals).toEqual(workshop.workshop!.portals);
+  expect(state.current?.quickForge?.workshop?.brushes[0].name).toBe('Peer room');
+});
 describe('shared QuickForge concurrent edits',()=>{
   it('retains a new edit made while a remote proposal was in flight',()=>{const a=structuredClone(base),b=structuredClone(base);a.geometry[0].position=[2,0,0];b.geometry[0].name='Partner';const r=mergeForge(base,a,b);expect(r.geometry[0].position).toEqual([2,0,0]);expect(r.geometry[0].name).toBe('Partner');});
   it('refuses competing transforms and edit/delete without discarding the draft',()=>{const a=structuredClone(base),b=structuredClone(base);a.geometry[0].position=[2,0,0];b.geometry[0].position=[9,0,0];expect(()=>mergeForge(base,a,b)).toThrow('Concurrent edit conflict');b.geometry=[];expect(()=>mergeForge(base,a,b)).toThrow('removed');expect(a.geometry[0].position).toEqual([2,0,0]);});

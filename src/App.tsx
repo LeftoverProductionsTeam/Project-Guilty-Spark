@@ -653,6 +653,10 @@ export default function App() {
     if(native&&!windowHistories.current.writable(project.id)){notice('This view follows the editing window. Choose Edit here in Changes to take over safely.');return;}
     dispatchDocument({type:'history',id:project.id,action:{type:'edit',project,description}});
   }
+  function materialDefaults(projectId:string,materials:ForgeMaterial[]){
+    if(native&&!windowHistories.current.writable(projectId))return;
+    dispatchDocument({type:'history',id:projectId,action:{type:'forge-defaults',projectId,materials}});
+  }
   async function importFiles(paths?: string[], destination?: 'build') {
     setBusy(true);
     try {
@@ -928,7 +932,7 @@ export default function App() {
       </div>
     </Empty>
   );
-  function forgeView(project:Project|null){return <QuickForge library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),busy}} key={project?.id??'new'} project={project} data={data} edit={edit} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:project!.id,document})} onCreate={createQuickForge} onSave={()=>save()} onBuild={buildQuickForge} onRuntimes={()=>setWorkspace('runtimes')} onLive={()=>setWorkspace('live')} onSettings={()=>setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch} dirty={project?history.dirty:false}/>;}
+  function forgeView(project:Project|null){return <QuickForge library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),busy}} key={project?.id??'new'} project={project} data={data} edit={edit} onDefaultMaterials={materials=>materialDefaults(project!.id,materials)} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:project!.id,document})} onCreate={createQuickForge} onSave={()=>save()} onBuild={buildQuickForge} onRuntimes={()=>setWorkspace('runtimes')} onLive={()=>setWorkspace('live')} onSettings={()=>setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch} dirty={project?history.dirty:false}/>;}
   function sourceView(){return current?.quickForge?forgeView(current):current?<Suspense fallback={<div className="loading">Loading map viewer…</div>}><World library={{documents:documents.documents,onImportModel:importAsset,onImportSound:importSound,onPlaceMesh:placeLibraryMesh,onSaveMap:id=>save(true,id),busy}} key={current.id} project={current} inspection={inspection} assetMeshes={meshes} edit={edit} notify={notice} onSelectMap={id=>{void openProject(id,'quickforge');}} onBeforeResources={save} onResourcesConnected={applyResourceMetadata} onOpenTag={(tagId,sourceId)=>{if(sourceId&&sourceId!==current.id){writeMapSession(sourceId,'tags.focus',tagId);dispatchDocument({type:'select',id:sourceId});}else setFocusTagId(tagId);setWorkspace('tags');}}/></Suspense>:forgeView(null);}
   async function openRecordingDirector(){const project=historyRef.current.current;if(!project)return;try{await save();window.dispatchEvent(new CustomEvent('guilty-spark-flush-map-view',{detail:project.id}));let session=await call<import('./directorSession').DirectorSession>('director_session',{projectId:project.id});if(session.revision===0){const pose=readMapSession<{position:number[];target?:number[];quaternion:number[]}|null>(project.id,'camera.world.PerspectiveCamera',null);if(pose?.position.length===3&&pose.quaternion?.length===4){const[x,y,z,w]=pose.quaternion,p=pose.position,target=pose.target??[p[0]-2*(x*z+w*y),p[1]-2*(y*z-w*x),p[2]-(1-2*(x*x+y*y))];session=await call('director_update',{projectId:project.id,revision:session.revision,composition:{...session.composition,pose:{position:p,lookAt:target,fov:55,roll:0}},save:true});}}await call('director_popout',{projectId:project.id});setDockedDirector(false);if(workspace==='machinima')setWorkspace('world');notice('Recording Director opened. Use its display selector or drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
   function content(){
@@ -1036,7 +1040,7 @@ export default function App() {
       case 'preservation':
         return <Preservation project={current} edit={edit} onBeforeSave={save} onRestore={load} />;
       case 'build':
-        return current.quickForge ? <QuickForge key={current.id} project={current} data={data} edit={edit} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:current!.id,document})} onCreate={createQuickForge} onSave={() => save()} onBuild={buildQuickForge} onRuntimes={() => setWorkspace('runtimes')} onSettings={() => setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch} dirty={history.dirty} /> : current.source ? (
+        return current.quickForge ? <QuickForge key={current.id} project={current} data={data} edit={edit} onDefaultMaterials={materials=>materialDefaults(current!.id,materials)} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:current!.id,document})} onCreate={createQuickForge} onSave={() => save()} onBuild={buildQuickForge} onRuntimes={() => setWorkspace('runtimes')} onSettings={() => setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch} dirty={history.dirty} /> : current.source ? (
           <Build
             key={current.id}
             edit={edit}
@@ -1099,7 +1103,7 @@ export default function App() {
                 <strong>GUILTY SPARK</strong>
                 <span>HALO MODERN EVOLVED</span>
               </div>
-              <Pill>0.4.0 · C46 dev</Pill>
+              <Pill>0.4.0 · C48 dev</Pill>
             </button>
             {documents.documents.length ? (
               <MapTabs

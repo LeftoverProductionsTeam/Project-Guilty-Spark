@@ -143,6 +143,24 @@ try {
   await expect(page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();
   await save();
   await expect.poll(async () => (await state()).workshop.brushes[0].position[0]).toBe(0.5);
+  if (process.env.SPARK_QA_WAIT_RUNTIME_DEFAULTS === '1') {
+    const beforeBinding=await call('read_workspace_history',{projectId:created.project.id});
+    await expect.poll(async()=>{
+      const status=await call('read_workspace_history',{projectId:created.project.id});
+      const current=status.history?.snapshots.find(s=>s.key===status.history.head.current)?.project.quickForge;
+      return current?.materials.find(m=>m.id==='surface')?.shaderPath??'';
+    },{timeout:120000}).not.toBe('');
+    await save();
+    const bound=await state(),afterBinding=await call('read_workspace_history',{projectId:created.project.id});
+    expect(bound.workshop.brushes[0].position[0]).toBe(0.5);
+    expect(afterBinding.history.head.past.length).toBe(beforeBinding.history.head.past.length);
+    receipt.runtimeMaterialResolutionPreservesAuthoredUndo={
+      waitedForActualRuntimeResponse:true,
+      shaderPath:bound.materials.find(m=>m.id==='surface').shaderPath,
+      authoredTransformPreserved:true,
+      noExtraUndoStep:true,
+    };
+  }
   await page.keyboard.press('Control+z');
   await expect(x).toHaveValue('0');
   await save();

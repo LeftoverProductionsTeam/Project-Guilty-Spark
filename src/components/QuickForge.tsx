@@ -1,25 +1,26 @@
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
-import {publishTextureResources,useTextureResourceScope} from '../textureResourceScope';
+import { publishTextureResources, useTextureResourceScope } from '../textureResourceScope';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
-import {draggedAsset} from '../assetDragRegistry';
+import { draggedAsset } from '../assetDragRegistry';
 import BuildTargets from './BuildTargets';
-import{WorkspacePanel,WorkspacePanelAddon,useRevealWorkspacePanel}from'./WorkspacePanels';
+import { WorkspacePanel, WorkspacePanelAddon, useRevealWorkspacePanel } from './WorkspacePanels';
 import SmartEditPanel from './SmartEditPanel';
-import {runtimeTextureSource,defaultPreviewMaterials} from '../runtimeTexturePreview';
-import {retainAssetSource} from '../assetSources';
+import { runtimeTextureSource, defaultPreviewMaterials } from '../runtimeTexturePreview';
+import type { ForgeMaterial } from '../forge';
+import { retainAssetSource } from '../assetSources';
 import RenderFeatures from './RenderFeatures';
 import LiveForge from './LiveForge';
 import MapSounds from './MapSounds';
-import type {ViewportLibraryControls} from './ViewportAssetLibrary';
+import type { ViewportLibraryControls } from './ViewportAssetLibrary';
 import ViewportAssetLibrary from './ViewportAssetLibrary';
 import ViewportTags from './ViewportTags';
-import WorkshopScene,{WorkshopObjectFields} from './WorkshopScene';
-import {viewportAssetCatalog,placeLibraryModel,librarySoundEmitters} from '../viewportAssets';
-import {useViewportAssetDrop} from '../useViewportAssetDrop';
-import {emptySoundScene} from '../spatialAudio';
+import WorkshopScene, { WorkshopObjectFields } from './WorkshopScene';
+import { viewportAssetCatalog, placeLibraryModel, librarySoundEmitters } from '../viewportAssets';
+import { useViewportAssetDrop } from '../useViewportAssetDrop';
+import { emptySoundScene } from '../spatialAudio';
 import SoundMixer from './SoundMixer';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {useMapState,writeMapSession,readMapSession} from '../mapSession';
+import { useMapState, writeMapSession, readMapSession } from '../mapSession';
 import {
   Box,
   Copy,
@@ -44,7 +45,7 @@ import {
 } from 'lucide-react';
 import type { Bootstrap, JobEvent, OpenProject, Project, RuntimeId, Vec3 } from '../types';
 import { call, native } from '../api';
-import {sourceSpartan} from '../sourceSpartan';
+import { sourceSpartan } from '../sourceSpartan';
 import {
   brushNames,
   catalogAssets,
@@ -81,9 +82,19 @@ import BspWorkshop from './BspWorkshop';
 import EnvironmentControls from './EnvironmentControls';
 import { environmentValue, validateEnvironment } from '../environment';
 import { inspectScenarioRisks } from '../scenarioSafety';
-import {auditClassicNetgame, classicModeChecklist, hillAreas, makeFourPointHill, makeTeleporterPair, netgameUsageId, nextFreeUsageId, nextFreeTeleportChannel, nextFreeRaceCheckpointId} from '../haloGametypeScenario';
-import {makeFiveModeTestPlan} from '../haloModeTestPlan';
-import {auditMultiplayerSpawns} from '../multiplayerSpawnAudit';
+import {
+  auditClassicNetgame,
+  classicModeChecklist,
+  hillAreas,
+  makeFourPointHill,
+  makeTeleporterPair,
+  netgameUsageId,
+  nextFreeUsageId,
+  nextFreeTeleportChannel,
+  nextFreeRaceCheckpointId,
+} from '../haloGametypeScenario';
+import { makeFiveModeTestPlan } from '../haloModeTestPlan';
+import { auditMultiplayerSpawns } from '../multiplayerSpawnAudit';
 import type { ForgeCamera, ForgeSnapshot } from './ForgeViewport';
 import Firefight from './Firefight';
 import { sculptTerrain } from '../terrain';
@@ -132,7 +143,8 @@ const templates = [
   {
     id: 'guiltySparkTestArena',
     name: 'Guilty Spark · Five-mode Test Arena',
-    detail: 'Original arena with 32 all-mode starts (16/team), both CTF flags, two four-corner hills, Oddball, Race checkpoints and vehicle markers, paired teleporters. Source only.',
+    detail:
+      'Original arena with 32 all-mode starts (16/team), both CTF flags, two four-corner hills, Oddball, Race checkpoints and vehicle markers, paired teleporters. Source only.',
     glyph: 'QA',
   },
   {
@@ -152,17 +164,18 @@ type PaletteItem =
   | { type: 'zone' };
 const dragType = 'application/x-guiltyspark-forge';
 interface Props {
-  library?:ViewportLibraryControls;
+  library?: ViewportLibraryControls;
   project: Project | null;
   data: Bootstrap;
   edit: (project: Project, description: string) => void;
-  onSharedDocument: (document:QuickForgeDocument)=>void;
+  onDefaultMaterials: (materials: ForgeMaterial[]) => void;
+  onSharedDocument: (document: QuickForgeDocument) => void;
   onCreate: (title: string, template: string, target: RuntimeId) => Promise<void>;
   onSave: () => Promise<void>;
   onBuild: () => Promise<void>;
   onRuntimes: () => void;
   onSettings: () => void;
-  onLive?:()=>void;
+  onLive?: () => void;
   notify: (message: string, tone?: string) => void;
   logs: JobEvent[];
   activeJob: string | null;
@@ -192,10 +205,20 @@ export default function QuickForge(props: Props) {
     />
   );
 }
-function NewMapWizard({ onCreate, onCancel,preferredHalo }: { onCreate: Props['onCreate']; onCancel?: () => void;preferredHalo?:RuntimeId|null }) {
+function NewMapWizard({
+  onCreate,
+  onCancel,
+  preferredHalo,
+}: {
+  onCreate: Props['onCreate'];
+  onCancel?: () => void;
+  preferredHalo?: RuntimeId | null;
+}) {
   const [title, setTitle] = useState('Guilty Spark Test Arena'),
     [template, setTemplate] = useState('guiltySparkTestArena'),
-    [target, setTarget] = useState<RuntimeId>(preferredHalo&&forgeTargets[preferredHalo]?preferredHalo:'mccSteam');
+    [target, setTarget] = useState<RuntimeId>(
+      preferredHalo && forgeTargets[preferredHalo] ? preferredHalo : 'mccSteam',
+    );
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   return (
@@ -285,26 +308,34 @@ function NewMapWizard({ onCreate, onCancel,preferredHalo }: { onCreate: Props['o
 }
 function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocument; onNew: () => void }) {
   const { project, document: doc, data, edit, notify } = props;
-  const [bspMode,setBspMode]=useMapState(project.id,'forge.bspWorkshop',!!doc.workshop);
-  const [bspBusy,setBspBusy]=useState(false);
-  const [selected, setSelected] = useMapState<string[]>(project.id,'forge.selection',[]),
-    [selectedZone, setSelectedZone] = useMapState<string | null>(project.id,'forge.zone',null);
-  const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(project.id,'forge.mode','translate'),
-    [snap, setSnap] = useMapState(project.id,'forge.snap',0.5),
-    [gridSnap, setGridSnap] = useMapState(project.id,'forge.gridSnap',true),
-    [meshSnap, setMeshSnap] = useMapState(project.id,'forge.meshSnap',false),
-    [grid, setGrid] = useMapState(project.id,'forge.grid',true),
-    [wireframe, setWireframe] = useMapState(project.id,'forge.wireframe',false),
-    [showHillAreas, setShowHillAreas] = useMapState(project.id,'forge.hills',true),
-    [showGameRoutes, setShowGameRoutes] = useMapState(project.id,'forge.routes',true),
-    [walkCollision, setWalkCollision] = useMapState(project.id,'forge.collision',true),
-    [cutaway, setCutaway] = useMapState(project.id,'forge.cutaway',true),
-    [cameraMode, setCameraMode] = useMapState<ForgeCamera>(project.id,'forge.cameraMode','orbit'),
+  const [bspMode, setBspMode] = useMapState(project.id, 'forge.bspWorkshop', !!doc.workshop);
+  const [bspBusy, setBspBusy] = useState(false);
+  const [selected, setSelected] = useMapState<string[]>(project.id, 'forge.selection', []),
+    [selectedZone, setSelectedZone] = useMapState<string | null>(project.id, 'forge.zone', null);
+  const [mode, setMode] = useMapState<'translate' | 'rotate' | 'scale'>(
+      project.id,
+      'forge.mode',
+      'translate',
+    ),
+    [snap, setSnap] = useMapState(project.id, 'forge.snap', 0.5),
+    [gridSnap, setGridSnap] = useMapState(project.id, 'forge.gridSnap', true),
+    [meshSnap, setMeshSnap] = useMapState(project.id, 'forge.meshSnap', false),
+    [grid, setGrid] = useMapState(project.id, 'forge.grid', true),
+    [wireframe, setWireframe] = useMapState(project.id, 'forge.wireframe', false),
+    [showHillAreas, setShowHillAreas] = useMapState(project.id, 'forge.hills', true),
+    [showGameRoutes, setShowGameRoutes] = useMapState(project.id, 'forge.routes', true),
+    [walkCollision, setWalkCollision] = useMapState(project.id, 'forge.collision', true),
+    [cutaway, setCutaway] = useMapState(project.id, 'forge.cutaway', true),
+    [cameraMode, setCameraMode] = useMapState<ForgeCamera>(project.id, 'forge.cameraMode', 'orbit'),
     [frame, setFrame] = useState(0);
-  const [tab, setTab] = useMapState<'palette' | 'properties' | 'firefight' | 'sound'>(project.id,'forge.inspector','palette');
-  const [actorId,setActorId]=useState('');
-  const [query, setQuery] = useMapState(project.id,'forge.query',''),
-    [category, setCategory] = useMapState(project.id,'forge.category','all');
+  const [tab, setTab] = useMapState<'palette' | 'properties' | 'firefight' | 'sound'>(
+    project.id,
+    'forge.inspector',
+    'palette',
+  );
+  const [actorId, setActorId] = useState('');
+  const [query, setQuery] = useMapState(project.id, 'forge.query', ''),
+    [category, setCategory] = useMapState(project.id, 'forge.category', 'all');
   const sources = data.entries.filter((entry) => entry.version !== null);
   const [sourceId, setSourceId] = useMapState(
       project.id,
@@ -316,13 +347,17 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [assets, setAssets] = useState<ForgeAsset[]>([]),
     [assetError, setAssetError] = useState('');
   const [sourceOpen, setSourceOpen] = useState<OpenProject | null>(null);
-  const [materialSourceId,setMaterialSourceId]=useMapState(project.id,'forge.materialSource',project.nativeAssetImports?.find(binding=>binding.tagClass==='senv')?.sourceProjectId??sourceId);
-  const [separateMaterialSource,setSeparateMaterialSource]=useState<OpenProject|null>(null);
-  const materialResourceScope=useTextureResourceScope(materialSourceId);
-  const materialOpen=materialSourceId===sourceId?sourceOpen:separateMaterialSource;
-  const defaultPreviewAttempt=useRef('');
-  const sourceResourceScope=useTextureResourceScope(sourceId);
-  const lastLoadedSource=useRef('');
+  const [materialSourceId, setMaterialSourceId] = useMapState(
+    project.id,
+    'forge.materialSource',
+    project.nativeAssetImports?.find((binding) => binding.tagClass === 'senv')?.sourceProjectId ?? sourceId,
+  );
+  const [separateMaterialSource, setSeparateMaterialSource] = useState<OpenProject | null>(null);
+  const materialResourceScope = useTextureResourceScope(materialSourceId);
+  const materialOpen = materialSourceId === sourceId ? sourceOpen : separateMaterialSource;
+  const defaultPreviewAttempt = useRef('');
+  const sourceResourceScope = useTextureResourceScope(sourceId);
+  const lastLoadedSource = useRef('');
   const [referenceFilter, setReferenceFilter] = useState<Set<number> | null>(null);
   const exchangePicker = useRef<HTMLInputElement>(null);
   const currentSourceId = useRef(sourceId);
@@ -333,7 +368,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [geometryError, setGeometryError] = useState(''),
     [previewBusy, setPreviewBusy] = useState(false);
   // Imported compiler evidence is memory-only, not part of saved source maps.
-  const wrlPicker = useRef<HTMLInputElement>(null), toolLogPicker = useRef<HTMLInputElement>(null);
+  const wrlPicker = useRef<HTMLInputElement>(null),
+    toolLogPicker = useRef<HTMLInputElement>(null);
   const [wrlSource, setWrlSource] = useState<string | null>(null);
   const [wrlCentimetres, setWrlCentimetres] = useState(true);
   const [wrlVisible, setWrlVisible] = useState(true);
@@ -342,144 +378,297 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const [toolLog, setToolLog] = useState<ToolLogReview | null>(null);
   const [toolLogLoadedSourceHash, setToolLogLoadedSourceHash] = useState<string | null>(null);
   const [diagnosticError, setDiagnosticError] = useState('');
-  const wrlParse = useMemo<{value:WrlDiagnostics|null;error:string}>(() => {
-    if (!wrlSource) return {value:null,error:''};
-    try{return {value:parseHaloWrl(wrlSource,wrlCentimetres),error:''};}
-    catch(e){return {value:null,error:String(e)};}
-  },[wrlSource,wrlCentimetres]);
+  const wrlParse = useMemo<{ value: WrlDiagnostics | null; error: string }>(() => {
+    if (!wrlSource) return { value: null, error: '' };
+    try {
+      return { value: parseHaloWrl(wrlSource, wrlCentimetres), error: '' };
+    } catch (e) {
+      return { value: null, error: String(e) };
+    }
+  }, [wrlSource, wrlCentimetres]);
   const [ghost, setGhost] = useState<Vec3 | null>(null),
     [dragging, setDragging] = useState<PaletteItem | null>(null);
   const dropPoint = useRef<((x: number, y: number) => Vec3 | null) | null>(null);
-  const library=props.library,revealPanel=useRevealWorkspacePanel(),viewportElement=useRef<HTMLDivElement|null>(null),assetAlive=useRef(true);
-  const [studioRole,setStudioRole]=useState<string|null>(null);
-  useEffect(()=>{const status=(event:Event)=>{const value=(event as CustomEvent<{projectId:string;view?:{role?:string}|null}>).detail;if(value?.projectId===project.id)setStudioRole(value.view?.role??null);};const open=(event:Event)=>{if((event as CustomEvent<{projectId:string}>).detail?.projectId===project.id)revealPanel('sparklink');};window.addEventListener('guilty-spark-studio-status',status);window.addEventListener('guilty-spark-live-studio-open',open);if(readMapSession(project.id,'studio.openRequest',false)){revealPanel('sparklink');requestAnimationFrame(()=>writeMapSession(project.id,'studio.openRequest',false));}return()=>{window.removeEventListener('guilty-spark-studio-status',status);window.removeEventListener('guilty-spark-live-studio-open',open);};},[project.id,revealPanel]);
+  const library = props.library,
+    revealPanel = useRevealWorkspacePanel(),
+    viewportElement = useRef<HTMLDivElement | null>(null),
+    assetAlive = useRef(true);
+  const [studioRole, setStudioRole] = useState<string | null>(null);
+  useEffect(() => {
+    const status = (event: Event) => {
+      const value = (event as CustomEvent<{ projectId: string; view?: { role?: string } | null }>).detail;
+      if (value?.projectId === project.id) setStudioRole(value.view?.role ?? null);
+    };
+    const open = (event: Event) => {
+      if ((event as CustomEvent<{ projectId: string }>).detail?.projectId === project.id)
+        revealPanel('sparklink');
+    };
+    window.addEventListener('guilty-spark-studio-status', status);
+    window.addEventListener('guilty-spark-live-studio-open', open);
+    if (readMapSession(project.id, 'studio.openRequest', false)) {
+      revealPanel('sparklink');
+      requestAnimationFrame(() => writeMapSession(project.id, 'studio.openRequest', false));
+    }
+    return () => {
+      window.removeEventListener('guilty-spark-studio-status', status);
+      window.removeEventListener('guilty-spark-live-studio-open', open);
+    };
+  }, [project.id, revealPanel]);
   const librarySources = useAssetLibrarySources(library?.documents ?? []);
   const catalog = useMemo(() => viewportAssetCatalog(librarySources), [librarySources]);
-  const [assetBusy,setAssetBusy]=useState(false),[workshopSelected,setWorkshopSelected]=useMapState<string|null>(project.id,'forge.workshopSelection',null);
-  const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',''),[tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null),[tagRevision,setTagRevision]=useState(0);
-  const tagDocument=library?.documents.find(document=>document.id===tagSource),tagProject=tagDocument?.history.current;
-  const workshop=project.scene.find(object=>object.id===workshopSelected&&object.assetId),workshopMeshes=library?.documents.find(document=>document.id===project.id)?.meshes??{};
-  useEffect(()=>{assetAlive.current=true;return()=>{assetAlive.current=false;};},[project.id]);
-  function openPlacementTag(id:string){const placement=latestProject.current.quickForge?.placements.find(value=>value.id===id);if(!placement?.sourceProjectId||placement.tagId===null)return;setTagSource(placement.sourceProjectId);setTagRequest(placement.tagId);setTagRevision(value=>value+1);revealPanel('object-tags');}
+  const [assetBusy, setAssetBusy] = useState(false),
+    [workshopSelected, setWorkshopSelected] = useMapState<string | null>(
+      project.id,
+      'forge.workshopSelection',
+      null,
+    );
+  const [tagSource, setTagSource] = useMapState(project.id, 'viewport.tags.source', ''),
+    [tagRequest, setTagRequest] = useMapState<number | null>(project.id, 'viewport.tags.request', null),
+    [tagRevision, setTagRevision] = useState(0);
+  const tagDocument = library?.documents.find((document) => document.id === tagSource),
+    tagProject = tagDocument?.history.current;
+  const workshop = project.scene.find((object) => object.id === workshopSelected && object.assetId),
+    workshopMeshes = library?.documents.find((document) => document.id === project.id)?.meshes ?? {};
+  useEffect(() => {
+    assetAlive.current = true;
+    return () => {
+      assetAlive.current = false;
+    };
+  }, [project.id]);
+  function openPlacementTag(id: string) {
+    const placement = latestProject.current.quickForge?.placements.find((value) => value.id === id);
+    if (!placement?.sourceProjectId || placement.tagId === null) return;
+    setTagSource(placement.sourceProjectId);
+    setTagRequest(placement.tagId);
+    setTagRevision((value) => value + 1);
+    revealPanel('object-tags');
+  }
   async function dropLibraryAsset(key: string, point: Vec3, replaceId?: string | null) {
-    if(!library||assetBusy||library.busy)return;
+    if (!library || assetBusy || library.busy) return;
     const item = catalog.find((value) => value.key === key) ?? draggedAsset(key);
-    if(!item){notify('Reopen the source map before placing this asset.','error');return;}
+    if (!item) {
+      notify('Reopen the source map before placing this asset.', 'error');
+      return;
+    }
     setAssetBusy(true);
     try {
       if (item.kind === 'model') {
         const binding = await prepareAssetImport(latestProject.current, item.asset);
-        if(!assetAlive.current)return;
+        if (!assetAlive.current) return;
         const placed = placeLibraryModel(
           attachAssetImport(latestProject.current, binding),
           item.asset,
           snapPoint(point, gridSnap ? snap : 0),
           replaceId,
         );
-        edit(placed.project,`${replaceId?'Replace':'Place'} ${item.name}`);
+        edit(placed.project, `${replaceId ? 'Replace' : 'Place'} ${item.name}`);
         setSelected([placed.selectedId]);
         setWorkshopSelected(null);
-      } else if (item.kind === 'mesh') {await library.onPlaceMesh(item,point,replaceId);setSelected([]);} else {
+      } else if (item.kind === 'mesh') {
+        await library.onPlaceMesh(item, point, replaceId);
+        setSelected([]);
+      } else {
         const binding = await prepareSoundImport(latestProject.current, item);
-        const emitters=await librarySoundEmitters(item,point);
-        if(!assetAlive.current)return;
+        const emitters = await librarySoundEmitters(item, point);
+        if (!assetAlive.current) return;
         const latest = binding ? attachAssetImport(latestProject.current, binding) : latestProject.current,
           scene = latest.audioPreview ?? emptySoundScene();
-        if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
-        edit({...latest,audioPreview:{...scene,emitters:[...scene.emitters,...emitters]}},'Place sound '+item.name);
-        writeMapSession(project.id,'sound-emitter-selection',emitters[0].id);
+        if (scene.emitters.length + emitters.length > 64)
+          throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
+        edit(
+          { ...latest, audioPreview: { ...scene, emitters: [...scene.emitters, ...emitters] } },
+          'Place sound ' + item.name,
+        );
+        writeMapSession(project.id, 'sound-emitter-selection', emitters[0].id);
         revealPanel('map-sounds');
       }
     } catch (reason) {
-      if(assetAlive.current)notify(String(reason),'error');
+      if (assetAlive.current) notify(String(reason), 'error');
     } finally {
-      if(assetAlive.current)setAssetBusy(false);
+      if (assetAlive.current) setAssetBusy(false);
     }
   }
-  async function dropFiles(paths:string[],point:Vec3){if(!library||library.busy)return;for(const path of paths){if(!assetAlive.current)return;if(/\.obj$/i.test(path))await library.onImportModel(point,path);else if(await library.onImportSound(point,path))revealPanel('map-sounds');}}
-  const assetDrag=useViewportAssetDrop(project.id,viewportElement,dropPoint,(key,point)=>void dropLibraryAsset(key,point),library?(paths,point)=>void dropFiles(paths,point):undefined);
-  const viewPoint=()=>{const rect=viewportElement.current?.getBoundingClientRect();return rect?dropPoint.current?.(rect.x+rect.width/2,rect.y+rect.height/2)??undefined:undefined;};
-  const pointerDrag = useRef<{item:PaletteItem;x:number;y:number;pointerId:number;moved:boolean}|null>(null);
-  const suppressPaletteClick = useRef(0);
-  const cancelledPointer = useRef<number|null>(null);
-  const pointerDrop = useRef<(item:PaletteItem,point:Vec3|null)=>void>(()=>{});
-  pointerDrop.current=(item,point)=>{
-    if(item.type==='hillPolygon'&&!point){notify('Point to an editable map surface to place a King hill.','error');return;}
-    add(item,point??[0,0,0]);
+  async function dropFiles(paths: string[], point: Vec3) {
+    if (!library || library.busy) return;
+    for (const path of paths) {
+      if (!assetAlive.current) return;
+      if (/\.obj$/i.test(path)) await library.onImportModel(point, path);
+      else if (await library.onImportSound(point, path)) revealPanel('map-sounds');
+    }
+  }
+  const assetDrag = useViewportAssetDrop(
+    project.id,
+    viewportElement,
+    dropPoint,
+    (key, point) => void dropLibraryAsset(key, point),
+    library ? (paths, point) => void dropFiles(paths, point) : undefined,
+  );
+  const viewPoint = () => {
+    const rect = viewportElement.current?.getBoundingClientRect();
+    return rect
+      ? (dropPoint.current?.(rect.x + rect.width / 2, rect.y + rect.height / 2) ?? undefined)
+      : undefined;
   };
-  useEffect(()=>{
+  const pointerDrag = useRef<{
+    item: PaletteItem;
+    x: number;
+    y: number;
+    pointerId: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressPaletteClick = useRef(0);
+  const cancelledPointer = useRef<number | null>(null);
+  const pointerDrop = useRef<(item: PaletteItem, point: Vec3 | null) => void>(() => {});
+  pointerDrop.current = (item, point) => {
+    if (item.type === 'hillPolygon' && !point) {
+      notify('Point to an editable map surface to place a King hill.', 'error');
+      return;
+    }
+    add(item, point ?? [0, 0, 0]);
+  };
+  useEffect(() => {
     // Tauri's Windows file-drop handler replaces WebView2 HTML5 drag/drop.
     // Pointer-driven internal drags keep OS map/archive drops working too.
-    const inside=(x:number,y:number)=>{
-      const rect=window.document.querySelector('.forge-viewport')?.getBoundingClientRect();
-      return !!rect&&x>=rect.left&&x<=rect.right&&y>=rect.top&&y<=rect.bottom;
+    const inside = (x: number, y: number) => {
+      const rect = window.document.querySelector('.forge-viewport')?.getBoundingClientRect();
+      return !!rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
     };
-    const clear=()=>{pointerDrag.current=null;setDragging(null);setGhost(null);};
-    const move=(event:PointerEvent)=>{
-      const drag=pointerDrag.current;if(!drag||event.pointerId!==drag.pointerId)return;
-      if(!drag.moved&&Math.hypot(event.clientX-drag.x,event.clientY-drag.y)<6)return;
-      drag.moved=true;event.preventDefault();setDragging(drag.item);
-      setGhost(inside(event.clientX,event.clientY)?dropPoint.current?.(event.clientX,event.clientY)??null:null);
+    const clear = () => {
+      pointerDrag.current = null;
+      setDragging(null);
+      setGhost(null);
     };
-    const up=(event:PointerEvent)=>{
-      if(cancelledPointer.current===event.pointerId){suppressPaletteClick.current=Date.now()+250;cancelledPointer.current=null;return;}
-      const drag=pointerDrag.current;if(!drag||event.pointerId!==drag.pointerId)return;
-      if(drag.moved){
-        suppressPaletteClick.current=Date.now()+250;
-        if(inside(event.clientX,event.clientY))pointerDrop.current(drag.item,dropPoint.current?.(event.clientX,event.clientY)??null);
+    const move = (event: PointerEvent) => {
+      const drag = pointerDrag.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      if (!drag.moved && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 6) return;
+      drag.moved = true;
+      event.preventDefault();
+      setDragging(drag.item);
+      setGhost(
+        inside(event.clientX, event.clientY)
+          ? (dropPoint.current?.(event.clientX, event.clientY) ?? null)
+          : null,
+      );
+    };
+    const up = (event: PointerEvent) => {
+      if (cancelledPointer.current === event.pointerId) {
+        suppressPaletteClick.current = Date.now() + 250;
+        cancelledPointer.current = null;
+        return;
+      }
+      const drag = pointerDrag.current;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      if (drag.moved) {
+        suppressPaletteClick.current = Date.now() + 250;
+        if (inside(event.clientX, event.clientY))
+          pointerDrop.current(drag.item, dropPoint.current?.(event.clientX, event.clientY) ?? null);
       }
       clear();
     };
-    const cancel=(event:KeyboardEvent)=>{if(event.key==='Escape'&&pointerDrag.current){event.preventDefault();cancelledPointer.current=pointerDrag.current.pointerId;clear();}};
-    window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',up);
-    window.addEventListener('pointercancel',clear);window.addEventListener('keydown',cancel);
-    return()=>{pointerDrag.current=null;window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',clear);window.removeEventListener('keydown',cancel);};
-  },[]);
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && pointerDrag.current) {
+        event.preventDefault();
+        cancelledPointer.current = pointerDrag.current.pointerId;
+        clear();
+      }
+    };
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', clear);
+    window.addEventListener('keydown', cancel);
+    return () => {
+      pointerDrag.current = null;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', clear);
+      window.removeEventListener('keydown', cancel);
+    };
+  }, []);
   const nodes = useMemo(() => forgeNodes(doc), [doc]);
-  const spawnModelSource=useMemo(()=>{const biped=sourceSpartan(sourceOpen?.inspection);const asset=biped&&sourceOpen?catalogAssets(sourceOpen).find(asset=>asset.tagId===biped.id):null;
-    return asset?{...placeAsset(asset,[0,0,0]),id:'spawn-preview'}:null;},[sourceOpen]);
+  const spawnModelSource = useMemo(() => {
+    const biped = sourceSpartan(sourceOpen?.inspection);
+    const asset =
+      biped && sourceOpen ? catalogAssets(sourceOpen).find((asset) => asset.tagId === biped.id) : null;
+    return asset ? { ...placeAsset(asset, [0, 0, 0]), id: 'spawn-preview' } : null;
+  }, [sourceOpen]);
   const caveReview = useMemo(() => analyzeCaveJoins(doc), [doc]);
   const caveSafety = useMemo(() => {
-    try { return {result:auditCaveExtensions(doc),error:''}; }
-    catch(error) { return {result:null,error:String(error)}; }
-  },[doc]);
-  const scenarioRisks = useMemo(() => inspectScenarioRisks(doc,project.firefight,sourceOpen?.inspection), [doc,project.firefight,sourceOpen]);
-  const scenarioRiskErrors = scenarioRisks.some(r=>r.severity==='error');
+    try {
+      return { result: auditCaveExtensions(doc), error: '' };
+    } catch (error) {
+      return { result: null, error: String(error) };
+    }
+  }, [doc]);
+  const scenarioRisks = useMemo(
+    () => inspectScenarioRisks(doc, project.firefight, sourceOpen?.inspection),
+    [doc, project.firefight, sourceOpen],
+  );
+  const scenarioRiskErrors = scenarioRisks.some((r) => r.severity === 'error');
   const netgameIssues = useMemo(() => auditClassicNetgame(doc), [doc]);
-  const netgameBlocked = netgameIssues.some(i=>i.severity==='error');
+  const netgameBlocked = netgameIssues.some((i) => i.severity === 'error');
   const gameChecklist = useMemo(() => classicModeChecklist(doc), [doc]);
   const spawnReview = useMemo(() => auditMultiplayerSpawns(doc), [doc]);
   const terrainJoins = useMemo(() => exactTerrainJoins(doc.geometry), [doc.geometry]);
   const chosen = nodes.filter((node) => selected.includes(node.value.id));
-  const preflight = useMemo(() => preflightSourceExport(doc, snapshot, report, validatedDoc, previewBusy||bspBusy), [doc, snapshot, report, validatedDoc, previewBusy,bspBusy]);
+  const preflight = useMemo(
+    () => preflightSourceExport(doc, snapshot, report, validatedDoc, previewBusy || bspBusy),
+    [doc, snapshot, report, validatedDoc, previewBusy, bspBusy],
+  );
   const meshReview = preflight.meshIntegrity;
   // A WRL describes the geometry of one compiler attempt; never present it as
   // diagnostic evidence for edited geometry without an explicit new import.
-  const wrlStale = !!wrlSource && (wrlLoadedSourceHash == null || !preflight.sameDocument ||
-    report?.sourceSha256 !== wrlLoadedSourceHash);
-  const toolLogStale = !!toolLog && (toolLogLoadedSourceHash == null || !preflight.sameDocument ||
-    report?.sourceSha256 !== toolLogLoadedSourceHash);
-  const wrlBrushMatch = useMemo<{value:ReturnType<typeof matchWrlToSourceBrushes>|null;error:string}>(() => {
+  const wrlStale =
+    !!wrlSource &&
+    (wrlLoadedSourceHash == null || !preflight.sameDocument || report?.sourceSha256 !== wrlLoadedSourceHash);
+  const toolLogStale =
+    !!toolLog &&
+    (toolLogLoadedSourceHash == null ||
+      !preflight.sameDocument ||
+      report?.sourceSha256 !== toolLogLoadedSourceHash);
+  const wrlBrushMatch = useMemo<{
+    value: ReturnType<typeof matchWrlToSourceBrushes> | null;
+    error: string;
+  }>(() => {
     if (wrlStale || !wrlParse.value || !preflight.sameDocument || !snapshot)
-      return {value:null,error:''};
-    try { return {value:matchWrlToSourceBrushes(snapshot.mesh,wrlParse.value),error:''}; }
-    catch(e) { return {value:null,error:String(e)}; }
+      return { value: null, error: '' };
+    try {
+      return { value: matchWrlToSourceBrushes(snapshot.mesh, wrlParse.value), error: '' };
+    } catch (e) {
+      return { value: null, error: String(e) };
+    }
   }, [wrlStale, wrlParse.value, preflight.sameDocument, snapshot]);
   const compilerTriage = useMemo(() => {
-    if (!preflight.sameDocument || !report?.sourceSha256 ||
-        (!toolLog || toolLogStale) && (!wrlParse.value || wrlStale)) return null;
+    if (
+      !preflight.sameDocument ||
+      !report?.sourceSha256 ||
+      ((!toolLog || toolLogStale) && (!wrlParse.value || wrlStale))
+    )
+      return null;
     try {
       return makeCompilerTriageReport({
-        sourceSha256:report.sourceSha256,preflight,
-        toolLog:toolLogStale ? null : toolLog,
-        toolLogLoadedSourceHash:toolLogStale ? null : toolLogLoadedSourceHash,
-        wrl:wrlStale ? null : wrlParse.value,
-        wrlLoadedSourceHash:wrlStale ? null : wrlLoadedSourceHash,
-        brushAssociation:wrlStale ? null : wrlBrushMatch.value,
+        sourceSha256: report.sourceSha256,
+        preflight,
+        toolLog: toolLogStale ? null : toolLog,
+        toolLogLoadedSourceHash: toolLogStale ? null : toolLogLoadedSourceHash,
+        wrl: wrlStale ? null : wrlParse.value,
+        wrlLoadedSourceHash: wrlStale ? null : wrlLoadedSourceHash,
+        brushAssociation: wrlStale ? null : wrlBrushMatch.value,
       });
-    } catch { return null; } // Imported evidence is optional, never bypasses source export guards.
-  }, [preflight,report?.sourceSha256,toolLog,toolLogStale,toolLogLoadedSourceHash,
-      wrlParse.value,wrlStale,wrlLoadedSourceHash,wrlBrushMatch.value]);
+    } catch {
+      return null;
+    } // Imported evidence is optional, never bypasses source export guards.
+  }, [
+    preflight,
+    report?.sourceSha256,
+    toolLog,
+    toolLogStale,
+    toolLogLoadedSourceHash,
+    wrlParse.value,
+    wrlStale,
+    wrlLoadedSourceHash,
+    wrlBrushMatch.value,
+  ]);
 
   const [receipt, setReceipt] = useState<QuickForgeBuildReceipt | null>(null),
     [buildError, setBuildError] = useState(''),
@@ -487,34 +676,79 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [expandedBuild, setExpandedBuild] = useState(false);
   const latestProject = useRef(project);
   latestProject.current = project;
-  useEffect(()=>{
-    if(studioRole!=null||!native||!doc.materials.some(m=>!m.shaderPath)||defaultPreviewAttempt.current===project.id)return;
-    defaultPreviewAttempt.current=project.id;let alive=true;
-    void runtimeTextureSource(doc.runtimeId).then(open=>{
-      if(!alive)return;const materials=defaultPreviewMaterials(open);
-      const metal=materials.find(m=>m.id==='surface'),grass=materials.find(m=>m.id==='grass');if(!metal)return;
-      const latest=latestProject.current;const current=latest.quickForge;if(!current)return;
-      edit({...latest,quickForge:{...current,materials:[...current.materials.map(m=>m.shaderPath?m:{...m,shaderPath:(m.id==='grass'?grass:metal)?.shaderPath??metal.shaderPath}),...materials.filter(m=>!current.materials.some(old=>old.id===m.id))]}},'Assign owned runtime defaults to untextured surfaces');
-      writeMapSession(project.id,'forge.materialSource',open.project.id);
-      if(!readMapSession(project.id,'forge.assetSource',''))writeMapSession(project.id,'forge.assetSource',open.project.id);
-      retainAssetSource(open);
-    }).catch(reason=>{if(alive)notify('Default materials need an owned runtime map: '+String(reason),'info');});
-    return()=>{alive=false;if(defaultPreviewAttempt.current===project.id)defaultPreviewAttempt.current="";};
-  },[studioRole,project.id,doc.runtimeId,doc.materials.some(m=>!m.shaderPath)]);
-  useEffect(()=>{
-    let alive=true;setSeparateMaterialSource(null);
-    if(!materialSourceId||materialSourceId===sourceId)return;
-    void call<OpenProject>('open_project',{id:materialSourceId}).then(async initial=>{
-      let open=initial;
-      if(native&&open.inspection?.header.version===13&&!open.project.source?.resourceSha256?.['mcc-textures']){
-        try{open=await call<OpenProject>('connect_mcc_texture_resources',{projectId:open.project.id});}catch{/* Missing source pixels stay explicit. */}
-      }else if(native&&[6,7,609].includes(open.inspection?.header.version??0)){
-        try{open=await call<OpenProject|null>('auto_connect_classic_textures',{projectId:open.project.id})??open;}catch{/* Keep unavailable source resources explicit. */}
-      }
-      if(alive){publishTextureResources(open.project);setSeparateMaterialSource(open);}
-    },reason=>{if(alive)setAssetError(String(reason));});
-    return()=>{alive=false;};
-  },[materialSourceId,materialResourceScope,sourceId]);
+  useEffect(() => {
+    if (
+      studioRole != null ||
+      !native ||
+      !doc.materials.some((m) => !m.shaderPath && !m.name.startsWith('+')) ||
+      defaultPreviewAttempt.current === project.id
+    )
+      return;
+    defaultPreviewAttempt.current = project.id;
+    let alive = true;
+    void runtimeTextureSource(doc.runtimeId)
+      .then((open) => {
+        if (!alive) return;
+        const materials = defaultPreviewMaterials(open);
+        const metal = materials.find((m) => m.id === 'surface');
+        if (!metal) return;
+        const latest = latestProject.current;
+        const current = latest.quickForge;
+        if (!current) return;
+        props.onDefaultMaterials(materials);
+        writeMapSession(project.id, 'forge.materialSource', open.project.id);
+        if (!readMapSession(project.id, 'forge.assetSource', ''))
+          writeMapSession(project.id, 'forge.assetSource', open.project.id);
+        retainAssetSource(open);
+      })
+      .catch((reason) => {
+        if (alive) notify('Default materials need an owned runtime map: ' + String(reason), 'info');
+      });
+    return () => {
+      alive = false;
+      if (defaultPreviewAttempt.current === project.id) defaultPreviewAttempt.current = '';
+    };
+  }, [studioRole, project.id, doc.runtimeId, doc.materials.some((m) => !m.shaderPath && !m.name.startsWith('+'))]);
+  useEffect(() => {
+    let alive = true;
+    setSeparateMaterialSource(null);
+    if (!materialSourceId || materialSourceId === sourceId) return;
+    void call<OpenProject>('open_project', { id: materialSourceId }).then(
+      async (initial) => {
+        let open = initial;
+        if (
+          native &&
+          open.inspection?.header.version === 13 &&
+          !open.project.source?.resourceSha256?.['mcc-textures']
+        ) {
+          try {
+            open = await call<OpenProject>('connect_mcc_texture_resources', { projectId: open.project.id });
+          } catch {
+            /* Missing source pixels stay explicit. */
+          }
+        } else if (native && [6, 7, 609].includes(open.inspection?.header.version ?? 0)) {
+          try {
+            open =
+              (await call<OpenProject | null>('auto_connect_classic_textures', {
+                projectId: open.project.id,
+              })) ?? open;
+          } catch {
+            /* Keep unavailable source resources explicit. */
+          }
+        }
+        if (alive) {
+          publishTextureResources(open.project);
+          setSeparateMaterialSource(open);
+        }
+      },
+      (reason) => {
+        if (alive) setAssetError(String(reason));
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [materialSourceId, materialResourceScope, sourceId]);
 
   const mutableNodes = chosen.filter((node) => !node.value.locked);
   const errors = useMemo(
@@ -524,7 +758,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       ),
     [report],
   );
-  const previewMeshCache = useRef<{key: string; mesh: ForgeMesh} | null>(null);
+  const previewMeshCache = useRef<{ key: string; mesh: ForgeMesh } | null>(null);
   useEffect(() => {
     let alive = true;
     const geometryKey = forgeGeometryKey(doc);
@@ -534,12 +768,20 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     setValidatedDoc(null);
     const timer = setTimeout(() => {
       void Promise.allSettled([
-        previewMeshCache.current?.key === geometryKey ? Promise.resolve(previewMeshCache.current.mesh) : call<ForgeMesh>('quickforge_preview', { document: doc }),
+        previewMeshCache.current?.key === geometryKey
+          ? Promise.resolve(previewMeshCache.current.mesh)
+          : call<ForgeMesh>('quickforge_preview', { document: doc }),
         call<GeometryReport>('quickforge_validate', { document: doc }),
       ]).then(([mesh, validation]) => {
         if (!alive) return;
-        if (mesh.status === 'fulfilled') { previewMeshCache.current = {key: geometryKey, mesh: mesh.value}; setSnapshot({ mesh: mesh.value, document: doc }); }
-        if (validation.status === 'fulfilled') { setReport(validation.value); setValidatedDoc(doc); }
+        if (mesh.status === 'fulfilled') {
+          previewMeshCache.current = { key: geometryKey, mesh: mesh.value };
+          setSnapshot({ mesh: mesh.value, document: doc });
+        }
+        if (validation.status === 'fulfilled') {
+          setReport(validation.value);
+          setValidatedDoc(doc);
+        }
         const failures = [mesh, validation]
           .filter((result) => result.status === 'rejected')
           .map((result) => String((result as PromiseRejectedResult).reason));
@@ -554,8 +796,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   }, [doc]);
   useEffect(() => {
     let alive = true;
-    if(lastLoadedSource.current!==sourceId){
-      lastLoadedSource.current=sourceId;
+    if (lastLoadedSource.current !== sourceId) {
+      lastLoadedSource.current = sourceId;
       setAssets([]);
       setSourceOpen(null);
       setReferenceFilter(null);
@@ -564,13 +806,32 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     if (!sourceId) return;
     call<OpenProject>('open_project', { id: sourceId })
       .then(async (initial) => {
-        let open=initial;
-        if(native&&open.inspection?.header.version===13&&!open.project.source?.resourceSha256?.['mcc-textures']){
-          try{open=await call<OpenProject>('connect_mcc_texture_resources',{projectId:open.project.id});}catch{/* Embedded images remain usable; missing dependencies stay explicit. */}
-        } else if(native&&[6,7,609].includes(open.inspection?.header.version??0)) {
-          try{open=await call<OpenProject|null>('auto_connect_classic_textures',{projectId:open.project.id})??open;}catch{/* Preview source can be owned by another map window. */}
+        let open = initial;
+        if (
+          native &&
+          open.inspection?.header.version === 13 &&
+          !open.project.source?.resourceSha256?.['mcc-textures']
+        ) {
+          try {
+            open = await call<OpenProject>('connect_mcc_texture_resources', { projectId: open.project.id });
+          } catch {
+            /* Embedded images remain usable; missing dependencies stay explicit. */
+          }
+        } else if (native && [6, 7, 609].includes(open.inspection?.header.version ?? 0)) {
+          try {
+            open =
+              (await call<OpenProject | null>('auto_connect_classic_textures', {
+                projectId: open.project.id,
+              })) ?? open;
+          } catch {
+            /* Preview source can be owned by another map window. */
+          }
         }
-        if (alive) { publishTextureResources(open.project);setSourceOpen(open); setAssets(catalogAssets(open)); }
+        if (alive) {
+          publishTextureResources(open.project);
+          setSourceOpen(open);
+          setAssets(catalogAssets(open));
+        }
       })
       .catch((e) => {
         if (alive) setAssetError(String(e));
@@ -578,7 +839,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     return () => {
       alive = false;
     };
-  }, [sourceId,sourceResourceScope]);
+  }, [sourceId, sourceResourceScope]);
   useEffect(() => {
     let alive = true;
     call<QuickForgeBuildReceipt | null>('quickforge_build_report', { projectId: project.id })
@@ -593,18 +854,31 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     };
   }, [project.id, props.epoch, props.activeJob]);
   function commit(next: QuickForgeDocument, description: string) {
-    if(studioRole==='viewer'){notify('This Live Studio participant is a viewer. Camera and selection remain available.','info');return;}
+    if (studioRole === 'viewer') {
+      notify('This Live Studio participant is a viewer. Camera and selection remain available.', 'info');
+      return;
+    }
     edit({ ...latestProject.current, quickForge: next }, description);
   }
   function selectMeshDiagnosticTriangle(triangles: number[]) {
     const triangle = triangles[0];
     if (!snapshot || !preflight.sameDocument || !Number.isSafeInteger(triangle)) return;
     const indexOffset = triangle * 3;
-    const affected = snapshot.mesh.parts.find(part => indexOffset >= part.indexStart && indexOffset < part.indexStart + part.indexCount);
-    if (!affected) { notify('This triangle has no corresponding editable source brush. Inspect the geometry diagnostic report.', 'error'); return; }
+    const affected = snapshot.mesh.parts.find(
+      (part) => indexOffset >= part.indexStart && indexOffset < part.indexStart + part.indexCount,
+    );
+    if (!affected) {
+      notify(
+        'This triangle has no corresponding editable source brush. Inspect the geometry diagnostic report.',
+        'error',
+      );
+      return;
+    }
     setSelected([affected.brushId]);
     setTab('properties');
-    notify(`Selected source brush for diagnostic triangle ${triangle}. Fix its geometry and regenerate the preview before rerunning Tool.`);
+    notify(
+      `Selected source brush for diagnostic triangle ${triangle}. Fix its geometry and regenerate the preview before rerunning Tool.`,
+    );
   }
   function select(id: string | null, additive: boolean) {
     setWorkshopSelected(null);
@@ -621,7 +895,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     if (id) {
       setTab('properties');
       if (!additive) {
-        const placement = doc.placements.find(value => value.id === id);
+        const placement = doc.placements.find((value) => value.id === id);
         if (placement?.sourceProjectId && placement.tagId != null) openPlacementTag(id);
         else revealPanel('forge-inspector');
       }
@@ -634,7 +908,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         description,
       );
     } catch (e) {
-      notify(String(e),'error');
+      notify(String(e), 'error');
     }
   }
   function duplicate() {
@@ -664,7 +938,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   }
   useEffect(() => {
     function key(event: KeyboardEvent) {
-      if(bspMode)return;
+      if (bspMode) return;
       if (
         (event.target as HTMLElement)?.closest(
           'input,textarea,select,[contenteditable="true"],[role="dialog"]',
@@ -696,50 +970,99 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       if (cameraMode !== 'orbit') return;
       if (event.key.toLowerCase() === 'w') setMode('translate');
       if (event.key.toLowerCase() === 'e') setMode('rotate');
-      if (event.key.toLowerCase() === 'r' && (workshop || mutableNodes.length === 1 && mutableNodes[0].type === 'brush'))
+      if (
+        event.key.toLowerCase() === 'r' &&
+        (workshop || (mutableNodes.length === 1 && mutableNodes[0].type === 'brush'))
+      )
         setMode('scale');
-      if (event.key.toLowerCase() === 'f') {setWrlFocus(false);setFrame((value) => value + 1);}
+      if (event.key.toLowerCase() === 'f') {
+        setWrlFocus(false);
+        setFrame((value) => value + 1);
+      }
       if (event.key.toLowerCase() === 'g') setGridSnap((value) => !value);
       if (event.key.toLowerCase() === 'm') setMeshSnap((value) => !value);
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [doc, selected, selectedZone, project.firefight, cameraMode,bspMode,workshop]);
+  }, [doc, selected, selectedZone, project.firefight, cameraMode, bspMode, workshop]);
   function addPolygonHill(rawPoint: Vec3 = [0, 0, 0]) {
-    const usageId=nextFreeUsageId(doc,'hill');
-    if(usageId===null || doc.objectives.length+4>200){notify('No free hill index or not enough Halo CE netgame flag slots (200 maximum).','error');return;}
+    const usageId = nextFreeUsageId(doc, 'hill');
+    if (usageId === null || doc.objectives.length + 4 > 200) {
+      notify('No free hill index or not enough Halo CE netgame flag slots (200 maximum).', 'error');
+      return;
+    }
     try {
-      const markers=makeFourPointHill(snapPoint(rawPoint,gridSnap?snap:0),usageId,2.5,2.5);
-      commit({...doc,objectives:[...doc.objectives,...markers]},`Add polygonal King hill ${usageId}`);
-      setSelected([markers[0].id]);setTab('properties');
-      notify(`Added hill ${usageId}: 4 convex-hull corner markers, 5×5 world units. Source-only; compile the scenario in Halo Tool/Sapien.`);
-    } catch(e){notify(String(e),'error');}
+      const markers = makeFourPointHill(snapPoint(rawPoint, gridSnap ? snap : 0), usageId, 2.5, 2.5);
+      commit({ ...doc, objectives: [...doc.objectives, ...markers] }, `Add polygonal King hill ${usageId}`);
+      setSelected([markers[0].id]);
+      setTab('properties');
+      notify(
+        `Added hill ${usageId}: 4 convex-hull corner markers, 5×5 world units. Source-only; compile the scenario in Halo Tool/Sapien.`,
+      );
+    } catch (e) {
+      notify(String(e), 'error');
+    }
   }
-  function addTeleportPair(rawPoint: Vec3 = [0,0,0]) {
-    const channel=nextFreeTeleportChannel(doc);
-    if(channel===null || doc.objectives.length+2>200){notify('No free teleporter channel (0–15) or netgame flag capacity.','error');return;}
+  function addTeleportPair(rawPoint: Vec3 = [0, 0, 0]) {
+    const channel = nextFreeTeleportChannel(doc);
+    if (channel === null || doc.objectives.length + 2 > 200) {
+      notify('No free teleporter channel (0–15) or netgame flag capacity.', 'error');
+      return;
+    }
     try {
-      const start=snapPoint(rawPoint,gridSnap?snap:0);
-      const end:[number,number,number]=[start[0]+4,start[1],start[2]];
-      const markers=makeTeleporterPair(start,end,channel);
-      commit({...doc,objectives:[...doc.objectives,...markers]},`Add paired CE teleporter channel ${channel}`);
-      setSelected([markers[0].id]);setTab('properties');
-      notify(`Created linked teleporter channel ${channel}. Move BOTH endpoints with XYZ handles; confirm terrain clearance in Halo.`);
-    }catch(e){notify(String(e),'error');}
+      const start = snapPoint(rawPoint, gridSnap ? snap : 0);
+      const end: [number, number, number] = [start[0] + 4, start[1], start[2]];
+      const markers = makeTeleporterPair(start, end, channel);
+      commit(
+        { ...doc, objectives: [...doc.objectives, ...markers] },
+        `Add paired CE teleporter channel ${channel}`,
+      );
+      setSelected([markers[0].id]);
+      setTab('properties');
+      notify(
+        `Created linked teleporter channel ${channel}. Move BOTH endpoints with XYZ handles; confirm terrain clearance in Halo.`,
+      );
+    } catch (e) {
+      notify(String(e), 'error');
+    }
   }
-  function enableAllGameStarts(){
-    if(!doc.spawns.length){notify('Add player starting markers first.','error');return;}
-    commit({...doc,spawns:doc.spawns.map(s=>({...s,gameModes:['allGames']}))},'Allow existing player starts for all five Halo CE modes');
-    notify('Enabled all-five-mode eligibility for authored starts. Review team indices and safe spawn distances in Sapien before game tests.');
+  function enableAllGameStarts() {
+    if (!doc.spawns.length) {
+      notify('Add player starting markers first.', 'error');
+      return;
+    }
+    commit(
+      { ...doc, spawns: doc.spawns.map((s) => ({ ...s, gameModes: ['allGames'] })) },
+      'Allow existing player starts for all five Halo CE modes',
+    );
+    notify(
+      'Enabled all-five-mode eligibility for authored starts. Review team indices and safe spawn distances in Sapien before game tests.',
+    );
   }
   function add(item: PaletteItem, rawPoint: Vec3 = [0, 0, 0]) {
     const point = snapPoint(rawPoint, gridSnap ? snap : 0);
-    if(item.type==='brush'&&doc.workshop){notify('Use BSP Workshop to add or reshape volumes. Objects & gameplay places assets, starts and objectives on that geometry.','error');return;}
-    if(item.type!=='brush'&&!pointInsideForgeRoom(doc,[point[0],point[1],point[2]+0.1])){
-      notify('Choose a surface inside the playable source space and outside solid volumes. No object was added.','error');return;
+    if (item.type === 'brush' && doc.workshop) {
+      notify(
+        'Use BSP Workshop to add or reshape volumes. Objects & gameplay places assets, starts and objectives on that geometry.',
+        'error',
+      );
+      return;
     }
-    if (item.type === 'hillPolygon') { addPolygonHill(point); return; }
-    if (item.type === 'teleportPair') { addTeleportPair(point); return; }
+    if (item.type !== 'brush' && !pointInsideForgeRoom(doc, [point[0], point[1], point[2] + 0.1])) {
+      notify(
+        'Choose a surface inside the playable source space and outside solid volumes. No object was added.',
+        'error',
+      );
+      return;
+    }
+    if (item.type === 'hillPolygon') {
+      addPolygonHill(point);
+      return;
+    }
+    if (item.type === 'teleportPair') {
+      addTeleportPair(point);
+      return;
+    }
     let next = structuredClone(doc),
       id = '';
     if (item.type === 'brush') {
@@ -759,9 +1082,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
           const hit = snapBrushToAuthoredMesh(brush, doc.geometry);
           if (hit) {
             brush = { ...brush, position: hit.position };
-            notify(`Snapped ${hit.kind === 'cave-rim' ? 'matching tunnel rims' : hit.kind === 'terrain-edge' ? 'matching terrain heightfield edges' : 'brush faces'} to authored source geometry. Game collision is not compiled.`);
+            notify(
+              `Snapped ${hit.kind === 'cave-rim' ? 'matching tunnel rims' : hit.kind === 'terrain-edge' ? 'matching terrain heightfield edges' : 'brush faces'} to authored source geometry. Game collision is not compiled.`,
+            );
           }
-        } catch (error) { notify(`Mesh snap skipped: ${String(error)}`, 'error'); }
+        } catch (error) {
+          notify(`Mesh snap skipped: ${String(error)}`, 'error');
+        }
       }
       next.geometry.push(brush);
       id = brush.id;
@@ -780,25 +1107,54 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       });
     }
     if (item.type === 'objective') {
-      if (doc.objectives.length>=200){notify('Classic Halo CE supports at most 200 netgame flags.','error');return;}
-      if(item.kind==='raceVehicle' && doc.objectives.filter(o=>o.kind==='raceVehicle').length>=16){notify('Halo CE allows at most 16 Race vehicle spawn markers.','error');return;}
-      const orphanEntry=doc.objectives.find(o=>o.kind==='teleportFrom'&&!doc.objectives.some(x=>x.kind==='teleportTo'&&netgameUsageId(x)===netgameUsageId(o)));
-      const orphanExit=doc.objectives.find(o=>o.kind==='teleportTo'&&!doc.objectives.some(x=>x.kind==='teleportFrom'&&netgameUsageId(x)===netgameUsageId(o)));
-      const nextId = item.kind==='raceCheckpoint'
-        ? nextFreeRaceCheckpointId(doc)
-        : item.kind==='raceVehicle'?0
-        : item.kind==='teleportFrom'?(orphanExit?netgameUsageId(orphanExit):nextFreeTeleportChannel(doc))
-        : item.kind==='teleportTo'?(orphanEntry?netgameUsageId(orphanEntry):nextFreeTeleportChannel(doc))
-        : nextFreeUsageId(doc,item.kind);
-      if (nextId===null || nextId>(item.kind==='raceCheckpoint'?31:15)){
-        notify(`There is no free valid ${item.kind} usage ID. Edit or remove an existing marker first.`,'error');return;
+      if (doc.objectives.length >= 200) {
+        notify('Classic Halo CE supports at most 200 netgame flags.', 'error');
+        return;
+      }
+      if (
+        item.kind === 'raceVehicle' &&
+        doc.objectives.filter((o) => o.kind === 'raceVehicle').length >= 16
+      ) {
+        notify('Halo CE allows at most 16 Race vehicle spawn markers.', 'error');
+        return;
+      }
+      const orphanEntry = doc.objectives.find(
+        (o) =>
+          o.kind === 'teleportFrom' &&
+          !doc.objectives.some((x) => x.kind === 'teleportTo' && netgameUsageId(x) === netgameUsageId(o)),
+      );
+      const orphanExit = doc.objectives.find(
+        (o) =>
+          o.kind === 'teleportTo' &&
+          !doc.objectives.some((x) => x.kind === 'teleportFrom' && netgameUsageId(x) === netgameUsageId(o)),
+      );
+      const nextId =
+        item.kind === 'raceCheckpoint'
+          ? nextFreeRaceCheckpointId(doc)
+          : item.kind === 'raceVehicle'
+            ? 0
+            : item.kind === 'teleportFrom'
+              ? orphanExit
+                ? netgameUsageId(orphanExit)
+                : nextFreeTeleportChannel(doc)
+              : item.kind === 'teleportTo'
+                ? orphanEntry
+                  ? netgameUsageId(orphanEntry)
+                  : nextFreeTeleportChannel(doc)
+                : nextFreeUsageId(doc, item.kind);
+      if (nextId === null || nextId > (item.kind === 'raceCheckpoint' ? 31 : 15)) {
+        notify(
+          `There is no free valid ${item.kind} usage ID. Edit or remove an existing marker first.`,
+          'error',
+        );
+        return;
       }
       id = crypto.randomUUID();
       next.objectives.push({
         id,
         name: `${item.kind} ${doc.objectives.length + 1}`,
         kind: item.kind,
-        position: [point[0],point[1],point[2]+0.1],
+        position: [point[0], point[1], point[2] + 0.1],
         facing: 0,
         team: item.kind === 'raceCheckpoint' ? -1 : nextId,
         sequence: item.kind === 'raceCheckpoint' ? nextId : 0,
@@ -849,13 +1205,22 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   function draggable(item: PaletteItem) {
     return {
       draggable: false,
-      onPointerDown:(event:React.PointerEvent)=>{
-        if(event.button!==0||event.pointerType==='touch')return;
-        cancelledPointer.current=null;
-        pointerDrag.current={item,x:event.clientX,y:event.clientY,pointerId:event.pointerId,moved:false};
+      onPointerDown: (event: React.PointerEvent) => {
+        if (event.button !== 0 || event.pointerType === 'touch') return;
+        cancelledPointer.current = null;
+        pointerDrag.current = {
+          item,
+          x: event.clientX,
+          y: event.clientY,
+          pointerId: event.pointerId,
+          moved: false,
+        };
       },
-      onClickCapture:(event:React.MouseEvent)=>{
-        if(Date.now()<suppressPaletteClick.current){event.preventDefault();event.stopPropagation();}
+      onClickCapture: (event: React.MouseEvent) => {
+        if (Date.now() < suppressPaletteClick.current) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
       },
       onDragStart: (event: React.DragEvent) => {
         event.preventDefault();
@@ -866,47 +1231,76 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       },
     };
   }
-  async function loadWrl(file:File) {
-    if (!/\.wrl$/i.test(file.name) || file.size===0 || file.size>2*1024*1024) {
-      setDiagnosticError('Select a local .wrl Halo Tool file under 2 MiB.'); return;
+  async function loadWrl(file: File) {
+    if (!/\.wrl$/i.test(file.name) || file.size === 0 || file.size > 2 * 1024 * 1024) {
+      setDiagnosticError('Select a local .wrl Halo Tool file under 2 MiB.');
+      return;
     }
     try {
-      const expectedDocument=doc;
-      const raw=await file.text();
-      if (latestProject.current.quickForge !== expectedDocument) throw new Error('Editor geometry changed during WRL import; reselect the diagnostic after your edit.');
-      parseHaloWrl(raw,wrlCentimetres);
+      const expectedDocument = doc;
+      const raw = await file.text();
+      if (latestProject.current.quickForge !== expectedDocument)
+        throw new Error(
+          'Editor geometry changed during WRL import; reselect the diagnostic after your edit.',
+        );
+      parseHaloWrl(raw, wrlCentimetres);
       setWrlSource(raw);
       setWrlLoadedSourceHash(preflight.sameDocument && report ? report.sourceSha256 : null);
-      setWrlVisible(true);setWrlFocus(true);
-      setDiagnosticError('');setFrame(v=>v+1);
-      notify('Loaded local Halo Tool error geometry as a read-only overlay; it is not source geometry or compiled collision.');
-    } catch(e){setDiagnosticError(`WRL rejected: ${String(e)}`);}
+      setWrlVisible(true);
+      setWrlFocus(true);
+      setDiagnosticError('');
+      setFrame((v) => v + 1);
+      notify(
+        'Loaded local Halo Tool error geometry as a read-only overlay; it is not source geometry or compiled collision.',
+      );
+    } catch (e) {
+      setDiagnosticError(`WRL rejected: ${String(e)}`);
+    }
   }
-  async function loadToolLog(file:File) {
-    if (file.size===0 || file.size>512*1024 || !/\.(txt|log)$/i.test(file.name)) {
-      setDiagnosticError('Select a .txt or .log Halo Tool report under 512 KiB.');return;
+  async function loadToolLog(file: File) {
+    if (file.size === 0 || file.size > 512 * 1024 || !/\.(txt|log)$/i.test(file.name)) {
+      setDiagnosticError('Select a .txt or .log Halo Tool report under 512 KiB.');
+      return;
     }
     try {
-      const expectedDocument=doc;
-      const raw=await file.text();
-      if(latestProject.current.quickForge !== expectedDocument)
-        throw new Error('Source geometry changed during Tool log import; select the log after the current edit completes.');
-      const result=analyzeHaloToolLog(raw);
+      const expectedDocument = doc;
+      const raw = await file.text();
+      if (latestProject.current.quickForge !== expectedDocument)
+        throw new Error(
+          'Source geometry changed during Tool log import; select the log after the current edit completes.',
+        );
+      const result = analyzeHaloToolLog(raw);
       setToolLog(result);
       setToolLogLoadedSourceHash(preflight.sameDocument && report ? report.sourceSha256 : null);
       setDiagnosticError('');
-    } catch(e){setDiagnosticError(`Tool log rejected: ${String(e)}`);}
+    } catch (e) {
+      setDiagnosticError(`Tool log rejected: ${String(e)}`);
+    }
   }
   async function exportSources() {
-    if (!preflight.ready) { setExpandedBuild(true); setBuildError(`Source preflight blocked export: ${preflight.blockers.join(' | ')}`); return; }
-    if (netgameBlocked) {setExpandedBuild(true);setBuildError(`Unsafe netgame flag data: ${netgameIssues.filter(i=>i.severity==='error').map(i=>i.message).join(' | ')}`);return;}
+    if (!preflight.ready) {
+      setExpandedBuild(true);
+      setBuildError(`Source preflight blocked export: ${preflight.blockers.join(' | ')}`);
+      return;
+    }
+    if (netgameBlocked) {
+      setExpandedBuild(true);
+      setBuildError(
+        `Unsafe netgame flag data: ${netgameIssues
+          .filter((i) => i.severity === 'error')
+          .map((i) => i.message)
+          .join(' | ')}`,
+      );
+      return;
+    }
     const expectedDoc = doc;
     setExporting(true);
     setBuildError('');
     setExpandedBuild(true);
     try {
       await props.onSave();
-      if (latestProject.current.quickForge !== expectedDoc) throw new Error('QuickForge changed while saving; rerun preflight before exporting.');
+      if (latestProject.current.quickForge !== expectedDoc)
+        throw new Error('QuickForge changed while saving; rerun preflight before exporting.');
       setReceipt(await call<QuickForgeBuildReceipt>('quickforge_export', { projectId: project.id }));
     } catch (e) {
       setBuildError(String(e));
@@ -924,7 +1318,11 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     lastLog = projectLogs.at(-1);
   const staleReceipt =
     !!receipt &&
-    (props.dirty || receipt.current === false || (!!receipt.sources && !!report && (receipt.sourceDocumentSha256 ?? receipt.sources.sourceSha256) !== report.sourceSha256));
+    (props.dirty ||
+      receipt.current === false ||
+      (!!receipt.sources &&
+        !!report &&
+        (receipt.sourceDocumentSha256 ?? receipt.sources.sourceSha256) !== report.sourceSha256));
   return (
     <div className={`forge-workspace ${bspMode ? 'bsp-active' : ''}`}>
       <div className="bsp-editor-switch" role="group" aria-label="Geometry authoring mode">
@@ -947,7 +1345,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         )}
         <LiveForge project={project} document={doc} selected={selected} />
       </WorkspacePanelAddon>
-      <WorkspacePanelAddon id="forge-palette"><SmartEditPanel project={project} onSave={props.onSave} notify={notify}/></WorkspacePanelAddon>
+      <WorkspacePanelAddon id="forge-palette">
+        <SmartEditPanel project={project} onSave={props.onSave} notify={notify} />
+      </WorkspacePanelAddon>
       <div className="forge-main">
         {bspMode ? (
           <BspWorkshop
@@ -958,7 +1358,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             onCommit={commit}
             onBusy={setBspBusy}
             onBack={() => setBspMode(false)}
-            readOnly={studioRole != null}
+            readOnly={studioRole === 'viewer'}
             materialSource={materialOpen}
             materialBindings={project.nativeAssetImports}
             textureSources={sources.map((s) => ({ id: s.id, title: s.title }))}
@@ -1162,7 +1562,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   label="Frame arena (F)"
                   onClick={() => {
                     setWrlFocus(false);
-                    setFrame(v=>v+1);
+                    setFrame((v) => v + 1);
                   }}
                 >
                   <Focus size={16} />
@@ -1404,7 +1804,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                         `Transform ${updated.length} object(s)`,
                       );
                     } catch (e) {
-                      notify(String(e),'error');
+                      notify(String(e), 'error');
                     }
                   }}
                   mode={mode}
@@ -1591,7 +1991,11 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                     ))}
                   </select>
                 </label>
-                {sourceId&&!sourceOpen ? <p className="subtle" role="status">Loading source sound library…</p> : sourceOpen?.inspection ? (
+                {sourceId && !sourceOpen ? (
+                  <p className="subtle" role="status">
+                    Loading source sound library…
+                  </p>
+                ) : sourceOpen?.inspection ? (
                   <MapSounds
                     expanded
                     key={sourceOpen.project.id}
@@ -2067,8 +2471,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                           hidden
                           aria-label="Import tag reference JSON"
                           onChange={(event) => {
-                            const file=event.currentTarget.files?.[0];
-                            event.currentTarget.value='';
+                            const file = event.currentTarget.files?.[0];
+                            event.currentTarget.value = '';
                             if (!file) return;
                             if (!sourceOpen || file.size > 524288 || !file.size) {
                               notify('Select a source map and a JSON manifest under 512 KiB.', 'error');
@@ -2249,7 +2653,15 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   : preflight.blockers.join(' ')
               }
               onClick={() => {
-                if (!preflight.ready || scenarioRiskErrors || netgameBlocked) { setBuildError([...preflight.blockers,...scenarioRisks.filter(x=>x.severity==='error').map(x=>x.message)].join(' | ')); return; }
+                if (!preflight.ready || scenarioRiskErrors || netgameBlocked) {
+                  setBuildError(
+                    [
+                      ...preflight.blockers,
+                      ...scenarioRisks.filter((x) => x.severity === 'error').map((x) => x.message),
+                    ].join(' | '),
+                  );
+                  return;
+                }
                 setBuildError('');
                 setExpandedBuild(true);
                 void props.onBuild().catch((e) => setBuildError(String(e)));
@@ -2475,7 +2887,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                             'application/json;charset=utf-8',
                           );
                         } catch (e) {
-                          notify(String(e),'error');
+                          notify(String(e), 'error');
                         }
                       }}
                     >
@@ -2541,7 +2953,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                         disabled={wrlStale || !wrlParse.value}
                         onClick={() => {
                           setWrlFocus(true);
-                          setFrame(v=>v+1);
+                          setFrame((v) => v + 1);
                         }}
                       >
                         Frame WRL
@@ -2553,7 +2965,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                           setWrlSource(null);
                           setWrlFocus(false);
                           setWrlLoadedSourceHash(null);
-                          setFrame(v=>v+1);
+                          setFrame((v) => v + 1);
                         }}
                       >
                         Clear WRL
@@ -2580,9 +2992,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   ref={wrlPicker}
                   aria-label="Import Halo 1 Tool WRL diagnostic"
                   onChange={(event) => {
-                    const file=event.currentTarget.files?.[0];
-                    event.currentTarget.value='';
-                    if(file)void loadWrl(file);
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = '';
+                    if (file) void loadWrl(file);
                   }}
                 />
                 <input
@@ -2592,9 +3004,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   ref={toolLogPicker}
                   aria-label="Import Halo Tool log"
                   onChange={(event) => {
-                    const file=event.currentTarget.files?.[0];
-                    event.currentTarget.value='';
-                    if(file)void loadToolLog(file);
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = '';
+                    if (file) void loadToolLog(file);
                   }}
                 />
                 {wrlSource && (
@@ -2724,7 +3136,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                               'application/json;charset=utf-8',
                             );
                           } catch (e) {
-                            notify(String(e),'error');
+                            notify(String(e), 'error');
                           }
                         }}
                       >
@@ -2825,11 +3237,20 @@ function ForgeProperties({
   const [sculptError, setSculptError] = useState('');
   function applySculpt(mode: SculptMode) {
     try {
-      changeNode(current => current.type === 'brush' && current.value.kind === 'terrain'
-        ? { ...current, value: sculptTerrain(current.value, terrainX, terrainY, terrainRadius, terrainStrength, mode) } : current,
-        `Terrain ${mode}`);
+      changeNode(
+        (current) =>
+          current.type === 'brush' && current.value.kind === 'terrain'
+            ? {
+                ...current,
+                value: sculptTerrain(current.value, terrainX, terrainY, terrainRadius, terrainStrength, mode),
+              }
+            : current,
+        `Terrain ${mode}`,
+      );
       setSculptError('');
-    } catch(e) { setSculptError(String(e)); }
+    } catch (e) {
+      setSculptError(String(e));
+    }
   }
   const position = node?.value.position ?? [0, 0, 0],
     rotation = node ? nodeRotation(node) : [0, 0, 0];
@@ -2861,10 +3282,7 @@ function ForgeProperties({
               value={node.value.name}
               maxLength={160}
               onChange={(e) =>
-                changeNode(
-                  (n) => patchForgeNode(n, { name: e.target.value }),
-                  'Rename QuickForge object',
-                )
+                changeNode((n) => patchForgeNode(n, { name: e.target.value }), 'Rename QuickForge object')
               }
             />
           </label>
@@ -2954,25 +3372,98 @@ function ForgeProperties({
                   />
                 </label>
               )}
-              {node.value.kind === 'terrain' && <div className="forge-sculpt-panel">
-                <h4>Terrain sculpt · source height grid</h4>
-                <p className="forge-hint">Edits a saved heightfield, then rebuilds the preview mesh and JMS source. This does not modify an imported Halo BSP, create portals, or merge overlapping solids.</p>
-                <div className="forge-vector">
-                  <label>Grid X<NumberField label="Terrain grid X" value={Math.min(terrainX,node.value.steps)} min={0} max={node.value.steps} step={1} onCommit={n=>setTerrainX(Math.round(n))}/></label>
-                  <label>Grid Y<NumberField label="Terrain grid Y" value={Math.min(terrainY,node.value.steps)} min={0} max={node.value.steps} step={1} onCommit={n=>setTerrainY(Math.round(n))}/></label>
-                  <label>Radius<NumberField label="Terrain brush radius" value={terrainRadius} min={0} max={32} step={1} onCommit={n=>setTerrainRadius(Math.round(n))}/></label>
+              {node.value.kind === 'terrain' && (
+                <div className="forge-sculpt-panel">
+                  <h4>Terrain sculpt · source height grid</h4>
+                  <p className="forge-hint">
+                    Edits a saved heightfield, then rebuilds the preview mesh and JMS source. This does not
+                    modify an imported Halo BSP, create portals, or merge overlapping solids.
+                  </p>
+                  <div className="forge-vector">
+                    <label>
+                      Grid X
+                      <NumberField
+                        label="Terrain grid X"
+                        value={Math.min(terrainX, node.value.steps)}
+                        min={0}
+                        max={node.value.steps}
+                        step={1}
+                        onCommit={(n) => setTerrainX(Math.round(n))}
+                      />
+                    </label>
+                    <label>
+                      Grid Y
+                      <NumberField
+                        label="Terrain grid Y"
+                        value={Math.min(terrainY, node.value.steps)}
+                        min={0}
+                        max={node.value.steps}
+                        step={1}
+                        onCommit={(n) => setTerrainY(Math.round(n))}
+                      />
+                    </label>
+                    <label>
+                      Radius
+                      <NumberField
+                        label="Terrain brush radius"
+                        value={terrainRadius}
+                        min={0}
+                        max={32}
+                        step={1}
+                        onCommit={(n) => setTerrainRadius(Math.round(n))}
+                      />
+                    </label>
+                  </div>
+                  <label className="forge-field">
+                    Sculpt strength
+                    <NumberField
+                      label="Terrain sculpt strength"
+                      value={terrainStrength}
+                      min={0.01}
+                      max={16}
+                      step={0.25}
+                      onCommit={setTerrainStrength}
+                    />
+                  </label>
+                  <div className="forge-brush-palette">
+                    {(['raise', 'lower', 'flatten', 'smooth'] as const).map((mode) => (
+                      <button key={mode} type="button" onClick={() => applySculpt(mode)}>
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                  {sculptError && <Notice>{sculptError}</Notice>}
                 </div>
-                <label className="forge-field">Sculpt strength<NumberField label="Terrain sculpt strength" value={terrainStrength} min={0.01} max={16} step={0.25} onCommit={setTerrainStrength}/></label>
-                <div className="forge-brush-palette">
-                  {(['raise','lower','flatten','smooth'] as const).map(mode=><button key={mode} type="button" onClick={()=>applySculpt(mode)}>{mode}</button>)}
+              )}
+              {node.value.kind === 'caveTunnel' && (
+                <div className="forge-sculpt-panel">
+                  <h4>Hollow cave tunnel</h4>
+                  <label className="forge-field">
+                    Radial subdivisions
+                    <NumberField
+                      label="Cave radial subdivisions"
+                      value={node.value.steps}
+                      min={8}
+                      max={64}
+                      step={1}
+                      onCommit={(value) =>
+                        changeNode(
+                          (current) =>
+                            current.type === 'brush'
+                              ? { ...current, value: { ...current.value, steps: Math.round(value) } }
+                              : current,
+                          'Resize cave tube subdivisions',
+                        )
+                      }
+                    />
+                  </label>
+                  <Notice tone="info">
+                    The tunnel is a manifold source shell. Exact matching tunnel rims are joined by removing
+                    shared cap faces in the Rust JMS generator. Terrain/room openings, collision, Halo
+                    portals, PVS, navigation and gameplay still require real compiler validation.
+                  </Notice>
                 </div>
-                {sculptError && <Notice>{sculptError}</Notice>}
-              </div>}
-              {node.value.kind === 'caveTunnel' && <div className="forge-sculpt-panel">
-                <h4>Hollow cave tunnel</h4>
-                <label className="forge-field">Radial subdivisions<NumberField label="Cave radial subdivisions" value={node.value.steps} min={8} max={64} step={1} onCommit={value => changeNode(current => current.type==='brush' ? {...current,value:{...current.value,steps:Math.round(value)}} : current,'Resize cave tube subdivisions')}/></label>
-                <Notice tone="info">The tunnel is a manifold source shell. Exact matching tunnel rims are joined by removing shared cap faces in the Rust JMS generator. Terrain/room openings, collision, Halo portals, PVS, navigation and gameplay still require real compiler validation.</Notice>
-              </div>}
+              )}
               <p className="forge-hint">
                 This edits source geometry. Hidden and locked flags affect the editor only; all authored
                 geometry is exported.
@@ -3012,15 +3503,16 @@ function ForgeProperties({
               </p>
             </>
           )}
-          {(node.type === 'spawn' || node.type === 'placement' || node.type === 'objective' && node.value.kind === 'ctfFlag') && (
+          {(node.type === 'spawn' ||
+            node.type === 'placement' ||
+            (node.type === 'objective' && node.value.kind === 'ctfFlag')) && (
             <label className="forge-field">
               {node.type === 'objective' ? 'CTF flag team' : 'Team'}
               <select
                 value={node.value.team}
                 onChange={(e) =>
                   changeNode(
-                    (n) =>
-                      n.type !== 'brush' ? patchForgeNode(n, { team: Number(e.target.value) }) : n,
+                    (n) => (n.type !== 'brush' ? patchForgeNode(n, { team: Number(e.target.value) }) : n),
                     'Assign team',
                   )
                 }
@@ -3031,17 +3523,73 @@ function ForgeProperties({
               </select>
             </label>
           )}
-          {node.type === 'objective' && node.value.kind !== 'ctfFlag' && node.value.kind !== 'raceVehicle' && (
-            <div className="forge-sculpt-panel">
-              <label className="forge-field" title={node.value.kind==='hill'?'Hill usage ID groups 1 or 3–8 markers into the same area. 0 is the initial hill for King and Crazy King.':node.value.kind==='oddball'?'Oddball markers have consecutive indices starting at 0; at most 16.':node.value.kind==='teleportFrom'||node.value.kind==='teleportTo'?'Teleporter entry and exit markers with the same channel are linked. An unpaired channel is blocked from export.':'Race checkpoint indices must begin at 0, follow the course and have no gaps; maximum is 32.'}>
-                {node.value.kind==='hill'?'Hill grouping ID':node.value.kind==='oddball'?'Ball spawn index':node.value.kind==='teleportFrom'||node.value.kind==='teleportTo'?'Teleporter channel':'Race checkpoint order'}
-                <NumberField label="Netgame usage ID" value={netgameUsageId(node.value)} min={0} max={node.value.kind==='raceCheckpoint'?31:15} step={1}
-                  onCommit={value=>changeNode(current=>current.type==='objective' ? {...current,value:{...current.value,team:current.value.kind==='raceCheckpoint'?-1:Math.round(value),sequence:current.value.kind==='raceCheckpoint'?Math.round(value):current.value.sequence}} : current,'Edit Halo netgame usage ID')}/>
-              </label>
-              <p className="forge-hint">{node.value.kind==='hill'?'One marker creates a 2×2 hill; 3–8 markers sharing this ID create a convex boundary. Two can crash Halo CE. Move each corner with the XYZ gizmo.':node.value.kind==='raceCheckpoint'?'This order is saved as the native race_track usage ID; face the marker along the course.':node.value.kind==='teleportFrom'||node.value.kind==='teleportTo'?'Pair entrance and exit on the SAME channel, review facing direction and verify placement in a real game to avoid loops.':'Each Oddball spawn index must be unique and sequential; index 0 spawns first.'}</p>
-            </div>
+          {node.type === 'objective' &&
+            node.value.kind !== 'ctfFlag' &&
+            node.value.kind !== 'raceVehicle' && (
+              <div className="forge-sculpt-panel">
+                <label
+                  className="forge-field"
+                  title={
+                    node.value.kind === 'hill'
+                      ? 'Hill usage ID groups 1 or 3–8 markers into the same area. 0 is the initial hill for King and Crazy King.'
+                      : node.value.kind === 'oddball'
+                        ? 'Oddball markers have consecutive indices starting at 0; at most 16.'
+                        : node.value.kind === 'teleportFrom' || node.value.kind === 'teleportTo'
+                          ? 'Teleporter entry and exit markers with the same channel are linked. An unpaired channel is blocked from export.'
+                          : 'Race checkpoint indices must begin at 0, follow the course and have no gaps; maximum is 32.'
+                  }
+                >
+                  {node.value.kind === 'hill'
+                    ? 'Hill grouping ID'
+                    : node.value.kind === 'oddball'
+                      ? 'Ball spawn index'
+                      : node.value.kind === 'teleportFrom' || node.value.kind === 'teleportTo'
+                        ? 'Teleporter channel'
+                        : 'Race checkpoint order'}
+                  <NumberField
+                    label="Netgame usage ID"
+                    value={netgameUsageId(node.value)}
+                    min={0}
+                    max={node.value.kind === 'raceCheckpoint' ? 31 : 15}
+                    step={1}
+                    onCommit={(value) =>
+                      changeNode(
+                        (current) =>
+                          current.type === 'objective'
+                            ? {
+                                ...current,
+                                value: {
+                                  ...current.value,
+                                  team: current.value.kind === 'raceCheckpoint' ? -1 : Math.round(value),
+                                  sequence:
+                                    current.value.kind === 'raceCheckpoint'
+                                      ? Math.round(value)
+                                      : current.value.sequence,
+                                },
+                              }
+                            : current,
+                        'Edit Halo netgame usage ID',
+                      )
+                    }
+                  />
+                </label>
+                <p className="forge-hint">
+                  {node.value.kind === 'hill'
+                    ? 'One marker creates a 2×2 hill; 3–8 markers sharing this ID create a convex boundary. Two can crash Halo CE. Move each corner with the XYZ gizmo.'
+                    : node.value.kind === 'raceCheckpoint'
+                      ? 'This order is saved as the native race_track usage ID; face the marker along the course.'
+                      : node.value.kind === 'teleportFrom' || node.value.kind === 'teleportTo'
+                        ? 'Pair entrance and exit on the SAME channel, review facing direction and verify placement in a real game to avoid loops.'
+                        : 'Each Oddball spawn index must be unique and sequential; index 0 spawns first.'}
+                </p>
+              </div>
+            )}
+          {node.type === 'objective' && node.value.kind === 'raceVehicle' && (
+            <p className="forge-hint">
+              Race vehicle marker: Halo uses this for Race-mode vehicle starting positions. Face it down the
+              course and test vehicle clearance in-game. Its native usage ID is ignored.
+            </p>
           )}
-          {node.type==='objective' && node.value.kind==='raceVehicle' && <p className="forge-hint">Race vehicle marker: Halo uses this for Race-mode vehicle starting positions. Face it down the course and test vehicle clearance in-game. Its native usage ID is ignored.</p>}
           {node.type === 'spawn' && (
             <label className="forge-field">
               Spawn game mode
@@ -3191,14 +3739,27 @@ function ForgeProperties({
           />
         </label>
         <details className="forge-details gs-environment-panel">
-          <summary title="Adjust editor lighting, ambient color, sun direction and fog in real time. Saves with this source map, but does not patch Halo sky or fog tags.">Environment lighting &amp; fog · live preview</summary>
-          <EnvironmentControls value={environmentValue(doc.environment)} persisted skyPath={doc.skyPath}
-            onChange={next=>{
-              try { validateEnvironment(next);commit({...doc,environment:next},'Change environment lighting/fog preview'); }
-              catch(e){notify(`Environment change rejected: ${String(e)}`,'error');}
-            }}/>
+          <summary title="Adjust editor lighting, ambient color, sun direction and fog in real time. Saves with this source map, but does not patch Halo sky or fog tags.">
+            Environment lighting &amp; fog · live preview
+          </summary>
+          <EnvironmentControls
+            value={environmentValue(doc.environment)}
+            persisted
+            skyPath={doc.skyPath}
+            onChange={(next) => {
+              try {
+                validateEnvironment(next);
+                commit({ ...doc, environment: next }, 'Change environment lighting/fog preview');
+              } catch (e) {
+                notify(`Environment change rejected: ${String(e)}`, 'error');
+              }
+            }}
+          />
         </details>
-        <p className="forge-hint">These colors are live editor intent, not compiled shader/sky/fog tags. A real Halo lighting change requires selecting an authorized sky tag and compiling new lightmaps.</p>
+        <p className="forge-hint">
+          These colors are live editor intent, not compiled shader/sky/fog tags. A real Halo lighting change
+          requires selecting an authorized sky tag and compiling new lightmaps.
+        </p>
       </details>
     </>
   );

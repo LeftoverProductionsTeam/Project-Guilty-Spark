@@ -19,6 +19,8 @@ import { NumberField, HelpTip, Notice } from './ui';
 import { call } from '../api';
 import { useMapState } from '../mapSession';
 import { beginProjectMutation } from '../projectMutation';
+import { mergeForge } from '../forgeSession';
+import type { WorkshopPreview } from '../studioClient';
 import {
   boxBrush,
   rampBrush,
@@ -52,6 +54,18 @@ interface Props {
   onBusy?: (busy: boolean) => void;
 }
 type Selection = { brushId: string; faceId?: string; vertices?: number[] };
+function sendDrag(projectId: string, brush: BspBrush | null) {
+  window.dispatchEvent(
+    new CustomEvent('guilty-spark-workshop-drag', {
+      detail: {
+        projectId,
+        brush: brush
+          ? { brushId: brush.id, position: brush.position, rotation: brush.rotation, scale: brush.scale }
+          : null,
+      },
+    }),
+  );
+}
 const toolList: [BspTool, string, string][] = [
   ['select', 'Select', 'Select a volume; Ctrl-click adds to selection in QuickForge.'],
   ['move', 'Move', 'Drag a volume in any orthographic view, or use the 3D axis gizmo.'],
@@ -85,10 +99,12 @@ function BrushOutline({
   brush,
   active,
   onSelect,
+  preview = false,
 }: {
   brush: BspBrush;
   active: boolean;
   onSelect: () => void;
+  preview?: boolean;
 }) {
   const geometry = useMemo(() => sourceGeometry(brush), [brush]);
   useEffect(() => () => geometry.dispose(), [geometry]);
@@ -96,21 +112,26 @@ function BrushOutline({
     <mesh geometry={geometry} raycast={() => null}>
       <meshBasicMaterial
         transparent
-        opacity={active ? 0.07 : 0.015}
+        opacity={preview ? 0.035 : active ? 0.07 : 0.015}
         depthWrite={false}
         side={THREE.DoubleSide}
       />
-      <Edges color={active ? '#a3ffe3' : brush.role === 'space' ? '#708db0' : '#daaa78'} threshold={15} />
+      <Edges
+        color={preview ? '#ffc96b' : active ? '#a3ffe3' : brush.role === 'space' ? '#708db0' : '#daaa78'}
+        threshold={15}
+      />
     </mesh>
   );
 }
 function BrushGizmo({
+  projectId,
   brush,
   mode,
   snap,
   onChange,
   onDrag,
 }: {
+  projectId: string;
   brush: BspBrush;
   mode: 'translate' | 'rotate' | 'scale';
   snap: number;
@@ -118,37 +139,49 @@ function BrushGizmo({
   onDrag: (v: boolean) => void;
 }) {
   const target = useRef<THREE.Group>(null),
-    center = brush.vertices.reduce((p, v) => p.map((x, k) => x + v[k] / brush.vertices.length) as Vec3, [
-      0, 0, 0,
-    ] as Vec3),
-    pivot = worldVertex(brush, center);
+    moving = useRef(false),
+    signature = JSON.stringify(brush);
+  // Keep target props stable through presence/ghost rerenders and unrelated
+  // source revisions; React must not reset a gizmo during its pointer gesture.
+  const { center, pivot, rotation } = useMemo(() => {
+    const center = brush.vertices.reduce(
+      (p, v) => p.map((x, k) => x + v[k] / brush.vertices.length) as Vec3,
+      [0, 0, 0] as Vec3,
+    );
+    return { center, pivot: worldVertex(brush, center), rotation: new THREE.Euler(...brush.rotation, 'ZYX') };
+  }, [signature]);
+  const transformed = () => {
+    const t = target.current;
+    if (!t) return null;
+    const next = {
+      ...brush,
+      position: [0, 0, 0] as Vec3,
+      rotation: [t.rotation.x, t.rotation.y, t.rotation.z] as Vec3,
+      scale: t.scale.toArray() as Vec3,
+    };
+    const changedCenter = worldVertex(next, center);
+    next.position = t.position.toArray().map((x, k) => x - changedCenter[k]) as Vec3;
+    return next;
+  };
   return (
     <>
-      <group
-        ref={target}
-        position={pivot}
-        rotation={new THREE.Euler(...brush.rotation, 'ZYX')}
-        scale={brush.scale}
-      />
+      <group ref={target} position={pivot} rotation={rotation} scale={brush.scale} />
       <TransformControls
         object={target as React.RefObject<THREE.Object3D>}
         mode={mode}
         translationSnap={snap || null}
         rotationSnap={snap ? Math.PI / 12 : null}
-        onMouseDown={() => onDrag(true)}
+        onMouseDown={() => {
+          moving.current = true;
+          onDrag(true);
+        }}
+        onObjectChange={() => {
+          if (moving.current) sendDrag(projectId, transformed());
+        }}
         onMouseUp={() => {
-          if (target.current) {
-            const t = target.current;
-            const next = {
-              ...brush,
-              position: [0, 0, 0] as Vec3,
-              rotation: [t.rotation.x, t.rotation.y, t.rotation.z] as Vec3,
-              scale: t.scale.toArray() as Vec3,
-            };
-            const changedCenter = worldVertex(next, center);
-            next.position = t.position.toArray().map((x, k) => x - changedCenter[k]) as Vec3;
-            onChange(next);
-          }
+          const next = transformed();
+          if (next) onChange(next);
+          moving.current = false;
           onDrag(false);
         }}
       />
@@ -168,6 +201,7 @@ function Ortho({
   onBrush,
   onMove,
   onGesture,
+  ghosts,
 }: {
   projectId: string;
   view: Exclude<BspView, 'perspective'>;
@@ -181,6 +215,7 @@ function Ortho({
   onBrush: (lo: Vec3, hi: Vec3) => void;
   onMove: (b: BspBrush) => void;
   onGesture: (v: boolean) => void;
+  ghosts: BspBrush[];
 }) {
   useEffect(() => () => onGesture(false), []);
   const axes = viewAxes[view],
@@ -318,7 +353,14 @@ function Ortho({
             x: drag.pan!.x - ((e.clientX - drag.pan!.screenX) / rect.width) * width,
             y: drag.pan!.y + ((e.clientY - drag.pan!.screenY) / rect.height) * vertical,
           }));
-        } else setDrag({ ...drag, end: p });
+        } else {
+          setDrag({ ...drag, end: p });
+          if (drag.brush && !drag.indices)
+            sendDrag(projectId, {
+              ...drag.brush,
+              position: drag.brush.position.map((v, k) => v + p[k] - drag.start[k]) as Vec3,
+            });
+        }
       }}
       onPointerUp={finish}
       onPointerCancel={() => {
@@ -338,6 +380,26 @@ function Ortho({
         height={vertical}
         fill={`url(#${gridId})`}
       />
+      {ghosts.map((b, i) => (
+        <g key={`${b.id}-${i}`} pointerEvents="none" data-workshop-preview={b.id}>
+          {b.faces.map((f) => (
+            <polygon
+              key={f.id}
+              points={f.vertices
+                .map((i) => {
+                  const p = worldVertex(b, b.vertices[i]);
+                  return `${p[axes[0]]},${-p[axes[1]]}`;
+                })
+                .join(' ')}
+              fill="none"
+              stroke="#ffc96b"
+              strokeDasharray="0.3 0.2"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </g>
+      ))}
       {brushes.map((b) => (
         <g key={b.id}>
           {b.faces.map((f) => (
@@ -449,8 +511,50 @@ export default function BspWorkshop(props: Props) {
     [portalX, setPortalX] = useState(8);
   const [materialId, setMaterialId] = useState(doc.materials.find((m) => !m.name.startsWith('+'))?.id ?? '');
   const lease = useRef<(() => void) | null>(null),
+    gestureBasis = useRef<QuickForgeDocument | null>(null),
     alive = useRef(true),
     operation = useRef(false);
+  const [peerPreviews, setPeerPreviews] = useState<(WorkshopPreview & { expiresAt: number })[]>([]);
+  const [retainedDraft, setRetainedDraft] = useState<{
+    basis: QuickForgeDocument;
+    document: QuickForgeDocument;
+  } | null>(null);
+  useEffect(() => {
+    const receive = (event: Event) => {
+      const d = (
+        event as CustomEvent<{
+          projectId: string;
+          view?: { authorId?: string; workshopPreviews?: WorkshopPreview[] } | null;
+        }>
+      ).detail;
+      if (d?.projectId === projectId)
+        setPeerPreviews(
+          (d.view?.workshopPreviews ?? [])
+            .filter((p) => p.author !== d.view?.authorId)
+            .map((p) => ({ ...p, expiresAt: performance.now() + p.remainingMs })),
+        );
+    };
+    setPeerPreviews([]);
+    const timer = setInterval(
+      () =>
+        setPeerPreviews((current) =>
+          current.some((p) => p.expiresAt <= performance.now())
+            ? current.filter((p) => p.expiresAt > performance.now())
+            : current,
+        ),
+      200,
+    );
+    window.addEventListener('guilty-spark-studio-status', receive);
+    return () => {
+      clearInterval(timer);
+      sendDrag(projectId, null);
+      window.removeEventListener('guilty-spark-studio-status', receive);
+    };
+  }, [projectId]);
+  const ghosts = peerPreviews.flatMap((p) => {
+    const b = w?.brushes.find((b) => b.id === p.brush.brushId);
+    return b ? [{ ...b, position: p.brush.position, rotation: p.brush.rotation, scale: p.brush.scale }] : [];
+  });
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -461,10 +565,15 @@ export default function BspWorkshop(props: Props) {
   }, []);
   function gesture(on: boolean) {
     props.onBusy?.(on || operation.current);
-    if (on && !lease.current) lease.current = beginProjectMutation(projectId);
+    if (on && !lease.current) {
+      lease.current = beginProjectMutation(projectId);
+      gestureBasis.current = latest.current;
+    }
     if (!on) {
       lease.current?.();
       lease.current = null;
+      gestureBasis.current = null;
+      sendDrag(projectId, null);
     }
   }
   async function apply(next: QuickForgeDocument, label: string) {
@@ -476,18 +585,31 @@ export default function BspWorkshop(props: Props) {
     props.onBusy?.(true);
     setError('');
     try {
-      const report = await call<GeometryReport>('quickforge_validate', { document: next });
-      if (!alive.current) return;
-      if (latest.current !== expected)
-        throw Error('Source changed while this operation was checked. Retry against the current revision');
-      const blockers = report.issues.filter(
-        (i) =>
-          i.severity === 'error' && !['WORKSHOP_DISCONNECTED', 'WORKSHOP_SPAWN_CLEARANCE'].includes(i.code),
-      );
-      if (blockers.length) throw Error(blockers.map((i) => i.message).join('\n'));
-      props.onCommit(next, label);
+      let basis = expected,
+        candidate = next;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const report = await call<GeometryReport>('quickforge_validate', { document: candidate });
+        if (!alive.current) return;
+        if (latest.current !== basis) {
+          candidate = mergeForge(basis, candidate, latest.current);
+          basis = latest.current;
+          continue;
+        }
+        const blockers = report.issues.filter(
+          (i) =>
+            i.severity === 'error' && !['WORKSHOP_DISCONNECTED', 'WORKSHOP_SPAWN_CLEARANCE'].includes(i.code),
+        );
+        if (blockers.length) throw Error(blockers.map((i) => i.message).join('\n'));
+        props.onCommit(candidate, label);
+        setRetainedDraft(null);
+        return;
+      }
+      throw Error('Source kept changing during validation. The unapplied BSP source is retained for export');
     } catch (e) {
-      if (alive.current) setError(String(e));
+      if (alive.current) {
+        setError(String(e));
+        setRetainedDraft({ basis: expected, document: next });
+      }
     } finally {
       release();
       operation.current = false;
@@ -496,11 +618,21 @@ export default function BspWorkshop(props: Props) {
     }
   }
   function updateBrush(brush: BspBrush, label = 'Edit BSP brush') {
-    if (!w) return;
-    void apply(
-      { ...doc, workshop: { ...w, brushes: w.brushes.map((b) => (b.id === brush.id ? brush : b)) } },
-      label,
-    );
+    const basis = gestureBasis.current ?? doc;
+    if (!basis.workshop) return;
+    const draft = {
+      ...basis,
+      workshop: {
+        ...basis.workshop,
+        brushes: basis.workshop.brushes.map((b) => (b.id === brush.id ? brush : b)),
+      },
+    };
+    try {
+      void apply(mergeForge(basis, draft, latest.current), label);
+    } catch (e) {
+      setError(String(e));
+      setRetainedDraft({ basis, document: draft });
+    }
   }
   const brush = w?.brushes.find((b) => b.id === selection?.brushId),
     face = brush?.faces.find((f) => f.id === selection?.faceId),
@@ -590,9 +722,10 @@ export default function BspWorkshop(props: Props) {
           <button onClick={props.onBack}>Back to QuickForge</button>
         </div>
         <p>
-          Starting the example replaces the geometry as one undoable edit. Existing assets, starts, objectives and game mode are kept; validation identifies anything that needs moving.
-          Save a separate project copy to keep both versions. Admitted native collaboration source requires a
-          separate Workshop project.
+          Starting the example replaces the geometry as one undoable edit. Existing assets, starts, objectives
+          and game mode are kept; validation identifies anything that needs moving. Save a separate project
+          copy to keep both versions. Admitted native collaboration source requires a separate Workshop
+          project.
         </p>
         {error && <Notice>{error}</Notice>}
       </section>
@@ -605,6 +738,7 @@ export default function BspWorkshop(props: Props) {
       data-source-sha={props.report?.sourceSha256 ?? ''}
       data-source-valid={props.report?.valid ?? false}
       data-textures={Object.keys(materialPreview.textures).length}
+      data-workshop-preview-count={ghosts.length}
     >
       <div className="bsp-toolbar">
         <strong>BSP Workshop</strong>
@@ -644,8 +778,30 @@ export default function BspWorkshop(props: Props) {
       </div>
       {props.readOnly && (
         <Notice>
-          Workshop source changes are not yet admitted in a shared editing session. Keep that session intact
-          and open a separate Workshop project.
+          This participant has viewing permission. Camera and selection remain available; ask the owner for
+          editing permission to change Workshop source.
+        </Notice>
+      )}
+      {retainedDraft && (
+        <Notice>
+          <span>An unapplied BSP source edit is retained.</span>{' '}
+          <button
+            type="button"
+            onClick={() => {
+              const url = URL.createObjectURL(
+                new Blob([JSON.stringify({ schemaVersion: 1, projectId, ...retainedDraft }, null, 2)], {
+                  type: 'application/json',
+                }),
+              );
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'Workshop-unapplied-source.json';
+              a.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}
+          >
+            Export unapplied source
+          </button>
         </Notice>
       )}
       <div className="bsp-body">
@@ -711,8 +867,18 @@ export default function BspWorkshop(props: Props) {
                         onSelect={() => setSelection({ brushId: b.id })}
                       />
                     ))}
+                    {ghosts.map((b, i) => (
+                      <BrushOutline
+                        key={`preview-${i}-${b.id}`}
+                        brush={b}
+                        active={false}
+                        preview
+                        onSelect={() => {}}
+                      />
+                    ))}
                     {brush && ['move', 'rotate', 'scale'].includes(tool) && !disabled && (
                       <BrushGizmo
+                        projectId={projectId}
                         brush={brush}
                         mode={tool === 'move' ? 'translate' : (tool as 'rotate' | 'scale')}
                         snap={grid}
@@ -726,6 +892,7 @@ export default function BspWorkshop(props: Props) {
                     projectId={projectId}
                     view={view}
                     brushes={w.brushes}
+                    ghosts={ghosts}
                     selected={selection}
                     tool={tool}
                     grid={grid}
@@ -791,7 +958,7 @@ export default function BspWorkshop(props: Props) {
           )}
         </div>
         <aside className="bsp-properties">
-          <MegaworldAtlas projectId={projectId}/>
+          <MegaworldAtlas projectId={projectId} />
           <div className="bsp-source-list">
             <b>Source volumes</b>
             {w.brushes.map((b) => (

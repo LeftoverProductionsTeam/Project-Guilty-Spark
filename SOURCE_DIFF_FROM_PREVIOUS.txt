@@ -1,3 +1,19 @@
+C48 — shared BSP editing and recoverable sessions
+Continues C47 04034b8b1e1cb03a789cec2a36878d75e2d7abf1 on the existing local master checkout.
+
+Three native Spark processes converge on simultaneous BSP edits and expiring four-view drag previews. Stable brush/portal merges retain topology/material conflicts. Native pending storage and rejoin preserve the original uncertain operation plus newer local edits through owner-process failure, exactly once. LAN and the actual Radmin adapter pass on one PC.
+
+Fix semantic portal/property-order history corruption, preserve authored undo/redo during owned runtime texture resolution and retain invalid local drafts in bounded unaccepted quarantine. An actual H1A BSP build freezes revision 247 while revision 248 continues. The separate tag/asset/Invader/preserved-Baboon regression compiles revision 18 while revision 19 continues; all source sets remain intact.
+
+629 locked Rust tests pass (7 ignored), 300 frontend, 136 browser, 59 offline and 32 native/interface diagnostics. A 1,100-source-transaction test and 240 native commits exercise explicit bounds and recovery. UI convergence medians 975.0 / 966.9 ms include polling; retained WebView heaps grow 1.42–1.68 MiB. No cross-PC, remote VPN, Steam relay, GPU or multi-day acceptance is claimed. The initial closed-Steam refusal is retained; after Steam launches, SDK initialization, the 4 MiB local transfer test and actual desktop hosting pass. Same-account joining and unverified recovery remain refused; real peer relay and precise join diagnostics remain open.
+
+426 ledger rows preserve all bytes of the prior 421 rows and generator regeneration retains later audited continuation records. Original assets, dirty root work, previous release artifacts, prior branch ancestry and failed research remain preserved. New Windows installer, portable and committed-source archives are verified locally. No push, protected-master bypass or remote publication is performed.
+
+Details: docs/CONTINUATION_48_ENGINEERING.md; docs/fixtures/c48-shared-bsp-stability.json
+Push/PR description: docs/C48_PUSH_SUMMARY.md
+
+--- Previous release notes retained ---
+
 Project Guilty Spark C44 measured loading and native AI diagnostics — 2026-11-01
 Committed foundation: C43 de8922f7e6cd5e597072dec08a8a7f2729a4e745
 Final Windows executable SHA-256: ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22

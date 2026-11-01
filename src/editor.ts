@@ -1,7 +1,9 @@
 import type { Project, Tag, TagField, TagReference, Vec3 } from './types';
 import {DEFAULT_HISTORY_LIMIT,validHistoryLimit} from './historyPreferences';
 import {mergeForge,portableForge} from './forgeSession';
-import type {QuickForgeDocument} from './forge';
+import type {QuickForgeDocument,ForgeMaterial} from './forge';
+import {sameJson} from './semanticJson';
+import {withPreviewDefaults} from './forgeDefaultMaterials';
 export interface HistoryState {
   current: Project | null;
   past: Project[];
@@ -16,6 +18,7 @@ export type HistoryAction =
   | { type: 'redo' }
   | { type: 'saved' }
   | { type: 'forge-remote';projectId:string;document:QuickForgeDocument }
+  | { type: 'forge-defaults';projectId:string;materials:ForgeMaterial[] }
   | { type: 'builds'; project: Project }
   | { type: 'assets'; project: Project }
   | { type: 'history-limit'; limit:number };
@@ -26,11 +29,33 @@ export function historyReducer(state: HistoryState, action: HistoryAction): Hist
   if (action.type === 'load') return { current: action.project, past: [], future: [], dirty: false,limit:state.limit };
   if (action.type === 'saved') return { ...state, dirty: false };
   if (!state.current) return state;
+  if(action.type==='forge-defaults'){
+    const current=state.current;
+    if(current.id!==action.projectId||!current.quickForge)return state;
+    const runtime=current.quickForge.runtimeId;
+    const apply=(p:Project)=>{
+      if(!p.quickForge||p.quickForge.runtimeId!==runtime)return p;
+      const materials=withPreviewDefaults(p.quickForge.materials,action.materials);
+      return sameJson(materials,p.quickForge.materials)?p:{...p,quickForge:{...p.quickForge,materials}};
+    };
+    const next=apply(current),past=state.past.map(apply),future=state.future.map(apply);
+    if(next===current&&past.every((p,i)=>p===state.past[i])&&future.every((p,i)=>p===state.future[i]))return state;
+    // Resource resolution is not a new authored operation. Update complete
+    // snapshots together so a delayed response cannot consume undo or erase redo.
+    return {...state,current:next,past,future,dirty:state.dirty||next!==current};
+  }
   if(action.type==='forge-remote'){
     if(action.projectId!==state.current.id||!state.current.quickForge)return state;
     const before=portableForge(state.current.quickForge),incoming=portableForge(action.document);
-    if(JSON.stringify(before)===JSON.stringify(incoming))return state;
-    const update=(p:Project)=>({...p,quickForge:p.quickForge?mergeForge(before,incoming,p.quickForge,true):p.quickForge});
+    if(sameJson(before,incoming))return state;
+    const update=(p:Project)=>{
+      if(!p.quickForge)return p;
+      // Source before a Workshop/native admission remains a complete older
+      // schema. Retrofitting only a changed brush/field would invent missing
+      // portal materials or native dependencies in that undo snapshot.
+      if(!!p.quickForge.workshop!==!!before.workshop||!sameJson(p.quickForge.native?.source,before.native?.source))return p;
+      return {...p,quickForge:mergeForge(before,incoming,p.quickForge,true)};
+    };
     const current={...state.current,quickForge:action.document,modifiedAt:new Date().toISOString()};
     const comparable=(p:Project)=>JSON.stringify({...p,modifiedAt:'',history:[],builds:[]});
     const differs=(p:Project)=>comparable(p)!==comparable(current);

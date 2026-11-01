@@ -74,8 +74,18 @@ pub fn read(dir:&Path,registered:&Project)->Result<Option<View>> {
     Ok(Some(View{revision:state.revision,head:state.head,snapshots}))
 }
 pub fn retain_draft(dir:&Path,registered:&Project,revision:u64,head:&Head,snapshots:&[Snapshot])->Result<std::path::PathBuf>{
-    head.validate()?;for s in snapshots{if !same_source(&s.project,registered){return invalid("Rejected draft has a foreign source identity");}s.project.validate()?;}
-    let bytes=serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"projectId":registered.id,"expectedRevision":revision,"head":head,"snapshots":snapshots,"accepted":false}))?;
+    head.validate()?;if snapshots.len()>2001{return invalid("Too many rejected history snapshots");}
+    let mut errors=BTreeMap::new();
+    for s in snapshots{
+        uuid::Uuid::parse_str(&s.key).map_err(|_|crate::SparkError::Invalid("Invalid rejected snapshot identity".into()))?;
+        if !same_source(&s.project,registered){return invalid("Rejected draft has a foreign source identity");}
+        if serde_json::to_vec(&s.project)?.len() as u64>MAX_SNAPSHOT{return invalid("Rejected snapshot exceeds 32 MiB");}
+        // Quarantine is never read as an accepted snapshot or used by a build.
+        // Keep semantically invalid authored data for diagnosis/recovery instead
+        // of losing the very candidate that caused validation to refuse it.
+        if let Err(reason)=s.project.validate(){errors.insert(s.key.clone(),reason.to_string());}
+    }
+    let bytes=serde_json::to_vec(&serde_json::json!({"schemaVersion":1,"projectId":registered.id,"expectedRevision":revision,"head":head,"snapshots":snapshots,"semanticErrors":errors,"accepted":false}))?;
     if bytes.len()>MAX_TRANSFER{return invalid("Rejected draft exceeds 64 MiB");}
     let file=dir.join(format!("rejected-{}.json",uuid::Uuid::new_v4()));project::atomic_write(&file,&bytes,false)?;Ok(file)
 }
@@ -95,7 +105,7 @@ fn commit_with_budget(dir:&Path,registered:&Project,expected:u64,head:Head,addit
     let mut total=0;
     for item in additions {
         uuid::Uuid::parse_str(&item.key).map_err(|_|crate::SparkError::Invalid("Invalid history snapshot identity".into()))?;
-        item.project.validate()?;
+        item.project.validate().map_err(|reason|crate::SparkError::Invalid(format!("History snapshot {} was refused: {reason}",item.key)))?;
         if !same_source(&item.project,registered){return invalid("Cannot put another map/source revision into this history");}
         let bytes=serde_json::to_vec(&item.project)?;total+=bytes.len();
         if bytes.len() as u64>MAX_SNAPSHOT || total>budget{return invalid("History snapshot transfer exceeds its byte budget");}
@@ -123,6 +133,21 @@ fn commit_with_budget(dir:&Path,registered:&Project,expected:u64,head:Head,addit
 
 #[cfg(test)] mod tests {
     use super::*;
+    #[test]fn invalid_bsp_draft_is_quarantined_intact_without_changing_the_acknowledged_head(){
+        let dir=tempfile::tempdir().unwrap();let mut good=Project::new("BSP");good.quick_forge=Some(crate::bsp_workshop::example().unwrap());
+        let first=uuid::Uuid::new_v4().to_string();let h=head(first.clone());
+        commit(dir.path(),&good,0,h,vec![Snapshot{key:first,project:good.clone()}]).unwrap();
+        let accepted=fs::read(dir.path().join("head.json")).unwrap();
+        let mut bad=good.clone();bad.quick_forge.as_mut().unwrap().workshop.as_mut().unwrap().portals.push(crate::bsp_workshop::Portal{
+            id:"door".into(),material_id:"missing".into(),points:vec![[8.,-2.,0.],[8.,2.,0.],[8.,2.,3.],[8.,-2.,3.]]});
+        let key=uuid::Uuid::new_v4().to_string();let h=head(key.clone());let snapshots=vec![Snapshot{key:key.clone(),project:bad.clone()}];
+        assert!(commit(dir.path(),&good,1,h.clone(),snapshots.clone()).is_err());
+        let file=retain_draft(dir.path(),&good,1,&h,&snapshots).unwrap();let retained:serde_json::Value=serde_json::from_slice(&fs::read(file).unwrap()).unwrap();
+        assert_eq!(retained["accepted"],false);assert_eq!(retained["snapshots"][0]["project"],serde_json::to_value(bad).unwrap());
+        assert!(retained["semanticErrors"][&key].as_str().unwrap().contains("portal"));
+        assert_eq!(fs::read(dir.path().join("head.json")).unwrap(),accepted);assert_eq!(read(dir.path(),&good).unwrap().unwrap().revision,1);
+        let mut foreign=snapshots;foreign[0].project.id=uuid::Uuid::new_v4().to_string();assert!(retain_draft(dir.path(),&good,1,&h,&foreign).is_err());
+    }
     fn head(key:String)->Head{Head{current:key,past:vec![],future:vec![],dirty:true,limit:100}}
     #[test] fn durable_handoff_undo_redo_and_stale_owner_conflicts(){
         let dir=tempfile::tempdir().unwrap();let p=Project::new("A");let a=uuid::Uuid::new_v4().to_string();

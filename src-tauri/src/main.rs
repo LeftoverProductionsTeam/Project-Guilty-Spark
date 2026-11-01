@@ -4,6 +4,7 @@ mod tool_cache;
 mod legacy_companions;
 mod live_mcc;
 mod steam_bridge;
+mod studio_network;
 fn main() {
     app::run();
 }
