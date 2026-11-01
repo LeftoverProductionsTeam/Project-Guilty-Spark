@@ -1,4 +1,5 @@
 import SceneEnvironment from './SceneEnvironment';
+import MegaworldAtlas from './MegaworldAtlas';
 import { sourceSurfaceEnvironment } from '../environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
@@ -790,6 +791,7 @@ export default function BspWorkshop(props: Props) {
           )}
         </div>
         <aside className="bsp-properties">
+          <MegaworldAtlas projectId={projectId}/>
           <div className="bsp-source-list">
             <b>Source volumes</b>
             {w.brushes.map((b) => (

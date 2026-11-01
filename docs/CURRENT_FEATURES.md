@@ -1,6 +1,8 @@
 # Current Spark capabilities
 
-This is the C41 integrated Windows development workbench. Features below describe actual operations, with native compilation and gameplay kept separate. See the [consolidation report](FINAL_CONSOLIDATION_C41.md) for fresh verification and [398-row ledger](MASTER_FEATURE_LEDGER.csv) for the full requested scope.
+This is the C43 Windows engineering checkpoint, continuing the integrated C41/C42 workbench. Features below describe actual operations, with native compilation and gameplay kept separate. See [C43 evidence and limits](CONTINUATION_43_ENGINEERING.md), the [earlier consolidation report](FINAL_CONSOLIDATION_C41.md) and the [complete requirement ledger](MASTER_FEATURE_LEDGER.csv).
+
+C43 adds durable revisioned local-window history, explicit editing ownership and observed views, independent drawer layouts, the original BSP Atlas and a reviewed native two-region CE assembly. The combined map loads on a private CE server with a player present; its new physical two-way walkthrough remains unaccepted. Initial Atlas inventory is about 63% faster in three paired debug scans with identical metadata; repeated full-byte verification remains about 5.6 seconds. These results do not establish faster full map rendering or four-region gameplay.
 
 The latest [measured loading pass](C41_MAP_LOADING_PERFORMANCE.md) batches fully verified reflection reads and overlaps asset-source preparation. Three native runs per build retain identical rendering content while improving repeated map switching by 8.6% and catalog preparation by 25.1%. Startup and general memory gains are not claimed. The original-loop audio and native asset/compiler checks pass again against the measured executable.
 

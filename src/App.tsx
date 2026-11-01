@@ -73,6 +73,7 @@ import type { OwnedBitmapPreview } from './ownedBitmapPreview';
 import { initialHistory, thumbnail } from './editor';
 import type {HistoryAction} from './editor';
 import {activeDocument,documentReducer,emptyMapDocuments} from './mapDocuments';
+import {WindowHistories,queuedWindowRefresh} from './windowHistory';
 import MapTabs from './components/MapTabs';
 import RuntimeDock from './components/RuntimeDock';
 import {EditorAudioProvider,EditorSoundControls} from './components/EditorAudio';
@@ -90,7 +91,7 @@ import type {TransferSelection} from './components/AssetTransfer';
 import {readHistoryLimit,saveHistoryLimit} from './historyPreferences';
 import { firstVisitWorkspace, markFirstVisitSeen, WORKSPACE_TOOLTIPS } from './firstRun';
 import {ResizeEdges} from './components/WindowFrame';
-import { Empty, IconButton, Pill, Toast } from './components/ui';
+import { Empty, IconButton, Pill, Toast, Notice } from './components/ui';
 import Library from './components/Library';
 import CommunityMaps from './components/CommunityMaps';
 import type {MapDownloadAction} from './components/MapDownload';
@@ -155,6 +156,10 @@ export default function App() {
   const [data, setData] = useState<Bootstrap>(browserBootstrap);
   const [ready, setReady] = useState(!native);
   const [documents,dispatchDocument]=useReducer(documentReducer,readHistoryLimit(),emptyMapDocuments);
+  const windowHistories=useRef(new WindowHistories());
+  const [windowWriters,setWindowWriters]=useState<Record<string,boolean>>({});
+  const [windowHistoryErrors,setWindowHistoryErrors]=useState<Record<string,string>>({});
+  const windowWritersRef=useRef(windowWriters);windowWritersRef.current=windowWriters;
   const resourceIdentities=JSON.stringify(documents.documents.map(d=>[d.id,textureResourceScope(d.history.current?.source)]));
   useEffect(()=>{for(const doc of documents.documents){if(doc.history.current)publishTextureResources(doc.history.current);}},[resourceIdentities]);
   const activeMap=activeDocument(documents),history=activeMap?.history??{...initialHistory,limit:documents.limit};
@@ -292,6 +297,7 @@ export default function App() {
     const targetId=active instanceof HTMLElement?active.closest<HTMLElement>('[data-history-project]')?.dataset.historyProject??documentsRef.current.activeId:documentsRef.current.activeId;
     if(targetId&&projectMutationPending(targetId))return;
     const apply=()=>{if(!targetId||projectMutationPending(targetId))return;const h=documentsRef.current.documents.find(d=>d.id===targetId)?.history;const candidate=type==='undo'?h?.past.at(-1):h?.future[0];const localOnly=(p:Project)=>JSON.stringify({...p,quickForge:null,modifiedAt:'',history:[],builds:[]});const hasUnsharedChange=!!candidate&&!!h?.current&&localOnly(candidate)!==localOnly(h.current);if(!hasUnsharedChange&&!window.dispatchEvent(new CustomEvent('guilty-spark-studio-undo',{cancelable:true,detail:{projectId:targetId,redo:type==='redo'}})))return;dispatchDocument({type:'history',id:targetId,action:{type}});};
+    if(native&&targetId&&!windowHistories.current.writable(targetId))return;
     if(active instanceof HTMLInputElement&&['number','range'].includes(active.type)){
       active.blur();requestAnimationFrame(apply);
     }else apply();
@@ -301,6 +307,27 @@ export default function App() {
     if (tone === 'success') playInterfaceCue('confirm');
     else if (tone === 'error') playInterfaceCue('warning');
   }, [playInterfaceCue]);
+  useEffect(()=>{
+    if(!native)return;
+    for(const doc of documents.documents){if(windowWriters[doc.id]===true)void windowHistories.current.persist(doc.id,doc.history).catch(e=>{setWindowHistoryErrors(old=>({...old,[doc.id]:String(e)}));notice(`Window history: ${String(e)}`,'error');});}
+  },[documents,windowWriters,notice]);
+  useEffect(()=>{
+    if(!native)return;
+    let alive=true;
+    const queue=queuedWindowRefresh(async id=>{
+      const {status,history}=await windowHistories.current.attach(id);if(!alive)return;
+      setWindowWriters(old=>({...old,[id]:status.writable}));
+      if(history)dispatchDocument({type:'window-history',id,history});
+    },e=>notice(`Window synchronization: ${String(e)}`,'error'));
+    const stop=listen<{projectId:string;revision?:number;owner?:string}>('spark:window-history',({payload})=>{
+      if(!documentsRef.current.documents.some(d=>d.id===payload.projectId))return;
+      if(payload.revision!==undefined&&payload.owner===getCurrentWindow().label)return;
+      if(payload.revision&&payload.revision<=windowHistories.current.revision(payload.projectId))return;
+      // Acknowledge callbacks can race this notification; serialize the read
+      // behind local pending commits, never replace an unacknowledged draft.
+      queue.request(payload.projectId);
+    });return()=>{alive=false;queue.dispose();void stop.then(stop=>stop());};
+  },[notice]);
   const refresh = useCallback(async () => {
     if (!native) return;
     const next = await call<Bootstrap>('bootstrap');
@@ -326,6 +353,7 @@ export default function App() {
       if (!p) return Promise.resolve();
       const operation = saveQueue.current.then(async () => {
         try {
+          if(native){if(windowWritersRef.current[p.id]===false)return;const h=documentsRef.current.documents.find(d=>d.id===p.id)?.history;if(h?.current===p)await windowHistories.current.persist(p.id,h);await windowHistories.current.flush(p.id);}
           await call('save_project', { project: p });
           dispatchDocument({type:'saved',id:p.id,project:p});
           if (announce) notice('Project saved. Your original map is unchanged.', 'success');
@@ -404,7 +432,8 @@ export default function App() {
       try {
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
         await save();
-        for(const doc of documentsRef.current.documents){const p=doc.history.current;if(p&&doc.history.dirty){await call('save_project',{project:p});dispatchDocument({type:'saved',id:p.id,project:p});}}
+        for(const doc of documentsRef.current.documents){const p=doc.history.current;if(p&&doc.history.dirty&&windowHistories.current.writable(p.id)){await windowHistories.current.persist(p.id,doc.history);await call('save_project',{project:p});dispatchDocument({type:'saved',id:p.id,project:p});}}
+        await windowHistories.current.flush();
         await call('close_application');
       } catch (error) {
         closingRef.current = false;
@@ -421,9 +450,12 @@ export default function App() {
   }, [notice, save]);
   const load = useCallback(
     async (open: OpenProject) => {
-      if(native)await call('claim_project_document',{id:open.project.id});
+      const observe=new URLSearchParams(location.search).get('observe')==='1';
+      if(native&&!observe)await call('claim_project_document',{id:open.project.id});
+      const attached=native?await windowHistories.current.attach(open.project.id):null;
       dispatchDocument({type:'open',open});
-      if(native&&open.project.source){const version=open.project.source.cacheVersion;
+      if(attached){setWindowWriters(old=>({...old,[open.project.id]:attached.status.writable}));if(attached.history)dispatchDocument({type:'window-history',id:open.project.id,history:attached.history});}
+      if(native&&(!attached||attached.status.writable)&&open.project.source){const version=open.project.source.cacheVersion;
         const command=[6,7,609].includes(version)?'auto_connect_classic_textures':version===13&&(!open.project.source.resourceSha256?.['mcc-textures']||!open.project.source.resourceSha256?.['mcc-shared-bitmaps.map'])?'connect_mcc_texture_resources':null;
         if(command)void call<OpenProject|null>(command,{projectId:open.project.id}).then(result=>{if(result)dispatchDocument({type:'resources',project:result.project,inspection:result.inspection});}).catch(e=>{if(version===13)notice('MCC texture resources: '+String(e),'error');});
       }
@@ -448,6 +480,7 @@ export default function App() {
     [notice],
   );
   const applyResourceMetadata=useCallback(async(open:OpenProject)=>{const existing=documentsRef.current.documents.find(d=>d.id===open.project.id);if(existing)dispatchDocument({type:'resources',project:open.project,inspection:open.inspection});else await load(open);},[load]);
+  useEffect(()=>{const opened=(event:Event)=>{const result=(event as CustomEvent<OpenProject>).detail;if(!result?.project?.id)return;void (async()=>{try{await save();await load(result);writeMapSession(result.project.id,'bsp.open',true);setWorkspace('world');await refresh();}catch(e){notice(String(e),'error');}})();};window.addEventListener('gs:atlas-open',opened);return()=>window.removeEventListener('gs:atlas-open',opened);},[load,save,refresh,notice,setWorkspace]);
   const applyDependencyChoice=useCallback((open:OpenProject)=>{
     const existing=documentsRef.current.documents.find(d=>d.id===open.project.id);
     if(!existing)return;
@@ -617,6 +650,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', key);
   }, [save,help,createModal,applyHistory]);
   function edit(project: Project, description: string) {
+    if(native&&!windowHistories.current.writable(project.id)){notice('This view follows the editing window. Choose Edit here in Changes to take over safely.');return;}
     dispatchDocument({type:'history',id:project.id,action:{type:'edit',project,description}});
   }
   async function importFiles(paths?: string[], destination?: 'build') {
@@ -685,7 +719,7 @@ export default function App() {
   function selectMap(id:string){if(document.activeElement instanceof HTMLElement)document.activeElement.blur();requestAnimationFrame(()=>{const map=documentsRef.current.documents.find(d=>d.id===id);dispatchDocument({type:'select',id});if(map?.history.current)setWorkspace(rememberedWorkspace(map.history.current,map.inspection));});}
   async function closeMap(id:string,separateWindow=false){
     if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
-    setBusy(true);try{await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id);window.dispatchEvent(new Event('gs:save-viewport-context'));if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call('open_project_window',{id,workspace:workspaceRef.current});}else if(native)await call('release_project_document',{id});const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});}catch(e){notice(String(e),'error');}finally{setBusy(false);}
+    setBusy(true);try{await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id);await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));const latest=documentsRef.current.documents.find(d=>d.id===id);if(latest&&native&&windowHistories.current.writable(id))await windowHistories.current.persist(id,latest.history);await windowHistories.current.flush(id);window.dispatchEvent(new Event('gs:save-viewport-context'));if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call('open_project_window',{id,workspace:workspaceRef.current});}else if(native)await call('release_project_document',{id});await windowHistories.current.release(id);const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});}catch(e){notice(String(e),'error');}finally{setBusy(false);}
   }
   async function popoutWorkspace(){if(!native){notice('Workspace windows require the desktop application.');return;}if(current&&mapWorkspaces.includes(workspaceRef.current)){if(busy||activeJob){notice('Finish the current map operation before moving its workspace to another window.');return;}await closeMap(current.id,true);return;}try{const section=workspaceRef.current==='learning'?learningSection:workspaceRef.current==='settings'?settingsTab:null;await call('open_workspace_window',{workspace:workspaceRef.current,section,context:section==='academy'?readMapSession<string>('global','learning.lesson','preservation'):null});notice('Workspace opened in a resizable window. Drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
   async function transferAsset(selection: TransferSelection) {
@@ -1065,7 +1099,7 @@ export default function App() {
                 <strong>GUILTY SPARK</strong>
                 <span>HALO MODERN EVOLVED</span>
               </div>
-              <Pill>0.4.0 · C42 dev</Pill>
+              <Pill>0.4.0 · C43 dev</Pill>
             </button>
             {documents.documents.length ? (
               <MapTabs
@@ -1301,7 +1335,7 @@ export default function App() {
               >
                 {documents.documents.map((document) => {
                   const project=document.history.current;
-                  return project?.quickForge?<ForgeCollaboration key={project.id} hidden={current?.id!==project.id} projectId={project.id} document={project.quickForge} entries={data.entries} onShared={next=>dispatch({type:'forge-remote',projectId:project.id,document:next})} onSave={()=>save(false,project.id)}/>:null;
+                  return project?.quickForge&&windowWriters[project.id]!==false?<ForgeCollaboration key={project.id} hidden={current?.id!==project.id} projectId={project.id} document={project.quickForge} entries={data.entries} onShared={next=>dispatch({type:'forge-remote',projectId:project.id,document:next})} onSave={()=>save(false,project.id)}/>:null;
                 })}
                 {current && (
                   <WorkspacePanel id="project-setup" label="Project setup">
@@ -1339,6 +1373,11 @@ export default function App() {
                       </IconButton>
                     </div>
                   )}
+                  {native&&current&&<div className="gs-edit-history-controls" role="group" aria-label="Workspace window ownership">
+                    <span>{windowWriters[current.id]===false?'Following the editing window':'Editing here · durable window history'}</span>
+                    {windowWriters[current.id]===false?<button onClick={()=>void (async()=>{try{await call('take_project_document',{id:current.id});const next=await windowHistories.current.attach(current.id);setWindowWriters(old=>({...old,[current.id]:next.status.writable}));if(next.history)dispatchDocument({type:'window-history',id:current.id,history:next.history});}catch(e){notice(String(e),'error');}})()}>Edit here</button>:<button disabled={busy||!!activeJob} onClick={()=>void (async()=>{try{await save(false,current.id);await windowHistories.current.flush(current.id);await call('open_project_window',{id:current.id,workspace:workspaceRef.current,observe:true});}catch(e){notice(String(e),'error');}})()}>Open another view</button>}
+                  </div>}
+                  {native&&current&&windowHistoryErrors[current.id]&&<Notice tone="error">{windowHistoryErrors[current.id]} <button onClick={()=>void (async()=>{try{const h=documentsRef.current.documents.find(d=>d.id===current.id)?.history;if(!h)return;const recovered=await windowHistories.current.retainAndRefresh(current.id,h);if(recovered.history)dispatchDocument({type:'window-history',id:current.id,history:recovered.history});setWindowWriters(old=>({...old,[current.id]:recovered.status.writable}));setWindowHistoryErrors(old=>{const next={...old};delete next[current.id];return next;});notice(`Draft preserved at ${recovered.retained}. Showing the accepted revision.`,'success');}catch(e){notice(String(e),'error');}})()}>Keep draft and use accepted revision</button></Notice>}
                   <ExternalMapSync
                     documents={documents.documents.flatMap((d) =>
                       d.history.current

@@ -76,6 +76,9 @@ pub mod steam;
 pub mod snapshots;
 pub mod working_tags;
 pub mod working_tag_changes;
+pub mod workspace_history;
+pub mod megaworld;
+pub mod megaworld_build;
 
 use std::path::Path;
 use thiserror::Error;

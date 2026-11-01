@@ -84,6 +84,12 @@ fn discover(state: &AppState) -> Reply<Vec<Detected>> {
     }
     Ok(found)
 }
+pub(super) fn owned_map_roots(state:&AppState)->Reply<Vec<(PathBuf,String)>>{
+    let mut roots=vec![];
+    if let Some(mcc)=lock(&state.installation)?.mcc_path.clone(){roots.push((mcc.join("halo1/maps"),"MCC Halo 1".into()));}
+    for item in discover(state)?{if item.content_ready{roots.push((item.data_root.join("maps"),item.runtime_id.name().into()));}}
+    Ok(roots)
+}
 #[tauri::command]
 pub(super) async fn discover_halo_connections(app: tauri::AppHandle) -> Reply<Vec<Detected>> {
     tauri::async_runtime::spawn_blocking(move || discover(&app.state::<AppState>())).await.map_err(error)?

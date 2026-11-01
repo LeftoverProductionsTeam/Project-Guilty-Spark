@@ -1,0 +1,324 @@
+{
+  "schemaVersion": 1,
+  "startingCommit": "ce697fda68919afa59c4593831200e2126dabc52",
+  "checkpoint": "C43; new two-region physical walkthrough remains pending",
+  "remotePublished": false,
+  "appSha256": "87065a1922a20a8731e50bcd97b1fe0e5d22a9d0a347906fd6f39743c1843262",
+  "installerSha256": "fa768c10e163fd8faa77f3814cac6473f5fa635fe2ab02d981f4c4f2028e4b24",
+  "tests": {
+    "rustPassed": 616,
+    "rustIgnored": 7,
+    "frontendPassed": 280,
+    "browserPassed": 136,
+    "offlineScriptsPassed": 59,
+    "interfaceProbesPassed": 2
+  },
+  "localWindows": {
+    "mockedIpc": false,
+    "cases": [
+      {
+        "name": "moving a real Workshop retains project identity, selected brush and Undo/Redo",
+        "projectId": "e17f3b69-4ae8-4b50-8898-7a3f95fc4068",
+        "selectionRetained": true
+      },
+      {
+        "name": "another native window observes the same committed transform",
+        "propagationMs": 215,
+        "independentWriter": false
+      },
+      {
+        "name": "editing lease transfer shares Undo/Redo; stale revision is rejected with a durable draft"
+      },
+      {
+        "name": "rapid committed edits converge in the observing window without losing the final notification"
+      },
+      {
+        "name": "independent map remains unchanged and its snapshot cannot enter the other map history"
+      },
+      {
+        "name": "abrupt process death recovers acknowledged unsaved transform and its Undo/Redo"
+      },
+      {
+        "name": "closing and reopening a pop-out saves the map and preserves its history"
+      }
+    ],
+    "workspaceRoutes": 23,
+    "simultaneousPopouts": 3,
+    "physicalMonitorTransferTested": false
+  },
+  "atlas": {
+    "caches": 94,
+    "distinctCacheHashes": 71,
+    "regions": 187,
+    "sourceMetadataSha256": "81b09f1725839e06a22e8b41269642fcab56ac3432b950e00381e758435f6f84",
+    "sourceMetadataUnchanged": true,
+    "cacheFailures": 0,
+    "nativeInterface": {
+      "elapsedMs": 20018.9215,
+      "caches": 94,
+      "regions": 187,
+      "uniqueSourceHashes": 71,
+      "paged": true,
+      "sourceBoundsVisible": true
+    }
+  },
+  "inspectionCache": {
+    "decodedMaps": 10,
+    "afterReopen": {
+      "entries": 8,
+      "estimatedBytes": 91676954,
+      "evictions": 6,
+      "maxEntries": 8,
+      "maxEstimatedBytes": 268435456
+    },
+    "geometryAndTagReopenIdentical": true,
+    "originalMapHashesUnchanged": true
+  },
+  "nativeTwoRegions": {
+    "build": {
+      "id": "f1bc4304-35e1-4ecd-9169-ad19b2989ddf",
+      "message": "Two source regions and their authored connection compiled into one CE BSP; native dependencies, CRC and collision route checked. Player traversal remains unverified.",
+      "output": "timberland.map",
+      "projectFingerprint": "bb4536932351a6cd73b96193a6ffc33b3cf53f247451ba7bafd300dd2a7522bc",
+      "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe",
+      "status": "validated",
+      "target": "gbx-custom",
+      "timestamp": "2026-11-01T05:37:27.781491900+00:00"
+    },
+    "sourceHashes": {
+      "base": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+      "donor": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a"
+    },
+    "report": {
+      "donorScenery": 42,
+      "generatedUvFaces": 1428,
+      "inputTriangles": 18760,
+      "outputTriangles": 32105,
+      "portalCount": 2,
+      "walkSamples": 423,
+      "warnings": [
+        "This rebuild regenerates collision, portals and lightmaps; original per-cluster weather/sound assignments and render-only decorations require separate review. Donor scenery is optional; campaign actors, scripts and gameplay objects are not imported.",
+        "UVs are projected from source render surfaces where available. Unmatched collision-only surfaces use generated planar UVs.",
+        "A compiled clearance test and successful boot do not replace a manual player walkthrough, including scenery collision at the entrances."
+      ]
+    },
+    "transform": {
+      "translation": [
+        196.80172729492188,
+        9.3280029296875,
+        -21.232985482283567
+      ],
+      "yawDegrees": 0,
+      "tunnelPoints": [
+        [
+          38.811767578125,
+          34.44912338256836,
+          -21.075042829581236
+        ],
+        [
+          144.11968994140625,
+          34.44912338256836,
+          -21.075042829581236
+        ]
+      ]
+    },
+    "nativeDurationMs": 226368,
+    "inputTags": 2685,
+    "detailSources": [
+      {
+        "cells": 0,
+        "detailBlocks": 1,
+        "inspectorSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+        "instances": 0,
+        "integerFieldsSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "layerCounts": 0,
+        "nativeSha256": "cb8d48fb11cfde8625b2fdeee41c59326cb5d8e77829ee5abdf4a677edecdbee",
+        "zReferenceDisplaySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "zReferenceVectors": 0
+      },
+      {
+        "cells": 0,
+        "detailBlocks": 1,
+        "inspectorSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+        "instances": 0,
+        "integerFieldsSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "layerCounts": 0,
+        "nativeSha256": "dcd23f7530ef9c719695296b0304c6dd1dc4100fd4a37d0dc04b2bba92fc8eaf",
+        "zReferenceDisplaySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "zReferenceVectors": 0
+      }
+    ],
+    "donorScenery": 42,
+    "residentBsps": 1,
+    "routes": {
+      "cacheSha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe",
+      "collisionTriangles": 16196,
+      "walkSamples": [
+        423
+      ]
+    },
+    "originalHashesVerified": true,
+    "streaming": false,
+    "gameplayVerified": false,
+    "scope": "CE 609 single-BSP multiplayer base and CE donor; prior reviewed seven-field CE compatibility fixes; regenerated lightmaps/collision; nonempty painted detail refused; full donor cluster acoustics/weather/render-only detail and campaign logic transfer unfinished"
+  },
+  "runtimeObservation": {
+    "appSha256": "6d06789e008b8cff9bdb8b1a61a535016d647f57a031771cc2e32d2377136c28",
+    "runtime": "Halo Custom Edition 1.10",
+    "mocked": false,
+    "serverPhase": "running",
+    "serverStatus": {
+      "name": "Spark C43 two regions",
+      "version": "01.00.10.0621",
+      "map": "timberland",
+      "gameType": "Slayer",
+      "state": "openplaying",
+      "players": 1,
+      "maximumPlayers": 2,
+      "dedicated": true
+    },
+    "cacheSha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe",
+    "visibleOwnedClient": true,
+    "strictClientAssociationVerified": false,
+    "physicalWalkthroughVerified": false,
+    "sessionStoppedAfterUnattendedObservation": true
+  },
+  "sparkLink": {
+    "nativeProcesses": 3,
+    "separateDataRoots": 3,
+    "physicalMachines": 1,
+    "transport": "private TCP + TLS 1.3, invitation-pinned certificate",
+    "mockedIpc": false,
+    "acceptanceComplete": true,
+    "threeAuthorNativeAcceptance": {
+      "revision": 3,
+      "documentSha256": "aae78e7a6776a407dad1b7b8bac4da102ebaf470555fac4e023a450e4350008c",
+      "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+      "assetId": "c9556d91-d519-42d4-afa0-b324ee5a666b",
+      "assetBytes": 632,
+      "actualModelsInThreeViewports": true,
+      "simultaneousAuthorActions": true
+    },
+    "actualHaloToolchain": {
+      "jobId": "d49a6db9-f3ea-426e-a8e1-c0730ea5a9a9",
+      "revision": 18,
+      "laterRevision": 19,
+      "nativeRadius": 0.5,
+      "publishedAssetPath": "scenery\\sparklink\\c9556d91-d519-42d4-afa0-b324ee5a666b",
+      "compiledModelTriangles": 31,
+      "placement": [
+        3,
+        2,
+        0.1
+      ],
+      "outputSha256": "e24ad9d19c05003b671769735c22560ba71e72cf5784ebc6a354fb43c17a035f",
+      "durationMs": 37319.47199999998,
+      "gameplayTested": false
+    },
+    "externalToolInterop": {
+      "mockedIpc": false,
+      "simultaneousEditors": 3,
+      "externalTool": "Invader",
+      "sharedSessionStayedConnected": true,
+      "corruptSaveRejected": true,
+      "corruptedCandidateRetained": true,
+      "externalExecutableSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invalidCrcRejectedBeforeNativeNormalization": true,
+      "otherExposedFieldNotSilentlyMerged": true,
+      "externalEditAndConcurrentWorldEditConverged": true,
+      "convergedRevision": 14,
+      "elapsedMs": 14140.582399999985,
+      "forkId": "4e6dd4e8-bbc6-4b46-a953-9139b4f2064c",
+      "candidateSha256": "15640d68228399293ba8d335839df25394f232c82d2f9f46e958f0f2563d99b2",
+      "alreadyCommittedEditDoesNotCreateAnotherTransaction": true,
+      "finalBoundingRadius": 0.5,
+      "baboonSavedFileReplay": {
+        "newGuiSession": false,
+        "priorHumanEditedSave": true,
+        "rawSha256": "6dc893d2375864e4648d45cd161d2e73a5b4ab18442fcb8d6fdb6a6e401d9d95",
+        "rawFileRetainedUnchanged": true,
+        "serialization": "equivalentNativeSerialization",
+        "convergedRevision": 15
+      },
+      "sameFieldConflictRejectedWithoutReplacingSource": true,
+      "participantUndoPreservesExternalAndOtherAuthorEdits": true,
+      "viewerCannotCreateToolFork": true,
+      "retainedAcrossActualHostRestart": true
+    },
+    "durableNativeRecovery": {
+      "revision": 19,
+      "assetBytesIdentical": true,
+      "semanticFieldIntact": true,
+      "authorIdentitiesAndHistoryRetained": true,
+      "newInvitation": true,
+      "replayDeduplicated": true,
+      "durationMs": 13549.932099999976
+    },
+    "originalSourcesUnchanged": {
+      "separateNativeTrees": 3,
+      "filesPerTree": 2240,
+      "templateUnchanged": true,
+      "importUnchanged": true
+    },
+    "synchronizationMeasurements": {
+      "samples": 7,
+      "valuesMs": [
+        8061.721999999994,
+        102.65120000000752,
+        888.7452000000048,
+        922.0038999999961,
+        502.36720000000787,
+        382.2225999999937,
+        406.7537999999913
+      ],
+      "physicalMachines": 1,
+      "includesNativeIpcAndReactConsumption": true
+    },
+    "gamePeerReplicationTested": false,
+    "applications": [
+      {
+        "actor": "owner",
+        "appSha256": "87065a1922a20a8731e50bcd97b1fe0e5d22a9d0a347906fd6f39743c1843262"
+      },
+      {
+        "actor": "editor-b",
+        "appSha256": "87065a1922a20a8731e50bcd97b1fe0e5d22a9d0a347906fd6f39743c1843262"
+      },
+      {
+        "actor": "editor-c",
+        "appSha256": "87065a1922a20a8731e50bcd97b1fe0e5d22a9d0a347906fd6f39743c1843262"
+      }
+    ]
+  },
+  "preservation": {
+    "checkedAt": "2026-11-01T07:14:24.337Z",
+    "complete": true,
+    "rootUntracked": 160,
+    "zombieOriginals": 67,
+    "installedMaps": 94,
+    "c42Artifacts": 4,
+    "failures": [],
+    "allPriorRefsPreserved": true,
+    "preservedRefs": 28
+  },
+  "limits": [
+    "Two-way Timberland/tunnel/Sidewinder player traversal is unaccepted; four-region expansion was not started.",
+    "All prior research and branch tips are preserved; unfinished direct-cache structural editing remains open.",
+    "Three Spark processes were tested on one computer; real second-computer LAN/VPN and in-game peer replication remain unaccepted.",
+    "No in-game native audio listening or complete rendering/audio parity claim is added.",
+    "Installer built, not tested on a clean machine; user controls remote publication.",
+    "Local window journals and editing leases are scoped to one application process; separate processes require independent directories and SparkLink, not a shared folder."
+  ],
+  "featureLedger": {
+    "earlierRecordsPreserved": 398,
+    "c43RecordsAdded": 6,
+    "totalRecords": 404
+  },
+  "integration": {
+    "priorBranchTipsAlreadyIntegrated": 21,
+    "startingCommit": "ce697fda68919afa59c4593831200e2126dabc52",
+    "allPriorBranchTipsAncestors": true,
+    "dirtyRootCheckoutPreserved": true,
+    "remotePublicationAttempted": false
+  }
+}

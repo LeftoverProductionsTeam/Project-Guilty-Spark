@@ -2,7 +2,7 @@
 
 A Halo 1 creation and preservation workbench with a visual level editor, native tag tools, verified builds, machinima and private collaborative editing.
 
-**0.4.0 · C42 integrated development build.** Windows is the verified native platform. Original maps and SDK sources remain separate from edited projects and generated outputs.
+**0.4.0 · C43 engineering checkpoint.** Windows is the verified native platform. Original maps and SDK sources remain separate from edited projects and generated outputs. C43 adds durable window history, an original BSP Atlas and a natively compiled two-region CE world; its new player walkthrough remains open. [Exact evidence and remaining gates](docs/CONTINUATION_43_ENGINEERING.md).
 
 [Get started](docs/GETTING_STARTED.md) · [Current capabilities](docs/CURRENT_FEATURES.md) · [Build on Windows](docs/BUILD_WINDOWS.md) · [Full backlog](docs/MASTER_FEATURE_LEDGER.md) · [Community credits](COMMUNITY_CREDITS.md)
 
@@ -12,7 +12,7 @@ A Halo 1 creation and preservation workbench with a visual level editor, native 
 | --- | --- | --- |
 | Map library | Compact map tiles/list, remembered search, preserved imports, variants, supported downloads, linked runtime assets and independent map tabs/windows. Animated native monitor showcase. | [Workbench follow-through](docs/C41_WORKBENCH_FOLLOW_THROUGH.md), [native showcase](docs/NATIVE_ASSETS_AND_SHOWCASE.md) |
 | Level editor / QuickForge | Fly, select and group objects; edit transforms/tags in drawers; drag verified assets; use collision-aware End snapping, keyboard undo/redo and per-map state. New shapes use owned Halo material defaults independently from compilation. | [Default materials](docs/C42_TOOLS_AND_DEFAULTS.md), [connected source workflow](docs/WORKBENCH_INTEGRATION.md) |
-| BSP Workshop | Four linked views, convex brush editing, extrusion/clipping, face materials/UVs, rooms, corridors, ramps and source collision. Native H1A/CE compiler paths. | [Workshop and traversal gates](docs/BSP_WORKSHOP.md) |
+| BSP Workshop / Atlas | Four linked views, convex brush editing, face materials/UVs, rooms, corridors, ramps and source collision. Inspect owned original BSP regions and build a reviewed two-region connection through native H1A/CE tools. | [C43 native world, inventory and traversal gate](docs/CONTINUATION_43_ENGINEERING.md), [Workshop](docs/BSP_WORKSHOP.md) |
 | Tag editor / Smart Edit | Collapsible class/tag tree, typed fields and dependency navigation. Save reviewed existing MCC Halo 1 scalar/placement changes directly into a separate validated cache copy. | [Smart Edit workflow and supported cells](docs/SMART_EDIT_WORKFLOWS.md) |
 | Native source tools | Recursive tag extraction/staging, Baboon/Invader handoff, semantic external-save checks, recoverable source revisions and isolated native compilation. | [C37 integrity and recovery](docs/CONTINUATION_37_ENGINEERING.md), [C38 native operations](docs/CONTINUATION_38_ENGINEERING.md) |
 | Asset library | Actual model previews, supported recursive scenery imports, material-assigned closed OBJ scenery/collision, sound audition and editor emitters. | [Native import acceptance](docs/NATIVE_ASSETS_AND_SHOWCASE.md) |
@@ -20,7 +20,7 @@ A Halo 1 creation and preservation workbench with a visual level editor, native 
 | SparkLink | Private TLS invitations, roles, ordered revisions, conflicts, per-author undo, durable recovery and frozen source builds. A reviewed external native tool can edit a private tag copy while three Spark processes continue editing. | [Shared external-tool acceptance and limits](docs/C42_SHARED_EXTERNAL_EDITING.md), [original native-content scope](docs/C39_NATIVE_CONTENT_ACCEPTANCE.md) |
 | Machinima / Creator | Camera paths, actor/animation rehearsal, detached Recording Director, editor WebM/audio takes and native script source workflows. | [Recording](docs/C35_DIRECTOR_RECORDING.md), [native camera/script boundaries](docs/NATIVE_GAMEPLAY_AND_AUDIO.md) |
 | Games & tools / Online | Four Halo cards, visible tool downloads/setup, discovered and explicitly selected app launchers, managed map editing, compact hosting and matching CE clients. | [C42 launcher and material fixes](docs/C42_TOOLS_AND_DEFAULTS.md), [earlier game acceptance](docs/C41_WORKBENCH_FOLLOW_THROUGH.md) |
-| Learning center / windows | Compact task guides, searchable glossary and Academy lessons in one workspace; remembered selections and Back/Forward. Every workspace can pop out for multiple displays. | [Native window acceptance and layout measurements](docs/C41_LEARNING_AND_WINDOWS.md) |
+| Learning center / windows | Compact task guides, glossary and Academy lessons; remembered selections and Back/Forward. Pop out every workspace, open another map view and transfer editing with durable acknowledged undo/redo and crash recovery. | [C43 window history and ownership](docs/CONTINUATION_43_ENGINEERING.md), [earlier layout acceptance](docs/C41_LEARNING_AND_WINDOWS.md) |
 
 The desktop Features & workflows page contains short instructions and operation-specific limits. [Current features](docs/CURRENT_FEATURES.md) separates accepted editor/compiler results from remaining game/runtime work.
 

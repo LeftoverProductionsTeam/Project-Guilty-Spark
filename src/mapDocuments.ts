@@ -14,6 +14,7 @@ export interface MapDocuments {
   limit: number;
 }
 export type DocumentAction =
+  | { type:'window-history';id:string;history:HistoryState }
   | { type: 'open'; open: OpenProject }
   | { type: 'external-revision'; previousId: string; open: OpenProject; replaceClean: boolean }
   | { type: 'resources'; project: Project; inspection?:MapInspection|null; kind?:'audio' }
@@ -29,6 +30,7 @@ export function activeDocument(state: MapDocuments): MapDocument | undefined {
   return state.documents.find((d) => d.id === state.activeId);
 }
 export function documentReducer(state: MapDocuments, action: DocumentAction): MapDocuments {
+  if(action.type==='window-history')return {...state,documents:state.documents.map(d=>d.id===action.id&&action.history.current?.id===d.id?{...d,history:action.history}:d)};
   if (action.type === 'external-revision') {
     const previous = state.documents.find(document => document.id === action.previousId);
     if (!previous || !previous.history.current) return state;

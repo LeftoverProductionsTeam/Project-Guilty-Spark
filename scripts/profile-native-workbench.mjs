@@ -199,7 +199,7 @@ async function nav(name) {
   await page.getByRole('button', { name: 'Toggle workspace navigation', exact: true }).click();
   await page.locator('.gs-navigation-drawer').getByRole('button', { name, exact: true }).click();
 }
-async function worldReady() {
+async function worldReady(expectedDecals) {
   const world = page.locator('.world-layout');
   await expect(world).toBeVisible();
   // One transient idle render can precede a map's material effect. Require all
@@ -217,8 +217,10 @@ async function worldReady() {
           state.world.materialLoading === 'false' &&
           state.world.pendingMaterials === '0' &&
           Number(state.world.sourceShaders) > 0 &&
-          state.decals &&
-          state.decals.rendered + state.decals.omitted === state.decals.source;
+          (state.decals
+            ? state.decals.source === expectedDecals &&
+              state.decals.rendered + state.decals.omitted === expectedDecals
+            : expectedDecals === 0);
         const next = JSON.stringify(state);
         if (!ready || next !== signature) {
           signature = next;
@@ -301,7 +303,7 @@ try {
         .locator('.map-card')
         .filter({ has: page.getByRole('heading', { name: `Profile map ${index + 1}`, exact: true }) })
         .click();
-      return worldReady();
+      return worldReady(opens[index].inspection.decals.length);
     });
     await idle(`map-${index + 1}-process-cpu-gpu-memory`);
   }
@@ -309,7 +311,7 @@ try {
     const index = turn % 2;
     await phase(`map-switch-${turn + 1}-to-${index + 1}`, async () => {
       await page.getByRole('tab', { name: `Profile map ${index + 1}`, exact: true }).click();
-      return worldReady();
+      return worldReady(opens[index].inspection.decals.length);
     });
   }
   await idle('repeat-switch-memory');

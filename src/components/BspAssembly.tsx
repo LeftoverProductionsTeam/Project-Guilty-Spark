@@ -7,6 +7,7 @@ import type { BspAssembly as Plan, BspOption, AssemblyReport } from '../bspAssem
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
+import MegaworldAtlas from './MegaworldAtlas';
 export default function BspAssembly({
   project,
   entries,
@@ -145,6 +146,7 @@ export default function BspAssembly({
       </summary>
       {open && (
         <div className="bsp-assembly-body">
+          <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256}/>
           <p>
             Add a campaign or multiplayer section and join it with a real tunnel. Spark rebuilds one MCC world
             with collision and new lightmaps. Your original maps stay preserved. Campaign actors and scripts

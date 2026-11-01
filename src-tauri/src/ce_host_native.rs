@@ -521,14 +521,15 @@ impl Drop for OwnedProcess {
     }
 }
 fn launch(game: &Path, directory: &Path, port: u16) -> Reply<OwnedProcess> {
+    if game.parent().map(fs::canonicalize).transpose().map_err(error)?!=Some(fs::canonicalize(directory).map_err(error)?){return Err("CE game/profile folders must share their owned session directory".into());}
     let mut command = Command::new(game.join("haloceded.exe"));
     command
         .current_dir(game)
         .args(["-ip", "127.0.0.1", "-port", &port.to_string()])
         .arg("-path")
-        .arg(directory.join("profile"))
+        .arg(Path::new("..").join("profile"))
         .arg("-exec")
-        .arg(directory.join("init.txt"))
+        .arg(Path::new("..").join("init.txt"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

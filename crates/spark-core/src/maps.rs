@@ -384,6 +384,13 @@ pub fn read_cache(path: &Path) -> Result<(MapHeader, Vec<u8>)> {
 }
 /// Parse and hash the same bounded file snapshot before any working-buffer normalization.
 pub(crate) fn read_cache_snapshot(path: &Path) -> Result<(MapHeader, Vec<u8>, String)> {
+    let (header,bytes,sha256)=read_original_cache_snapshot(path)?;
+    let bytes=normalize_cache_snapshot(&header,bytes)?;
+    Ok((header,bytes,sha256))
+}
+/// A metadata cache hit verifies all original bytes without decompressing a
+/// payload which will not be inspected. The original SHA remains the identity.
+pub(crate) fn read_original_cache_snapshot(path:&Path)->Result<(MapHeader,Vec<u8>,String)>{
     let file = File::open(path)?;
     if file.metadata()?.len() > MAX_CACHE_BYTES {
         return invalid(format!("Cache exceeds this reader's {} MiB memory safety limit. Use installed tool adapters for larger maps.",MAX_CACHE_BYTES/1024/1024));
@@ -398,6 +405,9 @@ pub(crate) fn read_cache_snapshot(path: &Path) -> Result<(MapHeader, Vec<u8>, St
         return invalid("Declared cache size exceeds the memory safety limit");
     }
     let sha256 = crate::hex_bytes(Sha256::digest(&bytes));
+    Ok((header,bytes,sha256))
+}
+pub(crate) fn normalize_cache_snapshot(header:&MapHeader,mut bytes:Vec<u8>)->Result<Vec<u8>>{
     if header.legacy_tag_size_repair {
         bytes[0x14..0x18].copy_from_slice(&header.tag_size.to_le_bytes());
     }
@@ -412,7 +422,7 @@ pub(crate) fn read_cache_snapshot(path: &Path) -> Result<(MapHeader, Vec<u8>, St
         }
         bytes = decoded;
     }
-    Ok((header, bytes, sha256))
+    Ok(bytes)
 }
 struct Space {
     begin: usize,
@@ -453,7 +463,12 @@ impl Space {
 }
 
 pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<MapInspection> {
-    let (mut header, bytes, sha256) = read_cache_snapshot(path)?;
+    let (header, bytes, sha256) = read_cache_snapshot(path)?;
+    inspect_snapshot(path,resource_directory,header,&bytes,sha256,true)
+}
+/// Metadata consumers can reuse one verified immutable file snapshot. The map
+/// viewer always uses inspect_map, including every supported object model.
+pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut header:MapHeader,bytes:&[u8],sha256:String,object_models:bool)->Result<MapInspection>{
     header.extended |= path
         .extension()
         .is_some_and(|x| x.eq_ignore_ascii_case("yelo"));
@@ -722,7 +737,7 @@ pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<Map
             None
         }
     };
-    let (model_meshes, model_notes) = crate::render::static_object_models(&bytes, &header, &tags, &objects);
+    let (model_meshes, model_notes) = if object_models{crate::render::static_object_models(&bytes, &header, &tags, &objects)}else{(Default::default(),vec![])};
     for note in model_notes {
         diagnostics.push(Diagnostic::warning("MODEL_RENDER_UNAVAILABLE", note));
     }
@@ -1264,6 +1279,9 @@ fn source_active_surfaces(r:&Reader,space:&Space,root:usize,surfaces:usize)->Res
 pub(crate) fn collision_source(path:&Path,inspection:&MapInspection)->Result<(MeshData,Vec<CollisionFace>)>{
     let (header,bytes,hash)=read_cache_snapshot(path)?;
     if hash!=inspection.sha256{return invalid("BSP source changed after inspection");}
+    collision_snapshot(&header,&bytes,inspection)
+}
+pub(crate) fn collision_snapshot(header:&MapHeader,bytes:&[u8],inspection:&MapInspection)->Result<(MeshData,Vec<CollisionFace>)>{
     let r=Reader(&bytes);let start=header.tag_offset as usize;let array=r.u32(start)?;
     let address=match header.version{5=>0x803a6000,6=>0x4bf10000,13=>array.checked_sub(0x28).ok_or_else(||SparkError::Invalid("Invalid MCC index".into()))?,_=>0x40440000};
     let space=Space{begin:start,end:start+header.tag_size as usize,address};

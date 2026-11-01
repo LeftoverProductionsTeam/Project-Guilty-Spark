@@ -1,6 +1,9 @@
 use notify::Watcher;
 #[path="texture_resources_native.rs"] mod texture_resources_native;
 #[path="workspace_windows.rs"] mod workspace_windows;
+#[path="workspace_history_native.rs"] mod workspace_history_native;
+#[path="megaworld_native.rs"] mod megaworld_native;
+#[path="inspection_cache.rs"] mod inspection_cache;
 use serde::{Deserialize, Serialize};
 use spark_core::{
     self as core, archive, assets, audio, quickforge, forge_build, firefight, tag_exchange,
@@ -123,13 +126,14 @@ struct AppState {
     installation: Mutex<Installation>,
     managed: Mutex<Option<ManagedRoot>>,
     watcher: Mutex<Option<notify::RecommendedWatcher>>,
-    inspections: Mutex<HashMap<String, Arc<MapInspection>>>,
+    inspections: Mutex<inspection_cache::InspectionCache>,
     jobs: Mutex<HashMap<String, Arc<AtomicBool>>>,
     logs: Mutex<Vec<JobEvent>>,
     diagnostics: Mutex<Vec<String>>,
     live_mcc: Mutex<Option<crate::live_mcc::Session>>,
     forge_session: Mutex<Option<shared_editing::Session>>,
     document_owners: Mutex<HashMap<String,String>>,
+    window_history: Mutex<()>,
     runtime_workbench: Mutex<runtime_workbench::WorkbenchState>,
     external_changes: Mutex<external_changes_native::ExternalChangesState>,
     invitations: Mutex<invitations_native::InvitationsState>,
@@ -185,6 +189,7 @@ fn editing_tools(state: &AppState, project: &Project) -> Reply<Toolchain> {
     Ok(tools)
 }
 fn project_tools(state:&AppState,project:&Project)->Reply<Toolchain>{
+    if core::megaworld_build::selected(project){return editing_tools(state,project);}
     if let Some(target)=project.active_build_target.as_ref().and_then(|id|project.build_targets.iter().find(|t|&t.id==id)){if target.runtime_id!=runtime::RuntimeId::MccSteam||target.builder!="h1a-tool"||target.hek_flavor.as_deref()!=Some("h1aEk"){return Err("Imported map conversion currently targets MCC using H1A Tool. CE source authoring has its own QuickForge target.".into());}}
     editing_tools(state,project)
 }
@@ -819,6 +824,7 @@ fn restore_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:
 
 #[tauri::command]
 fn save_project(state: State<AppState>, window:tauri::WebviewWindow, mut project: Project) -> Reply<LibraryEntry> {
+    let _history_guard=lock(&state.window_history)?;
     check_document_owner(&state,&project.id,window.label())?;
     let existing = lock(&state.library)?.get(&project.id).map_err(error)?;
     project.source = existing.source;
@@ -1203,6 +1209,7 @@ async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::Compati
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();
         let p = lock(&state.library)?.get(&id).map_err(error)?;
         let i = inspect(&state, &p)?;
+        if core::megaworld_build::selected(&p){let blockers=core::megaworld_build::preflight(&p,&i).err().map(|e|vec![e.to_string()]).unwrap_or_default();return Ok(build::CompatibilityReport{target:"gbx-custom".into(),pipeline:"Original CE regions → authored merged geometry → H1A structure/lightmaps → Invader CE cache → CRC/collision/scenery readback".into(),ready:blockers.is_empty(),blockers,warnings:vec!["One resident BSP; native compilation is separate from player traversal. Painted detail payloads are refused until transformed native preservation is implemented.".into()],bitmap_dependencies:None});}
         Ok(build::compatibility(&p, &i, &project_tools(&state, &p)?))
     }).await.map_err(error)?
 }
@@ -1251,9 +1258,9 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     snapshot_project_state(&state,&project,"before-build")?;
     let inspection = inspect(&state, &project)?;
     let tools = project_tools(&state, &project)?;
-    let report = build::compatibility(&project, &inspection, &tools);
-    if !report.ready {
-        return Err(report.blockers.join("\n"));
+    if core::megaworld_build::selected(&project){core::megaworld_build::preflight(&project,&inspection).map_err(error)?;}else{
+        let report = build::compatibility(&project, &inspection, &tools);
+        if !report.ready {return Err(report.blockers.join("\n"));}
     }
     let job_id = uuid::Uuid::new_v4().to_string();
     let cancel = Arc::new(AtomicBool::new(false));
@@ -1268,9 +1275,7 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     let jobs = state.root.join("jobs");
     let returned = job_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let record = build::run_build(&project, &inspection, &tools, &jobs, &job_id, cancel, |e| {
-            event(&app, e)
-        });
+        let record = if core::megaworld_build::selected(&project){core::megaworld_build::run(&project,&inspection,&jobs,&job_id,cancel,|e|event(&app,e))}else{build::run_build(&project, &inspection, &tools, &jobs, &job_id, cancel, |e|event(&app,e))};
         let state = app.state::<AppState>();
         match record {
             Ok(record) => {
@@ -1818,26 +1823,28 @@ fn check_document_owner(state:&AppState,id:&str,label:&str)->Reply<()> {
 }
 #[tauri::command]
 fn claim_project_document(state:State<AppState>,window:tauri::WebviewWindow,id:String)->Reply<()> {
+    let _history_guard=lock(&state.window_history)?;
     let _=lock(&state.library)?.get(&id).map_err(error)?;
-    let mut owners=lock(&state.document_owners)?;
+    let owners=lock(&state.document_owners)?;
     if owners.get(&id).is_some_and(|owner|owner!=window.label()){return Err("This map is already open for editing in another Spark window.".into());}
-    shared_editing::claim_owner(&state,&id,window.label())?;owners.insert(id,window.label().into());Ok(())
+    drop(owners);shared_editing::claim_owner(&state,&id,window.label())?;lock(&state.document_owners)?.insert(id,window.label().into());Ok(())
 }
 #[tauri::command]
 fn release_project_document(state:State<AppState>,window:tauri::WebviewWindow,id:String)->Reply<()> {
+    let _history_guard=lock(&state.window_history)?;
     let mut owners=lock(&state.document_owners)?;if owners.get(&id).is_some_and(|owner|owner==window.label()){owners.remove(&id);}Ok(())
 }
 #[tauri::command]
-async fn open_project_window(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,workspace:Option<String>)->Reply<String> {
-    let state=app.state::<AppState>();let project=lock(&state.library)?.get(&id).map_err(error)?;
+async fn open_project_window(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,workspace:Option<String>,observe:Option<bool>)->Reply<String> {
+    let state=app.state::<AppState>();let _history_guard=lock(&state.window_history)?;let project=lock(&state.library)?.get(&id).map_err(error)?;
     check_document_owner(&state,&id,window.label())?;
     let label=format!("editor-{}",uuid::Uuid::new_v4());
     let route=workspace.as_deref().map(workspace_windows::checked_workspace).transpose()?;
-    let url=tauri::WebviewUrl::App(format!("index.html?project={}{}",project.id,route.map(|w|format!("&workspace={w}")).unwrap_or_default()).into());
+    let url=tauri::WebviewUrl::App(format!("index.html?project={}{}{}",project.id,route.map(|w|format!("&workspace={w}")).unwrap_or_default(),if observe==Some(true){"&observe=1"}else{""}).into());
     // Only a registered UUID project may select the local app page. No arbitrary URL or script.
     if uuid::Uuid::parse_str(&project.id).is_err(){return Err("Invalid project identity".into());}
     let child=tauri::WebviewWindowBuilder::new(&app,&label,url).title(format!("{} · Project Guilty Spark",project.title)).inner_size(1440.,900.).min_inner_size(1000.,640.).decorations(false).transparent(true).shadow(false).theme(Some(tauri::Theme::Dark)).build().map_err(error)?;
-    lock(&state.document_owners)?.insert(id,child.label().into());Ok(label)
+    if observe!=Some(true){lock(&state.document_owners)?.insert(id,child.label().into());}Ok(label)
 }
 #[tauri::command]
 fn initialize_mcc_inbox(app: tauri::AppHandle, state: State<AppState>) -> Reply<Bootstrap> {
@@ -2634,13 +2641,14 @@ pub fn run() {
                 installation: Mutex::new(installation),
                 managed: Mutex::new(None),
                 watcher: Mutex::new(None),
-                inspections: Mutex::new(HashMap::new()),
+                inspections: Mutex::new(inspection_cache::InspectionCache::default()),
                 jobs: Mutex::new(HashMap::new()),
                 logs: Mutex::new(vec![]),
                 diagnostics: Mutex::new(vec![]),
                 live_mcc: Mutex::new(None),
                 forge_session: Mutex::new(None),
                 document_owners: Mutex::new(HashMap::new()),
+                window_history: Mutex::new(()),
                 runtime_workbench: Mutex::new(Default::default()),
                 external_changes: Mutex::new(Default::default()),
                 invitations: Mutex::new(Default::default()),
@@ -2766,6 +2774,13 @@ pub fn run() {
             plan_bsp_assembly,
             preview_bsp_assembly,
             claim_project_document,
+            workspace_history_native::read_workspace_history,
+            workspace_history_native::commit_workspace_history,
+            workspace_history_native::take_project_document,
+            workspace_history_native::retain_workspace_draft,
+            workspace_history_native::inspection_cache_status,
+            megaworld_native::megaworld_atlas,
+            megaworld_native::import_megaworld_region,
             release_project_document,
             open_project_window,
             workspace_windows::open_workspace_window,
@@ -2956,13 +2971,14 @@ mod readiness_tests {
             installation: Mutex::new(Installation::default()),
             managed: Mutex::new(None),
             watcher: Mutex::new(None),
-            inspections: Mutex::new(HashMap::new()),
+            inspections: Mutex::new(inspection_cache::InspectionCache::default()),
             jobs: Mutex::new(HashMap::new()),
             logs: Mutex::new(vec![]),
             diagnostics: Mutex::new(vec![]),
             live_mcc: Mutex::new(None),
             forge_session: Mutex::new(None),
             document_owners:Mutex::new(HashMap::new()),
+            window_history:Mutex::new(()),
             runtime_workbench:Mutex::new(Default::default()),
             external_changes:Mutex::new(Default::default()),
             invitations:Mutex::new(Default::default()),

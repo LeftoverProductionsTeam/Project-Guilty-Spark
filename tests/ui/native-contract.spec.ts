@@ -142,6 +142,9 @@ async function mockDesktop(page: Page) {
     };
     const callbacks = new Map<number, (event: any) => unknown>();
     const events = new Map<number, { event: string; handler: number }>();
+    // Synthetic IPC contract only. Durable files, process recovery and window
+    // leases are covered by test-window-history-native.mjs against the real app.
+    const windowHistories = new Map<string, any>();
     let sequence = 0;
     const mock = (w.__sparkMock = {
       projects,
@@ -192,6 +195,17 @@ async function mockDesktop(page: Page) {
           return {id:'synthetic-import', sourceProjectId:args.sourceProjectId,sourceSha256:args.sourceSha256,tagId:tag.id,tagClass:tag.class,tagPath:tag.path,nativePath:'synthetic-import/'+tag.path,receiptSha256:'c'.repeat(64),fileCount:1};
         }
         if (command === 'claim_project_document' || command === 'release_project_document') return null;
+        if (command === 'read_workspace_history') return {writable:true,owner:'main',history:structuredClone(windowHistories.get(args.projectId)??null)};
+        if (command === 'commit_workspace_history') {
+          const previous=windowHistories.get(args.projectId);
+          if(args.revision!==(previous?.revision??0))throw Error('Synthetic revision conflict');
+          const snapshots=new Map((previous?.snapshots??[]).map((s:any)=>[s.key,s]));
+          for(const snapshot of args.snapshots)snapshots.set(snapshot.key,structuredClone(snapshot));
+          const keys=new Set([args.head.current,...args.head.past,...args.head.future]);
+          const next={revision:args.revision+1,head:structuredClone(args.head),snapshots:[...snapshots.values()].filter((s:any)=>keys.has(s.key))};
+          windowHistories.set(args.projectId,next);return next.revision;
+        }
+        if(command==='retain_workspace_draft')return 'C:/synthetic/rejected-draft.json';
         if (command === 'auto_connect_classic_textures') return null;
         if (command === 'auto_connect_sound_resources') return null;
         if (command === 'external_map_watch_start' || command === 'external_map_watch_poll') return {watchId:args.projectId??args.watchId,projectId:args.projectId??args.watchId,path:'C:/synthetic/external.map',status:'watching',candidate:null,message:'Watching a synthetic input; no real filesystem is read.'};
@@ -402,6 +416,7 @@ test('popping out a map editor saves the focused edit before transferring its do
   const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('28');
   await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(28);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.findIndex((call:any)=>call.command==='open_project_window'))).toBeGreaterThan(0);
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);
   const move=calls.findIndex((call:any)=>call.command==='open_project_window');expect(move).toBeGreaterThan(0);
   expect(calls.slice(0,move).some((call:any)=>call.command==='save_project')).toBe(true);

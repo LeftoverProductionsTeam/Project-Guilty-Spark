@@ -1,5 +1,7 @@
 # Native BSP Workshop
 
+The [C43 continuation](CONTINUATION_43_ENGINEERING.md) adds an original BSP Atlas inside the properties panel and a reviewed native CE two-region assembly path. The new connected world compiles and loads on a private server; its physical two-way player walkthrough remains pending. The four-view/source workflow below remains in place.
+
 This continuation extends committed C39 (`2155ae1`) in the existing isolated local `master` worktree. It adds source brush construction to the Level Editor. It does not replace QuickForge, native tag editing, the BSP combiner, external editors, or the preserved direct compiled-map prototype.
 
 The source/editor and MCC native compilation milestones are verified. **The required player walkthrough is pending. The complete playable-editor milestone is not accepted yet.**

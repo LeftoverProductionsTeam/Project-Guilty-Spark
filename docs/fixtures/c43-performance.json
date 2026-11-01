@@ -1,0 +1,4263 @@
+{
+  "schemaVersion": 1,
+  "inventory": {
+    "baseline": "Initial unoptimized C43 Atlas, debug build; C42 had no Atlas",
+    "conditions": "Sequential alternating debug builds; exact same 19 owned CE map files; complete file hashes; no OS cache flush. Private CE playtest remains open in a separate process.",
+    "rows": [
+      {
+        "pair": 1,
+        "label": "before",
+        "appSha256": "67f3dcf52e0756380f9989a890a32cbccbffe42474b5b253d7fb57bc94680b7b",
+        "initialMs": 19922,
+        "repeatMs": 5499,
+        "regions": 19,
+        "metadataSha256": "09975366c1b950bef741ba93c34c429b3c8e9c90c2ae8b564dd70a6efeeec434",
+        "stderr": "",
+        "elapsedMs": 25631.2166,
+        "stdout": "19 cache entries; 19 unique source regions; 0 failures; initial 19922 ms / repeat 5499 ms\n",
+        "cpuMs": 24781.25,
+        "peakWorkingSetBytes": null,
+        "exitCode": 0
+      },
+      {
+        "pair": 1,
+        "label": "after",
+        "appSha256": "50f083c59a2c7d2d26b4509e0d746858703447066e3aa17b94c541c53f94243c",
+        "initialMs": 7262,
+        "repeatMs": 5868,
+        "regions": 19,
+        "metadataSha256": "09975366c1b950bef741ba93c34c429b3c8e9c90c2ae8b564dd70a6efeeec434",
+        "elapsedMs": 13431.0168,
+        "cpuMs": 13109.375,
+        "stderr": "",
+        "peakWorkingSetBytes": null,
+        "stdout": "19 cache entries; 19 unique source regions; 0 failures; initial 7262 ms / repeat 5868 ms\n",
+        "exitCode": 0
+      },
+      {
+        "pair": 2,
+        "label": "before",
+        "appSha256": "67f3dcf52e0756380f9989a890a32cbccbffe42474b5b253d7fb57bc94680b7b",
+        "initialMs": 19295,
+        "repeatMs": 5554,
+        "regions": 19,
+        "metadataSha256": "09975366c1b950bef741ba93c34c429b3c8e9c90c2ae8b564dd70a6efeeec434",
+        "cpuMs": 24828.125,
+        "stderr": "",
+        "elapsedMs": 24897.3211,
+        "exitCode": 0,
+        "peakWorkingSetBytes": null,
+        "stdout": "19 cache entries; 19 unique source regions; 0 failures; initial 19295 ms / repeat 5554 ms\n"
+      },
+      {
+        "pair": 2,
+        "label": "after",
+        "appSha256": "50f083c59a2c7d2d26b4509e0d746858703447066e3aa17b94c541c53f94243c",
+        "initialMs": 7018,
+        "repeatMs": 5598,
+        "regions": 19,
+        "metadataSha256": "09975366c1b950bef741ba93c34c429b3c8e9c90c2ae8b564dd70a6efeeec434",
+        "peakWorkingSetBytes": null,
+        "stderr": "",
+        "cpuMs": 12609.375,
+        "stdout": "19 cache entries; 19 unique source regions; 0 failures; initial 7018 ms / repeat 5598 ms\n",
+        "elapsedMs": 12659.5728,
+        "exitCode": 0
+      },
+      {
+        "pair": 3,
+        "label": "before",
+        "appSha256": "67f3dcf52e0756380f9989a890a32cbccbffe42474b5b253d7fb57bc94680b7b",
+        "initialMs": 19288,
+        "repeatMs": 5568,
+        "regions": 19,
+        "metadataSha256": "09975366c1b950bef741ba93c34c429b3c8e9c90c2ae8b564dd70a6efeeec434",
+        "stdout": "19 cache entries; 19 unique source regions; 0 failures; initial 19288 ms / repeat 5568 ms\n",
+        "exitCode": 0,
+        "stderr": "",
+        "elapsedMs": 24887.153,
+        "cpuMs": 24734.375,
+        "peakWorkingSetBytes": null
+      },
+      {
+        "pair": 3,
+        "label": "after",
+        "appSha256": "50f083c59a2c7d2d26b4509e0d746858703447066e3aa17b94c541c53f94243c",
+        "initialMs": 7130,
+        "repeatMs": 5637,
+        "regions": 19,
+        "metadataSha256": "09975366c1b950bef741ba93c34c429b3c8e9c90c2ae8b564dd70a6efeeec434",
+        "stdout": "19 cache entries; 19 unique source regions; 0 failures; initial 7130 ms / repeat 5637 ms\n",
+        "peakWorkingSetBytes": null,
+        "exitCode": 0,
+        "elapsedMs": 12798.7973,
+        "cpuMs": 12765.625,
+        "stderr": ""
+      }
+    ],
+    "fullInventoryEquivalence": {
+      "beforeRegions": 187,
+      "afterRegions": 187,
+      "metadataSha256": "81b09f1725839e06a22e8b41269642fcab56ac3432b950e00381e758435f6f84",
+      "afterMetadataSha256": "81b09f1725839e06a22e8b41269642fcab56ac3432b950e00381e758435f6f84",
+      "sameMetadata": true,
+      "failures": [],
+      "sourceHashesEqual": true,
+      "elapsedMs": 219963
+    },
+    "peakInventoryMemoryMeasured": false
+  },
+  "nativeRenderer": {
+    "conditions": {
+      "profile": "fresh library and WebView profile; process-cold, not flushed OS disk cache",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "focusEmulation": true,
+      "qualityUnchanged": true,
+      "mapViewport": {
+        "width": 1428,
+        "height": 888
+      },
+      "contentViewport": {
+        "width": 1428,
+        "height": 888
+      },
+      "comparison": "One sequential C42/final-C43 sample pair, same generated CE connected map and original MCC Blood Gulch; no game or compilation running; fresh libraries/WebView profiles, OS cache not flushed. Working sets are summed across this app process tree and may include shared pages more than once.",
+      "conclusion": "No general renderer/startup/IPC/memory improvement claimed from this sample."
+    },
+    "before": {
+      "appSha256": "de24bd7dac9430e16006034761f320f32f38e3327fdcf0c5a960d782d5cd56a6",
+      "coldStartup": {
+        "shellMs": 1174.7053,
+        "status": {
+          "phase": "Workbench ready",
+          "completed": 3,
+          "total": 3,
+          "ready": true,
+          "elapsedMs": 496
+        },
+        "pollingRoundTripMs": [
+          2.8030999999998585,
+          3.18769999999995,
+          2.6881000000000768,
+          2.3246999999998934,
+          4.024799999999914,
+          2.9873999999999796,
+          2.419499999999971,
+          2.18100000000004,
+          2.4846000000000004,
+          2.310699999999997
+        ],
+        "processToShowcaseReadyMs": 4611.3041
+      },
+      "warmStartup": {
+        "shellMs": 673.7854999999981,
+        "status": {
+          "phase": "Workbench ready",
+          "completed": 3,
+          "total": 3,
+          "ready": true,
+          "elapsedMs": 379
+        },
+        "pollingRoundTripMs": [
+          2.260599999994156,
+          2.0305999999982305,
+          1.9140000000043074,
+          1.52290000001085,
+          1.544000000008964,
+          1.5325000000011642,
+          1.8717000000033295,
+          1.4811999999947147,
+          1.5392999999894528,
+          1.4235000000044238
+        ],
+        "processToShowcaseReadyMs": 2744.346399999995
+      },
+      "phases": [
+        {
+          "name": "showcase-first-initialization",
+          "elapsedMs": 3332.4046,
+          "canvas": {
+            "width": 1371,
+            "height": 322,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.051,0.098,0.133],\"ambientColor\":[0.9,0.95,1],\"ambientIntensity\":0.5,\"sunColor\":[1,0.95,0.88],\"sunIntensity\":0.7,\"sunAzimuth\":-30,\"sunElevation\":35,\"fogEnabled\":false,\"fogColor\":[0.3,0.43,0.51],\"fogNear\":25,\"fogFar\":180,\"fogMaximumDensity\":1}",
+            "effects": "{\"enabled\":true,\"bloom\":true,\"bloomStrength\":0.065,\"bloomThreshold\":1.25,\"bloomRadius\":0.16,\"exposureEv\":-0.15,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.2,\"selfIllumination\":true,\"selfIllumStrength\":0.85,\"quality\":\"full\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 17.299999982118607,
+              "start": 65.90000000596046
+            },
+            {
+              "name": "spark.ipc.startup_status",
+              "ms": 18.5,
+              "start": 66.5
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 17.599999994039536,
+              "start": 69.90000000596046
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 496,
+              "start": 70.19999998807907
+            },
+            {
+              "name": "spark.ipc.bootstrap",
+              "ms": 18.30000001192093,
+              "start": 71
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 482.2999999821186,
+              "start": 92.90000000596046
+            },
+            {
+              "name": "spark.ipc.discover_asset_sources",
+              "ms": 62.29999998211861,
+              "start": 98.30000001192093
+            },
+            {
+              "name": "spark.ipc.runtime_report",
+              "ms": 45.400000005960464,
+              "start": 99.09999999403954
+            },
+            {
+              "name": "spark.ipc.discover_halo_connections",
+              "ms": 63.400000005960464,
+              "start": 99.5
+            },
+            {
+              "name": "spark.ipc.open_asset_source",
+              "ms": 1563.9000000059605,
+              "start": 160.59999999403954
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 103.89999997615814,
+              "start": 1729.300000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_animations",
+              "ms": 107.7999999821186,
+              "start": 1729.9000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 429.7999999821186,
+              "start": 1833.4000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 933.6000000238419,
+              "start": 1833.699999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 38.89999997615814,
+              "start": 2767.300000011921
+            }
+          ]
+        },
+        {
+          "name": "showcase-process-cpu-gpu-memory",
+          "elapsedMs": 2901.1270999999997,
+          "cpuOneCorePercent": 27.288467329117733,
+          "workingSetBytes": 833818624,
+          "privateBytes": 794529792,
+          "gpu3DPercent": 6,
+          "gpuProbeError": null
+        },
+        {
+          "name": "native-import-1",
+          "elapsedMs": 4494.201000000001,
+          "sourceContent": {
+            "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe",
+            "version": 609,
+            "tags": 2544,
+            "objects": 400,
+            "renderTriangles": 15909,
+            "modelTypes": 78,
+            "decals": 0
+          },
+          "decals": 0,
+          "nativeAndDecode": []
+        },
+        {
+          "name": "native-import-2",
+          "elapsedMs": 2934.1460000000025,
+          "sourceContent": {
+            "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+            "version": 13,
+            "tags": 2425,
+            "objects": 186,
+            "renderTriangles": 5503,
+            "modelTypes": 68,
+            "decals": 8
+          },
+          "decals": 8,
+          "nativeAndDecode": []
+        },
+        {
+          "name": "first-textured-map-1",
+          "elapsedMs": 5647.895799999998,
+          "resources": {
+            "sourceShaders": "158",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3782672387,3782803461,3782934535,3783065609,3783327757,3783720979,3784245275,3784507423,3784769571,3785359404,3785818163,3786211385,3786407996,3786801218,3787194440,3787456588,3787849810,3788177495,3788308569,3788701791,3790274679,3790667901,3790930049,3791323271,3791782030,3792109715,3792568474,3793289381,3793551529,3793682603,3794075825,3794206899,3794600121,3794993343,3795321028,3795386565,3811115445,3811377593,3811443130,3811508667,3811574204,3811639741,3811836352,3821208143,3821404754,3821601365,3821797976,3822060124,3822125661,3822256735,3822387809,3822453346,3822584420,3822912105,3822977642,3827958454,3828089528,3828155065,3828351676,3832873729,3833070340,3833135877,3833332488,3833463562,3833594636,3833660173,3836216116,3836412727,3836478264,3837395782,3837657930,3837723467,3840672632,3842638742,3842835353,3842900890,3843031964,3843818408,3844015019,3845718981,3845915592,3845981129,3848930294,3848995831,3850241034,3850372108,3850503182,3851158552,3851355163,3851551774,3851748385,3853321273,3853517884,3856598123,3856794734,3856860271,3856925808,3857122419,3857319030,3859022992,3859285140,3862627527,3862824138,3862889675,3862955212,3865314544,3866035451,3866232062,3866297599,3871933781,3872130392,3872261466,3876062612,3876259223,3876849056,3876980130,3877111204,3877176741,3878094259,3878356407,3878553018,3880256980,3883206145,3887924809,3887990346,3888055883,3888121420,3888186957,3888252494,3888318031,3888383568,3888449105,3888514642,3888580179,3888645716,3888711253,3888776790,3888842327,3888907864,3888973401,3889038938,3889104475,3893823139,3894019750,3894085287,3894412972,3895330490,3895592638,3895658175,3896903378,3897296600,3897427674,3897493211,3897689822,3904636744,3908044668,3908241279,3908437890",
+            "sourceLightmaps": "5",
+            "sourceDetails": "177",
+            "sourceReflections": "84",
+            "reflectionIssues": "",
+            "skyTriangles": "190",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": null,
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.372549,0.403922,0.552941],\"ambientColor\":[0.356863,0.415686,0.92549],\"ambientIntensity\":0.27,\"sunColor\":[0.87451,0.866667,0.823529],\"sunIntensity\":1.1,\"sunAzimuth\":-138,\"sunElevation\":26,\"fogEnabled\":true,\"fogColor\":[0.372549,0.403922,0.552941],\"fogNear\":0,\"fogFar\":120,\"fogMaximumDensity\":0.5}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.open_project",
+              "ms": 127.5,
+              "start": 1655.0999999940395
+            },
+            {
+              "name": "spark.ipc.claim_project_document",
+              "ms": 3.699999988079071,
+              "start": 1782.800000011921
+            },
+            {
+              "name": "spark.ipc.auto_connect_classic_textures",
+              "ms": 1336.199999988079,
+              "start": 1786.5
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 27.599999994039536,
+              "start": 1828.0999999940395
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 27.5,
+              "start": 1828.5
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 26.80000001192093,
+              "start": 1829.199999988079
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 91.69999998807907,
+              "start": 1830.4000000059605
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 19,
+              "start": 1837.4000000059605
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 366.39999997615814,
+              "start": 1837.800000011921
+            },
+            {
+              "name": "spark.ipc.auto_connect_sound_resources",
+              "ms": 1300.2000000178814,
+              "start": 1838.0999999940395
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.2999999821186066,
+              "start": 1858.4000000059605
+            },
+            {
+              "name": "spark.ipc.external_map_watch_start",
+              "ms": 3.699999988079071,
+              "start": 2049.9000000059605
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 2.2000000178813934,
+              "start": 2053.5999999940395
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.0999999940395355,
+              "start": 2056.4000000059605
+            },
+            {
+              "name": "spark.ipc.discover_asset_sources",
+              "ms": 72,
+              "start": 2132.300000011921
+            },
+            {
+              "name": "spark.ipc.bitmap_resource_candidates",
+              "ms": 70.90000000596046,
+              "start": 2133.4000000059605
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 75.2999999821186,
+              "start": 2133.9000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 189.2999999821186,
+              "start": 2188.4000000059605
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 398.7000000178814,
+              "start": 2377.699999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 326.90000000596046,
+              "start": 2814.5999999940395
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 280.5,
+              "start": 2871.800000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 678.5,
+              "start": 3152
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 156.2999999821186,
+              "start": 3152.4000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 472.7000000178814,
+              "start": 3401.699999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 257.19999998807907,
+              "start": 3833.9000000059605
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 199.40000000596046,
+              "start": 3840
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 107.40000000596046,
+              "start": 3874.4000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 292.59999999403954,
+              "start": 4090.5999999940395
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 341.09999999403954,
+              "start": 4097.800000011921
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 398.7999999821186,
+              "start": 4356.800000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 51.20000001788139,
+              "start": 4383.199999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 249.59999999403954,
+              "start": 4531
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 81.40000000596046,
+              "start": 4780.5999999940395
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 79.7000000178814,
+              "start": 4951.699999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 77,
+              "start": 5031.4000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 300.09999999403954,
+              "start": 5145.5999999940395
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 252.19999998807907,
+              "start": 5203.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 134.30000001192093,
+              "start": 5455.699999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 115.59999999403954,
+              "start": 5626.800000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 122.60000002384186,
+              "start": 5689.699999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 66.39999997615814,
+              "start": 5812.300000011921
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 70.09999999403954,
+              "start": 5910.800000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 77.90000000596046,
+              "start": 5945.699999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 16.099999994039536,
+              "start": 6023.5999999940395
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 73.7000000178814,
+              "start": 6072.0999999940395
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 80.30000001192093,
+              "start": 6107.199999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 62.69999998807907,
+              "start": 6187.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 80.19999998807907,
+              "start": 6318.800000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 7,
+              "start": 6399
+            }
+          ]
+        },
+        {
+          "name": "map-1-process-cpu-gpu-memory",
+          "elapsedMs": 2849.8532000000014,
+          "cpuOneCorePercent": 70.87289029535866,
+          "workingSetBytes": 1304010752,
+          "privateBytes": 1300574208,
+          "gpu3DPercent": 9,
+          "gpuProbeError": null
+        },
+        {
+          "name": "first-textured-map-2",
+          "elapsedMs": 6187.869599999998,
+          "resources": {
+            "sourceShaders": "151",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3783065609,3783327757,3783786516,3784114201,3784572960,3784966182,3785293867,3785621552,3785818163,3786080311,3786211385,3786539070,3786801218,3786932292,3787391051,3787718736,3787849810,3788177495,3788570717,3789095013,3789422698,3789684846,3789946994,3790274679,3790471290,3790930049,3791257734,3791388808,3791519882,3792044178,3792306326,3792437400,3792502937,3792699548,3798204656,3798466804,3798532341,3798728952,3798860026,3798991100,3799056637,3801678117,3801940265,3802005802,3813867999,3814064610,3815768572,3815965183,3816030720,3822518883,3822715494,3822912105,3823108716,3823370864,3823501938,3823567475,3823633012,3823829623,3824026234,3831104230,3831300841,3831366378,3831431915,3831497452,3831562989,3831759600,3837395782,3837723467,3837789004,3842507668,3842638742,3842769816,3842966427,3843163038,3843228575,3846374351,3851355163,3851551774,3851748385,3851944996,3853517884,3853714495,3857253493,3857450104,3857515641,3857581178,3860006047,3860399269,3860792491,3861251250,3861775546,3861972157,3862037694,3862168768,3862824138,3862889675,3864134878,3864265952,3864397026,3864855785,3865052396,3865117933,3865183470,3865380081,3865576692,3867280654,3867542802,3870557504,3870688578,3870819652,3870885189,3871868244,3872130392,3872195929,3874948483,3876914593,3877111204,3877242278,3880519128,3880715739,3880781276,3891988103,3892184714,3892250251,3892446862,3892709010,3892905621,3894544046,3897427674,3898345192,3898541803,3898607340,3899983617,3900311302,3900507913,3900704524,3938781519,3938978130,3939174741,3939305815,3939436889,3939633500,3939961185,3940157796,3940288870,3940616555,3940747629,3940878703,3941009777,3941075314,3941140851",
+            "sourceLightmaps": "15",
+            "sourceDetails": "151",
+            "sourceReflections": "68",
+            "reflectionIssues": "",
+            "skyTriangles": "183",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": {
+            "source": 8,
+            "rendered": 8,
+            "omitted": 0
+          },
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[1,0.901961,0.768628],\"ambientColor\":[0.870588,0.843137,0.752941],\"ambientIntensity\":0.2,\"sunColor\":[0.905882,0.894118,0.796079],\"sunIntensity\":1.8,\"sunAzimuth\":10,\"sunElevation\":40,\"fogEnabled\":true,\"fogColor\":[1,0.901961,0.768628],\"fogNear\":3,\"fogFar\":100,\"fogMaximumDensity\":0.4}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 153.80000001192093,
+              "start": 11044.699999988079
+            },
+            {
+              "name": "spark.ipc.open_project",
+              "ms": 104.7000000178814,
+              "start": 11092.199999988079
+            },
+            {
+              "name": "spark.ipc.claim_project_document",
+              "ms": 5.800000011920929,
+              "start": 11197
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 420.60000002384186,
+              "start": 11198.699999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 138.19999998807907,
+              "start": 11198.800000011921
+            },
+            {
+              "name": "spark.ipc.connect_mcc_texture_resources",
+              "ms": 1238.199999988079,
+              "start": 11202.800000011921
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 2,
+              "start": 11221
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 77.19999998807907,
+              "start": 11259.800000011921
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 76.69999998807907,
+              "start": 11260.300000011921
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 75.69999998807907,
+              "start": 11261.300000011921
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 75.30000001192093,
+              "start": 11261.699999988079
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 74.90000000596046,
+              "start": 11262.59999999404
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 70.90000000596046,
+              "start": 11266.59999999404
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 306.69999998807907,
+              "start": 11267.300000011921
+            },
+            {
+              "name": "spark.ipc.auto_connect_sound_resources",
+              "ms": 1173.2000000178814,
+              "start": 11267.699999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 355.7000000178814,
+              "start": 11313.09999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 176,
+              "start": 11668.800000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 565.5999999940395,
+              "start": 11875.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 525.1999999880791,
+              "start": 11922.40000000596
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 181.2000000178814,
+              "start": 12370.699999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 76.30000001192093,
+              "start": 12447.59999999404
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.5999999940395355,
+              "start": 12527.5
+            },
+            {
+              "name": "spark.ipc.external_map_watch_start",
+              "ms": 146.7999999821186,
+              "start": 12551.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 754.5,
+              "start": 12554.09999999404
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 147.5,
+              "start": 12554.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 85.69999998807907,
+              "start": 12617
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 596.1000000238419,
+              "start": 12698.699999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 111,
+              "start": 12702.699999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 438.10000002384186,
+              "start": 12880.199999988079
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 193.5,
+              "start": 13303.199999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 434.59999999403954,
+              "start": 13318
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 150.19999998807907,
+              "start": 13318.300000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 36.599999994039536,
+              "start": 13538.59999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 69.5,
+              "start": 13575.199999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 71.2999999821186,
+              "start": 13723.300000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 77,
+              "start": 13794.59999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 457.19999998807907,
+              "start": 13908.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 48,
+              "start": 13951.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 100.69999998807907,
+              "start": 13999.40000000596
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 75.5,
+              "start": 14127.300000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 36.80000001192093,
+              "start": 14174.59999999404
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 79.59999999403954,
+              "start": 14202.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 70.40000000596046,
+              "start": 14211.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 384.30000001192093,
+              "start": 14355.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 326,
+              "start": 14367.699999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 84.40000000596046,
+              "start": 14739.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 328.39999997615814,
+              "start": 14898.800000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 54.5,
+              "start": 15227.300000011921
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 44.099999994039536,
+              "start": 15308.300000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 320.89999997615814,
+              "start": 15333.800000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 6.4000000059604645,
+              "start": 15654.699999988079
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 330.2999999821186,
+              "start": 15710.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 29.400000005960464,
+              "start": 16041.199999988079
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 44.900000005960464,
+              "start": 16097.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 27.200000017881393,
+              "start": 16122.199999988079
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 91.5,
+              "start": 16142
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 46.5,
+              "start": 16149.40000000596
+            }
+          ]
+        },
+        {
+          "name": "map-2-process-cpu-gpu-memory",
+          "elapsedMs": 2840.5139000000054,
+          "cpuOneCorePercent": 30.14293230445458,
+          "workingSetBytes": 1548742656,
+          "privateBytes": 1454043136,
+          "gpu3DPercent": 5,
+          "gpuProbeError": null
+        },
+        {
+          "name": "map-switch-1-to-1",
+          "elapsedMs": 4231.455600000001,
+          "resources": {
+            "sourceShaders": "158",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3782672387,3782803461,3782934535,3783065609,3783327757,3783720979,3784245275,3784507423,3784769571,3785359404,3785818163,3786211385,3786407996,3786801218,3787194440,3787456588,3787849810,3788177495,3788308569,3788701791,3790274679,3790667901,3790930049,3791323271,3791782030,3792109715,3792568474,3793289381,3793551529,3793682603,3794075825,3794206899,3794600121,3794993343,3795321028,3795386565,3811115445,3811377593,3811443130,3811508667,3811574204,3811639741,3811836352,3821208143,3821404754,3821601365,3821797976,3822060124,3822125661,3822256735,3822387809,3822453346,3822584420,3822912105,3822977642,3827958454,3828089528,3828155065,3828351676,3832873729,3833070340,3833135877,3833332488,3833463562,3833594636,3833660173,3836216116,3836412727,3836478264,3837395782,3837657930,3837723467,3840672632,3842638742,3842835353,3842900890,3843031964,3843818408,3844015019,3845718981,3845915592,3845981129,3848930294,3848995831,3850241034,3850372108,3850503182,3851158552,3851355163,3851551774,3851748385,3853321273,3853517884,3856598123,3856794734,3856860271,3856925808,3857122419,3857319030,3859022992,3859285140,3862627527,3862824138,3862889675,3862955212,3865314544,3866035451,3866232062,3866297599,3871933781,3872130392,3872261466,3876062612,3876259223,3876849056,3876980130,3877111204,3877176741,3878094259,3878356407,3878553018,3880256980,3883206145,3887924809,3887990346,3888055883,3888121420,3888186957,3888252494,3888318031,3888383568,3888449105,3888514642,3888580179,3888645716,3888711253,3888776790,3888842327,3888907864,3888973401,3889038938,3889104475,3893823139,3894019750,3894085287,3894412972,3895330490,3895592638,3895658175,3896903378,3897296600,3897427674,3897493211,3897689822,3904636744,3908044668,3908241279,3908437890",
+            "sourceLightmaps": "5",
+            "sourceDetails": "177",
+            "sourceReflections": "84",
+            "reflectionIssues": "",
+            "skyTriangles": "190",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": null,
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.372549,0.403922,0.552941],\"ambientColor\":[0.356863,0.415686,0.92549],\"ambientIntensity\":0.27,\"sunColor\":[0.87451,0.866667,0.823529],\"sunIntensity\":1.1,\"sunAzimuth\":-138,\"sunElevation\":26,\"fogEnabled\":true,\"fogColor\":[0.372549,0.403922,0.552941],\"fogNear\":0,\"fogFar\":120,\"fogMaximumDensity\":0.5}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.300000011920929,
+              "start": 20862.19999998808
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 107.80000001192093,
+              "start": 20904.19999998808
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 110.80000001192093,
+              "start": 20904.59999999404
+            },
+            {
+              "name": "spark.ipc.bitmap_resource_candidates",
+              "ms": 110.2000000178814,
+              "start": 20905.59999999404
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 110.40000000596046,
+              "start": 20906
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 109.5,
+              "start": 20906.30000001192
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 109.5,
+              "start": 20906.90000000596
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 101,
+              "start": 20915.30000001192
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 721.1999999880791,
+              "start": 20915.90000000596
+            },
+            {
+              "name": "spark.ipc.auto_connect_sound_resources",
+              "ms": 1419.300000011921,
+              "start": 20916.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 158.2999999821186,
+              "start": 20979.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 361.19999998807907,
+              "start": 21137.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 118.40000000596046,
+              "start": 21534
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 140.30000001192093,
+              "start": 21588.19999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 366.19999998807907,
+              "start": 21662.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 167.59999999403954,
+              "start": 21728.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 110.90000000596046,
+              "start": 21991.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 295.2999999821186,
+              "start": 22032.30000001192
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 164.30000001192093,
+              "start": 22082.69999998808
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 107.19999998807907,
+              "start": 22102
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 146.09999999403954,
+              "start": 22247
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 106.30000001192093,
+              "start": 22298.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 207.80000001192093,
+              "start": 22335
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 49,
+              "start": 22404.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 96.90000000596046,
+              "start": 22542.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 79.19999998807907,
+              "start": 22639.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 82.40000000596046,
+              "start": 22807.69999998808
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 78.80000001192093,
+              "start": 22890.09999999404
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 118.40000000596046,
+              "start": 23002.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 118.09999999403954,
+              "start": 23008.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 130.59999999403954,
+              "start": 23065.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 140.90000000596046,
+              "start": 23196.59999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 111.7999999821186,
+              "start": 23376.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 125.69999998807907,
+              "start": 23437.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 66.2999999821186,
+              "start": 23563.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 76.89999997615814,
+              "start": 23697.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 16,
+              "start": 23774.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 80.5,
+              "start": 23857.59999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 65.5,
+              "start": 23938.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 75.80000001192093,
+              "start": 24073
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 16.900000005960464,
+              "start": 24099.19999998808
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 13,
+              "start": 24116.19999998808
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 7.399999976158142,
+              "start": 24148.80000001192
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 2.0999999940395355,
+              "start": 24915.40000000596
+            }
+          ]
+        },
+        {
+          "name": "map-switch-2-to-2",
+          "elapsedMs": 4801.144099999998,
+          "resources": {
+            "sourceShaders": "151",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3783065609,3783327757,3783786516,3784114201,3784572960,3784966182,3785293867,3785621552,3785818163,3786080311,3786211385,3786539070,3786801218,3786932292,3787391051,3787718736,3787849810,3788177495,3788570717,3789095013,3789422698,3789684846,3789946994,3790274679,3790471290,3790930049,3791257734,3791388808,3791519882,3792044178,3792306326,3792437400,3792502937,3792699548,3798204656,3798466804,3798532341,3798728952,3798860026,3798991100,3799056637,3801678117,3801940265,3802005802,3813867999,3814064610,3815768572,3815965183,3816030720,3822518883,3822715494,3822912105,3823108716,3823370864,3823501938,3823567475,3823633012,3823829623,3824026234,3831104230,3831300841,3831366378,3831431915,3831497452,3831562989,3831759600,3837395782,3837723467,3837789004,3842507668,3842638742,3842769816,3842966427,3843163038,3843228575,3846374351,3851355163,3851551774,3851748385,3851944996,3853517884,3853714495,3857253493,3857450104,3857515641,3857581178,3860006047,3860399269,3860792491,3861251250,3861775546,3861972157,3862037694,3862168768,3862824138,3862889675,3864134878,3864265952,3864397026,3864855785,3865052396,3865117933,3865183470,3865380081,3865576692,3867280654,3867542802,3870557504,3870688578,3870819652,3870885189,3871868244,3872130392,3872195929,3874948483,3876914593,3877111204,3877242278,3880519128,3880715739,3880781276,3891988103,3892184714,3892250251,3892446862,3892709010,3892905621,3894544046,3897427674,3898345192,3898541803,3898607340,3899983617,3900311302,3900507913,3900704524,3938781519,3938978130,3939174741,3939305815,3939436889,3939633500,3939961185,3940157796,3940288870,3940616555,3940747629,3940878703,3941009777,3941075314,3941140851",
+            "sourceLightmaps": "15",
+            "sourceDetails": "151",
+            "sourceReflections": "68",
+            "reflectionIssues": "",
+            "skyTriangles": "183",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": {
+            "source": 8,
+            "rendered": 8,
+            "omitted": 0
+          },
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[1,0.901961,0.768628],\"ambientColor\":[0.870588,0.843137,0.752941],\"ambientIntensity\":0.2,\"sunColor\":[0.905882,0.894118,0.796079],\"sunIntensity\":1.8,\"sunAzimuth\":10,\"sunElevation\":40,\"fogEnabled\":true,\"fogColor\":[1,0.901961,0.768628],\"fogNear\":3,\"fogFar\":100,\"fogMaximumDensity\":0.4}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.300000011920929,
+              "start": 25093.59999999404
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 90.90000000596046,
+              "start": 25128
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 90.59999999403954,
+              "start": 25128.30000001192
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 89.59999999403954,
+              "start": 25129.40000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 89.30000001192093,
+              "start": 25129.69999998808
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 89,
+              "start": 25130.5
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 84.69999998807907,
+              "start": 25134.80000001192
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 300.2999999821186,
+              "start": 25135.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 359.2999999821186,
+              "start": 25194.30000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 174.59999999403954,
+              "start": 25553.59999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 470.90000000596046,
+              "start": 25754.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 51.20000001788139,
+              "start": 25794.09999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 76.89999997615814,
+              "start": 25845.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 39.19999998807907,
+              "start": 25987.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 98.60000002384186,
+              "start": 26026.69999998808
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 122.90000000596046,
+              "start": 26149.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 77.7999999821186,
+              "start": 26195.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 425.30000001192093,
+              "start": 26232.59999999404
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 179.19999998807907,
+              "start": 26272
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 78,
+              "start": 26273.19999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 45.89999997615814,
+              "start": 26423.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 102.90000000596046,
+              "start": 26469.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 67.40000000596046,
+              "start": 26644.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 339.30000001192093,
+              "start": 26665.69999998808
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 72.39999997615814,
+              "start": 26712.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 362.09999999403954,
+              "start": 26860.40000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.800000011920929,
+              "start": 27137.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 84.80000001192093,
+              "start": 27222.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 360.40000000596046,
+              "start": 27381.59999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 53.400000005960464,
+              "start": 27742
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 356.59999999403954,
+              "start": 27843.80000001192
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 2.5,
+              "start": 28054.40000000596
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 3.7999999821186066,
+              "start": 28056.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 6,
+              "start": 28200.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 367,
+              "start": 28255.69999998808
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 29.400000005960464,
+              "start": 28622.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 27.599999994039536,
+              "start": 28707.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 46.70000001788139,
+              "start": 28735.09999999404
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.5,
+              "start": 29131.90000000596
+            }
+          ]
+        },
+        {
+          "name": "map-switch-3-to-1",
+          "elapsedMs": 4200.989300000001,
+          "resources": {
+            "sourceShaders": "158",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3782672387,3782803461,3782934535,3783065609,3783327757,3783720979,3784245275,3784507423,3784769571,3785359404,3785818163,3786211385,3786407996,3786801218,3787194440,3787456588,3787849810,3788177495,3788308569,3788701791,3790274679,3790667901,3790930049,3791323271,3791782030,3792109715,3792568474,3793289381,3793551529,3793682603,3794075825,3794206899,3794600121,3794993343,3795321028,3795386565,3811115445,3811377593,3811443130,3811508667,3811574204,3811639741,3811836352,3821208143,3821404754,3821601365,3821797976,3822060124,3822125661,3822256735,3822387809,3822453346,3822584420,3822912105,3822977642,3827958454,3828089528,3828155065,3828351676,3832873729,3833070340,3833135877,3833332488,3833463562,3833594636,3833660173,3836216116,3836412727,3836478264,3837395782,3837657930,3837723467,3840672632,3842638742,3842835353,3842900890,3843031964,3843818408,3844015019,3845718981,3845915592,3845981129,3848930294,3848995831,3850241034,3850372108,3850503182,3851158552,3851355163,3851551774,3851748385,3853321273,3853517884,3856598123,3856794734,3856860271,3856925808,3857122419,3857319030,3859022992,3859285140,3862627527,3862824138,3862889675,3862955212,3865314544,3866035451,3866232062,3866297599,3871933781,3872130392,3872261466,3876062612,3876259223,3876849056,3876980130,3877111204,3877176741,3878094259,3878356407,3878553018,3880256980,3883206145,3887924809,3887990346,3888055883,3888121420,3888186957,3888252494,3888318031,3888383568,3888449105,3888514642,3888580179,3888645716,3888711253,3888776790,3888842327,3888907864,3888973401,3889038938,3889104475,3893823139,3894019750,3894085287,3894412972,3895330490,3895592638,3895658175,3896903378,3897296600,3897427674,3897493211,3897689822,3904636744,3908044668,3908241279,3908437890",
+            "sourceLightmaps": "5",
+            "sourceDetails": "177",
+            "sourceReflections": "84",
+            "reflectionIssues": "",
+            "skyTriangles": "190",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": null,
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.372549,0.403922,0.552941],\"ambientColor\":[0.356863,0.415686,0.92549],\"ambientIntensity\":0.27,\"sunColor\":[0.87451,0.866667,0.823529],\"sunIntensity\":1.1,\"sunAzimuth\":-138,\"sunElevation\":26,\"fogEnabled\":true,\"fogColor\":[0.372549,0.403922,0.552941],\"fogNear\":0,\"fogFar\":120,\"fogMaximumDensity\":0.5}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.199999988079071,
+              "start": 29903
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 112,
+              "start": 29942.59999999404
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 114.80000001192093,
+              "start": 29943
+            },
+            {
+              "name": "spark.ipc.bitmap_resource_candidates",
+              "ms": 113.90000000596046,
+              "start": 29944.09999999404
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 113.59999999403954,
+              "start": 29944.40000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 113.30000001192093,
+              "start": 29944.69999998808
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 113.5,
+              "start": 29945.40000000596
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 105.30000001192093,
+              "start": 29953.19999998808
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 749.3000000119209,
+              "start": 29953.69999998808
+            },
+            {
+              "name": "spark.ipc.auto_connect_sound_resources",
+              "ms": 1430.5,
+              "start": 29954
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 169.5,
+              "start": 30020.59999999404
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 39.5,
+              "start": 30052.30000001192
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 98.2999999821186,
+              "start": 30091.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 365.80000001192093,
+              "start": 30190.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 127.69999998807907,
+              "start": 30590.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 153,
+              "start": 30646
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 347.80000001192093,
+              "start": 30731.09999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 158.19999998807907,
+              "start": 30799
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 103,
+              "start": 31044.59999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 293.80000001192093,
+              "start": 31082.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 106.40000000596046,
+              "start": 31147.59999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 100.30000001192093,
+              "start": 31347.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 233.5,
+              "start": 31384.09999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 52.19999998807907,
+              "start": 31447.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 99,
+              "start": 31588.19999998808
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 80,
+              "start": 31687.19999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 91.40000000596046,
+              "start": 31857.40000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 169,
+              "start": 31948.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 73.7999999821186,
+              "start": 31948.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 116,
+              "start": 32060.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 132.60000002384186,
+              "start": 32116.69999998808
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 69.80000001192093,
+              "start": 32117.19999998808
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 57.5,
+              "start": 32187.09999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 135.19999998807907,
+              "start": 32249.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 106.2000000178814,
+              "start": 32422.19999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 121.90000000596046,
+              "start": 32479.59999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 65,
+              "start": 32601.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 73.90000000596046,
+              "start": 32732
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 16,
+              "start": 32805.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 80,
+              "start": 32886.69999998808
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 64,
+              "start": 32966.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 73.69999998807907,
+              "start": 33097.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 7.300000011920929,
+              "start": 33171.59999999404
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.4000000059604645,
+              "start": 33951
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 2.4000000059604645,
+              "start": 34046
+            }
+          ]
+        },
+        {
+          "name": "map-switch-4-to-2",
+          "elapsedMs": 4763.9331999999995,
+          "resources": {
+            "sourceShaders": "151",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3783065609,3783327757,3783786516,3784114201,3784572960,3784966182,3785293867,3785621552,3785818163,3786080311,3786211385,3786539070,3786801218,3786932292,3787391051,3787718736,3787849810,3788177495,3788570717,3789095013,3789422698,3789684846,3789946994,3790274679,3790471290,3790930049,3791257734,3791388808,3791519882,3792044178,3792306326,3792437400,3792502937,3792699548,3798204656,3798466804,3798532341,3798728952,3798860026,3798991100,3799056637,3801678117,3801940265,3802005802,3813867999,3814064610,3815768572,3815965183,3816030720,3822518883,3822715494,3822912105,3823108716,3823370864,3823501938,3823567475,3823633012,3823829623,3824026234,3831104230,3831300841,3831366378,3831431915,3831497452,3831562989,3831759600,3837395782,3837723467,3837789004,3842507668,3842638742,3842769816,3842966427,3843163038,3843228575,3846374351,3851355163,3851551774,3851748385,3851944996,3853517884,3853714495,3857253493,3857450104,3857515641,3857581178,3860006047,3860399269,3860792491,3861251250,3861775546,3861972157,3862037694,3862168768,3862824138,3862889675,3864134878,3864265952,3864397026,3864855785,3865052396,3865117933,3865183470,3865380081,3865576692,3867280654,3867542802,3870557504,3870688578,3870819652,3870885189,3871868244,3872130392,3872195929,3874948483,3876914593,3877111204,3877242278,3880519128,3880715739,3880781276,3891988103,3892184714,3892250251,3892446862,3892709010,3892905621,3894544046,3897427674,3898345192,3898541803,3898607340,3899983617,3900311302,3900507913,3900704524,3938781519,3938978130,3939174741,3939305815,3939436889,3939633500,3939961185,3940157796,3940288870,3940616555,3940747629,3940878703,3941009777,3941075314,3941140851",
+            "sourceLightmaps": "15",
+            "sourceDetails": "151",
+            "sourceReflections": "68",
+            "reflectionIssues": "",
+            "skyTriangles": "183",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": {
+            "source": 8,
+            "rendered": 8,
+            "omitted": 0
+          },
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[1,0.901961,0.768628],\"ambientColor\":[0.870588,0.843137,0.752941],\"ambientIntensity\":0.2,\"sunColor\":[0.905882,0.894118,0.796079],\"sunIntensity\":1.8,\"sunAzimuth\":10,\"sunElevation\":40,\"fogEnabled\":true,\"fogColor\":[1,0.901961,0.768628],\"fogNear\":3,\"fogFar\":100,\"fogMaximumDensity\":0.4}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.399999976158142,
+              "start": 34114.30000001192
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 82.69999998807907,
+              "start": 34147
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 82.59999999403954,
+              "start": 34147.30000001192
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 81.59999999403954,
+              "start": 34148.30000001192
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 81.2000000178814,
+              "start": 34148.69999998808
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 81,
+              "start": 34149.30000001192
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 77.40000000596046,
+              "start": 34152.90000000596
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 301,
+              "start": 34153.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 343.90000000596046,
+              "start": 34210.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 172.69999998807907,
+              "start": 34554.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 462,
+              "start": 34753
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 47.400000005960464,
+              "start": 34793.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 76.5,
+              "start": 34840.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 39.69999998807907,
+              "start": 34981.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 96.60000002384186,
+              "start": 35021.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 74.40000000596046,
+              "start": 35186.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 444.7999999821186,
+              "start": 35222.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 77.80000001192093,
+              "start": 35260.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 46.29999998211861,
+              "start": 35420.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 101.40000000596046,
+              "start": 35467.19999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 68.5,
+              "start": 35646.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 342.2999999821186,
+              "start": 35673.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 72.2000000178814,
+              "start": 35714.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 345.10000002384186,
+              "start": 35863.69999998808
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 3.800000011920929,
+              "start": 36061.09999999404
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 1.5999999940395355,
+              "start": 36065
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 2,
+              "start": 36152.09999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 84.39999997615814,
+              "start": 36208.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 325.69999998807907,
+              "start": 36366.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 52.20000001788139,
+              "start": 36692.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 318.69999998807907,
+              "start": 36793
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 6.100000023841858,
+              "start": 37111.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 336.89999997615814,
+              "start": 37165.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 30.100000023841858,
+              "start": 37502.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 27.299999982118607,
+              "start": 37583.30000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 46.20000001788139,
+              "start": 37610.59999999404
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 2.5,
+              "start": 38050.30000001192
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 1.5999999940395355,
+              "start": 38052.80000001192
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.600000023841858,
+              "start": 38150.69999998808
+            }
+          ]
+        },
+        {
+          "name": "repeat-switch-memory",
+          "elapsedMs": 2836.4932000000044,
+          "cpuOneCorePercent": 37.84222534222534,
+          "workingSetBytes": 1627136000,
+          "privateBytes": 1505021952,
+          "gpu3DPercent": 5,
+          "gpuProbeError": null
+        },
+        {
+          "name": "large-asset-catalog",
+          "elapsedMs": 3117.874299999996,
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 95.90000000596046,
+              "start": 57029.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 93.89999997615814,
+              "start": 57030.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 213.80000001192093,
+              "start": 57124.19999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 187.90000000596046,
+              "start": 57124.59999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 214.09999999403954,
+              "start": 57125.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 211.69999998807907,
+              "start": 57125.90000000596
+            },
+            {
+              "name": "spark.ipc.open_asset_source",
+              "ms": 1577.9000000059605,
+              "start": 57145.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 24.900000005960464,
+              "start": 57312.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 0.30000001192092896,
+              "start": 57337.59999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 117.2999999821186,
+              "start": 57468.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 117.69999998807907,
+              "start": 57468.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 93,
+              "start": 57585.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 118,
+              "start": 57586.19999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 92.40000000596046,
+              "start": 57586.59999999404
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 0.09999999403953552,
+              "start": 57679
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 0.20000001788139343,
+              "start": 57704.19999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 76,
+              "start": 57800.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 83.5,
+              "start": 57876.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 83.2000000178814,
+              "start": 57876.69999998808
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 32.900000005960464,
+              "start": 57959.90000000596
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 2.199999988079071,
+              "start": 58046.30000001192
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 1.800000011920929,
+              "start": 58048.5
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.5,
+              "start": 58153.80000001192
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.4000000059604645,
+              "start": 58724.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 99.30000001192093,
+              "start": 58757.69999998808
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 98.90000000596046,
+              "start": 58758.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 86.59999999403954,
+              "start": 58823.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 386.80000001192093,
+              "start": 58910.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 96.59999999403954,
+              "start": 58910.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 19.400000005960464,
+              "start": 59007
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 90.69999998807907,
+              "start": 59897.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 90.89999997615814,
+              "start": 59897.80000001192
+            }
+          ],
+          "nativePreviewCount": 1,
+          "visibleCards": 150
+        },
+        {
+          "name": "showcase-warm-return",
+          "elapsedMs": 972.2207999999955,
+          "canvas": {
+            "width": 1371,
+            "height": 322,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.051,0.098,0.133],\"ambientColor\":[0.9,0.95,1],\"ambientIntensity\":0.5,\"sunColor\":[1,0.95,0.88],\"sunIntensity\":0.7,\"sunAzimuth\":-30,\"sunElevation\":35,\"fogEnabled\":false,\"fogColor\":[0.3,0.43,0.51],\"fogNear\":25,\"fogFar\":180,\"fogMaximumDensity\":1}",
+            "effects": "{\"enabled\":true,\"bloom\":true,\"bloomStrength\":0.065,\"bloomThreshold\":1.25,\"bloomRadius\":0.16,\"exposureEv\":-0.15,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.2,\"selfIllumination\":true,\"selfIllumStrength\":0.85,\"quality\":\"full\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 422.5,
+              "start": 60458.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 86.69999998807907,
+              "start": 60550.40000000596
+            },
+            {
+              "name": "spark.ipc.discover_halo_connections",
+              "ms": 56.79999998211861,
+              "start": 60580.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 86.90000000596046,
+              "start": 60601.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 388.90000000596046,
+              "start": 60688.09999999404
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 101.19999998807907,
+              "start": 60688.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 0.30000001192092896,
+              "start": 60789.59999999404
+            }
+          ]
+        },
+        {
+          "name": "after-maps-home-memory",
+          "elapsedMs": 2845.3975000000064,
+          "cpuOneCorePercent": 10.442314456559972,
+          "workingSetBytes": 1422254080,
+          "privateBytes": 1417273344,
+          "gpu3DPercent": 6,
+          "gpuProbeError": null
+        },
+        {
+          "name": "showcase-warm-process",
+          "elapsedMs": 2053.0350000000035,
+          "canvas": {
+            "width": 1371,
+            "height": 322,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.051,0.098,0.133],\"ambientColor\":[0.9,0.95,1],\"ambientIntensity\":0.5,\"sunColor\":[1,0.95,0.88],\"sunIntensity\":0.7,\"sunAzimuth\":-30,\"sunElevation\":35,\"fogEnabled\":false,\"fogColor\":[0.3,0.43,0.51],\"fogNear\":25,\"fogFar\":180,\"fogMaximumDensity\":1}",
+            "effects": "{\"enabled\":true,\"bloom\":true,\"bloomStrength\":0.065,\"bloomThreshold\":1.25,\"bloomRadius\":0.16,\"exposureEv\":-0.15,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.2,\"selfIllumination\":true,\"selfIllumStrength\":0.85,\"quality\":\"full\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.open_project",
+              "ms": 771.8999999761581,
+              "start": 330.30000001192093
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 772.5,
+              "start": 331.69999998807907
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 96.80000001192093,
+              "start": 1104.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_animations",
+              "ms": 91.80000001192093,
+              "start": 1105.0999999940395
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 382.19999998807907,
+              "start": 1201.4000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 915.5,
+              "start": 1201.699999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 33.79999998211861,
+              "start": 2117.300000011921
+            }
+          ]
+        },
+        {
+          "name": "warm-process-memory",
+          "elapsedMs": 2873.6226000000024,
+          "cpuOneCorePercent": 20.738735592036324,
+          "workingSetBytes": 800534528,
+          "privateBytes": 751362048,
+          "gpu3DPercent": 6,
+          "gpuProbeError": null
+        }
+      ],
+      "openProjectRoundTrips": [
+        {
+          "elapsedMs": 3634.5550999999978,
+          "tags": 2544,
+          "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe"
+        },
+        {
+          "elapsedMs": 3556.244299999991,
+          "tags": 2544,
+          "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe"
+        },
+        {
+          "elapsedMs": 3663.0674,
+          "tags": 2544,
+          "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe"
+        },
+        {
+          "elapsedMs": 3705.4821999999986,
+          "tags": 2544,
+          "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe"
+        }
+      ]
+    },
+    "after": {
+      "appSha256": "87065a1922a20a8731e50bcd97b1fe0e5d22a9d0a347906fd6f39743c1843262",
+      "coldStartup": {
+        "shellMs": 1039.2556,
+        "status": {
+          "phase": "Workbench ready",
+          "completed": 3,
+          "total": 3,
+          "ready": true,
+          "elapsedMs": 406
+        },
+        "pollingRoundTripMs": [
+          2.0153000000000247,
+          2.041099999999915,
+          1.9402000000000044,
+          1.7343999999998232,
+          1.607200000000148,
+          1.7406000000000859,
+          1.6027000000001408,
+          4.142000000000053,
+          2.838999999999942,
+          2.255700000000161
+        ],
+        "processToShowcaseReadyMs": 4135.2312
+      },
+      "warmStartup": {
+        "shellMs": 752.4670999999944,
+        "status": {
+          "phase": "Workbench ready",
+          "completed": 3,
+          "total": 3,
+          "ready": true,
+          "elapsedMs": 450
+        },
+        "pollingRoundTripMs": [
+          2.0547999999980675,
+          1.784299999999348,
+          1.5956000000005588,
+          1.9835000000020955,
+          1.5048999999999069,
+          1.6181999999971595,
+          1.485899999999674,
+          1.481099999989965,
+          1.6405999999988126,
+          2.006999999997788
+        ],
+        "processToShowcaseReadyMs": 2797.512699999992
+      },
+      "phases": [
+        {
+          "name": "showcase-first-initialization",
+          "elapsedMs": 3009.9723999999997,
+          "canvas": {
+            "width": 1371,
+            "height": 322,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.051,0.098,0.133],\"ambientColor\":[0.9,0.95,1],\"ambientIntensity\":0.5,\"sunColor\":[1,0.95,0.88],\"sunIntensity\":0.7,\"sunAzimuth\":-30,\"sunElevation\":35,\"fogEnabled\":false,\"fogColor\":[0.3,0.43,0.51],\"fogNear\":25,\"fogFar\":180,\"fogMaximumDensity\":1}",
+            "effects": "{\"enabled\":true,\"bloom\":true,\"bloomStrength\":0.065,\"bloomThreshold\":1.25,\"bloomRadius\":0.16,\"exposureEv\":-0.15,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.2,\"selfIllumination\":true,\"selfIllumStrength\":0.85,\"quality\":\"full\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 14.699999988079071,
+              "start": 54.70000001788139
+            },
+            {
+              "name": "spark.ipc.startup_status",
+              "ms": 15.100000023841858,
+              "start": 55.099999994039536
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 16,
+              "start": 57.70000001788139
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 397.60000002384186,
+              "start": 58.099999994039536
+            },
+            {
+              "name": "spark.ipc.bootstrap",
+              "ms": 15.400000005960464,
+              "start": 59
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 384.5,
+              "start": 77.5
+            },
+            {
+              "name": "spark.ipc.discover_asset_sources",
+              "ms": 60.89999997615814,
+              "start": 82.2000000178814
+            },
+            {
+              "name": "spark.ipc.runtime_report",
+              "ms": 45.69999998807907,
+              "start": 82.80000001192093
+            },
+            {
+              "name": "spark.ipc.discover_halo_connections",
+              "ms": 61.29999998211861,
+              "start": 83.2000000178814
+            },
+            {
+              "name": "spark.ipc.open_asset_source",
+              "ms": 1595,
+              "start": 143.2000000178814
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 94,
+              "start": 1742.5999999940395
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_animations",
+              "ms": 94,
+              "start": 1743.300000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 390,
+              "start": 1836.800000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 867.6000000238419,
+              "start": 1837.0999999940395
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 33.29999998211861,
+              "start": 2704.7000000178814
+            }
+          ]
+        },
+        {
+          "name": "showcase-process-cpu-gpu-memory",
+          "elapsedMs": 2878.5676999999996,
+          "cpuOneCorePercent": 23.861242759347025,
+          "workingSetBytes": 830050304,
+          "privateBytes": 757612544,
+          "gpu3DPercent": 6,
+          "gpuProbeError": null
+        },
+        {
+          "name": "native-import-1",
+          "elapsedMs": 4364.7868,
+          "sourceContent": {
+            "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe",
+            "version": 609,
+            "tags": 2544,
+            "objects": 400,
+            "renderTriangles": 15909,
+            "modelTypes": 78,
+            "decals": 0
+          },
+          "decals": 0,
+          "nativeAndDecode": []
+        },
+        {
+          "name": "native-import-2",
+          "elapsedMs": 3033.0543,
+          "sourceContent": {
+            "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+            "version": 13,
+            "tags": 2425,
+            "objects": 186,
+            "renderTriangles": 5503,
+            "modelTypes": 68,
+            "decals": 8
+          },
+          "decals": 8,
+          "nativeAndDecode": []
+        },
+        {
+          "name": "first-textured-map-1",
+          "elapsedMs": 5734.8969,
+          "resources": {
+            "sourceShaders": "158",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3782672387,3782803461,3782934535,3783065609,3783327757,3783720979,3784245275,3784507423,3784769571,3785359404,3785818163,3786211385,3786407996,3786801218,3787194440,3787456588,3787849810,3788177495,3788308569,3788701791,3790274679,3790667901,3790930049,3791323271,3791782030,3792109715,3792568474,3793289381,3793551529,3793682603,3794075825,3794206899,3794600121,3794993343,3795321028,3795386565,3811115445,3811377593,3811443130,3811508667,3811574204,3811639741,3811836352,3821208143,3821404754,3821601365,3821797976,3822060124,3822125661,3822256735,3822387809,3822453346,3822584420,3822912105,3822977642,3827958454,3828089528,3828155065,3828351676,3832873729,3833070340,3833135877,3833332488,3833463562,3833594636,3833660173,3836216116,3836412727,3836478264,3837395782,3837657930,3837723467,3840672632,3842638742,3842835353,3842900890,3843031964,3843818408,3844015019,3845718981,3845915592,3845981129,3848930294,3848995831,3850241034,3850372108,3850503182,3851158552,3851355163,3851551774,3851748385,3853321273,3853517884,3856598123,3856794734,3856860271,3856925808,3857122419,3857319030,3859022992,3859285140,3862627527,3862824138,3862889675,3862955212,3865314544,3866035451,3866232062,3866297599,3871933781,3872130392,3872261466,3876062612,3876259223,3876849056,3876980130,3877111204,3877176741,3878094259,3878356407,3878553018,3880256980,3883206145,3887924809,3887990346,3888055883,3888121420,3888186957,3888252494,3888318031,3888383568,3888449105,3888514642,3888580179,3888645716,3888711253,3888776790,3888842327,3888907864,3888973401,3889038938,3889104475,3893823139,3894019750,3894085287,3894412972,3895330490,3895592638,3895658175,3896903378,3897296600,3897427674,3897493211,3897689822,3904636744,3908044668,3908241279,3908437890",
+            "sourceLightmaps": "5",
+            "sourceDetails": "177",
+            "sourceReflections": "84",
+            "reflectionIssues": "",
+            "skyTriangles": "190",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": null,
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.372549,0.403922,0.552941],\"ambientColor\":[0.356863,0.415686,0.92549],\"ambientIntensity\":0.27,\"sunColor\":[0.87451,0.866667,0.823529],\"sunIntensity\":1.1,\"sunAzimuth\":-138,\"sunElevation\":26,\"fogEnabled\":true,\"fogColor\":[0.372549,0.403922,0.552941],\"fogNear\":0,\"fogFar\":120,\"fogMaximumDensity\":0.5}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.open_project",
+              "ms": 128.40000000596046,
+              "start": 1412.7000000178814
+            },
+            {
+              "name": "spark.ipc.claim_project_document",
+              "ms": 3.7999999821186066,
+              "start": 1541.2000000178814
+            },
+            {
+              "name": "spark.ipc.read_workspace_history",
+              "ms": 7,
+              "start": 1545.1000000238419
+            },
+            {
+              "name": "spark.ipc.auto_connect_classic_textures",
+              "ms": 1381.8999999761581,
+              "start": 1552.1000000238419
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 33.19999998807907,
+              "start": 1596.800000011921
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 33.099999994039536,
+              "start": 1597.1000000238419
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 32.5,
+              "start": 1597.800000011921
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 98.19999998807907,
+              "start": 1599.2000000178814
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 24.5,
+              "start": 1606.300000011921
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 376.2999999821186,
+              "start": 1606.6000000238419
+            },
+            {
+              "name": "spark.ipc.auto_connect_sound_resources",
+              "ms": 2038.9000000059605,
+              "start": 1607
+            },
+            {
+              "name": "spark.ipc.commit_workspace_history",
+              "ms": 63.89999997615814,
+              "start": 1618.6000000238419
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.4000000059604645,
+              "start": 1633
+            },
+            {
+              "name": "spark.ipc.discover_asset_sources",
+              "ms": 79.80000001192093,
+              "start": 1905.4000000059605
+            },
+            {
+              "name": "spark.ipc.bitmap_resource_candidates",
+              "ms": 78.69999998807907,
+              "start": 1906.6000000238419
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 78.40000000596046,
+              "start": 1907
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 203.10000002384186,
+              "start": 1966.5
+            },
+            {
+              "name": "spark.ipc.external_map_watch_start",
+              "ms": 770.4000000059605,
+              "start": 2148.4000000059605
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 408.59999999403954,
+              "start": 2169.600000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 339.2000000178814,
+              "start": 2614.9000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 290.80000001192093,
+              "start": 2679
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 218,
+              "start": 2918.9000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 686.6999999880791,
+              "start": 2965.300000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 163.5,
+              "start": 2969.800000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 472,
+              "start": 3221.7000000178814
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 171.7999999821186,
+              "start": 3651.7000000178814
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 253.5,
+              "start": 3655.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 105.40000000596046,
+              "start": 3693.7000000178814
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 297.89999997615814,
+              "start": 3908.600000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 345.59999999403954,
+              "start": 3915.600000023842
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 114.5,
+              "start": 4183.700000017881
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 50,
+              "start": 4206.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 250.39999997615814,
+              "start": 4352.600000023842
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 80.60000002384186,
+              "start": 4603
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 78.80000001192093,
+              "start": 4773.300000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 77.5,
+              "start": 4852.100000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 302.40000000596046,
+              "start": 4966.800000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 250.09999999403954,
+              "start": 5024.200000017881
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 135,
+              "start": 5274.4000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 126.30000001192093,
+              "start": 5445.4000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 145.5,
+              "start": 5507.600000023842
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 157,
+              "start": 5631.700000017881
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 65.09999999403954,
+              "start": 5653.100000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 80.5,
+              "start": 5788.300000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 16.5,
+              "start": 5868.800000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 80.2000000178814,
+              "start": 5951.9000000059605
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 64.5,
+              "start": 6032.100000023842
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 79.5,
+              "start": 6128.4000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 79.5,
+              "start": 6165.4000000059605
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 6.800000011920929,
+              "start": 6244.9000000059605
+            }
+          ]
+        },
+        {
+          "name": "map-1-process-cpu-gpu-memory",
+          "elapsedMs": 2887.5992000000006,
+          "cpuOneCorePercent": 72.72490448072247,
+          "workingSetBytes": 1332043776,
+          "privateBytes": 1327751168,
+          "gpu3DPercent": 9,
+          "gpuProbeError": null
+        },
+        {
+          "name": "first-textured-map-2",
+          "elapsedMs": 6343.664900000003,
+          "resources": {
+            "sourceShaders": "151",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3783065609,3783327757,3783786516,3784114201,3784572960,3784966182,3785293867,3785621552,3785818163,3786080311,3786211385,3786539070,3786801218,3786932292,3787391051,3787718736,3787849810,3788177495,3788570717,3789095013,3789422698,3789684846,3789946994,3790274679,3790471290,3790930049,3791257734,3791388808,3791519882,3792044178,3792306326,3792437400,3792502937,3792699548,3798204656,3798466804,3798532341,3798728952,3798860026,3798991100,3799056637,3801678117,3801940265,3802005802,3813867999,3814064610,3815768572,3815965183,3816030720,3822518883,3822715494,3822912105,3823108716,3823370864,3823501938,3823567475,3823633012,3823829623,3824026234,3831104230,3831300841,3831366378,3831431915,3831497452,3831562989,3831759600,3837395782,3837723467,3837789004,3842507668,3842638742,3842769816,3842966427,3843163038,3843228575,3846374351,3851355163,3851551774,3851748385,3851944996,3853517884,3853714495,3857253493,3857450104,3857515641,3857581178,3860006047,3860399269,3860792491,3861251250,3861775546,3861972157,3862037694,3862168768,3862824138,3862889675,3864134878,3864265952,3864397026,3864855785,3865052396,3865117933,3865183470,3865380081,3865576692,3867280654,3867542802,3870557504,3870688578,3870819652,3870885189,3871868244,3872130392,3872195929,3874948483,3876914593,3877111204,3877242278,3880519128,3880715739,3880781276,3891988103,3892184714,3892250251,3892446862,3892709010,3892905621,3894544046,3897427674,3898345192,3898541803,3898607340,3899983617,3900311302,3900507913,3900704524,3938781519,3938978130,3939174741,3939305815,3939436889,3939633500,3939961185,3940157796,3940288870,3940616555,3940747629,3940878703,3941009777,3941075314,3941140851",
+            "sourceLightmaps": "15",
+            "sourceDetails": "151",
+            "sourceReflections": "68",
+            "reflectionIssues": "",
+            "skyTriangles": "183",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": {
+            "source": 8,
+            "rendered": 8,
+            "omitted": 0
+          },
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[1,0.901961,0.768628],\"ambientColor\":[0.870588,0.843137,0.752941],\"ambientIntensity\":0.2,\"sunColor\":[0.905882,0.894118,0.796079],\"sunIntensity\":1.8,\"sunAzimuth\":10,\"sunElevation\":40,\"fogEnabled\":true,\"fogColor\":[1,0.901961,0.768628],\"fogNear\":3,\"fogFar\":100,\"fogMaximumDensity\":0.4}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 169.5,
+              "start": 10964.700000017881
+            },
+            {
+              "name": "spark.ipc.open_project",
+              "ms": 112.80000001192093,
+              "start": 11019.40000000596
+            },
+            {
+              "name": "spark.ipc.claim_project_document",
+              "ms": 7.0999999940395355,
+              "start": 11132.300000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 430.30000001192093,
+              "start": 11134.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 165.5,
+              "start": 11134.600000023842
+            },
+            {
+              "name": "spark.ipc.read_workspace_history",
+              "ms": 4.200000017881393,
+              "start": 11139.40000000596
+            },
+            {
+              "name": "spark.ipc.connect_mcc_texture_resources",
+              "ms": 1295.9000000059605,
+              "start": 11143.700000017881
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 2.699999988079071,
+              "start": 11165.300000011921
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 90.7999999821186,
+              "start": 11209.200000017881
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 90.69999998807907,
+              "start": 11209.600000023842
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 89.2999999821186,
+              "start": 11211.100000023842
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 88.89999997615814,
+              "start": 11211.600000023842
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 88.19999998807907,
+              "start": 11212.600000023842
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 83.09999999403954,
+              "start": 11217.700000017881
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 347.5,
+              "start": 11218.40000000596
+            },
+            {
+              "name": "spark.ipc.auto_connect_sound_resources",
+              "ms": 1209.800000011921,
+              "start": 11218.800000011921
+            },
+            {
+              "name": "spark.ipc.commit_workspace_history",
+              "ms": 46.400000005960464,
+              "start": 11254.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 377.59999999403954,
+              "start": 11270.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 178.30000001192093,
+              "start": 11648
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 585.9000000059605,
+              "start": 11853.700000017881
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 550.9000000059605,
+              "start": 11895.200000017881
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 177.90000000596046,
+              "start": 12358.200000017881
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.4000000059604645,
+              "start": 12429.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 78.59999999403954,
+              "start": 12446.100000023842
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 160,
+              "start": 12527.300000011921
+            },
+            {
+              "name": "spark.ipc.commit_workspace_history",
+              "ms": 154.40000000596046,
+              "start": 12532.90000000596
+            },
+            {
+              "name": "spark.ipc.external_map_watch_start",
+              "ms": 153.09999999403954,
+              "start": 12536.100000023842
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.4000000059604645,
+              "start": 12537.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 778.2999999821186,
+              "start": 12565.200000017881
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 165.7999999821186,
+              "start": 12565.600000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 98.90000000596046,
+              "start": 12632.5
+            },
+            {
+              "name": "spark.ipc.commit_workspace_history",
+              "ms": 178.59999999403954,
+              "start": 12687.300000011921
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 176.59999999403954,
+              "start": 12689.200000017881
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 111.30000001192093,
+              "start": 12731.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 475.69999998807907,
+              "start": 12908.800000011921
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 225.60000002384186,
+              "start": 13334.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 453.30000001192093,
+              "start": 13359.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 150.40000000596046,
+              "start": 13384.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 39.599999994039536,
+              "start": 13635.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 68.7000000178814,
+              "start": 13675.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 64.59999999403954,
+              "start": 13812.300000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 77.7000000178814,
+              "start": 13877
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 462.30000001192093,
+              "start": 13981.800000011921
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 50.20000001788139,
+              "start": 14026
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 142.30000001192093,
+              "start": 14068.800000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 105.59999999403954,
+              "start": 14076.200000017881
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 73.69999998807907,
+              "start": 14211.200000017881
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 33.5,
+              "start": 14255.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 71.40000000596046,
+              "start": 14289.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 390.5,
+              "start": 14433.200000017881
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 329.09999999403954,
+              "start": 14446.300000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 85.90000000596046,
+              "start": 14823.700000017881
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 361.60000002384186,
+              "start": 14984
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.5,
+              "start": 15212.200000017881
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 52.79999998211861,
+              "start": 15345.600000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 358,
+              "start": 15445.700000017881
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 6,
+              "start": 15803.700000017881
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 364.7999999821186,
+              "start": 15855.700000017881
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 2.199999988079071,
+              "start": 16054.100000023842
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 10.599999994039536,
+              "start": 16056.300000011921
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 30.5,
+              "start": 16220.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 28.80000001192093,
+              "start": 16301.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 47.69999998807907,
+              "start": 16330.700000017881
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.5999999940395355,
+              "start": 17211.90000000596
+            }
+          ]
+        },
+        {
+          "name": "map-2-process-cpu-gpu-memory",
+          "elapsedMs": 2870.6080999999976,
+          "cpuOneCorePercent": 45.827513966480446,
+          "workingSetBytes": 1629356032,
+          "privateBytes": 1514065920,
+          "gpu3DPercent": 5,
+          "gpuProbeError": null
+        },
+        {
+          "name": "map-switch-1-to-1",
+          "elapsedMs": 4238.820800000001,
+          "resources": {
+            "sourceShaders": "158",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3782672387,3782803461,3782934535,3783065609,3783327757,3783720979,3784245275,3784507423,3784769571,3785359404,3785818163,3786211385,3786407996,3786801218,3787194440,3787456588,3787849810,3788177495,3788308569,3788701791,3790274679,3790667901,3790930049,3791323271,3791782030,3792109715,3792568474,3793289381,3793551529,3793682603,3794075825,3794206899,3794600121,3794993343,3795321028,3795386565,3811115445,3811377593,3811443130,3811508667,3811574204,3811639741,3811836352,3821208143,3821404754,3821601365,3821797976,3822060124,3822125661,3822256735,3822387809,3822453346,3822584420,3822912105,3822977642,3827958454,3828089528,3828155065,3828351676,3832873729,3833070340,3833135877,3833332488,3833463562,3833594636,3833660173,3836216116,3836412727,3836478264,3837395782,3837657930,3837723467,3840672632,3842638742,3842835353,3842900890,3843031964,3843818408,3844015019,3845718981,3845915592,3845981129,3848930294,3848995831,3850241034,3850372108,3850503182,3851158552,3851355163,3851551774,3851748385,3853321273,3853517884,3856598123,3856794734,3856860271,3856925808,3857122419,3857319030,3859022992,3859285140,3862627527,3862824138,3862889675,3862955212,3865314544,3866035451,3866232062,3866297599,3871933781,3872130392,3872261466,3876062612,3876259223,3876849056,3876980130,3877111204,3877176741,3878094259,3878356407,3878553018,3880256980,3883206145,3887924809,3887990346,3888055883,3888121420,3888186957,3888252494,3888318031,3888383568,3888449105,3888514642,3888580179,3888645716,3888711253,3888776790,3888842327,3888907864,3888973401,3889038938,3889104475,3893823139,3894019750,3894085287,3894412972,3895330490,3895592638,3895658175,3896903378,3897296600,3897427674,3897493211,3897689822,3904636744,3908044668,3908241279,3908437890",
+            "sourceLightmaps": "5",
+            "sourceDetails": "177",
+            "sourceReflections": "84",
+            "reflectionIssues": "",
+            "skyTriangles": "190",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": null,
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.372549,0.403922,0.552941],\"ambientColor\":[0.356863,0.415686,0.92549],\"ambientIntensity\":0.27,\"sunColor\":[0.87451,0.866667,0.823529],\"sunIntensity\":1.1,\"sunAzimuth\":-138,\"sunElevation\":26,\"fogEnabled\":true,\"fogColor\":[0.372549,0.403922,0.552941],\"fogNear\":0,\"fogFar\":120,\"fogMaximumDensity\":0.5}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.4000000059604645,
+              "start": 20964.90000000596
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 111.19999998807907,
+              "start": 21006.600000023842
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 114.2000000178814,
+              "start": 21007
+            },
+            {
+              "name": "spark.ipc.bitmap_resource_candidates",
+              "ms": 113.30000001192093,
+              "start": 21008
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 112.90000000596046,
+              "start": 21008.40000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 112.69999998807907,
+              "start": 21008.70000001788
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 112.90000000596046,
+              "start": 21009.40000000596
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 105.2000000178814,
+              "start": 21017
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 757.2999999821186,
+              "start": 21017.70000001788
+            },
+            {
+              "name": "spark.ipc.auto_connect_sound_resources",
+              "ms": 1204,
+              "start": 21018
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 166.10000002384186,
+              "start": 21083
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 371.39999997615814,
+              "start": 21249.100000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 127.59999999403954,
+              "start": 21668.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 152.30000001192093,
+              "start": 21720.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 337.7999999821186,
+              "start": 21809.70000001788
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 156.5,
+              "start": 21872.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 104.7000000178814,
+              "start": 22117.40000000596
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 97.69999998807907,
+              "start": 22117.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 294.09999999403954,
+              "start": 22151.20000001788
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 229.80000001192093,
+              "start": 22215.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 107.89999997615814,
+              "start": 22222.100000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 101.5,
+              "start": 22415.20000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 230.19999998807907,
+              "start": 22453.20000001788
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 51.19999998807907,
+              "start": 22516.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 101.90000000596046,
+              "start": 22655.30000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 77.80000001192093,
+              "start": 22757.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 78.90000000596046,
+              "start": 22923.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 74.90000000596046,
+              "start": 23002.30000001192
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 113.80000001192093,
+              "start": 23107.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 112.30000001192093,
+              "start": 23114.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 121.19999998807907,
+              "start": 23170.70000001788
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 136.2000000178814,
+              "start": 23291.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 107.7999999821186,
+              "start": 23467.100000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 122.59999999403954,
+              "start": 23526.20000001788
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 74.19999998807907,
+              "start": 23648.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 76,
+              "start": 23794.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 15.800000011920929,
+              "start": 23870.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 78.89999997615814,
+              "start": 23953.100000023842
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 63.30000001192093,
+              "start": 24032
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 72,
+              "start": 24127.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 74,
+              "start": 24163.70000001788
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 12.099999994039536,
+              "start": 24199.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 7.199999988079071,
+              "start": 24237.70000001788
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.899999976158142,
+              "start": 25016.600000023842
+            }
+          ]
+        },
+        {
+          "name": "map-switch-2-to-2",
+          "elapsedMs": 4741.390200000002,
+          "resources": {
+            "sourceShaders": "151",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3783065609,3783327757,3783786516,3784114201,3784572960,3784966182,3785293867,3785621552,3785818163,3786080311,3786211385,3786539070,3786801218,3786932292,3787391051,3787718736,3787849810,3788177495,3788570717,3789095013,3789422698,3789684846,3789946994,3790274679,3790471290,3790930049,3791257734,3791388808,3791519882,3792044178,3792306326,3792437400,3792502937,3792699548,3798204656,3798466804,3798532341,3798728952,3798860026,3798991100,3799056637,3801678117,3801940265,3802005802,3813867999,3814064610,3815768572,3815965183,3816030720,3822518883,3822715494,3822912105,3823108716,3823370864,3823501938,3823567475,3823633012,3823829623,3824026234,3831104230,3831300841,3831366378,3831431915,3831497452,3831562989,3831759600,3837395782,3837723467,3837789004,3842507668,3842638742,3842769816,3842966427,3843163038,3843228575,3846374351,3851355163,3851551774,3851748385,3851944996,3853517884,3853714495,3857253493,3857450104,3857515641,3857581178,3860006047,3860399269,3860792491,3861251250,3861775546,3861972157,3862037694,3862168768,3862824138,3862889675,3864134878,3864265952,3864397026,3864855785,3865052396,3865117933,3865183470,3865380081,3865576692,3867280654,3867542802,3870557504,3870688578,3870819652,3870885189,3871868244,3872130392,3872195929,3874948483,3876914593,3877111204,3877242278,3880519128,3880715739,3880781276,3891988103,3892184714,3892250251,3892446862,3892709010,3892905621,3894544046,3897427674,3898345192,3898541803,3898607340,3899983617,3900311302,3900507913,3900704524,3938781519,3938978130,3939174741,3939305815,3939436889,3939633500,3939961185,3940157796,3940288870,3940616555,3940747629,3940878703,3941009777,3941075314,3941140851",
+            "sourceLightmaps": "15",
+            "sourceDetails": "151",
+            "sourceReflections": "68",
+            "reflectionIssues": "",
+            "skyTriangles": "183",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": {
+            "source": 8,
+            "rendered": 8,
+            "omitted": 0
+          },
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[1,0.901961,0.768628],\"ambientColor\":[0.870588,0.843137,0.752941],\"ambientIntensity\":0.2,\"sunColor\":[0.905882,0.894118,0.796079],\"sunIntensity\":1.8,\"sunAzimuth\":10,\"sunElevation\":40,\"fogEnabled\":true,\"fogColor\":[1,0.901961,0.768628],\"fogNear\":3,\"fogFar\":100,\"fogMaximumDensity\":0.4}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.4000000059604645,
+              "start": 25216
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 88.7000000178814,
+              "start": 25250.40000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 88.80000001192093,
+              "start": 25250.90000000596
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 88,
+              "start": 25251.80000001192
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 87.59999999403954,
+              "start": 25252.20000001788
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 87.30000001192093,
+              "start": 25253
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 83.7999999821186,
+              "start": 25256.600000023842
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 322.7000000178814,
+              "start": 25257
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 365.5,
+              "start": 25316.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 180.09999999403954,
+              "start": 25681.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 458.19999998807907,
+              "start": 25887.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 49.400000005960464,
+              "start": 25926.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 76.69999998807907,
+              "start": 25976.20000001788
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 73.69999998807907,
+              "start": 26075.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 34,
+              "start": 26117.600000023842
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 196.5,
+              "start": 26149.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 97.69999998807907,
+              "start": 26151.600000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 75.09999999403954,
+              "start": 26318.20000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 421.80000001192093,
+              "start": 26352.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 78.09999999403954,
+              "start": 26393.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 42.599999994039536,
+              "start": 26542.70000001788
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 102.59999999403954,
+              "start": 26585.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 66.60000002384186,
+              "start": 26762
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 334.59999999403954,
+              "start": 26783.20000001788
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 72.39999997615814,
+              "start": 26828.600000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 342.40000000596046,
+              "start": 26974.5
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.4000000059604645,
+              "start": 27254.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 87.5,
+              "start": 27316.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 345.80000001192093,
+              "start": 27501.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 54.099999994039536,
+              "start": 27847.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 326.09999999403954,
+              "start": 27954.100000023842
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 5,
+              "start": 28056.5
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 1.899999976158142,
+              "start": 28061.600000023842
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 6,
+              "start": 28280.20000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 349.40000000596046,
+              "start": 28333.70000001788
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 30.099999994039536,
+              "start": 28683.100000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 32.70000001788139,
+              "start": 28764.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 47.89999997615814,
+              "start": 28797.100000023842
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 4,
+              "start": 29257.20000001788
+            }
+          ]
+        },
+        {
+          "name": "map-switch-3-to-1",
+          "elapsedMs": 4297.656600000002,
+          "resources": {
+            "sourceShaders": "158",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3782672387,3782803461,3782934535,3783065609,3783327757,3783720979,3784245275,3784507423,3784769571,3785359404,3785818163,3786211385,3786407996,3786801218,3787194440,3787456588,3787849810,3788177495,3788308569,3788701791,3790274679,3790667901,3790930049,3791323271,3791782030,3792109715,3792568474,3793289381,3793551529,3793682603,3794075825,3794206899,3794600121,3794993343,3795321028,3795386565,3811115445,3811377593,3811443130,3811508667,3811574204,3811639741,3811836352,3821208143,3821404754,3821601365,3821797976,3822060124,3822125661,3822256735,3822387809,3822453346,3822584420,3822912105,3822977642,3827958454,3828089528,3828155065,3828351676,3832873729,3833070340,3833135877,3833332488,3833463562,3833594636,3833660173,3836216116,3836412727,3836478264,3837395782,3837657930,3837723467,3840672632,3842638742,3842835353,3842900890,3843031964,3843818408,3844015019,3845718981,3845915592,3845981129,3848930294,3848995831,3850241034,3850372108,3850503182,3851158552,3851355163,3851551774,3851748385,3853321273,3853517884,3856598123,3856794734,3856860271,3856925808,3857122419,3857319030,3859022992,3859285140,3862627527,3862824138,3862889675,3862955212,3865314544,3866035451,3866232062,3866297599,3871933781,3872130392,3872261466,3876062612,3876259223,3876849056,3876980130,3877111204,3877176741,3878094259,3878356407,3878553018,3880256980,3883206145,3887924809,3887990346,3888055883,3888121420,3888186957,3888252494,3888318031,3888383568,3888449105,3888514642,3888580179,3888645716,3888711253,3888776790,3888842327,3888907864,3888973401,3889038938,3889104475,3893823139,3894019750,3894085287,3894412972,3895330490,3895592638,3895658175,3896903378,3897296600,3897427674,3897493211,3897689822,3904636744,3908044668,3908241279,3908437890",
+            "sourceLightmaps": "5",
+            "sourceDetails": "177",
+            "sourceReflections": "84",
+            "reflectionIssues": "",
+            "skyTriangles": "190",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": null,
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.372549,0.403922,0.552941],\"ambientColor\":[0.356863,0.415686,0.92549],\"ambientIntensity\":0.27,\"sunColor\":[0.87451,0.866667,0.823529],\"sunIntensity\":1.1,\"sunAzimuth\":-138,\"sunElevation\":26,\"fogEnabled\":true,\"fogColor\":[0.372549,0.403922,0.552941],\"fogNear\":0,\"fogFar\":120,\"fogMaximumDensity\":0.5}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.399999976158142,
+              "start": 29961.600000023842
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 110.7000000178814,
+              "start": 30001.90000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 114.59999999403954,
+              "start": 30002.30000001192
+            },
+            {
+              "name": "spark.ipc.bitmap_resource_candidates",
+              "ms": 113.69999998807907,
+              "start": 30003.30000001192
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 114.39999997615814,
+              "start": 30003.600000023842
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 113,
+              "start": 30004
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 113.2999999821186,
+              "start": 30004.70000001788
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 105.60000002384186,
+              "start": 30012
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 755.8000000119209,
+              "start": 30012.40000000596
+            },
+            {
+              "name": "spark.ipc.auto_connect_sound_resources",
+              "ms": 1210.5999999940395,
+              "start": 30012.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 174.7999999821186,
+              "start": 30077.70000001788
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 45.29999998211861,
+              "start": 30103.70000001788
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 101.69999998807907,
+              "start": 30149.100000023842
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 367.10000002384186,
+              "start": 30252.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 119.2999999821186,
+              "start": 30662.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 147.7999999821186,
+              "start": 30715.100000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 364.40000000596046,
+              "start": 30792.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 176.2000000178814,
+              "start": 30862.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 97.5,
+              "start": 31127.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 292.5,
+              "start": 31161
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 111,
+              "start": 31225.40000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 101.69999998807907,
+              "start": 31424.20000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 229.19999998807907,
+              "start": 31460.30000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 49.80000001192093,
+              "start": 31525.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 95.5,
+              "start": 31663.30000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 80,
+              "start": 31758.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 82.2000000178814,
+              "start": 31929.5
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 117.09999999403954,
+              "start": 32005.30000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 77,
+              "start": 32011.70000001788
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 130.40000000596046,
+              "start": 32122
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 130.09999999403954,
+              "start": 32127.600000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 137.7000000178814,
+              "start": 32200.40000000596
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 59.400000005960464,
+              "start": 32252.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 135.09999999403954,
+              "start": 32338.100000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 114.30000001192093,
+              "start": 32513.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 130.10000002384186,
+              "start": 32571.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 64.89999997615814,
+              "start": 32701.600000023842
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 77.5,
+              "start": 32833.60000002384
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 16.599999994039536,
+              "start": 32911.10000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 80.5,
+              "start": 32992.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 64.2000000178814,
+              "start": 33073
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 75.5,
+              "start": 33204.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 6.9000000059604645,
+              "start": 33280.40000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.5999999940395355,
+              "start": 34011.70000001788
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 8.699999988079071,
+              "start": 34058.30000001192
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 2.100000023841858,
+              "start": 34067
+            }
+          ]
+        },
+        {
+          "name": "map-switch-4-to-2",
+          "elapsedMs": 4659.9491999999955,
+          "resources": {
+            "sourceShaders": "151",
+            "compatibleShaders": "0",
+            "sourceShaderIds": "3783065609,3783327757,3783786516,3784114201,3784572960,3784966182,3785293867,3785621552,3785818163,3786080311,3786211385,3786539070,3786801218,3786932292,3787391051,3787718736,3787849810,3788177495,3788570717,3789095013,3789422698,3789684846,3789946994,3790274679,3790471290,3790930049,3791257734,3791388808,3791519882,3792044178,3792306326,3792437400,3792502937,3792699548,3798204656,3798466804,3798532341,3798728952,3798860026,3798991100,3799056637,3801678117,3801940265,3802005802,3813867999,3814064610,3815768572,3815965183,3816030720,3822518883,3822715494,3822912105,3823108716,3823370864,3823501938,3823567475,3823633012,3823829623,3824026234,3831104230,3831300841,3831366378,3831431915,3831497452,3831562989,3831759600,3837395782,3837723467,3837789004,3842507668,3842638742,3842769816,3842966427,3843163038,3843228575,3846374351,3851355163,3851551774,3851748385,3851944996,3853517884,3853714495,3857253493,3857450104,3857515641,3857581178,3860006047,3860399269,3860792491,3861251250,3861775546,3861972157,3862037694,3862168768,3862824138,3862889675,3864134878,3864265952,3864397026,3864855785,3865052396,3865117933,3865183470,3865380081,3865576692,3867280654,3867542802,3870557504,3870688578,3870819652,3870885189,3871868244,3872130392,3872195929,3874948483,3876914593,3877111204,3877242278,3880519128,3880715739,3880781276,3891988103,3892184714,3892250251,3892446862,3892709010,3892905621,3894544046,3897427674,3898345192,3898541803,3898607340,3899983617,3900311302,3900507913,3900704524,3938781519,3938978130,3939174741,3939305815,3939436889,3939633500,3939961185,3940157796,3940288870,3940616555,3940747629,3940878703,3941009777,3941075314,3941140851",
+            "sourceLightmaps": "15",
+            "sourceDetails": "151",
+            "sourceReflections": "68",
+            "reflectionIssues": "",
+            "skyTriangles": "183",
+            "materialLoading": "false",
+            "pendingMaterials": "0"
+          },
+          "decals": {
+            "source": 8,
+            "rendered": 8,
+            "omitted": 0
+          },
+          "canvas": {
+            "width": 1426,
+            "height": 616,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[1,0.901961,0.768628],\"ambientColor\":[0.870588,0.843137,0.752941],\"ambientIntensity\":0.2,\"sunColor\":[0.905882,0.894118,0.796079],\"sunIntensity\":1.8,\"sunAzimuth\":10,\"sunElevation\":40,\"fogEnabled\":true,\"fogColor\":[1,0.901961,0.768628],\"fogNear\":3,\"fogFar\":100,\"fogMaximumDensity\":0.4}",
+            "effects": "{\"enabled\":false,\"bloom\":true,\"bloomStrength\":0.35,\"bloomThreshold\":0.9,\"bloomRadius\":0.4,\"exposureEv\":0,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.35,\"selfIllumination\":true,\"selfIllumStrength\":1,\"quality\":\"balanced\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.5,
+              "start": 34265.10000002384
+            },
+            {
+              "name": "spark.ipc.forge_session_status",
+              "ms": 87.59999999403954,
+              "start": 34298.20000001788
+            },
+            {
+              "name": "spark.ipc.live_mcc_cleanup_status",
+              "ms": 87.19999998807907,
+              "start": 34298.60000002384
+            },
+            {
+              "name": "spark.ipc.inspect_source_appearance",
+              "ms": 86.5,
+              "start": 34299.40000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 86.09999999403954,
+              "start": 34299.80000001192
+            },
+            {
+              "name": "spark.ipc.inspect_map_ambience",
+              "ms": 86.40000000596046,
+              "start": 34300.5
+            },
+            {
+              "name": "spark.ipc.baboon_report",
+              "ms": 82.7999999821186,
+              "start": 34304.10000002384
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 313.7000000178814,
+              "start": 34304.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 353.59999999403954,
+              "start": 34362.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 172.7000000178814,
+              "start": 34716.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 458.80000001192093,
+              "start": 34914
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 48.70000001788139,
+              "start": 34953
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 75.59999999403954,
+              "start": 35001.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 37.099999994039536,
+              "start": 35141.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 97.2000000178814,
+              "start": 35179
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 72.30000001192093,
+              "start": 35345.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 425.80000001192093,
+              "start": 35379.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 78.09999999403954,
+              "start": 35417.60000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 45.5,
+              "start": 35564.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 101.59999999403954,
+              "start": 35609.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 88,
+              "start": 35782.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube_batch",
+              "ms": 339.40000000596046,
+              "start": 35813.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 73.40000000596046,
+              "start": 35870.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 343.90000000596046,
+              "start": 36015.80000001192
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 3.7999999821186066,
+              "start": 36050.10000002384
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 1.9000000059604645,
+              "start": 36053.90000000596
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.5,
+              "start": 36303.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 84.69999998807907,
+              "start": 36359.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 326.80000001192093,
+              "start": 36516.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 52.599999994039536,
+              "start": 36843.60000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 318.69999998807907,
+              "start": 36946.20000001788
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 6.300000011920929,
+              "start": 37264.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 323.5,
+              "start": 37321.10000002384
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 30,
+              "start": 37644.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 27.600000023841858,
+              "start": 37724.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 46.099999994039536,
+              "start": 37752.10000002384
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 2.5,
+              "start": 38059.5
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 1.600000023841858,
+              "start": 38062
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 1.9000000059604645,
+              "start": 38302.30000001192
+            }
+          ]
+        },
+        {
+          "name": "repeat-switch-memory",
+          "elapsedMs": 2851.296000000002,
+          "cpuOneCorePercent": 42.70322354590049,
+          "workingSetBytes": 1634889728,
+          "privateBytes": 1502507008,
+          "gpu3DPercent": 4,
+          "gpuProbeError": null
+        },
+        {
+          "name": "large-asset-catalog",
+          "elapsedMs": 3038.814299999998,
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 90.59999999403954,
+              "start": 57005.20000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 88.89999997615814,
+              "start": 57005.60000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 209.39999997615814,
+              "start": 57094.60000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 210.90000000596046,
+              "start": 57094.90000000596
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 208.19999998807907,
+              "start": 57095.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 183.90000000596046,
+              "start": 57095.90000000596
+            },
+            {
+              "name": "spark.ipc.open_asset_source",
+              "ms": 1561.9000000059605,
+              "start": 57124.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 24,
+              "start": 57279.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 0.30000001192092896,
+              "start": 57305.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 132.40000000596046,
+              "start": 57430.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 131.59999999403954,
+              "start": 57430.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 165.5,
+              "start": 57562.30000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 165.19999998807907,
+              "start": 57562.60000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 105,
+              "start": 57562.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 127.2000000178814,
+              "start": 57562.90000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 36,
+              "start": 57690.10000002384
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 0.4000000059604645,
+              "start": 57727.80000001192
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 74.2999999821186,
+              "start": 57830.10000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 68.7000000178814,
+              "start": 57904.40000000596
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 0.09999999403953552,
+              "start": 57973.10000002384
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 2.600000023841858,
+              "start": 58049.5
+            },
+            {
+              "name": "spark.ipc.external_map_watch_poll",
+              "ms": 1.7999999821186066,
+              "start": 58052.20000001788
+            },
+            {
+              "name": "spark.ipc.live_mcc_sample",
+              "ms": 418,
+              "start": 58301.10000002384
+            },
+            {
+              "name": "spark.catalog.assets",
+              "ms": 1.5,
+              "start": 58686.70000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 93.60000002384186,
+              "start": 58724
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 93.10000002384186,
+              "start": 58724.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 85,
+              "start": 58781.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 393.39999997615814,
+              "start": 58866.60000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 95.40000000596046,
+              "start": 58866.80000001192
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 19.599999994039536,
+              "start": 58962.20000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 89,
+              "start": 59821.60000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 90.40000000596046,
+              "start": 59821.90000000596
+            }
+          ],
+          "nativePreviewCount": 1,
+          "visibleCards": 150
+        },
+        {
+          "name": "showcase-warm-return",
+          "elapsedMs": 957.7695999999996,
+          "canvas": {
+            "width": 1371,
+            "height": 322,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.051,0.098,0.133],\"ambientColor\":[0.9,0.95,1],\"ambientIntensity\":0.5,\"sunColor\":[1,0.95,0.88],\"sunIntensity\":0.7,\"sunAzimuth\":-30,\"sunElevation\":35,\"fogEnabled\":false,\"fogColor\":[0.3,0.43,0.51],\"fogNear\":25,\"fogFar\":180,\"fogMaximumDensity\":1}",
+            "effects": "{\"enabled\":true,\"bloom\":true,\"bloomStrength\":0.065,\"bloomThreshold\":1.25,\"bloomRadius\":0.16,\"exposureEv\":-0.15,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.2,\"selfIllumination\":true,\"selfIllumStrength\":0.85,\"quality\":\"full\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 415,
+              "start": 60346
+            },
+            {
+              "name": "spark.ipc.discover_halo_connections",
+              "ms": 52.69999998807907,
+              "start": 60517.20000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 85,
+              "start": 60538.10000002384
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 381,
+              "start": 60623.20000001788
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 106.40000000596046,
+              "start": 60623.5
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 0.20000001788139343,
+              "start": 60729.90000000596
+            }
+          ]
+        },
+        {
+          "name": "after-maps-home-memory",
+          "elapsedMs": 2823.4354999999923,
+          "cpuOneCorePercent": 7.169961171902576,
+          "workingSetBytes": 1618862080,
+          "privateBytes": 1599393792,
+          "gpu3DPercent": 6,
+          "gpuProbeError": null
+        },
+        {
+          "name": "showcase-warm-process",
+          "elapsedMs": 2027.7065000000002,
+          "canvas": {
+            "width": 1371,
+            "height": 322,
+            "environment": "{\"previewEnabled\":true,\"skyColor\":[0.051,0.098,0.133],\"ambientColor\":[0.9,0.95,1],\"ambientIntensity\":0.5,\"sunColor\":[1,0.95,0.88],\"sunIntensity\":0.7,\"sunAzimuth\":-30,\"sunElevation\":35,\"fogEnabled\":false,\"fogColor\":[0.3,0.43,0.51],\"fogNear\":25,\"fogFar\":180,\"fogMaximumDensity\":1}",
+            "effects": "{\"enabled\":true,\"bloom\":true,\"bloomStrength\":0.065,\"bloomThreshold\":1.25,\"bloomRadius\":0.16,\"exposureEv\":-0.15,\"saturation\":1,\"contrast\":1,\"vignette\":0,\"normalMaps\":true,\"normalStrength\":1,\"specular\":true,\"specularStrength\":0.2,\"selfIllumination\":true,\"selfIllumStrength\":0.85,\"quality\":\"full\",\"toneMapping\":\"source\"}"
+          },
+          "nativeAndDecode": [
+            {
+              "name": "spark.ipc.open_project",
+              "ms": 767.5999999940395,
+              "start": 400.09999999403954
+            },
+            {
+              "name": "spark.ipc.runtime_workbench_report",
+              "ms": 768.1999999880791,
+              "start": 401.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_model",
+              "ms": 90.19999998807907,
+              "start": 1169.9000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_object_animations",
+              "ms": 92.90000000596046,
+              "start": 1170.5
+            },
+            {
+              "name": "spark.ipc.preview_owned_reflection_cube",
+              "ms": 389.90000000596046,
+              "start": 1260.4000000059605
+            },
+            {
+              "name": "spark.ipc.preview_owned_cache_bitmap_batch",
+              "ms": 936.6000000238419,
+              "start": 1260.699999988079
+            },
+            {
+              "name": "spark.decode.bitmap-batch",
+              "ms": 35.19999998807907,
+              "start": 2197.4000000059605
+            }
+          ]
+        },
+        {
+          "name": "warm-process-memory",
+          "elapsedMs": 2861.8745999999956,
+          "cpuOneCorePercent": 20.16480641785839,
+          "workingSetBytes": 795303936,
+          "privateBytes": 747122688,
+          "gpu3DPercent": 7,
+          "gpuProbeError": null
+        }
+      ],
+      "openProjectRoundTrips": [
+        {
+          "elapsedMs": 3648.7886,
+          "tags": 2544,
+          "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe"
+        },
+        {
+          "elapsedMs": 3667.859400000001,
+          "tags": 2544,
+          "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe"
+        },
+        {
+          "elapsedMs": 3566.926600000006,
+          "tags": 2544,
+          "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe"
+        },
+        {
+          "elapsedMs": 3622.1884999999893,
+          "tags": 2544,
+          "sha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe"
+        }
+      ]
+    },
+    "resourceChecks": [
+      {
+        "phase": "first-textured-map-1",
+        "equal": true
+      },
+      {
+        "phase": "first-textured-map-2",
+        "equal": true
+      },
+      {
+        "phase": "map-switch-1-to-1",
+        "equal": true
+      },
+      {
+        "phase": "map-switch-2-to-2",
+        "equal": true
+      },
+      {
+        "phase": "map-switch-3-to-1",
+        "equal": true
+      },
+      {
+        "phase": "map-switch-4-to-2",
+        "equal": true
+      }
+    ]
+  }
+}

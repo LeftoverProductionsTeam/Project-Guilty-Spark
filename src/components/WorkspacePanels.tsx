@@ -2,7 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal, SquareArrowOutUpRight } from 'lucide-react';
-import { useMapState } from '../mapSession';
+import { useMapState,readMapSession,writeMapSession } from '../mapSession';
+import {native} from '../api';
+import {getCurrentWindow} from '@tauri-apps/api/window';
 import { useWindowFullscreen } from '../useWindowFullscreen';
 import { WindowControls } from './WindowFrame';
 import { changePanel, cleanLayout, defaultPanel } from '../workspaceLayout';
@@ -42,11 +44,15 @@ export default function WorkspacePanels({
   navigationOpen: boolean;
   onPopout?:()=>void;
 }) {
-  const [raw, setRaw] = useMapState<WorkspaceLayout>(id, `layout.${workspace}`, () => ({
+  const windowLayoutId=native?`${id}:window:${getCurrentWindow().label}`:id;
+  const [raw, setRaw] = useMapState<WorkspaceLayout>(windowLayoutId, `layout.${workspace}`, () => readMapSession<WorkspaceLayout>(id,`layout.${workspace}`,{
     version: 1,
     focus: false,
     panels: {},
   }));
+  // A new detached view inherits the last layout, then arranges its own panels.
+  // Moving a drawer on one monitor must not cover another window's inspector.
+  useEffect(()=>{if(!native)return;const persist=()=>writeMapSession(id,`layout.${workspace}`,raw);persist();window.addEventListener('gs:save-viewport-context',persist);return()=>window.removeEventListener('gs:save-viewport-context',persist);},[id,workspace,raw]);
   const layout = useMemo(() => cleanLayout(raw), [raw]);
   const { fullscreen, change: changeFullscreen, error: windowError } = useWindowFullscreen();
   const [peek, setPeek] = useState<string | null>(null);

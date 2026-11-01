@@ -450,7 +450,11 @@ fn arguments(profile: &Path, port: u16, mode: Mode) -> Reply<Vec<std::ffi::OsStr
     Ok(arguments)
 }
 fn launch(game: &Path, profile: &Path, port: u16, mode: Mode) -> Reply<ClientChild> {
-    let arguments = arguments(profile, port, mode)?;
+    if game.parent().map(fs::canonicalize).transpose().map_err(error)?!=profile.parent().map(fs::canonicalize).transpose().map_err(error)?||profile.file_name().is_none_or(|n|n!="client-profile"){return Err("CE playtest profile must stay inside its owned game session".into());}
+    // CE's legacy argument parser truncates long absolute option values even
+    // below Windows' own path limit. The fixed cwd and sibling guard keep these
+    // short relative paths confined to exactly the same owned directories.
+    let arguments = arguments(&Path::new("..").join("client-profile"), port, mode)?;
     #[cfg(windows)]
     {
         gui::Child::launch(&game.join("haloce.exe"), &arguments, game)
