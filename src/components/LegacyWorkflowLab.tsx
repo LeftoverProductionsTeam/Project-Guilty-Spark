@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import {useMapState} from '../mapSession';
 import { Archive, ArrowRight, BookOpenCheck, Download, ExternalLink, LockKeyhole, ShieldCheck } from 'lucide-react';
 import type { MapInspection, Project, Settings, Workspace } from '../types';
 import { LEGACY_WORKFLOWS, exportLegacyWorkflowPlan, planLegacyWorkflow } from '../legacyWorkflowLab';
@@ -13,7 +14,8 @@ export default function LegacyWorkflowLab({project,inspection,settings,navigate}
   project:Project|null;inspection:MapInspection|null;settings?:Partial<Settings>|null;
   navigate:(workspace:Workspace)=>void;
 }){
-  const [selected,setSelected]=useState<LegacyWorkflowId>('escha-tags');
+  const [savedSelected,setSelected]=useMapState<LegacyWorkflowId>('global','learning.legacyTechnique','escha-tags');
+  const selected=LEGACY_WORKFLOWS.some(item=>item.id===savedSelected)?savedSelected:'escha-tags';
   const [error,setError]=useState('');
   const workflow=LEGACY_WORKFLOWS.find(w=>w.id===selected)!;
   const review=planLegacyWorkflow(selected,project,inspection,settings);

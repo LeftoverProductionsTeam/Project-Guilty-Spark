@@ -214,7 +214,7 @@ async function launch(role, id) {
       HALO_HIDDEN_WINDOW: 'true',
       HALO_NULL_RENDERER: isOpenCe(id) ? 'true' : 'false',
       HALO_CONSOLE_LOG: 'all',
-      HALO_DISCORD_PRESENCE: 'false',
+      HALO_DISCORD_PRESENCE: 'off',
       HALO_UPDATE_AUTO: 'false',
       HALO_CRASH_REPORTS: 'no',
       SDL_AUDIO_DRIVER: 'dummy',

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "ef5e0de",
+  "platform": "Windows",
+  "remotePublished": false,
+  "checks": {"rustPassed":609,"rustIgnored":7,"frontend":275,"browser":134,"offlineScripts":59,"interfaceProbe":2,"typescript":true},
+  "learning": {"sidebarEntries":1,"sections":["guides","glossary","academy"],"guides":10,"glossaryDefinitions":50,"academyDefinitionsRetained":22,"legacyLinksRetained":true,"progressRequiresSourceEvidence":true},
+  "nativeWindows": {"mockedIpc":false,"gameOrExternalToolExecution":false,"routesOpened":23,"simultaneousPopouts":3,"nativeResize":{"width":1000,"height":720},"learningAndSettingsSectionsRetained":true,"projectContentAndWorkspaceTransferred":true,"duplicateWriterRejected":true,"physicalMonitorTransferTested":false,"preTransferUndoStackMigrated":false},
+  "layout": {"viewport":{"width":1280,"height":800},"beforeContentHeight":1471,"afterContentHeight":641,"reductionPercent":56.4,"allTenTasksRetained":true,"startupGpuOrMemoryImprovementClaimed":false},
+  "runtimeDiscovery": {"nativeTestedExecutableSha256":"90c46fffbcddf71a8f572a12f6180724722319ad073bca949606fe2ddf0162a8","additionalClientsDetectedAndConnected":["haloCustomEdition","openCe","chupathingyCe"],"staleIdentityRejected":true,"existingRegistrationOverwriteRejected":true,"autoLaunchesGames":false},
+  "zombieResearch": {"ceCacheSha256":"d1d1ddb96ca6093231b65c72918c2d61625bc81e27022ee46150517823b7e2b8","ceJoined":true,"humanReport":"Map loads, but no zombies","zombieSpawningAccepted":false,"openCeSameRuntimeNativeProcessesLoaded":2,"completeInventoryParity":false,"allRuntimeConversionAccepted":false},
+  "testedArtifacts": {
+    "executable":{"sha256":"e8c71f4a43f2cd754c342d2aa3a29881705059e6b3c0fc7d3829d2f205e86d50","bytes":40643584,"nativeUiTested":true},
+    "installer":{"sha256":"47452bac6374b5effa49fbc8f041c3ba9b3eb724a2110eef84d16509f72993d8","bytes":9841614,"cleanMachineTested":false}
+  },
+  "releaseArchives":"Created separately after the local source commit; their manifest records the exact commit and package identities. Historical archives are preserved."
+}

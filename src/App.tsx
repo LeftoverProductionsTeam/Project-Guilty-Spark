@@ -5,7 +5,7 @@ import type { ForgeMaterial } from './forge';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from './nativeAssetImport';
 import LaunchProgress from './components/LaunchProgress';
 import {useWorkflowHistory} from './useWorkflowHistory';
-import type {WorkflowRoute} from './workflowHistory';
+import type {LearningSection,WorkflowRoute} from './workflowHistory';
 import {librarySoundEmitters} from './viewportAssets';
 import {projectMutationPending} from './projectMutation';
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from 'react';
@@ -114,19 +114,17 @@ const InterfaceStudio = lazy(() => import('./components/InterfaceStudio'));
 const CreatorStudio = lazy(() => import('./components/CreatorStudio'));
 const MachinimaWorkspace = lazy(() => import('./components/MachinimaWorkspace'));
 const DockedDirector = lazy(() => import('./components/DirectorWindow'));
-const Academy = lazy(() => import('./components/Academy'));
+const LearningCenter = lazy(() => import('./components/LearningCenter'));
 const GettingStarted = lazy(() => import('./components/GettingStarted'));
-const HowTo = lazy(() => import('./components/HowTo'));
 const Features = lazy(() => import('./components/Features'));
 const CommunityThanks = lazy(() => import('./components/CommunityThanks'));
 const nav = [
   { id: 'get-started', label: 'Start here', icon: Compass },
   { id: 'features', label: 'Features & workflows', icon: BookOpen },
-  { id: 'how-to', label: 'How-to & Glossary', icon: BookOpen },
   { id: 'library', label: 'Map library', icon: LibraryBig },
   { id: 'map-finder', label: 'Community maps', icon: Globe2 },
   { id: 'quickforge', label: 'Level editor', icon: Layers3 },
-  { id: 'academy', label: 'Modding Academy', icon: GraduationCap },
+  { id: 'learning', label: 'Learning center', icon: GraduationCap },
   { id: 'community', label: 'Community Thanks', icon: Heart },
   { id: 'firefight', label: 'Firefight rules', icon: Flame },
   { id: 'world', label: 'World editor', icon: Box },
@@ -142,12 +140,13 @@ const nav = [
   { id: 'machinima', label: 'Machinima', icon: Clapperboard },
 ] as const;
 const mapWorkspaces:Workspace[]=['world','quickforge','live','tags','assets','scenario','build','firefight','creator','machinima','preservation'];
-function requestedWorkspace():Workspace|null{const value=new URLSearchParams(location.search).get('workspace');return nav.some(item=>item.id===value)||value==='settings'||value==='preservation'?value as Workspace:null;}
+function requestedWorkspace():Workspace|null{const value=new URLSearchParams(location.search).get('workspace');if(value==='how-to'||value==='academy')return 'learning';return nav.some(item=>item.id===value)||value==='settings'||value==='preservation'?value as Workspace:null;}
+function initialLearningSection():LearningSection{const query=new URLSearchParams(location.search);if(query.get('workspace')==='academy'||query.has('lesson'))return 'academy';if(query.get('workspace')==='how-to')return 'guides';const saved=query.get('workspace')==='learning'?query.get('section')??readMapSession<string>('global','learning.section','guides'):readMapSession<string>('global','learning.section','guides');return saved==='academy'||saved==='glossary'?saved:'guides';}
 function rememberedWorkspace(project:Project,inspection?:MapInspection|null):Workspace{const fallback:Workspace=project.quickForge?'quickforge':inspection?.header.scenarioType===2?'tags':'world';const stored=readMapSession<Workspace>(project.id,'workspace',fallback);return mapWorkspaces.includes(stored)?stored:fallback;}
-const navGroups = [["Level Editor",["quickforge"]],["Tags & Assets",["tags","assets","compare"]],["Gameplay Creator",["machinima","scenario","firefight","creator"]],["Projects & Testing",["library","build","runtimes"]],["Learn & Community",["get-started","features","how-to","academy","map-finder","community"]]] as const;
+const navGroups = [["Level Editor",["quickforge"]],["Tags & Assets",["tags","assets","compare"]],["Gameplay Creator",["machinima","scenario","firefight","creator"]],["Projects & Testing",["library","build","runtimes"]],["Learn & Community",["get-started","features","learning","map-finder","community"]]] as const;
 const finderItems: readonly WorkspaceFinderItem[] = [
   {id:'quickforge',label:'QuickForge',help:'Open the map viewer. QuickForge tools follow the open document.',keywords:'level editor geometry brushes tunnels forge'},
-  ...nav.map(({id,label}) => ({id,label,help:WORKSPACE_TOOLTIPS[id] ?? '',keywords:`${WORKBENCH_GUIDES[id].can} ${WORKBENCH_GUIDES[id].cannot} ${WORKBENCH_GUIDES[id].tip}`})),
+  ...nav.map(({id,label}) => ({id,label,help:WORKSPACE_TOOLTIPS[id] ?? '',keywords:`${WORKBENCH_GUIDES[id].can} ${WORKBENCH_GUIDES[id].cannot} ${WORKBENCH_GUIDES[id].tip} ${id==='learning'?'how-to how to glossary modding academy tutorials lessons':''}`})),
   {id:'preservation',label:'Preservation record',help:WORKSPACE_TOOLTIPS.preservation ?? '',keywords:WORKBENCH_GUIDES.preservation.tip},
   {id:'settings',label:'Settings & tools',help:WORKSPACE_TOOLTIPS.settings ?? '',keywords:WORKBENCH_GUIDES.settings.tip},
 ];
@@ -162,19 +161,21 @@ export default function App() {
   useEffect(()=>saveHistoryLimit(history.limit),[history.limit]);
   const inspection=activeMap?.inspection??null,meshes=activeMap?.meshes??{};
   const [workspace, setWorkspaceState] = useState<Workspace>(()=>requestedWorkspace()??firstVisitWorkspace());
+  const [learningSection,setLearningSection]=useState<LearningSection>(initialLearningSection);
+  useEffect(()=>writeMapSession('global','learning.section',learningSection),[learningSection]);
   const [sharedHistory,setSharedHistory]=useState<Record<string,{undo:boolean;redo:boolean}>>({});
   useEffect(()=>{const update=(event:Event)=>{const {projectId,view,paused}=(event as CustomEvent).detail??{};if(typeof projectId!=='string')return;setSharedHistory(old=>({...old,[projectId]:{undo:!paused&&!!view?.canUndo,redo:!paused&&!!view?.canRedo}}));};window.addEventListener('guilty-spark-studio-status',update);return()=>window.removeEventListener('guilty-spark-studio-status',update);},[]);
   const[sidebarOpen,setSidebarOpen]=useMapState('global','chrome.sidebar',false);
   const toggleNavigation=()=>setSidebarOpen(open=>!open);
   useEffect(()=>{if(!sidebarOpen)return;const dismiss=(event:globalThis.PointerEvent)=>{if((event.target as HTMLElement).closest('#gs-workspace-navigation,.gs-navigation-toggle'))return;setSidebarOpen(false);};document.addEventListener('pointerdown',dismiss,true);return()=>document.removeEventListener('pointerdown',dismiss,true);},[sidebarOpen,setSidebarOpen]);
   useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape'&&sidebarOpen&&!document.querySelector('[role="dialog"]')){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(false);document.querySelector<HTMLButtonElement>('.gs-navigation-toggle')?.focus();}else if((event.ctrlKey||event.metaKey)&&event.code==='Backslash'&&!event.altKey&&!event.shiftKey){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(open=>!open);}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[sidebarOpen,setSidebarOpen]);
-  const [settingsTab,setSettingsTabState]=useState<'tools'|'dependencies'>('tools');
-  const setWorkspace=useCallback((next:Workspace)=>{if(next===workspaceRef.current)return;window.dispatchEvent(new Event('gs:save-viewport-context'));workspaceRef.current=next;setWorkspaceState(next);},[]);
+  const [settingsTab,setSettingsTabState]=useState<'tools'|'dependencies'>(()=>new URLSearchParams(location.search).get('section')==='dependencies'?'dependencies':'tools');
+  const setWorkspace=useCallback((next:Workspace)=>{if(next==='how-to'||next==='academy'){setLearningSection(next==='academy'?'academy':'guides');next='learning';}if(next===workspaceRef.current)return;window.dispatchEvent(new Event('gs:save-viewport-context'));workspaceRef.current=next;setWorkspaceState(next);},[]);
   const setSettingsTab=useCallback((next:'tools'|'dependencies')=>setSettingsTabState(next),[]);
   const workspaceRef=useRef(workspace);
   workspaceRef.current=workspace;
   const bootRouteHandled=useRef(false);
-  useEffect(()=>{if(!ready||bootRouteHandled.current)return;bootRouteHandled.current=true;if(data.settings.onboardingCompleted){markFirstVisitSeen();if(workspace==='get-started')setWorkspace('library');}},[ready,data.settings.onboardingCompleted]);
+  useEffect(()=>{if(!ready||bootRouteHandled.current)return;bootRouteHandled.current=true;if(data.settings.onboardingCompleted){markFirstVisitSeen();if(workspace==='get-started'&&!requestedWorkspace())setWorkspace('library');}},[ready,data.settings.onboardingCompleted]);
   const [focusTagId, setFocusTagId] = useMapState<number | null>(activeMap?.id??'no-map','tags.focus',null);
   useEffect(()=>{if(activeMap&&mapWorkspaces.includes(workspace))writeMapSession(activeMap.id,'workspace',workspace);},[activeMap?.id,workspace]);
   const [interfacePreferences, setInterfacePreferences] = useState(readInterfacePreferences);
@@ -274,13 +275,13 @@ export default function App() {
   historyRef.current = history;
   const documentsRef=useRef(documents);
   documentsRef.current=documents;
-  const workflow=useWorkflowHistory({workspace,projectId:activeMap?.id??null,settingsTab},mapWorkspaces,route=>{
+  const workflow=useWorkflowHistory({workspace,projectId:activeMap?.id??null,settingsTab,learningSection},mapWorkspaces,route=>{
     if(route.projectId&&documentsRef.current.documents.some(d=>d.id===route.projectId))dispatchDocument({type:'select',id:route.projectId});
-    setSettingsTabState(route.settingsTab);workspaceRef.current=route.workspace;setWorkspaceState(route.workspace);
+    setSettingsTabState(route.settingsTab);if(route.learningSection)setLearningSection(route.learningSection);workspaceRef.current=route.workspace;setWorkspaceState(route.workspace);
   },route=>!mapWorkspaces.includes(route.workspace)||(route.projectId?documentsRef.current.documents.some(d=>d.id===route.projectId):!documentsRef.current.activeId));
   function routeTitle(route:WorkflowRoute|null,direction:'Back'|'Forward'){
     if(!route)return direction==='Back'?'No previous workspace':'No next workspace';
-    const label=nav.find(item=>item.id===route.workspace)?.label??(route.workspace==='settings'?(route.settingsTab==='dependencies'?'Dependencies & setup':'Games & tools'):route.workspace);
+    const label=route.workspace==='learning'?`Learning center · ${route.learningSection??'guides'}`:nav.find(item=>item.id===route.workspace)?.label??(route.workspace==='settings'?(route.settingsTab==='dependencies'?'Dependencies & setup':'Games & tools'):route.workspace);
     const map=documents.documents.find(d=>d.id===route.projectId)?.history.current?.title;
     return direction+' to '+label+(map?' · '+map:'')+' (Alt+'+(direction==='Back'?'Left':'Right')+')';
   }
@@ -677,7 +678,7 @@ export default function App() {
     if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
     setBusy(true);try{await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id);window.dispatchEvent(new Event('gs:save-viewport-context'));if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call('open_project_window',{id,workspace:workspaceRef.current});}else if(native)await call('release_project_document',{id});const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});}catch(e){notice(String(e),'error');}finally{setBusy(false);}
   }
-  async function popoutWorkspace(){if(!native){notice('Workspace windows require the desktop application.');return;}if(current&&mapWorkspaces.includes(workspaceRef.current)){if(busy||activeJob){notice('Finish the current map operation before moving its workspace to another window.');return;}await closeMap(current.id,true);return;}try{await call('open_workspace_window',{workspace:workspaceRef.current,context:null});}catch(e){notice(String(e),'error');}}
+  async function popoutWorkspace(){if(!native){notice('Workspace windows require the desktop application.');return;}if(current&&mapWorkspaces.includes(workspaceRef.current)){if(busy||activeJob){notice('Finish the current map operation before moving its workspace to another window.');return;}await closeMap(current.id,true);return;}try{const section=workspaceRef.current==='learning'?learningSection:workspaceRef.current==='settings'?settingsTab:null;await call('open_workspace_window',{workspace:workspaceRef.current,section,context:section==='academy'?readMapSession<string>('global','learning.lesson','preservation'):null});notice('Workspace opened in a resizable window. Drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
   async function transferAsset(selection: TransferSelection) {
     const target=historyRef.current.current;
     if(!target)return;
@@ -880,7 +881,7 @@ export default function App() {
     return workspaceContent();
   }
   function workspaceContent() {
-    if (workspace === 'how-to') return <HowTo navigate={setWorkspace}/>;
+    if (workspace === 'learning') return <LearningCenter project={current} inspection={inspection} settings={data.settings} section={learningSection} onSection={setLearningSection} navigate={setWorkspace}/>;
     if (workspace === 'get-started') return <GettingStarted data={data} project={current} onApply={applySettings} navigate={target => {markFirstVisitSeen();setWorkspace(target);}}/>;
     if (workspace === 'features') return <Features project={current} openMaps={documents.documents.length} navigate={setWorkspace}/>;
     if (workspace === 'community') return <CommunityThanks/>;
@@ -890,6 +891,7 @@ export default function App() {
         <Library
           data={data}
           onImport={() => void importFiles()}
+          onRuntime={id=>{setDependencyRuntime(id);setSettingsTab('tools');setWorkspace('settings');}}
           onNew={() => setCreateModal(true)}
           onNewMap={() => setWorkspace('quickforge')}
           onFindMaps={() => setWorkspace('map-finder')}
@@ -945,7 +947,6 @@ export default function App() {
       );
     if (workspace === 'runtimes')
       return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} settings={data.settings} onSettings={openDependencySetup} onOpenWorkspace={setWorkspace} edit={edit} />;
-    if (workspace === 'academy') return <Academy project={current} inspection={inspection} settings={data.settings} navigate={setWorkspace} />;
     if (!current) return commonEmpty;
     switch (workspace) {
       case 'firefight': return <Firefight key={current.id} project={current} entries={data.entries} edit={edit} />;

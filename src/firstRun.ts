@@ -51,6 +51,7 @@ export const STARTER_PATHS:readonly StarterPath[]=[
   ]},
 ];
 export const WORKSPACE_TOOLTIPS:Partial<Record<Workspace,string>>={
+  learning:'Task guides, searchable Halo vocabulary and project-aware Academy lessons in one workspace. Your place is remembered.',
   features:'Browse Spark capabilities, short how-to guides and tool requirements. Open maps and their undo histories stay in place.',
   'how-to':'Follow task guides and search the Halo glossary. Your saved Halo and tools remain connected between launches.',
   'get-started':'A beginner-safe tour of the available paths, dependencies and limitations.',

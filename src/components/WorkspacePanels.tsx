@@ -147,7 +147,7 @@ export default function WorkspacePanels({
           placement.dock === 'bottom'||placement.dock==='top' ? Math.min(placement.height, 360) : Math.min(placement.width, 440);
   return (
     <Context.Provider value={context}>
-      <div className="gs-workspace-shell" data-fullscreen={fullscreen}>
+      <div className="gs-workspace-shell" data-fullscreen={fullscreen} data-workspace={workspace}>
         <nav className="gs-workspace-tools" aria-label="Workspace panels">
           <button
             className="gs-navigation-toggle"
@@ -167,7 +167,7 @@ export default function WorkspacePanels({
           >
             {fullscreen ? 'Exit fullscreen · F11' : 'Fullscreen · F11'}
           </button>
-          {onPopout&&<button aria-label="Pop out workspace" title="Move this workspace to a resizable window for another monitor" onClick={onPopout}><SquareArrowOutUpRight size={14}/></button>}
+          {onPopout&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={onPopout}><SquareArrowOutUpRight size={14}/>Pop out</button>}
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
           <div className="gs-panel-buttons" ref={panelButtons}>
             {descriptors.map((panel) => (

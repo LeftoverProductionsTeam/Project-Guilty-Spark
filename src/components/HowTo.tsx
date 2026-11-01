@@ -1,7 +1,8 @@
-import {useState} from 'react';
+import {useMapState} from '../mapSession';
 import type {Workspace} from '../types';
-import {PageTitle} from './ui';
+import {academyTerms} from '../learningGlossary';
 const terms=[
+  ...academyTerms,
   ['Tag','A Halo data file that describes an object, effect, image, sound or level. Tags often reference other tags.'],
   ['Scenario','The level’s placements, player starts, objectives, scripts and BSP references.'],
   ['BSP','The compiled level structure: surfaces, collision and visibility data. Changing source geometry requires rebuilding it.'],
@@ -43,12 +44,19 @@ const workflows:{title:string;description:string;target:Workspace;steps:string[]
   {title:'Record a native camera take',description:'Hide the game HUD and keep your character controllable.',target:'machinima',steps:['In Machinima, capture camera keys and enable In-engine recording.','Choose a fixed camera or sequence, then open the MCC build workflow. Existing scenario scripts must be recovered and merged before adding a take.','Build and load the native scenario. Flashlight toggles the camera take and restores the HUD when stopped. Record the game with OBS at the game’s resolution.']},
   {title:'Adjust the shared renderer',description:'Use authored textures and lighting, with optional visual enhancements.',target:'world',steps:['Open a map in the Level Editor and let verified texture loading complete.','Use Lighting & fog for an editor override, or Render enhancements for normal maps, highlights, bloom and exposure.','Use map lighting and Restore source rendering return to the authored preview. These controls do not patch a running game’s renderer.']},
 ];
-export default function HowTo({navigate}:{navigate:(workspace:Workspace)=>void}){
-  const [tab,setTab]=useState<'guide'|'glossary'>('guide'),[query,setQuery]=useState('');
-  return <div className="analysis-page gs-how-to"><PageTitle eyebrow="FIELD MANUAL" title="How-to & Glossary" description="Choose a task or look up a Halo term. Your saved game and tools stay connected between launches."/><button onClick={()=>navigate('features')}>Browse all Spark features &amp; workflows</button>
-    <div role="tablist" aria-label="Help topics"><button role="tab" id="gs-howto-tab" aria-selected={tab==='guide'} aria-controls="gs-howto-panel" onClick={()=>setTab('guide')}>How to</button><button role="tab" id="gs-glossary-tab" aria-selected={tab==='glossary'} aria-controls="gs-howto-panel" onClick={()=>setTab('glossary')}>Glossary</button></div>
-    <section role="tabpanel" id="gs-howto-panel" aria-labelledby={tab==='guide'?'gs-howto-tab':'gs-glossary-tab'}>
-      {tab==='guide'?<div className="gs-howto-grid">{workflows.map(w=><article className="analysis-card" key={w.title}><h2>{w.title}</h2><p>{w.description}</p><ol>{w.steps.map(s=><li key={s}>{s}</li>)}</ol><button onClick={()=>navigate(w.target)}>Open {w.target==='interface'?'Interface Studio':w.target==='library'?'Map Library':w.target==='settings'?'Settings & tools':w.target==='live'?'Live Lab':'QuickForge'}</button></article>)}</div>:<><input type="search" aria-label="Search glossary" value={query} onChange={e=>setQuery(e.target.value)} placeholder="BSP, tags, lightmap…"/><dl className="gs-glossary">{terms.filter(([name,text])=>`${name} ${text}`.toLowerCase().includes(query.toLowerCase())).map(([name,text])=><div key={name}><dt>{name}</dt><dd>{text}</dd></div>)}</dl></>}
-    </section>
+const destinations:Partial<Record<Workspace,string>>={interface:'Interface Studio',library:'Map library',settings:'Settings & tools',live:'Level editor',world:'Level editor',quickforge:'Level editor',build:'Build & playtest',machinima:'Machinima'};
+export default function HowTo({navigate,section}:{navigate:(workspace:Workspace)=>void;section:'guides'|'glossary'}){
+  const [query,setQuery]=useMapState('global','learning.glossarySearch','');
+  const [selected,setSelected]=useMapState('global','learning.guide',workflows[0].title);
+  const guide=workflows.find(item=>item.title===selected)??workflows[0];
+  const matches=terms.filter(([name,text])=>`${name} ${text}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>a[0].localeCompare(b[0]));
+  return <div className="gs-how-to">
+    {section==='guides'?<div className="learning-guides">
+      <nav aria-label="Task guides">{workflows.map(item=><button key={item.title} aria-current={guide===item?'page':undefined} onClick={()=>setSelected(item.title)} title={item.description}>{item.title}</button>)}</nav>
+      <article className="learning-guide" aria-labelledby="learning-guide-title"><h2 id="learning-guide-title">{guide.title}</h2><p>{guide.description}</p><ol>{guide.steps.map(step=><li key={step}>{step}</li>)}</ol><button className="primary" onClick={()=>navigate(guide.target)}>Open {destinations[guide.target]??guide.target}</button></article>
+    </div>:<>
+      <div className="learning-search"><input type="search" aria-label="Search glossary" value={query} onChange={e=>setQuery(e.target.value)} placeholder="BSP, tags, lightmap…"/><small role="status">{matches.length} terms</small>{query&&<button onClick={()=>setQuery('')}>Clear search</button>}</div>
+      {matches.length?<dl className="gs-glossary">{matches.map(([name,text])=><div key={name}><dt>{name}</dt><dd>{text}</dd></div>)}</dl>:<p role="status">No matching terms. Try a shorter word or clear the search.</p>}
+    </>}
   </div>;
 }

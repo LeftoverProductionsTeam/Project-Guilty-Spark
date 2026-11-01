@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Check, FolderOpen, Gamepad2, RefreshCw, Settings2 } from 'lucide-react';
-import { call, native } from '../api';
+import { native } from '../api';
 import { useMapState } from '../mapSession';
 import { runtimeNames } from '../runtimeWorkbench';
-import type { Bootstrap, Project, RuntimeId, RuntimeReport } from '../types';
+import type { Bootstrap, Project, RuntimeId } from '../types';
+import { primaryRuntimes, useRuntimeConnections } from '../useRuntimeConnections';
 import { Notice } from './ui';
 import { useRevealWorkspacePanel } from './WorkspacePanels';
 import ToolEcosystem from './ToolEcosystem';
 import '../gamesTools.css';
 
-const runtimes: RuntimeId[] = ['mccSteam', 'openCe', 'chupathingyCe', 'haloCustomEdition'];
 
 export default function GamesTools({
   data,
@@ -37,35 +37,10 @@ export default function GamesTools({
   );
   const [search, setSearch] = useMapState(project?.id ?? 'global', `tools.search.${runtime}`, '');
   const [advanced, setAdvanced] = useMapState('global', 'tools.advanced', false);
-  const [reports, setReports] = useState<RuntimeReport[]>([]),
-    [checking, setChecking] = useState(false),
-    [error, setError] = useState('');
-  const generation = useRef(0),
-    reveal = useRevealWorkspacePanel();
-  const refresh = useCallback(async () => {
-    const version = ++generation.current;
-    if (!native) return;
-    setChecking(true);
-    setError('');
-    try {
-      const next = await call<RuntimeReport[]>('runtime_report');
-      if (generation.current === version) setReports(next);
-    } catch (e) {
-      if (generation.current === version) {
-        setReports([]);
-        setError(String(e));
-      }
-    } finally {
-      if (generation.current === version) setChecking(false);
-    }
-  }, [data.settings.mccDirectory, data.settings.steamDirectory]);
-  useEffect(() => {
-    void refresh();
-    return () => {
-      generation.current++;
-    };
-  }, [refresh]);
+  const { reports, detected, checking, connecting, error, refresh, connect } = useRuntimeConnections(data);
+  const reveal = useRevealWorkspacePanel();
   const installation = reports.find((report) => report.id === runtime)?.installation;
+  const candidate = detected.find(item => item.runtimeId === runtime);
   return (
     <div className="analysis-page games-tools-page">
       <header className="games-tools-heading">
@@ -78,13 +53,16 @@ export default function GamesTools({
       </header>
       {error && <Notice tone="error">{error}</Notice>}
       <div className="halo-runtime-grid" role="group" aria-label="Halo versions">
-        {runtimes.map((id) => {
+        {primaryRuntimes.map((id) => {
           const found = reports.find((report) => report.id === id)?.installation;
+          const available = detected.find(item => item.runtimeId === id);
           const connected = found?.validation === 'pass';
           const status = connected
             ? 'Connected'
             : found
               ? 'Needs attention'
+              : available
+                ? (available.contentReady ? 'Detected' : 'Needs content')
               : checking
                 ? 'Checking…'
                 : 'Not connected';
@@ -96,8 +74,8 @@ export default function GamesTools({
               aria-pressed={runtime === id}
               aria-label={`${runtimeNames[id]} · ${status}`}
               title={
-                found
-                  ? `${runtimeNames[id]}: ${found.root}`
+                found || available
+                  ? `${runtimeNames[id]}: ${found?.root ?? available?.root}`
                   : `Connect ${runtimeNames[id]} to use its installed tools and content`
               }
               onClick={() => setRuntime(id)}
@@ -148,9 +126,9 @@ export default function GamesTools({
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
-        <button onClick={() => onSetup(runtime)}>
+        <button disabled={connecting !== null} onClick={() => candidate?.contentReady && !installation ? void connect(candidate) : onSetup(runtime)} title={candidate?.detail}>
           <Settings2 size={14} />
-          {installation?.validation === 'pass' ? 'Connect tools' : 'Connect this Halo'}
+          {connecting === runtime ? 'Connecting…' : installation?.validation === 'pass' ? 'Connect tools' : candidate?.contentReady ? 'Connect detected Halo' : 'Connect this Halo'}
         </button>
       </div>
       <div className="games-tools-save-flow">

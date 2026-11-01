@@ -1,13 +1,12 @@
 import HomeModel from './HomeModel';
+import HomeRuntimes from './HomeRuntimes';
 import {
   ArrowDownToLine,
   Box,
-  Check,
   ChevronRight,
   FolderOpen,
   Globe2,
   Grid2X2,
-  HardDrive,
   Plus,
   List,
   Search,
@@ -18,7 +17,7 @@ import {
 import { useMapState } from '../mapSession';
 import '../libraryCompact.css';
 import { native } from '../api';
-import type { Bootstrap, LibraryEntry } from '../types';
+import type { Bootstrap, LibraryEntry, RuntimeId } from '../types';
 import { formatNumber } from '../editor';
 import { Notice, PageTitle, Pill } from './ui';
 export default function Library({
@@ -30,6 +29,7 @@ export default function Library({
   onOpen,
   onInbox,
   onInitializeInbox,
+  onRuntime,
   busy,
 }: {
   data: Bootstrap;
@@ -40,6 +40,7 @@ export default function Library({
   onOpen: (e: LibraryEntry) => void;
   onInbox: () => void;
   onInitializeInbox: () => void;
+  onRuntime: (id: RuntimeId) => void;
   busy: boolean;
 }) {
   const [query, setQuery] = useMapState('global', 'library.query', '');
@@ -92,34 +93,14 @@ export default function Library({
           <HomeModel data={data} />
         </div>
       </section>
-      {!data.installation.mccPath && (
+      {!native && (
         <Notice tone="info">
           {data.diagnostics[0] ??
             'MCC was not found automatically. The local Inbox can still import maps and archives.'}
         </Notice>
       )}
-      <div className="runtime-strip">
-        <div className="runtime-icon">
-          <HardDrive size={20} />
-        </div>
-        <div>
-          <strong>
-            {data.installation.mccPath ? 'Halo: The Master Chief Collection' : 'Local map library'}
-          </strong>
-          <span title={data.installation.mccPath ?? data.inboxDirectory}>
-            {data.installation.mccPath ?? data.inboxDirectory}
-          </span>
-        </div>
-        <Pill tone={data.installation.halo1Installed ? 'green' : 'muted'}>
-          {data.installation.halo1Installed ? (
-            <>
-              <Check size={11} />
-              Halo 1 found
-            </>
-          ) : (
-            'MCC not found'
-          )}
-        </Pill>
+      <div className="runtime-strip home-runtime-strip">
+        <HomeRuntimes data={data} onSelect={onRuntime}/>
         <span className="strip-divider" />
         <div className="inbox-state">
           <Watch size={16} />

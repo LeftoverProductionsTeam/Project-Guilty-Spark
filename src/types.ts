@@ -8,6 +8,7 @@ export type Workspace =
   | 'map-finder'
   | 'get-started'
   | 'features'
+  | 'learning'
   | 'how-to'
   | 'community'
   | 'world'

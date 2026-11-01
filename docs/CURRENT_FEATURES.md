@@ -9,7 +9,8 @@ The latest [measured loading pass](C41_MAP_LOADING_PERFORMANCE.md) batches fully
 - Preserve original map/archive bytes and record exact identities, resources and provenance.
 - Discover owned runtime maps and linked/downloaded assets; download supported HTTPS map/ZIP releases in Spark.
 - Keep multiple maps open with independent cameras, workspaces, tags, histories and target settings. Pop out workspaces and Recording Director for multiple displays.
-- Use Back/Forward to return to a workspace or Settings section. Keyboard undo/redo remains edit history, with a configurable default of 100 entries.
+- Use Back/Forward to return to a workspace, Settings section or Learning section. Keyboard undo/redo remains edit history, with a configurable default of 100 entries.
+- Use one Learning center for compact task guides, all 50 glossary definitions and Academy lessons, with remembered selections. All 23 native workspace routes passed pop-out acceptance, including three concurrent resizable windows. [Measurements and exact scope](C41_LEARNING_AND_WINDOWS.md).
 - Use one fullscreen mode, compact map/header controls, movable/resizable drawers, remembered layouts, searchable tools, onboarding, glossary and Academy guides.
 - Choose Dark Glow colors, white-on-dark themes, whole-window transparency and tint.
 - Use compact library tiles/list with remembered searches. Games & tools shows connected MCC, OpenCE, Chupathingy and Custom Edition cards, scopes tools to the selected runtime/map and keeps advanced paths expandable. Legacy editions remain export targets. [Workflow and exact acceptance](C41_WORKBENCH_FOLLOW_THROUGH.md).

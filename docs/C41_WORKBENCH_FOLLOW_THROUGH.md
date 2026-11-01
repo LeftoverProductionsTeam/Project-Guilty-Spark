@@ -2,6 +2,8 @@
 
 This continues the committed C35–C41 foundation. Original sources, earlier releases, failed trials and unfinished research remain preserved. No remote publication is implied.
 
+The subsequent [Learning center, runtime detection and native pop-out pass](C41_LEARNING_AND_WINDOWS.md) records newer test counts, artifact identities and the later CE Zombie load with missing AI. The earlier receipts and trial outcomes below remain historical evidence.
+
 ## Library, Games & tools and hosting
 
 - The library has smaller map tiles, a persistent list view, remembered searches/filters and no-results recovery. Import/new-map actions share its header. The actual Halo model showcase remains; optional Inbox setup is under Library options.

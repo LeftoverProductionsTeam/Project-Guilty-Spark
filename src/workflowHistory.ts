@@ -1,8 +1,10 @@
 import type { Workspace } from './types';
+export type LearningSection = 'guides' | 'glossary' | 'academy';
 export interface WorkflowRoute {
   workspace: Workspace;
   projectId: string | null;
   settingsTab: 'tools' | 'dependencies';
+  learningSection?: LearningSection;
 }
 export interface WorkflowHistory {
   current: WorkflowRoute;
@@ -11,7 +13,8 @@ export interface WorkflowHistory {
 }
 const LIMIT = 200;
 const same = (a: WorkflowRoute, b: WorkflowRoute) =>
-  a.workspace === b.workspace && a.projectId === b.projectId && a.settingsTab === b.settingsTab;
+  a.workspace === b.workspace && a.projectId === b.projectId && a.settingsTab === b.settingsTab &&
+  (a.workspace !== 'learning' || (a.learningSection ?? 'guides') === (b.learningSection ?? 'guides'));
 function lastAvailable(stack: WorkflowRoute[], available: (route: WorkflowRoute) => boolean) {
   for (let i = stack.length - 1; i >= 0; i--) if (available(stack[i])) return i;
   return -1;
@@ -30,6 +33,7 @@ export function visitWorkflow(
   if (same(history.current, route)) return history;
   const visibleChange =
     history.current.workspace !== route.workspace ||
+    (route.workspace === 'learning' && history.current.learningSection !== route.learningSection) ||
     (mapContextVisible && history.current.projectId !== route.projectId) ||
     (route.workspace === 'settings' && history.current.settingsTab !== route.settingsTab);
   if (!visibleChange) return { ...history, current: { ...route } };

@@ -75,7 +75,7 @@ export default function StartupSetup({
         <p>Setup will not reopen on each boot. Change these choices here whenever you need to.</p>
         <div className="analysis-actions">
           <button className="primary" onClick={() => navigate('how-to')}>
-            Open How-to & Glossary
+            Open Learning center
           </button>
           <button onClick={() => setStep(0)}>Change Halo or tools</button>
         </div>

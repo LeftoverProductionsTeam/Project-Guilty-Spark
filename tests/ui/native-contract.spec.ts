@@ -182,6 +182,8 @@ async function mockDesktop(page: Page) {
         if(command==='plugin:window|unmaximize'){mock.maximized=false;return null;}
         if(command==='plugin:window|maximize'){mock.maximized=true;return null;}
         if (command === 'bootstrap') return structuredClone(bootstrap);
+        if (command === 'open_workspace_window') return 'synthetic-workspace-window';
+        if (command === 'open_project_window') return 'synthetic-map-window';
         if (command === 'open_project') {if(mock.delayOpen){const delay=mock.delayOpen;mock.delayOpen=0;await new Promise(resolve=>setTimeout(resolve,delay));}return structuredClone(projects[args.id]);}
         if (command === 'prepare_native_asset_import') {
           const source = projects[args.sourceProjectId];
@@ -260,6 +262,7 @@ async function mockDesktop(page: Page) {
         if (command === 'compatibility') throw new Error('Synthetic compatibility error');
         if (command === 'launch_readiness') throw new Error('Synthetic readiness error');
         if (command === 'inspect_template') throw new Error('Synthetic template error');
+        if (command === 'discover_halo_connections') return [];
         if (command === 'tool_ecosystem_report') return { projectId: args.projectId, context: { runtimeId: args.runtimeId, sourceKind: 'Synthetic source' }, sourceIssue: null, tools: [] };
         if (command === 'runtime_report')
           return [
@@ -329,11 +332,98 @@ async function openFixture(page: Page) {
 }
 
 
+test('one Learning center retains guides, glossary and Academy while returning to edited maps',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('27');await field.press('Tab');
+  await chooseTool(page,'Learning center');
+  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();
+  const drawer=page.locator('.gs-navigation-drawer');
+  await expect(drawer.getByRole('button',{name:'Learning center',exact:true})).toHaveCount(1);
+  await expect(drawer.getByRole('button',{name:'How-to & Glossary',exact:true})).toHaveCount(0);
+  await expect(drawer.getByRole('button',{name:'Modding Academy',exact:true})).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('tablist',{name:'Learning sections'}).getByRole('tab')).toHaveCount(3);
+  await page.getByRole('button',{name:'Convert a classic map to MCC',exact:true}).click();
+  await page.getByRole('button',{name:'Open Build & playtest',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'From archive to in-game.',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Back to previous workspace',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Convert a classic map to MCC',exact:true})).toBeVisible();
+  await page.getByRole('tab',{name:'Glossary',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search glossary',exact:true}).fill('Race vehicle');
+  await expect(page.locator('.gs-glossary dt')).toHaveText(['Race vehicle and teleporter flags']);
+  await page.getByRole('tab',{name:'Academy',exact:true}).click();
+  await page.getByRole('button',{name:/07 Halo Modding Brain: the original magic/}).click();
+  await expect(page.locator('.gs-lesson-intro h2')).toHaveText('07 Halo Modding Brain: the original magic');
+  await expect(page.locator('.gs-legacy-lab')).toHaveCount(0);
+  await page.getByText('Classic workflows & companion tools',{exact:true}).click();
+  const techniques=page.getByRole('group',{name:'Classic Halo modding technique',exact:true});
+  await expect(techniques).toBeVisible();await techniques.getByRole('button').nth(1).click();
+  const technique=await techniques.locator('[aria-pressed="true"]').textContent();
+  await page.getByText('Classic workflows & companion tools',{exact:true}).click();
+  await page.getByText('Classic workflows & companion tools',{exact:true}).click();
+  await expect(techniques.locator('[aria-pressed="true"]')).toHaveText(technique!);
+  await page.getByRole('button',{name:'Pop out lesson',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='open_workspace_window').at(-1)?.args)).toEqual({workspace:'academy',context:'legacyPhilosophy'});
+  await chooseTool(page,'Tag editor');await expect(field).toHaveValue('27');
+  await page.getByRole('button',{name:'Back to previous workspace',exact:true}).click();
+  await expect(page.getByRole('tab',{name:'Academy',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('.gs-lesson-intro h2')).toHaveText('07 Halo Modding Brain: the original magic');
+  await page.getByRole('tab',{name:'Glossary',exact:true}).click();
+  await expect(page.getByRole('searchbox',{name:'Search glossary',exact:true})).toHaveValue('Race vehicle');
+  await page.getByRole('searchbox',{name:'Search glossary',exact:true}).fill('zzzz-unavailable');await expect(page.getByText('No matching terms. Try a shorter word or clear the search.')).toBeVisible();
+  await page.getByRole('button',{name:'Clear search',exact:true}).click();expect(await page.locator('.gs-glossary dt').count()).toBe(50);
+  await page.reload();await chooseTool(page,'Learning center');
+  await expect(page.getByRole('tab',{name:'Glossary',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.getByRole('tab',{name:'Guides',exact:true}).focus();await page.keyboard.press('End');
+  await expect(page.getByRole('tab',{name:'Academy',exact:true})).toBeFocused();
+  await page.getByRole('tab',{name:'Guides',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Convert a classic map to MCC',exact:true})).toBeVisible();
+  await page.setViewportSize({width:800,height:650});
+  expect(await page.locator('.learning-center').evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
+});
+
+test('each workspace exposes one pop-out and retains Learning and Settings sections',async({page})=>{
+  await mockDesktop(page);
+  const routes:[string,string][]=[['Map library','library'],['Start here','get-started'],['Features & workflows','features'],['Learning center','learning'],['Community maps','map-finder'],['Community Thanks','community'],['Compare variants','compare'],['Firefight rules','firefight'],['Creator Studio','creator'],['Build & playtest','build'],['Online','runtimes'],['Asset workshop','assets'],['AI & scenario','scenario'],['Machinima','machinima'],['Tag editor','tags'],['Level editor','quickforge'],['Preservation record','preservation'],['Settings & tools','settings']];
+  for(const [name,workspace] of routes){
+    await chooseTool(page,name);const popout=page.getByRole('button',{name:'Pop out workspace',exact:true});await expect(popout).toHaveCount(1);await popout.click();
+    await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args.workspace)).toBe(workspace);
+  }
+  await page.getByRole('tab',{name:'Dependencies & setup',exact:true}).click();await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args)).toEqual({workspace:'settings',section:'dependencies',context:null});
+  await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args.workspace)).toBe('interface');
+  await chooseTool(page,'Learning center');await page.getByRole('tab',{name:'Glossary',exact:true}).click();await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args)).toEqual({workspace:'learning',section:'glossary',context:null});
+});
+
+test('popping out a map editor saves the focused edit before transferring its document',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('28');
+  await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(28);
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);
+  const move=calls.findIndex((call:any)=>call.command==='open_project_window');expect(move).toBeGreaterThan(0);
+  expect(calls.slice(0,move).some((call:any)=>call.command==='save_project')).toBe(true);
+  expect(calls[move].args).toEqual({id:'a',workspace:'tags'});
+  await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+});
+
+test('explicit pop-out routes survive completed onboarding and legacy help links stay usable',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>localStorage.setItem('spark-test-settings',JSON.stringify({onboardingCompleted:true})));
+  await page.goto('/?workspace=get-started');await expect(page.getByRole('heading',{name:'Your workbench is ready',exact:true})).toBeVisible();
+  await page.goto('/?workspace=settings&section=dependencies');await expect(page.getByRole('tab',{name:'Dependencies & setup',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.goto('/?workspace=learning&section=glossary');await expect(page.getByRole('tab',{name:'Glossary',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.goto('/?workspace=academy&lesson=legacyPhilosophy');await expect(page.locator('.gs-lesson-intro h2')).toHaveText('07 Halo Modding Brain: the original magic');
+  await page.goto('/?workspace=how-to');await expect(page.getByRole('tab',{name:'Guides',exact:true})).toHaveAttribute('aria-selected','true');
+});
+
 test('one Back and Forward pair restores the workflow without undoing project edits',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('27');await field.press('Tab');
   const back=page.getByRole('button',{name:'Back to previous workspace',exact:true}),forward=page.getByRole('button',{name:'Forward to next workspace',exact:true});
-  for(const name of ['Compare variants','Firefight rules','Creator Studio','Build & playtest','Online','Settings & tools','Modding Academy','Tag editor']){
+  for(const name of ['Compare variants','Firefight rules','Creator Studio','Build & playtest','Online','Settings & tools','Learning center','Tag editor']){
     await chooseTool(page,name);await expect(back).toHaveCount(1);await expect(forward).toHaveCount(1);
     await expect(page.locator('.gs-workspace-tools').getByRole('button',{name:'Undo (Ctrl+Z)',exact:true})).toHaveCount(0);
   }
@@ -887,6 +977,47 @@ test('hosting uses the selected map and gameplay presets retain fixed left and r
   await expect(page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true})).toHaveValue('KeyV');
   await expect(page.getByText('Changing a preset does not enable them in the running game.',{exact:false})).toBeVisible();
 });
+test('home exposes four Halos and connects a discovered client only after an exact-identity action', async ({ page }) => {
+  await mockDesktop(page);
+  await page.evaluate(() => {
+    const w = window as any, original = w.__TAURI_INTERNALS__.invoke;
+    w.__connectedDiscoveredHalo = false;
+    w.__rejectDetectedHalo = true;
+    const reports = async () => {
+      const [base] = await original('runtime_report');
+      return [base, ...(w.__connectedDiscoveredHalo ? [{ ...base, id: 'openCe', installation: { root: 'C:/synthetic/OpenCE', validation: 'pass' } }] : [])];
+    };
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'runtime_report') return reports();
+      if (command === 'discover_halo_connections') return w.__connectedDiscoveredHalo ? [] : [{ runtimeId: 'openCe', root: 'C:/synthetic/OpenCE', executable: 'C:/synthetic/OpenCE/halo.exe', dataRoot: 'C:/synthetic/OpenCE', executableSha256: 'd'.repeat(64), version: '335', contentReady: true, detail: 'Synthetic detection only' }];
+      if (command === 'connect_detected_halo') {
+        w.__sparkMock.calls.push({ command, args });
+        if (w.__rejectDetectedHalo) throw Error('Detected runtime changed; recheck connections');
+        w.__connectedDiscoveredHalo = true;
+        return reports();
+      }
+      return original(command, args);
+    };
+  });
+  await chooseTool(page, 'Settings & tools');
+  await page.getByRole('button', { name: 'Guilty Spark home', exact: true }).click();
+  const homes = page.getByRole('group', { name: 'Your Halo installations', exact: true });
+  await expect(homes.getByRole('button')).toHaveCount(4);
+  await homes.getByRole('button', { name: 'OpenCE · Detected', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'OpenCE tools', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'OpenCE · Detected', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Connect detected Halo', exact: true }).click();
+  await expect(page.getByText('Detected runtime changed; recheck connections', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'OpenCE · Detected', exact: true })).toBeVisible();
+  await page.evaluate(() => (window as any).__rejectDetectedHalo = false);
+  await page.getByRole('button', { name: 'Connect detected Halo', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'OpenCE · Connected', exact: true })).toHaveAttribute('data-connected', 'true');
+  const requests = await page.evaluate(() => (window as any).__sparkMock.calls.filter((item: any) => item.command === 'connect_detected_halo'));
+  expect(requests.at(-1).args).toEqual({ runtimeId: 'openCe', executableSha256: 'd'.repeat(64) });
+  await page.getByRole('button', { name: 'Guilty Spark home', exact: true }).click();
+  await expect(page.getByRole('group', { name: 'Your Halo installations', exact: true }).getByRole('button', { name: 'OpenCE · Connected', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__sparkMock.calls.some((item: any) => ['launch_registered_runtime', 'launch_discovered_tool'].includes(item.command)))).toBe(false);
+});
 test('games and tools scopes connected Halo versions, editors and map handoffs', async ({ page }, testInfo) => {
   await mockDesktop(page);
   await openFixture(page);
@@ -1319,7 +1450,7 @@ test('onboarding keeps a failed save on its step and remembers completed Halo an
   await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.locator('.gs-first-setup').getByRole('alert')).toContainText('settings write failed');await expect(page.getByRole('heading',{name:'Which Halo are you working with?',exact:true})).toBeVisible();
   await page.evaluate(()=>(window as any).__sparkMock.failSettings=false);await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
   await page.getByRole('textbox',{name:'Setup Map Builder folder',exact:true}).fill('C:/owned/HCEEK');await page.getByRole('combobox',{name:'Setup editing kit generation',exact:true}).selectOption('h1aEk');await page.getByRole('textbox',{name:'Setup Editable Halo Tags folder',exact:true}).fill('C:/owned/working-tags');await page.getByRole('button',{name:'Save setup & open help',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'How-to & Glossary',exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();await chooseTool(page,"Start here");await expect(page.getByRole('heading',{name:'Your workbench is ready',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Learning center',exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();await chooseTool(page,"Start here");await expect(page.getByRole('heading',{name:'Your workbench is ready',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Change Halo or tools',exact:true}).click();await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.getByRole('textbox',{name:'Setup Editable Halo Tags folder',exact:true})).toHaveValue('C:/owned/working-tags');
 });
 test('feature search preserves multiple open maps and each map undo history',async({page})=>{

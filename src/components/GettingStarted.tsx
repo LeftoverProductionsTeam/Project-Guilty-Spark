@@ -26,7 +26,7 @@ export default function GettingStarted({data,project,navigate,onApply}:{data:Boo
       </li>)}</ol></section>
     <div className="gs-welcome-links">
       <button onClick={()=>navigate('map-finder')} title="Find HaloMods, HaloMaps and HaloMD archive pages, then import a locally downloaded map"><Globe2 size={17}/> Find community maps</button>
-      <button onClick={()=>navigate('academy')} title="Hands-on lessons explain each button and the Halo concepts behind it"><BookOpen size={17}/> Open Modding Academy</button>
+      <button onClick={()=>navigate('academy')} title="Open the Academy section in Learning center"><BookOpen size={17}/> Academy lessons</button>
       <button onClick={()=>navigate('runtimes')} title="View engine-specific tool compatibility and discover installed editing tools"><Boxes size={17}/> Choose compatible tools</button>
       <button onClick={()=>navigate('community')} title="Read the thank-you page for two decades of modding community contributions"><Users size={17}/> Thank the community</button>
       <button onClick={()=>navigate('library')} title="Open your safe, locally preserved source map library"><Compass size={17}/> Skip tour to Map Library</button>

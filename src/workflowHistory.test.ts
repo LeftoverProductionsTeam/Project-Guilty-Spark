@@ -7,6 +7,17 @@ const route = (
   settingsTab: WorkflowRoute['settingsTab'] = 'tools',
 ): WorkflowRoute => ({ workspace, projectId, settingsTab });
 describe('workflow location history stays separate from edit history', () => {
+  it('returns to the exact learning section without recording background tab preferences as navigation',()=>{
+    const guides:WorkflowRoute={...route('learning'),learningSection:'guides'};
+    const glossary:WorkflowRoute={...guides,learningSection:'glossary'};
+    let history=visitWorkflow(startWorkflow(guides),glossary,false);
+    history=visitWorkflow(history,{...route('tags'),learningSection:'glossary'},true);
+    history=travelWorkflow(history,'back',()=>true);expect(history.current).toEqual(glossary);
+    history=travelWorkflow(history,'back',()=>true);expect(history.current).toEqual(guides);
+    history=travelWorkflow(history,'forward',()=>true);expect(history.current).toEqual(glossary);
+    const background=visitWorkflow(startWorkflow(route('library')),{...route('library'),learningSection:'academy'},false);
+    expect(background.back).toHaveLength(0);
+  });
   it('restores both maps, tools and settings tabs in both directions', () => {
     const a = route('tags'),
       b = route('tags', 'b'),

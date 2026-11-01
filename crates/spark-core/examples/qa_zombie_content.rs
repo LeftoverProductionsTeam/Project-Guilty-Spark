@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mechanics: Vec<_> = i.tags.iter().filter(|tag|
         ["weap", "vehi", "bipd", "actv"].contains(&tag.class.as_str()) &&
         (tag.path.to_ascii_lowercase().contains("zombie") || tag.path.to_ascii_lowercase().contains("spawner")))
-        .map(|tag|serde_json::json!({"id":tag.id,"class":tag.class,"path":tag.path,"fields":tag.fields,"references":tag.references})).collect();
+        .map(|tag|serde_json::json!({"id":tag.id,"class":tag.class,"path":tag.path,"dataOffset":tag.data_offset,"fields":tag.fields,"references":tag.references})).collect();
     let result = serde_json::json!({"schemaVersion":1,"sourceSha256":i.sha256,"header":i.header,
         "scenarioPath":i.scenario_path,"classes":classes,"scripts":i.scripts,"encounters":i.encounters,
         "objects":i.objects,"decals":i.decals,"resources":i.resources,"diagnostics":i.diagnostics,

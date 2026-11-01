@@ -34,7 +34,7 @@ export default function WorkbenchGuide({workspace,evidence,onNavigate}:{
       </div>
       <div className="gs-guide-actions"><span>{guide.sourceReminder}</span>
         <button type="button" onClick={()=>onNavigate(guide.target)}><ChevronRight size={14}/>{guide.action}</button>
-        <button type="button" onClick={()=>onNavigate('academy')}><BookOpen size={14}/>Modding Academy</button>
+        <button type="button" onClick={()=>onNavigate('academy')}><BookOpen size={14}/>Academy lessons</button>
       </div>
     </div>}
   </section>;

@@ -46,6 +46,7 @@ use tauri::{Emitter, Manager, State};
 #[path="portability_native.rs"]mod portability_native;
 #[path="dependency_install.rs"] mod dependency_install;
 #[path="ce_setup.rs"] mod ce_setup;
+#[path="runtime_connections.rs"] mod runtime_connections;
 #[path="ce_host_native.rs"] mod ce_host_native;
 #[path="baboon_native.rs"] mod baboon_native;
 #[path="native_tag_parser.rs"] mod native_tag_parser;
@@ -2877,6 +2878,8 @@ pub fn run() {
             close_application,
             initialize_mcc_inbox,
             runtime_report,
+            runtime_connections::discover_halo_connections,
+            runtime_connections::connect_detected_halo,
             legacy_companion_dashboard,
             choose_legacy_companion_path,
             register_legacy_companion,

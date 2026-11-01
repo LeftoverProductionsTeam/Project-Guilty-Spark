@@ -20,7 +20,7 @@ export function useWorkflowHistory(
       history.current = next;
       redraw();
     }
-  }, [route.workspace, route.projectId, route.settingsTab, mapWorkspaces]);
+  }, [route.workspace, route.projectId, route.settingsTab, route.learningSection, mapWorkspaces]);
   const travel = useCallback((direction: 'back' | 'forward') => {
     if (moving.current || !workflowTarget(history.current, direction, latest.current.available)) return;
     // Commit a typed numeric/text field before selecting another retained document.

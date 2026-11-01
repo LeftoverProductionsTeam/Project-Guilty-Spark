@@ -145,6 +145,15 @@
   margin-top: 10px;
   gap: 5px;
 }
+.application .home-runtime-strip { gap: 8px; }
+.home-runtime-connections { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; min-width: 0; }
+.home-runtime-connections button { display: flex; align-items: center; gap: 6px; padding: 5px 8px; min-height: 30px; font-size: 11px; border-radius: 7px; }
+.home-runtime-connections button strong { font-size: 11px; }
+.home-runtime-connections button small { font-size: 10px; color: var(--muted); }
+.home-runtime-connections button[data-connected='true'] { border-color: var(--accent); box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 15%, transparent); }
+.home-runtime-connections button[data-connected='true'] :is(svg,small) { color: var(--accent); }
+.home-runtime-connections button[data-detected='true'] small { color: var(--cyan); }
+.home-runtime-error { width: 100%; overflow-wrap: anywhere; color: var(--amber); }
 .application .library-layout-list .map-grid {
   grid-template-columns: 1fr;
   gap: 4px;
