@@ -2,6 +2,17 @@
 
 A Halo 1 creation and preservation workbench with a visual level editor, native tag tools, verified builds, machinima and private collaborative editing.
 
+## Download
+
+**[Download approved previews from GitHub Releases](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases).** Choose the Windows x64 `_Setup.exe` installer or `_Portable.zip`, with its platform manifest and `SHA256SUMS-windows-x64.txt`. The portable app requires the separately installed [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/). The installer can offer that dependency if missing. No Halo game, maps, SDK or optional Steam bridge is included.
+
+The public `Preview` and `alpha` releases had **no attached binaries** when checked on November 1, 2026. The new **0.4.1 preview is a release candidate until its draft is built, attached, verified and approved by the owner**. A local build or an Actions artifact is not a public download. [Release process and exact gates](docs/RELEASING.md).
+
+| Platform | Package | Acceptance boundary |
+| --- | --- | --- |
+| Windows 10/11 x64 | NSIS `.exe` and portable ZIP | Release workflow requires regression tests, actual extracted/installed application launches and matching executable hashes. Unsigned preview; game-specific limits below remain. |
+| Linux x64 | AppImage and Debian `.deb` | Optional build on Ubuntu 22.04/WebKitGTK 4.1; both real packages must launch before attachment. No verified Linux release is advertised yet. Windows game hooks and tool launchers are not certified on Linux. |
+
 **0.4.0 · C48 shared BSP and session stability continuation.** Three independent Spark processes now see Workshop source edits and live drag previews, retain per-author undo and recover two genuine offline UI edits after owner-process failure. An actual frozen H1A build, 1,100-edit core endurance test and repeated native tag/asset/external-tool acceptance pass. [C48 evidence, measurements and limits](docs/CONTINUATION_48_ENGINEERING.md). C47 native readback performance, C46 audio candidates, renderer, Smart Edit and source transactions remain intact. Cross-computer/Steam relay, gameplay/AI replication, complete conversion and listening remain separate gates.
 
 [Get started](docs/GETTING_STARTED.md) · [Current capabilities](docs/CURRENT_FEATURES.md) · [Build on Windows](docs/BUILD_WINDOWS.md) · [Full backlog](docs/MASTER_FEATURE_LEDGER.md) · [Community credits](COMMUNITY_CREDITS.md)

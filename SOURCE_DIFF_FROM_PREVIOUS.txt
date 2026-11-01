@@ -1,32 +1,36 @@
-C48 — shared BSP editing and recoverable sessions
-Continues C47 04034b8b1e1cb03a789cec2a36878d75e2d7abf1 on the existing local master checkout.
+C49 release candidate and verified local-storage preservation
+Base: 46a5b893744d439d2ac22250463cd43f8accf790 (C48)
 
-Three native Spark processes converge on simultaneous BSP edits and expiring four-view drag previews. Stable brush/portal merges retain topology/material conflicts. Native pending storage and rejoin preserve the original uncertain operation plus newer local edits through owner-process failure, exactly once. LAN and the actual Radmin adapter pass on one PC.
+No original Halo data, private QA archives, source snapshots or release binaries are included in this committed source delta. Normal CI and the prior 426 ledger rows are retained.
 
-Fix semantic portal/property-order history corruption, preserve authored undo/redo during owned runtime texture resolution and retain invalid local drafts in bounded unaccepted quarantine. An actual H1A BSP build freezes revision 247 while revision 248 continues. The separate tag/asset/Invader/preserved-Baboon regression compiles revision 18 while revision 19 continues; all source sets remain intact.
-
-629 locked Rust tests pass (7 ignored), 300 frontend, 136 browser, 59 offline and 32 native/interface diagnostics. A 1,100-source-transaction test and 240 native commits exercise explicit bounds and recovery. UI convergence medians 975.0 / 966.9 ms include polling; retained WebView heaps grow 1.42–1.68 MiB. No cross-PC, remote VPN, Steam relay, GPU or multi-day acceptance is claimed. The initial closed-Steam refusal is retained; after Steam launches, SDK initialization, the 4 MiB local transfer test and actual desktop hosting pass. Same-account joining and unverified recovery remain refused; real peer relay and precise join diagnostics remain open.
-
-426 ledger rows preserve all bytes of the prior 421 rows and generator regeneration retains later audited continuation records. Original assets, dirty root work, previous release artifacts, prior branch ancestry and failed research remain preserved. New Windows installer, portable and committed-source archives are verified locally. No push, protected-master bypass or remote publication is performed.
-
-Details: docs/CONTINUATION_48_ENGINEERING.md; docs/fixtures/c48-shared-bsp-stability.json
-Push/PR description: docs/C48_PUSH_SUMMARY.md
-
---- Previous release notes retained ---
-
-Project Guilty Spark C44 measured loading and native AI diagnostics — 2026-11-01
-Committed foundation: C43 de8922f7e6cd5e597072dec08a8a7f2729a4e745
-Final Windows executable SHA-256: ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22
-
-Fix reflection-face cache aliasing and use bounded native Base64 decoding with a byte-loop fallback. Keep all source/resource/DDS checks, private pixel buffers and the original 128-entry/64 MiB cache policy. Two paired native runs preserve complete rendering-resource signatures and improve median map switching from 4486 to 4013 ms (10.6%); first loads improve 6.6–9%. No general startup, memory, catalog or GPU gain is claimed. Correct the earlier full-CDP-export/native-IPC timing attribution without erasing historical evidence.
-
-Add exact-build, matching-publisher-PDB, read-only OpenCE actor QA and bounded analysis. Real private host/client processes expose 42 shared actual AI identities, 33 moving and seven firing controls. All discrepancies remain included; full AI lifecycle, damage/death, late join, reconnect, AV and multi-computer acceptance remain open. The existing Zombie Apocalypse recovery cache loads/joins but fails the replicated-actor control gate. Preserve that failure and its host/client object census; do not declare faithful conversion.
-
-Three real Spark processes again converge on native tag editing, validated asset publication and placement. Invader external-save corruption is refused; the retained prior human Baboon edit reconciles as equivalent native serialization. Revision 18 compiles the 0.5 pistol radius and 31-triangle asset at [3,2,0.1]; revision 19 remains separate. Durable host recovery, author undo, conflicts, roles and original 2240-file source sets pass.
-
-616 locked Rust tests pass (seven opt-in ignored), 284 frontend, 136 browser, 59 offline, two MCC interface probes and three actor-analyzer tests. Wrong executable and altered PDB identities are refused in actual native tests. Final native window history and complete paired renderer checks pass.
-
-Original dirty root patches, 160 root untracked files, 67 Zombie Apocalypse files, 94 installed maps, prior branch references, eight C42/C43 artifacts and all 404 earlier ledger rows remain intact. Four C44 rows append to the ledger. C43 physical connected-world walkthrough, arbitrary direct compiled-map structural editing, all-runtime zombie recovery and broad gameplay gates stay open. Source is consolidated locally on master; no remote publication, force push or repository-rule change.
-
-Detailed evidence: docs/CONTINUATION_44_ENGINEERING.md and docs/fixtures/c44-*.json
-Publication description: docs/C44_PUSH_SUMMARY.md
+ .github/workflows/release.yml       | 188 ++++++++++++++++++
+ Cargo.lock                          |   6 +-
+ Cargo.toml                          |   2 +-
+ README.md                           |  11 ++
+ docs/C49_PUSH_SUMMARY.md            |  15 ++
+ docs/CURRENT_FEATURES.md            |   2 +
+ docs/KNOWN_LIMITATIONS.md           |   2 +
+ docs/LOCAL_STORAGE.md               |  35 ++++
+ docs/MASTER_FEATURE_LEDGER.csv      |   3 +
+ docs/MASTER_FEATURE_LEDGER.md       |   2 +
+ docs/RELEASING.md                   |  66 +++++++
+ docs/REMAINING_WORK.md              |   2 +
+ package.json                        |   2 +-
+ playwright.config.ts                |   5 +-
+ scripts/release/draft.mjs           | 262 +++++++++++++++++++++++++
+ scripts/release/draft.test.mjs      | 108 ++++++++++
+ scripts/release/gates.mjs           |  76 ++++++++
+ scripts/release/install-windows.ps1 |  49 +++++
+ scripts/release/package.py          | 379 ++++++++++++++++++++++++++++++++++++
+ scripts/release/smoke-linux.mjs     | 121 ++++++++++++
+ scripts/release/smoke-windows.mjs   | 107 ++++++++++
+ scripts/release/test-pipeline.mjs   |  10 +
+ scripts/release/test_package.py     | 150 ++++++++++++++
+ scripts/release/verify-public.mjs   |  95 +++++++++
+ src-tauri/src/app.rs                |   2 +
+ src-tauri/tauri.conf.json           |   2 +-
+ src-tauri/tauri.linux.conf.json     |   9 +
+ src/App.tsx                         |   2 +-
+ src/api.ts                          |   1 +
+ src/types.ts                        |   1 +
+ 30 files changed, 1707 insertions(+), 8 deletions(-)

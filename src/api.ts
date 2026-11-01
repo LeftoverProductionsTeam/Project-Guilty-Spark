@@ -16,6 +16,7 @@ export async function call<T>(command: string, args?: Record<string, unknown>): 
 }
 export const browserBootstrap: Bootstrap = {
   apiVersion: 1,
+  applicationVersion: '0.4.1',
   installation: {
     steamPath: null,
     steamExecutable: null,

@@ -1395,7 +1395,7 @@ dependencies = [
 
 [[package]]
 name = "guilty-spark"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "chrono",
  "notify",
@@ -3590,7 +3590,7 @@ dependencies = [
 
 [[package]]
 name = "spark-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "chrono",
  "flate2",
@@ -3609,7 +3609,7 @@ dependencies = [
 
 [[package]]
 name = "spark-steam-bridge"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "serde",
  "serde_json",

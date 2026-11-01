@@ -1103,7 +1103,7 @@ export default function App() {
                 <strong>GUILTY SPARK</strong>
                 <span>HALO MODERN EVOLVED</span>
               </div>
-              <Pill>0.4.0 · C48 dev</Pill>
+              <Pill>{data.applicationVersion ?? '0.4.1'} · Preview</Pill>
             </button>
             {documents.documents.length ? (
               <MapTabs

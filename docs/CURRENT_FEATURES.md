@@ -1,5 +1,7 @@
 # Current Spark capabilities
 
+C49 prepares the 0.4.1 Windows release candidate and a draft-only publication workflow on the preserved C48 foundation. Actual Release downloads, hosted CI, Linux native startup and public approval have separate gates; none is inferred from a local file. [Distribution and compatibility](RELEASING.md). Cold private QA storage is being archived with exact byte recovery while original inputs, release artifacts, source and tests remain protected. [Storage procedure](LOCAL_STORAGE.md).
+
 This is the C48 shared BSP and stability continuation, with new verified Windows packages. Features below describe actual operations, with editor synchronization, native compilation and gameplay kept separate. See [C48 acceptance and limits](CONTINUATION_48_ENGINEERING.md), [C47 native readback and failed AI evidence](CONTINUATION_47_ENGINEERING.md), and [C46 sound-chain results](CONTINUATION_46_ENGINEERING.md).
 
 C43 adds durable revisioned local-window history, explicit editing ownership and observed views, independent drawer layouts, the original BSP Atlas and a reviewed native two-region CE assembly. The combined map loads on a private CE server with a player present; its new physical two-way walkthrough remains unaccepted. Initial Atlas inventory is about 63% faster in three paired debug scans with identical metadata; repeated full-byte verification remains about 5.6 seconds. These results do not establish faster full map rendering or four-region gameplay.

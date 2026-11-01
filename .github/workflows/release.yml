@@ -1,0 +1,188 @@
+name: Release candidate (build or draft)
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: 'Exact pushed 40-character source commit (must be on master history)'
+        required: true
+        type: string
+      preview_number:
+        description: 'New preview number; existing tags and releases are never replaced'
+        required: true
+        default: '1'
+        type: string
+      prepare_draft:
+        description: 'Attach verified packages to a NEW private draft pre-release; never publish'
+        default: false
+        type: boolean
+      build_linux:
+        description: 'Also attempt Linux; only attach after both packages launch successfully'
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: release-candidate-${{ inputs.source_commit }}-${{ inputs.preview_number }}
+  cancel-in-progress: false
+env:
+  SOURCE_COMMIT: ${{ inputs.source_commit }}
+  PREVIEW_NUMBER: ${{ inputs.preview_number }}
+jobs:
+  windows:
+    name: Verified Windows x64 candidate
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_commit }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable, pinned
+      - name: Require the exact pushed source and consistent version
+        shell: pwsh
+        run: |
+          python -B scripts/release/package.py identity --commit $env:SOURCE_COMMIT --preview $env:PREVIEW_NUMBER
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git merge-base --is-ancestor HEAD origin/master
+          if ($LASTEXITCODE -ne 0) { throw 'Selected commit is not in pushed master history.' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install msedge
+      - name: All release regressions (includes cross-map Ctrl+S)
+        run: node scripts/release/gates.mjs $env:SOURCE_COMMIT releases/gates-windows
+      - name: Build NSIS with the official Tauri action (no release credentials)
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1, verified peeled commit
+        with:
+          tauriScript: pnpm tauri
+          args: --bundles nsis -- --locked
+      - name: Stage audited Windows and committed-source assets
+        run: python -B scripts/release/package.py stage --commit $env:SOURCE_COMMIT --preview $env:PREVIEW_NUMBER --platform windows-x64 --output releases/windows-x64
+      - name: Launch the extracted portable application
+        shell: pwsh
+        run: |
+          $zip = @(Get-ChildItem -LiteralPath releases/windows-x64 -Filter '*_Portable.zip')
+          if ($zip.Count -ne 1) { throw 'Expected one portable ZIP.' }
+          Expand-Archive -LiteralPath $zip[0].FullName -DestinationPath releases/portable-test
+          node scripts/release/smoke-windows.mjs releases/portable-test/GuiltySpark.exe $env:SOURCE_COMMIT releases/portable-startup
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install the genuine NSIS package into an isolated runner directory
+        id: install
+        shell: pwsh
+        run: |
+          $setup = @(Get-ChildItem -LiteralPath releases/windows-x64 -Filter '*_Setup.exe')
+          if ($setup.Count -ne 1) { throw 'Expected one NSIS installer.' }
+          & scripts/release/install-windows.ps1 -Installer $setup[0].FullName -ExpectedExecutable target/release/GuiltySpark.exe -TestRoot (Join-Path $env:RUNNER_TEMP 'spark-install-test')
+      - name: Launch the installed executable and verify its frontend
+        run: node scripts/release/smoke-windows.mjs "$env:RUNNER_TEMP/spark-install-test/installed/GuiltySpark.exe" $env:SOURCE_COMMIT releases/installed-startup
+      - name: Seal complete packages with exact binary, test and source identities
+        run: python -B scripts/release/package.py seal releases/windows-x64 --gates releases/gates-windows/gates.json --startup releases/portable-startup/startup.json --installer "$env:RUNNER_TEMP/spark-install-test/installation.json" --installed-startup releases/installed-startup/startup.json
+      - name: Retain verified build artifacts (these are NOT public Release downloads)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verified-windows-${{ inputs.source_commit }}-${{ github.run_id }}
+          path: releases/windows-x64/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove only this runner's test installation
+        if: always() && steps.install.outcome == 'success'
+        shell: pwsh
+        run: "& scripts/release/install-windows.ps1 -Uninstall -Installer unused -ExpectedExecutable unused -TestRoot (Join-Path $env:RUNNER_TEMP 'spark-install-test')"
+  linux:
+    name: Experimental Linux x64 build and actual package startup
+    if: inputs.build_linux
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_commit }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable, pinned
+      - name: Install build and native-startup dependencies on the disposable runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev webkit2gtk-driver xvfb xdg-utils
+      - name: Require the exact pushed source and consistent version
+        run: |
+          python3 -B scripts/release/package.py identity --commit "$SOURCE_COMMIT" --preview "$PREVIEW_NUMBER"
+          git merge-base --is-ancestor HEAD origin/master
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: node scripts/release/gates.mjs "$SOURCE_COMMIT" releases/gates-linux
+      - name: Build genuine Linux packages with the official Tauri action
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
+        with:
+          tauriScript: pnpm tauri
+          args: --bundles appimage,deb -- --locked
+      - run: python3 -B scripts/release/package.py stage --commit "$SOURCE_COMMIT" --preview "$PREVIEW_NUMBER" --platform linux-x64 --output releases/linux-x64
+      - run: cargo install tauri-driver --version 2.1.0 --locked
+      - name: Real AppImage and Debian application bootstrap
+        run: xvfb-run -a node scripts/release/smoke-linux.mjs releases/linux-x64 "$SOURCE_COMMIT" releases/linux-startup
+      - name: Attachable Linux packages require both actual startup checks
+        run: python3 -B scripts/release/package.py seal releases/linux-x64 --gates releases/gates-linux/gates.json --startup releases/linux-startup/startup.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verified-linux-${{ inputs.source_commit }}-${{ github.run_id }}
+          path: releases/linux-x64/*
+          if-no-files-found: error
+          retention-days: 30
+  draft:
+    name: Attach and re-download actual GitHub Release assets (draft only)
+    needs: [windows, linux]
+    if: always() && inputs.prepare_draft && needs.windows.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_commit }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: verified-windows-${{ inputs.source_commit }}-${{ github.run_id }}
+          path: releases/windows-x64
+      - name: Recheck Windows assets before granting them a Release location
+        run: python3 -B scripts/release/package.py verify releases/windows-x64
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        if: needs.linux.result == 'success'
+        with:
+          name: verified-linux-${{ inputs.source_commit }}-${{ github.run_id }}
+          path: releases/linux-x64
+      - name: Recheck optional Linux assets
+        if: needs.linux.result == 'success'
+        run: python3 -B scripts/release/package.py verify releases/linux-x64
+      - name: Create a new versioned draft, upload assets and verify downloaded bytes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SPARK_LINUX_JOB_RESULT: ${{ needs.linux.result }}
+        run: |
+          platforms=(releases/windows-x64)
+          if [ -d releases/linux-x64 ]; then platforms+=(releases/linux-x64); fi
+          node scripts/release/draft.mjs releases/draft-release-receipt.json "${platforms[@]}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: draft-release-download-verification-${{ github.run_id }}
+          path: releases/draft-release-receipt.json
+          if-no-files-found: error

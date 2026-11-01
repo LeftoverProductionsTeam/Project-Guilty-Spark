@@ -1,5 +1,7 @@
 # Living feature ledger — Integrated workbench
 
+C49 appends three scoped records for draft Release assets, optional Linux package acceptance and recoverable local-storage cleanup. Every byte of the previous 426 CSV records is retained; there are now 429 records. Remote publication and Linux startup are pending independent acceptance. [Release procedure](RELEASING.md) · [Private storage/recovery](LOCAL_STORAGE.md).
+
 C48 appends five records for shared BSP source, recoverable pending edits, scoped Radmin networking, bounded endurance and local history integrity. All prior 421 rows remain byte-identical; the ledger now has 426 rows. Three-process compiler/UI acceptance remains separate from cross-computer, Steam and gameplay gates. See [C48 evidence and limits](CONTINUATION_48_ENGINEERING.md).
 
 C47 adds three records for bounded native conversion readback, explicit failed-run AI diagnostics and the isolated carrier-state experiment. All previous 418 rows are preserved; the ledger now has 421 rows. Native source/cache equivalence and partial actor observations do not certify gameplay. The desktop packages remain C46. See [C47 results and remaining gates](CONTINUATION_47_ENGINEERING.md).

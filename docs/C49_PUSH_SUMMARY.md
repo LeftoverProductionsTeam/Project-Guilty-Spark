@@ -1,0 +1,15 @@
+# C49 — verifiable release candidates and smaller local storage
+
+Build and test a specific pushed source commit with the official pinned Tauri action. Keep temporary Actions artifacts separate from actual Release assets. A manual, optional publication job creates only a new versioned **draft pre-release**, attaches sealed Windows packages and re-downloads every upload to verify its SHA-256. Existing releases/tags are refused rather than replaced; owner approval is required for public publication. The ordinary CI and local-master workflow remain intact.
+
+Application version is 0.4.1 across frontend, Cargo, Tauri and the lockfile. Native bootstrap reports the compiled application version and the header displays it. Candidate gates require all Rust/frontend/browser/offline/diagnostic regressions, a real extracted portable launch, NSIS installation/payload verification and an installed-app launch. Source/portable payload allowlists exclude game resources, SDKs, private working directories and credentials. The cross-project Ctrl+S regression is retained.
+
+Linux has an optional Ubuntu 22.04/WebKitGTK 4.1 build route for genuine AppImage/deb packages, with real native startup checks for both. Until that runner passes, Linux is not advertised as verified and does not block a validated Windows draft. Windows-specific runtime hooks and launcher limitations remain explicit. Local packaging, hosted CI, authenticated draft uploads and anonymous public downloads have separate acceptance receipts.
+
+The README now points to GitHub Releases and accurately notes that the earlier public `Preview` and `alpha` pages had no binary assets on inspection. See [release instructions](RELEASING.md). Prepared GitHub About text: **A Halo 1 modding workbench with visual BSP editing, native tag tools, asset recovery, machinima and private collaborative source editing.**
+
+The storage audit found approximately 522.6 GiB of private development data. Rebuildable Cargo debug caches were removed after checks; obsolete CE trial copies were preserved in a deduplicated, SHA-verified private archive before their expanded copies were removed. Additional cold QA cleanup has independent receipts. Original game files, all source history, source snapshots, unique experiments, prior release artifacts and all 426 prior feature/evidence rows remain protected. [Storage/recovery procedure](LOCAL_STORAGE.md).
+
+The new full Megaworld scan retains 94 map paths and 187 BSP records with zero inspection failures. This is inventory evidence. Timberland–Sidewinder two-way player traversal, the four-region runtime route, all-map physical connectivity, Zombie spawning/physics, actual native sound listening, AI/game-peer replication and cross-computer/Steam relay are still independent open gates. No interface, archive or compiler result closes those gameplay requirements.
+
+No remote push, public publication, release/tag rewrite, ruleset change or mandatory PR is performed by this continuation. Push the reviewed local commits normally, run the new workflow on the exact pushed source commit, inspect the verified draft, then approve publication separately.

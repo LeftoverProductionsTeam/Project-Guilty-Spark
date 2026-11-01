@@ -316,6 +316,7 @@ export interface JobEvent {
 }
 export interface Bootstrap {
   apiVersion: number;
+  applicationVersion?: string;
   installation: Installation;
   managed: ManagedRoot | null;
   settings: Settings;

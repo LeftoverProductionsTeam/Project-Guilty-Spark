@@ -153,6 +153,7 @@ struct AppState {
 #[serde(rename_all = "camelCase")]
 struct Bootstrap {
     api_version: u32,
+    application_version: &'static str,
     installation: Installation,
     managed: Option<ManagedRoot>,
     settings: Settings,
@@ -455,6 +456,7 @@ fn bootstrap_state(state:&AppState)->Reply<Bootstrap> {
     let logs=lock(&state.logs)?.clone();
     Ok(Bootstrap {
         api_version: 1,
+        application_version: env!("CARGO_PKG_VERSION"),
         installation,
         managed,
         settings,
