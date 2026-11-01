@@ -38,6 +38,19 @@ fn community(root: &Path) -> Reply<Detected> {
     Ok(Detected { runtime_id, root, executable, data_root, executable_sha256: hash, version: Some(version.into()), content_ready,
         detail: if content_ready { "Reviewed client and Xbox UI cache found. Connection records paths only; game compatibility and live-link remain separate checks." } else { "Reviewed client found. Its original Xbox maps/ui.map is missing or incompatible; complete the owned-content setup first." }.into() })
 }
+/// Expand only known client folder names near explicitly linked/provenance roots.
+/// No recursive drive crawl; an installed app need not share the games' cwd.
+fn nearby_roots(anchors: impl IntoIterator<Item=PathBuf>) -> Vec<PathBuf> {
+    let mut roots=Vec::new();let mut seen=std::collections::HashSet::new();
+    for anchor in anchors {
+        for parent in anchor.ancestors().take(6) {
+            for candidate in std::iter::once(parent.to_path_buf()).chain(["Halo Custom Edition","opencehalo-windows-release","chupathingyce-windows64-release","OpenCE","ChupathingyCE"].map(|name|parent.join(name))) {
+                if seen.insert(candidate.clone()) {roots.push(candidate);if roots.len()==256{return roots;}}
+            }
+        }
+    }
+    roots
+}
 fn discover(state: &AppState) -> Reply<Vec<Detected>> {
     let mut found = Vec::new();
     if let Some(ce) = ce_setup::discover(state)? {
@@ -46,21 +59,28 @@ fn discover(state: &AppState) -> Reply<Vec<Detected>> {
             data_root: ce.root.clone(), root: ce.root.clone(), version: None, content_ready: ce_setup::require_startup(&ce.root).is_ok(),
             detail: "Custom Edition executable, native UI and resource indexes found. Connection does not launch the game or establish live-link.".into() });
     }
-    let linked: Vec<PathBuf> = lock(&state.library)?.setting("assetSourceFolders").map_err(error)?;
-    let mut roots: Vec<PathBuf> = linked.into_iter().take(16).collect();
-    for start in [std::env::current_dir().ok(), std::env::current_exe().ok().and_then(|file| file.parent().map(Path::to_path_buf))].into_iter().flatten() {
-        for parent in start.ancestors().take(6) {
-            for folder in ["opencehalo-windows-release", "chupathingyce-windows64-release", "OpenCE", "ChupathingyCE"] {
-                roots.push(parent.join(folder));
+    let mut anchors:Vec<PathBuf>={
+        let library=lock(&state.library)?;
+        let linked:Vec<PathBuf>=library.setting("assetSourceFolders").map_err(error)?;
+        let registered:Vec<runtime::RuntimeRegistration>=library.setting("runtimeRegistrations").map_err(error)?;
+        let mut anchors:Vec<PathBuf>=linked.into_iter().take(16).chain(registered.into_iter().take(8).map(|item|item.root)).collect();
+        for entry in library.list().map_err(error)?.into_iter().take(8) {
+            if let Ok(project)=library.get(&entry.id) {if let Some(source)=project.source {if let Some(parent)=source.original_path.parent(){anchors.push(parent.to_path_buf());}}}
+        }
+        anchors
+    };
+    anchors.extend([std::env::current_dir().ok(),std::env::current_exe().ok().and_then(|file|file.parent().map(Path::to_path_buf))].into_iter().flatten());
+    for root in nearby_roots(anchors) {
+        if !found.iter().any(|item|item.runtime_id==runtime::RuntimeId::HaloCustomEdition)&&root.join("haloce.exe").is_file() {
+            if let Ok(ce)=ce_setup::inspect_root(&root) {
+                let (executable,hash,_)=dependency_install::pe_identity(&ce.root.join("haloce.exe"))?;
+                found.push(Detected{runtime_id:runtime::RuntimeId::HaloCustomEdition,root:ce.root.clone(),data_root:ce.root.clone(),executable,executable_sha256:hash,version:None,content_ready:ce_setup::require_startup(&ce.root).is_ok(),detail:"Custom Edition found near a linked folder or preserved map source. Connection does not launch it or establish live-link.".into()});
             }
         }
-    }
-    let mut seen = std::collections::HashSet::new();
-    for root in roots.into_iter().take(64) {
-        if !root.join("halo.exe").is_file() || !seen.insert(root.clone()) { continue; }
-        if let Ok(candidate) = community(&root) {
-            if !found.iter().any(|old| old.runtime_id == candidate.runtime_id) { found.push(candidate); }
-        }
+        if root.join("halo.exe").is_file() {if let Ok(candidate)=community(&root) {
+            if !found.iter().any(|old|old.runtime_id==candidate.runtime_id){found.push(candidate);}
+        }}
+        if found.len()==3 {break;}
     }
     Ok(found)
 }
@@ -92,6 +112,13 @@ pub(super) async fn connect_detected_halo(app: tauri::AppHandle, runtime_id: run
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn linked_and_source_roots_discover_known_siblings_without_a_matching_process_directory(){
+        let anchor=PathBuf::from("owned/maps/zombie/maps");let roots=nearby_roots([anchor.clone(),anchor]);
+        for child in ["Halo Custom Edition","OpenCE","ChupathingyCE","opencehalo-windows-release","chupathingyce-windows64-release"] {assert!(roots.contains(&PathBuf::from("owned").join(child)));}
+        assert_eq!(roots.iter().collect::<std::collections::HashSet<_>>().len(),roots.len());
+        assert!(nearby_roots((0..100).map(|n|PathBuf::from(format!("owned-{n}/maps")))).len()<=256);
+    }
     #[test]
     fn unrelated_named_binaries_and_changed_identity_never_become_reviewed_clients() {
         assert!(community_identity(&"a".repeat(64)).is_none());

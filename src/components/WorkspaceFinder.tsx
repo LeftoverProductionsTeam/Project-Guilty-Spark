@@ -35,7 +35,7 @@ export default function WorkspaceFinder({items,onNavigate,onClose,project=null,s
     const onKey=(e:KeyboardEvent)=>{
       if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeRef.current();}
       if(e.key!=='Tab')return;
-      const elements=[...dialog.current?.querySelectorAll<HTMLElement>('input:not(:disabled),button:not(:disabled)')??[]];
+      const elements=[...dialog.current?.querySelectorAll<HTMLElement>('input:not(:disabled),button:not(:disabled),select:not(:disabled),a[href]')??[]];
       const first=elements[0],last=elements[elements.length-1];
       if(!first||!last){e.preventDefault();return;}
       if(e.shiftKey&&(document.activeElement===first||!dialog.current?.contains(document.activeElement))){e.preventDefault();last.focus();}
@@ -56,7 +56,7 @@ export default function WorkspaceFinder({items,onNavigate,onClose,project=null,s
         }}/><kbd>Esc</kbd></div>
       <span id={resultStatusId} className="gs-sr-only" role="status" aria-live="polite">{results.length} matching workspaces. {results.length ? `Selected: ${results[activeIndex].label}.` : 'Try a shorter query.'}</span>
       <div id="gs-finder-results" className="gs-finder-results" aria-label="Matching workspaces">
-        {settings&&<><label>Halo runtime<select aria-label="Tool launcher runtime" value={runtime} onChange={e=>setRuntime(e.target.value as RuntimeId)}>{Object.entries(runtimeNames).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><ToolEcosystem project={project} settings={settings} runtime={runtime} search={query} onSettings={()=>{onClose();onSettings?.();}} onOpenWorkspace={target=>{onNavigate(target);onClose();}}/></>}
+        {settings&&<><label>Halo runtime<select aria-label="Tool launcher runtime" value={runtime} onChange={e=>setRuntime(e.target.value as RuntimeId)}>{Object.entries(runtimeNames).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><ToolEcosystem compact heading="Installed tools & downloads" project={project} settings={settings} runtime={runtime} search={query} onSettings={()=>{onClose();onSettings?.();}} onOpenWorkspace={target=>{onNavigate(target);onClose();}}/></>}
         {results.map((item,index)=><button key={`${item.id}:${item.label}`} className={activeIndex===index?'gs-finder-item active':'gs-finder-item'} aria-current={activeIndex===index?'true':undefined} onMouseEnter={()=>setSelected(index)} onClick={()=>navigate(item.id)}>
           <span><strong>{item.label}</strong><small>{item.help}</small></span><ArrowRight size={16}/>
         </button>)}

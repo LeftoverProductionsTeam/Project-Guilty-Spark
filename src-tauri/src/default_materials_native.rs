@@ -4,7 +4,9 @@ pub(super) async fn runtime_texture_source(app:tauri::AppHandle,window:tauri::We
     let handle=app.clone();
     let open=tauri::async_runtime::spawn_blocking(move||{
         let state=handle.state::<AppState>();
-        let path=asset_sources_native::default_material_map(&state,runtime_id)?;
+        // Community runtimes may use an owned PC/MCC material source for editor
+        // preview. This does not change the stricter native build material route.
+        let path=[runtime_id,runtime::RuntimeId::MccSteam,runtime::RuntimeId::HaloCustomEdition,runtime::RuntimeId::HaloPc].into_iter().find_map(|target|asset_sources_native::default_material_map(&state,target).ok()).ok_or("Link an owned MCC, CE or PC Blood Gulch map for editor material previews")?;
         let (project,inspection)=lock(&state.library)?.import_map(&path,path.parent()).map_err(error)?;
         lock(&state.inspections)?.insert(project.id.clone(),Arc::new(inspection.clone()));
         Ok::<_,String>(OpenProject{project,inspection:Some(inspection)})

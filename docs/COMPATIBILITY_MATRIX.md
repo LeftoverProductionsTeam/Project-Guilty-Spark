@@ -1,4 +1,6 @@
-# Runtime and operation compatibility — Continuation 41
+# Runtime and operation compatibility — Continuation 42
+
+C42 adds a [bounded shared external-tool route](C42_SHARED_EXTERNAL_EDITING.md): three real Windows processes keep editing while a private Invader native tag save is reviewed and proposed, then compiled through H1A Tool. The genuine C37 human-saved Baboon tag also passes native-equivalent serialization review without replacing its raw bytes. Scope remains pistol bounding radius and admitted scenery publications. Arbitrary tools/formats, multi-computer acceptance and game-peer replication remain open. Original C35–C39 source and separate complete-file reconciliation/build guards remain intact.
 
 | C41 operation | Verified implementation boundary | Required separate acceptance |
 | --- | --- | --- |
@@ -6,7 +8,7 @@
 | Native source | Existing compatible MCC extraction/Tool, accepted working-tag revisions and reviewed QuickForge targets; native integrity/dependencies retained | Specific asset/scenario/game behavior; unsupported source imports |
 | Visual editing | Same Project/TagFields in class tree and drawer; actual source-placement transforms can publish through direct routing | New imported-cache arrays/models and arbitrary custom native import |
 | Live position plan | Explicit existing-object bindings, exact reviewed MCC session/map, ten-second expiry, before/readback journal | Fresh game presentation, collision relinking and peer agreement; persistent save separate |
-| SparkLink | Existing authenticated QuickForge source service and frozen owner builds | Native tag/binary transfer and game-peer replication |
+| SparkLink | Authenticated QuickForge source service, bounded native pistol-field/scenery publication, external native-tool review and frozen owner builds across three processes | General native schemas/binary imports, separate-computer tests and game-peer replication |
 
 [C41 evidence and workflow](CONTINUATION_41_ENGINEERING.md). A route's validation is not blanket runtime/game compatibility.
 

@@ -1,4 +1,5 @@
 import { retainAssetSource } from './assetSources';
+import {runtimeTextureSource,defaultPreviewMaterials} from './runtimeTexturePreview';
 import {publishTextureResources,textureResourceScope} from './textureResourceScope';
 import type { NativeAssetImport } from './types';
 import type { ForgeMaterial } from './forge';
@@ -587,8 +588,16 @@ export default function App() {
         }
         if (e.key.toLowerCase() === 's') {
           e.preventDefault();
-          const id=e.target instanceof HTMLElement?e.target.closest<HTMLElement>('[data-history-project]')?.dataset.historyProject:undefined;
-          void save(true,id).catch(() => {});
+          // A donor tag drawer can belong to a different map than the viewport.
+          // Capture that identity before committing its focused numeric draft.
+          const field=document.activeElement instanceof HTMLElement?document.activeElement:null;
+          const id=(e.target instanceof HTMLElement?e.target.closest<HTMLElement>('[data-history-project]')?.dataset.historyProject:undefined)??documentsRef.current.activeId;
+          if(!id)return;
+          field?.blur();
+          requestAnimationFrame(()=>{
+            void save(true,id).catch(() => {});
+            if(field?.isConnected&&document.activeElement===document.body)field.focus();
+          });
         }
         if (e.key.toLowerCase() === 'z') {
           const text=e.target instanceof Element?e.target.closest('input,textarea,[contenteditable="true"]'):null;
@@ -729,9 +738,22 @@ export default function App() {
   }
   async function createQuickForge(title: string, template: string, target: RuntimeId) {
     setBusy(true);
+    let previewDefaultsReady=false;
     try {
       if (historyRef.current.dirty) await save();
       const open = await call<OpenProject>('create_quickforge_project', { title, template, target });
+      if(native){
+        try{
+          const source=await runtimeTextureSource(target),materials=defaultPreviewMaterials(source);
+          if(open.project.quickForge&&materials.length){
+            open.project={...open.project,quickForge:{...open.project.quickForge,materials:[...materials,...open.project.quickForge.materials.filter(m=>!materials.some(defaultMaterial=>defaultMaterial.id===m.id))]}};
+            await call('save_project',{project:open.project});
+            writeMapSession(open.project.id,'forge.materialSource',source.project.id);
+            writeMapSession(open.project.id,'forge.assetSource',source.project.id);retainAssetSource(source);
+            previewDefaultsReady=true;
+          }
+        }catch(error){notice('Choose an owned Halo texture source to finish the default materials: '+String(error),'info');}
+      }
       await load(open);
       setWorkspace('quickforge');
       await refresh();
@@ -770,6 +792,7 @@ export default function App() {
               'Assign native Halo grass and metal defaults',
             );
             writeMapSession(latest.id, 'forge.assetSource', defaults.source.project.id);
+            writeMapSession(latest.id, 'forge.materialSource', defaults.source.project.id);
             retainAssetSource(defaults.source);
             await refresh();
             notice(
@@ -778,7 +801,7 @@ export default function App() {
             );
           }
         } catch (error) {
-          notice('Native defaults need source setup: ' + String(error), 'info');
+          notice((previewDefaultsReady?'Default textures are ready. Native building still needs matching source/tools: ':'Native defaults need source setup: ') + String(error), 'info');
         }
       }
     } finally {
@@ -1042,7 +1065,7 @@ export default function App() {
                 <strong>GUILTY SPARK</strong>
                 <span>HALO MODERN EVOLVED</span>
               </div>
-              <Pill>0.4.0 · C41 dev</Pill>
+              <Pill>0.4.0 · C42 dev</Pill>
             </button>
             {documents.documents.length ? (
               <MapTabs

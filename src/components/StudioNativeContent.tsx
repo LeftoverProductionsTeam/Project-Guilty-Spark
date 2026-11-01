@@ -3,6 +3,7 @@ import { call, native } from '../api';
 import type { LibraryEntry, OpenProject } from '../types';
 import type { QuickForgeDocument, StudioNativeAsset, StudioNativeDocument } from '../forge';
 import { Notice } from './ui';
+import StudioExternalTools from './StudioExternalTools';
 
 /** Local validation is a deliberate action. Receiving shared state never runs a
  * utility, reads a peer's path, or selects a native working-source revision. */
@@ -25,6 +26,7 @@ export default function StudioNativeContent({projectId,document:doc,entries,conn
     </>}
     {content&&<>
       <p className="subtle">Verified source {content.source.inventorySha256.slice(0,12)} · {content.source.templateTag}</p>
+      <StudioExternalTools projectId={projectId} document={doc} connected={connected} viewer={viewer} onChange={onChange}/>
       <details className="studio-native-recovery"><summary>Source recovery</summary><p>Reconstruct the exact admitted source from the matching base tags and preserved dependencies. The damaged copy stays available.</p><button disabled={!native||busy} onClick={()=>void run(async()=>{const result=await call<{detail:string}>('studio_native_recover_source',{projectId,templateTagsDirectory:directory||null});setMessage(result.detail);})}>Restore exact admitted source</button></details>
       <label>Pistol bounding radius<input aria-label="Shared pistol bounding radius" type="number" min="0" max="100000" step="0.025" value={radius} disabled={viewer} onChange={e=>setRadius(e.target.value)}/></label>
       <p>Committed value: <output aria-label="Committed pistol bounding radius">{content.fields[0]?.boundingRadius??content.source.boundingRadius}</output></p>

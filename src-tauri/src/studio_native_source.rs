@@ -24,7 +24,7 @@ fn admitted(state:&AppState, project:&str)->Reply<Admission> {
 }
 pub(super) fn require_unshared(state:&AppState,project:&str)->Reply<()> {
     if lock(&state.forge_session)?.as_ref().is_some_and(|s|s.project_id==project&&s.studio) {
-        return Err("SparkLink owns this map's shared source revision. Use its supported native field/publication controls, or leave the session before accepting or compiling an independent Baboon/Invader revision. All external candidates and recovery source remain available.".into());
+        return Err("SparkLink owns this map's shared source revision. Use its External editor review for the supported native field, or its publication controls. Leave the session before accepting or compiling an independent Baboon/Invader revision. All external candidates and recovery source remain available.".into());
     }
     Ok(())
 }
@@ -32,6 +32,132 @@ fn check_inventory(a:&Admission)->Reply<BTreeMap<String,String>> {
     let files=transaction::inventory(&a.tags).map_err(error)?;
     if content::inventory_hash(&files).map_err(error)?!=a.source.inventory_sha256 {return Err("Admitted native source changed or was corrupted. No build/import is allowed; the session and recoverable input remain intact.".into());}
     Ok(files)
+}
+
+// External applications edit a private fork. Only a reviewed semantic value
+// enters SparkLink; neither raw patches nor native tool commands cross peers.
+#[derive(Clone,Serialize,Deserialize,PartialEq)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+struct ExternalSource {
+    id:String,project_id:String,session_id:String,revision:u64,source:content::Source,
+    before_radius:f64,baseline:BTreeMap<String,String>,before_fields:String,field_size:u64,
+}
+fn external_root(state:&AppState,id:&str)->Reply<PathBuf>{
+    uuid::Uuid::parse_str(id).map_err(error)?;
+    let root=state.root.join("studio-native/external").join(id);core::reject_links(&root).map_err(error)?;Ok(root)
+}
+fn external_key(id:&str)->String{format!("studio-external-{id}")}
+fn external_source(state:&AppState,project:&str,id:&str)->Reply<(ExternalSource,PathBuf)>{
+    let root=external_root(state,id)?;
+    let saved:Option<ExternalSource>=lock(&state.library)?.setting(&external_key(id)).map_err(error)?;
+    let saved=saved.ok_or("No retained external source with this identity")?;
+    let disk:ExternalSource=serde_json::from_slice(&bounded_read(&root.join("source.json"),4*1024*1024)?).map_err(error)?;
+    if saved!=disk||saved.id!=id||saved.project_id!=project{return Err("External source receipt changed or belongs to another map. All files remain retained.".into());}
+    let admission=admitted(state,project)?;
+    if saved.source!=admission.source{return Err("External source belongs to another native admission; no shared edit was queued".into());}
+    Ok((saved,root))
+}
+fn write_radius(state:&AppState,p:&Project,tags:&Path,tag:&str,value:f64)->Reply<()>{
+    let operation=recipes::Operation::BoundingRadius{value};
+    let exe=native_operations_native::executable(state,p,operation.tool_id())?;
+    let args=operation.arguments(tags,"weap",tag).map_err(error)?;
+    let(ok,_,err)=native_operations_native::run(&exe,&args)?;
+    if !ok{return Err(format!("Native field writer refused the private candidate: {err}"));}Ok(())
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct ExternalView {
+    id:String,tags_directory:PathBuf,tag:String,before_radius:f64,revision:u64,source_sha256:String,candidate_sha256:String,baseline_sha256:String,
+}
+fn external_view(receipt:&ExternalSource,root:&Path)->Reply<ExternalView>{
+    let tags=root.join("tags");let file=tags.join(core::safe_relative(&receipt.source.field_tag).map_err(error)?);core::reject_links(&file).map_err(error)?;
+    if fs::metadata(&file).map_err(error)?.len()!=receipt.field_size{return Err("The external tag changed size or is still being saved. Its files are retained; review structural changes separately.".into());}
+    Ok(ExternalView{id:receipt.id.clone(),tags_directory:tags,tag:receipt.source.field_tag.clone(),before_radius:receipt.before_radius,revision:receipt.revision,source_sha256:receipt.source.inventory_sha256.clone(),candidate_sha256:maps::hash_file(&file).map_err(error)?,baseline_sha256:receipt.baseline[&receipt.source.field_tag].clone()})
+}
+#[tauri::command]
+pub(super) async fn studio_external_prepare(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<ExternalView>{
+    let owner=window.label().to_string();
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
+        let view=shared_editing::poll(&state,&owner,&project_id,None,false)?;
+        if view.role=="viewer"{return Err("Viewers cannot prepare editable native sources".into());}
+        matches(&state,&project_id,&view.document)?;
+        let a=admitted(&state,&project_id)?;let inventory=check_inventory(&a)?;
+        let native=view.document.native.as_ref().ok_or("This shared revision has no native admission")?;
+        let radius=native.fields.first().map_or(native.source.bounding_radius,|field|field.bounding_radius);
+        let id=uuid::Uuid::new_v4().to_string();let root=external_root(&state,&id)?;
+        fs::create_dir_all(root.parent().ok_or("External source has no owner")?).map_err(error)?;fs::create_dir(&root).map_err(error)?;
+        let tags=root.join("tags");
+        if transaction::fork(&a.tags,&tags,Arc::new(AtomicBool::new(false))).map_err(error)?!=inventory{return Err("Admitted source changed while preparing the tool fork; no source was selected".into());}
+        let p=lock(&state.library)?.get(&project_id).map_err(error)?;
+        write_radius(&state,&p,&tags,&a.source.field_tag,radius)?;
+        let before_fields=native_operations_native::fields(&state,&p,&tags,&a.source.field_tag)?;
+        let baseline=transaction::inventory(&tags).map_err(error)?;
+        fs::copy(tags.join(core::safe_relative(&a.source.field_tag).map_err(error)?),root.join("before.weapon")).map_err(error)?;
+        let field_size=fs::metadata(root.join("before.weapon")).map_err(error)?.len();
+        let receipt=ExternalSource{id:id.clone(),project_id,session_id:view.session_id,revision:view.revision,source:a.source,before_radius:radius,baseline,before_fields,field_size};
+        project::atomic_write(&root.join("source.json"),&serde_json::to_vec_pretty(&receipt).map_err(error)?,false).map_err(error)?;
+        lock(&state.library)?.set_setting(&external_key(&id),&receipt).map_err(error)?;
+        external_view(&receipt,&root)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+pub(super) async fn studio_external_status(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,id:String)->Reply<ExternalView>{
+    let owner=window.label().to_string();
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;let(receipt,root)=external_source(&state,&project_id,&id)?;external_view(&receipt,&root)}).await.map_err(error)?
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct ExternalReview {
+    id:String,source_sha256:String,candidate_sha256:String,before_radius:f64,bounding_radius:f64,changed:bool,revision:u64,serialization:&'static str,detail:String,
+}
+#[tauri::command]
+pub(super) async fn studio_external_review(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,id:String)->Reply<ExternalReview>{
+    let owner=window.label().to_string();
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
+        let view=shared_editing::poll(&state,&owner,&project_id,None,false)?;
+        if view.role=="viewer"{return Err("Viewers cannot propose external native edits".into());}
+        let(receipt,root)=external_source(&state,&project_id,&id)?;
+        let _=check_inventory(&admitted(&state,&project_id)?)?;
+        if view.session_id!=receipt.session_id{return Err("The external fork belongs to another SparkLink session; no edit was queued".into());}
+        let native=view.document.native.as_ref().ok_or("Shared native admission is unavailable")?;
+        if native.source!=receipt.source{return Err("External native source identity no longer matches the session".into());}
+        let committed=native.fields.first().map_or(native.source.bounding_radius,|field|field.bounding_radius);
+        let tags=root.join("tags");let before=transaction::inventory(&tags).map_err(error)?;
+        if before.len()!=receipt.baseline.len()||receipt.baseline.keys().any(|path|before.get(path)!=receipt.baseline.get(path)&&path!=&receipt.source.field_tag){return Err("Other native tags were added, removed or changed. The complete candidate is retained for separate review; no shared source was replaced.".into());}
+        let tag=&receipt.source.field_tag;let p=lock(&state.library)?.get(&project_id).map_err(error)?;
+        native_operations_native::verify_bytes(&tags,tag,&before[tag])?;
+        let fields=native_operations_native::fields(&state,&p,&tags,tag)?;
+        let radius=recipes::number(&fields,"bounding_radius").map_err(error)?;
+        let operation=recipes::Operation::BoundingRadius{value:radius};operation.validate("weap",tag).map_err(error)?;
+        if fields!=receipt.before_fields{let _=recipes::reviewed_difference(&receipt.before_fields,&fields,&operation).map_err(error)?;}
+        // Reproduce the scalar from the preserved baseline. A different native
+        // serializer may rewrite bookkeeping/padding: normalize a separate copy
+        // only after CRC and full exposed-field checks. Never replace the raw
+        // candidate or treat native normalization as an unknown-byte repair.
+        let oracle=root.join(format!("review-{}",uuid::Uuid::new_v4()));let relative=core::safe_relative(tag).map_err(error)?;
+        let target=oracle.join(&relative);fs::create_dir_all(target.parent().ok_or("Tag has no parent")?).map_err(error)?;
+        let baseline=root.join("before.weapon");core::reject_links(&baseline).map_err(error)?;
+        if maps::hash_file(&baseline).map_err(error)?!=receipt.baseline[tag]{return Err("Preserved tool baseline changed; candidate is retained".into());}
+        fs::copy(&baseline,&target).map_err(error)?;write_radius(&state,&p,&oracle,tag,radius)?;
+        let candidate=tags.join(&relative);let candidate_sha256=maps::hash_file(&candidate).map_err(error)?;
+        let expected=maps::hash_file(&target).map_err(error)?;
+        native_operations_native::verify_bytes(&oracle,tag,&expected)?;
+        let serialization=if candidate_sha256==expected{"exactNativeReplay"}else{
+            let normalized=oracle.join("candidate");let copy=normalized.join(&relative);
+            fs::create_dir_all(copy.parent().ok_or("Tag has no parent")?).map_err(error)?;fs::copy(&candidate,&copy).map_err(error)?;
+            if maps::hash_file(&copy).map_err(error)?!=candidate_sha256{return Err("External file changed while retaining its review copy; retry after saving finishes".into());}
+            write_radius(&state,&p,&normalized,tag,radius)?;
+            let normalized_sha=maps::hash_file(&copy).map_err(error)?;
+            native_operations_native::verify_bytes(&normalized,tag,&normalized_sha)?;
+            if native_operations_native::fields(&state,&p,&normalized,tag)?!=fields||normalized_sha!=expected{return Err("The external save does not normalize to the reviewed native field replay. This is an unreviewed rewrite, not a certified source repair; all files are retained.".into());}
+            "equivalentNativeSerialization"
+        };
+        if transaction::inventory(&tags).map_err(error)?!=before{return Err("The external save changed during review. Wait for it to finish, then review again.".into());}
+        if committed!=receipt.before_radius&&committed!=radius{return Err("Conflict: another participant changed this native field. The external candidate is retained; prepare a new fork before merging.".into());}
+        Ok(ExternalReview{id,source_sha256:receipt.source.inventory_sha256,candidate_sha256,before_radius:receipt.before_radius,bounding_radius:radius,changed:radius!=committed,revision:receipt.revision,serialization,detail:if radius==committed{"Native round-trip matched the committed semantic value; no shared transaction is needed."}else if serialization=="equivalentNativeSerialization"{"The raw save has a different native serialization. CRC, exposed fields and its separately normalized copy match the reviewed field replay. Only the scalar can be shared; raw and normalized files remain retained, and opaque bytes are not imported."}else{"Only the supported native scalar is reviewed. Share it through the existing authoritative transaction flow; the tool fork and admitted source remain separate."}.into()})
+    }).await.map_err(error)?
 }
 pub(super) fn matches(state:&AppState, project:&str, doc:&quickforge::QuickForgeDocument)->Reply<()> {
     if let Some(native)=&doc.native {

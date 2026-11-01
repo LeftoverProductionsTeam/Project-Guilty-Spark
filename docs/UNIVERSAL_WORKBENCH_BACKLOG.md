@@ -1,5 +1,7 @@
 # Universal workbench continuation
 
+C42 adds direct tool downloads/selected-app launching, independent Halo preview defaults, a bounded shared external-tool handoff, native-equivalent serialization review, cross-map focused-save correction and working-directory-independent runtime discovery. Three independent processes and actual native compilation are verified on one computer; universal tools, direct-map writers, multi-computer LAN/VPN and game-peer replication remain open. See [C42 evidence and limits](C42_SHARED_EXTERNAL_EDITING.md).
+
 The [startup follow-through](C41_STARTUP_FOLLOW_THROUGH.md) overlaps native source/texture preparation and first-reflection reads, with measured cold/warm showcase improvements and complete source/render quality checks. Catalog preparation, memory/CPU reduction, gameplay acceptance and all larger native/direct-map goals remain open; existing native/audio/source safeguards are preserved.
 
 The [native looping-emitter follow-through](NATIVE_LOOPING_EMITTERS.md) adds verified MCC classic-bank recovery, explicit native inclusion and local QuickForge sound-scenery compilation. It preserves the original loop and distinguishes editor rehearsal controls from native settings. This narrows the earlier compiled-sound gap: custom clips/events, other formats, existing-map additions, SparkLink audio, in-game listening and full acoustic/game-peer parity still have separate open gates.

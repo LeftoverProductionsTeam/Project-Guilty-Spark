@@ -61,6 +61,7 @@ export function useWorkshopTextures(
       setStatus('No exact shader images in the selected source map');
       return;
     }
+    setStatus('Loading original Halo material textures…');
     void (async () => {
       try {
         const tasks = materials.flatMap(({ material, tag }) =>

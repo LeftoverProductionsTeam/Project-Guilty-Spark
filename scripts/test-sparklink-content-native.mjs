@@ -9,17 +9,20 @@ import net from 'node:net';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 const expect = pwExpect.configure({ timeout: 45000 });
+const externalTools=process.argv.includes('--external-tools');
+const cliArgs=process.argv.slice(2).filter(value=>value!=='--external-tools');
 const args = new Map();
-for (let n = 2; n < process.argv.length; n += 2) {
+for (let n = 0; n < cliArgs.length; n += 2) {
   if (
-    !['--app', '--root', '--kit', '--invader', '--map', '--template-tags'].includes(process.argv[n]) ||
-    !process.argv[n + 1] ||
-    args.has(process.argv[n])
+    !['--app', '--root', '--kit', '--invader', '--map', '--template-tags', '--baboon-edited-tag'].includes(cliArgs[n]) ||
+    !cliArgs[n + 1] ||
+    args.has(cliArgs[n])
   )
     throw Error('Use unique app/root/kit/invader/map arguments');
-  args.set(process.argv[n], path.resolve(process.argv[n + 1]));
+  args.set(cliArgs[n], path.resolve(cliArgs[n + 1]));
 }
-if (args.size !== 6) throw Error('All six named arguments are required');
+if (!['--app','--root','--kit','--invader','--map','--template-tags'].every(key=>args.has(key))) throw Error('All six named arguments are required');
+if (args.has('--baboon-edited-tag')&&!externalTools) throw Error('Baboon save replay requires --external-tools');
 const root = args.get('--root'),
   output = path.join(root, `run-${new Date().toISOString().replace(/[:.]/g,'-')}`);
 await fs.mkdir(output); // Fresh evidence directory; never overwrite a previous attempt.
@@ -406,6 +409,11 @@ try {
     const next=await update(sender,origin,d=>{d.placements[0].position[0]=2+n*0.2;});
     await contentConverged(next.result);latencies.push(performance.now()-t);
   }
+  if(externalTools){
+    const {exerciseExternalTools}=await import('./sparklink-external-scenario.mjs');
+    receipt.externalToolInterop=await exerciseExternalTools({a,b,c,view,update,contentConverged,output,invader:args.get('--invader'),baboonEditedTag:args.get('--baboon-edited-tag')});
+    current=await view(a);await contentConverged(current);
+  }
   // A fresh generated namespace retains the parent's original BSP/scenario.
   await update(a,await view(a),d=>{d.name=`c39_native_${crypto.randomUUID().slice(0,8)}`;});
   current=await view(a);await contentConverged(current);
@@ -432,7 +440,7 @@ try {
   for(let i=0;i<3;i++)expect(compiledPlacement.position[i]).toBeCloseTo(frozenPlacement.position[i],5);
   const weapon=compiled.inspection.tags.find(t=>t.class==='weap'&&t.path.replaceAll('\\','/')==='weapons/pistol/pistol');
   const radius=weapon?.fields.find(f=>f.label==='Bounding radius'||f.key==='bounding_radius')?.value;
-  expect(Number(radius)).toBeCloseTo(0.275,6);
+  expect(Number(radius)).toBeCloseTo(externalTools?receipt.externalToolInterop.finalBoundingRadius:0.275,6);
   mark('actualHaloToolchain',{jobId,revision:binding.sessionRevision,laterRevision:during.result.revision,nativeRadius:Number(radius),publishedAssetPath:compiledAsset.path,compiledModelTriangles:compiledModel.mesh.indices.length/3,placement:compiledPlacement.position,outputSha256:built.sha256,durationMs:performance.now()-buildBegan,gameplayTested:false});
   current=await view(a);await contentConverged(current);
   // Loss of an actual host process; full asset bytes, semantic state and author history must survive.
@@ -448,6 +456,7 @@ try {
   await contentConverged(recovered.view);
   const replayAfter=await a.call('forge_session_update',{projectId:a.id,sessionId:a.session,revision:accepted.revision,document:accepted.document,operationId:accepted.operationId});expect(replayAfter.revision).toBe(beforeCrash.revision);
   mark('durableNativeRecovery',{revision:beforeCrash.revision,assetBytesIdentical:true,semanticFieldIntact:true,authorIdentitiesAndHistoryRetained:true,newInvitation:true,replayDeduplicated:true,durationMs:performance.now()-recoveryBegan});
+  if(externalTools){const retained=await a.call('studio_external_status',{projectId:a.id,id:receipt.externalToolInterop.forkId});expect(retained.candidateSha256).toBe(receipt.externalToolInterop.candidateSha256);receipt.externalToolInterop.retainedAcrossActualHostRestart=true;}
   await a.call('forge_session_role',{projectId:a.id,sessionId:a.session,participantId:c.author,role:'viewer',revoke:true});await expect(view(c)).rejects.toThrow(/revok|participant|credential/i);expect((await view(b)).document).toEqual(beforeCrash.document);mark('revocationRetainsOtherParticipants',true);
   for(const x of protectedInputs)expect(await sourceInventory(x.tags)).toEqual(x.hashes);
   expect(await hashFile(nativeFile)).toBe(protectedTemplateHash);expect(await hashFile(localImport)).toBe(protectedTemplateHash);

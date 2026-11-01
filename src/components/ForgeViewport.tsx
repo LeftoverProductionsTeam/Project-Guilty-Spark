@@ -692,9 +692,10 @@ export default function ForgeViewport(props: ForgeViewportProps) {
   const missing=Object.keys(failures).length;
   return (
     <>
-      <span hidden data-native-material-count={Object.keys(surfacePreview.views).length}>
+      <span hidden data-native-material-count={Object.keys(surfacePreview.views).length} data-native-material-source={props.materialSource?.project.id??''}>
         {surfacePreview.status}
       </span>
+      {props.document.materials.some(material=>material.shaderPath)&&!Object.keys(surfacePreview.views).length&&<div className="forge-material-status" role="status">{surfacePreview.status}</div>}
       <ViewportBoundary>
         <Canvas
           key={String(rendererQuality.antialias)}

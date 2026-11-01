@@ -26,6 +26,8 @@ The latest [measured loading pass](C41_MAP_LOADING_PERFORMANCE.md) batches fully
 - Import closed, material-assigned OBJ scenery through native model/collision compilation. Broader custom model classes and every runtime combination remain unaccepted.
 - Audition supported source sounds before editor placement. Explicitly include original loops in local MCC QuickForge builds as native sound scenery, with verified recursive samples and placements. [Native audio scope](NATIVE_LOOPING_EMITTERS.md).
 
+New arenas assign owned Halo preview defaults before entering the editor. Material selection stays independent from model/sound browsing; actual QuickForge and BSP Workshop views retain both textures with Invader unconfigured. [C42 defaults and launcher scope](C42_TOOLS_AND_DEFAULTS.md).
+
 ## Tags, safe external tools and builds
 
 - Browse collapsible tag classes, matching tags, typed fields and references. Root-object selection no longer interrupts dependency navigation.
@@ -33,6 +35,7 @@ The latest [measured loading pass](C41_MAP_LOADING_PERFORMANCE.md) batches fully
 - Direct writes bind exact IDs, paths, offsets and expected bytes; refuse unsupported structures; run the reviewed native CRC/info utilities; compare every unplanned byte and reopen native semantics. Other editions and structural edits retain independent gates.
 - Extract/stage recursive tags, duplicate supported campaign dependencies into isolated source, and compile through matching tools. A compiled campaign revision still needs game-load acceptance.
 - Hand off derived tags to configured Baboon, Guerilla/Sapien and compatible tools. Stable-save/content audits distinguish known writer associations, harmless normalization and invalid semantic edits.
+- In an active SparkLink native session, prepare a private tool copy, keep editing with peers, then review and propose the supported pistol-radius save. Truncation, bad CRC, unrelated fields and conflicting edits are refused without replacing the shared source. The retained C37 Baboon save passes separate native-equivalence checks; this is not universal tool or compiled-map compatibility. [C42 shared-tool workflow](C42_SHARED_EXTERNAL_EDITING.md).
 - Preserve damaged candidates and original sources; accept/reconcile valid native edits as new revisions. Build accepted working tags without regenerating them from an older cache or geometry draft.
 - Run source compatibility/dependency checks, isolated native jobs, source-bound receipts and output-integrity checks; inspect a compiled revision in a separate tab.
 - Use supported MCC/CE source and conversion paths, Portability Lab and semantic comparisons. Universal any-map/any-runtime conversion is unfinished.

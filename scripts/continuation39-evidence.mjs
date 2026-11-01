@@ -44,3 +44,11 @@ export const continuation39Overrides = Object.fromEntries(continuation39Requirem
   level: 'Level A shared editor source; compiler, live engine and game-peer evidence are separate',
   evidence: 'docs/C39_NATIVE_CONTENT_ACCEPTANCE.md; docs/fixtures/c39-native-content.json; docs/CONTINUATION_39_ENGINEERING.md; scripts/test-sparklink-content-native.mjs',
 }]));
+
+// Preserve C39 requirement IDs and open gates while adding C42 source evidence.
+for (const id of ['C39-core','C39-simultaneous','C39-semantic-tags','C39-shared-build','C39-recovery','C39-security']) {
+  const row=continuation39Overrides[id];
+  row.operation+=' C42 verifies a private native tool fork while three real Spark processes keep editing, explicit scalar proposal, truncated and bad-CRC save refusal, native-equivalent serialization review, conflict and per-author undo, frozen native compilation and recovery after actual host restart. The prior human-saved Baboon file is replayed; no new Baboon GUI save is claimed.';
+  row.files+='; src-tauri/src/studio_native_source.rs; src/components/StudioExternalTools.tsx; scripts/sparklink-external-scenario.mjs';
+  row.evidence+='; docs/C42_SHARED_EXTERNAL_EDITING.md; docs/fixtures/c42-shared-external-editing.json';
+}

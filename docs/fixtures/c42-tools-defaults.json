@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "appSha256": "de24bd7dac9430e16006034761f320f32f38e3327fdcf0c5a960d782d5cd56a6",
+  "mockedIpc": false,
+  "gameLaunched": false,
+  "installerExecuted": false,
+  "filePickerExercised": false,
+  "automaticKitDiscoveryWithoutConfiguredFolder": true,
+  "registeredApplicationLaunch": {
+    "actualApplication": "installed Guerilla",
+    "nativePid": 18860,
+    "windowTitle": "HCE Guerilla",
+    "responding": true,
+    "sourceArgumentsPassed": false
+  },
+  "changedLauncherIdentityRefused": true,
+  "previewRuntimeSources": {
+    "mccSteam": {
+      "previewCacheVersion": 13,
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "shaderCount": 2
+    },
+    "haloCustomEdition": {
+      "previewCacheVersion": 609,
+      "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "shaderCount": 2
+    },
+    "openCe": {
+      "previewCacheVersion": 13,
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "shaderCount": 2
+    },
+    "chupathingyCe": {
+      "previewCacheVersion": 13,
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "shaderCount": 2
+    }
+  },
+  "quickForgeDefaults": {
+    "actualUiCreation": true,
+    "invaderConfigured": false,
+    "materials": [
+      {
+        "id": "surface",
+        "name": "halo_metal",
+        "shaderPath": "levels/test/bloodgulch/shaders/cap_metal",
+        "color": [
+          0.35,
+          0.4,
+          0.42
+        ]
+      },
+      {
+        "id": "grass",
+        "name": "halo_grass",
+        "shaderPath": "levels/test/bloodgulch/shaders/blood ground",
+        "color": [
+          0.3,
+          0.42,
+          0.23
+        ]
+      }
+    ],
+    "actualNativeMaterialPreviews": 2
+  },
+  "soundBrowsingDoesNotClearSurfaceTextures": true,
+  "bspWorkshopUsesTheSameDefaultTextures": true,
+  "installedToolUnchanged": true,
+  "nativeWindows": {
+    "workspaceRoutes": 23,
+    "simultaneousPopouts": 3,
+    "complete": true
+  },
+  "discovery": {
+    "beforeExecutableSha256": "e8c71f4a43f2cd754c342d2aa3a29881705059e6b3c0fc7d3829d2f205e86d50",
+    "beforeClients": [],
+    "afterExecutableSha256": "de24bd7dac9430e16006034761f320f32f38e3327fdcf0c5a960d782d5cd56a6",
+    "afterClients": [
+      "haloCustomEdition",
+      "openCe",
+      "chupathingyCe"
+    ],
+    "executableAndWorkingDirectoryOutsideRepository": true,
+    "originalUnchanged": true
+  },
+  "complete": true
+}

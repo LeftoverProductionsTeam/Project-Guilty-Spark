@@ -1,5 +1,7 @@
 # Living feature ledger — Integrated workbench
 
+C42 adds direct tool downloads/selected-app launching, independent Halo preview defaults, a bounded shared external-tool handoff, native-equivalent serialization review, cross-map focused-save correction and working-directory-independent runtime discovery. Three independent processes and actual native compilation are verified on one computer; universal tools, direct-map writers, multi-computer LAN/VPN and game-peer replication remain open. See [C42 evidence and limits](C42_SHARED_EXTERNAL_EDITING.md).
+
 C41 adds seven Smart Edit/direct/source/visual/live/workflow/asset records while preserving all prior IDs and gates. The later [native-loop follow-through](NATIVE_LOOPING_EMITTERS.md) updates the existing sound-event requirement with exact MCC bank/source/compiler evidence and keeps game acceptance open. See [C41 routing and native evidence](CONTINUATION_41_ENGINEERING.md).
 
 The [test-build readiness audit](TEST_BUILD_READINESS.md) adds checked Custom Edition setup and scoped private engine observations, preserves failed client joins, and keeps all roadmap gates explicit.

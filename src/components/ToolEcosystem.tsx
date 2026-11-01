@@ -16,6 +16,7 @@ interface ToolDefinition {
   runtimes?: string[];
   platforms?: string[];
   integration: string;
+  mode?: string;
   handler: string;
   version: string | null;
   releaseUrl?: string | null;
@@ -37,6 +38,7 @@ interface ToolRow {
     available: boolean;
     detail: string;
   } | null;
+  userLauncher?: { path: string; sha256: string; architecture: string; available: boolean } | null;
 }
 interface EcosystemReport {
   projectId: string | null;
@@ -165,6 +167,9 @@ export default function ToolEcosystem({
   }
   function card(row: ToolRow) {
     const { definition: tool, assessment } = row;
+    const desktop = tool.mode
+      ? tool.mode !== 'integratedCli'
+      : ['sapien', 'guerilla', 'tagTest', 'invaderEditor', 'baboon'].includes(tool.id);
     const actionName =
       tool.handler === 'editTags'
         ? 'tag editing'
@@ -182,13 +187,22 @@ export default function ToolEcosystem({
         <p className="gs-tool-purpose" title={tool.purpose}>
           {tool.purpose}
         </p>
-        {assessment.executableFound &&
-          ['sapien', 'guerilla', 'tagTest', 'invaderEditor'].includes(tool.id) && (
+        {(assessment.executableFound || row.userLauncher?.available) &&
+          desktop &&
+          tool.integration !== 'externalCompanion' && (
             <button
               aria-label={`Launch ${tool.label}`}
-              disabled={busy || assessment.state === 'requiresRuntime'}
+              disabled={
+                busy ||
+                (!row.userLauncher?.available && assessment.state === 'requiresRuntime') ||
+                (tool.id === 'tagTest' && !assessment.canUseWorkflow)
+              }
               title="Open a blank scratch workspace. Use the managed map editing action to hand off the current map's working source."
               onClick={() => {
+                if (tool.id === 'tagTest') {
+                  open(tool);
+                  return;
+                }
                 setBusy(true);
                 setError('');
                 void call<string>('launch_discovered_tool', {
@@ -203,6 +217,42 @@ export default function ToolEcosystem({
               {compact ? 'Launch' : `Launch ${tool.label}`}
             </button>
           )}
+        {desktop && tool.integration !== 'externalCompanion' && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              const current = generation.current;
+              setBusy(true);
+              setError('');
+              void call('choose_tool_launcher', { runtimeId: runtime, toolId: tool.id })
+                .then(
+                  () => {
+                    if (current === generation.current) return refresh();
+                  },
+                  (reason) => {
+                    if (current === generation.current) setError(String(reason));
+                  },
+                )
+                .finally(() => {
+                  if (current === generation.current) setBusy(false);
+                });
+            }}
+          >
+            {row.userLauncher ? 'Change selected app' : `Locate ${tool.label}`}
+          </button>
+        )}
+        {row.userLauncher && (
+          <p className="subtle">
+            {row.userLauncher.available
+              ? 'Selected application · standalone launch'
+              : 'Selected application changed or is missing; locate it again'}
+            . Map handoff support is checked separately.
+          </p>
+        )}
+        <a className="small-button" href={tool.releaseUrl ?? tool.sourceUrl} target="_blank" rel="noreferrer">
+          Get {tool.label}
+        </a>
         {(!compact || !assessment.canUseWorkflow) && <p className="subtle">{assessment.detail}</p>}
         {tool.integration === 'externalCompanion' && (
           <>
@@ -268,8 +318,7 @@ export default function ToolEcosystem({
             </>
           )}
         </details>
-        {compact &&
-          (!assessment.executableFound || assessment.state === 'requiresRuntime') &&
+        {(!assessment.executableFound || assessment.state === 'requiresRuntime') &&
           !['upstreamOnly', 'externalCompanion'].includes(tool.integration) && (
             <button type="button" className="small-button" onClick={onSettings}>
               Set up {tool.label}
@@ -351,14 +400,35 @@ export default function ToolEcosystem({
           {report.tools.some((row) => row.definition.id === 'baboon' && row.assessment.canUseWorkflow) && (
             <BaboonTools project={project} />
           )}
-          <details>
+          <details
+            open={
+              search.trim()
+                ? report.tools.some(
+                    (row) =>
+                      row.definition.integration === 'upstreamOnly' &&
+                      `${row.definition.label} ${row.definition.purpose}`
+                        .toLowerCase()
+                        .includes(search.toLowerCase()),
+                  )
+                : undefined
+            }
+          >
             <summary>Other Halo tools · compatibility &amp; handoff research</summary>
             <p className="subtle">
-              These profiles describe upstream software. A verified Spark handoff has not been implemented;
-              they grant no launch or download action.
+              These apps can be located and launched independently. Use their official download links; map
+              handoff support remains unverified until its source workflow has been tested.
             </p>
             <div className="gs-tool-grid">
-              {report.tools.filter((row) => row.definition.integration === 'upstreamOnly').map(card)}
+              {report.tools
+                .filter(
+                  (row) =>
+                    row.definition.integration === 'upstreamOnly' &&
+                    (!search.trim() ||
+                      `${row.definition.label} ${row.definition.purpose}`
+                        .toLowerCase()
+                        .includes(search.toLowerCase())),
+                )
+                .map(card)}
             </div>
           </details>
           {!!report.companionCandidates?.length && (

@@ -538,6 +538,53 @@ test('cross-map model placement opens source tags and keeps undo and save in tha
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.id)).toBe('b');await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');
 });
 
+test('Ctrl+S commits a focused donor-tag draft into its own project without changing the active map',async({page})=>{
+ await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await page.getByRole('button',{name:'Toggle Asset library',exact:true}).click();
+ const library=page.getByRole('region',{name:'Asset library panel',exact:true});await library.getByLabel('Asset library map',{exact:true}).selectOption('b');
+ await library.getByRole('button',{name:'Add test at view',exact:true}).click();
+ await page.getByRole('button',{name:'Close Asset library',exact:true}).click();await page.locator('.viewport-object-actions').getByRole('button',{name:'Object tags',exact:true}).click();
+ const tags=page.getByRole('region',{name:'Object tags panel',exact:true});await expect(tags).toContainText('Synthetic candidate');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.projects.a.project.scene.length)).toBe(1);
+ const activeBefore=await page.evaluate(()=>JSON.stringify((window as any).__sparkMock.projects.a.project));
+ const value=tags.getByRole('spinbutton',{name:'Velocity',exact:true});await value.fill('43');await value.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.projects.b.project.tagEdits[0]?.value)).toBe(43);
+ await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');
+ expect(await page.evaluate(()=>JSON.stringify((window as any).__sparkMock.projects.a.project))).toBe(activeBefore);
+ await expect(value).toBeFocused();
+});
+
+test('Find tools exposes downloads and explicit registered app launch while preserving the edited map',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ const value=page.getByRole('spinbutton',{name:'Velocity',exact:true});await value.fill('37');await value.press('Tab');
+ await page.evaluate(()=>{
+   const w=window as any,original=w.__TAURI_INTERNALS__.invoke;let selected=false;
+   w.__sparkToolLaunches=[];
+   w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+     if(command==='tool_ecosystem_report')return {projectId:args.projectId,context:{runtimeId:args.runtimeId,sourceKind:'classicCache',ownedNativeTags:false,host:'windows'},sourceIssue:null,tools:[
+       {definition:{id:'guerilla',label:'Guerilla',mode:'externalGui',integration:'sourceHandoff',purpose:'Native tag editor',caveat:'Managed map source is separate',maintainer:'Official',sourceUrl:'https://learn.microsoft.com/en-us/halo-master-chief-collection/',license:'Separate install',inputs:['nativeH1'],platforms:['windows'],runtimes:['mccSteam'],handler:'editTags'},assessment:{state:'sourceUnsupported',executableFound:true,canUseWorkflow:false,detail:'Launch app or build source'},executable:'C:/synthetic/guerilla.exe'},
+       {definition:{id:'reclaimer',label:'Reclaimer',mode:'sourceHandoff',integration:'upstreamOnly',purpose:'Inspect assets',caveat:'No managed handoff',maintainer:'Community',sourceUrl:'https://github.com/Gravemind2401/Reclaimer',releaseUrl:'https://github.com/Gravemind2401/Reclaimer/releases',license:'Separate install',inputs:['cache'],platforms:['windows'],runtimes:[],handler:'research'},assessment:{state:'researchOnly',executableFound:false,canUseWorkflow:false,detail:'Launch support is separate from map handoff'},executable:null,userLauncher:selected?{path:'C:/synthetic/Reclaimer.exe',sha256:'a'.repeat(64),architecture:'x86_64',available:true}:null}
+     ]};
+     if(command==='choose_tool_launcher'){selected=true;return {available:true};}
+     if(command==='launch_discovered_tool'){w.__sparkToolLaunches.push(args);return 'Opened selected application';}
+     if(command==='open_external_url')return null;
+     return original(command,args);
+   };
+ });
+ await page.getByRole('button',{name:/Find tools/}).click();
+ const finder=page.getByRole('dialog');await expect(finder.getByRole('button',{name:'Launch Guerilla',exact:true})).toBeEnabled();
+ await expect(finder.getByRole('link',{name:'Get Guerilla',exact:true})).toHaveAttribute('href','https://learn.microsoft.com/en-us/halo-master-chief-collection/');
+ await finder.getByRole('textbox',{name:'Search workspaces'}).fill('Reclaimer');
+ await expect(finder.getByRole('link',{name:'Get Reclaimer',exact:true})).toHaveAttribute('href','https://github.com/Gravemind2401/Reclaimer/releases');
+ await finder.getByRole('button',{name:'Locate Reclaimer',exact:true}).click();
+ await expect(finder.getByRole('button',{name:'Launch Reclaimer',exact:true})).toBeEnabled();
+ expect(await page.evaluate(()=>(window as any).__sparkToolLaunches)).toEqual([]);
+ await finder.getByRole('button',{name:'Launch Reclaimer',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkToolLaunches)).toEqual([{runtimeId:'mccSteam',projectId:'a',toolId:'reclaimer'}]);
+ await page.keyboard.press('Escape');await expect(value).toHaveValue('37');
+});
+
 test('C35 empty Level editor asks for an editing context without assuming an installed MCC map',async({page})=>{
  await mockDesktop(page);await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,"Level editor");
  await expect(page.getByRole('heading',{name:'What would you like to work on?',exact:true})).toBeVisible();

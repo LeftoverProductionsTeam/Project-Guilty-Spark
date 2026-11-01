@@ -316,6 +316,10 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     [assets, setAssets] = useState<ForgeAsset[]>([]),
     [assetError, setAssetError] = useState('');
   const [sourceOpen, setSourceOpen] = useState<OpenProject | null>(null);
+  const [materialSourceId,setMaterialSourceId]=useMapState(project.id,'forge.materialSource',project.nativeAssetImports?.find(binding=>binding.tagClass==='senv')?.sourceProjectId??sourceId);
+  const [separateMaterialSource,setSeparateMaterialSource]=useState<OpenProject|null>(null);
+  const materialResourceScope=useTextureResourceScope(materialSourceId);
+  const materialOpen=materialSourceId===sourceId?sourceOpen:separateMaterialSource;
   const defaultPreviewAttempt=useRef('');
   const sourceResourceScope=useTextureResourceScope(sourceId);
   const lastLoadedSource=useRef('');
@@ -484,17 +488,33 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const latestProject = useRef(project);
   latestProject.current = project;
   useEffect(()=>{
-    if(studioRole!=null||!native||props.library?.busy||props.activeJob||!doc.materials.some(m=>!m.shaderPath)||defaultPreviewAttempt.current===project.id)return;
+    if(studioRole!=null||!native||!doc.materials.some(m=>!m.shaderPath)||defaultPreviewAttempt.current===project.id)return;
     defaultPreviewAttempt.current=project.id;let alive=true;
     void runtimeTextureSource(doc.runtimeId).then(open=>{
       if(!alive)return;const materials=defaultPreviewMaterials(open);
       const metal=materials.find(m=>m.id==='surface'),grass=materials.find(m=>m.id==='grass');if(!metal)return;
       const latest=latestProject.current;const current=latest.quickForge;if(!current)return;
       edit({...latest,quickForge:{...current,materials:[...current.materials.map(m=>m.shaderPath?m:{...m,shaderPath:(m.id==='grass'?grass:metal)?.shaderPath??metal.shaderPath}),...materials.filter(m=>!current.materials.some(old=>old.id===m.id))]}},'Assign owned runtime defaults to untextured surfaces');
-      writeMapSession(project.id,'forge.assetSource',open.project.id);retainAssetSource(open);
+      writeMapSession(project.id,'forge.materialSource',open.project.id);
+      if(!readMapSession(project.id,'forge.assetSource',''))writeMapSession(project.id,'forge.assetSource',open.project.id);
+      retainAssetSource(open);
     }).catch(reason=>{if(alive)notify('Default materials need an owned runtime map: '+String(reason),'info');});
     return()=>{alive=false;if(defaultPreviewAttempt.current===project.id)defaultPreviewAttempt.current="";};
-  },[studioRole,project.id,doc.runtimeId,props.library?.busy,props.activeJob,doc.materials.some(m=>!m.shaderPath)]);
+  },[studioRole,project.id,doc.runtimeId,doc.materials.some(m=>!m.shaderPath)]);
+  useEffect(()=>{
+    let alive=true;setSeparateMaterialSource(null);
+    if(!materialSourceId||materialSourceId===sourceId)return;
+    void call<OpenProject>('open_project',{id:materialSourceId}).then(async initial=>{
+      let open=initial;
+      if(native&&open.inspection?.header.version===13&&!open.project.source?.resourceSha256?.['mcc-textures']){
+        try{open=await call<OpenProject>('connect_mcc_texture_resources',{projectId:open.project.id});}catch{/* Missing source pixels stay explicit. */}
+      }else if(native&&[6,7,609].includes(open.inspection?.header.version??0)){
+        try{open=await call<OpenProject|null>('auto_connect_classic_textures',{projectId:open.project.id})??open;}catch{/* Keep unavailable source resources explicit. */}
+      }
+      if(alive){publishTextureResources(open.project);setSeparateMaterialSource(open);}
+    },reason=>{if(alive)setAssetError(String(reason));});
+    return()=>{alive=false;};
+  },[materialSourceId,materialResourceScope,sourceId]);
 
   const mutableNodes = chosen.filter((node) => !node.value.locked);
   const errors = useMemo(
@@ -939,10 +959,10 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             onBusy={setBspBusy}
             onBack={() => setBspMode(false)}
             readOnly={studioRole != null}
-            materialSource={sourceOpen}
+            materialSource={materialOpen}
             materialBindings={project.nativeAssetImports}
             textureSources={sources.map((s) => ({ id: s.id, title: s.title }))}
-            onTextureSource={setSourceId}
+            onTextureSource={setMaterialSourceId}
             wrlOverlay={wrlVisible && !wrlStale ? wrlParse.value : null}
           />
         ) : (
@@ -1303,7 +1323,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                 }}
               >
                 <ForgeViewport
-                  materialSource={sourceOpen}
+                  materialSource={materialOpen}
                   materialBindings={project.nativeAssetImports}
                   sessionId={project.id}
                   resourceScopes={Object.fromEntries(

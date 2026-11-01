@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "startingCommit": "a3e0ea6bc7c869f09ea3fe993cff481f9feca86e",
+  "appSha256": "de24bd7dac9430e16006034761f320f32f38e3327fdcf0c5a960d782d5cd56a6",
+  "nativeProcesses": 3,
+  "separateDataRoots": 3,
+  "physicalMachines": 1,
+  "mockedIpc": false,
+  "transport": "private TCP + TLS 1.3, invitation-pinned certificate",
+  "gameLaunched": false,
+  "gamePeerReplicationTested": false,
+  "threeAuthorNativeAcceptance": {
+    "revision": 3,
+    "documentSha256": "6b5052151b54e8e0c2496a559f8a785094f05e38732a485adf1e5b3e412bdb56",
+    "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+    "assetId": "b18c8e73-706d-41c6-8fff-ea684185a130",
+    "assetBytes": 632,
+    "actualModelsInThreeViewports": true,
+    "simultaneousAuthorActions": true
+  },
+  "externalToolInterop": {
+    "mockedIpc": false,
+    "simultaneousEditors": 3,
+    "externalTool": "Invader",
+    "sharedSessionStayedConnected": true,
+    "corruptSaveRejected": true,
+    "corruptedCandidateRetained": true,
+    "externalExecutableSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "invalidCrcRejectedBeforeNativeNormalization": true,
+    "otherExposedFieldNotSilentlyMerged": true,
+    "externalEditAndConcurrentWorldEditConverged": true,
+    "convergedRevision": 14,
+    "elapsedMs": 20931.67910000001,
+    "candidateSha256": "15640d68228399293ba8d335839df25394f232c82d2f9f46e958f0f2563d99b2",
+    "alreadyCommittedEditDoesNotCreateAnotherTransaction": true,
+    "finalBoundingRadius": 0.5,
+    "baboonSavedFileReplay": {
+      "newGuiSession": false,
+      "priorHumanEditedSave": true,
+      "rawSha256": "6dc893d2375864e4648d45cd161d2e73a5b4ab18442fcb8d6fdb6a6e401d9d95",
+      "rawFileRetainedUnchanged": true,
+      "serialization": "equivalentNativeSerialization",
+      "convergedRevision": 15
+    },
+    "sameFieldConflictRejectedWithoutReplacingSource": true,
+    "participantUndoPreservesExternalAndOtherAuthorEdits": true,
+    "viewerCannotCreateToolFork": true,
+    "retainedAcrossActualHostRestart": true
+  },
+  "participantUndoAndReferencedAssetConflict": true,
+  "sameFieldConflictCorruptBytesAndDuplicateAck": true,
+  "permissionsCoverNativeImportEditAndBuild": true,
+  "nativeSourceIntegrityAndIndependentToolBuildGuard": {
+    "truncatedAdmittedTagRejected": true,
+    "exactRecoveryBytesRetained": true,
+    "unsharedWorkingTagsBuildRefused": true
+  },
+  "synchronizationSurvivesWorkspaceChange": true,
+  "actualHaloToolchain": {
+    "jobId": "99fa7a06-1929-49ec-9fd8-dc9b19f41b6c",
+    "revision": 18,
+    "laterRevision": 19,
+    "nativeRadius": 0.5,
+    "publishedAssetPath": "scenery\\sparklink\\b18c8e73-706d-41c6-8fff-ea684185a130",
+    "compiledModelTriangles": 31,
+    "placement": [
+      3,
+      2,
+      0.1
+    ],
+    "outputSha256": "067435e6135097b5a1159e493b1ee91123995971aee9ba3a588f2bd2b305e4c5",
+    "durationMs": 37335.29990000004,
+    "gameplayTested": false
+  },
+  "durableNativeRecovery": {
+    "revision": 19,
+    "assetBytesIdentical": true,
+    "semanticFieldIntact": true,
+    "authorIdentitiesAndHistoryRetained": true,
+    "newInvitation": true,
+    "replayDeduplicated": true,
+    "durationMs": 13598.800300000003
+  },
+  "revocationRetainsOtherParticipants": true,
+  "originalSourcesUnchanged": {
+    "separateNativeTrees": 3,
+    "filesPerTree": 2240,
+    "templateUnchanged": true,
+    "importUnchanged": true
+  },
+  "synchronizationMeasurements": {
+    "samples": 7,
+    "valuesMs": [
+      8369.5907,
+      98.5737999999983,
+      390.7014999999956,
+      416.46669999998994,
+      413.6800000000221,
+      410.7826000000059,
+      300.7021999999997
+    ],
+    "physicalMachines": 1,
+    "includesNativeIpcAndReactConsumption": true
+  },
+  "sourceRegressions": {
+    "operationsAppSha256": "de24bd7dac9430e16006034761f320f32f38e3327fdcf0c5a960d782d5cd56a6",
+    "nativeCompilation": {
+      "compiledRadius": 0.550000011920929,
+      "sha256": "48ac630921e357dfa17403a464ab1c66cc432faf0602bc9fa0f2c0ad912539bf",
+      "allInputTagsByteIdentical": true,
+      "files": 2240,
+      "sourceAndDraftUnchanged": true
+    },
+    "baboonInteroperation": {
+      "preparedFromAcceptedInvaderSource": true,
+      "files": 2240,
+      "controlledWriter": "Invader in the Baboon fork; no fresh Baboon GUI edit is claimed",
+      "laterBaboonRevisionSupersedesInvader": true,
+      "nextInvaderRevisionUsesBaboonSource": true
+    },
+    "retainedHistoryAfterUiReload": true,
+    "recoveryAfterCompilation": true,
+    "integrityAppSha256": "c110275c0bd315a044e0555a668220fe4d92a3b48cdf5e511d4b8b86c65167a7",
+    "normalization": {
+      "changedBytes": 201,
+      "exposedFieldsEquivalent": true,
+      "acceptedAsEquivalent": true,
+      "scope": "Pinned Invader field-output comparison; opaque bytes/unprinted precision are not certified."
+    },
+    "semanticCorruption": {
+      "validChecksum": true,
+      "invalidDependencyLength": true,
+      "detectedByNativeParser": true,
+      "reconciliationRejected": true,
+      "actualControlledWriter": "QA Node process, intentionally malformed fixture; not Baboon or Invader"
+    },
+    "crcFailureDetected": true,
+    "recovery": {
+      "startingBytesRestored": true,
+      "damagedExternalEvidenceRetained": true,
+      "priorAcceptedSourceIntact": true
+    },
+    "validEdit": {
+      "writer": "Invader",
+      "toolSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "field": "bounding_radius",
+      "before": 0.1,
+      "expected": 0.225,
+      "compiled": 0.22499999403953552,
+      "reconciled": true,
+      "nativeCompiled": true,
+      "compiledTagBytesPreserved": true
+    }
+  },
+  "regressions": {
+    "rustPassed": 611,
+    "rustIgnored": 7,
+    "frontend": 275,
+    "browser": 136,
+    "offlineScripts": 59,
+    "interfaceProbe": 2,
+    "typeScript": true,
+    "windowsExecutableAndNsis": true
+  },
+  "acceptanceComplete": true,
+  "remotePublished": false
+}
