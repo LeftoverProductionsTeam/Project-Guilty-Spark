@@ -48,8 +48,11 @@ try {
   $env:GUILTY_SPARK_DATA_DIR = $priorSparkData
 }
 if (!$process.WaitForExit(180000) -or $process.ExitCode -ne 0) { throw 'NSIS installation failed or timed out.' }
-$installed = (Get-FileHash -LiteralPath (Join-Path $install 'GuiltySpark.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($installed -ne $expected) { throw 'NSIS installed executable differs from the packaged build.' }
-$result = @{schemaVersion=1;complete=$true;installerExitCode=$process.ExitCode;installerSha256=(Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant();installedExecutableSha256=$installed;cleanMachineTested=$false;hostedRunnerTested=($env:GITHUB_ACTIONS -eq 'true' -and [bool]$env:RUNNER_TEMP)}
+$python = if ($env:SPARK_RELEASE_PYTHON) { $env:SPARK_RELEASE_PYTHON } else { 'python' }
+$payloadJson = & $python -B (Join-Path $PSScriptRoot 'package.py') windows-payload $ExpectedExecutable (Join-Path $install 'GuiltySpark.exe')
+if ($LASTEXITCODE -ne 0) { throw 'NSIS installed payload failed exact verification.' }
+$payload = $payloadJson | ConvertFrom-Json
+if ($payload.portableExecutableSha256 -ne $expected) { throw 'Expected application changed during installation.' }
+$result = @{schemaVersion=1;complete=$true;installerExitCode=$process.ExitCode;installerSha256=(Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant();portableExecutableSha256=$expected;installedExecutableSha256=$payload.installedExecutableSha256;bundleMarkerRewrite=$payload.bundleMarkerRewrite;rewrittenBytes=$payload.rewrittenBytes;otherPayloadBytesIdentical=$payload.otherPayloadBytesIdentical;cleanMachineTested=$false;hostedRunnerTested=($env:GITHUB_ACTIONS -eq 'true' -and [bool]$env:RUNNER_TEMP)}
 [IO.File]::WriteAllText($receipt, ($result | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 $result | ConvertTo-Json

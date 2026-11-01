@@ -55,6 +55,7 @@ class PackageAcceptance(unittest.TestCase):
         self.binary = self.repo / 'target/release/GuiltySpark.exe'
         self.binary.parent.mkdir(parents=True)
         self.binary.write_bytes(pe(0x8664))
+        self.binary.write_bytes(self.binary.read_bytes() + package.BUNDLE_MARKER + b'UNK')
         setup = self.repo / 'target/release/bundle/nsis/Project Guilty Spark_0.4.1_x64-setup.exe'
         setup.parent.mkdir(parents=True)
         setup.write_bytes(pe(0x14c, True))
@@ -120,6 +121,31 @@ class PackageAcceptance(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Linux x64 ELF'):
             package.elf_x64(pe(0x8664))
 
+    def test_nsis_marker_is_the_only_permitted_payload_difference(self):
+        app = self.binary.read_bytes()
+        installed = self.root / 'installed.exe'
+        installed.write_bytes(package.nsis_payload(app))
+        receipt = package.windows_payload(self.binary, installed)
+        self.assertEqual(receipt['rewrittenBytes'], 3)
+        self.assertNotEqual(receipt['portableExecutableSha256'], receipt['installedExecutableSha256'])
+        for bad in [app, package.nsis_payload(app) + b'extra',
+                    package.nsis_payload(app).replace(b'MZ', b'NZ', 1)]:
+            installed.write_bytes(bad)
+            with self.assertRaisesRegex(ValueError, 'beyond the exact'):
+                package.windows_payload(self.binary, installed)
+        for bad in [app + package.BUNDLE_MARKER + b'UNK', app.replace(b'UNK', b'BAD')]:
+            with self.assertRaisesRegex(ValueError, 'ambiguous'):
+                package.nsis_payload(bad)
+
+    def test_linux_bundle_identity_preserves_every_other_byte(self):
+        app = b'Synthetic ELF payload' + package.BUNDLE_MARKER + b'UNK' + b'end'
+        for kind in [b'DEB', b'APP']:
+            bundled = package.bundle_payload(app, kind)
+            self.assertEqual(bundled.replace(package.BUNDLE_MARKER + kind,
+                                             package.BUNDLE_MARKER + b'UNK'), app)
+        with self.assertRaisesRegex(ValueError, 'Unknown bundle kind'):
+            package.bundle_payload(app, b'BAD')
+
     def test_seal_requires_all_gates_and_exact_native_and_installed_hashes(self):
         manifest = self.stage()
         gates = {'sourceCommit': self.commit, 'platform': 'windows-x64', 'complete': True,
@@ -127,8 +153,13 @@ class PackageAcceptance(unittest.TestCase):
         startup = {'sourceCommit': self.commit, 'applicationVersion': '0.4.1',
                    'executableSha256': manifest['executableSha256'], 'complete': True, 'mockedIpc': False}
         install = {'complete': True, 'installerSha256': manifest['artifacts'][0]['sha256'],
-                   'installedExecutableSha256': manifest['executableSha256']}
-        for name, value in [('gates', gates), ('startup', startup), ('install', install)]:
+                   'portableExecutableSha256': manifest['executableSha256'],
+                   'installedExecutableSha256': manifest['installedExecutableSha256'],
+                   'bundleMarkerRewrite': 'UNK-to-NSS', 'rewrittenBytes': 3,
+                   'otherPayloadBytesIdentical': True}
+        installed_startup = {**startup, 'executableSha256': manifest['installedExecutableSha256']}
+        for name, value in [('gates', gates), ('startup', startup), ('install', install),
+                            ('installed-startup', installed_startup)]:
             (self.root / (name + '.json')).write_text(json.dumps(value))
         with self.assertRaisesRegex(ValueError, 'installation'):
             package.seal(self.output, self.root / 'gates.json', self.root / 'startup.json')
@@ -139,7 +170,7 @@ class PackageAcceptance(unittest.TestCase):
             package.seal(self.output, self.root / 'gates.json', self.root / 'startup.json',
                          self.root / 'install.json', self.root / 'bad.json')
         package.seal(self.output, self.root / 'gates.json', self.root / 'startup.json',
-                     self.root / 'install.json', self.root / 'startup.json')
+                     self.root / 'install.json', self.root / 'installed-startup.json')
         package.verify(self.output)
         (self.output / 'unexpected.map').write_bytes(b'unexpected')
         with self.assertRaisesRegex(ValueError, 'Unexpected public'):

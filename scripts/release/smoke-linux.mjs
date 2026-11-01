@@ -22,7 +22,14 @@ const hash = (data) => crypto.createHash('sha256').update(data).digest('hex');
 await fs.chmod(imagePath, 0o755);
 execFileSync('dpkg-deb', ['--extract', debPath, path.join(root, 'debian')]);
 const debApp = path.join(root, 'debian/usr/bin/GuiltySpark');
-if (hash(await fs.readFile(debApp)) !== manifest.executableSha256) throw Error('Debian extraction differs');
+if (hash(await fs.readFile(debApp)) !== manifest.debianExecutableSha256)
+  throw Error('Debian extraction differs');
+const imagePayloadRoot = path.join(root, 'appimage-payload');
+await fs.mkdir(imagePayloadRoot);
+execFileSync(imagePath, ['--appimage-extract', 'usr/bin/GuiltySpark'], { cwd: imagePayloadRoot });
+const imageApp = path.join(imagePayloadRoot, 'squashfs-root/usr/bin/GuiltySpark');
+if (hash(await fs.readFile(imageApp)) !== manifest.appImageExecutableSha256)
+  throw Error('AppImage executable differs beyond its Tauri bundle marker');
 const freePort = async () => {
   const s = net.createServer();
   await new Promise((r) => s.listen(0, '127.0.0.1', r));
@@ -35,6 +42,8 @@ const receipt = {
   sourceCommit: commit,
   applicationVersion: manifest.applicationVersion,
   executableSha256: manifest.executableSha256,
+  debianExecutableSha256: hash(await fs.readFile(debApp)),
+  appImageExecutableSha256: hash(await fs.readFile(imageApp)),
   mockedIpc: false,
   complete: false,
   platform: 'linux-x64',

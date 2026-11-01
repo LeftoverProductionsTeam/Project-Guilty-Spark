@@ -28,6 +28,7 @@ FORBIDDEN_PARTS = {".git", ".local", ".research", ".toolchain", "node_modules",
 FORBIDDEN_SUFFIXES = {".map", ".yelo", ".iso", ".xiso", ".xbe", ".exe", ".dll",
                       ".pdb", ".sqlite3", ".db", ".pem", ".pfx", ".p12", ".key"}
 REPOSITORY = "LeftoverProductionsTeam/Project-Guilty-Spark"
+BUNDLE_MARKER = b"__TAURI_BUNDLE_TYPE_VAR_"
 
 
 def need(condition, message):
@@ -99,6 +100,29 @@ def pe_machine(data):
     offset = struct.unpack_from("<I", data, 60)[0]
     need(64 <= offset <= len(data) - 24 and data[offset:offset + 4] == b"PE\0\0", "Invalid PE header")
     return struct.unpack_from("<H", data, offset + 4)[0]
+
+
+def bundle_payload(app, kind):
+    # Tauri restores UNK in target/release after making each package.
+    # Match the complete upstream marker exactly once; never normalize other bytes.
+    need(kind in {b"NSS", b"DEB", b"APP"}, "Unknown bundle kind")
+    need(app.count(BUNDLE_MARKER) == 1 and app.count(BUNDLE_MARKER + b"UNK") == 1,
+         "Unknown or ambiguous Tauri bundle marker")
+    return app.replace(BUNDLE_MARKER + b"UNK", BUNDLE_MARKER + kind, 1)
+
+
+def nsis_payload(app):
+    need(pe_machine(app) == 0x8664, "Application must be x64")
+    return bundle_payload(app, b"NSS")
+
+
+def windows_payload(expected_file, installed_file):
+    app, installed = Path(expected_file).read_bytes(), Path(installed_file).read_bytes()
+    expected = nsis_payload(app)
+    need(installed == expected, "NSIS payload differs beyond the exact Tauri UNK-to-NSS marker")
+    return {"portableExecutableSha256": sha(app), "installedExecutableSha256": sha(installed),
+            "bundleMarkerRewrite": "UNK-to-NSS", "rewrittenBytes": 3,
+            "otherPayloadBytesIdentical": True}
 
 
 def elf_x64(data):
@@ -214,7 +238,7 @@ def stage(repo, commit, preview, platform, output):
         need(image_data[8:11] == b"AI\x02", "Not a type-2 AppImage")
         deb = one_file(repo / "target/release/bundle/deb", "*.deb")
         deb_app, control = deb_binary(deb)
-        need(deb_app == app, "Debian payload differs from the tested build")
+        need(deb_app == bundle_payload(app, b"DEB"), "Debian payload differs beyond the Tauri bundle marker")
         need(f"Version: {info['applicationVersion']}\n" in control, "Debian version differs")
         attach(image, prefix + ".AppImage", "appimage")
         attach(deb, prefix + ".deb", "debian")
@@ -232,6 +256,11 @@ def stage(repo, commit, preview, platform, output):
                 "bundledHaloContent": False, "publiclyPublished": False,
                 "workflow": {"runId": os.getenv("GITHUB_RUN_ID"),
                              "runAttempt": os.getenv("GITHUB_RUN_ATTEMPT")}}
+    if platform == "windows-x64":
+        manifest["installedExecutableSha256"] = sha(nsis_payload(app))
+    else:
+        manifest["debianExecutableSha256"] = sha(bundle_payload(app, b"DEB"))
+        manifest["appImageExecutableSha256"] = sha(bundle_payload(app, b"APP"))
     write_json(output / "candidate.json", manifest)
     return manifest
 
@@ -260,6 +289,8 @@ def verify_artifacts(directory, manifest):
                      and len(archive.infolist()) == 5 and archive.testzip() is None, "Portable contents differ")
                 app = archive.read("GuiltySpark.exe")
                 need(pe_machine(app) == 0x8664 and sha(app) == manifest["executableSha256"], "Portable app differs")
+                need(sha(nsis_payload(app)) == manifest["installedExecutableSha256"],
+                     "NSIS payload identity differs from the audited Tauri bundle rewrite")
                 build = json.loads(archive.read("BUILD_INFO.json"))
                 need(build["sourceCommit"] == manifest["sourceCommit"] and
                      build["applicationVersion"] == manifest["applicationVersion"] and
@@ -271,7 +302,13 @@ def verify_artifacts(directory, manifest):
             need(data[8:11] == b"AI\x02", "Invalid AppImage asset")
         elif item["kind"] == "debian":
             app, _ = deb_binary(file)
-            need(sha(app) == manifest["executableSha256"], "Debian executable differs")
+            need(sha(app) == manifest["debianExecutableSha256"], "Debian executable differs")
+            need(app.count(BUNDLE_MARKER + b"DEB") == 1 and app.count(BUNDLE_MARKER) == 1,
+                 "Debian bundle marker differs")
+            original = app.replace(BUNDLE_MARKER + b"DEB", BUNDLE_MARKER + b"UNK", 1)
+            need(sha(original) == manifest["executableSha256"] and
+                 sha(bundle_payload(original, b"APP")) == manifest["appImageExecutableSha256"],
+                 "Linux payload differs beyond the Tauri bundle marker")
         elif item["kind"] == "source-zip":
             with zipfile.ZipFile(io.BytesIO(data)) as archive:
                 need(archive.comment == manifest["sourceCommit"].encode() and archive.testzip() is None,
@@ -308,16 +345,22 @@ def seal(directory, gates_file, startup_file, installer_file=None, installed_sta
         install, installed = read_json(installer_file), read_json(installed_startup_file)
         setup = next(a for a in manifest["artifacts"] if a["kind"] == "nsis-installer")
         need(install["complete"] is True and install["installerSha256"] == setup["sha256"] and
-             install["installedExecutableSha256"] == manifest["executableSha256"], "Installer payload was not verified")
+             install["portableExecutableSha256"] == manifest["executableSha256"] and
+             install["installedExecutableSha256"] == manifest["installedExecutableSha256"] and
+             install["bundleMarkerRewrite"] == "UNK-to-NSS" and install["rewrittenBytes"] == 3 and
+             install["otherPayloadBytesIdentical"] is True, "Installer payload was not verified")
         need(installed["complete"] is True and installed["mockedIpc"] is False and
              installed["sourceCommit"] == manifest["sourceCommit"] and
-             installed["executableSha256"] == manifest["executableSha256"] and
+             installed["executableSha256"] == manifest["installedExecutableSha256"] and
              installed["applicationVersion"] == manifest["applicationVersion"], "Installed app did not launch")
         verification["installer"] = install
         verification["installedNativeStartup"] = installed
     else:
         need(startup.get("appImageLaunched") is True and startup.get("debianBinaryLaunched") is True,
              "Both genuine Linux packages must launch")
+        need(startup.get("appImageExecutableSha256") == manifest["appImageExecutableSha256"] and
+             startup.get("debianExecutableSha256") == manifest["debianExecutableSha256"],
+             "Linux startup payload identities differ")
     manifest["verification"] = verification
     name = f"Project_Guilty_Spark_{manifest['applicationVersion']}_{manifest['platform'].replace('-', '_')}_manifest.json"
     write_json(directory / name, manifest)
@@ -363,6 +406,9 @@ def main():
     seal_parser.add_argument("--installer")
     seal_parser.add_argument("--installed-startup")
     sub.add_parser("verify").add_argument("directory")
+    payload_parser = sub.add_parser("windows-payload")
+    payload_parser.add_argument("expected")
+    payload_parser.add_argument("installed")
     args = parser.parse_args()
     if args.command == "identity":
         result = source_info(args.repo, args.commit, args.preview)
@@ -370,6 +416,8 @@ def main():
         result = stage(args.repo, args.commit, args.preview, args.platform, args.output)
     elif args.command == "seal":
         result = seal(args.directory, args.gates, args.startup, args.installer, args.installed_startup)
+    elif args.command == "windows-payload":
+        result = windows_payload(args.expected, args.installed)
     else:
         result = verify(args.directory)
     print(json.dumps(result, indent=2))
