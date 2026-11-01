@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "scope": "Exact owned experimental projectile-wrapper baseline. Metadata hashes only; no game content is bundled. This recipe is not a complete or faithful conversion.",
+  "tools": {
+    "classic": "63181136d89194a0910a767e03c0a34a8c334b09f3146901e1be2fa70b574892",
+    "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12"
+  },
+  "files": {
+    "powerups/sniper rifle ammo/sniper rifle ammo.model_collision_geometry": "c128e2deb39ad909e991615a577a8ef8c84d60b6936b46730464e23ef47e5ab1",
+    "vehicles/rwarthog/rwarthog.gbxmodel": "d8943df9a321b1359070ee798c6c810f3e302f7bd1fe65e859d0b2db87451005",
+    "weapons/gravity rifle/gravity rifle.gbxmodel": "22038ff04d405a79283c0bdc0f7f3f79eddbe339a87eb7e5c40e9999962562e0",
+    "mgm/fonzie/sparky/tags/evolved zombie container.vehicle": "76e93dd8df794c87ddd348b4a4321b9b6d2a2a5b7926c25cb27db7ec9a30315b",
+    "mgm/fonzie/sparky/tags/zombie container.vehicle": "e2904fb8fab3ee57c1a0a4ed5f96f2ad7ff4b478f127f4c026c900363ed7c467",
+    "mgm/fonzie/sparky/tags/alpha zombie containerorig.vehicle": "819e618567122dc5205ace1936b4e0a497f8ada94369e28338579466dd3c09b9",
+    "gs_compat/zombie_spawn_0.effect": "33b3e194f0c94992c67d54677569ed076a76bd5b2fcd1ce5cd731a49ffd071a3",
+    "gs_compat/zombie_spawn_0.projectile": "be8536ff14b3210ed380184e9276603aacb83e5caf9235304b8efeb8e506a509",
+    "gs_compat/zombie_spawn_1.effect": "c03ff26572c38d874d9031624304770a849cf300bbb8b8232cc95e672281e087",
+    "gs_compat/zombie_spawn_1.projectile": "998143127570b93fa759c9c6a01cb848c1ca3ec9601eb6e42c8cb8733991ccaf",
+    "gs_compat/zombie_spawn_2.effect": "bb9dc1f943d7b7cbb0c5e06563d50345eefa6ec78daac3f1701812625d01ab1e",
+    "gs_compat/zombie_spawn_2.projectile": "efbd5fbed3fd30cede084716f9e8f8ab469eeb18aa7981fe1abe13e66bf9783f",
+    "mgm/fonzie/sparky/tags/ai respawning/evolved zombie spawnerorig.weapon": "7e4461c1f35535bba51e60fed8af18b6fac053cb03f11a818c730702d0fac528",
+    "mgm/fonzie/sparky/tags/ai respawning/zombie spawner.weapon": "591509795f7726162f935c2b74bc9cd393ac4a3b97a0dd7a5210dc829489df47",
+    "origmgm/fonzie/sparky/tags/ai respawning/alpha zombie spawner.weapon": "c755b83cd7d5aac2f72339e1f958576359d250dde570843992e74abea8f87eb2"
+  },
+  "tagCount": 3739,
+  "tagTreeSha256": "ee9e307640523674d30700e754365c903d1306bbd5116ac84eb0dd023f2764f7",
+  "toolFiles": {
+    "tool.exe": "63181136d89194a0910a767e03c0a34a8c334b09f3146901e1be2fa70b574892",
+    "msvcr71.dll": "8094af5ee310714caebccaeee7769ffb08048503ba478b879edfef5f1a24fefe",
+    "ogg.dll": "428183893fd6c2e6933d3b55fa498ee9178e5d152d93596a61e4dd1c4a6a47b9",
+    "vorbis.dll": "c1644d294d97456bf2c82a3fc573ab1dbe15d4b930e03018eec24dc764caf993",
+    "vorbisenc.dll": "3b3f1380006604e08a6cc9fb1825984c3e69dc1b6642b35e313da40d68811551",
+    "vorbisfile.dll": "831edb6f7a6fa7bba81f2783931d26cbdb79cb65ddc91dfa0a6199d079bd8e4c"
+  }
+}

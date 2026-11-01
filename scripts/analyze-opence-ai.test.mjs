@@ -86,3 +86,64 @@ test('a player unit or missing client control does not establish an AI identity'
   assert.equal(compareActorObservations(h, c).sharedActualActorIds, 0);
   assert.equal(compareActorObservations({ samples: [state] }, { samples: [] }).hostAuthorityObserved, false);
 });
+
+test('optional detailed native census validates identities, field widths and contents', () => {
+  const details = {
+    aiProfileDisabled: 0,
+    actorPool: [
+      {
+        id: actor.actorId,
+        unitId: actor.id,
+        actorTag: 3,
+        variantTag: 4,
+        active: 1,
+        frozen: 0,
+        dormant: 0,
+        eraseNextTick: 0,
+        encounterless: 1,
+        team: 2,
+        mode: 2,
+        action: 0,
+        combatStatus: 0,
+      },
+    ],
+    objects: [
+      {
+        id: actor.id,
+        type: 0,
+        tag: actor.tag,
+        parentId: none,
+        flags: 0,
+        position: [1, 2, 3],
+        velocity: [0, 0, 0],
+        health: 1,
+        shield: 0,
+        damageFlags: 0,
+        team: 2,
+        unit: {
+          actorId: actor.actorId,
+          playerId: none,
+          flags: 0,
+          seat: 65535,
+          controlFlags: 2048,
+          throttle: [0, 0, 0],
+        },
+      },
+    ],
+  };
+  const h = { ...header, detailedCensus: true },
+    s = { ...state, details };
+  assert.equal(parseActorObservation(text(h, s), record).samples[0].details.objects.length, 1);
+  assert.throws(() => parseActorObservation(text(header, s), record), /census/);
+  for (const broken of [
+    { ...details, actorPool: [] },
+    { ...details, aiProfileDisabled: 4 },
+    { ...details, objects: [details.objects[0], details.objects[0]] },
+    { ...details, objects: [{ ...details.objects[0], position: [NaN, 0, 0] }] },
+    {
+      ...details,
+      objects: [{ ...details.objects[0], unit: { ...details.objects[0].unit, controlFlags: 65536 } }],
+    },
+  ])
+    assert.throws(() => parseActorObservation(text(h, { ...state, details: broken }), record), /Invalid/);
+});

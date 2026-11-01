@@ -138,6 +138,24 @@ impl Symbols {
             json!({"name":name,"index":(*sym).Index,"typeIndex":(*sym).TypeIndex,"tag":(*sym).Tag,"layout":self.describe(if (*sym).TypeIndex!=0{(*sym).TypeIndex}else{(*sym).Index},7)})
         }
     }
+    fn resolve(&self, rva: u32) -> Value {
+        let mut storage = vec![0u64; 512];
+        let sym = storage.as_mut_ptr() as *mut SYMBOL_INFO;
+        let mut displacement = 0;
+        unsafe {
+            (*sym).SizeOfStruct = size_of::<SYMBOL_INFO>() as u32;
+            (*sym).MaxNameLen = 1023;
+            if SymFromAddr(self.h, self.base + u64::from(rva), &mut displacement, sym) == 0 {
+                return json!({"rva":rva,"error":GetLastError()});
+            }
+            assert!((*sym).NameLen <= 1023);
+            let name = String::from_utf8_lossy(std::slice::from_raw_parts(
+                (*sym).Name.as_ptr() as *const u8,
+                (*sym).NameLen as usize,
+            ));
+            json!({"rva":rva,"symbol":name,"displacement":displacement})
+        }
+    }
     fn symbol(&self, name: &str) -> Value {
         let mut storage = vec![0u64; 512];
         let sym = storage.as_mut_ptr() as *mut SYMBOL_INFO;
@@ -155,8 +173,8 @@ impl Symbols {
 pub fn run() {
     let args: Vec<_> = std::env::args().collect();
     assert!(
-        args.len() == 3 || args.len() == 5,
-        "<publisher exe> <local symbols directory> [<owned pid> <host|client>]"
+        args.len() == 3 || args.len() == 5 || (args.len() == 6 && args[5] == "--details"),
+        "<publisher exe> <local symbols directory> [<owned pid> <host|client> [--details] | --resolve-rvas <comma-separated hexadecimal RVAs>]"
     );
     verify(std::path::Path::new(&args[1]), EXE_SHA256);
     verify(&std::path::Path::new(&args[2]).join("halo.pdb"), PDB_SHA256);
@@ -188,11 +206,39 @@ pub fn run() {
         assert_ne!(SymGetModuleInfo64(h, base, &mut module), 0);
         assert_eq!(module.PdbUnmatched, 0, "Mismatched PDB");
         assert_eq!(module.SymType, SymPdb, "Missing private PDB type metadata");
-        let out = json!({"types":(["actor_datum","object_header_datum","object_datum","unit_datum","unit_control_data"].iter().map(|name|s.type_name(name)).collect::<Vec<_>>()),"module":{"base":base,"symType":module.SymType,"pdbAge":module.PdbAge,"pdbGuid":[module.PdbSig70.data1,module.PdbSig70.data2 as u32,module.PdbSig70.data3 as u32],"pdbGuidTail":module.PdbSig70.data4,"pdbUnmatched":module.PdbUnmatched},"symbols":(["actor_data","object_header_data","game_time_globals","host_actors","host_actor_count","client_actors","client_actor_count"].iter().map(|name|s.symbol(name)).collect::<Vec<_>>())});
+        if args.len() == 5 && args[3] == "--resolve-rvas" {
+            let rvas: Vec<_> = args[4]
+                .split(',')
+                .map(|rva| {
+                    assert!(
+                        rva.len() <= 8 && !rva.is_empty(),
+                        "bounded hexadecimal RVA required"
+                    );
+                    let rva = u32::from_str_radix(rva, 16).expect("hexadecimal RVA");
+                    assert!(rva < module.ImageSize, "RVA outside verified module");
+                    rva
+                })
+                .collect();
+            assert!(!rvas.is_empty() && rvas.len() <= 32, "at most 32 RVAs");
+            verify(std::path::Path::new(&args[1]), EXE_SHA256);
+            verify(&std::path::Path::new(&args[2]).join("halo.pdb"), PDB_SHA256);
+            println!(
+                "{}",
+                json!({"readOnly":true,"offline":true,"exeSha256":EXE_SHA256,"pdbSha256":PDB_SHA256,"resolved":rvas.into_iter().map(|rva|s.resolve(rva)).collect::<Vec<_>>()})
+            );
+            return;
+        }
+        let out = json!({"types":(["actor_datum","object_header_datum","object_datum","unit_datum","unit_control_data","weapon_datum"].iter().map(|name|s.type_name(name)).collect::<Vec<_>>()),"module":{"base":base,"symType":module.SymType,"pdbAge":module.PdbAge,"pdbGuid":[module.PdbSig70.data1,module.PdbSig70.data2 as u32,module.PdbSig70.data3 as u32],"pdbGuidTail":module.PdbSig70.data4,"pdbUnmatched":module.PdbUnmatched},"symbols":(["actor_data","object_header_data","game_time_globals","host_actors","host_actor_count","client_actors","client_actor_count","ai_profile"].iter().map(|name|s.symbol(name)).collect::<Vec<_>>())});
         if args.len() == 3 {
             println!("{}", serde_json::to_string_pretty(&out).unwrap());
         } else {
-            remote::observe(&out, &args[1], args[3].parse().unwrap(), &args[4]);
+            remote::observe(
+                &out,
+                &args[1],
+                args[3].parse().unwrap(),
+                &args[4],
+                args.len() == 6,
+            );
             verify(std::path::Path::new(&args[1]), EXE_SHA256);
             verify(&std::path::Path::new(&args[2]).join("halo.pdb"), PDB_SHA256);
             println!("{}", json!({"completed":true,"inputsRechecked":true}));

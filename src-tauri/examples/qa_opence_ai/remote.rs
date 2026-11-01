@@ -128,7 +128,151 @@ impl Remote {
             u32(&b, offset(t, "server_time")),
         ))
     }
-    fn snapshot(&self, meta: &Value, role: &str, census: bool) -> Result<Value, String> {
+    fn details(&self, meta: &Value, headers: &[u8], step: usize) -> Result<Value, String> {
+        let actor = typ(meta, "actor_datum");
+        let (maximum, stride, _, address) = self.pool(meta, "actor_data")?;
+        if maximum > 1024 || stride as u64 != actor["bytes"].as_u64().unwrap() {
+            return Err("actor detail pool layout differs".into());
+        }
+        let bytes = self.read(address as u64, maximum as usize * stride as usize)?;
+        let meta_type = &field(actor, "meta")["type"];
+        let state_type = &field(actor, "state")["type"];
+        // Resolve the verified PDB layout once per census, not for each object.
+        let actor_id = offset(actor, "identifier");
+        let actor_meta = offset(actor, "meta");
+        let actor_state = offset(actor, "state");
+        let [a_unit, a_tag, a_variant, a_active, a_frozen, a_dormant, a_erase, a_encounterless, a_team] =
+            [
+                "unit_index",
+                "definition_index",
+                "variant_definition_index",
+                "active",
+                "frozen",
+                "dormant",
+                "erase_next_tick",
+                "encounterless",
+                "team_index",
+            ]
+            .map(|n| offset(meta_type, n));
+        let [a_mode, a_action, a_combat] =
+            ["mode", "action", "combat_status"].map(|n| offset(state_type, n));
+        let mut pool = Vec::new();
+        for (index, entry) in bytes.chunks_exact(stride as usize).enumerate() {
+            let salt = u16(entry, actor_id);
+            if salt == 0 {
+                continue;
+            }
+            let m = &entry[actor_meta..];
+            let s = &entry[actor_state..];
+            pool.push(json!({
+                "id": ((salt as u32) << 16) | index as u32,
+                "unitId": u32(m, a_unit), "actorTag": u32(m, a_tag), "variantTag": u32(m, a_variant),
+                "active": m[a_active], "frozen": m[a_frozen], "dormant": m[a_dormant],
+                "eraseNextTick": m[a_erase], "encounterless": m[a_encounterless], "team": u16(m, a_team),
+                "mode": u16(s, a_mode), "action": u16(s, a_action), "combatStatus": u16(s, a_combat)
+            }));
+        }
+        let header = typ(meta, "object_header_datum");
+        let object_type = typ(meta, "object_datum");
+        let object = &field(object_type, "object")["type"];
+        let unit = typ(meta, "unit_datum");
+        let unit_type = &field(unit, "unit")["type"];
+        let weapon = typ(meta, "weapon_datum");
+        let weapon_type = &field(weapon, "weapon")["type"];
+        let trigger_type = definition(&field(weapon_type, "triggers")["type"]);
+        let [h_id, h_kind, h_size, h_datum] =
+            ["identifier", "type", "data_size", "datum"].map(|n| offset(header, n));
+        let object_start = offset(object_type, "object");
+        let object_tag = offset(object_type, "definition_index");
+        let [o_position, o_velocity, o_health, o_shield, o_flags, o_damage, o_team, o_parent] = [
+            "position",
+            "translational_velocity",
+            "body_vitality",
+            "shield_vitality",
+            "flags",
+            "damage_flags",
+            "owner_team_index",
+            "parent_object_index",
+        ]
+        .map(|n| offset(object, n));
+        let unit_start = offset(unit, "unit");
+        let [u_actor, u_player, u_flags, u_seat, u_control, u_throttle] = [
+            "actor_index",
+            "player_index",
+            "flags",
+            "parent_seat_index",
+            "control_flags",
+            "throttle",
+        ]
+        .map(|n| offset(unit_type, n));
+        let weapon_start = offset(weapon, "weapon");
+        let [w_fired, w_state, w_triggers] =
+            ["game_time_last_fired", "state", "triggers"].map(|n| offset(weapon_type, n));
+        let [t_state, t_flags, t_timer] =
+            ["state", "flags", "state_timer"].map(|n| offset(trigger_type, n));
+        let unit_bytes = unit["bytes"].as_u64().unwrap() as usize;
+        let weapon_bytes = weapon["bytes"].as_u64().unwrap() as usize;
+        let object_bytes = object_type["bytes"].as_u64().unwrap() as usize;
+        let mut objects = Vec::new();
+        for (index, h) in headers.chunks_exact(step).enumerate() {
+            let salt = u16(h, h_id);
+            let kind = h[h_kind];
+            let size = u16(h, h_size) as usize;
+            let required = if kind <= 1 {
+                unit_bytes
+            } else if kind == 2 {
+                weapon_bytes
+            } else {
+                object_bytes
+            };
+            if salt == 0 || kind > 5 || size < required || size > 16384 {
+                continue;
+            }
+            if objects.len() >= 4096 {
+                return Err("object detail limit exceeded".into());
+            }
+            let bytes = self.read(u32(h, h_datum) as u64, required)?;
+            let o = &bytes[object_start..];
+            let mut record = json!({
+                "id": ((salt as u32) << 16) | index as u32, "type": kind,
+                "tag": u32(&bytes, object_tag), "position": vector(o, o_position),
+                "velocity": vector(o, o_velocity), "health": f32(o, o_health), "shield": f32(o, o_shield),
+                "flags": u32(o, o_flags), "damageFlags": u16(o, o_damage),
+                "team": u16(o, o_team), "parentId": u32(o, o_parent)
+            });
+            if kind <= 1 {
+                let u = &bytes[unit_start..];
+                record["unit"] = json!({
+                    "actorId": u32(u, u_actor), "playerId": u32(u, u_player), "flags": u32(u, u_flags),
+                    "seat": u16(u, u_seat), "controlFlags": u16(u, u_control), "throttle": vector(u, u_throttle)
+                });
+            } else if kind == 2 {
+                let w = &bytes[weapon_start..];
+                let t = &w[w_triggers..];
+                record["weapon"] = json!({
+                    "lastFiredTick": u32(w, w_fired), "state": w[w_state], "triggerState": t[t_state],
+                    "triggerFlags": u32(t, t_flags), "triggerTimer": u16(t, t_timer)
+                });
+            }
+            objects.push(record);
+        }
+        let profile = definition(&symbol(meta, "ai_profile")["layout"]);
+        let profile_bytes = self.read_symbol(
+            meta,
+            "ai_profile",
+            profile["bytes"].as_u64().unwrap() as usize,
+        )?;
+        Ok(
+            json!({"actorPool": pool,"objects": objects,"aiProfileDisabled":profile_bytes[offset(profile,"disabled")]}),
+        )
+    }
+    fn snapshot(
+        &self,
+        meta: &Value,
+        role: &str,
+        census: bool,
+        details: bool,
+    ) -> Result<Value, String> {
         let tick = self.tick(meta)?;
         let (max, step, _, start) = self.pool(meta, "object_header_data")?;
         let header = typ(meta, "object_header_datum");
@@ -237,16 +381,21 @@ impl Remote {
             .into_iter()
             .map(|((kind, tag), count)| json!({"type": kind, "tag": tag, "count": count}))
             .collect();
+        let details = if census && details {
+            Some(self.details(meta, &headers, step as usize)?)
+        } else {
+            None
+        };
         let end = self.tick(meta)?;
         if end != tick {
             return Err("crossed tick while reading".into());
         }
         Ok(
-            json!({"localTick":tick.0,"serverTick":tick.1,"actorPoolCount":actor_count,"networkActorCount":count,"actors":records,"objectTags":object_tags}),
+            json!({"localTick":tick.0,"serverTick":tick.1,"actorPoolCount":actor_count,"networkActorCount":count,"actors":records,"objectTags":object_tags,"details":details}),
         )
     }
 }
-pub fn observe(meta: &Value, expected: &str, pid: u32, role: &str) {
+pub fn observe(meta: &Value, expected: &str, pid: u32, role: &str, details: bool) {
     assert!(role == "host" || role == "client");
     unsafe {
         let h = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
@@ -302,7 +451,7 @@ pub fn observe(meta: &Value, expected: &str, pid: u32, role: &str) {
                 "schemaVersion":1,"runtime":"opence-build-335",
                 "role":role,"pid":pid,"base":base,"readOnly":true,
                 "exeSha256":super::EXE_SHA256,"pdbSha256":super::PDB_SHA256,
-                "pdb":meta["module"],"atomicSnapshot":false
+                "pdb":meta["module"],"atomicSnapshot":false,"detailedCensus":details
             })
         );
         for sample in 0..760 {
@@ -310,12 +459,13 @@ pub fn observe(meta: &Value, expected: &str, pid: u32, role: &str) {
             if GetExitCodeProcess(remote.handle, &mut code) == 0 || code != STILL_ACTIVE as u32 {
                 break;
             }
-            let result = remote.snapshot(meta, role, sample % 10 == 0);
+            let read_started = Instant::now();
+            let result = remote.snapshot(meta, role, sample % 10 == 0, details);
             println!(
                 "{}",
                 match result {
                     Ok(v) =>
-                        json!({"sample":sample,"elapsedMs":begin.elapsed().as_millis(),"state":v}),
+                        json!({"sample":sample,"elapsedMs":begin.elapsed().as_millis(),"readMs":read_started.elapsed().as_secs_f64()*1000.0,"state":v}),
                     Err(e) =>
                         json!({"sample":sample,"elapsedMs":begin.elapsed().as_millis(),"error":e}),
                 }

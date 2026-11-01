@@ -1,12 +1,14 @@
 # Current Spark capabilities
 
-This is the C44 Windows engineering checkpoint, continuing the integrated C41–C43 workbench. Features below describe actual operations, with native compilation and gameplay kept separate. See [C44 measurements and native AI limits](CONTINUATION_44_ENGINEERING.md), [C43 evidence and limits](CONTINUATION_43_ENGINEERING.md), the [earlier consolidation report](FINAL_CONSOLIDATION_C41.md) and the [complete requirement ledger](MASTER_FEATURE_LEDGER.csv).
+This is the C45 source engineering checkpoint; the verified Windows desktop/installer remains C44. Features below describe actual operations, with native compilation and gameplay kept separate. See [C45 native recovery, fault reporting and measured diagnostics](CONTINUATION_45_ENGINEERING.md), [C44 measurements and native AI limits](CONTINUATION_44_ENGINEERING.md), [C43 evidence and limits](CONTINUATION_43_ENGINEERING.md), the [earlier consolidation report](FINAL_CONSOLIDATION_C41.md) and the [complete requirement ledger](MASTER_FEATURE_LEDGER.csv).
 
 C43 adds durable revisioned local-window history, explicit editing ownership and observed views, independent drawer layouts, the original BSP Atlas and a reviewed native two-region CE assembly. The combined map loads on a private CE server with a player present; its new physical two-way walkthrough remains unaccepted. Initial Atlas inventory is about 63% faster in three paired debug scans with identical metadata; repeated full-byte verification remains about 5.6 seconds. These results do not establish faster full map rendering or four-region gameplay.
 
 The earlier [measured loading pass](C41_MAP_LOADING_PERFORMANCE.md) batches fully verified reflection reads and overlaps asset-source preparation. Three native runs per build retain identical rendering content while improving repeated map switching by 8.6% and catalog preparation by 25.1%. Startup and general memory gains are not claimed. The original-loop audio and native asset/compiler checks pass again against the measured executable.
 
 C44 fixes reflection-face cache collisions and uses bounded native Base64 decoding. Two paired native runs improve map switching by about 10.6%, with original cache limits and complete resource signatures retained. Exact-build OpenCE actor observations prove a bounded host/client control path; full AI lifecycle and Zombie Apocalypse behavior remain unaccepted. [Measurements and limitations](CONTINUATION_44_ENGINEERING.md).
+
+C45 adds a developer-run, hash-bound native carrier recovery recipe and actual CE/MCC compilation. It fixes three tested carrier prerequisites without replacing original biped animation. Private OpenCE trials expose actual moving/firing AI controls; final runtime faults and extreme positions still cause strict refusal. Chupathingy joining also retains native assertions. Read-only complete-census diagnostics improve by 43.5% host/53.1% client in a paired stock-process test. This is not a new GUI feature, game protocol, accepted universal conversion or desktop load-time claim. [Exact scope](CONTINUATION_45_ENGINEERING.md).
 
 ## Maps and workflow
 

@@ -22,6 +22,7 @@ for (let at = 2; at < process.argv.length; at += 2) {
       '--mode',
       '--ce-map',
       '--ai-symbols',
+      '--ai-details',
     ].includes(process.argv[at]) ||
     !process.argv[at + 1] ||
     args.has(process.argv[at])
@@ -69,6 +70,12 @@ publisher.clients.push(
   ),
 );
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+const aiDetails = args.get('--ai-details') === 'true';
+if (
+  args.has('--ai-details') &&
+  (!args.has('--ai-symbols') || !['true', 'false'].includes(args.get('--ai-details')))
+)
+  throw Error('AI details require --ai-symbols and an explicit true/false value');
 let aiObserver;
 if (args.has('--ai-symbols')) {
   if (process.platform !== 'win32' || hostId !== 'opence-build-335' || clientId !== hostId)
@@ -303,11 +310,16 @@ async function launch(role, id) {
       sha256: aiObserver.sha256,
       pdbSha256: aiObserver.pdbSha256,
       readOnly: true,
+      detailedCensus: aiDetails,
     };
-    observer = spawn(aiObserver.executable, [executable, aiObserver.symbols, String(child.pid), role], {
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    observer = spawn(
+      aiObserver.executable,
+      [executable, aiObserver.symbols, String(child.pid), role, ...(aiDetails ? ['--details'] : [])],
+      {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
     let size = 0;
     observer.stdout.on('data', (bytes) => {
       size += bytes.length;
@@ -369,6 +381,28 @@ async function launch(role, id) {
       record.forced = forced;
       record.exitedAt = new Date().toISOString();
       await new Promise((finish) => log.end(finish));
+      try {
+        const directory = path.join(root, 'logs'),
+          file = path.join(directory, 'debug.txt');
+        const folder = await fs.lstat(directory),
+          stat = await fs.lstat(file);
+        if (
+          !folder.isDirectory() ||
+          folder.isSymbolicLink() ||
+          !stat.isFile() ||
+          stat.isSymbolicLink() ||
+          stat.size > 8 * 1024 * 1024
+        )
+          throw Error('Expected bounded native debug log');
+        const content = await fs.readFile(file),
+          after = await fs.lstat(file);
+        if (content.length !== stat.size || after.size !== stat.size || after.mtimeMs !== stat.mtimeMs)
+          throw Error('Native debug log changed during final readback');
+        record.nativeDebugLog = { path: 'logs/debug.txt', bytes: content.length, sha256: hash(content) };
+      } catch (error) {
+        record.nativeDebugLogError = String(error);
+        report.errors.push(role + ' native debug log could not be verified');
+      }
       record.inputsUnchanged = true;
       try {
         for (const file of inputs)

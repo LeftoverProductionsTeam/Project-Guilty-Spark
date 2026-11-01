@@ -1,0 +1,1070 @@
+{
+  "schemaVersion": 1,
+  "startingCommit": "c2af5ef76f816f5f62e8414331fcb6b5408845a5",
+  "scope": "Source-only native recovery and diagnostics continuation; no new desktop installer or game content is distributed.",
+  "recipe": {
+    "sourceTagCount": 3739,
+    "sourceTreeSha256": "ee9e307640523674d30700e754365c903d1306bbd5116ac84eb0dd023f2764f7",
+    "recipeSourceSha256": "f88e728610847c630adefe83396b3d26447fc9259739822fda4a85b9df8949b2",
+    "pinsSourceSha256": "f554d0108c6a884b9468f925324b7f6387d611ddc769b00384e976135d0b98b8",
+    "complete": true,
+    "originalsUnchanged": true,
+    "toolsUnchanged": true,
+    "stagedToolsUnchanged": true,
+    "changedTagCount": 9,
+    "cache": {
+      "bytes": 89421930,
+      "sha256": "bf2d2f6cf6738fec6ab722aafa95ff55a9f44810e1d2d1d1f0a95174a0ac3b81",
+      "version": 609
+    },
+    "gameplayAccepted": false,
+    "faithfulConversionAccepted": false
+  },
+  "mcc": {
+    "toolSha256": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+    "toolUnchanged": true,
+    "compilerExit": 0,
+    "cache": {
+      "bytes": 89703578,
+      "version": 13,
+      "sha256": "1ee82665e0b9c4d703d9ec49d3dd95c41ab28a9d100874ad7d3b1451d040234f"
+    },
+    "gameLoadAccepted": false
+  },
+  "nativeAi": {
+    "prototypeMapSha256": "ee8c160dd32e126c90fb49273daefa1606269796515e92f89bbe8da5c803abce",
+    "prototypeComparison": {
+      "exactTickFrames": 119,
+      "sharedActualActorIds": 44,
+      "movingActorIds": 20,
+      "firingActorIds": 1,
+      "position": {
+        "count": 1825,
+        "median": 0.035396256037911425,
+        "p95": 0.6488001893307703,
+        "maximum": 288.52683412169165
+      },
+      "health": {
+        "count": 1825,
+        "median": 0,
+        "p95": 0.000027358531951904297,
+        "maximum": 0.1720653772354126
+      },
+      "shield": {
+        "count": 1825,
+        "median": 0,
+        "p95": 0,
+        "maximum": 0
+      },
+      "throttle": {
+        "count": 1825,
+        "median": 0,
+        "p95": 0,
+        "maximum": 1
+      },
+      "receivedControlAgeTicks": {
+        "count": 1825,
+        "median": 1,
+        "p95": 3,
+        "maximum": 4
+      },
+      "parentOrSeatDifferences": 0,
+      "largePositionDifferences": {
+        "total": 57,
+        "examples": [
+          {
+            "tick": 64,
+            "id": 3815375095,
+            "tag": 3790930049,
+            "distance": 1.0905424928893146,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 64,
+            "id": 3815899391,
+            "tag": 3790930049,
+            "distance": 288.52683412169165,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 64,
+            "id": 3815833854,
+            "tag": 3790930049,
+            "distance": 2.2398900833356232,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 67,
+            "id": 3815375095,
+            "tag": 3790930049,
+            "distance": 1.0078675577976681,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 67,
+            "id": 3815833854,
+            "tag": 3790930049,
+            "distance": 2.2400437627862337,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 95,
+            "id": 3815899391,
+            "tag": 3790930049,
+            "distance": 191.94084631028485,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 98,
+            "id": 3815899391,
+            "tag": 3790930049,
+            "distance": 95.94771657349511,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 126,
+            "id": 3815899391,
+            "tag": 3790930049,
+            "distance": 95.76544073948847,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1257,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.36501454467892,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1257,
+            "id": 3846832397,
+            "tag": 3790930049,
+            "distance": 1.7825553244944028,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1257,
+            "id": 3846308101,
+            "tag": 3790930049,
+            "distance": 3.8248187508413487,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1257,
+            "id": 3846242564,
+            "tag": 3790930049,
+            "distance": 2.4324603989204174,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1282,
+            "id": 3846832397,
+            "tag": 3790930049,
+            "distance": 1.0007065879956705,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1285,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.362040076727304,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1288,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 42.72378250390043,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1304,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 42.720774406199396,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1307,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.36007848056332,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1313,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.359482890251176,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1316,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 42.71871790931879,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1319,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.35907521245466,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1335,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.357870827772995,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1341,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.357391826606754,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1344,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 42.71458607195029,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1347,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.357067588027007,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1363,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.356056868586762,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1369,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.355694477800384,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1372,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 42.7112412170233,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1375,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.355453521231333,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1385,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.355016134560096,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1388,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 42.709832131433316,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1391,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.354782252855777,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          },
+          {
+            "tick": 1397,
+            "id": 3846635786,
+            "tag": 3790930049,
+            "distance": 21.35453649783098,
+            "hostParent": 4294967295,
+            "clientParent": 4294967295,
+            "hostSeat": 65535,
+            "clientSeat": 65535
+          }
+        ]
+      },
+      "hostAuthorityObserved": true,
+      "aiActorAcceptance": false,
+      "fullLifecycleAcceptance": false,
+      "twoComputerAcceptance": false,
+      "note": "All pairs remain in the distributions. Same-tick process reads are not atomic engine packets; counters advance separately from position, damage, seat and control updates. No parity or latency threshold is approved here."
+    },
+    "finalReadRefusal": {
+      "schemaVersion": 1,
+      "analyzer": "analyze-opence-ai",
+      "analysisAccepted": false,
+      "aiActorAcceptance": false,
+      "error": "Error: Invalid native actor position at sample 549 (unit 3830317338, tag 3790930049; nonfinite or exceeds the 1000000-unit QA bound)"
+    },
+    "finalCacheAccepted": false,
+    "remainingFaults": "Empty-tag/tag-class native assertions; unstable actors leaving the world; complete damage/death/lifecycle and audiovisual acceptance absent.",
+    "newProtocolOrRemoteExecution": false
+  },
+  "chupathingy": {
+    "cache": {
+      "bytes": 89421930,
+      "sha256": "bf2d2f6cf6738fec6ab722aafa95ff55a9f44810e1d2d1d1f0a95174a0ac3b81",
+      "version": 609
+    },
+    "joinMarkers": true,
+    "packets": true,
+    "twoMachinePlayers": true,
+    "nativeStatus": "invalid-or-failed-evidence",
+    "health": [
+      {
+        "role": "host",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "nativeAssertion",
+            "source": "tag_files/tag_groups.c:3089",
+            "firstLine": 164,
+            "loggedRecords": 2,
+            "minimumOccurrences": 10
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "tag_files/tag_groups.c:3090",
+            "firstLine": 165,
+            "loggedRecords": 2,
+            "minimumOccurrences": 10
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 174,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 175,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 176,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          }
+        ]
+      },
+      {
+        "role": "client",
+        "status": "native-faults-observed",
+        "faults": [
+          {
+            "kind": "nativeAssertion",
+            "source": "tag_files/tag_groups.c:3089",
+            "firstLine": 140,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "tag_files/tag_groups.c:3090",
+            "firstLine": 141,
+            "loggedRecords": 3,
+            "minimumOccurrences": 100
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:522",
+            "firstLine": 148,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          },
+          {
+            "kind": "invalidTagReference",
+            "source": null,
+            "firstLine": 149,
+            "loggedRecords": 1,
+            "minimumOccurrences": 1
+          },
+          {
+            "kind": "nativeAssertion",
+            "source": "cache/cache_files.c:298",
+            "firstLine": 150,
+            "loggedRecords": 4,
+            "minimumOccurrences": 1000
+          }
+        ]
+      }
+    ],
+    "aiAcceptance": false
+  },
+  "performance": {
+    "method": "Preserved before/after observer binaries run concurrently against each of the same two stock b30 private game processes. Both use the same PDB and complete optional census. Statistics describe successful same-tick reads only; every refused sample remains counted.",
+    "results": [
+      {
+        "role": "host",
+        "variant": "before",
+        "gamePid": 30404,
+        "observerSha256": "90fba5e7526a722abeef386dfd526374de9bdeea75540b78ddcc31e35b5661a1",
+        "allAcceptedSnapshots": 662,
+        "readErrors": {
+          "bounded address rejected": 1,
+          "map not initialized": 2,
+          "crossed tick while reading": 80,
+          "invalid datum pool": 3
+        },
+        "completeCensus": {
+          "count": 18,
+          "median": 28.823999999999998,
+          "p95": 35.3352,
+          "max": 35.3352
+        },
+        "fieldPaths": [
+          "details.actorPool",
+          "details.actorPool[*].action",
+          "details.actorPool[*].active",
+          "details.actorPool[*].actorTag",
+          "details.actorPool[*].combatStatus",
+          "details.actorPool[*].dormant",
+          "details.actorPool[*].encounterless",
+          "details.actorPool[*].eraseNextTick",
+          "details.actorPool[*].frozen",
+          "details.actorPool[*].id",
+          "details.actorPool[*].mode",
+          "details.actorPool[*].team",
+          "details.actorPool[*].unitId",
+          "details.actorPool[*].variantTag",
+          "details.aiProfileDisabled",
+          "details.objects",
+          "details.objects[*].damageFlags",
+          "details.objects[*].flags",
+          "details.objects[*].health",
+          "details.objects[*].id",
+          "details.objects[*].parentId",
+          "details.objects[*].position",
+          "details.objects[*].shield",
+          "details.objects[*].tag",
+          "details.objects[*].team",
+          "details.objects[*].type",
+          "details.objects[*].unit",
+          "details.objects[*].unit.actorId",
+          "details.objects[*].unit.controlFlags",
+          "details.objects[*].unit.flags",
+          "details.objects[*].unit.playerId",
+          "details.objects[*].unit.seat",
+          "details.objects[*].unit.throttle",
+          "details.objects[*].velocity",
+          "details.objects[*].weapon",
+          "details.objects[*].weapon.lastFiredTick",
+          "details.objects[*].weapon.state",
+          "details.objects[*].weapon.triggerFlags",
+          "details.objects[*].weapon.triggerState",
+          "details.objects[*].weapon.triggerTimer"
+        ]
+      },
+      {
+        "role": "host",
+        "variant": "after",
+        "gamePid": 30404,
+        "observerSha256": "4667aa9df1c910b9db3165b6c14d8c83d1114a20788af71313b7dab96a848374",
+        "allAcceptedSnapshots": 699,
+        "readErrors": {
+          "map not initialized": 3,
+          "crossed tick while reading": 52,
+          "invalid datum pool": 3
+        },
+        "completeCensus": {
+          "count": 49,
+          "median": 16.2762,
+          "p95": 20.860799999999998,
+          "max": 21.4403
+        },
+        "fieldPaths": [
+          "details.actorPool",
+          "details.actorPool[*].action",
+          "details.actorPool[*].active",
+          "details.actorPool[*].actorTag",
+          "details.actorPool[*].combatStatus",
+          "details.actorPool[*].dormant",
+          "details.actorPool[*].encounterless",
+          "details.actorPool[*].eraseNextTick",
+          "details.actorPool[*].frozen",
+          "details.actorPool[*].id",
+          "details.actorPool[*].mode",
+          "details.actorPool[*].team",
+          "details.actorPool[*].unitId",
+          "details.actorPool[*].variantTag",
+          "details.aiProfileDisabled",
+          "details.objects",
+          "details.objects[*].damageFlags",
+          "details.objects[*].flags",
+          "details.objects[*].health",
+          "details.objects[*].id",
+          "details.objects[*].parentId",
+          "details.objects[*].position",
+          "details.objects[*].shield",
+          "details.objects[*].tag",
+          "details.objects[*].team",
+          "details.objects[*].type",
+          "details.objects[*].unit",
+          "details.objects[*].unit.actorId",
+          "details.objects[*].unit.controlFlags",
+          "details.objects[*].unit.flags",
+          "details.objects[*].unit.playerId",
+          "details.objects[*].unit.seat",
+          "details.objects[*].unit.throttle",
+          "details.objects[*].velocity",
+          "details.objects[*].weapon",
+          "details.objects[*].weapon.lastFiredTick",
+          "details.objects[*].weapon.state",
+          "details.objects[*].weapon.triggerFlags",
+          "details.objects[*].weapon.triggerState",
+          "details.objects[*].weapon.triggerTimer"
+        ]
+      },
+      {
+        "role": "client",
+        "variant": "before",
+        "gamePid": 5732,
+        "observerSha256": "90fba5e7526a722abeef386dfd526374de9bdeea75540b78ddcc31e35b5661a1",
+        "allAcceptedSnapshots": 489,
+        "readErrors": {
+          "map not initialized": 2,
+          "crossed tick while reading": 65,
+          "invalid datum pool": 3
+        },
+        "completeCensus": {
+          "count": 13,
+          "median": 27.2512,
+          "p95": 34.3452,
+          "max": 34.3452
+        },
+        "fieldPaths": [
+          "details.actorPool",
+          "details.aiProfileDisabled",
+          "details.objects",
+          "details.objects[*].damageFlags",
+          "details.objects[*].flags",
+          "details.objects[*].health",
+          "details.objects[*].id",
+          "details.objects[*].parentId",
+          "details.objects[*].position",
+          "details.objects[*].shield",
+          "details.objects[*].tag",
+          "details.objects[*].team",
+          "details.objects[*].type",
+          "details.objects[*].unit",
+          "details.objects[*].unit.actorId",
+          "details.objects[*].unit.controlFlags",
+          "details.objects[*].unit.flags",
+          "details.objects[*].unit.playerId",
+          "details.objects[*].unit.seat",
+          "details.objects[*].unit.throttle",
+          "details.objects[*].velocity",
+          "details.objects[*].weapon",
+          "details.objects[*].weapon.lastFiredTick",
+          "details.objects[*].weapon.state",
+          "details.objects[*].weapon.triggerFlags",
+          "details.objects[*].weapon.triggerState",
+          "details.objects[*].weapon.triggerTimer"
+        ]
+      },
+      {
+        "role": "client",
+        "variant": "after",
+        "gamePid": 5732,
+        "observerSha256": "4667aa9df1c910b9db3165b6c14d8c83d1114a20788af71313b7dab96a848374",
+        "allAcceptedSnapshots": 515,
+        "readErrors": {
+          "bounded address rejected": 1,
+          "map not initialized": 1,
+          "crossed tick while reading": 47,
+          "invalid datum pool": 3
+        },
+        "completeCensus": {
+          "count": 32,
+          "median": 12.789,
+          "p95": 19.0775,
+          "max": 19.1678
+        },
+        "fieldPaths": [
+          "details.actorPool",
+          "details.aiProfileDisabled",
+          "details.objects",
+          "details.objects[*].damageFlags",
+          "details.objects[*].flags",
+          "details.objects[*].health",
+          "details.objects[*].id",
+          "details.objects[*].parentId",
+          "details.objects[*].position",
+          "details.objects[*].shield",
+          "details.objects[*].tag",
+          "details.objects[*].team",
+          "details.objects[*].type",
+          "details.objects[*].unit",
+          "details.objects[*].unit.actorId",
+          "details.objects[*].unit.controlFlags",
+          "details.objects[*].unit.flags",
+          "details.objects[*].unit.playerId",
+          "details.objects[*].unit.seat",
+          "details.objects[*].unit.throttle",
+          "details.objects[*].velocity",
+          "details.objects[*].weapon",
+          "details.objects[*].weapon.lastFiredTick",
+          "details.objects[*].weapon.state",
+          "details.objects[*].weapon.triggerFlags",
+          "details.objects[*].weapon.triggerState",
+          "details.objects[*].weapon.triggerTimer"
+        ]
+      }
+    ],
+    "mainAppSpeedClaim": false,
+    "stockNativeFaults": [
+      {
+        "role": "host",
+        "status": "no-classified-native-faults"
+      },
+      {
+        "role": "client",
+        "status": "no-classified-native-faults"
+      }
+    ]
+  },
+  "semanticRepeat": {
+    "sameNativeTagChanges": false,
+    "sameBytes": false,
+    "differingBytes": 610,
+    "exampleOffsets": [
+      100,
+      101,
+      102,
+      103,
+      82734030,
+      82734031,
+      82734032,
+      82734033,
+      83353199,
+      83353331,
+      83353463,
+      83353595,
+      83353727,
+      83353859,
+      83353991,
+      83354123,
+      83359903,
+      83366735,
+      83376903,
+      83385415
+    ],
+    "before": {
+      "bytes": 89421930,
+      "sha256": "ee8c160dd32e126c90fb49273daefa1606269796515e92f89bbe8da5c803abce",
+      "version": 609
+    },
+    "after": {
+      "bytes": 89421930,
+      "sha256": "bf2d2f6cf6738fec6ab722aafa95ff55a9f44810e1d2d1d1f0a95174a0ac3b81",
+      "version": 609
+    },
+    "strictNativeMatchedTags": 12,
+    "strictNativeComparedTags": 12,
+    "relaxedFloatPrecision": false,
+    "semanticChangedValueControl": "Invader detects maximum_body_vitality 0.0001 versus 0.5 as mismatched.",
+    "opaqueByteIdentityClaim": false
+  },
+  "tests": {
+    "rustPassed": 616,
+    "rustIgnored": 7,
+    "frontendPassed": 284,
+    "browserPassed": 136,
+    "offlineScriptsPassed": 59,
+    "nativeDiagnosticsAndSourceTestsPassed": 14,
+    "nativeWindowCasesPassed": 7,
+    "nativeWindowBinary": "unchanged verified C44 executable ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22"
+  },
+  "remotePublished": false,
+  "fullAiAcceptance": false,
+  "universalConversionAccepted": false,
+  "directCompiledMapStructuralEditingComplete": false,
+  "finalCacheReadback": {
+    "ce": {
+      "sha256": "bf2d2f6cf6738fec6ab722aafa95ff55a9f44810e1d2d1d1f0a95174a0ac3b81",
+      "version": 609,
+      "tagClasses": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actr": 4,
+        "actv": 5,
+        "ant!": 1,
+        "antr": 20,
+        "bipd": 6,
+        "bitm": 404,
+        "coll": 41,
+        "colo": 4,
+        "cont": 2,
+        "deca": 25,
+        "devc": 23,
+        "effe": 177,
+        "eqip": 7,
+        "flag": 1,
+        "font": 4,
+        "foot": 7,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 10,
+        "jpt!": 44,
+        "lens": 7,
+        "ligh": 17,
+        "lsnd": 9,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 2,
+        "mod2": 66,
+        "part": 80,
+        "pctl": 5,
+        "phys": 2,
+        "pphy": 37,
+        "proj": 10,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 35,
+        "scex": 5,
+        "schi": 42,
+        "scnr": 1,
+        "senv": 18,
+        "sgla": 4,
+        "sky ": 1,
+        "smet": 2,
+        "snd!": 467,
+        "snde": 1,
+        "soso": 101,
+        "spla": 1,
+        "ssce": 1,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 4,
+        "udlg": 3,
+        "ustr": 52,
+        "vehi": 4,
+        "weap": 11,
+        "wind": 1,
+        "wphi": 4
+      },
+      "bspTriangles": 5503,
+      "collisionTriangles": 5940,
+      "modelTypes": 72,
+      "decals": 8,
+      "mechanics": 14,
+      "carrierDependencyClasses": [
+        {
+          "path": "mgm\\fonzie\\sparky\\tags\\evolved zombie container",
+          "classes": [
+            "actv",
+            "actv",
+            "actv",
+            "actv",
+            "mod2",
+            "antr",
+            "coll",
+            "phys",
+            "effe",
+            "effe",
+            "effe",
+            "effe",
+            "lsnd"
+          ]
+        },
+        {
+          "path": "mgm\\fonzie\\sparky\\tags\\zombie container",
+          "classes": [
+            "actv",
+            "actv",
+            "actv",
+            "mod2",
+            "antr",
+            "coll",
+            "phys",
+            "effe",
+            "effe"
+          ]
+        },
+        {
+          "path": "mgm\\fonzie\\sparky\\tags\\alpha zombie containerorig",
+          "classes": [
+            "actv",
+            "mod2",
+            "antr",
+            "coll",
+            "phys",
+            "effe",
+            "effe",
+            "effe",
+            "effe",
+            "lsnd"
+          ]
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "UNSUPPORTED_FIELDS",
+          "message": "1 tags have structures outside the audited schema or unresolved pointers; those tags are inspection-only.",
+          "severity": "warning"
+        },
+        {
+          "code": "LEGACY_PLACEMENT_CLASS",
+          "message": "Scenery placement 95 references bipd tag 'mgm\\fonzie\\sparky\\tags\\characters\\hiding marine'. This legacy cross-class placement may be rejected by the target compiler.",
+          "severity": "warning"
+        },
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ]
+    },
+    "mcc": {
+      "sha256": "1ee82665e0b9c4d703d9ec49d3dd95c41ab28a9d100874ad7d3b1451d040234f",
+      "version": 13,
+      "tagClasses": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actr": 4,
+        "actv": 5,
+        "ant!": 1,
+        "antr": 20,
+        "bipd": 6,
+        "bitm": 404,
+        "coll": 41,
+        "colo": 4,
+        "cont": 2,
+        "deca": 25,
+        "devc": 23,
+        "effe": 177,
+        "eqip": 7,
+        "flag": 1,
+        "font": 4,
+        "foot": 7,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 10,
+        "jpt!": 44,
+        "lens": 7,
+        "ligh": 17,
+        "lsnd": 9,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 2,
+        "mod2": 66,
+        "part": 80,
+        "pctl": 5,
+        "phys": 2,
+        "pphy": 37,
+        "proj": 10,
+        "rain": 1,
+        "sbsp": 1,
+        "scen": 35,
+        "scex": 5,
+        "schi": 42,
+        "scnr": 1,
+        "senv": 18,
+        "sgla": 4,
+        "sky ": 1,
+        "smet": 2,
+        "snd!": 467,
+        "snde": 1,
+        "soso": 101,
+        "spla": 1,
+        "ssce": 1,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 4,
+        "udlg": 3,
+        "ustr": 52,
+        "vehi": 4,
+        "weap": 11,
+        "wind": 1,
+        "wphi": 4
+      },
+      "bspTriangles": 5503,
+      "collisionTriangles": 5940,
+      "modelTypes": 72,
+      "decals": 8,
+      "mechanics": 14,
+      "carrierDependencyClasses": [
+        {
+          "path": "mgm\\fonzie\\sparky\\tags\\evolved zombie container",
+          "classes": [
+            "actv",
+            "actv",
+            "actv",
+            "actv",
+            "mod2",
+            "antr",
+            "coll",
+            "phys",
+            "effe",
+            "effe",
+            "effe",
+            "effe",
+            "lsnd"
+          ]
+        },
+        {
+          "path": "mgm\\fonzie\\sparky\\tags\\zombie container",
+          "classes": [
+            "actv",
+            "actv",
+            "actv",
+            "mod2",
+            "antr",
+            "coll",
+            "phys",
+            "effe",
+            "effe"
+          ]
+        },
+        {
+          "path": "mgm\\fonzie\\sparky\\tags\\alpha zombie containerorig",
+          "classes": [
+            "actv",
+            "mod2",
+            "antr",
+            "coll",
+            "phys",
+            "effe",
+            "effe",
+            "effe",
+            "effe",
+            "lsnd"
+          ]
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "UNSUPPORTED_FIELDS",
+          "message": "1 tags have structures outside the audited schema or unresolved pointers; those tags are inspection-only.",
+          "severity": "warning"
+        },
+        {
+          "code": "LEGACY_PLACEMENT_CLASS",
+          "message": "Scenery placement 95 references bipd tag 'mgm\\fonzie\\sparky\\tags\\characters\\hiding marine'. This legacy cross-class placement may be rejected by the target compiler.",
+          "severity": "warning"
+        },
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ]
+    }
+  }
+}

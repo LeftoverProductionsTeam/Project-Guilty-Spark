@@ -2,7 +2,7 @@
 
 A Halo 1 creation and preservation workbench with a visual level editor, native tag tools, verified builds, machinima and private collaborative editing.
 
-**0.4.0 · C44 engineering checkpoint.** Windows is the verified native platform. C44 improves measured map switching by about 10.6% with complete rendering-resource signatures preserved, fixes reflection-face caching and adds exact-build read-only OpenCE AI diagnostics. Zombie Apocalypse's native AI recovery remains open. [Current measurements, evidence and limits](docs/CONTINUATION_44_ENGINEERING.md). C43's durable windows, BSP Atlas and two-region CE world remain intact; its new physical walkthrough is still pending.
+**0.4.0 · C45 source engineering checkpoint.** The verified Windows desktop/installer remains C44. C45 adds an exact-input native zombie-carrier recovery recipe, actual CE/MCC compilation, stricter native-fault reports and faster read-only diagnostics. Real AI actors now appear in experimental private trials, but native tag faults and out-of-world physics still block conversion/AI acceptance. [C45 evidence and limits](docs/CONTINUATION_45_ENGINEERING.md). C44's measured rendering improvements and C43's windows/BSP work remain intact; the new connected-world physical walkthrough is still pending.
 
 [Get started](docs/GETTING_STARTED.md) · [Current capabilities](docs/CURRENT_FEATURES.md) · [Build on Windows](docs/BUILD_WINDOWS.md) · [Full backlog](docs/MASTER_FEATURE_LEDGER.md) · [Community credits](COMMUNITY_CREDITS.md)
 
@@ -43,9 +43,9 @@ For MCC tools: Steam → Library → include Tools → **Halo: CE Mod Tools - MC
 - Arbitrary live spawning, live BSP replacement, game-peer editor/AI replication and an MCC-to-community lobby protocol bridge.
 - Complete engine rendering/audio parity, compressed animation coverage, lighting/fog baking and general source reconstruction. [Original-loop sound emitters](docs/NATIVE_LOOPING_EMITTERS.md) now have bounded MCC QuickForge compilation and exact native sample acceptance; custom audio/event baking and in-game listening remain open.
 - Fully accepted dual-wield firing, player energy-sword lunge, third-person aim correction, expanded campaign/Firefight/player counts and new live-session gameplay acceptance.
-- Cross-runtime Zombie Apocalypse gameplay acceptance. The latest private CE conversion loads and joins, but the owner reports no zombies. AI recovery, missing original cues and other runtime gates remain open. [Latest recovery evidence](docs/C41_LEARNING_AND_WINDOWS.md#runtime-connections-and-retained-gameplay-research).
+- Cross-runtime Zombie Apocalypse gameplay acceptance. C45 compiles native CE/MCC candidates and observes real moving AI in private OpenCE trials, but remaining native tag faults, unstable physics and unavailable original cues keep full acceptance open. [Latest native recovery evidence](docs/CONTINUATION_45_ENGINEERING.md).
 
-All **398 requirement/evidence rows** remain in the [cumulative ledger](docs/MASTER_FEATURE_LEDGER.csv). Historical C35–C39 source, failed experiments and later research remain preserved. [Engineering backlog](docs/UNIVERSAL_WORKBENCH_BACKLOG.md) · [Exact compatibility matrix](docs/COMPATIBILITY_MATRIX.md).
+All **413 requirement/evidence rows** remain in the [cumulative ledger](docs/MASTER_FEATURE_LEDGER.csv). Historical C35–C39 source, failed experiments and later research remain preserved. [Engineering backlog](docs/UNIVERSAL_WORKBENCH_BACKLOG.md) · [Exact compatibility matrix](docs/COMPATIBILITY_MATRIX.md).
 
 ## Build and verify
 

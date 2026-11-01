@@ -14,6 +14,7 @@ const digest = (b) => createHash('sha256').update(b).digest('hex');
 const uint = (v, max = NONE) => Number.isSafeInteger(v) && v >= 0 && v <= max;
 const finite = (v) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 1e6;
 const vector = (v) => Array.isArray(v) && v.length === 3 && v.every(finite);
+const bit = (v) => v === 0 || v === 1;
 const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
 function boundedFile(file, limit) {
   const stat = fs.lstatSync(file);
@@ -45,6 +46,7 @@ export function parseActorObservation(text, record) {
     header.pdb?.symType !== 3 ||
     header.pdb?.pdbUnmatched !== 0 ||
     header.pdb?.pdbAge !== 1 ||
+    (header.detailedCensus !== undefined && typeof header.detailedCensus !== 'boolean') ||
     footer?.completed !== true ||
     footer.inputsRechecked !== true
   )
@@ -75,13 +77,80 @@ export function parseActorObservation(text, record) {
       s.actors.length > 1056
     )
       throw Error('Invalid actor snapshot bounds');
+    if (row.readMs !== undefined && (!finite(row.readMs) || row.readMs < 0 || row.readMs > 60000))
+      throw Error('Invalid native read duration');
+    if (s.details !== undefined && s.details !== null) {
+      const d = s.details;
+      if (
+        header.detailedCensus !== true ||
+        !bit(d.aiProfileDisabled) ||
+        !Array.isArray(d.actorPool) ||
+        d.actorPool.length !== s.actorPoolCount ||
+        d.actorPool.length > 1024 ||
+        !Array.isArray(d.objects) ||
+        d.objects.length > 4096
+      )
+        throw Error('Invalid detailed census bounds');
+      const actorIds = new Set(),
+        objectIds = new Set();
+      for (const a of d.actorPool) {
+        if (
+          ![a.id, a.unitId, a.actorTag, a.variantTag].every((v) => uint(v)) ||
+          actorIds.has(a.id) ||
+          ![a.active, a.frozen, a.dormant, a.eraseNextTick, a.encounterless].every(bit) ||
+          ![a.team, a.mode, a.action, a.combatStatus].every((v) => uint(v, 65535))
+        )
+          throw Error('Invalid detailed native actor');
+        actorIds.add(a.id);
+      }
+      for (const o of d.objects) {
+        if (
+          ![o.id, o.tag, o.parentId, o.flags].every((v) => uint(v)) ||
+          objectIds.has(o.id) ||
+          !uint(o.type, 5) ||
+          !vector(o.position) ||
+          !vector(o.velocity) ||
+          !finite(o.health) ||
+          !finite(o.shield) ||
+          !uint(o.damageFlags, 65535) ||
+          !uint(o.team, 65535)
+        )
+          throw Error('Invalid detailed native object');
+        objectIds.add(o.id);
+        if (o.type <= 1) {
+          const u = o.unit;
+          if (
+            !u ||
+            ![u.actorId, u.playerId, u.flags].every((v) => uint(v)) ||
+            !uint(u.seat, 65535) ||
+            !uint(u.controlFlags, 65535) ||
+            !vector(u.throttle)
+          )
+            throw Error('Invalid detailed native unit');
+        } else if (o.type === 2) {
+          const w = o.weapon;
+          if (
+            !w ||
+            ![w.lastFiredTick, w.triggerFlags].every((v) => uint(v)) ||
+            !uint(w.state, 255) ||
+            !uint(w.triggerState, 255) ||
+            !uint(w.triggerTimer, 65535)
+          )
+            throw Error('Invalid detailed native weapon');
+        }
+      }
+    }
     const ids = new Set();
     for (const a of s.actors) {
+      if (![a.id, a.tag, a.actorId, a.playerId, a.parentId].every((v) => uint(v)) || ids.has(a.id))
+        throw Error('Invalid or duplicate actor identity');
+      if (!vector(a.position))
+        throw Error(
+          `Invalid native actor position at sample ${row.sample} (unit ${a.id}, tag ${a.tag}; nonfinite or exceeds the 1000000-unit QA bound)`,
+        );
+      if (!vector(a.throttle))
+        throw Error(`Invalid native actor throttle at sample ${row.sample} (unit ${a.id}, tag ${a.tag})`);
       if (
-        ![a.id, a.tag, a.actorId, a.playerId, a.parentId].every((v) => uint(v)) ||
-        ids.has(a.id) ||
-        !vector(a.position) ||
-        !vector(a.throttle) ||
         !finite(a.health) ||
         !finite(a.shield) ||
         !(a.trigger === null || (finite(a.trigger) && a.trigger >= 0 && a.trigger <= 1)) ||
@@ -98,7 +167,7 @@ export function parseActorObservation(text, record) {
         throw Error('Invalid or duplicate actor state');
       ids.add(a.id);
     }
-    samples.push({ ...s, sample: row.sample, elapsedMs: row.elapsedMs });
+    samples.push({ ...s, sample: row.sample, elapsedMs: row.elapsedMs, readMs: row.readMs });
   }
   return { header, samples, errors };
 }
@@ -230,6 +299,26 @@ export function analyzeActors(directory) {
       readErrors: observed.errors,
       maximumActorPool: Math.max(0, ...observed.samples.map((s) => s.actorPoolCount)),
       maximumNetworkActors: Math.max(0, ...observed.samples.map((s) => s.networkActorCount)),
+      readTimingMs: distribution(observed.samples.flatMap((s) => (s.readMs === undefined ? [] : [s.readMs]))),
+      detailedCensus: (() => {
+        const rows = observed.samples.filter((s) => s.details);
+        const counts = (s) => ({
+          tick: s.serverTick,
+          actors: s.details.actorPool.length,
+          activeActors: s.details.actorPool.filter((a) => a.active).length,
+          bipeds: s.details.objects.filter((o) => o.type === 0).length,
+          vehicles: s.details.objects.filter((o) => o.type === 1).length,
+        });
+        return {
+          frames: rows.length,
+          readTimingMs: distribution(rows.map((s) => s.readMs).filter((v) => v !== undefined)),
+          last: rows.length ? counts(rows.at(-1)) : null,
+          peakActiveActors: Math.max(
+            0,
+            ...rows.map((s) => s.details.actorPool.filter((a) => a.active).length),
+          ),
+        };
+      })(),
     });
   }
   if (
@@ -242,6 +331,8 @@ export function analyzeActors(directory) {
   return {
     schemaVersion: 1,
     analyzer: 'analyze-opence-ai',
+    analyzerSourceSha256: digest(fs.readFileSync(fileURLToPath(import.meta.url))),
+    nativeAnalyzerProvenance: native.provenance,
     executionSha256: digest(receiptBytes),
     runtime: 'opence-build-335',
     mode: receipt.mode,
@@ -253,6 +344,8 @@ export function analyzeActors(directory) {
       comparison.movingActorIds > 0 &&
       native.verdict.joinMarkersObserved &&
       native.verdict.bidirectionalPacketCountersObserved,
+    nativeHealth: native.nativeHealth,
+    nativeFaultsObserved: native.nativeHealth.some((h) => h.status === 'native-faults-observed'),
     aiActorAcceptance: false,
     limitations: [
       'One physical computer, scripted player input, null rendering and dummy audio.',
@@ -267,8 +360,26 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       throw Error('Usage: node scripts/analyze-opence-ai.mjs --run <private-native-pair>');
     const r = analyzeActors(process.argv[3]);
     process.stdout.write(JSON.stringify(r, null, 2) + '\n');
-    if (!r.actorControlsObserved) process.exitCode = 2;
+    if (
+      !r.actorControlsObserved ||
+      r.nativeFaultsObserved ||
+      r.nativeJoin.status === 'invalid-or-failed-evidence'
+    )
+      process.exitCode = 2;
   } catch (e) {
+    process.stdout.write(
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          analyzer: 'analyze-opence-ai',
+          analysisAccepted: false,
+          aiActorAcceptance: false,
+          error: String(e).slice(0, 500),
+        },
+        null,
+        2,
+      ) + '\n',
+    );
     process.stderr.write(String(e) + '\n');
     process.exitCode = 1;
   }

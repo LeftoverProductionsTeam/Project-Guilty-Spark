@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { parseRuntimeHealth } from './native-runtime-health.mjs';
 
 const LIMITS = Object.freeze({
   logBytes: 8 * 1024 * 1024,
@@ -47,7 +48,14 @@ const detail = (values) => ({
   examples: values.slice(0, LIMITS.details),
 });
 
-function readBounded(root, relative, maxBytes) {
+function readBounded(root, relative, maxBytes, encoding = 'utf-8') {
+  let parent = root;
+  for (const segment of relative.split('/').slice(0, -1)) {
+    parent = path.join(parent, segment);
+    const stat = fs.lstatSync(parent);
+    if (!stat.isDirectory() || stat.isSymbolicLink())
+      throw Error('Native log parent must be an owned directory');
+  }
   const file = path.join(root, ...relative.split('/'));
   const stat = fs.lstatSync(file);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > maxBytes)
@@ -59,7 +67,7 @@ function readBounded(root, relative, maxBytes) {
   return {
     bytes: bytes.length,
     sha256: sha256(bytes),
-    text: new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, ''),
+    text: new TextDecoder(encoding, { fatal: true }).decode(bytes).replace(/^\uFEFF/, ''),
   };
 }
 
@@ -534,6 +542,33 @@ export function analyzeRun(directory) {
   );
   const [host, client] = roles,
     records = entries.map(executionRecord);
+  const nativeHealth = entries.map((entry) => {
+    const relative = entry.role + '/logs/debug.txt';
+    if (!fs.existsSync(path.join(root, relative))) {
+      if (entry.nativeDebugLog) throw Error('Recorded native debug log is missing');
+      return { role: entry.role, checked: false, status: 'unavailable', contentAcceptance: false };
+    }
+    // The legacy native error writer emits ANSI bytes, including historical
+    // tag names that are not UTF-8. Hash the exact bytes; JSON stays strict UTF-8.
+    const input = readBounded(root, relative, LIMITS.logBytes, 'windows-1252'),
+      recorded = entry.nativeDebugLog;
+    if (
+      recorded &&
+      (recorded.path !== 'logs/debug.txt' ||
+        recorded.bytes !== input.bytes ||
+        recorded.sha256 !== input.sha256)
+    )
+      throw Error('Native debug log differs from the execution receipt');
+    return {
+      role: entry.role,
+      path: relative,
+      bytes: input.bytes,
+      sha256: input.sha256,
+      textEncoding: 'windows-1252',
+      boundAtExecution: Boolean(recorded),
+      ...parseRuntimeHealth(input.text),
+    };
+  });
   const exact = compare(matchSamples(host.samples, client.samples, 0), 0);
   const phase = compare(matchSamples(host.samples, client.samples, LIMITS.phaseTicks), LIMITS.phaseTicks);
   const selected = phase.samplePairs > exact.samplePairs ? phase : exact;
@@ -541,6 +576,15 @@ export function analyzeRun(directory) {
   if (receipt.private !== true || receipt.publicListing !== false || receipt.routerFirewallChanges !== false)
     issues.push({ kind: 'privateRunScopeUnestablished' });
   if (receipt.errors?.length) issues.push({ kind: 'runnerReportedErrors', count: receipt.errors.length });
+  for (const health of nativeHealth) {
+    if (health.status === 'native-faults-observed')
+      issues.push({
+        role: health.role,
+        kind: 'nativeRuntimeFaults',
+        faultGroups: health.faults.length,
+        unclassifiedErrorRecords: health.unclassifiedErrorRecords,
+      });
+  }
   for (const record of records) {
     if (record.exitCode !== 0 || record.signal || record.forced !== false)
       issues.push({ role: record.role, kind: 'abnormalOrUnestablishedExit' });
@@ -597,6 +641,9 @@ export function analyzeRun(directory) {
     },
     provenance: {
       analyzerSourceSha256: sha256(fs.readFileSync(fileURLToPath(import.meta.url))),
+      nativeHealthParserSha256: sha256(
+        fs.readFileSync(new URL('./native-runtime-health.mjs', import.meta.url)),
+      ),
       execution: { path: 'execution.json', bytes: receiptInput.bytes, sha256: receiptInput.sha256 },
       records,
       logs: roles.map((r) => ({
@@ -625,6 +672,8 @@ export function analyzeRun(directory) {
       aiActorAcceptance: false,
       twoComputerAcceptance: false,
       renderingOrAudioAcceptance: false,
+      nativeDebugLogsChecked: nativeHealth.every((h) => h.checked),
+      nativeContentAcceptance: false,
       universalCrossRuntimeCompatibility: false,
       listingGateChangeAuthorized: false,
     },
@@ -672,6 +721,7 @@ export function analyzeRun(directory) {
       note: 'Continued ticks and app exit receipts are separate from a graceful in-game leave, reusable lobby, active match or reconnect acceptance. A retained dead entry without an increased death count is not an additional combat death.',
     },
     refusals: detail(refusal),
+    nativeHealth,
     errors: detail(errors),
     issues: detail(issues),
     limitations: [
