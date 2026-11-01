@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { decodeReflectionCube, decodeReflectionCubeBatch } from './ownedReflectionCube';
 import type { OwnedCubeResponse } from './ownedReflectionCube';
 const source = 'a'.repeat(64);
@@ -32,6 +32,32 @@ function cube(): OwnedCubeResponse {
     })),
   };
 }
+it('keeps all six distinct face payloads warm without aliasing pixels or bypassing provenance', () => {
+  const value = cube();
+  value.bitmapTagId = 49;
+  value.faces = value.faces.map((face, index) => {
+    const bytes = Buffer.from(face.ddsBase64, 'base64');
+    bytes.writeUInt16LE((index + 1) * 0x1010, 128);
+    return { ...face, bitmapTagId: 49, ddsBase64: bytes.toString('base64') };
+  });
+  vi.stubGlobal('__GS_PROFILE__', true);
+  try {
+    const original = decodeReflectionCube(value, source, 49, {});
+    const before = (globalThis as any).__GS_PROFILE_GAUGES__['bitmap-decode'];
+    expect(new Set(original.faces.map((f) => [...f.pixels].join(','))).size).toBe(6);
+    original.faces[0].pixels.fill(255);
+    const repeat = decodeReflectionCube(value, source, 49, {});
+    const after = (globalThis as any).__GS_PROFILE_GAUGES__['bitmap-decode'];
+    expect(after.hits - before.hits).toBe(6);
+    expect(after.misses - before.misses).toBe(0);
+    expect(repeat.faces[0].pixels).not.toEqual(original.faces[0].pixels);
+    const invalid = { ...value, faces: value.faces.map((f) => ({ ...f, sourceSha256: 'c'.repeat(64) })) };
+    expect(() => decodeReflectionCube(invalid, source, 49, {})).toThrow(/Source map changed/);
+  } finally {
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(globalThis, '__GS_PROFILE_GAUGES__');
+  }
+});
 it('decodes six exact source faces without a different image or resource identity', () => {
   const value = cube();
   const decoded = decodeReflectionCube(value, source, 7, {});

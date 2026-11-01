@@ -1,5 +1,7 @@
 # Universal workbench continuation
 
+C44 adds measured bounded image-decoding/reflection-cache improvements and read-only exact-build OpenCE actor diagnostics. Stock native actor controls are observed across two processes; the Zombie Apocalypse spawner/authority case remains unaccepted. The direct compiled-map structural editing workflow remains open and is not completed by source-tag tests. [Current evidence and next gates](CONTINUATION_44_ENGINEERING.md).
+
 C42 adds direct tool downloads/selected-app launching, independent Halo preview defaults, a bounded shared external-tool handoff, native-equivalent serialization review, cross-map focused-save correction and working-directory-independent runtime discovery. Three independent processes and actual native compilation are verified on one computer; universal tools, direct-map writers, multi-computer LAN/VPN and game-peer replication remain open. See [C42 evidence and limits](C42_SHARED_EXTERNAL_EDITING.md).
 
 The [startup follow-through](C41_STARTUP_FOLLOW_THROUGH.md) overlaps native source/texture preparation and first-reflection reads, with measured cold/warm showcase improvements and complete source/render quality checks. Catalog preparation, memory/CPU reduction, gameplay acceptance and all larger native/direct-map goals remain open; existing native/audio/source safeguards are preserved.

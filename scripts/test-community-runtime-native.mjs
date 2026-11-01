@@ -12,9 +12,17 @@ import { spawn } from 'node:child_process';
 const args = new Map();
 for (let at = 2; at < process.argv.length; at += 2) {
   if (
-    !['--host-id', '--host-dir', '--client-id', '--client-dir', '--maps', '--output', '--mode', '--ce-map'].includes(
-      process.argv[at],
-    ) ||
+    ![
+      '--host-id',
+      '--host-dir',
+      '--client-id',
+      '--client-dir',
+      '--maps',
+      '--output',
+      '--mode',
+      '--ce-map',
+      '--ai-symbols',
+    ].includes(process.argv[at]) ||
     !process.argv[at + 1] ||
     args.has(process.argv[at])
   )
@@ -27,7 +35,7 @@ if (
   )
 )
   throw Error(
-    'Required: --host-id pinned-id --host-dir official-release-folder --client-id pinned-id --client-dir official-release-folder --maps owned-Xbox-maps-folder --output fresh-directory [--mode bloodgulch:slayer|a30:coop]',
+    'Required: --host-id pinned-id --host-dir official-release-folder --client-id pinned-id --client-dir official-release-folder --maps owned-Xbox-maps-folder --output fresh-directory [--mode bloodgulch:slayer|a30:coop|b30:coop|ce:slayer] [--ai-symbols verified-PDB-directory]',
   );
 const hostId = args.get('--host-id'),
   clientId = args.get('--client-id'),
@@ -36,7 +44,7 @@ const allowed = ['opence-build-329', 'chupathingy-v0.8.1c', 'opence-build-335', 
 const isOpenCe = (id) => id.startsWith('opence-build-');
 if (
   ![hostId, clientId].every((id) => allowed.includes(id)) ||
-  !['bloodgulch:slayer', 'a30:coop', 'ce:slayer'].includes(mode)
+  !['bloodgulch:slayer', 'a30:coop', 'b30:coop', 'ce:slayer'].includes(mode)
 )
   throw Error('Use the exact pinned test releases and reviewed game modes');
 if ((mode === 'ce:slayer') !== args.has('--ce-map'))
@@ -49,24 +57,60 @@ const publisher = JSON.parse(
   await fs.readFile(new URL('../docs/fixtures/c36-community-client-files.json', import.meta.url), 'utf8'),
 );
 const installedPublisher = JSON.parse(
-  await fs.readFile(new URL('../docs/fixtures/c41-installed-community-runtimes.json', import.meta.url), 'utf8'),
+  await fs.readFile(
+    new URL('../docs/fixtures/c41-installed-community-runtimes.json', import.meta.url),
+    'utf8',
+  ),
 );
-publisher.clients.push(...installedPublisher.clients.filter((release) =>
-  ['opence-build-335', 'chupathingy-v0.8.1d'].includes(release.id) && release.publisherDigestVerified));
+publisher.clients.push(
+  ...installedPublisher.clients.filter(
+    (release) =>
+      ['opence-build-335', 'chupathingy-v0.8.1d'].includes(release.id) && release.publisherDigestVerified,
+  ),
+);
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+let aiObserver;
+if (args.has('--ai-symbols')) {
+  if (process.platform !== 'win32' || hostId !== 'opence-build-335' || clientId !== hostId)
+    throw Error('AI observation requires two exact OpenCE build-335 Windows copies');
+  const executable = path.resolve('target/debug/examples/qa_opence_ai.exe');
+  const symbols = path.resolve(args.get('--ai-symbols'));
+  const identity = async (file, limit) => {
+    const stat = await fs.lstat(file);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > limit)
+      throw Error('Expected bounded local QA input');
+    return hash(await fs.readFile(file));
+  };
+  const pdbSha256 = await identity(path.join(symbols, 'halo.pdb'), 32 * 1024 * 1024);
+  if (pdbSha256 !== 'b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800')
+    throw Error('Use the publisher-matching build-335 PDB; no guessed runtime offsets');
+  aiObserver = { executable, symbols, pdbSha256, sha256: await identity(executable, 64 * 1024 * 1024) };
+}
 let ceMap;
 if (args.has('--ce-map')) {
-  const source = path.resolve(args.get('--ce-map')), stat = await fs.lstat(source);
+  const source = path.resolve(args.get('--ce-map')),
+    stat = await fs.lstat(source);
   const name = path.basename(source, '.map');
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 2048 || stat.size > 512 * 1024 * 1024 ||
-      !/^[a-z][a-z0-9_]{0,30}$/.test(name)) throw Error('Choose a bounded CE cache with a safe native map name');
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.size < 2048 ||
+    stat.size > 512 * 1024 * 1024 ||
+    !/^[a-z][a-z0-9_]{0,30}$/.test(name)
+  )
+    throw Error('Choose a bounded CE cache with a safe native map name');
   const bytes = await fs.readFile(source);
-  if (bytes.subarray(0, 4).toString('ascii') !== 'daeh' || bytes.readUInt32LE(4) !== 609 ||
-      bytes.readUInt16LE(0x60) !== 1 || bytes.subarray(0x20, 0x40).toString('ascii').split('\0')[0] !== name)
+  if (
+    bytes.subarray(0, 4).toString('ascii') !== 'daeh' ||
+    bytes.readUInt32LE(4) !== 609 ||
+    bytes.readUInt16LE(0x60) !== 1 ||
+    bytes.subarray(0x20, 0x40).toString('ascii').split('\0')[0] !== name
+  )
     throw Error('The selected map must be an actual CE multiplayer cache with its native filename');
   ceMap = { source, name, bytes: bytes.length, sha256: hash(bytes), cacheVersion: 609 };
 }
-const sourceNames = ['ui.map', 'carousel.map', mode === 'a30:coop' ? 'a30.map' : 'bloodgulch.map'];
+const selectedMapName = mode.endsWith(':coop') ? mode.split(':')[0] + '.map' : 'bloodgulch.map';
+const sourceNames = ['ui.map', 'carousel.map', selectedMapName];
 const extraction = { files: [] };
 for (const name of sourceNames) {
   const file = path.join(fixtures, name);
@@ -133,7 +177,9 @@ const report = {
   routerFirewallChanges: false,
   executed: [],
   errors: [],
-  ...(ceMap ? { customEditionMap: ceMap, compatibilityDeployment: true, nativeCompilationPerformedByRunner: false } : {}),
+  ...(ceMap
+    ? { customEditionMap: ceMap, compatibilityDeployment: true, nativeCompilationPerformedByRunner: false }
+    : {}),
 };
 const children = [];
 const completions = [];
@@ -158,22 +204,19 @@ async function launch(role, id) {
       if (stat.isSymbolicLink() || (n < parts.length ? !stat.isDirectory() : !stat.isFile()))
         throw Error('Linked or invalid publisher member');
     }
-    const original = path.join(client, ...parts), target = path.join(root, ...parts);
+    const original = path.join(client, ...parts),
+      target = path.join(root, ...parts);
     if (hash(await fs.readFile(original)) !== known.sha256)
       throw Error('Release member differs from verified publisher inventory');
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.copyFile(original, target, fs.constants.COPYFILE_EXCL);
-    if (hash(await fs.readFile(target)) !== known.sha256)
-      throw Error('Copied publisher member differs');
+    if (hash(await fs.readFile(target)) !== known.sha256) throw Error('Copied publisher member differs');
   }
   const executable = path.join(root, 'halo.exe');
   if (hash(await fs.readFile(executable)) !== expected[id]) throw Error('Release EXE identity differs');
   const inputs = [];
   for (const file of extraction.files.filter(
-    (file) =>
-      file.name === 'ui.map' ||
-      file.name === 'carousel.map' ||
-      file.name === (mode === 'a30:coop' ? 'a30.map' : 'bloodgulch.map'),
+    (file) => file.name === 'ui.map' || file.name === 'carousel.map' || file.name === selectedMapName,
   )) {
     const original = path.join(fixtures, file.name),
       target = path.join(root, 'data', 'maps', file.name);
@@ -190,7 +233,13 @@ async function launch(role, id) {
     if (hash(await fs.readFile(ceMap.source)) !== ceMap.sha256) throw Error('Selected CE cache changed');
     await fs.copyFile(ceMap.source, target, fs.constants.COPYFILE_EXCL);
     if (hash(await fs.readFile(target)) !== ceMap.sha256) throw Error('CE deployment hash differs');
-    inputs.push({ name: ceMap.name + '.map', relativePath, bytes: ceMap.bytes, sha256: ceMap.sha256, cacheVersion: 609 });
+    inputs.push({
+      name: ceMap.name + '.map',
+      relativePath,
+      bytes: ceMap.bytes,
+      sha256: ceMap.sha256,
+      cacheVersion: 609,
+    });
   }
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('HALO_')));
   Object.assign(
@@ -203,10 +252,13 @@ async function launch(role, id) {
       HALO_DATA_ROOT: path.join(root, 'data'),
       HALO_SAVE_ROOT: path.join(root, 'save'),
       HALO_LOG_ROOT: path.join(root, 'logs'),
-      HALO_NETWORK_TEST: role === 'host' ? `host:${ceMap ? (isOpenCe(id) ? 'custom_maps\\' + ceMap.name : ceMap.name + '@ce') + ':slayer' : mode}` : 'join',
+      HALO_NETWORK_TEST:
+        role === 'host'
+          ? `host:${ceMap ? (isOpenCe(id) ? 'custom_maps\\' + ceMap.name : ceMap.name + '@ce') + ':slayer' : mode}`
+          : 'join',
       HALO_NETWORK_TEST_START: '12',
-      HALO_NETWORK_TEST_SHOOT: '4',
-      HALO_NETWORK_TEST_KILL: '17',
+      HALO_NETWORK_TEST_SHOOT: aiObserver ? '0' : '4',
+      HALO_NETWORK_TEST_KILL: aiObserver ? '0' : '17',
       HALO_TEST_INPUT: role === 'host' ? 'bot:1' : 'bot:2',
       HALO_EXIT_AFTER: role === 'host' ? '80' : '60',
       HALO_NET_ADDRESS: role === 'host' ? '127.0.0.210' : '127.0.0.211',
@@ -242,6 +294,41 @@ async function launch(role, id) {
     ),
   };
   report.executed.push(record);
+  let observer, observerDone;
+  if (aiObserver) {
+    const log = createWriteStream(path.join(root, 'ai-observer.ndjson'), { flags: 'wx' });
+    const errors = createWriteStream(path.join(root, 'ai-observer.stderr.log'), { flags: 'wx' });
+    record.aiObserver = {
+      schemaVersion: 1,
+      sha256: aiObserver.sha256,
+      pdbSha256: aiObserver.pdbSha256,
+      readOnly: true,
+    };
+    observer = spawn(aiObserver.executable, [executable, aiObserver.symbols, String(child.pid), role], {
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let size = 0;
+    observer.stdout.on('data', (bytes) => {
+      size += bytes.length;
+      if (size > 32 * 1024 * 1024) {
+        record.aiObserver.forced = true;
+        observer.kill();
+      } else log.write(bytes);
+    });
+    observer.stderr.on('data', (bytes) => {
+      if (bytes.length < 65536) errors.write(bytes);
+    });
+    observer.once('error', (error) => report.errors.push(role + ' AI observer failed: ' + String(error)));
+    observerDone = new Promise((resolve) =>
+      observer.once('close', async (code) => {
+        record.aiObserver.exitCode = code;
+        await Promise.all([new Promise((r) => log.end(r)), new Promise((r) => errors.end(r))]);
+        record.aiObserver.logSha256 = hash(await fs.readFile(path.join(root, 'ai-observer.ndjson')));
+        resolve();
+      }),
+    );
+  }
   console.log(JSON.stringify({ started: role, runtime: id, pid: child.pid }));
   let bytes = 0,
     forced = false;
@@ -267,6 +354,16 @@ async function launch(role, id) {
     });
     child.once('close', async (code, signal) => {
       clearTimeout(watchdog);
+      if (observerDone) {
+        const timer = setTimeout(() => {
+          record.aiObserver.forced = true;
+          observer.kill();
+        }, 2000);
+        await observerDone;
+        clearTimeout(timer);
+        if (record.aiObserver.exitCode !== 0 || record.aiObserver.forced)
+          report.errors.push(role + ' AI observer did not finish cleanly');
+      }
       record.exitCode = code;
       record.signal = signal;
       record.forced = forced;
@@ -275,7 +372,11 @@ async function launch(role, id) {
       record.inputsUnchanged = true;
       try {
         for (const file of inputs)
-          if (hash(await fs.readFile(path.join(root, 'data', file.relativePath ?? path.join('maps', file.name)))) !== file.sha256)
+          if (
+            hash(
+              await fs.readFile(path.join(root, 'data', file.relativePath ?? path.join('maps', file.name))),
+            ) !== file.sha256
+          )
             record.inputsUnchanged = false;
       } catch (error) {
         record.inputsUnchanged = false;
@@ -317,6 +418,8 @@ for (const file of extraction.files) {
   if (hash(await fs.readFile(path.join(fixtures, file.name))) !== file.sha256)
     report.errors.push('Original input map changed: ' + file.name);
 }
+if (aiObserver && hash(await fs.readFile(aiObserver.executable)) !== aiObserver.sha256)
+  report.errors.push('Native observer changed during execution');
 report.originalInputMapsUnchanged = !report.errors.some((error) =>
   error.startsWith('Original input map changed:'),
 );

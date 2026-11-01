@@ -1,5 +1,7 @@
 # Zombie Apocalypse audio and spawner evidence
 
+Current follow-up: [C44 exact-build native actor observations and Zombie Apocalypse conversion gate](CONTINUATION_44_ENGINEERING.md). The dated research below remains historical evidence; C44 does not establish a working MCC multiplayer AI bridge or a faithful restored zombie map.
+
 Audited on 2026-10-25. The supplied Demo artifact has not been restored into a playable MCC map. A separately labelled, opt-in experiment extracted all 2,823 retained tags after omitting two missing event sounds, then exposed additional corrupt and cross-class scenario data. No original cache, resource cache, archived executable, Steam file, or installed game was changed.
 
 ## Artifact identity and provenance

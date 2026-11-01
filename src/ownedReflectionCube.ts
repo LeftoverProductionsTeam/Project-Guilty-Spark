@@ -27,13 +27,17 @@ export function decodeReflectionCube(
     throw Error('Reflection cube resources differ from the map’s recorded pins.');
   let edge = 0,
     bytes = 0;
-  const faces = response.faces.map((face) => {
-    const image = decodeOwnedBitmapPreview(face, {
-      bitmapTagId: tagId,
-      imageIndex: 0,
-      sourceSha256: source,
-      resourceSha256: response.resourceSha256,
-    });
+  const faces = response.faces.map((face, cubeFaceIndex) => {
+    const image = decodeOwnedBitmapPreview(
+      face,
+      {
+        bitmapTagId: tagId,
+        imageIndex: 0,
+        sourceSha256: source,
+        resourceSha256: response.resourceSha256,
+      },
+      cubeFaceIndex,
+    );
     if (image.width !== image.height || image.width > 1024 || (edge && edge !== image.width))
       throw Error('Reflection faces must have the same bounded square dimensions.');
     edge = image.width;

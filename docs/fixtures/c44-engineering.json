@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 1,
+  "startingCommit": "de8922f7e6cd5e597072dec08a8a7f2729a4e745",
+  "checkpoint": "C44 measured renderer performance and native actor diagnostics; complete AI/conversion/gameplay gates remain open",
+  "remotePublished": false,
+  "appSha256": "ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22",
+  "installerSha256": "8c95d9395b0399d55d033d8a962827540c2f1ecc01ccbec487f05016c0469517",
+  "tests": {
+    "rustPassed": 616,
+    "rustIgnored": 7,
+    "frontendPassed": 284,
+    "browserPassed": 136,
+    "offlineScriptsPassed": 59,
+    "interfaceProbesPassed": 2,
+    "actorAnalyzerTestsPassed": 3,
+    "nativeObserverIdentityRefusals": 2
+  },
+  "localWindows": {
+    "schemaVersion": 1,
+    "appSha256": "ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22",
+    "mockedIpc": false,
+    "complete": true,
+    "cases": [
+      {
+        "name": "moving a real Workshop retains project identity, selected brush and Undo/Redo",
+        "projectId": "3daa711e-8268-4c51-bca3-d1a119fe8493",
+        "selectionRetained": true
+      },
+      {
+        "name": "another native window observes the same committed transform",
+        "propagationMs": 215,
+        "independentWriter": false
+      },
+      {
+        "name": "editing lease transfer shares Undo/Redo; stale revision is rejected with a durable draft"
+      },
+      {
+        "name": "rapid committed edits converge in the observing window without losing the final notification"
+      },
+      {
+        "name": "independent map remains unchanged and its snapshot cannot enter the other map history"
+      },
+      {
+        "name": "abrupt process death recovers acknowledged unsaved transform and its Undo/Redo"
+      },
+      {
+        "name": "closing and reopening a pop-out saves the map and preserves its history"
+      }
+    ],
+    "errors": []
+  },
+  "sharedNative": {
+    "nativeProcesses": 3,
+    "separateDataRoots": 3,
+    "physicalMachines": 1,
+    "mockedIpc": false,
+    "appSha256": "ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22",
+    "acceptanceComplete": true,
+    "nativeTagSharingTested": true,
+    "binaryAssetTransferTested": true,
+    "threeAuthorNativeAcceptance": {
+      "revision": 3,
+      "documentSha256": "723b8c86b2a375d531e0664e203ad0533ce38096cbbcfd54cac7b38ce82b84da",
+      "nativeField": "weapons/pistol/pistol.weapon:bounding_radius",
+      "assetId": "d95c5f23-bb2a-44e0-8688-e380ff30be6c",
+      "assetBytes": 632,
+      "actualModelsInThreeViewports": true,
+      "simultaneousAuthorActions": true
+    },
+    "participantUndoAndReferencedAssetConflict": true,
+    "sameFieldConflictCorruptBytesAndDuplicateAck": true,
+    "permissionsCoverNativeImportEditAndBuild": true,
+    "externalToolInterop": {
+      "mockedIpc": false,
+      "simultaneousEditors": 3,
+      "externalTool": "Invader",
+      "sharedSessionStayedConnected": true,
+      "corruptSaveRejected": true,
+      "corruptedCandidateRetained": true,
+      "externalExecutableSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invalidCrcRejectedBeforeNativeNormalization": true,
+      "otherExposedFieldNotSilentlyMerged": true,
+      "externalEditAndConcurrentWorldEditConverged": true,
+      "convergedRevision": 14,
+      "elapsedMs": 13473.40459999998,
+      "forkId": "7d97cc49-77a5-4e14-96fe-ac2717411584",
+      "candidateSha256": "15640d68228399293ba8d335839df25394f232c82d2f9f46e958f0f2563d99b2",
+      "alreadyCommittedEditDoesNotCreateAnotherTransaction": true,
+      "finalBoundingRadius": 0.5,
+      "baboonSavedFileReplay": {
+        "newGuiSession": false,
+        "priorHumanEditedSave": true,
+        "rawSha256": "6dc893d2375864e4648d45cd161d2e73a5b4ab18442fcb8d6fdb6a6e401d9d95",
+        "rawFileRetainedUnchanged": true,
+        "serialization": "equivalentNativeSerialization",
+        "convergedRevision": 15
+      },
+      "sameFieldConflictRejectedWithoutReplacingSource": true,
+      "participantUndoPreservesExternalAndOtherAuthorEdits": true,
+      "viewerCannotCreateToolFork": true,
+      "retainedAcrossActualHostRestart": true
+    },
+    "actualHaloToolchain": {
+      "jobId": "d7a80567-8375-40bb-9df5-2c1fb777e493",
+      "revision": 18,
+      "laterRevision": 19,
+      "nativeRadius": 0.5,
+      "publishedAssetPath": "scenery\\sparklink\\d95c5f23-bb2a-44e0-8688-e380ff30be6c",
+      "compiledModelTriangles": 31,
+      "placement": [3, 2, 0.1],
+      "outputSha256": "6384b72107286d621abe97c3f3998cea0b9dda41cc4492ce4e91926dfb6439be",
+      "durationMs": 37678.3958,
+      "gameplayTested": false
+    },
+    "durableNativeRecovery": {
+      "revision": 19,
+      "assetBytesIdentical": true,
+      "semanticFieldIntact": true,
+      "authorIdentitiesAndHistoryRetained": true,
+      "newInvitation": true,
+      "replayDeduplicated": true,
+      "durationMs": 14140.081600000034
+    },
+    "originalSourcesUnchanged": {
+      "separateNativeTrees": 3,
+      "filesPerTree": 2240,
+      "templateUnchanged": true,
+      "importUnchanged": true
+    },
+    "synchronizationMeasurements": {
+      "samples": 7,
+      "valuesMs": [
+        6571.476200000005, 82.60659999999916, 907.6284000000014, 891.6503999999986, 876.3931000000011,
+        876.7813000000024, 914.6393000000098
+      ],
+      "physicalMachines": 1,
+      "includesNativeIpcAndReactConsumption": true
+    },
+    "gamePeerReplicationTested": false
+  },
+  "preservation": {
+    "checkedAt": "2026-11-01T09:26:57.444Z",
+    "rootDirtyPatchesUnchanged": true,
+    "rootUntrackedFiles": 160,
+    "allRootUntrackedBytesUnchanged": true,
+    "originalZombieFiles": 67,
+    "originalZombieBytesUnchanged": true,
+    "originalInstalledMaps": 94,
+    "originalInstalledMapsUnchanged": true,
+    "priorReferences": 28,
+    "priorReferencesRetained": true,
+    "priorReleaseArtifacts": 8,
+    "priorReleaseArtifactsUnchanged": true,
+    "priorLedgerRowsUnchanged": true,
+    "ledgerRows": 408,
+    "artifacts": [
+      {
+        "file": "portable\\GuiltySpark.exe",
+        "sha256": "de24bd7dac9430e16006034761f320f32f38e3327fdcf0c5a960d782d5cd56a6"
+      },
+      {
+        "file": "Project_Guilty_Spark_C42_ce697fd_Setup.exe",
+        "sha256": "e9e68ca14ffee5c3b6a30540cfdc779b639dbc2a9299c2dc061679de8f1a5aed"
+      },
+      {
+        "file": "Project_Guilty_Spark_C42_ce697fd_SOURCE.zip",
+        "sha256": "8b3a39bc11d8f5d0d98848ba75e3d333b20d9eb8c75a5f7de858144049a4fc4b"
+      },
+      {
+        "file": "Project_Guilty_Spark_C42_ce697fd_PORTABLE.zip",
+        "sha256": "1bfb54189e5e7d6bd8097561295dc75af98ec7becee09240cdedef29e14973ec"
+      },
+      {
+        "file": "portable\\GuiltySpark.exe",
+        "sha256": "87065a1922a20a8731e50bcd97b1fe0e5d22a9d0a347906fd6f39743c1843262"
+      },
+      {
+        "file": "Project_Guilty_Spark_C43_de8922f_Setup.exe",
+        "sha256": "fa768c10e163fd8faa77f3814cac6473f5fa635fe2ab02d981f4c4f2028e4b24"
+      },
+      {
+        "file": "Project_Guilty_Spark_C43_de8922f_SOURCE.zip",
+        "sha256": "0226208a4db16aa5a30be76eb1645aec63f78f244db60b575adc9de5b91568b7"
+      },
+      {
+        "file": "Project_Guilty_Spark_C43_de8922f_PORTABLE.zip",
+        "sha256": "2cc32d0e50c416fd2f963c4f310a9d4f04dab8d13c47c3ce4b8c64df873c61be"
+      }
+    ],
+    "remotePublished": false
+  },
+  "observerIdentityTests": {
+    "cases": [
+      {
+        "case": "unsupported-executable",
+        "exitCode": 101,
+        "identityRejectedBeforeAnyObservation": true
+      },
+      {
+        "case": "changed-PDB",
+        "exitCode": 101,
+        "identityRejectedBeforeAnyObservation": true
+      }
+    ],
+    "pdbUnchanged": true,
+    "exactMatchingMetadataAccepted": true
+  },
+  "performance": "c44-performance.json",
+  "nativeAi": "c44-native-ai.json",
+  "artifacts": {
+    "nativeDesktopBuilt": true,
+    "nsisBuilt": true,
+    "installerCleanMachineTested": false,
+    "portableUsesFinalVerifiedExecutable": true,
+    "sourceIncludesOwnedPayloads": false
+  },
+  "retainedFailedTrials": [
+    "Private b30 trial without the selected map copied: engine refused the missing cache; private runner copy selection corrected.",
+    "Native content test with an incomplete boulder-template folder: source admission refused without replacing source; rerun uses the prior exact hash-verified admitted template.",
+    "Preliminary 512-entry decoded-cache experiment retained; final keeps original 128 entries/64 MiB.",
+    "Prototype AI observation includes the 75.96-unit transient discontinuity; no complete engine parity declared."
+  ],
+  "remaining": [
+    "C43 new Timberland–Sidewinder two-way physical walkthrough and four-region gate.",
+    "Host Zombie Apocalypse spawner/container/actor lifecycle and faithful per-runtime conversion.",
+    "Full native AI lifecycle, damage/death, late join, reconnect and audiovisual acceptance.",
+    "Two-computer LAN/VPN, mixed-engine gameplay and scale gates.",
+    "General direct compiled-map structural insertion/duplication and campaign-safe reference relocation."
+  ]
+}

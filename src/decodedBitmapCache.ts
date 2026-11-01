@@ -5,6 +5,10 @@ import type { DdsImage } from './haloDds';
 export class DecodedBitmapCache {
   private entries = new Map<string, { dds: string; image: DdsImage; bytes: number }>();
   private bytes = 0;
+  private hits = 0;
+  private misses = 0;
+  private changes = 0;
+  private evictions = 0;
   private readonly budget: number;
   private readonly limit: number;
   constructor(budget = 64 * 1024 * 1024, limit = 128) {
@@ -13,13 +17,19 @@ export class DecodedBitmapCache {
   }
   get(key: string, dds: string): DdsImage | null {
     const entry = this.entries.get(key);
-    if (!entry) return null;
+    if (!entry) {
+      this.misses++;
+      return null;
+    }
     this.entries.delete(key);
     if (entry.dds !== dds) {
       this.bytes -= entry.bytes;
+      this.misses++;
+      this.changes++;
       return null;
     }
     this.entries.set(key, entry);
+    this.hits++;
     return { ...entry.image, pixels: entry.image.pixels.slice() };
   }
   put(key: string, dds: string, image: DdsImage) {
@@ -35,8 +45,21 @@ export class DecodedBitmapCache {
       const oldest = this.entries.keys().next().value!;
       this.bytes -= this.entries.get(oldest)!.bytes;
       this.entries.delete(oldest);
+      this.evictions++;
     }
     this.entries.set(key, { dds, image: { ...image, pixels: image.pixels.slice() }, bytes });
     this.bytes += bytes;
+  }
+  stats() {
+    return {
+      entries: this.entries.size,
+      estimatedBytes: this.bytes,
+      maxBytes: this.budget,
+      maxEntries: this.limit,
+      hits: this.hits,
+      misses: this.misses,
+      changedPayloads: this.changes,
+      evictions: this.evictions,
+    };
   }
 }

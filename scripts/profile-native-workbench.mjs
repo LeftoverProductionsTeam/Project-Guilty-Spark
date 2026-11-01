@@ -23,6 +23,7 @@ const hash = async (p) =>
     .digest('hex');
 const report = {
   schemaVersion: 1,
+  measurementVersion: 2,
   label,
   appSha256: await hash(app),
   complete: false,
@@ -80,7 +81,14 @@ async function phase(name, action) {
   const at = performance.now(),
     result = await action();
   const elapsedMs = performance.now() - at;
-  const row = { name, elapsedMs, result, nativeAndDecode: await entries(), metrics: await metrics() };
+  const row = {
+    name,
+    elapsedMs,
+    result,
+    nativeAndDecode: await entries(),
+    metrics: await metrics(),
+    gauges: await page.evaluate(() => globalThis.__GS_PROFILE_GAUGES__ ?? null),
+  };
   report.phases.push(row);
   await save();
   console.log(name, Math.round(elapsedMs));
@@ -144,6 +152,9 @@ async function launch(warm) {
   await page.evaluate(() => {
     globalThis.__GS_PROFILE__ = true;
   });
+  report.conditions.nativeBase64Supported = await page.evaluate(
+    () => typeof Uint8Array.fromBase64 === 'function',
+  );
   call = (command, args = {}) =>
     page.evaluate(({ command, args }) => window.__TAURI_INTERNALS__.invoke(command, args), { command, args });
   const boot = await call('bootstrap');
@@ -271,20 +282,31 @@ try {
   const opens = [];
   for (const [index, file] of [mapA, mapB].entries()) {
     const row = await phase(`native-import-${index + 1}`, async () => {
-      const open = (await call('import_paths', { paths: [file] }))[0];
-      open.project.title = `Profile map ${index + 1}`;
-      await call('save_project', { project: open.project });
-      opens.push(open);
-      return {
-        id: open.project.id,
-        sha256: open.inspection.sha256,
-        version: open.inspection.header.version,
-        tags: open.inspection.tags.length,
-        objects: open.inspection.objects.length,
-        renderTriangles: open.inspection.renderMesh?.indices.length / 3,
-        modelTypes: Object.keys(open.inspection.modelMeshes).length,
-        decals: open.inspection.decals.length,
-      };
+      // Return counters only. Exporting the whole geometry again through CDP
+      // measures the automation bridge rather than Spark's own native IPC.
+      const summary = await page.evaluate(
+        async ({ file, index }) => {
+          const began = performance.now(),
+            open = (await window.__TAURI_INTERNALS__.invoke('import_paths', { paths: [file] }))[0];
+          const nativeImportMs = performance.now() - began;
+          open.project.title = `Profile map ${index + 1}`;
+          await window.__TAURI_INTERNALS__.invoke('save_project', { project: open.project });
+          return {
+            id: open.project.id,
+            sha256: open.inspection.sha256,
+            version: open.inspection.header.version,
+            tags: open.inspection.tags.length,
+            objects: open.inspection.objects.length,
+            renderTriangles: open.inspection.renderMesh?.indices.length / 3,
+            modelTypes: Object.keys(open.inspection.modelMeshes).length,
+            decals: open.inspection.decals.length,
+            nativeImportMs,
+          };
+        },
+        { file, index },
+      );
+      opens.push(summary);
+      return summary;
     });
     expect(row.result.sha256).toBe(await hash(file));
   }
@@ -303,7 +325,7 @@ try {
         .locator('.map-card')
         .filter({ has: page.getByRole('heading', { name: `Profile map ${index + 1}`, exact: true }) })
         .click();
-      return worldReady(opens[index].inspection.decals.length);
+      return worldReady(opens[index].decals);
     });
     await idle(`map-${index + 1}-process-cpu-gpu-memory`);
   }
@@ -311,18 +333,27 @@ try {
     const index = turn % 2;
     await phase(`map-switch-${turn + 1}-to-${index + 1}`, async () => {
       await page.getByRole('tab', { name: `Profile map ${index + 1}`, exact: true }).click();
-      return worldReady(opens[index].inspection.decals.length);
+      return worldReady(opens[index].decals);
     });
   }
   await idle('repeat-switch-memory');
   const native = [];
   for (let n = 0; n < 4; n++) {
     const at = performance.now();
-    const opened = await call('open_project', { id: opens[0].project.id });
+    const opened = await page.evaluate(async (id) => {
+      const began = performance.now(),
+        open = await window.__TAURI_INTERNALS__.invoke('open_project', { id });
+      return {
+        nativeIpcMs: performance.now() - began,
+        tags: open.inspection.tags.length,
+        sha256: open.inspection.sha256,
+      };
+    }, opens[0].id);
     native.push({
-      elapsedMs: performance.now() - at,
-      tags: opened.inspection.tags.length,
-      sha256: opened.inspection.sha256,
+      elapsedMs: opened.nativeIpcMs,
+      nodeHarnessRoundTripMs: performance.now() - at,
+      tags: opened.tags,
+      sha256: opened.sha256,
     });
   }
   report.openProjectRoundTrips = native;

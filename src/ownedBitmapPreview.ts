@@ -3,6 +3,8 @@
  */
 import { decodeHaloDds } from './haloDds.ts';
 import { DecodedBitmapCache } from './decodedBitmapCache.ts';
+import { decodeBoundedBase64 } from './boundedBase64.ts';
+import { profileGauge } from './profiling.ts';
 export interface OwnedBitmapPreview {
   bitmapTagId: number;
   imageIndex: number;
@@ -41,7 +43,16 @@ const SUPPORTED_FORMATS = new Set([
 const decodedPixels = new DecodedBitmapCache();
 
 /** Validate *both* tag and source identity before revealing any returned pixel buffer. */
-export function decodeOwnedBitmapPreview(preview: OwnedBitmapPreview, target: OwnedBitmapTarget) {
+export function decodeOwnedBitmapPreview(
+  preview: OwnedBitmapPreview,
+  target: OwnedBitmapTarget,
+  cubeFaceIndex?: number,
+) {
+  if (
+    cubeFaceIndex !== undefined &&
+    (!Number.isInteger(cubeFaceIndex) || cubeFaceIndex < 0 || cubeFaceIndex > 5)
+  )
+    throw Error('Invalid reflection face cache identity');
   const imageIndex = target.imageIndex ?? 0;
   if (
     !Number.isSafeInteger(target.bitmapTagId) ||
@@ -121,16 +132,12 @@ export function decodeOwnedBitmapPreview(preview: OwnedBitmapPreview, target: Ow
     preview.width,
     preview.height,
     preview.format,
+    cubeFaceIndex ?? '2d',
   ]);
   const cached = decodedPixels.get(key, preview.ddsBase64);
+  profileGauge('bitmap-decode', () => decodedPixels.stats());
   if (cached) return cached;
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(preview.ddsBase64))
-    throw new Error('Malformed or oversized bitmap response');
-  const packed = atob(preview.ddsBase64);
-  if (packed.length > 16 * 1024 * 1024 + 128 || packed.length < 128) {
-    throw new Error('Decoded bitmap exceeds size limits');
-  }
-  const dds = Uint8Array.from(packed, (character) => character.charCodeAt(0));
+  const dds = decodeBoundedBase64(preview.ddsBase64, 16 * 1024 * 1024 + 128, 128);
   const decoded = decodeHaloDds(dds.buffer);
   if (
     decoded.width !== preview.width ||
@@ -140,5 +147,6 @@ export function decodeOwnedBitmapPreview(preview: OwnedBitmapPreview, target: Ow
     throw new Error('Bitmap metadata conflicts with decoded DDS pixels');
   }
   decodedPixels.put(key, preview.ddsBase64, decoded);
+  profileGauge('bitmap-decode', () => decodedPixels.stats());
   return decoded;
 }

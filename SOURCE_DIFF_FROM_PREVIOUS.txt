@@ -1,31 +1,16 @@
-Project Guilty Spark C41 measured map-loading performance — 2026-10-31
-Previous committed foundation: 68dc2c00556b6ecc22a5a7092338d9ad956bd21a
-Validated source/document commit: 6564eedfec192e4d24cd9e62c7f2edc0b2896e48
-Application SHA-256: aeb585c30adb495e3af45fd49c658e758c7c9b58e7e2fa733c790f8ee89a6ce6
+Project Guilty Spark C44 measured loading and native AI diagnostics — 2026-11-01
+Committed foundation: C43 de8922f7e6cd5e597072dec08a8a7f2729a4e745
+Final Windows executable SHA-256: ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22
 
-Batch up to four source-exact cubemaps per native read transaction. Preserve source SHA checks, pre/post resource hashing, exact indexed spans, explicit refusals, source/resource epoch retirement and the existing resident budgets. Overlap asset source preparation and omit no renderer content.
+Fix reflection-face cache aliasing and use bounded native Base64 decoding with a byte-loop fallback. Keep all source/resource/DDS checks, private pixel buffers and the original 128-entry/64 MiB cache policy. Two paired native runs preserve complete rendering-resource signatures and improve median map switching from 4486 to 4013 ms (10.6%); first loads improve 6.6–9%. No general startup, memory, catalog or GPU gain is claimed. Correct the earlier full-CDP-export/native-IPC timing attribution without erasing historical evidence.
 
-Three native runs per executable measure repeated switching 4.583 to 4.187 seconds (8.6% faster), MCC revisits 4.899 to 4.315 seconds (11.9%), and catalog preparation 4.221 to 3.163 seconds (25.1%). All six runs and the slow initial startup are retained. Startup, first-load, frame-rate and general memory gains are not claimed.
+Add exact-build, matching-publisher-PDB, read-only OpenCE actor QA and bounded analysis. Real private host/client processes expose 42 shared actual AI identities, 33 moving and seven firing controls. All discrepancies remain included; full AI lifecycle, damage/death, late join, reconnect, AV and multi-computer acceptance remain open. The existing Zombie Apocalypse recovery cache loads/joins but fails the replicated-actor control gate. Preserve that failure and its host/client object census; do not declare faithful conversion.
 
-606 locked Windows Rust checks pass (7 opt-in ignored), 274 frontend, 126 browser, 59 offline and 2 interface probes; TypeScript and Windows/NSIS builds pass. Genuine native asset/reflection/animation/import/collision/cache and original-loop audio challenges pass against the exact executable.
+Three real Spark processes again converge on native tag editing, validated asset publication and placement. Invader external-save corruption is refused; the retained prior human Baboon edit reconciles as equivalent native serialization. Revision 18 compiles the 0.5 pistol radius and 31-triangle asset at [3,2,0.1]; revision 19 remains separate. Durable host recovery, author undo, conflicts, roles and original 2240-file source sets pass.
 
-Original 146 dirty files, C35-C39 history, native transactions, all earlier releases/research and structural direct-map backlog remain intact. OpenCE/Chupathingy now have Xbox-format map headers; gameplay acceptance is separate. CE joined player/traversal and MCC in-game listening remain open. No remote publication or repository-rule change.
+616 locked Rust tests pass (seven opt-in ignored), 284 frontend, 136 browser, 59 offline, two MCC interface probes and three actor-analyzer tests. Wrong executable and altered PDB identities are refused in actual native tests. Final native window history and complete paired renderer checks pass.
 
-Changed tracked paths:
-M	README.md
-M	crates/spark-core/src/bitmap_preview.rs
-M	docs/C41_GITHUB_DESCRIPTION.md
-A	docs/C41_MAP_LOADING_PERFORMANCE.md
-M	docs/CURRENT_FEATURES.md
-M	docs/GITHUB_HANDOFF.md
-A	docs/fixtures/c41-map-loading-performance.json
-A	docs/fixtures/c41-map-loading-validation.json
-M	scripts/compare-workbench-profiles.mjs
-M	scripts/test-assets-startup-native.mjs
-M	src-tauri/src/app.rs
-M	src/components/AssetSourceBrowser.tsx
-M	src/ownedReflectionCube.test.ts
-M	src/ownedReflectionCube.ts
-A	src/reflectionTextureSession.test.ts
-A	src/reflectionTextureSession.ts
-M	src/useReflectionTextures.ts
+Original dirty root patches, 160 root untracked files, 67 Zombie Apocalypse files, 94 installed maps, prior branch references, eight C42/C43 artifacts and all 404 earlier ledger rows remain intact. Four C44 rows append to the ledger. C43 physical connected-world walkthrough, arbitrary direct compiled-map structural editing, all-runtime zombie recovery and broad gameplay gates stay open. Source is consolidated locally on master; no remote publication, force push or repository-rule change.
+
+Detailed evidence: docs/CONTINUATION_44_ENGINEERING.md and docs/fixtures/c44-*.json
+Publication description: docs/C44_PUSH_SUMMARY.md

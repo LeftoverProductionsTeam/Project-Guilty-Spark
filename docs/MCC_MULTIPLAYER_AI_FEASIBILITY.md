@@ -1,5 +1,7 @@
 # MCC multiplayer AI feasibility
 
+Current follow-up: [C44 exact-build native actor observations and Zombie Apocalypse conversion gate](CONTINUATION_44_ENGINEERING.md). The dated research below remains historical evidence; C44 does not establish a working MCC multiplayer AI bridge or a faithful restored zombie map.
+
 Research date: 2026-10-25. This report records source evidence, not gameplay certification. No restored Zombie Apocalypse map was played in MCC, no native runtime was launched for this research, and no two-computer multiplayer test was performed. The MCC and native routes are separate targets.
 
 ## Decision

@@ -1,0 +1,766 @@
+{
+  "schemaVersion": 1,
+  "engineRelease": "OpenCE build-335",
+  "sourceCommit": "da8d455623cf50002e6a798b1980068fd3ca0292",
+  "publisherSymbolsArchiveSha256": "0d2c6e86f34f66555310ec5db11b1b62eedb8d71c36ff5d0d997de8749c9e989",
+  "campaign": {
+    "schemaVersion": 1,
+    "analyzer": "analyze-opence-ai",
+    "executionSha256": "5e3c4a07d4eaff6f0b8f40b8fe75b774a7f72315b75ec8a47e4796ace700e5f7",
+    "runtime": "opence-build-335",
+    "mode": "b30:coop",
+    "nativeJoin": {
+      "status": "sampled-native-simulation",
+      "selectedComparison": "exactTicks",
+      "joinMarkersObserved": true,
+      "bidirectionalPacketCountersObserved": true,
+      "atLeastTwoMachinePlayersObserved": true,
+      "completeInventoryParity": false,
+      "humanPlayAccepted": false,
+      "aiActorAcceptance": false,
+      "twoComputerAcceptance": false,
+      "renderingOrAudioAcceptance": false,
+      "universalCrossRuntimeCompatibility": false,
+      "listingGateChangeAuthorized": false
+    },
+    "identities": [
+      {
+        "role": "host",
+        "pid": 9372,
+        "observerSha256": "48a3e4242e6c678afc90f7e0d5d0fd828edf08fcf45044c576e0a9988188a5ae",
+        "logSha256": "3c54c2aa49f4e8eeeae1c7654e21044baf9dd0884bc502bfa864833704d41704",
+        "samples": 701,
+        "readErrors": {
+          "bounded address rejected": 1,
+          "map not initialized": 2,
+          "crossed tick while reading": 53,
+          "invalid datum pool": 3
+        },
+        "maximumActorPool": 92,
+        "maximumNetworkActors": 44
+      },
+      {
+        "role": "client",
+        "pid": 17196,
+        "observerSha256": "48a3e4242e6c678afc90f7e0d5d0fd828edf08fcf45044c576e0a9988188a5ae",
+        "logSha256": "5d36625438835f5f778c9c181fa18c6990059abd15187741124735dcfc48d1b2",
+        "samples": 528,
+        "readErrors": {
+          "bounded address rejected": 1,
+          "map not initialized": 2,
+          "crossed tick while reading": 38,
+          "invalid datum pool": 3
+        },
+        "maximumActorPool": 0,
+        "maximumNetworkActors": 44
+      }
+    ],
+    "comparison": {
+      "exactTickFrames": 55,
+      "sharedActualActorIds": 42,
+      "movingActorIds": 33,
+      "firingActorIds": 7,
+      "position": {
+        "count": 500,
+        "median": 0.027370240218137186,
+        "p95": 0.08373456964904719,
+        "maximum": 0.27580501019860354
+      },
+      "health": {
+        "count": 500,
+        "median": 0,
+        "p95": 0.000021696090698242188,
+        "maximum": 0.16001468896865845
+      },
+      "shield": {
+        "count": 500,
+        "median": 0,
+        "p95": 0.000010311603546142578,
+        "maximum": 0.000029027462005615234
+      },
+      "throttle": {
+        "count": 500,
+        "median": 0,
+        "p95": 0,
+        "maximum": 1.4142135623730951
+      },
+      "receivedControlAgeTicks": {
+        "count": 500,
+        "median": 1,
+        "p95": 3,
+        "maximum": 3
+      },
+      "parentOrSeatDifferences": 0,
+      "largePositionDifferences": {
+        "total": 0,
+        "examples": []
+      },
+      "hostAuthorityObserved": true,
+      "aiActorAcceptance": false,
+      "fullLifecycleAcceptance": false,
+      "twoComputerAcceptance": false,
+      "note": "All pairs remain in the distributions. Same-tick process reads are not atomic engine packets; counters advance separately from position, damage, seat and control updates. No parity or latency threshold is approved here."
+    },
+    "actorControlsObserved": true,
+    "aiActorAcceptance": false,
+    "limitations": [
+      "One physical computer, scripted player input, null rendering and dummy audio.",
+      "Only upstream build-335 actor telemetry is observed. This is not a new MCC/CE protocol bridge, authoring path, or complete Zombie Apocalypse conversion.",
+      "Damage/death, late join, reconnect, script/encounter coverage, audiovisual playback and cross-computer acceptance remain distinct gates."
+    ]
+  },
+  "zombie": {
+    "schemaVersion": 1,
+    "analyzer": "analyze-opence-ai",
+    "executionSha256": "b69169e351ce3c0ed804f2f21531e10c1b29b3fbb21db1f532d598ac78daf502",
+    "runtime": "opence-build-335",
+    "mode": "ce:slayer",
+    "nativeJoin": {
+      "status": "sampled-state-disagreement",
+      "selectedComparison": "exactTicks",
+      "joinMarkersObserved": true,
+      "bidirectionalPacketCountersObserved": true,
+      "atLeastTwoMachinePlayersObserved": true,
+      "completeInventoryParity": false,
+      "humanPlayAccepted": false,
+      "aiActorAcceptance": false,
+      "twoComputerAcceptance": false,
+      "renderingOrAudioAcceptance": false,
+      "universalCrossRuntimeCompatibility": false,
+      "listingGateChangeAuthorized": false
+    },
+    "identities": [
+      {
+        "role": "host",
+        "pid": 32824,
+        "observerSha256": "48a3e4242e6c678afc90f7e0d5d0fd828edf08fcf45044c576e0a9988188a5ae",
+        "logSha256": "ddf63a8af11c8127b350f30c1e599a706828d05a007e5cdca6a678d257a8e762",
+        "samples": 722,
+        "readErrors": {
+          "bounded address rejected": 3,
+          "map not initialized": 22,
+          "crossed tick while reading": 10,
+          "invalid datum pool": 3
+        },
+        "maximumActorPool": 6,
+        "maximumNetworkActors": 0
+      },
+      {
+        "role": "client",
+        "pid": 19596,
+        "observerSha256": "48a3e4242e6c678afc90f7e0d5d0fd828edf08fcf45044c576e0a9988188a5ae",
+        "logSha256": "bbe76b6ac1a092791b3509f1fae1c3080ce48d02ebcb65c51e4d070685ab3d4c",
+        "samples": 540,
+        "readErrors": {
+          "bounded address rejected": 1,
+          "map not initialized": 21,
+          "crossed tick while reading": 9,
+          "invalid datum pool": 3
+        },
+        "maximumActorPool": 0,
+        "maximumNetworkActors": 0
+      }
+    ],
+    "comparison": {
+      "exactTickFrames": 74,
+      "sharedActualActorIds": 0,
+      "movingActorIds": 0,
+      "firingActorIds": 0,
+      "position": null,
+      "health": null,
+      "shield": null,
+      "throttle": null,
+      "receivedControlAgeTicks": null,
+      "parentOrSeatDifferences": 0,
+      "largePositionDifferences": {
+        "total": 0,
+        "examples": []
+      },
+      "hostAuthorityObserved": false,
+      "aiActorAcceptance": false,
+      "fullLifecycleAcceptance": false,
+      "twoComputerAcceptance": false,
+      "note": "All pairs remain in the distributions. Same-tick process reads are not atomic engine packets; counters advance separately from position, damage, seat and control updates. No parity or latency threshold is approved here."
+    },
+    "actorControlsObserved": false,
+    "aiActorAcceptance": false,
+    "limitations": [
+      "One physical computer, scripted player input, null rendering and dummy audio.",
+      "Only upstream build-335 actor telemetry is observed. This is not a new MCC/CE protocol bridge, authoring path, or complete Zombie Apocalypse conversion.",
+      "Damage/death, late join, reconnect, script/encounter coverage, audiovisual playback and cross-computer acceptance remain distinct gates."
+    ]
+  },
+  "priorZombieCensus": {
+    "mapSha256": "d1d1ddb96ca6093231b65c72918c2d61625bc81e27022ee46150517823b7e2b8",
+    "roles": [
+      {
+        "role": "host",
+        "last": [
+          {
+            "count": 1,
+            "tag": 3838444374,
+            "type": 0,
+            "path": "mgm\\fonzie\\sparky\\tags\\player\\survivor",
+            "class": "bipd"
+          },
+          {
+            "count": 2,
+            "tag": 3787718736,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\ai respawning\\evolved zombie spawnerorig",
+            "class": "weap"
+          },
+          {
+            "count": 19,
+            "tag": 3804299597,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\weapons\\shotgun",
+            "class": "weap"
+          },
+          {
+            "count": 12,
+            "tag": 3825795733,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\weapons\\pistol",
+            "class": "weap"
+          },
+          {
+            "count": 16,
+            "tag": 3848930294,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\weapons\\assault rifle",
+            "class": "weap"
+          },
+          {
+            "count": 6,
+            "tag": 3865183470,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\weapons\\sniper rifle",
+            "class": "weap"
+          },
+          {
+            "count": 3,
+            "tag": 3875079557,
+            "type": 2,
+            "path": "origmgm\\fonzie\\sparky\\tags\\ai respawning\\alpha zombie spawner",
+            "class": "weap"
+          },
+          {
+            "count": 9,
+            "tag": 3875603853,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\ai respawning\\zombie spawner",
+            "class": "weap"
+          },
+          {
+            "count": 12,
+            "tag": 3802071339,
+            "type": 3,
+            "path": "mgm\\kiyoshi\\broke\\tags\\health\\pillz here",
+            "class": "eqip"
+          },
+          {
+            "count": 14,
+            "tag": 3869902134,
+            "type": 3,
+            "path": "mgm\\kiyoshi\\broke\\tags\\equipment\\molotov",
+            "class": "eqip"
+          },
+          {
+            "count": 3,
+            "tag": 3783917590,
+            "type": 6,
+            "path": "scenery\\rocks\\boulder_crouch\\boulder_crouch",
+            "class": "scen"
+          },
+          {
+            "count": 5,
+            "tag": 3784376349,
+            "type": 6,
+            "path": "scenery\\rocks\\boulder_doublewide\\boulder_doublewide",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3785097256,
+            "type": 6,
+            "path": "scenery\\shrubs\\shrub_large\\shrub_large",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3785424941,
+            "type": 6,
+            "path": "scenery\\plants\\plant_broadleaf_short\\plant_broadleaf_short",
+            "class": "scen"
+          },
+          {
+            "count": 3,
+            "tag": 3786342459,
+            "type": 6,
+            "path": "scenery\\scrawls\\1\\1",
+            "class": "scen"
+          },
+          {
+            "count": 44,
+            "tag": 3787194440,
+            "type": 6,
+            "path": "sparky\\scenery\\trees\\tree_leafydense_doublewide\\tree_leafydense_doublewide_multires",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3817275923,
+            "type": 6,
+            "path": "scenery\\teleporter_base\\teleporter_base",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3818455589,
+            "type": 6,
+            "path": "scenery\\small beacon\\small red beacon",
+            "class": "scen"
+          },
+          {
+            "count": 8,
+            "tag": 3819700792,
+            "type": 6,
+            "path": "scenery\\floor_arrow\\floor_arrow",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3820094014,
+            "type": 6,
+            "path": "characters\\elite\\elite_corpse\\elite_corpse",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3821470291,
+            "type": 6,
+            "path": "levels\\a10\\devices\\h oxy tank\\h oxy tank",
+            "class": "scen"
+          },
+          {
+            "count": 4,
+            "tag": 3822518883,
+            "type": 6,
+            "path": "scenery\\blood_pool\\blood_pool",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3832283896,
+            "type": 6,
+            "path": "scenery\\debris\\banshee_crashed\\banshee_crashed",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3832742655,
+            "type": 6,
+            "path": "scenery\\emitters\\glowingdrip\\glowingdrip",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3833463562,
+            "type": 6,
+            "path": "scenery\\rocks\\boulder_redrock_gigantic\\boulder_redrock_gigantic",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3833856784,
+            "type": 6,
+            "path": "scenery\\rocks\\boulder_redrock_large\\boulder_redrock_large",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3834118932,
+            "type": 6,
+            "path": "scenery\\rocks\\rock_shardlong\\rock_shardlong",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3834315543,
+            "type": 6,
+            "path": "scenery\\rocks\\rock_shardwide\\rock_shardwide",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3834512154,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy\\tree_leafy",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3834839839,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_doublewide\\tree_leafy_doublewide",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3835101987,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_fallentrunk_short\\tree_leafy_fallentrunk_short",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3835298598,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_medium\\tree_leafy_medium",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3835495209,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_sapling\\tree_leafy_sapling",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3835626283,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_stump\\tree_leafy_stump",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3835822894,
+            "type": 6,
+            "path": "scenery\\vehicles\\pelican_crashed\\pelican_crashed",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3837002560,
+            "type": 6,
+            "path": "scenery\\emitters\\burning_flame\\burning_flame",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3864790248,
+            "type": 11,
+            "path": "sound\\sfx\\ui\\teleporter_loop",
+            "class": "ssce"
+          }
+        ]
+      },
+      {
+        "role": "client",
+        "last": [
+          {
+            "count": 2,
+            "tag": 3790864512,
+            "type": 0,
+            "path": "mgm\\fonzie\\sparky\\tags\\zombies\\zombie",
+            "class": "bipd"
+          },
+          {
+            "count": 2,
+            "tag": 3794993343,
+            "type": 0,
+            "path": "mgm\\fonzie\\sparky\\tags\\zombies\\evolved zombie",
+            "class": "bipd"
+          },
+          {
+            "count": 2,
+            "tag": 3802595635,
+            "type": 0,
+            "path": "mgm\\fonzie\\sparky\\tags\\zombies\\alpha zombieorigshot",
+            "class": "bipd"
+          },
+          {
+            "count": 2,
+            "tag": 3838444374,
+            "type": 0,
+            "path": "mgm\\fonzie\\sparky\\tags\\player\\survivor",
+            "class": "bipd"
+          },
+          {
+            "count": 2,
+            "tag": 3790340216,
+            "type": 1,
+            "path": "mgm\\fonzie\\sparky\\tags\\evolved zombie container",
+            "class": "vehi"
+          },
+          {
+            "count": 2,
+            "tag": 3787718736,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\ai respawning\\evolved zombie spawnerorig",
+            "class": "weap"
+          },
+          {
+            "count": 20,
+            "tag": 3804299597,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\weapons\\shotgun",
+            "class": "weap"
+          },
+          {
+            "count": 12,
+            "tag": 3825795733,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\weapons\\pistol",
+            "class": "weap"
+          },
+          {
+            "count": 16,
+            "tag": 3848930294,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\weapons\\assault rifle",
+            "class": "weap"
+          },
+          {
+            "count": 7,
+            "tag": 3865183470,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\weapons\\sniper rifle",
+            "class": "weap"
+          },
+          {
+            "count": 3,
+            "tag": 3875079557,
+            "type": 2,
+            "path": "origmgm\\fonzie\\sparky\\tags\\ai respawning\\alpha zombie spawner",
+            "class": "weap"
+          },
+          {
+            "count": 9,
+            "tag": 3875603853,
+            "type": 2,
+            "path": "mgm\\fonzie\\sparky\\tags\\ai respawning\\zombie spawner",
+            "class": "weap"
+          },
+          {
+            "count": 13,
+            "tag": 3802071339,
+            "type": 3,
+            "path": "mgm\\kiyoshi\\broke\\tags\\health\\pillz here",
+            "class": "eqip"
+          },
+          {
+            "count": 14,
+            "tag": 3869902134,
+            "type": 3,
+            "path": "mgm\\kiyoshi\\broke\\tags\\equipment\\molotov",
+            "class": "eqip"
+          },
+          {
+            "count": 3,
+            "tag": 3783917590,
+            "type": 6,
+            "path": "scenery\\rocks\\boulder_crouch\\boulder_crouch",
+            "class": "scen"
+          },
+          {
+            "count": 5,
+            "tag": 3784376349,
+            "type": 6,
+            "path": "scenery\\rocks\\boulder_doublewide\\boulder_doublewide",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3785097256,
+            "type": 6,
+            "path": "scenery\\shrubs\\shrub_large\\shrub_large",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3785424941,
+            "type": 6,
+            "path": "scenery\\plants\\plant_broadleaf_short\\plant_broadleaf_short",
+            "class": "scen"
+          },
+          {
+            "count": 3,
+            "tag": 3786342459,
+            "type": 6,
+            "path": "scenery\\scrawls\\1\\1",
+            "class": "scen"
+          },
+          {
+            "count": 44,
+            "tag": 3787194440,
+            "type": 6,
+            "path": "sparky\\scenery\\trees\\tree_leafydense_doublewide\\tree_leafydense_doublewide_multires",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3817275923,
+            "type": 6,
+            "path": "scenery\\teleporter_base\\teleporter_base",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3818455589,
+            "type": 6,
+            "path": "scenery\\small beacon\\small red beacon",
+            "class": "scen"
+          },
+          {
+            "count": 8,
+            "tag": 3819700792,
+            "type": 6,
+            "path": "scenery\\floor_arrow\\floor_arrow",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3820094014,
+            "type": 6,
+            "path": "characters\\elite\\elite_corpse\\elite_corpse",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3821470291,
+            "type": 6,
+            "path": "levels\\a10\\devices\\h oxy tank\\h oxy tank",
+            "class": "scen"
+          },
+          {
+            "count": 4,
+            "tag": 3822518883,
+            "type": 6,
+            "path": "scenery\\blood_pool\\blood_pool",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3832283896,
+            "type": 6,
+            "path": "scenery\\debris\\banshee_crashed\\banshee_crashed",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3832742655,
+            "type": 6,
+            "path": "scenery\\emitters\\glowingdrip\\glowingdrip",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3833463562,
+            "type": 6,
+            "path": "scenery\\rocks\\boulder_redrock_gigantic\\boulder_redrock_gigantic",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3833856784,
+            "type": 6,
+            "path": "scenery\\rocks\\boulder_redrock_large\\boulder_redrock_large",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3834118932,
+            "type": 6,
+            "path": "scenery\\rocks\\rock_shardlong\\rock_shardlong",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3834315543,
+            "type": 6,
+            "path": "scenery\\rocks\\rock_shardwide\\rock_shardwide",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3834512154,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy\\tree_leafy",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3834839839,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_doublewide\\tree_leafy_doublewide",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3835101987,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_fallentrunk_short\\tree_leafy_fallentrunk_short",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3835298598,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_medium\\tree_leafy_medium",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3835495209,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_sapling\\tree_leafy_sapling",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3835626283,
+            "type": 6,
+            "path": "scenery\\trees\\tree_leafy_stump\\tree_leafy_stump",
+            "class": "scen"
+          },
+          {
+            "count": 1,
+            "tag": 3835822894,
+            "type": 6,
+            "path": "scenery\\vehicles\\pelican_crashed\\pelican_crashed",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3837002560,
+            "type": 6,
+            "path": "scenery\\emitters\\burning_flame\\burning_flame",
+            "class": "scen"
+          },
+          {
+            "count": 2,
+            "tag": 3864790248,
+            "type": 11,
+            "path": "sound\\sfx\\ui\\teleporter_loop",
+            "class": "ssce"
+          }
+        ]
+      }
+    ]
+  },
+  "preliminaryPrototype": {
+    "retained": true,
+    "sharedActorIds": 42,
+    "pairedActorStates": 14420,
+    "largePositionDifference": {
+      "tick": 1155,
+      "id": 3860136859,
+      "engineUnits": 75.96329875586369
+    },
+    "fullParityAccepted": false,
+    "note": "This discontinuity remains in the original observation. The final repeat had no >1-unit paired sample; that does not fix or disprove the earlier discrepancy."
+  }
+}
