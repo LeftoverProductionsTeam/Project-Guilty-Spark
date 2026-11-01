@@ -5,6 +5,7 @@ if (!/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535)
 const baseURL = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: './tests/ui',
+  outputDir: process.env.SPARK_BROWSER_EVIDENCE_DIR ?? './test-results',
   timeout: 30000,
   retries: 0,
   use: {

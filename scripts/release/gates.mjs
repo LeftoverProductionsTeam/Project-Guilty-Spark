@@ -55,6 +55,7 @@ for (const [id, executable, args] of commands) {
     const server = net.createServer();
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     env.SPARK_UI_TEST_PORT = String(server.address().port);
+    env.SPARK_BROWSER_EVIDENCE_DIR = path.resolve(output, 'browser-artifacts');
     await new Promise((resolve) => server.close(resolve));
   }
   const child = spawn(executable, args, { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });

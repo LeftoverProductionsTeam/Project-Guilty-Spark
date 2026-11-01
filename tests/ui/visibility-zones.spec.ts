@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-test('combined-world visibility zones persist per map and draw real portal handles', async ({ page }) => {
+test('combined-world visibility zones persist per map and draw real portal handles', async ({
+  page,
+}, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.setViewportSize({ width: 1500, height: 950 });
@@ -51,7 +53,7 @@ test('combined-world visibility zones persist per map and draw real portal handl
     .not.toBe(0.25);
   const dragged = JSON.parse((await page.getByTestId('zone-project').textContent()) ?? '{}').bspAssembly
     .visibilityZones[0].start;
-  await page.screenshot({ path: '.local/continuation34/visibility-zones-browser.png' });
+  await page.screenshot({ path: testInfo.outputPath('visibility-zones-browser.png') });
   await page.getByRole('button', { name: 'Switch synthetic map' }).click();
   await panel.locator('summary').click();
   await panel.getByRole('button', { name: 'Add planning box' }).click();
