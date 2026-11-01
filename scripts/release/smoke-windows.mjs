@@ -73,6 +73,11 @@ try {
     throw Error('Native bootstrap did not return a real library');
   const nativeVersion = boot.applicationVersion;
   if (nativeVersion !== version) throw Error('Packaged native version differs from source');
+  // A visible shell and successful IPC do not prove that lazy workspace chunks loaded.
+  await expect(page.getByText('Loading workspace…', { exact: true })).toBeHidden({ timeout: 90000 });
+  await expect(page.locator('main h1').first()).toBeVisible({ timeout: 90000 });
+  receipt.workspaceReady = true;
+  receipt.checks.push('initial workspace finished loading and its heading is visible');
   receipt.checks.push(
     'native window and frontend visible',
     'native bootstrap returned',

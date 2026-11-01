@@ -167,7 +167,8 @@ class PackageAcceptance(unittest.TestCase):
         gates = {'sourceCommit': self.commit, 'platform': 'windows-x64', 'complete': True,
                  'gates': [{'id': name, 'exitCode': 0} for name in package.GATES]}
         startup = {'sourceCommit': self.commit, 'applicationVersion': '0.4.1',
-                   'executableSha256': manifest['executableSha256'], 'complete': True, 'mockedIpc': False}
+                   'executableSha256': manifest['executableSha256'], 'complete': True, 'mockedIpc': False,
+                   'workspaceReady': True}
         install = {'complete': True, 'installerSha256': manifest['artifacts'][0]['sha256'],
                    'portableExecutableSha256': manifest['executableSha256'],
                    'installedExecutableSha256': manifest['installedExecutableSha256'],

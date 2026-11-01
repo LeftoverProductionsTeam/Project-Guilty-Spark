@@ -21,11 +21,11 @@ Cumulative source delta. Original Halo data, private QA archives, source snapsho
  scripts/release/draft.test.mjs      | 108 +++++++++
  scripts/release/gates.mjs           |  85 +++++++
  scripts/release/install-windows.ps1 |  58 +++++
- scripts/release/package.py          | 448 ++++++++++++++++++++++++++++++++++++
- scripts/release/smoke-linux.mjs     | 130 +++++++++++
- scripts/release/smoke-windows.mjs   | 107 +++++++++
+ scripts/release/package.py          | 450 ++++++++++++++++++++++++++++++++++++
+ scripts/release/smoke-linux.mjs     | 139 +++++++++++
+ scripts/release/smoke-windows.mjs   | 112 +++++++++
  scripts/release/test-pipeline.mjs   |  10 +
- scripts/release/test_package.py     | 197 ++++++++++++++++
+ scripts/release/test_package.py     | 198 ++++++++++++++++
  scripts/release/verify-public.mjs   |  95 ++++++++
  src-tauri/src/app.rs                |   2 +
  src-tauri/tauri.conf.json           |   2 +-
@@ -34,4 +34,4 @@ Cumulative source delta. Original Halo data, private QA archives, source snapsho
  src/api.ts                          |   1 +
  src/types.ts                        |   1 +
  tests/ui/visibility-zones.spec.ts   |   6 +-
- 31 files changed, 1864 insertions(+), 13 deletions(-)
+ 31 files changed, 1881 insertions(+), 13 deletions(-)

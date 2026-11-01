@@ -101,14 +101,21 @@ try {
           const boot=await window.__TAURI_INTERNALS__.invoke('bootstrap');
           const version=boot.applicationVersion;
           const deadline=Date.now()+60000;
-          while(!document.querySelector('.application')&&Date.now()<deadline)await new Promise(r=>setTimeout(r,100));
+          while(Date.now()<deadline){
+            const heading=document.querySelector('main h1');
+            const rect=heading?.getBoundingClientRect();
+            if(rect&&rect.width>0&&rect.height>0&&!Array.from(document.querySelectorAll('.loading')).some(n=>n.textContent==='Loading workspace…'))break;
+            await new Promise(r=>setTimeout(r,100));
+          }
           const app=document.querySelector('.application');
           const rect=app?.getBoundingClientRect();
-          return {version,ready:!!boot.settings&&Array.isArray(boot.entries),visible:!!rect&&rect.width>0&&rect.height>0};
+          const heading=document.querySelector('main h1')?.getBoundingClientRect();
+          return {version,ready:!!boot.settings&&Array.isArray(boot.entries),visible:!!rect&&rect.width>0&&rect.height>0,
+            workspaceReady:!!heading&&heading.width>0&&heading.height>0};
         })().then(done,e=>done({error:String(e)}));`,
         args: [],
       });
-      if (result.error || !result.ready || !result.visible || result.version !== manifest.applicationVersion)
+      if (result.error || !result.ready || !result.visible || !result.workspaceReady || result.version !== manifest.applicationVersion)
         throw Error('Actual Linux native bootstrap failed: ' + JSON.stringify(result));
       if (label === 'appimage') receipt.appImageLaunched = true;
       else receipt.debianBinaryLaunched = true;
@@ -116,6 +123,7 @@ try {
         package: label,
         nativeBootstrap: true,
         frontendVisible: true,
+        workspaceReady: true,
         versionMatches: true,
       });
     } finally {
@@ -124,6 +132,7 @@ try {
       await fs.writeFile(path.join(root, label + '-driver.log'), Buffer.concat(logs));
     }
   }
+  receipt.workspaceReady = true;
   receipt.complete = true;
 } finally {
   await fs.writeFile(path.join(root, 'startup.json'), JSON.stringify(receipt, null, 2) + '\n');

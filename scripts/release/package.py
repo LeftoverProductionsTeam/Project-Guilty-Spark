@@ -357,7 +357,8 @@ def seal(directory, gates_file, startup_file, installer_file=None, installed_sta
          len(gates["gates"]) == len(GATES) and all(g["exitCode"] == 0 for g in gates["gates"]),
          "Full release test gates have not passed")
     need(startup["executableSha256"] == manifest["executableSha256"] and
-         startup["applicationVersion"] == manifest["applicationVersion"] and startup["mockedIpc"] is False,
+         startup["applicationVersion"] == manifest["applicationVersion"] and startup["mockedIpc"] is False and
+         startup.get("workspaceReady") is True,
          "Native startup did not test this application")
     verification = {"complete": True, "testGates": gates["gates"],
                     "nativeStartup": startup, "testReceiptSha256": sha(Path(gates_file).read_bytes())}
@@ -373,6 +374,7 @@ def seal(directory, gates_file, startup_file, installer_file=None, installed_sta
         need(installed["complete"] is True and installed["mockedIpc"] is False and
              installed["sourceCommit"] == manifest["sourceCommit"] and
              installed["executableSha256"] == manifest["installedExecutableSha256"] and
+             installed.get("workspaceReady") is True and
              installed["applicationVersion"] == manifest["applicationVersion"], "Installed app did not launch")
         verification["installer"] = install
         verification["installedNativeStartup"] = installed
