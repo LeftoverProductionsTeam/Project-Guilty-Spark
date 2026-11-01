@@ -78,6 +78,7 @@ import {EditorAudioProvider,EditorSoundControls} from './components/EditorAudio'
 import ExternalMapSync from './components/ExternalMapSync';
 import {hasSourceBoundEdits} from './externalMapSync';
 import SettingsPanel from './components/SettingsPanel';
+const GamesTools = lazy(() => import('./components/GamesTools'));
 import MapTools from './components/MapTools';
 import WorkspaceSession from './components/WorkspaceSession';
 import WorkspacePanels,{WorkspacePanel}from'./components/WorkspacePanels';
@@ -927,13 +928,16 @@ export default function App() {
             <option value="mccSteam">Halo 1 · MCC (Steam)</option><option value="haloCustomEdition">Halo Custom Edition</option><option value="haloPc">Halo PC</option><option value="chupathingyCe">ChupathingyCE</option><option value="openCe">OpenCE</option><option value="haloPcTrial">Halo PC Trial</option><option value="macRetail">Halo Mac</option><option value="macDemo">Halo Mac Demo</option><option value="haloMd">HaloMD</option><option value="haloXbox">Halo Xbox</option>
           </select></label>
           <DependencyPanel project={current} runtime={dependencyRuntime} onSetupChanged={next=>{setData(next);setEpoch(value=>value+1);}} onProjectUpdated={applyDependencyChoice} onChooseAssets={()=>setWorkspace(current?'assets':'library')}/>
-        </div>:<Preferences
+        </div>:<GamesTools data={data} project={current} busy={busy}
+          onSelectMap={id=>void openProject(id,'settings')} onLibrary={()=>setWorkspace('library')}
+          onSetup={id=>{setDependencyRuntime(id);openDependencySetup();}}
+          onOpenWorkspace={target=>setWorkspace(target)}><Preferences embedded
           data={data}
           undoLimit={history.limit} onUndoLimit={limit=>dispatch({type:'history-limit',limit})}
           onApply={applySettings}
           onAction={action}
           onRuntimes={() => setWorkspace('runtimes')}
-        />}</SettingsPanel>
+        /></GamesTools>}</SettingsPanel>
       );
     if (workspace === 'compare')
       return (

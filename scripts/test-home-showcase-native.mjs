@@ -114,7 +114,16 @@ try {
   }
   await page.screenshot({ path: path.join(output, 'monitor-left.png') });
   const bounds = await canvas.boundingBox();
-  await page.mouse.move(bounds.x + bounds.width + 10, bounds.y + bounds.height / 2);
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  await expect(preview).toBeVisible({ timeout: 5000 });
+  // The borderless showcase can reach past the client edge. A point outside
+  // that edge is not a reliable pointer event in an owned native WebView.
+  const rightPoint = {
+    x: Math.min(viewport.width - 5, bounds.x + bounds.width + 10),
+    y: Math.min(viewport.height - 5, bounds.y + bounds.height / 2),
+  };
+  receipt.rightPointer = { ...rightPoint, viewport, canvas: bounds };
+  await page.mouse.move(rightPoint.x, rightPoint.y);
   if (!receipt.baseline) {
     await expect
       .poll(async () => JSON.parse((await canvas.getAttribute('data-gs-showcase-pose')) ?? '{}').yaw)

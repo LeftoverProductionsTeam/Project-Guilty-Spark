@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useMapState } from '../mapSession';
 import { Server, Save, RefreshCw, Unplug } from 'lucide-react';
 import { call, native } from '../api';
 import type { Project, RuntimeId } from '../types';
@@ -47,11 +48,21 @@ export default function CommunityHostAdapter({
   onRuntime: (id: RuntimeId) => void;
   onSetup: () => void;
 }) {
-  const [mode, setMode] = useState<'multiplayer' | 'campaign' | 'firefight'>('multiplayer'),
-    [players, setPlayers] = useState(128),
-    [map, setMap] = useState(project?.source?.scenarioPath.split(/[\\/]/).at(-1) ?? 'bloodgulch'),
-    [variant, setVariant] = useState('slayer'),
-    [name, setName] = useState('Spark private');
+  const scope = project?.id ?? 'global',
+    key = `hosting.community.${runtime}`;
+  const [mode, setMode] = useMapState<'multiplayer' | 'campaign' | 'firefight'>(
+      scope,
+      `${key}.mode`,
+      'multiplayer',
+    ),
+    [players, setPlayers] = useMapState(scope, `${key}.players`, 128),
+    [map, setMap] = useMapState(
+      scope,
+      `${key}.map`,
+      project?.source?.scenarioPath.split(/[\\/]/).at(-1) ?? 'bloodgulch',
+    ),
+    [variant, setVariant] = useMapState(scope, `${key}.variant`, 'slayer'),
+    [name, setName] = useMapState(scope, `${key}.name`, 'Spark private');
   const [plan, setPlan] = useState<HostPlan | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -160,14 +171,12 @@ export default function CommunityHostAdapter({
       <div className="section-heading">
         <h2>
           <Server size={16} />
-          Community host adapter
+          {runtime === 'openCe' ? 'OpenCE' : 'ChupathingyCE'} · host game
         </h2>
         <Pill>Private by default</Pill>
       </div>
       <p>
-        Prepare a real documented host configuration and inspect an owned server through Delta Control.
-        Capacity is a requested setting. Multiplayer 128, campaign eight and Firefight eight have separate
-        engine and game-acceptance gates.
+        Choose a map and mode, then check and save a private server profile. This does not start a server.
       </p>
       {!['chupathingyCe', 'openCe'].includes(runtime) && (
         <Notice tone="info">
@@ -176,7 +185,7 @@ export default function CommunityHostAdapter({
           <button onClick={onSetup}>MCC / runtime setup</button>
         </Notice>
       )}
-      <div className="button-row">
+      <div className="community-host-fields">
         <label>
           Mode
           <select
@@ -189,9 +198,9 @@ export default function CommunityHostAdapter({
               setPlayers(value === 'multiplayer' ? 128 : 8);
             }}
           >
-            <option value="multiplayer">Multiplayer · up to 128 requested</option>
-            <option value="campaign">Campaign · eight-player goal</option>
-            <option value="firefight">Firefight · eight-player goal</option>
+            <option value="multiplayer">Multiplayer</option>
+            <option value="campaign">Campaign · experimental</option>
+            <option value="firefight">Firefight · experimental</option>
           </select>
         </label>
         <label>
@@ -219,7 +228,7 @@ export default function CommunityHostAdapter({
         {mode === 'multiplayer' && (
           <>
             <label>
-              Map selector
+              Map name
               <input
                 aria-label="Community host map"
                 disabled={busy}
@@ -244,10 +253,14 @@ export default function CommunityHostAdapter({
           Check host adapter
         </button>
       </div>
+      <p className="subtle community-host-capacity">
+        Player limits are requested settings; 128-player multiplayer and eight-player campaign / Firefight
+        remain unverified.
+      </p>
       {error && <Notice>{error}</Notice>}
       {message && <Notice tone="info">{message}</Notice>}
       {plan && (
-        <div aria-live="polite">
+        <div className="community-host-result" aria-live="polite">
           <h3>
             {plan.readiness === 'readyForReview'
               ? 'Ready for owner review'
@@ -284,14 +297,14 @@ export default function CommunityHostAdapter({
           </p>
         </div>
       )}
-      <details>
-        <summary>Connect to my existing local / forwarded Delta Control service</summary>
+      <details className="community-host-control">
+        <summary>Existing server · authenticated status</summary>
         <p>
           Use an owner-controlled server with its documented authenticated API enabled on loopback, or a
           manually configured local tunnel. Spark does not enable remote administration, public listing, UPnP
           or firewall rules.
         </p>
-        <div className="button-row">
+        <div className="community-control-fields">
           <label>
             Loopback address
             <input
@@ -299,7 +312,7 @@ export default function CommunityHostAdapter({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               maxLength={80}
-              disabled={!!control||busy}
+              disabled={!!control || busy}
             />
           </label>
           <label>
@@ -311,7 +324,7 @@ export default function CommunityHostAdapter({
               value={token}
               onChange={(e) => setToken(e.target.value)}
               maxLength={256}
-              disabled={!!control||busy}
+              disabled={!!control || busy}
             />
           </label>
           <button disabled={!native || busy || !!control || !token} onClick={() => void connect()}>

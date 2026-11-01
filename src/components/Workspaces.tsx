@@ -555,12 +555,14 @@ export function Preferences({
   onApply,
   onAction,
   onRuntimes,
+  embedded=false,
   undoLimit=100,onUndoLimit,
 }: {
   data: Bootstrap;
   onApply: (s: Settings) => Promise<void>;
   onAction: (f: () => Promise<unknown>, s?: string) => Promise<void>;
   onRuntimes: () => void;
+  embedded?: boolean;
   undoLimit?:number;onUndoLimit?:(limit:number)=>void;
 }) {
   const [draft, setDraft] = useState(data.settings);
@@ -606,10 +608,10 @@ export function Preferences({
     ],
   ];
   return (
-    <div className="settings-page">
+    <div className={`settings-page${embedded ? ' preferences-embedded' : ''}`}>
       <PageTitle
         eyebrow="PREFERENCES & RUNTIMES"
-        title="A workbench that knows its limits."
+        title={embedded ? 'Folders & preferences' : 'A workbench that knows its limits.'}
         description="Connect installed tools and runtimes. All paths and integrations stay local."
         actions={
           <button className="primary" onClick={() => void onApply(draft).catch(()=>{})}>
@@ -702,11 +704,8 @@ export function Preferences({
             <label>Interval in minutes<input type="number" min={1} max={1440} value={draft.snapshotIntervalMinutes??10} onChange={e=>setDraft({...draft,snapshotIntervalMinutes:Number(e.target.value)})}/></label>
             <label>Snapshots to retain<input type="number" min={1} max={100} value={draft.snapshotRetention??20} onChange={e=>setDraft({...draft,snapshotRetention:Number(e.target.value)})}/></label>
             <p>Open the current project’s Preservation record to preview and confirm a restore.</p></div>
-          <button className="primary" onClick={() => void onApply(draft).catch(()=>{})}>
-            Apply preferences
-          </button>
         </section>
-        <aside>
+        {!embedded && <aside>
           <section className="surface">
             <div className="section-heading">
               <h3>
@@ -764,7 +763,7 @@ export function Preferences({
           {[...data.diagnostics, ...data.installation.diagnostics].map((d, i) => (
             <Notice key={i}>{d}</Notice>
           ))}
-        </aside>
+        </aside>}
       </div>
     </div>
   );

@@ -106,7 +106,8 @@ test('browser preview states native boundaries and navigates workspaces', async 
   await chooseTool(page,"Tag editor");
   await expect(page.getByRole('heading', { name: 'Choose a world to work on' })).toBeVisible();
   await chooseTool(page,"Settings & tools");
-  await expect(page.getByText('Live editing · AI replication · VR')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Games & tools', exact: true })).toBeVisible();
+  await expect(page.getByText('The desktop app checks installed tools and map sources.', { exact: false })).toBeVisible();
   await chooseTool(page,'Map library');
   await page.getByRole('button', { name: 'Import map or archive', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('desktop application');

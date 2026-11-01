@@ -434,7 +434,10 @@ fn arguments(profile: &Path, port: u16, mode: Mode) -> Reply<Vec<std::ffi::OsStr
         return Err("Private server has no valid local endpoint".into());
     }
     let mut arguments: Vec<std::ffi::OsString> =
-        ["-window", "-vidmode", "1280,720,60", "-novideo", "-path"]
+        // The same-machine dedicated engine can already own UDP 2303 even
+        // when its requested game port differs. Never reuse CE's client-port
+        // default: zero asks the engine for its own random client endpoint.
+        ["-window", "-vidmode", "1280,720,60", "-novideo", "-cport", "0", "-path"]
             .map(Into::into)
             .into();
     arguments.push(profile.as_os_str().to_owned());
@@ -479,6 +482,13 @@ mod tests {
         let game = arguments(profile, 12345, Mode::Playtest).unwrap();
         assert_eq!(game[game.len() - 2], "-connect");
         assert_eq!(game.last().unwrap(), "127.0.0.1:12345");
+        // A host's query/game sockets can include 2303. Both entry paths must
+        // ask CE for an independent endpoint rather than collide with it.
+        for args in [&menu, &game] {
+            let at = args.iter().position(|value| value == "-cport").unwrap();
+            assert_eq!(args[at + 1], "0");
+            assert_eq!(args.iter().filter(|value| *value == "-cport").count(), 1);
+        }
         assert!(arguments(profile, 0, Mode::Playtest).is_err());
     }
     fn fixture() -> (tempfile::TempDir, Pins) {

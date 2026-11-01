@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 const args = new Map();
 for (let at = 2; at < process.argv.length; at += 2) {
   if (
-    !['--host-id', '--host-dir', '--client-id', '--client-dir', '--maps', '--output', '--mode'].includes(
+    !['--host-id', '--host-dir', '--client-id', '--client-dir', '--maps', '--output', '--mode', '--ce-map'].includes(
       process.argv[at],
     ) ||
     !process.argv[at + 1] ||
@@ -32,12 +32,15 @@ if (
 const hostId = args.get('--host-id'),
   clientId = args.get('--client-id'),
   mode = args.get('--mode') ?? 'bloodgulch:slayer';
-const allowed = ['opence-build-329', 'chupathingy-v0.8.1c'];
+const allowed = ['opence-build-329', 'chupathingy-v0.8.1c', 'opence-build-335', 'chupathingy-v0.8.1d'];
+const isOpenCe = (id) => id.startsWith('opence-build-');
 if (
   ![hostId, clientId].every((id) => allowed.includes(id)) ||
-  !['bloodgulch:slayer', 'a30:coop'].includes(mode)
+  !['bloodgulch:slayer', 'a30:coop', 'ce:slayer'].includes(mode)
 )
   throw Error('Use the exact pinned test releases and reviewed game modes');
+if ((mode === 'ce:slayer') !== args.has('--ce-map'))
+  throw Error('ce:slayer requires an explicitly selected native Custom Edition cache');
 const output = path.resolve(args.get('--output')),
   fixtures = path.resolve(args.get('--maps')),
   label = path.basename(output);
@@ -45,7 +48,24 @@ await fs.mkdir(output);
 const publisher = JSON.parse(
   await fs.readFile(new URL('../docs/fixtures/c36-community-client-files.json', import.meta.url), 'utf8'),
 );
+const installedPublisher = JSON.parse(
+  await fs.readFile(new URL('../docs/fixtures/c41-installed-community-runtimes.json', import.meta.url), 'utf8'),
+);
+publisher.clients.push(...installedPublisher.clients.filter((release) =>
+  ['opence-build-335', 'chupathingy-v0.8.1d'].includes(release.id) && release.publisherDigestVerified));
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+let ceMap;
+if (args.has('--ce-map')) {
+  const source = path.resolve(args.get('--ce-map')), stat = await fs.lstat(source);
+  const name = path.basename(source, '.map');
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 2048 || stat.size > 512 * 1024 * 1024 ||
+      !/^[a-z][a-z0-9_]{0,30}$/.test(name)) throw Error('Choose a bounded CE cache with a safe native map name');
+  const bytes = await fs.readFile(source);
+  if (bytes.subarray(0, 4).toString('ascii') !== 'daeh' || bytes.readUInt32LE(4) !== 609 ||
+      bytes.readUInt16LE(0x60) !== 1 || bytes.subarray(0x20, 0x40).toString('ascii').split('\0')[0] !== name)
+    throw Error('The selected map must be an actual CE multiplayer cache with its native filename');
+  ceMap = { source, name, bytes: bytes.length, sha256: hash(bytes), cacheVersion: 609 };
+}
 const sourceNames = ['ui.map', 'carousel.map', mode === 'a30:coop' ? 'a30.map' : 'bloodgulch.map'];
 const extraction = { files: [] };
 for (const name of sourceNames) {
@@ -98,6 +118,8 @@ const plan = {
 const expected = {
   'opence-build-329': 'b581be3dacc832621624b0af86b6c5c73ce98dce8b6927552c1aca3e0810185c',
   'chupathingy-v0.8.1c': 'bd01e38996ec9787d8413ce84033d4cd3e1878099d3af27630a7d7ea493a1c4a',
+  'opence-build-335': '788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0',
+  'chupathingy-v0.8.1d': 'b2f8ea992ed4031461bc638f8af80c08ec8905c5f73c97c483e86f25273b18d4',
 };
 const report = {
   schemaVersion: 1,
@@ -111,6 +133,7 @@ const report = {
   routerFirewallChanges: false,
   executed: [],
   errors: [],
+  ...(ceMap ? { customEditionMap: ceMap, compatibilityDeployment: true, nativeCompilationPerformedByRunner: false } : {}),
 };
 const children = [];
 const completions = [];
@@ -122,29 +145,27 @@ async function launch(role, id) {
   await fs.mkdir(path.join(root, 'data', 'maps'));
   await fs.mkdir(path.join(root, 'save'));
   await fs.mkdir(path.join(root, 'logs'));
-  async function copyDirectory(relative = '') {
-    for (const row of await fs.readdir(path.join(client, relative), { withFileTypes: true })) {
-      if (
-        row.isSymbolicLink() ||
-        (!row.isDirectory() && !row.isFile()) ||
-        !/^[A-Za-z0-9_. -]+$/.test(row.name)
-      )
-        throw Error('Unexpected release member');
-      const member = path.join(relative, row.name);
-      if (row.isDirectory()) {
-        await fs.mkdir(path.join(root, member));
-        await copyDirectory(member);
-      } else {
-        const known = publisher.clients
-          .find((release) => release.id === id)
-          ?.files.find((file) => file.name === member.replaceAll('\\', '/'));
-        if (!known || hash(await fs.readFile(path.join(client, member))) !== known.sha256)
-          throw Error('Release member not in verified publisher inventory');
-        await fs.copyFile(path.join(client, member), path.join(root, member), fs.constants.COPYFILE_EXCL);
-      }
+  // Installed folders now contain user maps, profiles and configuration. Copy
+  // ONLY the exact publisher inventory; never copy or rewrite those user files.
+  const release = publisher.clients.find((entry) => entry.id === id);
+  if (!release?.files.length) throw Error('Missing pinned publisher inventory');
+  for (const known of release.files) {
+    const parts = known.name.split('/');
+    if (parts.some((part) => !/^[A-Za-z0-9_. -]+$/.test(part) || part === '.' || part === '..'))
+      throw Error('Unsafe publisher member path');
+    for (let n = 0; n <= parts.length; n++) {
+      const stat = await fs.lstat(path.join(client, ...parts.slice(0, n)));
+      if (stat.isSymbolicLink() || (n < parts.length ? !stat.isDirectory() : !stat.isFile()))
+        throw Error('Linked or invalid publisher member');
     }
+    const original = path.join(client, ...parts), target = path.join(root, ...parts);
+    if (hash(await fs.readFile(original)) !== known.sha256)
+      throw Error('Release member differs from verified publisher inventory');
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.copyFile(original, target, fs.constants.COPYFILE_EXCL);
+    if (hash(await fs.readFile(target)) !== known.sha256)
+      throw Error('Copied publisher member differs');
   }
-  await copyDirectory();
   const executable = path.join(root, 'halo.exe');
   if (hash(await fs.readFile(executable)) !== expected[id]) throw Error('Release EXE identity differs');
   const inputs = [];
@@ -161,18 +182,28 @@ async function launch(role, id) {
     if (hash(await fs.readFile(target)) !== file.sha256) throw Error('Game copy identity differs');
     inputs.push(file);
   }
+  if (ceMap) {
+    const folder = isOpenCe(id) ? 'custom_maps' : 'maps_ce';
+    const relativePath = path.join(folder, ceMap.name + '.map');
+    const target = path.join(root, 'data', relativePath);
+    await fs.mkdir(path.dirname(target));
+    if (hash(await fs.readFile(ceMap.source)) !== ceMap.sha256) throw Error('Selected CE cache changed');
+    await fs.copyFile(ceMap.source, target, fs.constants.COPYFILE_EXCL);
+    if (hash(await fs.readFile(target)) !== ceMap.sha256) throw Error('CE deployment hash differs');
+    inputs.push({ name: ceMap.name + '.map', relativePath, bytes: ceMap.bytes, sha256: ceMap.sha256, cacheVersion: 609 });
+  }
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('HALO_')));
   Object.assign(
     env,
     plan.proposedTwoGameTest.sharedEnvironment,
-    id === allowed[0]
+    isOpenCe(id)
       ? plan.proposedTwoGameTest.openCeAdditionalEnvironment
       : plan.proposedTwoGameTest.chupathingyAdditionalEnvironment,
     {
       HALO_DATA_ROOT: path.join(root, 'data'),
       HALO_SAVE_ROOT: path.join(root, 'save'),
       HALO_LOG_ROOT: path.join(root, 'logs'),
-      HALO_NETWORK_TEST: role === 'host' ? `host:${mode}` : 'join',
+      HALO_NETWORK_TEST: role === 'host' ? `host:${ceMap ? (isOpenCe(id) ? 'custom_maps\\' + ceMap.name : ceMap.name + '@ce') + ':slayer' : mode}` : 'join',
       HALO_NETWORK_TEST_START: '12',
       HALO_NETWORK_TEST_SHOOT: '4',
       HALO_NETWORK_TEST_KILL: '17',
@@ -181,7 +212,7 @@ async function launch(role, id) {
       HALO_NET_ADDRESS: role === 'host' ? '127.0.0.210' : '127.0.0.211',
       HALO_NET_BROADCAST: role === 'host' ? '127.0.0.211' : '127.0.0.210',
       HALO_HIDDEN_WINDOW: 'true',
-      HALO_NULL_RENDERER: id === allowed[0] ? 'true' : 'false',
+      HALO_NULL_RENDERER: isOpenCe(id) ? 'true' : 'false',
       HALO_CONSOLE_LOG: 'all',
       HALO_DISCORD_PRESENCE: 'false',
       HALO_UPDATE_AUTO: 'false',
@@ -189,7 +220,7 @@ async function launch(role, id) {
       SDL_AUDIO_DRIVER: 'dummy',
     },
   );
-  if (id === allowed[0]) env.SDL_VIDEO_DRIVER = 'dummy';
+  if (isOpenCe(id)) env.SDL_VIDEO_DRIVER = 'dummy';
   const log = createWriteStream(path.join(root, 'stdio.log'), { flags: 'wx' });
   const child = spawn(executable, [], {
     cwd: root,
@@ -200,7 +231,7 @@ async function launch(role, id) {
   children.push(child);
   const record = {
     role,
-    renderer: id === allowed[0] ? 'native-null' : 'hidden-native-window',
+    renderer: isOpenCe(id) ? 'native-null' : 'hidden-native-window',
     runtime: id,
     pid: child.pid,
     exeSha256: expected[id],
@@ -244,7 +275,7 @@ async function launch(role, id) {
       record.inputsUnchanged = true;
       try {
         for (const file of inputs)
-          if (hash(await fs.readFile(path.join(root, 'data', 'maps', file.name))) !== file.sha256)
+          if (hash(await fs.readFile(path.join(root, 'data', file.relativePath ?? path.join('maps', file.name)))) !== file.sha256)
             record.inputsUnchanged = false;
       } catch (error) {
         record.inputsUnchanged = false;

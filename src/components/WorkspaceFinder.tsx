@@ -57,7 +57,7 @@ export default function WorkspaceFinder({items,onNavigate,onClose,project=null,s
       <span id={resultStatusId} className="gs-sr-only" role="status" aria-live="polite">{results.length} matching workspaces. {results.length ? `Selected: ${results[activeIndex].label}.` : 'Try a shorter query.'}</span>
       <div id="gs-finder-results" className="gs-finder-results" aria-label="Matching workspaces">
         {settings&&<><label>Halo runtime<select aria-label="Tool launcher runtime" value={runtime} onChange={e=>setRuntime(e.target.value as RuntimeId)}>{Object.entries(runtimeNames).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label><ToolEcosystem project={project} settings={settings} runtime={runtime} search={query} onSettings={()=>{onClose();onSettings?.();}} onOpenWorkspace={target=>{onNavigate(target);onClose();}}/></>}
-        {results.map((item,index)=><button key={item.id} className={activeIndex===index?'gs-finder-item active':'gs-finder-item'} aria-current={activeIndex===index?'true':undefined} onMouseEnter={()=>setSelected(index)} onClick={()=>navigate(item.id)}>
+        {results.map((item,index)=><button key={`${item.id}:${item.label}`} className={activeIndex===index?'gs-finder-item active':'gs-finder-item'} aria-current={activeIndex===index?'true':undefined} onMouseEnter={()=>setSelected(index)} onClick={()=>navigate(item.id)}>
           <span><strong>{item.label}</strong><small>{item.help}</small></span><ArrowRight size={16}/>
         </button>)}
         {!results.length&&<div className="gs-finder-empty" role="status">No workspace matches. Try a simpler term such as “maps”, “tags”, or “build”.</div>}

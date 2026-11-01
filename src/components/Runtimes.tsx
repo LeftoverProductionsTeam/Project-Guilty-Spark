@@ -127,9 +127,9 @@ export default function Runtimes({
   return (
     <div className="analysis-page online-page">
       <PageTitle
-        eyebrow="RUNTIMES / LOCAL CAPABILITY EVIDENCE"
+        eyebrow="PLAY / HOST / CONNECT"
         title="Online"
-        description="Choose a session provider, check its runtime and content, then use the matching game’s join and hosting workflow."
+        description="Find a game or host one using your selected Halo."
         actions={
           <button disabled={loading || !native} onClick={() => void refresh()}>
             <RefreshCw size={15} />
@@ -137,7 +137,7 @@ export default function Runtimes({
           </button>
         }
       />
-      <Notice tone="info">Using Eschaton, HMT, SwordEdit, SparkEdit or other historical editors? Open <strong>Modding Academy → Legacy Workflow Lab</strong> to see native/Wine runtime candidates and register an installed copy to launch beside Spark. Detection is not proof of compatibility.</Notice>
+      {tab === 'runtime' && <Notice tone="info">For Eschaton, HMT, SwordEdit and other historical editors, open <strong>Modding Academy → Legacy Workflow Lab</strong> to register a separate installed copy.</Notice>}
       {!native && (
         <Notice tone="info">
           Runtime discovery and file hashing require the desktop application. Browser preview has no runtime
@@ -145,7 +145,8 @@ export default function Runtimes({
         </Notice>
       )}
       {error && <Notice>{error}</Notice>}
-      <div className="tabs workspace-tabs">
+      <div className="online-toolbar">
+      <div className="tabs workspace-tabs" aria-label="Online workspaces">
         <button className={tab === 'servers' ? 'selected' : ''} onClick={() => setTab('servers')}>Find games</button>
         <button className={tab === 'runtime' ? 'selected' : ''} onClick={() => setTab('runtime')}>
           Runtime adapters
@@ -163,7 +164,7 @@ export default function Runtimes({
       )}
       {reports.length > 0 && (
         <label className="runtime-picker">
-          Runtime / preservation family
+          Halo runtime
           <select
             aria-label="Runtime adapter"
             value={selected}
@@ -177,6 +178,7 @@ export default function Runtimes({
           </select>
         </label>
       )}
+      </div>
       {tab==='gameplay'&&<GameplayControls key={project?.id??'global'} project={project} edit={edit} onEditor={()=>onOpenWorkspace('quickforge')}/>}
       {tab==='servers'&&<PlayAndServers project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')} onSettings={onSettings} onHost={()=>setTab('hosting')} onFriends={()=>setTab('friends')}/>}
       {report && tab!=='gameplay' && tab!=='servers' &&
@@ -188,7 +190,13 @@ export default function Runtimes({
             <details><summary>Advanced · installed tool identity &amp; separate launchers</summary><ToolchainShelf project={project} runtime={selected} settings={settings} onSettings={onSettings} onOpenWorkspace={onOpenWorkspace} /></details>
           </>
         ) : tab === 'hosting' ? (
-          selected === 'haloCustomEdition' ? <CustomEditionHost onSetup={onSettings} projectId={project?.id} dirty={dirty} savedRevision={dirty ? null : project?.modifiedAt} onBuild={()=>onOpenWorkspace(project?.quickForge ? 'quickforge' : 'build')}/> : <><CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')}/><HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/></>
+          selected === 'haloCustomEdition' ? <CustomEditionHost onSetup={onSettings} projectId={project?.id} dirty={dirty} savedRevision={dirty ? null : project?.modifiedAt} onBuild={()=>onOpenWorkspace(project?.quickForge ? 'quickforge' : 'build')}/> :
+          selected === 'openCe' || selected === 'chupathingyCe' ? <>
+            <CommunityHostAdapter key={`${project?.id??'global'}:${selected}`} project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')}/>
+            <details className="hosting-runtime-guide"><summary>Map preparation &amp; other hosting options</summary>
+              <HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/>
+            </details>
+          </> : <HostingWorkspace project={project} dirty={dirty} report={report} onBuild={()=>onOpenWorkspace('build')} onCreator={()=>onOpenWorkspace('creator')} onEditor={()=>onOpenWorkspace('quickforge')} onFriends={()=>setTab('friends')}/>
         ) : (
           <Friends
             key={`${selected}:${project?.id ?? ''}`}

@@ -1959,15 +1959,19 @@ small {
   font-weight: 500;
   margin: 15px 0 5px;
 }
-.empty p {
+.empty p,
+.empty-description {
   max-width: 520px;
   font-size: 12px;
 }
+.empty-description { margin-block: 1em; }
 .empty > button,
-.empty p > button {
+.empty p > button,
+.empty-description > button {
   margin-top: 20px;
 }
-.empty p > button {
+.empty p > button,
+.empty-description > button {
   display: flex;
   margin-left: auto;
   margin-right: auto;

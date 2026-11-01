@@ -46,6 +46,113 @@
   align-items: center;
   margin: 12px 0;
 }
+.application .online-page {
+  padding: 12px 18px 16px;
+}
+.application .online-page > .page-title {
+  margin-bottom: 8px;
+  align-items: center;
+}
+.application .online-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.application .online-toolbar .workspace-tabs {
+  flex: 1;
+  align-self: center;
+  align-items: center;
+  margin: 0;
+  border: 0;
+}
+.application .online-toolbar .runtime-picker {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 7px;
+  margin: 4px 0;
+  width: auto;
+  font-size: 11px;
+}
+.application .online-toolbar .runtime-picker select {
+  width: clamp(160px, 20vw, 250px);
+  min-height: 28px;
+  padding: 4px 7px;
+}
+.application .online-page :is(.ce-private-host, .community-host-adapter, .hosting-workspace) {
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.application .community-host-adapter .section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.community-host-fields {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 100px minmax(130px, 1fr) minmax(150px, 1.4fr) minmax(100px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+.application .community-host-fields label,
+.application .community-control-fields label {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0;
+  min-width: 0;
+  font-size: 12px;
+}
+.community-host-fields :is(input, select),
+.community-control-fields input {
+  width: 100%;
+  min-width: 0;
+}
+.application .community-host-adapter :is(input, select, button),
+.application .hosting-workspace :is(select, button) {
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: 12px;
+}
+.community-host-fields > button { margin-bottom: 4px; }
+.application .community-host-capacity { font-size: 11px; margin: 4px 0 8px; }
+.community-control-fields {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(160px, 1.5fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+.community-control-fields > button { margin-bottom: 4px; }
+.application .community-host-result h3 { font-size: 13px; margin: 10px 0 4px; }
+.application .community-host-result :is(p, li),
+.application .hosting-workspace :is(p, li) { font-size: 12px; line-height: 1.45; }
+.application .community-host-control,
+.application .hosting-runtime-guide { margin-top: 8px; padding-block: 7px; border-top: 1px solid var(--line); }
+.application .hosting-workspace .hosting-context { margin: 6px 0; gap: 6px; }
+.application .hosting-action-picker {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 300px);
+  align-items: center;
+  justify-content: start;
+  gap: 10px;
+}
+.application .hosting-workspace .hosting-steps { margin: 8px 0; padding-inline-start: 22px; }
+.application .hosting-workspace .hosting-steps li { padding: 3px 0; }
+.application .hosting-plan-status { color: var(--muted); font-size: 11px; }
+@media (max-width: 1100px) {
+  .community-host-fields { grid-template-columns: minmax(150px, 1.3fr) minmax(80px, .6fr) minmax(130px, 1fr); }
+}
+@media (max-width: 650px) {
+  .application .online-page { padding: 10px; }
+  .application .online-toolbar .workspace-tabs { flex-basis: 100%; flex-wrap: wrap; }
+  .application .online-toolbar .runtime-picker { flex: 1; }
+  .application .online-toolbar .runtime-picker select { flex: 1; width: auto; min-width: 0; }
+  .community-host-fields, .community-control-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .application .hosting-action-picker { grid-template-columns: 1fr; gap: 4px; }
+}
 .gameplay-controls fieldset {
   border: 1px solid var(--line);
   border-radius: 20px 7px;

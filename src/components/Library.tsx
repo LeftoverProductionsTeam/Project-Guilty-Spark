@@ -1,20 +1,22 @@
 import HomeModel from './HomeModel';
 import {
   ArrowDownToLine,
-  ArrowRight,
   Box,
   Check,
   ChevronRight,
   FolderOpen,
   Globe2,
+  Grid2X2,
   HardDrive,
   Plus,
+  List,
   Search,
   ShieldCheck,
   Upload,
   Watch,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMapState } from '../mapSession';
+import '../libraryCompact.css';
 import { native } from '../api';
 import type { Bootstrap, LibraryEntry } from '../types';
 import { formatNumber } from '../editor';
@@ -40,19 +42,20 @@ export default function Library({
   onInitializeInbox: () => void;
   busy: boolean;
 }) {
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [query, setQuery] = useMapState('global', 'library.query', '');
+  const [filter, setFilter] = useMapState('global', 'library.filter', 'all');
+  const [layout, setLayout] = useMapState<'tiles' | 'list'>('global', 'library.layout', 'tiles');
   const entries = data.entries.filter(
     (e) =>
       (filter === 'all' || (filter === 'maps' ? e.version !== null : e.version === null)) &&
       `${e.title} ${e.creator} ${e.engine}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
-    <div className="library-page">
+    <div className={`library-page library-layout-${layout}`}>
       <PageTitle
-        eyebrow="HALO MODERN EVOLVED"
+        eyebrow="MAP LIBRARY"
         title="Your worlds, reimagined."
-        description="Discover, restore, and make something wonderfully unexpected."
+        description={`${data.entries.length} preserved maps and workspaces. Open a project to continue.`}
         actions={
           <>
             <button
@@ -62,11 +65,11 @@ export default function Library({
               <Globe2 size={15} />
               Find community maps
             </button>
-            <button onClick={onNewMap}>
+            <button onClick={onNewMap} disabled={busy}>
               <Box size={15} />
               Create a map
             </button>
-            <button onClick={onNew}>
+            <button onClick={onNew} disabled={busy}>
               <Plus size={15} />
               New workspace
             </button>
@@ -79,30 +82,11 @@ export default function Library({
       />
       <section className="library-hero">
         <div className="hero-copy">
-          <Pill tone="green">
-            <span className="live-dot" />
-            THE PRESERVATION WORKBENCH
-          </Pill>
           <h2>
             Old worlds. <br />
             <span>New possibilities.</span>
           </h2>
-          <p>
-            From your first projectile swap to the next great restoration. Bring your Halo maps into a
-            workspace built for discovery.
-          </p>
-          <div className="gs-hero-actions">
-            <button className="hero-link" onClick={onImport} disabled={busy}>
-              Open a .map or ZIP archive <ArrowRight size={17} />
-            </button>
-            <button
-              className="gs-hero-secondary"
-              onClick={onFindMaps}
-              title="Browse old HaloMods and current Halo map archives in an external browser"
-            >
-              Find classic maps <Globe2 size={17} />
-            </button>
-          </div>
+          <p>Choose a map below, import an archive, or build something new.</p>
         </div>
         <div className="hero-art" aria-label="Live Halo model showcase">
           <HomeModel data={data} />
@@ -122,7 +106,9 @@ export default function Library({
           <strong>
             {data.installation.mccPath ? 'Halo: The Master Chief Collection' : 'Local map library'}
           </strong>
-          <span>{data.installation.mccPath ?? data.inboxDirectory}</span>
+          <span title={data.installation.mccPath ?? data.inboxDirectory}>
+            {data.installation.mccPath ?? data.inboxDirectory}
+          </span>
         </div>
         <Pill tone={data.installation.halo1Installed ? 'green' : 'muted'}>
           {data.installation.halo1Installed ? (
@@ -144,14 +130,6 @@ export default function Library({
           Open Inbox
         </button>
       </div>
-      {data.installation.mccPath && !data.managed && (
-        <div className="mcc-inbox-optin">
-          <span>Optional: create an additional watched import Inbox inside the detected MCC mod folder.</span>
-          <button className="small-button" onClick={onInitializeInbox} disabled={busy}>
-            Create MCC Inbox
-          </button>
-        </div>
-      )}
       <div className="library-toolbar">
         <div className="tabs">
           <button className={filter === 'all' ? 'selected' : ''} onClick={() => setFilter('all')}>
@@ -164,6 +142,9 @@ export default function Library({
             Asset workspaces
           </button>
         </div>
+        <span className="library-result-count" role="status">
+          {entries.length} shown
+        </span>
         <div className="search-input">
           <Search size={16} />
           <input
@@ -173,6 +154,24 @@ export default function Library({
             onChange={(e) => setQuery(e.target.value)}
           />
           <kbd>⌕</kbd>
+        </div>
+        <div className="library-layout-switch" role="group" aria-label="Library layout">
+          <button
+            aria-label="Compact map tiles"
+            aria-pressed={layout === 'tiles'}
+            title="Compact map tiles"
+            onClick={() => setLayout('tiles')}
+          >
+            <Grid2X2 size={15} />
+          </button>
+          <button
+            aria-label="Map list"
+            aria-pressed={layout === 'list'}
+            title="Map list"
+            onClick={() => setLayout('list')}
+          >
+            <List size={15} />
+          </button>
         </div>
       </div>
       {entries.length ? (
@@ -229,24 +228,31 @@ export default function Library({
               </button>
             );
           })}
-          <button className="add-map-card" onClick={onImport}>
-            <Plus size={26} />
-            <strong>Another world awaits</strong>
-            <span>Import a map, ZIP archive or project</span>
-          </button>
         </div>
       ) : (
         <div className="import-dropzone" onDragOver={(e) => e.preventDefault()}>
           <div className="drop-icon">
             <ArrowDownToLine size={28} />
           </div>
-          <h2>{query ? 'No matching projects' : 'Every restoration starts with a map.'}</h2>
+          <h2>
+            {query || filter !== 'all' ? 'No matching projects' : 'Every restoration starts with a map.'}
+          </h2>
           <p>
-            {query
-              ? 'Try a different title, creator, or engine.'
+            {query || filter !== 'all'
+              ? 'Try another search or show all your projects.'
               : 'Drop a .map or ZIP archive into this window, browse for one, or place it in the local Inbox. Original files are always preserved.'}
           </p>
           <div className="gs-empty-map-actions">
+            {(query || filter !== 'all') && (
+              <button
+                onClick={() => {
+                  setQuery('');
+                  setFilter('all');
+                }}
+              >
+                Show all projects
+              </button>
+            )}
             <button onClick={onImport} disabled={busy}>
               <FolderOpen size={15} />
               {busy ? 'Reading cache…' : 'Browse local maps'}
@@ -273,13 +279,17 @@ export default function Library({
             <small>Source copies, integrity hashes, and changes stored in a separate project.</small>
           </span>
         </div>
-        <div>
-          <ArrowDownToLine size={18} />
-          <span>
-            <strong>Built for local preservation.</strong>
-            <small>No telemetry. No public uploads. Your library stays on your computer.</small>
-          </span>
-        </div>
+        {data.installation.mccPath && !data.managed && (
+          <details className="library-options">
+            <summary>Library options</summary>
+            <div className="mcc-inbox-optin">
+              <span>Add a watched import Inbox inside the detected MCC mod folder.</span>
+              <button className="small-button" onClick={onInitializeInbox} disabled={busy}>
+                Create MCC Inbox
+              </button>
+            </div>
+          </details>
+        )}
       </div>
     </div>
   );

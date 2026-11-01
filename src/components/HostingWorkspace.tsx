@@ -72,8 +72,8 @@ export default function HostingWorkspace({
     };
   }, [report.id, action, project?.id, project?.source?.sha256]);
   return (
-    <section className="analysis-card" aria-label="Hosting and servers">
-      <h2>Hosting &amp; servers</h2>
+    <section className="analysis-card hosting-workspace" aria-label="Hosting and servers">
+      <h2>{report.name} · hosting guide</h2>
       <div className="hosting-context">
         <strong>{project?.title ?? 'Choose a map for a matching hosting guide'}</strong>
         <Pill>{report.name}</Pill>
@@ -82,7 +82,7 @@ export default function HostingWorkspace({
         )}
         <Pill>Gameplay session unverified</Pill>
       </div>
-      <label>
+      <label className="hosting-action-picker">
         What do you want to do?
         <select
           aria-label="Hosting action"
@@ -113,7 +113,7 @@ export default function HostingWorkspace({
       {result && (
         <>
           <h3>{result.plan.title}</h3>
-          <p>
+          <p className="hosting-plan-status">
             Documented support: {result.plan.status} · Local test: {result.plan.testStatus} ·{' '}
             {result.plan.automatic ? 'Automated operation' : 'Manual game setup'}
           </p>

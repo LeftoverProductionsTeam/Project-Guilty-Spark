@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "6b7e1da4c50924a324b6d81771df5dadc2508955",
+  "platform": "Windows",
+  "remotePublished": false,
+  "checks": {
+    "rust": {
+      "passed": 606,
+      "ignored": 7,
+      "command": "cargo test --workspace --locked"
+    },
+    "frontend": 274,
+    "browser": 129,
+    "offlineScripts": 59,
+    "interfaceProbe": 2,
+    "typescript": true
+  },
+  "native": {
+    "mockedIpc": false,
+    "connectedRuntimeIds": [
+      "mccSteam",
+      "chupathingyCe",
+      "openCe",
+      "haloCustomEdition"
+    ],
+    "externalToolsLaunchedByUiCheck": false,
+    "showcase": {
+      "sourceHash": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+      "triangles": 1126,
+      "nativeAnimationCount": 3,
+      "textures": 1,
+      "reflections": 1,
+      "quality": "full",
+      "renderRatio": 1.4997704165300099,
+      "leftAndRightPointer": true
+    },
+    "newPerformanceComparison": false
+  },
+  "priorCeAcceptance": {
+    "appSha256": "3c6bd20697254a950ddec50ae5ec4061b3bb59fc286f7075639ac4a3765985c4",
+    "stockBloodGulchJoined": true,
+    "ownerConfirmedMovementAndCollision": true,
+    "originalInstallationFilesUnchanged": 127,
+    "workshopMapSha256": "14440101ff6d8e83bd7a6fe26866ceaa511275df845d30e0f86b82238138807e",
+    "workshopJoined": true,
+    "ownerConfirmedRoomsCorridorRampMaterials": true
+  },
+  "zombieRecovery": {
+    "originalFiles": 67,
+    "allOriginalHashesUnchanged": true,
+    "mccCompilerAccepted": true,
+    "mccCacheSha256": "50f653c605274b2b82e3bf1bcae1baf02108aff792501f176ff74ffcb07b09d1",
+    "ceCompilerAccepted": true,
+    "latestExperimentalCeCacheSha256": "754a8bd688c4d9676d40708039c9caea8abf129957033c8bdb18f2ac08de564a",
+    "missingOriginalCustomSoundCues": 2,
+    "fourRuntimeGameplayAccepted": false
+  },
+  "limitations": {
+    "nonMccLiveLinkAccepted": false,
+    "crossRuntimeCoopAccepted": false,
+    "universalConversionAccepted": false,
+    "completeAudioRenderingParityAccepted": false,
+    "structuralCompiledMapEditingCompleted": false
+  },
+  "artifacts": {
+    "executable": {
+      "sha256": "cd7f5b386a4fef8d3b34ada5916e972eb8ebcbba9a09b5042e055e2f2a450143",
+      "bytes": 40496128,
+      "nativeUiTested": true
+    },
+    "installer": {
+      "sha256": "3b20cc63053c48d77edc4367764bf5c21c89cc508d7f0a106d63bfafacc86944",
+      "bytes": 9809471,
+      "cleanMachineTested": false
+    },
+    "sourceArchive": "Prepared after the local source commit; previous release archives are preserved."
+  }
+}

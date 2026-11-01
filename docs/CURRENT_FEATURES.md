@@ -12,6 +12,7 @@ The latest [measured loading pass](C41_MAP_LOADING_PERFORMANCE.md) batches fully
 - Use Back/Forward to return to a workspace or Settings section. Keyboard undo/redo remains edit history, with a configurable default of 100 entries.
 - Use one fullscreen mode, compact map/header controls, movable/resizable drawers, remembered layouts, searchable tools, onboarding, glossary and Academy guides.
 - Choose Dark Glow colors, white-on-dark themes, whole-window transparency and tint.
+- Use compact library tiles/list with remembered searches. Games & tools shows connected MCC, OpenCE, Chupathingy and Custom Edition cards, scopes tools to the selected runtime/map and keeps advanced paths expandable. Legacy editions remain export targets. [Workflow and exact acceptance](C41_WORKBENCH_FOLLOW_THROUGH.md).
 
 ## Level, geometry and asset editing
 
@@ -60,13 +61,13 @@ The latest [measured loading pass](C41_MAP_LOADING_PERFORMANCE.md) batches fully
 - Author mission beats, HaloScript, Firefight rules, encounters, custom power-up recipes, rotations and game-type plans. Simulations and generated scripts require native/game validation.
 - Browse community listings and supported invitations with runtime-aware handoffs. MCC community-protocol bridging and expanded 8-player/128-player modes remain goals.
 - Connect or optionally install checked Custom Edition into a separate managed location. Prepare private loopback dedicated servers from installed maps or validated project outputs, with exact matching-client copies, startup-file guidance and owned-process cleanup.
-- Dedicated-engine map status and compiler/process tests pass. A genuine client join, visual first-run completion and Workshop collision walkthrough remain unverified.
+- Genuine CE client joins now pass for stock Blood Gulch and a natively compiled two-room Workshop map. The owner verified movement, collision, rooms, corridor, ramp and materials. [Exact scope and native identities](C41_WORKBENCH_FOLLOW_THROUGH.md#ce-gameplay-acceptance).
 - Diagnose full startup errors from the owned CE child. The actual missing graphics configuration and exclusive shader-read conflict have scoped private-copy fixes. Newly extracted OpenCE/Chupathingy files are distinguished from admitted game content and verified playability. [Runtime evidence and limits](C41_NATIVE_AUDIO_PERFORMANCE.md#custom-edition-diagnosis).
 
 ## Next acceptance priorities
 
 1. Load the direct MCC edited copy and compiled Workshop maps in their matching games; verify collisions, materials and interactions through actual play.
-2. Complete CE first-run/join and tunnel/ramp walkthroughs with observed player input.
+2. Complete the independent four-runtime Zombie recovery gates and non-MCC live-link/co-op work. Preserve the accepted CE join/Workshop cases separately from those unfinished tests.
 3. Expand direct writers/native import schemas only with exact format-specific integrity and native tests.
 4. Complete gameplay acceptance for dual-wield firing, sword/lunge, animation-speed sprint and third-person aiming.
 5. Advance the independent live engine, game-peer/AI and all-runtime conversion work. Preserve failed research and use the ledger's explicit gates.

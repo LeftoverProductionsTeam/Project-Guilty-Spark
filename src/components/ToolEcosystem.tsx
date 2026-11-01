@@ -13,6 +13,8 @@ interface ToolDefinition {
   sourceUrl: string;
   license: string;
   inputs: string[];
+  runtimes?: string[];
+  platforms?: string[];
   integration: string;
   handler: string;
   version: string | null;
@@ -38,7 +40,13 @@ interface ToolRow {
 }
 interface EcosystemReport {
   projectId: string | null;
-  context: { runtimeId: string; sourceKind: string; ownedNativeTags: boolean; cacheVersion?: number | null };
+  context: {
+    runtimeId: string;
+    sourceKind: string;
+    ownedNativeTags: boolean;
+    cacheVersion?: number | null;
+    host?: string;
+  };
   sourceIssue: string | null;
   tools: ToolRow[];
   companionCandidates?: { id: string; label: string; reportedWorkflow: string; missingEvidence: string }[];
@@ -59,8 +67,12 @@ export default function ToolEcosystem({
   onSettings,
   onOpenWorkspace,
   search = '',
+  compact = false,
+  heading = 'Tools for this map',
 }: {
   search?: string;
+  compact?: boolean;
+  heading?: string;
   project: Project | null;
   runtime: RuntimeId;
   settings: Settings;
@@ -153,15 +165,45 @@ export default function ToolEcosystem({
   }
   function card(row: ToolRow) {
     const { definition: tool, assessment } = row;
+    const actionName =
+      tool.handler === 'editTags'
+        ? 'tag editing'
+        : tool.handler === 'editLevel'
+          ? 'level editing'
+          : tool.handler === 'testScene'
+            ? 'test scene'
+            : 'managed workflow';
     return (
       <article className="gs-tool-card" key={tool.id}>
         <strong>{tool.label}</strong>
         <Pill tone={assessment.canUseWorkflow ? 'green' : 'muted'}>
           {stateNames[assessment.state] ?? assessment.state}
         </Pill>
-        <p>{tool.purpose}</p>
-        {assessment.executableFound&&['sapien','guerilla','tagTest','invaderEditor'].includes(tool.id)&&<button disabled={busy} onClick={()=>{setBusy(true);setError('');void call<string>('launch_discovered_tool',{runtimeId:runtime,projectId,toolId:tool.id}).then(setMessage,e=>setError(String(e))).finally(()=>setBusy(false));}}>Launch {tool.label}</button>}
-        <p className="subtle">{assessment.detail}</p>
+        <p className="gs-tool-purpose" title={tool.purpose}>
+          {tool.purpose}
+        </p>
+        {assessment.executableFound &&
+          ['sapien', 'guerilla', 'tagTest', 'invaderEditor'].includes(tool.id) && (
+            <button
+              aria-label={`Launch ${tool.label}`}
+              disabled={busy || assessment.state === 'requiresRuntime'}
+              title="Open a blank scratch workspace. Use the managed map editing action to hand off the current map's working source."
+              onClick={() => {
+                setBusy(true);
+                setError('');
+                void call<string>('launch_discovered_tool', {
+                  runtimeId: runtime,
+                  projectId,
+                  toolId: tool.id,
+                })
+                  .then(setMessage, (e) => setError(String(e)))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {compact ? 'Launch' : `Launch ${tool.label}`}
+            </button>
+          )}
+        {(!compact || !assessment.canUseWorkflow) && <p className="subtle">{assessment.detail}</p>}
         {tool.integration === 'externalCompanion' && (
           <>
             <div className="button-row">
@@ -188,21 +230,16 @@ export default function ToolEcosystem({
           <button
             type="button"
             className="small-button"
+            aria-label={`${compact ? 'Edit map · ' : 'Open '}${actionName}`}
             disabled={!assessment.canUseWorkflow}
             onClick={() => open(tool)}
           >
-            Open{' '}
-            {tool.handler === 'editTags'
-              ? 'tag editing'
-              : tool.handler === 'editLevel'
-                ? 'level editing'
-                : tool.handler === 'testScene'
-                  ? 'test scene'
-                  : 'managed workflow'}
+            {compact ? (tool.handler === 'build' ? 'Build map' : 'Edit map') : `Open ${actionName}`}
           </button>
         )}
         <details>
           <summary>Formats, source &amp; license</summary>
+          {compact && assessment.canUseWorkflow && <p>{assessment.detail}</p>}
           <p>{tool.caveat}</p>
           <p>
             Inputs: {tool.inputs.join(', ')} ·{' '}
@@ -231,27 +268,46 @@ export default function ToolEcosystem({
             </>
           )}
         </details>
+        {compact &&
+          (!assessment.executableFound || assessment.state === 'requiresRuntime') &&
+          !['upstreamOnly', 'externalCompanion'].includes(tool.integration) && (
+            <button type="button" className="small-button" onClick={onSettings}>
+              Set up {tool.label}
+            </button>
+          )}
       </article>
     );
   }
   return (
-    <section className="analysis-card tool-ecosystem" aria-label="Source-aware editing tools">
+    <section
+      className={`analysis-card tool-ecosystem${compact ? ' tool-ecosystem-compact' : ''}`}
+      aria-label="Source-aware editing tools"
+    >
       <div className="section-heading">
-        <h2>Tools for this map</h2>
+        <h2>{heading}</h2>
         <Pill>{report?.context.sourceKind ?? 'Choose a map'}</Pill>
+        {compact && (
+          <button type="button" disabled={busy || !native} onClick={() => void refresh()}>
+            {busy ? 'Checking…' : 'Recheck tools'}
+          </button>
+        )}
       </div>
-      <p>
-        Tools use the map’s source format, selected Halo and matching editing kit. Installed programs and
-        native editing readiness are checked separately.
-      </p>
-      <div className="button-row">
-        <button type="button" onClick={onSettings}>
-          Dependencies &amp; setup
-        </button>
-        <button type="button" disabled={busy || !native} onClick={() => void refresh()}>
-          {busy ? 'Checking…' : 'Recheck tools'}
-        </button>
-      </div>
+      {!compact && (
+        <p>
+          Tools use the map’s source format, selected Halo and matching editing kit. Installed programs and
+          native editing readiness are checked separately.
+        </p>
+      )}
+      {!compact && (
+        <div className="button-row">
+          <button type="button" onClick={onSettings}>
+            Dependencies &amp; setup
+          </button>
+          <button type="button" disabled={busy || !native} onClick={() => void refresh()}>
+            {busy ? 'Checking…' : 'Recheck tools'}
+          </button>
+        </div>
+      )}
       {!native && (
         <Notice tone="info">
           The desktop app checks installed tools and map sources. No external application runs in this browser
@@ -269,10 +325,20 @@ export default function ToolEcosystem({
         <>
           <div className="gs-tool-grid">
             {report.tools
-              .filter(row=>!search.trim()||`${row.definition.label} ${row.definition.purpose} ${row.assessment.executableFound?'installed':'install setup'}`.toLowerCase().includes(search.toLowerCase()))
               .filter(
                 (row) =>
-                  row.definition.integration !== 'upstreamOnly' && row.assessment.state !== 'requiresRuntime',
+                  !search.trim() ||
+                  `${row.definition.label} ${row.definition.purpose} ${row.assessment.executableFound ? 'installed' : 'install setup'}`
+                    .toLowerCase()
+                    .includes(search.toLowerCase()),
+              )
+              .filter(
+                (row) =>
+                  row.definition.integration !== 'upstreamOnly' &&
+                  (row.assessment.state !== 'requiresRuntime' ||
+                    (compact &&
+                      row.definition.runtimes?.includes(runtime) &&
+                      row.definition.platforms?.includes(report.context.host ?? 'windows'))),
               )
               .filter(
                 (row) =>

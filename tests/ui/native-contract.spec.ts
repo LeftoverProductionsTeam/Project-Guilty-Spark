@@ -260,6 +260,7 @@ async function mockDesktop(page: Page) {
         if (command === 'compatibility') throw new Error('Synthetic compatibility error');
         if (command === 'launch_readiness') throw new Error('Synthetic readiness error');
         if (command === 'inspect_template') throw new Error('Synthetic template error');
+        if (command === 'tool_ecosystem_report') return { projectId: args.projectId, context: { runtimeId: args.runtimeId, sourceKind: 'Synthetic source' }, sourceIssue: null, tools: [] };
         if (command === 'runtime_report')
           return [
             {
@@ -443,7 +444,7 @@ test('cross-map model placement opens source tags and keeps undo and save in tha
  await library.getByRole('button',{name:'Add test at view',exact:true}).click();await expect(page.locator('.viewport-object-actions strong')).toHaveText('test');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call: any)=>call.command==='prepare_native_asset_import').length)).toBe(1);
  await page.getByRole('button',{name:'Close Asset library',exact:true}).click();await page.locator('.viewport-object-actions').getByRole('button',{name:'Object tags',exact:true}).click();
- const tags=page.getByRole('region',{name:'Object tags panel',exact:true});await expect(tags).toContainText('Synthetic candidate');const value=tags.getByLabel('Velocity',{exact:true});await expect(value).toHaveValue('25');await value.fill('39');await value.press('Enter');await value.focus();await page.keyboard.press('Control+z');await expect(value).toHaveValue('25');await value.focus();await page.keyboard.press('Control+y');await expect(value).toHaveValue('39');await value.focus();await page.keyboard.press('Control+s');
+ const tags=page.getByRole('region',{name:'Object tags panel',exact:true});await expect(tags).toContainText('Synthetic candidate');const value=tags.getByLabel('Velocity',{exact:true});await expect(value).toHaveValue('25');await value.fill('39');await value.press('Enter');await value.focus();await page.keyboard.press('Control+z');await expect(value).toHaveValue('25');await value.focus();await page.keyboard.press('Control+y');await expect(value).toHaveValue('39');await value.focus();await expect(value).toBeFocused();await page.keyboard.press('Control+s');
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.id)).toBe('b');await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');
 });
 
@@ -873,6 +874,7 @@ test('slow onboarding saves keep navigation available and do not steal a later r
 test('hosting uses the selected map and gameplay presets retain fixed left and right gun controls',async({page})=>{
   await mockDesktop(page);await openFixture(page);await chooseTool(page,"Online");
   await page.getByRole('button',{name:'Host game',exact:true}).click();
+  await expect(page.getByRole('region', { name: 'Community host adapter' })).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Synthetic MCC Custom Games guide',exact:true})).toBeVisible();
   await expect(page.getByText('Use Halo CE Custom Games for this multiplayer map.',{exact:true})).toBeVisible();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='runtime_hosting_plan'));expect(calls.at(-1).args.projectId).toBe('a');
@@ -884,6 +886,113 @@ test('hosting uses the selected map and gameplay presets retain fixed left and r
   await chooseTool(page,"Tag editor");await chooseTool(page,"Online");
   await expect(page.getByRole('combobox',{name:'Dual-wield hotkey',exact:true})).toHaveValue('KeyV');
   await expect(page.getByText('Changing a preset does not enable them in the running game.',{exact:false})).toBeVisible();
+});
+test('games and tools scopes connected Halo versions, editors and map handoffs', async ({ page }, testInfo) => {
+  await mockDesktop(page);
+  await openFixture(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.evaluate(() => {
+    const w = window as any, original = w.__TAURI_INTERNALS__.invoke;
+    w.__toolHandoffs = [];
+    addEventListener('guilty-spark-runtime-tool', (event: any) => w.__toolHandoffs.push(event.detail));
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'runtime_report') {
+        const [report] = await original(command, args);
+        return ['mccSteam', 'haloCustomEdition', 'haloPc'].map(id => ({ ...report, id, installation: { root: 'C:/synthetic/' + id, validation: id === 'haloPc' ? 'fail' : 'pass', identity: 'userDeclared' } }));
+      }
+      if (command === 'tool_ecosystem_report') return {
+        projectId: args.projectId, context: { runtimeId: args.runtimeId, sourceKind: 'Synthetic native source', ownedNativeTags: true }, sourceIssue: null,
+        tools: [{ definition: { id: 'guerilla', label: `Synthetic ${args.runtimeId} editor`, purpose: 'Synthetic UI contract; no external program runs.', caveat: 'No native launch evidence.', maintainer: 'Fixture', sourceUrl: 'https://example.invalid', license: 'Fixture', inputs: ['native tags'], integration: 'managed', handler: 'editTags', version: null }, assessment: { state: 'installed', executableFound: true, compatibleSource: true, executableVerified: true, canUseWorkflow: true, detail: 'Synthetic source ready' }, executable: 'C:/synthetic/editor.exe', installationIssue: null }],
+      };
+      if (command === 'launch_discovered_tool') { w.__sparkMock.calls.push({ command, args }); return 'Synthetic launcher contract only; no executable started.'; }
+      return original(command, args);
+    };
+  });
+  await chooseTool(page, 'Settings & tools');
+  await expect(page.getByRole('group', { name: 'Halo versions' }).getByRole('button')).toHaveCount(4);
+  await expect(page.getByRole('button', { name: 'MCC Halo 1 · Connected', exact: true })).toHaveAttribute('data-connected', 'true');
+  await expect(page.getByRole('button', { name: 'OpenCE · Not connected', exact: true })).toHaveAttribute('data-connected', 'false');
+  await expect(page.getByRole('button', { name: /Halo PC · / })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Custom Edition · Connected', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Custom Edition tools', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Launch Synthetic haloCustomEdition editor', exact: true }).click();
+  const calls = await page.evaluate(() => (window as any).__sparkMock.calls.filter((call: any) => call.command === 'launch_discovered_tool'));
+  expect(calls.at(-1).args).toEqual({ runtimeId: 'haloCustomEdition', projectId: 'a', toolId: 'guerilla' });
+  await page.screenshot({ path: testInfo.outputPath('games-tools-1280.png') });
+  await page.getByRole('combobox', { name: 'Map for external tools', exact: true }).selectOption('b');
+  await expect(page.getByRole('combobox', { name: 'Map for external tools', exact: true })).toHaveValue('b');
+  await expect(page.getByRole('button', { name: 'MCC Halo 1 · Connected', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('combobox', { name: 'Map for external tools', exact: true }).selectOption('a');
+  await expect(page.getByRole('button', { name: 'Custom Edition · Connected', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.setViewportSize({ width: 800, height: 600 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('games-tools-800.png') });
+  await page.getByRole('button', { name: 'Edit map · tag editing', exact: true }).click();
+  expect(await page.evaluate(() => (window as any).__toolHandoffs.at(-1))).toEqual({ runtimeId: 'haloCustomEdition', projectId: 'a', actionId: 'editTags' });
+});
+test('compact library keeps its search and layout when leaving and returning', async ({ page }, testInfo) => {
+  await mockDesktop(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.getByRole('button', { name: 'Map list', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search library', exact: true }).fill('baseline');
+  await expect(page.locator('.map-card')).toHaveCount(1);
+  await chooseTool(page, 'Settings & tools');
+  await chooseTool(page, 'Map library');
+  await expect(page.getByRole('textbox', { name: 'Search library', exact: true })).toHaveValue('baseline');
+  await expect(page.getByRole('button', { name: 'Map list', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.map-card')).toHaveCount(1);
+  await page.getByRole('textbox', { name: 'Search library', exact: true }).fill('not-a-project');
+  await page.getByRole('button', { name: 'Show all projects', exact: true }).click();
+  await expect(page.locator('.map-card')).toHaveCount(3);
+  await expect(page.getByRole('textbox', { name: 'Search library', exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Map list', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.screenshot({ path: testInfo.outputPath('library-list-1280.png') });
+  await page.getByRole('button', { name: 'Compact map tiles', exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath('library-tiles-1280.png') });
+  await page.setViewportSize({ width: 800, height: 600 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.getByRole('button', { name: 'Import map or archive', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('library-800.png') });
+});
+test('host game presents one matching runtime setup and keeps compact controls reachable', async ({ page }, testInfo) => {
+  await mockDesktop(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.evaluate(() => {
+    const w = window as any, original = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'runtime_report') {
+        const [report] = await original(command, args);
+        return [report, ...['openCe', 'chupathingyCe', 'haloCustomEdition'].map(id => ({ ...report, id, name: `Synthetic ${id}` }))];
+      }
+      if (command === 'ce_host_catalog') return { executableSha256: 'a'.repeat(64), maps: [{ name: 'bloodgulch', sha256: 'b'.repeat(64) }], projectId: null, projectIssue: null };
+      if (command === 'ce_host_status') return null;
+      return original(command, args);
+    };
+  });
+  await chooseTool(page, 'Online');
+  await page.getByRole('button', { name: 'Host game', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Hosting and servers' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Community host adapter' })).toHaveCount(0);
+  await page.getByLabel('Runtime adapter', { exact: true }).selectOption('openCe');
+  await expect(page.getByRole('region', { name: 'Community host adapter' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Hosting and servers' })).not.toBeVisible();
+  await page.getByLabel('Community host map', { exact: true }).fill('sidewinder');
+  await page.getByLabel('Community host maximum players', { exact: true }).fill('8');
+  await chooseTool(page, 'Map library');
+  await chooseTool(page, 'Online');
+  await expect(page.getByLabel('Community host map', { exact: true })).toHaveValue('sidewinder');
+  await expect(page.getByLabel('Community host maximum players', { exact: true })).toHaveValue('8');
+  await expect(page.getByRole('button', { name: 'Check host adapter', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('host-opence-1280.png') });
+  await page.setViewportSize({ width: 800, height: 600 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.getByRole('button', { name: 'Check host adapter', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('host-opence-800.png') });
+  await page.getByLabel('Runtime adapter', { exact: true }).selectOption('haloCustomEdition');
+  await expect(page.getByRole('region', { name: 'Custom Edition private host' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Community host adapter' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Start private server', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('host-ce-800.png') });
 });
 
 test('native camera position edits persist across tools and restore through the adapter',async({page})=>{
@@ -1200,7 +1309,7 @@ test('numeric-field Ctrl+Z and both redo shortcuts survive autosave; history lim
   await field.focus();await page.keyboard.press('Control+y');await expect(field).toHaveValue('24');
   await field.focus();await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');
   await field.focus();await page.keyboard.press('Control+Shift+z');await expect(field).toHaveValue('24');
-  await chooseTool(page,"Settings & tools");const limit=page.getByRole('spinbutton',{name:'Undo history limit',exact:true});await expect(limit).toHaveValue('100');
+  await chooseTool(page,"Settings & tools");await page.getByText('Advanced folders, backups & preferences', { exact: true }).click();const limit=page.getByRole('spinbutton',{name:'Undo history limit',exact:true});await expect(limit).toHaveValue('100');
   await limit.fill('150');await limit.press('Tab');await expect.poll(()=>page.evaluate(()=>localStorage.getItem('guilty-spark-undo-limit-v1'))).toBe('150');
   await page.reload();await chooseTool(page,"Settings & tools");await expect(page.getByRole('spinbutton',{name:'Undo history limit',exact:true})).toHaveValue('150');
 });
@@ -1231,6 +1340,7 @@ test('maps retain independent tag views, tool profiles and last workspace; a lat
 test('settings Browse survives a bootstrap refresh without erasing other drafts', async ({ page }) => {
   await mockDesktop(page);
   await chooseTool(page,"Settings & tools");
+  await page.getByText('Advanced folders, backups & preferences', { exact: true }).click();
   await page
     .getByRole('textbox', { name: 'Halo Textures and shared sounds', exact: true })
     .fill('C:/synthetic/resources');

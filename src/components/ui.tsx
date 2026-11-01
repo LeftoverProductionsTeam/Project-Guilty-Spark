@@ -69,7 +69,7 @@ export function Empty({
     <div className="empty">
       <div className="empty-icon">{icon}</div>
       <h2>{title}</h2>
-      <p>{children}</p>
+      <div className="empty-description">{children}</div>
       {action}
     </div>
   );

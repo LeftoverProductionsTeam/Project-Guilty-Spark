@@ -10,7 +10,7 @@ A Halo 1 creation and preservation workbench with a visual level editor, native 
 
 | Workspace | Available workflow | Evidence and boundaries |
 | --- | --- | --- |
-| Map library | Preserve owned maps, compare variants, download supported map/ZIP releases, discover linked runtime assets, and open independent map tabs/windows. Animated native monitor showcase. | [Native assets and showcase](docs/NATIVE_ASSETS_AND_SHOWCASE.md) |
+| Map library | Compact map tiles/list, remembered search, preserved imports, variants, supported downloads, linked runtime assets and independent map tabs/windows. Animated native monitor showcase. | [Workbench follow-through](docs/C41_WORKBENCH_FOLLOW_THROUGH.md), [native showcase](docs/NATIVE_ASSETS_AND_SHOWCASE.md) |
 | Level editor / QuickForge | Fly, select and group objects; edit transforms/tags in drawers; drag verified assets; use collision-aware End snapping, keyboard undo/redo and per-map state. | [Connected source workflow](docs/WORKBENCH_INTEGRATION.md) |
 | BSP Workshop | Four linked views, convex brush editing, extrusion/clipping, face materials/UVs, rooms, corridors, ramps and source collision. Native H1A/CE compiler paths. | [Workshop and traversal gates](docs/BSP_WORKSHOP.md) |
 | Tag editor / Smart Edit | Collapsible class/tag tree, typed fields and dependency navigation. Save reviewed existing MCC Halo 1 scalar/placement changes directly into a separate validated cache copy. | [Smart Edit workflow and supported cells](docs/SMART_EDIT_WORKFLOWS.md) |
@@ -19,7 +19,7 @@ A Halo 1 creation and preservation workbench with a visual level editor, native 
 | Renderer / sound | Source models/materials, supported reflections, lightmaps, decals, sky/fog and quality controls; compatible-runtime image previews, verified spatial rehearsal and bounded original-loop native MCC QuickForge builds. | [Original bitmap resources](docs/ORIGINAL_BITMAP_RESTORATION.md), [native looping emitters](docs/NATIVE_LOOPING_EMITTERS.md) |
 | SparkLink | Private TLS invitations, roles, ordered revisions, conflicts, per-author undo, durable recovery and frozen source builds. Bounded native field/publication/placement workflow across three real processes. | [Exact shared-content acceptance](docs/C39_NATIVE_CONTENT_ACCEPTANCE.md) |
 | Machinima / Creator | Camera paths, actor/animation rehearsal, detached Recording Director, editor WebM/audio takes and native script source workflows. | [Recording](docs/C35_DIRECTOR_RECORDING.md), [native camera/script boundaries](docs/NATIVE_GAMEPLAY_AND_AUDIO.md) |
-| Online | Runtime-aware invitations, community listings, checked private CE dedicated hosting, saved-project output selection and exact matching-client preparation/startup. | [Private host](docs/CUSTOM_EDITION_PRIVATE_HOST.md), [matching client](docs/CE_MATCHING_CLIENT_PLAYTEST.md), [first-run help](docs/CE_STARTUP_AND_FIRST_RUN.md) |
+| Games & tools / Online | Four connected Halo cards, runtime/map-specific tool launch and managed editing, external-save review, compact hosting and matching CE clients. Local CE joins and the two-room Workshop walkthrough passed. | [Exact evidence and limits](docs/C41_WORKBENCH_FOLLOW_THROUGH.md), [matching client](docs/CE_MATCHING_CLIENT_PLAYTEST.md) |
 
 The desktop Features & workflows page contains short instructions and operation-specific limits. [Current features](docs/CURRENT_FEATURES.md) separates accepted editor/compiler results from remaining game/runtime work.
 
@@ -42,7 +42,7 @@ For MCC tools: Steam → Library → include Tools → **Halo: CE Mod Tools - MC
 - Arbitrary live spawning, live BSP replacement, game-peer editor/AI replication and an MCC-to-community lobby protocol bridge.
 - Complete engine rendering/audio parity, compressed animation coverage, lighting/fog baking and general source reconstruction. [Original-loop sound emitters](docs/NATIVE_LOOPING_EMITTERS.md) now have bounded MCC QuickForge compilation and exact native sample acceptance; custom audio/event baking and in-game listening remain open.
 - Fully accepted dual-wield firing, player energy-sword lunge, third-person aim correction, expanded campaign/Firefight/player counts and new live-session gameplay acceptance.
-- A genuine CE client join, visual first-run acceptance and Workshop collision walkthrough. Dedicated-server status and a client process launch do not prove these.
+- Cross-runtime Zombie Apocalypse gameplay acceptance. CE joins and the two-room Workshop walkthrough passed separately; they do not establish that the Zombie conversion loads. [Per-runtime results](docs/C41_WORKBENCH_FOLLOW_THROUGH.md#four-runtime-integration-remains-an-engineering-task).
 
 All **398 requirement/evidence rows** remain in the [cumulative ledger](docs/MASTER_FEATURE_LEDGER.csv). Historical C35–C39 source, failed experiments and later research remain preserved. [Engineering backlog](docs/UNIVERSAL_WORKBENCH_BACKLOG.md) · [Exact compatibility matrix](docs/COMPATIBILITY_MATRIX.md).
 
@@ -61,7 +61,7 @@ pnpm test:ui
 node scripts/desktop.mjs build
 ~~~
 
-The latest local checks pass **606 Rust tests (7 opt-in tests ignored), 274 frontend tests, 126 browser checks, 59 offline scripts and two interface-probe tests**. TypeScript, the Windows executable and NSIS installer build. These are local results, not a claim that hosted GitHub CI has rerun. The latest [map-loading performance pass](docs/C41_MAP_LOADING_PERFORMANCE.md) measures **8.6% faster repeated map switching and 25.1% faster catalog preparation** across three native runs per executable, with identical rendering content and resolution. Startup and general memory use are effectively unchanged by this patch. The earlier [startup improvements](docs/C41_STARTUP_FOLLOW_THROUGH.md) and [audio, performance and CE safeguards](docs/C41_NATIVE_AUDIO_PERFORMANCE.md) remain preserved.
+The latest local checks pass **606 Rust tests (7 opt-in tests ignored), 274 frontend tests, 129 browser checks, 59 offline scripts and two interface-probe tests**. TypeScript, the Windows executable and NSIS installer build. These are local results, not a claim that hosted GitHub CI has rerun. The latest [map-loading performance pass](docs/C41_MAP_LOADING_PERFORMANCE.md) measures **8.6% faster repeated map switching and 25.1% faster catalog preparation** across three native runs per executable, with identical rendering content and resolution. Startup and general memory use are effectively unchanged by this patch. The earlier [startup improvements](docs/C41_STARTUP_FOLLOW_THROUGH.md) and [audio, performance and CE safeguards](docs/C41_NATIVE_AUDIO_PERFORMANCE.md) remain preserved.
 
 The [home showcase polish](docs/NATIVE_ASSETS_AND_SHOWCASE.md#c41-clarity-and-loading-polish) sharpens the actual monitor, reduces its lighting/glow, extends its left-facing mouse response and shares source preparation across visits. Native animation, textures and reflections remain active; load timings and the later executable identity have their own evidence.
 
