@@ -6,7 +6,7 @@ A Halo 1 creation and preservation workbench with a visual level editor, native 
 
 **[Download approved previews from GitHub Releases](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases).** Choose the Windows x64 `_Setup.exe` installer or `_Portable.zip`, with its platform manifest and `SHA256SUMS-windows-x64.txt`. The portable app requires the separately installed [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/). The installer can offer that dependency if missing. No Halo game, maps, SDK or optional Steam bridge is included.
 
-The public `Preview` and `alpha` releases had **no attached binaries** when checked on November 1, 2026. The new **0.4.1 preview is a release candidate until its draft is built, attached, verified and approved by the owner**. A local build or an Actions artifact is not a public download. [Release process and exact gates](docs/RELEASING.md).
+The public `Preview` and `alpha` releases had **no attached binaries** when checked on November 1, 2026. The new **0.4.1 preview is a release candidate until its draft is built, attached, verified and approved by the owner**. A local build or an Actions artifact is not a public download. [Release process and exact gates](docs/RELEASING.md). **C49 local acceptance is complete for Windows source `cb07581`; public upload remains pending.** [Verified files, cleanup results and open gates](docs/CONTINUATION_49_ENGINEERING.md). **C49 local acceptance is complete for Windows source `cb07581`; public upload remains pending.** [Verified files, cleanup results and open gates](docs/CONTINUATION_49_ENGINEERING.md).
 
 | Platform | Package | Acceptance boundary |
 | --- | --- | --- |

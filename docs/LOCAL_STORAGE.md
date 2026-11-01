@@ -4,7 +4,7 @@ Historical native tests created many independent copies of the same Halo resourc
 
 The first completed cleanup removed **92,908,480,937 bytes (86.5 GiB)** of ignored Cargo debug caches from three checkouts, after checking the resolved paths, Git exclusions, Cargo fingerprints, running processes and absence of native project/map files. Tracked tests and source were retained. Public release artifacts remain separate from rebuildable compiler output. Rebuilding tests can temporarily recreate a substantial target directory.
 
-Nineteen obsolete CE trial copies (**51,604,850,918 bytes**) were preserved in a **963,002,576-byte private archive** with exact SHA-256 identities. Their expanded copies were removed only after every unique archived payload and a real largest-file restoration probe passed. This step reclaimed another **50,641,848,342 bytes (47.2 GiB)**. Larger cold test archives are a separate measured cleanup operation; their final receipts determine the accepted savings.
+Nineteen obsolete CE trial copies (**51,604,850,918 bytes**) were preserved in a **963,002,576-byte private archive** with exact SHA-256 identities. Their expanded copies were removed only after every unique archived payload and a real largest-file restoration probe passed. This step reclaimed another **50,641,848,342 bytes (47.2 GiB)**. The larger cold test groups are now complete. The final extended-path audit measured 94.8 GiB and 404,958 regular files with zero errors, compared with the initial approximately 522.6 GiB. All three vaults preserve 2,060,611 file records. See [final results and boundaries](CONTINUATION_49_ENGINEERING.md).
 
 ## What stays available
 

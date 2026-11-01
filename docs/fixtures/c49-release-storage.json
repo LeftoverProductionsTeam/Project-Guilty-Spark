@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-01T23:41:57.824675+00:00",
+  "applicationVersion": "0.4.1",
+  "applicationSourceCommit": "cb07581597de11e83d1c10bafad526e8b031f27e",
+  "windows": {
+    "localNativeAcceptance": true,
+    "portableWorkspaceLoaded": true,
+    "installedWorkspaceLoaded": true,
+    "genuineNsisInstallation": true,
+    "cleanMachineTested": false,
+    "hostedRunnerTested": false,
+    "manifestSha256": "c00f7afc9b1d57963bbe0234ef4c3c992a574136a27cbf34dca83354fe2a0b52",
+    "executableSha256": "02fc21ec292f45591ad43f6e8541b47e6da668d3e13872595a36b1aa84af16c6",
+    "installedExecutableSha256": "c4c0c5b71be39cca6556f7d0a7c688ed2493ce585bf8e3fe6de4b792f131201d",
+    "artifacts": [
+      {
+        "file": "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe",
+        "kind": "nsis-installer",
+        "bytes": 10107686,
+        "sha256": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749"
+      },
+      {
+        "file": "Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip",
+        "kind": "portable-zip",
+        "bytes": 13941863,
+        "sha256": "ff6c9e4dea48126680c2a9b8536dfb2185fab5ac445c7d4f306b9bed52e07069"
+      },
+      {
+        "file": "Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip",
+        "kind": "source-zip",
+        "bytes": 26186072,
+        "sha256": "c6ea81b25bfae352d76df58557a82daef44b72ba11bf778d0e2eee9f56ae03f0"
+      }
+    ]
+  },
+  "regressions": {
+    "rust": {
+      "passed": 629,
+      "failed": 0,
+      "ignored": 7
+    },
+    "frontend": 300,
+    "browser": 136,
+    "offline": 59,
+    "nativeDiagnostics": 32,
+    "releasePipeline": 16,
+    "typescript": true,
+    "workflowLint": true,
+    "finalRunOnly": true
+  },
+  "storage": {
+    "beforeScannedBytes": 561170127222,
+    "beforeFiles": 2548242,
+    "initialSkippedLongPathDirectories": 446,
+    "afterBytes": 101811641788,
+    "afterFiles": 404958,
+    "finalScanErrors": 0,
+    "finalScanUsesExtendedPaths": true,
+    "followsJunctions": false,
+    "logicalReductionBytes": 459358485434,
+    "approximateBaselineComparison": true,
+    "archives": [
+      {
+        "name": "C49-cold-ce-trials",
+        "sourceBytes": 51604850918,
+        "compressedPayloadBytes": 963002576,
+        "files": 56016,
+        "retainedMetadataOnlyFiles": 0,
+        "retainedContentChanges": 0
+      },
+      {
+        "name": "C49-cold-native-qa",
+        "sourceBytes": 243133958166,
+        "compressedPayloadBytes": 7618872756,
+        "files": 1515639,
+        "retainedMetadataOnlyFiles": 56,
+        "retainedContentChanges": 0
+      },
+      {
+        "name": "C49-cold-worktree-qa",
+        "sourceBytes": 88599814097,
+        "compressedPayloadBytes": 4646376067,
+        "files": 488956,
+        "retainedMetadataOnlyFiles": 1,
+        "retainedContentChanges": 0
+      }
+    ],
+    "realIndependentRecoveryFiles": 3,
+    "recoveryToolAcceptance": true,
+    "identicalStagingCleanup": {
+      "complete": true,
+      "removedBytes": 6494860184,
+      "uniqueEvidenceRemoved": false,
+      "onlyByteIdenticalStagingVolumesRemoved": true
+    },
+    "partialStagingVolumesRetained": 2,
+    "applicationPerformanceImprovementClaim": false
+  },
+  "preservation": {
+    "checkedAt": "2026-11-01T23:37:16.525Z",
+    "rootDirtyPatchesUnchanged": true,
+    "rootUntrackedFiles": 160,
+    "allRootUntrackedBytesUnchanged": true,
+    "originalZombieFiles": 67,
+    "originalZombieBytesUnchanged": true,
+    "originalInstalledMaps": 94,
+    "originalInstalledMapsUnchanged": true,
+    "priorReferences": 28,
+    "priorReferencesRetained": true,
+    "priorLocalAndTagReferencesUnchanged": true,
+    "priorBranchTipsContained": 21,
+    "priorReleaseArtifacts": 23,
+    "priorReleaseArtifactsUnchanged": true,
+    "prior426LedgerRowsUnchanged": true,
+    "ledgerRows": 429,
+    "nativeOriginalTags": 3739,
+    "nativeOriginalTagTreeUnchanged": true,
+    "finalNativeChangedOrAddedTags": 15,
+    "finalNativeTagCount": 3742,
+    "mccCompilationDidNotAlterTags": true,
+    "authoredPhysicsUnchanged": true,
+    "remotePublished": false
+  },
+  "megaworld": {
+    "mapPaths": 94,
+    "bspRecords": 187,
+    "inspectionFailures": 0,
+    "nativePairCacheSha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe",
+    "nativePairCacheBytes": 77711328,
+    "twoWayPlayerTraversalVerified": false,
+    "allMapPhysicalWorldVerified": false
+  },
+  "distribution": {
+    "publicState": {
+      "checkedAt": "2026-11-01T23:39:58.887Z",
+      "master": "98698955a7a92d4746230cfae44c41b1aacf51f9",
+      "releases": [
+        {
+          "tag": "Preview",
+          "draft": false,
+          "prerelease": true,
+          "assets": []
+        },
+        {
+          "tag": "alpha",
+          "draft": false,
+          "prerelease": true,
+          "assets": []
+        }
+      ],
+      "authenticated": false,
+      "writesPerformed": false
+    },
+    "draftCreatedByThisRun": false,
+    "pushPerformedByThisRun": false,
+    "anonymousDownloadVerified": false,
+    "ownerApprovalRequiredForPublication": true,
+    "githubWriteConnectionAvailable": false
+  },
+  "linux": {
+    "nativeCompilationVerified": false,
+    "appImageStartupVerified": false,
+    "debianStartupVerified": false,
+    "publicPackagesAdvertisedAsVerified": false
+  }
+}

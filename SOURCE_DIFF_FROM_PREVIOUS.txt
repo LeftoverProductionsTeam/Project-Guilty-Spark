@@ -1,37 +1,41 @@
 C49 release candidate and verified local-storage preservation
 Base: 46a5b893744d439d2ac22250463cd43f8accf790 (C48)
+Application candidate source: cb07581597de11e83d1c10bafad526e8b031f27e
+Final changes after that source are documentation and evidence only.
 
-Cumulative source delta. Original Halo data, private QA archives, source snapshots and release binaries remain excluded. Normal CI and all prior 426 ledger rows are retained.
+Original Halo data, private QA archives, source snapshots and release binaries remain excluded. Normal CI and all prior 426 ledger rows are retained.
 
- .github/workflows/release.yml       | 188 +++++++++++++++
- Cargo.lock                          |   6 +-
- Cargo.toml                          |   2 +-
- README.md                           |  11 +
- docs/C49_PUSH_SUMMARY.md            |  17 ++
- docs/CURRENT_FEATURES.md            |   2 +
- docs/KNOWN_LIMITATIONS.md           |   2 +
- docs/LOCAL_STORAGE.md               |  35 +++
- docs/MASTER_FEATURE_LEDGER.csv      |   3 +
- docs/MASTER_FEATURE_LEDGER.md       |   2 +
- docs/RELEASING.md                   |  66 ++++++
- docs/REMAINING_WORK.md              |   2 +
- package.json                        |   2 +-
- playwright.config.ts                |  16 +-
- scripts/release/draft.mjs           | 262 +++++++++++++++++++++
- scripts/release/draft.test.mjs      | 108 +++++++++
- scripts/release/gates.mjs           |  85 +++++++
- scripts/release/install-windows.ps1 |  58 +++++
- scripts/release/package.py          | 450 ++++++++++++++++++++++++++++++++++++
- scripts/release/smoke-linux.mjs     | 139 +++++++++++
- scripts/release/smoke-windows.mjs   | 112 +++++++++
- scripts/release/test-pipeline.mjs   |  10 +
- scripts/release/test_package.py     | 198 ++++++++++++++++
- scripts/release/verify-public.mjs   |  95 ++++++++
- src-tauri/src/app.rs                |   2 +
- src-tauri/tauri.conf.json           |   2 +-
- src-tauri/tauri.linux.conf.json     |   9 +
- src/App.tsx                         |   2 +-
- src/api.ts                          |   1 +
- src/types.ts                        |   1 +
- tests/ui/visibility-zones.spec.ts   |   6 +-
- 31 files changed, 1881 insertions(+), 13 deletions(-)
+ .github/workflows/release.yml          | 188 ++++++++++++++
+ Cargo.lock                             |   6 +-
+ Cargo.toml                             |   2 +-
+ README.md                              |  11 +
+ docs/C49_PUSH_SUMMARY.md               |  17 ++
+ docs/CONTINUATION_49_ENGINEERING.md    |  41 +++
+ docs/CURRENT_FEATURES.md               |   2 +
+ docs/KNOWN_LIMITATIONS.md              |   2 +
+ docs/LOCAL_STORAGE.md                  |  35 +++
+ docs/MASTER_FEATURE_LEDGER.csv         |   3 +
+ docs/MASTER_FEATURE_LEDGER.md          |   2 +
+ docs/RELEASING.md                      |  66 +++++
+ docs/REMAINING_WORK.md                 |   2 +
+ docs/fixtures/c49-release-storage.json | 167 ++++++++++++
+ package.json                           |   2 +-
+ playwright.config.ts                   |  16 +-
+ scripts/release/draft.mjs              | 262 +++++++++++++++++++
+ scripts/release/draft.test.mjs         | 108 ++++++++
+ scripts/release/gates.mjs              |  85 +++++++
+ scripts/release/install-windows.ps1    |  58 +++++
+ scripts/release/package.py             | 450 +++++++++++++++++++++++++++++++++
+ scripts/release/smoke-linux.mjs        | 139 ++++++++++
+ scripts/release/smoke-windows.mjs      | 112 ++++++++
+ scripts/release/test-pipeline.mjs      |  10 +
+ scripts/release/test_package.py        | 198 +++++++++++++++
+ scripts/release/verify-public.mjs      |  95 +++++++
+ src-tauri/src/app.rs                   |   2 +
+ src-tauri/tauri.conf.json              |   2 +-
+ src-tauri/tauri.linux.conf.json        |   9 +
+ src/App.tsx                            |   2 +-
+ src/api.ts                             |   1 +
+ src/types.ts                           |   1 +
+ tests/ui/visibility-zones.spec.ts      |   6 +-
+ 33 files changed, 2089 insertions(+), 13 deletions(-)
