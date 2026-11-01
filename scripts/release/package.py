@@ -136,6 +136,7 @@ def source_archive(repo, commit, destination):
         files = [i for i in archive.infolist() if not i.is_dir()]
         need(len(files) <= 4096, "Source inventory exceeds bound")
         need(sum(i.file_size for i in files) <= 128 * 1024**2, "Source archive exceeds bound")
+        verify_source_checksums(archive)
         names = set()
         for item in files:
             public_source_path(item.filename)
@@ -148,6 +149,25 @@ def source_archive(repo, commit, destination):
         need(archive.testzip() is None, "Source archive CRC failure")
     Path(destination).write_bytes(data)
     return len(files)
+
+
+def verify_source_checksums(archive):
+    manifests = {"SOURCE_SHA256SUMS.txt", "SOURCE_MANIFEST_SHA256.txt"}
+    members = {i.filename for i in archive.infolist() if not i.is_dir()}
+    need(manifests <= members, "Committed source checksum manifests are missing")
+    text = archive.read("SOURCE_SHA256SUMS.txt")
+    need(text == archive.read("SOURCE_MANIFEST_SHA256.txt"), "Source checksum manifests differ")
+    records = {}
+    for line in text.decode("utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("  ", 1)
+        need(len(parts) == 2 and re.fullmatch(r"[0-9a-f]{64}", parts[0]), "Invalid source checksum row")
+        checksum, name = parts
+        need(name not in records and name in members - manifests, "Unexpected source checksum member")
+        need(sha(archive.read(name)) == checksum, "Committed source checksum mismatch: " + name)
+        records[name] = checksum
+    need(set(records) == members - manifests, "Source checksum inventory is incomplete")
 
 
 def one_file(directory, pattern):
@@ -313,6 +333,7 @@ def verify_artifacts(directory, manifest):
             with zipfile.ZipFile(io.BytesIO(data)) as archive:
                 need(archive.comment == manifest["sourceCommit"].encode() and archive.testzip() is None,
                      "Source identity/CRC differs")
+                verify_source_checksums(archive)
                 for member in archive.infolist():
                     if not member.is_dir():
                         public_source_path(member.filename)

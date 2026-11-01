@@ -49,6 +49,13 @@ class PackageAcceptance(unittest.TestCase):
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(data)
         self.run_git('add', '.')
+        # Hash staged Git bytes: .gitattributes may normalize Windows line endings.
+        names = self.run_git('ls-files').splitlines()
+        sums = ''.join(package.sha(self.run_git('show', ':' + name).encode()) + '  ' + name + '\n'
+                       for name in sorted(names))
+        for name in ['SOURCE_SHA256SUMS.txt', 'SOURCE_MANIFEST_SHA256.txt']:
+            (self.repo / name).write_text(sums, newline='\n')
+        self.run_git('add', '.')
         self.run_git('-c', 'user.name=Release Test', '-c', 'user.email=release-test@example.invalid',
                      'commit', '-qm', 'Synthetic packaging fixture')
         self.commit = self.run_git('rev-parse', 'HEAD').strip()
@@ -105,6 +112,15 @@ class PackageAcceptance(unittest.TestCase):
                      'commit', '-qm', 'Require sidecar')
         self.commit = self.run_git('rev-parse', 'HEAD').strip()
         with self.assertRaisesRegex(ValueError, 'sidecars'):
+            self.stage()
+
+    def test_source_archive_rejects_stale_committed_checksum_manifests(self):
+        (self.repo / 'src/app.txt').write_text('Changed source without updating checksums')
+        self.run_git('add', '.')
+        self.run_git('-c', 'user.name=Release Test', '-c', 'user.email=release-test@example.invalid',
+                     'commit', '-qm', 'Stale checksum fixture')
+        self.commit = self.run_git('rev-parse', 'HEAD').strip()
+        with self.assertRaisesRegex(ValueError, 'Committed source checksum mismatch'):
             self.stage()
 
     def test_corrupt_missing_renamed_or_changed_assets_fail_integrity(self):

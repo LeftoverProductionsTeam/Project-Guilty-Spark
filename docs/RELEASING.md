@@ -39,7 +39,7 @@ Project_Guilty_Spark_0.4.1_COMMITPREFIX_Source.zip
 SHA256SUMS-windows-x64.txt
 ```
 
-The source archive is generated from committed Git blobs, checks its archive identity/CRC and rejects private/generated directories, native game payloads, executable tools and credential filenames. Native test libraries, archives of owned test data and local secrets never enter this public asset list.
+The source archive is generated from committed Git blobs, checks its archive identity/CRC and rejects private/generated directories, native game payloads, executable tools and credential filenames. Both source checksum manifests must agree, cover every other archived source file exactly once and match the committed bytes. Windows line-ending normalization must be accounted for before generating these checksums. Native test libraries, archives of owned test data and local secrets never enter this public asset list.
 
 ## Linux acceptance and limits
 

@@ -3,7 +3,7 @@ Base: 46a5b893744d439d2ac22250463cd43f8accf790 (C48)
 
 Cumulative source delta. Original Halo data, private QA archives, source snapshots and release binaries remain excluded. Normal CI and all prior 426 ledger rows are retained.
 
- .github/workflows/release.yml       | 188 ++++++++++++++++
+ .github/workflows/release.yml       | 188 +++++++++++++++
  Cargo.lock                          |   6 +-
  Cargo.toml                          |   2 +-
  README.md                           |  11 +
@@ -17,15 +17,15 @@ Cumulative source delta. Original Halo data, private QA archives, source snapsho
  docs/REMAINING_WORK.md              |   2 +
  package.json                        |   2 +-
  playwright.config.ts                |  16 +-
- scripts/release/draft.mjs           | 262 ++++++++++++++++++++++
+ scripts/release/draft.mjs           | 262 +++++++++++++++++++++
  scripts/release/draft.test.mjs      | 108 +++++++++
  scripts/release/gates.mjs           |  85 +++++++
  scripts/release/install-windows.ps1 |  58 +++++
- scripts/release/package.py          | 427 ++++++++++++++++++++++++++++++++++++
+ scripts/release/package.py          | 448 ++++++++++++++++++++++++++++++++++++
  scripts/release/smoke-linux.mjs     | 130 +++++++++++
  scripts/release/smoke-windows.mjs   | 107 +++++++++
  scripts/release/test-pipeline.mjs   |  10 +
- scripts/release/test_package.py     | 181 +++++++++++++++
+ scripts/release/test_package.py     | 197 ++++++++++++++++
  scripts/release/verify-public.mjs   |  95 ++++++++
  src-tauri/src/app.rs                |   2 +
  src-tauri/tauri.conf.json           |   2 +-
@@ -34,4 +34,4 @@ Cumulative source delta. Original Halo data, private QA archives, source snapsho
  src/api.ts                          |   1 +
  src/types.ts                        |   1 +
  tests/ui/visibility-zones.spec.ts   |   6 +-
- 31 files changed, 1827 insertions(+), 13 deletions(-)
+ 31 files changed, 1864 insertions(+), 13 deletions(-)
