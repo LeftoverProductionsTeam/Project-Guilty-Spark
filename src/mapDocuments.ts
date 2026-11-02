@@ -7,6 +7,8 @@ export interface MapDocument {
   history: HistoryState;
   inspection: MapInspection | null;
   meshes: Record<string, MeshData>;
+  /** Saved native metadata invalidates only this document's tool reports. */
+  savedRevision?: number;
 }
 export interface MapDocuments {
   activeId: string | null;
@@ -116,9 +118,8 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
       if (d.id !== id) return d;
       if (action.type === 'mesh') return { ...d, meshes: { ...d.meshes, [action.assetId]: action.mesh } };
       if (action.type === 'saved')
-        return d.history.current === action.project
-          ? { ...d, history: historyReducer(d.history, { type: 'saved' }) }
-          : d;
+        return { ...d, savedRevision: (d.savedRevision ?? 0) + 1,
+          history: d.history.current === action.project ? historyReducer(d.history, { type: 'saved' }) : d.history };
       return { ...d, history: historyReducer(d.history, action.action) };
     }),
   };

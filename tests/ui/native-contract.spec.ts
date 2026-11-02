@@ -250,7 +250,8 @@ async function mockDesktop(page: Page) {
           if (mock.failSave) throw new Error('Synthetic save failure');
           mock.saved = structuredClone(args.project);
           projects[args.project.id].project = structuredClone(args.project);
-          return null;
+          const p=projects[args.project.id].project;
+          return {id:p.id,title:p.title,engine:p.source.engine,version:p.source.cacheVersion,sha256:p.source.sha256,modifiedAt:'saved-receipt-'+p.id,creator:p.provenance.creator,tagCount:projects[p.id].inspection.tags.length,objectCount:p.scene.length,status:'preserved',projectPath:p.id+'.gsproject',scenarioType:1};
         }
         if(command==='quickforge_preview')return {positions:[],normals:[],uvs:[],indices:[],parts:[]};
         if(command==='quickforge_validate')return {valid:true,issues:[],vertices:0,triangles:0,closedComponents:0,sourceSha256:'a'.repeat(64)};
@@ -668,6 +669,22 @@ test('custom tag names stay map-owned, saved and undoable without changing sourc
   await rename.getByRole('textbox',{name:'Custom tag name',exact:true}).fill('../escape');
   await rename.getByRole('button',{name:'Rename tag',exact:true}).click();
   await expect(rename.getByRole('alert')).toContainText('relative tag path');
+});
+
+test('ordinary save consumes its project receipt without bootstrapping unrelated state',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  const value=page.getByLabel('Velocity',{exact:true});
+  await value.fill('31');
+  const before=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((row:any)=>row.command==='bootstrap').length);
+  await value.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits[0]?.value)).toBe(31);
+  await expect(page.getByRole('button',{name:'Saved',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((row:any)=>row.command==='bootstrap').length)).toBe(before);
+  await chooseTool(page,'Map library');
+  await expect(page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})})).toContainText('Synthetic baseline');
+  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+  await chooseTool(page,'Tag editor');await expect(value).toHaveValue('31');
+  await page.keyboard.press('Control+z');await expect(value).toHaveValue('10');
 });
 
 test('switching tags never leaves a duplicate panel from the previous tag',async({page})=>{

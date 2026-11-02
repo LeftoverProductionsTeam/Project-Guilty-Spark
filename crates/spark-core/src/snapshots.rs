@@ -48,6 +48,18 @@ pub fn create(project_dir:&Path,project:&Project,reason:&str,retention:usize)->R
         return invalid("Snapshot retention must be 1–100 and the reason must be known");
     }
     project.validate()?;
+    // Save timestamps are not a new recoverable revision. Compare the full
+    // metadata, not the narrower native-build fingerprint: names, provenance,
+    // editor preferences and source/resource bindings must also be preserved.
+    // Explicit manual/build/recovery checkpoints always retain their meaning.
+    if reason=="periodic" {
+        if let Some(latest)=list(project_dir)?.first() {
+            let (snapshot,verified)=read(project_dir,&latest.id)?;
+            let mut previous=snapshot.project;
+            previous.modified_at=project.modified_at.clone();
+            if serde_json::to_vec(&previous)?==serde_json::to_vec(project)? {return Ok(verified);}
+        }
+    }
     let dir=folder(project_dir)?;fs::create_dir_all(&dir)?;
     let id=uuid::Uuid::new_v4().to_string();
     let snapshot=Snapshot{schema_version:1,id:id.clone(),created_at:chrono::Utc::now().to_rfc3339(),reason:reason.into(),project:project.clone()};
@@ -76,6 +88,28 @@ pub fn preview(project_dir:&Path,current:&Project,id:&str,expected_sha256:&str)-
 
 #[cfg(test)] mod tests {
     use super::*;
+    #[test] fn unchanged_periodic_metadata_reuses_only_the_latest_verified_checkpoint() {
+        let dir=tempfile::tempdir().unwrap();let mut p=Project::new("First");
+        let first=create(dir.path(),&p,"periodic",10).unwrap();
+        p.modified_at="later save timestamp".into();
+        let same=create(dir.path(),&p,"periodic",10).unwrap();
+        assert_eq!(same.id,first.id);assert_eq!(list(dir.path()).unwrap().len(),1);
+        // The build fingerprint deliberately omits names/provenance. Snapshot
+        // equality must preserve these metadata edits as well as native inputs.
+        p.title="Renamed".into();
+        let renamed=create(dir.path(),&p,"periodic",10).unwrap();assert_ne!(renamed.id,first.id);
+        p.title="First".into();
+        let returned=create(dir.path(),&p,"periodic",10).unwrap();assert_ne!(returned.id,first.id);
+        let manual=create(dir.path(),&p,"manual",10).unwrap();assert_ne!(manual.id,returned.id);
+        assert_eq!(create(dir.path(),&p,"periodic",10).unwrap().id,manual.id);
+        let build=create(dir.path(),&p,"before-build",10).unwrap();assert_ne!(build.id,manual.id);
+        // An unreadable latest checkpoint cannot suppress a replacement.
+        fs::write(folder(dir.path()).unwrap().join(format!("{}.gsproject",build.id)),b"corrupt").unwrap();
+        p.provenance.description="New recoverable metadata".into();
+        let replacement=create(dir.path(),&p,"periodic",10).unwrap();
+        assert_ne!(replacement.id,build.id);
+        assert_eq!(preview(dir.path(),&p,&replacement.id,&replacement.sha256).unwrap().provenance.description,p.provenance.description);
+    }
     #[test] fn retention_preview_interruption_and_source_identity() {
         let dir=tempfile::tempdir().unwrap();let mut p=Project::new("First");
         let first=create(dir.path(),&p,"manual",2).unwrap();p.title="Second".into();

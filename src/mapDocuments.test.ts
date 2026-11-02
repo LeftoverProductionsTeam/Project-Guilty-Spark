@@ -5,6 +5,20 @@ import type {Project} from './types';
 const project=(id:string):Project=>({schemaVersion:1,id,title:id,createdAt:'',modifiedAt:'',source:null,provenance:{creator:'',community:'',releaseYear:null,description:'',sourceUrl:'',permissions:''},scene:[],assets:[],tagEdits:[],history:[],builds:[]});
 const open=(state:MapDocuments,p:Project)=>documentReducer(state,{type:'open',open:{project:p,inspection:null}});
 describe('Independent open map documents',()=>{
+  it('invalidates only the saved map and retains edits made while its save was pending',()=>{
+    const a=project('a'),b=project('b');let state=open(open(emptyMapDocuments(100),a),b);
+    state=documentReducer(state,{type:'history',id:'a',action:{type:'edit',project:{...a,title:'Saved A'},description:'First edit'}});
+    const pending=state.documents.find(d=>d.id==='a')!.history.current!;
+    const latest={...pending,title:'Newer unsaved A'};
+    state=documentReducer(state,{type:'history',id:'a',action:{type:'edit',project:latest,description:'Edit during save'}});
+    const latestStored=state.documents.find(d=>d.id==='a')!.history.current;
+    const bBefore=state.documents.find(d=>d.id==='b');
+    state=documentReducer(state,{type:'saved',id:'a',project:pending});
+    const saved=state.documents.find(d=>d.id==='a')!;
+    expect(saved.savedRevision).toBe(1);expect(saved.history.current).toBe(latestStored);expect(saved.history.dirty).toBe(true);
+    expect(saved.history.past.at(-1)).toBe(pending);expect(state.documents.find(d=>d.id==='b')).toBe(bBefore);
+    expect(state.activeId).toBe('b');
+  });
   it('retains verified immutable geometry on reopen and invalidates it for source or resource changes',()=>{
     const p={...project('a'),source:{originalPath:'owned/map.map',preservedPath:'preserved/map.map',cacheVersion:7,engine:'Halo PC',scenarioPath:'levels/test/map',sha256:'a'.repeat(64),resourceDirectory:'owned',resourceSha256:{'bitmaps.map':'b'.repeat(64)}}} as Project;
     const inspection={sha256:p.source!.sha256,header:{version:7},renderMesh:{positions:[0,0,0]}} as unknown as import('./types').MapInspection;
