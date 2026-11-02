@@ -5,6 +5,7 @@ use spark_core::bitmap_preview::BitmapResourceCompatibility;
 use std::collections::{BTreeMap, HashSet};
 
 const MAX_CANDIDATES: usize = 12;
+const IMPORTED_COPY_RESOURCES:&str="Beside another verified copy of this map";
 
 /// Explicitly linked asset folders also contain resources beside maps that
 /// have not been opened yet. Bound this walk; never scan arbitrary drives,
@@ -80,6 +81,8 @@ pub(super) fn resource_roots(state: &AppState, project: &Project) -> Reply<Vec<(
             roots.push((path.to_owned(), "Beside the original map"));
         }
         let library = lock(&state.library)?;
+        let origins:Vec<PathBuf>=library.setting(&format!("mapResourceOrigins.{}",project.id)).map_err(error)?;
+        for folder in origins.into_iter().take(8){roots.push((folder,IMPORTED_COPY_RESOURCES));}
         for entry in library
             .list()
             .map_err(error)?
@@ -192,6 +195,9 @@ fn review_one(
 
 fn automatic_coverage(coverage: &BitmapResourceCompatibility) -> bool {
     coverage.verified_images > 0 && coverage.missing_or_mismatched_images == 0
+}
+fn candidate_coverage(coverage:&BitmapResourceCompatibility,reason:&str)->bool{
+    automatic_coverage(coverage)||(reason==IMPORTED_COPY_RESOURCES&&coverage.verified_images>0)
 }
 
 // All recorded classic pins must agree; one matching bitmap must never
@@ -327,8 +333,14 @@ pub(super) async fn auto_connect(
                 }
                 updated.resource_directory = Some(folder);
             } else {
+                // Explicitly importing an identical map from its own resource
+                // folder has the same selection semantics as its first import.
+                // Preserve that choice even when unused legacy images are
+                // missing. Each decoded image still requires its exact native
+                // path/span/hash; this is never proof of a complete pack/build.
+                let reason=candidate.reason.clone();
                 let reviewed = review_one(source, &inspection, candidate);
-                let Some(coverage) = reviewed.coverage.filter(automatic_coverage) else {
+                let Some(coverage) = reviewed.coverage.filter(|coverage|candidate_coverage(coverage,&reason)) else {
                     continue;
                 };
                 let hashes = project::resource_hashes(&folder).map_err(error)?;
@@ -381,10 +393,13 @@ mod tests {
             shared_native_images:0,cubemap_images:0,volume_images:0,
         };
         assert!(!automatic_coverage(&coverage));
+        assert!(!candidate_coverage(&coverage,"Installed runtime resources"));
+        assert!(candidate_coverage(&coverage,IMPORTED_COPY_RESOURCES));
         coverage.missing_or_mismatched_images = 0;
         assert!(automatic_coverage(&coverage));
         coverage.verified_images = 0;
         assert!(!automatic_coverage(&coverage));
+        assert!(!candidate_coverage(&coverage,IMPORTED_COPY_RESOURCES));
     }
     #[test]
     fn automatic_discovery_refuses_network_device_and_stream_paths_before_opening() {

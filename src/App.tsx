@@ -94,7 +94,7 @@ import AssetTransfer,{transferTag} from './components/AssetTransfer';
 import type {TransferSelection} from './components/AssetTransfer';
 import {readHistoryLimit,saveHistoryLimit} from './historyPreferences';
 import { firstVisitWorkspace, markFirstVisitSeen, WORKSPACE_TOOLTIPS } from './firstRun';
-import {ResizeEdges,maximizeWindow} from './components/WindowFrame';
+import {ResizeEdges} from './components/WindowFrame';
 import SparkEmblem from './components/SparkEmblem';
 import ShowcaseChoice from './components/ShowcaseChoice';
 import HeaderRuntime from './components/HeaderRuntime';
@@ -1157,7 +1157,6 @@ export default function App() {
             id="gs-window-header"
             className="app-header gs-compact-header"
             data-tauri-drag-region="deep"
-            onDoubleClick={event=>{if(!(event.target as HTMLElement).closest('button,a,input,select,textarea,[role="button"]'))void maximizeWindow().catch(reason=>notice(String(reason)));}}
             style={
               ownedHeaderArt && matchesOwnedInterfaceBitmap(bitmapPreference, current, inspection)
                 ? {

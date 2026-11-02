@@ -34,6 +34,7 @@ try{
  const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,preferredHalo:'mccSteam'}});
  const opened=[];
  for(const entry of configuration.sources){
+  if(entry.sameHashFirst){const folder=path.join(root,'originally-downloaded');await fs.mkdir(folder,{recursive:true});const copy=path.join(folder,`cache-${opened.length}.map`);await fs.copyFile(entry.path,copy,fs.constants.COPYFILE_EXCL);await call('import_paths',{paths:[copy]});}
   const before=await hash(entry.path),began=performance.now(),o=(await call('import_paths',{paths:[entry.path]}))[0];
   await call('claim_project_document',{id:o.project.id});o.project.title=entry.name;await call('save_project',{project:o.project});
   report.maps.push({name:entry.name,path:entry.path,sourceSha256:before,importMs:performance.now()-began,version:o.inspection.header.version,models:[],samples:[]});opened.push(o);
@@ -52,7 +53,8 @@ try{
    await selectTag(o,tag);const preview=page.locator('.tag-model-preview .native-model-preview');await expect(preview).toHaveAttribute('data-model-tag',String(tag.id));
    await expect(preview).toHaveAttribute('data-model-ready','true');const canvas=preview.locator('canvas');await expect(canvas).toBeVisible();
    const observation={path:tag.path,id:tag.id,...await preview.evaluate(e=>({...e.dataset}))};
-   expect(Number(observation.modelTextures),'Representative native models must have actual source textures').toBeGreaterThan(0);
+   await expect.poll(async()=>Number(await preview.getAttribute('data-model-textures')),'Representative native models must have actual source textures').toBeGreaterThan(0);
+   Object.assign(observation,await preview.evaluate(e=>({...e.dataset})));
    const info=await page.locator('.tag-properties-pane').boundingBox(),modelBounds=await preview.boundingBox();
    expect(modelBounds.x).toBeGreaterThanOrEqual(info.x+info.width-1);expect(modelBounds.height).toBeGreaterThan(350);
    observation.layout={info,model:modelBounds};

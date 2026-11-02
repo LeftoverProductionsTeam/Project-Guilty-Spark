@@ -51,6 +51,7 @@ function Model({
   view,
   live,
   showcase,
+  portrait,
   animation,
   onAnimationError,
   identity,
@@ -59,6 +60,7 @@ function Model({
   view: OwnedModelView;
   live: boolean;
   showcase: boolean;
+  portrait: boolean;
   animation?: AnimationPreview;
   onAnimationError: (error: string) => void;
   identity:{projectId:string;sourceHash:string;tagId:number};
@@ -102,7 +104,7 @@ function Model({
     const aspect=camera instanceof THREE.PerspectiveCamera?camera.aspect:1;
     const stored=readMapSession<unknown>(identity.projectId,sessionKey,null);
     const restore=!showcase&&framing.revision===0&&validModelPreviewCamera(stored,identity.sourceHash,fit.radius)?stored:null;
-    camera.position.fromArray(restore?.position??(showcase?[fit.radius*2.1,-fit.radius,fit.radius*.65]:modelFitPosition(fit.radius,aspect,42,framing.preset)));
+    camera.position.fromArray(restore?.position??(portrait?[fit.radius*3.15,0,0]:showcase?[fit.radius*2.1,-fit.radius,fit.radius*.65]:modelFitPosition(fit.radius,aspect,42,framing.preset)));
     const target=new THREE.Vector3().fromArray(restore?.target??[0,0,0]);
     controls.current?.target.copy(target);camera.lookAt(target);controls.current?.update();
     if (camera instanceof THREE.PerspectiveCamera) {
@@ -112,13 +114,13 @@ function Model({
     }
     invalidate();
     if(!showcase)remember();
-  }, [camera, fit, invalidate, showcase,identity.projectId,identity.sourceHash,sessionKey,framing]);
+  }, [camera, fit, invalidate, showcase,portrait,identity.projectId,identity.sourceHash,sessionKey,framing]);
   useFrame((_, dt) => {
     if (!group.current) return;
     // Keep the left-facing resting pose, but let the right half of the page
     // turn the model far enough to face that side as well.
     const followYaw = pointer.current.x * (pointer.current.x > 0 ? 1 : 0.6);
-    const target = showcase ? -1.0 + (live && motionAllowed ? followYaw : 0) : 0;
+    const target = showcase&&!portrait ? -1.0 + (live && motionAllowed ? followYaw : 0) : 0;
     group.current.rotation.z = THREE.MathUtils.damp(group.current.rotation.z, target, 4, dt);
     group.current.rotation.x = THREE.MathUtils.damp(
       group.current.rotation.x,
@@ -162,11 +164,13 @@ export default function NativeModelPreview({
   environment,
   onSnapshot,
   showcase = false,
+  portrait = false,
   animate = true,
 }: {
   asset: Pick<ForgeAsset, 'tagId' | 'sourceProjectId' | 'sourceSha256'>;
   live?: boolean;
   showcase?: boolean;
+  portrait?: boolean;
   animate?: boolean;
   environment?: EditorEnvironment | null;
   onSnapshot?: (url: string) => void;
@@ -231,6 +235,7 @@ export default function NativeModelPreview({
     <div
       className={`native-model-preview${showcase ? ' native-model-showcase' : ''}`}
       data-transparent-background={showcase}
+      data-model-portrait={portrait?'front':undefined}
       ref={host}
       data-model-tag={asset.tagId ?? undefined}
       data-model-source={asset.sourceProjectId ?? undefined}
@@ -245,17 +250,17 @@ export default function NativeModelPreview({
           : 0
       }
     >
-      {view && (visible||live) && activity.graphicsResident ? (
+      {view && (visible||live||onSnapshot) && activity.graphicsResident ? (
         <Canvas
           camera={{ fov: 42, up: [0, 0, 1] }}
-          dpr={showcase ? [1.5, 2] : [1, 1.5]}
+          dpr={portrait ? 1 : showcase ? [1.5, 2] : [1, 1.5]}
           gl={{
             antialias: true,
             alpha: true,
             premultipliedAlpha: false,
             preserveDrawingBuffer: !!onSnapshot,
           }}
-          frameloop={activity.active&&visible&&(live||onSnapshot)?'always':'demand'}
+          frameloop={activity.active&&(visible||onSnapshot)&&(live||onSnapshot)?'always':'demand'}
           onCreated={({ gl }) => {
             gl.outputColorSpace = THREE.SRGBColorSpace;
             gl.toneMapping = THREE.NoToneMapping;
@@ -268,6 +273,7 @@ export default function NativeModelPreview({
               view={view}
               live={live&&visible&&activity.active}
               showcase={showcase}
+              portrait={portrait}
               animation={animation}
               onAnimationError={setAnimationError}
               identity={identity}

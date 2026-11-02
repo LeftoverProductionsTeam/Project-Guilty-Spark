@@ -82,10 +82,12 @@ try {
       borderRadius: style.borderRadius,
     };
   });
-  expect(report.restored.x).toBe(0);
-  expect(report.restored.y).toBe(0);
-  expect(report.restored.width).toBe(report.restored.viewport[0]);
-  expect(report.restored.height).toBe(report.restored.viewport[1]);
+  // Symmetric top/left headroom lets the source-derived monitor protrude
+  // beyond the curved application without crossing native window bounds.
+  expect(report.restored.x).toBe(16);
+  expect(report.restored.y).toBe(16);
+  expect(report.restored.width).toBe(report.restored.viewport[0]-16);
+  expect(report.restored.height).toBe(report.restored.viewport[1]-16);
   expect(report.restored.borderRadius).not.toBe('0px');
   expect(await call('plugin:window|is_maximized')).toBe(false);
   const point = await header.evaluate((e) => {
@@ -104,6 +106,7 @@ try {
   await header.dblclick({ position: point, delay: 70 });
   await expect.poll(() => call('plugin:window|is_maximized')).toBe(true);
   report.doubleClickMaximized = true;
+  await expect.poll(()=>page.locator('.application').evaluate(e=>{const r=e.getBoundingClientRect();return r.x===0&&r.y===0&&r.width===innerWidth&&r.height===innerHeight;})).toBe(true);
   await page.getByRole('button', { name: 'Restore window', exact: true }).click();
   await expect.poll(() => call('plugin:window|is_maximized')).toBe(false);
   // Same documented framework route, independent of the restored window size.

@@ -671,7 +671,7 @@ test('the Spark corner visual clears the curved frame and stays above window gla
  await expect(button).toHaveCSS('margin-left','0px');
  for(const width of [1440,960]){
   await page.setViewportSize({width,height:800});
-  await expect.poll(async()=>{const mark=await emblem.boundingBox(),hit=await button.boundingBox();return !!mark&&!!hit&&Math.abs(mark.x-Math.max(8,hit.x-10))<1&&Math.abs(mark.y-Math.max(8,hit.y-8))<1&&mark.x>=8&&mark.y>=8&&mark.x+mark.width<=width;}).toBe(true);
+  await expect.poll(async()=>{const mark=await emblem.boundingBox(),hit=await button.boundingBox();return !!mark&&!!hit&&Math.abs(mark.x-Math.max(0,hit.x-24))<1&&Math.abs(mark.y-Math.max(0,hit.y-24))<1&&mark.x>=0&&mark.y>=0&&mark.x+mark.width<=width;}).toBe(true);
   if(await button.getAttribute('aria-expanded')!=='true')await button.click();
   await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
   await button.click();await expect(page.locator('.gs-navigation-drawer')).toBeHidden();

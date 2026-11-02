@@ -26,6 +26,18 @@ fn canonical_library_paths_keep_the_same_managed_source_when_reopened(){
     let d=tempfile::tempdir().unwrap();let input=d.path().join("input.map");common::write_map(&input,6);let root=d.path().join("library");std::fs::create_dir_all(&root).unwrap();let canonical=std::fs::canonicalize(&root).unwrap();let first=Library::open(&canonical).unwrap();let(mut p,_)=first.import_map(&input,None).unwrap();drop(first);let reopened=Library::open(&root).unwrap();p.title="Same owned source, new title".into();reopened.save(&p,None).unwrap();assert_eq!(reopened.get(&p.id).unwrap().title,p.title);assert_eq!(maps::hash_file(&input).unwrap(),p.source.unwrap().sha256);
 }
 #[test]
+fn duplicate_map_import_keeps_its_resource_origin_without_replacing_the_project(){
+    let dir=tempfile::tempdir().unwrap();let first=dir.path().join("download.map");common::write_map(&first,6);
+    let library=Library::open(&dir.path().join("library")).unwrap();let(mut original,inspection)=library.import_map(&first,None).unwrap();
+    let tag=&inspection.tags[1];let field=tag.fields.iter().find(|field|field.key=="bounding-radius").unwrap();
+    original.title="An edited preserved map".into();original.tag_edits.push(TagEdit{tag_id:tag.id,field_key:field.key.clone(),value:serde_json::json!(2.)});library.save(&original,None).unwrap();
+    let own=dir.path().join("owned/maps");std::fs::create_dir_all(&own).unwrap();let second=own.join("bloodgulch.map");std::fs::copy(&first,&second).unwrap();
+    let(imported,_)=library.import_map(&second,None).unwrap();assert_eq!(serde_json::to_value(&imported).unwrap(),serde_json::to_value(&original).unwrap());
+    let origins:Vec<std::path::PathBuf>=library.setting(&format!("mapResourceOrigins.{}",original.id)).unwrap();assert_eq!(origins,vec![std::fs::canonicalize(&own).unwrap()]);
+    assert_eq!(library.list().unwrap().len(),1);assert_eq!(maps::hash_file(&first).unwrap(),maps::hash_file(&second).unwrap());
+    assert_eq!(maps::hash_file(&imported.source.unwrap().preserved_path).unwrap(),maps::hash_file(&first).unwrap());
+}
+#[test]
 fn project_roundtrip_and_backup() {
     let d = tempfile::tempdir().unwrap();
     let p = project::Project::new("Restoration");

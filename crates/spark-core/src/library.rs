@@ -208,6 +208,19 @@ impl Library {
             if inspection.sha256 != source.sha256 {
                 return invalid("Preserved source checksum changed");
             }
+            // Deduplication keeps the original project but also remembers
+            // resources beside another explicitly imported identical map.
+            // These are candidates, not admitted resource pins.
+            if [6,7,609].contains(&source.cache_version) {
+                validate_local_input_path(path)?;crate::reject_links(path)?;
+                let canonical=fs::canonicalize(path)?;
+                if let Some(folder)=canonical.parent() {
+                    let key=format!("mapResourceOrigins.{}",project.id);
+                    let mut origins:Vec<PathBuf>=self.setting(&key)?;
+                    origins.retain(|value|value!=folder);origins.insert(0,folder.to_owned());origins.truncate(8);
+                    self.set_setting(&key,&origins)?;
+                }
+            }
             return Ok((project, inspection));
         }
         let mut p = Project::new(&inspection.header.name.replace('_', " "));

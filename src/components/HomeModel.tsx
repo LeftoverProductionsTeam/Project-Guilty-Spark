@@ -6,7 +6,6 @@ import { preloadHomeModels,isHaloMonitor } from '../homeShowcase';
 import NativeModelPreview from './NativeModelPreview';
 import {useMapState} from '../mapSession';
 import {showcaseKey} from './ShowcaseChoice';
-import {publishSparkEmblem} from './SparkEmblem';
 
 export default function HomeModel({ data }: { data: Bootstrap }) {
   const [selection,setSelection]=useMapState('global','home.model','automatic');
@@ -41,7 +40,7 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
   return (
     <div className="home-native-model">
       {model ? (
-        <NativeModelPreview key={showcaseKey(model)} asset={model} showcase onSnapshot={isHaloMonitor(model)?publishSparkEmblem:undefined}/>
+        <NativeModelPreview key={showcaseKey(model)} asset={model} showcase/>
       ) : (
         <span className="model-preview-loading">{message}</span>
       )}
