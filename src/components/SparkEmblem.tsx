@@ -12,7 +12,9 @@ export default function SparkEmblem({data}:{data:Bootstrap}){
   const anchor=useRef<HTMLSpanElement>(null),[position,setPosition]=useState<{left:number;top:number}|null>(null);
   useLayoutEffect(()=>{
     const target=anchor.current;if(!target)return;
-    const update=()=>{const rect=target.getBoundingClientRect();setPosition(previous=>previous?.left===rect.left-10&&previous.top===rect.top-8?previous:{left:rect.left-10,top:rect.top-8});};
+    // Overlap the application's rounded clip, but stay inside the actual
+    // WebView/OS window: negative coordinates crop the monitor's silhouette.
+    const update=()=>{const rect=target.getBoundingClientRect(),left=Math.max(8,rect.left-10),top=Math.max(8,rect.top-8);setPosition(previous=>previous?.left===left&&previous.top===top?previous:{left,top});};
     const observer=new ResizeObserver(update);observer.observe(target);update();
     window.addEventListener('resize',update);window.addEventListener('scroll',update,true);
     return()=>{observer.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true);};
