@@ -261,7 +261,7 @@ export default function Tags({
           </Notice>
         )}
         {selectedTag ? (
-          <div className={`tag-selection-layout${selectedModel?' has-model':''}`}>
+          <div className={`tag-selection-layout${selectedModel?' has-model':''}${selectedTag.class==='snd!'?' is-sound':''}`}>
             <div className="tag-properties-pane">
             <div className="tag-detail-heading">
               <div className="eyebrow">
@@ -277,6 +277,10 @@ export default function Tags({
                   {selectedTag.fields.length ? 'Typed fields available' : 'Inspection only'}
                 </Pill>
               </div>
+              {selectedTag.class==='snd!'&&<Sound
+                key={`${selectedTag.id}:${JSON.stringify(project.source?.audioResources??project.source?.resourceSha256)}`}
+                projectId={project.id} tagId={selectedTag.id} sourceHash={project.source?.sha256??''}
+                onAssign={onAssignSound} onResources={onResources}/>}
             {selectedTag.class==='bitm'&&<BitmapPreview key={`${project.id}:${selectedTag.id}`} project={project} tagId={selectedTag.id}/>}
               <details className="tag-secondary-actions">
                 <summary>Extract, export or transfer tags</summary>
@@ -488,6 +492,7 @@ export default function Tags({
                 )}
               </details>
             </div>
+            <div className="tag-native-tools">
             <BaboonTools project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} />
             <NativeTagOperations project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} />
             <TagDuplicatePanel
@@ -497,6 +502,7 @@ export default function Tags({
               source={selectedTag}
               edit={edit}
             />
+            </div>
             {projectile && rocket && (
               <div className="preset-bar">
                 <div>
@@ -511,22 +517,6 @@ export default function Tags({
                   <ArrowRight size={14} />
                 </button>
               </div>
-            )}
-            {selectedTag.class === 'snd!' && (
-              <>
-                {onResources && (
-                  <button className="small-button" onClick={onResources}>
-                    Locate Halo Sounds folder
-                  </button>
-                )}
-                <Sound
-                  key={`${selectedTag.id}:${JSON.stringify(project.source?.audioResources ?? project.source?.resourceSha256)}`}
-                  projectId={project.id}
-                  tagId={selectedTag.id}
-                  sourceHash={project.source?.sha256 ?? ''}
-                  onAssign={onAssignSound}
-                />
-              </>
             )}
             {selectedTag.references.length > 0 && (
               <div className="reference-list">

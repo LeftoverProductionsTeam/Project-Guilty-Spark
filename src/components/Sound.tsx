@@ -7,7 +7,7 @@ import { Notice } from './ui';
 import SoundAudition from './SoundAudition';
 import '../soundInspector.css';
 
-export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: { projectId: string; tagId: number; sourceHash?: string; onAssign?: (cue: CueName, ref: LocalCueReference) => void }) {
+export default function Sound({ projectId, tagId, sourceHash = '', onAssign,onResources }: { projectId: string; tagId: number; sourceHash?: string; onAssign?: (cue: CueName, ref: LocalCueReference) => void;onResources?:()=>void }) {
   const [inspection, setInspection] = useState<SoundInspection | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,6 +61,7 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign }: {
           <label><input type="checkbox" checked={repeat} onChange={event=>setRepeat(event.target.checked)}/> Repeat sample</label>
           <label>Preview volume <input aria-label="Sound preview volume" type="range" min="0" max="1" step=".01" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label>
         </div>
+        {onResources&&<button className="small-button" onClick={onResources}>Locate Halo Sounds folder</button>}
           {onAssign && sample?.available && sample.embedded && <div className="sound-assign">
             <small>Assign local cue:</small>
             {([['select', 'Navigate'], ['confirm', 'Confirm'], ['warning', 'Warning']] as const).map(([cue, label]) => (

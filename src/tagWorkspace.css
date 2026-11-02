@@ -19,8 +19,34 @@
 .tag-selection-layout .tag-model-preview {height:100%;min-height:0;min-width:0;border-left:1px solid var(--line);padding:0;position:relative;}
 .tag-selection-layout .tag-model-preview .native-model-preview {min-height:0;}
 .tag-layout .relationships {width:100%;border:0;}
+.tag-selection-layout.is-sound .tag-properties-pane {padding:10px 12px;}
+.tag-selection-layout.is-sound .sound-inspector {max-width:780px;box-sizing:border-box;margin:8px 0 0;}
+.tag-selection-layout.is-sound .field-table {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 12px;}
+.tag-selection-layout.is-sound .field-table > :not(.property-row) {grid-column:1/-1;}
+.tag-selection-layout.is-sound .field-table .property-row {align-content:center;min-width:0;}
+.tag-selection-layout.is-sound .tag-native-tools {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:7px 0;}
+.tag-selection-layout.is-sound .tag-native-tools > details {min-width:0;margin:0;padding:6px 8px;font-size:11px;}
+.tag-selection-layout.is-sound .tag-native-tools > details[open] {grid-column:1/-1;}
+.tag-properties-pane :is(.gs-tag-lineage,.gs-tag-migration) {padding:0;margin:7px 0;border-radius:6px;font-size:11px;}
+.gs-lineage-disclosure > summary,.gs-migration-disclosure > summary {display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 9px;cursor:pointer;list-style:none;}
+.gs-lineage-disclosure > summary::before,.gs-migration-disclosure > summary::before {content:'▸';font-size:10px;}
+.gs-lineage-disclosure[open] > summary::before,.gs-migration-disclosure[open] > summary::before {content:'▾';}
+.gs-lineage-disclosure > summary small,.gs-migration-disclosure > summary small {color:var(--muted);margin-left:auto;font-size:10px;}
+.gs-lineage-disclosure > :not(summary),.gs-migration-disclosure > :not(summary) {margin:7px 9px;}
+.tag-properties-pane .gs-lineage-heading {justify-content:flex-end;}
+.tag-properties-pane .gs-lineage-detail {padding:4px 7px;margin-top:6px;border-radius:5px;}
+.tag-properties-pane .gs-lineage-detail > summary {padding:3px 0;}
+.tag-properties-pane .gs-lineage-list {margin:5px 0;gap:4px;max-height:240px;}
+.tag-properties-pane .gs-lineage-link {min-height:34px;padding:4px 7px;}
+.tag-properties-pane .gs-lineage-stats {display:flex;flex-wrap:wrap;gap:5px;margin:7px 0;}
+.tag-properties-pane .gs-lineage-stats span {display:inline-flex;flex-direction:row;align-items:center;gap:5px;padding:4px 6px;}
+.tag-properties-pane .gs-lineage-stats strong {font-size:12px;}
+.tag-properties-pane .gs-lineage-footer {font-size:10px;line-height:1.4;}
+.tag-properties-pane .gs-migration-actions {gap:7px;margin:7px 0;}
 @media(max-width:1000px){
  .application .tag-layout {grid-template-columns:170px minmax(0,1fr);}
  .tag-selection-layout.has-model {grid-template-columns:minmax(230px,1fr) minmax(200px,1.1fr);}
  .tag-properties-pane {padding:7px;}
+ .tag-selection-layout.is-sound .field-table {grid-template-columns:repeat(2,minmax(0,1fr));}
+ .tag-selection-layout.is-sound .tag-native-tools {grid-template-columns:minmax(0,1fr);}
 }

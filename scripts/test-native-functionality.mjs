@@ -70,6 +70,9 @@ try{
   if(entry.sound){
    const tag=o.inspection.tags.find(t=>t.class==='snd!'&&new RegExp(entry.sound,'i').test(t.path));expect(tag,'An actual requested source sound is required').toBeTruthy();
    await selectTag(o,tag);const sound=page.locator('.sound-inspector');await expect(sound.getByRole('button',{name:'Play sample',exact:true})).toBeVisible();
+   const compact=await page.locator('.tag-selection-layout.is-sound').evaluate(e=>{const pane=e.querySelector('.tag-properties-pane'),sound=e.querySelector('.sound-inspector'),lineage=e.querySelector('.gs-tag-lineage'),migration=e.querySelector('.gs-tag-migration');return{soundTop:sound.getBoundingClientRect().top-pane.getBoundingClientRect().top,lineageHeight:lineage.getBoundingClientRect().height,migrationHeight:migration.getBoundingClientRect().height,scroll:pane.scrollHeight-pane.clientHeight};});
+   expect(compact.soundTop).toBeLessThan(200);expect(compact.lineageHeight).toBeLessThanOrEqual(44);expect(compact.migrationHeight).toBeLessThanOrEqual(44);expect(compact.scroll).toBeLessThanOrEqual(1);result.soundLayout=compact;
+   const lineage=page.locator('.gs-lineage-disclosure');await lineage.locator(':scope > summary').click();await expect(lineage.getByRole('button',{name:'Export audit',exact:true})).toBeVisible();await lineage.locator(':scope > summary').click();
    await sound.locator('details summary').click();await sound.getByLabel('Repeat sample',{exact:true}).check();await sound.locator('details summary').click();
    const reportSound=await call('inspect_sound',{projectId:o.project.id,tagId:tag.id});expect(reportSound.permutations.some(p=>p.available)).toBe(true);
    const meterFile=path.join(root,`audio-output-${i}.json`);const meter=spawn(path.resolve(configuration.audioMeter),[String(child.pid),meterFile,'8'],{windowsHide:true,stdio:['ignore','pipe','pipe']});
@@ -80,6 +83,7 @@ try{
    if(meterExit===0){const measured=JSON.parse((await fs.readFile(meterFile,'utf8')).replace(/^\uFEFF/,''));result.samples.at(-1).windowsMaximumPeak=Math.max(0,...measured.readings.flatMap(r=>r.sessions.map(s=>s.Peak)));}
    expect(meterExit,`Windows audio meter: ${meterErrors}`).toBe(0);expect(result.samples.at(-1).windowsMaximumPeak).toBeGreaterThan(.0001);
    await sound.screenshot({path:path.join(root,`sound-${i}.png`)});
+   await page.screenshot({path:path.join(root,`sound-workspace-${i}.png`)});
   }
   expect(await hash(entry.path)).toBe(result.sourceSha256);
  }

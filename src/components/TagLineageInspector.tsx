@@ -15,11 +15,13 @@ export default function TagLineageInspector({project,inspection,tag,onNavigate,n
     catch(error){return {report:null,error:String(error)};}
   },[project.source?.sha256,project.tagEdits,inspection,tag.id]);
   const report=result.report;
+  const unresolved=report?report.issues.missing+report.issues.wrongClass+report.issues.ambiguous+report.issues.invalid:0;
   const byId=useMemo(()=>new Map(inspection.tags.map(t=>[t.id,t])),[inspection]);
   return <section className="gs-tag-lineage" aria-label="Tag lineage inspector">
+    {result.error&&<p role="alert" className="gs-lineage-warning">{result.error}. Select the matching preserved cache to continue.</p>}
+    <details className="gs-lineage-disclosure">
+    <summary><GitBranch size={13}/><strong>Tag Lineage Inspector</strong>{report&&<small>{report.nodes.length} tags · {report.edges.length} links · {report.incomingObserved} incoming{unresolved>0?` · ${unresolved} unresolved`:''}{report.truncations.length?' · bounded scan':''}</small>}{(unresolved>0||!!report?.truncations.length)&&<ShieldAlert size={13} aria-label="Lineage needs review"/>}</summary>
     <div className="gs-lineage-heading">
-      <div><span className="gs-lineage-kicker"><GitBranch size={13}/> 07 Halo Modding Brain</span>
-        <h3>Tag Lineage Inspector</h3></div>
       <button type="button" className="small-button" disabled={!report} onClick={()=>{
         if(!report)return;
         try{
@@ -28,18 +30,11 @@ export default function TagLineageInspector({project,inspection,tag,onNavigate,n
         }catch(error){notify(`Lineage export refused: ${String(error)}`);}
       }}><Download size={13}/> Export audit</button>
     </div>
-    {result.error&&<p role="alert" className="gs-lineage-warning">{result.error}. Select the matching preserved cache to continue.</p>}
     {report&&<>
-      <div className="gs-lineage-stats">
-        <span><strong>{report.nodes.length}</strong> indexed tags visited</span>
-        <span><strong>{report.edges.length}</strong> observed links</span>
-        <span><strong>{report.incomingObserved}</strong> direct incoming</span>
-        <span><strong>{report.issues.missing+report.issues.wrongClass+report.issues.ambiguous+report.issues.invalid}</strong> unresolved</span>
-      </div>
       <p className="subtle">Eschaton/HMT-style follow-the-reference discovery, now attached to this exact source SHA. Staged reference edits are reflected, not written to the map. The parser indexes only known relationships.</p>
       {report.truncations.length>0&&<p role="status" className="gs-lineage-warning"><ShieldAlert size={14}/> Bounded scan: {report.truncations.join(', ')}. This is an incomplete view.</p>}
       {report.scans.indexedReferenceFieldsMissing>0&&<p className="gs-lineage-warning">{report.scans.indexedReferenceFieldsMissing} typed reference fields lack indexed relationships. Inspect them individually before extraction.</p>}
-      <details open className="gs-lineage-detail">
+      <details open={report.edges.length>0} className="gs-lineage-detail">
         <summary>Dependency walk - {report.edges.length} inspected links</summary>
         <div className="gs-lineage-list">
           {report.edges.slice(0,72).map((edge,i)=>{
@@ -77,5 +72,6 @@ export default function TagLineageInspector({project,inspection,tag,onNavigate,n
       </details>
       <p className="gs-lineage-footer">Reference discovery is not a complete recursive .tag extraction. Missing schemas, external tag bodies and engine-specific runtime fields require Invader/MEK or compatible Editing Kit tools, plus real compilation and gameplay testing.</p>
     </>}
+    </details>
   </section>;
 }

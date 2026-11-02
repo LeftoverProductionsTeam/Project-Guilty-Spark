@@ -115,6 +115,12 @@ try {
   await header.dispatchEvent('mousedown', { button: 0, detail: 2, bubbles: true, cancelable: true });
   await expect.poll(() => call('plugin:window|is_maximized')).toBe(false);
   report.frameworkDoubleClickRoundTrip = true;
+  await page.keyboard.press('F11');
+  await expect.poll(()=>call('plugin:window|is_fullscreen')).toBe(true);
+  await expect.poll(()=>page.locator('.application').evaluate(e=>{const r=e.getBoundingClientRect();return r.x===0&&r.y===0&&r.width===innerWidth&&r.height===innerHeight;})).toBe(true);
+  await page.keyboard.press('Escape');await expect.poll(()=>call('plugin:window|is_fullscreen')).toBe(false);
+  await expect.poll(()=>page.locator('.application').evaluate(e=>{const r=e.getBoundingClientRect();return r.x===16&&r.y===16;})).toBe(true);
+  report.fullscreenUsesCompleteViewportAndRestoresCorner=true;
   expect(await page.getByRole('button', { name: 'Close window', exact: true }).count()).toBe(1);
   expect(report.errors).toEqual([]);
   await page.screenshot({ path: path.join(root, 'curved-frame.png'), omitBackground: true });

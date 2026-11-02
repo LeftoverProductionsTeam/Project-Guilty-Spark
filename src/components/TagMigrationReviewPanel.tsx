@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Archive, Download, FileSearch, GitCompareArrows, ShieldAlert } from 'lucide-react';
+import { Download, FileSearch, GitCompareArrows, ShieldAlert } from 'lucide-react';
 import type { MapInspection, Project } from '../types';
 import { exportTagMigrationReview, reviewTagMigration } from '../tagMigrationReview';
 import { downloadLocalText } from '../exportHelpers';
@@ -31,11 +31,8 @@ export default function TagMigrationReviewPanel({project,inspection,notify}:{
     }catch(error){setFileError(`Could not read manifest: ${String(error)}`);}
   }
   return <section className="gs-tag-migration" aria-label="Cross-map tag migration preview">
-    <div className="gs-lineage-heading">
-      <div><span className="gs-lineage-kicker"><Archive size={13}/> 07 Halo Modding Brain · Time Machine</span>
-        <h3><GitCompareArrows size={17}/> Cross-map Tag Migration Preview</h3></div>
-      <Pill>Read-only reference archaeology</Pill>
-    </div>
+    <details className="gs-migration-disclosure">
+    <summary><GitCompareArrows size={13}/><strong>Cross-map Tag Migration Preview</strong><small>{report?`${report.selected.length} tags reviewed`:'Read-only manifest review'}</small></summary>
     <p className="subtle">Old Eschaton/HMT-style transplants need more than matching datum IDs. Export a <strong>tag reference + dependencies</strong> JSON manifest from one map, open the destination map here, then select the JSON to compare class/path identities. Source and destination caches stay untouched.</p>
     <div className="gs-migration-actions">
       <label htmlFor="gs-migration-file"><FileSearch size={14}/> Review a previously exported tag manifest</label>
@@ -88,5 +85,6 @@ export default function TagMigrationReviewPanel({project,inspection,notify}:{
       </div>
       <p className="gs-lineage-footer">Even a matching class/path is only an identity match; compiled tag fields and external resources can differ. For real migration, use a compatible Invader/Editing Kit extraction into isolated source folders, resolve the full dependency closure, compile a new map and test it in the target engine. Original files are never overwritten by this preview.</p>
     </div>}
+    </details>
   </section>;
 }
