@@ -40,7 +40,14 @@ try{
   expect(layout.bodyOverflow).toBe(false);expect(layout.workspaceOverflow).toBe(false);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();report.layouts.push({...layout,dpi});
  }
  await cdp.send('Emulation.clearDeviceMetricsOverride');await cdp.detach();
- await page.getByRole('group',{name:'Your Halo installations',exact:true}).getByRole('button',{name:/MCC/}).click();await expect(page.getByRole('tab',{name:'Games & tools',exact:true})).toBeVisible();await shot('runtimes');
+ await page.getByRole('group',{name:'Your Halo installations',exact:true}).getByRole('button',{name:/MCC/}).click();
+ await expect(page.getByRole('heading',{name:'Games & tools',exact:true})).toBeVisible();
+ const runtimeCards=page.getByRole('group',{name:'Halo versions',exact:true});
+ await expect(runtimeCards.getByRole('button')).toHaveCount(4);
+ await expect(runtimeCards.locator('[data-connected="true"]')).toHaveCount(4);
+ await expect(page.getByRole('button',{name:'Recheck tools',exact:true})).toBeEnabled();
+ await expect.poll(()=>page.locator('.tool-ecosystem-compact .gs-tool-card').count()).toBeGreaterThan(0);
+ await shot('runtimes');
  await page.getByRole('button',{name:'HOME',exact:true}).click();
  const created=await call('create_quickforge_project',{title:'C51 native Workshop source',template:'customBlank',target:'mccSteam'});report.projectId=created.project.id;
  await page.reload();await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'C51 native Workshop source',exact:true})}).click();

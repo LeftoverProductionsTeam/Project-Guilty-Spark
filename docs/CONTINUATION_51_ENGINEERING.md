@@ -93,3 +93,66 @@ Private QA is bounded under `.local/c51-flagship-20261102` with short separate n
 - [Halo 1 scripting reference](https://c20.reclaimers.net/h1/scripting/) — encounter activation and native script semantics.
 
 Upstream implementation files are inspected privately, not vendored as Spark code or game content. Publisher executable/PDB identities remain exact: `788fb409…` / `b3755a3d…`.
+
+## Final verification and measured performance
+
+The final application sources are committed at **`f9d441ecd5ae13320fe3c9e9cc52f719dfd92a0d`** after the initial C51 checkpoint `e18151e…` and showcase follow-up `ccdd1a5…`. Web bundling and the optimized locked Windows build pass; the last native build takes **1m 36s**. Only documentation/captures and the separate opt-in Node UI harness change after that application-source checkpoint. The native loaded JavaScript is hash-compared against the built distribution.
+
+Final development executable: **`target/release/GuiltySpark.exe`**, **42,098,176 bytes**, SHA-256 **`ca80a3cd46e302ddc0296850be855e7816a072a4c6b8b51b86b996a761d6b287`**. Application version remains 0.4.1; this does not replace the sealed C49 package or certify a new installer.
+
+| Regression | Actual result |
+| --- | --- |
+| `cargo test --workspace --locked -j4` | **636 passed, eight owner-dependent opt-ins ignored**; no failures |
+| Frontend unit suite / TypeScript | **311 tests / 71 files passed**, final typecheck passed |
+| Full browser suite on final runtime sources | **143 passed**, 3.0 minutes |
+| Offline script chains | **59 passed** |
+| Native-census diagnostic guards | **Five passed**; synthetic parser guards, not gameplay |
+| Final real native UI | Exact built source served; all four runtime connections pass; actual four-volume Workshop source becomes valid; Home and Features each expose eight flagship entries; no page errors |
+| Real native home showcase | Source hash retained across navigation; 1,126-triangle owned monitor, texture and reflection; native animation time progresses; projected left/right headings have opposite signs; no page errors |
+
+The home test initially failed because C50's yaw range stopped at `-0.4`: it responded to the cursor but could not face the right edge. C51 keeps the left-facing rest pose and extends the positive range; the test now additionally requires positive projected screen heading. Native clips, lighting and reduced-motion behavior are preserved.
+
+The first paired profile comparison also refused acceptance: Home's added overview caused a scrollbar and reduced the showcase buffer from 1,371 to 1,364 pixels wide. That failed comparison remains. The empty-library instructions/actions are now a desktop grid with all text/actions retained. Fresh profiles pass the **unchanged** content and pixel-workload checks. Final native captures wait for actual runtime/tool cards and valid Workshop source, rather than capturing a lazy-loading placeholder.
+
+The four native size/DPI checks have no horizontal overflow and retain visible window controls. Empty Home has no vertical overflow at 1,440×900; it still requires **39 px** of internal scrolling at 1,280×720 and **109 px** at 960×650. This is not reported as universal no-scroll UI acceptance. Public screenshots are genuine final native captures; earlier captures remain in private evidence.
+
+### Comparable before/after observations
+
+Two independent fresh-profile runs per executable, sequentially with other test apps/builds closed. Same installed Xbox a10 and MCC Blood Gulch, **1,440×900 / DPR 1**, **1,428×888 map work area**, same actual source identities, source/model/object counts, geometry, visible triangles, materials, lightmaps, decals, shader settings and render resolution. All **24** settled map observations pass parity. Home uses the same 1,371×322 render buffer. Cold means a fresh process/profile, not a flushed Windows disk cache.
+
+Baseline executable SHA: `4a35c6f46279986131e0765eb4e92828c0a36bb80c84f71afaccaf3c7aee6c61`. Final executable SHA is above. Raw runs: `profile-quiet-before-c/d` and `profile-quiet-after-c/d` under the C51 private evidence root; the earlier exploratory and rejected runs are excluded from this comparison but retained.
+
+| Measurement (median) | C50 before | C51 after |
+| --- | ---: | ---: |
+| Process-cold shell ready | 1,151.7 ms | 1,147.3 ms |
+| Warm-process shell ready | 916.9 ms | 889.8 ms |
+| Process-cold showcase ready | 3,911.2 ms | 3,980.1 ms |
+| Warm-process showcase ready | 2,938.1 ms | 2,913.2 ms |
+| First fully textured Xbox a10 | 14,250.6 ms | 14,262.5 ms |
+| First fully textured MCC Blood Gulch | 7,336.9 ms | 7,382.4 ms |
+| Repeated map switches (eight samples each) | 1,027.5 ms | 1,000.7 ms |
+| Large asset catalog, 150 of 1,082 cards | 2,954.9 ms | 3,403.1 ms |
+| Open-project native IPC | 693.3 ms | 823.4 ms |
+| Lightweight polling IPC | 2.68 ms | 2.97 ms |
+| Sampled render rate | 59.70 fps | 59.52 fps |
+
+Repeated switches are **2.62% shorter** in this small sample, while catalog/open-project IPC and cold showcase are slower. This is a regression baseline, not proof of a new general performance improvement. C51 does not remove content/validation or add speculative caching to manufacture a gain. Next profiling should isolate catalog readiness and native open-project tails, then measure any optimization against this workload.
+
+| Settled owned process tree | CPU, before → after (% of machine) | Resident RAM, before → after (MiB) | 3D GPU, before → after (%) | Dedicated GPU, before → after (MiB) |
+| --- | ---: | ---: | ---: | ---: |
+| First showcase | 0.70 → 1.23 | 795.9 → 743.3 | 7 → 7 | 146.3 → 148.3 |
+| Xbox a10 | 8.00 → 8.57 | 2,434.1 → 2,418.7 | 14.5 → 13.5 | 263.4 → 263.6 |
+| MCC Blood Gulch | 2.70 → 2.93 | 2,564.4 → 2,467.0 | 15 → 14.5 | 437.3 → 435.2 |
+| After repeated switches | 3.10 → 2.89 | 2,577.2 → 2,481.2 | 15 → 15 | 440.8 → 441.0 |
+| Back on Home after maps | 1.01 → 1.08 | 2,721.6 → 2,667.1 | 8 → 8.5 | 575.1 → 576.0 |
+| Warm process | 0.59 → 0.73 | 708.9 → 772.6 | 6 → 6.5 | 145.5 → 147.3 |
+
+These are short settled samples, not peak usage, overnight leak acceptance, isolated whole-machine GPU results or statistical confidence intervals. The full metadata receipt includes private memory and every raw measurement. Repeated switches decode zero new bitmap batches and issue zero new reflection requests in both versions; the retained C50 caches already avoid that work. Source/resource identity validation remains enabled.
+
+### Preservation and handoff
+
+Final audit verifies all **26** non-master historical references, the C50 foundation and sealed C49 source ancestry, unchanged original 92 requirements, the exact **948,674-byte** historical ledger prefix and **444 unique records** after six additions. Installer, portable, source ZIP, manifest and checksum file remain byte-identical. No prior failed research, archived source or release artifact is deleted.
+
+The controlled Firefight completion test exercises native custom-map HSC with a separate death-driving QA script. The explicitly singleplayer/campaign candidate is compiled and run separately and retains its placement/physics timeout. Neither is a verified player-driven solo or cooperative Firefight experience. Original audio compilation/readback remains the accepted C50 scope; native MCC listening is still pending. Full shared AI and two-way Megaworld traversal remain open.
+
+[Machine-readable C51 evidence](fixtures/c51-flagship-pass.json) · [Descriptive push and distribution notes](C51_PUSH_NOTES.md). Local master is ready for the user's normal push; nothing was remotely published. GitHub metadata editing remains unavailable, its prepared text is separate, and public release approval is still required.
