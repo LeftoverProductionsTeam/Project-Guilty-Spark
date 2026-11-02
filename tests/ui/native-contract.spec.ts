@@ -661,6 +661,23 @@ test('the single header reserves map-tab space and keeps overflow drawers reacha
  }
 });
 
+test('the Spark corner visual clears the curved frame and stays above window glass without blocking input',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{document.documentElement.style.setProperty('--gs-window-opacity','.35');document.documentElement.style.setProperty('--gs-window-tint-strength','.5');});
+ const emblem=page.locator('.gs-spark-emblem'),button=page.getByRole('button',{name:'Toggle workspace navigation',exact:true});
+ await expect(emblem).toHaveCSS('opacity','1');await expect(page.locator('.gs-window-content')).toHaveCSS('opacity','0.35');
+ expect(await emblem.evaluate(element=>element.parentElement===document.body)).toBe(true);
+ await expect(emblem).toHaveCSS('pointer-events','none');
+ for(const width of [1440,960]){
+  await page.setViewportSize({width,height:800});
+  await expect.poll(async()=>{const mark=await emblem.boundingBox(),hit=await button.boundingBox();return !!mark&&!!hit&&Math.abs(mark.x-(hit.x-10))<1&&Math.abs(mark.y-(hit.y-8))<1;}).toBe(true);
+  if(await button.getAttribute('aria-expanded')!=='true')await button.click();
+  await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
+  await button.click();await expect(page.locator('.gs-navigation-drawer')).toBeHidden();
+  await page.getByRole('button',{name:'HOME',exact:true}).click();await expect(page.locator('.library-page')).toBeVisible();
+ }
+});
+
 test('tag classes expand their matching tags and keep the selected editor when folded',async({page})=>{
  await mockDesktop(page);await openFixture(page);
  const group=page.getByRole('button',{name:/class \(weap\)/});await expect(group).toHaveAttribute('aria-expanded','true');

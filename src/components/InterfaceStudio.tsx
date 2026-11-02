@@ -74,7 +74,7 @@ export default function InterfaceStudio({
     </section>
     <section className="analysis-card gs-window-appearance">
       <h2>Window glass</h2>
-      <p>Adjust the whole window, including its controls, panels, text and viewport.</p>
+      <p>Adjust the window’s controls, panels, text and viewport. The Spark corner emblem stays solid.</p>
       <label>Window transparency · {Math.round((1-preferences.windowOpacity)*100)}%
         <input aria-label="Whole window transparency" type="range" min="0" max="90" step="1" value={Math.round((1-preferences.windowOpacity)*100)} onChange={e=>onChange({...preferences,windowOpacity:1-Number(e.target.value)/100})}/>
       </label>

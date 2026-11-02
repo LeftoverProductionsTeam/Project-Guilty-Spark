@@ -29,7 +29,7 @@ export function createVisualPipeline(
   const grade = new ShaderPass({
     uniforms: {
       tDiffuse: { value: null },
-      tAlpha: { value: alpha?.renderTarget.texture ?? null },
+      tAlpha: { value: null },
       preserveAlpha: { value: preserveAlpha },
       exposure: { value: 1 },
       saturation: { value: 1 },
@@ -46,6 +46,10 @@ export function createVisualPipeline(
       c=mix(vec3(dot(c,vec3(.2126,.7152,.0722))),c,saturation);c=(c-.18)*contrast+.18;
       vec2 p=effectUv*2.0-1.0;c*=1.0-vignette*smoothstep(.25,1.4,dot(p,p));float a=preserveAlpha?max(texture2D(tAlpha,effectUv).a,clamp(max(c.r,max(c.g,c.b))*1.3,0.0,.45)):original.a;gl_FragColor=vec4(displayColor(c),a);}`,
   });
+  // ShaderPass clones its initial uniforms, which clears render-target
+  // textures. Bind the live coverage texture after that clone, or solid
+  // models inherit only the translucent bloom halo's alpha.
+  grade.uniforms.tAlpha.value = alpha?.renderTarget.texture ?? null;
   grade.material.toneMapped = false;
   composer.addPass(render);
   if (alpha) composer.addPass(alpha);
