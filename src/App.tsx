@@ -976,6 +976,7 @@ export default function App() {
       return (
         <Library
           data={data}
+          onWorkspace={setWorkspace}
           onImport={() => void importFiles()}
           onRuntime={id=>{setDependencyRuntime(id);setSettingsTab('tools');setWorkspace('settings');}}
           onNew={() => setCreateModal(true)}

@@ -3,6 +3,7 @@ import { SPARK_FEATURES, searchFeatures } from '../featureCatalog';
 import type { Project, Workspace } from '../types';
 import { PageTitle, Pill } from './ui';
 import '../features.css';
+import FlagshipOverview from './FlagshipOverview';
 const toolNames: Partial<Record<Workspace, string>> = {
   world: 'Level Editor',
   quickforge: 'Level Editor',
@@ -40,8 +41,9 @@ export default function Features({
       <PageTitle
         eyebrow="SPARK FIELD GUIDE"
         title="What can Spark do?"
-        description="Browse capabilities, follow a short workflow, and jump into the right tool. Your current map stays open while you explore."
+        description="One Halo. Every World. Every Tool. Together. Explore the flagships, check their limits and continue without closing your map."
       />
+      <FlagshipOverview navigate={navigate}/>
       <div className="feature-journey" aria-label="Workbench workflow">
         <button onClick={() => navigate('get-started')}>1 · Connect your Halo &amp; tools</button>
         <button onClick={() => navigate('library')}>2 · Open or create maps</button>

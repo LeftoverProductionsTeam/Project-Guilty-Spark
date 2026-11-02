@@ -1,5 +1,6 @@
 import HomeModel from './HomeModel';
 import HomeRuntimes from './HomeRuntimes';
+import FlagshipOverview from './FlagshipOverview';
 import {
   ArrowDownToLine,
   Box,
@@ -17,7 +18,7 @@ import {
 import { useMapState } from '../mapSession';
 import '../libraryCompact.css';
 import { native } from '../api';
-import type { Bootstrap, LibraryEntry, RuntimeId } from '../types';
+import type { Bootstrap, LibraryEntry, RuntimeId, Workspace } from '../types';
 import { formatNumber } from '../editor';
 import { Notice, PageTitle, Pill } from './ui';
 export default function Library({
@@ -30,6 +31,7 @@ export default function Library({
   onInbox,
   onInitializeInbox,
   onRuntime,
+  onWorkspace,
   busy,
 }: {
   data: Bootstrap;
@@ -41,6 +43,7 @@ export default function Library({
   onInbox: () => void;
   onInitializeInbox: () => void;
   onRuntime: (id: RuntimeId) => void;
+  onWorkspace: (workspace:Workspace) => void;
   busy: boolean;
 }) {
   const [query, setQuery] = useMapState('global', 'library.query', '');
@@ -55,7 +58,7 @@ export default function Library({
     <div className={`library-page library-layout-${layout}`}>
       <PageTitle
         eyebrow="MAP LIBRARY"
-        title="Your worlds, reimagined."
+        title="One Halo. Every World. Every Tool. Together."
         description={`${data.entries.length} preserved maps and workspaces. Open a project to continue.`}
         actions={
           <>
@@ -84,15 +87,16 @@ export default function Library({
       <section className="library-hero">
         <div className="hero-copy">
           <h2>
-            Old worlds. <br />
-            <span>New possibilities.</span>
+            Project Guilty Spark<br />
+            <span>Your Halo creation studio.</span>
           </h2>
-          <p>Choose a map below, import an archive, or build something new.</p>
+          <p>Build native worlds, edit together and test in your Halo. Choose a preserved map below.</p>
         </div>
         <div className="hero-art" aria-label="Live Halo model showcase">
           <HomeModel data={data} />
         </div>
       </section>
+      <FlagshipOverview compact navigate={onWorkspace}/>
       {!native && (
         <Notice tone="info">
           {data.diagnostics[0] ??

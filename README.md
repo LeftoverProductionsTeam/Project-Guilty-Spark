@@ -1,68 +1,98 @@
-# Project Guilty Spark
+# PROJECT GUILTY SPARK
 
-A Halo 1 creation and preservation workbench with a visual level editor, native tag tools, verified builds, machinima and private collaborative editing.
+**One Halo. Every World. Every Tool. Together.**
 
-## Download
+An open-source Halo 1 creation and interoperability studio combining native modding, worldbuilding, collaborative editing and experimental gameplay enhancement.
 
-**[Download page: GitHub Releases](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases).** Windows previews use an x64 `_Setup.exe` installer or `_Portable.zip`, with their platform manifest and `SHA256SUMS-windows-x64.txt`. The portable app requires the separately installed [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/). The installer can offer that dependency if missing. No Halo game, maps, SDK or optional Steam bridge is included.
+**Available now** means a validated operation within its stated boundaries. **In active development** means source exists but important native gameplay or compatibility gates remain. **Future research** means feasibility and acceptance are still unproven.
 
-Anonymous GitHub verification on November 2, 2026 returned **no public releases**. The **0.4.1 Windows candidate from `cb07581` is accepted locally**, including fresh installed/portable launches and exact payload verification. Public upload remains pending: its new draft must have real attached binaries and verified downloads, followed by the owner's publication approval. A local build or Actions artifact is not a public download. [Release process](docs/RELEASING.md) · [Preserved C49 files and exact remaining action](docs/C50_PUSH_NOTES.md).
+## Build the Halo worlds we imagined
 
-| Platform | Package | Acceptance boundary |
+| Flagship | Status today | Working foundation and next gate |
 | --- | --- | --- |
-| Windows 10/11 x64 | NSIS `.exe` and portable ZIP | Release workflow requires regression tests, actual extracted/installed application launches and matching executable hashes. Unsigned preview; game-specific limits below remain. |
-| Linux x64 | AppImage and Debian `.deb` | Optional build on Ubuntu 22.04/WebKitGTK 4.1; both real packages must launch before attachment. No verified Linux release is advertised yet. Windows game hooks and tool launchers are not certified on Linux. |
+| **Halo Megaworld** | In active development | Original-map Atlas, BSP reconstruction and connected Timberland–Sidewinder compilation. A joined CE player is recorded; the new tunnel's two-way walkthrough is still unaccepted. Four-region gameplay and streaming have separate gates. |
+| **Forge & BSP Workshop** | Available now, scoped | Four linked views, brushes, face materials/UVs, rooms, ramps, collision and native compilation. A player verified the two-room CE Workshop corridor/ramp. General imported-terrain sculpting and arbitrary live BSP replacement remain open. |
+| **Multiplayer AI synchronization** | In active development | Exact-build OpenCE host/client actor diagnostics. Three matching actor identities are observed; full combat, damage/death, late-join and reconnect consistency are not accepted. |
+| **Firefight & Zombie Apocalypse** | In active development | Existing wave authoring now exports an opt-in native solo round controller. Native tests observe two waves, 1,000 points, completion, restart and refusal of a partial spawn. Script-caused deaths are not player combat. Commanded live carrier ejection works; automatic weapon-driven release remains open. |
+| **Universal Halo conversion** | In active development | Original-source recovery, recursive staging and native MCC/CE build paths. Xbox, PC, Demo/MD and extended sources retain format-specific limits. Compilation and renamed headers do not prove playable conversion. |
+| **Live Link & collaborative modding** | Available now, scoped | Supported MCC object edits/readback; private SparkLink native tag, asset and BSP sharing with author undo, conflicts and recovery. Three independent processes on one PC are proven. Editor sharing, game editing and gameplay networking are distinct. |
+| **Multiplayer Hub** | Available now, scoped | Runtime-aware discovery and managed private CE hosting/client joining. CE movement/collision is user-verified. Each engine retains its own protocol; no universal MCC-to-community lobby bridge is claimed. |
+| **Campaign & cinematic creator** | In active development | Mission/HaloScript sources, camera paths, Recording Director and named takes. First Contact still needs a complete mission playthrough. |
 
-**C50 development checkpoint · sealed C49 Windows candidate preserved.** Retained/paused editors, compact comparisons and drawers, supported custom native tag names and a corrected window handoff pass native checks. Two paired C50 runs improve repeated map switching by 8.68%; startup, GPU and memory gains are not claimed. Fresh three-process Workshop collaboration/recovery, native looping-emitter compilation and 25-route rendered UI acceptance pass. [C50 measurements and honest gameplay gates](docs/CONTINUATION_50_ENGINEERING.md). [C48 shared BSP history](docs/CONTINUATION_48_ENGINEERING.md), C47 research, Smart Edit and source transactions remain intact. Tunnel traversal, seated Zombie release/death, game-peer AI, cross-computer/Steam relay and audible in-game sound remain separate acceptance gates.
+**Future research stays visible:** expanded campaign co-op, accepted 128-player gameplay, four-region engine streaming, PC split-screen, VR and tracked interactions. These remain requirements, not advertised production capabilities.
 
-[Get started](docs/GETTING_STARTED.md) · [Current capabilities](docs/CURRENT_FEATURES.md) · [Build on Windows](docs/BUILD_WINDOWS.md) · [Full backlog](docs/MASTER_FEATURE_LEDGER.md) · [Community credits](COMMUNITY_CREDITS.md)
+## Real accomplishments
 
-## Current capabilities
+- Native geometry/collision compilation and a user-verified Custom Edition Workshop playthrough.
+- Three separate Spark processes sharing native/BSP edits, validated assets, author undo, conflicts, crash recovery and a frozen native build.
+- MCC looping-sound dependency/sample recovery, sound-scenery attachment and compiled placement readback. In-game listening remains pending.
+- Actual installed Xbox `a10` decoding: **364,774 render triangles, nine BSP parts, 70 model types, 425 requested images with no failures, 17 reflection cubes and three sound previews** in the C51 reader run. Full engine rendering/audio parity is not claimed.
+- A zombie exits its original carrier alive, moves under active AI, advances animation, takes damage, dies and is cleaned up in two independent three-cycle native runs. One animation reference is repaired; automatic release and visual/combat acceptance remain open.
+- Source-preserving external-tool handoff and semantic reconciliation, supported custom native tag names, Smart Edit copies and recoverable revisions.
+- A native Windows application and a sealed, locally accepted **0.4.1 C49 installer/portable candidate**. Public release upload and approval remain pending.
 
-| Workspace | Available workflow | Evidence and boundaries |
-| --- | --- | --- |
-| Map library | Compact map tiles/list, remembered search, preserved imports, variants, supported downloads, linked runtime assets and independent map tabs/windows. Animated native monitor showcase. | [Workbench follow-through](docs/C41_WORKBENCH_FOLLOW_THROUGH.md), [native showcase](docs/NATIVE_ASSETS_AND_SHOWCASE.md) |
-| Level editor / QuickForge | Fly, select and group objects; edit transforms/tags in drawers; drag verified assets; use collision-aware End snapping, keyboard undo/redo and per-map state. New shapes use owned Halo material defaults independently from compilation. | [Default materials](docs/C42_TOOLS_AND_DEFAULTS.md), [connected source workflow](docs/WORKBENCH_INTEGRATION.md) |
-| BSP Workshop / Atlas | Four linked views, convex brush editing, face materials/UVs, rooms, corridors, ramps and source collision. Inspect owned original BSP regions and build a reviewed two-region connection through native H1A/CE tools. | [C43 native world, inventory and traversal gate](docs/CONTINUATION_43_ENGINEERING.md), [Workshop](docs/BSP_WORKSHOP.md) |
-| Tag editor / Smart Edit | Collapsible class/tag tree, typed fields, dependency navigation and supported custom native tag names with reference-aware rebuilding. Save reviewed existing MCC Halo 1 scalar/placement changes into a separate validated cache copy. | [Smart Edit workflow](docs/SMART_EDIT_WORKFLOWS.md), [native tag naming scope](docs/C50_COMPARE_AND_TAG_NAMES.md) |
-| Native source tools | Recursive tag extraction/staging, Baboon/Invader handoff, semantic external-save checks, recoverable source revisions and isolated native compilation. | [C37 integrity and recovery](docs/CONTINUATION_37_ENGINEERING.md), [C38 native operations](docs/CONTINUATION_38_ENGINEERING.md) |
-| Asset library | Actual model previews, supported recursive scenery imports, material-assigned closed OBJ scenery/collision, sound audition and editor emitters. | [Native import acceptance](docs/NATIVE_ASSETS_AND_SHOWCASE.md) |
-| Renderer / sound | Source models/materials, supported reflections, lightmaps, decals, sky/fog and quality controls; compatible-runtime image previews, verified spatial rehearsal and bounded original-loop native MCC QuickForge builds. | [C44 measured rendering](docs/CONTINUATION_44_ENGINEERING.md), [original bitmap resources](docs/ORIGINAL_BITMAP_RESTORATION.md), [native looping emitters](docs/NATIVE_LOOPING_EMITTERS.md) |
-| SparkLink | Shared BSP brushes/portals and expiring drag previews, per-author undo, conflicts, roles, durable pending-edit recovery, LAN/Radmin selection and frozen native builds. Reviewed local tools can edit private copies while participants continue editing. | [Three-process BSP, tool and stability acceptance](docs/CONTINUATION_48_ENGINEERING.md), [original native-content scope](docs/C39_NATIVE_CONTENT_ACCEPTANCE.md) |
-| Machinima / Creator | Camera paths, actor/animation rehearsal, detached Recording Director, editor WebM/audio takes and native script source workflows. | [Recording](docs/C35_DIRECTOR_RECORDING.md), [native camera/script boundaries](docs/NATIVE_GAMEPLAY_AND_AUDIO.md) |
-| Games & tools / Online | Four Halo cards, visible tool downloads/setup, discovered and explicitly selected app launchers, managed map editing, compact hosting and matching CE clients. | [C42 launcher and material fixes](docs/C42_TOOLS_AND_DEFAULTS.md), [earlier game acceptance](docs/C41_WORKBENCH_FOLLOW_THROUGH.md) |
-| Learning center / windows | Compact task guides, glossary and Academy lessons; remembered selections and Back/Forward. Pop out every workspace, open another map view and transfer editing with durable acknowledged undo/redo and crash recovery. | [C43 window history and ownership](docs/CONTINUATION_43_ENGINEERING.md), [earlier layout acceptance](docs/C41_LEARNING_AND_WINDOWS.md) |
+[C51 native results and corrections](docs/CONTINUATION_51_ENGINEERING.md) · [C50 regressions/performance](docs/CONTINUATION_50_ENGINEERING.md) · [BSP Workshop](docs/BSP_WORKSHOP.md) · [C48 collaboration evidence](docs/CONTINUATION_48_ENGINEERING.md).
 
-The desktop Features & workflows page contains short instructions and operation-specific limits. [Current features](docs/CURRENT_FEATURES.md) separates accepted editor/compiler results from remaining game/runtime work.
+## Four Halo runtimes, explicit capabilities
 
-## Start with an owned map
+| Capability | MCC Halo 1 | Custom Edition | OpenCE | ChupathingyCE |
+| --- | --- | --- | --- | --- |
+| Installation discovery | Tested locally | Tested locally | Tested locally | Tested locally |
+| Maps/BSPs/textures/tags | Cache 13 reader and compatible resources | Classic/CE reader; pinned shared resources | Owned Xbox/CE sources; Xbox preview path | Actual installed Xbox `a10` verified; internal pixels need no `bitmaps.map` |
+| Sound previews | Exact supported classic bank samples; other codecs limited | Supported embedded/pinned samples | Supported original Xbox samples | Supported original Xbox samples |
+| Editing/builds | Supported direct scalar/placement copies and native source builds | Native loose tags, geometry and Tool builds | Compatible source toolchain; engine-specific validation | Format-specific source work; broad conversion unfinished |
+| Converted gameplay | Map-specific builds; full Zombie gameplay open | Original conversion loads; original spawning gameplay open | Commanded actor lifecycle and native round tests; full restoration open | Broad converted gameplay not accepted |
+| Hosting/joining | Official MCC session handoff | Private host/client join and movement verified | Private native process trials; content/protocol faults retained | Discovery/launch and scoped trials; converted-map faults remain |
+| Live Link | Bounded object edits/readback | Full exact-build feature acceptance incomplete | Read-only exact-build AI diagnostics; general live writes open | Full live-object write acceptance open |
+| AI/co-op | Full shared AI open | Full shared AI open | Partial real host/client observations; combat/late-join/recovery open | Full shared AI/converted gameplay open |
 
-1. Choose your Halo once in Start here. Connect the installed game and matching tools in Settings; Spark remembers them.
-2. Import a map or supported ZIP into Map library. Open Level editor or Tag editor; both share that map’s saved project and history.
-3. Find assets in the right-side library. Supported native imports review the exact source and recursive dependencies before a build. Missing resources lead to setup or source selection.
-4. Save the project. For an existing supported MCC field/placement edit, expand **Save a map copy → Review save plan**. For source geometry or supported imports, use the matching native build.
-5. Inspect the separate validated output, then test it in its matching game. Compiler/cache validation and game acceptance are recorded separately.
+A runtime selector does not translate networking protocols. [Detailed compatibility](docs/COMPATIBILITY_MATRIX.md) · [C51 runtime/flagship gates](docs/C51_RUNTIME_AND_FLAGSHIPS.md).
 
-**Navigation:** Back/Forward restores the previous map, workspace and Settings section. Ctrl+Z undoes edits; Ctrl+Y / Ctrl+Shift+Z redoes them. History defaults to 100 and is configurable. F11 uses one fullscreen mode; drawers remain movable/resizable and can be reopened without replacing the map. Workspaces and Recording Director can pop out for multiple displays.
+## Download / install
 
-For MCC tools: Steam → Library → include Tools → **Halo: CE Mod Tools - MCC**. Direct MCC map copies require the separately installed reviewed Invader CRC/info tools. Custom Edition can use a connected installation or the optional checked separate installation flow. Source files and build dependencies vary by map and target.
+**[Download Windows previews from GitHub Releases](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases).** A release must attach an x64 `_Setup.exe`, complete `_Portable.zip`, SHA-256 checksums and the exact source/version manifest.
 
-## What remains open
+The last anonymous verification on November 2, 2026 found **no public releases**. The accepted local C49 candidate is not a public download. Its sealed source is `cb07581597de11e83d1c10bafad526e8b031f27e`; C51 does not replace those binaries under the same identity. The draft-only [release workflow](.github/workflows/release.yml) requires pushed source, regression/package checks, verified asset downloads and owner approval before publication. Actions artifacts are not Release assets. [Exact preserved files and owner action](docs/C50_PUSH_NOTES.md).
 
-- Direct compiled-map writing beyond the reviewed unextended/uncompressed MCC Halo 1 cache-13 scalar fields and existing transforms. Arbitrary references, tag-array growth, BSP relocation and other editions need their own writers and acceptance.
-- Universal conversion between every runtime. Existing MCC/CE source and conversion paths have map/tool-specific dependencies; a runtime selector is not a converter.
-- Arbitrary live spawning, live BSP replacement, game-peer editor/AI replication and an MCC-to-community lobby protocol bridge.
-- Complete engine rendering/audio parity, compressed animation coverage, lighting/fog baking and general source reconstruction. [Original-loop sound emitters](docs/NATIVE_LOOPING_EMITTERS.md) now have bounded MCC QuickForge compilation and exact native sample acceptance; custom audio/event baking and in-game listening remain open.
-- Fully accepted dual-wield firing, player energy-sword lunge, third-person aim correction, expanded campaign/Firefight/player counts and new live-session gameplay acceptance.
-- Cross-runtime Zombie Apocalypse gameplay acceptance. C46 recovers complete native long-sound chains and corrects carrier animation/collider prerequisites. Real OpenCE AI observations still retain native faults and large state differences; the final Chupathingy host fails. Two original custom cues remain unavailable, and MCC changes two sound-distance defaults. [Latest native recovery evidence](docs/CONTINUATION_46_ENGINEERING.md).
+Windows 10/11 x64 requires [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/); the installer can offer it when missing. **No Linux package is advertised as verified:** AppImage and `.deb` builds must compile and launch first. No Halo game, maps, models, SDK, proprietary bank or optional Steam bridge is bundled.
 
-All **426 requirement/evidence rows** remain in the [cumulative ledger](docs/MASTER_FEATURE_LEDGER.csv). Historical C35–C39 source, failed experiments and later research remain preserved. [Engineering backlog](docs/UNIVERSAL_WORKBENCH_BACKLOG.md) · [Exact compatibility matrix](docs/COMPATIBILITY_MATRIX.md).
+## Inside the workbench
 
-## Build and verify
+Genuine native application captures. Editor/compiler previews are work in progress; they do not prove game combat or multiplayer parity.
 
-Use Node 24, pnpm 11.25.0, current stable Rust, the Windows MSVC build tools and WebView2. Halo native acceptance additionally needs your installed game, matching source data and editing tools.
+![Current native Spark home and flagship overview](docs/screenshots/c51/home.png)
 
-~~~powershell
+![Native BSP Workshop construction](docs/screenshots/c51/workshop.png)
+
+![Runtime-specific Halo connections and tools](docs/screenshots/c51/runtimes.png)
+
+## Edit, build, test and keep your source
+
+1. Connect an owned Halo runtime once. Spark discovers known directories and verifies resource identities; only missing resources need selection.
+2. Open a preserved map or author geometry in Level Editor / QuickForge. Per-map source, camera, selections, tools and history stay independent. Inactive level views pause instead of clearing.
+3. Use typed tag drawers and supported recursive imports. Smart Edit reviews supported existing MCC scalar/placement changes into a separate cache; structural/source changes need the matching native build.
+4. Optional Editing Kit, Invader and Baboon handoffs use isolated source copies. Reviewed external saves are reconciled semantically; corruption is refused and recovery source retained. Peers cannot request arbitrary raw patches or remote tools.
+5. Inspect the validated build, then test that exact output in Halo. Source validation, compilation, startup, gameplay and user confirmation are separate gates.
+
+Back/Forward preserves workflow; Ctrl+Z/Ctrl+Y edit history defaults to 100. F11, movable drawers and workspace/Recording Director pop-outs support focused and multi-monitor work. [Get started](docs/GETTING_STARTED.md) · [Smart Edit](docs/SMART_EDIT_WORKFLOWS.md) · [Native transactions](docs/CONTINUATION_38_ENGINEERING.md) · [External-tool integrity](docs/CONTINUATION_37_ENGINEERING.md).
+
+## Roadmap and engineering evidence
+
+[Flagship roadmap](ROADMAP.md) · [All twelve flagship gates](docs/C51_RUNTIME_AND_FLAGSHIPS.md) · [Current features](docs/CURRENT_FEATURES.md) · [Original 92 requirements](docs/ORIGINAL_92_REQUIREMENTS_RECONSTRUCTION.md) · [Cumulative ledger](docs/MASTER_FEATURE_LEDGER.md) · [Engineering backlog](docs/UNIVERSAL_WORKBENCH_BACKLOG.md).
+
+Direct compiled-map structural editing, arbitrary live spawning/BSP replacement, native audio listening, complete rendering parity, expanded player counts and cross-computer/Steam collaboration remain explicit. Local processes do not prove a two-computer LAN/VPN session. Steam production integration needs an authorized app identity; Spacewar is not a production shortcut.
+
+## Community and preservation
+
+Built on more than twenty years of Halo community research, tools, documentation and preservation. The original MacGamingMods community and Patrick Davis/Fonzie/AnonDavis Zombie Apocalypse history remain part of the restoration record. [Community credits](COMMUNITY_CREDITS.md).
+
+Spark metadata stays in sidecars; native Halo files retain standard formats. Halo content belongs to its respective owners and is supplied by the user.
+
+## Build, contribute and get help
+
+Tauri 2, Rust, React and Three.js. Use Node 24, pnpm 11.25.0, stable Rust, MSVC build tools and WebView2 on Windows. Native tests also need matching owned Halo content/tools.
+
+```powershell
 pnpm install --frozen-lockfile
 cargo test --workspace --locked
 pnpm check
@@ -71,16 +101,8 @@ pnpm test:offline
 pnpm exec playwright install msedge
 pnpm test:ui
 node scripts/desktop.mjs build
-~~~
+```
 
-C48 local checks pass **629 Rust tests (7 opt-in tests ignored), 300 frontend tests, 136 browser checks, 59 offline scripts and 32 native diagnostic/interface tests**. TypeScript, the Windows executable and NSIS installer build. Native acceptance verifies three-process visible BSP edits, exact-once crash recovery, actual LAN/Radmin interfaces, native compilation and the existing tag/asset/Invader/preserved-Baboon workflow on this exact executable. Across 240 native commits, early/late 12-sample UI-convergence medians are **975.0 / 966.9 ms**, including test polling; DOM counts plateau while retained WebView heaps increase by 1.42–1.68 MiB. This is a short one-PC endurance measurement, not a multi-day, cross-PC, GPU or game replication acceptance. Session limits remain explicit. New installer, portable and committed-source artifacts are verified locally; clean-machine installation and hosted CI/publication are unverified. The retained [map-loading performance pass](docs/C41_MAP_LOADING_PERFORMANCE.md) measures **8.6% faster repeated map switching and 25.1% faster catalog preparation** across three native runs per executable, with identical rendering content and resolution. C42 synchronization timings are a separate workload and do not establish a new before/after loading improvement. The earlier [startup improvements](docs/C41_STARTUP_FOLLOW_THROUGH.md) and [audio, performance and CE safeguards](docs/C41_NATIVE_AUDIO_PERFORMANCE.md) remain preserved.
+[Windows build guide](docs/BUILD_WINDOWS.md) · [Contributing](CONTRIBUTING.md) · [Report a problem](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/issues/new/choose) · [Release procedure](docs/RELEASING.md).
 
-The [home showcase polish](docs/NATIVE_ASSETS_AND_SHOWCASE.md#c41-clarity-and-loading-polish) sharpens the actual monitor, reduces its lighting/glow, extends its left-facing mouse response and shares source preparation across visits. Native animation, textures and reflections remain active; load timings and the later executable identity have their own evidence.
-
-## Project and community
-
-Built with Tauri 2, Rust, React and Three.js. Spark uses standard native Halo files and matching external tools; its project/recovery metadata stays outside native tags.
-
-Project Guilty Spark builds on more than twenty years of Halo community research, editors, documentation and preservation. [Credits](COMMUNITY_CREDITS.md) · [Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Report a problem](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/issues/new/choose).
-
-GitHub repository protections remain unchanged. Publication is owner-controlled; local consolidation does not imply a remote push or successful hosted CI.
+Local master consolidation does not imply a push, updated GitHub metadata or published release. Repository protections and source history remain unchanged.

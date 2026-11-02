@@ -276,11 +276,11 @@ try {
   const back = page.getByRole('button', { name: 'Back to previous workspace', exact: true }),
     forward = page.getByRole('button', { name: 'Forward to next workspace', exact: true });
   await back.click();
-  await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.', exact: true })).toBeVisible();
   await back.click();
   await expect(xField).toHaveValue('4.25');
   await forward.click();
-  await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.', exact: true })).toBeVisible();
   await page.keyboard.press('Alt+ArrowLeft');
   await expect(xField).toHaveValue('4.25');
   await page.keyboard.press('Control+z');

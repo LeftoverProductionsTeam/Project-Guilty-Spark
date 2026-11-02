@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Plus, ShieldCheck, Trash2, Play, Flag } from 'lucide-react';
+import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
+import { exportHaloCeFirefightRound, scriptManifest } from '../haloScript';
+import { sourceZip } from '../sourceZip';
 import { call } from '../api';
 import type {
   FirefightCatalog,
@@ -117,6 +119,19 @@ export default function Firefight({
     } finally {
       setBusy(false);
     }
+  }
+  function exportRound() {
+    if(!config)return;
+    try {
+      const source=exportHaloCeFirefightRound(config);
+      const bytes=sourceZip([{name:source.filename,contents:source.content},
+        {name:'native-round.json',contents:scriptManifest(source)},
+        {name:'encounter-plan.json',contents:JSON.stringify({scenarioType:'singleplayer',sourceSha256:config.sourceSha256,enemies:config.enemies,
+          spawnZones:config.spawnZones,waves:config.waves,dependencies:source.dependencies,compiled:false,gameplayVerified:false},null,2)}]);
+      const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'application/zip'}));
+      const link=document.createElement('a');link.href=url;link.download='spark-native-firefight-round-source.zip';
+      document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);setError('');
+    }catch(error){setError(String(error));}
   }
   return (
     <div className={compact ? 'firefight-compact' : 'analysis-page firefight-page'}>
@@ -513,6 +528,9 @@ export default function Firefight({
             <button disabled={busy} onClick={() => void run('preview')}>
               <Play size={14} />
               Preview rule sequence
+            </button>
+            <button disabled={busy} onClick={exportRound} title="Experimental singleplayer source: one player/life, finite waves and no scaling or supplies. Requires matching native encounters and a separate build.">
+              <Download size={14} />Export native round source
             </button>
           </div>
           {validation && (

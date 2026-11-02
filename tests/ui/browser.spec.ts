@@ -102,7 +102,7 @@ test('browser preview states native boundaries and navigates workspaces', async 
   await expect(page.getByRole('button', { name: 'HOME', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make a Halo world. Know what the engine needs.' })).toBeVisible();
   await chooseTool(page,"Map library");
-  await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.' })).toBeVisible();
   await chooseTool(page,"Tag editor");
   await expect(page.getByRole('heading', { name: 'Choose a world to work on' })).toBeVisible();
   await chooseTool(page,"Settings & tools");

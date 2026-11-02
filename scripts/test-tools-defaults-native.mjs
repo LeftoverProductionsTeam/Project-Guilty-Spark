@@ -92,7 +92,7 @@ try {
     },
   });
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.' })).toBeVisible();
   // Identify the disposable QA window without changing app behavior/state.
   await page
     .locator('#gs-window-header')

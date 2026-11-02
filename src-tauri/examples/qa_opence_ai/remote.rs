@@ -128,6 +128,50 @@ impl Remote {
             u32(&b, offset(t, "server_time")),
         ))
     }
+    fn script_globals(&self, meta: &Value) -> Result<Value, String> {
+        let scenario = typ(meta, "scenario");
+        let global = typ(meta, "hs_global");
+        let datum = typ(meta, "hs_global_datum");
+        let pointer = u32(&self.read_symbol(meta, "global_scenario", 4)?, 0);
+        let block_type = &field(scenario, "hs_globals")["type"];
+        let block = self.read(pointer as u64 + offset(scenario, "hs_globals") as u64,
+            definition(block_type)["bytes"].as_u64().unwrap() as usize)?;
+        let count = u32(&block, offset(block_type, "count")) as usize;
+        if count > 256 { return Err("script global census exceeds bound".into()); }
+        if count == 0 { return Ok(json!([])); }
+        let stride = global["bytes"].as_u64().unwrap() as usize;
+        let globals = self.read(u32(&block, offset(block_type, "address")) as u64, count * stride)?;
+        // The constant count is optimized out; the publisher PDB retains the
+        // actual external-global array extent. Never substitute a guessed count.
+        let external = symbol(meta, "hs_external_globals")["layout"]["count"].as_u64()
+            .filter(|count| *count > 0 && *count <= 512).ok_or("external global layout differs")? as usize;
+        let (maximum, datum_stride, _, values) = self.pool(meta, "hs_global_data")?;
+        if maximum > 1024 || external + count > maximum as usize || datum_stride as u64 != datum["bytes"].as_u64().unwrap() {
+            return Err("script global pool layout differs".into());
+        }
+        let mut out = vec![];
+        for index in 0..count {
+            let row = &globals[index * stride..(index + 1) * stride];
+            let name_start = offset(global, "name");
+            let name = &row[name_start..name_start+32];
+            let name = String::from_utf8_lossy(&name[..name.iter().position(|b| *b == 0).unwrap_or(32)]);
+            // Only Spark's explicit test/controller state, never arbitrary script strings/pointers.
+            if !name.starts_with("gs_ff_") { continue; }
+            let kind = u16(row, offset(global, "type"));
+            if !matches!(kind, 5 | 7 | 8) { continue; }
+            let value = self.read(values as u64 + ((external + index) * datum_stride as usize) as u64, datum_stride as usize)?;
+            if u16(&value, offset(datum, "identifier")) != 0xaced { return Err("script global salt differs".into()); }
+            let at = offset(datum, "value");
+            let number = match kind {
+                5 => i64::from(value[at] != 0),
+                7 => i64::from(u16(&value, at) as i16),
+                8 => i64::from(u32(&value, at) as i32),
+                _ => return Err("unsupported Spark script global type".into()),
+            };
+            out.push(json!({"name":name,"type":kind,"value":number}));
+        }
+        Ok(json!(out))
+    }
     fn details(&self, meta: &Value, headers: &[u8], step: usize) -> Result<Value, String> {
         let actor = typ(meta, "actor_datum");
         let (maximum, stride, _, address) = self.pool(meta, "actor_data")?;
@@ -196,6 +240,11 @@ impl Remote {
         ]
         .map(|n| offset(object, n));
         let unit_start = offset(unit, "unit");
+        let unit_animation = typ(meta, "unit_animation");
+        let u_animation = offset(unit_type, "animation");
+        let object_animation = typ(meta, "object_animation_state");
+        let object_state = typ(meta, "animation_state");
+        let o_animation_state = offset(object, "animation") + offset(object_animation, "state");
         let [u_actor, u_player, u_flags, u_seat, u_control, u_throttle] = [
             "actor_index",
             "player_index",
@@ -244,7 +293,12 @@ impl Remote {
                 let u = &bytes[unit_start..];
                 record["unit"] = json!({
                     "actorId": u32(u, u_actor), "playerId": u32(u, u_player), "flags": u32(u, u_flags),
-                    "seat": u16(u, u_seat), "controlFlags": u16(u, u_control), "throttle": vector(u, u_throttle)
+                    "seat": u16(u, u_seat), "controlFlags": u16(u, u_control), "throttle": vector(u, u_throttle),
+                    "animationSeat": u[u_animation + offset(unit_animation, "seat_index")] as i8,
+                    "animationState": u[u_animation + offset(unit_animation, "state")] as i8,
+                    "animationAction": u[u_animation + offset(unit_animation, "action")] as i8,
+                    "animationIndex": u16(o, o_animation_state + offset(object_state, "index")),
+                    "animationFrame": u16(o, o_animation_state + offset(object_state, "frame_index"))
                 });
             } else if kind == 2 {
                 let w = &bytes[weapon_start..];
@@ -263,7 +317,7 @@ impl Remote {
             profile["bytes"].as_u64().unwrap() as usize,
         )?;
         Ok(
-            json!({"actorPool": pool,"objects": objects,"aiProfileDisabled":profile_bytes[offset(profile,"disabled")]}),
+            json!({"actorPool": pool,"objects": objects,"aiProfileDisabled":profile_bytes[offset(profile,"disabled")],"scriptGlobals":self.script_globals(meta)?}),
         )
     }
     fn snapshot(

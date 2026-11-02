@@ -249,7 +249,7 @@ pub fn run() {
             );
             return;
         }
-        let out = json!({"types":(["actor_datum","object_header_datum","object_datum","unit_datum","unit_control_data","weapon_datum"].iter().map(|name|s.type_name(name)).collect::<Vec<_>>()),"module":{"base":base,"symType":module.SymType,"pdbAge":module.PdbAge,"pdbGuid":[module.PdbSig70.data1,module.PdbSig70.data2 as u32,module.PdbSig70.data3 as u32],"pdbGuidTail":module.PdbSig70.data4,"pdbUnmatched":module.PdbUnmatched},"symbols":(["actor_data","object_header_data","game_time_globals","host_actors","host_actor_count","client_actors","client_actor_count","ai_profile"].iter().map(|name|s.symbol(name)).collect::<Vec<_>>())});
+        let out = json!({"types":(["actor_datum","object_header_datum","object_datum","unit_datum","unit_control_data","weapon_datum","scenario","hs_global","hs_global_datum","unit_animation","object_animation_state","animation_state"].iter().map(|name|s.type_name(name)).collect::<Vec<_>>()),"module":{"base":base,"symType":module.SymType,"pdbAge":module.PdbAge,"pdbGuid":[module.PdbSig70.data1,module.PdbSig70.data2 as u32,module.PdbSig70.data3 as u32],"pdbGuidTail":module.PdbSig70.data4,"pdbUnmatched":module.PdbUnmatched},"symbols":(["actor_data","object_header_data","game_time_globals","host_actors","host_actor_count","client_actors","client_actor_count","ai_profile","global_scenario","hs_global_data","hs_external_globals"].iter().map(|name|s.symbol(name)).collect::<Vec<_>>())});
         if args.len() == 3 {
             println!("{}", serde_json::to_string_pretty(&out).unwrap());
         } else {

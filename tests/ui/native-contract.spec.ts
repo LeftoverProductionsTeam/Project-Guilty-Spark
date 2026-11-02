@@ -341,7 +341,7 @@ async function mockDesktop(page: Page) {
     };
   });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.' })).toBeVisible();
 }
 async function openFixture(page: Page) {
   await page
@@ -429,7 +429,7 @@ test('popping out a map editor saves the focused edit before transferring its do
   const move=calls.findIndex((call:any)=>call.command==='open_project_window');expect(move).toBeGreaterThan(0);
   expect(calls.slice(0,move).some((call:any)=>call.command==='save_project')).toBe(true);
   expect(calls[move].args).toEqual({id:'a',workspace:'tags'});
-  await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
   const afterTransfer=await page.evaluate(()=>(window as any).__sparkMock.calls);
   expect(afterTransfer.slice(move+1).filter((call:any)=>call.command==='commit_workspace_history')).toEqual([]);
   await expect(page.getByText('Editing moved to another window',{exact:true})).toHaveCount(0);
@@ -454,12 +454,12 @@ test('one Back and Forward pair restores the workflow without undoing project ed
     await expect(page.locator('.gs-workspace-tools').getByRole('button',{name:'Undo (Ctrl+Z)',exact:true})).toHaveCount(0);
   }
   await expect(field).toHaveValue('27');await chooseTool(page,'Map library');await chooseTool(page,'Features & workflows');
-  await back.click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await back.click();await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
   await back.click();await expect(field).toHaveValue('27');
   await expect(forward).toHaveAttribute('title',/Map library/);
-  await forward.click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await forward.click();await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
   await forward.click();await expect(forward).toBeDisabled();
-  await page.keyboard.press('Alt+ArrowLeft');await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await page.keyboard.press('Alt+ArrowLeft');await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
   await page.keyboard.press('Alt+ArrowLeft');await expect(field).toHaveValue('27');
   await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');await page.keyboard.press('Control+y');await expect(field).toHaveValue('27');
   await page.getByRole('button',{name:'Toggle Changes',exact:true}).click();
@@ -480,7 +480,7 @@ test('workflow navigation restores each map draft and skips a closed map',async(
   await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toHaveAttribute('aria-selected','true');
   await forward.click();await expect(field).toHaveValue('27');
   await page.getByRole('button',{name:'Save and close Synthetic candidate',exact:true}).click();await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toHaveCount(0);
-  await back.click();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await back.click();await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
 });
 
 test('workflow navigation includes settings tabs and commits a typed field before keyboard Back',async({page})=>{
@@ -1061,9 +1061,9 @@ test('slow onboarding saves keep navigation available and do not steal a later r
   await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='save_settings'?new Promise((resolve,reject)=>{w.__finishSetup=()=>original(command,args).then(resolve,reject);}):original(command,args);});
   await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
   await expect(page.getByRole('button',{name:'Saving Halo choice…',exact:true})).toBeDisabled();
-  await chooseTool(page,"Map library");await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await chooseTool(page,"Map library");await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
   await page.evaluate(()=>(window as any).__finishSetup());
-  await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
   await chooseTool(page,"Start here");await expect(page.getByRole('heading',{name:'Your editing tools',exact:true})).toBeVisible();
 });
 test('hosting uses the selected map and gameplay presets retain fixed left and right gun controls',async({page})=>{
@@ -1583,7 +1583,7 @@ test('onboarding keeps a failed save on its step and remembers completed Halo an
   await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.locator('.gs-first-setup').getByRole('alert')).toContainText('settings write failed');await expect(page.getByRole('heading',{name:'Which Halo are you working with?',exact:true})).toBeVisible();
   await page.evaluate(()=>(window as any).__sparkMock.failSettings=false);await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
   await page.getByRole('textbox',{name:'Setup Map Builder folder',exact:true}).fill('C:/owned/HCEEK');await page.getByRole('combobox',{name:'Setup editing kit generation',exact:true}).selectOption('h1aEk');await page.getByRole('textbox',{name:'Setup Editable Halo Tags folder',exact:true}).fill('C:/owned/working-tags');await page.getByRole('button',{name:'Save setup & open help',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Learning center',exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();await chooseTool(page,"Start here");await expect(page.getByRole('heading',{name:'Your workbench is ready',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Learning center',exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();await chooseTool(page,"Start here");await expect(page.getByRole('heading',{name:'Your workbench is ready',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Change Halo or tools',exact:true}).click();await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.getByRole('textbox',{name:'Setup Editable Halo Tags folder',exact:true})).toHaveValue('C:/owned/working-tags');
 });
 

@@ -1,10 +1,33 @@
 # Roadmap
 
+## C51 flagship milestone — One Halo. Every World. Every Tool. Together.
+
+The [twelve-flagship/runtime matrix](docs/C51_RUNTIME_AND_FLAGSHIPS.md) is the current entry point. [C51 evidence](docs/CONTINUATION_51_ENGINEERING.md) corrects the older carrier death diagnosis and advances commanded live ejection plus an opt-in native solo Firefight round controller. It does **not** accept automatic weapon-driven release, human Firefight combat or complete shared AI.
+
+| Available now, within stated bounds | In active development | Future research |
+| --- | --- | --- |
+| Four-view BSP source construction and CE Workshop playthrough; supported MCC Live Link; three-process SparkLink; native tags/assets/builds; managed CE host/client join | Megaworld traversal/four-region play; original Zombie lifecycle; Firefight combat/HUD; shared AI; universal conversion; First Contact; broader Live Link | Expanded campaign co-op, accepted 128-player gameplay, engine streaming, split-screen, VR/tracked interactions, broader native platforms |
+
+Highest-value next gates, ordered by dependencies and user impact:
+
+1. **Walk the existing Timberland–Sidewinder tunnel both ways.** Cache/server/client already load. Real entrance, floor/head clearance and return traversal close this gate before expanding the four-region gameplay claim.
+2. **Finish original weapon-driven zombie release.** Commanded exits now pass twice after repairing a missing animation reference. Without the command, actors stay seated. Close automatic release without replacing the original spawning intent; review the transition visually.
+3. **Close native Firefight combat.** Round state, wave-clear score, restart and bounded failure run natively. Automated deaths prove control flow; a player must fight both waves, see useful feedback and restart. Integrate native encounter construction/building into Spark.
+4. **Resolve OpenCE native faults before accepting AI parity.** Matching identities/motion are partial evidence; dependency clears and health/animation differences still refuse acceptance. Prove combat, damage/death and cleanup, then late join/reconnect.
+5. **Accept the original restoration on all four targets.** Preserve independent hashes, shaders, audio and behavior. Two missing original custom cues cannot be silently substituted.
+6. **Hear the native MCC looping emitter.** Compiler/readback proves attachment and position. Accept actual playback, distance/class and the unsafe music/background conflict case in game.
+7. **Extend guarded Live Link by exact build.** Prove object edit/readback/reconnect on each community/classic engine before arbitrary spawning or geometry replacement.
+8. **Run two-computer and longer collaboration tests.** One-PC three-process editing is proven. A second machine and authorized Steam identity remain dependencies; verify interruptions, conflicts and bounded history without remote tools.
+9. **Play First Contact from objective to mission end.** Source exists; triggers, AI, checkpoint/restart, sound and the end state need a complete playthrough.
+10. **Publish verified Windows downloads, then verify Linux.** Preserve C49, push known source, run the draft workflow, verify attached downloads and obtain publication approval. Linux packages must compile and launch first.
+
+Direct compiled-map structural writing, the original 92 requirements and all historical ledger rows remain preserved. [Distribution gates](docs/RELEASING.md).
+
 The [living requirements ledger](docs/MASTER_FEATURE_LEDGER.md) retains the original 92-item reconstruction, every supplied historical crosswalk row and later founder requests. This overview does not replace it.
 
-## Next verification gates
+## Preserved earlier verification gates
 
-The current [C40 engineering record](docs/CONTINUATION_40_ENGINEERING.md) preserves the completed native-edit pipeline and prior SparkLink source slice. The next playable milestone is one compiled AI/Firefight encounter on one explicit owned runtime, verified inside Halo before widening player counts or runtime bridges. Mantle's isolated CE 609 save test is a separate optional companion gate; leftknut still needs official identity and runtime evidence. Shared native tag/assets and game-peer replication remain separate from C39's shared QuickForge source.
+The earlier [C40 engineering record](docs/CONTINUATION_40_ENGINEERING.md) preserves the completed native-edit pipeline and prior SparkLink source slice. The next playable milestone is one compiled AI/Firefight encounter on one explicit owned runtime, verified inside Halo before widening player counts or runtime bridges. Mantle's isolated CE 609 save test is a separate optional companion gate; leftknut still needs official identity and runtime evidence. Shared native tag/assets and game-peer replication remain separate from C39's shared QuickForge source.
 
 1. Compare the actual textured Demo scene against the same original mod in its real game. Extend supported detail/blending/sky paths with version-specific fixtures.
 2. Complete manual traversal, game-mode and retail MCC acceptance for the native arena and connected worlds, including the [rotated four-map case](docs/FOUR_MAP_CHALLENGE.md). Installed kit/tag integration, native collision/lightmap compilation and SDK loading already have measured cases; see [current acceptance](docs/RECLAMATION_AND_WORKFLOW_POLISH.md) and [donor scenery](docs/DONOR_SCENERY.md).

@@ -7,7 +7,7 @@
 import type { CreatorStudioDocument } from './creatorStudio';
 import { validateCreatorStudio } from './creatorStudio.ts';
 import type { FirefightConfig } from './firefight';
-export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; generatedOnly: true }
+export interface ScriptExport { filename: string; content: string; dependencies: string[]; warnings: string[]; activation?: string; scenarioType?: 'singleplayer'; generatedOnly: true }
 const ident = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
 const tag = /^[A-Za-z_][A-Za-z0-9_/-]{0,30}$/;
 const safeComment = (s: string): string => s.replace(/[\r\n\0]/g,' ').replace(/[^\x20-\x7e]/g,'?').slice(0,110);
@@ -135,8 +135,84 @@ export function exportHaloCeFirefight(config:FirefightConfig):ScriptExport {
     'This HSC is a finite campaign AI sequence. Lives, scoring, revives, zombie infection, dynamic spawns and network synchronization are not implemented.',
   ],generatedOnly:true};
 }
+/** Opt-in extension of the existing finite encounter exporter. This source owns
+ * only its named encounters. The engine runs waves; Spark does not send kills
+ * or commands to a game. Encounter construction and human combat remain gates.
+ */
+export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport {
+  const conservative=exportHaloCeFirefight(config);
+  if(config.playerCount!==1 || config.teamLives!==1 || config.allowRevives || config.endless || config.difficultyStepPercent!==0 ||
+    config.extraPlayerCountPercent!==0 || config.replenishAmmoEachWave ||
+    !Array.isArray(config.startingEquipment) || config.startingEquipment.length ||
+    !Array.isArray(config.supplyDropTags) || config.supplyDropTags.length)
+    throw Error('Native round source currently requires one player, one life, no revives, no scaling, and no equipment/resupply overrides. Those rules remain in the authoring plan.');
+  for(const [label,value] of [['preparation',config.preparationMs],['countdown',config.countdownMs],
+    ['spawn timeout',config.spawnTimeoutMs],['wave timeout',config.stuckTimeoutMs]] as const)
+    if(!Number.isSafeInteger(value)||value<0||value>600000 || (label.includes('timeout')&&value<1000))
+      throw Error(`Native round ${label} must be bounded to ten minutes (timeouts at least one second).`);
+  if(config.preparationMs+config.countdownMs>600000)throw Error('Combined preparation/countdown exceeds ten minutes.');
+  const enemies=new Map(config.enemies.map(e=>[e.id,e]));
+  if(enemies.size!==config.enemies.length)throw Error('Duplicate native round enemy identity.');
+  const waves=config.waves.map((wave,w)=>{
+    if(!Number.isSafeInteger(wave.scoreMultiplierMilli)||wave.scoreMultiplierMilli<1||wave.scoreMultiplierMilli>10000)
+      throw Error('Native round score multiplier must be 1-10000.');
+    const groups=wave.groups.map((group,g)=>{
+      const points=enemies.get(group.enemyId)?.points;
+      if(typeof points!=='number'||!Number.isSafeInteger(points)||points<0||points>100000)throw Error('Native round enemy points must be 0-100000.');
+      return {ref:`gs_w${String(w+1).padStart(2,'0')}_g${String(g+1).padStart(2,'0')}`,count:group.count,
+        points:Math.floor(group.count*points*wave.scoreMultiplierMilli/1000)};
+    });
+    return {groups,count:groups.reduce((n,g)=>n+g.count,0),score:groups.reduce((n,g)=>n+g.points,0)};
+  });
+  if(waves.reduce((n,w)=>n+w.score,0)*config.rounds>2147483647)throw Error('Native round score exceeds Halo long range.');
+  const lines=heading('Firefight native round candidate · solo encounter controller');
+  lines.push('; State: 0 idle, 1 preparing, 2 active, 3 intermission, 4 complete, 5 refused/defeated.',
+    '; Score is team wave-clear points, not player kill attribution or a native HUD/medal implementation.',
+    '(global boolean gs_ff_start false)','(global short gs_ff_state 0)','(global short gs_ff_round 0)',
+    '(global short gs_ff_wave 0)','(global long gs_ff_score 0)','(global long gs_ff_cleared 0)','(global unit gs_ff_player none)','',
+    '(script static void gs_ff_reset');
+  for(const wave of waves)for(const group of wave.groups)lines.push(`  (ai_erase ${group.ref})`);
+  lines.push('  (set gs_ff_score 0)','  (set gs_ff_cleared 0)','  (set gs_ff_round 0)','  (set gs_ff_wave 0)',')','');
+  waves.forEach((wave,w)=>{
+    const counts=wave.groups.map(g=>`(ai_living_count ${g.ref})`), living=counts.length===1?counts[0]:`(+ ${counts.join(' ')})`;
+    lines.push(`(script static void gs_wave_${String(w+1).padStart(2,'0')}`, '  (if (!= gs_ff_state 5) (begin',
+      '    (set gs_ff_state 2)',`    (set gs_ff_wave ${w+1})`);
+    for(const group of wave.groups)lines.push(`    (ai_place ${group.ref})`,`    (ai_force_active ${group.ref} true)`);
+    const exact=wave.groups.map(g=>`(= (ai_living_count ${g.ref}) ${g.count})`), ready=exact.length===1?exact[0]:`(and ${exact.join(' ')})`;
+    lines.push(`    (sleep_until ${ready} 1 ${ticks(config.spawnTimeoutMs)})`,
+      `    (if (not ${ready}) (set gs_ff_state 5))`,
+      '    (if (!= gs_ff_state 5) (begin',
+      `      (sleep_until (or (= ${living} 0) (<= (unit_get_health gs_ff_player) 0)) 1 ${ticks(config.stuckTimeoutMs)})`,
+      `      (if (and (= ${living} 0) (> (unit_get_health gs_ff_player) 0))`,
+      '        (begin',`          (set gs_ff_score (+ gs_ff_score ${wave.score}))`,
+      `          (set gs_ff_cleared (+ gs_ff_cleared ${wave.count}))`,
+      '          (set gs_ff_state 3)',
+      '        )','        (set gs_ff_state 5)', '      )','    ))','  ))',')','');
+  });
+  lines.push('(script continuous gs_firefight','  (sleep_until gs_ff_start 1)','  (set gs_ff_start false)',
+    '  (gs_ff_reset)','  (set gs_ff_state 1)',
+    `  (sleep_until (> (unit_get_health (unit (list_get (players) 0))) 0) 1 ${ticks(config.spawnTimeoutMs)})`,
+    '  (set gs_ff_player (unit (list_get (players) 0)))',
+    '  (if (<= (unit_get_health gs_ff_player) 0) (set gs_ff_state 5))',
+    `  (sleep ${ticks(config.preparationMs+config.countdownMs)})`);
+  for(let r=0;r<config.rounds;r++){
+    lines.push(`  (set gs_ff_round ${r+1})`);
+    for(let w=0;w<waves.length;w++)lines.push(`  (gs_wave_${String(w+1).padStart(2,'0')})`,
+      `  (if (!= gs_ff_state 5) (sleep ${ticks(config.intermissionMs)}))`);
+  }
+  lines.push('  (if (!= gs_ff_state 5) (set gs_ff_state 4))');
+  for(const wave of waves)for(const group of wave.groups)lines.push(`  (ai_force_active ${group.ref} false)`);
+  lines.push(')','');
+  return {...conservative,content:lines.join('\r\n'),activation:'(set gs_ff_start true)',scenarioType:'singleplayer',warnings:[
+    'Experimental native solo round source. Build only into a separate reviewed singleplayer/campaign scenario with these exact encounters/counts and safe spawn/navigation data.',
+    'Start or request another round with (set gs_ff_start true). The continuous controller resets only its own encounters and score, then waits for actual living counts to reach zero.',
+    'Missing/partial spawns, a dead player or the authored wave deadline refuse progression. No phantom success, forced kills or invulnerability is generated.',
+    'Wave-clear points are a script global, not per-player kill credit, medals or a Halo HUD. External scripts must not erase or respawn these owned encounters during a round.',
+    'Solo only. Team lives, revives, supplies, difficulty scaling, infection and multiplayer AI are separate gates. Native compilation is not human gameplay acceptance.',
+  ]};
+}
 /** Plain JSON contract for creator tool integration. No secrets or local source paths. */
 export function scriptManifest(out:ScriptExport):string {
   return JSON.stringify({schemaVersion:1,kind:'guilty-spark-h1-script-source',file:out.filename,
-    status:'exportedNotCompiled',gameplayVerified:false,activation:out.activation ?? null,dependencies:out.dependencies,warnings:out.warnings},null,2);
+    status:'exportedNotCompiled',gameplayVerified:false,scenarioType:out.scenarioType??null,activation:out.activation ?? null,dependencies:out.dependencies,warnings:out.warnings},null,2);
 }

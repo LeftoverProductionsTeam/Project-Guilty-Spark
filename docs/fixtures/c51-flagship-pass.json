@@ -1,0 +1,790 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-11-02T10:58:46.258Z",
+  "scope": "C51 controlled native progression and flagship presentation; human gameplay gates remain open",
+  "foundationCommit": "c3b4fe5601f019fa57fdf988596a99b8f89a3f0b",
+  "branch": "master",
+  "sourceHashes": {
+    "scripts/analyze-carrier-census.mjs": "f3bf904fe3a3d30f32975a79e7ce2226e23631021b08c440c74d900bf1e40850",
+    "scripts/analyze-carrier-census.test.mjs": "fa6c85cb151b40457f1c2edcdeadb8c3be3ca5d836fe24124a96354cd2812a3e",
+    "src-tauri/examples/qa_opence_ai/remote.rs": "8d2b1af6eb028043a47075ab4497369f55d5223c4009c6d225b1d46535b10623",
+    "src-tauri/examples/qa_opence_ai/symbols.rs": "c1939865789de88f91b178406c10fdc531539459ae4fb65d9db479d43660f12f",
+    "src/haloScript.ts": "d299760f4a4e7766c7cff60bcf9cd27e56740366e38e3948bfa2bac5da1137c2",
+    "src/components/Firefight.tsx": "0e9dc8c4b708da8b848915f1a10b26de4cee380edcc663b2864f939d41f7b18c",
+    "src/flagships.ts": "7d9afd8dcf2d4a04900ac46b2e0ba69797175b83d82639cbc7424cd92928854b",
+    "src/components/FlagshipOverview.tsx": "8e9715d712ac5c2008fc4528155c1bb5aa2ab28b152a51f0bcb684566cb58082",
+    "src/flagships.css": "fb14c11ed5a7abb84ced5d90e0faf09c7075840ed7621ed7efa2006f65632d33",
+    "scripts/test-flagship-ui-native.mjs": "ea2478c0da5b38589f83c36c2eda9a74cedd9ae06d52dc2625000a2d3695f940"
+  },
+  "original92Changed": false,
+  "ledger": {
+    "originalBytes": 948674,
+    "originalSha256": "d4e4e30645e6fd903d4e3ef90b158814b394f4cf3e32be61bdf89b6dd09b9c81",
+    "historicalPrefixUnchanged": true,
+    "appendedRecords": 6,
+    "totalRecords": 444
+  },
+  "nativeXbox": {
+    "version": 5,
+    "sha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+    "sourceUnchanged": true,
+    "bspParts": 9,
+    "renderTriangles": 364774,
+    "modelTypes": 70,
+    "images": 425,
+    "imageFailures": 0,
+    "cubes": 17,
+    "cubeFailures": 0,
+    "soundPreviews": 3,
+    "soundPreviewFailures": 0,
+    "debugOnlyTimings": {
+      "inspectMs": 9164.5224,
+      "bitmapMs": 215802.8482,
+      "totalMs": 326280.2811
+    },
+    "gameplayAudioVerified": false
+  },
+  "nativeLifecycle": [
+    {
+      "evidence": "carrier-exit-analysis.json",
+      "schemaVersion": 2,
+      "analysisOnly": true,
+      "atomicSnapshots": false,
+      "lifecycleAccepted": false,
+      "gamePeerReplicationTested": false,
+      "note": "Native sampled observations are evidence, not a collision/animation or complete lifecycle acceptance.",
+      "trials": [
+        {
+          "input": "carrier-exit-engine-2/observer.ndjson",
+          "inputSha256": "b2275a0a4b7b91e1c8933c8ac4ec910f1cfacebd13c6edbe64f042325e07f5b2",
+          "identity": {
+            "runtime": "opence-build-335",
+            "role": "host",
+            "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+            "pdbSha256": "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800"
+          },
+          "samples": 711,
+          "detailedSamples": 61,
+          "firstTick": 1,
+          "lastTick": 1767,
+          "sampleErrors": 25,
+          "actorCounts": [
+            0,
+            1
+          ],
+          "actors": [
+            {
+              "id": 3799777285,
+              "firstTick": 208,
+              "lastTick": 572,
+              "parents": [
+                3799711748,
+                4294967295
+              ],
+              "seats": [
+                0,
+                65535
+              ],
+              "minimumHealth": -0.3100000023841858,
+              "maximumHealth": 1,
+              "lastActorTick": 538,
+              "activeActorSamples": 107,
+              "completeObjectSamples": 11,
+              "liveUnparentedSamples": 3,
+              "liveUnparentedPositionBounds": [
+                [
+                  93.8862075805664,
+                  95.41083526611328
+                ],
+                [
+                  -154.8323516845703,
+                  -152.95083618164062
+                ],
+                [
+                  0.0017063766717910767,
+                  0.4143676161766052
+                ]
+              ],
+              "corpseUnparentedSamples": 1,
+              "nativeDeadFlagObserved": true,
+              "firstObservedDeathTick": 572,
+              "nonlethalHealthReductionObserved": true,
+              "damageFlagValues": [
+                0,
+                12
+              ],
+              "animationFrameProgressObserved": true,
+              "absentFromFinalCompleteSnapshots": true
+            },
+            {
+              "id": 3800956932,
+              "firstTick": 632,
+              "lastTick": 995,
+              "parents": [
+                3800891395,
+                4294967295
+              ],
+              "seats": [
+                0,
+                65535
+              ],
+              "minimumHealth": -0.3100000023841858,
+              "maximumHealth": 1,
+              "lastActorTick": 989,
+              "activeActorSamples": 107,
+              "completeObjectSamples": 11,
+              "liveUnparentedSamples": 4,
+              "liveUnparentedPositionBounds": [
+                [
+                  93.9105453491211,
+                  97.78609466552734
+                ],
+                [
+                  -160.1532440185547,
+                  -152.99343872070312
+                ],
+                [
+                  -0.2869850695133209,
+                  0.1696608066558838
+                ]
+              ],
+              "corpseUnparentedSamples": 1,
+              "nativeDeadFlagObserved": true,
+              "firstObservedDeathTick": 995,
+              "nonlethalHealthReductionObserved": true,
+              "damageFlagValues": [
+                0,
+                12
+              ],
+              "animationFrameProgressObserved": true,
+              "absentFromFinalCompleteSnapshots": true
+            },
+            {
+              "id": 3802267652,
+              "firstTick": 1086,
+              "lastTick": 1449,
+              "parents": [
+                3802202115,
+                4294967295
+              ],
+              "seats": [
+                0,
+                65535
+              ],
+              "minimumHealth": -0.3100000023841858,
+              "maximumHealth": 1,
+              "lastActorTick": 1440,
+              "activeActorSamples": 106,
+              "completeObjectSamples": 12,
+              "liveUnparentedSamples": 2,
+              "liveUnparentedPositionBounds": [
+                [
+                  95.0584716796875,
+                  95.31816101074219
+                ],
+                [
+                  -155.91122436523438,
+                  -154.23333740234375
+                ],
+                [
+                  -0.19915293157100677,
+                  0.17449086904525757
+                ]
+              ],
+              "corpseUnparentedSamples": 1,
+              "nativeDeadFlagObserved": true,
+              "firstObservedDeathTick": 1449,
+              "nonlethalHealthReductionObserved": true,
+              "damageFlagValues": [
+                0,
+                12
+              ],
+              "animationFrameProgressObserved": true,
+              "absentFromFinalCompleteSnapshots": true
+            }
+          ],
+          "vehicleSamples": 34,
+          "maximumObservedVehicleSpeedNativeUnits": 0.06108215470463498,
+          "vehiclePositionBounds": [
+            [
+              93.99311065673828,
+              94
+            ],
+            [
+              -153,
+              -152.95040893554688
+            ],
+            [
+              0.3601427674293518,
+              1.4121239185333252
+            ]
+          ],
+          "finalActorCount": 0,
+          "finalVehicleCount": 0
+        }
+      ],
+      "privateRawPathsNotPublished": true
+    },
+    {
+      "evidence": "carrier-exit-repeat-analysis.json",
+      "schemaVersion": 2,
+      "analysisOnly": true,
+      "atomicSnapshots": false,
+      "lifecycleAccepted": false,
+      "gamePeerReplicationTested": false,
+      "note": "Native sampled observations are evidence, not a collision/animation or complete lifecycle acceptance.",
+      "trials": [
+        {
+          "input": "carrier-exit-engine-repeat/observer.ndjson",
+          "inputSha256": "3186b6add0f0289d56621fb65805a8140a221c172d876ba4792c11287ad53bc8",
+          "identity": {
+            "runtime": "opence-build-335",
+            "role": "host",
+            "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+            "pdbSha256": "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800"
+          },
+          "samples": 712,
+          "detailedSamples": 60,
+          "firstTick": 1,
+          "lastTick": 1767,
+          "sampleErrors": 24,
+          "actorCounts": [
+            0,
+            1
+          ],
+          "actors": [
+            {
+              "id": 3799777285,
+              "firstTick": 212,
+              "lastTick": 572,
+              "parents": [
+                3799711748,
+                4294967295
+              ],
+              "seats": [
+                0,
+                65535
+              ],
+              "minimumHealth": -0.3100000023841858,
+              "maximumHealth": 1,
+              "lastActorTick": 538,
+              "activeActorSamples": 108,
+              "completeObjectSamples": 11,
+              "liveUnparentedSamples": 5,
+              "liveUnparentedPositionBounds": [
+                [
+                  93.88614654541016,
+                  98.63895416259766
+                ],
+                [
+                  -157.25804138183594,
+                  -152.949951171875
+                ],
+                [
+                  -0.2869850695133209,
+                  0.16978192329406738
+                ]
+              ],
+              "corpseUnparentedSamples": 1,
+              "nativeDeadFlagObserved": true,
+              "firstObservedDeathTick": 572,
+              "nonlethalHealthReductionObserved": true,
+              "damageFlagValues": [
+                0,
+                12
+              ],
+              "animationFrameProgressObserved": true,
+              "absentFromFinalCompleteSnapshots": true
+            },
+            {
+              "id": 3800956932,
+              "firstTick": 632,
+              "lastTick": 1026,
+              "parents": [
+                3800891395,
+                4294967295
+              ],
+              "seats": [
+                0,
+                65535
+              ],
+              "minimumHealth": -0.3100000023841858,
+              "maximumHealth": 1,
+              "lastActorTick": 989,
+              "activeActorSamples": 107,
+              "completeObjectSamples": 11,
+              "liveUnparentedSamples": 5,
+              "liveUnparentedPositionBounds": [
+                [
+                  93.91085052490234,
+                  98.2310562133789
+                ],
+                [
+                  -157.57186889648438,
+                  -152.99331665039062
+                ],
+                [
+                  -0.2869850695133209,
+                  0.16967621445655823
+                ]
+              ],
+              "corpseUnparentedSamples": 1,
+              "nativeDeadFlagObserved": true,
+              "firstObservedDeathTick": 1026,
+              "nonlethalHealthReductionObserved": true,
+              "damageFlagValues": [
+                0,
+                12
+              ],
+              "animationFrameProgressObserved": true,
+              "absentFromFinalCompleteSnapshots": true
+            },
+            {
+              "id": 3802267652,
+              "firstTick": 1086,
+              "lastTick": 1480,
+              "parents": [
+                3802202115,
+                4294967295
+              ],
+              "seats": [
+                0,
+                65535
+              ],
+              "minimumHealth": -0.3100000023841858,
+              "maximumHealth": 1,
+              "lastActorTick": 1438,
+              "activeActorSamples": 106,
+              "completeObjectSamples": 12,
+              "liveUnparentedSamples": 4,
+              "liveUnparentedPositionBounds": [
+                [
+                  94.0242691040039,
+                  96.92769622802734
+                ],
+                [
+                  -157.53663635253906,
+                  -153.14297485351562
+                ],
+                [
+                  -0.2869850695133209,
+                  0.1123935878276825
+                ]
+              ],
+              "corpseUnparentedSamples": 2,
+              "nativeDeadFlagObserved": true,
+              "firstObservedDeathTick": 1450,
+              "nonlethalHealthReductionObserved": true,
+              "damageFlagValues": [
+                0,
+                12
+              ],
+              "animationFrameProgressObserved": true,
+              "absentFromFinalCompleteSnapshots": true
+            }
+          ],
+          "vehicleSamples": 34,
+          "maximumObservedVehicleSpeedNativeUnits": 0.009968693368496168,
+          "vehiclePositionBounds": [
+            [
+              93.99311065673828,
+              94
+            ],
+            [
+              -153,
+              -152.95040893554688
+            ],
+            [
+              0.43903934955596924,
+              1.4121239185333252
+            ]
+          ],
+          "finalActorCount": 0,
+          "finalVehicleCount": 0
+        }
+      ],
+      "privateRawPathsNotPublished": true
+    },
+    {
+      "evidence": "carrier-auto-analysis.json",
+      "schemaVersion": 2,
+      "analysisOnly": true,
+      "atomicSnapshots": false,
+      "lifecycleAccepted": false,
+      "gamePeerReplicationTested": false,
+      "note": "Native sampled observations are evidence, not a collision/animation or complete lifecycle acceptance.",
+      "trials": [
+        {
+          "input": "carrier-auto-engine/observer.ndjson",
+          "inputSha256": "1644cf15194d6bc78104775eba731691be69cdb07fd6a79e36ebd6331c15ae0e",
+          "identity": {
+            "runtime": "opence-build-335",
+            "role": "host",
+            "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+            "pdbSha256": "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800"
+          },
+          "samples": 714,
+          "detailedSamples": 63,
+          "firstTick": 2,
+          "lastTick": 1765,
+          "sampleErrors": 22,
+          "actorCounts": [
+            0,
+            1
+          ],
+          "actors": [
+            {
+              "id": 3799777285,
+              "firstTick": 207,
+              "lastTick": 600,
+              "parents": [
+                3799711748,
+                4294967295
+              ],
+              "seats": [
+                0,
+                65535
+              ],
+              "minimumHealth": -0.3100000023841858,
+              "maximumHealth": 1,
+              "lastActorTick": 540,
+              "activeActorSamples": 107,
+              "completeObjectSamples": 12,
+              "liveUnparentedSamples": 0,
+              "liveUnparentedPositionBounds": null,
+              "corpseUnparentedSamples": 2,
+              "nativeDeadFlagObserved": true,
+              "firstObservedDeathTick": 570,
+              "nonlethalHealthReductionObserved": false,
+              "damageFlagValues": [
+                0,
+                12
+              ],
+              "animationFrameProgressObserved": true,
+              "absentFromFinalCompleteSnapshots": true
+            },
+            {
+              "id": 3800956932,
+              "firstTick": 661,
+              "lastTick": 1024,
+              "parents": [
+                3800891395,
+                4294967295
+              ],
+              "seats": [
+                0,
+                65535
+              ],
+              "minimumHealth": -0.3100000023841858,
+              "maximumHealth": 1,
+              "lastActorTick": 988,
+              "activeActorSamples": 107,
+              "completeObjectSamples": 11,
+              "liveUnparentedSamples": 0,
+              "liveUnparentedPositionBounds": null,
+              "corpseUnparentedSamples": 2,
+              "nativeDeadFlagObserved": true,
+              "firstObservedDeathTick": 994,
+              "nonlethalHealthReductionObserved": false,
+              "damageFlagValues": [
+                0,
+                12
+              ],
+              "animationFrameProgressObserved": true,
+              "absentFromFinalCompleteSnapshots": true
+            },
+            {
+              "id": 3802267652,
+              "firstTick": 1112,
+              "lastTick": 1478,
+              "parents": [
+                3802202115,
+                4294967295
+              ],
+              "seats": [
+                0,
+                65535
+              ],
+              "minimumHealth": -0.3100000023841858,
+              "maximumHealth": 1,
+              "lastActorTick": 1439,
+              "activeActorSamples": 108,
+              "completeObjectSamples": 12,
+              "liveUnparentedSamples": 0,
+              "liveUnparentedPositionBounds": null,
+              "corpseUnparentedSamples": 2,
+              "nativeDeadFlagObserved": true,
+              "firstObservedDeathTick": 1448,
+              "nonlethalHealthReductionObserved": false,
+              "damageFlagValues": [
+                0,
+                12
+              ],
+              "animationFrameProgressObserved": true,
+              "absentFromFinalCompleteSnapshots": true
+            }
+          ],
+          "vehicleSamples": 36,
+          "maximumObservedVehicleSpeedNativeUnits": 0.0707953727456908,
+          "vehiclePositionBounds": [
+            [
+              93.99311065673828,
+              94
+            ],
+            [
+              -153,
+              -152.95040893554688
+            ],
+            [
+              0.3499719798564911,
+              1.407909631729126
+            ]
+          ],
+          "finalActorCount": 0,
+          "finalVehicleCount": 0
+        }
+      ],
+      "privateRawPathsNotPublished": true
+    }
+  ],
+  "firefightRounds": [
+    {
+      "evidence": "firefight-active-state.json",
+      "observerSha256": "e9d272b2e4698224caf024295d367af7223d03ef190c5097324168e62a97652d",
+      "samples": 729,
+      "states": [
+        null,
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "last": {
+        "tick": 877,
+        "values": {
+          "gs_ff_start": 0,
+          "gs_ff_state": 4,
+          "gs_ff_round": 1,
+          "gs_ff_wave": 2,
+          "gs_ff_score": 1000,
+          "gs_ff_cleared": 5,
+          "gs_ff_test_completed": 2
+        }
+      },
+      "humanCombatAccepted": false
+    },
+    {
+      "evidence": "firefight-active-partial-state.json",
+      "observerSha256": "78175f5356823a222301fb2f51eb31e4097de132bb4a5bb49fa74677fffd2f1b",
+      "samples": 737,
+      "states": [
+        null,
+        0,
+        1,
+        2,
+        5
+      ],
+      "last": {
+        "tick": 418,
+        "values": {
+          "gs_ff_start": 0,
+          "gs_ff_state": 5,
+          "gs_ff_round": 1,
+          "gs_ff_wave": 1,
+          "gs_ff_score": 0,
+          "gs_ff_cleared": 0
+        }
+      },
+      "humanCombatAccepted": false
+    },
+    {
+      "evidence": "firefight-active-unforced-state.json",
+      "observerSha256": "822ba9fc51c268d0aaff4158da98a0583646f405b9735dbc48989def2d93cf7d",
+      "samples": 736,
+      "states": [
+        null,
+        0,
+        1,
+        2,
+        5
+      ],
+      "last": {
+        "tick": 1144,
+        "values": {
+          "gs_ff_start": 0,
+          "gs_ff_state": 5,
+          "gs_ff_round": 1,
+          "gs_ff_wave": 1,
+          "gs_ff_score": 0,
+          "gs_ff_cleared": 0
+        }
+      },
+      "humanCombatAccepted": false
+    },
+    {
+      "evidence": "firefight-campaign-state.json",
+      "observerSha256": "cb85cfb7c10c774ad31c897c50c982520c81104d9d9ba9001057e44bebfdbf67",
+      "samples": 736,
+      "states": [
+        null,
+        0,
+        1,
+        2,
+        5
+      ],
+      "last": {
+        "tick": 1177,
+        "values": {
+          "gs_ff_start": 0,
+          "gs_ff_state": 5,
+          "gs_ff_round": 1,
+          "gs_ff_wave": 1,
+          "gs_ff_score": 0,
+          "gs_ff_cleared": 0
+        }
+      },
+      "humanCombatAccepted": false
+    }
+  ],
+  "nativeUi": {
+    "candidate": true,
+    "appSha256": "3e001d513b4142e8824fe0ce52657cbba486e18a159e571bf8f5a04e4cd3c643",
+    "complete": true,
+    "layouts": [
+      {
+        "width": 1440,
+        "height": 900,
+        "bodyOverflow": false,
+        "workspaceOverflow": false,
+        "mainScroll": 0,
+        "dpi": 1
+      },
+      {
+        "width": 1280,
+        "height": 720,
+        "bodyOverflow": false,
+        "workspaceOverflow": false,
+        "mainScroll": 0,
+        "dpi": 1
+      },
+      {
+        "width": 960,
+        "height": 650,
+        "bodyOverflow": false,
+        "workspaceOverflow": false,
+        "mainScroll": 0,
+        "dpi": 1
+      },
+      {
+        "width": 1280,
+        "height": 720,
+        "bodyOverflow": false,
+        "workspaceOverflow": false,
+        "mainScroll": 0,
+        "dpi": 1.5
+      }
+    ],
+    "servedSource": [
+      {
+        "file": "dist\\assets\\index-Dg-joFIW.js",
+        "sha256": "434fa2d4352dd098ae6e36942f8d3ab00a9dcade36c4cc6d824b1ca3b7bf7c18"
+      }
+    ],
+    "screenshots": [
+      {
+        "file": "home.png",
+        "sha256": "d9bbb68e0de6f0cb61c08f0146ca5a0da4c30b5597a9b36b80b1d97464f0720e"
+      },
+      {
+        "file": "runtimes.png",
+        "sha256": "878b3521a5df7a7b58d403b10bf9da942288d26df989f5091867444313b11150"
+      },
+      {
+        "file": "workshop.png",
+        "sha256": "328635683b63eb53e8f13600582d4796b48ba6315965582fb0c9f57b8dedcd41"
+      },
+      {
+        "file": "features.png",
+        "sha256": "945cf0984ff733bedf17be4d2423aed8aede7e94e681d55ed61517a3262df8c9"
+      }
+    ],
+    "installedRuntimeValidation": [
+      {
+        "id": "mccSteam",
+        "validation": "pass"
+      },
+      {
+        "id": "chupathingyCe",
+        "validation": "pass"
+      },
+      {
+        "id": "openCe",
+        "validation": "pass"
+      },
+      {
+        "id": "haloCustomEdition",
+        "validation": "pass"
+      }
+    ]
+  },
+  "tests": {
+    "rust": {
+      "passed": 636,
+      "ignored": 8
+    },
+    "frontend": {
+      "passed": 311,
+      "files": 71
+    },
+    "browser": {
+      "passed": 143
+    },
+    "offlineScriptChains": 59,
+    "censusGuardTests": 5,
+    "finalFollowThroughPending": true
+  },
+  "sealedC49Artifacts": [
+    {
+      "file": "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe",
+      "Hash": "6E0C3EFB53CED11DDE522492EA341A019C93976D3CA0C16AE28AE180DA334749"
+    },
+    {
+      "file": "Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip",
+      "Hash": "FF6C9E4DEA48126680C2A9B8536DFB2185FAB5AC445C7D4F306B9BED52E07069"
+    },
+    {
+      "file": "Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip",
+      "Hash": "C6EA81B25BFAE352D76DF58557A82DAEF44B72BA11BF778D0E2EEE9F56AE03F0"
+    },
+    {
+      "file": "Project_Guilty_Spark_0.4.1_windows_x64_manifest.json",
+      "Hash": "C00F7AFC9B1D57963BBE0234EF4C3C992A574136A27CBF34DCA83354FE2A0B52"
+    },
+    {
+      "file": "SHA256SUMS-windows-x64.txt",
+      "Hash": "EA47E113B4613C59EEA87521A4600BF4A950DB1B73E0D51559CEE86F0F3CCE69"
+    }
+  ],
+  "github": {
+    "checkedAtUtc": "2026-11-02T10:04:42.8011995Z",
+    "description": "An All in One Halo Combat Evolved Modding & Server Hosting Suite",
+    "topics": [],
+    "defaultBranch": "master",
+    "master": "f247cbae3969631870bc4a6ac1abc55a6468e628",
+    "publicReleases": [],
+    "authenticated": false
+  },
+  "limitations": [
+    "Automatic original weapon/carrier release is not repaired by the exit reference alone.",
+    "Unforced actor placement/physics and actual Firefight combat remain blocked.",
+    "Native dependency faults and state differences refuse shared-AI acceptance.",
+    "No two-way tunnel human report, audible native MCC emitter, two-computer acceptance or new public release is claimed.",
+    "Native source/controller tests do not complete direct compiled-map structural editing."
+  ],
+  "releaseCandidateReplaced": false,
+  "remotePushed": false,
+  "remoteMetadataChanged": false,
+  "publicReleasePublished": false,
+  "linuxPackagesVerified": false
+}

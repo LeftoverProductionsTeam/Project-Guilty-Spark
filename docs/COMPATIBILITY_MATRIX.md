@@ -1,5 +1,7 @@
 # Runtime and operation compatibility — Continuation 42
 
+C51's current [four-runtime resource/workflow and twelve-flagship matrix](C51_RUNTIME_AND_FLAGSHIPS.md) separates installation, source rendering, native editing/builds, live writes and game/AI acceptance. The installed Chupathingy Xbox a10's render geometry, 425 requested images, 17 cubes and three audio previews are reverified. This supported C50 reader path supersedes older Xbox-preview exclusions below. Full asset-class and engine parity remain open. Native Firefight controller tests and commanded original-carrier exits do not complete automatic Zombie spawning, human Firefight combat or shared-AI parity. Historical format-specific evidence and limits below remain preserved.
+
 C42 adds a [bounded shared external-tool route](C42_SHARED_EXTERNAL_EDITING.md): three real Windows processes keep editing while a private Invader native tag save is reviewed and proposed, then compiled through H1A Tool. The genuine C37 human-saved Baboon tag also passes native-equivalent serialization review without replacing its raw bytes. Scope remains pistol bounding radius and admitted scenery publications. Arbitrary tools/formats, multi-computer acceptance and game-peer replication remain open. Original C35–C39 source and separate complete-file reconciliation/build guards remain intact.
 
 | C41 operation | Verified implementation boundary | Required separate acceptance |

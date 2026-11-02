@@ -67,6 +67,6 @@ for (const candidate of candidates) {
 }
 await writeFile('.local/qa/application-restoration-library.json', JSON.stringify(imported, null, 2));
 await page.reload();
-await page.getByRole('heading', { name: 'Your worlds, reimagined.' }).waitFor();
+await page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.' }).waitFor();
 console.log('Prepared', imported.length, 'candidate projects in the actual application library.');
 await browser.close();

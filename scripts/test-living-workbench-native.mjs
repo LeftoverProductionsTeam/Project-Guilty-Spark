@@ -92,7 +92,7 @@ try {
   const candidates = await call('bitmap_resource_candidates', { projectId: fixture.projectId });
   expect(candidates.some((candidate) => candidate.reason.includes('identical preserved map'))).toBe(true);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.', exact: true })).toBeVisible();
   await page
     .locator('.map-card')
     .filter({ has: page.getByRole('heading', { name: fixture.title, exact: true }) })

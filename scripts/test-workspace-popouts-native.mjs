@@ -127,7 +127,7 @@ try {
     expect(duplicateWriterRejected).toBe(true);
     const transferred=await invoke(editor,'open_project',{id:created.project.id});
     expect(transferred.project.quickForge).toEqual(created.project.quickForge);
-    await expect(main.getByRole('heading',{name:'Your worlds, reimagined.',exact:true})).toBeVisible();
+    await expect(main.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
     report.projectTransfer={nativeProjectPreserved:true,workspacePreserved:true,duplicateWriterRejected};
     await close(editor);
     expect(report.errors).toEqual([]);
