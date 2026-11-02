@@ -5,6 +5,7 @@ import { decodeOwnedBitmapBatch, uniqueBitmapTargets, MAX_NATIVE_BATCH_RGBA_BYTE
 import type { OwnedBitmapBatchResponse } from './ownedBitmapBatch';
 import { configureSourceTexture } from './sourceTexture';
 import { loadReflectionCube } from './ownedReflectionCube';
+import { nativeShaderTextureRole } from './nativeShaderTextures';
 import { textureResourceScope } from './textureResourceScope';
 import type { OpenProject, NativeAssetImport, ShaderPreview } from './types';
 import type { QuickForgeDocument } from './forge';
@@ -66,18 +67,7 @@ export function useWorkshopTextures(
       try {
         const tasks = materials.flatMap(({ material, tag }) =>
           tag.references.flatMap((reference) => {
-            const role = (
-              {
-                'Base map': 'base',
-                'Diffuse map': 'base',
-                'Primary detail map': 'primaryDetail',
-                'Detail map': 'primaryDetail',
-                'Secondary detail map': 'secondaryDetail',
-                'Micro detail map': 'microDetail',
-                'Bump map': 'normalMap',
-                'Multipurpose map': 'multipurpose',
-              } as Record<string, string>
-            )[reference.label];
+            const role = nativeShaderTextureRole(reference.label);
             return role ? [{ material, role, bitmapTagId: reference.targetId, imageIndex: 0 }] : [];
           }),
         );

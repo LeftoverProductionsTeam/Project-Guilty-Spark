@@ -21,12 +21,14 @@ import type { CueName, LocalCueReference } from '../interfacePreferences';
 import { createTagExchangeBundle } from '../haloExchange';
 import { downloadLocalText } from '../exportHelpers';
 import { call, native } from '../api';
-import {useMapState} from '../mapSession';
+import {useMapState,writeMapSession} from '../mapSession';
 import BaboonTools from './BaboonTools';
 import NativeTagOperations from './NativeTagOperations';
 import SmartEditPanel from './SmartEditPanel';
 import TagRenamePanel from './TagRenamePanel';
 import { renamedTagPath } from '../tagRenames';
+import { WorkspacePanel } from './WorkspacePanels';
+import '../tagWorkspace.css';
 export default function Tags({
   project,
   inspection,
@@ -102,9 +104,14 @@ export default function Tags({
   }, [focusTagId, inspection?.sha256]);
   const tags = inspection?.tags ?? [];
   const selectedTag = tags.find((t) => t.id === selected);
+  useEffect(()=>{
+    if(focusTagId!=null&&selectedTag?.id!==focusTagId)return;
+    if(new URLSearchParams(location.search).get('panel')==='object-tags'&&selectedTag)
+      writeMapSession(project.id,'viewport.tags.selected',selectedTag.id);
+  },[project.id,selectedTag?.id,focusTagId]);
   const selectedModel = useMemo(
     () =>
-      selectedTag?.class === 'mod2' && project.source
+      selectedTag && ['mod2','mode'].includes(selectedTag.class) && project.source
         ? { tagId: selectedTag.id, sourceProjectId: project.id, sourceSha256: project.source.sha256 }
         : catalogAssets({ project, inspection }).find((asset) => asset.tagId === selectedTag?.id),
     [project.id, inspection, selectedTag?.id],
@@ -254,19 +261,8 @@ export default function Tags({
           </Notice>
         )}
         {selectedTag ? (
-          <>
-            {selectedModel && (
-              <details className="tag-model-preview" open>
-                <summary>Actual model preview</summary>
-                <div style={{ height: 210 }}>
-                  <NativeModelPreview
-                    key={selectedModel.tagId}
-                    asset={selectedModel}
-                    environment={project.worldEnvironment}
-                  />
-                </div>
-              </details>
-            )}
+          <div className={`tag-selection-layout${selectedModel?' has-model':''}`}>
+            <div className="tag-properties-pane">
             <div className="tag-detail-heading">
               <div className="eyebrow">
                 {classNames[selectedTag.class] ?? 'Tag'} · {selectedTag.class}
@@ -573,14 +569,18 @@ export default function Tags({
               Edits stay in this project until you publish a map copy. Review the save plan above for a
               direct cache edit or the matching native build route. Your original map stays unchanged.
             </Notice>
-          </>
+            </div>
+            {selectedModel&&<section className="tag-model-preview" aria-label="Actual model preview">
+              <NativeModelPreview key={`${project.id}:${selectedModel.tagId}`} asset={selectedModel} environment={project.worldEnvironment}/>
+            </section>}
+          </div>
         ) : (
           <Empty icon={<FileCode2 />} title="Select a tag">
             Inspect properties and relationships, then make changes in your project.
           </Empty>
         )}
       </section>
-      <aside className="panel relationships">
+      <WorkspacePanel id="tag-relationships" label="Tag relationships" defaultDock="right"><aside className="panel relationships">
         <div className="panel-heading">
           <strong>Relationships</strong>
           <GitBranch size={15} />
@@ -651,7 +651,7 @@ export default function Tags({
             </div>
           </>
         )}
-      </aside>
+      </aside></WorkspacePanel>
     </div>
   );
 }

@@ -62,6 +62,14 @@ try{
   await start();await openProject(main,'C43 history A');await value(main,1.25);await main.keyboard.press('Control+z');await value(main,0.75);await main.keyboard.press('Control+y');await value(main,1.25);await acknowledged(main,id,1.25);step('abrupt process death recovers acknowledged unsaved transform and its Undo/Redo');
   previous=new Set(pages());await main.getByRole('button',{name:'Pop out workspace',exact:true}).click();const final=await nextPage(previous);await value(final,1.25);await final.getByRole('button',{name:'Close window',exact:true}).click();await expect.poll(()=>final.isClosed()).toBe(true);
   const saved=(await invoke(main,'open_project',{id})).project;expect(saved.quickForge.workshop.brushes[0].position[0]).toBe(1.25);await openProject(main,'C43 history A');await value(main,1.25);await main.keyboard.press('Control+z');await value(main,0.75);step('closing and reopening a pop-out saves the map and preserves its history');
+  previous=new Set(pages());const tab=main.getByRole('tab',{name:'C43 history A',exact:true});const bounds=await tab.boundingBox();
+  await main.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await main.mouse.down();await main.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height+110,{steps:12});await main.mouse.up();
+  const dragged=await nextPage(previous);await value(dragged,.75);await setX(dragged,2.25);await acknowledged(dragged,id,2.25);
+  await dragged.getByRole('button',{name:'Return to main',exact:true}).click();await value(main,2.25);
+  expect((await state(main,id)).writable).toBe(true);expect((await state(dragged,id)).writable).toBe(false);
+  await main.keyboard.press('Control+z');await value(main,.75);await main.keyboard.press('Control+y');await value(main,2.25);await acknowledged(main,id,2.25);
+  await main.screenshot({path:path.join(output,'reattached-after-tab-drag.png')});
+  step('pointer drag detaches a real tab; Return to main transfers the editing lease and durable Undo/Redo');
   expect(report.errors).toEqual([]);report.complete=true;
 }catch(e){report.errors.push(String(e));report.failureStack=e.stack;process.exitCode=1;await main?.screenshot({path:path.join(output,'failure.png')}).catch(()=>{});if(browser)for(const [index,page]of pages().entries())await page.screenshot({path:path.join(output,`failure-window-${index}.png`)}).catch(()=>{});}
 finally{await fs.writeFile(path.join(output,'acceptance.json'),JSON.stringify(report,null,2));await browser?.close().catch(()=>{});if(child?.exitCode===null)child.kill();console.log(JSON.stringify({complete:report.complete,cases:report.cases.length,errors:report.errors}));}

@@ -42,7 +42,7 @@ import SceneEnvironment from './SceneEnvironment';
 import SceneEffects from './SceneEffects';
 import RenderFeatures from './RenderFeatures';
 import VisibilityZones,{VisibilityZoneOverlay} from './VisibilityZones';
-import {useMapState,writeMapSession} from '../mapSession';
+import {useMapState,readMapSession,writeMapSession} from '../mapSession';
 import ViewportSession,{hasViewportSession} from './ViewportSession';
 import ViewportPerformance from './ViewportPerformance';
 import {renderFeatures} from '../renderFeatures';
@@ -458,6 +458,7 @@ export default function World({
   edit,
   notify,
   onOpenTag,
+  onDetachTags,
   onSelectMap,
   onResourcesConnected,
   onBeforeResources,
@@ -477,6 +478,7 @@ export default function World({
   edit: (p: Project, description: string) => void;
   notify: (m: string) => void;
   onOpenTag?: (tagId: number, sourceProjectId?: string) => void;
+  onDetachTags?: (sourceProjectId:string,tagId:number)=>Promise<boolean>;
   onSelectMap?: (id:string)=>void;
   onResourcesConnected?: (open: OpenProject) => Promise<void>;
   onBeforeResources?: () => Promise<void>;
@@ -1548,7 +1550,10 @@ export default function World({
         </div>
       </section>
       {!cinematic && selectedId === undefined && (
-        <WorkspacePanel id="object-tags" label="Object tags">
+        <WorkspacePanel id="object-tags" label="Object tags" onDetach={onDetachTags&&tagContext?.inspection?()=>{
+          const id=readMapSession<number|null>(tagContext.project.id,'viewport.tags.selected',tagRequest);
+          return id===null?Promise.resolve(false):onDetachTags(tagContext.project.id,id);
+        }:undefined}>
           {tagContext?.inspection ? (
             <>
               <p className="subtle">{tagContext.project.title} · source tags</p>

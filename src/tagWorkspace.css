@@ -1,0 +1,26 @@
+.application .tag-layout {grid-template-columns:clamp(170px,15vw,220px) minmax(0,1fr);gap:0;}
+.application .tag-detail {padding:0;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+.tag-selection-layout {flex:1;min-height:0;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);overflow:hidden;}
+.tag-selection-layout.has-model {grid-template-columns:clamp(280px,30%,390px) minmax(0,1fr);}
+.tag-properties-pane {min-height:0;min-width:0;overflow:auto;padding:10px 12px;scrollbar-width:thin;}
+.tag-properties-pane .tag-detail-heading {padding-bottom:8px;margin-bottom:8px;}
+.tag-properties-pane .tag-detail-heading h2 {font-size:19px;line-height:1.2;margin:3px 0;}
+.tag-properties-pane .tag-badges {gap:4px;margin-top:5px;}
+.tag-properties-pane .field-table-title {margin:6px 0;gap:5px;flex-wrap:wrap;}
+.tag-properties-pane .field-table-title h3 {font-size:12px;margin:0;}
+.tag-properties-pane .field-table .property-row {padding:5px 0;gap:8px;grid-template-columns:minmax(75px,1fr) minmax(110px,160px);}
+.tag-properties-pane .property-row > div:first-child {min-width:0;overflow-wrap:anywhere;gap:3px;}
+.tag-properties-pane .analysis-card {padding:8px;margin-block:6px;}
+.tag-properties-pane .reference-list {margin-top:10px;}
+.tag-properties-pane .reference-list h3 {font-size:12px;margin:6px 0;}
+.tag-properties-pane .reference-list button {padding:5px 7px;min-width:0;}
+.tag-properties-pane .reference-list strong {font-size:10px;overflow-wrap:anywhere;}
+.tag-properties-pane .preset-bar {padding:7px;gap:6px;margin-block:8px;}
+.tag-selection-layout .tag-model-preview {height:100%;min-height:0;min-width:0;border-left:1px solid var(--line);padding:0;position:relative;}
+.tag-selection-layout .tag-model-preview .native-model-preview {min-height:0;}
+.tag-layout .relationships {width:100%;border:0;}
+@media(max-width:1000px){
+ .application .tag-layout {grid-template-columns:170px minmax(0,1fr);}
+ .tag-selection-layout.has-model {grid-template-columns:minmax(230px,1fr) minmax(200px,1.1fr);}
+ .tag-properties-pane {padding:7px;}
+}

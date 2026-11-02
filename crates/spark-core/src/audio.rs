@@ -50,7 +50,7 @@ struct SoundData {
     bytes: std::sync::Arc<[u8]>,
     ranges: Vec<(usize, usize)>,
     external:std::collections::BTreeMap<usize,Vec<u8>>,
-    descriptors: Vec<usize>,
+    descriptors: Vec<Option<usize>>,
 }
 
 /// Inspect every native sound descriptor in one verified cache snapshot. This
@@ -177,7 +177,8 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
         permutations: vec![],
         warnings: vec![],
     };
-    if r.u32(tag + 24)? != 0 {
+    let indexed = r.u32(tag + 24)? != 0;
+    if indexed && (header.version!=609 || r.u32(tag+24)?!=1) {
         report.warnings.push("Sound metadata is indexed in an external resource cache; embedded preview is unavailable".into());
         return Ok(SoundData {
             report,
@@ -188,57 +189,74 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
         });
     }
     let at = pointer(r.u32(tag + 20)?, 164)?;
-    let channels = match r.u16(at + 108)? {
+    let mut resource=resources.map(|(p,h)|crate::resource_map::open_verified_sound(p,h)).transpose();
+    let indexed_metadata=if indexed{
+        let pair=resource.as_mut().map_err(|_|SparkError::Invalid("Pinned sounds.map could not be verified".into()))?
+            .as_mut().ok_or_else(||SparkError::Invalid("Indexed CE sound needs its original pinned sounds.map".into()))?;
+        Some(crate::resource_map::read_indexed_sound_metadata(&mut pair.0,&pair.1,&report.tag_path)?)
+    }else{None};
+    let structures=Reader(indexed_metadata.as_deref().unwrap_or(&bytes));
+    let body=if indexed{0}else{at};
+    // A CE cache header leaves rate/encoding zero. Read them from the exact
+    // resource header, while its runtime pointer words are never trusted.
+    let channels = match structures.u16(body + 108)? {
         0 => 1,
         1 => 2,
         _ => return invalid("Unsupported sound channel enum"),
     };
-    let sample_rate = match r.u16(at + 6)? {
+    let sample_rate = match structures.u16(body + 6)? {
         0 => 22050,
         1 => 44100,
         _ => return invalid("Unsupported sound sample-rate enum"),
     };
     let pitch_count = r.u32(at + 152)? as usize;
+    if indexed&&structures.u32(152)? as usize!=pitch_count{return invalid("CE cache and sound resource disagree about pitch ranges");}
     if pitch_count > 8 {
         return invalid("Sound exceeds eight pitch ranges");
     }
+    let structure_pointer=|value:u32,size:usize|->Result<usize>{
+        if let Some(metadata)=&indexed_metadata{
+            let offset=164usize.checked_add(value as usize).ok_or_else(||SparkError::Invalid("CE sound metadata pointer overflow".into()))?;
+            if offset.checked_add(size).is_none_or(|end|end>metadata.len()){return invalid("CE sound structure escapes its exact resource entry");}
+            Ok(offset)
+        }else{pointer(value,size)}
+    };
     let pitches = if pitch_count == 0 {
         0
     } else {
-        pointer(r.u32(at + 156)?, pitch_count * 72)?
+        structure_pointer(r.u32(at + 156)?, pitch_count * 72)?
     };
     let mut ranges = vec![];
     let mut descriptors = vec![];
     let mut external=std::collections::BTreeMap::new();
-    let mut resource=resources.map(|(p,h)|crate::resource_map::open_verified_sound(p,h)).transpose();
     let mut inspected_sample_bytes = 0usize;
     for pitch_range in 0..pitch_count {
         let pitch = pitches + pitch_range * 72;
-        let pitch_name=r.string(pitch,32)?;
-        let count = r.u32(pitch + 60)? as usize;
+        let pitch_name=structures.string(pitch,32)?;
+        let count = structures.u32(pitch + 60)? as usize;
         if count > 256 {
             return invalid("Sound exceeds 256 permutations per pitch range");
         }
         let permutations = if count == 0 {
             0
         } else {
-            pointer(r.u32(pitch + 64)?, count * 124)?
+            structure_pointer(structures.u32(pitch + 64)?, count * 124)?
         };
-        let actual_count = r.u16(pitch + 44)? as usize;
+        let actual_count = structures.u16(pitch + 44)? as usize;
         if actual_count > count {
             return invalid("Sound's root permutation count exceeds its pitch range");
         }
         for permutation in 0..count {
             let perm = permutations + permutation * 124;
-            let codec = r.u16(perm + 40)?;
-            let next = r.u16(perm + 42)?;
-            let length = r.u32(perm + 64)? as usize;
-            let flags = r.u32(perm + 68)?;
-            let offset = r.u32(perm + 72)? as usize;
+            let codec = structures.u16(perm + 40)?;
+            let next = structures.u16(perm + 42)?;
+            let length = structures.u32(perm + 64)? as usize;
+            let flags = structures.u32(perm + 68)?;
+            let offset = structures.u32(perm + 72)? as usize;
             let mut item = SoundPermutation {
                 pitch_range,
                 permutation,
-                name: r.string(perm, 32)?,
+                name: structures.string(perm, 32)?,
                 next_permutation: (next != u16::MAX).then_some(next as usize),
                 chain_start: actual_count == 0 || permutation < actual_count,
                 format: match codec {
@@ -260,6 +278,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
             };
             let validation = (|| -> Result<(String, f64)> {
                 if flags>1{return invalid("Unsupported sound raw-data flags");}
+                if indexed&&flags!=1{return invalid("Indexed CE sample must belong to its exact shared sample entry");}
                 if length == 0 || length > MAX_PREVIEW_BYTES {
                     return invalid("Audio preview must be between 1 byte and 16 MiB");
                 }
@@ -301,7 +320,8 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
                 Err(e) => item.reason = Some(e.to_string()),
             }
             ranges.push((offset, length));
-            descriptors.push(perm + 64);
+            // Resource-relative descriptors must never be used as cache writes.
+            descriptors.push((!indexed).then_some(perm + 64));
             report.permutations.push(item);
         }
     }
@@ -360,7 +380,7 @@ pub(crate) fn mcc_extraction_input(source:&crate::project::Source, inspection:&m
             return invalid(format!("{}: all original sound permutations must be recoverable from the pinned bank; CELT and unsupported codecs remain blocked",data.report.tag_path));
         }
         for (index,sample) in &data.external {
-            let descriptor=data.descriptors[*index];
+            let descriptor=data.descriptors[*index].ok_or_else(||SparkError::Invalid("Resource-relative sound descriptors cannot be materialized as cache offsets".into()))?;
             if data.report.permutations[*index].format!="Xbox ADPCM" || descriptor+20>original_len {
                 return invalid("Only exact MCC classic ADPCM sample descriptors can be materialized");
             }
@@ -720,6 +740,33 @@ mod tests {
         let entry=bytes[0x880..0x8a0].to_vec();bytes[0x828..0x848].copy_from_slice(&entry);set(&mut bytes,4,13);set(&mut bytes,0x800,base+0x28);set(&mut bytes,0x838,base+0x100);set(&mut bytes,0x83c,base+0x180);set(&mut bytes,0x980+156,base+0x300);set(&mut bytes,0xb00+64,base+0x380);
         let dir=tempfile::tempdir().unwrap();let path=dir.path().join("mcc.map");std::fs::write(&path,&bytes).unwrap();let hash=crate::hex_bytes(Sha256::digest(&bytes));let sound=inspect_sound(&path,&hash,0x1234).unwrap();assert!(sound.permutations[0].available);let clip=preview_sound(&path,&hash,0x1234,0,0).unwrap();assert_eq!(&clip.bytes[44..46],&1000i16.to_le_bytes());assert_eq!(std::fs::read(&path).unwrap(),bytes);
         set(&mut bytes,0x980+156,0x40440300);std::fs::write(&path,&bytes).unwrap();let hash=crate::hex_bytes(Sha256::digest(&bytes));assert!(inspect_sound(&path,&hash,0x1234).is_err());
+    }
+    #[test]
+    fn ce_indexed_sound_uses_split_metadata_exact_samples_and_resource_encoding(){
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("ce.map");let resource=dir.path().join("sounds.map");
+        let set=|b:&mut[u8],at:usize,n:u32|b[at..at+4].copy_from_slice(&n.to_le_bytes());
+        let mut cache=sound_fixture(true);set(&mut cache,4,609);set(&mut cache,0x898,1);set(&mut cache,0x980+156,0);
+        std::fs::write(&path,&cache).unwrap();let hash=crate::hex_bytes(Sha256::digest(&cache));
+        let mut raw=vec![0u8;0x800];set(&mut raw,0,2);set(&mut raw,4,0x100);set(&mut raw,8,0x40);set(&mut raw,12,2);
+        raw[0x100..0x114].copy_from_slice(b"test\\sound__samples\0");raw[0x114..0x11f].copy_from_slice(b"test\\sound\0");
+        set(&mut raw,0x44,72);set(&mut raw,0x48,0x700);set(&mut raw,0x4c,20);set(&mut raw,0x50,360);set(&mut raw,0x54,0x300);
+        raw[0x300..0x3a4].copy_from_slice(&cache[0x980..0xa24]);raw[0x306..0x308].copy_from_slice(&1u16.to_le_bytes());raw[0x36c..0x36e].copy_from_slice(&1u16.to_le_bytes());
+        raw[0x3a4..0x3ec].copy_from_slice(&cache[0xb00..0xb48]);set(&mut raw,0x3a4+64,72);
+        raw[0x3ec..0x468].copy_from_slice(&cache[0xb80..0xbfc]);set(&mut raw,0x3ec+64,72);set(&mut raw,0x3ec+72,0x700);
+        raw[0x700..0x702].copy_from_slice(&1000i16.to_le_bytes());raw[0x704..0x706].copy_from_slice(&2000i16.to_le_bytes());
+        std::fs::write(&resource,&raw).unwrap();let pinned=crate::hex_bytes(Sha256::digest(&raw));
+        assert!(inspect_sound(&path,&hash,0x1234).is_err());
+        let report=inspect_sound_with_resources(&path,&hash,0x1234,Some((&resource,&pinned))).unwrap();
+        assert_eq!(report.permutations.len(),1);let item=&report.permutations[0];assert!(item.available);assert!(!item.embedded);assert_eq!(item.channels,2);assert_eq!(item.sample_rate,44100);
+        let preview=preview_sound_with_resources(&path,&hash,0x1234,0,0,Some((&resource,&pinned))).unwrap();assert_eq!(&preview.bytes[44..48],&[0xe8,3,0xd0,7]);
+        for (offset,value) in [(0x3a4+64,u32::MAX),(0x300+152,2),(0x3ec+72,0x6ff),(0,1)]{
+            let mut corrupt=raw.clone();set(&mut corrupt,offset,value);std::fs::write(&resource,&corrupt).unwrap();let changed=crate::hex_bytes(Sha256::digest(&corrupt));
+            assert!(preview_sound_with_resources(&path,&hash,0x1234,0,0,Some((&resource,&changed))).is_err());
+        }
+        let mut wrong_path=raw.clone();wrong_path[0x114]=b'x';std::fs::write(&resource,&wrong_path).unwrap();let changed=crate::hex_bytes(Sha256::digest(&wrong_path));
+        assert!(inspect_sound_with_resources(&path,&hash,0x1234,Some((&resource,&changed))).is_err());
+        std::fs::write(&resource,&raw).unwrap();assert!(preview_sound_with_resources(&path,&hash,0x1234,0,0,Some((&resource,&"0".repeat(64)))).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(),cache);assert_eq!(std::fs::read(&resource).unwrap(),raw);
     }
     #[test]fn shared_samples_require_kind_hash_and_exact_permutation_span(){
         let dir=tempfile::tempdir().unwrap();let path=dir.path().join("source.map");let bytes=sound_fixture(true);std::fs::write(&path,&bytes).unwrap();

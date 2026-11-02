@@ -11,6 +11,7 @@ import {configureSourceTexture} from './sourceTexture';
 import {extraTextureKey} from './haloMaterial';
 import {useTextureResourceScopes} from './textureResourceScope';
 import {useMapSessionValues} from './mapSession';
+import {nativeShaderTextureRole} from './nativeShaderTextures';
 
 export interface OwnedModelView {
   ready?: boolean;
@@ -72,7 +73,7 @@ export function useOwnedForgeModels(
           )) {
             view.shaderMetadata[tag.id]=tag.shaderPreview!;
             for (const reference of tag.references) {
-              const role=/^(Base map|Diffuse map)$/.test(reference.label)?'base':({'Primary detail map':'primaryDetail','Detail map':'primaryDetail','Secondary detail map':'secondaryDetail','Micro detail map':'microDetail','Bump map':'normalMap','Multipurpose map':'multipurpose'} as Record<string,string>)[reference.label]??(/^Chicago layer [1-3]$/.test(reference.label)?`layer${reference.label.at(-1)}`:undefined);
+              const role=nativeShaderTextureRole(reference.label);
               if (role && result.tags.some((t) => t.id === reference.targetId && t.class === 'bitm'))
                 tasks.push({shader:tag.id,bitmap:reference.targetId,role});
             }

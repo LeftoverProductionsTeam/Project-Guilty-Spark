@@ -13,6 +13,7 @@ const showcaseFeatures = {
   toneMapping: 'source' as const,
 };
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {OrbitControls} from '@react-three/drei';
 import * as THREE from 'three';
@@ -28,6 +29,10 @@ import { useNativeModelAnimations } from '../useNativeModelAnimations';
 import type { AnimationPreview } from '../animation';
 import SceneEnvironment from './SceneEnvironment';
 import '../nativeModelPreview.css';
+import { useWorkspaceActivity } from './WorkspaceActivity';
+import { readMapSession, writeMapSession } from '../mapSession';
+import { modelFitPosition, validModelPreviewCamera } from '../modelPreviewCamera';
+import type { ModelViewPreset } from '../modelPreviewCamera';
 
 function Snapshot({ ready, onSnapshot }: { ready: boolean; onSnapshot: (url: string) => void }) {
   const { gl } = useThree(),
@@ -48,16 +53,28 @@ function Model({
   showcase,
   animation,
   onAnimationError,
+  identity,
+  framing,
 }: {
   view: OwnedModelView;
   live: boolean;
   showcase: boolean;
   animation?: AnimationPreview;
   onAnimationError: (error: string) => void;
+  identity:{projectId:string;sourceHash:string;tagId:number};
+  framing:{preset:ModelViewPreset;revision:number};
 }) {
   const group = useRef<THREE.Group>(null),
     { camera, gl, invalidate } = useThree();
   const pointer=useRef({x:0,y:0});
+  const controls=useRef<ComponentRef<typeof OrbitControls>>(null);
+  const sessionKey=`preview.camera.${identity.tagId}`;
+  const remember=()=>{
+    const target=controls.current?.target??new THREE.Vector3();
+    const value={sourceHash:identity.sourceHash,position:camera.position.toArray(),target:target.toArray()};
+    if(validModelPreviewCamera(value,identity.sourceHash,fit.radius))writeMapSession(identity.projectId,sessionKey,value);
+    gl.domElement.dataset.gsPreviewCamera=JSON.stringify(value);invalidate();
+  };
   const poseSample = useRef(0);
   const motionAllowed = useMemo(() => !matchMedia('(prefers-reduced-motion: reduce)').matches, []);
   useEffect(() => {
@@ -82,19 +99,20 @@ function Model({
   }, [view.mesh]);
   useEffect(() => {
     camera.up.set(0, 0, 1);
-    camera.position.set(
-      fit.radius * (showcase ? 2.1 : 2.8),
-      -fit.radius * (showcase ? 1 : 1.4),
-      fit.radius * (showcase ? 0.65 : 0.95),
-    );
-    camera.lookAt(0, 0, 0);
+    const aspect=camera instanceof THREE.PerspectiveCamera?camera.aspect:1;
+    const stored=readMapSession<unknown>(identity.projectId,sessionKey,null);
+    const restore=!showcase&&framing.revision===0&&validModelPreviewCamera(stored,identity.sourceHash,fit.radius)?stored:null;
+    camera.position.fromArray(restore?.position??(showcase?[fit.radius*2.1,-fit.radius,fit.radius*.65]:modelFitPosition(fit.radius,aspect,42,framing.preset)));
+    const target=new THREE.Vector3().fromArray(restore?.target??[0,0,0]);
+    controls.current?.target.copy(target);camera.lookAt(target);controls.current?.update();
     if (camera instanceof THREE.PerspectiveCamera) {
       camera.near = Math.max(0.001, fit.radius / 100);
-      camera.far = fit.radius * 30;
+      camera.far = fit.radius * 60;
       camera.updateProjectionMatrix();
     }
     invalidate();
-  }, [camera, fit, invalidate, showcase]);
+    if(!showcase)remember();
+  }, [camera, fit, invalidate, showcase,identity.projectId,identity.sourceHash,sessionKey,framing]);
   useFrame((_, dt) => {
     if (!group.current) return;
     // Keep the left-facing resting pose, but let the right half of the page
@@ -134,7 +152,7 @@ function Model({
           />
         )}
       </group>
-    </group>{!showcase&&live&&<OrbitControls makeDefault enablePan={false} enableDamping minDistance={fit.radius*.7} maxDistance={fit.radius*12}/>}</>
+    </group>{!showcase&&<OrbitControls ref={controls} makeDefault enabled={live} enablePan enableDamping minDistance={fit.radius*.15} maxDistance={fit.radius*25} onEnd={remember}/>}</>
   );
 }
 /** Uses the exact same native geometry, texture decoder and shader as the map viewport. */
@@ -157,6 +175,9 @@ export default function NativeModelPreview({
     () => ({ tagId: asset.tagId, sourceProjectId: asset.sourceProjectId, sourceSha256: asset.sourceSha256 }),
     [asset.sourceProjectId, asset.sourceSha256, asset.tagId],
   );
+  const activity=useWorkspaceActivity();
+  const [framing,setFraming]=useState<{preset:ModelViewPreset;revision:number}>({preset:'fit',revision:0});
+  const identity=useMemo(()=>({projectId:asset.sourceProjectId??'',sourceHash:asset.sourceSha256??'',tagId:asset.tagId??0}),[asset.sourceProjectId,asset.sourceSha256,asset.tagId]);
   const { models, failures } = useOwnedForgeModels([placement]);
   const animations = useNativeModelAnimations(placement, showcase&&animate);
   const [clipIndex, setClipIndex] = useState(0);
@@ -165,6 +186,7 @@ export default function NativeModelPreview({
   useEffect(() => {
     setClipIndex(0);
     setAnimationError('');
+    setFraming({preset:'fit',revision:0});
   }, [asset.sourceProjectId, asset.sourceSha256, asset.tagId]);
   const clip = animations.value?.clips[clipIndex];
   const animation = useMemo<AnimationPreview | undefined>(
@@ -173,7 +195,7 @@ export default function NativeModelPreview({
         ? {
             clip,
             targetTagId: asset.tagId ?? 0,
-            playing: playing && live,
+            playing: playing && live && activity.active,
             loop: true,
             speed: 1,
             seek: 0,
@@ -181,7 +203,7 @@ export default function NativeModelPreview({
             rootMotion: false,
           }
         : undefined,
-    [clip, playing, live, asset.tagId, animationError],
+    [clip, playing, live, activity.active,asset.tagId, animationError],
   );
   const key = forgeModelKey(placement),
     view = models[key];
@@ -223,7 +245,7 @@ export default function NativeModelPreview({
           : 0
       }
     >
-      {view && visible ? (
+      {view && (visible||live) && activity.graphicsResident ? (
         <Canvas
           camera={{ fov: 42, up: [0, 0, 1] }}
           dpr={showcase ? [1.5, 2] : [1, 1.5]}
@@ -233,7 +255,7 @@ export default function NativeModelPreview({
             premultipliedAlpha: false,
             preserveDrawingBuffer: !!onSnapshot,
           }}
-          frameloop={live || onSnapshot ? 'always' : 'demand'}
+          frameloop={activity.active&&visible&&(live||onSnapshot)?'always':'demand'}
           onCreated={({ gl }) => {
             gl.outputColorSpace = THREE.SRGBColorSpace;
             gl.toneMapping = THREE.NoToneMapping;
@@ -244,10 +266,12 @@ export default function NativeModelPreview({
             {showcase && <SceneEffects settings={showcaseFeatures} transparentBackground />}
             <Model
               view={view}
-              live={live}
+              live={live&&visible&&activity.active}
               showcase={showcase}
               animation={animation}
               onAnimationError={setAnimationError}
+              identity={identity}
+              framing={framing}
             />
             {onSnapshot && <Snapshot ready={!!view.ready} onSnapshot={onSnapshot} />}
           </Suspense>
@@ -258,6 +282,14 @@ export default function NativeModelPreview({
         </span>
       )}
       {failures[key] && <small role="status">{failures[key]}</small>}
+      {view&&!view.ready&&!failures[key]&&<small className="model-material-loading" role="status">Loading source textures &amp; reflections…</small>}
+      {!showcase&&live&&<div className="native-model-view-controls" aria-label="Model preview controls">
+        <button type="button" title="Fit the complete model to this preview" onClick={()=>setFraming(value=>({preset:'fit',revision:value.revision+1}))}>Fit / Reset</button>
+        <select aria-label="Model view" value={framing.preset} onChange={event=>setFraming(value=>({preset:event.target.value as ModelViewPreset,revision:value.revision+1}))}>
+          <option value="fit">Perspective</option><option value="front">Front</option><option value="side">Side</option><option value="top">Top</option>
+        </select>
+        <span>Drag orbit · wheel zoom · right-drag pan</span>
+      </div>}
       {showcase && (
         <div className="native-model-animation-controls">
           {!!animations.value?.clips.length && !animationError ? (

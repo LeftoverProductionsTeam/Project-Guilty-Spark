@@ -15,6 +15,12 @@
   display: block;
   touch-action: none;
 }
+.native-model-view-controls {position:absolute;inset:5px 6px auto;display:flex;align-items:center;gap:5px;font-size:10px;pointer-events:none;}
+.native-model-view-controls button,.native-model-view-controls select {pointer-events:auto;min-height:23px;padding:2px 6px;font-size:10px;width:auto;}
+.native-model-view-controls span {color:var(--muted);margin-left:auto;text-shadow:0 1px 3px #000;}
+@media(max-width:700px){.native-model-view-controls span{display:none;}}
+.application .map-tab[data-detaching] {opacity:.6;outline:1px dashed var(--accent);cursor:grabbing;}
+.native-model-preview > .model-material-loading {left:auto;right:8px;bottom:8px;width:max-content;max-width:calc(100% - 16px);}
 .model-preview-loading {
   position: absolute;
   inset: 0;

@@ -191,10 +191,26 @@ impl ResourceIndex {
 
 pub(crate) fn read_external_sound_from_verified(file:&mut File,index:&ResourceIndex,tag:&str,pitch:usize,permutation:usize,generation:u32,offset:u64,length:usize)->Result<Vec<u8>>{
     if index.kind_code!=2||length==0||length>16*1024*1024{return invalid("Unsupported or oversized sound resource span");}
-    let key=match generation{6|7=>format!("{tag}__{pitch}__{permutation}"),609=>format!("{tag}__samples"),_=>return invalid("Unsupported sound resource generation")};
+    let key=match generation{6|7=>format!("{tag}__{pitch}__{permutation}"),609=>{
+        // Original HEK resources name this block __permutations; Invader's
+        // native resource writer names it __samples. Accept one exact known
+        // entry, never a fuzzy suffix or an ambiguous pair of aliases.
+        let original=format!("{tag}__permutations");let invader=format!("{tag}__samples");
+        if index.count_exact(&original)+index.count_exact(&invader)!=1{return invalid("CE sample block is missing or ambiguous between native resource writers");}
+        if index.count_exact(&original)==1{original}else{invader}
+    },_=>return invalid("Unsupported sound resource generation")};
     let entry=index.exact(&key)?;let end=offset.checked_add(length as u64).ok_or_else(||SparkError::Invalid("Sound span overflow".into()))?;
     if offset<entry.data_offset||end>entry.data_offset+entry.data_size||end>index.file_size{return invalid("Sound range does not belong to its exact indexed permutation");}
     let mut bytes=vec![0u8;length];read_exact_at(file,offset,&mut bytes)?;Ok(bytes)
+}
+
+/// CE keeps the sound header in the map and relative pitch/permutation blocks
+/// after a second 164-byte header in one exactly named sounds.map entry.
+pub(crate) fn read_indexed_sound_metadata(file:&mut File,index:&ResourceIndex,tag_path:&str)->Result<Vec<u8>>{
+    if index.kind_code!=2{return invalid("Indexed sound metadata requires a sound resource map");}
+    let entry=index.exact(tag_path)?;
+    if !(164..=1024*1024).contains(&entry.data_size){return invalid("CE sound metadata exceeds its 1 MiB tag-body limit");}
+    let mut bytes=vec![0;entry.data_size as usize];read_exact_at(file,entry.data_offset,&mut bytes)?;Ok(bytes)
 }
 
 pub fn audit(path: &Path, expected_sha256: &str, bitmap_paths: &[String]) -> Result<ResourceMapAudit> {
@@ -366,6 +382,22 @@ mod tests {
         for (path,offset,length,image) in [("scenery/teleporter/mask",512,65,0),("scenery/teleporter/mask",511,64,0),
             ("scenery/teleporter/mask",512,64,1),("scenery/teleporter/other",512,64,0)] {
             assert!(prove_external_image_range(&index,path,offset,length,16,13,image).is_err());
+        }
+    }
+    #[test]
+    fn ce_sound_sample_aliases_are_exact_unique_and_span_bounded() {
+        let mut file=tempfile::NamedTempFile::new().unwrap();
+        file.write_all(&[0x5a;128]).unwrap();
+        let entry=|name:&str|ResourceEntry{path:name.into(),data_offset:32,data_size:16};
+        for name in ["sound\\test__permutations","sound\\test__samples"] {
+            let index=ResourceIndex::new(2,128,vec![entry(name)]);
+            assert_eq!(read_external_sound_from_verified(file.as_file_mut(),&index,"sound/test",0,0,609,32,16).unwrap(),vec![0x5a;16]);
+            assert!(read_external_sound_from_verified(file.as_file_mut(),&index,"sound/test",0,0,609,31,16).is_err());
+            assert!(read_external_sound_from_verified(file.as_file_mut(),&index,"sound/test",0,0,609,32,17).is_err());
+        }
+        for entries in [vec![entry("sound\\test__samples_other")],vec![entry("sound\\test__samples"),entry("sound\\test__permutations")],vec![entry("sound\\test__samples"),entry("sound\\test__samples")]] {
+            let index=ResourceIndex::new(2,128,entries);
+            assert!(read_external_sound_from_verified(file.as_file_mut(),&index,"sound/test",0,0,609,32,16).is_err());
         }
     }
     #[test]

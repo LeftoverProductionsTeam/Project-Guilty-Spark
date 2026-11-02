@@ -5,6 +5,28 @@ use spark_core::bitmap_preview::BitmapResourceCompatibility;
 use std::collections::{BTreeMap, HashSet};
 
 const MAX_CANDIDATES: usize = 12;
+
+/// Explicitly linked asset folders also contain resources beside maps that
+/// have not been opened yet. Bound this walk; never scan arbitrary drives,
+/// follow links, or enter build/cache folders to discover a resource pack.
+fn linked_resource_folders(roots:&[PathBuf])->Vec<PathBuf>{
+    let mut result=vec![];let mut visited=HashSet::new();let mut entries=0usize;
+    let mut pending=roots.iter().take(16).cloned().map(|root|(root,0usize)).collect::<Vec<_>>();
+    while let Some((folder,depth))=pending.pop(){
+        if visited.len()>=128||entries>=2048||result.len()>=MAX_CANDIDATES{break;}
+        if core::library::validate_local_input_path(&folder).is_err()||core::reject_links(&folder).is_err(){continue;}
+        let Ok(canonical)=fs::canonicalize(&folder)else{continue};if !visited.insert(canonical){continue;}
+        if ["bitmaps.map","sounds.map"].iter().any(|name|{let file=folder.join(name);core::reject_links(&file).is_ok()&&file.is_file()}){result.push(folder.clone());}
+        if depth>=3{continue;}
+        let Ok(children)=fs::read_dir(&folder)else{continue};
+        let mut children=children.take(2048-entries).filter_map(Result::ok).collect::<Vec<_>>();entries+=children.len();children.sort_by_key(|entry|entry.file_name());
+        for entry in children.into_iter().rev(){
+            let name=entry.file_name();let name=name.to_string_lossy();
+            if name.starts_with('.')||matches!(name.to_ascii_lowercase().as_str(),"node_modules"|"target"|"dist"){continue;}
+            if entry.file_type().is_ok_and(|kind|kind.is_dir()&&!kind.is_symlink()){pending.push((entry.path(),depth+1));}
+        }
+    }result
+}
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Candidate {
@@ -104,6 +126,8 @@ pub(super) fn resource_roots(state: &AppState, project: &Project) -> Reply<Vec<(
             roots.push((path.join("maps"), "Registered runtime data"));
         }
     }
+    let linked:Vec<PathBuf>=lock(&state.library)?.setting("assetSourceFolders").map_err(error)?;
+    for folder in linked_resource_folders(&linked){roots.push((folder,"Inside a linked map/asset folder"));}
     let mut seen=HashSet::new();
     Ok(roots.into_iter().filter_map(|(root,reason)|{
         let directory=std::path::absolute(&root).ok()?;
@@ -374,5 +398,15 @@ mod tests {
         ] {
             assert!(candidate_file(Path::new(path)).is_none(), "{path}");
         }
+    }
+    #[test]
+    fn linked_asset_folders_find_unopened_map_resources_without_entering_builds_or_deep_trees(){
+        let root=tempfile::tempdir().unwrap();
+        for child in ["owned/maps","target/ignored/maps",".local/ignored/maps","too/deep/for/maps"]{
+            let folder=root.path().join(child);fs::create_dir_all(&folder).unwrap();fs::write(folder.join("bitmaps.map"),b"probe only").unwrap();
+        }
+        let found=linked_resource_folders(&[root.path().to_path_buf(),root.path().to_path_buf()]);
+        assert_eq!(found,vec![root.path().join("owned/maps")]);
+        assert!(linked_resource_folders(&[PathBuf::from(r"\\host\share")]).is_empty());
     }
 }

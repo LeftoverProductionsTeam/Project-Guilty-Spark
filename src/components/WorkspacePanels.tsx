@@ -283,11 +283,13 @@ export function WorkspacePanel({
   label,
   defaultDock,
   children,
+  onDetach,
 }: {
   id: string;
   label: string;
   defaultDock?: PanelPlacement['dock'];
   children: ReactNode;
+  onDetach?:()=>Promise<boolean>;
 }) {
   const {active,scope}=useWorkspaceActivity();
   const context = useContext(Context),
@@ -303,6 +305,11 @@ export function WorkspacePanel({
   };
   const drag = useRef<{ pointer: number; x: number; y: number; left: number; top: number; moved:boolean } | null>(null);
   const resize=useRef<{pointer:number;x:number;y:number;width:number;height:number}|null>(null);
+  const [detaching,setDetaching]=useState(false),[detachError,setDetachError]=useState('');
+  const detach=()=>{
+    if(!onDetach||detaching)return;setDetaching(true);setDetachError('');
+    void onDetach().then(moved=>{if(moved)context?.update(id,{open:false});}).catch(error=>setDetachError(String(error))).finally(()=>setDetaching(false));
+  };
   if (!context) return <>{children}</>;
   if (!context.host) return null;
   const styles =
@@ -363,6 +370,7 @@ export function WorkspacePanel({
             }
           }}
           onPointerUp={(event) => {
+            if(drag.current?.moved&&onDetach&&(event.clientX<0||event.clientY<0||event.clientX>innerWidth||event.clientY>innerHeight)){drag.current=null;detach();return;}
             if(drag.current?.moved&&context.host){
               const layer=context.host.getBoundingClientRect(),x=event.clientX-layer.left,y=event.clientY-layer.top;
               const dock=x<28?'left':x>layer.width-28?'right':y<28?'top':y>layer.height-28?'bottom':'float';
@@ -375,6 +383,7 @@ export function WorkspacePanel({
           <PanelLeftClose size={15} />
           {label}
         </span>
+        {native&&onDetach&&<button aria-label={`Detach ${label}`} title={`Move ${label} to a separate native editing window`} disabled={detaching} onClick={detach}><SquareArrowOutUpRight size={14}/></button>}
         <details className="gs-panel-options">
           <summary aria-label={`${label} drawer options`} title="Drawer position, size and pinning"><SlidersHorizontal size={14}/></summary>
       <div className="gs-panel-placement">
@@ -418,7 +427,7 @@ export function WorkspacePanel({
           <X size={15} />
         </button>
       </header>
-      <div className="gs-panel-content">{children}<div ref={appendHost} className="gs-panel-addons"/></div>
+      <div className="gs-panel-content">{detachError&&<p role="alert">{detachError}</p>}{children}<div ref={appendHost} className="gs-panel-addons"/></div>
       <div className="gs-panel-resize" role="separator" tabIndex={0} aria-label={`Resize ${label} drawer`}
         aria-orientation={placement.dock==='top'||placement.dock==='bottom'?'horizontal':'vertical'}
         onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);resize.current={pointer:event.pointerId,x:event.clientX,y:event.clientY,width:placement.width,height:placement.height};}}
