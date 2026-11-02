@@ -1372,7 +1372,7 @@ export default function World({
         >
           <ViewportBoundary>
             <Suspense fallback={<div className="loading">Preparing geometry…</div>}>
-              <Canvas
+              {activity.graphicsResident&&<Canvas
                 key={String(rendererQuality.antialias)}
                 frameloop={activity.active?'always':'never'}
                 dpr={rendererQuality.dpr}
@@ -1450,7 +1450,7 @@ export default function World({
                   />
                 )}
                 {viewportChildren}
-              </Canvas>
+              </Canvas>}
             </Suspense>
           </ViewportBoundary>
           {!cinematic && chosen && (

@@ -955,12 +955,16 @@ export default function App() {
     return workspaceContent();
   }
   const inLevelEditor=workspace==='world'||workspace==='quickforge'||workspace==='live';
-  if(inLevelEditor&&ready)visitedLevelViews.current.add(current?.id??'new');
+  if(inLevelEditor&&ready){const id=current?.id??'new';visitedLevelViews.current.delete(id);visitedLevelViews.current.add(id);}
   for(const id of visitedLevelViews.current)if(id!=='new'&&!documents.documents.some(map=>map.id===id))visitedLevelViews.current.delete(id);
-  function retainedLevels(){return [...visitedLevelViews.current].map(id=>{
+  function retainedLevels(){
+    // Keep the two most recently used maps warm. The editor components, native
+    // payloads, draft/history and camera session survive graphics retirement.
+    const warm=new Set([...visitedLevelViews.current].filter(id=>id!=='new').slice(-2));
+    return [...visitedLevelViews.current].map(id=>{
     const map=documents.documents.find(map=>map.id===id),project=map?.history.current??null;
     const active=inLevelEditor&&id===(current?.id??'new');
-    return <RetainedLevelView key={id} id={id} active={active}>
+    return <RetainedLevelView key={id} id={id} active={active} graphicsResident={warm.has(id)}>
       <Suspense fallback={<div className="loading">Opening level editor…</div>}>
         <LevelEditorWorkspace entries={data.entries} onBuild={()=>setWorkspace('build')} project={project} inspection={map?.inspection??null} assetMeshes={map?.meshes??{}} intent={active?workspace as 'world'|'quickforge'|'live':'world'} onSourceEdit={edit} onImportMap={()=>void importFiles()} onContinue={id=>void openProject(id,'world')} onDirector={()=>void openRecordingDirector()}
           source={sourceView(map)} newMap={forgeView(null)} notify={notice} onBeforeResources={()=>save(false,project?.id)} onResourcesConnected={applyResourceMetadata}

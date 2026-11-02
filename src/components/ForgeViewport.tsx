@@ -703,7 +703,7 @@ export default function ForgeViewport(props: ForgeViewportProps) {
       </span>
       {props.document.materials.some(material=>material.shaderPath)&&!Object.keys(surfacePreview.views).length&&<div className="forge-material-status" role="status">{surfacePreview.status}</div>}
       <ViewportBoundary>
-        <Canvas
+        {activity.graphicsResident&&<Canvas
           key={String(rendererQuality.antialias)}
           frameloop={activity.active?'always':'never'}
           dpr={rendererQuality.dpr}
@@ -736,7 +736,7 @@ export default function ForgeViewport(props: ForgeViewportProps) {
               ? props.viewportChildren(surfacePreview.textures)
               : props.viewportChildren}
           </Suspense>
-        </Canvas>
+        </Canvas>}
       </ViewportBoundary>
       {props.cameraMode === 'machinima' && (
         <div className="forge-director-controls">

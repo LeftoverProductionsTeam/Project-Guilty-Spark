@@ -1695,6 +1695,24 @@ test('level views retain their WebGL context across tools and maps while inactiv
   await expect.poll(()=>page.evaluate(()=>(window as any).__keptLevel.draws)).toBeGreaterThan(paused);
   await chooseTool(page,'Tag editor');await expect(page.getByRole('spinbutton',{name:'Velocity',exact:true})).toHaveValue('34');
 });
+test('a third map retires the oldest GPU view while retaining its editor, camera and author history',async({page})=>{
+ await mockDesktop(page);await openFixture(page);await page.getByRole('spinbutton',{name:'Velocity',exact:true}).fill('34');await page.keyboard.press('Tab');await chooseTool(page,'Level editor');
+ const canvas=page.locator('.world-layout canvas');await expect(canvas).toHaveAttribute('data-gs-camera-pose',/.+/);
+ await canvas.evaluate((element:HTMLCanvasElement)=>{(window as any).__retiredView={canvas:element,world:element.closest('.world-layout'),gl:element.getContext('webgl2'),pose:JSON.parse(element.dataset.gsCameraPose!)};});
+ for(const title of ['Synthetic candidate','Synthetic third donor']){await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:title,exact:true})}).click();await chooseTool(page,'Level editor');await expect(page.locator('.world-layout canvas')).toBeVisible();}
+ await expect.poll(()=>page.evaluate(()=>(window as any).__retiredView.world.querySelector('canvas')===null)).toBe(true);
+ await expect.poll(()=>page.evaluate(()=>(window as any).__retiredView.gl.isContextLost())).toBe(true);
+ expect(await page.evaluate(()=>(window as any).__retiredView.world.closest('.gs-retained-level-content').dataset.levelGraphics)).toBe('released');
+ const opens=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='open_project'&&c.args.id==='a').length);
+ await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await chooseTool(page,'Level editor');
+ await expect(canvas).toHaveAttribute('data-gs-camera-pose',/.+/);
+ const restored=await canvas.evaluate((element:HTMLCanvasElement)=>({sameEditor:element.closest('.world-layout')===(window as any).__retiredView.world,newCanvas:element!==(window as any).__retiredView.canvas,live:!element.getContext('webgl2')!.isContextLost(),before:(window as any).__retiredView.pose,after:JSON.parse(element.dataset.gsCameraPose!)}));
+ expect(restored.sameEditor).toBe(true);expect(restored.newCanvas).toBe(true);expect(restored.live).toBe(true);
+ for(const key of ['position','quaternion','target'] as const)if(restored.before[key])for(let i=0;i<restored.before[key].length;i++)expect(restored.after[key][i]).toBeCloseTo(restored.before[key][i],4);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='open_project'&&c.args.id==='a').length)).toBe(opens);
+ await chooseTool(page,'Tag editor');await expect(page.getByRole('spinbutton',{name:'Velocity',exact:true})).toHaveValue('34');await page.keyboard.press('Control+z');await expect(page.getByRole('spinbutton',{name:'Velocity',exact:true})).toHaveValue('10');
+});
+
 test('idle level views stop drawing and camera gestures resume without unloading content', async ({page}) => {
   await mockDesktop(page); await openFixture(page); await chooseTool(page, 'Level editor');
   const canvas = page.locator('.world-layout canvas');
