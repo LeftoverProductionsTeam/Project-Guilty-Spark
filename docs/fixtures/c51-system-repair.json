@@ -1,0 +1,894 @@
+{
+  "schemaVersion": 1,
+  "scope": "C51 scoped source/resource/persistence/graphics/header repairs; independent gameplay and release gates remain open",
+  "startingSource": "8055d0033fc2be2e7b1dd9ff70fef66133793b06",
+  "application": {
+    "sourceCommit": "638640454fa92ec7b105acf65cb755b4d319e10c",
+    "version": "0.4.1",
+    "bytes": 42268160,
+    "sha256": "fea8e1906a011303932f2faf41351e28bb9a006a87fc7fb5edc86fecbff7efe2",
+    "path": "target/release/GuiltySpark.exe",
+    "packageStatus": "Tested local standalone development executable; not an installer or public Release"
+  },
+  "preservation": {
+    "existingBranchAndTagRefsUnchanged": 22,
+    "startingCommitIsAncestor": true,
+    "olderRootCheckoutPreserved": true,
+    "sealedC49Source": "cb07581597de11e83d1c10bafad526e8b031f27e",
+    "sealedC49": [
+      {
+        "file": "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe",
+        "bytes": 10107686,
+        "sha256": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749"
+      },
+      {
+        "file": "Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip",
+        "bytes": 13941863,
+        "sha256": "ff6c9e4dea48126680c2a9b8536dfb2185fab5ac445c7d4f306b9bed52e07069"
+      },
+      {
+        "file": "Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip",
+        "bytes": 26186072,
+        "sha256": "c6ea81b25bfae352d76df58557a82daef44b72ba11bf778d0e2eee9f56ae03f0"
+      },
+      {
+        "file": "Project_Guilty_Spark_0.4.1_windows_x64_manifest.json",
+        "bytes": 4879,
+        "sha256": "c00f7afc9b1d57963bbe0234ef4c3c992a574136a27cbf34dca83354fe2a0b52"
+      },
+      {
+        "file": "SHA256SUMS-windows-x64.txt",
+        "bytes": 469,
+        "sha256": "ea47e113b4613c59eea87521a4600bf4a950db1b73e0d51559cee86f0f3cce69"
+      }
+    ]
+  },
+  "tests": {
+    "rust": {
+      "passed": 640,
+      "ignored": 8,
+      "suites": 44,
+      "command": "cargo test --workspace --locked -j 4",
+      "scope": "Final Rust source; later changes are frontend/UI/test documentation only"
+    },
+    "frontend": {
+      "passed": 318,
+      "files": 72
+    },
+    "browser": {
+      "passed": 149,
+      "scope": "Full alpha/corner suite, followed by three focused WebGL/header/complete-silhouette tests after the final corner clamp"
+    },
+    "offline": {
+      "passed": 59
+    },
+    "typecheck": "passed"
+  },
+  "native": {
+    "monitor": {
+      "source": {
+        "sha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+        "monitor": [
+          {
+            "id": 3785621552,
+            "path": "characters\\monitor\\monitor",
+            "class": "bipd"
+          }
+        ]
+      },
+      "alpha": {
+        "width": 96,
+        "height": 96,
+        "opaque": 7017,
+        "lowAlpha": 2131,
+        "max": 255
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 64,
+        "height": 64
+      },
+      "glass": {
+        "parentIsBody": true,
+        "ancestorOpacity": "1",
+        "windowOpacity": "0.35"
+      },
+      "homeReadyBeforeLeaving": 0,
+      "zeroPageErrors": true
+    },
+    "originalPixels": {
+      "applicationSha256": "c7a4878e641bb50c5b74cbc230e762190bfc87fd588a4e7d40174ebac5c20283",
+      "sourceCommit": "be56e1311e35f3afe9bfe247e7fd385cd1eb7ad6",
+      "scope": "Same native readers and renderer as final application; final change only clamps the corner position",
+      "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "originalShaderBindings": 135,
+      "independentlyDecodedImages": 100,
+      "compatibleBindings": 0,
+      "lightmaps": 15,
+      "detailSlots": 177,
+      "reflectionCubes": 57,
+      "remainingReflectionIssue": "halo3\\weapons\\bottle-nade\\bottle-glass++: No exact tag/image path in the selected resource index; fuzzy matching refused",
+      "originalAndPreservedSourceUnchanged": true,
+      "toolFreeDefaultNativeMaterials": 2
+    },
+    "audio": {
+      "applicationSha256": "e589a6152cddc027204bc13eca042051d2c006e9fc1362e1792a91aa6120dc3e",
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "samples": 21,
+      "encodedBytes": 1167696,
+      "compiledSha256": "17642e70d32709cc7b330a8e85b53f7983ebf0ebadb62990818a26358d7128b5",
+      "emitterPosition": [
+        2,
+        3,
+        1
+      ],
+      "nativeCompileMs": 26123,
+      "wholeLoopPreserved": true,
+      "editorMuteSeparate": true,
+      "ownerNativeFilesPreserved": 2249,
+      "corruptionRefused": true,
+      "corruptionToolAttribution": null,
+      "previousGoodBuildPreserved": true,
+      "gameplayListeningVerified": false
+    },
+    "sourceIdentity": {
+      "installedRuntimes": 4,
+      "zeroPageErrors": true,
+      "fullCeExternalBitmapTagBodies": false
+    }
+  },
+  "performance": {
+    "conditions": {
+      "profile": "fresh library and WebView profile; process-cold, not flushed OS disk cache",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "focusEmulation": true,
+      "qualityUnchanged": true,
+      "capturePixelProof": true,
+      "nativeBase64Supported": true,
+      "mapViewport": {
+        "width": 1428,
+        "height": 888
+      },
+      "contentViewport": {
+        "width": 1428,
+        "height": 888
+      },
+      "afterMapViewport": {
+        "width": 1428,
+        "height": 888
+      }
+    },
+    "beforeApplicationSha256": [
+      "ca80a3cd46e302ddc0296850be855e7816a072a4c6b8b51b86b996a761d6b287"
+    ],
+    "afterApplicationSha256": [
+      "4afa59ad34c9e2920cc333b406706ff5a3d0090c6080f94a86d68f627f114700"
+    ],
+    "measurementSource": "d732667",
+    "medians": {
+      "processColdShellMs": {
+        "before": 1122.33795,
+        "after": 1069.7977
+      },
+      "warmProcessShellMs": {
+        "before": 855.1497000000018,
+        "after": 867.672249999996
+      },
+      "processColdShowcaseMs": {
+        "before": 3905.6037,
+        "after": 3840.2649
+      },
+      "warmProcessShowcaseMs": {
+        "before": 2867.5058500000014,
+        "after": 2884.8675999999978
+      },
+      "pollingIpcMs": {
+        "before": 1.8915999999999258,
+        "after": 2.1645999999999503
+      },
+      "openProjectIpcMs": {
+        "before": 109.5,
+        "after": 110.39999999850988
+      },
+      "repeatSwitchMs": {
+        "before": 1018.806899999996,
+        "after": 1003.8325000000004
+      },
+      "repeatBitmapDecodeMs": {
+        "before": 0,
+        "after": 0
+      },
+      "repeatCubeRequests": {
+        "before": 0,
+        "after": 0
+      },
+      "renderingFps": {
+        "before": 59.70202450912137,
+        "after": 59.70202450912137
+      }
+    },
+    "phaseTimes": {
+      "showcase-first-initialization": {
+        "before": [
+          2718.3635999999997,
+          2670.7306999999996
+        ],
+        "after": [
+          2697.0731000000005,
+          2669.7119
+        ],
+        "beforeMedian": 2694.5471499999994,
+        "afterMedian": 2683.3925,
+        "betterWhen": "lower",
+        "improvementPercent": 0.4139712307502021
+      },
+      "native-import-1": {
+        "before": [
+          282.0042000000012,
+          266.1199999999999
+        ],
+        "after": [
+          285.1206999999995,
+          276.46669999999995
+        ],
+        "beforeMedian": 274.06210000000056,
+        "afterMedian": 280.7936999999997,
+        "betterWhen": "lower",
+        "improvementPercent": -2.4562316350926117
+      },
+      "native-import-2": {
+        "before": [
+          2094.9007,
+          1925.6975000000002
+        ],
+        "after": [
+          2110.5283999999992,
+          2037.1844
+        ],
+        "beforeMedian": 2010.2991000000002,
+        "afterMedian": 2073.8563999999997,
+        "betterWhen": "lower",
+        "improvementPercent": -3.161584263754557
+      },
+      "first-textured-map-1": {
+        "before": [
+          8226.0544,
+          8191.4274000000005
+        ],
+        "after": [
+          8180.2228,
+          8164.144700000001
+        ],
+        "beforeMedian": 8208.7409,
+        "afterMedian": 8172.18375,
+        "betterWhen": "lower",
+        "improvementPercent": 0.4453441818342755
+      },
+      "first-textured-map-2": {
+        "before": [
+          14666.731599999996,
+          14868.891500000002
+        ],
+        "after": [
+          12828.363299999997,
+          15101.0959
+        ],
+        "beforeMedian": 14767.811549999999,
+        "afterMedian": 13964.729599999999,
+        "betterWhen": "lower",
+        "improvementPercent": 5.438056595460821
+      },
+      "map-switch-1-to-1": {
+        "before": [
+          1032.366900000001,
+          1004.0612999999939
+        ],
+        "after": [
+          996.6589000000022,
+          1029.6995000000024
+        ],
+        "beforeMedian": 1018.2140999999974,
+        "afterMedian": 1013.1792000000023,
+        "betterWhen": "lower",
+        "improvementPercent": 0.49448342936864825
+      },
+      "map-switch-2-to-2": {
+        "before": [
+          1056.5970000000016,
+          999.7669000000024
+        ],
+        "after": [
+          1041.2929000000004,
+          940.8115000000034
+        ],
+        "beforeMedian": 1028.181950000002,
+        "afterMedian": 991.0522000000019,
+        "betterWhen": "lower",
+        "improvementPercent": 3.6112042231435777
+      },
+      "map-switch-3-to-1": {
+        "before": [
+          1011.3220999999976,
+          993.5673999999999
+        ],
+        "after": [
+          981.1104999999952,
+          1011.0060999999987
+        ],
+        "beforeMedian": 1002.4447499999987,
+        "afterMedian": 996.058299999997,
+        "betterWhen": "lower",
+        "improvementPercent": 0.6370874803825144
+      },
+      "map-switch-4-to-2": {
+        "before": [
+          1026.2916999999943,
+          1042.024400000002
+        ],
+        "after": [
+          1037.3646999999983,
+          990.6474000000017
+        ],
+        "beforeMedian": 1034.1580499999982,
+        "afterMedian": 1014.00605,
+        "betterWhen": "lower",
+        "improvementPercent": 1.9486383150040034
+      },
+      "large-asset-catalog": {
+        "before": [
+          3182.217300000004,
+          3048.034999999996
+        ],
+        "after": [
+          3096.6177000000025,
+          3755.571799999998
+        ],
+        "beforeMedian": 3115.12615,
+        "afterMedian": 3426.09475,
+        "betterWhen": "lower",
+        "improvementPercent": -9.982536341265028
+      },
+      "showcase-warm-return": {
+        "before": [
+          967.4138999999996,
+          988.2822000000015
+        ],
+        "after": [
+          987.6303999999946,
+          998.5691999999981
+        ],
+        "beforeMedian": 977.8480500000005,
+        "afterMedian": 993.0997999999963,
+        "betterWhen": "lower",
+        "improvementPercent": -1.5597259717392493
+      },
+      "showcase-warm-process": {
+        "before": [
+          1998.2425999999978,
+          1990.7472000000053
+        ],
+        "after": [
+          2001.522800000006,
+          1990.2229000000007
+        ],
+        "beforeMedian": 1994.4949000000015,
+        "afterMedian": 1995.8728500000034,
+        "betterWhen": "lower",
+        "improvementPercent": -0.06908766725860634
+      }
+    },
+    "counters": {
+      "showcase-process-cpu-gpu-memory": {
+        "cpuMachinePercent": {
+          "before": [
+            1.1575979585116891,
+            1.8389184836471753
+          ],
+          "after": [
+            0.914963545790446,
+            1.6634137686302342
+          ],
+          "beforeMedian": 1.4982582210794322,
+          "afterMedian": 1.2891886572103401,
+          "betterWhen": "lower",
+          "improvementPercent": 13.954174315724174
+        },
+        "residentMiB": {
+          "before": [
+            801.4140625,
+            805.03515625
+          ],
+          "after": [
+            790.6875,
+            680.4140625
+          ],
+          "beforeMedian": 803.224609375,
+          "afterMedian": 735.55078125,
+          "betterWhen": "lower",
+          "improvementPercent": 8.425268266824883
+        },
+        "privateMiB": {
+          "before": [
+            752.94921875,
+            738.4609375
+          ],
+          "after": [
+            718.0078125,
+            630.7421875
+          ],
+          "beforeMedian": 745.705078125,
+          "afterMedian": 674.375,
+          "betterWhen": "lower",
+          "improvementPercent": 9.565454254965283
+        },
+        "gpu3DPercent": {
+          "before": [
+            7,
+            8
+          ],
+          "after": [
+            7,
+            7
+          ],
+          "beforeMedian": 7.5,
+          "afterMedian": 7,
+          "betterWhen": "lower",
+          "improvementPercent": 6.666666666666667
+        },
+        "gpuDedicatedMiB": {
+          "before": [
+            149.15234375,
+            175.7890625
+          ],
+          "after": [
+            140.81640625,
+            174.93359375
+          ],
+          "beforeMedian": 162.470703125,
+          "afterMedian": 157.875,
+          "betterWhen": "lower",
+          "improvementPercent": 2.8286349702470397
+        }
+      },
+      "map-1-process-cpu-gpu-memory": {
+        "cpuMachinePercent": {
+          "before": [
+            3.372405400440852,
+            2.7326491163475697
+          ],
+          "after": [
+            2.9017447725605283,
+            2.3652522935779814
+          ],
+          "beforeMedian": 3.052527258394211,
+          "afterMedian": 2.633498533069255,
+          "betterWhen": "lower",
+          "improvementPercent": 13.72727218643699
+        },
+        "residentMiB": {
+          "before": [
+            1581.42578125,
+            1588.3671875
+          ],
+          "after": [
+            1530.18359375,
+            1598.73828125
+          ],
+          "beforeMedian": 1584.896484375,
+          "afterMedian": 1564.4609375,
+          "betterWhen": "lower",
+          "improvementPercent": 1.289393160781646
+        },
+        "privateMiB": {
+          "before": [
+            1516.65625,
+            1496.56640625
+          ],
+          "after": [
+            1442.9296875,
+            1509.05078125
+          ],
+          "beforeMedian": 1506.611328125,
+          "afterMedian": 1475.990234375,
+          "betterWhen": "lower",
+          "improvementPercent": 2.0324481290146945
+        },
+        "gpu3DPercent": {
+          "before": [
+            14,
+            10
+          ],
+          "after": [
+            10,
+            13
+          ],
+          "beforeMedian": 12,
+          "afterMedian": 11.5,
+          "betterWhen": "lower",
+          "improvementPercent": 4.166666666666667
+        },
+        "gpuDedicatedMiB": {
+          "before": [
+            195.51953125,
+            195.04296875
+          ],
+          "after": [
+            195.30859375,
+            195.16796875
+          ],
+          "beforeMedian": 195.28125,
+          "afterMedian": 195.23828125,
+          "betterWhen": "lower",
+          "improvementPercent": 0.022003520563290125
+        }
+      },
+      "map-2-process-cpu-gpu-memory": {
+        "cpuMachinePercent": {
+          "before": [
+            8.776882336757154,
+            8.323383541513593
+          ],
+          "after": [
+            8.454466250917095,
+            8.339986313868613
+          ],
+          "beforeMedian": 8.550132939135374,
+          "afterMedian": 8.397226282392854,
+          "betterWhen": "lower",
+          "improvementPercent": 1.7883541440933697
+        },
+        "residentMiB": {
+          "before": [
+            2302.66015625,
+            2520.74609375
+          ],
+          "after": [
+            2399.27734375,
+            3065.08203125
+          ],
+          "beforeMedian": 2411.703125,
+          "afterMedian": 2732.1796875,
+          "betterWhen": "lower",
+          "improvementPercent": -13.288391891103927
+        },
+        "privateMiB": {
+          "before": [
+            2371.09375,
+            2598.796875
+          ],
+          "after": [
+            2448.91015625,
+            3120.84765625
+          ],
+          "beforeMedian": 2484.9453125,
+          "afterMedian": 2784.87890625,
+          "betterWhen": "lower",
+          "improvementPercent": -12.07002794955875
+        },
+        "gpu3DPercent": {
+          "before": [
+            12,
+            10
+          ],
+          "after": [
+            10,
+            12
+          ],
+          "beforeMedian": 11,
+          "afterMedian": 11,
+          "betterWhen": "lower",
+          "improvementPercent": 0
+        },
+        "gpuDedicatedMiB": {
+          "before": [
+            423.71484375,
+            423.9296875
+          ],
+          "after": [
+            423.359375,
+            423.49609375
+          ],
+          "beforeMedian": 423.822265625,
+          "afterMedian": 423.427734375,
+          "betterWhen": "lower",
+          "improvementPercent": 0.09308884454623796
+        }
+      },
+      "repeat-switch-memory": {
+        "cpuMachinePercent": {
+          "before": [
+            8.65037060761347,
+            7.4052132701421804
+          ],
+          "after": [
+            7.792482613469985,
+            7.233796296296297
+          ],
+          "beforeMedian": 8.027791938877826,
+          "afterMedian": 7.513139454883141,
+          "betterWhen": "lower",
+          "improvementPercent": 6.4108846855169785
+        },
+        "residentMiB": {
+          "before": [
+            2263.92578125,
+            2498.359375
+          ],
+          "after": [
+            2393.3125,
+            3067.67578125
+          ],
+          "beforeMedian": 2381.142578125,
+          "afterMedian": 2730.494140625,
+          "betterWhen": "lower",
+          "improvementPercent": -14.67159361683803
+        },
+        "privateMiB": {
+          "before": [
+            2345.40234375,
+            2594.01171875
+          ],
+          "after": [
+            2454.0703125,
+            3154.9609375
+          ],
+          "beforeMedian": 2469.70703125,
+          "afterMedian": 2804.515625,
+          "betterWhen": "lower",
+          "improvementPercent": -13.556611756518437
+        },
+        "gpu3DPercent": {
+          "before": [
+            12,
+            12
+          ],
+          "after": [
+            11,
+            12
+          ],
+          "beforeMedian": 12,
+          "afterMedian": 11.5,
+          "betterWhen": "lower",
+          "improvementPercent": 4.166666666666667
+        },
+        "gpuDedicatedMiB": {
+          "before": [
+            425.09375,
+            429.57421875
+          ],
+          "after": [
+            425.54296875,
+            424.828125
+          ],
+          "beforeMedian": 427.333984375,
+          "afterMedian": 425.185546875,
+          "betterWhen": "lower",
+          "improvementPercent": 0.5027537192349002
+        }
+      },
+      "after-maps-home-memory": {
+        "cpuMachinePercent": {
+          "before": [
+            0.8654911373707532,
+            0.9754786348501665
+          ],
+          "after": [
+            0.5759307040176925,
+            0.9776487764182424
+          ],
+          "beforeMedian": 0.9204848861104599,
+          "afterMedian": 0.7767897402179675,
+          "betterWhen": "lower",
+          "improvementPercent": 15.610809917768563
+        },
+        "residentMiB": {
+          "before": [
+            2722.7109375,
+            2971.21875
+          ],
+          "after": [
+            2771.19140625,
+            3053.66015625
+          ],
+          "beforeMedian": 2846.96484375,
+          "afterMedian": 2912.42578125,
+          "betterWhen": "lower",
+          "improvementPercent": -2.299323704109228
+        },
+        "privateMiB": {
+          "before": [
+            2965.921875,
+            3222.14453125
+          ],
+          "after": [
+            2999.328125,
+            3295.8515625
+          ],
+          "beforeMedian": 3094.033203125,
+          "afterMedian": 3147.58984375,
+          "betterWhen": "lower",
+          "improvementPercent": -1.7309652841122498
+        },
+        "gpu3DPercent": {
+          "before": [
+            8,
+            8
+          ],
+          "after": [
+            8,
+            8
+          ],
+          "beforeMedian": 8,
+          "afterMedian": 8,
+          "betterWhen": "lower",
+          "improvementPercent": 0
+        },
+        "gpuDedicatedMiB": {
+          "before": [
+            560.42578125,
+            562.98828125
+          ],
+          "after": [
+            561.63671875,
+            566.07421875
+          ],
+          "beforeMedian": 561.70703125,
+          "afterMedian": 563.85546875,
+          "betterWhen": "lower",
+          "improvementPercent": -0.3824836401315744
+        }
+      },
+      "warm-process-memory": {
+        "cpuMachinePercent": {
+          "before": [
+            0.5033827319587628,
+            1.1505891016200294
+          ],
+          "after": [
+            0.8158713221939702,
+            1.322093395536041
+          ],
+          "beforeMedian": 0.826985916789396,
+          "afterMedian": 1.0689823588650056,
+          "betterWhen": "lower",
+          "improvementPercent": -29.262462293809225
+        },
+        "residentMiB": {
+          "before": [
+            764.71875,
+            766.66015625
+          ],
+          "after": [
+            653.21875,
+            646.640625
+          ],
+          "beforeMedian": 765.689453125,
+          "afterMedian": 649.9296875,
+          "betterWhen": "lower",
+          "improvementPercent": 15.118370137207837
+        },
+        "privateMiB": {
+          "before": [
+            710.17578125,
+            729.35546875
+          ],
+          "after": [
+            618.94140625,
+            604.78125
+          ],
+          "beforeMedian": 719.765625,
+          "afterMedian": 611.861328125,
+          "betterWhen": "lower",
+          "improvementPercent": 14.991587973515685
+        },
+        "gpu3DPercent": {
+          "before": [
+            7,
+            7
+          ],
+          "after": [
+            7,
+            7
+          ],
+          "beforeMedian": 7,
+          "afterMedian": 7,
+          "betterWhen": "lower",
+          "improvementPercent": 0
+        },
+        "gpuDedicatedMiB": {
+          "before": [
+            147.30859375,
+            147.59375
+          ],
+          "after": [
+            147.109375,
+            147.21875
+          ],
+          "beforeMedian": 147.451171875,
+          "afterMedian": 147.1640625,
+          "betterWhen": "lower",
+          "improvementPercent": 0.19471488178025034
+        }
+      }
+    },
+    "save": {
+      "before": {
+        "runs": 2,
+        "saves": 20,
+        "medianFrontendCommitMs": 34.50000000372529,
+        "bootstrapCalls": 20,
+        "uniquePeriodicSnapshotsPerTenCalls": [
+          10,
+          10
+        ]
+      },
+      "after": {
+        "runs": 2,
+        "saves": 20,
+        "medianFrontendCommitMs": 23.150000002235174,
+        "bootstrapCalls": 0,
+        "uniquePeriodicSnapshotsPerTenCalls": [
+          1,
+          1
+        ]
+      }
+    },
+    "graphicsBudget": {
+      "warmMapLimitPerWindow": 2,
+      "beforeApplicationSha256": "ca80a3cd46e302ddc0296850be855e7816a072a4c6b8b51b86b996a761d6b287",
+      "afterApplicationSha256": "341eb07cd5ad88f7186ef50f227c8fe7492370f700a21d48fe6530d92584bf94",
+      "measurementSource": "7a43be7",
+      "before": {
+        "afterThreeMaps": {
+          "workingSetBytes": 3003039744,
+          "privateBytes": 3173093376,
+          "gpuDedicatedBytes": 565841920
+        },
+        "afterRepeatVisits": {
+          "workingSetBytes": 2954489856,
+          "privateBytes": 3162529792,
+          "gpuDedicatedBytes": 601583616
+        }
+      },
+      "after": {
+        "afterThreeMaps": {
+          "workingSetBytes": 3033010176,
+          "privateBytes": 3026079744,
+          "gpuDedicatedBytes": 406159360
+        },
+        "afterRepeatVisits": {
+          "workingSetBytes": 3401928704,
+          "privateBytes": 3385712640,
+          "gpuDedicatedBytes": 434778112
+        }
+      },
+      "restoreMs": {
+        "before": 1061.3588999999993,
+        "after": 1564.9661999999953
+      },
+      "editorAndAuthorHistoryRetained": true,
+      "aggregateCpuPayloadBudgetComplete": false
+    },
+    "caveats": [
+      "Two fresh profiles per performance/save executable; process-cold does not flush Windows disk cache.",
+      "Earlier save/resource and GPU repair checkpoints were measured separately; these numbers are not all from the final corner executable.",
+      "RAM did not improve and no long-session plateau or whole-process memory cap is claimed.",
+      "First unmatched-viewport profile, unsupported CE pixel trial, stale fixed-count texture test and development-server build trial remain preserved."
+    ]
+  },
+  "remaining": [
+    "CE external bitmap-tag body decoding",
+    "Player-driven Firefight placement/navigation/combat",
+    "Automatic original Zombie carrier release",
+    "Aggregate retained CPU-payload budget",
+    "Human two-way Timberland/Sidewinder tunnel traversal",
+    "Actual target-game MCC audio listening",
+    "Two-computer LAN/VPN and fault-free game-peer AI",
+    "Broader structural cache and non-MCC live writes",
+    "Owner source push/draft asset verification/publication approval and verified Linux startup"
+  ]
+}

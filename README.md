@@ -29,16 +29,19 @@ An open-source Halo 1 creation and interoperability studio combining native modd
 - Actual installed Xbox `a10` decoding: **364,774 render triangles, nine BSP parts, 70 model types, 425 requested images with no failures, 17 reflection cubes and three sound previews** in the C51 reader run. Full engine rendering/audio parity is not claimed.
 - A zombie exits its original carrier alive, moves under active AI, advances animation, takes damage, dies and is cleaned up in two independent three-cycle native runs. One animation reference is repaired; automatic release and visual/combat acceptance remain open.
 - Source-preserving external-tool handoff and semantic reconciliation, supported custom native tag names, Smart Edit copies and recoverable revisions.
+- Incremental map saves with author history retained; unchanged periodic snapshots reuse their verified checkpoint. Two matched native runs reduced median save completion from **34.5 to 23.2 ms**, with no full-library bootstrap per save.
+- Two warm map renderers per window, with older GPU views released while the editor, camera, selection and undo stay available. Whole-process RAM budgeting remains unfinished.
+- A real owned Halo monitor for the corner menu, independent of the Home showcase. Solid model coverage, curved-corner placement and window-transparency separation are verified in the native app.
 - A native Windows application and a sealed, locally accepted **0.4.1 C49 installer/portable candidate**. Public release upload and approval remain pending.
 
-[C51 native results and corrections](docs/CONTINUATION_51_ENGINEERING.md) · [C50 regressions/performance](docs/CONTINUATION_50_ENGINEERING.md) · [BSP Workshop](docs/BSP_WORKSHOP.md) · [C48 collaboration evidence](docs/CONTINUATION_48_ENGINEERING.md).
+[C51 system audit, repairs and measured limits](docs/C51_SYSTEM_REPAIR.md) · [C51 native gameplay results](docs/CONTINUATION_51_ENGINEERING.md) · [C50 regressions/performance](docs/CONTINUATION_50_ENGINEERING.md) · [BSP Workshop](docs/BSP_WORKSHOP.md) · [C48 collaboration evidence](docs/CONTINUATION_48_ENGINEERING.md).
 
 ## Four Halo runtimes, explicit capabilities
 
 | Capability | MCC Halo 1 | Custom Edition | OpenCE | ChupathingyCE |
 | --- | --- | --- | --- | --- |
 | Installation discovery | Tested locally | Tested locally | Tested locally | Tested locally |
-| Maps/BSPs/textures/tags | Cache 13 reader and compatible resources | Classic/CE reader; pinned shared resources | Owned Xbox/CE sources; Xbox preview path | Actual installed Xbox `a10` verified; internal pixels need no `bitmaps.map` |
+| Maps/BSPs/textures/tags | Cache 13 reader and compatible resources | Native metadata/geometry and pinned resources; CE external bitmap-tag bodies remain a preview blocker | Owned Xbox/CE sources; Xbox preview path | Actual installed Xbox `a10` verified; internal pixels need no `bitmaps.map` |
 | Sound previews | Exact supported classic bank samples; other codecs limited | Supported embedded/pinned samples | Supported original Xbox samples | Supported original Xbox samples |
 | Editing/builds | Supported direct scalar/placement copies and native source builds | Native loose tags, geometry and Tool builds | Compatible source toolchain; engine-specific validation | Format-specific source work; broad conversion unfinished |
 | Converted gameplay | Map-specific builds; full Zombie gameplay open | Original conversion loads; original spawning gameplay open | Commanded actor lifecycle and native round tests; full restoration open | Broad converted gameplay not accepted |

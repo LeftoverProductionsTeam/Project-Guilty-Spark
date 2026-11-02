@@ -4,7 +4,7 @@ Work remains on local `master` in `D:\Project Guilty Spark\.local\c39-native-col
 
 Suggested push summary:
 
-**C51: advance native Firefight rounds and original Zombie diagnostics; preserve gameplay gates and present Spark's flagships**
+**C51: validate native workflows, repair source identity and retained editors, and polish the real Spark corner menu**
 
 Description:
 
@@ -15,6 +15,14 @@ Description:
 - Surface eight flagship areas and all twelve engineering tracks in Home, Features, README and the roadmap, with scoped availability and explicit gameplay limits.
 - Fix the home model's rightward cursor range; retain its left-facing rest pose and authored animation. Compact empty-library guidance without shrinking render workload. Preserve the native failures that revealed both issues.
 - Record final native UI/model acceptance, four comparable performance profiles, regression results, unchanged historical ledger bytes and sealed package hashes.
+- Reuse validated library receipts for incremental saves, retaining late edits and author history. Reuse verified unchanged periodic checkpoints while preserving explicit recovery snapshots.
+- Bind texture planning/native build inspection to the actual preserved source, share bounded discovery roots, and keep partially recovered original pixels ahead of compatible previews. Preserve the newly demonstrated CE external bitmap-tag-body limitation.
+- Bound warm GPU map views to two per window without discarding editors, camera sessions, selection or undo. Record the dedicated-GPU reduction and the still-unresolved CPU RAM budget separately.
+- Remove the unused raw live-batch IPC exposure while retaining the internal Smart Edit helper and independently validated inspector operations. Retire only three proven-dead presentation helpers; retain public APIs and experimental code.
+- Reserve usable tab space/overflow actions and show the actual owned monitor as the corner menu. Repair the postprocessing opacity mask, keep Spark above window glass, and clear the legacy margin that prevented leftward placement.
+- Repeat native MCC emitter compilation/readback and corrupt-import refusal. Compare exact decoded original shader identities instead of a stale fixed count. Keep actual game audio listening, automatic Zombie release, human tunnel traversal and two-computer/shared-AI gates open.
+
+[System inventory, before/after timings, native failures and final source/artifact identities](C51_SYSTEM_REPAIR.md) · [Metadata-only receipt](fixtures/c51-system-repair.json).
 
 Application source checkpoints:
 
@@ -30,7 +38,7 @@ Validation: **636 Rust passed / eight owner opt-ins ignored; 311 frontend; 143 b
 
 ## Executable and package identities
 
-The C51 development executable is `target/release/GuiltySpark.exe`, **42,098,176 bytes**, SHA-256 **`ca80a3cd46e302ddc0296850be855e7816a072a4c6b8b51b86b996a761d6b287`**. It is a tested local development binary, not an installer or new public release.
+The final standalone C51 repair executable is `target/release/GuiltySpark.exe`, **42,268,160 bytes**, SHA-256 **`fea8e1906a011303932f2faf41351e28bb9a006a87fc7fb5edc86fecbff7efe2`**, built from **`638640454fa92ec7b105acf65cb755b4d319e10c`**. Native opaque-monitor/full-silhouette acceptance passes on this exact binary; settled original-texture checks pass on its `be56e13` predecessor with identical readers/rendering. The final change only clamps the corner image inside the native window. It is a local development executable, not an installer or new public release. The preceding **42,098,176-byte** C51 executable, SHA **`ca80a3cd46e302ddc0296850be855e7816a072a4c6b8b51b86b996a761d6b287`**, remains preserved as the before-measurement baseline.
 
 The sealed **0.4.1 C49** installer remains `.local/releases/C49-preview-cb07581/Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe`, source **`cb07581597de11e83d1c10bafad526e8b031f27e`**, SHA-256 **`6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749`**. Its portable ZIP, source ZIP, manifest and checksum file are rechecked unchanged. [Exact table](CONTINUATION_51_ENGINEERING.md#distribution-and-protected-artifacts). C51 has no new NSIS/portable/source release bundle; Linux packages remain unverified.
 
@@ -41,4 +49,4 @@ The sealed **0.4.1 C49** installer remains `.local/releases/C49-preview-cb07581/
 3. Use the existing `.github/workflows/release.yml` draft-only process against a known pushed source. For the sealed C49 candidate, retain its source identity above and choose a new unused preview identifier. A future C51 package must identify its own source; never substitute it under C49 or overwrite `alpha`.
 4. Verify real attached installer, portable, manifest and checksum downloads. Obtain owner approval before public publication. Temporary Actions artifacts do not satisfy distribution.
 
-Anonymous verification still sees public master `f247cbae…` and no public releases. No remote publication or rule change is claimed. [Release procedure](RELEASING.md).
+The preceding C51 checkpoint's anonymous verification saw public master `f247cbae…` and no public releases; it was not repeated during this repair extension. No remote publication or rule change is claimed. [Release procedure](RELEASING.md).
