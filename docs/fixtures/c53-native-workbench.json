@@ -1,0 +1,470 @@
+{
+  "schemaVersion": 1,
+  "continuation": 53,
+  "startingMaster": "5d4c6588faf921d1f85c3277d11b3aaa7c391181",
+  "sourceCommit": "d32b085e0158e6a1fa3a36db51e34bfa2fbe22ee",
+  "application": {
+    "version": "0.4.1",
+    "platform": "Windows x64",
+    "path": "target/release/GuiltySpark.exe",
+    "bytes": 42293248,
+    "sha256": "8b2242b5c5aa832ec198ec41214f25faab36cd983d9b5b1b26f918d162c20165",
+    "build": "pnpm exec tauri build --no-bundle",
+    "newInstallerOrPortable": false
+  },
+  "regressions": {
+    "rust": {
+      "passed": 646,
+      "ignored": 8,
+      "suites": 44
+    },
+    "frontend": {
+      "passed": 331,
+      "files": 78
+    },
+    "browser": {
+      "passed": 149
+    },
+    "offlinePrograms": 59,
+    "nativeAnalysisAndReleaseGuards": 43
+  },
+  "native": {
+    "mockedIpc": false,
+    "sourceInputsUnchanged": true,
+    "maps": [
+      {
+        "name": "C53 native CE",
+        "cacheVersion": 609,
+        "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "models": [
+          {
+            "path": "vehicles\\warthog\\mp_warthog",
+            "textures": 11,
+            "reflections": 4,
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "powerups\\over shield",
+            "textures": 3,
+            "reflections": 2,
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "characters\\cyborg_mp\\cyborg_mp",
+            "textures": 4,
+            "reflections": 2,
+            "orbit": true,
+            "zoom": true
+          }
+        ],
+        "sound": [
+          {
+            "path": "sound\\sfx\\ui\\teleporter_loop",
+            "playingThenStopped": true,
+            "windowsMaximumPeak": 0.4071117
+          }
+        ],
+        "soundLayout": {
+          "soundTop": 129.796875,
+          "lineageHeight": 31,
+          "migrationHeight": 31,
+          "scroll": 0
+        },
+        "worldRetained": true
+      },
+      {
+        "name": "C53 native Demo",
+        "cacheVersion": 6,
+        "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+        "models": [
+          {
+            "path": "sparky\\scenery\\trees\\tree_leafydense_doublewide\\tree_leafydense_doublewide_multires",
+            "textures": 2,
+            "reflections": 0,
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "scenery\\trees\\tree_leafy\\tree_leafy",
+            "textures": 2,
+            "reflections": 0,
+            "orbit": true,
+            "zoom": true
+          }
+        ],
+        "sound": [
+          {
+            "path": "sound\\sfx\\ui\\teleporter_loop",
+            "playingThenStopped": true,
+            "windowsMaximumPeak": 0.4071117
+          }
+        ],
+        "soundLayout": {
+          "soundTop": 129.796875,
+          "lineageHeight": 31,
+          "migrationHeight": 31,
+          "scroll": 0
+        },
+        "worldRetained": true
+      },
+      {
+        "name": "C53 native MCC",
+        "cacheVersion": 13,
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "models": [
+          {
+            "path": "vehicles\\warthog\\mp_warthog",
+            "textures": 11,
+            "reflections": 4,
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "powerups\\over shield",
+            "textures": 3,
+            "reflections": 2,
+            "orbit": true,
+            "zoom": true
+          }
+        ],
+        "sound": [
+          {
+            "path": "sound\\sfx\\ui\\teleporter_loop",
+            "playingThenStopped": true,
+            "windowsMaximumPeak": 0.4071117
+          }
+        ],
+        "soundLayout": {
+          "soundTop": 129.796875,
+          "lineageHeight": 31,
+          "migrationHeight": 31,
+          "scroll": 0
+        },
+        "worldRetained": true
+      },
+      {
+        "name": "C53 native Xbox a10",
+        "cacheVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "models": [
+          {
+            "path": "characters\\cyborg\\cyborg",
+            "textures": 4,
+            "reflections": 2,
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "vehicles\\pelican\\pelican",
+            "textures": 9,
+            "reflections": 1,
+            "orbit": true,
+            "zoom": true
+          }
+        ],
+        "sound": [
+          {
+            "path": "sound\\sfx\\ambience\\emitters\\steam_constant",
+            "playingThenStopped": true,
+            "windowsMaximumPeak": 0.6528391
+          }
+        ],
+        "soundLayout": {
+          "soundTop": 129.796875,
+          "lineageHeight": 31,
+          "migrationHeight": 31,
+          "scroll": 0
+        },
+        "worldRetained": true
+      }
+    ],
+    "history": {
+      "cases": 8,
+      "appSha256": "be4705717daed5f382845850bfcaaa6ebf05a7ce6d564c24e9a20fa658958976"
+    },
+    "tagDrawer": {
+      "cases": [
+        {
+          "name": "Native Object tags drawer edits the same acknowledged project; main map canvas stays resident",
+          "info": {
+            "x": 233,
+            "y": 98,
+            "width": 361.796875,
+            "height": 718
+          },
+          "preview": {
+            "x": 594.796875,
+            "y": 98,
+            "width": 844.203125,
+            "height": 718
+          }
+        },
+        {
+          "name": "Information and model remain side by side at 800 by 600",
+          "extra": 0,
+          "info": 291.421875,
+          "model": 320.578125
+        },
+        {
+          "name": "Return to main restores drawer selection, writer lease and Undo/Redo"
+        },
+        {
+          "name": "Closing the native drawer saves and reattaches the same map without unloading its world"
+        }
+      ],
+      "appSha256": "b2a9b6159404c47667f245a4837c7460eb031918342295ad3085f56c82e530a1"
+    },
+    "portrait": {
+      "complete": true,
+      "mockedIpc": false,
+      "appSha256": "649d22b44782acd84c4f9fb68baab3f35626e9f857686bc3eb15835fca7efc74",
+      "errors": [],
+      "picture": {
+        "width": 256,
+        "height": 256,
+        "sha256": "df26b30ba8fda7932d73bf600892f4d3524109760da40e9eeb2cd745c729db5b"
+      },
+      "bounds": {
+        "frame": {
+          "x": 16,
+          "y": 16,
+          "width": 1484,
+          "height": 934,
+          "right": 1500,
+          "bottom": 950
+        },
+        "monitor": {
+          "x": 0,
+          "y": 0,
+          "width": 64,
+          "height": 64,
+          "right": 64,
+          "bottom": 64
+        },
+        "home": {
+          "x": 95,
+          "y": 21.5,
+          "width": 46.140625,
+          "height": 26,
+          "right": 141.140625,
+          "bottom": 47.5
+        },
+        "breadcrumb": {
+          "x": 93,
+          "y": 63,
+          "width": 179.421875,
+          "height": 24,
+          "right": 272.421875,
+          "bottom": 87
+        },
+        "curve": "36px"
+      },
+      "cachedPictureSurvivesReloadWithoutCornerRenderer": true
+    },
+    "frame": {
+      "schemaVersion": 1,
+      "applicationSha256": "b2a9b6159404c47667f245a4837c7460eb031918342295ad3085f56c82e530a1",
+      "mockedIpc": false,
+      "complete": true,
+      "errors": [],
+      "restored": {
+        "x": 16,
+        "y": 16,
+        "width": 1484,
+        "height": 934,
+        "viewport": [
+          1500,
+          950
+        ],
+        "margin": "16px 0px 0px 16px",
+        "borderRadius": "36px 20px 32px 16px"
+      },
+      "doubleClickMaximized": true,
+      "frameworkDoubleClickRoundTrip": true,
+      "fullscreenUsesCompleteViewportAndRestoresCorner": true,
+      "nativeShadowEnabledInSource": false,
+      "osCompositeVisualVerification": false
+    }
+  },
+  "performance": {
+    "comparableBeforeAfterBenchmark": false,
+    "cachedCornerCanvases": 0,
+    "qualityOmissionAllowed": false,
+    "observation": "Import timings overlapped regression work; no startup, GPU or process-memory improvement is claimed."
+  },
+  "ledger": {
+    "previousRecords": 452,
+    "previousBytes": 970548,
+    "previousSha256": "efb264c42e24b097054560ea9e6f4fc6cbb31e76f1d330a1fdb7903ccd9b73fb",
+    "appendedRecords": 5,
+    "totalRecords": 457
+  },
+  "preservation": {
+    "references": [
+      {
+        "ref": "refs/heads/codex/c37-modders-workbench",
+        "before": "bde73ceb00f42f6dce916a93d9d4c0adb8dae207",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/c38-universal-workbench",
+        "before": "45596d5072b1c115c71132b78e7798c3baa547d0",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/c39-native-asset-transactions",
+        "before": "2a3e779bf7784463df68a24f372aa4b1e5439ccd",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/c39-sparklink-live-studio",
+        "before": "192b2f5cb8a845b17d48a7def66d96ae631bd67a",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/c40-companions-and-consolidation",
+        "before": "72e9fe32d4ed5e8623d05caa3b10e8752456d54f",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/c40-integration-start-20261030",
+        "before": "8c0bed0fcce3fbff7108b53dcee6ef077f253387",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/c41-smart-edit-routing",
+        "before": "96911112af1e9c0f88aa8f94e23ab2f43d870e48",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/consolidation-start-20261030T001853Z",
+        "before": "617d267a8dd8b1c504d47bdaef4c0f338615786e",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-donor-scenery",
+        "before": "be3d3af6062700a768666d6ab5a652b21c668d68",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-hosting-collision",
+        "before": "03686e920cbe2dcf71af7f333ed2de448910f408",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-native-gameplay",
+        "before": "6610adf80f518d4e6a6e49379c990efe1eff0d14",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-resources-and-community",
+        "before": "4da849efaffa9161a369cb1264c260214b5d0d4b",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-33-world-challenges",
+        "before": "520b69c8b8654bd83ad456dce23a8e3a47f409d5",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-34-runtime-integration",
+        "before": "d6bfe25666aad35aa63cd1fdd7082d71ca72119b",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-35-living-workbench",
+        "before": "21804c191a918cbf8bd74efac60dfcec65c9083b",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/continuation-36-one-halo",
+        "before": "489443d7b892b14bda553ed5f4f8d33480ffe78c",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/fix-windows-manifest-paths",
+        "before": "2a3e779bf7784463df68a24f372aa4b1e5439ccd",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/integration-all-continuations",
+        "before": "2a3e779bf7784463df68a24f372aa4b1e5439ccd",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/one-halo-mcc-investigation",
+        "before": "c9c92e33b97f9b85fce2fcccbab28e4bb3f2464b",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/codex/pre-ci-master-20261030",
+        "before": "96911112af1e9c0f88aa8f94e23ab2f43d870e48",
+        "preserved": true
+      },
+      {
+        "ref": "refs/heads/master",
+        "before": "5d4c6588faf921d1f85c3277d11b3aaa7c391181",
+        "preserved": true
+      },
+      {
+        "ref": "refs/tags/Preview",
+        "before": "46a5b893744d439d2ac22250463cd43f8accf790",
+        "preserved": true
+      },
+      {
+        "ref": "refs/tags/alpha",
+        "before": "6b7e1da4c50924a324b6d81771df5dadc2508955",
+        "preserved": true
+      }
+    ],
+    "baselineApplicationPreserved": true,
+    "sealedC49Artifacts": [
+      {
+        "name": "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe",
+        "bytes": 10107686,
+        "sha256": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749"
+      },
+      {
+        "name": "Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip",
+        "bytes": 13941863,
+        "sha256": "ff6c9e4dea48126680c2a9b8536dfb2185fab5ac445c7d4f306b9bed52e07069"
+      },
+      {
+        "name": "Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip",
+        "bytes": 26186072,
+        "sha256": "c6ea81b25bfae352d76df58557a82daef44b72ba11bf778d0e2eee9f56ae03f0"
+      },
+      {
+        "name": "Project_Guilty_Spark_0.4.1_windows_x64_manifest.json",
+        "bytes": 4879,
+        "sha256": "c00f7afc9b1d57963bbe0234ef4c3c992a574136a27cbf34dca83354fe2a0b52"
+      },
+      {
+        "name": "SHA256SUMS-windows-x64.txt",
+        "bytes": 469,
+        "sha256": "ea47e113b4613c59eea87521a4600bf4a950db1b73e0d51559cee86f0f3cce69"
+      }
+    ],
+    "olderDirtyRootUntouched": true,
+    "experimentalAndFailedReceiptsRetained": true
+  },
+  "privateEvidenceDirectory": ".local/c53-functionality-closure-20261102",
+  "remote": {
+    "pushed": false,
+    "published": false,
+    "repositoryRulesChanged": false
+  },
+  "remaining": [
+    "Physical speaker listening and in-game sound",
+    "Full rendering/audio parity and unsupported native asset/shader forms",
+    "Every asset class/runtime import, build and playtest",
+    "Native detach for other drawers",
+    "Comparable startup/load/GPU/RAM optimization and full process-memory budget",
+    "Structural compiled-map editing",
+    "Original automatic Zombie release, unforced Firefight combat and complete AI lifecycle",
+    "Separate-computer LAN/VPN and Steam acceptance",
+    "New Windows/Linux release packages and approved public downloads"
+  ]
+}

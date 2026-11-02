@@ -1,5 +1,14 @@
 # Changelog
 
+## C53 — Native previews and compact tag workspaces
+
+- Decode native CE indexed sounds with bounded exact-bank metadata, codec/rate/channel and sample-span verification. Consolidate audition ownership, cancellation, source/hash checks and compact Play/Stop controls.
+- Place compact tag information beside a full-height model with orbit, pan, zoom, fit and source-bound camera persistence. Share generic transparent shader stages and admit already-supported Xbox model tags in the Tag editor.
+- Detach dragged map tabs and Object tags through the existing single-writer lease and durable journal. Keep the parent map resident; return or close the drawer without losing selection or Undo/Redo.
+- Preserve resource candidates beside explicit identical-map reimports without replacing the original project, source provenance or edits. Keep individual image failures and complete-build gates explicit.
+- Use a cached, straight-on picture of the owner's monitor model in the corner. Give it symmetric clearance outside the curve, independent of Home animation and window tint. Retain fullscreen and native titlebar controls.
+- Preserve all prior history, failed-run evidence and sealed C49 packages. [Acceptance and exact limits](docs/CONTINUATION_53_ENGINEERING.md).
+
 ## C41 home showcase polish
 
 - Render the native monitor at 1.5–2× density with softer lighting, tighter glow and source-color grading. Bias the resting pose left and extend the actual mouse-follow range to both sides.
