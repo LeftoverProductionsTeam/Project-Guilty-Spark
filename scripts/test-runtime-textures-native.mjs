@@ -7,6 +7,8 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { chromium, expect as assertion } from '@playwright/test';
+import {buildMaterialAudit} from '../src/materialAudit.ts';
+import {decodeOwnedBitmapBatch,bitmapImageKey} from '../src/ownedBitmapBatch.ts';
 const expect = assertion.configure({ timeout: 120000 }),
   args = new Map();
 for (let i = 2; i < process.argv.length; i += 2) args.set(process.argv[i], process.argv[i + 1]);
@@ -183,11 +185,36 @@ try {
   if(await navigation.getAttribute('aria-expanded')!=='true')await navigation.click();
   await page.locator('.gs-navigation-drawer').getByRole('button',{name:'Map library',exact:true}).click();
   await page.locator('.map-card').filter({has:page.getByRole('heading',{name:open.project.title,exact:true})}).filter({hasText:'Halo Demo / Trial'}).click();
-  await expect.poll(() => world.getAttribute('data-source-shaders')).toBe('132');
+  // Derive exact expected bindings from this source and freshly validated
+  // original pixels. A fixed count misses both new recovered images and
+  // same-count substitutions; keep the established minimum as a floor.
+  const connected=await call('open_project',{id:open.project.id}),appearance=await call('inspect_source_appearance',{projectId:open.project.id});
+  expect(appearance.sourceSha256).toBe(before);
+  const materialBindings=new Map();
+  for(const mesh of [connected.inspection.renderMesh,...Object.values(connected.inspection.modelMeshes??{}).slice(0,256),appearance.skyMesh])
+    for(const shader of buildMaterialAudit(connected.inspection,mesh).shaders)
+      if(shader.status==='resolved'&&shader.bitmapTagId!=null&&!connected.inspection.tags.find(tag=>tag.id===shader.bitmapTagId)?.external)
+        materialBindings.set(shader.shaderTagId,shader.bitmapTagId);
+  const ids=[...new Set(materialBindings.values())],verified=new Set(),refused=[];
+  for(let at=0;at<ids.length;at+=24){
+    const targets=ids.slice(at,at+24).map(bitmapTagId=>({bitmapTagId,imageIndex:0,sourceSha256:before,resourceSha256:connected.project.source.resourceSha256['bitmaps.map']}));
+    const response=await call('preview_owned_cache_bitmap_batch',{projectId:open.project.id,requests:targets.map(({bitmapTagId,imageIndex})=>({bitmapTagId,imageIndex}))});
+    for(const [key,item] of decodeOwnedBitmapBatch(response,targets)){
+      if(item.image)verified.add(key);else refused.push({bitmapTagId:item.bitmapTagId,reason:item.error});
+    }
+  }
+  const expectedShaderIds=[...materialBindings].filter(([,bitmap])=>verified.has(bitmapImageKey(bitmap,0))).map(([shader])=>shader).sort((a,b)=>a-b);
+  expect(expectedShaderIds.length).toBeGreaterThanOrEqual(132);
+  await expect.poll(async()=>String(await world.getAttribute('data-source-shader-ids')).split(',').filter(Boolean).map(Number).sort((a,b)=>a-b)).toEqual(expectedShaderIds);
+  await expect.poll(() => world.getAttribute('data-source-shaders')).toBe(String(expectedShaderIds.length));
   await expect.poll(() => world.getAttribute('data-compatible-shaders')).toBe('0');
   receipt.originalPack = {
     viewport: await world.evaluate((e) => ({ ...e.dataset })),
     compatiblePreviewsReplacedByOriginals: true,
+    expectedShaderIds,
+    originalResourceSha256:connected.project.source.resourceSha256['bitmaps.map'],
+    independentlyDecodedImages:verified.size,
+    refusedImages:refused,
   };
   expect(await hash(input)).toBe(before);
   expect(await hash(standalone)).toBe(before);
