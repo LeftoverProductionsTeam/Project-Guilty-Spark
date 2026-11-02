@@ -4,7 +4,7 @@ const mock = vi.hoisted(() => ({ call: vi.fn(), retain: vi.fn() }));
 vi.mock('./api', () => ({ call: mock.call }));
 vi.mock('./assetSources', () => ({ retainAssetSource: mock.retain }));
 vi.mock('./forge', () => ({ catalogAssets: (open: { testAssets?: unknown[] }) => open.testAssets ?? [] }));
-import { preloadHomeModels } from './homeShowcase';
+import { preloadHomeModels,isHaloMonitor } from './homeShowcase';
 const bootstrap = (id: string) =>
   ({ dataDirectory: id, installation: { mccPath: 'installed-MCC' }, entries: [] }) as unknown as Bootstrap;
 const model = {
@@ -23,6 +23,10 @@ const source = {
 beforeEach(() => {
   mock.call.mockReset();
   mock.retain.mockReset();
+});
+it('only monitor tag paths qualify as the Spark emblem, independently of a chosen biped',()=>{
+  for(const path of ['characters/monitor/monitor','characters\\monitor\\monitor','characters/343/343'])expect(isHaloMonitor({path})).toBe(true);
+  for(const path of ['characters/cyborg/cyborg','characters/elite/elite','characters/monitoring/chief','weapons/3434/pistol'])expect(isHaloMonitor({path})).toBe(false);
 });
 it('shares one source preparation between preloading and home without retaining decoded pixels', async () => {
   mock.call.mockImplementation(async (command) =>

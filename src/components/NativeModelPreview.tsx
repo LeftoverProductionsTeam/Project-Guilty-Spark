@@ -144,10 +144,12 @@ export default function NativeModelPreview({
   environment,
   onSnapshot,
   showcase = false,
+  animate = true,
 }: {
   asset: Pick<ForgeAsset, 'tagId' | 'sourceProjectId' | 'sourceSha256'>;
   live?: boolean;
   showcase?: boolean;
+  animate?: boolean;
   environment?: EditorEnvironment | null;
   onSnapshot?: (url: string) => void;
 }) {
@@ -156,7 +158,7 @@ export default function NativeModelPreview({
     [asset.sourceProjectId, asset.sourceSha256, asset.tagId],
   );
   const { models, failures } = useOwnedForgeModels([placement]);
-  const animations = useNativeModelAnimations(placement, showcase);
+  const animations = useNativeModelAnimations(placement, showcase&&animate);
   const [clipIndex, setClipIndex] = useState(0);
   const [playing, setPlaying] = useState(() => !matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [animationError, setAnimationError] = useState('');

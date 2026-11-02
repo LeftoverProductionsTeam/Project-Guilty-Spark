@@ -1132,7 +1132,7 @@ export default function App() {
             }
           >
             <button className="brand gs-spark-navigation" onClick={()=>setSidebarOpen(value=>!value)} aria-label="Toggle workspace navigation" aria-expanded={sidebarOpen} aria-controls="gs-workspace-navigation" title="Guilty Spark · workspaces">
-              <SparkEmblem/>
+              <SparkEmblem data={data}/>
             </button>
             <button className="gs-home-button" onClick={()=>setWorkspace('library')} title="Home · your maps and Halo model showcase">HOME</button>
             {documents.documents.length ? (

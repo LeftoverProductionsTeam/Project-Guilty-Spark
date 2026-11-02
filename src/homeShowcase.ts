@@ -6,7 +6,7 @@ import { retainAssetSource } from './assetSources';
 import type { AssetSourceInventory } from './assetSources';
 
 const sources = new Map<string, Promise<ForgeAsset[]>>();
-const isMonitor = (asset: ForgeAsset) => /(?:^|[\\/])(?:monitor|343)[\\/]/i.test(asset.path);
+export const isHaloMonitor = (asset: Pick<ForgeAsset,'path'>) => /(?:^|[\\/])(?:monitor|343)[\\/]/i.test(asset.path);
 function characters(source: OpenProject): ForgeAsset[] {
   const available = catalogAssets(source);
   const featured = available.filter(
@@ -14,7 +14,7 @@ function characters(source: OpenProject): ForgeAsset[] {
       (asset.class==='bipd'||/monitor|343/i.test(asset.path)) && ['bipd', 'scen', 'vehi'].includes(asset.class),
   );
   return (featured.length ? featured : available.filter((asset) => asset.class === 'bipd')).sort(
-    (a, b) => Number(isMonitor(b)) - Number(isMonitor(a)),
+    (a, b) => Number(isHaloMonitor(b)) - Number(isHaloMonitor(a)),
   );
 }
 async function connect(source: OpenProject): Promise<ForgeAsset[]> {
@@ -41,7 +41,7 @@ export function preloadHomeModels(data: Bootstrap): Promise<ForgeAsset[]> {
     if (preserved) {
       try {
         const found = await connect(await call<OpenProject>('open_project', { id: preserved.id }));
-        if (found.some(isMonitor)) return found;
+        if (found.some(isHaloMonitor)) return found;
       } catch {
         /* Original integrity checks remain authoritative; try another source. */
       }
@@ -59,7 +59,7 @@ export function preloadHomeModels(data: Bootstrap): Promise<ForgeAsset[]> {
         }))[0];
         if (source) {
           const found = await connect(source);
-          if (found.some(isMonitor)) return found;
+          if (found.some(isHaloMonitor)) return found;
         }
       }
     } catch {

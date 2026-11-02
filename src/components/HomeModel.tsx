@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { native } from '../api';
 import type { Bootstrap } from '../types';
 import type { ForgeAsset } from '../forge';
-import { preloadHomeModels } from '../homeShowcase';
+import { preloadHomeModels,isHaloMonitor } from '../homeShowcase';
 import NativeModelPreview from './NativeModelPreview';
 import {useMapState} from '../mapSession';
 import {showcaseKey} from './ShowcaseChoice';
@@ -27,7 +27,7 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
           return;
         }
         setModels(choices);
-        const monitor = choices.findIndex((asset) => /(?:^|[\\/])(?:monitor|343)[\\/]/i.test(asset.path));
+        const monitor = choices.findIndex(isHaloMonitor);
         setIndex(monitor >= 0 ? monitor : Math.floor(Math.random() * choices.length));
       })
       .catch((error) => {
@@ -41,7 +41,7 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
   return (
     <div className="home-native-model">
       {model ? (
-        <NativeModelPreview key={showcaseKey(model)} asset={model} showcase onSnapshot={/monitor|343/i.test(model.path)?publishSparkEmblem:undefined}/>
+        <NativeModelPreview key={showcaseKey(model)} asset={model} showcase onSnapshot={isHaloMonitor(model)?publishSparkEmblem:undefined}/>
       ) : (
         <span className="model-preview-loading">{message}</span>
       )}
