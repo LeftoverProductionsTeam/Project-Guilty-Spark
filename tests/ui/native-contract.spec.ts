@@ -652,7 +652,7 @@ test('the single header reserves map-tab space and keeps overflow drawers reacha
   })).toBe(true);
   const tabs=page.getByRole('tablist',{name:'Open maps',exact:true}),active=page.getByRole('tab',{name:'Synthetic candidate',exact:true});
   const bar=await page.locator('.map-tab-bar').boundingBox();expect(bar!.width).toBeGreaterThanOrEqual(168);
-  await expect.poll(async()=>{const list=await tabs.boundingBox(),button=await active.boundingBox();return button!.x>=list!.x-1&&button!.x+button!.width<=list!.x+list!.width+1;}).toBe(true);
+  await expect.poll(async()=>{const list=await tabs.boundingBox(),button=await active.locator('..').boundingBox();return button!.x>=list!.x-1&&button!.x+button!.width<=list!.x+list!.width+1;}).toBe(true);
   const more=page.getByLabel('More workspace drawers',{exact:true});await expect(more).toBeVisible();await more.click();
   const menu=page.getByRole('menu',{name:'Workspace drawers',exact:true});await expect(menu).toBeInViewport();
   await menu.getByRole('menuitemcheckbox',{name:'Object tags',exact:true}).click();await expect(page.getByRole('region',{name:'Object tags panel',exact:true})).toBeVisible();

@@ -19,7 +19,7 @@ export default function MapTabs({
   const tabs = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const list=tabs.current;if(!list)return;
-    const reveal=()=>list.querySelector('[aria-selected="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
+    const reveal=()=>list.querySelector('[aria-selected="true"]')?.closest('.map-tab')?.scrollIntoView({block:'nearest',inline:'nearest'});
     reveal();const observer=new ResizeObserver(reveal);observer.observe(list);
     return()=>observer.disconnect();
   }, [state.activeId,state.documents.length]);
@@ -55,7 +55,7 @@ export default function MapTabs({
               title={d.history.current?.source?.scenarioPath ?? 'Editable source project'}
             >
               {d.history.dirty && <span aria-label="Unsaved changes">● </span>}
-              {d.history.current?.title}
+              <span className="map-tab-title">{d.history.current?.title}</span>
             </button>
             <button
               className="map-tab-action"
