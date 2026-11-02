@@ -35,7 +35,8 @@ try{
  for(const url of await page.locator('script[src]').evaluateAll(nodes=>nodes.map(node=>node.src))){const script=parsed.find(row=>row.url===url);if(!script)throw Error('No native loaded-source record');const {scriptSource}=await cdp.send('Debugger.getScriptSource',{scriptId:script.scriptId});const local=path.join('dist',new URL(url).pathname.replace(/^\//,''));expect(hash(scriptSource)).toBe(hash(await fs.readFile(local)));report.servedSource.push({file:local,sha256:hash(scriptSource)});}
  for(const [width,height,dpi] of [[1440,900,1],[1280,720,1],[960,650,1],[1280,720,1.5]]){
   await cdp.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:dpi,mobile:false});await page.waitForTimeout(150);
-  const layout=await page.evaluate(()=>{const main=document.querySelector('main');return {width:innerWidth,height:innerHeight,bodyOverflow:document.documentElement.scrollWidth>innerWidth+1,workspaceOverflow:main.scrollWidth>main.clientWidth+1,mainScroll:main.scrollHeight-main.clientHeight};});
+  const layout=await page.evaluate(()=>{const main=document.querySelector('main'),libraryScroll=[];for(let e=document.querySelector('.library-page');e;e=e.parentElement)if(/auto|scroll/.test(getComputedStyle(e).overflowY)&&e.clientHeight>0)libraryScroll.push({className:e.className,overflow:e.scrollHeight-e.clientHeight});return {width:innerWidth,height:innerHeight,bodyOverflow:document.documentElement.scrollWidth>innerWidth+1,workspaceOverflow:main.scrollWidth>main.clientWidth+1,mainScroll:main.scrollHeight-main.clientHeight,libraryScroll};});
+  if(height>=900)expect(layout.libraryScroll.every(row=>row.overflow<=1)).toBe(true);
   expect(layout.bodyOverflow).toBe(false);expect(layout.workspaceOverflow).toBe(false);await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();report.layouts.push({...layout,dpi});
  }
  await cdp.send('Emulation.clearDeviceMetricsOverride');await cdp.detach();

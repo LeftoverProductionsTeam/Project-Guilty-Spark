@@ -145,6 +145,22 @@
   margin-top: 10px;
   gap: 5px;
 }
+@media (min-width: 900px) {
+  .application .library-page .import-dropzone {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    grid-template-areas: 'icon title actions' 'icon help actions' 'icon formats actions';
+    align-items: center;
+    gap: 4px 14px;
+    padding: 14px 18px;
+    text-align: left;
+  }
+  .application .library-page .import-dropzone .drop-icon { grid-area: icon; margin: 0; }
+  .application .library-page .import-dropzone h2 { grid-area: title; margin: 0; }
+  .application .library-page .import-dropzone p { grid-area: help; max-width: 65ch; margin: 0; }
+  .application .library-page .import-dropzone .gs-empty-map-actions { grid-area: actions; max-width: 340px; flex-wrap: wrap; }
+  .application .library-page .import-dropzone .supported-formats { grid-area: formats; justify-content: flex-start; margin: 0; }
+}
 .application .home-runtime-strip { gap: 8px; }
 .home-runtime-connections { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; min-width: 0; }
 .home-runtime-connections button { display: flex; align-items: center; gap: 6px; padding: 5px 8px; min-height: 30px; font-size: 11px; border-radius: 7px; }
