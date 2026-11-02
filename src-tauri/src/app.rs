@@ -2601,7 +2601,6 @@ fn live_moves_for(state:&AppState,project_id:&str,document:&quickforge::QuickFor
     }
     Ok((session,moves))
 }
-#[tauri::command]
 async fn live_mcc_apply(app:tauri::AppHandle,project_id:String,document:quickforge::QuickForgeDocument,bindings:Vec<LiveBinding>,expected_session:String)->Reply<Vec<core::live_adapter::MoveReceipt>>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let(session,moves)=live_moves_for(&state,&project_id,&document,&bindings,&expected_session)?;
         crate::live_mcc::moves(&session,&moves).map_err(error)
@@ -2879,7 +2878,6 @@ pub fn run() {
             live_mcc_camera_configure,
             live_mcc_camera_shortcut,
             live_mcc_camera_toggle,
-            live_mcc_apply,
             live_mcc_cleanup_status,
             live_mcc_disconnect,
             live_mcc_move_object,
