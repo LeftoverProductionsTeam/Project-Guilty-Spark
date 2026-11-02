@@ -1,12 +1,7 @@
 import {useEffect,useState} from 'react';
 import {getCurrentWindow} from '@tauri-apps/api/window';
 type ResizeDirection=Parameters<ReturnType<typeof getCurrentWindow>['startResizeDragging']>[0];
-import type {PointerEvent} from 'react';
 import {native} from '../api';
-export async function dragWindow(event:PointerEvent<HTMLElement>){
-  if(!native||event.button!==0||(event.target as HTMLElement).closest('button,a,input,select,textarea,[role="button"]'))return;
-  await getCurrentWindow().startDragging();
-}
 export async function maximizeWindow(){if(native)await getCurrentWindow().toggleMaximize();}
 export function WindowControls({notify,fullscreen=false,onExitFullscreen}:{notify:(message:string)=>void;fullscreen?:boolean;onExitFullscreen?:()=>Promise<void>}){
   const [maximized,setMaximized]=useState(false);

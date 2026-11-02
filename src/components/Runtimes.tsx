@@ -1,4 +1,3 @@
-import LiveObjectInspector from './LiveObjectInspector';
 import BaboonTools from './BaboonTools';
 import ToolEcosystem from './ToolEcosystem';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -783,35 +782,6 @@ function ManifestSummary({ title, manifest }: { title: string; manifest: PeerMan
       </div>
       <pre>{JSON.stringify(manifest, null, 2)}</pre>
     </details>
-  );
-}
-
-export function LiveLab({ onBuild, onQuickForge }: { onBuild: () => void; onQuickForge: () => void }) {
-  return (
-    <div className="analysis-page">
-      <PageTitle
-        eyebrow="LIVE LAB / BRIDGE STATUS"
-        title="Live source editing & engine bridge"
-        description="Connect the supported MCC Halo 1 build for live object position and size controls, or use QuickForge for shared source editing."
-      />
-      <LiveObjectInspector/>
-      <section className="analysis-card">
-        <h2>Available workflow</h2>
-        <ol className="workflow-steps">
-          <li>Edit audited tag fields and source placements in the workbench.</li>
-          <li>Save the project and run the configured extraction / rebuild pipeline.</li>
-          <li>Review validation and packaging results before manually testing in the intended runtime.</li>
-        </ol>
-        <button className="small-button" title="Open QuickForge: edit source geometry and immediately walk the regenerated triangles." onClick={onQuickForge}>Open live source editor</button>
-        <button className="primary" onClick={onBuild}>
-          Open Build &amp; playtest
-        </button>
-        <p className="subtle">
-          Rebuild status is file validation evidence. It does not certify visual behavior, collision, AI,
-          multiplayer or VR in a running game.
-        </p>
-      </section>
-    </div>
   );
 }
 

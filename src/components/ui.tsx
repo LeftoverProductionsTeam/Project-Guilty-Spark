@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {createPortal} from 'react-dom';
-import { AlertTriangle, Check, ChevronRight, X } from 'lucide-react';
+import { AlertTriangle, Check, X } from 'lucide-react';
 export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?: string }) {
   return <span className={`pill ${tone}`}>{children}</span>;
 }
@@ -189,16 +189,6 @@ export function Toast({ message, tone, onClose }: { message: string; tone: strin
     </div>
   );
 }
-export function Breadcrumb({ section, title }: { section: string; title: string }) {
-  return (
-    <div className="breadcrumb">
-      <span>{section}</span>
-      <ChevronRight size={12} />
-      <span>{title}</span>
-    </div>
-  );
-}
-
 /**
  * Hover, keyboard focus and touch-accessible help. Escape hides the popup
  * without moving focus; focusing or hovering again reopens it.
