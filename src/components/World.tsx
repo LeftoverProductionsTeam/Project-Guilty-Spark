@@ -55,7 +55,7 @@ import { loadUserShaderTexture } from '../haloTexture';
 import { decodeHaloDds } from '../haloDds';
 import { call, native } from '../api';
 import { decodeOwnedBitmapPreview } from '../ownedBitmapPreview';
-import { MAX_OWNED_PREVIEWS_PER_CLICK, planOwnedMaterialPreviews } from '../ownedMaterialBatch';
+import { MAX_OWNED_PREVIEWS_PER_CLICK, planOwnedMaterialPreviews,canRequestBitmapMetadata } from '../ownedMaterialBatch';
 import type { OwnedMaterialPreviewTask } from '../ownedMaterialBatch';
 import {bitmapImageKey, decodeOwnedBitmapBatch, uniqueBitmapTargets, MAX_NATIVE_BATCH_RGBA_BYTES} from '../ownedBitmapBatch';
 import type {OwnedBitmapBatchResponse} from '../ownedBitmapBatch';
@@ -118,7 +118,7 @@ function planWorldMaterialPreviews(inspection:MapInspection,_mesh:MeshData|null|
     if(tag.class==='soso')roles['Multipurpose map']='multipurpose';
     for(const ref of tag.references){const role=roles[ref.label]??(/^(?:Chicago|Transparent) layer [1-3]$/.test(ref.label)?`layer${ref.label.at(-1)}`:null);if(!role)continue;
       const key=extraTextureKey(tag.id,role),bitmap=inspection.tags.find(t=>t.id===ref.targetId);
-      if(!extras.has(key)&&bitmap?.class==='bitm'&&!bitmap.external)detailTasks.push({kind:'detail',shaderTagId:tag.id,bitmapTagId:bitmap.id,imageIndex:0,role,key});
+      if(!extras.has(key)&&bitmap&&canRequestBitmapMetadata(bitmap,inspection.header.version))detailTasks.push({kind:'detail',shaderTagId:tag.id,bitmapTagId:bitmap.id,imageIndex:0,role,key});
     }
   }
   return {...plan,detailTasks:[...detailTasks,...decalTextureRequests(inspection,extras)]};

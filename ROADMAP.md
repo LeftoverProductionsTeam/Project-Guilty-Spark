@@ -1,5 +1,9 @@
 # Roadmap
 
+## C52 engine intelligence and native resource repair
+
+Six separate source repositories are pinned and mapped to existing Spark owners in the [Engine Source Atlas](docs/ENGINE_SOURCE_ATLAS.md). Native CE indexed bitmap metadata now follows its actual resource slot and body-relative pointers; the packaged app recovers its source textures, lightmaps, detail and reflection assignments. This extends the existing Xbox a10 reader rather than replacing it. Upstream actor/co-op knowledge remains separate from installed-build acceptance; no new packet bridge or second AI simulator is introduced. The atlas lists ten concrete source-backed next steps and retains the gameplay gates below.
+
 ## C51 flagship milestone — One Halo. Every World. Every Tool. Together.
 
 The [twelve-flagship/runtime matrix](docs/C51_RUNTIME_AND_FLAGSHIPS.md) is the current entry point. [C51 evidence](docs/CONTINUATION_51_ENGINEERING.md) corrects the older carrier death diagnosis and advances commanded live ejection plus an opt-in native solo Firefight round controller. It does **not** accept automatic weapon-driven release, human Firefight combat or complete shared AI.

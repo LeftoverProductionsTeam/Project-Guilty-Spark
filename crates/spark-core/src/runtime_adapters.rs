@@ -926,10 +926,20 @@ pub fn capability_report(observation: &RuntimeObservation) -> RuntimeCapabilityR
     });
     let mut ai = capability(SynchronizeAi, if community { UpstreamDeclared } else { Unsupported }, Unavailable, if community { "Upstream community engine actor replication is separate from co-op script/encounter coverage. Spark has not accepted a real two-client authored AI scenario." } else { "No arbitrary multiplayer AI synchronization adapter is implemented for this runtime; official campaign co-op does not provide it." }, "Pin the engine implementation and validate host-authoritative lifecycle, damage/death, late join and map transitions in two real clients.");
     if community {
-        ai.evidence.push(EvidenceReference { target: profile_id(observation.runtime_id).into(), procedure: "Inspect pinned upstream actor/netcode implementation, separate from Spark execution.".into(), result: "Upstream-declared implementation; no local or multiplayer acceptance in Spark.".into(), location: "docs/MCC_MULTIPLAYER_AI_FEASIBILITY.md".into() });
+        let (project, revision, location) = match observation.runtime_id {
+            RuntimeId::OpenCe => ("OpenCE", "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+                "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/network_actors.c"),
+            _ => ("ChupathingyCE", "9990568507eede8b81edd5437a4860de5465c408",
+                "https://github.com/ChupathingyCE/chupathingyce/blob/9990568507eede8b81edd5437a4860de5465c408/port/linux/game/network_actors.c"),
+        };
+        ai.evidence.push(EvidenceReference { target: format!("{project} source {revision}"), procedure: "C52 source trace: host unit controls, datum-owned object lifecycle, client driving and native damage. See docs/ENGINE_SOURCE_ATLAS.md and its structured index.".into(), result: "Source research only. This revision is not an installed executable fingerprint, a supported control API, or accepted multiplayer gameplay. Spark does not replace engine replication.".into(), location: location.into() });
     }
     capabilities.push(ai);
-    capabilities.push(capability(CampaignCoop, if community || observation.runtime_id == RuntimeId::MccSteam { UpstreamDeclared } else { Unknown }, Unavailable, "Engine campaign co-op, script synchronization, and arbitrary multiplayer AI are different capabilities. No two-computer Spark campaign acceptance has been recorded.", "Use a compatible campaign profile and verify progression, respawn, checkpoints and late join on real clients."));
+    let mut coop = capability(CampaignCoop, if community || observation.runtime_id == RuntimeId::MccSteam { UpstreamDeclared } else { Unknown }, Unavailable, "Engine campaign co-op, script synchronization, and arbitrary multiplayer AI are different capabilities. No two-computer Spark campaign acceptance has been recorded.", "Use a compatible campaign profile and verify progression, respawn, checkpoints and late join on real clients.");
+    if community {
+        coop.evidence.push(EvidenceReference { target: profile_id(observation.runtime_id).into(), procedure: "C52 traced host-owned scenario progression and BSP acknowledgement separately from actor and object state.".into(), result: "A native BSP switch coordinates one active structure; it does not establish simultaneous Megaworld residency or validate an installed build.".into(), location: "docs/ENGINE_SOURCE_ATLAS.md#bsp-transitions-and-megaworld".into() });
+    }
+    capabilities.push(coop);
     capabilities.push(capability(PlayerScale, Unknown, Unavailable, &format!("The 128-player target remains open. Current observation reports {:?} tested players; neither protocol metadata nor simulated messages certify real clients.", observation.protocol.tested_players), "Progress through controlled 2/8/16/32/64/128-client gates with matched content, measured server/frame/network budgets and AI/connected-world acceptance."));
     capabilities.push(capability(LegacyTools, Implemented, if has_tool(observation, ToolKind::Legacy) { Ready } else { SetupRequired }, "Optional legacy companion fingerprint/setup and explicit launch are separate from modern Halo tools. A detected archive is not a verified executable.", "Choose and validate the separately installed exact companion. Confirm each legacy execution or external download."));
     let mut diagnostics = vec!["Registry evidence describes a bounded operation, not authorization to execute it. Native handlers must revalidate identities, generation and operation preconditions.".into()];
@@ -1197,6 +1207,20 @@ mod tests {
                 .availability,
             ActionAvailability::Unavailable
         );
+        for runtime in [RuntimeId::OpenCe, RuntimeId::ChupathingyCe] {
+            o.runtime_id = runtime;
+            o.target = target_for(runtime, "windows");
+            let traced = capability_report(&o);
+            let ai = traced.capability(RuntimeOperation::SynchronizeAi).unwrap();
+            assert_eq!(ai.evidence_level, EvidenceLevel::UpstreamDeclared);
+            assert_eq!(ai.availability, ActionAvailability::Unavailable);
+            assert!(ai.evidence.iter().any(|e| e.location.contains("/blob/")
+                && e.result.contains("not an installed executable fingerprint")));
+            assert_eq!(traced.capability(RuntimeOperation::CampaignCoop).unwrap().availability,
+                ActionAvailability::Unavailable);
+            assert!(traced.capabilities.iter().all(|c|
+                c.evidence_level != EvidenceLevel::MultiplayerTested));
+        }
     }
     #[test]
     fn native_conversion_requires_an_implemented_source_bound_preflight() {

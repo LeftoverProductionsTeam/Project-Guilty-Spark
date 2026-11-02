@@ -1,0 +1,984 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-11-02",
+  "researchOnly": true,
+  "incorporatedEngineModules": 0,
+  "gameplayAcceptance": false,
+  "projects": [
+    {
+      "id": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "licenseFile": "LICENSE",
+      "licenseSha256": "e0eedba615d5cd1b986afb6c5b3a4b1ae33713e7e9dc74d19daec5e3221f9d2e",
+      "licenseUrl": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/LICENSE",
+      "scope": "Sparse, detached, source-only research; selected modules reviewed; not a complete repository audit",
+      "checkedOutFiles": 2838,
+      "checkedOutBytes": 65939583
+    },
+    {
+      "id": "chupa",
+      "repository": "https://github.com/ChupathingyCE/chupathingyce",
+      "revision": "9990568507eede8b81edd5437a4860de5465c408",
+      "license": "GPL-3.0-or-later; section 7 console SDK permission",
+      "licenseFile": "docs/license.md",
+      "licenseSha256": "11e7357d374f1b4ae05dc1cb642529aa6db2e2a60df0137bad7dcb7c9b5d71ad",
+      "licenseUrl": "https://github.com/ChupathingyCE/chupathingyce/blob/9990568507eede8b81edd5437a4860de5465c408/docs/license.md",
+      "scope": "Sparse, detached, source-only research; selected modules reviewed; not a complete repository audit",
+      "checkedOutFiles": 2606,
+      "checkedOutBytes": 51037988
+    },
+    {
+      "id": "halo-bnunu",
+      "repository": "https://github.com/bnunu/halo-1",
+      "revision": "2e376b992e920bcc3a094727475c17daef71ec8c",
+      "license": "CC0-1.0",
+      "licenseFile": "LICENSE.md",
+      "licenseSha256": "f4e7f373b9b996950337e8d41a4a2939c2d90b7725e9baf3d5084a22717ad328",
+      "licenseUrl": "https://github.com/bnunu/halo-1/blob/2e376b992e920bcc3a094727475c17daef71ec8c/LICENSE.md",
+      "scope": "Sparse, detached, source-only research; selected modules reviewed; not a complete repository audit",
+      "checkedOutFiles": 3101,
+      "checkedOutBytes": 35442106
+    },
+    {
+      "id": "halo-original",
+      "repository": "https://github.com/punpckhdq/halo",
+      "revision": "4754c8e7cf1dfdee533e591054ec6c28ad718a2e",
+      "license": "AGPL-3.0 text at this revision; differs from older CC0 history",
+      "licenseFile": "LICENSE",
+      "licenseSha256": "6f1e622c82a380075843bb084a7ec3b1f1d12a4a02526d75e78b0924a860aa75",
+      "licenseUrl": "https://github.com/punpckhdq/halo/blob/4754c8e7cf1dfdee533e591054ec6c28ad718a2e/LICENSE",
+      "scope": "Sparse, detached, source-only research; selected modules reviewed; not a complete repository audit",
+      "checkedOutFiles": 887,
+      "checkedOutBytes": 8300148
+    },
+    {
+      "id": "invader",
+      "repository": "https://github.com/SnowyMouse/invader",
+      "revision": "e8b58542fd1e0a239d0fbc689ac4e55b80e79442",
+      "license": "GPL-3.0-only",
+      "licenseFile": "LICENSE.md",
+      "licenseSha256": "2cb1bf66086c83e41b704734c0b3e17038cebdb4eedc1231eda48447bd64a75a",
+      "licenseUrl": "https://github.com/SnowyMouse/invader/blob/e8b58542fd1e0a239d0fbc689ac4e55b80e79442/LICENSE.md",
+      "scope": "Sparse, detached, source-only research; selected modules reviewed; not a complete repository audit",
+      "checkedOutFiles": 470,
+      "checkedOutBytes": 16049566
+    },
+    {
+      "id": "reclaimer",
+      "repository": "https://github.com/Gravemind2401/Reclaimer",
+      "revision": "36224d7a4581f2a1f255099bf706aa56be9f6e21",
+      "license": "GPL-3.0 text; exact later-version election not established",
+      "licenseFile": "LICENSE",
+      "licenseSha256": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
+      "licenseUrl": "https://github.com/Gravemind2401/Reclaimer/blob/36224d7a4581f2a1f255099bf706aa56be9f6e21/LICENSE",
+      "scope": "Sparse, detached, source-only research; selected modules reviewed; not a complete repository audit",
+      "checkedOutFiles": 466,
+      "checkedOutBytes": 3716118
+    }
+  ],
+  "behaviors": [
+    {
+      "id": "opence-network-actors-c-network-actors-host-tick",
+      "capability": "Host actor control and distance-budgeted state",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/network_actors.c",
+        "symbol": "network_actors_host_tick",
+        "line": 729,
+        "definitionLocated": true,
+        "fileSha256": "320140381f1d602f5b9efea035208525e1e9feeb8c127bfb8c1870177e07ee91",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/network_actors.c#L729"
+      },
+      "ownership": "Host AI / client driven units",
+      "inputOutput": "distributed_actor_state: unit datum, controls, pose, seat, health, shields and numbered impulses",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/runtime_adapters.rs",
+        "symbol": "SynchronizeAi",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Installed-build combat and reconnect acceptance remains open",
+      "integrationMethod": "Author native encounters; let engine replicate; observe exact installed build",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Two real processes: same actor moves, targets, attacks, takes damage, dies, is removed and reconstructs after reconnect",
+      "trace": [
+        "game.c: ai_update host only",
+        "unit_control -> network_actors_note_control",
+        "network_actors_host_tick -> distributed_send_to_machine",
+        "network_actors_handle_states -> network_actors_drive"
+      ],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-network-actors-c-network-actors-drive",
+      "capability": "Apply native actor controls and expire stale control",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/network_actors.c",
+        "symbol": "network_actors_drive",
+        "line": 849,
+        "definitionLocated": true,
+        "fileSha256": "320140381f1d602f5b9efea035208525e1e9feeb8c127bfb8c1870177e07ee91",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/network_actors.c#L849"
+      },
+      "ownership": "Client",
+      "inputOutput": "Latest host control through unit_control; numbered impulse/melee/leap/speech events, 2-second expiry",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/runtime_adapters.rs",
+        "symbol": "SynchronizeAi",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Identity tables alone do not verify drift, animation or combat",
+      "integrationMethod": "Engine-owned native driving; no Spark packet replayer",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Observe client motion and attack against host; stop host updates and check control expiry",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-network-objects-c-distributed-client-create",
+      "capability": "Reliable object creation at host datum identity",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/network_objects.c",
+        "symbol": "distributed_client_create",
+        "line": 2383,
+        "definitionLocated": true,
+        "fileSha256": "bbf42a70077be6b9332b4c20c3d4f8bd20f9b7d8b352e004d236829b35721559",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/network_objects.c#L2383"
+      },
+      "ownership": "Host owns gameplay object lifetime; client reconstructs",
+      "inputOutput": "Tag/type/placement/appearance plus complete datum salt and index",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/runtime_adapters.rs",
+        "symbol": "SpawnLiveObject",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "No supported general object-create Live Link operation",
+      "integrationMethod": "Native scenario/script authoring; object-create call needs separately reviewed companion",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Create/delete/recreate objects and verify new salt, children, late join and no stale writes",
+      "trace": [
+        "object_new -> host change journal",
+        "network_objects_host_tick -> reliable changes",
+        "distributed_client_create -> object_new at requested datum"
+      ],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-network-objects-c-network-objects-client-asked",
+      "capability": "Late loaded client requests authoritative object inventory",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/network_objects.c",
+        "symbol": "network_objects_client_asked",
+        "line": 1272,
+        "definitionLocated": true,
+        "fileSha256": "bbf42a70077be6b9332b4c20c3d4f8bd20f9b7d8b352e004d236829b35721559",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/network_objects.c#L1272"
+      },
+      "ownership": "Host / joining client",
+      "inputOutput": "Inventory generation and reliable object changes; completion removes unowned local simulation objects",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/runtime_adapters.rs",
+        "symbol": "SynchronizeAi",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Not a durable Spark editor journal; build-specific reconnect proof pending",
+      "integrationMethod": "Use existing engine join/resync, keep SparkLink source transactions separate",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Disconnect client, alter host objects, reconnect; verify absent and newly created objects",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-network-objects-c-network-objects-may-delete",
+      "capability": "Prevent client deletion of host-owned objects",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/network_objects.c",
+        "symbol": "network_objects_may_delete",
+        "line": 620,
+        "definitionLocated": true,
+        "fileSha256": "bbf42a70077be6b9332b4c20c3d4f8bd20f9b7d8b352e004d236829b35721559",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/network_objects.c#L620"
+      },
+      "ownership": "Runtime object owner",
+      "inputOutput": "Deletion ownership flags and object datum identity",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/runtime_adapters.rs",
+        "symbol": "ReplicateLiveEdits",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Editor deletion is not a replicated in-game operation",
+      "integrationMethod": "Native script/object ownership; no editor raw binary broadcasts",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Client cannot remove host actor independently; host deletion reaches both games",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-network-damage-c-network-damage-client-tick",
+      "capability": "Host-authoritative native damage reporting and replay",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/network_damage.c",
+        "symbol": "network_damage_client_tick",
+        "line": 2873,
+        "definitionLocated": true,
+        "fileSha256": "9ee7040beda747b5882cb6791d74f1b9387d2dc5495a0e1f1d99cc0ece4af129",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/network_damage.c#L2873"
+      },
+      "ownership": "Client reports candidate hits; host validates and applies",
+      "inputOutput": "Player ownership, damage effect, tick, impact shape, historical target, bounded firing rate",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/runtime_adapters.rs",
+        "symbol": "SynchronizeAi",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Scripted kill does not prove player or AI combat",
+      "integrationMethod": "Use native weapon/damage path, observe bounded health/death events",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Two players witness natural attacks, nonlethal health change, killing blow and corpse cleanup",
+      "trace": [
+        "client hit report -> host validation against ownership/history",
+        "host damage -> aftermath/kill replication",
+        "client replay -> native pain/death effects"
+      ],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-network-coop-c-network-coop-host-tick",
+      "capability": "Host co-op progression and presentation",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/network_coop.c",
+        "symbol": "network_coop_host_tick",
+        "line": 3019,
+        "definitionLocated": true,
+        "fileSha256": "eccfabbc0fd6d28f8d664dacf0151956be0bb1f27f644993350fbcdfb8300e49",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/network_coop.c#L3019"
+      },
+      "ownership": "Host scripts / client presentation",
+      "inputOutput": "Devices, named objects, sounds, cinematics and progression state",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/runtime_adapters.rs",
+        "symbol": "CampaignCoop",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Campaign progression is not equivalent to arbitrary multiplayer AI",
+      "integrationMethod": "Native campaign profile and supported host/client session",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Two games progress triggers, checkpoints, respawn and late join without duplicate scripts",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-actors-c-actor-create-for-unit",
+      "capability": "Register live biped with native actor/encounter ownership",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "source/ai/actors.c",
+        "symbol": "actor_create_for_unit",
+        "line": 2523,
+        "definitionLocated": true,
+        "fileSha256": "130d3b9bfeccb6398df55c2923d07726452aff23e2bb2cd75e65206b286f3fe6",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/source/ai/actors.c#L2523"
+      },
+      "ownership": "Runtime host AI",
+      "inputOutput": "Non-dead biped, matching actor variant/swarm, optional encounter/squad, activation state",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/firefight.rs",
+        "symbol": "Firefight",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Native placement/navigation and real combat round are not accepted",
+      "integrationMethod": "Generate native scenario encounters through existing source pipeline",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "One hostile actor survives spawn on valid floor, navigates, targets, attacks and is cleaned up",
+      "trace": [
+        "actor_new -> encounterless_attach_actor or encounter_attach_actor",
+        "actor_attach_unit -> actor_verify_activation"
+      ],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-units-c-unit-try-and-exit-seat",
+      "capability": "Seat exit requires valid animation and idle animation state",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "source/units/units.c",
+        "symbol": "unit_try_and_exit_seat",
+        "line": 4893,
+        "definitionLocated": true,
+        "fileSha256": "12060912cec6cab62ac0b6bcd5fa7f4a64100919efe05d0686a0defbd5d21e05",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/source/units/units.c#L4893"
+      },
+      "ownership": "Runtime unit/AI",
+      "inputOutput": "Parent unit/seat, animation graph seat slot 8; missing NONE animation refuses exit",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/conversion.rs",
+        "symbol": "conversion",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "C51 candidate repairs slot but automatic historical release remains open",
+      "integrationMethod": "Preserve original payload and test separately derived source candidate",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Original weapon-created carrier releases live actor without scripted forced exit",
+      "trace": [
+        "actor_action_handle_exit_vehicle -> unit_try_and_exit_seat",
+        "valid animation -> _unit_state_exiting_seat",
+        "animation completion -> unit_exit_seat_end"
+      ],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-units-c-unit-exit-seat-end",
+      "capability": "Detach rider and derive native exit position from marker/root",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "source/units/units.c",
+        "symbol": "unit_exit_seat_end",
+        "line": 3187,
+        "definitionLocated": true,
+        "fileSha256": "12060912cec6cab62ac0b6bcd5fa7f4a64100919efe05d0686a0defbd5d21e05",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/source/units/units.c#L3187"
+      },
+      "ownership": "Runtime vehicle / rider",
+      "inputOutput": "Parent seat marker, biped node/root inverse, relative placement and native detachment",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/conversion.rs",
+        "symbol": "conversion",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Unsafe marker/physics relationships cannot be fixed by clearing a parent pointer",
+      "integrationMethod": "Validate native dependencies, marker transforms and actual release in isolated source build",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Repeated original carrier cycles with bounded velocity, ground contact, correct actor ownership and no damage crash",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-scenario-c-scenario-switch-structure-bsp",
+      "capability": "One active structure, checked unload/load with rollback",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "source/scenario/scenario.c",
+        "symbol": "scenario_switch_structure_bsp",
+        "line": 1056,
+        "definitionLocated": true,
+        "fileSha256": "6d17388aef022c708e67100c779aa1daba02e9a3b0ccc7d20430fa5dd538e04f",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/source/scenario/scenario.c#L1056"
+      },
+      "ownership": "Runtime scenario",
+      "inputOutput": "Scenario BSP reference index within capacity; disconnect/reconnect structure procedures",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/bsp_compile.rs",
+        "symbol": "bsp",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "One active BSP transition is not simultaneous world streaming",
+      "integrationMethod": "Merge connected geometry into native BSP or separately test supported scenario transition",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Walk Timberland to Sidewinder and back; test host/client BSP acknowledgement before larger world",
+      "trace": [
+        "disconnect callbacks -> scenario_structure_bsp_unload",
+        "scenario_structure_bsp_load -> structure_bsp_port_verify",
+        "failed load -> restore old BSP or return to menu"
+      ],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-custom-edition-geometry-c-custom-edition-structure-bsp-load",
+      "capability": "Convert checked native CE render buffers for Xbox-derived runtime",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/custom_edition_geometry.c",
+        "symbol": "custom_edition_structure_bsp_load",
+        "line": 957,
+        "definitionLocated": true,
+        "fileSha256": "3be3e3f46ff1931fc22b23decdf612919f794b1cad61122945c2b70601a7895f",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/custom_edition_geometry.c#L957"
+      },
+      "ownership": "Runtime content loading",
+      "inputOutput": "CE uncompressed vertices/lightmap vertices, validated material surfaces and native GPU buffers",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/render.rs",
+        "symbol": "render",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Resource/geometry decoding is not runtime audiovisual or collision parity",
+      "integrationMethod": "Independent bounded format reader and native runtime content conversion",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Known CE campaign geometry/material/lightmap counts match source; game traverses native collision",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-custom-edition-bitmaps-c-bitmap-format-drawable",
+      "capability": "Validate formats before runtime texture conversion",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/custom_edition_bitmaps.c",
+        "symbol": "bitmap_format_drawable",
+        "line": 314,
+        "definitionLocated": true,
+        "fileSha256": "12e4212a3a563bc4ec0801cb1a5a8563f419870f120625f21b687427c30efb83",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/custom_edition_bitmaps.c#L314"
+      },
+      "ownership": "Runtime graphics",
+      "inputOutput": "Bitmap format/dimension/flags and runtime conversion constraints",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/bitmap_preview.rs",
+        "symbol": "preview_owned_bitmap",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Unsupported formats remain explicit; no texture omission for speed",
+      "integrationMethod": "Independent source-bound DDS preview, not copied engine renderer",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Exact known raw pixels, mip/cube layout and corrupt metadata refusals",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "opence-custom-edition-sounds-c-custom-edition-sounds-decode",
+      "capability": "Convert supported native CE sound formats",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/custom_edition_sounds.c",
+        "symbol": "custom_edition_sounds_decode",
+        "line": 565,
+        "definitionLocated": true,
+        "fileSha256": "3131778102b1c758bf17038bc394c6e9c0f06ef02817094e56b3021eff52ae68",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/custom_edition_sounds.c#L565"
+      },
+      "ownership": "Runtime audio",
+      "inputOutput": "Permutation codec/rate/channels -> Xbox-compatible samples in separate decoded offset region",
+      "runtimeSupport": "Pinned upstream source only; installed build 335 is a different source revision",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/audio.rs",
+        "symbol": "preview_sound",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "CE indexed sound uses mixed map/resource metadata; current external-tag preview remains open",
+      "integrationMethod": "Separate bounded reader; editor audition is not native mixing",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Exact known samples and native class/loop dependencies; listen in actual game",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "chupa-delta-compat-c-delta-compat-decide",
+      "capability": "Decide wire range/major compatibility",
+      "sourceProject": "chupa",
+      "repository": "https://github.com/ChupathingyCE/chupathingyce",
+      "revision": "9990568507eede8b81edd5437a4860de5465c408",
+      "sourceLocation": {
+        "file": "port/linux/src/delta_compat.c",
+        "symbol": "delta_compat_decide",
+        "line": 297,
+        "definitionLocated": true,
+        "fileSha256": "4d421a98e6aa8d5e8a6d05b045099dd4de822567aa363aa8c2ef685ada8516ab",
+        "url": "https://github.com/ChupathingyCE/chupathingyce/blob/9990568507eede8b81edd5437a4860de5465c408/port/linux/src/delta_compat.c#L297"
+      },
+      "ownership": "Native game session handshake",
+      "inputOutput": "Versioned reserved tag, major, current/oldest wire range; accepted/refused/unknown",
+      "runtimeSupport": "Pinned upstream source only; installed executable must be fingerprinted separately",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/community_servers.rs",
+        "symbol": "community",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Public provider advertisements do not establish negotiated ranges or game join",
+      "integrationMethod": "Pass native invitation to exact client; never forge negotiation",
+      "license": "GPL-3.0-or-later; section 7 console SDK permission",
+      "acceptance": "Compatible and incompatible actual builds join/refuse with matching map hashes",
+      "trace": [
+        "delta_compat_read_tag or read_range -> ranges_meet",
+        "missing range -> historical exact wire comparison"
+      ],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "chupa-delta-compat-c-delta-compat-opence-server",
+      "capability": "Distinguish OpenCE and Delta discovery advertisements",
+      "sourceProject": "chupa",
+      "repository": "https://github.com/ChupathingyCE/chupathingyce",
+      "revision": "9990568507eede8b81edd5437a4860de5465c408",
+      "sourceLocation": {
+        "file": "port/linux/src/delta_compat.c",
+        "symbol": "delta_compat_opence_server",
+        "line": 356,
+        "definitionLocated": true,
+        "fileSha256": "4d421a98e6aa8d5e8a6d05b045099dd4de822567aa363aa8c2ef685ada8516ab",
+        "url": "https://github.com/ChupathingyCE/chupathingyce/blob/9990568507eede8b81edd5437a4860de5465c408/port/linux/src/delta_compat.c#L356"
+      },
+      "ownership": "Runtime discovery/control plane",
+      "inputOutput": "Reserved discovery flags and protocol advertisement",
+      "runtimeSupport": "Pinned upstream source only; installed executable must be fingerprinted separately",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/community_servers.rs",
+        "symbol": "community",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Delta discovery is not universal crossplay or an authenticated editor session",
+      "integrationMethod": "Existing bounded Delta list and native handoff; no remote tool execution",
+      "license": "GPL-3.0-or-later; section 7 console SDK permission",
+      "acceptance": "Observe real host identity/protocol and join only matching native client",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "chupa-network-actors-c-network-actors-host-tick",
+      "capability": "Chupathingy actor replication must be evaluated at its own revision",
+      "sourceProject": "chupa",
+      "repository": "https://github.com/ChupathingyCE/chupathingyce",
+      "revision": "9990568507eede8b81edd5437a4860de5465c408",
+      "sourceLocation": {
+        "file": "port/linux/game/network_actors.c",
+        "symbol": "network_actors_host_tick",
+        "line": 729,
+        "definitionLocated": true,
+        "fileSha256": "bf2e1e58f018a336a1ad4320afb8cf59f8e4cf45b0e9f2130d53a3f73c947fbe",
+        "url": "https://github.com/ChupathingyCE/chupathingyce/blob/9990568507eede8b81edd5437a4860de5465c408/port/linux/game/network_actors.c#L729"
+      },
+      "ownership": "Host / client",
+      "inputOutput": "Native distributed actor state and game protocol at this source pin",
+      "runtimeSupport": "Pinned upstream source only; installed executable must be fingerprinted separately",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/runtime_adapters.rs",
+        "symbol": "SynchronizeAi",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "OpenCE source equivalence is not assumed; installed Chupa build and protocol differ",
+      "integrationMethod": "Author native encounters, use Chupa engine networking",
+      "license": "GPL-3.0-or-later; section 7 console SDK permission",
+      "acceptance": "Two exact Chupa processes pass full actor/combat/reconnect acceptance",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "halo-bnunu-cache-files-c-cache-file-header-verify",
+      "capability": "Original Xbox cache admission constraints",
+      "sourceProject": "halo-bnunu",
+      "repository": "https://github.com/bnunu/halo-1",
+      "revision": "2e376b992e920bcc3a094727475c17daef71ec8c",
+      "sourceLocation": {
+        "file": "source/cache/cache_files.c",
+        "symbol": "cache_file_header_verify",
+        "line": 545,
+        "definitionLocated": true,
+        "fileSha256": "d286b846454d1ea7f478157cba2737ba5641a081da3daf5560982ba4a952023b",
+        "url": "https://github.com/bnunu/halo-1/blob/2e376b992e920bcc3a094727475c17daef71ec8c/source/cache/cache_files.c#L545"
+      },
+      "ownership": "Engine cache loader",
+      "inputOutput": "Cache signature/version/build/size and platform-owned tag memory",
+      "runtimeSupport": "Reconstructed Xbox development build 2342 only; not an MCC or CE ABI",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/maps.rs",
+        "symbol": "MapHeader",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Build 2342 layout is not a PC/MCC ABI",
+      "integrationMethod": "Independent version-dispatched readers; preserve source header/hash",
+      "license": "CC0-1.0",
+      "acceptance": "Xbox v5 a10 native render/collision/tags/sounds recover; PC/MCC use their own layouts",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "halo-bnunu-scenario-c-scenario-switch-structure-bsp",
+      "capability": "Original single-active-BSP scenario lifecycle",
+      "sourceProject": "halo-bnunu",
+      "repository": "https://github.com/bnunu/halo-1",
+      "revision": "2e376b992e920bcc3a094727475c17daef71ec8c",
+      "sourceLocation": {
+        "file": "source/scenario/scenario.c",
+        "symbol": "scenario_switch_structure_bsp",
+        "line": 986,
+        "definitionLocated": true,
+        "fileSha256": "7e2cb4a7778c909ed44de4f4e2092c38dd49d979abca0ef76d498d5a8bd23880",
+        "url": "https://github.com/bnunu/halo-1/blob/2e376b992e920bcc3a094727475c17daef71ec8c/source/scenario/scenario.c#L986"
+      },
+      "ownership": "Engine scenario",
+      "inputOutput": "Structure reference index, disconnect/load/connect callbacks",
+      "runtimeSupport": "Reconstructed Xbox development build 2342 only; not an MCC or CE ABI",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/bsp_compile.rs",
+        "symbol": "bsp",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "No original simultaneous all-map residency",
+      "integrationMethod": "Native source merge and compiler checks",
+      "license": "CC0-1.0",
+      "acceptance": "Valid compiled connection plus actual two-way traversal, not bounds overlap",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "halo-bnunu-objects-c-object-new",
+      "capability": "Native object datum allocation and definition lifecycle",
+      "sourceProject": "halo-bnunu",
+      "repository": "https://github.com/bnunu/halo-1",
+      "revision": "2e376b992e920bcc3a094727475c17daef71ec8c",
+      "sourceLocation": {
+        "file": "source/objects/objects.c",
+        "symbol": "object_new",
+        "line": 3237,
+        "definitionLocated": true,
+        "fileSha256": "206c98c118b507de3e957ec2d6bd9dcbcc8a8a6d481d0910616c73d6953a4312",
+        "url": "https://github.com/bnunu/halo-1/blob/2e376b992e920bcc3a094727475c17daef71ec8c/source/objects/objects.c#L3237"
+      },
+      "ownership": "Engine object system",
+      "inputOutput": "Object placement data and type-specific construction; datum allocation",
+      "runtimeSupport": "Reconstructed Xbox development build 2342 only; not an MCC or CE ABI",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/live_adapter.rs",
+        "symbol": "live",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "MCC and port object allocation cannot use Xbox addresses",
+      "integrationMethod": "Source authoring or separately reviewed exact-build adapter",
+      "license": "CC0-1.0",
+      "acceptance": "Corrupt type rejected; salted identity and child object lifetime verified in actual runtime",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "halo-original-model-definitions-h-model-geometry-part",
+      "capability": "Compressed and uncompressed model vertex representations",
+      "sourceProject": "halo-original",
+      "repository": "https://github.com/punpckhdq/halo",
+      "revision": "4754c8e7cf1dfdee533e591054ec6c28ad718a2e",
+      "sourceLocation": {
+        "file": "source/models/model_definitions.h",
+        "symbol": "model_geometry_part",
+        "line": 116,
+        "definitionLocated": false,
+        "fileSha256": "bda8be5916ee529aadde1d58611c9bce6c5713d9537cf6f1147b0f0412610d9e",
+        "url": "https://github.com/punpckhdq/halo/blob/4754c8e7cf1dfdee533e591054ec6c28ad718a2e/source/models/model_definitions.h#L116"
+      },
+      "ownership": "Engine rendering structures",
+      "inputOutput": "Per-part index/vertex blocks, shader and node data",
+      "runtimeSupport": "Reconstructed Xbox development build 2342 only; not an MCC or CE ABI",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/render.rs",
+        "symbol": "render",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Original structures document layouts, not a ready-made MCC decoder",
+      "integrationMethod": "Independent bounded per-cache model reader",
+      "license": "AGPL-3.0 text at this revision; differs from older CC0 history",
+      "acceptance": "High-LOD native model topology, materials, UV and bones match source",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "halo-original-sound-definitions-h-sound-permutation",
+      "capability": "Native sound metadata is distinct from sample and mix policy",
+      "sourceProject": "halo-original",
+      "repository": "https://github.com/punpckhdq/halo",
+      "revision": "4754c8e7cf1dfdee533e591054ec6c28ad718a2e",
+      "sourceLocation": {
+        "file": "source/sound/sound_definitions.h",
+        "symbol": "sound_permutation",
+        "line": 108,
+        "definitionLocated": false,
+        "fileSha256": "bd7cefa9837ad3fb6cbc5e003efc256dc90b1b08b1e9742a1db275c411638fdb",
+        "url": "https://github.com/punpckhdq/halo/blob/4754c8e7cf1dfdee533e591054ec6c28ad718a2e/source/sound/sound_definitions.h#L108"
+      },
+      "ownership": "Engine sound",
+      "inputOutput": "Codec, next permutation, raw samples, mouth/subtitle data",
+      "runtimeSupport": "Reconstructed Xbox development build 2342 only; not an MCC or CE ABI",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/audio.rs",
+        "symbol": "SoundPermutation",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Sample decoding does not implement sound classes, mixing or native loops",
+      "integrationMethod": "Keep editor audition and native authored audio separate",
+      "license": "AGPL-3.0 text at this revision; differs from older CC0 history",
+      "acceptance": "Exact sample plus complete loop dependency/build readback and actual game listening",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "halo-original-structure-bsp-definitions-h-structure-material",
+      "capability": "BSP material/lightmap/compressed vertex fields",
+      "sourceProject": "halo-original",
+      "repository": "https://github.com/punpckhdq/halo",
+      "revision": "4754c8e7cf1dfdee533e591054ec6c28ad718a2e",
+      "sourceLocation": {
+        "file": "source/structures/structure_bsp_definitions.h",
+        "symbol": "structure_material",
+        "line": 225,
+        "definitionLocated": false,
+        "fileSha256": "3d62e5a87438879770bddf53a62b8934a7bbc21997af95a1c224583108fc014a",
+        "url": "https://github.com/punpckhdq/halo/blob/4754c8e7cf1dfdee533e591054ec6c28ad718a2e/source/structures/structure_bsp_definitions.h#L225"
+      },
+      "ownership": "Engine geometry/visibility",
+      "inputOutput": "Material surface ranges, lightmap vertices and raw compressed/uncompressed data",
+      "runtimeSupport": "Reconstructed Xbox development build 2342 only; not an MCC or CE ABI",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/render.rs",
+        "symbol": "render",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Collision mesh is not the render/lightmap mesh",
+      "integrationMethod": "Version-specific source-bound render geometry reader",
+      "license": "AGPL-3.0 text at this revision; differs from older CC0 history",
+      "acceptance": "Known render counts and authored UVs/lightmap pages survive readback",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "invader-map-cpp-map-map-with-move",
+      "capability": "External cache tags bind to exact resource entries",
+      "sourceProject": "invader",
+      "repository": "https://github.com/SnowyMouse/invader",
+      "revision": "e8b58542fd1e0a239d0fbc689ac4e55b80e79442",
+      "sourceLocation": {
+        "file": "src/map/map.cpp",
+        "symbol": "Map::map_with_move",
+        "line": 25,
+        "definitionLocated": true,
+        "fileSha256": "7926742b96d31ef9df009c1b10ed35040ba6a5ad5f3b6929979a8e96e5ae48d6",
+        "url": "https://github.com/SnowyMouse/invader/blob/e8b58542fd1e0a239d0fbc689ac4e55b80e79442/src/map/map.cpp#L25"
+      },
+      "ownership": "Native format tool",
+      "inputOutput": "609 indexed flag; bitmap resource slot; sounds locate exact name and mix base/reflexive sources",
+      "runtimeSupport": "Version-specific parser/compiler routes; no universal conversion",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/bitmap_preview.rs",
+        "symbol": "ce_indexed_body",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "C51 refused all indexed bitmap bodies; C52 repairs bitmap route only",
+      "integrationMethod": "Independent bounded CE reader; do not import GPL parser code",
+      "license": "GPL-3.0-only",
+      "acceptance": "Installed CE Blood Gulch loads 159 shader bindings/15 lightmaps/233 detail slots/73 reflection assignments",
+      "trace": [
+        "indexed bitmap -> resource_index from tag data",
+        "resource body -> base pointer zero",
+        "indexed sound -> map base + resource reflexives"
+      ],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "invader-tag-cpp-tag-data",
+      "capability": "Resolve per-tag source region and pointer translation",
+      "sourceProject": "invader",
+      "repository": "https://github.com/SnowyMouse/invader",
+      "revision": "e8b58542fd1e0a239d0fbc689ac4e55b80e79442",
+      "sourceLocation": {
+        "file": "src/map/tag.cpp",
+        "symbol": "Tag::data",
+        "line": 50,
+        "definitionLocated": true,
+        "fileSha256": "4577c6c2d42fc9bad5b5b9676d2577e0bbfbb214fe212791fd74895cca4db7cf",
+        "url": "https://github.com/SnowyMouse/invader/blob/e8b58542fd1e0a239d0fbc689ac4e55b80e79442/src/map/tag.cpp#L50"
+      },
+      "ownership": "Native format tool",
+      "inputOutput": "Internal tag base versus external relative tag body",
+      "runtimeSupport": "Version-specific parser/compiler routes; no universal conversion",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/bitmap_preview.rs",
+        "symbol": "ce_image_metadata",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "No global pointer translation across unrelated resource entries",
+      "integrationMethod": "Exact-path indexed body, 1 MiB body/16 MiB metadata bounds",
+      "license": "GPL-3.0-only",
+      "acceptance": "Wrong slot/path/hash/kind, relative pointer escape and truncation never return pixels",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "invader-decompile-cpp-bitmap-post-cache-parse",
+      "capability": "Xbox cube face-major mips versus PC mip-major top faces",
+      "sourceProject": "invader",
+      "repository": "https://github.com/SnowyMouse/invader",
+      "revision": "e8b58542fd1e0a239d0fbc689ac4e55b80e79442",
+      "sourceLocation": {
+        "file": "src/tag/parser/compile/bitmap/decompile.cpp",
+        "symbol": "Bitmap::post_cache_parse",
+        "line": 9,
+        "definitionLocated": true,
+        "fileSha256": "bd2c095f5be84a7098661240e9e9dfcf9030e578b1aafa36073d5394fbb4b890",
+        "url": "https://github.com/SnowyMouse/invader/blob/e8b58542fd1e0a239d0fbc689ac4e55b80e79442/src/tag/parser/compile/bitmap/decompile.cpp#L9"
+      },
+      "ownership": "Native asset extraction",
+      "inputOutput": "Compression/swizzle validity; six cube faces; Xbox face 1/2 swap and 128-byte alignment",
+      "runtimeSupport": "Version-specific parser/compiler routes; no universal conversion",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/bitmap_preview.rs",
+        "symbol": "preview_owned_cube",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Source layout proof is separate from native reflection appearance",
+      "integrationMethod": "Independent reviewed cube reader, exact source bytes",
+      "license": "GPL-3.0-only",
+      "acceptance": "Distinct sentinel face/mip fixture and native CE/Xbox cube decoding; no wrong face alias",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "reclaimer-bitmapsaddresstranslator-cs-getaddress",
+      "capability": "CE resource-body-relative pointer translation",
+      "sourceProject": "reclaimer",
+      "repository": "https://github.com/Gravemind2401/Reclaimer",
+      "revision": "36224d7a4581f2a1f255099bf706aa56be9f6e21",
+      "sourceLocation": {
+        "file": "Reclaimer.Blam/Blam/Halo1/BitmapsAddressTranslator.cs",
+        "symbol": "GetAddress",
+        "line": 25,
+        "definitionLocated": false,
+        "fileSha256": "e867d05aeedb8a3161173f20226a18732a4f9b74eda6d1704086fa305f623db2",
+        "url": "https://github.com/Gravemind2401/Reclaimer/blob/36224d7a4581f2a1f255099bf706aa56be9f6e21/Reclaimer.Blam/Blam/Halo1/BitmapsAddressTranslator.cs#L25"
+      },
+      "ownership": "Asset inspection",
+      "inputOutput": "Native metadata slot -> 12-byte resource index; TagAddress + relative pointer",
+      "runtimeSupport": "Per-cache Halo1 classes; decoder availability differs by format",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/bitmap_preview.rs",
+        "symbol": "ce_indexed_body",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Filename equality cannot validate body identity",
+      "integrationMethod": "Independent slot/path/hash/span checks",
+      "license": "GPL-3.0 text; exact later-version election not established",
+      "acceptance": "Correct CE indexed image golden plus forged metadata rejection",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "reclaimer-bitmaptag-cs-todds",
+      "capability": "Choose native pixel source and frame/mip layout",
+      "sourceProject": "reclaimer",
+      "repository": "https://github.com/Gravemind2401/Reclaimer",
+      "revision": "36224d7a4581f2a1f255099bf706aa56be9f6e21",
+      "sourceLocation": {
+        "file": "Reclaimer.Blam/Blam/Halo1/BitmapTag.cs",
+        "symbol": "ToDds",
+        "line": 45,
+        "definitionLocated": true,
+        "fileSha256": "f58081ea6b8464fc9dc91c938e7024877983d41fce85d80f7ed492637619ed49",
+        "url": "https://github.com/Gravemind2401/Reclaimer/blob/36224d7a4581f2a1f255099bf706aa56be9f6e21/Reclaimer.Blam/Blam/Halo1/BitmapTag.cs#L45"
+      },
+      "ownership": "Asset inspection",
+      "inputOutput": "External flag/cache edition, PixelsOffset/Size, submap format, depth/cube properties",
+      "runtimeSupport": "Per-cache Halo1 classes; decoder availability differs by format",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/bitmap_preview.rs",
+        "symbol": "preview_owned_bitmap",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "No runtime compatibility inferred from a matching bitmap name",
+      "integrationMethod": "Existing DDS transport, source-first resource resolver",
+      "license": "GPL-3.0 text; exact later-version election not established",
+      "acceptance": "Native installed CE/Xbox/MCC images display; wrong resources refused",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "reclaimer-gbxmodeltag-cs-getmodelcontent",
+      "capability": "Per-region/permutation model geometry inspection",
+      "sourceProject": "reclaimer",
+      "repository": "https://github.com/Gravemind2401/Reclaimer",
+      "revision": "36224d7a4581f2a1f255099bf706aa56be9f6e21",
+      "sourceLocation": {
+        "file": "Reclaimer.Blam/Blam/Halo1/GbxmodelTag.cs",
+        "symbol": "GetModelContent",
+        "line": 48,
+        "definitionLocated": true,
+        "fileSha256": "45f948b9eae412d65b53c5c07103fbf53d05eff63fbfc3e19597e2dac49ed1d8",
+        "url": "https://github.com/Gravemind2401/Reclaimer/blob/36224d7a4581f2a1f255099bf706aa56be9f6e21/Reclaimer.Blam/Blam/Halo1/GbxmodelTag.cs#L48"
+      },
+      "ownership": "Asset inspection",
+      "inputOutput": "Geometry parts, node palette, shader material and mesh data",
+      "runtimeSupport": "Per-cache Halo1 classes; decoder availability differs by format",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/render.rs",
+        "symbol": "render",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Asset preview is not arbitrary native tag import success",
+      "integrationMethod": "Native decoder + recursive extraction/build workflow",
+      "license": "GPL-3.0 text; exact later-version election not established",
+      "acceptance": "Actual preview topology/materials and independent native compiled placement",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "reclaimer-scenariostructurebsptag-cs-getmodelcontent",
+      "capability": "BSP render surfaces and material sections",
+      "sourceProject": "reclaimer",
+      "repository": "https://github.com/Gravemind2401/Reclaimer",
+      "revision": "36224d7a4581f2a1f255099bf706aa56be9f6e21",
+      "sourceLocation": {
+        "file": "Reclaimer.Blam/Blam/Halo1/ScenarioStructureBspTag.cs",
+        "symbol": "GetModelContent",
+        "line": 48,
+        "definitionLocated": true,
+        "fileSha256": "569e066e0241f2e19c5ac1c9c817411c096e5ca93fea852d2956833f3e1be53b",
+        "url": "https://github.com/Gravemind2401/Reclaimer/blob/36224d7a4581f2a1f255099bf706aa56be9f6e21/Reclaimer.Blam/Blam/Halo1/ScenarioStructureBspTag.cs#L48"
+      },
+      "ownership": "Asset inspection",
+      "inputOutput": "Render surfaces/vertex pools/lightmap indices distinct from collision",
+      "runtimeSupport": "Per-cache Halo1 classes; decoder availability differs by format",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/render.rs",
+        "symbol": "render",
+        "equivalence": "Related workflow owner, not proof of identical layouts or semantics"
+      },
+      "gap": "Render visibility does not certify collision, portals or all gameplay",
+      "integrationMethod": "Reuse existing render/collision separation and native BSP compiler",
+      "license": "GPL-3.0 text; exact later-version election not established",
+      "acceptance": "Native render/UV count and collision walkthrough, each separately verified",
+      "trace": [],
+      "status": "source-reviewed; no runtime authorization"
+    }
+  ]
+}

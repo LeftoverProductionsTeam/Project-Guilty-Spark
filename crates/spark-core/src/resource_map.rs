@@ -9,7 +9,7 @@
 //! MCC's legacy shared bitmap map retains the retail per-image key/span layout;
 //! its separately pinned ipak resources still use their own reader.
 //! No offsets are inferred from tag IDs or fuzzy filenames. MCC ipaks and
-//! external *tag metadata* are not covered by this reader.
+//! CE indexed bitmap bodies use a separate exact-slot/path-bounded reader.
 use crate::{invalid, reject_links, Result, SparkError};
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::{Read, Seek, SeekFrom}, path::Path};
@@ -216,7 +216,7 @@ pub fn audit(path: &Path, expected_sha256: &str, bitmap_paths: &[String]) -> Res
         missing_bitmap_path_matches: missing,
         ambiguous_bitmap_paths: ambiguous,
         resource_sha256: expected_sha256.to_ascii_lowercase(),
-        warning: "Index audit only. Pixel previews additionally require the generation-specific image key and bounded raw span. External tag metadata and MCC ipaks remain unsupported.".into(),
+        warning: "Index audit only. Pixel previews additionally require the generation-specific image key and bounded raw span. Indexed CE bitmap bodies require their separate slot/path/hash validation; MCC ipaks use a separate decoder.".into(),
     })
 }
 
@@ -224,6 +224,24 @@ pub fn audit(path: &Path, expected_sha256: &str, bitmap_paths: &[String]) -> Res
 /// No new path is followed and no data is returned until this check succeeds.
 pub(crate) fn verify_open_handle_hash(file: &mut File, sha256: &str) -> Result<()> {
     verify_handle_hash(file, sha256)
+}
+
+/// CE's native tag-index data word selects a resource entry, not a pointer.
+/// Only that exact, uniquely named metadata entry may supply relative pointers.
+/// Format references and independent implementation notes: ENGINE_SOURCE_ATLAS.
+pub(crate) fn read_indexed_bitmap_metadata(file:&mut File,index:&ResourceIndex,
+    tag_path:&str,slot:u32,spent:&mut usize)->Result<Vec<u8>> {
+    if index.kind_code!=1 {return invalid("Indexed bitmap metadata requires a bitmap resource map");}
+    let selected=index.entries.get(slot as usize).ok_or_else(||SparkError::Invalid("CE bitmap resource slot is outside the native index".into()))?;
+    if selected.path!=normalize_path(tag_path)? || !std::ptr::eq(selected,index.exact(tag_path)?) {
+        return invalid("CE bitmap resource slot and exact tag path disagree");
+    }
+    if !(108..=1024*1024).contains(&selected.data_size) {return invalid("CE bitmap metadata size exceeds its bounded tag-body limit");}
+    let size=usize::try_from(selected.data_size).map_err(|_|SparkError::Invalid("CE bitmap metadata size overflow".into()))?;
+    let next=spent.checked_add(size).ok_or_else(||SparkError::Invalid("CE bitmap metadata budget overflow".into()))?;
+    if next>16*1024*1024 {return invalid("CE bitmap metadata transaction exceeds the 16 MiB budget");}
+    *spent=next;
+    let mut bytes=vec![0;size];read_exact_at(file,selected.data_offset,&mut bytes)?;Ok(bytes)
 }
 
 /// Read from an already verified handle and index. The *caller* must verify the

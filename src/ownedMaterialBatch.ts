@@ -8,11 +8,17 @@
  * H1 BSPs can share lightmap page indices. Page 0 in BSP A MUST NOT be assumed
  * to be image 0 of BSP B's lightmap bitmap tag.
  */
-import type { MapInspection, MeshData } from './types';
+import type { MapInspection, MeshData, Tag } from './types';
 import { buildMaterialAudit } from './materialAudit.ts';
 import { inspectLightmapPages, lightmapPageKey } from './haloLightmap.ts';
 
 export const MAX_OWNED_PREVIEWS_PER_CLICK = 24;
+
+/** This only schedules native validation; it never admits pixels. Indexed CE
+ * bodies are resolved by exact native slot/path/resource pins in Rust. */
+export function canRequestBitmapMetadata(tag:Pick<Tag,'class'|'external'>|undefined,version:number):boolean{
+  return tag?.class==='bitm'&&(!tag.external||version===609);
+}
 
 export type OwnedMaterialPreviewTask =
   | { kind: 'shader'; shaderTagId: number; bitmapTagId: number; imageIndex: 0; key: string }
@@ -52,7 +58,7 @@ export function planOwnedMaterialPreviews(
       continue;
     }
     const bitmap = tags.get(shader.bitmapTagId);
-    if (!bitmap || bitmap.class !== 'bitm' || bitmap.external || !Number.isSafeInteger(bitmap.id) || bitmap.id < 0) {
+    if (!bitmap || !canRequestBitmapMetadata(bitmap,inspection.header.version) || !Number.isSafeInteger(bitmap.id) || bitmap.id < 0) {
       result.skipped.push({key,reason:'Bitmap tag metadata is external or invalid'});
       continue;
     }
@@ -73,7 +79,7 @@ export function planOwnedMaterialPreviews(
     }
     const id = section[0].lightmapBitmapTagId;
     const tag = id == null ? undefined : tags.get(id);
-    if (!Number.isSafeInteger(id) || id! < 0 || id! > 0xffffffff || !tag || tag.class !== 'bitm' || tag.external) {
+    if (!Number.isSafeInteger(id) || id! < 0 || id! > 0xffffffff || !tag || !canRequestBitmapMetadata(tag,inspection.header.version)) {
       result.skipped.push({key:page.key,reason:'No verified internal lightmap bitmap metadata for this BSP'});
       continue;
     }
