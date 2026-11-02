@@ -73,6 +73,11 @@ export default function WorkspacePanels({
   const [descriptors, setDescriptors] = useState<Descriptor[]>([]),
     [host, setHost] = useState<HTMLDivElement | null>(null),
     [counts, setCounts] = useState<Record<string, number>>({});
+  const shortcuts=useMemo(()=>{
+    const order=['Inspector','Object tags','Camera','Objects'];
+    const rank=(panel:Descriptor)=>{const index=order.indexOf(panel.label);return index<0?order.length:index;};
+    return [...descriptors].sort((a,b)=>rank(a)-rank(b));
+  },[descriptors]);
   useEffect(() => {
     const element=panelButtons;if(!element)return;
     const measure=()=>setOverflowing(element.scrollWidth>element.clientWidth+2);
@@ -182,7 +187,7 @@ export default function WorkspacePanels({
           {onPopout&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={onPopout}><SquareArrowOutUpRight size={14}/></button>}
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
           <div className="gs-panel-buttons" ref={setPanelButtons}>
-            {descriptors.map((panel) => (
+            {shortcuts.map((panel) => (
               <button
                 key={panel.id}
                 type="button"
