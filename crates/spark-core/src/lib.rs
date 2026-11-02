@@ -28,6 +28,7 @@ pub mod tool_ecosystem;
 pub mod native_operations;
 pub mod tag_renames;
 pub mod smart_edit;
+pub mod source_identity;
 pub mod studio_journal;
 pub mod studio_tls;
 pub mod studio_session;

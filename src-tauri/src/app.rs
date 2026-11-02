@@ -330,6 +330,8 @@ fn current_build_matching(state:&AppState,project:&Project,target:Option<&str>)-
 }
 fn inspect(state: &AppState, p: &Project) -> Reply<Arc<MapInspection>> {
     if let Some(i) = lock(&state.inspections)?.get(&p.id) {
+        let source=p.source.as_ref().ok_or("This is an asset workspace without a Halo map")?;
+        core::source_identity::validate(source,&i).map_err(error)?;
         return Ok(i.clone());
     }
     let source = p
@@ -353,6 +355,7 @@ fn inspect(state: &AppState, p: &Project) -> Reply<Arc<MapInspection>> {
             "Preserved source checksum changed. Restore the original map before continuing.".into(),
         );
     }
+    core::source_identity::validate(source,&i).map_err(error)?;
     lock(&state.inspections)?.insert(p.id.clone(), i.clone());
     Ok(i)
 }
@@ -1069,14 +1072,9 @@ async fn auto_connect_sound_resources(app:tauri::AppHandle,window:tauri::Webview
             if !directory.join("sounds_adpcm.fsb").is_file()||!directory.join("lst/sounds_adpcm.lst.bin").is_file(){return Ok(None);}
             Some(core::mcc_audio::pin_mcc(&directory).map_err(error)?)
         }else if [6,7,609].contains(&source.cache_version) {
-            let mut roots=vec![];
-            if let Some(root)=&source.resource_directory{roots.push(root.clone());}
-            if let Some(root)=source.original_path.parent(){roots.push(root.to_path_buf());}
-            if let Some(root)=lock(&state.settings)?.resource_directory.clone(){roots.push(root);}
-            if let Some(root)=mcc{roots.push(root.join("halo1/maps/custom_edition"));}
-            let mut seen=std::collections::HashSet::new();let mut found=None;
-            for root in roots.into_iter().filter(|root|seen.insert(root.clone())).take(6) {
-                if !root.join("sounds.map").is_file(){continue;}
+            let roots=texture_resources_native::resource_roots(&state,&project)?;
+            let mut found=None;
+            for (root,_) in roots.into_iter().filter(|(root,_)|root.join("sounds.map").is_file()).take(12) {
                 let Ok(binding)=core::mcc_audio::pin_classic(&root) else{continue};
                 if source.resource_directory.as_ref()==Some(&root)&&source.resource_sha256.get("sounds.map").is_some_and(|hash|Some(hash)!=binding.sha256.get("sounds.map")){continue;}
                 let matching=inspected.tags.iter().filter(|tag|tag.class=="snd!").take(8).any(|tag|audio::inspect_sound_with_bindings(&source.preserved_path,&source.sha256,tag.id,None,Some(&binding)).is_ok_and(|report|report.permutations.iter().any(|p|!p.embedded&&p.available)));
@@ -2922,6 +2920,8 @@ pub fn run() {
             asset_import_native::prepare_native_asset_import,
             default_materials_native::prepare_default_halo_materials,
             default_materials_native::runtime_texture_source,
+            default_materials_native::map_texture_source,
+            default_materials_native::inspect_map_source,
             default_materials_native::compatible_bitmap_targets,
             open_project,
             connect_mcc_texture_resources,

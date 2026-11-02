@@ -90,6 +90,33 @@ pub(super) fn owned_map_roots(state:&AppState)->Reply<Vec<(PathBuf,String)>>{
     for item in discover(state)?{if item.content_ready{roots.push((item.data_root.join("maps"),item.runtime_id.name().into()));}}
     Ok(roots)
 }
+/// Provenance uses original byte identity and installation roots, never the
+/// selected hosting runtime. Missing/changed originals or ambiguous shared
+/// roots leave provenance unknown; the preserved map remains inspectable.
+pub(super) fn source_origin(state:&AppState,source:&project::Source)->Reply<Option<core::source_identity::RuntimeOrigin>>{
+    fn canonical_local(path:&Path)->Option<PathBuf>{
+        core::library::validate_local_input_path(path).ok()?;core::reject_links(path).ok()?;fs::canonicalize(path).ok()
+    }
+    let Some(original)=canonical_local(&source.original_path) else{return Ok(None)};
+    if !original.is_file()||maps::hash_file(&original).map_err(error)?!=source.sha256{return Ok(None);}
+    let mut matches=vec![];
+    if let Some(mcc)=lock(&state.installation)?.mcc_path.clone(){
+        if canonical_local(&mcc.join("halo1/maps")).is_some_and(|maps|original.starts_with(maps)){
+            matches.push(core::source_identity::RuntimeOrigin{runtime_id:runtime::RuntimeId::MccSteam,root:mcc,executable_sha256:None});
+        }
+    }
+    let registrations:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+    for registration in registrations.into_iter().take(24){
+        let maps=registration.data_root.as_ref().unwrap_or(&registration.root).join("maps");
+        if !canonical_local(&maps).is_some_and(|maps|original.starts_with(maps)){continue;}
+        if let Ok(installation)=runtime::inspect_registration(&registration){
+            if installation.validation==runtime::TestStatus::Pass {
+                matches.push(core::source_identity::RuntimeOrigin{runtime_id:registration.runtime_id,root:installation.root,executable_sha256:installation.executable_sha256});
+            }
+        }
+    }
+    Ok(if matches.len()==1 {matches.pop()}else{None})
+}
 #[tauri::command]
 pub(super) async fn discover_halo_connections(app: tauri::AppHandle) -> Reply<Vec<Detected>> {
     tauri::async_runtime::spawn_blocking(move || discover(&app.state::<AppState>())).await.map_err(error)?

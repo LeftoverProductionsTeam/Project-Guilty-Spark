@@ -375,15 +375,21 @@ pub(super) fn default_material_map(
     state: &AppState,
     runtime: runtime::RuntimeId,
 ) -> Reply<PathBuf> {
-    let version=match runtime {runtime::RuntimeId::MccSteam=>13,runtime::RuntimeId::HaloCustomEdition=>609,runtime::RuntimeId::HaloPc=>7,_=>return Err("Default native source materials need a compatible MCC, CE or PC source map. Link the matching runtime's map folder.".into())};
+    if !matches!(runtime,runtime::RuntimeId::MccSteam|runtime::RuntimeId::HaloCustomEdition|runtime::RuntimeId::HaloPc){
+        return Err("Default native source materials need a compatible MCC, CE or PC source map. Link the matching runtime's map folder.".into());
+    }
+    default_material_map_for(state,&[runtime]).map(|(_,path)|path)
+}
+/// One bounded catalogue scan for a source-derived preview order. The chosen
+/// ID is returned with the actual map, rather than copied from a UI preference.
+pub(super) fn default_material_map_for(state:&AppState,runtimes:&[runtime::RuntimeId])->Reply<(runtime::RuntimeId,PathBuf)> {
+    if runtimes.is_empty()||runtimes.len()>4{return Err("No compatible native material source was requested".into());}
     let found = scan(&roots(state)?);
-    found
-        .maps
-        .into_iter()
-        .find(|c| c.cache_version == Some(version) && c.name.eq_ignore_ascii_case("bloodgulch.map"))
-        .map(|c| c.path)
-        .ok_or(
-            "Link this runtime’s owned Blood Gulch map to supply its exact grass and metal shaders"
-                .into(),
-        )
+    for runtime in runtimes {
+        let version=match runtime {runtime::RuntimeId::MccSteam=>13,runtime::RuntimeId::HaloCustomEdition=>609,runtime::RuntimeId::HaloPc=>7,_=>continue};
+        if let Some(candidate)=found.maps.iter().find(|c|c.cache_version==Some(version)&&c.name.eq_ignore_ascii_case("bloodgulch.map")) {
+            return Ok((*runtime,candidate.path.clone()));
+        }
+    }
+    Err("Link an owned matching Blood Gulch map to supply its exact grass and metal shaders".into())
 }

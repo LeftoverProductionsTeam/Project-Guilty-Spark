@@ -1,18 +1,58 @@
 use super::*;
 #[tauri::command]
 pub(super) async fn runtime_texture_source(app:tauri::AppHandle,window:tauri::WebviewWindow,runtime_id:runtime::RuntimeId)->Reply<OpenProject>{
+    material_preview_source(app,window,vec![runtime_id,runtime::RuntimeId::MccSteam,runtime::RuntimeId::HaloCustomEdition,runtime::RuntimeId::HaloPc]).await.map(|(_,open)|open)
+}
+async fn material_preview_source(app:tauri::AppHandle,window:tauri::WebviewWindow,runtimes:Vec<runtime::RuntimeId>)->Reply<(runtime::RuntimeId,OpenProject)>{
     let handle=app.clone();
-    let open=tauri::async_runtime::spawn_blocking(move||{
+    let (selected,open)=tauri::async_runtime::spawn_blocking(move||{
         let state=handle.state::<AppState>();
         // Community runtimes may use an owned PC/MCC material source for editor
         // preview. This does not change the stricter native build material route.
-        let path=[runtime_id,runtime::RuntimeId::MccSteam,runtime::RuntimeId::HaloCustomEdition,runtime::RuntimeId::HaloPc].into_iter().find_map(|target|asset_sources_native::default_material_map(&state,target).ok()).ok_or("Link an owned MCC, CE or PC Blood Gulch map for editor material previews")?;
+        let (selected,path)=asset_sources_native::default_material_map_for(&state,&runtimes)?;
         let (project,inspection)=lock(&state.library)?.import_map(&path,path.parent()).map_err(error)?;
         lock(&state.inspections)?.insert(project.id.clone(),Arc::new(inspection.clone()));
-        Ok::<_,String>(OpenProject{project,inspection:Some(inspection)})
+        Ok::<_,String>((selected,OpenProject{project,inspection:Some(inspection)}))
     }).await.map_err(error)??;
-    if open.project.source.as_ref().is_some_and(|s|s.cache_version==13){connect_mcc_texture_resources(app,window,open.project.id).await}
-    else {Ok(texture_resources_native::auto_connect(app,window,open.project.id.clone()).await?.unwrap_or(open))}
+    let open=if open.project.source.as_ref().is_some_and(|s|s.cache_version==13){connect_mcc_texture_resources(app,window,open.project.id).await?}
+    else {texture_resources_native::auto_connect(app,window,open.project.id.clone()).await?.unwrap_or(open)};
+    Ok((selected,open))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub(super) struct MapTextureSource {
+    identity:core::source_identity::SourceIdentity,
+    runtime_id:runtime::RuntimeId,
+    open:OpenProject,
+}
+fn source_context(state:&AppState,project:&Project,inspection:&MapInspection)->Reply<core::source_identity::SourceIdentity>{
+    let mut identity=core::source_identity::describe(project,inspection).map_err(error)?;
+    identity.runtime_origin=runtime_connections::source_origin(state,&identity.source)?;
+    Ok(identity)
+}
+#[tauri::command]
+pub(super) async fn map_texture_source(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,source_sha256:String)->Reply<MapTextureSource>{
+    let handle=app.clone();
+    let identity=tauri::async_runtime::spawn_blocking(move||{
+        let state=handle.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let inspection=inspect(&state,&project)?;
+        let identity=source_context(&state,&project,&inspection)?;
+        if identity.source.sha256!=source_sha256||maps::hash_file(&identity.source.preserved_path).map_err(error)?!=source_sha256 {
+            return Err("Map texture source changed before resource discovery".into());
+        }
+        Ok::<_,String>(identity)
+    }).await.map_err(error)??;
+    let (runtime_id,open)=material_preview_source(app,window,identity.candidate_preview_runtimes.clone()).await?;
+    Ok(MapTextureSource{identity,runtime_id,open})
+}
+
+#[tauri::command]
+pub(super) async fn inspect_map_source(app:tauri::AppHandle,project_id:String)->Reply<core::source_identity::SourceIdentity>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
+        let inspection=inspect(&state,&project)?;let identity=source_context(&state,&project,&inspection)?;
+        if maps::hash_file(&identity.source.preserved_path).map_err(error)?!=identity.source.sha256{return Err("Preserved map changed before source identification".into());}Ok(identity)
+    }).await.map_err(error)?
 }
 
 #[tauri::command]

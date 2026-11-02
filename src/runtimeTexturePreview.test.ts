@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OpenProject, Project, MapInspection } from './types';
 import type { VerifiedBatchImage } from './ownedBitmapBatch';
-const mock = vi.hoisted(() => ({ call: vi.fn() }));
+const mock = vi.hoisted(() => ({ call: vi.fn(), hosting: vi.fn(()=>'mccSteam') }));
 vi.mock('./api', () => ({ call: mock.call }));
-vi.mock('./mapSession', () => ({ readMapSession: () => 'mccSteam' }));
+vi.mock('./mapSession', () => ({ readMapSession: mock.hosting }));
 import { defaultPreviewMaterials, fillRuntimeTexturePreviews } from './runtimeTexturePreview';
 const sourceHash = 'a'.repeat(64),
   runtimeHash = 'b'.repeat(64),
@@ -14,10 +14,10 @@ const inspection = {
   sha256: sourceHash,
   tags: [tag(1), tag(2, 'textures/embedded')],
 } as MapInspection;
-const project = { id: 'source', source: { sha256: sourceHash, resourceSha256: {} } } as Project;
+const project = { id: 'source', source: { sha256: sourceHash, cacheVersion:6, resourceSha256: {} } } as Project;
 const runtime = {
   project: { id: 'runtime', source: { sha256: runtimeHash, resourceSha256: { 'mcc-textures': packHash } } },
-  inspection: { sha256: runtimeHash, tags: [tag(9)] },
+  inspection: { sha256: runtimeHash, tags: [tag(9),tag(10,'textures/embedded')] },
 } as unknown as OpenProject;
 function preview() {
   const bytes = new Uint8Array(132),
@@ -62,8 +62,10 @@ const refusal = (code = 'missing-resource'): VerifiedBatchImage => ({
 const mapping = { sourceBitmapTagId: 1, bitmapTagId: 9, imageIndex: 0, width: 1, height: 1, format: 'BGRA8' };
 beforeEach(() => {
   mock.call.mockReset();
-  mock.call.mockImplementation(async (command: string) => {
+  mock.hosting.mockClear();
+  mock.call.mockImplementation(async (command: string,args:any) => {
     if(command==='original_bitmap_preview_sources')return [];
+    if(command==='map_texture_source')return {identity:{schemaVersion:1,projectId:args.projectId,source:structuredClone(project.source)},runtimeId:'mccSteam',open:structuredClone(runtime)};
     if (command === 'runtime_texture_source') return structuredClone(runtime);
     if (command === 'compatible_bitmap_targets') return [mapping];
     if (command === 'preview_owned_cache_bitmap_batch')
@@ -76,6 +78,42 @@ beforeEach(() => {
   });
 });
 describe('viewer-only compatible runtime pixels', () => {
+  it('refuses a foreign native source plan and retries a corrected plan without changing compiler pins',async()=>{
+    const p={...project,id:'foreign-plan'},decoded=new Map([['1:0',refusal()]]);
+    const original=structuredClone(p);let foreign=true;
+    mock.call.mockImplementation(async(command:string)=>{
+      if(command==='original_bitmap_preview_sources')return [];
+      if(command==='map_texture_source')return {identity:{schemaVersion:1,projectId:foreign?'other-map':p.id,source:structuredClone(p.source)},runtimeId:'mccSteam',open:structuredClone(runtime)};
+      if(command==='compatible_bitmap_targets')return [mapping];
+      if(command==='preview_owned_cache_bitmap_batch')return {sourceSha256:runtimeHash,resourceSha256:packHash,items:[{bitmapTagId:9,imageIndex:0,preview:preview()}]};
+      throw Error(command);
+    });
+    expect(await fillRuntimeTexturePreviews(p,inspection,[target],decoded)).toBe(decoded);
+    expect(mock.call.mock.calls.some(([command])=>command==='compatible_bitmap_targets')).toBe(false);
+    foreign=false;
+    expect((await fillRuntimeTexturePreviews(p,inspection,[target],decoded)).get('1:0')?.image).not.toBeNull();
+    expect(p).toEqual(original);
+  });
+  it('resolves by preserved source identity without consulting the hosting runtime',async()=>{
+    const result=await fillRuntimeTexturePreviews({...project,id:'hosting-independent'},inspection,[target],new Map([['1:0',refusal()]]));
+    expect(result.get('1:0')?.image).not.toBeNull();expect(mock.hosting).not.toHaveBeenCalled();
+    expect(mock.call).toHaveBeenCalledWith('map_texture_source',{projectId:'hosting-independent',sourceSha256:sourceHash});
+  });
+  it('keeps partially recovered original pixels and requests compatible pixels only for the unresolved remainder',async()=>{
+    mock.call.mockImplementation(async(command:string,args:any)=>{
+      if(command==='original_bitmap_preview_sources')return [{projectId:'original-partial',sourceSha256:sourceHash,resourceSha256:packHash}];
+      if(command==='map_texture_source')return {identity:{schemaVersion:1,projectId:args.projectId,source:structuredClone(project.source)},runtimeId:'mccSteam',open:structuredClone(runtime)};
+      if(command==='runtime_texture_source')return structuredClone(runtime);
+      if(command==='compatible_bitmap_targets')return args.requests.map((r:any)=>({...mapping,sourceBitmapTagId:r.bitmapTagId,bitmapTagId:r.bitmapTagId===1?9:10}));
+      if(command==='preview_owned_cache_bitmap_batch'&&args.projectId==='original-partial')return {sourceSha256:sourceHash,resourceSha256:packHash,items:[{bitmapTagId:1,imageIndex:0,preview:{...preview(),bitmapTagId:1,sourceSha256:sourceHash}},{bitmapTagId:2,imageIndex:0,preview:null,error:'No exact original image',errorCode:'missing-resource'}]};
+      if(command==='preview_owned_cache_bitmap_batch')return {sourceSha256:runtimeHash,resourceSha256:packHash,items:args.requests.map((r:any)=>({bitmapTagId:r.bitmapTagId,imageIndex:0,preview:{...preview(),bitmapTagId:r.bitmapTagId}}))};
+      throw Error(command);
+    });
+    const result=await fillRuntimeTexturePreviews({...project,id:'partial-original'},inspection,[target,{...target,bitmapTagId:2}],new Map([['1:0',refusal()],['2:0',{...refusal(),bitmapTagId:2}]]));
+    expect(result.get('1:0')?.recoveredResourceProjectId).toBe('original-partial');
+    expect(result.get('1:0')?.compatibleRuntime).toBeUndefined();expect(result.get('2:0')?.image).not.toBeNull();
+    expect(mock.call).toHaveBeenCalledWith('compatible_bitmap_targets',{projectId:'partial-original',runtimeProjectId:'runtime',requests:[{bitmapTagId:2,imageIndex:0}]});
+  });
   it('recovers missing tree pixels from an exact-map original pack without changing compiler bindings',async()=>{
     const original=structuredClone(project);
     mock.call.mockImplementation(async(command:string)=>{

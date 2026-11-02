@@ -103,6 +103,9 @@ pub fn compatibility(
 ) -> CompatibilityReport {
     let mut blockers = vec![];
     let mut warnings = vec![];
+    if let Some(source)=&project.source {
+        if let Err(problem)=crate::source_identity::validate(source,inspection){blockers.push(problem.to_string());}
+    }
     if crate::native_audio::requested(project) {
         blockers.push("Native looping emitters currently require the MCC QuickForge source build; existing-map conversion cannot add them".into());
     }

@@ -1,14 +1,34 @@
 import { call } from './api';
-import { readMapSession } from './mapSession';
 import type { MapInspection, OpenProject, Project, RuntimeId } from './types';
 import { bitmapImageKey, decodeOwnedBitmapBatch } from './ownedBitmapBatch';
 import type { OwnedBitmapBatchResponse, VerifiedBatchImage } from './ownedBitmapBatch';
 import type { OwnedBitmapTarget } from './ownedBitmapPreview';
 import type { ForgeMaterial } from './forge';
-import { publishTextureResources } from './textureResourceScope';
+import { publishTextureResources, textureResourceScope } from './textureResourceScope';
+import type { MapTextureSource } from './sourceIdentity';
 export { withPreviewDefaults } from './forgeDefaultMaterials';
 
 const sources = new Map<RuntimeId, Promise<OpenProject>>();
+const mapSources = new Map<string, Promise<MapTextureSource>>();
+function mapTextureSource(project: Project, inspection: MapInspection): Promise<MapTextureSource> {
+  const key=JSON.stringify([project.id,project.source?.originalPath,project.source?.preservedPath,project.source?.cacheVersion,textureResourceScope(project.source)]);
+  let pending=mapSources.get(key);
+  if(!pending){
+    pending=call<MapTextureSource>('map_texture_source',{projectId:project.id,sourceSha256:inspection.sha256}).then(result=>{
+      const identity=result.identity;
+      if(identity?.schemaVersion!==1||identity.projectId!==project.id||identity.source.sha256!==inspection.sha256||
+          identity.source.cacheVersion!==inspection.header.version||identity.source.originalPath!==project.source?.originalPath||
+          identity.source.preservedPath!==project.source?.preservedPath||textureResourceScope(identity.source)!==textureResourceScope(project.source))
+        throw Error('The native texture search belongs to a different source revision');
+      publishTextureResources(result.open.project);
+      return result;
+    }).catch(error=>{if(mapSources.get(key)===pending)mapSources.delete(key);throw error;});
+    mapSources.set(key,pending);
+    // Retention is bounded per source/resource identity, not per hosting choice.
+    while(mapSources.size>16)mapSources.delete(mapSources.keys().next().value!);
+  }
+  return pending;
+}
 export function runtimeTextureSource(runtimeId: RuntimeId): Promise<OpenProject> {
   let pending = sources.get(runtimeId);
   if (!pending) {
@@ -54,7 +74,8 @@ export async function fillRuntimeTexturePreviews(
   targets: OwnedBitmapTarget[],
   decoded: Map<string, VerifiedBatchImage>,
 ): Promise<Map<string, VerifiedBatchImage>> {
-  if (![6, 7, 609].includes(inspection.header.version)) return decoded;
+  if (!project.source||project.source.sha256!==inspection.sha256||project.source.cacheVersion!==inspection.header.version||
+      ![6, 7, 609].includes(inspection.header.version)) return decoded;
   const missing = targets.filter((t) => {
     const item = decoded.get(bitmapImageKey(t.bitmapTagId, t.imageIndex ?? 0));
     return (
@@ -62,7 +83,7 @@ export async function fillRuntimeTexturePreviews(
       ['missing-resource', 'resource-mismatch', 'resource-unavailable'].includes(item?.errorCode ?? '')
     );
   });
-  if (!missing.length) return decoded;
+  if (!missing.length||missing.some(target=>target.sourceSha256!==inspection.sha256)) return decoded;
   // Old projects can have a partial stock pack pinned while another preserved
   // variant holds the real original pack. Same SHA means the exact tag IDs and
   // bitmap metadata agree. Each candidate's native batch still verifies all
@@ -82,16 +103,19 @@ export async function fillRuntimeTexturePreviews(
     }
     if(missing.every(t=>decoded.get(bitmapImageKey(t.bitmapTagId,t.imageIndex??0))?.image))return decoded;
   }catch{/* Missing recovery candidates leave the explicit runtime preview path available. */}
-  const runtimeId = readMapSession<RuntimeId>(project.id, 'hosting.runtime', 'mccSteam');
+  // Original recovery can be partial. Never include its successful pixels in
+  // a later substitution request or replace them with compatible runtime data.
+  const unresolved=missing.filter(target=>!decoded.get(bitmapImageKey(target.bitmapTagId,target.imageIndex??0))?.image);
+  if(!unresolved.length)return decoded;
   try {
-    const open = await runtimeTextureSource(runtimeId);
+    const {open,runtimeId} = await mapTextureSource(project,inspection);
     if (!open.inspection || open.inspection.sha256 === inspection.sha256) return decoded;
     const matches = await call<Match[]>('compatible_bitmap_targets', {
       projectId: project.id,
       runtimeProjectId: open.project.id,
-      requests: missing.map((t) => ({ bitmapTagId: t.bitmapTagId, imageIndex: t.imageIndex ?? 0 })),
+      requests: unresolved.map((t) => ({ bitmapTagId: t.bitmapTagId, imageIndex: t.imageIndex ?? 0 })),
     });
-    if (!Array.isArray(matches) || matches.length > missing.length)
+    if (!Array.isArray(matches) || matches.length > unresolved.length)
       throw Error('Unbounded compatibility mapping');
     const seen = new Set<string>();
     for (const m of matches) {
@@ -100,7 +124,7 @@ export async function fillRuntimeTexturePreviews(
         b = open.inspection.tags.find((t) => t.id === m.bitmapTagId && t.class === 'bitm');
       if (
         seen.has(key) ||
-        !missing.some((t) => t.bitmapTagId === m.sourceBitmapTagId && (t.imageIndex ?? 0) === m.imageIndex) ||
+        !unresolved.some((t) => t.bitmapTagId === m.sourceBitmapTagId && (t.imageIndex ?? 0) === m.imageIndex) ||
         !a ||
         !b ||
         normalized(a.path) !== normalized(b.path)

@@ -46,7 +46,9 @@ fn candidate_file(root: &Path) -> Option<PathBuf> {
     fs::canonicalize(file).ok()
 }
 
-pub(super) fn candidates(state: &AppState, project: &Project) -> Reply<Vec<Candidate>> {
+/// Shared folder discovery only. Bitmap and sound readers keep separate
+/// format, exact-pin, sample/span and coverage admission below this boundary.
+pub(super) fn resource_roots(state: &AppState, project: &Project) -> Reply<Vec<(PathBuf,&'static str)>> {
     let mut roots: Vec<(PathBuf, &str)> = vec![];
     if let Some(source) = &project.source {
         if let Some(path) = &source.resource_directory {
@@ -102,8 +104,20 @@ pub(super) fn candidates(state: &AppState, project: &Project) -> Reply<Vec<Candi
             roots.push((path.join("maps"), "Registered runtime data"));
         }
     }
+    let mut seen=HashSet::new();
+    Ok(roots.into_iter().filter_map(|(root,reason)|{
+        let directory=std::path::absolute(&root).ok()?;
+        core::library::validate_local_input_path(&directory).ok()?;core::reject_links(&directory).ok()?;
+        if !directory.is_dir(){return None;}
+        let canonical=fs::canonicalize(&directory).ok()?;
+        // Keep the recorded spelling for existing pin-location guards; the
+        // canonical identity is used only for deduplication.
+        seen.insert(canonical).then_some((root,reason))
+    }).collect())
+}
+pub(super) fn candidates(state: &AppState, project: &Project) -> Reply<Vec<Candidate>> {
     let mut seen = HashSet::new();
-    Ok(roots
+    Ok(resource_roots(state,project)?
         .into_iter()
         .filter_map(|(root, reason)| {
             let file = candidate_file(&root)?;
