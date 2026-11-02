@@ -1,4 +1,5 @@
 import { ExternalLink, PackageOpen, X } from 'lucide-react';
+import { useLayoutEffect, useRef } from 'react';
 import type { MapDocuments } from '../mapDocuments';
 export default function MapTabs({
   state,
@@ -15,10 +16,17 @@ export default function MapTabs({
   onWindow: (id: string) => void;
   onAssets: () => void;
 }) {
+  const tabs = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const list=tabs.current;if(!list)return;
+    const reveal=()=>list.querySelector('[aria-selected="true"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
+    reveal();const observer=new ResizeObserver(reveal);observer.observe(list);
+    return()=>observer.disconnect();
+  }, [state.activeId,state.documents.length]);
   if (!state.documents.length) return null;
   return (
     <div className="map-tab-bar">
-      <div className="map-tabs" role="tablist" aria-label="Open maps">
+      <div ref={tabs} className="map-tabs" role="tablist" aria-label="Open maps">
         {state.documents.map((d) => (
           <div className={'map-tab' + (d.id === state.activeId ? ' active' : '')} key={d.id}>
             <button
@@ -70,7 +78,7 @@ export default function MapTabs({
           </div>
         ))}
       </div>
-      <button className="small-button" disabled={disabled} onClick={onAssets}>
+      <button className="small-button" title="Transfer assets between open maps" aria-label="Transfer assets" disabled={disabled} onClick={onAssets}>
         <PackageOpen size={14} /> Transfer assets
       </button>
     </div>

@@ -639,6 +639,28 @@ test('narrow workspaces expose every drawer and Escape closes its options before
  await page.keyboard.press('Escape');await expect(drawer).toBeHidden();expect(await viewport.boundingBox()).toEqual(before);
 });
 
+test('the single header reserves map-tab space and keeps overflow drawers reachable after portal mounting',async({page},testInfo)=>{
+ await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();await chooseTool(page,'Level editor');
+ await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-selected','true');
+ for(const width of [1920,1440,1280,960,880]){
+  await page.setViewportSize({width,height:800});
+  const header=page.locator('#gs-window-header');
+  await expect.poll(()=>header.evaluate(element=>{
+   const rect=element.getBoundingClientRect(),children=[...element.children].map(child=>child.getBoundingClientRect()).filter(child=>child.width>0&&child.height>0);
+   return children.every((child,index)=>child.left>=rect.left-1&&child.right<=rect.right+1&&(!index||children[index-1].right<=child.left+1));
+  })).toBe(true);
+  const tabs=page.getByRole('tablist',{name:'Open maps',exact:true}),active=page.getByRole('tab',{name:'Synthetic candidate',exact:true});
+  const bar=await page.locator('.map-tab-bar').boundingBox();expect(bar!.width).toBeGreaterThanOrEqual(168);
+  await expect.poll(async()=>{const list=await tabs.boundingBox(),button=await active.boundingBox();return button!.x>=list!.x-1&&button!.x+button!.width<=list!.x+list!.width+1;}).toBe(true);
+  const more=page.getByLabel('More workspace drawers',{exact:true});await expect(more).toBeVisible();await more.click();
+  const menu=page.getByRole('menu',{name:'Workspace drawers',exact:true});await expect(menu).toBeInViewport();
+  await menu.getByRole('menuitemcheckbox',{name:'Object tags',exact:true}).click();await expect(page.getByRole('region',{name:'Object tags panel',exact:true})).toBeVisible();
+  await expect(active).toHaveAttribute('aria-selected','true');await page.keyboard.press('Escape');
+  if(width===1920||width===880)await page.screenshot({path:testInfo.outputPath(`header-space-${width}.png`)});
+ }
+});
+
 test('tag classes expand their matching tags and keep the selected editor when folded',async({page})=>{
  await mockDesktop(page);await openFixture(page);
  const group=page.getByRole('button',{name:/class \(weap\)/});await expect(group).toHaveAttribute('aria-expanded','true');

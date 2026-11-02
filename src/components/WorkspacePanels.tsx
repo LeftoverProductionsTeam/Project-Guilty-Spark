@@ -65,7 +65,7 @@ export default function WorkspacePanels({
   const [frameError, setFrameError] = useState('');
   const [windowHost,setWindowHost]=useState<HTMLElement|null>(null);
   useEffect(()=>setWindowHost(document.getElementById('gs-window-actions')),[]);
-  const panelButtons = useRef<HTMLDivElement>(null);
+  const [panelButtons, setPanelButtons] = useState<HTMLDivElement | null>(null);
   const [overflowing, setOverflowing] = useState(false);
   const [contentHosts, setContentHosts] = useState<Record<string, HTMLDivElement | null>>({});
   const attachContent = useCallback((id:string,element:HTMLDivElement|null)=>setContentHosts(old=>old[id]===element?old:{...old,[id]:element}),[]);
@@ -74,11 +74,11 @@ export default function WorkspacePanels({
     [host, setHost] = useState<HTMLDivElement | null>(null),
     [counts, setCounts] = useState<Record<string, number>>({});
   useEffect(() => {
-    const element=panelButtons.current;if(!element)return;
+    const element=panelButtons;if(!element)return;
     const measure=()=>setOverflowing(element.scrollWidth>element.clientWidth+2);
     measure();const observer=new ResizeObserver(measure);observer.observe(element);
     return()=>observer.disconnect();
-  },[descriptors]);
+  },[panelButtons,descriptors]);
   const context = useMemo<ContextValue>(
     () => ({
       contentHosts,
@@ -181,7 +181,7 @@ export default function WorkspacePanels({
           </button>
           {onPopout&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={onPopout}><SquareArrowOutUpRight size={14}/></button>}
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
-          <div className="gs-panel-buttons" ref={panelButtons}>
+          <div className="gs-panel-buttons" ref={setPanelButtons}>
             {descriptors.map((panel) => (
               <button
                 key={panel.id}
