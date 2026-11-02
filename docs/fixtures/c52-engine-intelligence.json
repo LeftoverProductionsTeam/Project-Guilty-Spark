@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "continuation": 52,
+  "sourceCommit": "2d24da3632d6359cfe32c54038c64356a1540a40",
+  "startingMaster": "c0f43f39b7a055f289603547b238ef00f534fabc",
+  "application": {
+    "version": "0.4.1",
+    "platform": "Windows x64",
+    "path": "target/release/GuiltySpark.exe",
+    "bytes": 42283520,
+    "sha256": "8c1ccb4ddd43dfe3ec0f27a441508f7825239529372a6287f3b5c0f0e4a60b55",
+    "sourceCommit": "2d24da3632d6359cfe32c54038c64356a1540a40",
+    "packagedWebview": true,
+    "build": "pnpm exec tauri build --no-bundle",
+    "newInstallerOrPortable": false
+  },
+  "sourceResearch": {
+    "repositories": 6,
+    "behaviorReferences": 30,
+    "allSelectedFilesRehashed": 10368,
+    "selectedFileBytes": 180485509,
+    "storageIncludingGit": [
+      {
+        "name": "chupa",
+        "files": 2643,
+        "bytes": 71663637
+      },
+      {
+        "name": "halo-bnunu",
+        "files": 3137,
+        "bytes": 47540440
+      },
+      {
+        "name": "halo-original",
+        "files": 923,
+        "bytes": 10176958
+      },
+      {
+        "name": "invader",
+        "files": 506,
+        "bytes": 17265606
+      },
+      {
+        "name": "opence",
+        "files": 2880,
+        "bytes": 95450412
+      },
+      {
+        "name": "reclaimer",
+        "files": 503,
+        "bytes": 4543281
+      }
+    ],
+    "engineModulesIncorporated": 0
+  },
+  "nativeReaders": {
+    "ce": {
+      "cacheVersion": 609,
+      "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "sourceUnchanged": true,
+      "bspParts": 1,
+      "renderTriangles": 5503,
+      "modelTypes": 68,
+      "requestedImages": 121,
+      "decodedImages": 121,
+      "requestedCubes": 12,
+      "decodedCubes": 12,
+      "soundReports": 1,
+      "playableSampleReports": 0,
+      "inspectMs": 2915.2904,
+      "bitmapMs": 128168.93200000002,
+      "totalMs": 226872.14839999998
+    },
+    "chupathingyA10": {
+      "cacheVersion": 5,
+      "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+      "sourceUnchanged": true,
+      "bspParts": 9,
+      "renderTriangles": 364774,
+      "modelTypes": 70,
+      "requestedImages": 425,
+      "decodedImages": 425,
+      "requestedCubes": 17,
+      "decodedCubes": 17,
+      "soundReports": 3,
+      "playableSampleReports": 3,
+      "inspectMs": 902.6144,
+      "bitmapMs": 7298.8622000000005,
+      "totalMs": 11487.6413
+    }
+  },
+  "nativeApp": {
+    "finalBindings": {
+      "sourceShaders": 159,
+      "compatibleShaders": 0,
+      "sourceLightmaps": 15,
+      "sourceDetails": 233,
+      "sourceReflections": 73,
+      "pendingMaterials": 0
+    },
+    "actualAssetPreview": {
+      "alt": "Actual textured Halo model: mp_warthog",
+      "width": 162,
+      "height": 96,
+      "bytes": 9282
+    },
+    "finalOriginalResourcesUnchanged": true,
+    "monitor": {
+      "source": {
+        "sha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+        "monitor": [
+          {
+            "id": 3785621552,
+            "path": "characters\\monitor\\monitor",
+            "class": "bipd"
+          }
+        ]
+      },
+      "alpha": {
+        "width": 96,
+        "height": 96,
+        "opaque": 7043,
+        "lowAlpha": 2108,
+        "max": 255
+      },
+      "bounds": {
+        "x": 8,
+        "y": 8,
+        "width": 64,
+        "height": 64
+      },
+      "glass": {
+        "parentIsBody": true,
+        "ancestorOpacity": "1",
+        "windowOpacity": "0.35"
+      },
+      "complete": true
+    },
+    "fourRuntimeOrigins": [
+      {
+        "runtime": "mccSteam",
+        "cacheVersion": 13,
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "renderTriangles": 5503,
+        "modelTypes": 68,
+        "origin": "mccSteam",
+        "originalAndPreservedUnchanged": true
+      },
+      {
+        "runtime": "haloCustomEdition",
+        "cacheVersion": 609,
+        "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "renderTriangles": 5503,
+        "modelTypes": 68,
+        "origin": "haloCustomEdition",
+        "originalAndPreservedUnchanged": true
+      },
+      {
+        "runtime": "openCe",
+        "cacheVersion": 5,
+        "sourceSha256": "0a7b26d6d828e7b773d36d9d5c798b9bf4b143332301a0c0e7a3d685782eab48",
+        "renderTriangles": 235145,
+        "modelTypes": 63,
+        "origin": "openCe",
+        "originalAndPreservedUnchanged": true
+      },
+      {
+        "runtime": "chupathingyCe",
+        "cacheVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "renderTriangles": 364774,
+        "modelTypes": 70,
+        "origin": "chupathingyCe",
+        "originalAndPreservedUnchanged": true
+      }
+    ]
+  },
+  "timing": {
+    "scope": "Content recovery observations, not an optimization benchmark. Baseline omits the textures the repair restores; parallel load/cache state differs in later runs.",
+    "before": {
+      "importMs": 1078.016,
+      "firstViewMs": 5351.5936,
+      "bindings": {
+        "sourceShaders": 0,
+        "compatibleShaders": 0,
+        "sourceLightmaps": 0,
+        "sourceDetails": 0,
+        "sourceReflections": 0,
+        "pendingMaterials": 0
+      }
+    },
+    "firstRepair": {
+      "importMs": 933.9314999999997,
+      "firstViewMs": 12587.7835,
+      "bindings": {
+        "sourceShaders": 159,
+        "compatibleShaders": 0,
+        "sourceLightmaps": 15,
+        "sourceDetails": 233,
+        "sourceReflections": 73,
+        "pendingMaterials": 0
+      }
+    },
+    "final": {
+      "importMs": 1490.7584000000002,
+      "firstViewMs": 12960.571999999998
+    },
+    "performanceImprovementClaimed": false
+  },
+  "nativeAi": [
+    {
+      "scenario": "a30",
+      "sourceRevision": "da8d455623cf50002e6a798b1980068fd3ca0292",
+      "runtime": "opence-build-335",
+      "processes": 2,
+      "physicalComputers": 1,
+      "sourceMap": {
+        "name": "a30.map",
+        "bytes": 152610816,
+        "sha256": "4875fa105e6c517589a796cfdcc7fcaa07e98df13d14e601bfc9eb1eab7e30b5",
+        "cacheVersion": 5
+      },
+      "forcedShotCues": 0,
+      "forcedKillCues": 0,
+      "renderer": "native null",
+      "audio": "disabled, dummy output; diagnostic only",
+      "joined": true,
+      "actorCounts": [
+        {
+          "role": "host",
+          "maximumActorPool": 5,
+          "maximumNetworkActors": 0
+        },
+        {
+          "role": "client",
+          "maximumActorPool": 0,
+          "maximumNetworkActors": 0
+        }
+      ],
+      "matchedServerTicks": 63,
+      "sharedActorIds": 0,
+      "movingActorIds": 0,
+      "firingControlActorIds": 0,
+      "hostAuthorityObserved": false,
+      "missingClientUnitTicks": 0,
+      "knownAiMissingHostUnitTicks": 0,
+      "mismatchedTagUnitTicks": 0,
+      "healthDelta": null,
+      "nativeClassifiedFaults": false,
+      "fullLifecycleAcceptance": false,
+      "reconnectAccepted": false
+    },
+    {
+      "scenario": "b30",
+      "sourceRevision": "da8d455623cf50002e6a798b1980068fd3ca0292",
+      "runtime": "opence-build-335",
+      "processes": 2,
+      "physicalComputers": 1,
+      "sourceMap": {
+        "name": "b30.map",
+        "bytes": 162877440,
+        "sha256": "a6e2ae628f96b666922d6429541068c3e117e8aa5031d00d187b3c853630be0f",
+        "cacheVersion": 5
+      },
+      "forcedShotCues": 0,
+      "forcedKillCues": 0,
+      "renderer": "native null",
+      "audio": "disabled, dummy output; diagnostic only",
+      "joined": true,
+      "actorCounts": [
+        {
+          "role": "host",
+          "maximumActorPool": 92,
+          "maximumNetworkActors": 44
+        },
+        {
+          "role": "client",
+          "maximumActorPool": 0,
+          "maximumNetworkActors": 44
+        }
+      ],
+      "matchedServerTicks": 172,
+      "sharedActorIds": 42,
+      "movingActorIds": 34,
+      "firingControlActorIds": 10,
+      "hostAuthorityObserved": true,
+      "missingClientUnitTicks": 336,
+      "knownAiMissingHostUnitTicks": 462,
+      "mismatchedTagUnitTicks": 0,
+      "healthDelta": {
+        "count": 5372,
+        "median": 0,
+        "p95": 0.000012159347534179688,
+        "maximum": 0.19998767971992493
+      },
+      "nativeClassifiedFaults": false,
+      "fullLifecycleAcceptance": false,
+      "reconnectAccepted": false
+    }
+  ],
+  "regressions": {
+    "rust": {
+      "suites": 44,
+      "passed": 642,
+      "failed": 0,
+      "ignored": 8
+    },
+    "frontend": {
+      "passed": 319,
+      "files": 73
+    },
+    "browser": {
+      "passed": 149
+    },
+    "offline": {
+      "programs": 59
+    },
+    "nativeAnalyzers": {
+      "passed": 37
+    },
+    "sourceIndex": {
+      "projects": 6,
+      "behaviors": 30,
+      "offlineAndLocalHashChecks": true
+    }
+  },
+  "preservation": {
+    "c49AllFiveArtifactsUnchanged": true,
+    "c49Source": "cb07581597de11e83d1c10bafad526e8b031f27e",
+    "nonMasterBranchRefsVerified": 20,
+    "historicalBranchPointerRestored": {
+      "reference": "refs/heads/codex/continuation-34-runtime-integration",
+      "commit": "d6bfe25666aad35aa63cd1fdd7082d71ca72119b",
+      "createOnly": true,
+      "commitRemainedReachable": true
+    },
+    "original92Unchanged": true,
+    "ledger": {
+      "precedingRecords": 449,
+      "appended": 3,
+      "total": 452,
+      "preservedPrefixBytes": 965743,
+      "preservedPrefixSha256": "b03d115a63002f385c15c28688c8a5c73cb4693b60c162c023549bc9965344ac",
+      "precedingSource": "c0f43f39b7a055f289603547b238ef00f534fabc"
+    },
+    "rootDirtyWorktreeUntouched": true,
+    "priorGoodExeSha256": "fea8e1906a011303932f2faf41351e28bb9a006a87fc7fb5edc86fecbff7efe2"
+  },
+  "distribution": {
+    "remotePushAttempted": false,
+    "releasePublished": false,
+    "linuxPackagesVerified": false
+  },
+  "openGates": [
+    "CE mixed-source indexed sound metadata",
+    "Native shader/audio parity and actual game listening",
+    "Original automatic carrier release; unforced authored Firefight placement/combat",
+    "Full AI targeting, natural damage/death/removal, seat consistency and reconnect acceptance",
+    "Timberland-Sidewinder human two-way traversal",
+    "Two-computer LAN/VPN and authorized Steam collaboration",
+    "Direct compiled-map structural editing",
+    "Universal conversion, live object/BSP replacement and cross-runtime networking",
+    "Public release publication and verified Linux packages"
+  ]
+}

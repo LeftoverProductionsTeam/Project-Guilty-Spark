@@ -1,5 +1,7 @@
 # Runtime capability evidence
 
+C52 links existing OpenCE/Chupathingy AI and co-op evidence to pinned upstream source locations. The report keeps them upstream-declared and unavailable for unaccepted operations; finding an executable or supplying protocol/player-count observations cannot promote them. The [Engine Source Atlas](ENGINE_SOURCE_ATLAS.md) distinguishes source revision, installed publisher build, content, editor, gameplay and network compatibility. Native CE indexed-bitmap recovery is a source-preview repair, not a universal live adapter or game-protocol bridge. [C52 native results](CONTINUATION_52_ENGINEERING.md).
+
 C41 direct writes are reviewed only for unextended/uncompressed MCC Halo 1 cache 13 and listed scalar/placement cells. Other runtime names and manual choices confer no write permission. Native source builds retain their own compatible compiler gates. Temporary bound MCC moves reuse the exact-build adapter and need fresh game acceptance; they do not add spawning, BSP replacement or peer replication. [C41 operation scope](CONTINUATION_41_ENGINEERING.md).
 
 The maintained [runtime compatibility matrix](RUNTIME_COMPATIBILITY.md), runtime adapter reports and [C32 verification](CONTINUATION_32_ENGINEERING.md) distinguish source implementation, upstream documentation, local inspection and game/network testing.
