@@ -128,6 +128,9 @@ try {
     await expect
       .poll(async () => JSON.parse((await canvas.getAttribute('data-gs-showcase-pose')) ?? '{}').yaw)
       .toBeGreaterThan(-0.2);
+    await expect
+      .poll(async () => JSON.parse((await canvas.getAttribute('data-gs-showcase-pose')) ?? '{}').screenHeading)
+      .toBeGreaterThan(0.05);
     receipt.rightPose = JSON.parse(await canvas.getAttribute('data-gs-showcase-pose'));
   }
   await page.screenshot({ path: path.join(output, 'monitor-right.png') });

@@ -97,7 +97,10 @@ function Model({
   }, [camera, fit, invalidate, showcase]);
   useFrame((_, dt) => {
     if (!group.current) return;
-    const target = showcase ? -1.0 + (live && motionAllowed ? pointer.current.x * 0.6 : 0) : 0;
+    // Keep the left-facing resting pose, but let the right half of the page
+    // turn the model far enough to face that side as well.
+    const followYaw = pointer.current.x * (pointer.current.x > 0 ? 1 : 0.6);
+    const target = showcase ? -1.0 + (live && motionAllowed ? followYaw : 0) : 0;
     group.current.rotation.z = THREE.MathUtils.damp(group.current.rotation.z, target, 4, dt);
     group.current.rotation.x = THREE.MathUtils.damp(
       group.current.rotation.x,
