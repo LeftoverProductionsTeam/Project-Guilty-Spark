@@ -4,8 +4,12 @@ import type { Bootstrap } from '../types';
 import type { ForgeAsset } from '../forge';
 import { preloadHomeModels } from '../homeShowcase';
 import NativeModelPreview from './NativeModelPreview';
+import {useMapState} from '../mapSession';
+import {showcaseKey} from './ShowcaseChoice';
+import {publishSparkEmblem} from './SparkEmblem';
 
 export default function HomeModel({ data }: { data: Bootstrap }) {
+  const [selection,setSelection]=useMapState('global','home.model','automatic');
   const [models, setModels] = useState<ForgeAsset[]>([]),
     [index, setIndex] = useState(0),
     [message, setMessage] = useState('Finding your Halo models…');
@@ -33,20 +37,18 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
       alive = false;
     };
   }, [data.dataDirectory, data.installation.mccPath]);
-  const model = models[index % Math.max(1, models.length)];
+  const model = models.find(asset=>showcaseKey(asset)===selection)??models[index % Math.max(1, models.length)];
   return (
     <div className="home-native-model">
       {model ? (
-        <NativeModelPreview asset={model} showcase />
+        <NativeModelPreview key={showcaseKey(model)} asset={model} showcase onSnapshot={/monitor|343/i.test(model.path)?publishSparkEmblem:undefined}/>
       ) : (
         <span className="model-preview-loading">{message}</span>
       )}
       {model && (
         <div className="home-model-caption">
           <span>{model.name} · actual Halo model</span>
-          {models.length > 1 && (
-            <button onClick={() => setIndex((value) => (value + 1) % models.length)}>Next model</button>
-          )}
+          {models.length > 1 && <select aria-label="Home model" value={showcaseKey(model)} onChange={event=>setSelection(event.target.value)}>{models.map(asset=><option value={showcaseKey(asset)} key={showcaseKey(asset)}>{asset.name}</option>)}</select>}
         </div>
       )}
     </div>

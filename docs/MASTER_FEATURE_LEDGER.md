@@ -1,5 +1,7 @@
 # Living feature ledger — Integrated workbench
 
+C50 appends nine scoped records without removing or rewriting any of the preceding 429 CSV records: 438 total. It records compact/retained editors, custom native tag names, bounded preview readers, window ownership, measured performance, original audio compilation, failed seated-carrier diagnostics and the still-open two-way tunnel test. [C50 acceptance, regressions and exact gates](CONTINUATION_50_ENGINEERING.md) · [Metadata-only evidence](fixtures/c50-completion-pass.json). Editor/source/compiler results do not complete direct compiled-map structure changes, in-game playback, game-peer AI or cross-computer acceptance.
+
 C49 appends three scoped records for draft Release assets, optional Linux package acceptance and recoverable local-storage cleanup. Every byte of the previous 426 CSV records is retained; there are now 429 records. Local Windows acceptance and storage reclamation are verified in [C49 final results](CONTINUATION_49_ENGINEERING.md). Remote publication and Linux startup are pending independent acceptance. [Release procedure](RELEASING.md) · [Private storage/recovery](LOCAL_STORAGE.md).
 
 C48 appends five records for shared BSP source, recoverable pending edits, scoped Radmin networking, bounded endurance and local history integrity. All prior 421 rows remain byte-identical; the ledger now has 426 rows. Three-process compiler/UI acceptance remains separate from cross-computer, Steam and gameplay gates. See [C48 evidence and limits](CONTINUATION_48_ENGINEERING.md).

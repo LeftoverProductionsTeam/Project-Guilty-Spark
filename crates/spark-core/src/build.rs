@@ -121,6 +121,11 @@ pub fn compatibility(
         }
     }
     let native=tools.h1a_directory.is_some();
+    if !project.tag_renames.is_empty(){
+        if !native{blockers.push("Native tag renaming requires the matching MCC H1A source compiler".into());}
+        for name in ["invader-refactor","invader-dependency","invader-edit"]{if tool_path(tools,name).is_none(){blockers.push(format!("{name} is required for verified native tag renaming"));}}
+        if let Err(e)=crate::tag_renames::validate_source(project,inspection){blockers.push(e.to_string());}
+    }
     if !project.tag_duplicates.is_empty(){
         if !native{blockers.push("Tag duplication requires the native MCC H1A compiler; enable the installed MCC editing kit".into());}
         for name in ["invader-refactor","invader-dependency"]{if tool_path(tools,name).is_none(){blockers.push(format!("{name} is required for verified tag duplication"));}}
@@ -318,15 +323,15 @@ impl Runner<'_> {
         let native_alias = if executable.file_name().is_some_and(|s|{
             let name=s.to_string_lossy();
             (name.eq_ignore_ascii_case("tool.exe") && args.iter().any(|s|s=="-tags_dir"))
-                || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"|"asset-references"))
+                || (name.eq_ignore_ascii_case("invader-refactor.exe") && matches!(phase,"bsp-namespace"|"bsp-shaders"|"asset-references"|"tag-renaming"))
                 || (name.eq_ignore_ascii_case("invader-extract.exe") && phase=="extract")
-                || (name.eq_ignore_ascii_case("invader-edit.exe")&&matches!(phase,"asset-native-readback"|"asset-placement"))
-                || (name.eq_ignore_ascii_case("invader-dependency.exe")&&phase=="asset-dependencies")
+                || (name.eq_ignore_ascii_case("invader-edit.exe")&&matches!(phase,"asset-native-readback"|"asset-placement"|"tag-renaming"))
+                || (name.eq_ignore_ascii_case("invader-dependency.exe")&&matches!(phase,"asset-dependencies"|"tag-renaming"))
         }) {
             Some(crate::native_workspace::Alias::new(cwd)?)
         } else {None};
         #[cfg(windows)]
-        let extraction_args = if matches!(phase,"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies") {
+        let extraction_args = if matches!(phase,"extract"|"asset-references"|"asset-native-readback"|"asset-placement"|"asset-dependencies"|"tag-renaming") {
             native_alias.as_ref().map(|alias|crate::native_workspace::extraction_arguments(args,cwd,alias.path())).transpose()?
         } else {None};
         #[cfg(windows)]
@@ -517,7 +522,7 @@ pub fn validate_existing_mcc(
     {
         return invalid("This operation requires an existing unextended MCC cache, not a legacy map or test fixture");
     }
-    if !project.tag_duplicates.is_empty() || !project.tag_edits.is_empty() || project.scene != inspection.objects
+    if !project.tag_duplicates.is_empty() || !project.tag_renames.is_empty() || !project.tag_edits.is_empty() || project.scene != inspection.objects
         || project.bsp_assembly.is_some() || !project.animation_assignments.is_empty() || !project.powerups.is_empty()
         || project.studio.as_ref().and_then(|s|s.engine_machinima.as_ref()).is_some_and(|take|take.enabled)
         || project.conversion_profile.as_deref().is_some_and(|profile|profile!="faithful")
@@ -773,6 +778,7 @@ pub fn run_build(
         crate::native_asset_imports::verify_compiled(project,&validated)?;
         if !project.native_asset_imports.is_empty(){let _=crate::native_asset_imports::available_files(jobs_root.parent().unwrap(),project)?;}
         crate::tag_duplicates::verify_compiled(project,inspection,&validated)?;
+        crate::tag_renames::verify_compiled(project,inspection,&validated)?;
         crate::powerups::verify_compiled(project,&validated,&dir)?;
         if let Some(assembly)=&project.bsp_assembly{
             let (compiled_collision,compiled_faces)=maps::collision_source(&output,&validated)?;

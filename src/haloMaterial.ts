@@ -25,7 +25,8 @@ varying vec3 haloVertexColor;
 uniform samplerCube reflectionCube;uniform bool hasReflection;uniform mat3 viewToWorld;uniform vec2 reflectionBrightness,reflectionRange;uniform vec3 reflectionPerpTint,reflectionParallelTint;
 uniform sampler2D baseMap,lightMap,primaryDetail,secondaryDetail,microDetail,alphaMask,layer1,layer2,layer3;
 uniform bool hasLight,hasPrimary,hasSecondary,hasMicro,hasMask,alphaTest,baseEncoded,alphaBlended;
-uniform int kind,shaderType,detailFunction,microFunction,layerCount;
+uniform int kind,shaderType,detailFunction,microFunction,layerCount,detailMask;
+uniform bool bumpIsSpecular;uniform float detailVScale;
 uniform vec2 baseScale,layerScale[4],layerOffset[4];uniform float layerRotation[4];
 uniform vec2 rotationCenter[4];uniform vec4 motionU[4],motionV[4],motionRotation[4];uniform int layerFlags[4];uniform float time;
 uniform vec3 detailScales;uniform int colorFunction[4],alphaFunction[4];
@@ -58,8 +59,8 @@ vec4 combine(vec4 current,vec4 next,int c,int a){
   return clamp(vec4(rgb,alpha),0.0,1.0);
 }
 void main(){
-  vec4 base=sourceColor(texture2D(baseMap,kind>=2?layerUv(0):haloUv*baseScale));
-  if(kind>=2){
+  vec4 base=sourceColor(texture2D(baseMap,(kind==2||kind==3)?layerUv(0):haloUv*baseScale));
+  if(kind==2||kind==3){
     vec4 maps[4];maps[0]=stageSample(texture2D(baseMap,layerUv(0)),0);
     maps[1]=stageSample(texture2D(layer1,layerUv(1)),1);maps[2]=stageSample(texture2D(layer2,layerUv(2)),2);maps[3]=stageSample(texture2D(layer3,layerUv(3)),3);
     base=maps[0];
@@ -71,9 +72,14 @@ void main(){
     if(alphaTest&&base.a<0.5)discard;
   }else{
     vec3 detail=vec3(0.5);bool hasDetail=hasPrimary;
-    if(hasPrimary)detail=texture2D(primaryDetail,haloUv*detailScales.x).rgb;
+    if(hasPrimary)detail=texture2D(primaryDetail,haloUv*detailScales.x*vec2(1.0,kind==1?detailVScale:1.0)).rgb;
     if(shaderType>0&&hasSecondary){vec3 other=texture2D(secondaryDetail,haloUv*detailScales.y).rgb;detail=mix(other,detail,base.a);hasDetail=true;}
-    if(hasDetail)base.rgb=detailBlend(base.rgb,detail,detailFunction);
+    float detailAmount=1.0;
+    if(kind==1&&hasMultipurpose&&detailMask>0){vec4 masks=texture2D(multipurpose,haloUv*baseScale);
+      float specular=multipurposeXbox?masks.r:masks.b,change=multipurposeXbox?masks.b:masks.a,aux=multipurposeXbox?masks.a:masks.r;
+      float selected=detailMask<=2?specular:detailMask<=4?masks.g:detailMask<=6?change:aux;
+      detailAmount=mod(float(detailMask),2.0)>0.5?1.0-selected:selected;}
+    if(hasDetail)base.rgb=mix(base.rgb,detailBlend(base.rgb,detail,detailFunction),detailAmount);
     if(hasMicro)base.rgb=detailBlend(base.rgb,texture2D(microDetail,haloUv*detailScales.z).rgb,microFunction);
     if(alphaTest){float mask=hasMask?texture2D(alphaMask,haloUv).a:base.a;if(mask<0.5)discard;}
     vec3 surface=base.rgb;
@@ -91,6 +97,8 @@ void main(){
     if(overrideLighting)base.rgb*=ambientFill+sunFill*max(0.0,dot(n,normalize(lightDirection)));
     if(hasReflection){vec3 reflected=viewToWorld*reflect(normalize(haloView),n);float grazing=1.0-clamp(dot(normalize(-haloView),n),0.0,1.0);float brightness=mix(reflectionBrightness.x,reflectionBrightness.y,grazing);vec3 tint=mix(reflectionPerpTint,reflectionParallelTint,grazing);
       float mask=1.0;if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);mask=multipurposeXbox?masks.r:masks.b;}
+      else if(bumpIsSpecular&&hasNormal)mask=texture2D(normalMap,haloUv*normalScale).a;
+      else if(kind==0&&shaderType==2)mask=base.a;
       float fade=reflectionRange.y>0.0?1.0-clamp((length(haloView)-reflectionRange.x)/max(.001,reflectionRange.y-reflectionRange.x),0.0,1.0):1.0;
       base.rgb+=textureCube(reflectionCube,reflected).rgb*tint*brightness*mask*fade;}
     if(!alphaBlended)base.a=1.0;
@@ -109,7 +117,7 @@ export function createHaloMaterial(
   extra: Record<string, THREE.Texture>,
   sky = false,
 ): THREE.ShaderMaterial {
-  const m=metadata,layerCount=Math.min(4,m?.layers?.length??1),kind=m?.kind==='generic'?3:m?.kind==='chicago'?2:m?.kind==='model'?1:0;
+  const m=metadata,layerCount=Math.min(4,m?.layers?.length??1),kind=m?.kind==='glass'?4:m?.kind==='generic'?3:m?.kind==='chicago'?2:m?.kind==='model'?1:0;
   const blend=m?.framebufferBlend??0;
   const fogCode=blend===1||blend===2?`base.rgb=mix(base.rgb,vec3(${blend===1?'1.0':'0.5'}),amount);`:
     blend>=3?'base.rgb*=1.0-amount;':'base.rgb=mix(base.rgb,fogColor,amount);';
@@ -171,6 +179,9 @@ export function createHaloMaterial(
       kind: { value: kind },
       shaderType: { value: m?.shaderType ?? 0 },
       detailFunction: { value: m?.detailFunction ?? 0 },
+      detailMask:{value:m?.detailMask??0},
+      detailVScale:{value:m?.detailVScale||1},
+      bumpIsSpecular:{value:!!m?.bumpIsSpecular},
       microFunction: { value: m?.microDetailFunction ?? 0 },
       detailScales: { value: new THREE.Vector3(...(m?.detailScales ?? [1, 1, 1])) },
       baseScale: { value: new THREE.Vector2(...(m?.uvScale ?? [1, 1])) },
@@ -214,15 +225,30 @@ export function createHaloMaterial(
     enhancedNormal:{value:false},enhancedSpecular:{value:false},enhancedSelfIllum:{value:false},normalScale:{value:m?.bumpScale||1},normalStrength:{value:1},specularStrength:{value:.35},selfIllumStrength:{value:1}});
   if(extra.normalMap&&!extra.alphaMask){material.uniforms.alphaMask.value=extra.normalMap;material.uniforms.hasMask.value=true;}
   material.userData.haloSource=true;
+  material.userData.haloAnimated=!!m?.layers?.slice(0,4).some(layer=>layer.animations?.some(a=>a.source===0&&a.function>=2&&a.scale!==0)) ||
+    (kind===3&&!!m?.stages?.some(stage=>stage.constant0Function>=2&&stage.constant0Lower.some((value,index)=>value!==stage.constant0Upper[index])));
   material.userData.sky=sky;
   material.addEventListener('dispose',()=>samplers.forEach(texture=>texture.dispose()));
   if(kind>=2||m?.alphaBlended)applyHaloBlend(material,blend);
+  if(kind===4){
+    // Halo's constant glass background tint multiplies the existing scene;
+    // its diffuse/reflected contribution is then added. An opaque fallback
+    // used to cover the power-up's actual inner shader with a black shell.
+    material.blending=THREE.CustomBlending;material.blendEquation=THREE.AddEquation;
+    material.blendSrc=THREE.OneFactor;material.blendDst=THREE.ConstantColorFactor;
+    material.blendColor.fromArray(m?.glassTint??[1,1,1]);
+    material.blendSrcAlpha=THREE.ZeroFactor;material.blendDstAlpha=THREE.OneFactor;
+    material.depthWrite=false;
+  }
   return material;
 }
-export function updateHaloMaterial(material: THREE.Material, scene: THREE.Scene, camera: THREE.Camera) {
+export function updateHaloMaterial(material: THREE.Material, scene: THREE.Scene, camera: THREE.Camera, redraw?:()=>void) {
   if(!material.userData.haloSource)return;
   const m=material as THREE.ShaderMaterial,fog=scene.fog as (THREE.Fog&{maximumDensity?:number})|null;
   m.uniforms.time.value=performance.now()/1000;
+  // Only an animated surface actually submitted by the renderer requests its
+  // next frame. Off-screen effects do not keep a static editor spinning.
+  if(material.userData.haloAnimated)redraw?.();
   m.uniforms.viewToWorld.value.setFromMatrix4(camera.matrixWorld);
   m.uniforms.fogEnabled.value=!!fog&&!material.userData.sky;
   if(fog){m.uniforms.fogColor.value.copy(fog.color).convertLinearToSRGB();m.uniforms.fogNear.value=fog.near;m.uniforms.fogFar.value=fog.far;m.uniforms.fogMaximum.value=fog.maximumDensity??1;}

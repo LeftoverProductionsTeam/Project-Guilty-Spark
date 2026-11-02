@@ -175,6 +175,7 @@ fn lock<T>(m: &Mutex<T>) -> Reply<std::sync::MutexGuard<'_, T>> {
 }
 fn editing_tools(state: &AppState, project: &Project) -> Reply<Toolchain> {
     let mut tools = lock(&state.settings)?.tools();
+    if tools.invader_directory.is_none(){tools.invader_directory=find_local_invader(state);}
     if let Some(id)=&project.active_build_target{
         let target=project.build_targets.iter().find(|t|&t.id==id).ok_or("Selected conversion target is missing")?;
         tools.h1a_directory=if target.hek_flavor.as_deref()==Some("h1aEk"){target.hek_directory.clone()}else{None};tools.base_tags_directory=target.tags_directory.clone();
@@ -188,6 +189,29 @@ fn editing_tools(state: &AppState, project: &Project) -> Reply<Toolchain> {
         tools.resource_directory = Some(resources);
     }
     Ok(tools)
+}
+/// Find an already installed suite in nearby, fixed tool folders. Discovery
+/// never downloads or runs anything and never replaces a user's chosen suite.
+/// Native extraction still validates executable/source identities per job.
+fn find_local_invader(state:&AppState)->Option<PathBuf>{
+    let mut anchors=vec![state.root.clone()];
+    if let Ok(library)=state.library.lock(){if let Ok(registrations)=library.setting::<Vec<runtime::RuntimeRegistration>>("runtimeRegistrations"){anchors.extend(registrations.into_iter().map(|r|r.root));}}
+    if let Ok(directory)=std::env::current_dir(){anchors.push(directory);}
+    if let Ok(executable)=std::env::current_exe(){if let Some(directory)=executable.parent(){anchors.push(directory.to_path_buf());}}
+    let mut seen=std::collections::HashSet::new();
+    for anchor in anchors {for parent in anchor.ancestors().take(10).filter(|p|p.parent().is_some()) {
+        for suffix in [".local/tools/invader","tools/invader"] {
+            let candidate=parent.join(suffix);
+            if !seen.insert(candidate.clone())||!candidate.is_dir()||core::reject_links(&candidate).is_err(){continue;}
+            let names=if cfg!(windows){["invader-extract.exe","invader-info.exe","invader-build.exe"]}else{["invader-extract","invader-info","invader-build"]};
+            let valid=names.iter().all(|name|{
+                let binary=candidate.join(name);
+                #[cfg(windows)]{dependency_install::pe_identity(&binary).is_ok()}
+                #[cfg(not(windows))]{binary.is_file()&&core::reject_links(&binary).is_ok()}
+            });
+            if valid{return Some(candidate);}
+        }
+    }}None
 }
 fn project_tools(state:&AppState,project:&Project)->Reply<Toolchain>{
     if core::megaworld_build::selected(project){return editing_tools(state,project);}
@@ -384,6 +408,26 @@ async fn preview_owned_cache_bitmap(
             &source.preserved_path, &source.sha256, &inspection,
             bitmap_tag_id, image_index, resource_args,
         ).map_err(error)
+    }).await.map_err(error)?
+}
+/// Resource alternatives attached to an independently preserved copy of the
+/// exact same map. This is viewer recovery, never a new compiler binding.
+#[tauri::command]
+async fn original_bitmap_preview_sources(app:tauri::AppHandle,project_id:String,source_sha256:String)->Reply<Vec<serde_json::Value>>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let library=lock(&state.library)?;
+        let project=library.get(&project_id).map_err(error)?;
+        let source=project.source.as_ref().ok_or("No preserved bitmap source")?;
+        if source.sha256!=source_sha256{return Err("Bitmap recovery source identity changed".into());}
+        let mut found=vec![];let mut seen=std::collections::HashSet::new();
+        for entry in library.list().map_err(error)?.into_iter().filter(|entry|entry.id!=project_id&&entry.sha256.as_deref()==Some(source_sha256.as_str())){
+            let other=library.get(&entry.id).map_err(error)?;let Some(candidate)=other.source else{continue};
+            if candidate.cache_version!=source.cache_version||candidate.sha256!=source_sha256{continue;}
+            let Some(hash)=candidate.resource_sha256.get("bitmaps.map")else{continue};
+            if source.resource_sha256.get("bitmaps.map")==Some(hash)||!seen.insert(hash.clone()){continue;}
+            found.push(serde_json::json!({"projectId":entry.id,"sourceSha256":source_sha256,"resourceSha256":hash}));
+            if found.len()==6{break;}
+        }Ok(found)
     }).await.map_err(error)?
 }
 
@@ -1011,6 +1055,13 @@ async fn auto_connect_sound_resources(app:tauri::AppHandle,window:tauri::Webview
         let source=project.source.as_ref().ok_or("No preserved sound source")?;
         let inspected=inspect(&state,&project)?;
         if source.audio_resources.is_some(){return Ok(Some(OpenProject{project,inspection:Some((*inspected).clone())}));}
+        // Self-contained caches need no shared-bank search. Check all native
+        // descriptors against the preserved SHA rather than guessing from the
+        // first few tags, or caching a stale negative discovery result.
+        if [5,6,7,609,13].contains(&source.cache_version)
+            && !audio::requires_external_samples(&source.preserved_path,&source.sha256).map_err(error)? {
+            return Ok(None);
+        }
         let mcc=lock(&state.installation)?.mcc_path.clone();
         let binding=if source.cache_version==13 {
             let Some(root)=mcc else{return Ok(None)};
@@ -1081,6 +1132,7 @@ async fn choose_project_resources(
     .map_err(error)?
 }
 fn configure(app: &tauri::AppHandle, state: &AppState, mut settings: Settings) -> Reply<()> {
+    if settings.invader_directory.is_none(){settings.invader_directory=find_local_invader(state);}
     let _update=lock(&state.settings_write)?;
     let previous=lock(&state.settings)?.clone();
     // This preference has its own live command. An older Settings form must
@@ -1845,7 +1897,7 @@ async fn open_project_window(app:tauri::AppHandle,window:tauri::WebviewWindow,id
     let url=tauri::WebviewUrl::App(format!("index.html?project={}{}{}",project.id,route.map(|w|format!("&workspace={w}")).unwrap_or_default(),if observe==Some(true){"&observe=1"}else{""}).into());
     // Only a registered UUID project may select the local app page. No arbitrary URL or script.
     if uuid::Uuid::parse_str(&project.id).is_err(){return Err("Invalid project identity".into());}
-    let child=tauri::WebviewWindowBuilder::new(&app,&label,url).title(format!("{} · Project Guilty Spark",project.title)).inner_size(1440.,900.).min_inner_size(1000.,640.).decorations(false).transparent(true).shadow(false).theme(Some(tauri::Theme::Dark)).build().map_err(error)?;
+    let child=tauri::WebviewWindowBuilder::new(&app,&label,url).title(format!("{} · Project Guilty Spark",project.title)).inner_size(1440.,900.).min_inner_size(800.,600.).decorations(false).transparent(true).shadow(false).theme(Some(tauri::Theme::Dark)).build().map_err(error)?;
     if observe!=Some(true){lock(&state.document_owners)?.insert(id,child.label().into());}Ok(label)
 }
 #[tauri::command]
@@ -2198,6 +2250,28 @@ async fn inspect_looping_sound(app: tauri::AppHandle, project_id: String, tag_id
         core::looping_audio::inspect(&source.preserved_path, &source.sha256, tag_id).map_err(error)
     }).await.map_err(error)?
 }
+fn audition_audio_binding(state:&AppState,source:&project::Source)->Reply<Option<core::mcc_audio::Binding>>{
+    if let Some(binding)=source.audio_resources.as_ref(){return Ok(Some(binding.clone()));}
+    // Keep the recorded resource identity authoritative. The sample reader
+    // verifies this existing pin; discovery must never re-pin a changed file.
+    if [6,7,609].contains(&source.cache_version)&&source.resource_sha256.contains_key("sounds.map") {return Ok(None);}
+    static PREVIEW:std::sync::OnceLock<Mutex<HashMap<PathBuf,core::mcc_audio::Binding>>>=std::sync::OnceLock::new();
+    let (directory,mcc)=if source.cache_version==13{
+        let Some(root)=lock(&state.installation)?.mcc_path.clone()else{return Ok(None)};
+        if !root.join("halo1/sound/pc/sounds_adpcm.fsb").is_file()||!root.join("halo1/sound/pc/lst/sounds_adpcm.lst.bin").is_file(){return Ok(None);}
+        (root.join("halo1/sound/pc"),true)
+    }else if [6,7,609].contains(&source.cache_version){
+        let Some(directory)=source.resource_directory.as_ref().filter(|root|root.join("sounds.map").is_file()).cloned().or_else(||source.original_path.parent().filter(|root|root.join("sounds.map").is_file()).map(Path::to_path_buf))else{return Ok(None)};
+        (directory,false)
+    }else{return Ok(None)};
+    let cache=PREVIEW.get_or_init(||Mutex::new(HashMap::new()));
+    if let Some(binding)=lock(cache)?.get(&directory).cloned(){return Ok(Some(binding));}
+    let binding=if mcc{core::mcc_audio::pin_mcc(&directory)}else{core::mcc_audio::pin_classic(&directory)}.map_err(error)?;
+    let mut cache=lock(cache)?;if cache.len()>=16{cache.clear();}cache.insert(directory,binding.clone());
+    // Preview-only pins. The actual sample reader re-verifies the bank/index;
+    // this never changes native extraction/build resource bindings.
+    Ok(Some(binding))
+}
 #[tauri::command]
 async fn inspect_sound(
     app: tauri::AppHandle,
@@ -2210,7 +2284,8 @@ async fn inspect_sound(
         let s = p.source.ok_or("Project has no source map")?;
         let resource=s.resource_directory.as_ref().map(|p|p.join("sounds.map"));
         let pinned=resource.as_ref().zip(s.resource_sha256.get("sounds.map")).map(|(p,h)|(p.as_path(),h.as_str()));
-        audio::inspect_sound_with_bindings(&s.preserved_path, &s.sha256, tag_id,pinned,s.audio_resources.as_ref()).map_err(error)
+        let binding=audition_audio_binding(&state,&s)?;
+        audio::inspect_sound_with_bindings(&s.preserved_path, &s.sha256, tag_id,pinned,binding.as_ref()).map_err(error)
     })
     .await
     .map_err(error)?
@@ -2299,6 +2374,7 @@ async fn preview_sound(
         let s = p.source.ok_or("Project has no source map")?;
         let resource=s.resource_directory.as_ref().map(|p|p.join("sounds.map"));
         let pinned=resource.as_ref().zip(s.resource_sha256.get("sounds.map")).map(|(p,h)|(p.as_path(),h.as_str()));
+        let binding=audition_audio_binding(&state,&s)?;
         audio::preview_sound_with_bindings(
             &s.preserved_path,
             &s.sha256,
@@ -2306,7 +2382,7 @@ async fn preview_sound(
             pitch_range,
             permutation,
             pinned,
-            s.audio_resources.as_ref(),
+            binding.as_ref(),
         )
         .map_err(error)
     })
@@ -2832,6 +2908,7 @@ pub fn run() {
             forge_session_update,
             forge_session_leave,
             preview_owned_cache_bitmap,
+            original_bitmap_preview_sources,
             inspect_source_appearance,
             preview_owned_cache_bitmap_batch,
             audit_owned_bitmap_resources,

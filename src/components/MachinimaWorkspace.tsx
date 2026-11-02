@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import {WorkspacePanel} from './WorkspacePanels';
 import { Camera, Clapperboard, Pause, Play, Plus, Square, Download, Upload, Video } from 'lucide-react';
 import type { Bootstrap, MapInspection, MeshData, OpenProject, Project, Vec3 } from '../types';
 import type { CameraShot } from '../creatorStudio';
@@ -290,7 +291,7 @@ export default function MachinimaWorkspace({
           <button onClick={onLive}>MCC live mode</button>
         </div>
       </header>
-      <details className="engine-machinima-controls"><summary>In-engine recording · native cameras, HUD off, your actor stays controllable</summary>
+      <WorkspacePanel id="engine-recording" label="In-game recording" defaultDock="right"><div className="engine-machinima-controls">
         <NativeCameraControls/>
         <p>Build a private MCC map variant with these camera points. In Halo, toggle your flashlight to start/stop the take. Movement and actions remain enabled while the game camera is detached. Record the Halo window with OBS Game Capture at the game’s full resolution.</p>
         <label><input type="checkbox" checked={!!studio.engineMachinima?.enabled} onChange={e=>edit({...project,studio:{...studio,engineMachinima:{enabled:e.target.checked,playback:studio.engineMachinima?.playback??'fixed',cameraId:shot?.id??null,autoStart:studio.engineMachinima?.autoStart??false}}},'Configure game-native machinima take')}/>Include native engine camera controls in the next MCC build</label>
@@ -304,9 +305,9 @@ export default function MachinimaWorkspace({
           <p className="subtle">Uses the current validated build’s private tags and your installed MCC editing-kit runtime. Rebuild after changing cameras or animation assignments. OBS captures the game at the selected resolution.</p>
         </>}
         <p className="subtle">Supports 1–64 keys per engine take. Build/reload is required. Scenarios with existing scripts require their original source to be merged first; Spark will keep that build blocked instead of replacing gameplay. Engine effects and actor motion still need actual-game acceptance.</p>
-      </details>
-      <div className="director-body">
-        <aside className="director-shots">
+      </div></WorkspacePanel>
+      <div className="director-body gs-director-drawers">
+        <WorkspacePanel id="director-keys" label="Camera keys" defaultDock="left"><aside className="director-shots">
           <h3>
             Camera keys <span>{shots.length}/256</span>
           </h3>
@@ -440,7 +441,7 @@ export default function MachinimaWorkspace({
           )}
           <AnimationStudio project={project} inspection={inspection} edit={edit} onPreview={setAnimation} notify={notify}/>
           <Notice>Source animation playback uses the biped’s actual skeleton and weights. Game changes require a native build and reload; live graph replacement and peer animation replication remain unverified.</Notice>
-        </aside>
+        </aside></WorkspacePanel>
         <section className="director-center">
           <div className="director-stage" data-testid="director-stage">
             <Suspense fallback={<p>Loading director viewport…</p>}>
@@ -558,7 +559,7 @@ export default function MachinimaWorkspace({
               'Capture camera keys, preview the take, then export a frame or a silent video. Keys and lens settings save with the project.'}
           </p>
         </section>
-        <aside className="director-inspector">
+        <WorkspacePanel id="director-lens" label="Lens & composition" defaultDock="right"><aside className="director-inspector">
           <RenderFeatures project={project} edit={edit}/>
           <h3>Lens & composition</h3>
           <select
@@ -747,7 +748,7 @@ export default function MachinimaWorkspace({
             </fieldset>
           )}
           {!native && <p>Desktop source loading is unavailable in this browser.</p>}
-        </aside>
+        </aside></WorkspacePanel>
       </div>
     </div>
   );

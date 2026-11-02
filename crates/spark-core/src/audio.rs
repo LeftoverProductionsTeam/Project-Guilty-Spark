@@ -47,18 +47,83 @@ pub struct AudioPreview {
 
 struct SoundData {
     report: SoundInspection,
-    bytes: Vec<u8>,
+    bytes: std::sync::Arc<[u8]>,
     ranges: Vec<(usize, usize)>,
     external:std::collections::BTreeMap<usize,Vec<u8>>,
     descriptors: Vec<usize>,
 }
 
+/// Inspect every native sound descriptor in one verified cache snapshot. This
+/// answers only whether resource discovery is necessary; it does not certify
+/// sample playback, decode audio, or cache an absence after the source changes.
+pub fn requires_external_samples(path: &Path, expected_sha256: &str) -> Result<bool> {
+    let (header, bytes, hash) = maps::read_cache_snapshot_shared(path)?;
+    if hash != expected_sha256 {
+        return invalid("Sound resource discovery source checksum changed");
+    }
+    if ![5, 6, 7, 609, 13].contains(&header.version) || header.extended {
+        return invalid("Sound resource discovery requires a supported native cache");
+    }
+    let r = Reader(&bytes);
+    let start = header.tag_offset as usize;
+    let end = start + header.tag_size as usize;
+    let base = match header.version {
+        5 => 0x803a6000,
+        6 => 0x4bf10000,
+        13 => r.u32(start)?.checked_sub(0x28).ok_or_else(|| SparkError::Invalid("Invalid MCC sound index".into()))?,
+        _ => 0x40440000,
+    };
+    let pointer = |value: u32, size: usize| -> Result<usize> {
+        let offset = value.checked_sub(base).and_then(|v| start.checked_add(v as usize))
+            .ok_or_else(|| SparkError::Invalid("Sound resource pointer overflow".into()))?;
+        if offset.checked_add(size).is_none_or(|last| last > end) {
+            return invalid("Sound resource descriptor exceeds the tag region");
+        }
+        Ok(offset)
+    };
+    if r.u32(start + if header.version==5 {32}else{36})? != 0x74616773 { return invalid("Invalid sound resource tag index"); }
+    let count = r.u32(start + 12)? as usize;
+    if count > maps::MAX_TAGS { return invalid("Sound resource tag count exceeds limit"); }
+    let table = pointer(r.u32(start)?, count * 32)?;
+    let mut total = 0usize;
+    for index in 0..count {
+        let tag = table + index * 32;
+        if r.fourcc(tag)? != "snd!" { continue; }
+        // Indexed metadata itself needs its original resource cache.
+        if r.u32(tag + 24)? != 0 { return Ok(true); }
+        let at = pointer(r.u32(tag + 20)?, 164)?;
+        let pitches = r.u32(at + 152)? as usize;
+        if pitches > 8 { return invalid("Sound exceeds eight pitch ranges"); }
+        if pitches == 0 { continue; }
+        let pitch_table = pointer(r.u32(at + 156)?, pitches * 72)?;
+        for pitch in 0..pitches {
+            let at = pitch_table + pitch * 72;
+            let permutations = r.u32(at + 60)? as usize;
+            if permutations > 256 || r.u16(at + 44)? as usize > permutations {
+                return invalid("Invalid sound permutation count");
+            }
+            total += permutations;
+            if total > 1_048_576 { return invalid("Sound resource descriptor budget exceeded"); }
+            if permutations == 0 { continue; }
+            let table = pointer(r.u32(at + 64)?, permutations * 124)?;
+            for permutation in 0..permutations {
+                match r.u32(table + permutation * 124 + 68)? {
+                    0 => (),
+                    1 => return Ok(true),
+                    _ => return invalid("Unsupported sound raw-data flags"),
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
 fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(&Path,&str)>,audio:Option<&crate::mcc_audio::Binding>) -> Result<SoundData> {
-    let (header, bytes, sha256) = maps::read_cache_snapshot(path)?;
+    let (header, bytes, sha256) = maps::read_cache_snapshot_shared(path)?;
     if sha256 != expected_sha256 {
         return invalid("Audio source checksum differs from the preserved project source");
     }
-    if ![6, 7, 609,13].contains(&header.version) || header.extended {
+    if ![5,6, 7, 609,13].contains(&header.version) || header.extended {
         return invalid("Audio preview requires an unextended classic or MCC Halo 1 cache with supported sound metadata");
     }
     if let Some(binding)=audio { binding.validate(header.version)?; }
@@ -68,7 +133,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
     let r = Reader(&bytes);
     let start = header.tag_offset as usize;
     let end = start + header.tag_size as usize;
-    let base = match header.version {6=>0x4bf10000,13=>r.u32(start)?.checked_sub(0x28).ok_or_else(||SparkError::Invalid("Invalid MCC sound tag index".into()))?,_=>0x40440000};
+    let base = match header.version {5=>0x803a6000,6=>0x4bf10000,13=>r.u32(start)?.checked_sub(0x28).ok_or_else(||SparkError::Invalid("Invalid MCC sound tag index".into()))?,_=>0x40440000};
     let pointer = |value: u32, size: usize| -> Result<usize> {
         let offset =
             start
@@ -81,7 +146,7 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
         }
         Ok(offset)
     };
-    if r.u32(start + 36)? != 0x74616773 {
+    if r.u32(start + if header.version==5{32}else{36})? != 0x74616773 {
         return invalid("Invalid tag index for audio inspection");
     }
     let count = r.u32(start + 12)? as usize;

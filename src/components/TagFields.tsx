@@ -3,6 +3,7 @@ import { ArrowRight, FileCode2, RotateCcw } from 'lucide-react';
 import { classNames, fieldValue, formatNumber, shortPath } from '../editor';
 import type { Project, Tag, TagField } from '../types';
 import { NumberField } from './ui';
+import { renamedTagPath } from '../tagRenames';
 
 /** The same audited field controls serve the full Tag editor and the viewport drawer. */
 export default function TagFields({
@@ -48,7 +49,7 @@ export default function TagFields({
                     .filter((candidate) => candidate.class === field.targetClass)
                     .map((candidate) => (
                       <option key={candidate.id} value={candidate.id}>
-                        {shortPath(candidate.path)}
+                        {shortPath(renamedTagPath(project,candidate))}
                       </option>
                     ))}
                 </select>

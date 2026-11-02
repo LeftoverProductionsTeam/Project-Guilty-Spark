@@ -218,6 +218,7 @@ pub(crate) fn compile_native(
             inspection.scripts.len(),
         )?;
     }
+    crate::tag_renames::prepare(project,inspection,tools,workspace,tags,runner)?;
     runner.emit("native-preservation","Snapshotting native tag bytes before target compilation",58,"info");
     let inventory_started=std::time::Instant::now();
     let input_tags=crate::working_tags::tree_hashes(tags,runner.cancel)?;

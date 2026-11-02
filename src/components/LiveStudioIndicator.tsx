@@ -7,10 +7,12 @@ export default function LiveStudioIndicator({
   projectId,
   canHost,
   onOpen,
+  onSetup,
 }: {
   projectId: string | null;
   canHost: boolean;
   onOpen: (id: string) => void;
+  onSetup?:()=>void;
 }) {
   const [state, setState] = useState<{
     projectId: string;
@@ -66,10 +68,10 @@ export default function LiveStudioIndicator({
           ? 'Open the active shared QuickForge session'
           : 'Host or join shared QuickForge source. Native tag and binary-asset sharing are separate milestones.'
       }
-      disabled={!state && (!projectId || !canHost)}
+      disabled={!state && (!projectId || !canHost)&&!onSetup}
       onClick={() => {
         const id = state?.projectId ?? projectId;
-        if (id) onOpen(id);
+        if (id&&(state||canHost)) onOpen(id);else onSetup?.();
       }}
     >
       <Users size={15} />

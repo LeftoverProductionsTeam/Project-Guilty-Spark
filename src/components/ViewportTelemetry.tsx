@@ -1,5 +1,5 @@
-import {useFrame,useThree} from '@react-three/fiber';
-import {useRef} from 'react';
+import {addAfterEffect,useFrame,useThree} from '@react-three/fiber';
+import {useEffect,useRef} from 'react';
 import {Box3,Vector3} from 'three';
 import type {Object3D} from 'three';
 type GizmoControl=Object3D&{enabled:boolean;object?:Object3D;space:string;mode:string;axis?:string|null;dragging?:boolean;getHelper?:()=>Object3D;gizmo?:{picker?:Record<string,Object3D>}};
@@ -8,16 +8,24 @@ export default function ViewportTelemetry(){
   const {gl,camera,controls,scene}=useThree();const previous=useRef('');
   const box=useRef(new Box3()),point=useRef(new Vector3());
   const sample=useRef({seconds:0,frames:0,gizmo:'',decals:''});
+  const rendered=useRef<{fps:number;frameMs:number}|null>(null);
+  useEffect(()=>addAfterEffect(()=>{
+    const timing=rendered.current;if(!timing)return;rendered.current=null;
+    // GPU counters before gl.render describe the previous frame and can omit
+    // the final resource upload when a demand-rendered viewport goes idle.
+    gl.domElement.dataset.gsPerformance=JSON.stringify({...timing,drawCalls:gl.info.render.calls,triangles:gl.info.render.triangles,geometries:gl.info.memory.geometries,textures:gl.info.memory.textures,sampledAt:Date.now()});
+  }),[gl]);
   useFrame((_,delta)=>{
     const stats=sample.current;stats.seconds+=delta;stats.frames++;
-    if(stats.seconds<0.25)return;
-    gl.domElement.dataset.gsPerformance=JSON.stringify({fps:stats.frames/stats.seconds,frameMs:stats.seconds*1000/stats.frames,drawCalls:gl.info.render.calls,triangles:gl.info.render.triangles,geometries:gl.info.memory.geometries,textures:gl.info.memory.textures,sampledAt:Date.now()});
-    stats.seconds=0;stats.frames=0;
+    rendered.current={fps:stats.seconds>0?stats.frames/stats.seconds:0,frameMs:stats.seconds*1000/stats.frames};
     const target=(controls as unknown as {target?:Vector3}|null)?.target;
     const state=JSON.stringify({position:camera.position.toArray().map(v=>+v.toFixed(5)),
       quaternion:camera.quaternion.toArray().map(v=>+v.toFixed(5)),target:target?.toArray().map(v=>+v.toFixed(5)),
       textures:gl.info.memory.textures});
     if(state!==previous.current){gl.domElement.dataset.gsCamera=state;previous.current=state;}
+    // A demand-rendered scene may not draw again after its final upload. Sample
+    // its content on every rendered frame, never wait for a future idle frame.
+    stats.seconds=0;stats.frames=0;
     let decalState:{source:number;rendered:number;omitted:number}|undefined;
     let active:GizmoControl|undefined;
     scene.traverse(object=>{const root=object as Object3D&{isTransformControlsRoot?:boolean;isTransformControls?:boolean;controls?:GizmoControl};

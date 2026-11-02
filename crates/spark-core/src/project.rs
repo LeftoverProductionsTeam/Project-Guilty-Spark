@@ -108,6 +108,8 @@ pub struct Project {
     pub native_asset_imports:Vec<crate::native_asset_imports::Binding>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub tag_duplicates:Vec<crate::tag_duplicates::TagDuplicate>,
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    pub tag_renames:Vec<crate::tag_renames::TagRename>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub audio_preview:Option<crate::audio_preview::SoundScene>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
@@ -163,6 +165,7 @@ impl Project {
         Self {
             native_asset_imports:vec![],
             tag_duplicates:vec![],
+            tag_renames:vec![],
             audio_preview:None,
             powerups:vec![],
             schema_version: PROJECT_VERSION,
@@ -202,6 +205,10 @@ impl Project {
     pub fn validate(&self) -> Result<()> {
         crate::native_asset_imports::validate(&self.native_asset_imports)?;
         crate::tag_duplicates::validate(&self.tag_duplicates)?;
+        crate::tag_renames::validate(&self.tag_renames)?;
+        if !self.tag_renames.is_empty()&&(self.source.is_none()||self.quick_forge.is_some()){
+            return invalid("Native tag renaming requires a preserved source map; build and open generated source first");
+        }
         if !self.tag_duplicates.is_empty()&&(self.source.is_none()||self.quick_forge.is_some()){
             return invalid("Tag duplication requires a preserved source map; build and open a QuickForge cache before duplicating its tags");
         }
@@ -337,9 +344,9 @@ impl Project {
         let camera=self.studio.as_ref().and_then(|s|s.engine_machinima.as_ref().filter(|o|o.enabled).map(|o|(o,&s.shots)));
         let profile=self.conversion_profile.as_deref().filter(|p|*p!="faithful");
         let native_audio=crate::native_audio::fingerprint_inputs(self);
-        if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none()&&self.powerups.is_empty()&&self.tag_duplicates.is_empty()&&self.native_asset_imports.is_empty()&&native_audio.is_empty(){return Ok(base);}
+        if camera.is_none()&&profile.is_none()&&self.animation_assignments.is_empty()&&self.bsp_assembly.is_none()&&self.powerups.is_empty()&&self.tag_duplicates.is_empty()&&self.tag_renames.is_empty()&&self.native_asset_imports.is_empty()&&native_audio.is_empty(){return Ok(base);}
         let used:Vec<_>=self.animations.iter().filter(|asset|self.animation_assignments.iter().any(|a|a.asset_id==asset.id)).collect();
-        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}if !self.powerups.is_empty(){hash.update(b"custom-powerups-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.powerups)?));}if !self.tag_duplicates.is_empty(){hash.update(b"tag-duplicates-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_duplicates)?));}if !self.native_asset_imports.is_empty(){hash.update(b"native-asset-imports-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.native_asset_imports)?));}if !native_audio.is_empty(){hash.update(b"native-audio-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&native_audio)?));}Ok(crate::hex_bytes(hash.finalize()))
+        let mut hash=Sha256::new();hash.update(b"spark-native-inputs-v1\0");hash.update(base.as_bytes());hash.update(fingerprint_json(serde_json::to_vec(&(camera,profile,&self.animation_assignments,used))?));if let Some(assembly)=&self.bsp_assembly{hash.update(b"bsp-assembly-v1\0");hash.update(fingerprint_json(serde_json::to_vec(assembly)?));}if !self.powerups.is_empty(){hash.update(b"custom-powerups-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.powerups)?));}if !self.tag_duplicates.is_empty(){hash.update(b"tag-duplicates-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_duplicates)?));}if !self.tag_renames.is_empty(){hash.update(b"tag-renames-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.tag_renames)?));}if !self.native_asset_imports.is_empty(){hash.update(b"native-asset-imports-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&self.native_asset_imports)?));}if !native_audio.is_empty(){hash.update(b"native-audio-v1\0");hash.update(fingerprint_json(serde_json::to_vec(&native_audio)?));}Ok(crate::hex_bytes(hash.finalize()))
     }
 }
 
@@ -420,6 +427,7 @@ pub fn load_project(path: &Path) -> Result<Project> {
 
 /// A renderer supplies semantic edits, never arbitrary offsets. Re-resolve every field from the cache.
 pub fn validate_edits(project: &Project, inspection: &MapInspection) -> Result<()> {
+    crate::tag_renames::validate_source(project, inspection)?;
     for edit in &project.tag_edits {
         let field = inspection
             .tags

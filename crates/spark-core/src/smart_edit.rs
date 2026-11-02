@@ -170,6 +170,7 @@ pub fn analyze(project: &Project, map: &MapInspection) -> Result<Analysis> {
     }
     for (present, category) in [
         (!project.tag_duplicates.is_empty(), "tag duplication"),
+        (!project.tag_renames.is_empty(), "native tag renaming"),
         (project.bsp_assembly.is_some(), "BSP assembly"),
         (
             !project.animation_assignments.is_empty(),

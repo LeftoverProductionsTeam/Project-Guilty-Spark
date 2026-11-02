@@ -14,6 +14,7 @@ const showcaseFeatures = {
 };
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import {OrbitControls} from '@react-three/drei';
 import * as THREE from 'three';
 import type { ForgeAsset } from '../forge';
 
@@ -55,21 +56,19 @@ function Model({
   onAnimationError: (error: string) => void;
 }) {
   const group = useRef<THREE.Group>(null),
-    { camera, pointer, invalidate, gl } = useThree();
+    { camera, gl, invalidate } = useThree();
+  const pointer=useRef({x:0,y:0});
   const poseSample = useRef(0);
   const motionAllowed = useMemo(() => !matchMedia('(prefers-reduced-motion: reduce)').matches, []);
   useEffect(() => {
     if (!showcase || !live || !motionAllowed) return;
     const follow = (event: PointerEvent) => {
-      const bounds = gl.domElement.getBoundingClientRect();
-      pointer.set(
-        THREE.MathUtils.clamp(((event.clientX - bounds.left) / Math.max(1, bounds.width)) * 2 - 1, -1, 1),
-        THREE.MathUtils.clamp(1 - ((event.clientY - bounds.top) / Math.max(1, bounds.height)) * 2, -1, 1),
-      );
+      pointer.current.x=THREE.MathUtils.clamp(event.clientX/Math.max(1,innerWidth)*2-1,-1,1);
+      pointer.current.y=THREE.MathUtils.clamp(1-event.clientY/Math.max(1,innerHeight)*2,-1,1);
     };
     window.addEventListener('pointermove', follow, { passive: true });
     return () => window.removeEventListener('pointermove', follow);
-  }, [showcase, live, motionAllowed, gl, pointer]);
+  }, [showcase, live, motionAllowed]);
   const fit = useMemo(() => {
     const box = new THREE.Box3();
     for (let i = 0; i < view.mesh.positions.length; i += 3)
@@ -84,7 +83,7 @@ function Model({
   useEffect(() => {
     camera.up.set(0, 0, 1);
     camera.position.set(
-      fit.radius * (showcase ? 2.75 : 2.8),
+      fit.radius * (showcase ? 2.1 : 2.8),
       -fit.radius * (showcase ? 1 : 1.4),
       fit.radius * (showcase ? 0.65 : 0.95),
     );
@@ -98,11 +97,11 @@ function Model({
   }, [camera, fit, invalidate, showcase]);
   useFrame((_, dt) => {
     if (!group.current) return;
-    const target = (showcase ? -0.6 : 0) + (live && motionAllowed ? pointer.x * (showcase ? 0.45 : 0.22) : 0);
+    const target = showcase ? -1.0 + (live && motionAllowed ? pointer.current.x * 0.6 : 0) : 0;
     group.current.rotation.z = THREE.MathUtils.damp(group.current.rotation.z, target, 4, dt);
     group.current.rotation.x = THREE.MathUtils.damp(
       group.current.rotation.x,
-      live && motionAllowed ? pointer.y * 0.045 : 0,
+      showcase && live && motionAllowed ? pointer.current.y * 0.08 : 0,
       4,
       dt,
     );
@@ -119,7 +118,7 @@ function Model({
     }
   });
   return (
-    <group ref={group}>
+    <><group ref={group}>
       <group position={fit.center.clone().multiplyScalar(-1)}>
         {animation ? (
           <AnimatedBiped model={view} animation={animation} onError={onAnimationError} />
@@ -132,7 +131,7 @@ function Model({
           />
         )}
       </group>
-    </group>
+    </group>{!showcase&&live&&<OrbitControls makeDefault enablePan={false} enableDamping minDistance={fit.radius*.7} maxDistance={fit.radius*12}/>}</>
   );
 }
 /** Uses the exact same native geometry, texture decoder and shader as the map viewport. */
@@ -193,9 +192,9 @@ export default function NativeModelPreview({
       environment ?? {
         ...DEFAULT_ENVIRONMENT,
         ambientColor: [0.9, 0.95, 1],
-        ambientIntensity: showcase ? 0.5 : 0.85,
+        ambientIntensity: showcase ? 0.9 : 0.85,
         sunColor: [1, 0.95, 0.88],
-        sunIntensity: showcase ? 0.7 : 1.6,
+        sunIntensity: showcase ? 1.1 : 1.6,
         sunAzimuth: -30,
         sunElevation: 35,
       },

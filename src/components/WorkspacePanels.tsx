@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useWorkspaceActivity } from './WorkspaceActivity';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal, SquareArrowOutUpRight } from 'lucide-react';
+import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal, SquareArrowOutUpRight, Expand, Shrink } from 'lucide-react';
 import { useMapState,readMapSession,writeMapSession } from '../mapSession';
 import {native} from '../api';
 import {getCurrentWindow} from '@tauri-apps/api/window';
@@ -27,6 +28,11 @@ interface ContextValue {
   reveal: (id: string) => void;
 }
 const Context = createContext<ContextValue | null>(null);
+function HeaderTools({children}:{children:ReactNode}){
+  const [host,setHost]=useState<HTMLElement|null>(null);
+  useEffect(()=>setHost(document.getElementById('gs-header-workspace-tools')),[]);
+  return host?createPortal(children,host):children;
+}
 export default function WorkspacePanels({
   id,
   workspace,
@@ -154,8 +160,8 @@ export default function WorkspacePanels({
   return (
     <Context.Provider value={context}>
       <div className="gs-workspace-shell" data-fullscreen={fullscreen} data-workspace={workspace}>
-        <nav className="gs-workspace-tools" aria-label="Workspace panels">
-          <button
+        <HeaderTools><nav className="gs-workspace-tools" aria-label="Workspace panels">
+          {!windowHost&&<button
             className="gs-navigation-toggle"
             aria-label="Toggle workspace navigation"
             aria-expanded={navigationOpen}
@@ -164,16 +170,16 @@ export default function WorkspacePanels({
             onClick={onNavigationToggle}
           >
             <Menu size={16} />
-          </button>
+          </button>}
           <button
             aria-label={fullscreen ? 'Exit fullscreen editing' : 'Fullscreen editing'}
             aria-pressed={fullscreen}
             title="Borderless fullscreen (F11). Escape returns to your workspace."
             onClick={() => void changeFullscreen()}
           >
-            {fullscreen ? 'Exit fullscreen · F11' : 'Fullscreen · F11'}
+            {fullscreen ? <Shrink size={16}/> : <Expand size={16}/>}
           </button>
-          {onPopout&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={onPopout}><SquareArrowOutUpRight size={14}/>Pop out</button>}
+          {onPopout&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={onPopout}><SquareArrowOutUpRight size={14}/></button>}
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
           <div className="gs-panel-buttons" ref={panelButtons}>
             {descriptors.map((panel) => (
@@ -229,7 +235,7 @@ export default function WorkspacePanels({
             fullscreen={fullscreen}
             onExitFullscreen={() => changeFullscreen(false)}
           />,windowHost)}
-        </nav>
+        </nav></HeaderTools>
         <div
           className="gs-workspace-content"
           style={{ paddingLeft: padding.left, paddingRight: padding.right, paddingTop:padding.top, paddingBottom: padding.bottom }}
@@ -244,23 +250,27 @@ export default function WorkspacePanels({
 /** Reveal an existing overlay without changing the map, camera or focus layout. */
 export function useRevealWorkspacePanel() {
   const context = useContext(Context);
-  return context?.reveal ?? (() => {});
+  const {active}=useWorkspaceActivity();
+  return active ? context?.reveal ?? (() => {}) : () => {};
 }
 export function usePanelAttention(id: string, count: number) {
+  const {active}=useWorkspaceActivity();
   const context = useContext(Context);
   const ref = useRef(context);
   ref.current = context;
   useEffect(() => {
+    if(!active)return;
     ref.current?.attention(id, count);
     return () => ref.current?.attention(id, 0);
-  }, [id, count]);
+  }, [active,id, count]);
 }
 /** Add related controls to the existing drawer, with no second registration,
  * button, close control or overlapping panel. The source editor owns its state. */
 export function WorkspacePanelAddon({id,children}:{id:string;children:ReactNode}) {
   const context=useContext(Context);
+  const {scope}=useWorkspaceActivity();
   if(!context)return <>{children}</>;
-  const host=context.contentHosts[id];
+  const host=context.contentHosts[`${scope}:${id}`];
   return host?createPortal(children,host):null;
 }
 export function WorkspacePanel({
@@ -274,13 +284,14 @@ export function WorkspacePanel({
   defaultDock?: PanelPlacement['dock'];
   children: ReactNode;
 }) {
+  const {active,scope}=useWorkspaceActivity();
   const context = useContext(Context),
     register = useRef(context?.register);
   register.current = context?.register;
   const attach = context?.attachContent;
-  const appendHost = useCallback((element:HTMLDivElement|null)=>attach?.(id,element),[attach,id]);
+  const appendHost = useCallback((element:HTMLDivElement|null)=>attach?.(`${scope}:${id}`,element),[attach,id,scope]);
   const section = useRef<HTMLElement>(null);
-  useEffect(() => register.current?.({ id, label, defaultDock }), [id, label, defaultDock]);
+  useEffect(() => active ? register.current?.({ id, label, defaultDock }) : undefined, [active,id, label, defaultDock]);
   const placement = context?.panels[id] ?? {
     ...defaultPanel(),
     ...(defaultDock ? { dock: defaultDock } : {}),
@@ -310,7 +321,7 @@ export function WorkspacePanel({
             context.update(id, { width, height });
         }
       }}
-      hidden={!placement.open}
+      hidden={!active || !placement.open}
       className="gs-workspace-panel"
       data-panel-id={id}
       data-dock={placement.dock}

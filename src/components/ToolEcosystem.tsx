@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { Box, FileCode2, Hammer, Layers3, Tags, Wrench } from 'lucide-react';
 import { call, native } from '../api';
 import type { Project, RuntimeId, Settings } from '../types';
 import { Notice, Pill } from './ui';
@@ -62,6 +64,9 @@ const stateNames: Record<string, string> = {
   requiresRuntime: 'Different runtime / kit',
   researchOnly: 'Upstream · handoff not verified',
 };
+function ToolOptions({compact,children}:{compact:boolean;children:ReactNode}) {
+  return compact?<details className="gs-tool-options"><summary>Map actions &amp; setup</summary><div>{children}</div></details>:<>{children}</>;
+}
 export default function ToolEcosystem({
   project,
   runtime,
@@ -165,6 +170,13 @@ export default function ToolEcosystem({
       if (current === generation.current) setBusy(false);
     }
   }
+  function locate(tool:ToolDefinition) {
+    const current=generation.current;
+    setBusy(true);setError('');
+    void call('choose_tool_launcher',{runtimeId:runtime,toolId:tool.id})
+      .then(()=>{if(current===generation.current)return refresh();},reason=>{if(current===generation.current)setError(String(reason));})
+      .finally(()=>{if(current===generation.current)setBusy(false);});
+  }
   function card(row: ToolRow) {
     const { definition: tool, assessment } = row;
     const desktop = tool.mode
@@ -178,11 +190,13 @@ export default function ToolEcosystem({
           : tool.handler === 'testScene'
             ? 'test scene'
             : 'managed workflow';
+    const installed=assessment.executableFound||!!row.userLauncher?.available||!!row.externalCompanion?.available;
+    const Icon=/blender|foundry|reclaimer/i.test(tool.id)?Box:/sapien|osoyoos/i.test(tool.id)?Layers3:/build|haloTool/i.test(tool.id)?Hammer:/tag|baboon|guerilla|mozzarilla|invaderEditor/i.test(tool.id)?Tags:/extract|assembly|refinery/i.test(tool.id)?FileCode2:Wrench;
     return (
-      <article className="gs-tool-card" key={tool.id}>
-        <strong>{tool.label}</strong>
+      <article className="gs-tool-card" key={tool.id} data-tool-id={tool.id}>
+        <header className="gs-tool-emblem-heading"><span className="gs-tool-emblem" aria-hidden="true"><Icon size={22}/></span><strong title={tool.label}>{tool.label}</strong></header>
         <Pill tone={assessment.canUseWorkflow ? 'green' : 'muted'}>
-          {stateNames[assessment.state] ?? assessment.state}
+          {compact&&installed?'Installed':stateNames[assessment.state] ?? assessment.state}
         </Pill>
         <p className="gs-tool-purpose" title={tool.purpose}>
           {tool.purpose}
@@ -217,27 +231,15 @@ export default function ToolEcosystem({
               {compact ? 'Launch' : `Launch ${tool.label}`}
             </button>
           )}
-        {desktop && tool.integration !== 'externalCompanion' && (
+        {compact&&desktop&&!installed&&tool.integration!=='externalCompanion'&&<button disabled={busy} onClick={()=>locate(tool)}>Locate {tool.label}</button>}
+        {compact&&tool.integration==='externalCompanion'&&<button disabled={busy} onClick={()=>void companion(installed?'launch':'select')}>{installed?'Launch Mantle':'Select installed application'}</button>}
+        {compact&&<a className="small-button gs-tool-get" href={tool.releaseUrl??tool.sourceUrl} target="_blank" rel="noreferrer" title={`Official download or installation instructions for ${tool.label}`}>Get {tool.label}</a>}
+        <ToolOptions compact={compact}>
+        {desktop && (!compact||installed) && tool.integration !== 'externalCompanion' && (
           <button
             type="button"
             disabled={busy}
-            onClick={() => {
-              const current = generation.current;
-              setBusy(true);
-              setError('');
-              void call('choose_tool_launcher', { runtimeId: runtime, toolId: tool.id })
-                .then(
-                  () => {
-                    if (current === generation.current) return refresh();
-                  },
-                  (reason) => {
-                    if (current === generation.current) setError(String(reason));
-                  },
-                )
-                .finally(() => {
-                  if (current === generation.current) setBusy(false);
-                });
-            }}
+            onClick={() => locate(tool)}
           >
             {row.userLauncher ? 'Change selected app' : `Locate ${tool.label}`}
           </button>
@@ -250,9 +252,9 @@ export default function ToolEcosystem({
             . Map handoff support is checked separately.
           </p>
         )}
-        <a className="small-button" href={tool.releaseUrl ?? tool.sourceUrl} target="_blank" rel="noreferrer">
+        {!compact&&<a className="small-button" href={tool.releaseUrl ?? tool.sourceUrl} target="_blank" rel="noreferrer">
           Get {tool.label}
-        </a>
+        </a>}
         {(!compact || !assessment.canUseWorkflow) && <p className="subtle">{assessment.detail}</p>}
         {tool.integration === 'externalCompanion' && (
           <>
@@ -324,6 +326,7 @@ export default function ToolEcosystem({
               Set up {tool.label}
             </button>
           )}
+        </ToolOptions>
       </article>
     );
   }
@@ -383,7 +386,7 @@ export default function ToolEcosystem({
               )
               .filter(
                 (row) =>
-                  row.definition.integration !== 'upstreamOnly' &&
+                  (compact || row.definition.integration !== 'upstreamOnly') &&
                   (row.assessment.state !== 'requiresRuntime' ||
                     (compact &&
                       row.definition.runtimes?.includes(runtime) &&
@@ -400,7 +403,7 @@ export default function ToolEcosystem({
           {report.tools.some((row) => row.definition.id === 'baboon' && row.assessment.canUseWorkflow) && (
             <BaboonTools project={project} />
           )}
-          <details
+          {!compact&&<details
             open={
               search.trim()
                 ? report.tools.some(
@@ -430,7 +433,7 @@ export default function ToolEcosystem({
                 )
                 .map(card)}
             </div>
-          </details>
+          </details>}
           {!!report.companionCandidates?.length && (
             <details>
               <summary>Companion candidates · evidence needed</summary>

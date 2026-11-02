@@ -63,6 +63,7 @@ const mapping = { sourceBitmapTagId: 1, bitmapTagId: 9, imageIndex: 0, width: 1,
 beforeEach(() => {
   mock.call.mockReset();
   mock.call.mockImplementation(async (command: string) => {
+    if(command==='original_bitmap_preview_sources')return [];
     if (command === 'runtime_texture_source') return structuredClone(runtime);
     if (command === 'compatible_bitmap_targets') return [mapping];
     if (command === 'preview_owned_cache_bitmap_batch')
@@ -75,6 +76,17 @@ beforeEach(() => {
   });
 });
 describe('viewer-only compatible runtime pixels', () => {
+  it('recovers missing tree pixels from an exact-map original pack without changing compiler bindings',async()=>{
+    const original=structuredClone(project);
+    mock.call.mockImplementation(async(command:string)=>{
+      if(command==='original_bitmap_preview_sources')return [{projectId:'original-demo',sourceSha256:sourceHash,resourceSha256:packHash}];
+      if(command==='preview_owned_cache_bitmap_batch')return {sourceSha256:sourceHash,resourceSha256:packHash,items:[{bitmapTagId:1,imageIndex:0,preview:{...preview(),bitmapTagId:1,sourceSha256:sourceHash}}]};
+      throw Error('Unexpected runtime substitution');
+    });
+    const result=await fillRuntimeTexturePreviews(project,inspection,[target],new Map([['1:0',refusal('resource-mismatch')]]));
+    expect(result.get('1:0')?.recoveredResourceProjectId).toBe('original-demo');expect(result.get('1:0')?.image?.pixels).toHaveLength(4);expect(project).toEqual(original);
+    expect(mock.call.mock.calls.some(([name])=>name==='runtime_texture_source')).toBe(false);
+  });
   it('uses exact native mappings and runtime pins while preserving the source map and embedded image', async () => {
     const original = structuredClone(project),
       embedded = {

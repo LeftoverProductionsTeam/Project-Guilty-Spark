@@ -1,0 +1,1256 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-11-02T07:59:16.032Z",
+  "scope": "C50 local master completion checkpoint; remaining gameplay gates are explicit",
+  "source": {
+    "baseCommit": "f247cbae3969631870bc4a6ac1abc55a6468e628",
+    "branch": "master",
+    "startingDirtyPaths": 88,
+    "validatedDevelopmentAppSha256": "1fe7687336e507fa7cfb5a9934fb2a2526fb775e6ea961d40474d9883dc535cf",
+    "releaseCandidateReplaced": false
+  },
+  "tests": {
+    "rust": {
+      "passed": 636,
+      "ignored": 8,
+      "failed": 0,
+      "log": "rust-final.log"
+    },
+    "frontend": {
+      "passed": 308,
+      "files": 70,
+      "log": "frontend-verified.log"
+    },
+    "browser": {
+      "passed": 143,
+      "failed": 0,
+      "log": "browser-verified-retry.log",
+      "priorTimeoutRetained": true,
+      "focusedAudioRetryPassed": true
+    },
+    "offline": {
+      "chains": 59,
+      "log": "offline-final.log"
+    },
+    "releasePipeline": {
+      "pythonPassed": 10,
+      "nodePassed": 6
+    },
+    "typeScriptPassed": true,
+    "whitespaceCheckPassed": true
+  },
+  "ui": {
+    "native": true,
+    "mockedIpc": false,
+    "routes": [
+      "library",
+      "map-finder",
+      "get-started",
+      "features",
+      "learning",
+      "how-to",
+      "community",
+      "world",
+      "tags",
+      "assets",
+      "scenario",
+      "build",
+      "preservation",
+      "settings",
+      "compare",
+      "runtimes",
+      "live",
+      "quickforge",
+      "firefight",
+      "interface",
+      "creator",
+      "machinima",
+      "academy",
+      "quickforge-arena",
+      "bsp-workshop"
+    ],
+    "routeCount": 25,
+    "baseLayouts": 100,
+    "subviews": 22,
+    "sizes": [
+      [
+        800,
+        600
+      ],
+      [
+        1280,
+        720
+      ],
+      [
+        1920,
+        1080
+      ],
+      [
+        1280,
+        720,
+        2
+      ]
+    ],
+    "dpiEmulated": true,
+    "otherPhysicalMonitorNotTested": true,
+    "clippedControls": 0,
+    "popoutWindows": 23,
+    "simultaneousPopouts": 3,
+    "windowHistoryCases": 7,
+    "sourceUnchanged": true
+  },
+  "performance": {
+    "conditions": {
+      "profile": "fresh library and WebView profile; process-cold, not flushed OS disk cache",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "focusEmulation": true,
+      "qualityUnchanged": true,
+      "capturePixelProof": true,
+      "nativeBase64Supported": true,
+      "mapViewport": {
+        "width": 1428,
+        "height": 888
+      },
+      "contentViewport": {
+        "width": 1428,
+        "height": 888
+      },
+      "afterMapViewport": {
+        "width": 1428,
+        "height": 888
+      }
+    },
+    "sourceRuns": [
+      "pixels-before-1",
+      "pixels-before-2",
+      "final-perf-1",
+      "final-perf-2"
+    ],
+    "beforeApplicationSha256": [
+      "102093182ff6808ac4561b45234983264639c37ae31c030457761c2677f6c502"
+    ],
+    "afterApplicationSha256": [
+      "ec6ac83437cc477d2cbe76bdd89a8e10eaeaeee7ab6cabb4b4f73ce419244476"
+    ],
+    "qualityAccepted": true,
+    "scalar": {
+      "processColdShellMs": {
+        "before": 1133.2586999999999,
+        "after": 1138.85055,
+        "improvementPercent": -0.4934310232959385
+      },
+      "warmProcessShellMs": {
+        "before": 936.7156500000019,
+        "after": 897.4069000000018,
+        "improvementPercent": 4.1964442464476885
+      },
+      "processColdShowcaseMs": {
+        "before": 3915.20965,
+        "after": 3942.2681500000003,
+        "improvementPercent": -0.6911124159085721
+      },
+      "warmProcessShowcaseMs": {
+        "before": 2963.2499000000025,
+        "after": 2916.7348500000007,
+        "improvementPercent": 1.569730922795332
+      },
+      "pollingIpcMs": {
+        "before": 2.469549999999913,
+        "after": 2.2157000000000835,
+        "improvementPercent": 10.279200664082053
+      },
+      "openProjectIpcMs": {
+        "before": 109.34999999776483,
+        "after": 124.19999999925494,
+        "improvementPercent": -13.580246915220538
+      },
+      "repeatSwitchMs": {
+        "before": 1049.7788999999975,
+        "after": 958.6635999999999,
+        "improvementPercent": 8.679475268553967
+      },
+      "repeatBitmapDecodeMs": {
+        "before": 0,
+        "after": 0,
+        "improvementPercent": null
+      },
+      "repeatCubeRequests": {
+        "before": 0,
+        "after": 0,
+        "improvementPercent": null
+      },
+      "repeatCubeBatchRequests": {
+        "before": 0,
+        "after": 0,
+        "improvementPercent": null
+      }
+    },
+    "phases": {
+      "showcase-first-initialization": {
+        "before": 2689.6926000000003,
+        "after": 2710.3698000000004,
+        "improvementPercent": -0.7687569947584375
+      },
+      "native-import-1": {
+        "before": 377.16444999999976,
+        "after": 370.4863000000005,
+        "improvementPercent": 1.7706202161946285
+      },
+      "native-import-2": {
+        "before": 273.6396500000001,
+        "after": 276.6720499999992,
+        "improvementPercent": -1.1081727373935546
+      },
+      "first-textured-map-1": {
+        "before": 6270.0824999999995,
+        "after": 6238.8143500000015,
+        "improvementPercent": 0.4986880156680245
+      },
+      "first-textured-map-2": {
+        "before": 7545.8902,
+        "after": 7277.3457,
+        "improvementPercent": 3.5588180172565984
+      },
+      "map-switch-1-to-1": {
+        "before": 1026.3491499999982,
+        "after": 970.3816999999999,
+        "improvementPercent": 5.453061465486514
+      },
+      "map-switch-2-to-2": {
+        "before": 1045.1179999999986,
+        "after": 960.3638499999979,
+        "improvementPercent": 8.109529258897156
+      },
+      "map-switch-3-to-1": {
+        "before": 1080.329700000002,
+        "after": 958.6635999999999,
+        "improvementPercent": 11.261941609121916
+      },
+      "map-switch-4-to-2": {
+        "before": 1063.7033999999985,
+        "after": 915.839100000001,
+        "improvementPercent": 13.900895682010386
+      },
+      "large-asset-catalog": {
+        "before": 2748.350549999999,
+        "after": 2729.9524500000007,
+        "improvementPercent": 0.669423338300077
+      },
+      "showcase-warm-return": {
+        "before": 978.9266500000012,
+        "after": 984.4926999999952,
+        "improvementPercent": -0.5685870335631363
+      },
+      "showcase-warm-process": {
+        "before": 2005.9664499999963,
+        "after": 1995.0856000000022,
+        "improvementPercent": 0.5424243261892101
+      }
+    },
+    "rendererFpsIsNotThroughput": true,
+    "rawComparison": "final-performance-comparison.json",
+    "counters": {
+      "showcase-process-cpu-gpu-memory": {
+        "cpuMachinePercent": {
+          "before": 1.7561926072961773,
+          "after": 1.0934426248462674,
+          "improvementPercent": 37.73788704590184
+        },
+        "residentMiB": {
+          "before": 708.271484375,
+          "after": 795.072265625,
+          "improvementPercent": -12.255298026941691
+        },
+        "privateMiB": {
+          "before": 659.109375,
+          "after": 724.77734375,
+          "improvementPercent": -9.963136808666999
+        },
+        "gpu3DPercent": {
+          "before": 7,
+          "after": 6.5,
+          "improvementPercent": 7.142857142857143
+        },
+        "gpuDedicatedMiB": {
+          "before": 161.4453125,
+          "after": 145.708984375,
+          "improvementPercent": 9.747157028792644
+        }
+      },
+      "map-1-process-cpu-gpu-memory": {
+        "cpuMachinePercent": {
+          "before": 5.453793416684872,
+          "after": 5.394384709456214,
+          "improvementPercent": 1.0893098196001956
+        },
+        "residentMiB": {
+          "before": 1348.455078125,
+          "after": 1340.701171875,
+          "improvementPercent": 0.5750214727791787
+        },
+        "privateMiB": {
+          "before": 1363.8125,
+          "after": 1352.474609375,
+          "improvementPercent": 0.8313379313505339
+        },
+        "gpu3DPercent": {
+          "before": 17.5,
+          "after": 17.5,
+          "improvementPercent": 0
+        },
+        "gpuDedicatedMiB": {
+          "before": 274.6328125,
+          "after": 274.5546875,
+          "improvementPercent": 0.028447074218416635
+        }
+      },
+      "map-2-process-cpu-gpu-memory": {
+        "cpuMachinePercent": {
+          "before": 2.7017979280612723,
+          "after": 2.7548731220725493,
+          "improvementPercent": -1.9644398072864822
+        },
+        "residentMiB": {
+          "before": 1761.4140625,
+          "after": 1777.275390625,
+          "improvementPercent": -0.9004883327936982
+        },
+        "privateMiB": {
+          "before": 1837.5234375,
+          "after": 1876.587890625,
+          "improvementPercent": -2.1259295162051504
+        },
+        "gpu3DPercent": {
+          "before": 10,
+          "after": 14,
+          "improvementPercent": -40
+        },
+        "gpuDedicatedMiB": {
+          "before": 447.96484375,
+          "after": 448.78515625,
+          "improvementPercent": -0.1831198388545418
+        }
+      },
+      "repeat-switch-memory": {
+        "cpuMachinePercent": {
+          "before": 3.061875994079495,
+          "after": 3.110321762939517,
+          "improvementPercent": -1.582225046138304
+        },
+        "residentMiB": {
+          "before": 1629.6640625,
+          "after": 1647.419921875,
+          "improvementPercent": -1.0895410768131852
+        },
+        "privateMiB": {
+          "before": 1723.310546875,
+          "after": 1747.537109375,
+          "improvementPercent": -1.405815251576782
+        },
+        "gpu3DPercent": {
+          "before": 10.5,
+          "after": 14,
+          "improvementPercent": -33.333333333333336
+        },
+        "gpuDedicatedMiB": {
+          "before": 446.240234375,
+          "after": 446.224609375,
+          "improvementPercent": 0.003501477185687712
+        }
+      },
+      "after-maps-home-memory": {
+        "cpuMachinePercent": {
+          "before": 0.8586700937729321,
+          "after": 0.8624456946634752,
+          "improvementPercent": -0.43970331771464943
+        },
+        "residentMiB": {
+          "before": 1995.255859375,
+          "after": 1949.759765625,
+          "improvementPercent": 2.280213514283393
+        },
+        "privateMiB": {
+          "before": 2245.505859375,
+          "after": 2207.19140625,
+          "improvementPercent": 1.706272685285453
+        },
+        "gpu3DPercent": {
+          "before": 8.5,
+          "after": 7.5,
+          "improvementPercent": 11.764705882352942
+        },
+        "gpuDedicatedMiB": {
+          "before": 586.658203125,
+          "after": 586.404296875,
+          "improvementPercent": 0.04328009881179483
+        }
+      },
+      "warm-process-memory": {
+        "cpuMachinePercent": {
+          "before": 1.1268194261124007,
+          "after": 0.9802687128788465,
+          "improvementPercent": 13.005696373123735
+        },
+        "residentMiB": {
+          "before": 762.8203125,
+          "after": 707.40625,
+          "improvementPercent": 7.264366403457564
+        },
+        "privateMiB": {
+          "before": 713.525390625,
+          "after": 672.3359375,
+          "improvementPercent": 5.77266817217546
+        },
+        "gpu3DPercent": {
+          "before": 6,
+          "after": 7,
+          "improvementPercent": -16.666666666666668
+        },
+        "gpuDedicatedMiB": {
+          "before": 145.26953125,
+          "after": 145.1953125,
+          "improvementPercent": 0.05109037618650676
+        }
+      }
+    },
+    "bsp": {
+      "before": {
+        "geometrySha256": "bebdd68fd55ec01d498b146a1d7b7ff4f2a46729a17553ab5e41445e66df31fc",
+        "sourceTriangles": 58,
+        "textures": 2,
+        "cameraFlightVerified": true,
+        "samples": [
+          {
+            "draws": 165,
+            "cpuOneCorePercent": 1.2513347570742126
+          },
+          {
+            "draws": 164,
+            "cpuOneCorePercent": 0
+          },
+          {
+            "draws": 163,
+            "cpuOneCorePercent": 1.1488970588235294
+          }
+        ]
+      },
+      "after": {
+        "geometrySha256": "bebdd68fd55ec01d498b146a1d7b7ff4f2a46729a17553ab5e41445e66df31fc",
+        "sourceTriangles": 58,
+        "textures": 2,
+        "cameraFlightVerified": true,
+        "samples": [
+          {
+            "draws": 0,
+            "cpuOneCorePercent": 0
+          },
+          {
+            "draws": 0,
+            "cpuOneCorePercent": 0
+          },
+          {
+            "draws": 0,
+            "cpuOneCorePercent": 0.5740264511388685
+          }
+        ]
+      }
+    }
+  },
+  "nativeAudio": {
+    "appSha256": "ec6ac83437cc477d2cbe76bdd89a8e10eaeaeee7ab6cabb4b4f73ce419244476",
+    "complete": true,
+    "mockedIpc": false,
+    "source": {
+      "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "cacheVersion": 13
+    },
+    "control": {
+      "elapsedMs": 2220.0958999999966,
+      "nativeLoopExplicitlyIncluded": true,
+      "editorMutePreserved": true,
+      "importedFileCount": 2,
+      "singleUndoRedo": true
+    },
+    "compiled": {
+      "sha256": "01d187eb0a547b606db258ae3d2cb2df272f6d6a3ae50e6e0a4df75348bd57b4",
+      "sceneryPath": "spark\\audio\\5cf94ea7cd694ddca7b8d220625e3eb1\\2c7edca8e356403c8c392fd6203e69b6",
+      "loopPath": "gs_assets_145deb2bc183470789a71eb208adb917\\sound\\sfx\\ambience\\multiplayer\\bloodgultch",
+      "position": [
+        2,
+        3,
+        1
+      ],
+      "wholeLoopPreserved": true,
+      "decoded": {
+        "frames": 63390,
+        "channels": 2,
+        "sampleRate": 48000,
+        "durationSeconds": 1.320625,
+        "rms": 0.010976681588094929
+      }
+    },
+    "ownerNativeFilesPreserved": 2249,
+    "bankRecovery": {
+      "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+      "inputSha256": "52cae9442c6a8c1d28d44bf5dc73ca8476c8b43ba5de9e9704817153063d2e67",
+      "soundCount": 1,
+      "sampleCount": 21,
+      "encodedBytes": 1167696,
+      "sampleSha256": [
+        "5bf3dc2c1835a1602e1fe3954c5aa7042ea32eb48a6d471c76e980ea0bcdc43f",
+        "a5bbb607ffbb0ef28a9aea65e3aa1ef49faf43442af41b3caf17a365c2e437d9",
+        "057d64ee15c3feef4b060a935ed473625da1fe3e483061f5c786693d2bef0212",
+        "a9fe8b559fff7ad764c42332a8547cd9f37939a13e8909b6ee8e6efba86133b6",
+        "cd4964fbab6303da79da4c130bc65c77c6381139b36fb7b0bfc231c9d1438b2a",
+        "3d57a133c317e68894958d43e549bc4957da024417276e5ee3c5fb1d6c67e0f0",
+        "3afa9a831ec19edf88b22228a7fdefc7269a1b18ae02d9990aafebd170b6e859",
+        "615ce7f6efb34db8ba45e5211bd674650f86ce9bcb05f4c58c6a5043644ea41a",
+        "7b7635484f6d24366e20fe4d127fcd10e1f6f1d27b1bbdae2535a5ecaf209381",
+        "6475807ab2c3066fda6904a09636c10dda81f3366c39a9ab4a5f04ebb6059a9f",
+        "2125fb7dd589b685df89ad5d9d5a9f91c14d192476dc7539a581186f9cef6490",
+        "9548a875252f6eb04506cfba105ab10d4efdf5d4554e04232a31a46478748754",
+        "93687e4ac5d818ac7105697889607d1c2445dde9b0b3683cb03e62de17c42ca8",
+        "2c8537e7775d1664eb7bf41f7643854815e9465880d4b1309bb00df76131fca8",
+        "9e9f9ddfd26ea085998bc0011ce160739f018af842da488be94563beb1407b01",
+        "c1a6688265927bc7774cd131f3d8ab1885e86df397e2a7b365671c8a861adba1",
+        "a480e8956f222b9729e66a07df0de7240bf36dfd123a1888cb3befa3d72d1395",
+        "c88d1e712c1f9986f2778c79cef93e6b9a21a52273ca7c4d296680f6dcc8699e",
+        "8b003d22811fd13f1c1e191408e2ffe6525891d097a8f7352f01948b09f8d602",
+        "d1525310e90d92365943fce7bcbaa7506ae0172ca97a7eaceb250bc26c7efd85",
+        "cee2e9809288bb98ccfddb3a927b48f6bf38c778edd1289caf66d616131e875d"
+      ],
+      "bankSha256": {
+        "sounds_adpcm.fsb": "d9a70adcb681bcb152a50ea61904fc921d2d94aff3000fe3d2827823c9e49e88",
+        "sounds_adpcm.lst.bin": "d469b6d72c7d8f6d141da2b61c14b29862a57d3563ebb195e3829f18db742a78"
+      },
+      "notice": "Extraction input only: exact pinned MCC classic ADPCM bytes embedded locally for native Invader serialization. Only raw-sample flags/offsets and declared length differ; original metadata/source remains intact. This input is not a playable map or a shared patch."
+    },
+    "deliberateManagedImportCorruption": {
+      "rejected": true,
+      "blockers": [
+        "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+      ],
+      "attributedTool": null
+    },
+    "sourcePreserved": true,
+    "previousAcceptedBuildPreserved": true,
+    "gameplayAudioVerified": false,
+    "gameReplicationVerified": false
+  },
+  "sparkLink": {
+    "complete": true,
+    "nativeProcesses": 3,
+    "separateLibraries": 3,
+    "physicalMachines": 1,
+    "mockedIpc": false,
+    "stages": {
+      "threeIndependentWorkshopEditors": {
+        "tls": true,
+        "durable": true,
+        "network": "actual private LAN interface",
+        "participants": 3
+      },
+      "simultaneousUiBrushEdits": true,
+      "participantSpecificBspUndoRedo": true,
+      "actualMouseDragGhosts": {
+        "perspectiveAndOrthographic": true,
+        "uncommittedRevisionUnchanged": true,
+        "clearedAfterGesture": true,
+        "actualGeometryCommittedAndRenderedByAllEditors": true
+      },
+      "conflictsReplayViewerAndBuildPermissions": true,
+      "expiredEditorLeaseReauthenticatesSameIdentity": {
+        "pausedNativeEditorJavaScriptMs": 11500,
+        "networkOutageSimulated": false
+      },
+      "sustainedNativeBspEditing": {
+        "commits": 240,
+        "durationMs": 77162.952,
+        "history": 100,
+        "revision": 247,
+        "acknowledgedOperations": 247,
+        "journalBytes": 1140156
+      },
+      "frozenSharedBspNativeBuild": {
+        "jobId": "ea61f96e-2e53-4a09-93c7-0f43754c03c1",
+        "durationMs": 20167.54329999999,
+        "sessionRevision": 247,
+        "newerRevision": 248,
+        "cacheVersion": 13,
+        "compiledCollisionTriangles": 58,
+        "cacheSha256": "31b4b57c92c8d8fd28b86c8ba69d5a587c95acaed347dbb1c19cd69fb214fe8c",
+        "cacheBytes": 88880670,
+        "output": "\\\\?\\D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\.local\\c50-completion-20261102\\sparklink-native\\owner\\library\\jobs\\ea61f96e-2e53-4a09-93c7-0f43754c03c1\\output\\c48_workshop_owner.map",
+        "portals": 2,
+        "readbackTags": 2239
+      },
+      "twoGenuineOfflineUiEditsRetained": {
+        "operationId": "b66f005a-5d08-4803-94d9-f91d85ff7e02",
+        "baseline": 248,
+        "pendingSourceSha256": "cd6f8648c3dad993bb70117572b4f85bfe29bbf8902582eb42bbf7279de8ae72",
+        "newerDraftSourceSha256": "0e339d6746dc8916721e682e99025bf9a03a2ad94ec2e13b91529206a8b5a0f8"
+      },
+      "ownerProcessDeathRecoversSourceHistoryAndPendingIdentity": {
+        "originalOperationId": "b66f005a-5d08-4803-94d9-f91d85ff7e02",
+        "author": "f59a4ee2-d4df-4baa-89d3-24973e9a845e",
+        "beforeRevision": 248,
+        "afterRevision": 250,
+        "genuineOfflineUiEdits": 2,
+        "originalOperationAppliedOnce": true,
+        "newerLocalDraftPreserved": true
+      },
+      "radminInterfaceThreeProcessConvergence": {
+        "scope": "Radmin adapter, same physical machine",
+        "crossComputer": false,
+        "remoteVpnTunnelTested": false,
+        "revision": 3
+      },
+      "revokedParticipantCannotReconnect": true
+    },
+    "elapsedMs": 140933.63019999999,
+    "latenciesMs": {
+      "samples": 25,
+      "minimum": 890.6970000000001,
+      "median": 913.3043000000034,
+      "maximum": 1154.7293000000009
+    },
+    "memory": [
+      {
+        "label": "before sustained edits",
+        "elapsedMs": 28523.0921,
+        "samples": [
+          {
+            "actor": "owner",
+            "Documents": 1,
+            "Nodes": 9545,
+            "LayoutDuration": 0,
+            "TaskDuration": 0.040342,
+            "JSHeapUsedSize": 84408244,
+            "JSHeapTotalSize": 86568960
+          },
+          {
+            "actor": "editor-b",
+            "Documents": 1,
+            "Nodes": 9695,
+            "LayoutDuration": 0,
+            "TaskDuration": 0.04316,
+            "JSHeapUsedSize": 85777748,
+            "JSHeapTotalSize": 87355392
+          },
+          {
+            "actor": "editor-c",
+            "Documents": 1,
+            "Nodes": 9622,
+            "LayoutDuration": 0,
+            "TaskDuration": 0.038814,
+            "JSHeapUsedSize": 84136296,
+            "JSHeapTotalSize": 86044672
+          }
+        ]
+      },
+      {
+        "label": "mid sustained edits",
+        "elapsedMs": 67759.35329999999,
+        "samples": [
+          {
+            "actor": "owner",
+            "Documents": 1,
+            "Nodes": 9592,
+            "LayoutDuration": 0,
+            "TaskDuration": 0.025441,
+            "JSHeapUsedSize": 85483884,
+            "JSHeapTotalSize": 87093248
+          },
+          {
+            "actor": "editor-b",
+            "Documents": 1,
+            "Nodes": 9742,
+            "LayoutDuration": 0,
+            "TaskDuration": 0.028559,
+            "JSHeapUsedSize": 86735664,
+            "JSHeapTotalSize": 88403968
+          },
+          {
+            "actor": "editor-c",
+            "Documents": 1,
+            "Nodes": 9669,
+            "LayoutDuration": 0,
+            "TaskDuration": 0.024608,
+            "JSHeapUsedSize": 85055040,
+            "JSHeapTotalSize": 87093248
+          }
+        ]
+      },
+      {
+        "label": "after sustained edits",
+        "elapsedMs": 105679.99859999999,
+        "samples": [
+          {
+            "actor": "owner",
+            "Documents": 1,
+            "Nodes": 9592,
+            "LayoutDuration": 0,
+            "TaskDuration": 0.027512,
+            "JSHeapUsedSize": 85892040,
+            "JSHeapTotalSize": 88141824
+          },
+          {
+            "actor": "editor-b",
+            "Documents": 1,
+            "Nodes": 9742,
+            "LayoutDuration": 0,
+            "TaskDuration": 0.027825,
+            "JSHeapUsedSize": 87091208,
+            "JSHeapTotalSize": 89190400
+          },
+          {
+            "actor": "editor-c",
+            "Documents": 1,
+            "Nodes": 9669,
+            "LayoutDuration": 0,
+            "TaskDuration": 0.026071,
+            "JSHeapUsedSize": 85480584,
+            "JSHeapTotalSize": 87093248
+          }
+        ]
+      }
+    ],
+    "gameplayReplicationTested": false,
+    "crossComputerTested": false,
+    "steamRelayTested": false
+  },
+  "atlas": {
+    "complete": true,
+    "paths": 94,
+    "regions": 187,
+    "uniqueSourceHashes": 71,
+    "scanMs": 20572.4515,
+    "decodedMaps": 10,
+    "finalCache": {
+      "entries": 8,
+      "estimatedBytes": 101024140,
+      "evictions": 6,
+      "maxEntries": 8,
+      "maxEstimatedBytes": 268435456
+    },
+    "sourceContentReopenedExactly": true
+  },
+  "zombieDiagnostics": {
+    "schemaVersion": 1,
+    "analysisOnly": true,
+    "atomicSnapshots": false,
+    "lifecycleAccepted": false,
+    "gamePeerReplicationTested": false,
+    "note": "Native sampled observations are evidence, not a collision/animation or complete lifecycle acceptance.",
+    "trials": [
+      {
+        "input": "carrier-engine/observer.ndjson",
+        "inputSha256": "1bca5222593066450205f163be886a234c4510ae824b55b56291cbc6df010ce0",
+        "identity": {
+          "runtime": "opence-build-335",
+          "role": "host",
+          "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+          "pdbSha256": "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800"
+        },
+        "samples": 716,
+        "detailedSamples": 63,
+        "firstTick": 1,
+        "lastTick": 1769,
+        "sampleErrors": 20,
+        "actorCounts": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "actors": [
+          {
+            "id": 3799777285,
+            "firstTick": 212,
+            "lastTick": 839,
+            "parents": [
+              4294967295
+            ],
+            "seats": [
+              65535
+            ],
+            "minimumHealth": 0.08498962223529816,
+            "maximumHealth": 1,
+            "unparentedSamples": 206,
+            "unparentedPositionBounds": [
+              [
+                113.98565673828125,
+                117.87301635742188
+              ],
+              [
+                -129.89910888671875,
+                -121.08879852294922
+              ],
+              [
+                1.3060381412506104,
+                49.443912506103516
+              ]
+            ]
+          },
+          {
+            "id": 3800170500,
+            "firstTick": 303,
+            "lastTick": 888,
+            "parents": [
+              4294967295
+            ],
+            "seats": [
+              65535
+            ],
+            "minimumHealth": 0.04748062416911125,
+            "maximumHealth": 1,
+            "unparentedSamples": 192,
+            "unparentedPositionBounds": [
+              [
+                113.96749877929688,
+                117.87301635742188
+              ],
+              [
+                -129.50448608398438,
+                -121.08879852294922
+              ],
+              [
+                1.335390329360962,
+                49.40469741821289
+              ]
+            ]
+          },
+          {
+            "id": 3800563715,
+            "firstTick": 394,
+            "lastTick": 1769,
+            "parents": [
+              4294967295
+            ],
+            "seats": [
+              65535
+            ],
+            "minimumHealth": 0.1625550389289856,
+            "maximumHealth": 1,
+            "unparentedSamples": 451,
+            "unparentedPositionBounds": [
+              [
+                113.97911071777344,
+                117.87301635742188
+              ],
+              [
+                -129.68772888183594,
+                -121.08879852294922
+              ],
+              [
+                1.3781592845916748,
+                49.40469741821289
+              ]
+            ]
+          }
+        ],
+        "vehicleSamples": 7,
+        "maximumObservedVehicleSpeedNativeUnits": 2541.3691027765476,
+        "vehiclePositionBounds": [
+          [
+            11.337249755859375,
+            120.00895690917969
+          ],
+          [
+            -188.3979034423828,
+            -77.08940124511719
+          ],
+          [
+            13.589559555053711,
+            49.302818298339844
+          ]
+        ],
+        "finalActorCount": 1,
+        "finalVehicleCount": 0
+      },
+      {
+        "input": "carrier-engine-inertia/observer.ndjson",
+        "inputSha256": "5df04979259e898d36c48c597a046a3bb9d3038d4013ef8fc1d4966d585c79a3",
+        "identity": {
+          "runtime": "opence-build-335",
+          "role": "host",
+          "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+          "pdbSha256": "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800"
+        },
+        "samples": 720,
+        "detailedSamples": 69,
+        "firstTick": 0,
+        "lastTick": 1765,
+        "sampleErrors": 16,
+        "actorCounts": [
+          0,
+          1
+        ],
+        "actors": [
+          {
+            "id": 3799777285,
+            "firstTick": 213,
+            "lastTick": 539,
+            "parents": [
+              3799711748
+            ],
+            "seats": [
+              0
+            ],
+            "minimumHealth": 1,
+            "maximumHealth": 1,
+            "unparentedSamples": 0,
+            "unparentedPositionBounds": null
+          },
+          {
+            "id": 3800956932,
+            "firstTick": 663,
+            "lastTick": 990,
+            "parents": [
+              3800891395
+            ],
+            "seats": [
+              0
+            ],
+            "minimumHealth": 1,
+            "maximumHealth": 1,
+            "unparentedSamples": 0,
+            "unparentedPositionBounds": null
+          },
+          {
+            "id": 3802267652,
+            "firstTick": 1111,
+            "lastTick": 1439,
+            "parents": [
+              3802202115
+            ],
+            "seats": [
+              0
+            ],
+            "minimumHealth": 1,
+            "maximumHealth": 1,
+            "unparentedSamples": 0,
+            "unparentedPositionBounds": null
+          }
+        ],
+        "vehicleSamples": 39,
+        "maximumObservedVehicleSpeedNativeUnits": 0.020513421034451813,
+        "vehiclePositionBounds": [
+          [
+            93.99311065673828,
+            94
+          ],
+          [
+            -153,
+            -152.95040893554688
+          ],
+          [
+            0.3521639406681061,
+            1.4097089767456055
+          ]
+        ],
+        "finalActorCount": 0,
+        "finalVehicleCount": 0
+      },
+      {
+        "input": "carrier-engine-inertia-repeat/observer.ndjson",
+        "inputSha256": "f0afd83bbfcf43714b3d1f3e20a831ec491634db5c70eb1deeefb808c2d4410e",
+        "identity": {
+          "runtime": "opence-build-335",
+          "role": "host",
+          "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+          "pdbSha256": "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800"
+        },
+        "samples": 716,
+        "detailedSamples": 64,
+        "firstTick": 0,
+        "lastTick": 1766,
+        "sampleErrors": 20,
+        "actorCounts": [
+          0,
+          1
+        ],
+        "actors": [
+          {
+            "id": 3799777285,
+            "firstTick": 213,
+            "lastTick": 540,
+            "parents": [
+              3799711748
+            ],
+            "seats": [
+              0
+            ],
+            "minimumHealth": 1,
+            "maximumHealth": 1,
+            "unparentedSamples": 0,
+            "unparentedPositionBounds": null
+          },
+          {
+            "id": 3800956932,
+            "firstTick": 661,
+            "lastTick": 988,
+            "parents": [
+              3800891395
+            ],
+            "seats": [
+              0
+            ],
+            "minimumHealth": 1,
+            "maximumHealth": 1,
+            "unparentedSamples": 0,
+            "unparentedPositionBounds": null
+          },
+          {
+            "id": 3802267652,
+            "firstTick": 1112,
+            "lastTick": 1439,
+            "parents": [
+              3802202115
+            ],
+            "seats": [
+              0
+            ],
+            "minimumHealth": 1,
+            "maximumHealth": 1,
+            "unparentedSamples": 0,
+            "unparentedPositionBounds": null
+          }
+        ],
+        "vehicleSamples": 37,
+        "maximumObservedVehicleSpeedNativeUnits": 0.0707953727456908,
+        "vehiclePositionBounds": [
+          [
+            93.99311065673828,
+            94
+          ],
+          [
+            -153,
+            -152.95040893554688
+          ],
+          [
+            0.3499719798564911,
+            1.407909631729126
+          ]
+        ],
+        "finalActorCount": 0,
+        "finalVehicleCount": 0
+      },
+      {
+        "input": "carrier-engine-release/observer.ndjson",
+        "inputSha256": "a9d722c5aae3ddb7fbb9758c24f8e7636b8e12b2cb8b00ea76bed666a0f95e21",
+        "identity": {
+          "runtime": "opence-build-335",
+          "role": "host",
+          "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+          "pdbSha256": "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800"
+        },
+        "samples": 686,
+        "detailedSamples": 57,
+        "firstTick": 1,
+        "lastTick": 1902,
+        "sampleErrors": 38,
+        "actorCounts": [
+          0,
+          1
+        ],
+        "actors": [
+          {
+            "id": 3799777285,
+            "firstTick": 213,
+            "lastTick": 540,
+            "parents": [
+              3799711748
+            ],
+            "seats": [
+              0
+            ],
+            "minimumHealth": 1,
+            "maximumHealth": 1,
+            "unparentedSamples": 0,
+            "unparentedPositionBounds": null
+          },
+          {
+            "id": 3800956932,
+            "firstTick": 661,
+            "lastTick": 988,
+            "parents": [
+              3800891395
+            ],
+            "seats": [
+              0
+            ],
+            "minimumHealth": 1,
+            "maximumHealth": 1,
+            "unparentedSamples": 0,
+            "unparentedPositionBounds": null
+          },
+          {
+            "id": 3802267652,
+            "firstTick": 1112,
+            "lastTick": 1439,
+            "parents": [
+              3802202115
+            ],
+            "seats": [
+              0
+            ],
+            "minimumHealth": 1,
+            "maximumHealth": 1,
+            "unparentedSamples": 0,
+            "unparentedPositionBounds": null
+          }
+        ],
+        "vehicleSamples": 36,
+        "maximumObservedVehicleSpeedNativeUnits": 0.06835292324869355,
+        "vehiclePositionBounds": [
+          [
+            93.99311065673828,
+            94
+          ],
+          [
+            -153,
+            -152.95040893554688
+          ],
+          [
+            0.43903934955596924,
+            1.0709525346755981
+          ]
+        ],
+        "finalActorCount": 0,
+        "finalVehicleCount": 0
+      }
+    ]
+  },
+  "tunnel": {
+    "nativeCompiled": true,
+    "cacheSha256": "c84a1ed439ea0d37705899382c6304e14203c68518a743fcb57bdf1a0c5ea7e7",
+    "loaded": true,
+    "clientJoined": true,
+    "playerWalkthroughVerified": false,
+    "sourceBuildProvenance": null,
+    "scope": "Prepared isolated native acceptance cache, loaded by the checked CE runtime inventory. No application project-build receipt was fabricated.",
+    "testInstruction": "Walk forward into Sidewinder, turn back through the tunnel into Timberland, return and check both mouths, floor and head clearance.",
+    "boundedTrialMinutes": 30,
+    "isolatedClientAndServerExited": true
+  },
+  "preservation": {
+    "sealedRelease": [
+      {
+        "file": "Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip",
+        "bytes": 26186072,
+        "sha256": "c6ea81b25bfae352d76df58557a82daef44b72ba11bf778d0e2eee9f56ae03f0"
+      },
+      {
+        "file": "Project_Guilty_Spark_0.4.1_windows_x64_manifest.json",
+        "bytes": 4879,
+        "sha256": "c00f7afc9b1d57963bbe0234ef4c3c992a574136a27cbf34dca83354fe2a0b52"
+      },
+      {
+        "file": "Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip",
+        "bytes": 13941863,
+        "sha256": "ff6c9e4dea48126680c2a9b8536dfb2185fab5ac445c7d4f306b9bed52e07069"
+      },
+      {
+        "file": "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe",
+        "bytes": 10107686,
+        "sha256": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749"
+      },
+      {
+        "file": "SHA256SUMS-windows-x64.txt",
+        "bytes": 469,
+        "sha256": "ea47e113b4613c59eea87521a4600bf4a950db1b73e0d51559cee86f0f3cce69"
+      }
+    ],
+    "archives": [
+      {
+        "name": "C49-cold-native-qa",
+        "catalogSha256": "f440aaa70d6ff28bf813bb8a9dcc332b8aa5e138a16eb867f0cb8e9429c4f3bd",
+        "catalogVerified": true,
+        "payloadFiles": 7,
+        "payloadBytes": 7618872756,
+        "fullRestorationRepeated": false,
+        "recoveryToolAvailable": true
+      },
+      {
+        "name": "C49-cold-worktree-qa",
+        "catalogSha256": "48af5f513ba7225c5e47228d314c40f72037f6d7edde700ce87f7e286f741795",
+        "catalogVerified": true,
+        "payloadFiles": 5,
+        "payloadBytes": 4646376067,
+        "fullRestorationRepeated": false,
+        "recoveryToolAvailable": true
+      },
+      {
+        "name": "C49-cold-ce-trials",
+        "catalogSha256": "92f09f1855e2db8f501790cfc5432eb54c0b89eee0212ec8858ae500f956e7c8",
+        "catalogVerified": true,
+        "payloadFiles": 1,
+        "payloadBytes": 963002576,
+        "fullRestorationRepeated": false,
+        "recoveryToolAvailable": true
+      }
+    ],
+    "storageBeforeBytes": 112767948116,
+    "storageAfterBytes": 126881444781,
+    "growthBytes": 14113496665,
+    "storageAfterGiB": 118.16755382437259,
+    "growthGiB": 13.14421805087477,
+    "inventoryErrors": 0,
+    "filesAfter": 455859,
+    "linksSkipped": 719,
+    "cleanupRepeated": false,
+    "previousGoodBuildsPreserved": true
+  },
+  "distribution": {
+    "sourceCommit": "cb07581597de11e83d1c10bafad526e8b031f27e",
+    "version": "0.4.1",
+    "workflow": ".github/workflows/release.yml",
+    "publicReleases": 0,
+    "publicCheckedAt": "2026-11-02T07:49:06.418Z",
+    "authenticatedGitHubAccess": false,
+    "publiclyPublished": false,
+    "linuxBuiltOrLaunched": false,
+    "packageStartupTimings": [
+      {
+        "mode": "portable",
+        "trial": 1,
+        "workspaceReadyMs": 1193.5429,
+        "nativeBootstrapMs": 866.2403999999999,
+        "complete": true
+      },
+      {
+        "mode": "portable",
+        "trial": 2,
+        "workspaceReadyMs": 1185.6694,
+        "nativeBootstrapMs": 848.1300000000001,
+        "complete": true
+      },
+      {
+        "mode": "installed",
+        "trial": 1,
+        "workspaceReadyMs": 1405.7327,
+        "nativeBootstrapMs": 1081.2183,
+        "complete": true
+      },
+      {
+        "mode": "installed",
+        "trial": 2,
+        "workspaceReadyMs": 1169.331,
+        "nativeBootstrapMs": 837.4093,
+        "complete": true
+      }
+    ],
+    "timingScope": "C49 sealed first-run heading and native IPC; not C50 Home/showcase readiness."
+  },
+  "remaining": [
+    "Human tunnel two-way traversal and native in-game audio listening",
+    "Safe seated Zombie actor release, movement/animation, damage/death and repeated lifecycle",
+    "AI game-peer replication after local lifecycle acceptance",
+    "Cross-computer LAN/VPN, Steam relay, arbitrary live BSP replacement and universal direct compiled-map authoring",
+    "Authenticated draft asset attachment and approved public publication; Linux native startup"
+  ]
+}

@@ -8,6 +8,7 @@ import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
 import '../bspAssembly.css';
 import MegaworldAtlas from './MegaworldAtlas';
+import { useWorkspaceActivity } from './WorkspaceActivity';
 export default function BspAssembly({
   project,
   entries,
@@ -21,6 +22,8 @@ export default function BspAssembly({
   onSave: () => Promise<void>;
   onBuild: () => void;
 }) {
+  const {active}=useWorkspaceActivity();
+  const activeNow=useRef(active);activeNow.current=active;
   const candidates = entries.filter(
     (e) => e.id !== project.id && e.sha256 && [6, 7, 13, 609].includes(e.version ?? 0),
   );
@@ -57,6 +60,14 @@ export default function BspAssembly({
       operation.current++;
     };
   }, []);
+  useEffect(() => {
+    if (!active) {
+      // Parking the editor preserves its draft and GPU state, but a result
+      // requested in a previous active context must still be reviewed again.
+      operation.current++;
+      setBusy(false);
+    }
+  }, [active]);
   useEffect(() => {
     const signature = assemblySignature(project.bspAssembly ?? null);
     let previous = appliedSource;
@@ -98,7 +109,7 @@ export default function BspAssembly({
       owner = project.id;
     const signature = latest.current.signature;
     const current = () =>
-      mounted.current && operation.current === request && latest.current.projectId === owner;
+      mounted.current && activeNow.current && operation.current === request && latest.current.projectId === owner;
     setBusy(true);
     setError('');
     try {

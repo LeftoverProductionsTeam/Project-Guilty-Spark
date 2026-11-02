@@ -86,6 +86,10 @@ export interface ShaderStage {flags:number;constant0Source:number;constant0Funct
   constant0Lower:[number,number,number,number];constant0Upper:[number,number,number,number];constant1:[number,number,number,number];
   colorInputs:number[];colorOutputs:number[];alphaInputs:number[];alphaOutputs:number[]}
 export interface ShaderPreview {
+  detailMask?:number;
+  detailVScale?:number;
+  bumpIsSpecular?:boolean;
+  glassTint?:Vec3|null;
   reflection?: {
     bitmapTagId: number;
     perpendicularBrightness: number;
@@ -212,6 +216,7 @@ export interface NativeAssetImport {
 export interface Project {
   nativeAssetImports?: NativeAssetImport[];
   tagDuplicates?: import('./tagDuplicates').TagDuplicate[];
+  tagRenames?: import('./tagRenames').TagRename[];
   audioPreview?: import('./spatialAudio').SoundScene | null;
   powerups?: import('./powerups').CustomPowerup[];
   gameplayControls?: import('./gameplay').GameplayControls | null;

@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import type {ViewportAsset} from '../viewportAssets';
-import Sound from './Sound';
+import SoundAudition from './SoundAudition';
 import NativeModelPreview from './NativeModelPreview';
 import {librarySoundEmitters} from '../viewportAssets';
 import {useTextureResourceScope} from '../textureResourceScope';
@@ -18,9 +18,7 @@ function AssetPreview({item,cacheKey}:{item:ViewportAsset;cacheKey:string}) {
     complete = useRef<((url: string) => void) | null>(null);
   const [src, setSrc] = useState(thumbs.get(cacheKey) ?? ''),
     [error, setError] = useState(''),
-    [render, setRender] = useState(false),
-    [audition, setAudition] = useState(false),
-    [tracks, setTracks] = useState<{ tagId: number; sourceId: string }[]>([]);
+    [render, setRender] = useState(false);
   useEffect(() => {
     if(item.kind!=='model'||src)return;
     let active=true;
@@ -61,7 +59,6 @@ function AssetPreview({item,cacheKey}:{item:ViewportAsset;cacheKey:string}) {
       complete.current?.('');
     };
   }, [cacheKey, src]);
-  async function previewSound(){try{setError('');if(item.kind==='sound'){if(item.looping){const emitters=await librarySoundEmitters(item,[0,0,0]);setTracks([...new Map(emitters.map(e=>[e.tagId,{tagId:e.tagId,sourceId:e.sourceProjectId??item.sourceId}])).values()]);}else setTracks([{tagId:item.tagId,sourceId:item.sourceId}]);}setAudition(true);}catch(e){setError(String(e));}}
   return (
     <div className="library-asset-preview" ref={host}>
       {item.kind === 'model' ? (
@@ -80,20 +77,11 @@ function AssetPreview({item,cacheKey}:{item:ViewportAsset;cacheKey:string}) {
         )
       ) : item.kind === 'sound' ? (
         <>
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              void previewSound();
-            }}
-          >
-            Preview {item.looping ? 'sound tracks' : 'sound'}
-          </button>
-          {audition &&
-            tracks.map((t) => (
-              <Sound key={t.tagId} projectId={t.sourceId} tagId={t.tagId} sourceHash={item.sourceSha256} />
-            ))}
+          <SoundAudition tracks={async()=>{
+            if(!item.looping)return [{projectId:item.sourceId,tagId:item.tagId,sourceHash:item.sourceSha256}];
+            const emitters=await librarySoundEmitters(item,[0,0,0]);
+            return [...new Map(emitters.map(e=>[e.tagId,{projectId:e.sourceProjectId??item.sourceId,tagId:e.tagId,sourceHash:item.sourceSha256}])).values()];
+          }}/>
         </>
       ) : (
         <small>{item.kind === 'mesh' ? 'Custom model' : 'Custom sound'}</small>

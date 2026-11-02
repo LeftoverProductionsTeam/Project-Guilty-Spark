@@ -25,7 +25,7 @@ pub struct Inspection {
     pub warnings: Vec<String>,
 }
 pub fn inspect(path: &Path, expected_sha256: &str, tag_id: u32) -> Result<Inspection> {
-    let (header, bytes, sha256) = maps::read_cache_snapshot(path)?;
+    let (header, bytes, sha256) = maps::read_cache_snapshot_shared(path)?;
     if sha256 != expected_sha256 {
         return invalid("Looping sound source identity changed");
     }
@@ -37,7 +37,7 @@ fn inspect_bytes(
     sha256: String,
     tag_id: u32,
 ) -> Result<Inspection> {
-    if ![6, 7, 13, 609].contains(&header.version) || header.extended {
+    if ![5,6, 7, 13, 609].contains(&header.version) || header.extended {
         return invalid("Looping sound preview needs a supported unextended Halo 1 cache");
     }
     let r = Reader(bytes);
@@ -46,8 +46,9 @@ fn inspect_bytes(
         .checked_add(header.tag_size as usize)
         .filter(|end| *end <= bytes.len())
         .ok_or_else(|| SparkError::Invalid("Looping sound tag region exceeds the cache".into()))?;
-    r.bytes(begin, 40)?;
+    r.bytes(begin, if header.version==5{36}else{40})?;
     let base = match header.version {
+        5 => 0x803a6000,
         6 => 0x4bf10000,
         13 => r
             .u32(begin)?
@@ -66,7 +67,7 @@ fn inspect_bytes(
         }
         Ok(at)
     };
-    if r.u32(begin + 36)? != 0x74616773 {
+    if r.u32(begin + if header.version==5{32}else{36})? != 0x74616773 {
         return invalid("Invalid looping sound tag index");
     }
     let count = r.u32(begin + 12)? as usize;

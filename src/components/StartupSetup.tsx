@@ -2,6 +2,7 @@ import { useEffect,useRef,useState } from 'react';
 import type { Bootstrap, RuntimeId, Settings, Workspace } from '../types';
 import ConnectGames from './ConnectGames';
 import CustomEditionSetup from './CustomEditionSetup';
+import { primaryRuntimes, useRuntimeConnections } from '../useRuntimeConnections';
 const halos: { id: RuntimeId; name: string; description: string }[] = [
   {
     id: 'mccSteam',
@@ -12,16 +13,6 @@ const halos: { id: RuntimeId; name: string; description: string }[] = [
     id: 'haloCustomEdition',
     name: 'Halo Custom Edition',
     description: 'Classic CE with a matching HEK or explicitly reviewed compatible tagset.',
-  },
-  {
-    id: 'haloPc',
-    name: 'Halo PC',
-    description: 'Preserve and inspect classic PC maps; runtime/tool support varies.',
-  },
-  {
-    id: 'macDemo',
-    name: 'Halo Demo / Mac preservation',
-    description: 'Inspect owned legacy content on Windows. This does not run PowerPC game executables.',
   },
   {
     id: 'chupathingyCe',
@@ -43,11 +34,14 @@ export default function StartupSetup({
   onApply: (settings: Settings) => Promise<void>;
   navigate: (w: Workspace) => void;
 }) {
+  const connections = useRuntimeConnections(data);
   const [choice, setChoice] = useState<RuntimeId>(data.settings.preferredHalo ?? 'mccSteam'),
     [step, setStep] = useState(data.settings.onboardingCompleted ? 2 : data.settings.preferredHalo ? 1 : 0),
     [draft, setDraft] = useState(data.settings),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const selectedRuntime = connections.reports.find(item => item.id === choice);
+  const selectedCandidate = connections.detected.find(item => item.runtimeId === choice);
   const mounted=useRef(true);useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   async function save(settings: Settings, next: number) {
     setBusy(true);
@@ -96,21 +90,30 @@ export default function StartupSetup({
             targets.
           </p>
           <div className="gs-halo-choices" role="group" aria-label="Your Halo edition">
-            {halos.map((h) => (
+            {primaryRuntimes.map(id => halos.find(h => h.id === id)!).map((h) => {
+              const installed = connections.reports.find(item => item.id === h.id)?.installation;
+              const candidate = connections.detected.find(item => item.runtimeId === h.id);
+              const connected = installed?.validation === 'pass';
+              const status = connected ? 'Connected' : candidate ? (candidate.contentReady ? 'Detected' : 'Needs content') : connections.checking ? 'Checking…' : 'Not connected';
+              return (
               <button
                 key={h.id}
                 className={choice === h.id ? 'selected' : ''}
                 aria-pressed={choice === h.id}
+                data-connected={connected}
+                title={installed?.root ?? candidate?.root ?? h.description}
                 onClick={() => setChoice(h.id)}
               >
                 <strong>{h.name}</strong>
                 <small>{h.description}</small>
-                {h.id === 'mccSteam' && data.installation.mccPath && (
-                  <span>MCC detected on this computer</span>
-                )}
+                <span>{status}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
+          <details className="gs-legacy-targets"><summary>Legacy import and export targets</summary>
+            <p>Halo PC, Xbox, Demo, Mac and HaloMD remain available through advanced import, export and build targets. A preserved map does not establish a connected game installation.</p>
+          </details>
           <button
             className="primary"
             disabled={busy}
@@ -127,6 +130,13 @@ export default function StartupSetup({
             Your Halo: <strong>{halos.find((h) => h.id === choice)?.name}</strong>. Existing tool folders are
             prefilled. Connect them now or keep the editor available and configure them later.
           </p>
+          <div className="analysis-actions gs-setup-connection" aria-label="Selected runtime connection">
+            <span>{selectedRuntime?.installation?.validation === 'pass' ? 'Connected · installation verified' : selectedCandidate ? selectedCandidate.detail : 'Connect your game separately from its editing tools.'}</span>
+            {selectedCandidate && <button disabled={!!connections.connecting} onClick={() => void connections.connect(selectedCandidate)}>
+              {connections.connecting ? 'Connecting…' : 'Connect detected game'}
+            </button>}
+            <button onClick={() => navigate('runtimes')}>Runtime setup</button>
+          </div>
           <ConnectGames
             data={data}
             onApply={onApply}
@@ -159,6 +169,7 @@ export default function StartupSetup({
       )}
       {busy&&<p role="status">Saving your selection. You can still use the sidebar while setup finishes.</p>}
       {error && <p role="alert">{error}</p>}
+      {connections.error && <p role="status">{connections.error}</p>}
     </section>
   );
 }

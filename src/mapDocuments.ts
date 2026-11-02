@@ -29,6 +29,12 @@ export function emptyMapDocuments(limit: number): MapDocuments {
 export function activeDocument(state: MapDocuments): MapDocument | undefined {
   return state.documents.find((d) => d.id === state.activeId);
 }
+function inspectionUnchanged(previous:MapInspection|null|undefined,incoming:MapInspection|null|undefined,oldSource:Project['source'],source:Project['source']) {
+  return !!previous&&!!incoming&&!!oldSource&&!!source&&oldSource.sha256===source.sha256&&
+    previous.sha256===source.sha256&&incoming.sha256===source.sha256&&typeof previous.header?.version==='number'&&previous.header.version===incoming.header?.version&&
+    JSON.stringify([oldSource.resourceDirectory,oldSource.resourceSha256,oldSource.audioResources,previous.diagnostics,previous.resources])===
+    JSON.stringify([source.resourceDirectory,source.resourceSha256,source.audioResources,incoming.diagnostics,incoming.resources]);
+}
 export function documentReducer(state: MapDocuments, action: DocumentAction): MapDocuments {
   if(action.type==='window-history')return {...state,documents:state.documents.map(d=>d.id===action.id&&action.history.current?.id===d.id?{...d,history:action.history}:d)};
   if (action.type === 'external-revision') {
@@ -48,14 +54,18 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
     const source=action.project.source;
     if(!source)return state;
     const merge=(p:Project)=>p.source?.sha256===source.sha256?{...p,source:{...p.source,...(action.kind==='audio'?{}:{resourceDirectory:source.resourceDirectory,resourceSha256:source.resourceSha256}),...(source.audioResources===undefined?{}:{audioResources:source.audioResources})}}:p;
-    return {...state,documents:state.documents.map(d=>d.id!==action.project.id?d:{...d,inspection:d.history.current?.source?.sha256===source.sha256&&action.inspection?.sha256===source.sha256?action.inspection:d.inspection,history:{...d.history,current:d.history.current?merge(d.history.current):null,past:d.history.past.map(merge),future:d.history.future.map(merge)}})};
+    return {...state,documents:state.documents.map(d=>d.id!==action.project.id?d:{...d,inspection:d.history.current?.source?.sha256===source.sha256&&action.inspection?.sha256===source.sha256&&!inspectionUnchanged(d.inspection,action.inspection,d.history.current.source,source)?action.inspection:d.inspection,history:{...d.history,current:d.history.current?merge(d.history.current):null,past:d.history.past.map(merge),future:d.history.future.map(merge)}})};
   }
   if (action.type === 'open') {
     const id = action.open.project.id,
       old = state.documents.find((d) => d.id === id);
+    const sameSource=inspectionUnchanged(old?.inspection,action.open.inspection,old?.history.current?.source??null,action.open.project.source);
     const doc = {
       id,
-      inspection: action.open.inspection,
+      // Native open has already revalidated the preserved source. Reuse its
+      // immutable decoded buffers only when source AND resource identities
+      // agree, so retained editors do not decode/reupload them on tab return.
+      inspection: sameSource ? old!.inspection : action.open.inspection,
       meshes: old?.meshes ?? {},
       history: historyReducer(
         { ...initialHistory, limit: state.limit },

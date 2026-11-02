@@ -4,6 +4,7 @@ import { call } from './api';
 import { isEditingText } from './editorFlight';
 import { collisionBounds, floorSnapDelta } from './floorSnap';
 import type { CollisionMesh, FloorSurface } from './floorSnap';
+import { useWorkspaceActivity } from './components/WorkspaceActivity';
 export interface DropBody {
   id: string;
   name: string;
@@ -44,9 +45,10 @@ export default function useEndToFloor(config: {
   onDrop: (delta: number) => void;
   onError: (message: string) => void;
 }) {
+  const activity=useWorkspaceActivity();
   const latest = useRef(config),
     busy = useRef(false);
-  latest.current = config;
+  latest.current = {...config,enabled:config.enabled&&activity.active};
   useEffect(() => {
     let active = true;
     const key = (event: KeyboardEvent) => {

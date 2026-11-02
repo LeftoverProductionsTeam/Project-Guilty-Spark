@@ -23,7 +23,7 @@ const hash = async (p) =>
     .digest('hex');
 const report = {
   schemaVersion: 1,
-  measurementVersion: 2,
+  measurementVersion: 3,
   label,
   appSha256: await hash(app),
   complete: false,
@@ -33,6 +33,7 @@ const report = {
     viewport: { width: 1440, height: 900 },
     focusEmulation: true,
     qualityUnchanged: true,
+    capturePixelProof: true,
   },
   phases: [],
   errors: [],
@@ -89,6 +90,11 @@ async function phase(name, action) {
     metrics: await metrics(),
     gauges: await page.evaluate(() => globalThis.__GS_PROFILE_GAUGES__ ?? null),
   };
+  if (name.startsWith('first-textured-map-') || name.startsWith('map-switch-')) {
+    const file = `${name}.png`;
+    const pixels = await page.locator('.world-layout:visible canvas').screenshot({ path: path.join(root, file) });
+    row.renderedPixels = {file,sha256:crypto.createHash('sha256').update(pixels).digest('hex')};
+  }
   report.phases.push(row);
   await save();
   console.log(name, Math.round(elapsedMs));
@@ -242,7 +248,16 @@ async function worldReady(expectedDecals) {
       },
       { intervals: [100, 100, 100, 100] },
     )
-    .toBe(true);
+    .toBe(true)
+    .catch(async (error) => {
+      report.readinessFailure = await world.evaluate((element) => ({
+        world: { ...element.dataset },
+        decals: element.querySelector('canvas')?.dataset.gsDecals ?? null,
+        render: element.querySelector('canvas')?.dataset.gsPerformance ?? null,
+      }));
+      await save();
+      throw error;
+    });
   return world.evaluate((e) => ({
     world: { ...e.dataset },
     render: JSON.parse(e.querySelector('canvas').dataset.gsPerformance ?? 'null'),
@@ -359,7 +374,10 @@ try {
   report.openProjectRoundTrips = native;
   await phase('large-asset-catalog', async () => {
     await page.getByRole('button', { name: 'Toggle Asset library', exact: true }).click();
-    const browse = page.locator('.viewport-asset-library .asset-source-browser');
+    // Retained workspaces keep their source panel mounted while its drawer is
+    // open. Exercise only the displayed drawer, never a parked/hidden copy.
+    const library = page.locator('.viewport-asset-library:visible');
+    const browse = library.locator('.asset-source-browser:visible');
     await browse.locator('summary').click();
     await expect(browse.getByLabel('Discovered asset source')).toContainText('c40.map');
     const options = await browse
@@ -371,17 +389,17 @@ try {
     await browse.getByLabel('Discovered asset source').selectOption(selected.value);
     await browse.getByRole('button', { name: 'Load assets', exact: true }).click();
     await expect(browse.getByRole('button', { name: 'Load assets', exact: true })).toBeEnabled();
-    await expect.poll(() => page.locator('.viewport-asset-list article').count()).toBeGreaterThan(0);
-    await page.getByLabel('Search loaded assets').fill('monitor');
-    await expect.poll(() => page.locator('.viewport-asset-list article img').count()).toBeGreaterThan(0);
+    await expect.poll(() => library.locator('.viewport-asset-list article').count()).toBeGreaterThan(0);
+    await library.getByLabel('Search loaded assets').fill('monitor');
+    await expect.poll(() => library.locator('.viewport-asset-list article img').count()).toBeGreaterThan(0);
     await frames();
-    const nativePreviewCount = await page.locator('.viewport-asset-list article img').count();
-    await page.getByLabel('Search loaded assets').fill('');
+    const nativePreviewCount = await library.locator('.viewport-asset-list article img').count();
+    await library.getByLabel('Search loaded assets').fill('');
     await frames();
     return {
       nativePreviewCount,
-      visibleCards: await page.locator('.viewport-asset-list article').count(),
-      text: await page.locator('.viewport-asset-library').innerText(),
+      visibleCards: await library.locator('.viewport-asset-list article').count(),
+      text: await library.innerText(),
     };
   });
   await page.screenshot({ path: path.join(root, 'catalog.png') });

@@ -5,6 +5,7 @@ import { directionForFlight, flightAnglesFromDirection, flightKey, flightVelocit
 import{useMapState}from'../mapSession';
 import{observeWindowFocus}from'../windowFocus';
 import type { FlightAngles } from '../editorFlight';
+import { useWorkspaceActivity } from './WorkspaceActivity';
 
 /** Hold right mouse + WASD to fly, RMB mouse motion to look, Q/E vertical,
  * Shift boost. Unlike FlyControls this does not capture typing outside the
@@ -17,11 +18,13 @@ export default function RightMouseFly({ speed = 12 }: { speed?: number }) {
   const config=navigationConfig(raw),configuration=useRef(config);configuration.current=config;
   const speedRef=useRef(config.speed);speedRef.current=config.speed;
   const held = useRef(false);
+  const activity=useWorkspaceActivity();
   const keys = useRef(new Set<string>());
   const angles = useRef<FlightAngles>({ yaw: 0, pitch: 0 });
   const orbit = controls as unknown as { enabled?: boolean; target?: THREE.Vector3; update?: () => void } | null;
 
   useEffect(() => {
+    if(!activity.active)return;
     const canvas = gl.domElement;
     const sight = new THREE.Vector3();
     const finish = () => {
@@ -102,7 +105,7 @@ export default function RightMouseFly({ speed = 12 }: { speed?: number }) {
       document.removeEventListener('visibilitychange', onVisibility);
       canvas.removeEventListener('contextmenu', onMenu);
     };
-  }, [gl, camera, orbit, invalidate]);
+  }, [activity.active,gl, camera, orbit, invalidate]);
   useFrame((_, delta) => {
     if (!held.current || delta <= 0) return;
     const velocity = flightVelocity(angles.current, keys.current,Math.min(100,speedRef.current*(speed/12)),configuration.current.bindings);

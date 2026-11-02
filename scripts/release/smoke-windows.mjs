@@ -17,6 +17,7 @@ const server = net.createServer();
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
 await new Promise((r) => server.close(r));
+const launchedAt = performance.now();
 const child = spawn(app, [], {
   windowsHide: true,
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -68,7 +69,9 @@ try {
     .find((p) => p.url().includes('tauri.localhost'));
   page.on('pageerror', (e) => errors.push(String(e)));
   await expect(page.locator('.application')).toBeVisible({ timeout: 90000 });
+  receipt.windowShellMs = performance.now() - launchedAt;
   const boot = await page.evaluate(() => window.__TAURI_INTERNALS__.invoke('bootstrap'));
+  receipt.nativeBootstrapMs = performance.now() - launchedAt;
   if (!boot?.settings || !Array.isArray(boot.entries))
     throw Error('Native bootstrap did not return a real library');
   const nativeVersion = boot.applicationVersion;
@@ -76,6 +79,7 @@ try {
   // A visible shell and successful IPC do not prove that lazy workspace chunks loaded.
   await expect(page.getByText('Loading workspace…', { exact: true })).toBeHidden({ timeout: 90000 });
   await expect(page.locator('main h1').first()).toBeVisible({ timeout: 90000 });
+  receipt.workspaceReadyMs = performance.now() - launchedAt;
   receipt.workspaceReady = true;
   receipt.checks.push('initial workspace finished loading and its heading is visible');
   receipt.checks.push(

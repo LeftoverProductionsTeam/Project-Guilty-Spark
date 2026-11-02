@@ -35,6 +35,7 @@ export function hasSourceBoundEdits(project: Project, inspection: MapInspection 
     project.tagEdits.length ||
     project.assets.length ||
     project.tagDuplicates?.length ||
+    project.tagRenames?.length ||
     project.powerups?.length ||
     project.animations?.length ||
     project.animationAssignments?.length ||

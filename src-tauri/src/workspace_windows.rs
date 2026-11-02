@@ -5,7 +5,7 @@ pub(super) fn checked_workspace(value:&str)->Reply<&str>{
 fn workspace_query(workspace:&str,context:Option<&str>,section:Option<&str>)->Reply<String>{
     let workspace=checked_workspace(workspace)?;
     let mut query=format!("index.html?workspace={workspace}");
-    if let Some(section)=section{if !matches!((workspace,section),("learning","guides"|"glossary"|"academy")|("settings","tools"|"dependencies")){return Err("Invalid workspace section".into());}query.push_str(&format!("&section={section}"));}
+    if let Some(section)=section{if !matches!((workspace,section),("learning","guides"|"glossary"|"academy")|("settings","tools"|"dependencies"|"interface")){return Err("Invalid workspace section".into());}query.push_str(&format!("&section={section}"));}
     if let Some(context)=context{if !(workspace=="academy"||workspace=="learning"&&section==Some("academy"))||context.is_empty()||context.len()>64||!context.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'-'||b==b'_'){return Err("Invalid tutorial context".into());}query.push_str(&format!("&lesson={context}"));}
     Ok(query)
 }
@@ -25,6 +25,7 @@ pub(super) async fn open_workspace_window(app:tauri::AppHandle,workspace:String,
     assert_eq!(workspace_query("learning",Some("preservation"),Some("academy")).unwrap(),"index.html?workspace=learning&section=academy&lesson=preservation");
     assert!(workspace_query("academy",Some("preservation"),None).is_ok());
     assert!(workspace_query("settings",None,Some("dependencies")).is_ok());
+    assert_eq!(workspace_query("settings",None,Some("interface")).unwrap(),"index.html?workspace=settings&section=interface");
     for (workspace,context,section) in [("settings",None,Some("tools&project=other")),("learning",Some("../elsewhere"),Some("academy")),("learning",Some("preservation"),Some("glossary")),("world",None,Some("glossary")),("learning",None,Some("https://example.com"))]{assert!(workspace_query(workspace,context,section).is_err());}
 }
 #[test]fn every_public_workspace_has_a_local_popout_route(){for workspace in ["library","map-finder","get-started","features","learning","how-to","community","world","tags","assets","scenario","build","preservation","settings","compare","runtimes","live","quickforge","firefight","interface","creator","machinima","academy"]{assert!(workspace_query(workspace,None,None).is_ok(),"{workspace}");}}

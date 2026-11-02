@@ -25,6 +25,7 @@ export interface OwnedBitmapBatchResponse {
   items: OwnedBitmapBatchItem[];
 }
 export interface VerifiedBatchImage {
+  recoveredResourceProjectId?: string;
   compatibleRuntime?: string;
   compatibleSourceSha256?: string;
   compatibleBitmapTagId?: number;

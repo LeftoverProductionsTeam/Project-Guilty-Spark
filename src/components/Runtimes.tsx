@@ -17,6 +17,7 @@ import type {
   RuntimeRegistration,
   RuntimeReport,
 } from '../types';
+import { primaryRuntimes } from '../useRuntimeConnections';
 import { Empty, Notice, PageTitle, Pill } from './ui';
 import { offeredTools, toolchainHint } from '../toolchainProfiles';
 import '../onboarding.css';
@@ -102,7 +103,7 @@ export default function Runtimes({
   const [selected, setSelected] = useMapState<RuntimeId>(project?.id??'global','hosting.runtime',project?.quickForge?.runtimeId ?? settings.preferredHalo ?? 'mccSteam');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useMapState<'runtime'|'friends'|'hosting'|'gameplay'|'servers'>(project?.id??'global','hosting.tab','servers');
+  const [tab, setTab] = useMapState<'choose'|'runtime'|'friends'|'hosting'|'gameplay'|'servers'>(project?.id??'global','hosting.tab','choose');
   const alive = useRef(true);
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -147,7 +148,7 @@ export default function Runtimes({
       {error && <Notice>{error}</Notice>}
       <div className="online-toolbar">
       <div className="tabs workspace-tabs" aria-label="Online workspaces">
-        <button className={tab === 'servers' ? 'selected' : ''} onClick={() => setTab('servers')}>Find games</button>
+        <button className={tab === 'servers' ? 'selected' : ''} onClick={() => setTab('servers')}>Join server</button>
         <button className={tab === 'runtime' ? 'selected' : ''} onClick={() => setTab('runtime')}>
           Runtime adapters
         </button>
@@ -168,20 +169,24 @@ export default function Runtimes({
           <select
             aria-label="Runtime adapter"
             value={selected}
-            onChange={(e) => setSelected(e.target.value as RuntimeId)}
+            onChange={(e) => {setSelected(e.target.value as RuntimeId);setTab('choose');}}
           >
-            {reports.map((item) => (
+            {primaryRuntimes.flatMap(id => reports.filter(item => item.id === id)).map((item) => (
               <option value={item.id} key={item.id}>
                 {item.name}
               </option>
             ))}
+            <optgroup label="Advanced · legacy inspection and export">
+              {reports.filter(item => !primaryRuntimes.some(id => id === item.id)).map(item => <option value={item.id} key={item.id}>{item.name}</option>)}
+            </optgroup>
           </select>
         </label>
       )}
       </div>
       {tab==='gameplay'&&<GameplayControls key={project?.id??'global'} project={project} edit={edit} onEditor={()=>onOpenWorkspace('quickforge')}/>}
       {tab==='servers'&&<PlayAndServers project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')} onSettings={onSettings} onHost={()=>setTab('hosting')} onFriends={()=>setTab('friends')}/>}
-      {report && tab!=='gameplay' && tab!=='servers' &&
+      {tab==='choose'&&<p className="subtle">Select your Halo, then choose Join server or Host game. Setup and gameplay controls stay with this runtime.</p>}
+      {report && tab!=='choose' && tab!=='gameplay' && tab!=='servers' &&
         (tab === 'runtime' ? (
           <>
             <CompatibilityTable/>

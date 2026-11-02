@@ -7,6 +7,8 @@ import BitmapPreview from './BitmapPreview';
 import SmartEditPanel from './SmartEditPanel';
 import { Notice, Pill } from './ui';
 import '../viewportAssets.css';
+import TagRenamePanel from './TagRenamePanel';
+import { renamedTagPath } from '../tagRenames';
 
 /** A source-bound tag drawer. It shares project edits, never the full editor's navigation state. */
 export default function ViewportTags({
@@ -60,10 +62,11 @@ export default function ViewportTags({
   return (
     <div className="viewport-tags" data-history-project={project.id}>
       <div className="panel-heading">
-        <strong>{shortPath(tag.path)}</strong>
+        <strong>{shortPath(renamedTagPath(project,tag))}</strong>
         <Pill>{classNames[tag.class] ?? tag.class}</Pill>
       </div>
-      <code className="viewport-tag-path">{tag.path}</code>
+      <code className="viewport-tag-path">{renamedTagPath(project,tag)}</code>
+      <TagRenamePanel key={tag.id} project={project} inspection={inspection} tag={tag} edit={edit}/>
       {(tag.class!=='bitm'||tag.fields.length>0)&&<><p className="subtle">
         Tag changes affect every object using this tag. Review the save plan to create a validated game map.
       </p>
@@ -94,7 +97,7 @@ export default function ViewportTags({
                   disabled={!target}
                   onClick={() => target && select(target.id)}
                 >
-                  {reference.label} → {target ? shortPath(target.path) : 'Unavailable dependency'}
+                  {reference.label} → {target ? shortPath(renamedTagPath(project,target)) : 'Unavailable dependency'}
                 </button>
               );
             })}

@@ -99,7 +99,7 @@ test('workspace search keeps focus bounded and navigates with the keyboard', asy
 test('browser preview states native boundaries and navigates workspaces', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#gs-window-header')).toBeVisible();
-  await expect(page.getByText('Browser preview', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'HOME', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make a Halo world. Know what the engine needs.' })).toBeVisible();
   await chooseTool(page,"Map library");
   await expect(page.getByRole('heading', { name: 'Your worlds, reimagined.' })).toBeVisible();

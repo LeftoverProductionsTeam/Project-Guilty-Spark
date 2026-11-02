@@ -4,6 +4,7 @@ import { sourceSurfaceEnvironment } from '../environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
+import ViewportActivity from './ViewportActivity';
 import { Edges, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import TransformControls from './HaloTransformControls';
@@ -836,6 +837,7 @@ export default function BspWorkshop(props: Props) {
                     gl={{ antialias: q.antialias, alpha: false }}
                     onPointerMissed={() => setSelection(null)}
                   >
+                    <ViewportActivity />
                     <PerspectiveCamera
                       makeDefault
                       position={[36, -36, 28]}

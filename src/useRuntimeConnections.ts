@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { call, native } from './api';
 import type { Bootstrap, RuntimeId, RuntimeReport } from './types';
 
-export const primaryRuntimes: RuntimeId[] = ['mccSteam', 'openCe', 'chupathingyCe', 'haloCustomEdition'];
+export const primaryRuntimes = ['mccSteam', 'haloCustomEdition', 'openCe', 'chupathingyCe'] as const satisfies readonly RuntimeId[];
 export interface DetectedHalo {
   runtimeId: RuntimeId;
   root: string;
@@ -18,6 +18,9 @@ export function useRuntimeConnections(data: Bootstrap) {
   const [detected, setDetected] = useState<DetectedHalo[]>([]);
   const [checking, setChecking] = useState(false), [connecting, setConnecting] = useState<RuntimeId | null>(null), [error, setError] = useState('');
   const generation = useRef(0);
+  const connectionAttempt = useRef(0);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const refresh = useCallback(async () => {
     const version = ++generation.current;
     if (!native) return;
@@ -34,15 +37,18 @@ export function useRuntimeConnections(data: Bootstrap) {
   useEffect(() => { void refresh(); return () => { generation.current++; }; }, [refresh]);
   const connect = async (candidate: DetectedHalo) => {
     const version = generation.current;
+    const attempt = ++connectionAttempt.current;
     setConnecting(candidate.runtimeId); setError('');
     try {
       const next = await call<RuntimeReport[]>('connect_detected_halo', { runtimeId: candidate.runtimeId, executableSha256: candidate.executableSha256 });
       if (version === generation.current) { setReports(next); setDetected(old => old.filter(item => item.runtimeId !== candidate.runtimeId)); }
-      window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
+      if (mounted.current) window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
     } catch (e) {
       if (version === generation.current) setError(String(e));
     } finally {
-      if (version === generation.current) setConnecting(null);
+      // A read-only refresh can supersede discovery while connection is in
+      // flight. It must not strand the Connect button in its busy state.
+      if (mounted.current && attempt === connectionAttempt.current) setConnecting(null);
     }
   };
   return { reports, detected, checking, connecting, error, refresh, connect };

@@ -25,6 +25,8 @@ import {useMapState} from '../mapSession';
 import BaboonTools from './BaboonTools';
 import NativeTagOperations from './NativeTagOperations';
 import SmartEditPanel from './SmartEditPanel';
+import TagRenamePanel from './TagRenamePanel';
+import { renamedTagPath } from '../tagRenames';
 export default function Tags({
   project,
   inspection,
@@ -113,10 +115,10 @@ export default function Tags({
       tags.filter(
         (t) =>
           (filter === 'all' || t.class === filter) &&
-          (t.path.toLowerCase().includes(query.toLowerCase()) ||
+          (renamedTagPath(project,t).toLowerCase().includes(query.toLowerCase()) || t.path.toLowerCase().includes(query.toLowerCase()) ||
             t.class.toLowerCase().includes(query.toLowerCase())),
       ),
-    [tags, query, filter],
+    [tags, query, filter, project.tagRenames],
   );
   const grouped=useMemo(()=>{const groups=new Map<string,Tag[]>();for(const tag of shown){const group=groups.get(tag.class)??[];group.push(tag);groups.set(tag.class,group);}return [...groups].sort(([a],[b])=>a.localeCompare(b));},[shown]);
   // Referenced tags are often outside the active class/search filters.
@@ -231,10 +233,10 @@ export default function Tags({
             >
               <FileCode2 size={14}/>
               <span>
-                <strong>{shortPath(t.path)}</strong>
-                <small>{t.path.split(/[\\/]/).slice(0, -1).join(' / ')}</small>
+                <strong>{shortPath(renamedTagPath(project,t))}</strong>
+                <small>{renamedTagPath(project,t).split(/[\\/]/).slice(0, -1).join(' / ')}</small>
               </span>
-              {project.tagEdits.some((e) => e.tagId === t.id) && <span className="edit-dot" />}
+              {(project.tagEdits.some((e) => e.tagId === t.id)||project.tagRenames?.some(rename=>rename.sourceTagId===t.id)) && <span className="edit-dot" />}
             </button>
           ))}</div>}
           </div>;
@@ -269,8 +271,9 @@ export default function Tags({
               <div className="eyebrow">
                 {classNames[selectedTag.class] ?? 'Tag'} · {selectedTag.class}
               </div>
-              <h2>{shortPath(selectedTag.path)}</h2>
-              <code>{selectedTag.path}</code>
+              <h2>{shortPath(renamedTagPath(project,selectedTag))}</h2>
+              <code>{renamedTagPath(project,selectedTag)}</code>
+              <TagRenamePanel project={project} inspection={inspection} tag={selectedTag} edit={edit}/>
               <div className="tag-badges">
                 <Pill tone="blue">ID {selectedTag.id.toString(16).toUpperCase()}</Pill>
                 <Pill>{selectedTag.external ? 'External resource' : 'Embedded tag'}</Pill>
@@ -587,7 +590,7 @@ export default function Tags({
             <div className="dependency-graph">
               <div className="graph-origin">
                 <FileCode2 size={18} />
-                <strong>{shortPath(selectedTag.path)}</strong>
+                <strong>{shortPath(renamedTagPath(project,selectedTag))}</strong>
                 <small>{selectedTag.class}</small>
               </div>
               {selectedTag.references.length > 0 && <div className="graph-trunk" />}
@@ -603,7 +606,7 @@ export default function Tags({
                   >
                     <span className="graph-branch" />
                     <Pill>{ref.class}</Pill>
-                    <span>{shortPath(target?.path ?? 'unresolved')}</span>
+                    <span>{target?shortPath(renamedTagPath(project,target)):'unresolved'}</span>
                     <ArrowRight size={12} />
                   </button>
                 );

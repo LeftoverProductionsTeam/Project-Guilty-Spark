@@ -5,6 +5,21 @@ import type {Project} from './types';
 const project=(id:string):Project=>({schemaVersion:1,id,title:id,createdAt:'',modifiedAt:'',source:null,provenance:{creator:'',community:'',releaseYear:null,description:'',sourceUrl:'',permissions:''},scene:[],assets:[],tagEdits:[],history:[],builds:[]});
 const open=(state:MapDocuments,p:Project)=>documentReducer(state,{type:'open',open:{project:p,inspection:null}});
 describe('Independent open map documents',()=>{
+  it('retains verified immutable geometry on reopen and invalidates it for source or resource changes',()=>{
+    const p={...project('a'),source:{originalPath:'owned/map.map',preservedPath:'preserved/map.map',cacheVersion:7,engine:'Halo PC',scenarioPath:'levels/test/map',sha256:'a'.repeat(64),resourceDirectory:'owned',resourceSha256:{'bitmaps.map':'b'.repeat(64)}}} as Project;
+    const inspection={sha256:p.source!.sha256,header:{version:7},renderMesh:{positions:[0,0,0]}} as unknown as import('./types').MapInspection;
+    let s=documentReducer(emptyMapDocuments(100),{type:'open',open:{project:p,inspection}});
+    const incoming=structuredClone(inspection);
+    s=documentReducer(s,{type:'open',open:{project:p,inspection:incoming}});
+    expect(s.documents[0].inspection).toBe(inspection);
+    const changed={...p,source:{...p.source!,resourceSha256:{'bitmaps.map':'c'.repeat(64)}}};
+    s=documentReducer(s,{type:'open',open:{project:changed,inspection:incoming}});
+    expect(s.documents[0].inspection).toBe(incoming);
+    const next={...changed,source:{...changed.source!,sha256:'d'.repeat(64)}};
+    const decoded={...inspection,sha256:next.source.sha256};
+    s=documentReducer(s,{type:'open',open:{project:next,inspection:decoded}});
+    expect(s.documents[0].inspection).toBe(decoded);
+  });
   it('refreshes recovered resource diagnostics only for the matching preserved map and keeps undo',()=>{
     const p={...project('a'),source:{sha256:'owned',resourceSha256:{}}} as Project;
     let s=open(emptyMapDocuments(100),p);

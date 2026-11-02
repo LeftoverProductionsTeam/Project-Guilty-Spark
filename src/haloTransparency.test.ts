@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { applyHaloBlend, genericCombiner } from './haloTransparency';
-import { createHaloMaterial } from './haloMaterial';
+import { createHaloMaterial, updateHaloMaterial } from './haloMaterial';
 import { planOwnedMaterialPreviews } from './ownedMaterialBatch';
 import type { MapHeader, Tag } from './types';
 import type { ShaderPreview, ShaderStage } from './types';
@@ -28,6 +28,21 @@ const metadata: ShaderPreview = {
   stages: [stage],
 };
 describe('source transparent materials', () => {
+  it('continues visible native shader animation while static materials need no idle frames', () => {
+    const base = new THREE.Texture(), scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+    const staticMaterial=createHaloMaterial(base,null,metadata,{});
+    let frames=0;
+    updateHaloMaterial(staticMaterial,scene,camera,()=>frames++);
+    expect(frames).toBe(0);
+    const animated=createHaloMaterial(base,null,{...metadata,stages:[{...stage,constant0Function:6,constant0Lower:[0,0,0,0]}]},{});
+    expect(animated.userData.haloAnimated).toBe(true);
+    updateHaloMaterial(animated,scene,camera,()=>frames++);
+    updateHaloMaterial(animated,scene,camera,()=>frames++);
+    expect(frames).toBe(2);
+    const constant=createHaloMaterial(base,null,{...metadata,stages:[{...stage,constant0Function:6}]},{});
+    expect(constant.userData.haloAnimated).toBe(false);
+    staticMaterial.dispose();animated.dispose();constant.dispose();base.dispose();
+  });
   it('routes native transparent-generic dependencies into the viewport texture planner', () => {
     const tags: Tag[] = [
       {

@@ -111,7 +111,7 @@ pub fn bundle_id(hashes: &BTreeMap<String, String>) -> Result<String> {
 pub fn pin(directory: &Path, name: &str) -> Result<BTreeMap<String, String>> {
     let name = map_name(name)?;
     crate::reject_links(directory)?;
-    let mut hashes = BTreeMap::new();
+    let mut files = Vec::new();
     for file in [
         format!("{name}.imeta"),
         "common.ipak".into(),
@@ -125,11 +125,11 @@ pub fn pin(directory: &Path, name: &str) -> Result<BTreeMap<String, String>> {
             if len > 2 * 1024 * 1024 * 1024 {
                 return invalid("MCC texture pack exceeds 2 GiB");
             }
-            hashes.insert(file, maps::hash_file(&path)?);
+            files.push((file, path));
         }
     }
-    if !hashes.contains_key(&format!("{name}.imeta"))
-        || !hashes.keys().any(|k| k.ends_with(".ipak"))
+    if !files.iter().any(|(file,_)| file == &format!("{name}.imeta"))
+        || !files.iter().any(|(file,_)| file.ends_with(".ipak"))
     {
         return invalid("Matching MCC imeta and texture packs were not found");
     }
@@ -139,9 +139,29 @@ pub fn pin(directory: &Path, name: &str) -> Result<BTreeMap<String, String>> {
         if shared.is_file() {
             crate::reject_links(&shared)?;
             if fs::metadata(&shared)?.len() > 2 * 1024 * 1024 * 1024 { return invalid("MCC shared bitmaps exceed 2 GiB"); }
-            hashes.insert("mcc-shared-bitmaps.map".into(),maps::hash_file(&shared)?);
+            files.push(("mcc-shared-bitmaps.map".into(),shared));
         }
     }
+    // Two bounded workers hash independent packs in full. No stat-only cache,
+    // partial hashes or abandoned background tasks can establish a binding.
+    let groups = std::thread::scope(|scope| {
+        let workers: Vec<_> = files.chunks(files.len().div_ceil(2)).map(|group| scope.spawn(move || {
+            group.iter().map(|(name,path)| {
+                crate::reject_links(path)?;
+                let before = fs::metadata(path)?;
+                let hash = maps::hash_file(path)?;
+                let after = fs::metadata(path)?;
+                if before.len() != after.len() || before.modified()? != after.modified()? {
+                    return invalid("MCC texture resource changed while hashing");
+                }
+                Ok((name.clone(),hash))
+            }).collect::<Result<Vec<_>>>()
+        })).collect();
+        workers.into_iter().map(|worker| worker.join()
+            .map_err(|_| SparkError::Invalid("MCC resource verification worker failed".into()))?)
+            .collect::<Result<Vec<_>>>()
+    })?;
+    let mut hashes: BTreeMap<_,_> = groups.into_iter().flatten().collect();
     hashes.insert("mcc-textures".into(), bundle_id(&hashes)?);
     Ok(hashes)
 }

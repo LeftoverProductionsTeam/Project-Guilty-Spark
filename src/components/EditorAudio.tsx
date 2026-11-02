@@ -7,6 +7,10 @@ import type { MapInspection, Project } from '../types';
 import '../viewportAssets.css';
 const Context = createContext<EditorAudioSession | null>(null);
 export const useEditorAudio = () => useContext(Context);
+export function EditorAudioScope({active,children}:{active:boolean;children:ReactNode}) {
+  const session=useEditorAudio();
+  return <Context.Provider value={active?session:null}>{children}</Context.Provider>;
+}
 export function EditorAudioProvider({
   project,
   inspection,

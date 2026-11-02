@@ -10,15 +10,15 @@ pub struct SourceAppearance {
     pub sky_mesh:Option<MeshData>,pub warnings:Vec<String>,
 }
 pub fn inspect(path:&Path,hash:&str,inspection:&MapInspection)->Result<SourceAppearance>{
-    let (header,bytes,actual)=maps::read_cache_snapshot(path)?;
+    let (header,bytes,actual)=maps::read_cache_snapshot_shared(path)?;
     if actual!=hash||actual!=inspection.sha256{return invalid("Source changed during appearance inspection");}
     let mut result=SourceAppearance{source_sha256:actual,sky_tag_id:None,sky_path:None,environment:None,
         fog_maximum_density:0.,sky_mesh:None,warnings:vec![]};
-    if !matches!(header.version,6|7|13|609){result.warnings.push("This engine's authored sky/appearance reader is not implemented".into());return Ok(result);}
+    if !matches!(header.version,5|6|7|13|609){result.warnings.push("This engine's authored sky/appearance reader is not implemented".into());return Ok(result);}
     let start=header.tag_offset as usize;let end=start.checked_add(header.tag_size as usize).ok_or_else(||SparkError::Invalid("Sky tag region overflow".into()))?;
     let r=Reader(&bytes);r.bytes(start,header.tag_size as usize)?;
     let bounded=|at:usize,size:usize|->Result<()> {if at<start||at.checked_add(size).is_none_or(|last|last>end){return invalid("Sky metadata escapes bounded tag region");}r.bytes(at,size)?;Ok(())};
-    let base=match header.version{6=>0x4bf1_0000,13=>r.u32(start)?.checked_sub(40).ok_or_else(||SparkError::Invalid("Invalid MCC tag base".into()))?,_=>0x4044_0000};
+    let base=match header.version{5=>0x803a_6000,6=>0x4bf1_0000,13=>r.u32(start)?.checked_sub(40).ok_or_else(||SparkError::Invalid("Invalid MCC tag base".into()))?,_=>0x4044_0000};
     let pointer=|value:u32,size:usize|->Result<usize>{
         let offset=value.checked_sub(base).ok_or_else(||SparkError::Invalid("Sky pointer precedes tag region".into()))? as usize;
         let at=start.checked_add(offset).ok_or_else(||SparkError::Invalid("Sky pointer overflow".into()))?;bounded(at,size)?;Ok(at)};

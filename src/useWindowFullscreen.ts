@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow,currentMonitor } from '@tauri-apps/api/window';
 import { native } from './api';
 // Window state survives switching tools, which remounts the workspace controls.
 let restoreMaximized = false;
@@ -37,12 +37,16 @@ export function useWindowFullscreen() {
       const next = enabled ?? !active;
       if (native) {
         const current = getCurrentWindow();
+        // Read the maximized window's monitor before unmaximizing: its saved
+        // normal position can belong to a different display or DPI scale.
+        const monitor=next?await currentMonitor():null;
         if (next && !active) {
           restoreMaximized = await current.isMaximized();
           if (restoreMaximized) await current.unmaximize();
         }
         try {
-          await current.setFullscreen(next);
+          if(next&&monitor)await current.setFullscreenOnMonitor(monitor.position);
+          else await current.setFullscreen(next);
           if ((await current.isFullscreen()) !== next)
             throw new Error('The window did not enter the requested display mode.');
         } catch (reason) {

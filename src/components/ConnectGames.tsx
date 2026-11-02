@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import type { Bootstrap, RuntimeReport, Settings, Workspace } from '../types';
+import { reconcileSettingsDraft } from '../settings';
 interface Kit {
   root: string;
   generation: string;
@@ -55,7 +56,12 @@ export default function ConnectGames({
   useEffect(() => {
     if (native) void refresh();
   }, []);
-  useEffect(() => setDraft(data.settings), [data.settings]);
+  const previousSettings = useRef(data.settings);
+  useEffect(() => {
+    const previous = previousSettings.current;
+    setDraft(current => reconcileSettingsDraft(current, previous, data.settings));
+    previousSettings.current = data.settings;
+  }, [data.settings]);
   useEffect(() => onDraftChange?.(draft), [draft]);
   async function browse(key: 'hekDirectory' | 'hekTagsDirectory' | 'invaderDirectory') {
     try {
@@ -97,7 +103,7 @@ export default function ConnectGames({
   }
   const installed = report?.runtimes.filter((r) => r.installation) ?? [];
   const foundKit = report?.kits.find((kit) => kit.generation.startsWith('h1aEk'));
-  const wantsMcc = draft.preferredHalo === 'mccSteam' || draft.hekFlavor === 'h1aEk';
+  const wantsMcc = draft.preferredHalo ? draft.preferredHalo === 'mccSteam' : draft.hekFlavor === 'h1aEk';
   return (
     <section className="analysis-card gs-connect-games" aria-label="Connect Your Halo Games">
       <div className="section-heading">
@@ -161,7 +167,7 @@ export default function ConnectGames({
                 ? 'Halo: CE Mod Tools - MCC was found. Select the detected kit below, then prepare or connect its editable tags.'
                 : `${report?.mccInstalled ? 'MCC is installed, but its map-building tools are a separate installation. ' : ''}Install the free Halo: CE Mod Tools - MCC package through Steam to edit and compile Halo 1 content.`}
           </p>
-          <a
+          {wantsMcc && <><a
             className="button"
             href="https://store.steampowered.com/app/1532190/"
             target="_blank"
@@ -175,7 +181,8 @@ export default function ConnectGames({
               extraction instructions into a fresh working copy.
             </small>
           </p>
-          {foundKit && (
+          </>}
+          {wantsMcc && foundKit && (
             <button
               className="small-button"
               disabled={busy}

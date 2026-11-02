@@ -15,7 +15,9 @@ use std::collections::{HashMap, HashSet};
 mod animation;
 pub use animation::{object_animation_clips, NativeAnimations};
 
-const MAX_BSP_VERTICES: usize = 500_000;
+// The complete nine-BSP Xbox a10 contains 603,012 rendered vertices. Keep a
+// bounded aggregate budget without silently dropping later campaign BSPs.
+const MAX_BSP_VERTICES: usize = 1_000_000;
 const MAX_MODEL_VERTICES: usize = 350_000;
 const MAX_PREVIEW_INDICES: usize = 1_500_000;
 const MAX_MODEL_TYPES: usize = 128;
@@ -98,7 +100,7 @@ pub fn bsp_render_geometry(bytes: &[u8], header: &MapHeader, scenario_at: usize)
     bsp_render_geometry_selected(bytes,header,scenario_at,None)
 }
 pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenario_at:usize,selected:Option<usize>)->Result<MeshData>{
-    if !matches!(header.version,6|7|13|609) {return invalid("Render BSP preview requires a supported PC-derived cache layout");}
+    if !matches!(header.version,5|6|7|13|609) {return invalid("Render BSP preview requires a supported Halo 1 cache layout");}
     let r = Reader(bytes);
     let tags = tag_space(&r,header)?;
     let bsps = scene_bsps(&r,tags,scenario_at)?;
@@ -134,7 +136,10 @@ pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenari
                 let vertex_type=r.u16(material+176)?;
                 let vertices=r.u32(material+180)? as usize;
                 if count == 0 || vertices == 0 {continue;}
-                if vertex_type != 0 {continue;} // compressed vertex streams remain unsupported
+                let compressed = header.version == 5 && vertex_type == 1;
+                if vertex_type != 0 && !compressed {return invalid("BSP material uses an unsupported render vertex type");}
+                let vertex_stride = if compressed {32}else{56};
+                let lightmap_stride = if compressed {8}else{20};
                 if start.checked_add(count).is_none_or(|end|end>surface_count) {
                     return invalid("BSP material references surfaces outside the BSP surface block");
                 }
@@ -142,8 +147,16 @@ pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenari
                     return invalid("BSP render vertex safety limit exceeded");
                 }
                 // TagDataOffset: size, external, file offset, cached pointer data.
-                let required=vertices.checked_mul(56).ok_or_else(||crate::SparkError::Invalid("Vertex byte count overflow".into()))?;
-                let (vertex_at,lightmap_at)=if header.version==13 {
+                let required=vertices.checked_mul(vertex_stride).ok_or_else(||crate::SparkError::Invalid("Vertex byte count overflow".into()))?;
+                let (vertex_at,lightmap_at)=if compressed {
+                    let length=r.u32(material+236)? as usize;
+                    let pointer=r.u32(material+248)?;
+                    if length < required {return invalid("Compressed BSP vertices exceed their declared stream");}
+                    let at=region.pointer(pointer,length)?;
+                    let lm_count=r.u32(material+200)? as usize;
+                    let lm=if lm_count==vertices && required.checked_add(vertices*8).is_some_and(|end|end<=length) {Some(at+required)} else {None};
+                    (at,lm)
+                }else if header.version==13 {
                     // MCC separates the uncompressed vertex pool from BSP metadata.
                     // Its BSP header stores pool byte length +4 and file offset +8;
                     // material +184/+204 are offsets into that one bounded pool.
@@ -183,14 +196,14 @@ pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenari
                 // relative* pointer bounds-checks. Unavailable or malformed
                 // secondary UVs are never represented as actual lightmap data.
                 let lightmap_values = if lightmap_page >= 0 {
-                    lightmap_at.and_then(|at|r.bytes(at,vertices*20).ok())
+                    lightmap_at.and_then(|at|r.bytes(at,vertices*lightmap_stride).ok())
                         .and_then(|bytes| {
                             let lm=Reader(bytes);
                             let mut values=Vec::with_capacity(vertices*2);
                             for vertex in 0..vertices {
-                                let at=vertex*20;
-                                let u=lm.f32(at+12).ok()?;
-                                let v=lm.f32(at+16).ok()?;
+                                let at=vertex*lightmap_stride;
+                                let u=if compressed {crate::xbox_cache::signed_fraction(lm.u16(at+4).ok()? as u32,16)}else{lm.f32(at+12).ok()?};
+                                let v=if compressed {crate::xbox_cache::signed_fraction(lm.u16(at+6).ok()? as u32,16)}else{lm.f32(at+16).ok()?};
                                 if !u.is_finite() || !v.is_finite() || u.abs()>32.0 || v.abs()>32.0 {return None;}
                                 values.extend_from_slice(&[u,v]);
                             }
@@ -201,17 +214,21 @@ pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenari
                 mesh.lightmap_uvs.extend(lightmap_values.unwrap_or_else(||vec![0.0; vertices*2]));
                 let base=(mesh.positions.len()/3) as u32;
                 for v in 0..vertices {
-                    let p = v * 56;
+                    let p = v * vertex_stride;
                     let position = [raw.f32(p)?, raw.f32(p + 4)?, raw.f32(p + 8)?];
-                    let normal = [raw.f32(p + 12)?, raw.f32(p + 16)?, raw.f32(p + 20)?];
-                    let uv = [raw.f32(p + 48)?, raw.f32(p + 52)?];
+                    let normal = if compressed {crate::xbox_cache::normal(raw.u32(p+12)?)}else{[raw.f32(p + 12)?, raw.f32(p + 16)?, raw.f32(p + 20)?]};
+                    let uv_at=if compressed {24}else{48};
+                    let uv = [raw.f32(p + uv_at)?, raw.f32(p + uv_at+4)?];
                     // A map's raw-data pointer may be unsupported even when it
                     // happens to fall inside the file. Checking only finite
                     // floats would mistake index strips for rendered vertices.
                     let normal_length_sq = normal.iter().map(|x| (*x) * (*x)).sum::<f32>();
                     if position.iter().any(|x| x.abs() > 5000.0)
                         || !(0.5..=1.5).contains(&normal_length_sq)
-                        || uv.iter().any(|x| x.abs() > 10_000.0)
+                        // Original Xbox a10 contains four authored UVs near
+                        // -2.1 million. Preserve those finite floats rather
+                        // than discarding all nine otherwise validated BSPs.
+                        || uv.iter().any(|x| x.abs() > if compressed {16_777_216.0}else{10_000.0})
                     {
                         return invalid("BSP render vertex stream is not validated for this cache; refusing to display potentially corrupted geometry");
                     }
@@ -240,7 +257,7 @@ pub(crate) fn bsp_render_geometry_selected(bytes:&[u8],header:&MapHeader,scenari
         }
         mesh.parts.push(MeshPart{name,index_start:first_index,index_count:mesh.indices.len()-first_index});
     }
-    if mesh.indices.is_empty() {return invalid("No supported uncompressed BSP render triangles in this cache; collision preview remains available");}
+    if mesh.indices.is_empty() {return invalid("No supported BSP render triangles in this cache; collision preview remains available");}
     Ok(mesh)
 }
 
@@ -256,7 +273,7 @@ fn finite_model_float(r:&Reader, at:usize) -> Result<f32> {
 // PC/Demo Gearbox model geometry is in a separate raw vertex/index region.
 // Model geometry is displayed in cached bind-pose coordinates. A multi-node
 // preview is diagnostic only; bone transforms/animations are NOT reconstructed.
-fn gbxmodel_static_mesh(r: &Reader, region: Region, model_at: usize, raw_start:usize, raw_vertex_size:usize, raw_model_size:usize) -> Result<MeshData> {
+fn gbxmodel_static_mesh(r: &Reader, region: Region, model_at: usize, raw_start:usize, raw_vertex_size:usize, raw_model_size:usize, xbox:bool) -> Result<MeshData> {
     r.bytes(model_at,232)?;
     let (nodes,node_count)=region.block(r,model_at+184,156,64)?;
     let (geometries,n_geometries)=region.block(r,model_at+208,48,256)?;
@@ -289,9 +306,10 @@ fn gbxmodel_static_mesh(r: &Reader, region: Region, model_at: usize, raw_start:u
     let mut geometry_ids=selected.into_iter().collect::<Vec<_>>(); geometry_ids.sort_unstable();
     for idx in geometry_ids {
         let g=geometries+idx*48;
-        let (parts,n_parts)=region.block(r,g+36,132,32)?;
+        let part_stride=if xbox {104}else{132};
+        let (parts,n_parts)=region.block(r,g+36,part_stride,32)?;
         for p in 0..n_parts {
-            let part=parts+p*132;
+            let part=parts+p*part_stride;
             let triangle_count=r.u32(part+72)? as usize;
             let triangle_offset=r.u32(part+76)? as usize;
             let vertex_count=r.u32(part+88)? as usize;
@@ -305,29 +323,34 @@ fn gbxmodel_static_mesh(r: &Reader, region: Region, model_at: usize, raw_start:u
             if vertex_count>65_535 || triangle_count>131_072 || mesh.positions.len()/3+vertex_count>MAX_MODEL_VERTICES {
                 return invalid("GBX model exceeds bounded preview geometry limits");
             }
-            let vertex_bytes=vertex_count.checked_mul(68).ok_or_else(||crate::SparkError::Invalid("Model vertex byte count overflow".into()))?;
+            let vertex_stride=if xbox {32}else{68};
+            let vertex_bytes=vertex_count.checked_mul(vertex_stride).ok_or_else(||crate::SparkError::Invalid("Model vertex byte count overflow".into()))?;
             let vertex_end=vertex_offset.checked_add(vertex_bytes).ok_or_else(||crate::SparkError::Invalid("Model vertex offset overflow".into()))?;
-            if vertex_end>raw_vertex_size {return invalid("Model part vertices escape the cache model vertex region");}
-            let at=raw_start.checked_add(vertex_offset).ok_or_else(||crate::SparkError::Invalid("Model vertex file offset overflow".into()))?;
+            if !xbox && vertex_end>raw_vertex_size {return invalid("Model part vertices escape the cache model vertex region");}
+            let at=if xbox {
+                if r.u16(part+84)?!=5 {return invalid("Xbox model does not declare compressed model vertices");}
+                let descriptor=region.pointer(vertex_offset as u32,12)?;
+                region.pointer(r.u32(descriptor+4)?,vertex_bytes)?
+            }else{raw_start.checked_add(vertex_offset).ok_or_else(||crate::SparkError::Invalid("Model vertex file offset overflow".into()))?};
             let verts=Reader(r.bytes(at,vertex_bytes)?);
             let base=(mesh.positions.len()/3) as u32;
             for i in 0..vertex_count {
-                let v=i*68;
+                let v=i*vertex_stride;
                 for off in [0,4,8] {mesh.positions.push(finite_model_float(&verts,v+off)?);}
-                for off in [12,16,20] {mesh.normals.push(finite_model_float(&verts,v+off)?);}
-                for off in [48,52] {mesh.uvs.push(finite_model_float(&verts,v+off)?);}
-                if let Some(skeleton)=rig.as_mut(){let mut ids=[verts.u16(v+56)?,verts.u16(v+58)?];let mut weights=[verts.f32(v+60).unwrap_or(-1.),verts.f32(v+64).unwrap_or(-1.)];
-                    if local_nodes{let count=r.bytes(part+107,1)?[0]as usize;for id in &mut ids{if *id!=u16::MAX{*id=if (*id as usize)<count&&count<=22{r.bytes(part+108+*id as usize,1)?[0]as u16}else{u16::MAX};}}}
+                if xbox {mesh.normals.extend(crate::xbox_cache::normal(verts.u32(v+12)?));for off in [24,26]{mesh.uvs.push(crate::xbox_cache::signed_fraction(verts.u16(v+off)? as u32,16));}}
+                else {for off in [12,16,20] {mesh.normals.push(finite_model_float(&verts,v+off)?);}for off in [48,52] {mesh.uvs.push(finite_model_float(&verts,v+off)?);}}
+                if let Some(skeleton)=rig.as_mut(){let mut ids=if xbox {let indices=verts.bytes(v+28,2)?;[indices[0],indices[1]].map(|node|if node<128&&node%3==0{u16::from(node/3)}else{u16::MAX})}else{[verts.u16(v+56)?,verts.u16(v+58)?]};let mut weights=if xbox {let weight=crate::xbox_cache::signed_fraction(verts.u16(v+30)? as u32,16);[weight,1.-weight]}else{[verts.f32(v+60).unwrap_or(-1.),verts.f32(v+64).unwrap_or(-1.)]};
+                    if local_nodes&&!xbox{let count=r.bytes(part+107,1)?[0]as usize;for id in &mut ids{if *id!=u16::MAX{*id=if (*id as usize)<count&&count<=22{r.bytes(part+108+*id as usize,1)?[0]as u16}else{u16::MAX};}}}
                     for j in 0..2{if ids[j]==u16::MAX&&weights[j].abs()<0.001{ids[j]=0;weights[j]=0.;}}
                     let sum=weights[0]+weights[1];if ids.iter().any(|id|*id as usize>=node_count)||weights.iter().any(|w|!w.is_finite()||*w<0.||*w>1.001)||!(0.99..=1.01).contains(&sum){rig=None;}else{skeleton.indices.extend(ids);skeleton.weights.extend(weights.map(|w|w/sum));}
                 }
             }
             // The cache stores triangle strips. Indices start after the model
             // vertex region and may include degenerate triangles and 0xFFFF.
-            let index_start=raw_start.checked_add(raw_vertex_size).and_then(|v|v.checked_add(triangle_offset)).ok_or_else(||crate::SparkError::Invalid("Model triangle offset overflow".into()))?;
             let count=triangle_count.checked_add(2).ok_or_else(||crate::SparkError::Invalid("Model index count overflow".into()))?;
             let index_bytes=count.checked_mul(2).ok_or_else(||crate::SparkError::Invalid("Model strip byte count overflow".into()))?;
-            if raw_vertex_size.checked_add(triangle_offset).and_then(|v|v.checked_add(index_bytes)).is_none_or(|end|end>raw_model_size) {
+            let index_start=if xbox {region.pointer(triangle_offset as u32,index_bytes)?}else{raw_start.checked_add(raw_vertex_size).and_then(|v|v.checked_add(triangle_offset)).ok_or_else(||crate::SparkError::Invalid("Model triangle offset overflow".into()))?};
+            if !xbox && raw_vertex_size.checked_add(triangle_offset).and_then(|v|v.checked_add(index_bytes)).is_none_or(|end|end>raw_model_size) {
                 return invalid("Model indices escape the bounded cache model data region");
             }
             let raw=Reader(r.bytes(index_start,index_bytes)?);
@@ -397,7 +420,7 @@ fn gbxmodel_static_mesh(r: &Reader, region: Region, model_at: usize, raw_start:u
 /// Returns successful unique static scenery/vehicle models keyed by the
 /// placement's object tag ID, and diagnostic detail for unsupported models.
 pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], objects: &[SceneObject]) -> (HashMap<u32,MeshData>,Vec<String>) {
-    if !matches!(header.version,6|7|13|609) {
+    if !matches!(header.version,5|6|7|13|609) {
         return (HashMap::new(),vec!["Static object preview requires a supported PC-derived cache; unsupported models are not drawn".into()]);
     }
     let r=Reader(bytes);
@@ -411,7 +434,7 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
     let raw_start=match r.u32(map_start+20) {Ok(v)=>v as usize,Err(e)=>return (models,vec![e.to_string()])};
     let raw_vertex_size=match r.u32(map_start+28) {Ok(v)=>v as usize,Err(e)=>return (models,vec![e.to_string()])};
     let raw_model_size=match r.u32(map_start+32) {Ok(v)=>v as usize,Err(e)=>return (models,vec![e.to_string()])};
-    if raw_vertex_size>raw_model_size || raw_start.checked_add(raw_model_size).is_none_or(|end|end>bytes.len()) {
+    if header.version!=5 && (raw_vertex_size>raw_model_size || raw_start.checked_add(raw_model_size).is_none_or(|end|end>bytes.len())) {
         return (models,vec!["Model vertex/index data is outside the bounded cache region".into()]);
     }
     let requested=objects.iter().filter(|o|matches!(o.kind.as_str(),"Scenery"|"Vehicle"|"Equipment"|"Weapon"|"Biped"|"Netgame item")).filter_map(|o|o.tag_id)
@@ -428,9 +451,9 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
         // Common object header model TagDependency at offset 40, datum ID +12.
         let model_id=match r.u32(object_at+52) {Ok(id)=>id,Err(_)=>continue};
         let Some(model_tag)=tag_lookup.get(&model_id) else {continue};
-        if model_tag.class!="mod2" {continue;}
+        if model_tag.class!=if header.version==5{"mode"}else{"mod2"} {continue;}
         let Some(model_at)=model_tag.data_offset else {continue};
-        match gbxmodel_static_mesh(&r,region,model_at,raw_start,raw_vertex_size,raw_model_size) {
+        match gbxmodel_static_mesh(&r,region,model_at,raw_start,raw_vertex_size,raw_model_size,header.version==5) {
             Ok(mut mesh)=>{mesh.material_ranges.retain(|m|tag_lookup.get(&m.shader_tag_id)
                 .is_some_and(|t|matches!(t.class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla")));
                 models.insert(object_id,mesh);},
@@ -439,7 +462,7 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
     }
     if models.len()<MAX_MODEL_TYPES {
         for object in tags.iter().filter(|t|t.class=="bipd"&&!t.external) {
-            let spartan=object.references.iter().any(|reference|reference.label=="Model"&&tags.iter().any(|model|model.id==reference.target_id&&model.class=="mod2"&&
+            let spartan=object.references.iter().any(|reference|reference.label=="Model"&&tags.iter().any(|model|model.id==reference.target_id&&matches!(model.class.as_str(),"mod2"|"mode")&&
                 matches!(model.path.replace('\\',"/").to_ascii_lowercase().as_str(),"characters/cyborg/cyborg"|"characters/cyborg_mp/cyborg_mp")));
             if spartan&&!models.contains_key(&object.id){match object_model_mesh(bytes,header,tags,object.id,0){Ok((_,mesh))=>{models.insert(object.id,mesh);},Err(error)=>notes.push(format!("Spartan model: {error}"))}break;}
         }
@@ -449,16 +472,16 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
 
 /// The same bounded model reader for a source-authored sky model reference.
 pub fn cached_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],model_id:u32)->Result<MeshData>{
-    if !matches!(header.version,6|7|13|609){return invalid("Sky model preview requires a supported PC-derived cache");}
+    if !matches!(header.version,5|6|7|13|609){return invalid("Model preview requires a supported Halo 1 cache");}
     let r=Reader(bytes);let region=tag_space(&r,header)?;
-    let tag=tags.iter().find(|t|t.id==model_id&&t.class=="mod2"&&!t.external)
-        .ok_or_else(||crate::SparkError::Invalid("Sky model reference is not an internal GBX model".into()))?;
+    let tag=tags.iter().find(|t|t.id==model_id&&t.class==if header.version==5{"mode"}else{"mod2"}&&!t.external)
+        .ok_or_else(||crate::SparkError::Invalid("Model reference is not an internal model for this cache layout".into()))?;
     let at=tag.data_offset.ok_or_else(||crate::SparkError::Invalid("Sky model body unavailable".into()))?;
     let start=header.tag_offset as usize;
     let raw_start=r.u32(start+20)? as usize;let vertex_size=r.u32(start+28)? as usize;let total=r.u32(start+32)? as usize;
-    if vertex_size>total||raw_start.checked_add(total).is_none_or(|end|end>bytes.len()){return invalid("Sky model raw region escapes cache");}
-    let mut mesh=gbxmodel_static_mesh(&r,region,at,raw_start,vertex_size,total)?;
-    mesh.material_ranges.retain(|m|tags.iter().any(|t|t.id==m.shader_tag_id&&matches!(t.class.as_str(),"senv"|"soso"|"schi"|"scex")));
+    if header.version!=5 && (vertex_size>total||raw_start.checked_add(total).is_none_or(|end|end>bytes.len())){return invalid("Sky model raw region escapes cache");}
+    let mut mesh=gbxmodel_static_mesh(&r,region,at,raw_start,vertex_size,total,header.version==5)?;
+    mesh.material_ranges.retain(|m|tags.iter().any(|t|t.id==m.shader_tag_id&&matches!(t.class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla")));
     Ok(mesh)
 }
 
@@ -468,7 +491,7 @@ pub fn object_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id:u32
     let r=Reader(bytes);let region=tag_space(&r,header)?;
     let mut object=tags.iter().find(|t|t.id==object_id&&!t.external)
         .ok_or_else(||crate::SparkError::Invalid("Object tag is missing or external".into()))?;
-    if object.class=="mod2" {return Ok((object.id,cached_model_mesh(bytes,header,tags,object.id)?));}
+    if matches!(object.class.as_str(),"mod2"|"mode") {return Ok((object.id,cached_model_mesh(bytes,header,tags,object.id)?));}
     if object.class=="itmc" {
         let at=object.data_offset.ok_or_else(||crate::SparkError::Invalid("Item collection body unavailable".into()))?;
         if at<region.begin||at.checked_add(12).is_none_or(|end|end>region.end){return invalid("Item collection body escapes tag region");}
@@ -483,16 +506,16 @@ pub fn object_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id:u32
     }
     let at=object.data_offset.ok_or_else(||crate::SparkError::Invalid("Object body unavailable".into()))?;
     if at<region.begin||at.checked_add(56).is_none_or(|end|end>region.end){return invalid("Object model dependency escapes tag region");}
-    if r.fourcc(at+40)?!="mod2" {return invalid("Object does not reference a supported world GBX model");}
+    if r.fourcc(at+40)?!=if header.version==5{"mode"}else{"mod2"} {return invalid("Object does not reference a supported native world model");}
     let model_id=r.u32(at+52)?;Ok((model_id,cached_model_mesh(bytes,header,tags,model_id)?))
 }
 pub fn preview_owned_object_model(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<(u32,MeshData)>{
-    let (header,bytes,actual)=crate::maps::read_cache_snapshot(path)?;
+    let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
     if actual!=expected||actual!=inspection.sha256{return invalid("Model source changed during inspection");}
     object_model_mesh(&bytes,&header,&inspection.tags,object_id,0)
 }
 pub fn preview_owned_object_animations(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<NativeAnimations>{
-    let (header,bytes,actual)=crate::maps::read_cache_snapshot(path)?;
+    let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
     if actual!=expected||actual!=inspection.sha256{return invalid("Animation source changed during inspection");}
     object_animation_clips(&bytes,&header,&inspection.tags,object_id)
 }
@@ -551,7 +574,7 @@ pub fn object_collision_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id
     if mesh.indices.is_empty(){return Ok(None);}Ok(Some(mesh))
 }
 pub fn preview_owned_object_collision(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<Option<MeshData>>{
-    let (header,bytes,actual)=crate::maps::read_cache_snapshot(path)?;
+    let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
     if actual!=expected||actual!=inspection.sha256{return invalid("Collision source changed during inspection");}
     object_collision_mesh(&bytes,&header,&inspection.tags,object_id)
 }
@@ -634,6 +657,21 @@ mod geometry_tests {
         assert_eq!(mesh.material_ranges[0].lightmap_bitmap_tag_id,Some(0x8899));
         assert_eq!(mesh.material_ranges[0].index_count,3);
         assert_eq!(mesh.lightmap_uvs,vec![0.0;6]);
+        // The original Xbox uses the same faces, with packed normals and
+        // secondary UVs in its separately bounded compressed material stream.
+        let mut xbox=b.clone();let mut xbox_header=header.clone();xbox_header.version=5;
+        put32(&mut xbox,scenario+0x5a8,0x803a_6e00);
+        put16(&mut xbox,mat+176,1);put32(&mut xbox,mat+200,3);
+        put32(&mut xbox,mat+236,120);put32(&mut xbox,mat+248,0x5000_3800);
+        for (i,pos) in [[0.,0.,0.],[1.,0.,0.],[0.,1.,0.]].iter().enumerate(){
+            let at=0x4000+i*32;for axis in 0..3{putf(&mut xbox,at+axis*4,pos[axis]);}
+            put32(&mut xbox,at+12,511<<22);putf(&mut xbox,at+24,pos[0]);putf(&mut xbox,at+28,pos[1]);
+            put16(&mut xbox,0x4000+96+i*8+4,if i==1{32767}else{0});put16(&mut xbox,0x4000+96+i*8+6,if i==2{32767}else{0});
+        }
+        put16(&mut xbox,0xb80,0);
+        let recovered=bsp_render_geometry(&xbox,&xbox_header,scenario).unwrap();
+        assert_eq!(recovered.indices,[0,1,2]);assert_eq!(recovered.normals,[0.,0.,1.,0.,0.,1.,0.,0.,1.]);assert_eq!(recovered.lightmap_uvs,[0.,0.,1.,0.,0.,1.]);
+        put32(&mut xbox,mat+248,0x5000_47ff);assert!(bsp_render_geometry(&xbox,&xbox_header,scenario).is_err());
         assert!(!mesh.material_ranges[0].has_lightmap_uvs);
         // Inject a genuine bounded secondary stream and a valid lightmap page.
         put16(&mut b,0xb80,2);
@@ -690,21 +728,27 @@ mod geometry_tests {
         let indices=raw+3*68;
         put16(&mut b,indices,0);put16(&mut b,indices+2,1);put16(&mut b,indices+4,2);
         let region=Region{begin:0,end:0x1800,address:base};
-        let mesh=gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+6).unwrap();
+        let mesh=gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+6,false).unwrap();
         assert_eq!(mesh.indices,[0,1,2]);
         assert_eq!(mesh.positions.len(),9);
         assert_eq!(mesh.parts.len(),1);
+        let mut xbox=b.clone();put16(&mut xbox,p+84,5);put32(&mut xbox,p+100,base+0x500);put32(&mut xbox,0x504,base+0x600);put32(&mut xbox,p+76,base+0x900);
+        for (i,pos) in [[0.,0.,0.],[1.,0.,0.],[0.,1.,0.]].iter().enumerate(){let at=0x600+i*32;for axis in 0..3{putf(&mut xbox,at+axis*4,pos[axis]);}put32(&mut xbox,at+12,511<<22);put16(&mut xbox,at+24,if i==1{32767}else{0});put16(&mut xbox,at+26,if i==2{32767}else{0});}
+        for(i,index)in [0,1,2].into_iter().enumerate(){put16(&mut xbox,0x900+i*2,index);}
+        let recovered=gbxmodel_static_mesh(&Reader(&xbox),region,model,0,0,0,true).unwrap();
+        assert_eq!(recovered.indices,[0,1,2]);assert_eq!(recovered.uvs,[0.,0.,1.,0.,0.,1.]);
+        put32(&mut xbox,0x504,base+0x17f0);assert!(gbxmodel_static_mesh(&Reader(&xbox),region,model,0,0,0,true).is_err());
         put16(&mut b,indices+4,4);
-        assert!(gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+6).is_err());
+        assert!(gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+6,false).is_err());
         // Bind pose remains available for multi-node static preview only.
         put16(&mut b,indices+4,2);
         put32(&mut b,model+184,3);
         put32(&mut b,model+188,base+0xa00);
-        let pose=gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+6).unwrap();
+        let pose=gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+6,false).unwrap();
         assert!(pose.label.contains("bind-pose"));
         assert_eq!(pose.indices,[0,1,2]);
         // Reject a plausible in-file index location if outside model region.
-        assert!(gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+4).is_err());
+        assert!(gbxmodel_static_mesh(&Reader(&b),region,model,raw,3*68,3*68+4,false).is_err());
     }
     #[test]
     fn object_collision_uses_exact_bone_pose_and_rejects_escaped_or_broken_edges() {

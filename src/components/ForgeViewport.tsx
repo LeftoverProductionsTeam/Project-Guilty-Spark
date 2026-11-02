@@ -14,6 +14,7 @@ import SceneEffects from './SceneEffects';
 import ViewportLabel from './ViewportLabel';
 import ViewportTelemetry from './ViewportTelemetry';
 import ViewportActivity from './ViewportActivity';
+import { useWorkspaceActivity } from './WorkspaceActivity';
 import SpatialAudioListener from './SpatialAudioListener';
 import { Suspense, useEffect, useMemo, useRef,useState } from 'react';
 import MachinimaActor from './MachinimaActor';
@@ -159,6 +160,7 @@ function NodeVisual({
   ownedModel?: OwnedModelView;
   surfaceView?: WorkshopMaterialView;
 }) {
+  const {invalidate}=useThree();
   const original = snapshot?.document.geometry.find((b) => b.id === node.value.id);
   const geometry = useMemo(
     () => (original && snapshot ? brushGeometry(snapshot, original, cutaway) : null),
@@ -186,7 +188,7 @@ function NodeVisual({
       <mesh
         geometry={geometry}
         material={nativeMaterial ?? undefined}
-        onBeforeRender={(_gl, scene, camera, _geo, material) => updateHaloMaterial(material, scene, camera)}
+        onBeforeRender={(_gl, scene, camera, _geo, material) => updateHaloMaterial(material, scene, camera, invalidate)}
         scale={ratio}
         userData={{ dropSurface: true, brushId: node.value.id }}
       >
@@ -366,11 +368,13 @@ function WalkCamera({ document: doc, snapshot, collisionEnabled, onError }: {
   onError: (message: string) => void;
 }) {
   const { camera } = useThree();
+  const activity=useWorkspaceActivity();
   // Avoid retriggering collider re-projection/diagnostics when the parent
   // supplies a new notification callback after a render.
   const errorHandler = useRef(onError);
   errorHandler.current = onError;
   const keys = useRef(new Set<string>());
+  useEffect(()=>{if(!activity.active)keys.current.clear();},[activity.active]);
   const start = doc.spawns[0]?.position ?? [0, 0, 0];
   const state = useRef<WalkState>({ feet: [...start] as Vec3, grounded: false, verticalSpeed: 0, contacts: 0 });
   const collider = useMemo(() => {
@@ -387,6 +391,7 @@ function WalkCamera({ document: doc, snapshot, collisionEnabled, onError }: {
   }, [collider]);
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
+      if(!activity.active)return;
       if (document.pointerLockElement) {
         if (['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(event.code)) event.preventDefault();
         keys.current.add(event.code);
@@ -683,6 +688,7 @@ function ForgeScene(props: ForgeViewportProps) {
   );
 }
 export default function ForgeViewport(props: ForgeViewportProps) {
+  const activity=useWorkspaceActivity();
   const selectionGuard=useRef(0);
   const surfacePreview = useWorkshopTextures(props.document, props.materialSource, props.materialBindings);
   const {models,failures}=useOwnedForgeModels([...props.document.placements,...(props.spawnModelSource?[props.spawnModelSource]:[])],props.resourceScopes);
@@ -699,6 +705,7 @@ export default function ForgeViewport(props: ForgeViewportProps) {
       <ViewportBoundary>
         <Canvas
           key={String(rendererQuality.antialias)}
+          frameloop={activity.active?'always':'never'}
           dpr={rendererQuality.dpr}
           gl={{ antialias: rendererQuality.antialias, preserveDrawingBuffer: !!props.cinema }}
           onPointerMissed={(event) => {

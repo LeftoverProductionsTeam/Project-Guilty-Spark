@@ -342,6 +342,17 @@ export function compareProjects(
         materials: asset.materials,
       }),
     );
+  if (includeSavedEdits) {
+    const renamed = (open: OpenProject) => new Map((open.project.tagRenames ?? []).flatMap(rename => {
+      const tag = open.inspection?.tags.find(tag => tag.id === rename.sourceTagId);
+      return tag ? [[tagIdentity(tag), rename.path.replaceAll('\\', '/').toLowerCase()] as const] : [];
+    }));
+    const before = renamed(left), after = renamed(right);
+    for (const key of new Set([...before.keys(), ...after.keys()])) {
+      const originalPath = key.slice(key.indexOf(':') + 1);
+      add('Tags', key, 'Custom tag path', before.get(key) ?? (a.has(key) ? originalPath : undefined), after.get(key) ?? (b.has(key) ? originalPath : undefined));
+    }
+  }
   const lm = left.inspection?.mesh,
     rm = right.inspection?.mesh;
   if (lm?.positions.length && rm?.positions.length) {

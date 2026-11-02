@@ -11,7 +11,7 @@ function characters(source: OpenProject): ForgeAsset[] {
   const available = catalogAssets(source);
   const featured = available.filter(
     (asset) =>
-      /monitor|343|cyborg|master.?chief/i.test(asset.path) && ['bipd', 'scen', 'vehi'].includes(asset.class),
+      (asset.class==='bipd'||/monitor|343/i.test(asset.path)) && ['bipd', 'scen', 'vehi'].includes(asset.class),
   );
   return (featured.length ? featured : available.filter((asset) => asset.class === 'bipd')).sort(
     (a, b) => Number(isMonitor(b)) - Number(isMonitor(a)),

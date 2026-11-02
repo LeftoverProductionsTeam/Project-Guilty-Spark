@@ -7,6 +7,7 @@ use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
     path::Path,
+    sync::{Arc, Mutex, OnceLock},
 };
 #[path = "map_decals.rs"]
 mod decals;
@@ -186,6 +187,10 @@ pub struct Tag {
 #[derive(Clone,Debug,Default,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ShaderPreview {
+    #[serde(default)] pub detail_mask:u16,
+    #[serde(default)] pub detail_v_scale:f32,
+    #[serde(default)] pub bump_is_specular:bool,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub glass_tint:Option<[f32;3]>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub reflection:Option<ShaderReflection>,
     #[serde(default)] pub multipurpose_xbox:bool,
     #[serde(default)] pub bump_scale:f32,
@@ -388,6 +393,25 @@ pub(crate) fn read_cache_snapshot(path: &Path) -> Result<(MapHeader, Vec<u8>, St
     let bytes=normalize_cache_snapshot(&header,bytes)?;
     Ok((header,bytes,sha256))
 }
+/// One bounded immutable decompression cache. Every caller still reads and
+/// hashes the entire original file; a timestamp or path never proves identity.
+/// Serializing normalization also prevents simultaneous texture batches from
+/// each inflating the same Xbox campaign into another hundreds-of-MiB buffer.
+pub(crate) fn read_cache_snapshot_shared(path: &Path) -> Result<(MapHeader, Arc<[u8]>, String)> {
+    static XBOX: OnceLock<Mutex<Option<(String, Arc<[u8]>)>>> = OnceLock::new();
+    let (header, original, hash) = read_original_cache_snapshot(path)?;
+    if header.version != 5 || !header.compressed || header.declared_size > 320 * 1024 * 1024 {
+        return Ok((header.clone(), Arc::from(normalize_cache_snapshot(&header, original)?), hash));
+    }
+    let mut cached = XBOX.get_or_init(|| Mutex::new(None)).lock()
+        .map_err(|_| SparkError::Invalid("Xbox snapshot cache lock failed".into()))?;
+    if let Some((identity, bytes)) = cached.as_ref().filter(|(identity, _)| identity == &hash) {
+        return Ok((header, Arc::clone(bytes), identity.clone()));
+    }
+    let bytes: Arc<[u8]> = Arc::from(normalize_cache_snapshot(&header, original)?);
+    *cached = Some((hash.clone(), Arc::clone(&bytes)));
+    Ok((header, bytes, hash))
+}
 /// A metadata cache hit verifies all original bytes without decompressing a
 /// payload which will not be inspected. The original SHA remains the identity.
 pub(crate) fn read_original_cache_snapshot(path:&Path)->Result<(MapHeader,Vec<u8>,String)>{
@@ -463,7 +487,7 @@ impl Space {
 }
 
 pub fn inspect_map(path: &Path, resource_directory: Option<&Path>) -> Result<MapInspection> {
-    let (header, bytes, sha256) = read_cache_snapshot(path)?;
+    let (header, bytes, sha256) = read_cache_snapshot_shared(path)?;
     inspect_snapshot(path,resource_directory,header,&bytes,sha256,true)
 }
 /// Metadata consumers can reuse one verified immutable file snapshot. The map
@@ -876,6 +900,7 @@ fn shader_bitmap_references(
             (0xDC, "Detail map"),
             (0x164, "Reflection cube map"),
         ]),
+        "sgla" => (480, &[(0x158,"Diffuse map"),(0x16c,"Detail map"),(0xc0,"Bump map"),(0xac,"Reflection cube map")]),
         _ => return Ok(()),
     };
     // Check the entire known structure before reading any individual field.
@@ -912,27 +937,30 @@ fn shader_bitmap_references(
         [if u==0.{1.}else{u},if v==0.{1.}else{v}]
     }else{[1.,1.]};
     let reflection=if let Some(reference)=tag.references.iter().find(|v|v.label=="Reflection cube map"){
-        let model=tag.class=="soso";let perpendicular=r.f32(at+if model{0x144}else{0x2f4})?;let parallel=r.f32(at+if model{0x154}else{0x2f8})?;
+        let model=tag.class=="soso";let glass=tag.class=="sgla";let perpendicular=r.f32(at+if model{0x144}else if glass{0x8c}else{0x2f4})?;let parallel=r.f32(at+if model{0x154}else if glass{0x9c}else{0x2f8})?;
         let tint=|offset:usize|->[f32;3]{std::array::from_fn(|i|r.f32(at+offset+i*4).unwrap_or(f32::NAN))};
-        let perp=if model{tint(0x148)}else{[1.;3]};let para=if model{tint(0x158)}else{[1.;3]};
+        let perp=if model{tint(0x148)}else if glass{tint(0x90)}else{tint(0x2a8)};let para=if model{tint(0x158)}else if glass{tint(0xa0)}else{tint(0x2b4)};
         let falloff=if model{r.f32(at+0x13c)?}else{0.};let cutoff=if model{r.f32(at+0x140)?}else{0.};
         if [perpendicular,parallel].iter().all(|v|v.is_finite()&&(0.0..=1.0).contains(v))&&perp.iter().chain(&para).all(|v|v.is_finite()&&(0.0..=1.0).contains(v))&&[falloff,cutoff].iter().all(|v|v.is_finite()&&(0.0..=1e6).contains(v)){
             Some(ShaderReflection{bitmap_tag_id:reference.target_id,perpendicular_brightness:perpendicular,parallel_brightness:parallel,perpendicular_tint:perp,parallel_tint:para,falloff,cutoff})
         }else{None}
     }else{None};
-    tag.shader_preview=Some(ShaderPreview{reflection,alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
+    let glass=tag.class=="sgla";
+    let glass_tint=if glass {let rgb=[r.f32(at+0x54)?,r.f32(at+0x58)?,r.f32(at+0x5c)?];if rgb.iter().any(|v|!(0.0..=1.0).contains(v)){return invalid("Glass background tint is invalid");}Some(rgb)}else{None};
+    let model_detail=tag.class=="soso"&&tag.references.iter().any(|v|v.label=="Detail map");
+    tag.shader_preview=Some(ShaderPreview{reflection,glass_tint,detail_mask:if model_detail{r.u16(at+0xd6)?}else{0},detail_v_scale:if model_detail{shader_scale(r,at+0xec)?}else{1.},bump_is_specular:if glass{flags&8!=0}else{tag.class=="senv"&&flags&2!=0},alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
         multipurpose_xbox:tag.class=="soso"&&flags&64!=0,bump_scale:if tag.class=="senv"{r.f32(at+0x124).ok().filter(|v|v.abs()<=1024.&&*v!=0.).unwrap_or(1.)}else{1.},
-        two_sided:tag.class=="soso"&&flags&2!=0,uv_scale,
-        alpha_blended:tag.class=="soso"&&flags&8!=0,decal:tag.class=="soso"&&flags&8!=0,
-        kind:if tag.class=="senv"{"environment"}else{"model"}.into(),
+        two_sided:if glass{flags&4!=0}else{tag.class=="soso"&&flags&2!=0},uv_scale:if glass{[shader_scale(r,at+0x154)?;2]}else{uv_scale},
+        alpha_blended:glass||tag.class=="soso"&&flags&8!=0,decal:if glass{flags&2!=0}else{tag.class=="soso"&&flags&8!=0},
+        kind:if tag.class=="senv"{"environment"}else if glass{"glass"}else{"model"}.into(),
         shader_type:if tag.class=="senv"{r.u16(at+0x2a)?}else{0},
-        detail_function:if tag.references.iter().any(|v|matches!(v.label.as_str(),"Primary detail map"|"Detail map")){r.u16(at+if tag.class=="senv"{0xb0}else{0xd4})?}else{0},
+        detail_function:if !glass&&tag.references.iter().any(|v|matches!(v.label.as_str(),"Primary detail map"|"Detail map")){r.u16(at+if tag.class=="senv"{0xb0}else{0xd4})?}else{0},
         micro_detail_function:if tag.references.iter().any(|v|v.label=="Micro detail map"){r.u16(at+0xf4)?}else{0},
         detail_scales:if tag.class=="senv"{[
             if tag.references.iter().any(|v|v.label=="Primary detail map"){shader_scale(r,at+0xb4)?}else{1.},
             if tag.references.iter().any(|v|v.label=="Secondary detail map"){shader_scale(r,at+0xc8)?}else{1.},
             if tag.references.iter().any(|v|v.label=="Micro detail map"){shader_scale(r,at+0xf8)?}else{1.}]}
-            else{[if tag.references.iter().any(|v|v.label=="Detail map"){shader_scale(r,at+0xd8)?}else{1.},1.,1.]},..Default::default()});
+            else{[if tag.references.iter().any(|v|v.label=="Detail map"){shader_scale(r,at+if glass{0x168}else{0xd8})?}else{1.},1.,1.]},..Default::default()});
     Ok(())
 }
 fn shader_scale(r:&Reader,at:usize)->Result<f32>{let v=r.f32(at)?;if v.abs()>1024.{return invalid("Shader UV scale exceeds supported range");}Ok(if v==0.{1.}else{v})}
@@ -974,7 +1002,7 @@ fn read_fields(
     if matches!(version,6|7|13|609) && matches!(tag.class.as_str(),"DeLa"|"tagc"|"Soul") {
         ui_tags::read(r,space,tag,ids)?;
     }
-    if matches!(version,6|7|13|609)&&tag.class=="snd!" {
+    if matches!(version,5|6|7|13|609)&&tag.class=="snd!" {
         space.pointer(space.address+(at-space.begin)as u32,164)?;
         for (offset,key,label,max,unit) in [(8,"sound-min-distance","Minimum audible distance",20000.,"world units"),
             (12,"sound-max-distance","Maximum audible distance",20000.,"world units"),
@@ -985,7 +1013,7 @@ fn read_fields(
         }
         reference(r,tag,at+112,"Promotion sound",Some("snd!"),ids)?;
     }
-    if matches!(version,6|7|13|609)&&tag.class=="lsnd" {
+    if matches!(version,5|6|7|13|609)&&tag.class=="lsnd" {
         space.pointer(space.address+(at-space.begin)as u32,84)?;
         let (tracks,count)=space.block(r,at+60,160,4)?;
         for index in 0..count {let track=tracks+index*160;
@@ -1000,11 +1028,12 @@ fn read_fields(
         for index in 0..count {reference(r,tag,details+index*104,&format!("Detail sound {}",index+1),Some("snd!"),ids)?;}
     }
     // PC-derived layouts, including the verified MCC v13 classic shader bodies.
-    if matches!(tag.class.as_str(), "senv" | "soso") && matches!(version, 6 | 7 | 13 | 609) {
+    if matches!(tag.class.as_str(), "senv" | "soso" | "sgla") && matches!(version, 5 | 6 | 7 | 13 | 609) {
         shader_bitmap_references(r, space, tag, ids, at)?;
+        if version==5&&tag.class=="soso"{if let Some(preview)=tag.shader_preview.as_mut(){preview.multipurpose_xbox=true;}}
     }
-    if matches!(tag.class.as_str(),"schi"|"scex")&&matches!(version,6|7|13|609){chicago_bitmap_references(r,space,tag,ids,at)?;}
-    if tag.class=="sotr"&&matches!(version,6|7|13|609){shader_transparent::inspect(r,space,tag,ids,at)?;}
+    if matches!(tag.class.as_str(),"schi"|"scex")&&matches!(version,5|6|7|13|609){chicago_bitmap_references(r,space,tag,ids,at)?;}
+    if tag.class=="sotr"&&matches!(version,5|6|7|13|609){shader_transparent::inspect(r,space,tag,ids,at)?;}
     // Read-only dependency metadata from Invader's HEK definitions. Actor variants
     // and item collections can drive AI even when the scenario has no encounters.
     if tag.class == "actv" {
@@ -1503,6 +1532,18 @@ mod shader_dependency_tests {
         assert_eq!(tag.references.len(), 2);
         assert_eq!(tag.references[0].label, "Diffuse map");
         assert_eq!(tag.references[1].label, "Multipurpose map");
+    }
+    #[test]
+    fn native_glass_keeps_tint_reflection_and_transparency_instead_of_an_opaque_shell(){
+        let mut bytes=vec![0u8;1200];let at=64;
+        install_ref(&mut bytes,at+0x158,17,b"mtib");install_ref(&mut bytes,at+0xac,18,b"mtib");
+        bytes[at+40..at+42].copy_from_slice(&4u16.to_le_bytes());
+        for(offset,value)in [(0x54,0.65f32),(0x58,0.7),(0x5c,1.),(0x8c,0.25),(0x9c,1.),(0x154,1.)]{bytes[at+offset..at+offset+4].copy_from_slice(&value.to_le_bytes());}
+        for offset in [0x90,0x94,0x98,0xa0,0xa4,0xa8]{bytes[at+offset..at+offset+4].copy_from_slice(&1f32.to_le_bytes());}
+        let region=Space{begin:0,end:bytes.len(),address:0};let ids=std::collections::HashMap::from([(17,"bitm".into()),(18,"bitm".into())]);let mut tag=shader_fixture("sgla");
+        shader_bitmap_references(&Reader(&bytes),&region,&mut tag,&ids,at).unwrap();let preview=tag.shader_preview.unwrap();
+        assert_eq!(preview.kind,"glass");assert!(preview.alpha_blended&&preview.two_sided);assert_eq!(preview.glass_tint,Some([0.65,0.7,1.]));assert_eq!(preview.reflection.unwrap().bitmap_tag_id,18);
+        let mut corrupt=shader_fixture("sgla");bytes[at+0x54..at+0x58].copy_from_slice(&f32::NAN.to_le_bytes());assert!(shader_bitmap_references(&Reader(&bytes),&region,&mut corrupt,&ids,at).is_err());
     }
     #[test]
     fn shader_bitmap_id_mismatch_is_not_resolved() {

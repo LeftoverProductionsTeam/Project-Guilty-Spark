@@ -1,5 +1,6 @@
 import { AudioLines, ExternalLink, Image as ImageIcon, Palette, RotateCcw, ShieldCheck, Volume2, VolumeX } from 'lucide-react';
 import { useState } from 'react';
+import type {ReactNode} from 'react';
 import type { InterfacePreferences, CueName, ThemeName } from '../interfacePreferences';
 import { cueNames, DEFAULT_INTERFACE } from '../interfacePreferences';
 import { Notice, PageTitle, Pill } from './ui';
@@ -16,6 +17,7 @@ const eventLabels: Record<CueName, string> = { select: 'Menu navigation', confir
 export default function InterfaceStudio({
   preferences, onChange, onPreview, onOpenTags, canBrowseSounds,
   bitmapTags, bitmapStatus, bitmapLoading, bitmapActive, onChooseBitmap, onClearBitmap,
+  homeModelSettings,
 }: {
   preferences: InterfacePreferences;
   onChange: (next: InterfacePreferences) => void;
@@ -28,6 +30,7 @@ export default function InterfaceStudio({
   bitmapActive: boolean;
   onChooseBitmap: (id:number)=>void;
   onClearBitmap: ()=>void;
+  homeModelSettings?:ReactNode;
 }) {
   const [bitmapQuery,setBitmapQuery]=useState('');
   const [chosenBitmap,setChosenBitmap]=useState<number|null>(preferences.bitmap?.bitmapTagId ?? null);
@@ -39,6 +42,7 @@ export default function InterfaceStudio({
       actions={<button onClick={() => onChange({ ...DEFAULT_INTERFACE, cues: {} })}><RotateCcw size={14}/> Restore defaults</button>}/>
     <section className="analysis-card">
       <h2><Palette size={19}/> Visual identity</h2>
+      {homeModelSettings}
       <div className="interface-theme-grid">
         {themes.map((theme) => <button
           type="button" key={theme.id} aria-pressed={preferences.theme === theme.id}

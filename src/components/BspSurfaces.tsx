@@ -1,6 +1,7 @@
 import { createHaloMaterial, updateHaloMaterial } from '../haloMaterial';
 import type { WorkshopMaterialView } from '../useWorkshopTextures';
 import { useEffect, useMemo } from 'react';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ForgeMesh, QuickForgeDocument } from '../forge';
 
@@ -22,6 +23,7 @@ export default function BspSurfaces({
   textures: Record<string, THREE.Texture>;
   views?: Record<string, WorkshopMaterialView>;
 }) {
+  const {invalidate}=useThree();
   const surface = useMemo(() => {
     const geometry = new THREE.BufferGeometry(),
       indices: number[] = [],
@@ -87,7 +89,7 @@ export default function BspSurfaces({
   return (
     <mesh
       onBeforeRender={(_gl, scene, camera, _geometry, material) =>
-        updateHaloMaterial(material, scene, camera)
+        updateHaloMaterial(material, scene, camera, invalidate)
       }
       geometry={surface.geometry}
       material={surface.materials}

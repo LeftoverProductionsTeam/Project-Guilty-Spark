@@ -21,6 +21,41 @@ fn sound_fixture() -> Vec<u8> {
 }
 
 #[test]
+fn resource_discovery_checks_late_permutations_and_rechecks_source_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("resource-needs.map");
+    let mut bytes = sound_fixture();
+    put_u32(&mut bytes, 0x403c, 12);
+    for i in 0..12 { put_u32(&mut bytes, 0x4100 + i * 124 + 68, 0); }
+    std::fs::write(&path, &bytes).unwrap();
+    let embedded_hash = maps::hash_file(&path).unwrap();
+    assert!(!audio::requires_external_samples(&path, &embedded_hash).unwrap());
+    put_u32(&mut bytes, 0x4100 + 11 * 124 + 68, 1);
+    std::fs::write(&path, &bytes).unwrap();
+    assert!(audio::requires_external_samples(&path, &embedded_hash).is_err());
+    let hash = maps::hash_file(&path).unwrap();
+    assert!(audio::requires_external_samples(&path, &hash).unwrap());
+    assert_eq!(maps::hash_file(&path).unwrap(), hash);
+}
+
+#[test]
+fn resource_discovery_never_treats_malformed_metadata_as_embedded_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("malformed.map");
+    for (offset, value) in [(0x2698, 9), (0x4040, 1), (0x403c, 257), (0x4144, 2)] {
+        let mut bytes = sound_fixture();
+        put_u32(&mut bytes, offset, value);
+        std::fs::write(&path, bytes).unwrap();
+        let hash = maps::hash_file(&path).unwrap();
+        assert!(audio::requires_external_samples(&path, &hash).is_err(), "offset {offset:x}");
+    }
+    let mut bytes = sound_fixture();
+    put_u32(&mut bytes, 0x828 + 96 + 24, 1);
+    std::fs::write(&path, bytes).unwrap();
+    assert!(audio::requires_external_samples(&path, &maps::hash_file(&path).unwrap()).unwrap());
+}
+
+#[test]
 fn missing_external_audio_never_becomes_a_preview_or_a_substitution() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("external.map");

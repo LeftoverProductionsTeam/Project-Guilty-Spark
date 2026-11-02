@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from 'react';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { MeshData, ShaderPreview } from '../types';
 import { shaderLegend, shaderForTriangle } from '../renderView';
@@ -32,6 +33,7 @@ export default function HaloMesh({
   extraTextures?: Record<string, THREE.Texture>;
   sky?: boolean;
 }) {
+  const {invalidate}=useThree();
   const legend = useMemo(
     () =>
       materialLens || Object.keys(shaderTextures).length || Object.keys(lightmapTextures).length
@@ -140,7 +142,7 @@ export default function HaloMesh({
       material={materials ?? undefined}
       frustumCulled={!sky}
       onBeforeRender={(_renderer, scene, camera, _geometry, material) =>
-        updateHaloMaterial(material, scene, camera)
+        updateHaloMaterial(material, scene, camera, invalidate)
       }
       raycast={sky ? () => null : undefined}
       onClick={(event) => {

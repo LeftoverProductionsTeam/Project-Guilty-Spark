@@ -4,6 +4,7 @@ import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../na
 import { draggedAsset } from '../assetDragRegistry';
 import BuildTargets from './BuildTargets';
 import { WorkspacePanel, WorkspacePanelAddon, useRevealWorkspacePanel } from './WorkspacePanels';
+import { useWorkspaceActivity } from './WorkspaceActivity';
 import SmartEditPanel from './SmartEditPanel';
 import { runtimeTextureSource, defaultPreviewMaterials } from '../runtimeTexturePreview';
 import type { ForgeMaterial } from '../forge';
@@ -307,6 +308,7 @@ function NewMapWizard({
   );
 }
 function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocument; onNew: () => void }) {
+  const activity=useWorkspaceActivity();
   const { project, document: doc, data, edit, notify } = props;
   const [bspMode, setBspMode] = useMapState(project.id, 'forge.bspWorkshop', !!doc.workshop);
   const [bspBusy, setBspBusy] = useState(false);
@@ -938,6 +940,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   }
   useEffect(() => {
     function key(event: KeyboardEvent) {
+      if(!activity.active)return;
       if (bspMode) return;
       if (
         (event.target as HTMLElement)?.closest(
@@ -984,7 +987,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [doc, selected, selectedZone, project.firefight, cameraMode, bspMode, workshop]);
+  }, [activity.active,doc, selected, selectedZone, project.firefight, cameraMode, bspMode, workshop]);
   function addPolygonHill(rawPoint: Vec3 = [0, 0, 0]) {
     const usageId = nextFreeUsageId(doc, 'hill');
     if (usageId === null || doc.objectives.length + 4 > 200) {

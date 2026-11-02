@@ -3,7 +3,7 @@ export type LearningSection = 'guides' | 'glossary' | 'academy';
 export interface WorkflowRoute {
   workspace: Workspace;
   projectId: string | null;
-  settingsTab: 'tools' | 'dependencies';
+  settingsTab: 'tools' | 'dependencies' | 'interface';
   learningSection?: LearningSection;
 }
 export interface WorkflowHistory {

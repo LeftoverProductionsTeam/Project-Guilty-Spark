@@ -190,4 +190,10 @@ describe('semantic variant comparison', () => {
   it('preserves the distinct empty basename found in legacy source paths', () => {
     expect(tagIdentity(tag(1, 'weapons/test/'))).not.toBe(tagIdentity(tag(2, 'weapons/test')));
   });
+  it('compares custom names only when saved project edits are included', () => {
+    const before=source();before.inspection!.tags=[tag(1,'weapons/pistol','weap')];
+    const after=structuredClone(before);after.project.tagRenames=[{sourceTagId:1,path:'custom/my pistol'}];
+    expect(compareProjects(before,after).rows.some(row=>row.property==='Custom tag path')).toBe(false);
+    expect(compareProjects(before,after,true).rows).toContainEqual(expect.objectContaining({property:'Custom tag path',before:'weapons/pistol',after:'custom/my pistol',status:'changed'}));
+  });
 });

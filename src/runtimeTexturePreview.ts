@@ -63,6 +63,25 @@ export async function fillRuntimeTexturePreviews(
     );
   });
   if (!missing.length) return decoded;
+  // Old projects can have a partial stock pack pinned while another preserved
+  // variant holds the real original pack. Same SHA means the exact tag IDs and
+  // bitmap metadata agree. Each candidate's native batch still verifies all
+  // source/resource bytes and per-image spans; compiler pins remain unchanged.
+  try {
+    const alternatives=await call<{projectId:string;sourceSha256:string;resourceSha256:string}[]>('original_bitmap_preview_sources',{projectId:project.id,sourceSha256:inspection.sha256});
+    if(!Array.isArray(alternatives)||alternatives.length>6)throw Error('Unbounded original resource alternatives');
+    for(const candidate of alternatives){
+      if(candidate.projectId===project.id||candidate.sourceSha256!==inspection.sha256||!/^[a-f0-9]{64}$/i.test(candidate.resourceSha256))throw Error('Original resource candidate identity differs');
+      const wanted=missing.filter(t=>!decoded.get(bitmapImageKey(t.bitmapTagId,t.imageIndex??0))?.image);
+      if(!wanted.length)break;
+      const targets=wanted.map(t=>({...t,resourceSha256:candidate.resourceSha256}));
+      const response=await call<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch',{projectId:candidate.projectId,requests:targets.map(t=>({bitmapTagId:t.bitmapTagId,imageIndex:t.imageIndex??0}))});
+      const recovered=decodeOwnedBitmapBatch(response,targets),next=new Map(decoded);
+      for(const [key,item] of recovered)if(item.image)next.set(key,{...item,recoveredResourceProjectId:candidate.projectId});
+      decoded=next;
+    }
+    if(missing.every(t=>decoded.get(bitmapImageKey(t.bitmapTagId,t.imageIndex??0))?.image))return decoded;
+  }catch{/* Missing recovery candidates leave the explicit runtime preview path available. */}
   const runtimeId = readMapSession<RuntimeId>(project.id, 'hosting.runtime', 'mccSteam');
   try {
     const open = await runtimeTextureSource(runtimeId);

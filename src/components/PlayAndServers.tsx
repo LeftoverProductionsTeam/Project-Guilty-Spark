@@ -31,9 +31,13 @@ export default function PlayAndServers({
   const [provider, setProvider] = useMapState<'community' | 'mcc' | 'private'>(
     project?.id ?? 'global',
     'servers.provider',
-    'community',
+    runtime==='mccSteam'?'mcc':runtime==='haloCustomEdition'?'private':'community',
   );
   const [filter, setFilter] = useMapState(project?.id ?? 'global', 'servers.filter', '');
+  const [players,setPlayers]=useMapState(project?.id??'global','servers.players','all');
+  const [sort,setSort]=useMapState(project?.id??'global','servers.sort','players');
+  const runtimeAtMount=useRef(runtime);
+  useEffect(()=>{const valid=provider==='private'||runtime==='mccSteam'&&provider==='mcc'||(runtime==='openCe'||runtime==='chupathingyCe')&&provider==='community';if(runtimeAtMount.current===runtime&&valid)return;runtimeAtMount.current=runtime;setProvider(runtime==='mccSteam'?'mcc':runtime==='haloCustomEdition'?'private':'community');setSelected(null);},[runtime,provider]);
   const [lobbyFilter, setLobbyFilter] = useMapState<LobbyFilter>(
     project?.id ?? 'global',
     'servers.lobbyFilter',
@@ -108,13 +112,15 @@ export default function PlayAndServers({
     () =>
       (view?.listing?.servers ?? [])
         .filter((server) => matchesLobbyFilter(server, lobbyFilter))
+        .filter(server=>players==='all'||players==='playing'&&server.players>0||players==='space'&&server.open&&server.players<server.advertisedCapacity||players==='empty'&&server.players===0)
         .filter((server) =>
           `${server.name} ${server.map.displayName} ${server.provider} ${server.protocol} ${server.gameType}`
             .toLowerCase()
             .includes(filter.toLowerCase()),
         )
+        .sort((a,b)=>sort==='map'?a.map.displayName.localeCompare(b.map.displayName):sort==='name'?a.name.localeCompare(b.name):b.players-a.players)
         .slice(0, 512),
-    [view, filter, lobbyFilter],
+    [view, filter, lobbyFilter,players,sort],
   );
   const stale = listingExpired(view, time),
     retry = Math.max(0, Math.ceil((view?.refreshAfterUnix ?? 0) - time / 1000));
@@ -172,23 +178,23 @@ export default function PlayAndServers({
   }
   return (
     <div className="play-servers-workspace">
-      <InvitationJoin
+      <details className="compact-invitation"><summary>Join by invitation or address</summary><InvitationJoin
         mapId={project?.id ?? 'global'}
         runtime={runtime}
         onRuntime={onRuntime}
         onSetup={onSetup}
-      />
+      /></details>
       <div className="tabs workspace-tabs" aria-label="Game session providers">
-        <button
+        {(runtime==='openCe'||runtime==='chupathingyCe')&&<button
           className={provider === 'community' ? 'selected' : ''}
           onClick={() => setProvider('community')}
         >
           <Globe2 size={14} />
           Community servers
-        </button>
-        <button className={provider === 'mcc' ? 'selected' : ''} onClick={() => setProvider('mcc')}>
+        </button>}
+        {runtime==='mccSteam'&&<button className={provider === 'mcc' ? 'selected' : ''} onClick={() => setProvider('mcc')}>
           MCC sessions
-        </button>
+        </button>}
         <button className={provider === 'private' ? 'selected' : ''} onClick={() => setProvider('private')}>
           Private / LAN
         </button>
@@ -239,6 +245,11 @@ export default function PlayAndServers({
                 placeholder="Search server, map or protocol"
               />
             </label>
+            <div className="compact-server-filters">
+              <label>Players<select aria-label="Filter games by players" value={players} onChange={event=>setPlayers(event.target.value)}><option value="all">All</option><option value="playing">Has players</option><option value="space">Open slots</option><option value="empty">Empty</option></select></label>
+              <label>Sort<select aria-label="Sort games" value={sort} onChange={event=>setSort(event.target.value)}><option value="players">Most players</option><option value="map">Map</option><option value="name">Name</option></select></label>
+              <span className="subtle" title="The current listing provider does not supply measured server latency.">Ping unavailable</span>
+            </div>
             <label>
               Show lobbies
               <select

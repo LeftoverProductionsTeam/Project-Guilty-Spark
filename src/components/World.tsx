@@ -1,4 +1,5 @@
 import { useReflectionTextures } from '../useReflectionTextures';
+import {copySceneObject,readSceneObject,cloneSceneObject} from '../sceneClipboard';
 import { textureResourceScope } from '../textureResourceScope';
 import {fillRuntimeTexturePreviews} from '../runtimeTexturePreview';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
@@ -62,6 +63,7 @@ import {summarizeTextureFailures} from '../textureDiagnostics';
 import type {TextureFailure} from '../textureDiagnostics';
 import HaloTextures from './HaloTextures';
 import ViewportActivity from './ViewportActivity';
+import { useWorkspaceActivity } from './WorkspaceActivity';
 import MapSounds from './MapSounds';
 import SpatialAudioListener from './SpatialAudioListener';
 import ViewportTelemetry from './ViewportTelemetry';
@@ -112,8 +114,8 @@ function planWorldMaterialPreviews(inspection:MapInspection,_mesh:MeshData|null|
   for(const tag of inspection.tags.filter(t=>ids.has(t.id)&&t.shaderPreview)){
     const roles:Record<string,string>={'Primary detail map':'primaryDetail','Detail map':'primaryDetail','Secondary detail map':'secondaryDetail','Micro detail map':'microDetail'};
     const enhanced=renderFeatures(features);
-    if(tag.class==='senv'&&(tag.shaderPreview?.alphaTest||(enhanced.enabled&&enhanced.normalMaps)))roles['Bump map']='normalMap';
-    if(tag.class==='soso'&&enhanced.enabled&&(enhanced.specular||enhanced.selfIllumination))roles['Multipurpose map']='multipurpose';
+    if(['senv','sgla'].includes(tag.class)&&(tag.shaderPreview?.alphaTest||tag.shaderPreview?.bumpIsSpecular||(enhanced.enabled&&enhanced.normalMaps)))roles['Bump map']='normalMap';
+    if(tag.class==='soso')roles['Multipurpose map']='multipurpose';
     for(const ref of tag.references){const role=roles[ref.label]??(/^(?:Chicago|Transparent) layer [1-3]$/.test(ref.label)?`layer${ref.label.at(-1)}`:null);if(!role)continue;
       const key=extraTextureKey(tag.id,role),bitmap=inspection.tags.find(t=>t.id===ref.targetId);
       if(!extras.has(key)&&bitmap?.class==='bitm'&&!bitmap.external)detailTasks.push({kind:'detail',shaderTagId:tag.id,bitmapTagId:bitmap.id,imageIndex:0,role,key});
@@ -285,7 +287,7 @@ function Scene({
   assetMeshes: Record<string, MeshData>;
   selected: string | null;
   setSelected: (s: string | null) => void;
-  onTransform: (o: SceneObject) => void;
+  onTransform: (o: SceneObject,duplicate?:boolean) => void;
   onOpenTag?: (tagId: number) => void;
   shaderTextures: Record<number, THREE.Texture>;
   lightmapTextures: Record<string, THREE.Texture>;
@@ -306,6 +308,8 @@ function Scene({
   ownedModels:Record<string,OwnedModelView>;
 }) {
   const group = useRef<THREE.Group>(null);
+  const altDrag=useRef(false),{gl}=useThree();
+  useEffect(()=>{const begin=(event:PointerEvent)=>{altDrag.current=event.altKey;};gl.domElement.addEventListener('pointerdown',begin,true);return()=>gl.domElement.removeEventListener('pointerdown',begin,true);},[gl]);
   const chosen = project.scene.find((o) => o.id === selected);
   const all = project.scene.filter((o) => o.visible);
   const markerSize = inspection ? 0.22 : 0.15;
@@ -424,7 +428,7 @@ function Scene({
                 position: g.position.toArray() as Vec3,
                 rotation: [g.rotation.z, g.rotation.y, g.rotation.x],
                 scale: g.scale.toArray() as Vec3,
-              });
+              },altDrag.current);
             }
             onSceneDragEnd?.();
           }}
@@ -487,6 +491,7 @@ export default function World({
   library?: ViewportLibraryControls;
 }) {
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
+  const activity=useWorkspaceActivity();
   const [tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null);
   const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',project.id);
   const [tagRevision,setTagRevision]=useState(0);
@@ -734,6 +739,7 @@ export default function World({
         if(task.kind==='shader') {const metadata=inspection.tags.find(t=>t.id===task.shaderTagId)?.shaderPreview;
           if(metadata){texture.userData.alphaTest=metadata.alphaTest;texture.repeat.set(...metadata.uvScale);}}
         texture.userData.rgbaBytes=byteCount;
+        if(found.recoveredResourceProjectId)texture.userData.originalResourceProject=found.recoveredResourceProjectId;
         if(found.compatibleRuntime)texture.userData.runtimePreview={runtime:found.compatibleRuntime,sourceSha256:found.compatibleSourceSha256,bitmapTagId:found.compatibleBitmapTagId};
         texture.name=`Verified Halo ${task.kind} bitmap ${task.bitmapTagId} image ${task.imageIndex}`;
         const label=`Read-only ${found.compatibleRuntime?'compatible '+found.compatibleRuntime:found.sourceKind==='verified-resource'?'verified resource':'cache'} `+
@@ -1050,9 +1056,10 @@ export default function World({
       notify(`Exported ${exported.triangles} real source triangles as OBJ (read-only). Material IDs are diagnostic; compiled BSP/collision and game textures are not included.`);
     } catch (error) { notify(`OBJ export rejected: ${String(error)}`); }
   }
-  function update(o: SceneObject) {
+  function update(o: SceneObject,asCopy=false) {
     try {
       validateSceneTransform(o);
+      if(asCopy){const duplicate=cloneSceneObject(o);edit({...project,scene:[...project.scene,duplicate]},`Duplicate and move ${o.name}`);setSelected(duplicate.id);return;}
       edit({ ...project, scene: project.scene.map((s) => (s.id === o.id ? o : s)) }, `Transform ${o.name}`);
     } catch (error) { notify(`Scene transform was not saved: ${String(error)}`); }
   }
@@ -1073,9 +1080,28 @@ export default function World({
         'Duplicated in the project. Exporting additional Halo instances requires a scenario compilation adapter and is currently blocked.',
       );
   }
+  async function pasteSelection(){
+    const copied=readSceneObject();if(!copied){notify('Copy a selected Spark asset first (Ctrl+C).');return;}
+    try{
+      const position=[copied.object.position[0]+1,copied.object.position[1],copied.object.position[2]] as Vec3;
+      if(copied.sourceProjectId===project.id){const object=cloneSceneObject(copied.object);object.position=position;edit({...projectValue.current,scene:[...projectValue.current.scene,object]},'Paste '+copied.object.name);setSelected(object.id);return;}
+      if(!copied.asset)throw Error('This object has no transferable native model. Copy it from its source map’s asset library.');
+      setAssetBusy(true);const binding=await prepareAssetImport(projectValue.current,copied.asset);
+      if(!alive.current)return;
+      const placed=placeLibraryModel(attachAssetImport(projectValue.current,binding),copied.asset,position);
+      const object=placed.project.scene.find(o=>o.id===placed.selectedId)!;object.rotation=[...copied.object.rotation];object.scale=[...copied.object.scale];
+      edit(placed.project,'Paste imported '+copied.object.name);setSelected(placed.selectedId);
+    }catch(reason){notify(String(reason));}finally{if(alive.current)setAssetBusy(false);}
+  }
   useEffect(() => {
     function key(e: KeyboardEvent) {
-      if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable="true"]') || e.ctrlKey || e.metaKey || document.querySelector('canvas[data-gs-fly-active="true"]')) return;
+      if(!activity.active)return;
+      if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable="true"]') || document.querySelector('canvas[data-gs-fly-active="true"]')) return;
+      if(e.ctrlKey||e.metaKey){
+        if(e.key.toLowerCase()==='c'&&chosen){e.preventDefault();const item=catalog.find(item=>item.kind==='model'&&item.asset.tagId===chosen.tagId&&item.sourceId===(chosen.sourceModel?.projectId??project.id));copySceneObject({version:1,sourceProjectId:project.id,object:chosen,asset:item?.kind==='model'?item.asset:undefined});notify('Asset copied. Ctrl+V pastes it into the active map.');}
+        if(e.key.toLowerCase()==='v'&&!assetBusy){e.preventDefault();void pasteSelection();}
+        return;
+      }
       switch (e.key.toLowerCase()) {
         case 'w':
           if (!fly) setMode('translate');
@@ -1097,7 +1123,7 @@ export default function World({
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [fly,project.id]);
+  }, [activity.active,fly,project.id,chosen,catalog,assetBusy]);
   return (
     <div
       className="world-layout"
@@ -1348,6 +1374,7 @@ export default function World({
             <Suspense fallback={<div className="loading">Preparing geometry…</div>}>
               <Canvas
                 key={String(rendererQuality.antialias)}
+                frameloop={activity.active?'always':'never'}
                 dpr={rendererQuality.dpr}
                 gl={{ antialias: rendererQuality.antialias, alpha: false, preserveDrawingBuffer: true }}
                 onPointerMissed={(event) => {
