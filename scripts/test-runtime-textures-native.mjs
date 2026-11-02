@@ -208,6 +208,8 @@ try {
   await expect.poll(async()=>String(await world.getAttribute('data-source-shader-ids')).split(',').filter(Boolean).map(Number).sort((a,b)=>a-b)).toEqual(expectedShaderIds);
   await expect.poll(() => world.getAttribute('data-source-shaders')).toBe(String(expectedShaderIds.length));
   await expect.poll(() => world.getAttribute('data-compatible-shaders')).toBe('0');
+  await expect.poll(() => world.getAttribute('data-material-loading')).toBe('false');
+  await expect.poll(() => world.getAttribute('data-pending-materials')).toBe('0');
   receipt.originalPack = {
     viewport: await world.evaluate((e) => ({ ...e.dataset })),
     compatiblePreviewsReplacedByOriginals: true,

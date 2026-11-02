@@ -668,6 +668,7 @@ test('the Spark corner visual clears the curved frame and stays above window gla
  await expect(emblem).toHaveCSS('opacity','1');await expect(page.locator('.gs-window-content')).toHaveCSS('opacity','0.35');
  expect(await emblem.evaluate(element=>element.parentElement===document.body)).toBe(true);
  await expect(emblem).toHaveCSS('pointer-events','none');
+ await expect(button).toHaveCSS('margin-left','0px');
  for(const width of [1440,960]){
   await page.setViewportSize({width,height:800});
   await expect.poll(async()=>{const mark=await emblem.boundingBox(),hit=await button.boundingBox();return !!mark&&!!hit&&Math.abs(mark.x-(hit.x-10))<1&&Math.abs(mark.y-(hit.y-8))<1;}).toBe(true);
