@@ -1713,6 +1713,20 @@ test('a third map retires the oldest GPU view while retaining its editor, camera
  await chooseTool(page,'Tag editor');await expect(page.getByRole('spinbutton',{name:'Velocity',exact:true})).toHaveValue('34');await page.keyboard.press('Control+z');await expect(page.getByRole('spinbutton',{name:'Velocity',exact:true})).toHaveValue('10');
 });
 
+test('parked BSP Workshop retains its four-view editor and ignores another map hotkeys',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[],workshop:{schemaVersion:1,brushes:[],portals:[]}})));
+ await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');
+ const workshop=page.locator('.bsp-workshop');await expect(workshop.locator('.bsp-view')).toHaveCount(4);await expect(workshop.locator('canvas')).toHaveAttribute('data-gs-camera-pose',/.+/);
+ await workshop.locator('canvas').evaluate((canvas:HTMLCanvasElement)=>{(window as any).__keptBsp={editor:canvas.closest('.bsp-workshop'),canvas,gl:canvas.getContext('webgl2'),pose:JSON.parse(canvas.dataset.gsCameraPose!)};});
+ await page.keyboard.press('e');await expect(workshop.getByRole('button',{name:'Rotate',exact:true})).toHaveAttribute('aria-pressed','true');
+ for(const name of ['Synthetic candidate','Synthetic third donor']){await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name,exact:true})}).click();await chooseTool(page,'Level editor');}
+ await expect.poll(()=>page.evaluate(()=>(window as any).__keptBsp.editor.querySelector('canvas')===null)).toBe(true);await expect.poll(()=>page.evaluate(()=>(window as any).__keptBsp.gl.isContextLost())).toBe(true);
+ await page.keyboard.press('w');
+ await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await chooseTool(page,'Level editor');await expect(workshop.locator('.bsp-view')).toHaveCount(4);await expect(workshop.locator('canvas')).toHaveAttribute('data-gs-camera-pose',/.+/);
+ await expect(workshop.getByRole('button',{name:'Rotate',exact:true})).toHaveAttribute('aria-pressed','true');
+ expect(await workshop.evaluate(element=>element===(window as any).__keptBsp.editor)).toBe(true);expect(await workshop.locator('canvas').evaluate(element=>element!==(window as any).__keptBsp.canvas)).toBe(true);
+});
+
 test('idle level views stop drawing and camera gestures resume without unloading content', async ({page}) => {
   await mockDesktop(page); await openFixture(page); await chooseTool(page, 'Level editor');
   const canvas = page.locator('.world-layout canvas');

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
 import ViewportActivity from './ViewportActivity';
+import { useWorkspaceActivity } from './WorkspaceActivity';
 import { Edges, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import TransformControls from './HaloTransformControls';
@@ -489,6 +490,7 @@ function Ortho({
   );
 }
 export default function BspWorkshop(props: Props) {
+  const activity=useWorkspaceActivity();
   const { document: doc, projectId } = props,
     w = doc.workshop,
     q = useRendererQuality(projectId),
@@ -640,6 +642,7 @@ export default function BspWorkshop(props: Props) {
     disabled = busy || props.readOnly;
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
+      if(!activity.active)return;
       if (
         (e.target as HTMLElement)?.closest('input,textarea,select,[contenteditable="true"]') ||
         e.ctrlKey ||
@@ -658,7 +661,7 @@ export default function BspWorkshop(props: Props) {
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [setTool, setSelection]);
+  }, [activity.active,setTool, setSelection]);
   const fields = (label: string, values: Vec3, change: (v: Vec3) => void, step = 0.5) => (
     <fieldset>
       <legend>{label}</legend>
@@ -831,7 +834,7 @@ export default function BspWorkshop(props: Props) {
                   </button>
                 </header>
                 {view === 'perspective' ? (
-                  <Canvas
+                  activity.graphicsResident&&<Canvas
                     key={String(q.antialias)}
                     dpr={q.dpr}
                     gl={{ antialias: q.antialias, alpha: false }}
