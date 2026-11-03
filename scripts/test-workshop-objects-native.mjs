@@ -5,6 +5,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
+import {beginQaStorage} from './native-qa-storage.mjs';
+import {openDrawer} from '../tests/ui/helpers/navigation.ts';
 const expect = assertion.configure({ timeout: 45000 }),
   a = process.argv.slice(2);
 if (a.length !== 2 && a.length !== 5)
@@ -30,6 +32,7 @@ const hash = async (p) =>
     complete: false,
   },
   errors = [];
+const finishStorage=await beginQaStorage(root,{workflow:'workshop-objects',appSha256:receipt.appSha256});
 const server = net.createServer();
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
@@ -106,6 +109,16 @@ try {
     await page.keyboard.press('Control+s');
     await expect(page.getByText('Saved', { exact: true }).last()).toBeVisible();
   };
+  const acknowledgeImport=async result=>{
+    // Match the UI's import callback: the durable workspace head, not a stale
+    // library file alone, is authoritative when reopening an edited document.
+    await call('claim_project_document',{id:created.project.id});
+    const status=await call('read_workspace_history',{projectId:created.project.id});
+    const previous=status.history,key=crypto.randomUUID(),limit=previous?.head.limit??100;
+    await call('commit_workspace_history',{projectId:created.project.id,revision:previous?.revision??0,
+      head:{current:key,past:previous?[...previous.head.past,previous.head.current].slice(-limit):[],future:[],dirty:false,limit},
+      snapshots:[{key,project:result.project}]});
+  };
   await open();
   await page.getByRole('button', { name: 'BSP Workshop', exact: true }).click();
   await page.getByRole('button', { name: 'Two rooms + corridor + ramp', exact: true }).click();
@@ -130,13 +143,20 @@ try {
   const obj = path.join(root, 'original_wedge.obj');
   await fs.copyFile(path.resolve('crates/spark-core/tests/fixtures/static_wedge.obj'), obj);
   const objHash = await hash(obj);
+  // Direct native imports do not run the UI callback that adopts their returned
+  // project. Release the acknowledged UI document before changing its disk copy.
+  // A reload of an open draft would otherwise flush the pre-import state over it.
+  await page.getByRole('button',{name:'Save and close '+created.project.title,exact:true}).click();
+  await expect(page.getByRole('button',{name:'Save and close '+created.project.title,exact:true})).toHaveCount(0);
   const imported = await call('import_asset', { id: created.project.id, path: obj });
+  await acknowledgeImport(imported);
   expect(imported.asset.triangles).toBe(8);
+  expect((await saved()).scene).toHaveLength(1);
   receipt.realObjImported = { originalSha256: objHash, managedSha256: imported.asset.sha256 };
   await open();
   await page.getByRole('button', { name: 'Objects & gameplay', exact: true }).click();
   await expect(page.locator('.forge-viewport canvas')).toBeVisible();
-  await page.getByRole('button', { name: 'Toggle Build tools', exact: true }).click();
+  await openDrawer(page,'Build tools');
   await page.locator('.forge-tree-select').filter({ hasText: 'original_wedge.obj' }).click();
   await expect(page.getByRole('button', { name: 'Close Custom model', exact: true })).toBeVisible();
   for (const [axis, value] of [
@@ -195,13 +215,17 @@ try {
     .toBeLessThan(0.01);
   receipt.endToWorkshopFloorWithUndoRedo = true;
   await save();
+  await page.getByRole('button',{name:'Save and close '+created.project.title,exact:true}).click();
+  await expect(page.getByRole('button',{name:'Save and close '+created.project.title,exact:true})).toHaveCount(0);
   const second = await call('import_asset', { id: created.project.id, path: obj });
+  await acknowledgeImport(second);
+  expect((await saved()).scene).toHaveLength(2);
   await open();
   await page.getByRole('button', { name: 'Objects & gameplay', exact: true }).click();
   if (
     !(await page.locator('.forge-tree-select').filter({ hasText: 'original_wedge.obj' }).last().isVisible())
   )
-    await page.getByRole('button', { name: 'Toggle Build tools', exact: true }).click();
+    await openDrawer(page,'Build tools');
   await page.locator('.forge-tree-select').filter({ hasText: 'original_wedge.obj' }).last().click();
   await expect(page.getByRole('spinbutton', { name: 'Custom model position 0', exact: true })).toHaveValue(
     '0',
@@ -357,7 +381,9 @@ try {
   receipt.complete = true;
   await fs.writeFile(path.join(root, 'acceptance.json'), JSON.stringify(receipt, null, 2));
   console.log(
-    'PASS native Workshop + object editor, OBJ import, material binding, End/history/reopen and production Halo build',
+    a.length===5
+      ? 'PASS native Workshop + object editor, OBJ import, material binding, End/history/reopen and production Halo build'
+      : 'PASS native Workshop + object editor, OBJ import, material binding and End/history/reopen; compiler not invoked',
   );
 } catch (e) {
   receipt.error = String(e);
@@ -370,4 +396,5 @@ try {
 } finally {
   await browser?.close();
   child.kill();
+  await finishStorage(receipt.complete?'passed':'failed');
 }

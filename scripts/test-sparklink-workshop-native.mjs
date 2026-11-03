@@ -6,6 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
+import {beginQaStorage} from './native-qa-storage.mjs';
 const expect = assertion.configure({ timeout: 45000 }),
   args = process.argv.slice(2);
 if (args.length !== 5)
@@ -39,6 +40,7 @@ const receipt = {
   latencies: [],
   memory: [],
 };
+const finishStorage=await beginQaStorage(root,{workflow:'sparklink-workshop',appSha256:receipt.appSha256});
 async function mark(key, value = true) {
   receipt.stages[key] = value;
   await fs.writeFile(path.join(root, 'progress.json'), JSON.stringify(receipt, null, 2));
@@ -838,4 +840,5 @@ try {
     await a.browser?.close().catch(() => {});
     a.child?.kill();
   }
+  await finishStorage(receipt.complete?'passed':'failed');
 }

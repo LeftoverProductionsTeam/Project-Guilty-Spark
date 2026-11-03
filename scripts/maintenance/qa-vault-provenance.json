@@ -1,0 +1,17 @@
+{
+  "origin": "C49-cold-ce-trials/restore.py",
+  "originSha256": "903d3bbae5ed41cfab50fcf84a029fc4e7060f72059acf53512dd372758e0e4b",
+  "workerSha256": "e9b915456d364f73c921c9f44947027bd39151b69529fe951e26c7bbf0ca2bf7",
+  "schemaVersion": 1,
+  "changes": [
+    "Explicit workspace binding",
+    "Prepare without unlinking",
+    "Independent map/executable/config restore checkpoint",
+    "C49 newer-file retention reused in finish",
+    "Verified seed catalog merge for self-contained historical restores",
+    "Separate metadata validation from actual filesystem resolution",
+    "Extended-path resolution and real long-path restoration coverage",
+    "Worktree source protection and read-only outcome-specific retention advice"
+  ],
+  "originalToolsChanged": false
+}

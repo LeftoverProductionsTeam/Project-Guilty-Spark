@@ -24,3 +24,5 @@ playwright-report/
 /releases/
 /reports/
 /gamestate.txt
+# Generated Python bytecode from local maintenance/packaging helpers.
+__pycache__/

@@ -22,6 +22,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable, verified 2026-10-26
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Verified QA archive and retention contracts
+        run: python -B scripts/maintenance/test_qa_vault.py
+      - run: node --test scripts/native-qa-storage.test.mjs
       - run: pnpm install --frozen-lockfile
       - run: cargo test -p spark-core --locked
       - run: pnpm check
@@ -43,6 +49,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable, verified 2026-10-26
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Verified QA archive and retention contracts
+        run: python -B scripts/maintenance/test_qa_vault.py
+      - run: node --test scripts/native-qa-storage.test.mjs
       - run: pnpm install --frozen-lockfile
       - run: cargo test --workspace --locked
       - run: pnpm test:engine-sources

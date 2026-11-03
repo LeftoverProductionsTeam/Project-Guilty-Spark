@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "continuation": "C62",
+  "baseCommit": "7e684a040a91a50dae8bd79e99ef0b53895fc2dc",
+  "branch": "master",
+  "complete": true,
+  "scope": "Preservation-first cleanup; existing native workflows reverified; no new gameplay acceptance",
+  "privateEvidenceRoot": ".local/c62-safe-cleanup-20261103",
+  "storage": {
+    "before": {
+      "bytes": 337889724946,
+      "physicalUniqueBytes": 337878053296,
+      "files": 858395
+    },
+    "afterComparable": {
+      "bytes": 97740986101,
+      "physicalUniqueBytes": 97714930704,
+      "files": 438176
+    },
+    "logicalReductionBytes": 240148738845,
+    "allocatedReductionBytes": 240163122592,
+    "reparsePointsSkipped": 721,
+    "auditErrors": 0,
+    "allocationApi": "Windows FileStandardInfo.AllocationSize",
+    "hardlinksDeduplicatedByFileIdentity": true,
+    "externalHardlinkAllocationCanBeShared": true,
+    "newEvidence": {
+      "complete": true,
+      "evidenceLogicalBytes": 4493067696,
+      "evidenceReferencedAllocatedBytes": 4519055400,
+      "evidenceAdditionalUniqueAllocatedBytes": 4519055400,
+      "evidenceFiles": 15720,
+      "linksSkipped": 0,
+      "errors": [],
+      "includesTemporaryCargoTarget": false,
+      "currentProjectLogicalBytes": 102234053797,
+      "currentProjectAllocatedBytes": 102233986104,
+      "outsideEvidenceSnapshot": "disk-final.json",
+      "currentEvidenceSnapshotUtc": "2026-11-03T18:04:39.742090+00:00",
+      "instrumentationFileItselfExcluded": true
+    },
+    "conservativeNetAllocatedReductionIncludingNewEvidenceBytes": 235644067192,
+    "additionalNetAllocatedReductionAfterFirstPassBytes": 132471189368,
+    "firstPassCompleteAllocatedBytes": 234705175472,
+    "temporaryValidationIntermediatesRemovedBytes": 4618615270,
+    "newArchiveVolumeBytes": 13008422771,
+    "allPrivateArchiveLogicalBytes": 28511468597,
+    "snapshots": "Private disk-before.json, disk-after.json and disk-final.json retain each measured stage. Final evidence is added separately; small later documentation and Git metadata are outside the timestamped measurement."
+  },
+  "integrity": {
+    "sourceFilesBaselined": 5977,
+    "worktreesPreserved": 4,
+    "dirtyC41Unchanged": true,
+    "originalRuntimeModArchiveFilesUnchanged": 323,
+    "originalProtectedBytes": 24702292247,
+    "canonicalSdkFilesUnchanged": 11538,
+    "originalZombieFilesMatchEarlierC49": 67,
+    "featureLedgerRows": 472,
+    "featureLedgerSha256": "aad57672fe87c3cd2077df325b18d353ddf573a0c73b7f7940142b2403794c51",
+    "oldPrivateArchivesAndFiveSealedC49ReleaseFilesUnchanged": true,
+    "sealedSourceZipAllCrcAndFourIndependentRestores": true,
+    "currentApplicationBuildInputsUnchangedSinceValidation": 718
+  },
+  "application": {
+    "path": ".local/c62-safe-cleanup-20261103/GuiltySpark-C62-embedded.exe",
+    "bytes": 42968064,
+    "sha256": "861c7835afda103769f16d0c0c6371bb684089183b5cefaf7045e081b7851fd9",
+    "version": "0.4.1",
+    "profile": "Optimized release with tauri/custom-protocol; offline and locked",
+    "newInstallerOrPortable": false,
+    "previousC61ExecutableUnchanged": true,
+    "previousC49ReleaseUnchanged": true,
+    "applicationSourceManifestSha256": "75e42adfcb371e42fadbebf0e3d9a89722e19a95328aa320b90468fd8ca1eb9f",
+    "applicationSourceFiles": 718,
+    "builtBeforeCommitFromDirtyC61WithScopedC62Changes": true
+  },
+  "validation": {
+    "rust": {
+      "passed": 666,
+      "failed": 0,
+      "ignored": 8,
+      "workspace": true,
+      "locked": true,
+      "offline": true,
+      "debugSymbols": false,
+      "incremental": false
+    },
+    "frontend": 366,
+    "browser": 157,
+    "offlinePrograms": 59,
+    "nativeDiagnostics": 37,
+    "archiveContracts": 17,
+    "storageContract": 1,
+    "packageContracts": 10,
+    "releaseDraftContracts": 6,
+    "nativeWorkshopObjectUi": {
+      "complete": true,
+      "compilerInvoked": false,
+      "appSha256": "d5aa90b439e7663315b213156ced095f5d3e9b5b09917534f400f7683ed9f5d9"
+    },
+    "nativeLifecycleCases": 8,
+    "nativeThreeProcessRolloverCases": 4,
+    "currentEmbeddedInspector": {
+      "complete": true,
+      "windowSizes": 3,
+      "durableUndo": true,
+      "mapCanvasRetained": true,
+      "originalMapUnchanged": true
+    },
+    "acceptedNativeCachesRehashedAndReadBack": 3,
+    "nativeAudioLoopsAndSafeClassesRechecked": true,
+    "currentThreeProcessSharedBsp": {
+      "complete": true,
+      "nativeProcesses": 3,
+      "physicalMachines": 1,
+      "separateLibraries": 3,
+      "mockedIpc": false,
+      "frozenRevision": 247,
+      "newerRevision": 248,
+      "cacheVersion": 13,
+      "bytes": 88880670,
+      "sha256": "f94cbbbbf0643fb5accb2211f5930273e547891e48c1617ec285b706d8ca4b1e",
+      "collisionTriangles": 58,
+      "portals": 2,
+      "tags": 2239,
+      "compileDurationMs": 80945.7503,
+      "crashOfflineRecoveryRolloverRevocation": true,
+      "crossComputer": false,
+      "gameReplication": false
+    },
+    "postCleanupNativeCacheAndAudioReadback": true,
+    "maintenanceContractsConfiguredForWindowsAndLinuxCi": true,
+    "remoteCiOrLinuxExecutionClaimed": false
+  },
+  "code": {
+    "removed": "One unconditionally superseded Inspector margin-bottom declaration",
+    "reused": "C49 archive schema/hash worker/newer-file retention, self-contained seed snapshots and real extended-path recovery; existing native drawer and authoritative workspace history",
+    "dependenciesChanged": false,
+    "nativeCommandsRemoved": false,
+    "testsRemovedOrWeakened": false
+  },
+  "release": {
+    "existingC49SourceCommit": "cb07581597de11e83d1c10bafad526e8b031f27e",
+    "existingInstaller": "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe",
+    "existingInstallerSha256": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749",
+    "newPublicAssets": false,
+    "remotePushOrMetadataWrite": false,
+    "ownerPushesAndUploads": true
+  },
+  "limitations": [
+    "Eight opt-in runtime/owned-content tests remain ignored, not passed.",
+    "New QA evidence is retained and included separately in the final total.",
+    "Not all older one-off harnesses have storage manifests; unknown/active/unique state stays protected.",
+    "All failed/rejected harness attempts and build diagnostics remain preserved.",
+    "No new human gameplay, sound listening, separate-computer or public-release acceptance."
+  ],
+  "firstArchive": {
+    "path": ".local/archives/C62-cold-native-copies",
+    "schemaVersion": 1,
+    "catalogSha256": "dda12b5184822d81ece841ad591b63317b5d824fe9f4edb926ca50bbe53066a0",
+    "sourceBytes": 79349583113,
+    "volumeBytes": 2121044516,
+    "filesPreserved": 149886,
+    "uniquePayloads": 14801,
+    "roots": 95,
+    "historicalSaveTrees": 70,
+    "compilerStagingRoots": 25,
+    "allUniquePayloadsReadBack": true,
+    "actualIndependentRestores": [
+      {
+        "kind": ".map",
+        "bytes": 22571008,
+        "sha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+        "independentRegularFile": true
+      },
+      {
+        "kind": ".exe",
+        "bytes": 22826496,
+        "sha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+        "independentRegularFile": true
+      },
+      {
+        "kind": ".toml",
+        "bytes": 52621,
+        "sha256": "0840fd5d6da9ec2d7f9bd58a19d5f69d94086d387bfa4146063c3d6828975533",
+        "independentRegularFile": true
+      },
+      {
+        "kind": ".bin",
+        "bytes": 20971520,
+        "sha256": "cd52d81e25f372e6fa4db2c0dfceb59862c1969cab17096da352b34950c973cc",
+        "independentRegularFile": true
+      }
+    ],
+    "newerChangedFilesRetained": [],
+    "originalInstallationsExcluded": true,
+    "distributable": false
+  },
+  "archives": [
+    {
+      "name": "C62-cold-native-copies",
+      "path": "D:\\Project Guilty Spark\\.local\\archives\\C62-cold-native-copies",
+      "catalogSha256": "dda12b5184822d81ece841ad591b63317b5d824fe9f4edb926ca50bbe53066a0",
+      "sourceSnapshotBytes": 79349583113,
+      "originalCurrentBytesRemoved": 79349583113,
+      "originalCurrentFilesRemoved": 149886,
+      "alreadyAbsentInheritedBytes": 0,
+      "volumeBytes": 2121044516,
+      "filesInSnapshot": 149886,
+      "uniquePayloads": 14801,
+      "roots": 95,
+      "allUniquePayloadsReadBack": true,
+      "actualRecoverySamples": 4,
+      "allNewerFilesRetained": true,
+      "distributable": false
+    },
+    {
+      "name": "C62-expanded-cold-history",
+      "path": "D:\\Project Guilty Spark\\.local\\archives\\C62-expanded-cold-history",
+      "catalogSha256": "faabdc91d725976bbb22c4a040dee60e2f3f86a808695b5c4da45a1cdb143c03",
+      "sourceSnapshotBytes": 189291895834,
+      "originalCurrentBytesRemoved": 114256980542,
+      "originalCurrentFilesRemoved": 193639,
+      "alreadyAbsentInheritedBytes": 75034915292,
+      "volumeBytes": 8401444709,
+      "filesInSnapshot": 340983,
+      "uniquePayloads": 53129,
+      "roots": 299,
+      "allUniquePayloadsReadBack": true,
+      "actualRecoverySamples": 6,
+      "allNewerFilesRetained": true,
+      "distributable": false
+    },
+    {
+      "name": "C62-legacy-launch-libraries",
+      "path": "D:\\Project Guilty Spark\\.local\\archives\\C62-legacy-launch-libraries",
+      "catalogSha256": "296218dd254443e107069621512243d6d28f1e455fafe4a0554b3e65d1abfd93",
+      "sourceSnapshotBytes": 12420199450,
+      "originalCurrentBytesRemoved": 12420199450,
+      "originalCurrentFilesRemoved": 52939,
+      "alreadyAbsentInheritedBytes": 0,
+      "volumeBytes": 778375278,
+      "filesInSnapshot": 52939,
+      "uniquePayloads": 3993,
+      "roots": 25,
+      "allUniquePayloadsReadBack": true,
+      "actualRecoverySamples": 4,
+      "allNewerFilesRetained": true,
+      "distributable": false
+    },
+    {
+      "name": "C62-cold-debug-symbols",
+      "path": "D:\\Project Guilty Spark\\.local\\archives\\C62-cold-debug-symbols",
+      "catalogSha256": "56a04fcb7d38c7e4cfb0134b3d7fe9fd179007d4dbe23981f3f33f0d7e6ab749",
+      "sourceSnapshotBytes": 6367195007,
+      "originalCurrentBytesRemoved": 6363586560,
+      "originalCurrentFilesRemoved": 48,
+      "alreadyAbsentInheritedBytes": 0,
+      "volumeBytes": 1215073288,
+      "filesInSnapshot": 50,
+      "uniquePayloads": 50,
+      "roots": 1,
+      "allUniquePayloadsReadBack": true,
+      "actualRecoverySamples": 4,
+      "allNewerFilesRetained": true,
+      "distributable": false
+    },
+    {
+      "name": "C62-surplus-current-qa",
+      "path": "D:\\Project Guilty Spark\\.local\\archives\\C62-surplus-current-qa",
+      "catalogSha256": "7a4ae5b66d68251a4b7929dbdcef7484cf90977cc86005a1d94d56ebdf4e4a93",
+      "sourceSnapshotBytes": 10012297194,
+      "originalCurrentBytesRemoved": 10012297194,
+      "originalCurrentFilesRemoved": 10132,
+      "alreadyAbsentInheritedBytes": 0,
+      "volumeBytes": 492484980,
+      "filesInSnapshot": 10132,
+      "uniquePayloads": 4002,
+      "roots": 31,
+      "allUniquePayloadsReadBack": true,
+      "actualRecoverySamples": 4,
+      "allNewerFilesRetained": true,
+      "distributable": false
+    }
+  ],
+  "debugSymbols": {
+    "originalPdbFilesArchived": 48,
+    "originalPdbBytesArchived": 6363586560,
+    "diagnosticExeFilesKeptExpanded": 48,
+    "diagnosticExeBytes": 285809152,
+    "originalExesUnchanged": true,
+    "stagingCopiesNotCountedAsOriginalReclamation": true
+  },
+  "performance": {
+    "scope": "Archive catalog metadata validation, 1000 identical rows and three trials. Actual source reads/writes/unlinks still resolve paths and verify hashes. Not an application/rendering/startup benchmark.",
+    "beforeMedianMs": 574.4313000177499,
+    "afterMedianMs": 9.265800006687641
+  },
+  "retention": {
+    "successfulRunsPerWorkflow": 2,
+    "failedRunsPerWorkflow": 4,
+    "successfulDays": 7,
+    "failedDays": 30,
+    "warnProjectLogicalBytes": 85899345920,
+    "automaticDeletion": false,
+    "appliesTo": "Explicit reviewed QA manifests, not original installations or unique source"
+  }
+}

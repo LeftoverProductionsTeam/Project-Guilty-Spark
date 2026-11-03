@@ -321,7 +321,6 @@ html[data-gs-fullscreen=true] #gs-header-workspace-tools .gs-panel-buttons butto
    the drawer width instead of a long stack in every 3D workspace. */
 .application .world-inspector-selection{padding:8px;flex-shrink:0;border-bottom:1px solid var(--line);}
 .application .world-inspector-selection .inspector-section{margin-top:8px;padding-top:8px;}
-.application .world-inspector-selection .transform-field{margin-bottom:6px;}
 .application .gs-render-features{padding:8px 10px;}
 .application .gs-render-features>label{margin:7px 0;}
 .application .gs-render-scope{margin:5px 0;font-size:10px;}

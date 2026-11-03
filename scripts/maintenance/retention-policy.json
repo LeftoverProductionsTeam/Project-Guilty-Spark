@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "successfulRunsPerWorkflow": 2,
+  "failedRunsPerWorkflow": 4,
+  "archiveSuccessfulAfterDays": 7,
+  "archiveFailedAfterDays": 30,
+  "warnRunLogicalBytes": 4294967296,
+  "warnProjectLogicalBytes": 85899345920,
+  "warnFreeBytes": 21474836480,
+  "automaticDeletion": false,
+  "protect": ["active", "incomplete", "unknown", "immutable-fixture", "accepted-release", "canonical-source"]
+}

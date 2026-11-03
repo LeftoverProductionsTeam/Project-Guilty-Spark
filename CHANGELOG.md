@@ -1,5 +1,13 @@
 # Changelog
 
+## C62 — Recoverable storage cleanup
+
+- Reduce the full measured footprint from 314.67 to 95.21 GiB allocated, including archives and new evidence (219.46 GiB net). The first completed pass left 218.59 GiB; deeper verified archival removes another 123.37 GiB. Keep all historical snapshots recoverable through five verified private vaults and actual restoration tests.
+- Preserve all four worktrees, original Halo/Zombie assets, canonical SDK inputs, accepted native outputs, diagnostic executables, old private archives and sealed C49 release files. Keep all 472 requirement rows unchanged.
+- Reuse the C49 format/hash worker with prepare, real recovery-proof and finish checkpoints, self-contained seed snapshots and long-path recovery. Keep 48 diagnostic programs runnable while archiving their PDBs. Add configurable read-only retention advice and storage warnings; reduce measured catalog-metadata overhead without weakening file checks.
+- Remove one fully superseded CSS declaration. Update the old native import test to use current drawer navigation and authoritative workspace-history acknowledgements; retain failed attempts and distinguish UI-only from compiler acceptance.
+- Verify full Rust/frontend/browser/offline suites, archive/release contracts, native editor/window workflows, source rendering and an actual current-source three-process BSP build/recovery. No new gameplay or public release claim. [C62 report](docs/CONTINUATION_62_SAFE_CLEANUP.md).
+
 ## C61 — Source-bound status, compact inspection and Home lighting
 
 - Replace full decoded-map status refreshes with source-bound build metadata; retain unsaved edits, durable history, existing native admission and every prior command.

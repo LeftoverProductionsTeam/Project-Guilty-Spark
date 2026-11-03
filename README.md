@@ -26,6 +26,8 @@ An open-source Halo 1 creation and interoperability studio combining native modd
 
 **C60 maintenance and release closure:** stale library replies can no longer overwrite newer snapshots; real 40-event bursts drop from 40 to 2 library reads, with the same reduction for focused-map metadata. Window lifecycle commands and QuickForge source-resource resolution reuse dedicated owners. Full native regression and rendering-quality checks pass; broad load-time and memory results are mixed. The original C49 portable and newly installed NSIS application both start successfully, but GitHub upload is still blocked by missing authenticated access. [Exact findings, timings and release handoff](docs/CONTINUATION_60_RELEASE_MAINTENANCE.md).
 
+**C62 preservation cleanup:** the complete measured development footprint drops from **314.67 to 95.21 GiB allocated**, including recovery archives and new verification evidence. The first pass left 218.59 GiB; deeper verified archival reclaims another 123.37 GiB. Original runtimes, dirty worktrees, canonical SDK tags, accepted caches, diagnostic executables and the C49 release stay intact. Current-source three-process BSP/editor acceptance and post-cleanup native readback pass. [Measured storage, recovery instructions and limits](docs/CONTINUATION_62_SAFE_CLEANUP.md).
+
 ## Real accomplishments
 
 - Native geometry/collision compilation and a user-verified Custom Edition Workshop playthrough.
