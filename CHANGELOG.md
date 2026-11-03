@@ -1,5 +1,14 @@
 # Changelog
 
+## C54 — Character rendering, compact menus and scoped stability
+
+- Replace the crowded drawer shortcut strip with grouped Tools and searchable Maps menus. Preserve tab drag-out, native window controls, per-map place/history and keyboard access. Split Interface Studio into four remembered compact categories; label lighting/fog fields visibly.
+- Save Monitor, Johnson, campaign Chief or Cortana for Home. Play one verified original dialogue chain per app launch, with independent mute/volume and durable shuffled line history. Missing sources/codecs remain explicit; extra windows cannot start another greeting.
+- Convert Halo bind/animation quaternions consistently, select standing source idles and Johnson's exact model variation, and apply Chief's authored change color. Decode Cortana's screen-space shader layers and correct transparent preview composition. Preserve older hashed imported clips through in-memory rotation conversion.
+- Scope remembered UI notifications by map/key and cache eight decoded storage records while still reading current peer storage. A paired React workload improves 36.4→30.0 ms; source content and validation remain unchanged.
+- Reject AI comparisons across unscoped tick resets/wrap, retaining original observations and prior reports. No new game networking or full AI replication is accepted.
+- Preserve source history, failed experiments, original assets and sealed C49 packages. [Verification, exact scope and remaining gates](docs/CONTINUATION_54_ENGINEERING.md).
+
 ## C53 — Native previews and compact tag workspaces
 
 - Decode native CE indexed sounds with bounded exact-bank metadata, codec/rate/channel and sample-span verification. Consolidate audition ownership, cancellation, source/hash checks and compact Play/Stop controls.

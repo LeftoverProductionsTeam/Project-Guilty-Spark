@@ -1,0 +1,821 @@
+{
+  "schemaVersion": 1,
+  "continuation": 54,
+  "startingMaster": "0a10b978423140b7cf50963b47ac2a0fc86f84b8",
+  "sourceCommit": "00eb74499cb8596f704c2593ac5e898089824bf2",
+  "application": {
+    "version": "0.4.1",
+    "platform": "Windows x64",
+    "path": "target/release/GuiltySpark.exe",
+    "bytes": 42564096,
+    "sha256": "f6427fb9c37c2777eecd16acc1f9cd27a88906565b2f76a7a53acb04dbacafd6",
+    "build": "pnpm exec tauri build --no-bundle",
+    "newInstallerOrPortable": false
+  },
+  "regressions": {
+    "rust": {
+      "passed": 655,
+      "ignored": 8,
+      "suites": 44
+    },
+    "frontend": {
+      "passed": 339,
+      "files": 80
+    },
+    "browser": {
+      "passed": 152,
+      "realWebGL": true,
+      "contractFixturesAreNotNativeGameEvidence": true
+    },
+    "offlinePrograms": 59,
+    "nativeAnalysisAndReleaseGuards": 45,
+    "logs": {
+      "rust-delivery.log": "741d7f0fe191178b463ddc6c51bfc0e6ac42f553f7f2e1caeb9af2f0bfb5aad7",
+      "frontend-delivery.log": "7065c0ef2d83acec08fabdfe0adb48ca2fd74d689f8b5f190d1815c58752e904",
+      "browser-final.log": "e5c302770f2de4c5fb955b2518a9d432f31c12963a5049de4be8c8fab9664a3d",
+      "offline-final.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+      "analysis-final.log": "d9f5f05de8012c6da53e0ee9e726bc2a4252dcfde404fdc1df557a4ecd1664f5",
+      "engine-source-final.log": "fc45c722b6d6d1e9d92f44740273cb52a9d39a7ccedc7ca490d85a210bcfe77e",
+      "build-delivery.log": "249decec07da9d1af37bd20a3ffa4277a1a06fdfb0792fcefcf008bc3028b3c3"
+    }
+  },
+  "native": {
+    "mockedIpc": false,
+    "reportIdentity": {
+      "characters": {
+        "path": ".local/c54-workbench-polish-20261102/characters-delivery/acceptance.json",
+        "sha256": "f5c91ecfb3468ccd503b617c8db19f5a5bc65bd47e01503c07bef5d14a65523e",
+        "appSha256": "f6427fb9c37c2777eecd16acc1f9cd27a88906565b2f76a7a53acb04dbacafd6"
+      },
+      "layout": {
+        "path": ".local/c54-workbench-polish-20261102/layout-c54-delivery/audit.json",
+        "sha256": "ca2945cdc42af907a6c98ca75dbb20e27e26ce800089e9c40390cc0c8e285b8b",
+        "appSha256": "f6427fb9c37c2777eecd16acc1f9cd27a88906565b2f76a7a53acb04dbacafd6"
+      },
+      "history": {
+        "path": ".local/c54-workbench-polish-20261102/history-final/acceptance.json",
+        "sha256": "536f37e19db49718505910ed21b03b0695b11d7c0f1a11a1316070db7ad49e83",
+        "appSha256": "f6427fb9c37c2777eecd16acc1f9cd27a88906565b2f76a7a53acb04dbacafd6"
+      },
+      "content": {
+        "path": ".local/c54-workbench-polish-20261102/content-c54-delivery/acceptance.json",
+        "sha256": "667d2239834cde899e3e995ea25a8ff2a736a6bb24dae554325dfb9e3864c57d",
+        "appSha256": "f6427fb9c37c2777eecd16acc1f9cd27a88906565b2f76a7a53acb04dbacafd6"
+      },
+      "drawer": {
+        "path": ".local/c54-workbench-polish-20261102/tag-drawer-c54-delivery/acceptance.json",
+        "sha256": "a651eaed60b3aa6775803f27aff4f4c28fae934853682e13f7fbee2909f8faa4",
+        "appSha256": "f6427fb9c37c2777eecd16acc1f9cd27a88906565b2f76a7a53acb04dbacafd6"
+      }
+    },
+    "sourceInputsUnchanged": true,
+    "layout": {
+      "routeCases": 25,
+      "sizesPerRoute": 4,
+      "subviewCases": 26,
+      "dpiEmulated": true,
+      "physicalMultiMonitorCertified": false,
+      "originalMapUnchanged": true,
+      "errors": []
+    },
+    "history": {
+      "cases": [
+        "moving a real Workshop retains project identity, selected brush and Undo/Redo",
+        "another native window observes the same committed transform",
+        "editing lease transfer shares Undo/Redo; stale revision is rejected with a durable draft",
+        "rapid committed edits converge in the observing window without losing the final notification",
+        "independent map remains unchanged and its snapshot cannot enter the other map history",
+        "abrupt process death recovers acknowledged unsaved transform and its Undo/Redo",
+        "closing and reopening a pop-out saves the map and preserves its history",
+        "pointer drag detaches a real tab; Return to main transfers the editing lease and durable Undo/Redo"
+      ],
+      "errors": []
+    },
+    "tagDrawer": {
+      "cases": [
+        "Native Object tags drawer edits the same acknowledged project; main map canvas stays resident",
+        "Information and model remain side by side at 800 by 600",
+        "Return to main restores drawer selection, writer lease and Undo/Redo",
+        "Closing the native drawer saves and reattaches the same map without unloading its world"
+      ]
+    },
+    "content": [
+      {
+        "name": "C53 native CE",
+        "cacheVersion": 609,
+        "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "worldRetained": true,
+        "models": [
+          {
+            "path": "vehicles\\warthog\\mp_warthog",
+            "tagId": 3822322272,
+            "triangles": 2798,
+            "textures": 11,
+            "missingMaterialBindings": 0,
+            "reflections": 4,
+            "orbit": true,
+            "zoom": true,
+            "fitted": {
+              "sourceHash": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+              "position": [
+                2.7733425628614743,
+                -1.4232654736478914,
+                0.9555143441648235
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "path": "powerups\\over shield",
+            "tagId": 3860530343,
+            "triangles": 768,
+            "textures": 3,
+            "missingMaterialBindings": 0,
+            "reflections": 2,
+            "orbit": true,
+            "zoom": true,
+            "fitted": {
+              "sourceHash": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+              "position": [
+                0.5176580853498257,
+                -0.26640183069737156,
+                0.17864814898405879
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "path": "characters\\cyborg_mp\\cyborg_mp",
+            "tagId": 3792109715,
+            "triangles": 2016,
+            "textures": 4,
+            "missingMaterialBindings": 0,
+            "reflections": 2,
+            "orbit": true,
+            "zoom": true,
+            "fitted": {
+              "sourceHash": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+              "position": [
+                0.970939670886487,
+                -0.4996736516653937,
+                0.3350794276918185
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "auditionCount": 1
+      },
+      {
+        "name": "C53 native Demo",
+        "cacheVersion": 6,
+        "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+        "worldRetained": true,
+        "models": [
+          {
+            "path": "sparky\\scenery\\trees\\tree_leafydense_doublewide\\tree_leafydense_doublewide_multires",
+            "tagId": 3783196683,
+            "triangles": 598,
+            "textures": 2,
+            "missingMaterialBindings": 0,
+            "reflections": 0,
+            "orbit": true,
+            "zoom": true,
+            "fitted": {
+              "sourceHash": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+              "position": [
+                14.043605175782055,
+                -7.227245616942589,
+                4.846565987703944
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "path": "scenery\\trees\\tree_leafy\\tree_leafy",
+            "tagId": 3784376349,
+            "triangles": 426,
+            "textures": 2,
+            "missingMaterialBindings": 0,
+            "reflections": 0,
+            "orbit": true,
+            "zoom": true,
+            "fitted": {
+              "sourceHash": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+              "position": [
+                12.656497731472935,
+                -6.513399986021595,
+                4.3678635692912815
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "auditionCount": 1
+      },
+      {
+        "name": "C53 native MCC",
+        "cacheVersion": 13,
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "worldRetained": true,
+        "models": [
+          {
+            "path": "vehicles\\warthog\\mp_warthog",
+            "tagId": 3822387809,
+            "triangles": 2798,
+            "textures": 11,
+            "missingMaterialBindings": 0,
+            "reflections": 4,
+            "orbit": true,
+            "zoom": true,
+            "fitted": {
+              "sourceHash": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+              "position": [
+                2.774208428779431,
+                -1.4218702508428076,
+                0.9550779155751179
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "path": "powerups\\over shield",
+            "tagId": 3860661417,
+            "triangles": 768,
+            "textures": 3,
+            "missingMaterialBindings": 0,
+            "reflections": 2,
+            "orbit": true,
+            "zoom": true,
+            "fitted": {
+              "sourceHash": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+              "position": [
+                0.5180080052635495,
+                -0.26583910651273224,
+                0.17847203084455437
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "auditionCount": 1
+      },
+      {
+        "name": "C53 native Xbox a10",
+        "cacheVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "worldRetained": true,
+        "models": [
+          {
+            "path": "characters\\cyborg\\cyborg",
+            "tagId": 3873310058,
+            "triangles": 2016,
+            "textures": 4,
+            "missingMaterialBindings": 0,
+            "reflections": 2,
+            "orbit": true,
+            "zoom": true,
+            "fitted": {
+              "sourceHash": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+              "position": [
+                0.972187266619992,
+                -0.4976648594193223,
+                0.3344509408764763
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "path": "vehicles\\pelican\\pelican",
+            "tagId": 3786276922,
+            "triangles": 4469,
+            "textures": 9,
+            "missingMaterialBindings": 1,
+            "reflections": 1,
+            "orbit": true,
+            "zoom": true,
+            "fitted": {
+              "sourceHash": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+              "position": [
+                14.949454477450223,
+                -7.643722201243668,
+                5.139330276025369
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ],
+        "auditionCount": 1
+      }
+    ],
+    "characters": {
+      "cases": [
+        {
+          "runtime": "mccSteam",
+          "character": "monitor",
+          "complete": true,
+          "modelCacheVersion": 13,
+          "modelTag": "3785621552",
+          "modelSourceSha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand unarmed idle",
+            "frames": 10,
+            "bones": 2,
+            "playing": true
+          },
+          "lineId": "60b1d20d642748da628d181d25c2cdaf22e3831ed71b12a423add75404e0f4a6",
+          "dialogueTagPath": "sound\\dialog\\monitor\\player dead1",
+          "dialogueSourceSha256": "d65683f92e2f78cf8ba4d31c26b212869652b5d5ec037add480865a49e18434e",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.218794435,
+          "voiceReadyMilliseconds": 12954.5479
+        },
+        {
+          "runtime": "mccSteam",
+          "character": "johnson",
+          "complete": true,
+          "modelCacheVersion": 13,
+          "modelTag": "3809935779",
+          "modelSourceSha256": "08cd04eb76fbd61e57016fb592d95491905c61e021702a45e1359a4551abe15b",
+          "modelVariant": "sgt_johnson-100",
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand pistol idle",
+            "frames": 46,
+            "bones": 20,
+            "playing": true
+          },
+          "lineId": "15181c5af2f4d0e6ebb0c2de9fda94cefc66a464b16514e9a2f1b782ae08dedc",
+          "dialogueTagPath": "sound\\dialog\\sargeant\\conditional\\combat2\\killingpeople\\killedenemysniper",
+          "dialogueSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.135787383,
+          "voiceReadyMilliseconds": 14310.9372
+        },
+        {
+          "runtime": "mccSteam",
+          "character": "chief",
+          "complete": true,
+          "modelCacheVersion": 13,
+          "modelTag": "3972860759",
+          "modelSourceSha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand missile idle",
+            "frames": 50,
+            "bones": 19,
+            "playing": true
+          },
+          "lineId": "d11f733dbe5e4f07b359b50d0a8b322f42ca5c0f84a1aa33d26636df0dedd1b5",
+          "dialogueTagPath": "sound\\dialog\\c40\\c40_extract_030_chief",
+          "dialogueSourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.09428756,
+          "voiceReadyMilliseconds": 11212.363199999993
+        },
+        {
+          "runtime": "mccSteam",
+          "character": "cortana",
+          "complete": true,
+          "modelCacheVersion": 13,
+          "modelTag": "3807969669",
+          "modelSourceSha256": "08cd04eb76fbd61e57016fb592d95491905c61e021702a45e1359a4551abe15b",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand unarmed idle%1",
+            "frames": 90,
+            "bones": 41,
+            "playing": true
+          },
+          "lineId": "bde268e9fb430516505396bd08734addd1e7577c39ae360150d5248e2a859add",
+          "dialogueTagPath": "sound\\dialog\\c40\\c40_extract_070_cortana",
+          "dialogueSourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.226373821,
+          "voiceReadyMilliseconds": 11666.812699999995
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "character": "monitor",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3785621552",
+          "modelSourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand unarmed idle",
+            "frames": 10,
+            "bones": 2,
+            "playing": true
+          },
+          "lineId": "32d535c14adad2e2b78e3e2898446151cc56b957066304aa534bc9aad6a53a68",
+          "dialogueTagPath": "sound\\dialog\\c10\\c10_extract_040_monitor",
+          "dialogueSourceSha256": "d65683f92e2f78cf8ba4d31c26b212869652b5d5ec037add480865a49e18434e",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.223209947,
+          "voiceReadyMilliseconds": 4106.6570000000065
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "character": "johnson",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3809935779",
+          "modelSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "modelVariant": "sgt_johnson-100",
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand pistol idle",
+            "frames": 46,
+            "bones": 20,
+            "playing": true
+          },
+          "lineId": "3c0f1995a613f1afda9ef351424251e261a7c83fd33613b9093699ddd0bcaa52",
+          "dialogueTagPath": "sound\\dialog\\b40\\b40_240_sarge",
+          "dialogueSourceSha256": "0a7b26d6d828e7b773d36d9d5c798b9bf4b143332301a0c0e7a3d685782eab48",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.229364544,
+          "voiceReadyMilliseconds": 5486.952000000019
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "character": "chief",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3986033695",
+          "modelSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand missile idle",
+            "frames": 50,
+            "bones": 19,
+            "playing": true
+          },
+          "lineId": "46d96da7044b6e0364e19274bd1155e1579f8607002d109441318b992c7bdcfe",
+          "dialogueTagPath": "sound\\dialog\\c40\\c40_insert_040_chief",
+          "dialogueSourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.1639575,
+          "voiceReadyMilliseconds": 5142.669599999994
+        },
+        {
+          "runtime": "haloCustomEdition",
+          "character": "cortana",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3807969669",
+          "modelSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand unarmed idle%1",
+            "frames": 90,
+            "bones": 41,
+            "playing": true
+          },
+          "lineId": "e28983b69f9f0c4ea3191bf80c0c84cef9b685810e4463064314fd22ae998e7b",
+          "dialogueTagPath": "sound\\dialog\\d40\\d40_010_cortana",
+          "dialogueSourceSha256": "7c6dccc9f928f4a44db992c4d6f5fa6191e9cfd331bb0d0b631540f0fc9bc796",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.221030146,
+          "voiceReadyMilliseconds": 4695.224500000011
+        },
+        {
+          "runtime": "openCe",
+          "character": "monitor",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3785621552",
+          "modelSourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand unarmed idle",
+            "frames": 10,
+            "bones": 2,
+            "playing": true
+          },
+          "lineId": "1ae54c6d7befbed95dbdb92637530c2a151a09edf4d5923a955cdd30e102209c",
+          "dialogueTagPath": "sound\\dialog\\monitor\\monitor humming",
+          "dialogueSourceSha256": "d65683f92e2f78cf8ba4d31c26b212869652b5d5ec037add480865a49e18434e",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.125454888,
+          "voiceReadyMilliseconds": 4301.529299999995
+        },
+        {
+          "runtime": "openCe",
+          "character": "johnson",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3809935779",
+          "modelSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "modelVariant": "sgt_johnson-100",
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand pistol idle",
+            "frames": 46,
+            "bones": 20,
+            "playing": true
+          },
+          "lineId": "166802286e359077bb4984527618c05be0d219b0b3c25c6cdf6203b16edebdff",
+          "dialogueTagPath": "sound\\dialog\\sargeant\\conditional\\combat2\\postcombatcomments\\checkbodyenemy",
+          "dialogueSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.2279457,
+          "voiceReadyMilliseconds": 3300.4612999999663
+        },
+        {
+          "runtime": "openCe",
+          "character": "chief",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3986033695",
+          "modelSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand missile idle",
+            "frames": 50,
+            "bones": 19,
+            "playing": true
+          },
+          "lineId": "03784f7852380c8355fc8caa257c8bdc14cf8dc938d2c06446b851fe53b8aa17",
+          "dialogueTagPath": "sound\\dialog\\c40\\c40_insert_100_chief",
+          "dialogueSourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.187239885,
+          "voiceReadyMilliseconds": 4876.955199999968
+        },
+        {
+          "runtime": "openCe",
+          "character": "cortana",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3807969669",
+          "modelSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand unarmed idle%1",
+            "frames": 90,
+            "bones": 41,
+            "playing": true
+          },
+          "lineId": "036720680306fd5ba2c85190780042e04777205d3c56cba33653d952f173840d",
+          "dialogueTagPath": "sound\\dialog\\a50\\a50_450_cortana",
+          "dialogueSourceSha256": "f8ec33c0130191cf944ef7b4a3f210bb680cfd1341cdf3a6ef3447391049abe7",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.227083459,
+          "voiceReadyMilliseconds": 4523.466000000015
+        },
+        {
+          "runtime": "chupathingyCe",
+          "character": "monitor",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3785621552",
+          "modelSourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand unarmed idle",
+            "frames": 10,
+            "bones": 2,
+            "playing": true
+          },
+          "lineId": "bb66b4fe8e65aae8389faa6c9f5f7b544261f6154d459f675afe049885918ca6",
+          "dialogueTagPath": "sound\\dialog\\c20\\c20_extract_030_monitor",
+          "dialogueSourceSha256": "6560cd88af4c5b4e2f02f14017085a7b47e9a9622198c30f36b03d3d3943d6b8",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.22725983,
+          "voiceReadyMilliseconds": 2359.9100000000326
+        },
+        {
+          "runtime": "chupathingyCe",
+          "character": "johnson",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3809935779",
+          "modelSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "modelVariant": "sgt_johnson-100",
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand pistol idle",
+            "frames": 46,
+            "bones": 20,
+            "playing": true
+          },
+          "lineId": "78b29c9b38b895c9bc8048697a80d190fd405781752ac581a9ecfe75b0a48b11",
+          "dialogueTagPath": "sound\\dialog\\sargeant\\conditional\\combat2\\groupcomm\\alertfriendre",
+          "dialogueSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.228760883,
+          "voiceReadyMilliseconds": 3475.8009999999776
+        },
+        {
+          "runtime": "chupathingyCe",
+          "character": "chief",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3986033695",
+          "modelSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand missile idle",
+            "frames": 50,
+            "bones": 19,
+            "playing": true
+          },
+          "lineId": "56d2f545ed7b6aaffa2ddf620340a9b2b986ca3ca29143a08c6771d4af860718",
+          "dialogueTagPath": "sound\\dialog\\c40\\c40_insert_290_chief",
+          "dialogueSourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.103515118,
+          "voiceReadyMilliseconds": 4479.195499999914
+        },
+        {
+          "runtime": "chupathingyCe",
+          "character": "cortana",
+          "complete": true,
+          "modelCacheVersion": 5,
+          "modelTag": "3807969669",
+          "modelSourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "modelVariant": null,
+          "missingMaterialBindings": 0,
+          "nativeAnimation": {
+            "name": "stand unarmed idle%1",
+            "frames": 90,
+            "bones": 41,
+            "playing": true
+          },
+          "lineId": "4e84d293c8ee78249da7b2410a2fcdfbad5178b1c9ee8b07ebad95fa6d43215f",
+          "dialogueTagPath": "sound\\dialog\\a50\\a50_880_cortana",
+          "dialogueSourceSha256": "f8ec33c0130191cf944ef7b4a3f210bb680cfd1341cdf3a6ef3447391049abe7",
+          "dialogueOriginalUnchanged": true,
+          "nativeWindowsAudioPeak": 0.2272015,
+          "voiceReadyMilliseconds": 4488.931499999948
+        }
+      ],
+      "eligibleCatalogLines": {
+        "monitor": 80,
+        "johnson": 662,
+        "chief": 22,
+        "cortana": 355
+      },
+      "oneGreetingPerProcess": true,
+      "noRepeatAcrossFourRestartsPerCharacter": true,
+      "completeHumanCatalogListening": false,
+      "haloGameAudioPlaybackCertified": false,
+      "linkedCampaignFallback": true,
+      "codecBoundary": "PCM/Xbox ADPCM only; no MCC CELT or Ogg greeting decoding",
+      "errors": []
+    }
+  },
+  "performance": {
+    "complete": true,
+    "ordering": [
+      "before-a",
+      "after-a",
+      "after-b",
+      "before-b"
+    ],
+    "beforeMedianMilliseconds": 36.3999999910593,
+    "afterMedianMilliseconds": 30,
+    "reductionPercent": 17.582417562173884,
+    "scope": "Real React UI preference subscriptions; no maps or GPU work",
+    "sourceHashes": [
+      "b8cca1d1ca9deca478cb4e4ed4d990f7c84af53cf4be6ec8cd06cd8ed796bbf9",
+      "f5b5f5408b758c74be55776556b1a2e315a55e2bc8878500b8a032ba6ce80162"
+    ],
+    "reports": [
+      {
+        "name": "ui-paired-before-a.json",
+        "sourceSha256": "b8cca1d1ca9deca478cb4e4ed4d990f7c84af53cf4be6ec8cd06cd8ed796bbf9",
+        "browser": "156.0.4314.58",
+        "medianMilliseconds": 36.3999999910593,
+        "measuredPasses": 15,
+        "sha256": "2902c3c26f78499e92efc83156247af7a3402a88aacb26868edcff71bd6f76aa"
+      },
+      {
+        "name": "ui-paired-after-a.json",
+        "sourceSha256": "f5b5f5408b758c74be55776556b1a2e315a55e2bc8878500b8a032ba6ce80162",
+        "browser": "156.0.4314.58",
+        "medianMilliseconds": 29,
+        "measuredPasses": 15,
+        "sha256": "77740c8b19f0134fd726f03082e57061c5f98c2cb09d9ba7a1e567dbb2f4a1c1"
+      },
+      {
+        "name": "ui-paired-after-b.json",
+        "sourceSha256": "f5b5f5408b758c74be55776556b1a2e315a55e2bc8878500b8a032ba6ce80162",
+        "browser": "156.0.4314.58",
+        "medianMilliseconds": 30,
+        "measuredPasses": 15,
+        "sha256": "cd4d7884aac492e075a51f62da1c0f3fa832ebdacc2ee2da432215217d95edbc"
+      },
+      {
+        "name": "ui-paired-before-b.json",
+        "sourceSha256": "b8cca1d1ca9deca478cb4e4ed4d990f7c84af53cf4be6ec8cd06cd8ed796bbf9",
+        "browser": "156.0.4314.58",
+        "medianMilliseconds": 36.3999999910593,
+        "measuredPasses": 15,
+        "sha256": "4b4d86b64faa80b76327eda5af51a247adfd45af55275e05e25d6d0d2e4e3886"
+      }
+    ],
+    "subscribers": 480,
+    "writesPerPass": 160,
+    "syntheticCachedPictureCharacters": 121916,
+    "coldStartupMapGpuMemoryNetworkImprovementClaimed": false
+  },
+  "ai": {
+    "readOnlyReanalysis": true,
+    "originalCapturesAndReportsPreserved": true,
+    "sourceCaptureNames": [
+      "stock-a30-two-games",
+      "stock-b30-two-games"
+    ],
+    "tickResetOrWrapRefusesPairing": true,
+    "freshEpochAndSessionIdentityRequired": true,
+    "newGameplayOrAiReplicationAccepted": false
+  },
+  "ledger": {
+    "appended": 5,
+    "total": 462,
+    "previousBytes": 978343,
+    "previousSha256": "80e14d6d15b6a66a6ba24073f0244f35dd904cdedc92c47c2f149d90d1059e05",
+    "previousBytesPreserved": true,
+    "sha256": "7a5c460da72b2d95e462e2cbcf1e0260eba6d59a18e6506c267276d5802b98e5",
+    "workingSha256": "1c5fab3a5ecc7773c59a3c7811fed1239e738f0181fd29b127845e24f48f2c13",
+    "previousCommittedBytes": 978338,
+    "previousCommittedSha256": "b983cb9facdc4c22e3dabe1289ab24ef764aa12f2976d44d7784064f028aefcf",
+    "previousCommittedPrefixPreserved": true,
+    "lineEndingNote": "Five existing CRLF endings in the working prefix normalize to LF in Git; all historical working bytes and all canonical committed prefix bytes are preserved."
+  },
+  "preservedArtifacts": {
+    "complete": true,
+    "appSha256": "f6427fb9c37c2777eecd16acc1f9cd27a88906565b2f76a7a53acb04dbacafd6",
+    "sealedC49": {
+      "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749",
+      "Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip": "ff6c9e4dea48126680c2a9b8536dfb2185fab5ac445c7d4f306b9bed52e07069",
+      "Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip": "c6ea81b25bfae352d76df58557a82daef44b72ba11bf778d0e2eee9f56ae03f0",
+      "Project_Guilty_Spark_0.4.1_windows_x64_manifest.json": "c00f7afc9b1d57963bbe0234ef4c3c992a574136a27cbf34dca83354fe2a0b52",
+      "SHA256SUMS-windows-x64.txt": "ea47e113b4613c59eea87521a4600bf4a950db1b73e0d51559cee86f0f3cce69"
+    },
+    "remotePublication": false,
+    "originalInputsVerifiedByNativeReports": true
+  },
+  "remainingGates": [
+    "In-game audio listening and complete audiovisual parity",
+    "All native shader, compressed/additive animation and object-function behaviors",
+    "Broader profiling of startup, maps, GPU, CPU and whole-process RAM",
+    "Direct compiled-map structural editing and all runtime/class conversion",
+    "Arbitrary live BSP replacement and game-peer delivery",
+    "Fresh verified AI epoch/session captures and full combat/lifecycle/late-join/recovery",
+    "Cross-computer LAN/VPN/authorized Steam acceptance",
+    "Human gameplay, physical multiple monitors and public release publication"
+  ],
+  "remotePush": false,
+  "publicReleasePublished": false
+}
