@@ -1,0 +1,751 @@
+{
+  "schemaVersion": 1,
+  "continuation": 55,
+  "startingMaster": "1eef97dfbd0ab04ca0ca752623ecd0eaad17468e",
+  "sourceCommit": "0c605c00b5cd3abb732714dc600612b391a7859f",
+  "validationCommit": "c20d485fe68da8674d24681e73c89b655617873c",
+  "scope": "Supported native editor/render/import/build paths. Not full engine parity or arbitrary imported-terrain editing.",
+  "application": {
+    "version": "0.4.1",
+    "platform": "Windows x64",
+    "path": "target/release/GuiltySpark.exe",
+    "bytes": 42592768,
+    "sha256": "35d690902dc4ddd1f68efbca7e93d09990db3293fd4ac77923738d9db6467130",
+    "build": "pnpm exec tauri build --no-bundle",
+    "newInstallerOrPortable": false
+  },
+  "regressions": {
+    "rust": {
+      "passed": 655,
+      "ignored": 8,
+      "suites": 44
+    },
+    "frontend": {
+      "passed": 350,
+      "files": 83
+    },
+    "browser": {
+      "passed": 152,
+      "actualWebGL": true,
+      "contractFixturesAreNotNativeGameEvidence": true
+    },
+    "offlinePrograms": 59,
+    "nativeAnalysisAndReleaseGuards": 45,
+    "logs": {
+      "rust-final.log": "a6065880b5db8b4a497bd1c88fed98074639ef241e1d84d9bc2502e68442684e",
+      "frontend-verified.log": "e2b5965cfed6a79bb2e000968a0b40006041ff9b4e5e2ab82838f204f25fb60e",
+      "browser-verified.log": "62f25cd39f7677e26d717b3c9d87dfe46aadd232f9473ea972f0e5efc86826c6",
+      "offline-delivery.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+      "analysis-verified.log": "33840bf589b50a26f4e20f6bbd492f483e06b5885a597660263e48843d7219ff",
+      "build-delivery.log": "5f27de9940823e746a1a29576db705f70303c87d443d616306dc5c95ebbfe012",
+      "native-emission-gpu.log": "1855576946d384c1a4202f4e574a5f5b29714483ecae4790117749497d94c5de"
+    }
+  },
+  "native": {
+    "mockedIpc": false,
+    "reportIdentity": {
+      "content": {
+        "path": ".local/c55-native-assets-20261102/content-traced/acceptance.json",
+        "sha256": "a8f65eba36dc5024bd08d38c22c0f0a5e84aa425d6600b7dccbd39ab891ce717"
+      },
+      "openCe": {
+        "path": ".local/c55-native-assets-20261102/opence-traced/acceptance.json",
+        "sha256": "bbc352e72d5beeeea1412ec78208b99e18bc3f123a549d16dc7cb9ed1b06469e"
+      },
+      "assets": {
+        "path": ".local/c55-native-assets-20261102/assets-accepted/acceptance.json",
+        "sha256": "1bfbefe23a03299dc8d3011963fc18316d3804a313f9f188b6700929290cc608"
+      },
+      "worldComparisonBefore": {
+        "path": ".local/c55-native-assets-20261102/render-before/native-verification.json",
+        "sha256": "8b7be5fd268f69999aa10ccd50a69e1490c18fc664eb2176abf0fcea9872ec88"
+      },
+      "worldComparisonAfter": {
+        "path": ".local/c55-native-assets-20261102/render-after/native-verification.json",
+        "sha256": "c15c8aee3170212760bd5f077b28e82cf6fc39ec381d190c1e79d19fe12f79b1"
+      },
+      "standalone": {
+        "path": ".local/c55-native-assets-20261102/standalone-safe-acceptance.json",
+        "sha256": "b13f5accf4adb86a8f636408e12bbd5436e566c4d14d43725e5a1c687b85af9e"
+      },
+      "invokePropertyCheck": {
+        "path": ".local/c55-native-assets-20261102/invoke-observer-check.json",
+        "sha256": "116b2d4db77ccb845fc561ddc04b60e73ccc577f7359304cc1eefdbb883dd0ee"
+      }
+    },
+    "maps": [
+      {
+        "name": "C55 native CE",
+        "cacheVersion": 609,
+        "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "originalUnchanged": true,
+        "world": {
+          "sourceShaders": 159,
+          "lightmaps": 15,
+          "detailBindings": 211,
+          "reflectionBindings": 73,
+          "reflectionCubes": 11,
+          "reflectionIssues": ""
+        },
+        "surfaceSelection": {
+          "nativeSurface": "0",
+          "sourceHash": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+          "pointerClicks": [
+            [
+              0.15,
+              0.3
+            ]
+          ],
+          "shaderTagId": 3940747629,
+          "shaderTagPath": "levels\\test\\bloodgulch\\shaders\\cap_cliff01b"
+        },
+        "models": [
+          {
+            "path": "vehicles\\warthog\\mp_warthog",
+            "tagId": 3822322272,
+            "triangles": 2798,
+            "textures": 11,
+            "reflections": 4,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 158772,
+              "samples": 490752,
+              "background": [
+                255,
+                230,
+                196
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "powerups\\over shield",
+            "tagId": 3860530343,
+            "triangles": 768,
+            "textures": 3,
+            "reflections": 2,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 298278,
+              "samples": 490752,
+              "background": [
+                255,
+                230,
+                196
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "characters\\cyborg_mp\\cyborg_mp",
+            "tagId": 3792109715,
+            "triangles": 2016,
+            "textures": 4,
+            "reflections": 2,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 115732,
+              "samples": 490752,
+              "background": [
+                255,
+                230,
+                196
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          }
+        ],
+        "samples": [
+          {
+            "path": "sound\\sfx\\ui\\teleporter_loop",
+            "playingThenStopped": true,
+            "windowsMaximumPeak": 0.4071117,
+            "meterExit": 0,
+            "humanListening": false,
+            "inGamePlayback": false
+          }
+        ],
+        "resourceReuse": {
+          "method": "CDP function-call breakpoint",
+          "positiveControl": "startup_status",
+          "observedCommands": [
+            "startup_status",
+            "runtime_workbench_report",
+            "live_mcc_sample",
+            "runtime_workbench_report",
+            "external_map_watch_poll",
+            "runtime_workbench_report",
+            "baboon_report",
+            "runtime_workbench_report"
+          ]
+        },
+        "readerCalls": [],
+        "worldRetained": true,
+        "soundLayout": {
+          "soundTop": 129.796875,
+          "lineageHeight": 31,
+          "migrationHeight": 31,
+          "scroll": 0
+        }
+      },
+      {
+        "name": "C55 native Demo",
+        "cacheVersion": 6,
+        "sourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+        "originalUnchanged": true,
+        "world": {
+          "sourceShaders": 135,
+          "lightmaps": 15,
+          "detailBindings": 178,
+          "reflectionBindings": 58,
+          "reflectionCubes": 12,
+          "reflectionIssues": "halo3\\weapons\\bottle-nade\\bottle-glass++: No exact tag/image path in the selected resource index; fuzzy matching refused"
+        },
+        "surfaceSelection": {
+          "nativeSurface": "0",
+          "sourceHash": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+          "pointerClicks": [
+            [
+              0.15,
+              0.3
+            ]
+          ],
+          "shaderTagId": 3913418702,
+          "shaderTagPath": "levels\\b30\\shaders\\metal panels generic ext"
+        },
+        "models": [
+          {
+            "path": "sparky\\scenery\\trees\\tree_leafydense_doublewide\\tree_leafydense_doublewide_multires",
+            "tagId": 3783196683,
+            "triangles": 598,
+            "textures": 2,
+            "reflections": 0,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 130283,
+              "samples": 490752,
+              "background": [
+                255,
+                230,
+                196
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "scenery\\trees\\tree_leafy\\tree_leafy",
+            "tagId": 3784376349,
+            "triangles": 426,
+            "textures": 2,
+            "reflections": 0,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 27756,
+              "samples": 490752,
+              "background": [
+                255,
+                230,
+                196
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          }
+        ],
+        "samples": [
+          {
+            "path": "sound\\sfx\\ui\\teleporter_loop",
+            "playingThenStopped": true,
+            "windowsMaximumPeak": 0.4071117,
+            "meterExit": 0,
+            "humanListening": false,
+            "inGamePlayback": false
+          }
+        ],
+        "resourceReuse": {
+          "method": "CDP function-call breakpoint",
+          "positiveControl": "startup_status",
+          "observedCommands": [
+            "startup_status",
+            "runtime_workbench_report",
+            "runtime_workbench_report",
+            "external_map_watch_poll",
+            "external_map_watch_poll",
+            "live_mcc_sample",
+            "runtime_workbench_report",
+            "baboon_report",
+            "runtime_workbench_report"
+          ]
+        },
+        "readerCalls": [],
+        "worldRetained": true,
+        "soundLayout": {
+          "soundTop": 129.796875,
+          "lineageHeight": 31,
+          "migrationHeight": 31,
+          "scroll": 0
+        }
+      },
+      {
+        "name": "C55 native MCC",
+        "cacheVersion": 13,
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "originalUnchanged": true,
+        "world": {
+          "sourceShaders": 159,
+          "lightmaps": 15,
+          "detailBindings": 237,
+          "reflectionBindings": 73,
+          "reflectionCubes": 11,
+          "reflectionIssues": ""
+        },
+        "surfaceSelection": {
+          "nativeSurface": "0",
+          "sourceHash": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+          "pointerClicks": [
+            [
+              0.15,
+              0.3
+            ]
+          ],
+          "shaderTagId": 3938781519,
+          "shaderTagPath": "levels\\test\\bloodgulch\\shaders\\cap_cliff01b"
+        },
+        "models": [
+          {
+            "path": "vehicles\\warthog\\mp_warthog",
+            "tagId": 3822387809,
+            "triangles": 2798,
+            "textures": 11,
+            "reflections": 4,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 158606,
+              "samples": 490752,
+              "background": [
+                255,
+                230,
+                196
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "powerups\\over shield",
+            "tagId": 3860661417,
+            "triangles": 768,
+            "textures": 3,
+            "reflections": 2,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 298198,
+              "samples": 490752,
+              "background": [
+                255,
+                230,
+                196
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          }
+        ],
+        "samples": [
+          {
+            "path": "sound\\sfx\\ui\\teleporter_loop",
+            "playingThenStopped": true,
+            "windowsMaximumPeak": 0.4071117,
+            "meterExit": 0,
+            "humanListening": false,
+            "inGamePlayback": false
+          }
+        ],
+        "resourceReuse": {
+          "method": "CDP function-call breakpoint",
+          "positiveControl": "startup_status",
+          "observedCommands": [
+            "startup_status",
+            "runtime_workbench_report",
+            "live_mcc_sample",
+            "live_mcc_sample",
+            "runtime_workbench_report",
+            "runtime_workbench_report",
+            "external_map_watch_poll",
+            "external_map_watch_poll",
+            "external_map_watch_poll",
+            "live_mcc_sample",
+            "baboon_report",
+            "runtime_workbench_report"
+          ]
+        },
+        "readerCalls": [],
+        "worldRetained": true,
+        "soundLayout": {
+          "soundTop": 129.796875,
+          "lineageHeight": 31,
+          "migrationHeight": 31,
+          "scroll": 0
+        }
+      },
+      {
+        "name": "C55 native Xbox a10",
+        "cacheVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "originalUnchanged": true,
+        "world": {
+          "sourceShaders": 181,
+          "lightmaps": 309,
+          "detailBindings": 247,
+          "reflectionBindings": 108,
+          "reflectionCubes": 17,
+          "reflectionIssues": ""
+        },
+        "surfaceSelection": {
+          "nativeSurface": "0",
+          "sourceHash": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "pointerClicks": [
+            [
+              0.15,
+              0.3
+            ]
+          ],
+          "shaderTagId": 3885696551,
+          "shaderTagPath": "levels\\a10\\shaders\\panel strip"
+        },
+        "models": [
+          {
+            "path": "characters\\cyborg\\cyborg",
+            "tagId": 3873310058,
+            "triangles": 2016,
+            "textures": 4,
+            "reflections": 2,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 69436,
+              "samples": 490752,
+              "background": [
+                0,
+                0,
+                0
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "vehicles\\pelican\\pelican",
+            "tagId": 3786276922,
+            "triangles": 4469,
+            "textures": 9,
+            "reflections": 2,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 67265,
+              "samples": 490752,
+              "background": [
+                0,
+                0,
+                0
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          }
+        ],
+        "samples": [
+          {
+            "path": "sound\\sfx\\ambience\\emitters\\steam_constant",
+            "playingThenStopped": true,
+            "windowsMaximumPeak": 0.6528391,
+            "meterExit": 0,
+            "humanListening": false,
+            "inGamePlayback": false
+          }
+        ],
+        "resourceReuse": {
+          "method": "CDP function-call breakpoint",
+          "positiveControl": "startup_status",
+          "observedCommands": [
+            "startup_status",
+            "runtime_workbench_report",
+            "runtime_workbench_report",
+            "live_mcc_sample",
+            "live_mcc_sample",
+            "live_mcc_sample",
+            "runtime_workbench_report",
+            "baboon_report",
+            "runtime_workbench_report",
+            "external_map_watch_poll",
+            "live_mcc_sample",
+            "external_map_watch_poll",
+            "external_map_watch_poll",
+            "external_map_watch_poll"
+          ]
+        },
+        "readerCalls": [],
+        "worldRetained": true,
+        "soundLayout": {
+          "soundTop": 129.796875,
+          "lineageHeight": 31,
+          "migrationHeight": 31,
+          "scroll": 0
+        }
+      },
+      {
+        "name": "C55 native OpenCE a10",
+        "cacheVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "originalUnchanged": true,
+        "world": {
+          "sourceShaders": 181,
+          "lightmaps": 309,
+          "detailBindings": 247,
+          "reflectionBindings": 108,
+          "reflectionCubes": 17,
+          "reflectionIssues": ""
+        },
+        "surfaceSelection": {
+          "nativeSurface": "0",
+          "sourceHash": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+          "pointerClicks": [
+            [
+              0.15,
+              0.3
+            ]
+          ],
+          "shaderTagId": 3885696551,
+          "shaderTagPath": "levels\\a10\\shaders\\panel strip"
+        },
+        "models": [
+          {
+            "path": "characters\\cyborg\\cyborg",
+            "tagId": 3873310058,
+            "triangles": 2016,
+            "textures": 4,
+            "reflections": 2,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 69522,
+              "samples": 490752,
+              "background": [
+                0,
+                0,
+                0
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          },
+          {
+            "path": "vehicles\\pelican\\pelican",
+            "tagId": 3786276922,
+            "triangles": 4469,
+            "textures": 9,
+            "reflections": 2,
+            "materialGaps": 0,
+            "sourceLighting": "source",
+            "gpuPixels": {
+              "visible": 67317,
+              "samples": 490752,
+              "background": [
+                0,
+                0,
+                0
+              ]
+            },
+            "orbit": true,
+            "zoom": true
+          }
+        ],
+        "samples": [
+          {
+            "path": "sound\\sfx\\ambience\\emitters\\steam_constant",
+            "playingThenStopped": true,
+            "windowsMaximumPeak": 0.6528391,
+            "meterExit": 0,
+            "humanListening": false,
+            "inGamePlayback": false
+          }
+        ],
+        "resourceReuse": {
+          "method": "CDP function-call breakpoint",
+          "positiveControl": "startup_status",
+          "observedCommands": [
+            "startup_status",
+            "runtime_workbench_report",
+            "live_mcc_sample",
+            "external_map_watch_poll",
+            "runtime_workbench_report",
+            "runtime_workbench_report",
+            "baboon_report",
+            "runtime_workbench_report"
+          ]
+        },
+        "readerCalls": [],
+        "worldRetained": true,
+        "soundLayout": {
+          "soundTop": 129.796875,
+          "lineageHeight": 31,
+          "migrationHeight": 31,
+          "scroll": 0
+        }
+      }
+    ],
+    "home": {
+      "sourceSha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+      "triangles": 1126,
+      "selfIlluminatingMaterials": 1,
+      "materialGaps": 0,
+      "actualAnimationMovement": true,
+      "pauseFreezesTime": true
+    },
+    "assetWorkflow": {
+      "actualPreviewDrag": true,
+      "pasteAfterUndoRestoresDependencies": true,
+      "transform": {
+        "before": [
+          2.5,
+          -0.5,
+          0.01
+        ],
+        "after": [
+          5,
+          -0.5,
+          0.01
+        ]
+      },
+      "altDragOneActionUndoRedo": true,
+      "clipboard": {
+        "actualKeyboard": true,
+        "freshIds": [
+          "e1f1f82f-8206-4a87-8312-bca845234f38",
+          "f762205d-6bc5-4178-a7d1-e897e42af440",
+          "b9c7985e-aca0-4e54-bf54-1477349859c4"
+        ],
+        "oneActionUndoRedo": true,
+        "dependenciesSharedOnce": true
+      },
+      "build": {
+        "status": "validated",
+        "projectFingerprint": "8c5c54125c205ae40f259752d0adc4319e4dda8d8a6530cc5a032ca348150112",
+        "cacheSha256": "24031fa2065353ef7b02b4f62c4a1f02c692ddd76808c81a1ff4c6f96a40e507",
+        "observedBuildDurationMs": 107965,
+        "notAControlledPerformanceComparison": true,
+        "toolIdentities": {
+          "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+          "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+          "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4"
+        },
+        "positions": [
+          [
+            5,
+            -0.5,
+            0.01
+          ],
+          [
+            7.5,
+            -0.5,
+            0.01
+          ],
+          [
+            8.5,
+            0.5,
+            0.01
+          ]
+        ],
+        "collisionTriangles": 12
+      },
+      "changedImportRejected": [
+        "Imported native tags changed or are incomplete; rebuild the asset import before compiling"
+      ],
+      "previousBuildPreserved": true,
+      "sourceMapAddition": {
+        "matchingEditableSource": true,
+        "outputSha256": "bd87f12398a830c0bb517f04e53e34e4be471b30fec85d98c5001c54d329aa7b",
+        "nativeTag": "gs_assets_3e72b4405a09434085ce1998fa5d07f0\\scenery\\rocks\\boulder\\boulder",
+        "position": [
+          -3,
+          2,
+          0.01
+        ],
+        "originalSourcePreserved": true
+      },
+      "crossMapPaste": {
+        "sourceRuntime": "mccSteam",
+        "targetRuntime": "haloCustomEdition",
+        "freshTargetBinding": "a94e79ee-5ef4-4149-b61c-c00288e0122a",
+        "sourceTagHash": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "fileCount": 5,
+        "oneActionUndoRedo": true,
+        "nativeCompilationVerified": false,
+        "gameplayVerified": false
+      },
+      "gameplayVerified": false
+    },
+    "standalone": {
+      "cacheSha256": "b7475f36b1046d6631dcd1e1cfdacaa7327d225f17378ffa57f47b3698ff9403",
+      "usesEarlierC55AcceptedSourceBuild": true,
+      "executableSha256": "fc9e2b6193c6f6d9ff988278b0d39a983747f3fdbdeca7cafadd28f1f0c53e73",
+      "scenario": "levels\\quickforge\\recursive_native_drop_acceptanc\\recursive_native_drop_acceptanc",
+      "nativeLogChanged": true,
+      "stillRunningAtTimedObservation": true,
+      "stoppedOwnedTrial": true,
+      "gameplayVerified": false,
+      "desktopControlFailure": "windows sandbox failed: helper_unknown_error: setup refresh had errors"
+    },
+    "discardedMeasurement": {
+      "method": "Attempt to replace immutable native invoke property",
+      "inconclusive": true,
+      "excludedFromResourceReuseAcceptance": true,
+      "priorFilesRetained": true
+    },
+    "performanceBoundary": "Positive-control native reader call counts and retained rendering only; no new controlled startup/map/GPU/CPU/RAM before/after benchmark."
+  },
+  "preservation": {
+    "olderCheckoutStatusSha256": "34f9e278307670e12b957705181d3776aedcf2466636ff52a3ca0635be5798c5",
+    "olderCheckoutDiffSha256": "a4992aa7416af103f9afb4a19cc48b4b72e412c8430d3b73bf174f75c2b3ecd0",
+    "priorApplicationSha256": "f6427fb9c37c2777eecd16acc1f9cd27a88906565b2f76a7a53acb04dbacafd6",
+    "sealedC49": {
+      "Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip": "c6ea81b25bfae352d76df58557a82daef44b72ba11bf778d0e2eee9f56ae03f0",
+      "Project_Guilty_Spark_0.4.1_windows_x64_manifest.json": "c00f7afc9b1d57963bbe0234ef4c3c992a574136a27cbf34dca83354fe2a0b52",
+      "Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip": "ff6c9e4dea48126680c2a9b8536dfb2185fab5ac445c7d4f306b9bed52e07069",
+      "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749",
+      "SHA256SUMS-windows-x64.txt": "ea47e113b4613c59eea87521a4600bf4a950db1b73e0d51559cee86f0f3cce69"
+    },
+    "historyAncestorVerified": true,
+    "noSourceMapsChanged": true,
+    "noResearchDiscarded": true
+  },
+  "remaining": [
+    "Direct sculpt/extrude/cut and seamless joining of arbitrary imported BSPs",
+    "Local BSP-cluster object lighting and complete shader/reflection/power-up/canyon-seam visual parity",
+    "Exact Demo custom bottle-glass reflection source",
+    "Broader asset classes and native target-runtime compilation/playtests",
+    "Human listening and Halo gameplay acceptance",
+    "Cross-computer/Steam collaboration and game-peer replication",
+    "Whole-process CPU/GPU/RAM and cold/warm startup performance profiling"
+  ],
+  "distribution": {
+    "newInstaller": false,
+    "newPortable": false,
+    "newSourceArchive": false,
+    "linux": false,
+    "remotePush": false,
+    "publicPublication": false
+  }
+}

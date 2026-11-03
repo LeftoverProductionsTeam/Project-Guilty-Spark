@@ -2,6 +2,8 @@
 
 This continues `e8b5761` and preserves C35–C39 history, native reconciliation/build safeguards, experimental research and the unfinished direct compiled-map editor.
 
+The later [C55 native asset pass](CONTINUATION_55_NATIVE_ASSETS.md) adds supported QuickForge Alt-drag/copy/paste and native build/readback, source-authored model emission, legal diffuse-free glass, source-aware preview lighting and the Xbox zero-range fog correction. It supersedes the older presentation-lighting description below. Complete local model lighting, engine shader parity and direct imported-terrain reshaping remain open; the historical reports below are retained.
+
 The later [native looping-emitter milestone](NATIVE_LOOPING_EMITTERS.md) adds verified MCC bank-backed sound imports and native QuickForge sound scenery. It supersedes the blanket compiled-emitter gap only for that local source path; native gameplay listening and the broader audio goals remain open.
 
 ## Workflow
