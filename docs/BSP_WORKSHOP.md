@@ -1,5 +1,7 @@
 # Native BSP Workshop
 
+[C57](CONTINUATION_57_MEGAWORLD.md) adds direct source-face selection from Objects & gameplay into these existing tools, with native wall-extrusion/build/Undo acceptance. Its compiled Timberland–Sidewinder route and portal/start diagnostics retain a separate, still-pending two-way player gate. General imported-landscape reconstruction remains open.
+
 The [C43 continuation](CONTINUATION_43_ENGINEERING.md) adds an original BSP Atlas inside the properties panel and a reviewed native CE two-region assembly path. The new connected world compiles and loads on a private server; its physical two-way player walkthrough remains pending. The four-view/source workflow below remains in place.
 
 This continuation extends committed C39 (`2155ae1`) in the existing isolated local `master` worktree. It adds source brush construction to the Level Editor. It does not replace QuickForge, native tag editing, the BSP combiner, external editors, or the preserved direct compiled-map prototype.

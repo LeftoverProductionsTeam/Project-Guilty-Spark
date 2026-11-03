@@ -1,5 +1,7 @@
 # Rotated four-map challenge and connection workflow
 
+C57 preserves this research without expanding it before the first Timberland–Sidewinder walkthrough passes. **Current player-verified physical connections: 0.** [Exact current cache, native diagnostics, connection diagram and pending gate](CONTINUATION_57_MEGAWORLD.md). Historical compilation below is not new four-region gameplay acceptance.
+
 This pass extends the preserved [three-map world](THREE_MAP_WORLD_AND_PERFORMANCE.md) with Battle Creek. Timberland, Sidewinder, Blood Gulch and a 90-degree Battle Creek section compile into one derived MCC world. Earlier projects and releases remain preserved.
 
 ## Native result

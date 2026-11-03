@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "continuation": 57,
+  "startingMaster": "e49e3c6ed7af5e43fa41d217f9942db50a9dbdde",
+  "sourceCommit": "17eac0cee8f53c5ee027abedfe02963339c44c17",
+  "branch": "master",
+  "application": {
+    "path": "target/release/GuiltySpark.exe",
+    "version": "0.4.1",
+    "platform": "Windows x64",
+    "bytes": 42587136,
+    "sha256": "a137815efd4f55720033c4aa24ce517306ca51918152185dd532c2eb6281827f",
+    "newInstallerOrPortable": false
+  },
+  "verifiedPhysicallyTraversableConnections": 0,
+  "tunnel": {
+    "cache": {
+      "path": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\.local\\c57-megaworld-20261103\\tunnel-rebuild\\c50tunnel.map",
+      "bytes": 77711328,
+      "sha256": "c84a1ed439ea0d37705899382c6304e14203c68518a743fcb57bdf1a0c5ea7e7",
+      "version": 609
+    },
+    "byteIdenticalToPreviousGood": true,
+    "compilationScope": "Invader cache build using preserved previously compiled connected BSP source tag",
+    "nativeTools": {
+      "invader-edit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invader-build": "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a",
+      "invader-extract": "ded684bc2730b836719071dcdc505a78e5dca3730f19e9a30527ac725180c138"
+    },
+    "collisionTriangles": 16196,
+    "forwardSamples": 423,
+    "returnSamples": 423,
+    "starts": 68,
+    "startIssues": 0,
+    "portalGraphs": [
+      {
+        "bsp": 0,
+        "clusters": 3,
+        "edges": [
+          [
+            2,
+            1
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "reachedClusters": [
+          0,
+          2,
+          1
+        ],
+        "connected": true,
+        "materialCounts": [
+          9,
+          2,
+          5,
+          8,
+          1,
+          0
+        ]
+      }
+    ],
+    "scenario": {
+      "tag": "levels\\test\\timberland\\c50tunnel.scenario",
+      "counts": {
+        "scenery": 210,
+        "scenery_palette": 27,
+        "player_starting_locations": 68,
+        "sound_scenery": 42,
+        "bipeds": 0,
+        "vehicles": 24
+      }
+    },
+    "atmosphere": [
+      {
+        "index": 0,
+        "pvsSha256": "df3cb1ae640ffe59ede40fe0ead4268c0e47b1ffd7da0d131ae66d11384bdec9",
+        "pasSha256": "6630e884bb3a46b034db84b861a7ce6f3c3cd6d06e871bb2865e77d2af64ac9b",
+        "sky": [
+          0
+        ],
+        "fog": [
+          -1
+        ],
+        "backgroundPalette": 0,
+        "environmentPalette": 0
+      }
+    ],
+    "game": {
+      "runtime": "Halo Custom Edition 1.10",
+      "loaded": true,
+      "joined": true,
+      "nativeServerPlayers": 1,
+      "cacheSha256": "c84a1ed439ea0d37705899382c6304e14203c68518a743fcb57bdf1a0c5ea7e7",
+      "playerWalkthroughVerified": false,
+      "userResult": "Pending; no result returned during 45-minute isolated test",
+      "computerControl": "helper_unknown_error: setup refresh had errors",
+      "noAutomatedPlayerInput": true,
+      "publicListing": false,
+      "ownedProcessesAbsentAfterTrial": true
+    }
+  },
+  "sourceEditing": {
+    "clickedSurface": "room-a/face-5",
+    "sourceBrushes": 4,
+    "extrudedBrushes": 5,
+    "nativeBuildStatus": "validated",
+    "nativeBuildMs": 67322,
+    "nativeOutputSha256": "47d76d8d38036ce3c6d6cf05a7e071b0345ded5555709718afb26eeb5dd8cc61",
+    "compiledBoundsReadback": {
+      "expectedBounds": [
+        [
+          -10,
+          36
+        ],
+        [
+          -6,
+          6
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "collision": [
+        [
+          -10,
+          36
+        ],
+        [
+          -6,
+          6
+        ],
+        [
+          0,
+          5
+        ]
+      ],
+      "render": [
+        [
+          -10,
+          36
+        ],
+        [
+          -6,
+          6
+        ],
+        [
+          0,
+          5
+        ]
+      ]
+    },
+    "materialPreviews": 2,
+    "oneActionUndo": true,
+    "reopenPreservesTopology": true,
+    "mockedIpc": false,
+    "pageErrors": [],
+    "sourceSha256": "d3513897677004b30c966c3079e44131b24ee97e7b937b60bc3cdc961e14a9ba"
+  },
+  "regressions": {
+    "rust": {
+      "passed": 656,
+      "ignored": 8,
+      "suites": 44
+    },
+    "frontend": {
+      "passed": 352,
+      "files": 83
+    },
+    "browser": {
+      "passed": 152
+    },
+    "offline": {
+      "scripts": 59,
+      "passed": true
+    },
+    "windowsNativeWorkshop": true
+  },
+  "preserved": {
+    "originalMaps": [
+      {
+        "path": "D:\\Project Guilty Spark\\Halo Custom Edition\\maps\\timberland.map",
+        "sha256": "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+        "bytes": 14690920,
+        "unchanged": true
+      },
+      {
+        "path": "D:\\Project Guilty Spark\\Halo Custom Edition\\maps\\sidewinder.map",
+        "sha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a",
+        "bytes": 14840596,
+        "unchanged": true
+      },
+      {
+        "path": ".local/c50-workbench-20261101/tunnel-native-f/c50tunnel.map",
+        "sha256": "c84a1ed439ea0d37705899382c6304e14203c68518a743fcb57bdf1a0c5ea7e7",
+        "bytes": 77711328,
+        "unchanged": true
+      }
+    ],
+    "nativeSourceTags": [
+      {
+        "tag": "levels/test/timberland/timberland.scenario",
+        "sha256": "343cc3137bf81aca0905f17f14ca60e8bb20132accf345fe2cb494783ec2dc14",
+        "unchanged": true
+      },
+      {
+        "tag": "levels/spark/assembly_c693a32c/connected.scenario_structure_bsp",
+        "sha256": "a8f619f0eb162edea9c5d6e3db2085f3c3763fb7722d42683422b3a72325eb06",
+        "unchanged": true
+      }
+    ],
+    "previousGoodApp": {
+      "path": ".local/c57-megaworld-20261103/GuiltySpark-C56-previous-good.exe",
+      "sha256": "53e8de1ea577dd50003f4c24ae872c5bce65bfaa256f00dcd7528a2ba2e6a56b"
+    },
+    "originalDirtyCheckoutStatusUnchanged": true,
+    "historicalLedger": {
+      "bytes": 985547,
+      "sha256": "1c5fab3a5ecc7773c59a3c7811fed1239e738f0181fd29b127845e24f48f2c13",
+      "rows": 462
+    },
+    "historicalLedgerPrefixUnchanged": true,
+    "fourRegionExpansionGated": true,
+    "oldResearchAndFailedTrialsRetained": true
+  },
+  "remaining": [
+    "Timberland-Sidewinder native two-way player walkthrough and scenery/visibility/material checks",
+    "Four-region per-connection gameplay after first gate",
+    "General imported-landscape source reconstruction and editing",
+    "General direct compiled-map structural editing",
+    "Donor environment/lightmap/audio/AI fidelity and engine streaming research"
+  ],
+  "evidenceRoot": ".local/c57-megaworld-20261103",
+  "evidenceFiles": {
+    "tunnel-rebuild/walkthrough.json": "f8b3404927190f91303dcde83796f9aade2137e022c0357d306e3f558c4cf379",
+    "connection-audit-final/connection-audit.json": "472926316710efa1c703a89de06d0c02dc13b90b0b471fd0876d5a965bcfa3af",
+    "workshop-native-readback/acceptance.json": "86ee79de7be90a3ed4c7367f09d6500305fe6999691176d565c34d68504034ec",
+    "rust-tests.log": "a2483d9204015bd1acda8e1ef95c1152eb128da15f4ffc0321c66e945cf24c29",
+    "frontend-final.log": "6fe76e437ba077591d63a117aa033edb7af387d3f459cf79cdb15b9598bbd6f9",
+    "browser-final.log": "e8f93ed795cd0356b80da5bea42c2459f1fb72bc482cb859920d06e3cd90b56f",
+    "offline-tests.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+    "desktop-build-final.log": "a862edb161a24bdde8a30caeb70aaa5719ce7dbf8e0d16432b66da4d13e2c305"
+  },
+  "distribution": "No new installer, portable, public release, push, force push or repository rules change"
+}
