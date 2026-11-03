@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import net from 'node:net';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import {chooseTool,openDrawer} from '../tests/ui/helpers/navigation.ts';
 const exec = promisify(execFile),
   expect = assertion.configure({ timeout: 120000 }),
   args = process.argv.slice(2);
@@ -23,7 +24,7 @@ const hash = async (p) =>
     .digest('hex');
 const report = {
   schemaVersion: 1,
-  measurementVersion: 3,
+  measurementVersion: 4,
   label,
   appSha256: await hash(app),
   complete: false,
@@ -213,8 +214,7 @@ async function homeReady() {
   }));
 }
 async function nav(name) {
-  await page.getByRole('button', { name: 'Toggle workspace navigation', exact: true }).click();
-  await page.locator('.gs-navigation-drawer').getByRole('button', { name, exact: true }).click();
+  await chooseTool(page,name);
 }
 async function worldReady(expectedDecals) {
   const world = page.locator('.world-layout');
@@ -373,7 +373,7 @@ try {
   }
   report.openProjectRoundTrips = native;
   await phase('large-asset-catalog', async () => {
-    await page.getByRole('button', { name: 'Toggle Asset library', exact: true }).click();
+    await openDrawer(page,'Asset library');
     // Retained workspaces keep their source panel mounted while its drawer is
     // open. Exercise only the displayed drawer, never a parked/hidden copy.
     const library = page.locator('.viewport-asset-library:visible');

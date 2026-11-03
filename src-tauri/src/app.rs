@@ -1865,97 +1865,8 @@ fn start_watcher(app: &tauri::AppHandle, state: &AppState) -> Reply<()> {
     });
     Ok(())
 }
-#[tauri::command]
-async fn close_application(app: tauri::AppHandle,window:tauri::WebviewWindow) -> Reply<()> {
-    if app.webview_windows().keys().filter(|label|!label.starts_with("director-")).count()==1 {
-        let closing=app.clone();tauri::async_runtime::spawn_blocking(move||{let state=closing.state::<AppState>();let mut live=lock(&state.live_mcc)?;if let Some(session)=live.as_ref(){crate::live_mcc::disconnect(session).map_err(error)?;}*live=None;Ok::<(),String>(())}).await.map_err(error)??;
-    }
-    workspace_windows::remember(&app,&window)?;
-    workspace_windows::release_window(&app,window.label());
-    lock(&app.state::<AppState>().document_owners)?.retain(|_,owner|owner!=window.label());
-    window.destroy().map_err(error)
-}
 fn check_document_owner(state:&AppState,id:&str,label:&str)->Reply<()> {
     if lock(&state.document_owners)?.get(id).is_some_and(|owner|owner!=label){return Err("This map is being edited in another Spark window. Close it there before editing it here.".into());}Ok(())
-}
-#[tauri::command]
-fn claim_project_document(state:State<AppState>,window:tauri::WebviewWindow,id:String)->Reply<()> {
-    let _history_guard=lock(&state.window_history)?;
-    let _=lock(&state.library)?.get(&id).map_err(error)?;
-    let owners=lock(&state.document_owners)?;
-    if owners.get(&id).is_some_and(|owner|owner!=window.label()){return Err("This map is already open for editing in another Spark window.".into());}
-    drop(owners);shared_editing::claim_owner(&state,&id,window.label())?;lock(&state.document_owners)?.insert(id,window.label().into());Ok(())
-}
-#[tauri::command]
-fn release_project_document(state:State<AppState>,window:tauri::WebviewWindow,id:String)->Reply<()> {
-    let _history_guard=lock(&state.window_history)?;
-    let mut owners=lock(&state.document_owners)?;if owners.get(&id).is_some_and(|owner|owner==window.label()){owners.remove(&id);}Ok(())
-}
-#[tauri::command]
-async fn open_project_window(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,workspace:Option<String>,observe:Option<bool>,panel:Option<String>,focus_tag:Option<u32>,origin_workspace:Option<String>)->Reply<String> {
-    let state=app.state::<AppState>();let _history_guard=lock(&state.window_history)?;let project=lock(&state.library)?.get(&id).map_err(error)?;
-    check_document_owner(&state,&id,window.label())?;
-    if app.webview_windows().len()>=16{return Err("Close a Spark window before opening another map editor".into());}
-    let label=format!("editor-{}",uuid::Uuid::new_v4());
-    let route=workspace.as_deref().map(workspace_windows::checked_workspace).transpose()?;
-    let origin=origin_workspace.as_deref().map(workspace_windows::checked_workspace).transpose()?;
-    let suffix=if let Some(panel)=panel.as_deref(){
-        if observe==Some(true){return Err("An observing window cannot detach an editing drawer".into());}
-        let legacy_tags=panel=="object-tags"&&route==Some("tags");
-        if !legacy_tags {workspace_windows::checked_panel(route.ok_or("Choose a workspace before detaching a panel")?,panel,true)?;}
-        if runtime_workbench::has_running(&state,&id)?{return Err("Close this map's active native tool before moving its editing drawer".into());}
-        let focus=if legacy_tags {
-            let selected=focus_tag.ok_or("Select a tag before detaching its drawer")?;
-            if !inspect(&state,&project)?.tags.iter().any(|tag|tag.id==selected){return Err("The detached tag is not in this preserved map".into());}
-            format!("&tag={selected}")
-        }else{if focus_tag.is_some(){return Err("Tag focus requires the Object tags handoff".into());}String::new()};
-        format!("&panel={panel}{focus}&returnWorkspace={}",origin.or(route).unwrap_or("world"))
-    }else{if focus_tag.is_some()||origin.is_some(){return Err("Tag focus/origin requires a supported drawer handoff".into());}String::new()};
-    let url=tauri::WebviewUrl::App(format!("index.html?project={}{}{}{}",project.id,route.map(|w|format!("&workspace={w}")).unwrap_or_default(),if observe==Some(true){"&observe=1"}else{""},suffix).into());
-    // Only a registered UUID project may select the local app page. No arbitrary URL or script.
-    if uuid::Uuid::parse_str(&project.id).is_err(){return Err("Invalid project identity".into());}
-    let panel_only=panel.as_deref().is_some_and(|p|!(p=="object-tags"&&route==Some("tags")));
-    // Reserve one writer while source/history are locked, then release the
-    // lock BEFORE dispatching native window construction. A parent WebView can
-    // synchronously ask for history on the UI thread during that dispatch.
-    let prior_owner=lock(&state.document_owners)?.get(&id).cloned();
-    if observe!=Some(true){shared_editing::claim_owner(&state,&id,&label)?;lock(&state.document_owners)?.insert(id.clone(),label.clone());}
-    drop(_history_guard);
-    let restore=||->Reply<()> {
-        if observe==Some(true){return Ok(())}
-        let _guard=lock(&state.window_history)?;
-        if lock(&state.document_owners)?.get(&id).map(String::as_str)!=Some(&label){return Ok(())}
-        shared_editing::claim_owner(&state,&id,prior_owner.as_deref().unwrap_or(window.label()))?;
-        let mut owners=lock(&state.document_owners)?;
-        if let Some(previous)=&prior_owner{owners.insert(id.clone(),previous.clone());}else{owners.remove(&id);}
-        drop(owners);let _=app.emit("spark:window-history",serde_json::json!({"projectId":id,"owner":prior_owner}));Ok(())
-    };
-    let child=match tauri::WebviewWindowBuilder::new(&app,&label,url).title(format!("{} · Project Guilty Spark",project.title)).inner_size(if panel_only{620.}else{1440.},900.).min_inner_size(if panel_only{400.}else{800.},400.).decorations(false).transparent(true).shadow(false).theme(Some(tauri::Theme::Dark)).build(){Ok(child)=>child,Err(reason)=>{restore()?;return Err(error(reason));}};
-    if let Err(reason)=workspace_windows::register(&app,&child,workspace_windows::ReturnTarget{origin:window.label().into(),project:Some(id.clone()),workspace:origin.or(route).unwrap_or("world").into(),panel:panel.clone()}){restore()?;workspace_windows::forget(&state,&label)?;let _=child.destroy();return Err(reason);}
-    if observe!=Some(true){let _=app.emit("spark:window-history",serde_json::json!({"projectId":id,"owner":child.label()}));}Ok(label)
-}
-#[tauri::command]
-fn return_project_to_main(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,workspace:Option<String>,panel:Option<String>,allow_missing_main:Option<bool>,activate:Option<bool>)->Reply<()> {
-    let state=app.state::<AppState>();let _guard=lock(&state.window_history)?;
-    if !window.label().starts_with("editor-"){return Err("Only a detached map editor can return its document".into());}
-    if lock(&state.document_owners)?.get(&id).map(String::as_str)!=Some(window.label()){return Err("Only the current editing window can return this map".into());}
-    let _=lock(&state.library)?.get(&id).map_err(error)?;
-    if runtime_workbench::has_running(&state,&id)?{return Err("Close this map's native tool before moving its editing window".into());}
-    let route=workspace.as_deref().map(workspace_windows::checked_workspace).transpose()?;
-    let target=workspace_windows::target(&state,window.label())?;
-    if target.as_ref().is_some_and(|target|target.project.as_deref()!=Some(&id)||target.panel!=panel){return Err("The returning panel no longer matches its native window".into());}
-    let original=target.as_ref().map_or("main",|target|target.origin.as_str());
-    let main=match app.get_webview_window(original){Some(main)=>main,None if allow_missing_main==Some(true)=>return Ok(()),None=>return Err("The original Spark window is closed; keep editing in this window".into())};
-    workspace_windows::remember(&app,&window)?;
-    shared_editing::claim_owner(&state,&id,original)?;
-    lock(&state.document_owners)?.insert(id.clone(),original.into());
-    if let Err(reason)=main.emit("spark:reattach-project",serde_json::json!({"id":id,"workspace":route,"panel":panel,"activate":activate.unwrap_or(true)})){
-        shared_editing::claim_owner(&state,&id,window.label())?;
-        lock(&state.document_owners)?.insert(id,window.label().into());
-        return Err(error(reason));
-    }
-    workspace_windows::forget(&state,window.label())?;
-    if activate!=Some(false){let _=main.show();let _=main.set_focus();}Ok(())
 }
 #[tauri::command]
 fn initialize_mcc_inbox(app: tauri::AppHandle, state: State<AppState>) -> Reply<Bootstrap> {
@@ -2938,7 +2849,7 @@ pub fn run() {
             bsp_assembly_options,
             plan_bsp_assembly,
             preview_bsp_assembly,
-            claim_project_document,
+            workspace_windows::claim_project_document,
             workspace_history_native::read_workspace_history,
             workspace_history_native::commit_workspace_history,
             workspace_history_native::take_project_document,
@@ -2946,9 +2857,9 @@ pub fn run() {
             workspace_history_native::inspection_cache_status,
             megaworld_native::megaworld_atlas,
             megaworld_native::import_megaworld_region,
-            release_project_document,
-            open_project_window,
-            return_project_to_main,
+            workspace_windows::release_project_document,
+            workspace_windows::open_project_window,
+            workspace_windows::return_project_to_main,
             workspace_windows::open_workspace_window,
             workspace_windows::recover_workspace_window,
             workspace_windows::return_workspace_panel,
@@ -3067,7 +2978,7 @@ pub fn run() {
             launch_mcc,
             launch_native,
             launch_engine_take,
-            close_application,
+            workspace_windows::close_application,
             initialize_mcc_inbox,
             runtime_report,
             runtime_connections::discover_halo_connections,

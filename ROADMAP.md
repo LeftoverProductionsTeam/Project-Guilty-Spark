@@ -1,5 +1,12 @@
 # Roadmap
 
+## C60 maintenance checkpoint — November 3, 2026
+
+The stale library-refresh race is repaired and native event bursts use bounded reads. Existing window/source-resource owners are consolidated; validators, public APIs, research and all 472 requirement rows remain. Full regression, native window/history/session tests and a frozen shared BSP native build pass. Load-time/memory measurements are mixed; no overall RAM-budget completion is claimed. C49 installer/portable integrity and startup pass again, but authenticated GitHub attachment and approved public publication remain blocked. [Evidence and remaining gates](docs/CONTINUATION_60_RELEASE_MAINTENANCE.md).
+
+Next: attach the exact verified Windows assets; obtain publication approval; finish the two-way Timberland–Sidewinder player test; then native AI/Firefight/Zombie gameplay, independent runtime adapters, two-computer collaboration and memory/endurance acceptance. Direct compiled-map structural editing and native Linux/macOS remain open.
+
+
 ## C52 engine intelligence and native resource repair
 
 Six separate source repositories are pinned and mapped to existing Spark owners in the [Engine Source Atlas](docs/ENGINE_SOURCE_ATLAS.md). Native CE indexed bitmap metadata now follows its actual resource slot and body-relative pointers; the packaged app recovers its source textures, lightmaps, detail and reflection assignments. This extends the existing Xbox a10 reader rather than replacing it. Upstream actor/co-op knowledge remains separate from installed-build acceptance; no new packet bridge or second AI simulator is introduced. The atlas lists ten concrete source-backed next steps and retains the gameplay gates below.

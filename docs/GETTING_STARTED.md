@@ -1,17 +1,21 @@
 # Connect your first Halo project
 
-To create together, open a QuickForge map and choose **Live Studio · Solo** in the header. The existing session drawer hosts or joins a private encrypted source session. Start with different brushes or player starts; keep native tags/custom imports as separate solo work until their shared phases are implemented. [SparkLink setup, recovery and first acceptance test](SPARKLINK_SETUP.md).
+Choose your goal first: **inspect an existing cache**, **rebuild native loose tags**, or **author geometry**. Spark keeps these as distinct operations; a visible placement is not automatically a game-ready edit. [Current source vs the earlier C49 preview](CONTINUATION_60_RELEASE_MAINTENANCE.md).
 
-For built QuickForge/native source, **Tag editor → Invader** offers a native-tag picker, dependency checks, isolated edit previews and retained recovery. Accept a source revision, then use **Runtime & Tools → Build working tag edits**. **Play & servers → Tools for this map** separates installed programs from actual source compatibility. [Tools and setup](COMPATIBLE_TOOLS.md).
+To create together, use **Online → Collaborate** or **Live Studio · Solo**. The drawer hosts/joins private encrypted source sessions. Current acceptance includes native transactions and a separate validated tag/asset workflow, plus three-process BSP edits, author Undo, conflict/reconnect recovery and native compilation. Every participant needs compatible owned dependencies. This is editor collaboration, not Halo game co-op. A second physical computer is still an acceptance gate. [Setup and recovery](SPARKLINK_SETUP.md).
+
+To play, use **Online → choose runtime → Host game / Join server**. Use the runtime's supported protocol and matching map. Hosting selection never changes the edition used to decode an already imported source.
+
+For built QuickForge/native source, **Tag editor → Invader** offers a native-tag picker, dependency checks, isolated edit previews and retained recovery. Accept a source revision, then use **Runtime & Tools → Build working tag edits**. **Games & tools** separates installed programs from actual source compatibility. [Tools and setup](COMPATIBLE_TOOLS.md).
 
 For full MCC H1 loose tags, open Runtime & Tools details or the selected tag’s Baboon panel. Choose the complete reviewed portable folder, save in the external editor, review stable-save integrity and field findings, keep a new revision and Build working tag edits. Failed integrity checks block acceptance/builds. Restore starting source creates a new verified recovery copy. See [C37 setup and limits](CONTINUATION_37_ENGINEERING.md).
 
 
-**Menu** opens the workspace drawer. The title and map tabs share one compact header with upper-right native window controls. Ctrl+Backslash opens navigation. Objects, Object tags, Asset library, Map sounds and other utilities open as drawers without changing the viewport. F11 uses one fullscreen mode with thinner bars; map tabs, editing controls, audio and runtime actions stay available. Escape closes a drawer before leaving fullscreen.
+The **Guilty Spark monitor** opens the workspace menu; **HOME** returns to the character showcase. The title and map tabs share one compact header with upper-right native window controls. Ctrl+Backslash opens navigation. Objects, Object tags, Asset library, Map sounds and other utilities open as drawers without changing the viewport. F11 uses one fullscreen mode with thinner bars; map tabs, editing controls, audio and runtime actions stay available. Escape closes a drawer before leaving fullscreen.
 
 For native edition checks, open **Build & playtest → Portability Lab**. Choose existing runtime profiles, inspect findings, verify untouched bytes and save the readable/JSON report. Use the supported MCC build path, then **Review native changes** before game testing. [Portability policy and scope](NATIVE_PORTABILITY.md).
 
-Click a map object to edit its typed tags in the Object tags drawer. Asset library searches the maps you have open and accepts source model/sound placements plus custom OBJ/WAV/OGG imports. Imported-cache model additions are previews until supported model/scenario compilation. Map ambience plays automatically; use the compact mute and volume controls or Map sounds for the full spatial mix. [Viewport and audio workflow](C35_VIEWPORT_WORKFLOW.md).
+Click a map object to edit its typed tags in the Object tags drawer. Asset library searches the maps you have open and accepts source model/sound placements plus custom OBJ/WAV/OGG imports. A compatible library drop can extract/stage native dependencies when Invader and the matching source toolchain are connected; unsupported cache structural operations are refused. Check the save/build plan before treating the placement as native output. Map ambience plays automatically; use the compact mute and volume controls or Map sounds for the full spatial mix. [Viewport and audio workflow](C35_VIEWPORT_WORKFLOW.md).
 
 1. Home shows **MCC, OpenCE, Chupathingy and Custom Edition**. Choose a runtime to open its Games & tools page. If a reviewed installation is detected, use **Connect detected Halo**; missing content leads to setup. Choices are remembered. Additional runtime setup is available in **Online → Runtime adapters**.
 2. Open **Settings → Dependencies & setup** for missing tools, resources or source assets. If MCC is installed but Map Builder is absent, review **Open Steam install UI** for the separate free [Halo: CE Mod Tools - MCC](https://store.steampowered.com/app/1532190/), or use Steam Library → Tools. Spark shows the exact Steam executable and destination before handing off. Steam manages installation; follow the supplied extraction instructions in a fresh working copy. Spark does not execute its batch files or overwrite stock tags.
@@ -50,3 +54,10 @@ For animation, drop a supported JMA/JMM-family source into Machinima, select a m
 For the new **Recording Director ↗**, prepare the Level editor view and pop it out to another native window. Dock back retains the same camera session. Editor Render uses Spark's renderer; Live Game Capture explicitly asks you to share a window/display. An independent MCC spectator camera is unavailable. The [Director test card](CONTINUATION_35_TEST_CARD.md) covers the remaining Save-dialog, recording startup and actual game/audio acceptance.
 
 Complete game shader parity, arbitrary cross-engine conversion and universal game acceptance remain incomplete. Legal source images can be matched without bundling their bytes in project exports. Read [compatibility](COMPATIBILITY_MATRIX.md) before building.
+
+
+## Release and recovery checkpoints
+
+The preserved 0.4.1 C49 candidate predates current-source features. Check the release manifest's source commit; do not assume a screenshot from master describes an older binary. GitHub downloads remain pending authenticated upload and publication approval. [Release procedure](RELEASING.md).
+
+Ordinary saves update the current library entry. Global library notifications coalesce into a fresh ordered read; an older reply cannot replace a newer snapshot or authored document. If a source, external-tool save or native build fails integrity checks, keep its review/error visible and use retained recovery rather than overwriting the preserved map.

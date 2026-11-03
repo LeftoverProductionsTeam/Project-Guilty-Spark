@@ -158,6 +158,7 @@ export async function createDraft(set, api, { runId, linuxStatus = 'not requeste
   const linux = manifests.find((p) => p.platform === 'linux-x64');
   const notes = [
     `Project Guilty Spark ${m.applicationVersion} preview. Source: ${m.sourceCommit}.`,
+    'This binary snapshot contains that exact source revision. Later master/README features are not retroactively included.',
     '',
     'Download the Windows x64 `_Setup.exe` installer or `_Portable.zip`. The portable app requires Microsoft Edge WebView2 Runtime. This preview is unsigned.',
     'Automated regression gates, a real extracted portable launch, NSIS installation/payload verification and an installed-app launch passed. Check the platform manifest and SHA-256 file for exact identities.',

@@ -1,5 +1,8 @@
 # Release candidates and public downloads
 
+C60 re-verified the exact older C49 installer, portable, source and manifest without replacement, including fresh installed/portable startup. The owner chose the [prepared five-file upload bundle](C60_PUSH_NOTES.md). There is no confirmed remote draft or public asset yet. An older sealed candidate can be attached using `scripts/release/draft.mjs`; a new workflow build gets its own exact source identity and unused preview number. Do not attribute later master features to C49. `scripts/release/recheck-windows.mjs` can re-open an exact sealed portable/installed payload without comparing it to newer `dist` bytes.
+
+
 Use [GitHub Releases](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases) for public application downloads. Actions artifacts are temporary build outputs; they do not appear as Release assets automatically. Existing `alpha` and `Preview` history must remain unchanged.
 
 The manually triggered workflow is [`.github/workflows/release.yml`](../.github/workflows/release.yml), **Release candidate (build or draft)**. Normal CI remains unchanged. There is no required PR, direct-master restriction, force push or repository ruleset modification in this workflow.

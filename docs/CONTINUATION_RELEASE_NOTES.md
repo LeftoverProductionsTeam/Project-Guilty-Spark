@@ -1,5 +1,12 @@
 # Guilty Spark — cumulative Living Render continuation
 
+## C60 — ordered refresh, preserved release and maintainability
+
+Fixed an out-of-order library read that could replace newer library state. Global and focused-map refreshes now coalesce bursts, reject stale replies, recover after errors and fence an in-flight read when a save receipt arrives. Idle saves still avoid global reloads. Native window commands live with window recovery/placement; QuickForge resource admission uses one source-bound helper. No geometry, validation or public command capability was removed.
+
+Fresh paired native profiles retain complete rendering. Warm 40-event bursts use 2+2 reads instead of 40+40; ordinary map switching and RAM are not broadly faster. The exact C49 portable and installed application start again. No public Release assets are available yet; draft creation needs authenticated GitHub access and publication still needs owner approval. [Complete evidence](CONTINUATION_60_RELEASE_MAINTENANCE.md).
+
+
 ## Source lineage
 
 This package builds on the **previous Living Render v0.3 source snapshot** (including the earlier experimental renderer, viewport modes, and offline Invader cache), *not* on the older v0.2.0 release. The current root version remains `0.3.0`: it is a source-level continuation, not a proven Windows release. Do not assume this patch applies cleanly to an independently modified working tree.

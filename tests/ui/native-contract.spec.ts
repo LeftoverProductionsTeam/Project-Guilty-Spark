@@ -2,6 +2,34 @@ import {chooseTool,openDrawer} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
 import { test, expect, type Page } from '@playwright/test';
 
+test('C60 late library replies cannot overwrite a newer snapshot or an open map edit',async({page})=>{
+  await mockDesktop(page);await openFixture(page);const field=page.getByLabel('Velocity',{exact:true});await field.fill('31');await field.press('Tab');
+  await page.evaluate(()=>{
+    const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__libraryRefreshProbe={pending:[]};
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command!=='bootstrap')return original(command,args);
+      const value=await original(command,args);
+      return new Promise(resolve=>{w.__libraryRefreshProbe.pending.push({done:false,finish:(title:string)=>{const next=structuredClone(value);next.entries.find((row:any)=>row.id==='b').title=title;resolve(next);}});});
+    };
+  });
+  await page.evaluate(()=>(window as any).__sparkMock.emit('spark:imported'));
+  await expect.poll(()=>page.evaluate(()=>(window as any).__libraryRefreshProbe.pending.length)).toBe(1);
+  await page.evaluate(()=>(window as any).__sparkMock.emit('spark:imported'));
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const overlapping=await page.evaluate(()=>(window as any).__libraryRefreshProbe.pending.length>1);
+  if(overlapping){
+    await page.evaluate(()=>(window as any).__libraryRefreshProbe.pending[1].finish('Newest library snapshot'));
+    await chooseTool(page,'Map library');await expect(page.getByRole('heading',{name:'Newest library snapshot',exact:true})).toBeVisible();
+    await page.evaluate(()=>(window as any).__libraryRefreshProbe.pending[0].finish('Stale library snapshot'));
+  }else{
+    await page.evaluate(()=>(window as any).__libraryRefreshProbe.pending[0].finish('Stale library snapshot'));
+    await expect.poll(()=>page.evaluate(()=>(window as any).__libraryRefreshProbe.pending.length)).toBe(2);
+    await page.evaluate(()=>(window as any).__libraryRefreshProbe.pending[1].finish('Newest library snapshot'));await chooseTool(page,'Map library');
+  }
+  await expect(page.getByRole('heading',{name:'Newest library snapshot',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Stale library snapshot',exact:true})).toHaveCount(0);
+  await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await chooseTool(page,'Tag editor');await expect(field).toHaveValue('31');
+});
+
 test('C59 Online separates game hosting, compatible joins and source collaboration',async({page})=>{
   await mockDesktop(page);await page.goto('/');await chooseTool(page,'Online');
   await page.getByRole('button',{name:'Host game',exact:true}).click();

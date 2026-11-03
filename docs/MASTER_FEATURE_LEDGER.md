@@ -1,3 +1,6 @@
+
+C60 preserves all **472 existing CSV rows byte for byte**. It repairs ordering of library notifications and consolidates existing window/resource owners without removing a feature requirement or declaring a new gameplay capability. Fresh tests and release/performance limitations are recorded in [C60](CONTINUATION_60_RELEASE_MAINTENANCE.md). The direct compiled-map structural backlog, unfinished runtime/game gates and prior source/research evidence remain intact.
+
 # Living feature ledger — Integrated workbench
 
 C59 appends four scoped workspace/collaboration records to C58's 468: **472 total**, preserving every prior CSV byte. Eligible native panels return project/history/layout to their originating window; actual parked/minimized draws stop and the third map releases the oldest GPU context. The 23-route/126-state survey and three-process BSP/compiler/crash/rollover/Radmin acceptance pass locally. Physical monitor removal, separate-computer networking, full window-session restoration, whole-process RAM limits and authorized production Steam remain open. No game/AI/traversal gate is promoted. [C59 report](CONTINUATION_59_WORKSPACE.md) · [Metadata receipt](fixtures/c59-professional-workspace.json) · [Push handoff](C59_PUSH_NOTES.md).

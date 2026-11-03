@@ -1,3 +1,8 @@
+
+# Current C60 handoff
+
+Use [C60 push/release notes](C60_PUSH_NOTES.md) for the reviewed local master, immutable C49 upload set and proposed About/topics. Remote metadata/upload has not been confirmed. The older handoffs below remain historical; their status is not current acceptance.
+
 # C41 performance handoff
 
 Title: **C41: batch verified reflection reads and accelerate asset catalog loading**.

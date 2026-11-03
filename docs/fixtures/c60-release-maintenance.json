@@ -1,0 +1,776 @@
+{
+  "schemaVersion": 1,
+  "continuation": "C60",
+  "parentCommit": "67ef43bfe1576089a459ee9d1eb115f00de74921",
+  "applicationVersion": "0.4.1",
+  "testedAppSha256": "195070aba1f3f12346996d6d9c1d99323620ba9a0e6b89513e113254e23c1ecf",
+  "mockedNativeAcceptance": false,
+  "preservation": {
+    "commandBodiesUnchangedExceptVisibility": [
+      "close_application",
+      "claim_project_document",
+      "release_project_document",
+      "open_project_window",
+      "return_project_to_main"
+    ],
+    "ledgerBytesUnchanged": 1001461,
+    "ledgerSha256": "aad57672fe87c3cd2077df325b18d353ddf573a0c73b7f7940142b2403794c51",
+    "ledgerRows": 472
+  },
+  "architecture": {
+    "before": {
+      "files": 927,
+      "functions": 4009,
+      "imports": 3633,
+      "literalIpcCalls": 1121,
+      "annotatedCommands": 255,
+      "registeredCommands": 255
+    },
+    "after": {
+      "files": 933,
+      "functions": 4015,
+      "imports": 3657,
+      "literalIpcCalls": 1118,
+      "annotatedCommands": 255,
+      "registeredCommands": 255
+    },
+    "registeredCommandNamesUnchanged": true,
+    "controllers": [
+      {
+        "file": "crates/spark-core/src/quickforge.rs",
+        "beforeLines": 2085,
+        "afterLines": 2085
+      },
+      {
+        "file": "src-tauri/src/app.rs",
+        "beforeLines": 3232,
+        "afterLines": 3143
+      },
+      {
+        "file": "src/App.tsx",
+        "beforeLines": 1755,
+        "afterLines": 1763
+      },
+      {
+        "file": "src/components/QuickForge.tsx",
+        "beforeLines": 3821,
+        "afterLines": 3780
+      },
+      {
+        "file": "src/components/World.tsx",
+        "beforeLines": 2282,
+        "afterLines": 2282
+      },
+      {
+        "file": "src/styles.css",
+        "beforeLines": 3927,
+        "afterLines": 3927
+      }
+    ],
+    "publicApiCandidatesRetained": [
+      "launch_native",
+      "hosting_plan",
+      "read_cache",
+      "parse_maps",
+      "pair_recipe",
+      "live_mcc_apply"
+    ],
+    "alreadyAbsentBeforeThisPass": [
+      "LiveLab",
+      "dragWindow",
+      "Breadcrumb"
+    ],
+    "productionCodeDeleted": false
+  },
+  "regressions": {
+    "rustPassed": 664,
+    "rustIgnored": 8,
+    "frontendPassed": 365,
+    "browserPassed": 155,
+    "offlineScripts": 59,
+    "nativeDiagnosticsPassed": 37,
+    "releasePythonPassed": 10,
+    "draftContractPassed": 6,
+    "nativeWindowLifecycleCases": 8,
+    "nativeWindowHistoryCases": 8,
+    "nativeRolloverCases": 4,
+    "nativeLayoutRoutes": 25,
+    "nativeLayoutWorkspaceRoutes": 23,
+    "nativeLayoutGeometryViews": 2,
+    "nativeLayoutStates": 126
+  },
+  "performance": {
+    "schemaVersion": 1,
+    "profileVersion": 4,
+    "independentRunsPerExecutable": 2,
+    "qualityAccepted": true,
+    "conditions": {
+      "profile": "fresh library and WebView profile; process-cold, not flushed OS disk cache",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "focusEmulation": true,
+      "qualityUnchanged": true,
+      "capturePixelProof": true,
+      "nativeBase64Supported": true,
+      "mapViewport": {
+        "width": 1444,
+        "height": 904
+      },
+      "contentViewport": {
+        "width": 1428,
+        "height": 888
+      },
+      "afterMapViewport": {
+        "width": 1444,
+        "height": 904
+      }
+    },
+    "timings": {
+      "processColdShellMs": {
+        "beforeMedian": 1297.83705,
+        "afterMedian": 1116.40395,
+        "improvementPercent": 13.979651759826103
+      },
+      "warmProcessShellMs": {
+        "beforeMedian": 875.2414000000026,
+        "afterMedian": 885.606200000002,
+        "improvementPercent": -1.1842218615343545
+      },
+      "processColdShowcaseMs": {
+        "beforeMedian": 7206.5707,
+        "afterMedian": 5730.577950000001,
+        "improvementPercent": 20.48120821183367
+      },
+      "warmProcessShowcaseMs": {
+        "beforeMedian": 3436.1020000000026,
+        "afterMedian": 3440.1934500000025,
+        "improvementPercent": -0.1190724256730415
+      },
+      "openProjectIpcMs": {
+        "beforeMedian": 98.30000001192093,
+        "afterMedian": 101.30000001192093,
+        "improvementPercent": -3.0518819935261314
+      },
+      "repeatSwitchMs": {
+        "beforeMedian": 949.5221999999994,
+        "afterMedian": 958.7243500000004,
+        "improvementPercent": -0.9691347922145463
+      },
+      "renderingFps": {
+        "beforeMedian": 59.880239456841785,
+        "afterMedian": 59.70202452263748,
+        "improvementPercent": -0.2976189404398634
+      }
+    },
+    "phases": {
+      "showcase-first-initialization": {
+        "beforeMedian": 5818.8398,
+        "afterMedian": 4512.59545,
+        "improvementPercent": 22.44853604665315
+      },
+      "native-import-1": {
+        "beforeMedian": 297.1845999999996,
+        "afterMedian": 287.97399999999925,
+        "improvementPercent": 3.0992857637981084
+      },
+      "native-import-2": {
+        "beforeMedian": 619.9714999999997,
+        "afterMedian": 266.19884999999977,
+        "improvementPercent": 57.06272788345917
+      },
+      "first-textured-map-1": {
+        "beforeMedian": 9000.8138,
+        "afterMedian": 8963.43245,
+        "improvementPercent": 0.4153107800096882
+      },
+      "first-textured-map-2": {
+        "beforeMedian": 6005.730150000003,
+        "afterMedian": 6063.93325,
+        "improvementPercent": -0.9691261269871901
+      },
+      "map-switch-1-to-1": {
+        "beforeMedian": 1012.5397499999999,
+        "afterMedian": 989.6010500000011,
+        "improvementPercent": 2.2654616769365146
+      },
+      "map-switch-2-to-2": {
+        "beforeMedian": 977.3197,
+        "afterMedian": 928.4509500000022,
+        "improvementPercent": 5.000282916633914
+      },
+      "map-switch-3-to-1": {
+        "beforeMedian": 932.5037499999999,
+        "afterMedian": 1009.7258499999989,
+        "improvementPercent": -8.281157046285236
+      },
+      "map-switch-4-to-2": {
+        "beforeMedian": 987.2969499999999,
+        "afterMedian": 997.3699500000039,
+        "improvementPercent": -1.020260419117466
+      },
+      "large-asset-catalog": {
+        "beforeMedian": 3315.681550000001,
+        "afterMedian": 3344.6581000000006,
+        "improvementPercent": -0.8739243972328825
+      },
+      "showcase-warm-return": {
+        "beforeMedian": 1129.267499999998,
+        "afterMedian": 982.0865999999987,
+        "improvementPercent": 13.033306988822368
+      },
+      "showcase-warm-process": {
+        "beforeMedian": 2534.5113500000043,
+        "afterMedian": 2526.6811499999967,
+        "improvementPercent": 0.30894318149364747
+      }
+    },
+    "processCounters": {
+      "showcase-process-cpu-gpu-memory": {
+        "cpuMachinePercent": {
+          "beforeMedian": 6.023174285813605,
+          "afterMedian": 6.1019584477150834,
+          "improvementPercent": -1.3080173038830893
+        },
+        "residentMiB": {
+          "beforeMedian": 1345.03125,
+          "afterMedian": 1278.330078125,
+          "improvementPercent": 4.959079714690644
+        },
+        "privateMiB": {
+          "beforeMedian": 1277.0625,
+          "afterMedian": 1223.4609375,
+          "improvementPercent": 4.197254441344883
+        },
+        "gpu3DPercent": {
+          "beforeMedian": 6,
+          "afterMedian": 6,
+          "improvementPercent": 0
+        },
+        "gpuDedicatedMiB": {
+          "beforeMedian": 144.95703125,
+          "afterMedian": 146.291015625,
+          "improvementPercent": -0.920261931067935
+        }
+      },
+      "map-1-process-cpu-gpu-memory": {
+        "cpuMachinePercent": {
+          "beforeMedian": 3.1547272114001537,
+          "afterMedian": 3.197583463451332,
+          "improvementPercent": -1.3584772685356015
+        },
+        "residentMiB": {
+          "beforeMedian": 1579.501953125,
+          "afterMedian": 1535.916015625,
+          "improvementPercent": 2.759473479204407
+        },
+        "privateMiB": {
+          "beforeMedian": 1494.919921875,
+          "afterMedian": 1453.876953125,
+          "improvementPercent": 2.7454961399217925
+        },
+        "gpu3DPercent": {
+          "beforeMedian": 15.5,
+          "afterMedian": 15.5,
+          "improvementPercent": 0
+        },
+        "gpuDedicatedMiB": {
+          "beforeMedian": 203.33984375,
+          "afterMedian": 203.17578125,
+          "improvementPercent": 0.08068389203726828
+        }
+      },
+      "map-2-process-cpu-gpu-memory": {
+        "cpuMachinePercent": {
+          "beforeMedian": 3.184481421253651,
+          "afterMedian": 3.1403228344849303,
+          "improvementPercent": 1.3866806216547656
+        },
+        "residentMiB": {
+          "beforeMedian": 1814.794921875,
+          "afterMedian": 1936.146484375,
+          "improvementPercent": -6.686792046708101
+        },
+        "privateMiB": {
+          "beforeMedian": 1826.236328125,
+          "afterMedian": 1954.63671875,
+          "improvementPercent": -7.030874846128426
+        },
+        "gpu3DPercent": {
+          "beforeMedian": 15.5,
+          "afterMedian": 15.5,
+          "improvementPercent": 0
+        },
+        "gpuDedicatedMiB": {
+          "beforeMedian": 359.767578125,
+          "afterMedian": 360.005859375,
+          "improvementPercent": -0.06623199656896542
+        }
+      },
+      "repeat-switch-memory": {
+        "cpuMachinePercent": {
+          "beforeMedian": 3.2245101718098055,
+          "afterMedian": 3.4822200519841857,
+          "improvementPercent": -7.992217932118868
+        },
+        "residentMiB": {
+          "beforeMedian": 1807.38671875,
+          "afterMedian": 1926.0546875,
+          "improvementPercent": -6.5657209671249275
+        },
+        "privateMiB": {
+          "beforeMedian": 1822.560546875,
+          "afterMedian": 1937.3671875,
+          "improvementPercent": -6.299194878428036
+        },
+        "gpu3DPercent": {
+          "beforeMedian": 15.5,
+          "afterMedian": 15.5,
+          "improvementPercent": 0
+        },
+        "gpuDedicatedMiB": {
+          "beforeMedian": 361.775390625,
+          "afterMedian": 362.3671875,
+          "improvementPercent": -0.16358129666520901
+        }
+      },
+      "after-maps-home-memory": {
+        "cpuMachinePercent": {
+          "beforeMedian": 1.339205160591844,
+          "afterMedian": 0.7318907871274978,
+          "improvementPercent": 45.34886747269938
+        },
+        "residentMiB": {
+          "beforeMedian": 1975.24609375,
+          "afterMedian": 2131.166015625,
+          "improvementPercent": -7.893695999114034
+        },
+        "privateMiB": {
+          "beforeMedian": 2125.3984375,
+          "afterMedian": 2275.638671875,
+          "improvementPercent": -7.068803275856365
+        },
+        "gpu3DPercent": {
+          "beforeMedian": 7.5,
+          "afterMedian": 7,
+          "improvementPercent": 6.666666666666667
+        },
+        "gpuDedicatedMiB": {
+          "beforeMedian": 483.740234375,
+          "afterMedian": 489.654296875,
+          "improvementPercent": -1.2225699000706571
+        }
+      },
+      "warm-process-memory": {
+        "cpuMachinePercent": {
+          "beforeMedian": 1.5139611467226222,
+          "afterMedian": 0.8088431987246602,
+          "improvementPercent": 46.574375407478605
+        },
+        "residentMiB": {
+          "beforeMedian": 956.205078125,
+          "afterMedian": 902.587890625,
+          "improvementPercent": 5.607289558128752
+        },
+        "privateMiB": {
+          "beforeMedian": 886.0078125,
+          "afterMedian": 824.998046875,
+          "improvementPercent": 6.885917343420716
+        },
+        "gpu3DPercent": {
+          "beforeMedian": 6.5,
+          "afterMedian": 6,
+          "improvementPercent": 7.6923076923076925
+        },
+        "gpuDedicatedMiB": {
+          "beforeMedian": 142.9921875,
+          "afterMedian": 143.80859375,
+          "improvementPercent": -0.5709446538818773
+        }
+      }
+    },
+    "refresh": {
+      "before": {
+        "coldTrial": {
+          "trial": 1,
+          "notifications": 40,
+          "observedToQuietMs": 1503.8113999999996,
+          "bootstrapReads": 42,
+          "projectReads": 41
+        },
+        "warmedTrials": [
+          {
+            "trial": 2,
+            "notifications": 40,
+            "observedToQuietMs": 708.8380000000006,
+            "bootstrapReads": 40,
+            "projectReads": 40
+          },
+          {
+            "trial": 3,
+            "notifications": 40,
+            "observedToQuietMs": 720.0828000000001,
+            "bootstrapReads": 40,
+            "projectReads": 40
+          }
+        ],
+        "memory": [
+          {
+            "name": "one-window",
+            "residentMiB": 1234.0625,
+            "privateMiB": 1128.05078125,
+            "gpuDedicatedMiB": 138.6953125,
+            "gpuError": null
+          },
+          {
+            "name": "three-windows",
+            "residentMiB": 2266.57421875,
+            "privateMiB": 2201.29296875,
+            "gpuDedicatedMiB": 333.98828125,
+            "gpuError": null
+          },
+          {
+            "name": "returned-one-window",
+            "residentMiB": 1127.71484375,
+            "privateMiB": 1164.40625,
+            "gpuDedicatedMiB": 309.1640625,
+            "gpuError": null
+          }
+        ]
+      },
+      "after": {
+        "coldTrial": {
+          "trial": 1,
+          "notifications": 40,
+          "observedToQuietMs": 1356.8805999999995,
+          "bootstrapReads": 4,
+          "projectReads": 3
+        },
+        "warmedTrials": [
+          {
+            "trial": 2,
+            "notifications": 40,
+            "observedToQuietMs": 687.4331999999995,
+            "bootstrapReads": 2,
+            "projectReads": 2
+          },
+          {
+            "trial": 3,
+            "notifications": 40,
+            "observedToQuietMs": 688.5006999999987,
+            "bootstrapReads": 2,
+            "projectReads": 2
+          }
+        ],
+        "memory": [
+          {
+            "name": "one-window",
+            "residentMiB": 1758.02734375,
+            "privateMiB": 1657.56640625,
+            "gpuDedicatedMiB": 142.31640625,
+            "gpuError": null
+          },
+          {
+            "name": "three-windows",
+            "residentMiB": 2326.5390625,
+            "privateMiB": 2255.0625,
+            "gpuDedicatedMiB": 325.96875,
+            "gpuError": null
+          },
+          {
+            "name": "returned-one-window",
+            "residentMiB": 1238.09375,
+            "privateMiB": 1267.9921875,
+            "gpuDedicatedMiB": 300.83203125,
+            "gpuError": null
+          }
+        ]
+      }
+    },
+    "qualityExamples": [
+      {
+        "appSha256": "195070aba1f3f12346996d6d9c1d99323620ba9a0e6b89513e113254e23c1ecf",
+        "phase": "first-textured-map-1",
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "sourceShaders": 159,
+        "compatibleShaders": 0,
+        "shaderIdsSha256": "db5bc2a65d716b64d02e002fbec55cbbfe99091b046f0034f34e0c5fa0fed698",
+        "lightmaps": 15,
+        "materialExtras": 237,
+        "reflectionBindings": 73,
+        "reflectionIssues": 0,
+        "decals": {
+          "source": 8,
+          "rendered": 8,
+          "omitted": 0
+        },
+        "nativeSourceRenderTriangles": 5503,
+        "nativeModelTypes": 68,
+        "residentGeometries": 57,
+        "visiblePassTriangles": 72884,
+        "canvas": [
+          1426,
+          654
+        ]
+      },
+      {
+        "appSha256": "195070aba1f3f12346996d6d9c1d99323620ba9a0e6b89513e113254e23c1ecf",
+        "phase": "first-textured-map-2",
+        "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "sourceShaders": 159,
+        "compatibleShaders": 0,
+        "shaderIdsSha256": "73fc004097008c8c8cce3207139e934dbb09e1ba2f3f3c51f82d40faaa6ba740",
+        "lightmaps": 15,
+        "materialExtras": 233,
+        "reflectionBindings": 73,
+        "reflectionIssues": 0,
+        "decals": null,
+        "nativeSourceRenderTriangles": 5503,
+        "nativeModelTypes": 68,
+        "residentGeometries": 55,
+        "visiblePassTriangles": 72873,
+        "canvas": [
+          1426,
+          654
+        ]
+      }
+    ]
+  },
+  "nativeBuilds": {
+    "sharedBsp": {
+      "jobId": "18113181-b69e-44e4-ba62-3a30a19e7f5b",
+      "durationMs": 125734.15810000002,
+      "sessionRevision": 247,
+      "newerRevision": 248,
+      "cacheVersion": 13,
+      "compiledCollisionTriangles": 58,
+      "cacheSha256": "f94cbbbbf0643fb5accb2211f5930273e547891e48c1617ec285b706d8ca4b1e",
+      "cacheBytes": 88880670,
+      "portals": 2,
+      "readbackTags": 2239
+    },
+    "conversion": {
+      "id": "9ec09270-746a-43e9-8ea5-22c810dbb974",
+      "status": "validated",
+      "target": "mcc-cea",
+      "sha256": "6ce8de58af57901a68bc77007cdd9dc1ee65a2bee76cbd3866e4af110ae71c77",
+      "message": "MCC cache rebuilt and structurally validated. In-game load test pending."
+    },
+    "conversionTiming": {
+      "nativePipelineChanged": false,
+      "exitCode": 0,
+      "compiledExample": "qa_convert",
+      "elapsedMs": 288834.9325,
+      "controlledBeforeAfter": false
+    },
+    "sourceReadback": {
+      "build": "01.00.00.0609",
+      "classes": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actv": 4,
+        "ant!": 3,
+        "antr": 22,
+        "bipd": 2,
+        "bitm": 448,
+        "coll": 38,
+        "colo": 4,
+        "cont": 12,
+        "deca": 38,
+        "devc": 23,
+        "effe": 350,
+        "eqip": 14,
+        "flag": 1,
+        "font": 3,
+        "foot": 5,
+        "grhi": 2,
+        "hmt ": 1,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 14,
+        "jpt!": 81,
+        "lens": 28,
+        "ligh": 39,
+        "lsnd": 17,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 10,
+        "mod2": 70,
+        "part": 106,
+        "pctl": 12,
+        "phys": 5,
+        "pphy": 30,
+        "proj": 21,
+        "sbsp": 1,
+        "scen": 19,
+        "scex": 10,
+        "schi": 44,
+        "scnr": 1,
+        "senv": 15,
+        "sgla": 6,
+        "sky ": 1,
+        "smet": 4,
+        "snd!": 333,
+        "snde": 1,
+        "soso": 117,
+        "spla": 1,
+        "ssce": 1,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 8,
+        "udlg": 1,
+        "unhi": 5,
+        "ustr": 100,
+        "vehi": 6,
+        "weap": 20,
+        "wind": 1,
+        "wphi": 22
+      },
+      "collisionTriangles": 5940,
+      "modelTypes": 68,
+      "placements": 186,
+      "renderTriangles": 5503,
+      "scenarioType": 1,
+      "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "version": 609
+    },
+    "targetReadback": {
+      "build": "01.03.43.0000",
+      "classes": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actv": 4,
+        "ant!": 3,
+        "antr": 22,
+        "bipd": 2,
+        "bitm": 448,
+        "coll": 38,
+        "colo": 4,
+        "cont": 12,
+        "deca": 38,
+        "devc": 23,
+        "effe": 350,
+        "eqip": 14,
+        "flag": 1,
+        "font": 2,
+        "foot": 5,
+        "grhi": 2,
+        "hmt ": 1,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 14,
+        "jpt!": 81,
+        "lens": 28,
+        "ligh": 39,
+        "lsnd": 17,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 10,
+        "mod2": 70,
+        "part": 106,
+        "pctl": 12,
+        "phys": 5,
+        "pphy": 30,
+        "proj": 21,
+        "sbsp": 1,
+        "scen": 19,
+        "scex": 10,
+        "schi": 44,
+        "scnr": 1,
+        "senv": 15,
+        "sgla": 6,
+        "sky ": 1,
+        "smet": 4,
+        "snd!": 333,
+        "snde": 1,
+        "soso": 117,
+        "spla": 1,
+        "ssce": 1,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 8,
+        "udlg": 1,
+        "unhi": 5,
+        "ustr": 54,
+        "vehi": 6,
+        "weap": 20,
+        "wind": 1,
+        "wphi": 22
+      },
+      "collisionTriangles": 5940,
+      "modelTypes": 68,
+      "placements": 186,
+      "renderTriangles": 5503,
+      "scenarioType": 1,
+      "sha256": "6ce8de58af57901a68bc77007cdd9dc1ee65a2bee76cbd3866e4af110ae71c77",
+      "version": 13
+    },
+    "conversionVisualParityVerified": false,
+    "conversionGameplayVerified": false
+  },
+  "release": {
+    "preservedSourceCommit": "cb07581597de11e83d1c10bafad526e8b031f27e",
+    "tag": "v0.4.1-preview.1",
+    "packageIntegrityVerified": true,
+    "freshPortableStartup": {
+      "schemaVersion": 1,
+      "sourceCommit": "cb07581597de11e83d1c10bafad526e8b031f27e",
+      "sourceTree": "c4196fc48c0dc22e3daa17affcabe2a7279f200a",
+      "applicationVersion": "0.4.1",
+      "releaseTag": "v0.4.1-preview.1",
+      "appSha256": "02fc21ec292f45591ad43f6e8541b47e6da668d3e13872595a36b1aa84af16c6",
+      "payload": {
+        "portableExecutableSha256": "02fc21ec292f45591ad43f6e8541b47e6da668d3e13872595a36b1aa84af16c6",
+        "installedExecutableSha256": "02fc21ec292f45591ad43f6e8541b47e6da668d3e13872595a36b1aa84af16c6",
+        "bundleMarkerRewrite": "none"
+      },
+      "originalAcceptance": true,
+      "mockedIpc": false,
+      "complete": true,
+      "errors": [],
+      "workspaceHeading": "Make a Halo world. Know what the engine needs.",
+      "workspaceReadyMs": 2056.9156000000003
+    },
+    "freshInstalledStartup": {
+      "schemaVersion": 1,
+      "sourceCommit": "cb07581597de11e83d1c10bafad526e8b031f27e",
+      "sourceTree": "c4196fc48c0dc22e3daa17affcabe2a7279f200a",
+      "applicationVersion": "0.4.1",
+      "releaseTag": "v0.4.1-preview.1",
+      "appSha256": "c4c0c5b71be39cca6556f7d0a7c688ed2493ce585bf8e3fe6de4b792f131201d",
+      "payload": {
+        "portableExecutableSha256": "02fc21ec292f45591ad43f6e8541b47e6da668d3e13872595a36b1aa84af16c6",
+        "installedExecutableSha256": "c4c0c5b71be39cca6556f7d0a7c688ed2493ce585bf8e3fe6de4b792f131201d",
+        "bundleMarkerRewrite": "UNK-to-NSS",
+        "rewrittenBytes": 3,
+        "otherPayloadBytesIdentical": true
+      },
+      "originalAcceptance": true,
+      "mockedIpc": false,
+      "complete": true,
+      "errors": [],
+      "workspaceHeading": "Make a Halo world. Know what the engine needs.",
+      "workspaceReadyMs": 1891.2840999999999
+    },
+    "ownedTestUninstalled": true,
+    "remoteDraftCreated": false,
+    "publicAssetsVerified": false,
+    "publicationApproved": false,
+    "blockedBy": "Owner chose the prepared upload bundle; no authenticated remote upload or metadata write was performed.",
+    "publicReleasesAtCheck": 0,
+    "publicCheckUtc": "2026-11-03T12:53:56.301Z",
+    "aboutTopicsApplied": false,
+    "linuxVerified": false,
+    "macosVerified": false,
+    "ownerWillUpload": true
+  },
+  "limitations": [
+    "No new Halo game or listening test.",
+    "Zero player-verified Megaworld region connections.",
+    "Two physical computers and physical monitor removal remain unverified.",
+    "Direct compiled-map structural writing, arbitrary live BSP replacement and complete non-MCC live writes remain open.",
+    "Multiplayer AI/Firefight/Zombie acceptance remains runtime-specific and incomplete.",
+    "Performance sample sizes are small; mixed startup/load/RAM results do not prove a broad speedup or memory budget."
+  ]
+}

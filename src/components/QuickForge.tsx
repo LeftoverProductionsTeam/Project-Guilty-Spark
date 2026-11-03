@@ -1,4 +1,5 @@
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
+import {openMapPreviewSource} from '../mapPreviewSource';
 import { publishTextureResources, useTextureResourceScope } from '../textureResourceScope';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
 import { draggedAsset } from '../assetDragRegistry';
@@ -720,29 +721,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     let alive = true;
     setSeparateMaterialSource(null);
     if (!materialSourceId || materialSourceId === sourceId) return;
-    void call<OpenProject>('open_project', { id: materialSourceId }).then(
-      async (initial) => {
-        let open = initial;
-        if (
-          native &&
-          open.inspection?.header.version === 13 &&
-          !open.project.source?.resourceSha256?.['mcc-textures']
-        ) {
-          try {
-            open = await call<OpenProject>('connect_mcc_texture_resources', { projectId: open.project.id });
-          } catch {
-            /* Missing source pixels stay explicit. */
-          }
-        } else if (native && [6, 7, 609].includes(open.inspection?.header.version ?? 0)) {
-          try {
-            open =
-              (await call<OpenProject | null>('auto_connect_classic_textures', {
-                projectId: open.project.id,
-              })) ?? open;
-          } catch {
-            /* Keep unavailable source resources explicit. */
-          }
-        }
+    void openMapPreviewSource(materialSourceId).then(
+      (open) => {
         if (alive) {
           publishTextureResources(open.project);
           setSeparateMaterialSource(open);
@@ -811,29 +791,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     }
     setAssetError('');
     if (!sourceId) return;
-    call<OpenProject>('open_project', { id: sourceId })
-      .then(async (initial) => {
-        let open = initial;
-        if (
-          native &&
-          open.inspection?.header.version === 13 &&
-          !open.project.source?.resourceSha256?.['mcc-textures']
-        ) {
-          try {
-            open = await call<OpenProject>('connect_mcc_texture_resources', { projectId: open.project.id });
-          } catch {
-            /* Embedded images remain usable; missing dependencies stay explicit. */
-          }
-        } else if (native && [6, 7, 609].includes(open.inspection?.header.version ?? 0)) {
-          try {
-            open =
-              (await call<OpenProject | null>('auto_connect_classic_textures', {
-                projectId: open.project.id,
-              })) ?? open;
-          } catch {
-            /* Preview source can be owned by another map window. */
-          }
-        }
+    openMapPreviewSource(sourceId)
+      .then((open) => {
         if (alive) {
           publishTextureResources(open.project);
           setSourceOpen(open);

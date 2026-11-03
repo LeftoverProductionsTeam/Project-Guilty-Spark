@@ -75,6 +75,7 @@ import { initialHistory, thumbnail } from './editor';
 import type {HistoryAction} from './editor';
 import {activeDocument,documentReducer,emptyMapDocuments} from './mapDocuments';
 import {applyLibraryReceipt,checkedSaveReceipt} from './libraryReceipts';
+import {createLatestRefresh} from './latestRefresh';
 import {WindowHistories,queuedWindowRefresh} from './windowHistory';
 import MapTabs from './components/MapTabs';
 import RuntimeDock from './components/RuntimeDock';
@@ -234,7 +235,7 @@ export default function App() {
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
-  const buildRequest = useRef(0);
+  const libraryRefresh = useRef<ReturnType<typeof createLatestRefresh<void,Bootstrap>> | null>(null);
   const current = history.current;
   useEffect(()=>{
     if(!native||!ready||current||!data.installation.mccPath)return;
@@ -351,11 +352,18 @@ export default function App() {
       queue.request(payload.projectId);
     });return()=>{alive=false;queue.dispose();void stop.then(stop=>stop());};
   },[notice]);
+  useEffect(() => {
+    if (!native) return;
+    const queue=createLatestRefresh<void,Bootstrap>(()=>call<Bootstrap>('bootstrap'),next=>{
+      setData(next);
+      setEpoch(v=>v+1);
+    });
+    libraryRefresh.current=queue;
+    return()=>{queue.dispose();if(libraryRefresh.current===queue)libraryRefresh.current=null;};
+  },[]);
   const refresh = useCallback(async () => {
     if (!native) return;
-    const next = await call<Bootstrap>('bootstrap');
-    setData(next);
-    setEpoch((v) => v + 1);
+    return libraryRefresh.current?.request();
   }, []);
   const action = useCallback(
     async (f: () => Promise<unknown>, success?: string) => {
@@ -379,6 +387,7 @@ export default function App() {
           if(native){if(windowWritersRef.current[p.id]===false)return;const h=documentsRef.current.documents.find(d=>d.id===p.id)?.history;if(h?.current===p)await windowHistories.current.persist(p.id,h);await windowHistories.current.flush(p.id);}
           const entry=checkedSaveReceipt(p,await call<LibraryEntry>('save_project', { project: p }));
           setData(data=>applyLibraryReceipt(data,entry));
+          void libraryRefresh.current?.invalidateActive()?.catch(error=>notice(String(error),'error'));
           dispatchDocument({type:'saved',id:p.id,project:p});
           if (announce) notice('Project saved. Your original map is unchanged.', 'success');
         } catch (e) {
@@ -549,22 +558,20 @@ export default function App() {
   useEffect(() => {
     if (!native) return;
     let alive = true;
-    call<Bootstrap>('bootstrap')
+    refresh()
       .then((d) => {
-        if (alive) {
-          setData(d);
+        if (alive && d) {
           setLogs(d.logs);
           setReady(true);
         }
       })
       .catch((e) => {
-        notice(String(e),'error');
-        setReady(true);
+        if(alive){notice(String(e),'error');setReady(true);}
       });
     return () => {
       alive = false;
     };
-  }, [notice]);
+  }, [notice,refresh]);
   const initialWindowProject=useRef(false);
   useEffect(()=>{
     if(!native||!ready)return;
@@ -596,6 +603,11 @@ export default function App() {
   useEffect(()=>{const query=new URLSearchParams(location.search),id=query.get('project');if(!native||!ready||!id||initialWindowProject.current)return;initialWindowProject.current=true;if(!/^[0-9a-f-]{36}$/i.test(id)){notice('Invalid map window identity.','error');return;}void call<OpenProject>('open_project',{id}).then(async open=>{await load(open);const tag=Number(query.get('tag'));if(query.get('panel')==='object-tags'&&query.has('tag')&&open.inspection?.tags.some(t=>t.id===tag))writeMapSession(open.project.id,'tags.focus',tag);setWorkspace(requestedWorkspace()??rememberedWorkspace(open.project,open.inspection));}).catch(e=>notice(String(e),'error'));},[ready,load,notice]);
   useEffect(() => {
     if (!native) return;
+    let alive=true;
+    const failed=(error:unknown)=>{if(alive)notice(String(error),'error');};
+    const builds=createLatestRefresh<string,OpenProject>(id=>call<OpenProject>('open_project',{id}),open=>{
+      if(historyRef.current.current?.id===open.project.id)dispatch({type:'builds',project:open.project});
+    });
     const unsubs: Promise<() => void>[] = [];
     unsubs.push(
       listen<JobEvent>('spark:job', ({ payload }) => {
@@ -610,15 +622,9 @@ export default function App() {
     );
     unsubs.push(
       listen('spark:library-changed', () => {
-        void refresh();
+        void refresh().catch(failed);
         const p = historyRef.current.current;
-        const request = ++buildRequest.current;
-        if (p)
-          void call<OpenProject>('open_project', { id: p.id })
-            .then((open) => {
-              if (request === buildRequest.current) dispatch({ type: 'builds', project: open.project });
-            })
-            .catch((e) => notice(String(e), 'error'));
+        if (p) void builds.request(p.id).catch(failed);
       }),
     );
     unsubs.push(
@@ -627,7 +633,7 @@ export default function App() {
           'Inbox map imported. Open it from your library to inspect the compatibility report.',
           'success',
         );
-        void refresh();
+        void refresh().catch(failed);
       }),
     );
     unsubs.push(
@@ -645,6 +651,8 @@ export default function App() {
       }),
     );
     return () => {
+      alive=false;
+      builds.dispose();
       for (const p of unsubs) void p.then((fn) => fn());
     };
   }, [notice, refresh]);

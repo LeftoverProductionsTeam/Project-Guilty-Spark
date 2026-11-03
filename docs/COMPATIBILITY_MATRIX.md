@@ -1,5 +1,10 @@
 # Runtime and operation compatibility — Continuation 42
 
+## C60 scope clarification — November 3, 2026
+
+C60 repairs ordered library refresh and reuses existing source-resource/window owners. It adds **no new runtime format, game adapter, AI replication claim or conversion guarantee**. Fresh native checks retain exact source identities, complete renderer counters, shared BSP native compilation, window/Undo recovery and session rollover. C49 Windows payload/startup acceptance is separate from current-source features; Linux/macOS remain unverified. [Current maintenance evidence and blockers](CONTINUATION_60_RELEASE_MAINTENANCE.md).
+
+
 C52 repairs **native CE 609 indexed bitmap bodies**, including source render/model/material previews, lightmaps, detail and reflection assignments. This is independently validated against installed CE Blood Gulch and its original resource pack. Native source origin and geometry/model/tag readback are repeated across all four primary runtimes; actual Chupathingy Xbox a10 image/cube/sound decoding is repeated without new allowlists. New two-process stock OpenCE campaign trials establish join and partial actor controls, **not** complete combat/lifecycle, reconnect or cross-computer acceptance. [Exact C52 matrix and gates](CONTINUATION_52_ENGINEERING.md) · [Pinned engine source](ENGINE_SOURCE_ATLAS.md). Historical evidence below retains its original scope/date.
 
 C51's current [four-runtime resource/workflow and twelve-flagship matrix](C51_RUNTIME_AND_FLAGSHIPS.md) separates installation, source rendering, native editing/builds, live writes and game/AI acceptance. The installed Chupathingy Xbox a10's render geometry, 425 requested images, 17 cubes and three audio previews are reverified. This supported C50 reader path supersedes older Xbox-preview exclusions below. Full asset-class and engine parity remain open. Native Firefight controller tests and commanded original-carrier exits do not complete automatic Zombie spawning, human Firefight combat or shared-AI parity. Historical format-specific evidence and limits below remain preserved.

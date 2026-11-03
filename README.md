@@ -4,24 +4,27 @@
 
 An open-source Halo 1 creation and interoperability studio combining native modding, worldbuilding, collaborative editing and experimental gameplay enhancement.
 
-**Available now** means a validated operation within its stated boundaries. **In active development** means source exists but important native gameplay or compatibility gates remain. **Future research** means feasibility and acceptance are still unproven.
+**Available Now** means a validated operation within its stated boundaries. **In Development** means important native gameplay or compatibility gates remain. **Research** means feasibility and acceptance are still unproven. These statuses describe current source; the preserved C49 Windows preview is an earlier snapshot.
 
 ## Build the Halo worlds we imagined
 
-| Flagship | Status today | Working foundation and next gate |
+| Flagship | Status | Proven scope and next gate |
 | --- | --- | --- |
-| **Halo Megaworld** | In active development | Original-map Atlas, BSP reconstruction and connected Timberland–Sidewinder compilation. C57 repeats the exact cache build, both collision-route directions, starts and native portal graph. A real CE client joined; **0 region connections have a returned two-way player test**. Four-region expansion remains gated. [Evidence](docs/CONTINUATION_57_MEGAWORLD.md). |
-| **Forge & BSP Workshop** | Available now, scoped | Four linked views, brushes, face materials/UVs, rooms, ramps and native compilation. Click a source surface to reach the existing Workshop tools; a real wall extrusion passes native collision/render readback and one-action Undo. A player previously verified the two-room CE corridor/ramp. General imported-terrain sculpting and arbitrary live BSP replacement remain open. |
-| **Multiplayer AI synchronization** | In active development | Real OpenCE peers observe native actor movement, combat, damage/death and cleanup, including a hostile created after reconnection. Exact-tick discrepancies remain visible; full lifecycle parity, vehicles, shared round globals and cross-computer acceptance remain open. |
-| **Firefight & Zombie Apocalypse** | In active development | The existing solo controller completes two waves through native AI combat, reaches 400 wave-clear points and removes owned corpses. Human player engagement remains pending. The original weapon creates its carrier/rider; automatic release and full Zombie gameplay remain open. |
-| **Universal Halo conversion** | In active development | Original-source recovery, recursive staging and native MCC/CE build paths. Xbox, PC, Demo/MD and extended sources retain format-specific limits. Compilation and renamed headers do not prove playable conversion. |
-| **Live Link & collaborative modding** | Available now, scoped | Supported MCC object edits/readback; private SparkLink native tag, asset and BSP sharing with author undo, conflicts and recovery. Three independent processes on one PC are proven. Editor sharing, game editing and gameplay networking are distinct. |
-| **Multiplayer Hub** | Available now, scoped | Runtime-aware discovery and managed private CE hosting/client joining. CE movement/collision is user-verified. Each engine retains its own protocol; no universal MCC-to-community lobby bridge is claimed. |
-| **Campaign & cinematic creator** | In active development | Mission/HaloScript sources, camera paths, Recording Director and named takes. First Contact still needs a complete mission playthrough. |
+| **1. Halo Megaworld** | In Development | Atlas, source reconstruction and connected Timberland–Sidewinder native compilation. Collision routes and portals pass automated checks; a CE client joined. **0 region connections have a returned two-way player test.** Four-region expansion remains gated. [Evidence](docs/CONTINUATION_57_MEGAWORLD.md). |
+| **2. Native Forge / BSP Workshop** | Available Now, scoped | Four linked views, brushes, materials/UVs, rooms, ramps and native collision compilation/readback. An authored wall extrusion and Undo pass; a player verified the two-room CE corridor/ramp. General imported-terrain sculpting remains unfinished. |
+| **3. Multiplayer AI synchronization** | In Development | Real OpenCE peers observe native movement, combat, damage/death and cleanup. Full state/lifecycle parity, vehicles, shared round globals and cross-computer acceptance remain open. [AI evidence](docs/CONTINUATION_56_NATIVE_AI.md). |
+| **4. Firefight & Zombie Apocalypse** | In Development | A solo native controller completes two AI-cleared waves. Human engagement remains pending. Original Zombie carrier/rider creation and controlled release work; automatic release and complete Zombie gameplay remain open. |
+| **5. Universal Halo editing & conversion** | In Development | Format-specific readers, native loose tags, bounded compiled-map edits, recursive staging and real CE → MCC rebuilding. Each target still needs its own game/asset acceptance; a compile is not playable-conversion proof. [Compatibility](docs/CONTINUATION_58_COMPATIBILITY.md). |
+| **6. Live Link** | Available Now, scoped | Supported exact-build MCC object transforms, scaling and readback. Non-MCC write adapters and arbitrary live spawning/BSP replacement remain unverified. |
+| **7. Real-time collaborative modding** | Available Now, scoped | Private SparkLink native-tag/validated-asset/BSP transactions, author Undo, conflict handling, crash recovery and session rollover. Three independent native processes are tested on one PC. Two-computer acceptance remains open; this is source editing, separate from game replication. |
+| **8. Multiplayer Hub** | Available Now, scoped | Choose a runtime, then Host, Join or Collaborate. Managed CE hosting/joining and player movement/collision have evidence. Games retain their own protocols; no universal MCC-to-community lobby bridge is claimed. |
+| **9. Campaign creation & machinima** | In Development | Mission/HaloScript sources, camera paths, detached native recording cameras and takes. First Contact needs a full mission playthrough. |
 
-**Future research stays visible:** expanded campaign co-op, accepted 128-player gameplay, four-region engine streaming, PC split-screen, VR and tracked interactions. These remain requirements, not advertised production capabilities.
+**Research stays visible:** expanded campaign co-op, accepted 128-player gameplay, four-region engine streaming, PC split-screen, VR and tracked interactions. These remain requirements, not advertised production capabilities.
 
 **C59 workspace acceptance:** eligible drawers and map tabs detach into native windows with original-window return, saved placement and durable history. Minimized/inactive editors stop drawing; two warm map renderers per window retain document state while older GPU contexts can be released. Online separates Host, Join and source collaboration. Three independent Spark processes pass native BSP compilation, host-crash/offline-edit recovery and explicit durable session rollover with fresh invitations. The 23-route native layout audit passes; physical multi-monitor removal and two-computer LAN/VPN remain unverified. Release builds refuse the Spacewar test bridge. [Exact evidence and limits](docs/CONTINUATION_59_WORKSPACE.md).
+
+**C60 maintenance and release closure:** stale library replies can no longer overwrite newer snapshots; real 40-event bursts drop from 40 to 2 library reads, with the same reduction for focused-map metadata. Window lifecycle commands and QuickForge source-resource resolution reuse dedicated owners. Full native regression and rendering-quality checks pass; broad load-time and memory results are mixed. The original C49 portable and newly installed NSIS application both start successfully, but GitHub upload is still blocked by missing authenticated access. [Exact findings, timings and release handoff](docs/CONTINUATION_60_RELEASE_MAINTENANCE.md).
 
 ## Real accomplishments
 
@@ -61,21 +64,21 @@ A runtime selector does not translate networking protocols. [Detailed compatibil
 
 ## Download / install
 
-**[Download Windows previews from GitHub Releases](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases).** A release must attach an x64 `_Setup.exe`, complete `_Portable.zip`, SHA-256 checksums and the exact source/version manifest.
+**[GitHub Releases — Windows upload pending](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases).** A public release must attach an x64 `_Setup.exe`, complete `_Portable.zip`, SHA-256 checksums and the exact source/version manifest.
 
-The last anonymous verification on November 2, 2026 found **no public releases**. The accepted local C49 candidate is not a public download. Its sealed source is `cb07581597de11e83d1c10bafad526e8b031f27e`; C51 does not replace those binaries under the same identity. The draft-only [release workflow](.github/workflows/release.yml) requires pushed source, regression/package checks, verified asset downloads and owner approval before publication. Actions artifacts are not Release assets. [Exact preserved files and owner action](docs/C51_PUSH_NOTES.md).
+The fresh anonymous API check on **November 3, 2026, 12:53 UTC** returned **no public releases**. C49's accepted installer/portable/source set was rechecked and its two Windows applications launched again; those local files are not public downloads. Its exact source is `cb07581597de11e83d1c10bafad526e8b031f27e`. C50–C60 source improvements are not retroactively included in that candidate. The draft-only [release workflow](.github/workflows/release.yml) requires known pushed source, regression/package checks, verified asset downloads and owner approval before publication. Actions artifacts are not Release assets. [Exact files and draft-upload instructions](docs/C60_PUSH_NOTES.md).
 
-Windows 10/11 x64 requires [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/); the installer can offer it when missing. **No Linux package is advertised as verified:** AppImage and `.deb` builds must compile and launch first. No Halo game, maps, models, SDK, proprietary bank or optional Steam bridge is bundled.
+Windows 10/11 x64 requires [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/); the installer can offer it when missing. **No Linux package is advertised as verified:** AppImage and `.deb` builds must compile and launch first. macOS also has no accepted native package/startup test. No Halo game, maps, models, SDK, proprietary bank or optional Steam bridge is bundled.
 
 ## Inside the workbench
 
 Genuine native application captures. Editor/compiler previews are work in progress; they do not prove game combat or multiplayer parity.
 
-![Current native Spark home and flagship overview](docs/screenshots/c51/home.png)
+![C60 native map renderer with the actual MCC Blood Gulch source](docs/screenshots/c60/native-mcc-map.png)
 
-![Native BSP Workshop construction](docs/screenshots/c51/workshop.png)
+![C60 three-process collaborative BSP source editing and peer drag preview](docs/screenshots/c60/native-shared-bsp.png)
 
-![Runtime-specific Halo connections and tools](docs/screenshots/c51/runtimes.png)
+These are actual Windows app captures from C60 tests, using owned content. The BSP image shows editable source before compilation; neither capture proves gameplay parity. Earlier [Home](docs/screenshots/c51/home.png) and [runtime tools](docs/screenshots/c51/runtimes.png) captures remain historical.
 
 ## Edit, build, test and keep your source
 
