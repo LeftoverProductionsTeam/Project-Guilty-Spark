@@ -35,3 +35,39 @@ fn source(path:&std::path::Path,inspection:&maps::MapInspection)->Project {
     let report=spark_core::build::compatibility(&p,&inspection,&Default::default());
     assert!(report.blockers.iter().any(|message|message.contains("source identity does not match")));
 }
+
+#[test] fn input_family_agreement_never_grants_conversion_or_live_writes() {
+    use source_identity::RouteStatus::*;
+    let dir=tempfile::tempdir().unwrap();
+    for version in [5,6,7,609,13] {
+        let path=dir.path().join(format!("native-{version}.map"));common::write_map(&path,version);
+        let mut inspection=maps::inspect_map(&path,None).unwrap();let p=source(&path,&inspection);
+        let facts=source_identity::describe(&p,&inspection).unwrap();
+        let contract=&facts.contract;
+        assert_eq!(contract.platform_ambiguous,matches!(version,6|7));
+        assert_eq!(contract.runtime_family_candidates.contains(&RuntimeId::MccSteam),version==13);
+        assert_eq!(contract.runtime_family_candidates.contains(&RuntimeId::OpenCe),matches!(version,5|609));
+        assert_eq!(contract.runtime_family_candidates.contains(&RuntimeId::ChupathingyCe),matches!(version,5|7|609));
+        assert_eq!(contract.compilation_targets[0].status,if version==5{Unsupported}else{RequiresPreflight});
+        assert!(contract.compilation_targets.iter().skip(1).all(|route|route.status==Unsupported));
+        assert!(contract.operations.iter().all(|route|route.operation!="liveWrite"));
+        assert_eq!(contract.operations.iter().find(|route|route.operation=="compiledCacheEdit").unwrap().status,
+            if version==13{RequiresPreflight}else{Unsupported});
+        for compressed in [false,true] {
+            inspection.header.extended=!compressed;inspection.header.compressed=compressed;
+            assert!(!source_identity::mcc_conversion_source(&inspection));
+            let contract=source_identity::format_contract(&p,&inspection);
+            assert_eq!(contract.compilation_targets[0].status,Unsupported);
+            let report=spark_core::build::compatibility(&p,&inspection,&Default::default());
+            assert!(report.blockers.iter().any(|message|message.contains("no reviewed imported-cache MCC conversion route")));
+        }
+    }
+}
+
+#[test] fn runtime_map_directories_cover_native_custom_content_without_broad_searches() {
+    assert!(spark_core::runtime::map_directories(RuntimeId::OpenCe).iter().any(|(path,_)|*path=="custom_maps"));
+    for folder in ["maps_ce","maps_md","maps_pc","custom_maps"] {
+        assert!(spark_core::runtime::map_directories(RuntimeId::ChupathingyCe).iter().any(|(path,_)|*path==folder));
+    }
+    assert!(!spark_core::runtime::map_directories(RuntimeId::MccSteam).iter().any(|(path,_)|*path=="maps"));
+}

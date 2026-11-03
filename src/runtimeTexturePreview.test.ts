@@ -4,7 +4,7 @@ import type { VerifiedBatchImage } from './ownedBitmapBatch';
 const mock = vi.hoisted(() => ({ call: vi.fn(), hosting: vi.fn(()=>'mccSteam') }));
 vi.mock('./api', () => ({ call: mock.call }));
 vi.mock('./mapSession', () => ({ readMapSession: mock.hosting }));
-import { defaultPreviewMaterials, fillRuntimeTexturePreviews } from './runtimeTexturePreview';
+import { defaultPreviewMaterials, fillRuntimeTexturePreviews, runtimeTextureSource, invalidateRuntimeTextureSources } from './runtimeTexturePreview';
 const sourceHash = 'a'.repeat(64),
   runtimeHash = 'b'.repeat(64),
   packHash = 'c'.repeat(64);
@@ -14,7 +14,7 @@ const inspection = {
   sha256: sourceHash,
   tags: [tag(1), tag(2, 'textures/embedded')],
 } as MapInspection;
-const project = { id: 'source', source: { sha256: sourceHash, cacheVersion:6, resourceSha256: {} } } as Project;
+const project = { id: 'source', source: { sha256: sourceHash, cacheVersion:6, resourceSha256: {},originalPath:'/owned/original.map',preservedPath:'/library/source.map',scenarioPath:'levels/test/source' } } as Project;
 const runtime = {
   project: { id: 'runtime', source: { sha256: runtimeHash, resourceSha256: { 'mcc-textures': packHash } } },
   inspection: { sha256: runtimeHash, tags: [tag(9),tag(10,'textures/embedded')] },
@@ -61,6 +61,7 @@ const refusal = (code = 'missing-resource'): VerifiedBatchImage => ({
 });
 const mapping = { sourceBitmapTagId: 1, bitmapTagId: 9, imageIndex: 0, width: 1, height: 1, format: 'BGRA8' };
 beforeEach(() => {
+  invalidateRuntimeTextureSources();
   mock.call.mockReset();
   mock.hosting.mockClear();
   mock.call.mockImplementation(async (command: string,args:any) => {
@@ -76,6 +77,18 @@ beforeEach(() => {
       };
     throw Error(command);
   });
+});
+it('retires changed installation results without deleting a newer material request',async()=>{
+  const pending:((value:OpenProject)=>void)[]=[];
+  mock.call.mockImplementation(()=>new Promise<OpenProject>(resolve=>pending.push(resolve)));
+  const old=runtimeTextureSource('openCe');
+  const refused=expect(old).rejects.toThrow('Runtime installations changed');
+  invalidateRuntimeTextureSources();
+  const current=runtimeTextureSource('openCe');
+  pending[0](runtime);await refused;
+  expect(runtimeTextureSource('openCe')).toBe(current);
+  pending[1](runtime);expect(await current).toBe(runtime);
+  expect(mock.call).toHaveBeenCalledTimes(2);
 });
 describe('viewer-only compatible runtime pixels', () => {
   it('refuses a foreign native source plan and retries a corrected plan without changing compiler pins',async()=>{

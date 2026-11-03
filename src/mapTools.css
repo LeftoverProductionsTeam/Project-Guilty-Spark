@@ -6,6 +6,15 @@
   max-width: 100%;
   box-sizing: border-box;
 }
+.gs-source-identity {margin:6px 0;font-size:11px;min-width:0;}
+.gs-source-identity summary {cursor:pointer;padding:5px 0;}
+.gs-source-identity dl {display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px;margin:6px 0;}
+.gs-source-identity dd {margin:0;overflow-wrap:anywhere;}
+.gs-source-identity dt,.gs-source-identity small {color:var(--text-muted,#a8b7c5);}
+.gs-source-identity li {margin:4px 0;}
+.gs-source-identity li small {display:block;}
+.gs-source-routes {display:flex;gap:5px;flex-wrap:wrap;}
+.gs-source-routes span {border:1px solid var(--line,#344352);border-radius:5px;padding:3px 5px;}
 .gs-map-tools > summary {
   cursor: pointer;
   font-size: 12px;

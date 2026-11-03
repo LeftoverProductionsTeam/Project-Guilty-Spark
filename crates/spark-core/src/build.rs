@@ -106,6 +106,9 @@ pub fn compatibility(
     if let Some(source)=&project.source {
         if let Err(problem)=crate::source_identity::validate(source,inspection){blockers.push(problem.to_string());}
     }
+    if !crate::source_identity::mcc_conversion_source(inspection) {
+        blockers.push("This source format has no reviewed imported-cache MCC conversion route. Xbox, extended and compressed assets being readable does not make them convertible; preserve them and use a separately supported source workflow.".into());
+    }
     if crate::native_audio::requested(project) {
         blockers.push("Native looping emitters currently require the MCC QuickForge source build; existing-map conversion cannot add them".into());
     }

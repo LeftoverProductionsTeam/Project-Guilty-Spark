@@ -1,6 +1,7 @@
 import type { Project, Settings } from '../types';
 import { useMapState } from '../mapSession';
 import BuildTargets from './BuildTargets';
+import MapSourceIdentity from './MapSourceIdentity';
 import '../mapTools.css';
 export default function MapTools({
   project,
@@ -34,6 +35,7 @@ export default function MapTools({
         onSave={onSave}
         onChange={(p) => edit(p, 'Configure tools and tags for this map')}
       />
+      {open&&<MapSourceIdentity project={project}/>}
       <p className="subtle">
         Tags, selections, searches, viewport position and the last active editor are remembered per map.
         Source edits keep their own undo history; switching tools does not clear them.

@@ -2192,9 +2192,30 @@ test('connected thread-release faults disable object, sprint and camera writes w
   await expect(page.getByRole('button',{name:'Toggle in-game third person',exact:true})).toBeDisabled();
   await page.locator('.native-sprint-controls>summary').click();await expect(page.getByRole('button',{name:'Enable native sprint',exact:true})).toBeDisabled();
   await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');await expect(page.getByRole('button',{name:'Apply live object position',exact:true})).toBeDisabled();
+  await page.getByRole('combobox',{name:'Active map runtime',exact:true}).selectOption('openCe');
+  await expect(page.getByText('This connection remains bound to MCC.',{exact:false})).toBeVisible();
   const release=page.getByRole('button',{name:'Retry thread release & disconnect',exact:true});await release.click();await expect(page.getByText('Synthetic thread release still incomplete',{exact:false})).toBeVisible();await expect(release).toBeEnabled();
   await page.evaluate(()=>{(window as any).__threadRelease.fail=false;});await release.click();await expect(page.getByText('Synthetic owned thread release acknowledged and temporary data restored.',{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>(window as any).__threadRelease.calls)).toEqual(['synthetic-thread-connection','synthetic-thread-connection']);
+});
+
+test('selecting a non-MCC game never enables the MCC connect operation',async({page})=>{
+  await mockDesktop(page);
+  await chooseTool(page,'Level editor');
+  await page.getByRole('button',{name:'Connect to a running Halo game',exact:true}).click();
+  await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');
+  await openDrawer(page,'Game connection');
+  const consent=page.getByRole('checkbox',{name:'I launched MCC using Anti-Cheat Disabled in Steam',exact:true});
+  await consent.check();
+  const connect=page.getByRole('button',{name:'Connect current Halo 1 session',exact:true});
+  await expect(connect).toBeEnabled();
+  for(const runtime of ['haloCustomEdition','openCe','chupathingyCe']){
+    await page.getByRole('combobox',{name:'Active map runtime',exact:true}).selectOption(runtime);
+    await expect(connect).toBeDisabled();await expect(consent).toBeDisabled();
+    await expect(page.getByText('This runtime has no validated Spark Live Link write adapter.',{exact:false})).toBeVisible();
+  }
+  await page.getByRole('combobox',{name:'Active map runtime',exact:true}).selectOption('mccSteam');
+  await expect(connect).toBeEnabled();
 });
 
 test('competing live connections and uncertain cleanup preserve retry and the new identity', async ({page}) => {

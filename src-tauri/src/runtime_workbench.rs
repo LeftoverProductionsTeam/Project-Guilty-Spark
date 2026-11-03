@@ -6,6 +6,7 @@ use spark_core::{
     community_servers as servers, mcc_content_probe as content, runtime_adapters as adapters,
 };
 use std::process::{Child, Command};
+use sha2::Digest;
 const WORKING_TAG_SNAPSHOT_REASON:&str="before-build";
 
 #[derive(Default)]
@@ -50,9 +51,57 @@ struct PendingTool {
     created: Instant,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all="camelCase")]
+struct ToolResource { relative_path:String, sha256:String, bytes:u64 }
+
+/// H1A's rasterizer reads these relative to its current directory. Keep the
+/// derived job as cwd (short relative tag paths), with only the exact installed
+/// kit's shader resources. Never copy a complete kit or overwrite user files.
+fn tool_resources(kit:&Path)->Reply<Vec<ToolResource>> {
+    ["shaders/fx.bin","shaders/psh.bin","shaders/vsh.bin"].into_iter().map(|relative|{
+        let file=kit.join(relative);core::reject_links(&file).map_err(error)?;
+        let metadata=fs::metadata(&file).map_err(error)?;
+        if !metadata.is_file()||!(1..=16*1024*1024).contains(&metadata.len()){return Err("H1A shader resource is missing or exceeds 16 MiB; verify the installed kit".into());}
+        Ok(ToolResource{relative_path:relative.into(),sha256:maps::hash_file(&file).map_err(error)?,bytes:metadata.len()})
+    }).collect()
+}
+fn stage_tool_resources(kit:&Path,workspace:&Path,pins:&[ToolResource])->Reply<()> {
+    // Review the whole input/destination set before creating anything.
+    let current=tool_resources(kit)?;
+    if serde_json::to_value(&current).map_err(error)?!=serde_json::to_value(pins).map_err(error)? {return Err("H1A shader resources changed after the launch preview; prepare it again".into());}
+    for pin in pins {
+        let target=workspace.join(&pin.relative_path);core::reject_links(&target).map_err(error)?;
+        if target.exists()&&(!target.is_file()||maps::hash_file(&target).map_err(error)?!=pin.sha256){return Err("The working folder contains different shader resources; no file was overwritten".into());}
+    }
+    for pin in pins {
+        let target=workspace.join(&pin.relative_path);
+        if !target.exists(){
+            let bytes=bounded_read(&kit.join(&pin.relative_path),16*1024*1024)?;
+            if bytes.len() as u64!=pin.bytes||core::hex_bytes(sha2::Sha256::digest(&bytes))!=pin.sha256{return Err("H1A shader resource changed during staging".into());}
+            fs::create_dir_all(target.parent().ok_or("Shader resource has no parent")?).map_err(error)?;
+            project::atomic_write(&target,&bytes,false).map_err(error)?;
+        }
+        if maps::hash_file(&target).map_err(error)?!=pin.sha256{return Err("Staged shader resource readback differed".into());}
+    }
+    Ok(())
+}
+
 struct ToolProcess {
     child: Child,
     view: ToolProcessView,
+    owner:String,
+    #[cfg(windows)]
+    workspace_alias:Option<core::native_workspace::Alias>,
+}
+impl Drop for ToolProcess {
+    fn drop(&mut self) {
+        // Only the owned Standalone preview uses a process-lifetime short path.
+        // Stop it before releasing that mapping; external editing tools keep
+        // their existing independent lifetime and editable source ownership.
+        #[cfg(windows)]
+        if self.workspace_alias.is_some()&&self.child.try_wait().ok().flatten().is_none(){let _=self.child.kill();let _=self.child.wait();}
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -86,6 +135,7 @@ pub(super) struct ToolLaunchPlan {
     scenario_file: PathBuf,
     arguments: Vec<String>,
     startup_script: Option<String>,
+    resources: Vec<ToolResource>,
     expires_at_unix: u64,
     detail: String,
 }
@@ -135,6 +185,7 @@ pub(super) fn release_window(state: &AppState, label: &str) {
     if let Ok(mut workbench) = state.runtime_workbench.lock() {
         workbench.plans.retain(|_, p| p.owner != label);
         workbench.joins.retain(|_, p| p.owner != label);
+        workbench.processes.retain(|p|p.owner!=label||p.view.action_id!="testScene");
     }
 }
 
@@ -376,6 +427,8 @@ fn processes(state: &AppState) -> Reply<Vec<ToolProcessView>> {
         if process.view.status == "running" {
             match process.child.try_wait() {
                 Ok(Some(exit)) => {
+                    #[cfg(windows)]
+                    process.workspace_alias.take();
                     process.view.status = "exited".into();
                     process.view.exit_code = exit.code();
                     process.view.detail = "Process exited. Exit status alone does not establish scene loading, connection or gameplay acceptance.".into();
@@ -577,7 +630,7 @@ pub(super) async fn prepare_runtime_tool(
         if runtime_id!=runtime::RuntimeId::MccSteam {return Err("This source-aware tool route currently implements the H1A kit. Other runtimes retain their separate setup/build workflows.".into());}
         let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
-        let settings=tool_settings(&state,Some(&project))?;official_h1a_kit(&state,&settings)?;
+        let settings=tool_settings(&state,Some(&project))?;let kit=official_h1a_kit(&state,&settings)?;
         let tool_id=match action_id.as_str(){"editLevel"=>"sapien","editTags"=>"guerilla","testScene"=>"tagTest",_=>return Err("Choose an integrated scene or tag editor action".into())};
         let (executable,executable_sha256,executable_architecture)=inspect_tool_file(&settings,tool_id)?;
         let id=uuid::Uuid::new_v4().to_string();
@@ -594,7 +647,8 @@ pub(super) async fn prepare_runtime_tool(
             if action_id=="editLevel"{arguments.extend(["-multipleinstance".into(),"-data_dir".into(),"data".into()]);}
             arguments.push(format!("tags\\{}.scenario",context.scenario_path.replace('/',"\\")));None
         };
-        let view=ToolLaunchPlan{id:id.clone(),runtime_id,action_id,project_id,build_id:context.build.id,executable,executable_sha256,executable_architecture,working_directory:context.workspace,tags_directory:context.tags,scenario_file:context.scenario,arguments,startup_script:startup_script.clone(),expires_at_unix:now()+90,
+        let resources=if action_id=="editTags"{vec![]}else{tool_resources(&kit)?};
+        let view=ToolLaunchPlan{id:id.clone(),runtime_id,action_id,project_id,build_id:context.build.id,executable,executable_sha256,executable_architecture,working_directory:context.workspace,tags_directory:context.tags,scenario_file:context.scenario,arguments,startup_script:startup_script.clone(),resources,expires_at_unix:now()+90,
             detail:"Uses this map's derived build-job tags. External tools can edit those working files; source caches and SDK master tags are not selected. Close the tools, use Build working tag edits in dock details, then open that compiled map to bring changes into Spark. The ordinary source build regenerates its own tags. Standalone scene tests do not certify retail MCC or multiplayer.".into()};
         let mut workbench=lock(&state.runtime_workbench)?;
         if app.get_webview_window(&owner).is_none(){return Err("The requesting window closed during tool inspection".into());}
@@ -621,7 +675,7 @@ pub(super) async fn launch_runtime_tool(
         check_document_owner(&state,&plan.view.project_id,&owner)?;
         let project=lock(&state.library)?.get(&plan.view.project_id).map_err(error)?;
         let context=source_context(&state,&project)?;
-        let settings=tool_settings(&state,Some(&project))?;official_h1a_kit(&state,&settings)?;
+        let settings=tool_settings(&state,Some(&project))?;let kit=official_h1a_kit(&state,&settings)?;
         let tool_id=match plan.view.action_id.as_str(){"editLevel"=>"sapien","editTags"=>"guerilla","testScene"=>"tagTest",_=>return Err("Unknown tool launch plan".into())};
         let (executable,hash,_)=inspect_tool_file(&settings,tool_id)?;
         if project.fingerprint().map_err(error)?!=plan.fingerprint || context.build.id!=plan.view.build_id || context.tags!=plan.view.tags_directory || context.workspace!=plan.view.working_directory || context.scenario!=plan.view.scenario_file || context.scenario_sha256!=plan.scenario_sha256 || executable!=plan.view.executable || hash!=plan.view.executable_sha256 {
@@ -634,6 +688,7 @@ pub(super) async fn launch_runtime_tool(
             workbench.processes.retain(|p|p.view.status=="running");
             if workbench.processes.len()>=16{return Err("Close an existing tool before opening another (16 running tool limit)".into());}
         }
+        if !plan.view.resources.is_empty(){stage_tool_resources(&kit,&context.workspace,&plan.view.resources)?;}
         if let Some(contents)=&plan.startup_script {
             let script=context.workspace.join(format!("spark-scene-{}.txt",plan.view.id));
             project::atomic_write(&script,contents.as_bytes(),false).map_err(error)?;
@@ -641,9 +696,14 @@ pub(super) async fn launch_runtime_tool(
         if plan.view.action_id!="editTags"{let data=context.workspace.join("data");core::reject_links(&data).map_err(error)?;fs::create_dir_all(data).map_err(error)?;}
         let mut command=Command::new(&executable);command.current_dir(&context.workspace).args(&plan.view.arguments).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
         #[cfg(windows)]{use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);}
+        #[cfg(windows)]
+        let workspace_alias=if plan.view.action_id=="testScene"{Some(core::native_workspace::Alias::new(&context.workspace).map_err(error)?)}else{None};
+        #[cfg(windows)]
+        if let Some(alias)=&workspace_alias{command.current_dir(alias.path());}
         let child=command.spawn().map_err(error)?;
-        let view=ToolProcessView{id:plan.view.id,action_id:plan.view.action_id,project_id:project.id,process_id:child.id(),status:"running".into(),exit_code:None,detail:"Process launch observed. Scene loading and gameplay await acceptance. Save and close this tool, then choose Build working tag edits in dock details.".into(),executable:plan.view.executable,executable_sha256:plan.view.executable_sha256,tags_directory:context.tags};
-        lock(&state.runtime_workbench)?.processes.push(ToolProcess{child,view:view.clone()});
+        let detail=if plan.view.action_id=="testScene"{"Standalone preview launched with owned source and native path support. It stops when Spark closes. Scene loading and gameplay await acceptance."}else{"Process launch observed. Scene loading and gameplay await acceptance. Save and close this tool, then choose Build working tag edits in dock details."};
+        let view=ToolProcessView{id:plan.view.id,action_id:plan.view.action_id,project_id:project.id,process_id:child.id(),status:"running".into(),exit_code:None,detail:detail.into(),executable:plan.view.executable,executable_sha256:plan.view.executable_sha256,tags_directory:context.tags};
+        lock(&state.runtime_workbench)?.processes.push(ToolProcess{child,view:view.clone(),owner,#[cfg(windows)]workspace_alias});
         Ok(view)
     }).await.map_err(error)?
 }
@@ -1036,6 +1096,24 @@ mod tests {
         ] {
             assert!(console_scenario(value).is_err(), "{value:?}");
         }
+    }
+    #[test]
+    fn native_shader_staging_rechecks_kit_and_never_overwrites_other_working_files() {
+        let temp=tempfile::tempdir().unwrap();let kit=temp.path().join("kit");let job=temp.path().join("job");
+        fs::create_dir_all(kit.join("shaders")).unwrap();fs::create_dir(&job).unwrap();
+        for name in ["fx.bin","psh.bin","vsh.bin"]{fs::write(kit.join("shaders").join(name),name.as_bytes()).unwrap();}
+        fs::write(kit.join("shaders/unrelated.exe"),b"never copy").unwrap();
+        let pins=tool_resources(&kit).unwrap();
+        fs::write(kit.join("shaders/vsh.bin"),b"changed").unwrap();
+        assert!(stage_tool_resources(&kit,&job,&pins).is_err());assert!(!job.join("shaders").exists());
+        fs::write(kit.join("shaders/vsh.bin"),b"vsh.bin").unwrap();
+        fs::create_dir(job.join("shaders")).unwrap();fs::write(job.join("shaders/vsh.bin"),b"user data").unwrap();
+        assert!(stage_tool_resources(&kit,&job,&pins).is_err());
+        assert_eq!(fs::read(job.join("shaders/vsh.bin")).unwrap(),b"user data");assert!(!job.join("shaders/fx.bin").exists());
+        let clean=temp.path().join("clean-job");fs::create_dir(&clean).unwrap();
+        stage_tool_resources(&kit,&clean,&pins).unwrap();stage_tool_resources(&kit,&clean,&pins).unwrap();
+        assert_eq!(fs::read_dir(clean.join("shaders")).unwrap().count(),3);
+        for pin in pins{assert_eq!(maps::hash_file(&clean.join(&pin.relative_path)).unwrap(),pin.sha256);assert_eq!(maps::hash_file(&kit.join(&pin.relative_path)).unwrap(),pin.sha256);}
     }
     #[test]
     fn sdk_architecture_is_not_inferred_from_the_mcc_game_process() {

@@ -87,35 +87,46 @@ fn discover(state: &AppState) -> Reply<Vec<Detected>> {
 pub(super) fn owned_map_roots(state:&AppState)->Reply<Vec<(PathBuf,String)>>{
     let mut roots=vec![];
     if let Some(mcc)=lock(&state.installation)?.mcc_path.clone(){roots.push((mcc.join("halo1/maps"),"MCC Halo 1".into()));}
-    for item in discover(state)?{if item.content_ready{roots.push((item.data_root.join("maps"),item.runtime_id.name().into()));}}
+    for item in discover(state)?{if item.content_ready{
+        roots.extend(runtime::map_directories(item.runtime_id).iter().map(|(folder,_)|
+            (item.data_root.join(folder),item.runtime_id.name().into())));
+    }}
     Ok(roots)
 }
 /// Provenance uses original byte identity and installation roots, never the
 /// selected hosting runtime. Missing/changed originals or ambiguous shared
 /// roots leave provenance unknown; the preserved map remains inspectable.
-pub(super) fn source_origin(state:&AppState,source:&project::Source)->Reply<Option<core::source_identity::RuntimeOrigin>>{
-    fn canonical_local(path:&Path)->Option<PathBuf>{
-        core::library::validate_local_input_path(path).ok()?;core::reject_links(path).ok()?;fs::canonicalize(path).ok()
-    }
-    let Some(original)=canonical_local(&source.original_path) else{return Ok(None)};
-    if !original.is_file()||maps::hash_file(&original).map_err(error)?!=source.sha256{return Ok(None);}
+fn canonical_local(path:&Path)->Option<PathBuf>{
+    core::library::validate_local_input_path(path).ok()?;core::reject_links(path).ok()?;fs::canonicalize(path).ok()
+}
+fn original_in_maps(runtime_id:runtime::RuntimeId,root:&Path,original:&Path)->bool{
+    runtime::map_directories(runtime_id).iter().any(|(folder,_)|
+        canonical_local(&root.join(folder)).is_some_and(|maps|original.starts_with(maps)))
+}
+pub(super) fn source_installations(state:&AppState,source:&project::Source)->Reply<Vec<core::source_identity::RuntimeInstallation>>{
+    let original=canonical_local(&source.original_path).filter(|path|path.is_file());
+    let original=original.filter(|path|maps::hash_file(path).ok().as_deref()==Some(&source.sha256));
+    let belongs=|runtime_id:runtime::RuntimeId,root:&Path| original.as_ref().is_some_and(|original|original_in_maps(runtime_id,root,original));
     let mut matches=vec![];
     if let Some(mcc)=lock(&state.installation)?.mcc_path.clone(){
-        if canonical_local(&mcc.join("halo1/maps")).is_some_and(|maps|original.starts_with(maps)){
-            matches.push(core::source_identity::RuntimeOrigin{runtime_id:runtime::RuntimeId::MccSteam,root:mcc,executable_sha256:None});
-        }
+        matches.push(core::source_identity::RuntimeInstallation{
+            original_location:belongs(runtime::RuntimeId::MccSteam,&mcc),
+            cache_family_matches:core::source_identity::runtime_family_matches(runtime::RuntimeId::MccSteam,source.cache_version),
+            origin:core::source_identity::RuntimeOrigin{runtime_id:runtime::RuntimeId::MccSteam,root:mcc,executable_sha256:None}});
     }
     let registrations:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
     for registration in registrations.into_iter().take(24){
-        let maps=registration.data_root.as_ref().unwrap_or(&registration.root).join("maps");
-        if !canonical_local(&maps).is_some_and(|maps|original.starts_with(maps)){continue;}
         if let Ok(installation)=runtime::inspect_registration(&registration){
             if installation.validation==runtime::TestStatus::Pass {
-                matches.push(core::source_identity::RuntimeOrigin{runtime_id:registration.runtime_id,root:installation.root,executable_sha256:installation.executable_sha256});
+                if matches.iter().any(|entry|entry.origin.runtime_id==registration.runtime_id&&entry.origin.root==installation.root){continue;}
+                matches.push(core::source_identity::RuntimeInstallation{
+                    original_location:belongs(registration.runtime_id,&installation.data_root),
+                    cache_family_matches:core::source_identity::runtime_family_matches(registration.runtime_id,source.cache_version),
+                    origin:core::source_identity::RuntimeOrigin{runtime_id:registration.runtime_id,root:installation.root,executable_sha256:installation.executable_sha256}});
             }
         }
     }
-    Ok(if matches.len()==1 {matches.pop()}else{None})
+    Ok(matches)
 }
 #[tauri::command]
 pub(super) async fn discover_halo_connections(app: tauri::AppHandle) -> Reply<Vec<Detected>> {
@@ -145,6 +156,20 @@ pub(super) async fn connect_detected_halo(app: tauri::AppHandle, runtime_id: run
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn original_custom_map_membership_is_native_family_specific_and_not_a_sibling_prefix(){
+        let root=tempfile::tempdir().unwrap();
+        for folder in ["maps","custom_maps","maps_ce","maps_md","maps_pc","maps_other"]{
+            fs::create_dir(root.path().join(folder)).unwrap();
+            let file=root.path().join(folder).join("owned.map");fs::write(&file,b"path membership only").unwrap();
+            let original=fs::canonicalize(file).unwrap();
+            assert_eq!(original_in_maps(runtime::RuntimeId::OpenCe,root.path(),&original),matches!(folder,"maps"|"custom_maps"));
+            assert_eq!(original_in_maps(runtime::RuntimeId::ChupathingyCe,root.path(),&original),folder!="maps_other");
+            assert!(!original_in_maps(runtime::RuntimeId::MccSteam,root.path(),&original));
+        }
+        let other=tempfile::tempdir().unwrap();let file=other.path().join("outside.map");fs::write(&file,b"outside").unwrap();
+        assert!(!original_in_maps(runtime::RuntimeId::OpenCe,root.path(),&fs::canonicalize(file).unwrap()));
+    }
     #[test]
     fn linked_and_source_roots_discover_known_siblings_without_a_matching_process_directory(){
         let anchor=PathBuf::from("owned/maps/zombie/maps");let roots=nearby_roots([anchor.clone(),anchor]);

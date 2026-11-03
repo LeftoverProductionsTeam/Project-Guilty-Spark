@@ -28,7 +28,9 @@ pub(super) struct MapTextureSource {
 }
 fn source_context(state:&AppState,project:&Project,inspection:&MapInspection)->Reply<core::source_identity::SourceIdentity>{
     let mut identity=core::source_identity::describe(project,inspection).map_err(error)?;
-    identity.runtime_origin=runtime_connections::source_origin(state,&identity.source)?;
+    identity.runtime_installations=runtime_connections::source_installations(state,&identity.source)?;
+    let origins=identity.runtime_installations.iter().filter(|entry|entry.original_location).collect::<Vec<_>>();
+    identity.runtime_origin=if origins.len()==1{Some(origins[0].origin.clone())}else{None};
     Ok(identity)
 }
 #[tauri::command]

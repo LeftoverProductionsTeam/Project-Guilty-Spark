@@ -121,12 +121,11 @@ pub(super) fn resource_roots(state: &AppState, project: &Project) -> Reply<Vec<(
         .setting("runtimeRegistrations")
         .map_err(error)?;
     for registration in registrations.into_iter().take(24) {
-        roots.push((
-            registration.root.join("maps"),
-            "Registered Halo installation",
-        ));
-        if let Some(path) = registration.data_root {
-            roots.push((path.join("maps"), "Registered runtime data"));
+        for (folder,_) in runtime::map_directories(registration.runtime_id) {
+            roots.push((registration.root.join(folder), "Registered Halo installation"));
+            if let Some(path) = &registration.data_root {
+                roots.push((path.join(folder), "Registered runtime data"));
+            }
         }
     }
     let linked:Vec<PathBuf>=lock(&state.library)?.setting("assetSourceFolders").map_err(error)?;

@@ -5,7 +5,7 @@ mod windows {
     use crate::{invalid, Result};
     use std::{
         path::{Path, PathBuf},
-        sync::{Mutex, MutexGuard},
+        sync::Mutex,
     };
     static LOCK: Mutex<()> = Mutex::new(());
     #[link(name = "kernel32")]
@@ -40,14 +40,13 @@ mod windows {
             })
         }).collect()
     }
-    pub(crate) struct Alias {
+    pub struct Alias {
         path: PathBuf,
         device: Vec<u16>,
         target: Vec<u16>,
-        _lock: MutexGuard<'static, ()>,
     }
     impl Alias {
-        pub(crate) fn new(workspace: &Path) -> Result<Self> {
+        pub fn new(workspace: &Path) -> Result<Self> {
             crate::reject_links(workspace)?;
             let canonical = workspace.canonicalize()?;
             let name = canonical.to_string_lossy();
@@ -68,11 +67,14 @@ mod windows {
                 if unsafe { DefineDosDeviceW(0x1 | 0x8, device.as_ptr(), target.as_ptr()) } == 0 {
                     continue;
                 }
+                // Each lease owns an exact mapping. Serialize allocation, not
+                // its entire lifetime: another compiler may need a different
+                // letter while a native preview is still running.
+                drop(lock);
                 let alias = Self {
                     path: PathBuf::from(format!("{}:\\", letter as char)),
                     device,
                     target: target.clone(),
-                    _lock: lock,
                 };
                 if query(&alias.device).as_deref() != Some(&target_name) {
                     return invalid("Native workspace alias readback differed");
@@ -81,12 +83,13 @@ mod windows {
             }
             invalid("Native Halo tools need a free temporary drive letter P-Z to avoid filename limits; close an unused mapping and retry")
         }
-        pub(crate) fn path(&self) -> &Path {
+        pub fn path(&self) -> &Path {
             &self.path
         }
     }
     impl Drop for Alias {
         fn drop(&mut self) {
+            let _lock=LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             unsafe {
                 DefineDosDeviceW(
                     0x1 | 0x2 | 0x4 | 0x8,
@@ -122,6 +125,17 @@ mod windows {
                 .any(|mapping| mapping == &target[..target.len() - 1]));
         }
         #[test]
+        fn simultaneous_native_leases_keep_distinct_mapping_and_source_identity() {
+            let left=tempfile::tempdir().unwrap();let right=tempfile::tempdir().unwrap();
+            std::fs::write(left.path().join("owned.txt"),b"left").unwrap();
+            std::fs::write(right.path().join("owned.txt"),b"right").unwrap();
+            let a=Alias::new(left.path()).unwrap();let b=Alias::new(right.path()).unwrap();
+            assert_ne!(a.path(),b.path());
+            assert_eq!(std::fs::read(a.path().join("owned.txt")).unwrap(),b"left");
+            drop(a);
+            assert_eq!(std::fs::read(b.path().join("owned.txt")).unwrap(),b"right");
+        }
+        #[test]
         fn extraction_rebases_long_owned_paths_and_preserves_external_resources() {
             let temp = tempfile::tempdir().unwrap();
             let root = temp.path().join("an owned workspace with spaces".repeat(4));
@@ -147,4 +161,6 @@ mod windows {
     }
 }
 #[cfg(windows)]
-pub(crate) use windows::{Alias,extraction_arguments};
+pub use windows::Alias;
+#[cfg(windows)]
+pub(crate) use windows::extraction_arguments;

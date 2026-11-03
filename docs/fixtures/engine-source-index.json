@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedOn": "2026-11-02",
+  "reviewedOn": "2026-11-03",
   "researchOnly": true,
   "incorporatedEngineModules": 0,
   "gameplayAcceptance": false,
@@ -979,6 +979,174 @@
       "acceptance": "Native render/UV count and collision walkthrough, each separately verified",
       "trace": [],
       "status": "source-reviewed; no runtime authorization"
+    },
+    {
+      "id": "c58-opence-custom-edition-header-verify",
+      "capability": "CE header, length and extension admission",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/cache_file_formats.c",
+        "symbol": "custom_edition_header_verify",
+        "line": 1030,
+        "definitionLocated": true,
+        "fileSha256": "5cf0dc1eec04923e1d3bb740054a35c95e84ad7ffdd8b2c3a4af555429637ff8",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/cache_file_formats.c#L1030"
+      },
+      "ownership": "CE v609 uses tag-region bounds and rejects unsupported OpenSauce/compressed cases before loading. This is independent of the Xbox source layout.",
+      "inputOutput": "Read-only review of native cache/header/resource or console transport interfaces; no game bytes, scripts or commands transmitted.",
+      "runtimeSupport": "opence exact source revision only; separately installed publisher binaries retain independent identities.",
+      "gap": "Full format conversion and runtime-specific Live Link acceptance are not established by source availability.",
+      "integrationMethod": "Use supported tool/format boundaries or independently implement a narrowly reviewed adapter. No engine source copied or linked into Spark.",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Exact checkout, source file and license hashes verified. Runtime game-load, rendering, script safety and gameplay remain separate evidence.",
+      "status": "researched",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/source_identity.rs",
+        "symbol": "mcc_conversion_source",
+        "equivalence": "Independent source-contract or capability gate; not proof of equivalent engine behavior or accepted Live Link writes."
+      }
+    },
+    {
+      "id": "c58-opence-resource-map-open",
+      "capability": "Resource type and entry-table admission",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/cache_file_formats.c",
+        "symbol": "resource_map_open",
+        "line": 2084,
+        "definitionLocated": true,
+        "fileSha256": "5cf0dc1eec04923e1d3bb740054a35c95e84ad7ffdd8b2c3a4af555429637ff8",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/cache_file_formats.c#L2084"
+      },
+      "ownership": "Resource files are identified separately and checked against their expected native resource kind; a matching basename or hosting runtime is insufficient.",
+      "inputOutput": "Read-only review of native cache/header/resource or console transport interfaces; no game bytes, scripts or commands transmitted.",
+      "runtimeSupport": "opence exact source revision only; separately installed publisher binaries retain independent identities.",
+      "gap": "Full format conversion and runtime-specific Live Link acceptance are not established by source availability.",
+      "integrationMethod": "Use supported tool/format boundaries or independently implement a narrowly reviewed adapter. No engine source copied or linked into Spark.",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Exact checkout, source file and license hashes verified. Runtime game-load, rendering, script safety and gameplay remain separate evidence.",
+      "status": "researched",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/resource_map.rs",
+        "symbol": "parse",
+        "equivalence": "Independent source-contract or capability gate; not proof of equivalent engine behavior or accepted Live Link writes."
+      }
+    },
+    {
+      "id": "c58-opence-custom-edition-cache-tags-load",
+      "capability": "Native CE-to-engine tag loading",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "port/linux/game/custom_edition_cache.c",
+        "symbol": "custom_edition_cache_tags_load",
+        "line": 1117,
+        "definitionLocated": true,
+        "fileSha256": "322817b0034a2625c088421c81b262bcfb0f4c078b34e8ba74b53ced2566a7e3",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/port/linux/game/custom_edition_cache.c#L1117"
+      },
+      "ownership": "OpenCE resolves its own custom map, resource maps and conversion workspace. This is a native loader adaptation, not an emitted MCC cache or proof Spark can rebuild arbitrary Xbox maps.",
+      "inputOutput": "Read-only review of native cache/header/resource or console transport interfaces; no game bytes, scripts or commands transmitted.",
+      "runtimeSupport": "opence exact source revision only; separately installed publisher binaries retain independent identities.",
+      "gap": "Full format conversion and runtime-specific Live Link acceptance are not established by source availability.",
+      "integrationMethod": "Use supported tool/format boundaries or independently implement a narrowly reviewed adapter. No engine source copied or linked into Spark.",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Exact checkout, source file and license hashes verified. Runtime game-load, rendering, script safety and gameplay remain separate evidence.",
+      "status": "researched",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/source_identity.rs",
+        "symbol": "format_contract",
+        "equivalence": "Independent source-contract or capability gate; not proof of equivalent engine behavior or accepted Live Link writes."
+      }
+    },
+    {
+      "id": "c58-opence-telnet-console-initialize",
+      "capability": "Optional local script console boundary",
+      "sourceProject": "opence",
+      "repository": "https://github.com/OpenCommunityEdition/OpenCE",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "sourceLocation": {
+        "file": "source/networking/telnet_console.c",
+        "symbol": "telnet_console_initialize",
+        "line": 105,
+        "definitionLocated": true,
+        "fileSha256": "b9f7fd924271e3264943976826085d79260fd156b5cdbc77dc96686757b7f70b",
+        "url": "https://github.com/OpenCommunityEdition/OpenCE/blob/899219cc0a14b03bc12f0517a1e9ee4c37158af8/source/networking/telnet_console.c#L105"
+      },
+      "ownership": "The reviewed source disables this console by default, explicitly binds loopback and evaluates script text without authentication. It is a possible local integration interface, not a validated Spark write adapter.",
+      "inputOutput": "Read-only review of native cache/header/resource or console transport interfaces; no game bytes, scripts or commands transmitted.",
+      "runtimeSupport": "opence exact source revision only; separately installed publisher binaries retain independent identities.",
+      "gap": "Full format conversion and runtime-specific Live Link acceptance are not established by source availability.",
+      "integrationMethod": "Use supported tool/format boundaries or independently implement a narrowly reviewed adapter. No engine source copied or linked into Spark.",
+      "license": "AGPL-3.0 text; exact later-version election not established",
+      "acceptance": "Exact checkout, source file and license hashes verified. Runtime game-load, rendering, script safety and gameplay remain separate evidence.",
+      "status": "researched",
+      "sparkEquivalent": {
+        "file": "src/components/LiveObjectInspector.tsx",
+        "symbol": "adapterAvailable",
+        "equivalence": "Independent source-contract or capability gate; not proof of equivalent engine behavior or accepted Live Link writes."
+      }
+    },
+    {
+      "id": "c58-chupa-ce-map-open",
+      "capability": "Separate PC-family native cache admission",
+      "sourceProject": "chupa",
+      "repository": "https://github.com/ChupathingyCE/chupathingyce",
+      "revision": "9990568507eede8b81edd5437a4860de5465c408",
+      "sourceLocation": {
+        "file": "source/cache/cache_files_windows.c",
+        "symbol": "ce_map_open",
+        "line": 487,
+        "definitionLocated": true,
+        "fileSha256": "12f4d035590b557b342c26c5c3f8727d63c823c8e0913f43a866fd951c7fea17",
+        "url": "https://github.com/ChupathingyCE/chupathingyce/blob/9990568507eede8b81edd5437a4860de5465c408/source/cache/cache_files_windows.c#L487"
+      },
+      "ownership": "The CE/PC/MD map family decides filename suffix, version and independent tag cache; MCC input is explicitly refused. Missing files and rejected formats must remain distinct.",
+      "inputOutput": "Read-only review of native cache/header/resource or console transport interfaces; no game bytes, scripts or commands transmitted.",
+      "runtimeSupport": "chupa exact source revision only; separately installed publisher binaries retain independent identities.",
+      "gap": "Full format conversion and runtime-specific Live Link acceptance are not established by source availability.",
+      "integrationMethod": "Use supported tool/format boundaries or independently implement a narrowly reviewed adapter. No engine source copied or linked into Spark.",
+      "license": "GPL-3.0-or-later; section 7 console SDK permission",
+      "acceptance": "Exact checkout, source file and license hashes verified. Runtime game-load, rendering, script safety and gameplay remain separate evidence.",
+      "status": "researched",
+      "sparkEquivalent": {
+        "file": "crates/spark-core/src/source_identity.rs",
+        "symbol": "runtime_family_matches",
+        "equivalence": "Independent source-contract or capability gate; not proof of equivalent engine behavior or accepted Live Link writes."
+      }
+    },
+    {
+      "id": "c58-chupa-telnet-console-initialize",
+      "capability": "Chupathingy local script console boundary",
+      "sourceProject": "chupa",
+      "repository": "https://github.com/ChupathingyCE/chupathingyce",
+      "revision": "9990568507eede8b81edd5437a4860de5465c408",
+      "sourceLocation": {
+        "file": "source/networking/telnet_console.c",
+        "symbol": "telnet_console_initialize",
+        "line": 112,
+        "definitionLocated": true,
+        "fileSha256": "0f5428c43439a97d6752822d242832254e824b3f2c5e484c9efe91f03cb871f7",
+        "url": "https://github.com/ChupathingyCE/chupathingyce/blob/9990568507eede8b81edd5437a4860de5465c408/source/networking/telnet_console.c#L112"
+      },
+      "ownership": "The pinned source has a default-off loopback script console. Installed release, command semantics, map ownership and acknowledgment still require separate testing; there is no Spark adapter acceptance.",
+      "inputOutput": "Read-only review of native cache/header/resource or console transport interfaces; no game bytes, scripts or commands transmitted.",
+      "runtimeSupport": "chupa exact source revision only; separately installed publisher binaries retain independent identities.",
+      "gap": "Full format conversion and runtime-specific Live Link acceptance are not established by source availability.",
+      "integrationMethod": "Use supported tool/format boundaries or independently implement a narrowly reviewed adapter. No engine source copied or linked into Spark.",
+      "license": "GPL-3.0-or-later; section 7 console SDK permission",
+      "acceptance": "Exact checkout, source file and license hashes verified. Runtime game-load, rendering, script safety and gameplay remain separate evidence.",
+      "status": "researched",
+      "sparkEquivalent": {
+        "file": "src/components/LiveObjectInspector.tsx",
+        "symbol": "adapterAvailable",
+        "equivalence": "Independent source-contract or capability gate; not proof of equivalent engine behavior or accepted Live Link writes."
+      }
     }
   ]
 }

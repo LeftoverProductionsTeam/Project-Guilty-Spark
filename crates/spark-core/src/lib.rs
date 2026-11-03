@@ -61,7 +61,7 @@ pub mod mcc;
 pub mod mcc_content_probe;
 pub mod mcc_textures;
 pub mod multiplayer;
-mod native_workspace;
+pub mod native_workspace;
 pub mod project;
 pub mod portability;
 pub mod powerups;

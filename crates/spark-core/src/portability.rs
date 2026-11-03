@@ -198,7 +198,7 @@ pub fn assess(
                     profile.toolchain_generation
                 )
             },
-            conversion_available: mcc,
+            conversion_available: mcc && crate::source_identity::mcc_conversion_source(inspection),
             findings: target_findings(inspection, &profile),
             build_preflight: mcc.then(|| build::compatibility(project, inspection, tools)),
             profile,

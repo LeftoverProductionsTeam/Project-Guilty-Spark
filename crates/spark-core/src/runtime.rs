@@ -692,7 +692,7 @@ pub fn inspect_registration(registration: &RuntimeRegistration) -> Result<Runtim
     })
 }
 
-fn map_directories(id: RuntimeId) -> &'static [(&'static str, &'static str)] {
+pub fn map_directories(id: RuntimeId) -> &'static [(&'static str, &'static str)] {
     match id {
         RuntimeId::MccSteam => &[("halo1/maps", "mccHalo1")],
         RuntimeId::ChupathingyCe => &[

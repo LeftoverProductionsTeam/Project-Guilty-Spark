@@ -12,6 +12,90 @@ pub struct RuntimeOrigin {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all="camelCase")]
+pub struct RuntimeInstallation {
+    #[serde(flatten)]
+    pub origin: RuntimeOrigin,
+    pub original_location: bool,
+    /// Registry input-family agreement only, never a game-load receipt.
+    pub cache_family_matches: bool,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all="camelCase")]
+pub enum RouteStatus { Available, RequiresPreflight, Unsupported, RequiresSource }
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct NativeRoute {
+    pub operation: &'static str,
+    pub status: RouteStatus,
+    pub detail: &'static str,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct FormatContract {
+    pub cache_version: u32,
+    pub edition: &'static str,
+    pub platform_ambiguous: bool,
+    pub build: String,
+    pub extended: bool,
+    pub compressed: bool,
+    pub operations: Vec<NativeRoute>,
+    pub compilation_targets: Vec<NativeRoute>,
+    pub runtime_family_candidates: Vec<RuntimeId>,
+}
+
+pub fn runtime_family_matches(runtime_id: RuntimeId, version: u32) -> bool {
+    crate::runtime_adapters::registry().iter().any(|profile|
+        profile.profile_id == crate::runtime_adapters::profile_id(runtime_id)
+        && profile.cache_versions.contains(&version))
+}
+
+/// One source-family admission rule shared by preflight and the read-only
+/// contract. Parsed Xbox assets are not an implemented Xbox -> MCC converter.
+pub fn mcc_conversion_source(inspection: &MapInspection) -> bool {
+    [6, 7, 609, 13].contains(&inspection.header.version)
+        && !inspection.header.extended && !inspection.header.compressed
+}
+
+pub fn format_contract(project: &Project, inspection: &MapInspection) -> FormatContract {
+    use RouteStatus::*;
+    let plain = !inspection.header.extended && !inspection.header.compressed;
+    let rebuild = mcc_conversion_source(inspection);
+    let edition = match inspection.header.version {
+        5 => "Original Xbox-derived cache",
+        6 => "PC Trial / Mac Demo family; original platform needs provenance",
+        7 => "PC Retail / Mac / HaloMD family; original platform needs provenance",
+        609 => "Halo Custom Edition cache",
+        13 => "MCC Halo 1 cache",
+        _ => "Unclassified native cache",
+    };
+    let operations = vec![
+        NativeRoute {operation:"inspect",status:Available,detail:"This exact preserved cache was read by its native parser; counts are decoder evidence."},
+        NativeRoute {operation:"assetPreview",status:RequiresPreflight,detail:"Resolve exact resource identities and supported bitmap/model/audio payloads. Rendering and audible playback remain separate acceptance."},
+        NativeRoute {operation:"compiledCacheEdit",status:if plain&&inspection.header.version==13 {RequiresPreflight}else{Unsupported},detail:"The current direct writer reviews bounded MCC v13 cells/CRC. It cannot add arrays, tags or BSP topology; Smart Edit must admit each transaction."},
+        NativeRoute {operation:"looseTagRebuild",status:if rebuild {RequiresPreflight}else{Unsupported},detail:"Existing imported-cache publication rebuilds into MCC using matching native tools, complete recovered tags and explicit conversion preflight."},
+        NativeRoute {operation:"bspTopology",status:if rebuild&&project.bsp_assembly.is_some(){RequiresPreflight}else{RequiresSource},detail:"Use existing BSP assembly or editable QuickForge/Workshop source. Selecting a compiled triangle does not make it editable source."},
+    ];
+    let compilation_targets = vec![
+        NativeRoute {operation:"mccSteam",status:if rebuild{RequiresPreflight}else{Unsupported},detail:"MCC output requires the native conversion preflight and full dependencies. Unchanged MCC copies are not conversions."},
+        NativeRoute {operation:"haloCustomEdition",status:Unsupported,detail:"Imported-cache conversion to CE is not integrated. The separate reviewed CE QuickForge/working-source builder does not grant arbitrary reverse conversion."},
+        NativeRoute {operation:"openCe",status:Unsupported,detail:"OpenCE can admit reviewed native CE content through its own loader; this is not a separate cache compiler or an arbitrary converter."},
+        NativeRoute {operation:"chupathingyCe",status:Unsupported,detail:"Chupathingy has distinct native input families and resources. A CE source build/handoff is not universal cache conversion."},
+        NativeRoute {operation:"haloXbox",status:Unsupported,detail:"Xbox preservation and asset decoding are implemented subsets. No verified imported-cache console compiler or original-console publication route is integrated."},
+        NativeRoute {operation:"haloMd",status:Unsupported,detail:"A v7 family match is not a native HaloMD conversion. Preserve original platform/build resources; native Mac/MD compilation and gameplay need separate engineering."},
+    ];
+    FormatContract {cache_version:inspection.header.version,edition,
+        platform_ambiguous:matches!(inspection.header.version,6|7),build:inspection.header.build.clone(),
+        extended:inspection.header.extended,compressed:inspection.header.compressed,operations,compilation_targets,
+        runtime_family_candidates:[RuntimeId::MccSteam,RuntimeId::HaloCustomEdition,RuntimeId::OpenCe,RuntimeId::ChupathingyCe,
+            RuntimeId::HaloPc,RuntimeId::MacRetail,RuntimeId::MacDemo,RuntimeId::HaloPcTrial,RuntimeId::HaloMd,RuntimeId::HaloXbox]
+            .into_iter().filter(|id|runtime_family_matches(*id,inspection.header.version)).collect()}
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct Readback {
     pub render_triangles: usize,
     pub collision_triangles: usize,
@@ -29,6 +113,8 @@ pub struct SourceIdentity {
     /// Matching original bytes under a validated installation, when known.
     /// This does not grant runtime gameplay, conversion or Live Link support.
     pub runtime_origin: Option<RuntimeOrigin>,
+    pub runtime_installations: Vec<RuntimeInstallation>,
+    pub contract: FormatContract,
     pub resources: Vec<Resource>,
     pub readback: Readback,
     /// Configured profiles still need their normal source/tool preflight.
@@ -62,6 +148,7 @@ pub fn describe(project: &Project, inspection: &MapInspection) -> Result<SourceI
         }
     };
     Ok(SourceIdentity{schema_version:1,project_id:project.id.clone(),source:source.clone(),format:inspection.header.engine.clone(),runtime_origin:None,
+        runtime_installations:vec![],contract:format_contract(project,inspection),
         resources:inspection.resources.clone(),
         readback:Readback{render_triangles:inspection.render_mesh.as_ref().map_or(0,|mesh|mesh.indices.len()/3),collision_triangles:inspection.mesh.indices.len()/3,
             model_types:inspection.model_meshes.len(),tags:inspection.tags.len(),typed_fields:inspection.tags.iter().map(|tag|tag.fields.len()).sum()},

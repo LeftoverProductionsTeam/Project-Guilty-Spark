@@ -26,6 +26,7 @@ export default function LevelEditorWorkspace({
   entries,
   onBuild,
   onImportMap,onContinue,onDirector,
+  defaultRuntime,
 }: {
   project: Project | null;
   inspection: MapInspection | null;
@@ -42,6 +43,7 @@ export default function LevelEditorWorkspace({
   onBuild:()=>void;
   onImportMap:()=>void;onContinue:(id:string)=>void;
   onDirector:()=>void;
+  defaultRuntime?:import('../types').RuntimeId;
 }) {
   const [target, setTarget] = useMapState<'auto' | 'source' | 'live'>(project?.id??'new-map','level.target',intent === 'live' ? 'live' : 'auto');
   const [creating,setCreating]=useMapState(project?.id??'new-map','level.creating',false);
@@ -114,6 +116,7 @@ export default function LevelEditorWorkspace({
       {project?.source&&!project.quickForge&&<WorkspacePanel id="construction" label="Construction"><BspAssembly key={project.id} project={project} entries={entries} onEdit={onSourceEdit} onSave={onBeforeResources} onBuild={onBuild}/></WorkspacePanel>}
       <section className="level-editor-body" aria-label="Map viewer">
         <LiveEditor
+          defaultRuntime={defaultRuntime}
           onSourceEdit={onSourceEdit}
           project={project}
           inspection={inspection}

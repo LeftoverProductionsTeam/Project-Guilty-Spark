@@ -473,6 +473,7 @@ function Registration({
     setError('');
     try {
       onRegistered(await call<RuntimeReport[]>('register_runtime', { registration: draft }));
+      window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
       setMessage('Registration saved. Runtime files were not changed.');
     } catch (e) {
       setError(String(e));

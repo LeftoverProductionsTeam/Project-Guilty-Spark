@@ -7,6 +7,8 @@ import type { LiveViewportControls, LiveStatus } from './LiveObjectInspector';
 import { matchesLiveMap, runtimeScene } from '../liveScene';
 import { Notice } from './ui';
 import {assemblySignature} from '../bspAssembly';
+import {useMapState} from '../mapSession';
+import type {RuntimeId} from '../types';
 const World = lazy(() => import('./World'));
 type DropPoint = (x: number, y: number) => Vec3 | null;
 function LiveCameraStart({ status }: { status: LiveStatus }) {
@@ -68,6 +70,7 @@ function DropSurface({ point }: { point: React.MutableRefObject<DropPoint | null
   return null;
 }
 interface Props {
+  defaultRuntime?:RuntimeId;
   onSourceEdit?:(project:Project,description:string)=>void;
   mode?:'auto'|'source'|'live';
   sourceViewport?:React.ReactNode;
@@ -259,7 +262,9 @@ function LiveViewport({
   );
 }
 export default function LiveEditor(props: Props) {
+  const [runtime]=useMapState<RuntimeId>(props.project?.id??'global','hosting.runtime',props.project?.quickForge?.runtimeId??props.defaultRuntime??'mccSteam');
   return <LiveObjectInspector presentation={props.sourceViewport!==undefined?'drawer':'sidebar'} controlsOpen={props.mode==='live'}
+    runtimeId={runtime}
     keyboardEnabled={status=>!!status&&(props.mode==='live'||(props.mode!=='source'&&matchesLiveMap(props.project,props.inspection,status)))}
     viewport={(controls) => <LiveViewport {...props} controls={controls} />} />;
 }

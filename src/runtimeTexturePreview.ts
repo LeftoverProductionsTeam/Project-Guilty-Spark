@@ -4,22 +4,29 @@ import { bitmapImageKey, decodeOwnedBitmapBatch } from './ownedBitmapBatch';
 import type { OwnedBitmapBatchResponse, VerifiedBatchImage } from './ownedBitmapBatch';
 import type { OwnedBitmapTarget } from './ownedBitmapPreview';
 import type { ForgeMaterial } from './forge';
-import { publishTextureResources, textureResourceScope } from './textureResourceScope';
+import { publishTextureResources } from './textureResourceScope';
 import type { MapTextureSource } from './sourceIdentity';
+import {assertMapSourceIdentity,mapSourceIdentityKey} from './sourceIdentity';
 export { withPreviewDefaults } from './forgeDefaultMaterials';
 
 const sources = new Map<RuntimeId, Promise<OpenProject>>();
 const mapSources = new Map<string, Promise<MapTextureSource>>();
+let runtimeSourceEpoch=0;
+export function invalidateRuntimeTextureSources() {
+  runtimeSourceEpoch++;
+  sources.clear();
+  mapSources.clear();
+}
+if(typeof window!=='undefined')window.addEventListener('guilty-spark-runtime-connections-changed',invalidateRuntimeTextureSources);
 function mapTextureSource(project: Project, inspection: MapInspection): Promise<MapTextureSource> {
-  const key=JSON.stringify([project.id,project.source?.originalPath,project.source?.preservedPath,project.source?.cacheVersion,textureResourceScope(project.source)]);
+  const key=mapSourceIdentityKey(project);
   let pending=mapSources.get(key);
   if(!pending){
+    const epoch=runtimeSourceEpoch;
     pending=call<MapTextureSource>('map_texture_source',{projectId:project.id,sourceSha256:inspection.sha256}).then(result=>{
       const identity=result.identity;
-      if(identity?.schemaVersion!==1||identity.projectId!==project.id||identity.source.sha256!==inspection.sha256||
-          identity.source.cacheVersion!==inspection.header.version||identity.source.originalPath!==project.source?.originalPath||
-          identity.source.preservedPath!==project.source?.preservedPath||textureResourceScope(identity.source)!==textureResourceScope(project.source))
-        throw Error('The native texture search belongs to a different source revision');
+      if(epoch!==runtimeSourceEpoch)throw Error('Runtime installations changed during resource discovery');
+      assertMapSourceIdentity(identity,project,inspection);
       publishTextureResources(result.open.project);
       return result;
     }).catch(error=>{if(mapSources.get(key)===pending)mapSources.delete(key);throw error;});
@@ -32,13 +39,15 @@ function mapTextureSource(project: Project, inspection: MapInspection): Promise<
 export function runtimeTextureSource(runtimeId: RuntimeId): Promise<OpenProject> {
   let pending = sources.get(runtimeId);
   if (!pending) {
+    const epoch=runtimeSourceEpoch;
     pending = call<OpenProject>('runtime_texture_source', { runtimeId })
       .then((open) => {
+        if(epoch!==runtimeSourceEpoch)throw Error('Runtime installations changed during material discovery');
         publishTextureResources(open.project);
         return open;
       })
       .catch((error) => {
-        sources.delete(runtimeId);
+        if(sources.get(runtimeId)===pending)sources.delete(runtimeId);
         throw error;
       });
     sources.set(runtimeId, pending);
