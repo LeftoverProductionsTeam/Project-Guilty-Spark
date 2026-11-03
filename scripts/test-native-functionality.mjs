@@ -25,6 +25,23 @@ async function selectTag(open,tag){await choose('Tag editor');await page.getByPl
  const toggle=group.locator('.tag-class-toggle');if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
  const short=tag.path.split(/[\\/]/).at(-1);await group.locator('.tag-row').filter({has:page.getByText(short,{exact:true})}).first().click();
 }
+/** Tauri's invoke property is immutable. Observe the real function through CDP;
+ * a failed assignment is never allowed to masquerade as a zero-call trace. */
+async function observeNativeInvokes(p){
+ const session=await p.context().newCDPSession(p),commands=[],errors=[],pending=new Set();
+ session.on('Debugger.paused',event=>{
+  const task=(async()=>{try{
+   const value=await session.send('Debugger.evaluateOnCallFrame',{callFrameId:event.callFrames[0].callFrameId,expression:'arguments[0]',returnByValue:true});
+   if(typeof value.result.value!=='string'||commands.length>=10000)throw Error('Native invocation trace is invalid or exceeds its bound');commands.push(value.result.value);
+  }catch(error){errors.push(String(error));}finally{await session.send('Debugger.resume').catch(error=>errors.push(String(error)));}})();
+  pending.add(task);void task.finally(()=>pending.delete(task));
+ });
+ await session.send('Debugger.enable');
+ const fn=await session.send('Runtime.evaluate',{expression:'window.__TAURI_INTERNALS__.invoke'});
+ if(!fn.result.objectId)throw Error('The actual native invocation function is unavailable');
+ const {breakpointId}=await session.send('Debugger.setBreakpointOnFunctionCall',{objectId:fn.result.objectId});
+ return {commands,async stop(){await session.send('Debugger.removeBreakpoint',{breakpointId});await Promise.all([...pending]);await session.send('Debugger.disable');await session.detach();if(errors.length)throw Error(errors.join(' | '));}};
+}
 async function visibleModelPixels(png){
  return page.evaluate(async data=>{
   const image=new Image();image.src=`data:image/png;base64,${data}`;await image.decode();
@@ -85,10 +102,11 @@ try{
   await expect(construction.getByRole('status').filter({hasText:'Reshaping compiled landscape faces is still in development'})).toBeVisible();
   await page.getByRole('button',{name:'Close Construction',exact:true}).click();
   await picked.getByRole('button',{name:'Deselect surface',exact:true}).click();
-  await page.evaluate(()=>{const original=window.__TAURI_INTERNALS__.invoke.bind(window.__TAURI_INTERNALS__);window.gsQaNativeReads=[];window.gsQaRestoreInvoke=()=>window.__TAURI_INTERNALS__.invoke=original;window.__TAURI_INTERNALS__.invoke=(command,...args)=>{if(/preview_owned_(?:cache_bitmap|object_model|reflection_cube)/.test(command))window.gsQaNativeReads.push(command);return original(command,...args);};});
+  const observer=await observeNativeInvokes(page);await call('startup_status');expect(observer.commands).toContain('startup_status');
   const beforeMaterials=await world.getAttribute('data-source-shaders');
-  for(const runtime of ['haloCustomEdition','openCe','chupathingyCe','mccSteam']){await page.locator('.runtime-dock').getByLabel('Active map runtime',{exact:true}).selectOption(runtime);await page.waitForTimeout(250);await expect(world).toHaveAttribute('data-material-loading','false');await expect(worldCanvas).toHaveAttribute('data-qa-retained','native-c53');}
-  result.hostingSwitchReads=await page.evaluate(()=>{const reads=window.gsQaNativeReads;window.gsQaRestoreInvoke();return reads;});expect(result.hostingSwitchReads).toEqual([]);expect(await world.getAttribute('data-source-shaders')).toBe(beforeMaterials);
+  try{for(const runtime of ['haloCustomEdition','openCe','chupathingyCe','mccSteam']){await page.locator('.runtime-dock').getByLabel('Active map runtime',{exact:true}).selectOption(runtime);await page.waitForTimeout(250);await expect(world).toHaveAttribute('data-material-loading','false');await expect(worldCanvas).toHaveAttribute('data-qa-retained','native-c53');}}finally{await observer.stop();}
+  result.hostingSwitchObservation={method:'CDP function-call breakpoint',positiveControl:'startup_status',observedCommands:observer.commands};
+  result.hostingSwitchReads=observer.commands.filter(command=>/preview_owned_(?:cache_bitmap|object_model|reflection_cube)/.test(command));expect(result.hostingSwitchReads).toEqual([]);expect(await world.getAttribute('data-source-shaders')).toBe(beforeMaterials);
   const wanted=entry.models.map(pattern=>{const tag=o.inspection.tags.find(t=>['scen','vehi','bipd','eqip','itmc','mod2','mode'].includes(t.class)&&new RegExp(pattern,'i').test(t.path));expect(tag,`Missing requested native model ${pattern}`).toBeTruthy();return tag;});
   for(const tag of wanted){
    await selectTag(o,tag);const preview=page.locator('.tag-model-preview .native-model-preview');await expect(preview).toHaveAttribute('data-model-tag',String(tag.id));
