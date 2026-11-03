@@ -76,7 +76,7 @@ export interface Tag {
   fields: TagField[];
   references: TagReference[];
   /** Read-only classic shader base/diffuse map attribution from the source cache. */
-  primaryBitmapStatus?: 'resolved' | 'missing' | 'invalid' | 'unavailable' | null;
+  primaryBitmapStatus?: 'resolved' | 'not-required' | 'missing' | 'invalid' | 'unavailable' | null;
   shaderPreview?:ShaderPreview|null;
 }
 export interface ShaderAnimation {source:number;function:number;period:number;phase:number;scale:number}
@@ -86,6 +86,8 @@ export interface ShaderStage {flags:number;constant0Source:number;constant0Funct
   constant0Lower:[number,number,number,number];constant0Upper:[number,number,number,number];constant1:[number,number,number,number];
   colorInputs:number[];colorOutputs:number[];alphaInputs:number[];alphaOutputs:number[]}
 export interface ShaderPreview {
+  selfIllumination?:{source:number;function:number;period:number;lower:Vec3;upper:Vec3};
+  glassDiffuseAbsent?:boolean;
   changeColorSource?:number;
   changeColor?:[number,number,number];
   firstMapScreenspace?:boolean;

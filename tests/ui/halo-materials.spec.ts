@@ -16,4 +16,8 @@ test('WebGL renders Halo exterior faces and source transparency without black oc
   expect(Math.abs(result.added[0] - 90)).toBeLessThanOrEqual(1);
   expect(Math.abs(result.combined[1] - 115)).toBeLessThanOrEqual(1);
   expect(result.model).toEqual([0, 128, 0, 255]);
+  expect(result.nativeGlow).toEqual([128,64,32,255]);
+  expect(result.advancedGlow).toEqual(result.nativeGlow);
+  expect(result.unmasked).toEqual([0,0,0,255]);
+  expect(result.blackGlow).toEqual([0,0,0,255]);
 });

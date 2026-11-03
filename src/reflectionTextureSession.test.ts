@@ -21,7 +21,7 @@ const result = (ids: number[], bytes = 384): Map<number, DecodedReflectionItem> 
     ]),
   );
 const settle = async () => {
-  for (let i = 0; i < 15; i++) await Promise.resolve();
+  for (let i = 0; i < 24; i++) await Promise.resolve();
 };
 it('batches incremental shader arrivals and shares both failures and successful textures', async () => {
   const first = deferred<Map<number, DecodedReflectionItem>>();
@@ -52,12 +52,15 @@ it('retires pending work without admitting GPU textures from a late map response
   const session = new ReflectionTextureSession(read, create, publish);
   session.enqueue([1]);
   session.enqueue([2, 3]);
+  const pendingPublications=publish.mock.calls.length;
+  expect(session.loading).toBe(true);
   session.dispose();
   pending.resolve(result([1]));
   await settle();
   expect(read).toHaveBeenCalledTimes(1);
   expect(create).not.toHaveBeenCalled();
-  expect(publish).not.toHaveBeenCalled();
+  expect(publish).toHaveBeenCalledTimes(pendingPublications);
+  expect(session.loading).toBe(false);
   // A fresh resource epoch retries the same identity through a new verified read.
   const nextRead = vi.fn(async (ids: number[]) => result(ids));
   const next = new ReflectionTextureSession(nextRead, create, publish);
@@ -66,7 +69,7 @@ it('retires pending work without admitting GPU textures from a late map response
   expect(nextRead).toHaveBeenCalledWith([1]);
   next.dispose();
 });
-it('keeps the resident 16-cube and 64 MiB limits under batched reads', async () => {
+it('admits a10-sized cube sets while keeping the resident 32-cube and 64 MiB limits', async () => {
   const create = vi.fn(() => new THREE.CubeTexture());
   const session = new ReflectionTextureSession(
     async (ids) => result(ids, 16 * 1024 * 1024),
@@ -83,9 +86,9 @@ it('keeps the resident 16-cube and 64 MiB limits under batched reads', async () 
     create,
     () => {},
   );
-  count.enqueue(Array.from({ length: 20 }, (_, i) => i));
+  count.enqueue(Array.from({ length: 36 }, (_, i) => i));
   await settle();
-  expect(count.cubes.size).toBe(16);
+  expect(count.cubes.size).toBe(32);
   expect(count.errors.size).toBe(4);
   count.dispose();
 });

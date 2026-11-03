@@ -6,6 +6,7 @@ import { shaderLegend, shaderForTriangle } from '../renderView';
 import { renderIndices } from '../haloGeometry';
 import { materialLightmapKey } from '../haloLightmap';
 import { createHaloMaterial, updateHaloMaterial } from '../haloMaterial';
+import {glassWithoutDiffuse} from '../nativeShaderTextures';
 const EMPTY_SHADER_TEXTURES: Record<number, THREE.Texture> = {};
 const EMPTY_LIGHTMAP_TEXTURES: Record<string, THREE.Texture> = {};
 export default function HaloMesh({
@@ -17,6 +18,7 @@ export default function HaloMesh({
   shaderTextures = EMPTY_SHADER_TEXTURES,
   lightmapTextures = EMPTY_LIGHTMAP_TEXTURES,
   onShaderClick,
+  onSurfaceClick,
   shaderMetadata = {},
   extraTextures = {},
   sky = false,
@@ -29,6 +31,7 @@ export default function HaloMesh({
   shaderTextures?: Record<number, THREE.Texture>;
   lightmapTextures?: Record<string, THREE.Texture>;
   onShaderClick?: (tagId: number) => void;
+  onSurfaceClick?: (triangle:number,point:[number,number,number])=>void;
   shaderMetadata?: Record<number, ShaderPreview>;
   extraTextures?: Record<string, THREE.Texture>;
   sky?: boolean;
@@ -36,10 +39,10 @@ export default function HaloMesh({
   const {invalidate}=useThree();
   const legend = useMemo(
     () =>
-      materialLens || Object.keys(shaderTextures).length || Object.keys(lightmapTextures).length
+      materialLens || Object.keys(shaderTextures).length || Object.keys(lightmapTextures).length || Object.values(shaderMetadata).some(glassWithoutDiffuse)
         ? shaderLegend(data)
         : [],
-    [data, materialLens, shaderTextures, lightmapTextures],
+    [data, materialLens, shaderTextures, lightmapTextures,shaderMetadata],
   );
   const hasSecondUvs =
     !!data.lightmapUvs &&
@@ -63,12 +66,12 @@ export default function HaloMesh({
               const tag = Number(tagText);
               const entry = legend.find((item) => item.tagId === tag);
               const lightMap = lightPageKey ? (lightmapTextures[lightPageKey] ?? null) : null;
-              if (shaderTextures[tag] && !materialLens && !wireframe) {
+              if ((shaderTextures[tag]||glassWithoutDiffuse(shaderMetadata[tag])) && !materialLens && !wireframe) {
                 const extra: Record<string, THREE.Texture> = {};
                 for (const [key, texture] of Object.entries(extraTextures))
                   if (key.startsWith(`${tag}:`)) extra[key.slice(key.indexOf(':') + 1)] = texture;
                 const source=shaderMetadata[tag],change=source?.changeColorSource?data.changeColors?.[source.changeColorSource-1]:undefined;
-                return createHaloMaterial(shaderTextures[tag], lightMap, change?{...source,changeColor:change}:source, extra, sky);
+                return createHaloMaterial(shaderTextures[tag]??null, lightMap, change?{...source,changeColor:change}:source, extra, sky);
               }
               return new THREE.MeshStandardMaterial({
                 color:
@@ -148,6 +151,7 @@ export default function HaloMesh({
       }
       raycast={sky ? () => null : undefined}
       onClick={(event) => {
+        if(onSurfaceClick&&!materialLens&&event.faceIndex!=null&&event.button===0&&event.delta<=5){event.stopPropagation();onSurfaceClick(event.faceIndex,event.point.toArray());return;}
         if (
           !onShaderClick ||
           !materialLens ||

@@ -53,6 +53,7 @@ export function planOwnedMaterialPreviews(
   for (const shader of audit.shaders) {
     const key = `shader:${shader.shaderTagId}`;
     if (assignedShaders.has(shader.shaderTagId)) continue;
+    if(shader.status==='not-required')continue;
     if (shader.status !== 'resolved' || shader.bitmapTagId === null) {
       result.skipped.push({key,reason:`Shader primary map ${shader.status}; no automatic guessing`});
       continue;

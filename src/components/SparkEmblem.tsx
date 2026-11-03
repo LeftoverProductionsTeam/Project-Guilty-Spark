@@ -39,7 +39,7 @@ export default function SparkEmblem({data}:{data:Bootstrap}){
   return <><span className="gs-spark-anchor" ref={anchor} aria-hidden="true"/>{position&&createPortal(<>
     <span className="gs-spark-emblem" style={position} aria-hidden="true">{visual}</span>
     {monitor&&!unavailable&&!image&&<span className="gs-spark-capture" aria-hidden="true"><Suspense fallback={null}><NativeModelPreview asset={monitor} showcase portrait animate={false} live={false} onSnapshot={png=>{
-      const picture:SparkEmblemPicture={version:1,sourceHash:monitor.sourceSha256??'',tagId:monitor.tagId??0,resources,png};
+      const picture:SparkEmblemPicture={version:2,sourceHash:monitor.sourceSha256??'',tagId:monitor.tagId??0,resources,png};
       if(validSparkEmblemPicture(picture,picture.sourceHash,picture.tagId,resources))setCached(picture);
     }}/></Suspense></span>}
   </>,document.body)}</>;

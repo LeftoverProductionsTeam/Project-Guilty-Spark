@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 import { MAX_REFLECTION_BATCH } from './ownedReflectionCube';
 import type { DecodedReflectionItem, DecodedReflectionCube } from './ownedReflectionCube';
+const MAX_RESIDENT_CUBES=32;
 
 /** One map/resource epoch owns its pending reads and GPU textures. New shaders
  * join the next bounded batch instead of adding another full resource audit. */
@@ -12,6 +13,7 @@ export class ReflectionTextureSession {
   private bytes = 0;
   readonly cubes = new Map<number, THREE.CubeTexture>();
   readonly errors = new Map<number, string>();
+  get loading(){return this.alive&&(this.running||this.pending.length>0);}
   constructor(
     private read: (ids: number[]) => Promise<Map<number, DecodedReflectionItem>>,
     private create: (cube: DecodedReflectionCube, id: number) => THREE.CubeTexture,
@@ -34,14 +36,15 @@ export class ReflectionTextureSession {
   }
   private async drain() {
     this.running = true;
+    this.publish();
     try {
       while (this.alive && this.pending.length) {
         const ids = this.pending.splice(0, MAX_REFLECTION_BATCH);
-        if (this.cubes.size >= 16) {
+        if (this.cubes.size >= MAX_RESIDENT_CUBES) {
           for (const id of ids)
             this.errors.set(
               id,
-              'Sixteen reflection cubes are loaded; remaining cubes exceed the active preview budget.',
+              'Thirty-two reflection cubes are loaded; remaining cubes exceed the active preview budget.',
             );
         } else {
           try {
@@ -54,7 +57,7 @@ export class ReflectionTextureSession {
                 this.errors.set(id, item?.error ?? 'Reflection batch omitted a requested cube.');
                 continue;
               }
-              if (this.cubes.size >= 16 || this.bytes + item.cube.bytes > 64 * 1024 * 1024) {
+              if (this.cubes.size >= MAX_RESIDENT_CUBES || this.bytes + item.cube.bytes > 64 * 1024 * 1024) {
                 this.errors.set(id, 'Reflection cubes exceed the active preview budget.');
                 continue;
               }
@@ -75,6 +78,7 @@ export class ReflectionTextureSession {
       }
     } finally {
       this.running = false;
+      if(this.alive)this.publish();
     }
   }
 }

@@ -76,6 +76,15 @@ try {
   });
   call = (command, args = {}) =>
     page.evaluate(({ command, args }) => window.__TAURI_INTERNALS__.invoke(command, args), { command, args });
+  const cdp=await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setFocusEmulationEnabled',{enabled:true});
+  const openDrawer=async name=>{
+    if(await page.getByRole('button',{name:`Close ${name}`,exact:true}).isVisible())return;
+    const tools=page.locator('.gs-panel-overflow');
+    if(await tools.getAttribute('open')===null)await tools.locator('summary').click();
+    await tools.getByRole('menuitemcheckbox',{name,exact:true}).click();
+  };
+  const closeDrawer=async name=>{const close=page.getByRole('button',{name:`Close ${name}`,exact:true});if(await close.isVisible())await close.click();};
 
   const boot = await call('bootstrap');
   receipt.startup = await call('startup_status');
@@ -148,6 +157,7 @@ try {
     })),
   };
   await page.reload();
+  await call('plugin:window|maximize',{label:'main'});
   if (found.maps.some((map) => map.cacheVersion === 13 && /^c40\.map$/i.test(map.name)))
     await expect(page.locator('.home-model-caption')).toContainText('monitor', { timeout: 120000 });
   await expect(page.locator('.home-native-model [data-model-triangles]').first()).toHaveAttribute(
@@ -172,6 +182,7 @@ try {
   receipt.home.caption = await page.locator('.home-model-caption').innerText();
   if (receipt.home.caption.includes('monitor')) {
     const preview = page.locator('.home-native-model .native-model-preview');
+    await expect.poll(async()=>Number(await preview.getAttribute('data-native-self-illumination'))).toBeGreaterThan(0);
     await expect(preview).toHaveAttribute('data-native-animation-count', '3', { timeout: 90000 });
     const identity = await preview.evaluate((element) => ({ ...element.dataset }));
     const decoded = await call('preview_owned_object_animations', {
@@ -192,6 +203,11 @@ try {
     ).rejects.toThrow(/SHA-256|identity/i);
     const playback = async () =>
       preview.locator('canvas').evaluate((canvas) => JSON.parse(canvas.dataset.gsAnimation ?? 'null'));
+    await expect.poll(async () => (await playback())?.name).toBe('stand unarmed idle');
+    // The authored standing idle can be stationary. Select the source overlay
+    // explicitly before requiring its observed vertex motion.
+    await page.locator('.home-native-model').hover();
+    await page.getByLabel('Showcase animation',{exact:true}).selectOption({label:'idle overlay'});
     await expect.poll(async () => (await playback())?.name).toBe('idle overlay');
     const first = await playback();
     await expect
@@ -267,7 +283,7 @@ try {
   );
   receipt.defaultMaterials.previewCount = 2;
   await page.screenshot({ path: path.join(root, 'native-default-materials.png') });
-  await page.getByRole('button', { name: 'Toggle Asset library', exact: true }).click();
+  await openDrawer('Asset library');
   const drawer = page
     .locator('.gs-workspace-panel')
     .filter({ has: page.getByRole('heading', { name: 'Asset library', exact: true }) });
@@ -311,7 +327,13 @@ try {
     placement: placed.quickForge.placements[0],
     actualPointerDrag: true,
   };
-  await page.getByRole('button', { name: 'Toggle Changes', exact: true }).click();
+  // Keep a real copied source selection while Undo removes its first placement
+  // and binding. Pasting must re-admit the native closure rather than copying
+  // a stale target receipt or making an unbuildable editor-only object.
+  await closeDrawer('Asset library');
+  await page.locator('.forge-viewport canvas').first().focus();
+  await page.keyboard.press('Control+c');
+  await openDrawer('Changes');
   await page.getByRole('button', { name: 'Undo (Ctrl+Z)', exact: true }).focus();
   await page.keyboard.press('Control+z');
   await expect(page.getByRole('button', { name: 'Redo (Ctrl+Y / Ctrl+Shift+Z)', exact: true })).toBeEnabled();
@@ -322,8 +344,9 @@ try {
   let undo = (await call('open_project', { id: created.project.id })).project;
   expect(undo.quickForge.placements).toHaveLength(0);
   expect(undo.nativeAssetImports ?? []).toHaveLength(initialImports);
-  await page.getByRole('button', { name: 'Redo (Ctrl+Y / Ctrl+Shift+Z)', exact: true }).focus();
-  await page.keyboard.press('Control+y');
+  await closeDrawer('Changes');
+  await page.locator('.forge-viewport canvas').first().focus();
+  await page.keyboard.press('Control+v');
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
@@ -337,7 +360,39 @@ try {
   placed = (await call('open_project', { id: created.project.id })).project;
   expect(placed.quickForge.placements).toHaveLength(1);
   expect(placed.nativeAssetImports).toHaveLength(initialImports + 1);
-  receipt.drop.singleUndoRedo = true;
+  expect(placed.quickForge.placements[0].id).not.toBe(receipt.drop.placement.id);
+  receipt.drop.pasteAfterUndoRestoresDependencies = true;
+  const save=async()=>{await page.locator('.forge-viewport canvas').first().focus();await page.keyboard.press('Control+s');await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));return (await call('open_project',{id:created.project.id})).project;};
+  const dragAxis=async duplicate=>{
+    const canvas=page.locator('.forge-viewport canvas').first();await canvas.focus();await page.keyboard.press('f');
+    await expect.poll(async()=>{const raw=await canvas.getAttribute('data-gs-gizmo');return raw&&JSON.parse(raw).mode==='translate';}).toBeTruthy();
+    const gizmo=JSON.parse(await canvas.getAttribute('data-gs-gizmo')),bounds=await canvas.boundingBox();
+    const axis=['X','Y','Z'].find(axis=>gizmo.handles[axis]?.every(v=>Number.isFinite(v)&&Math.abs(v)<.85));
+    expect(axis,'An actual visible translation axis is required').toBeTruthy();
+    const h=gizmo.handles[axis],px=bounds.x+(h[0]+1)*bounds.width/2,py=bounds.y+(1-h[1])*bounds.height/2;
+    const dx=(h[0]-gizmo.origin[0])*bounds.width/2,dy=-(h[1]-gizmo.origin[1])*bounds.height/2,length=Math.hypot(dx,dy);expect(length).toBeGreaterThan(2);
+    if(duplicate)await page.keyboard.down('Alt');
+    try{await page.mouse.move(px,py);await page.mouse.down();await page.mouse.move(px+dx/length*45,py+dy/length*45,{steps:15});await page.mouse.up();}finally{if(duplicate)await page.keyboard.up('Alt');}
+    return {axis,gizmo};
+  };
+  const initialPlacement=structuredClone(placed.quickForge.placements[0]);
+  receipt.transform=await dragAxis(false);
+  await expect.poll(async()=>JSON.stringify((await save()).quickForge.placements[0].position)).not.toBe(JSON.stringify(initialPlacement.position));
+  placed=await save();const moved=structuredClone(placed.quickForge.placements[0]);receipt.transform.before=initialPlacement.position;receipt.transform.after=moved.position;
+  receipt.altDrag=await dragAxis(true);
+  await expect.poll(async()=>(await save()).quickForge.placements.length).toBe(2);
+  placed=await save();expect(placed.quickForge.placements[0]).toEqual(moved);expect(placed.quickForge.placements[1].id).not.toBe(moved.id);
+  expect(placed.quickForge.placements[1].position).not.toEqual(moved.position);
+  await page.keyboard.press('Control+z');await expect.poll(async()=>(await save()).quickForge.placements.length).toBe(1);
+  expect((await save()).quickForge.placements[0]).toEqual(moved);
+  await page.keyboard.press('Control+y');await expect.poll(async()=>(await save()).quickForge.placements.length).toBe(2);receipt.altDrag.oneActionUndoRedo=true;
+  await page.keyboard.press('Control+c');await page.keyboard.press('Control+v');
+  await expect.poll(async()=>(await save()).quickForge.placements.length).toBe(3);
+  await page.keyboard.press('Control+z');await expect.poll(async()=>(await save()).quickForge.placements.length).toBe(2);
+  await page.keyboard.press('Control+y');await expect.poll(async()=>(await save()).quickForge.placements.length).toBe(3);
+  placed=await save();expect(new Set(placed.quickForge.placements.map(p=>p.id)).size).toBe(3);expect(placed.nativeAssetImports).toHaveLength(initialImports+1);
+  receipt.clipboard={actualKeyboard:true,freshIds:placed.quickForge.placements.map(p=>p.id),oneActionUndoRedo:true,dependenciesSharedOnce:true};
+  await page.screenshot({path:path.join(root,'native-transformed-duplicates.png')});
   receipt.sourceValidation = await call('quickforge_validate', { document: placed.quickForge });
   await fs.writeFile(
     path.join(root, 'source-validation.json'),
@@ -368,12 +423,15 @@ try {
   expect(tag).toBeTruthy();
   const placement = rebuilt.inspection.objects.find((object) => object.tagId === tag.id);
   expect(placement).toBeTruthy();
+  const copies=rebuilt.inspection.objects.filter(object=>object.tagId===tag.id);expect(copies).toHaveLength(3);
+  for(const authored of placed.quickForge.placements)expect(copies.some(object=>object.position.every((value,axis)=>Math.abs(value-authored.position[axis])<.0001))).toBe(true);
   for (let axis = 0; axis < 3; axis++)
     expect(placement.position[axis]).toBeCloseTo(placed.quickForge.placements[0].position[axis], 4);
   receipt.compiled = {
     sha256: rebuilt.inspection.sha256,
     nativeTagPath: tag.path,
     position: placement.position,
+    allPlacedCopies:copies.map(copy=>copy.position),
     collisionTriangles: rebuilt.inspection.mesh.indices.length / 3,
   };
   receipt.sourcePreserved = (await hash(source.source.originalPath)) === inspection.sha256;
@@ -483,6 +541,23 @@ try {
     position: added.position,
     originalSourcePreserved: true,
   };
+
+  // A second map/runtime must receive its own admitted closure, never the
+  // first map's receipt ID. This proves staging and editor history only; CE
+  // compilation/gameplay remain separate from the MCC build above.
+  const destination=await call('create_quickforge_project',{title:'Cross-map CE clipboard destination',template:'customBlank',target:'haloCustomEdition'});
+  await page.reload();
+  await page.locator('.map-card').filter({has:page.getByRole('heading',{name:destination.project.title,exact:true})}).click();
+  await expect(page.locator('.forge-viewport canvas').first()).toBeVisible();
+  const readDestination=async()=>{await page.locator('.forge-viewport canvas').first().focus();await page.keyboard.press('Control+s');return (await call('open_project',{id:destination.project.id})).project;};
+  const baseline=(await readDestination()).nativeAssetImports?.length??0;
+  await page.keyboard.press('Control+v');
+  await expect.poll(async()=>(await readDestination()).quickForge.placements.length,{timeout:90000}).toBe(1);
+  const pasted=await readDestination(),newBinding=pasted.nativeAssetImports.find(b=>b.tagClass==='scen');
+  expect(newBinding).toBeTruthy();expect(newBinding.id).not.toBe(placed.nativeAssetImports.at(-1).id);expect(newBinding.sourceSha256).toBe(inspection.sha256);expect(newBinding.fileCount).toBe(5);
+  await page.keyboard.press('Control+z');await expect.poll(async()=>(await readDestination()).quickForge.placements.length).toBe(0);expect((await readDestination()).nativeAssetImports??[]).toHaveLength(baseline);
+  await page.keyboard.press('Control+y');await expect.poll(async()=>(await readDestination()).quickForge.placements.length).toBe(1);
+  receipt.crossMapPaste={sourceRuntime:placed.quickForge.runtimeId,targetRuntime:pasted.quickForge.runtimeId,freshTargetBinding:newBinding.id,sourceTagHash:newBinding.sourceSha256,fileCount:newBinding.fileCount,oneActionUndoRedo:true,nativeCompilationVerified:false,gameplayVerified:false};
 
   receipt.complete = true;
   await page.screenshot({ path: path.join(root, 'native-drop-compiled.png') });

@@ -35,6 +35,8 @@ import {
 } from 'lucide-react';
 import type { MapInspection, MeshData, Project, SceneObject, Vec3,ShaderPreview,RuntimeId } from '../types';
 import { extraTextureKey } from '../haloMaterial';
+import {nativeSurfacePick} from '../nativeSurfacePick';
+import type {NativeSurfacePick} from '../nativeSurfacePick';
 import {configureSourceTexture} from '../sourceTexture';
 import {playerStartCamera} from '../sourceCamera';
 import {sourceSpartan} from '../sourceSpartan';
@@ -265,6 +267,7 @@ function Scene({
   onTransform,
   onOpenTag,
   shaderTextures,
+  onPickSurface,
   lightmapTextures,
   mode,
   snap,
@@ -289,6 +292,7 @@ function Scene({
   setSelected: (s: string | null) => void;
   onTransform: (o: SceneObject,duplicate?:boolean) => void;
   onOpenTag?: (tagId: number) => void;
+  onPickSurface?: (pick:NativeSurfacePick)=>void;
   shaderTextures: Record<number, THREE.Texture>;
   lightmapTextures: Record<string, THREE.Texture>;
   mode: 'translate' | 'rotate' | 'scale';
@@ -370,6 +374,7 @@ function Scene({
           shaderTextures={viewMode === 'render' || viewMode === 'materials' ? shaderTextures : EMPTY_SHADER_TEXTURES}
           lightmapTextures={viewMode === 'render' || viewMode === 'materials' ? lightmapTextures : EMPTY_LIGHTMAP_TEXTURES}
           onShaderClick={onOpenTag}
+          onSurfaceClick={!cinematic&&inspection&&previewMesh&&onPickSurface?(triangle,point)=>{const pick=nativeSurfacePick(previewMesh,inspection.sha256,triangle,point);if(pick)onPickSurface(pick);}:undefined}
         />
         </group>
       ) : null}
@@ -493,6 +498,7 @@ export default function World({
   library?: ViewportLibraryControls;
 }) {
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
+  const [surfacePick,setSurfacePick]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
   const activity=useWorkspaceActivity();
   const [tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null);
   const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',project.id);
@@ -506,7 +512,7 @@ export default function World({
   };
   const [,setZoneSelection]=useMapState<string|null>(project.id,'visibility.selected',null);
   const selected=selectedId!==undefined?selectedId:localSelected;
-  const setSelected=(id:string|null)=>{setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
+  const setSelected=(id:string|null)=>{setSurfacePick(null);setLocalSelected(id);if(id){setZoneSelection(null);const object=project.scene.find(o=>o.id===id);if(!cinematic&&selectedId===undefined){if(object?.sourceModel)openObjectTag(object.sourceModel.tagId,object.sourceModel.projectId);else if(object?.tagId!=null)openObjectTag(object.tagId);else revealPanel('inspector');}}onSelectObject?.(id);};
   const tagDocument=library?.documents.find(document=>document.id===tagSource);
   const tagContext=tagSource===project.id?{project,inspection}:tagDocument?.history.current?{project:tagDocument.history.current,inspection:tagDocument.inspection}:null;
   const librarySources = useAssetLibrarySources(library?.documents ?? []);
@@ -980,8 +986,7 @@ export default function World({
   currentProjectRef.current = project.id;
   const currentResourceRef = useRef((project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null);
   currentResourceRef.current = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
-  const [previewRuntime]=useMapState<RuntimeId>(project.id,'hosting.runtime','mccSteam');
-  const textureScope=textureResourceScope(project.source)+':'+previewRuntime;
+  const textureScope=textureResourceScope(project.source);
   const currentTextureScopeRef=useRef(textureScope);
   currentTextureScopeRef.current=textureScope;
   const chosen = project.scene.find((o) => o.id === selected);
@@ -1138,6 +1143,8 @@ export default function World({
       data-reflection-issues={reflectionPreview.issues.join(' | ')}
       data-sky-triangles={(sourceAppearance?.skyMesh?.indices.length ?? 0) / 3}
       data-material-loading={!!autoPreviewProgress?.active}
+      data-reflection-loading={reflectionPreview.loading}
+      data-source-cubes={new Set(Object.values(reflectionPreview.textures)).size}
       data-pending-materials={
         ownedPreviewPlan
           ? [
@@ -1414,6 +1421,7 @@ export default function World({
                   onSnapError={notify}
                   onTransform={update}
                   onOpenTag={cinematic ? onOpenTag : openObjectTag}
+                  onPickSurface={pick=>{setSelected(null);setSurfacePick(pick);}}
                   shaderTextures={shaderTextures}
                   lightmapTextures={lightmapTextures}
                 />
@@ -1473,6 +1481,12 @@ export default function World({
               <button onClick={() => setSelected(null)}>Deselect object</button>
             </div>
           )}
+          {!cinematic&&!chosen&&surfacePick&&inspection&&surfacePick.sourceHash===inspection.sha256&&<div className="viewport-object-actions" data-native-surface={surfacePick.bspIndex} data-source-hash={surfacePick.sourceHash}>
+            <strong>BSP {surfacePick.bspIndex+1} · landscape</strong>
+            <button onClick={()=>openObjectTag(surfacePick.shaderTagId)}>Surface shader</button>
+            <button onClick={()=>{writeMapSession(project.id,'bsp.open',true);revealPanel('construction');}}>Connect / tunnel</button>
+            <button onClick={()=>setSurfacePick(null)}>Deselect surface</button>
+          </div>}
           {assetDrag.dragging && (
             <div className="viewport-asset-drop-hint">Drop to place at the surface · Esc cancels</div>
           )}

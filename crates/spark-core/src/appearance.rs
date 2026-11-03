@@ -36,7 +36,11 @@ pub fn inspect(path:&Path,hash:&str,inspection:&MapInspection)->Result<SourceApp
     let fog=rgb(at+0x58)?;let density=r.f32(at+0x6c)?;let near=r.f32(at+0x70)?;let far=r.f32(at+0x74)?;
     if !(0.0..=1.0).contains(&density)||near<0.||far<near||far>20_000.{return invalid("Unsupported source atmospheric fog range");}
     let mut env=EditorEnvironment{sky_color:fog,ambient_color:rgb(at+0x48)?,ambient_intensity:r.f32(at+0x54)?.clamp(0.,5.),
-        fog_color:fog,fog_near:near,fog_far:far.max(near+1.),fog_enabled:density>0.,..Default::default()};
+        // A zero-width native range is not a one-unit wall of fog. In a10's
+        // space sky both distances are zero; inventing a positive range hid
+        // every model behind full black. Retain the authored density and
+        // explicitly disable this unsupported distance approximation.
+        fog_color:fog,fog_near:near,fog_far:far.max(near+1.),fog_enabled:density>0.&&far>near,..Default::default()};
     let lights=r.u32(at+0xc4)? as usize;
     if lights>32{return invalid("Source sky light count exceeds the bounded preview limit");}
     if lights>0 {let light=pointer(r.u32(at+0xc8)?,lights*116)?;
@@ -45,6 +49,7 @@ pub fn inspect(path:&Path,hash:&str,inspection:&MapInspection)->Result<SourceApp
         env.sun_elevation=r.f32(light+0x6c)?.to_degrees().clamp(-90.,90.);
     }else{env.sun_intensity=0.;}
     result.sky_tag_id=Some(id);result.sky_path=Some(sky.path.clone());result.environment=Some(env);result.fog_maximum_density=density;
+    if density>0.&&far==near{result.warnings.push("Atmospheric fog has no positive native distance range; the preview does not invent one".into());}
     if count>1{result.warnings.push("Multiple skies require BSP cluster/portal sky selection; this view currently uses scenario sky 0".into());}
     if matches!(r.fourcc(at)?.as_str(),"mod2"|"mode") {
         match crate::render::cached_model_mesh(&bytes,&header,&inspection.tags,r.u32(at+12)?){Ok(mesh)=>result.sky_mesh=Some(mesh),Err(e)=>result.warnings.push(e.to_string())}

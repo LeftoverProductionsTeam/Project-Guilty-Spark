@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type {ShaderPreview} from './types';
 import {sunlightPosition} from './environment';
 import {applyHaloBlend,genericCombiner,haloWaveGlsl} from './haloTransparency';
+import {glassWithoutDiffuse} from './nativeShaderTextures';
 export const extraTextureKey=(id:number,role:string)=>`${id}:${role}`;
 const vertex = `varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;varying vec4 haloClip;
 attribute vec2 uv1;
@@ -24,7 +25,7 @@ varying vec3 haloVertexColor;
 #endif
 uniform samplerCube reflectionCube;uniform bool hasReflection;uniform mat3 viewToWorld;uniform vec2 reflectionBrightness,reflectionRange;uniform vec3 reflectionPerpTint,reflectionParallelTint;
 uniform sampler2D baseMap,lightMap,primaryDetail,secondaryDetail,microDetail,alphaMask,layer1,layer2,layer3;
-uniform bool hasLight,hasPrimary,hasSecondary,hasMicro,hasMask,alphaTest,baseEncoded,alphaBlended;
+uniform bool hasBase,hasLight,hasPrimary,hasSecondary,hasMicro,hasMask,alphaTest,baseEncoded,alphaBlended;
 uniform int kind,shaderType,detailFunction,microFunction,layerCount,detailMask;
 uniform bool bumpIsSpecular;uniform float detailVScale;
 uniform vec2 baseScale,layerScale[4],layerOffset[4];uniform float layerRotation[4];
@@ -34,6 +35,7 @@ uniform bool fogEnabled;uniform vec3 fogColor;uniform float fogNear,fogFar,fogMa
 uniform bool overrideLighting;uniform vec3 lightDirection,ambientFill,sunFill;
 uniform sampler2D normalMap,multipurpose;uniform bool hasNormal,hasMultipurpose,multipurposeXbox,linearOutput,enhancedNormal,enhancedSpecular,enhancedSelfIllum;
 uniform float normalScale,normalStrength,specularStrength,selfIllumStrength;
+uniform bool hasNativeSelfIllum;uniform vec3 selfIllumLower,selfIllumUpper;uniform vec2 selfIllumAnimation;
 uniform bool hasChangeColor,firstMapScreenspace,scaleFirstMapWithDistance;uniform vec3 changeColor;
 vec4 sourceColor(vec4 c){return baseEncoded?c:sRGBTransferOETF(c);}
 ${haloWaveGlsl}
@@ -61,7 +63,7 @@ vec4 combine(vec4 current,vec4 next,int c,int a){
   return clamp(vec4(rgb,alpha),0.0,1.0);
 }
 void main(){
-  vec4 base=sourceColor(texture2D(baseMap,(kind==2||kind==3)?layerUv(0):haloUv*baseScale));
+  vec4 base=hasBase?sourceColor(texture2D(baseMap,(kind==2||kind==3)?layerUv(0):haloUv*baseScale)):vec4(0.0,0.0,0.0,1.0);
   if(kind==2||kind==3){
     vec4 maps[4];maps[0]=stageSample(texture2D(baseMap,layerUv(0)),0);
     maps[1]=stageSample(texture2D(layer1,layerUv(1)),1);maps[2]=stageSample(texture2D(layer2,layerUv(2)),2);maps[3]=stageSample(texture2D(layer3,layerUv(3)),3);
@@ -95,9 +97,14 @@ void main(){
         float baseDiffuse=max(.25,dot(n,normalize(lightDirection))*.5+.5),relief=max(.25,dot(perturbed,normalize(lightDirection))*.5+.5);
         base.rgb*=clamp(relief/baseDiffuse,.25,2.0);n=perturbed;}}
     if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);
-      if(enhancedSelfIllum)base.rgb+=surface*masks.g*selfIllumStrength;
       if(enhancedSpecular){float mask=multipurposeXbox?masks.r:masks.b;vec3 halfVector=normalize(normalize(lightDirection)+normalize(-haloView));base.rgb+=sunFill*mask*pow(max(0.0,dot(n,halfVector)),32.0)*specularStrength;}}
     if(overrideLighting)base.rgb*=ambientFill+sunFill*max(0.0,dot(n,normalize(lightDirection)));
+    // Native emission adds to diffuse illumination before multiplication by
+    // the surface colour. It survives darkness and does not require optional
+    // post-processing. A black diffuse texel still cannot invent light.
+    if(kind==1&&hasMultipurpose&&hasNativeSelfIllum){float mask=texture2D(multipurpose,haloUv*baseScale).g;
+      vec3 emission=mix(selfIllumLower,selfIllumUpper,haloWave(selfIllumAnimation.x,time/max(selfIllumAnimation.y,.001)));
+      base.rgb+=surface*emission*mask*(enhancedSelfIllum?selfIllumStrength:1.0);}
     if(hasReflection){vec3 reflected=viewToWorld*reflect(normalize(haloView),n);float grazing=1.0-clamp(dot(normalize(-haloView),n),0.0,1.0);float brightness=mix(reflectionBrightness.x,reflectionBrightness.y,grazing);vec3 tint=mix(reflectionPerpTint,reflectionParallelTint,grazing);
       float mask=1.0;if(kind==1&&hasMultipurpose){vec4 masks=texture2D(multipurpose,haloUv*baseScale);mask=multipurposeXbox?masks.r:masks.b;}
       else if(bumpIsSpecular&&hasNormal)mask=texture2D(normalMap,haloUv*normalScale).a;
@@ -114,12 +121,13 @@ void main(){
   gl_FragColor=linearOutput?sRGBTransferEOTF(base):base;
 }`;
 export function createHaloMaterial(
-  base: THREE.Texture,
+  base: THREE.Texture|null,
   light: THREE.Texture | null,
   metadata: ShaderPreview | undefined,
   extra: Record<string, THREE.Texture>,
   sky = false,
 ): THREE.ShaderMaterial {
+  if(!base&&!glassWithoutDiffuse(metadata))throw Error('This native shader requires its actual diffuse image.');
   const m=metadata,layerCount=Math.min(4,m?.layers?.length??1),kind=m?.kind==='glass'?4:m?.kind==='generic'?3:m?.kind==='chicago'?2:m?.kind==='model'?1:0;
   const blend=m?.framebufferBlend??0;
   const fogCode=blend===1||blend===2?`base.rgb=mix(base.rgb,vec3(${blend===1?'1.0':'0.5'}),amount);`:
@@ -127,7 +135,8 @@ export function createHaloMaterial(
   const motion=(axis:number)=>Array.from({length:4},(_,i)=>{const a=m?.layers?.[i]?.animations?.[axis];
     return a&&a.source===0?new THREE.Vector4(a.function,a.period,a.phase,a.scale):new THREE.Vector4(1,1,0,0);});
   const samplers:THREE.Texture[]=[];
-  const stageTexture=(source:THREE.Texture,i:number)=>{
+  const stageTexture=(source:THREE.Texture|null,i:number)=>{
+    if(!source)return null;
     const flags=m?.layers?.[i]?.flags??0;
     if(!(flags&13))return source;
     const texture=source.clone();
@@ -163,6 +172,7 @@ export function createHaloMaterial(
       reflectionPerpTint: { value: new THREE.Vector3(...(reflection?.perpendicularTint ?? [1, 1, 1])) },
       reflectionParallelTint: { value: new THREE.Vector3(...(reflection?.parallelTint ?? [1, 1, 1])) },
       baseMap: { value: kind >= 2 ? stageTexture(base, 0) : base },
+      hasBase: { value: !!base },
       lightMap: { value: light ?? base },
       primaryDetail: { value: extra.primaryDetail ?? base },
       secondaryDetail: { value: extra.secondaryDetail ?? base },
@@ -178,7 +188,7 @@ export function createHaloMaterial(
       hasMask: { value: !!extra.alphaMask },
       alphaTest: { value: !!m?.alphaTest },
       alphaBlended: { value: !!m?.alphaBlended },
-      baseEncoded: { value: !!base.userData.sourceEncoded },
+      baseEncoded: { value: !!base?.userData.sourceEncoded },
       kind: { value: kind },
       shaderType: { value: m?.shaderType ?? 0 },
       detailFunction: { value: m?.detailFunction ?? 0 },
@@ -224,13 +234,15 @@ export function createHaloMaterial(
     },
   });
   Object.assign(material.uniforms,{normalMap:{value:extra.normalMap??base},multipurpose:{value:extra.multipurpose??base},
+    hasNativeSelfIllum:{value:!!m?.selfIllumination&&m.selfIllumination.source===0},selfIllumLower:{value:new THREE.Vector3(...(m?.selfIllumination?.lower??[0,0,0]))},selfIllumUpper:{value:new THREE.Vector3(...(m?.selfIllumination?.upper??[0,0,0]))},selfIllumAnimation:{value:new THREE.Vector2(m?.selfIllumination?.function??1,m?.selfIllumination?.period??1)},
     hasChangeColor:{value:!!m?.changeColor},changeColor:{value:new THREE.Vector3(...(m?.changeColor??[1,1,1]))},firstMapScreenspace:{value:!!m?.firstMapScreenspace},scaleFirstMapWithDistance:{value:!!m?.scaleFirstMapWithDistance},
     hasNormal:{value:!!extra.normalMap},hasMultipurpose:{value:!!extra.multipurpose},multipurposeXbox:{value:!!m?.multipurposeXbox},linearOutput:{value:false},
     enhancedNormal:{value:false},enhancedSpecular:{value:false},enhancedSelfIllum:{value:false},normalScale:{value:m?.bumpScale||1},normalStrength:{value:1},specularStrength:{value:.35},selfIllumStrength:{value:1}});
   if(extra.normalMap&&!extra.alphaMask){material.uniforms.alphaMask.value=extra.normalMap;material.uniforms.hasMask.value=true;}
   material.userData.haloSource=true;
   material.userData.haloAnimated=!!m?.layers?.slice(0,4).some(layer=>layer.animations?.some(a=>a.source===0&&a.function>=2&&a.scale!==0)) ||
-    (kind===3&&!!m?.stages?.some(stage=>stage.constant0Function>=2&&stage.constant0Lower.some((value,index)=>value!==stage.constant0Upper[index])));
+    (kind===3&&!!m?.stages?.some(stage=>stage.constant0Function>=2&&stage.constant0Lower.some((value,index)=>value!==stage.constant0Upper[index])))||
+    (m?.selfIllumination?.source===0&&m.selfIllumination.function>=2&&m.selfIllumination.lower.some((value,index)=>value!==m.selfIllumination!.upper[index]));
   material.userData.sky=sky;
   material.addEventListener('dispose',()=>samplers.forEach(texture=>texture.dispose()));
   if(kind>=2||m?.alphaBlended)applyHaloBlend(material,blend);

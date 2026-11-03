@@ -187,6 +187,8 @@ pub struct Tag {
 #[derive(Clone,Debug,Default,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ShaderPreview {
+    #[serde(default,skip_serializing_if="Option::is_none")] pub self_illumination:Option<ShaderSelfIllumination>,
+    #[serde(default,skip_serializing_if="Option::is_none")] pub glass_diffuse_absent:Option<bool>,
     #[serde(default,skip_serializing_if="Option::is_none")] pub change_color_source:Option<u16>,
     #[serde(default)] pub first_map_screenspace:bool,
     #[serde(default)] pub scale_first_map_with_distance:bool,
@@ -209,6 +211,9 @@ pub struct ShaderPreview {
     #[serde(default)] pub decal:bool,
     #[serde(default)] pub alpha_blended:bool,
 }
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ShaderSelfIllumination {pub source:u16,pub function:u16,pub period:f32,pub lower:[f32;3],pub upper:[f32;3]}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ShaderReflection {
@@ -933,8 +938,12 @@ fn shader_bitmap_references(
         // must not silently turn shader metadata into a writable operation.
         if index == 0 { primary_status = "resolved"; }
     }
-    tag.primary_bitmap_status = Some(primary_status.into());
-    if primary_status!="resolved"{tag.shader_preview=None;return Ok(());}
+    // A null diffuse dependency is legal for native glass: its authored tint
+    // and reflection still contribute. An invalid/non-null bitmap never gains
+    // this exception. Keep absence distinct from a successfully decoded image.
+    let glass_diffuse_absent=tag.class=="sgla"&&r.u32(at+0x158+12)?==u32::MAX;
+    tag.primary_bitmap_status = Some(if glass_diffuse_absent{"not-required"}else{primary_status}.into());
+    if primary_status!="resolved"&&!glass_diffuse_absent{tag.shader_preview=None;return Ok(());}
     let flags=r.u16(at+40)?;
     let uv_scale=if tag.class=="soso" {
         let u=r.f32(at+0x9c)?;let v=r.f32(at+0xa0)?;
@@ -953,7 +962,13 @@ fn shader_bitmap_references(
     let glass=tag.class=="sgla";
     let glass_tint=if glass {let rgb=[r.f32(at+0x54)?,r.f32(at+0x58)?,r.f32(at+0x5c)?];if rgb.iter().any(|v|!(0.0..=1.0).contains(v)){return invalid("Glass background tint is invalid");}Some(rgb)}else{None};
     let model_detail=tag.class=="soso"&&tag.references.iter().any(|v|v.label=="Detail map");
-    tag.shader_preview=Some(ShaderPreview{change_color_source:if tag.class=="soso"{Some(r.u16(at+76)?).filter(|v|*v<=4)}else{None},reflection,glass_tint,detail_mask:if model_detail{r.u16(at+0xd6)?}else{0},detail_v_scale:if model_detail{shader_scale(r,at+0xec)?}else{1.},bump_is_specular:if glass{flags&8!=0}else{tag.class=="senv"&&flags&2!=0},alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
+    let self_illumination=if tag.class=="soso"&&tag.references.iter().any(|v|v.label=="Multipurpose map"){
+        let source=r.u16(at+0x70)?;let function=r.u16(at+0x72)?;let period=r.f32(at+0x74)?;
+        let lower=[r.f32(at+0x78)?,r.f32(at+0x7c)?,r.f32(at+0x80)?];let upper=[r.f32(at+0x84)?,r.f32(at+0x88)?,r.f32(at+0x8c)?];
+        if source>4||function>11||!period.is_finite()||!(0.0..=86400.).contains(&period)||lower.iter().chain(&upper).any(|v|!v.is_finite()||!(0.0..=1.0).contains(v)){return invalid("Model self-illumination metadata is invalid");}
+        Some(ShaderSelfIllumination{source,function,period:if period==0.{1.}else{period},lower,upper})
+    }else{None};
+    tag.shader_preview=Some(ShaderPreview{self_illumination,glass_diffuse_absent:glass_diffuse_absent.then_some(true),change_color_source:if tag.class=="soso"{Some(r.u16(at+76)?).filter(|v|*v<=4)}else{None},reflection,glass_tint,detail_mask:if model_detail{r.u16(at+0xd6)?}else{0},detail_v_scale:if model_detail{shader_scale(r,at+0xec)?}else{1.},bump_is_specular:if glass{flags&8!=0}else{tag.class=="senv"&&flags&2!=0},alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
         multipurpose_xbox:tag.class=="soso"&&flags&64!=0,bump_scale:if tag.class=="senv"{r.f32(at+0x124).ok().filter(|v|v.abs()<=1024.&&*v!=0.).unwrap_or(1.)}else{1.},
         two_sided:if glass{flags&4!=0}else{tag.class=="soso"&&flags&2!=0},uv_scale:if glass{[shader_scale(r,at+0x154)?;2]}else{uv_scale},
         alpha_blended:glass||tag.class=="soso"&&flags&8!=0,decal:if glass{flags&2!=0}else{tag.class=="soso"&&flags&8!=0},
@@ -1531,12 +1546,18 @@ mod shader_dependency_tests {
         ]);
         let region = Space {begin: 0, end: bytes.len(), address: 0};
         bytes[0x40+0x9c..0x40+0xa4].copy_from_slice(&[0,0,128,63,0,0,128,63]);
+        bytes[64+0x70..64+0x90].fill(0);
+        bytes[64+0x72..64+0x74].copy_from_slice(&2u16.to_le_bytes());
+        bytes[64+0x74..64+0x78].copy_from_slice(&2f32.to_le_bytes());
+        bytes[64+0x84..64+0x88].copy_from_slice(&0.75f32.to_le_bytes());
         let mut tag = shader_fixture("soso");
         shader_bitmap_references(&Reader(&bytes), &region, &mut tag, &ids, 64).unwrap();
         assert_eq!(tag.primary_bitmap_status.as_deref(), Some("resolved"));
         assert_eq!(tag.references.len(), 2);
         assert_eq!(tag.references[0].label, "Diffuse map");
         assert_eq!(tag.references[1].label, "Multipurpose map");
+        let glow=tag.shader_preview.unwrap().self_illumination.unwrap();assert_eq!(glow.function,2);assert_eq!(glow.period,2.);assert_eq!(glow.upper,[0.75,0.,0.]);
+        bytes[64+0x84..64+0x88].copy_from_slice(&f32::NAN.to_le_bytes());let mut bad=shader_fixture("soso");assert!(shader_bitmap_references(&Reader(&bytes),&region,&mut bad,&ids,64).is_err());
     }
     #[test]
     fn native_glass_keeps_tint_reflection_and_transparency_instead_of_an_opaque_shell(){
@@ -1548,6 +1569,15 @@ mod shader_dependency_tests {
         let region=Space{begin:0,end:bytes.len(),address:0};let ids=std::collections::HashMap::from([(17,"bitm".into()),(18,"bitm".into())]);let mut tag=shader_fixture("sgla");
         shader_bitmap_references(&Reader(&bytes),&region,&mut tag,&ids,at).unwrap();let preview=tag.shader_preview.unwrap();
         assert_eq!(preview.kind,"glass");assert!(preview.alpha_blended&&preview.two_sided);assert_eq!(preview.glass_tint,Some([0.65,0.7,1.]));assert_eq!(preview.reflection.unwrap().bitmap_tag_id,18);
+        // Xbox Pelican glass intentionally has no diffuse image. Keep its
+        // exact reflection/tint rather than discarding the material or using
+        // the reflection cube as if it were an ordinary 2D base map.
+        bytes[at+0x158+12..at+0x158+16].copy_from_slice(&u32::MAX.to_le_bytes());
+        let mut absent=shader_fixture("sgla");shader_bitmap_references(&Reader(&bytes),&region,&mut absent,&ids,at).unwrap();
+        assert_eq!(absent.primary_bitmap_status.as_deref(),Some("not-required"));
+        let absent=absent.shader_preview.unwrap();assert_eq!(absent.glass_diffuse_absent,Some(true));assert_eq!(absent.reflection.unwrap().bitmap_tag_id,18);
+        install_ref(&mut bytes,at+0x158,999,b"mtib");let mut invalid=shader_fixture("sgla");shader_bitmap_references(&Reader(&bytes),&region,&mut invalid,&ids,at).unwrap();assert_eq!(invalid.primary_bitmap_status.as_deref(),Some("invalid"));assert!(invalid.shader_preview.is_none());
+        install_ref(&mut bytes,at+0x158,17,b"mtib");
         let mut corrupt=shader_fixture("sgla");bytes[at+0x54..at+0x58].copy_from_slice(&f32::NAN.to_le_bytes());assert!(shader_bitmap_references(&Reader(&bytes),&region,&mut corrupt,&ids,at).is_err());
     }
     #[test]

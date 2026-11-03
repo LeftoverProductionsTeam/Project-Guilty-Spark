@@ -80,13 +80,20 @@ export function renderMaterialChecks() {
   exterior.setAttribute('uv1', exterior.getAttribute('uv'));
   exterior.setIndex(renderIndices(cached));
   const model = sample(createHaloMaterial(green, null, { ...metadata, kind: 'model' }, {}), exterior);
+  const glowMetadata:ShaderPreview={...metadata,kind:'model',selfIllumination:{source:0,function:0,period:2,lower:[0,0,0],upper:[1,.5,.25]}};
+  const emissiveMask=texture([0,255,0,0]),noEmissionMask=texture([0,0,0,0]),grey=texture([128,128,128,255]);
+  const glowSample=(base:THREE.Texture,mask:THREE.Texture,enabled:boolean)=>{
+    const material=createHaloMaterial(base,null,glowMetadata,{multipurpose:mask});material.uniforms.overrideLighting.value=true;material.uniforms.ambientFill.value.set(0,0,0);material.uniforms.sunFill.value.set(0,0,0);material.uniforms.lightDirection.value.set(0,0,1);material.uniforms.enhancedSelfIllum.value=enabled;
+    return sample(material,exterior);
+  };
+  const nativeGlow=glowSample(grey,emissiveMask,false),advancedGlow=glowSample(grey,emissiveMask,true),unmasked=glowSample(grey,noEmissionMask,false),blackGlow=glowSample(black,emissiveMask,false);
   camera.position.z = -2;
   camera.lookAt(0, 0, 0);
   const back = sample(createHaloMaterial(green, null, { ...metadata, kind: 'model' }, {}), exterior);
   exterior.dispose();
   geometry.dispose();
-  for (const t of [black, green, red, half]) t.dispose();
+  for (const t of [black, green, red, half,emissiveMask,noEmissionMask,grey]) t.dispose();
   target.dispose();
   renderer.dispose();
-  return { neutral, added, alphaAdded, combined, model, back, errors };
+  return { neutral, added, alphaAdded, combined, model, back,nativeGlow,advancedGlow,unmasked,blackGlow, errors };
 }

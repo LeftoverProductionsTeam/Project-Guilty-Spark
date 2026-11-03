@@ -5,6 +5,7 @@ import { loadReflectionCubeBatch, createDecodedReflectionCubeTexture } from './o
 import { ReflectionTextureSession } from './reflectionTextureSession';
 import { extraTextureKey } from './haloMaterial';
 import { textureResourceScope } from './textureResourceScope';
+import {glassWithoutDiffuse} from './nativeShaderTextures';
 export function useReflectionTextures(
   project: Project,
   inspection: MapInspection | null,
@@ -15,9 +16,10 @@ export function useReflectionTextures(
     scope: string;
     cubes: Record<number, THREE.CubeTexture>;
     errors: Record<number, string>;
-  }>({ scope: '', cubes: {}, errors: {} });
+    loading:boolean;
+  }>({ scope: '', cubes: {}, errors: {},loading:false });
   const shaders =
-    inspection?.tags.filter((tag) => tag.shaderPreview?.reflection && baseTextures[tag.id]) ?? [];
+    inspection?.tags.filter((tag) => tag.shaderPreview?.reflection && (baseTextures[tag.id]||glassWithoutDiffuse(tag.shaderPreview))) ?? [];
   const scope = JSON.stringify([project.id, inspection?.sha256, textureResourceScope(project.source)]);
   const bitmapIds = [...new Set(shaders.map((tag) => tag.shaderPreview!.reflection!.bitmapTagId))];
   const targets = bitmapIds.join(',');
@@ -31,11 +33,12 @@ export function useReflectionTextures(
           scope,
           cubes: Object.fromEntries(reader.cubes),
           errors: Object.fromEntries(reader.errors),
+          loading:reader.loading,
         }),
     );
     const current = { scope, reader };
     session.current = current;
-    setPreview({ scope, cubes: {}, errors: {} });
+    setPreview({ scope, cubes: {}, errors: {},loading:false });
     return () => {
       reader.dispose();
     };
@@ -56,6 +59,6 @@ export function useReflectionTextures(
         if (preview.cubes[id]) textures[extraTextureKey(tag.id, 'reflectionCube')] = preview.cubes[id];
         if (preview.errors[id]) issues.push(`${tag.path}: ${preview.errors[id]}`);
       }
-    return { textures, issues };
+    return { textures, issues,loading:preview.scope===scope&&preview.loading };
   }, [preview, scope, shaderIds]);
 }

@@ -10,8 +10,7 @@ import type {OwnedBitmapBatchResponse} from './ownedBitmapBatch';
 import {configureSourceTexture} from './sourceTexture';
 import {extraTextureKey} from './haloMaterial';
 import {useTextureResourceScopes} from './textureResourceScope';
-import {useMapSessionValues} from './mapSession';
-import {nativeShaderTextureRole} from './nativeShaderTextures';
+import {nativeShaderTextureRole,glassWithoutDiffuse} from './nativeShaderTextures';
 
 export interface OwnedModelView {
   ready?: boolean;
@@ -43,7 +42,6 @@ export function useOwnedForgeModels(
   const [failures,setFailures]=useState<Record<string,string>>({});
   const sources=[...new Map(placements.map(p=>[forgeModelKey(p),p])).values()];
   const resourceIdentity=useTextureResourceScopes(sources.flatMap(p=>p.sourceProjectId?[p.sourceProjectId]:[]));
-  const previewRuntimes=useMapSessionValues(sources.flatMap(p=>p.sourceProjectId?[p.sourceProjectId]:[]),'hosting.runtime','mccSteam');
   const scope=JSON.stringify(sources.map(p=>[p.sourceProjectId,p.sourceSha256,p.tagId,p.modelVariant??'',resourceScopes[p.sourceProjectId??'']??'']));
   useEffect(() => {
     let live=true,textureBytes=0,geometryBytes=0;
@@ -69,7 +67,7 @@ export function useOwnedForgeModels(
           setModels({...loaded});
           const tasks:{shader:number;bitmap:number;role:string}[]=[];
           for (const tag of result.tags.filter(
-            (t) => t.shaderPreview && t.primaryBitmapStatus === 'resolved',
+            (t) => t.shaderPreview && (t.primaryBitmapStatus === 'resolved'||t.primaryBitmapStatus==='not-required'&&glassWithoutDiffuse(t.shaderPreview)),
           )) {
             view.shaderMetadata[tag.id]=tag.shaderPreview!;
             for (const reference of tag.references) {
@@ -148,6 +146,12 @@ export function useOwnedForgeModels(
           view.shaderTextures={...view.shaderTextures};
           view.extraTextures={...view.extraTextures};
           view.shaderMetadata={...view.shaderMetadata};
+          const absent=[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])].filter(id=>!view.shaderMetadata[id]||!view.shaderTextures[id]&&!glassWithoutDiffuse(view.shaderMetadata[id]));
+          if(absent.length){
+            const names=absent.slice(0,3).map(id=>result.tags.find(tag=>tag.id===id)?.path??`datum ${id}`).join(', ');
+            const message=`${absent.length} native material(s) unavailable: ${names}. This preview is incomplete.`;
+            errors[key]=errors[key]?`${errors[key]} ${message}`:message;
+          }
           loaded[key] = { ...view, ready: true };
           if(live){setModels({...loaded});setFailures({...errors});}
         } catch (error) {
@@ -157,6 +161,6 @@ export function useOwnedForgeModels(
     }
     void load();
     return()=>{live=false;for(const texture of pool.values())texture.dispose();};
-  }, [scope,resourceIdentity,previewRuntimes]);
+  }, [scope,resourceIdentity]);
   return {models,failures};
 }

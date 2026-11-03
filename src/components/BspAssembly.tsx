@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import { useMapState } from '../mapSession';
+import type {NativeSurfacePick} from '../nativeSurfacePick';
 import type { LibraryEntry, Project, Vec3 } from '../types';
 import { assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport } from '../bspAssembly';
@@ -23,6 +24,7 @@ export default function BspAssembly({
   onBuild: () => void;
 }) {
   const {active}=useWorkspaceActivity();
+  const [pickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
   const activeNow=useRef(active);activeNow.current=active;
   const candidates = entries.filter(
     (e) => e.id !== project.id && e.sha256 && [6, 7, 13, 609].includes(e.version ?? 0),
@@ -157,6 +159,7 @@ export default function BspAssembly({
       </summary>
       {open && (
         <div className="bsp-assembly-body">
+          {pickedSurface&&project.source&&pickedSurface.sourceHash===project.source.sha256&&<p className="subtle" role="status">Selected BSP {pickedSurface.bspIndex+1}. Connect or extend with a rebuilt tunnel below. Reshaping compiled landscape faces is still in development; face extrusion, clipping and vertex editing currently require editable BSP Workshop source.</p>}
           <MegaworldAtlas projectId={project.id} assembly={project.bspAssembly} sourceSha={project.source?.sha256}/>
           <p>
             Add a campaign or multiplayer section and join it with a real tunnel. Spark rebuilds one MCC world

@@ -25,6 +25,20 @@ async function selectTag(open,tag){await choose('Tag editor');await page.getByPl
  const toggle=group.locator('.tag-class-toggle');if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
  const short=tag.path.split(/[\\/]/).at(-1);await group.locator('.tag-row').filter({has:page.getByText(short,{exact:true})}).first().click();
 }
+async function visibleModelPixels(png){
+ return page.evaluate(async data=>{
+  const image=new Image();image.src=`data:image/png;base64,${data}`;await image.decode();
+  const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
+  const {data:p}=ctx.getImageData(0,0,canvas.width,canvas.height),at=(x,y)=>(y*canvas.width+x)*4;
+  const b=at(Math.floor(canvas.width*.05),Math.floor(canvas.height*.1)),background=[p[b],p[b+1],p[b+2]];let visible=0,samples=0;
+  // Exclude toolbar/caption text. Metadata/triangle counts alone can pass a
+  // completely black viewport; the rendered subject must occupy real pixels.
+  for(let y=Math.floor(canvas.height*.2);y<canvas.height*.85;y++)for(let x=Math.floor(canvas.width*.2);x<canvas.width*.85;x++){
+   const i=at(x,y);samples++;if(Math.max(...background.map((v,c)=>Math.abs(v-p[i+c])))>12)visible++;
+  }
+  return {visible,samples,background};
+ },png.toString('base64'));
+}
 try{
  await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);
  browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
@@ -45,15 +59,43 @@ try{
   await page.locator('.map-card').filter({has:page.getByRole('heading',{name:entry.name,exact:true})}).click();
   const world=page.locator('.world-layout:visible');await expect(world).toBeVisible();const began=performance.now();
   await expect.poll(()=>world.getAttribute('data-material-loading')).toBe('false');await expect.poll(()=>world.getAttribute('data-pending-materials')).toBe('0');
+  await expect.poll(()=>world.getAttribute('data-reflection-loading')).toBe('false');
   result.worldMs=performance.now()-began;result.world=await world.evaluate(e=>({...e.dataset}));
+  if(entry.reflectionCubes)expect(Number(result.world.sourceCubes)).toBe(entry.reflectionCubes);
   await page.screenshot({path:path.join(root,`world-${i}.png`)});
   const worldCanvas=world.locator('canvas');await worldCanvas.evaluate(e=>e.dataset.qaRetained='native-c53');
+  // Authored player starts can place a biped directly in front of the camera.
+  // Click visible wall/floor candidates instead of treating an object hit as a
+  // failed BSP pick. These are real pointer events, never injected selection.
+  const picked=world.locator('[data-native-surface]'),surfaceClicks=[];
+  for(const [x,y] of [[.15,.3],[.4,.15],[.75,.25],[.3,.9],[.9,.9]]){
+   const bounds=await worldCanvas.boundingBox();await worldCanvas.click({position:{x:bounds.width*x,y:bounds.height*y}});surfaceClicks.push([x,y]);await page.waitForTimeout(200);if(await picked.count())break;
+  }
+  await expect(picked).toHaveAttribute('data-source-hash',o.inspection.sha256);
+  result.surfaceSelection={...await picked.evaluate(e=>({...e.dataset})),pointerClicks:surfaceClicks};
+  const selectedSurface=await page.evaluate(id=>JSON.parse(localStorage.getItem('guilty-spark-map-session-v1:'+id))['world.surface-selection'],o.project.id);
+  const surfaceShader=o.inspection.tags.find(tag=>tag.id===selectedSurface.shaderTagId);expect(surfaceShader).toBeTruthy();
+  await picked.getByRole('button',{name:'Surface shader',exact:true}).click();
+  const tagDrawer=page.getByRole('region',{name:'Object tags panel',exact:true}).locator('.viewport-tags');
+  await expect(tagDrawer).toHaveAttribute('data-history-project',o.project.id);await expect(tagDrawer.locator('.viewport-tag-path')).toHaveText(surfaceShader.path);
+  result.surfaceSelection.shaderTagId=surfaceShader.id;result.surfaceSelection.shaderTagPath=surfaceShader.path;
+  await page.getByRole('button',{name:'Close Object tags',exact:true}).click();
+  await picked.getByRole('button',{name:'Connect / tunnel',exact:true}).click();
+  const construction=page.getByRole('region',{name:'Construction panel',exact:true});
+  await expect(construction.getByRole('status').filter({hasText:'Reshaping compiled landscape faces is still in development'})).toBeVisible();
+  await page.getByRole('button',{name:'Close Construction',exact:true}).click();
+  await picked.getByRole('button',{name:'Deselect surface',exact:true}).click();
+  await page.evaluate(()=>{const original=window.__TAURI_INTERNALS__.invoke.bind(window.__TAURI_INTERNALS__);window.gsQaNativeReads=[];window.gsQaRestoreInvoke=()=>window.__TAURI_INTERNALS__.invoke=original;window.__TAURI_INTERNALS__.invoke=(command,...args)=>{if(/preview_owned_(?:cache_bitmap|object_model|reflection_cube)/.test(command))window.gsQaNativeReads.push(command);return original(command,...args);};});
+  const beforeMaterials=await world.getAttribute('data-source-shaders');
+  for(const runtime of ['haloCustomEdition','openCe','chupathingyCe','mccSteam']){await page.locator('.runtime-dock').getByLabel('Active map runtime',{exact:true}).selectOption(runtime);await page.waitForTimeout(250);await expect(world).toHaveAttribute('data-material-loading','false');await expect(worldCanvas).toHaveAttribute('data-qa-retained','native-c53');}
+  result.hostingSwitchReads=await page.evaluate(()=>{const reads=window.gsQaNativeReads;window.gsQaRestoreInvoke();return reads;});expect(result.hostingSwitchReads).toEqual([]);expect(await world.getAttribute('data-source-shaders')).toBe(beforeMaterials);
   const wanted=entry.models.map(pattern=>{const tag=o.inspection.tags.find(t=>['scen','vehi','bipd','eqip','itmc','mod2','mode'].includes(t.class)&&new RegExp(pattern,'i').test(t.path));expect(tag,`Missing requested native model ${pattern}`).toBeTruthy();return tag;});
   for(const tag of wanted){
    await selectTag(o,tag);const preview=page.locator('.tag-model-preview .native-model-preview');await expect(preview).toHaveAttribute('data-model-tag',String(tag.id));
-   await expect(preview).toHaveAttribute('data-model-ready','true');const canvas=preview.locator('canvas');await expect(canvas).toBeVisible();
+   await expect(preview).toHaveAttribute('data-model-ready','true');await expect(preview).toHaveAttribute('data-model-lighting-ready','true');const canvas=preview.locator('canvas');await expect(canvas).toBeVisible();
    const observation={path:tag.path,id:tag.id,...await preview.evaluate(e=>({...e.dataset}))};
    await expect.poll(async()=>Number(await preview.getAttribute('data-model-textures')),'Representative native models must have actual source textures').toBeGreaterThan(0);
+   await expect(preview).toHaveAttribute('data-model-material-gaps','0');
    Object.assign(observation,await preview.evaluate(e=>({...e.dataset})));
    const info=await page.locator('.tag-properties-pane').boundingBox(),modelBounds=await preview.boundingBox();
    expect(modelBounds.x).toBeGreaterThanOrEqual(info.x+info.width-1);expect(modelBounds.height).toBeGreaterThan(350);
@@ -63,7 +105,7 @@ try{
    await expect.poll(()=>canvas.getAttribute('data-gs-preview-camera')).not.toBe(pose);observation.orbit=true;
    const orbit=await canvas.getAttribute('data-gs-preview-camera');await page.mouse.wheel(0,-300);await expect.poll(()=>canvas.getAttribute('data-gs-preview-camera')).not.toBe(orbit);observation.zoom=true;
    await page.getByRole('button',{name:'Fit / Reset',exact:true}).click();observation.fitted=JSON.parse(await canvas.getAttribute('data-gs-preview-camera'));
-   await preview.screenshot({path:path.join(root,`model-${i}-${tag.id}.png`)});
+   const image=await preview.screenshot({path:path.join(root,`model-${i}-${tag.id}.png`)});observation.gpuPixels=await visibleModelPixels(image);expect(observation.gpuPixels.visible,'Actual model pixels must be visible, not only decoded material metadata').toBeGreaterThan(2000);
    await page.screenshot({path:path.join(root,`tag-workspace-${i}-${tag.id}.png`)});result.models.push(observation);
   }
   await choose('Level editor');await expect(page.locator('.world-layout:visible canvas')).toHaveAttribute('data-qa-retained','native-c53');result.worldRetained=true;

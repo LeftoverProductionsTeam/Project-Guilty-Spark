@@ -68,7 +68,7 @@ export interface ForgeViewportProps {
   snapshot: ForgeSnapshot | null;
   selected: string[];
   onSelect: (id: string | null, additive: boolean) => void;
-  onTransform: (nodes: ForgeNode[]) => void;
+  onTransform: (nodes: ForgeNode[],duplicate?:boolean) => void;
   mode: 'translate' | 'rotate' | 'scale';
   snap: number;
   grid: boolean;
@@ -437,6 +437,7 @@ function WalkCamera({ document: doc, snapshot, collisionEnabled, onError }: {
 }
 
 function ForgeScene(props: ForgeViewportProps) {
+  const altDrag=useRef(false);
   const {
     document: doc,
     snapshot,
@@ -452,6 +453,7 @@ function ForgeScene(props: ForgeViewportProps) {
     ghost,
   } = props;
   const { camera, gl, scene } = useThree();
+  useEffect(()=>{const begin=(event:PointerEvent)=>{altDrag.current=event.altKey;};gl.domElement.addEventListener('pointerdown',begin,true);return()=>gl.domElement.removeEventListener('pointerdown',begin,true);},[gl]);
   const group = useRef<THREE.Group>(null);
   const zoneGroup = useRef<THREE.Group>(null);
   const nodes = forgeNodes(doc).filter((node) => node.value.visible);
@@ -603,6 +605,7 @@ function ForgeScene(props: ForgeViewportProps) {
               if (!group.current) return;
               try {
             const target = group.current;
+            if(target.position.distanceTo(origin)<1e-6&&target.quaternion.angleTo(base)<1e-6&&target.scale.distanceTo(new THREE.Vector3(1,1,1))<1e-6)return;
             target.updateMatrix();
             const deltaRotation = target.quaternion.clone().multiply(base.clone().invert());
             const changed = chosen.map((node) => {
@@ -624,7 +627,7 @@ function ForgeScene(props: ForgeViewportProps) {
                 chosen.length === 1 ? (target.scale.toArray() as Vec3) : [1, 1, 1],
               );
             });
-            onTransform(changed);
+            onTransform(changed,altDrag.current);
             target.scale.set(1, 1, 1);
             } catch (error) { props.onError(String(error)); group.current.position.copy(origin); group.current.rotation.copy(baseRotation); group.current.scale.set(1, 1, 1); }
             }}

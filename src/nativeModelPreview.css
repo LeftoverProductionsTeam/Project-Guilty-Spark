@@ -114,7 +114,9 @@
   color: var(--muted);
   opacity: 0.25;
   transition: opacity 0.2s;
+  pointer-events: none;
 }
+.home-model-caption :is(button,select) { pointer-events: auto; }
 .home-native-model:hover .home-model-caption,
 .home-native-model:focus-within .home-model-caption {
   opacity: 1;

@@ -1,4 +1,5 @@
 import SceneEffects from './SceneEffects';
+import {native} from '../api';
 import { DEFAULT_RENDER_FEATURES } from '../renderFeatures';
 const showcaseFeatures = {
   ...DEFAULT_RENDER_FEATURES,
@@ -8,8 +9,9 @@ const showcaseFeatures = {
   bloomThreshold: 1.25,
   bloomRadius: 0.16,
   exposureEv: -0.15,
-  selfIllumStrength: 0.85,
-  specularStrength: 0.2,
+  normalMaps:false,
+  specular:false,
+  selfIllumination:false,
   toneMapping: 'source' as const,
 };
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -22,7 +24,10 @@ import type { ForgeAsset } from '../forge';
 import { useOwnedForgeModels, forgeModelKey } from '../useOwnedForgeModels';
 import type { OwnedModelView } from '../useOwnedForgeModels';
 import type { EditorEnvironment } from '../environment';
-import { DEFAULT_ENVIRONMENT } from '../environment';
+import { sourceSurfaceEnvironment } from '../environment';
+import {modelSourceAppearance} from '../modelSourceAppearance';
+import {glassWithoutDiffuse} from '../nativeShaderTextures';
+import type {ModelSourceAppearance} from '../modelSourceAppearance';
 import HaloMesh from './HaloMesh';
 import AnimatedBiped from './AnimatedBiped';
 import { useNativeModelAnimations } from '../useNativeModelAnimations';
@@ -211,6 +216,10 @@ export default function NativeModelPreview({
   );
   const key = forgeModelKey(placement),
     view = models[key];
+  const [sourceLighting,setSourceLighting]=useState<{key:string;value:ModelSourceAppearance|null}|null>(null);
+  useEffect(()=>{let alive=true;setSourceLighting(null);if(!native||!identity.projectId||!identity.sourceHash){setSourceLighting({key,value:null});return;}
+    void modelSourceAppearance(identity.projectId,identity.sourceHash).then(value=>{if(alive)setSourceLighting({key,value});},()=>{if(alive)setSourceLighting({key,value:null});});return()=>{alive=false;};
+  },[identity.projectId,identity.sourceHash,key]);
   const [visible, setVisible] = useState(false),
     host = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -220,16 +229,8 @@ export default function NativeModelPreview({
   }, []);
   const value = useMemo<EditorEnvironment>(
     () =>
-      environment ?? {
-        ...DEFAULT_ENVIRONMENT,
-        ambientColor: [0.9, 0.95, 1],
-        ambientIntensity: showcase ? (view?.mesh.rig&&view.mesh.rig.nodes.length>1?0.45:0.9) : 0.85,
-        sunColor: [1, 0.95, 0.88],
-        sunIntensity: showcase ? (view?.mesh.rig&&view.mesh.rig.nodes.length>1?0.55:1.1) : 1.6,
-        sunAzimuth: -30,
-        sunElevation: 35,
-      },
-    [environment, showcase,view?.mesh.rig?.nodes.length],
+      environment ?? (sourceLighting?.key===key?sourceLighting.value?.environment:null) ?? sourceSurfaceEnvironment(),
+    [environment,sourceLighting,key],
   );
   return (
     <div
@@ -244,8 +245,11 @@ export default function NativeModelPreview({
       data-model-triangles={view ? view.mesh.indices.length / 3 : 0}
       data-model-ready={!!view?.ready}
       data-native-animation-count={animations.value?.clips.length ?? 0}
+      data-native-self-illumination={view?Object.values(view.shaderMetadata).filter(m=>m.selfIllumination?.source===0&&[...m.selfIllumination.lower,...m.selfIllumination.upper].some(v=>v>0)).length:0}
+      data-model-lighting={environment?'custom':sourceLighting?.key===key&&sourceLighting.value?.environment?'source':'inspection'}
+      data-model-lighting-ready={!!environment||sourceLighting?.key===key}
       data-model-textures={view ? Object.keys(view.shaderTextures).length : 0}
-      data-model-material-gaps={view?[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])].filter(id=>!view.shaderTextures[id]||!view.shaderMetadata[id]).length:0}
+      data-model-material-gaps={view?[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])].filter(id=>!view.shaderMetadata[id]||!view.shaderTextures[id]&&!glassWithoutDiffuse(view.shaderMetadata[id])).length:0}
       data-model-reflections={
         view
           ? Object.values(view.extraTextures).filter((texture) => texture instanceof THREE.CubeTexture).length
@@ -269,7 +273,7 @@ export default function NativeModelPreview({
           }}
         >
           <Suspense fallback={null}>
-            <SceneEnvironment value={value} overrideLighting transparentBackground={showcase} />
+            <SceneEnvironment value={value} maximumFogDensity={sourceLighting?.key===key?sourceLighting.value?.fogMaximumDensity??1:1} overrideLighting transparentBackground={showcase} />
             {showcase && <SceneEffects settings={showcaseFeatures} transparentBackground />}
             <Model
               view={view}
@@ -281,7 +285,7 @@ export default function NativeModelPreview({
               identity={identity}
               framing={framing}
             />
-            {onSnapshot && <Snapshot ready={!!view.ready} onSnapshot={onSnapshot} />}
+            {onSnapshot && <Snapshot ready={!!view.ready&&(!!environment||sourceLighting?.key===key)} onSnapshot={onSnapshot} />}
           </Suspense>
         </Canvas>
       ) : (
@@ -291,6 +295,7 @@ export default function NativeModelPreview({
       )}
       {failures[key] && <small role="status">{failures[key]}</small>}
       {view&&!view.ready&&!failures[key]&&<small className="model-material-loading" role="status">Loading source textures &amp; reflections…</small>}
+      {!showcase&&sourceLighting?.key===key&&!sourceLighting.value?.environment&&!environment&&<small className="model-lighting-status">Source lighting unavailable · inspection lighting</small>}
       {!showcase&&live&&<div className="native-model-view-controls" aria-label="Model preview controls">
         <button type="button" title="Fit the complete model to this preview" onClick={()=>setFraming(value=>({preset:'fit',revision:value.revision+1}))}>Fit / Reset</button>
         <select aria-label="Model view" value={framing.preset} onChange={event=>setFraming(value=>({preset:event.target.value as ModelViewPreset,revision:value.revision+1}))}>

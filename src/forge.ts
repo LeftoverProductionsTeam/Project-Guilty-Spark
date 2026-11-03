@@ -253,14 +253,19 @@ export function duplicateForgeNodes(
   doc: QuickForgeDocument,
   ids: string[],
 ): { document: QuickForgeDocument; ids: string[] } {
+  return appendForgeNodes(doc,forgeNodes(doc).filter(n=>ids.includes(n.value.id)&&!n.value.locked),[1,1,0]);
+}
+/** Clone source references, never source instance identities. Used by copy/paste
+ * and Alt-drag so the entire placement change is one authored transaction. */
+export function appendForgeNodes(doc:QuickForgeDocument,nodes:ForgeNode[],offset:Vec3=[0,0,0]):{document:QuickForgeDocument;ids:string[]}{
   const result = structuredClone(doc),
     created: string[] = [];
-  for (const node of forgeNodes(doc).filter((n) => ids.includes(n.value.id) && !n.value.locked)) {
+  for (const node of nodes.filter(n=>!n.value.locked)) {
     const copy = structuredClone(node);
     copy.value.id = crypto.randomUUID();
     copy.value.name = `${copy.value.name || nodeCategory(node)} copy`;
-    copy.value.position[0] += 1;
-    copy.value.position[1] += 1;
+    copy.value.position=copy.value.position.map((v,i)=>v+offset[i]) as Vec3;
+    transformForgeNode(copy,copy.value.position,nodeRotation(copy),[1,1,1]);
     created.push(copy.value.id);
     if (copy.type === 'brush') result.geometry.push(copy.value);
     else if (copy.type === 'placement') result.placements.push(copy.value);

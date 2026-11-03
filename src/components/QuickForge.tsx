@@ -2,6 +2,7 @@ import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import { publishTextureResources, useTextureResourceScope } from '../textureResourceScope';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
 import { draggedAsset } from '../assetDragRegistry';
+import {copyForgeSelection,readForgeSelection,prepareForgePaste,applyForgePaste} from '../forgeClipboard';
 import BuildTargets from './BuildTargets';
 import { WorkspacePanel, WorkspacePanelAddon, useRevealWorkspacePanel } from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
@@ -52,6 +53,7 @@ import {
   catalogAssets,
   createBrush,
   duplicateForgeNodes,
+  appendForgeNodes,
   forgeModes,
   forgeGeometryKey,
   forgeNodes,
@@ -920,6 +922,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       setSelected(copy.ids);
     }
   }
+  async function pasteSelection(){
+    if(assetBusy||studioRole==='viewer')return;
+    const copied=readForgeSelection();if(!copied){notify('Copy compatible QuickForge objects first (Ctrl+C).','info');return;}
+    setAssetBusy(true);
+    try{const prepared=await prepareForgePaste(latestProject.current,copied);if(!assetAlive.current)return;const pasted=applyForgePaste(latestProject.current,prepared);edit(pasted.project,`Paste ${pasted.ids.length} QuickForge object(s)`);setSelected(pasted.ids);setWorkshopSelected(null);}
+    catch(error){if(assetAlive.current)notify(String(error),'error');}finally{if(assetAlive.current)setAssetBusy(false);}
+  }
   function remove() {
     if (selectedZone && project.firefight) {
       edit(
@@ -950,6 +959,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         return;
       if (document.querySelector('canvas[data-gs-fly-active="true"]')) return;
       if (event.ctrlKey || event.metaKey) {
+        if(event.key.toLowerCase()==='c'){event.preventDefault();try{const count=copyForgeSelection(latestProject.current,selected);if(count)notify(`${count} object(s) copied. Ctrl+V pastes into the active QuickForge map.`);}catch(error){notify(String(error),'error');}}
+        if(event.key.toLowerCase()==='v'&&!assetBusy){event.preventDefault();void pasteSelection();}
         if (event.key.toLowerCase() === 'd') {
           event.preventDefault();
           duplicate();
@@ -987,7 +998,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [activity.active,doc, selected, selectedZone, project.firefight, cameraMode, bspMode, workshop]);
+  }, [activity.active,doc, selected, selectedZone, project.firefight, cameraMode, bspMode, workshop,assetBusy,studioRole]);
   function addPolygonHill(rawPoint: Vec3 = [0, 0, 0]) {
     const usageId = nextFreeUsageId(doc, 'hill');
     if (usageId === null || doc.objectives.length + 4 > 200) {
@@ -1788,7 +1799,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   snapshot={snapshot}
                   selected={selected}
                   onSelect={select}
-                  onTransform={(updated) => {
+                  onTransform={(updated,asCopy) => {
                     try {
                       let snapped: ForgeNode[] = updated;
                       const only = updated[0];
@@ -1802,6 +1813,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                         }
                       }
                       const byId = new Map(snapped.map((node) => [node.value.id, node]));
+                      if(asCopy){const copied=appendForgeNodes(doc,snapped);commit(copied.document,`Duplicate and move ${copied.ids.length} object(s)`);setSelected(copied.ids);return;}
                       commit(
                         mapForgeNodes(doc, (node) => byId.get(node.value.id) ?? node),
                         `Transform ${updated.length} object(s)`,

@@ -28,6 +28,11 @@ const metadata: ShaderPreview = {
   stages: [stage],
 };
 describe('source transparent materials', () => {
+  it('renders explicitly absent glass diffuse as zero contribution while retaining the authored tint and reflection',()=>{
+    const cube=new THREE.CubeTexture(),material=createHaloMaterial(null,null,{...metadata,kind:'glass',glassDiffuseAbsent:true,glassTint:[.4,.5,.6],reflection:{bitmapTagId:7,perpendicularBrightness:.1,parallelBrightness:.7,perpendicularTint:[1,1,1],parallelTint:[1,1,1],falloff:0,cutoff:0}},{reflectionCube:cube});
+    expect(material.uniforms.hasBase.value).toBe(false);expect(material.uniforms.baseMap.value).toBeNull();expect(material.uniforms.hasReflection.value).toBe(true);expect(material.blendColor.toArray()).toEqual([.4,.5,.6]);
+    expect(()=>createHaloMaterial(null,null,{...metadata,kind:'model'},{})).toThrow(/actual diffuse/);material.dispose();cube.dispose();
+  });
   it('continues visible native shader animation while static materials need no idle frames', () => {
     const base = new THREE.Texture(), scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
     const staticMaterial=createHaloMaterial(base,null,metadata,{});

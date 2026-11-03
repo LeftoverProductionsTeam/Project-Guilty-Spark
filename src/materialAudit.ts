@@ -2,8 +2,9 @@
  * pixels, local operating-system paths and any claim of game shader parity.
  * All bitmap IDs come from the exact inspected cache's tag table. */
 import type { MapInspection, MeshData, Tag } from './types';
+import {glassWithoutDiffuse} from './nativeShaderTextures.ts';
 
-export type MaterialBindingState = 'resolved' | 'missing' | 'invalid' | 'unavailable' | 'legacy-unverified';
+export type MaterialBindingState = 'resolved' | 'not-required' | 'missing' | 'invalid' | 'unavailable' | 'legacy-unverified';
 export interface MaterialDependency {
   shaderTagId: number;
   shaderClass: string;
@@ -29,6 +30,7 @@ const primaryLabel = /^(?:base map|base texture|diffuse map|diffuse texture|prim
 function shaderState(tag:Tag|undefined, bitmap:Tag|undefined, primaryCount:number):MaterialBindingState {
   if(!tag || !['senv','soso'].includes(tag.class)&&!(tag.class==='sgla'&&tag.shaderPreview?.kind==='glass')&&!(['schi','scex'].includes(tag.class)&&tag.shaderPreview?.kind==='chicago')&&!(tag.class==='sotr'&&tag.shaderPreview?.kind==='generic')) return 'invalid';
   const status=tag.primaryBitmapStatus;
+  if(status==='not-required'&&glassWithoutDiffuse(tag.shaderPreview)&&primaryCount===0)return 'not-required';
   if(status==='missing'||status==='unavailable'||status==='invalid')return status;
   if(status==='resolved')return primaryCount===1&&bitmap?.class==='bitm'?'resolved':'invalid';
   // Old serialized inspections did not carry native shader provenance.
