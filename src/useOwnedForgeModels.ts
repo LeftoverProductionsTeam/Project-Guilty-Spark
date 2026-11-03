@@ -29,9 +29,9 @@ interface ModelResponse {
   tags: Tag[];
   resourceHashes?: Record<string, string>;
 }
-export type OwnedModelIdentity = Pick<ForgePlacement, 'sourceProjectId' | 'sourceSha256' | 'tagId'>;
+export type OwnedModelIdentity = Pick<ForgePlacement, 'sourceProjectId' | 'sourceSha256' | 'tagId'> & {modelVariant?:string};
 export const forgeModelKey = (value: OwnedModelIdentity) =>
-  `${value.sourceProjectId}:${value.sourceSha256}:${value.tagId}`;
+  `${value.sourceProjectId}:${value.sourceSha256}:${value.tagId}${value.modelVariant?':'+value.modelVariant:''}`;
 
 /** One shared set of source models/textures for a viewport. Transform edits do
  * not reload sources. A missing dependency never creates replacement geometry. */
@@ -44,7 +44,7 @@ export function useOwnedForgeModels(
   const sources=[...new Map(placements.map(p=>[forgeModelKey(p),p])).values()];
   const resourceIdentity=useTextureResourceScopes(sources.flatMap(p=>p.sourceProjectId?[p.sourceProjectId]:[]));
   const previewRuntimes=useMapSessionValues(sources.flatMap(p=>p.sourceProjectId?[p.sourceProjectId]:[]),'hosting.runtime','mccSteam');
-  const scope=JSON.stringify(sources.map(p=>[p.sourceProjectId,p.sourceSha256,p.tagId,resourceScopes[p.sourceProjectId??'']??'']));
+  const scope=JSON.stringify(sources.map(p=>[p.sourceProjectId,p.sourceSha256,p.tagId,p.modelVariant??'',resourceScopes[p.sourceProjectId??'']??'']));
   useEffect(() => {
     let live=true,textureBytes=0,geometryBytes=0;
     const pool=new Map<string,THREE.Texture>(),loaded:Record<string,OwnedModelView>={},errors:Record<string,string>={};
@@ -58,7 +58,7 @@ export function useOwnedForgeModels(
         try {
           if(!native||!placement.sourceProjectId||!placement.sourceSha256||placement.tagId==null)throw new Error('An imported map and exact source tag are required');
           if(Object.keys(loaded).length>=128)throw new Error('The viewport model-type limit is full');
-          const result=await call<ModelResponse>('preview_owned_object_model',{projectId:placement.sourceProjectId,tagId:placement.tagId,sourceSha256:placement.sourceSha256});
+          const result=await call<ModelResponse>('preview_owned_object_model',{projectId:placement.sourceProjectId,tagId:placement.tagId,sourceSha256:placement.sourceSha256,...(placement.modelVariant?{modelVariant:placement.modelVariant}:{})});
           if(!live)return;
           if(result.sourceSha256!==placement.sourceSha256||result.objectTagId!==placement.tagId)throw new Error('Model source identity differs from its placement');
           const bytes=(result.mesh.positions.length+(result.mesh.normals?.length??0)+(result.mesh.uvs?.length??0)+result.mesh.indices.length+(result.mesh.rig?.weights.length??0))*4+(result.mesh.rig?.indices.length??0)*2;

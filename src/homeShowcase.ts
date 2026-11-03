@@ -4,8 +4,40 @@ import { catalogAssets } from './forge';
 import type { ForgeAsset } from './forge';
 import { retainAssetSource } from './assetSources';
 import type { AssetSourceInventory } from './assetSources';
+import {matchesHomeCharacter} from './homeCharacters';
+import type {HomeCharacter} from './homeCharacters';
 
 const sources = new Map<string, Promise<ForgeAsset[]>>();
+const characterSources=new Map<string,Promise<ForgeAsset|null>>();
+export function preloadHomeCharacter(data:Bootstrap,character:HomeCharacter):Promise<ForgeAsset|null>{
+  const runtime=data.settings?.preferredHalo??'mccSteam';
+  const key=JSON.stringify([data.dataDirectory,data.installation.mccPath,runtime,character]);
+  const existing=characterSources.get(key);if(existing)return existing;
+  const pending=(async()=>{
+    const known=await preloadHomeModels(data);
+    const pick=async(assets:ForgeAsset[])=>{
+      const matching=assets.filter(asset=>matchesHomeCharacter(asset,character));
+      const model=matching[0];if(!model)return null;
+      if(character!=='johnson'||/characters[\\/]johnson[\\/]/i.test(model.path))return model;
+      const variants=await call<string[]>('owned_character_variants',{projectId:model.sourceProjectId,tagId:model.tagId,sourceSha256:model.sourceSha256});
+      const johnson=variants.find(name=>/^sgt_johnson(?:-|$)/i.test(name));
+      return johnson?{...model,modelVariant:johnson,name:'Sgt. Johnson'}:null;
+    };
+    const version=runtime==='mccSteam'?13:runtime==='haloCustomEdition'?609:5;
+    const available=await pick(known.filter(asset=>asset.cacheVersion===version));if(available)return available;
+    const inventory=await call<AssetSourceInventory>('discover_asset_sources');
+    const wanted=character==='monitor'?/^c40\.map$/i:/^a10\.map$/i;
+    const provider=runtime==='openCe'?'opence':runtime==='chupathingyCe'?'chupathingy':'';
+    const rank=(row:AssetSourceInventory['maps'][number])=>(row.cacheVersion===version?0:10)+(provider&&!row.location.toLowerCase().includes(provider)?1:0)+(character==='chief'&&!/^bloodgulch/i.test(row.name)?2:0);
+    const maps=inventory.maps.filter(row=>!row.archive&&wanted.test(row.name)).sort((a,b)=>rank(a)-rank(b));
+    for(const row of maps.slice(0,6)){
+      try{const source=(await call<OpenProject[]>('open_asset_source',{sourceId:row.id,preparePreviewResources:true}))[0];if(source){const chosen=await pick(await connect(source));if(chosen)return chosen;}}
+      catch{/* A different owned copy may have the exact model and variation. */}
+    }return pick(known);
+  })();
+  if(characterSources.size>=16)characterSources.delete(characterSources.keys().next().value!);
+  characterSources.set(key,pending);void pending.then(model=>{if(!model)characterSources.delete(key);},()=>characterSources.delete(key));return pending;
+}
 export const isHaloMonitor = (asset: Pick<ForgeAsset,'path'>) => /(?:^|[\\/])(?:monitor|343)[\\/]/i.test(asset.path);
 function characters(source: OpenProject): ForgeAsset[] {
   const available = catalogAssets(source);

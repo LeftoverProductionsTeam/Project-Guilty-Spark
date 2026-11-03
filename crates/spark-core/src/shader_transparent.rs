@@ -79,9 +79,6 @@ pub(super) fn inspect(
         return invalid("Transparent cube/screen maps require a distinct preview decoder");
     }
     let flags = r.bytes(at + 41, 1)?[0];
-    if flags & 8 != 0 {
-        return invalid("Screen-space transparent maps require a distinct preview decoder");
-    }
     let blend = r.u16(at + 44)?;
     if blend > 7 {
         return invalid("Unknown transparent shader framebuffer blend");
@@ -169,6 +166,8 @@ pub(super) fn inspect(
     tag.primary_bitmap_status = Some("resolved".into());
     tag.shader_preview = Some(ShaderPreview {
         kind: "generic".into(),
+        first_map_screenspace:flags&8!=0,
+        scale_first_map_with_distance:flags&64!=0,
         alpha_test: flags & 1 != 0,
         two_sided: flags & 4 != 0,
         decal: flags & 2 != 0,
@@ -232,6 +231,10 @@ mod tests {
         assert_eq!(m.stages[0].color_inputs[2], 23);
         assert_eq!(b, before);
         assert_eq!(t.references[0].offset, 156);
+    }
+    #[test]fn screen_space_maps_keep_authored_uv_flags_instead_of_losing_cortana_layers(){
+        let(mut b,mut tag,ids)=fixture();b[41]=72;let space=Space{begin:0,end:b.len(),address:0};inspect(&Reader(&b),&space,&mut tag,&ids,0).unwrap();
+        let shader=tag.shader_preview.unwrap();assert!(shader.first_map_screenspace&&shader.scale_first_map_with_distance);assert_eq!(shader.layers.len(),1);assert_eq!(tag.primary_bitmap_status.as_deref(),Some("resolved"));
     }
     #[test]
     fn rejects_bad_pointers_enums_nonfinite_and_wrong_bitmap_identity() {

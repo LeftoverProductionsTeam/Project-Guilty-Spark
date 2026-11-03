@@ -59,6 +59,7 @@ fn main() -> spark_core::Result<()> {
         })
         .expect("A named acting bone is required");
     let mut clip = AnimationClip {
+        canonical_rotations: true,
         name: "spark wave".into(),
         fps: 30.,
         frame_count: 31,

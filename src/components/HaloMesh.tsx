@@ -67,7 +67,8 @@ export default function HaloMesh({
                 const extra: Record<string, THREE.Texture> = {};
                 for (const [key, texture] of Object.entries(extraTextures))
                   if (key.startsWith(`${tag}:`)) extra[key.slice(key.indexOf(':') + 1)] = texture;
-                return createHaloMaterial(shaderTextures[tag], lightMap, shaderMetadata[tag], extra, sky);
+                const source=shaderMetadata[tag],change=source?.changeColorSource?data.changeColors?.[source.changeColorSource-1]:undefined;
+                return createHaloMaterial(shaderTextures[tag], lightMap, change?{...source,changeColor:change}:source, extra, sky);
               }
               return new THREE.MeshStandardMaterial({
                 color:
@@ -93,6 +94,7 @@ export default function HaloMesh({
       lightmapTextures,
       materialLens,
       shaderMetadata,
+      data.changeColors,
       extraTextures,
       sky,
       wireframe,

@@ -182,6 +182,21 @@ const distribution = (a) => {
   };
 };
 export function compareActorObservations(host, client) {
+  const continuity=(samples)=>{
+    let repeated=0;const discontinuities=[];
+    for(let i=1;i<samples.length;i++) {
+      const before=samples[i-1],after=samples[i];
+      if(after.serverTick===before.serverTick)repeated++;
+      if(after.serverTick<before.serverTick||after.localTick<before.localTick)
+        discontinuities.push({sample:after.sample??i,serverBefore:before.serverTick,serverAfter:after.serverTick,localBefore:before.localTick,localAfter:after.localTick});
+    }
+    return {monotonic:discontinuities.length===0,repeatedTickObservations:repeated,discontinuities:discontinuities.length,examples:discontinuities.slice(0,16)};
+  };
+  const hostContinuity=continuity(host.samples),clientContinuity=continuity(client.samples);
+  // The observer has no native session/epoch identity. The same numeric tick
+  // after a map restart, reconnect or wrap must never match another lifetime.
+  // Keep every raw observation, but require a fresh scoped run before pairing.
+  const pairable=hostContinuity.monotonic&&clientContinuity.monotonic;
   const byTick = new Map(host.samples.map((s) => [s.serverTick, s]));
   const clientByTick = new Map(client.samples.map((s) => [s.serverTick, s]));
   const hostAiIds = new Set(
@@ -219,6 +234,7 @@ export function compareActorObservations(host, client) {
   // Select the last observation per tick on BOTH sides for the comparison;
   // repeated postgame observations must not inflate evidence or weight medians.
   for (const c of clientByTick.values()) {
+    if(!pairable)continue;
     const h = byTick.get(c.serverTick);
     if (!h) continue;
     frames++;
@@ -278,6 +294,9 @@ export function compareActorObservations(host, client) {
     }
   }
   return {
+    tickContinuity:{pairable,host:hostContinuity,client:clientContinuity,
+      refusal:pairable?null:'Tick reset/wrap without a native session identity; collect a fresh scoped host/client observation.',
+      sessionIdentityVerified:false},
     exactTickFrames: frames,
     sharedActualActorIds: ids.size,
     movingActorIds: moving.size,
@@ -297,12 +316,12 @@ export function compareActorObservations(host, client) {
       clientObservations: client.samples.length,
       hostDistinctTicks: byTick.size,
       clientDistinctTicks: clientByTick.size,
-      hostRepeatedTickObservations: host.samples.length - byTick.size,
-      clientRepeatedTickObservations: client.samples.length - clientByTick.size,
+      hostRepeatedTickObservations: hostContinuity.repeatedTickObservations,
+      clientRepeatedTickObservations: clientContinuity.repeatedTickObservations,
       hostTicksWithoutClientPair: byTick.size - frames,
       clientTicksWithoutHostPair: clientByTick.size - frames,
       selection:
-        'Last validated observation per distinct server tick on each side; raw observations and errors remain retained.',
+        'Last validated observation per distinct server tick on each side, only without counter discontinuities; raw observations and errors remain retained. Monotonic counters alone do not prove a shared native session.',
     },
     identityCoverage: coverage,
     health: distribution(health),

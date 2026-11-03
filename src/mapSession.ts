@@ -4,14 +4,54 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { MapInspection } from './types';
 const cache = new Map<string, Record<string, unknown>>(),
   unpersisted = new Map<string, Record<string, unknown>>(),
-  listeners = new Set<() => void>();
+  listeners = new Map<string, Map<string, Set<() => void>>>();
 const prefix = 'guilty-spark-map-session-v1:';
+// Re-read the storage string on every write for peer-window changes, but do not
+// repeatedly decode an unchanged portrait/camera/layout record. Bound the extra
+// serialized snapshots independently of the existing per-map view cache.
+const storedRecords=new Map<string,{text:string|null;value:Record<string,unknown>}>();
+function rememberStored(id:string,text:string|null,value:Record<string,unknown>) {
+  storedRecords.delete(id);storedRecords.set(id,{text,value});
+  if(storedRecords.size>8)storedRecords.delete(storedRecords.keys().next().value!);
+  return value;
+}
+
+/** Subscribe only to the remembered values this view actually reads. */
+export function subscribeMapSession(ids:readonly string[], key:string, listener:()=>void) {
+  const unique=[...new Set(ids)];
+  for(const id of unique) {
+    let keys=listeners.get(id);
+    if(!keys)listeners.set(id,keys=new Map());
+    let callbacks=keys.get(key);
+    if(!callbacks)keys.set(key,callbacks=new Set());
+    callbacks.add(listener);
+  }
+  return()=>{
+    for(const id of unique) {
+      const keys=listeners.get(id),callbacks=keys?.get(key);
+      callbacks?.delete(listener);
+      if(!callbacks?.size)keys?.delete(key);
+      if(!keys?.size)listeners.delete(id);
+    }
+  };
+}
+function publish(id:string, before:Record<string,unknown>, after:Record<string,unknown>) {
+  cache.set(id,after);
+  const pending=new Set<()=>void>();
+  for(const [key,callbacks] of listeners.get(id)??[]) {
+    if(Object.hasOwn(before,key)===Object.hasOwn(after,key)&&Object.is(before[key],after[key]))continue;
+    for(const callback of callbacks)pending.add(callback);
+  }
+  for(const callback of pending)callback();
+}
 function stored(id: string): Record<string, unknown> | undefined {
   try {
     const text = localStorage.getItem(prefix + id);
     if (text && text.length > 262144) return;
+    const known=storedRecords.get(id);
+    if(known&&known.text===text)return rememberStored(id,text,known.value);
     const value = text ? JSON.parse(text) : {};
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    return rememberStored(id,text,value && typeof value === 'object' && !Array.isArray(value) ? value : {});
   } catch {
     return;
   }
@@ -20,7 +60,7 @@ function merged(old: Record<string, unknown>, next: Record<string, unknown>) {
   const value = { ...old };
   for (const [key, item] of Object.entries(next)) {
     // Keep stable references for unchanged layout/camera objects in peer updates.
-    if (JSON.stringify(old[key]) !== JSON.stringify(item))
+    if (!Object.is(old[key],item) && JSON.stringify(old[key]) !== JSON.stringify(item))
       Object.defineProperty(value, key, {
         value: item,
         enumerable: true,
@@ -35,19 +75,22 @@ if (typeof window !== 'undefined')
     if (event.key === null) {
       cache.clear();
       unpersisted.clear();
+      storedRecords.clear();
+      const pending=new Set([...listeners.values()].flatMap(keys=>[...keys.values()].flatMap(callbacks=>[...callbacks])));
+      for(const callback of pending)callback();
     } else if (event.key.startsWith(prefix)) {
       const id = event.key.slice(prefix.length),
         latest = stored(id);
       if (latest === undefined) return;
-      if (event.newValue === null && !Object.keys(latest).length) cache.delete(id);
-      else cache.set(id, merged(merged(cache.get(id) ?? {}, latest), unpersisted.get(id) ?? {}));
+      const before=cache.get(id)??{};
+      if (event.newValue === null && !Object.keys(latest).length) publish(id,before,{});
+      else publish(id,before,merged(merged(before, latest), unpersisted.get(id) ?? {}));
     } else return;
-    for (const listener of listeners) listener();
   });
 function record(id: string) {
   let value = cache.get(id);
   if (!value) {
-    value = stored(id) ?? {};
+    value = {...stored(id)};
     cache.set(id, value!);
   }
   return value!;
@@ -59,7 +102,7 @@ export function readMapSession<T>(id: string, key: string, fallback: T): T {
 /** One stable subscription for source maps in a multi-map asset viewport. */
 export function useMapSessionValues(ids: readonly string[], key: string, fallback: string): string {
   return useSyncExternalStore(
-    listener => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    listener => subscribeMapSession(ids,key,listener),
     () => JSON.stringify(ids.map(id => [id, readMapSession(id, key, fallback)])),
     () => '',
   );
@@ -67,23 +110,30 @@ export function useMapSessionValues(ids: readonly string[], key: string, fallbac
 export function writeMapSession<T>(id: string, key: string, value: T) {
   if (!id || id.length > 128 || !/^[\w.:-]{1,80}$/.test(key)) return;
   // Another native WebView may have saved a different key since this cache loaded.
-  const old = merged(merged(record(id), stored(id) ?? {}), unpersisted.get(id) ?? {});
+  const before=record(id);
+  const old = merged(merged(before, stored(id) ?? {}), unpersisted.get(id) ?? {});
   let text: string;
   try {
-    if (JSON.stringify(old[key]) === JSON.stringify(value)) return;
+    if (JSON.stringify(old[key]) === JSON.stringify(value)) {
+      // A peer can have changed another key before its storage event arrives.
+      // Even a no-op local request must publish that acknowledged preference.
+      publish(id,before,old);
+      return;
+    }
     text = JSON.stringify({ ...old, [key]: value });
     if (text.length > 262144) return;
   } catch {
     return;
   }
-  cache.set(id, { ...old, [key]: value });
+  const next={...old,[key]:value};
   try {
     localStorage.setItem(prefix + id, text);
+    rememberStored(id,text,{...next});
     unpersisted.delete(id);
   } catch {
     unpersisted.set(id, { ...unpersisted.get(id), [key]: value });
   }
-  for (const listener of listeners) listener();
+  publish(id,before,next);
 }
 export function useMapState<T>(
   id: string,
@@ -107,10 +157,7 @@ export function useMapState<T>(
     return r[key] as T;
   };
   const value = useSyncExternalStore(
-    (callback) => {
-      listeners.add(callback);
-      return () => listeners.delete(callback);
-    },
+    (callback) => subscribeMapSession([id],key,callback),
     get,
     get,
   );

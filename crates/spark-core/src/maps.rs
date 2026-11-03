@@ -187,6 +187,9 @@ pub struct Tag {
 #[derive(Clone,Debug,Default,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ShaderPreview {
+    #[serde(default,skip_serializing_if="Option::is_none")] pub change_color_source:Option<u16>,
+    #[serde(default)] pub first_map_screenspace:bool,
+    #[serde(default)] pub scale_first_map_with_distance:bool,
     #[serde(default)] pub detail_mask:u16,
     #[serde(default)] pub detail_v_scale:f32,
     #[serde(default)] pub bump_is_specular:bool,
@@ -281,6 +284,8 @@ pub struct MeshMaterialRange {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MeshData {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub change_colors:Option<Vec<[f32;3]>>,
     #[serde(default,skip_serializing_if="Option::is_none")]
     pub rig:Option<ModelRig>,
     pub positions: Vec<f32>,
@@ -948,7 +953,7 @@ fn shader_bitmap_references(
     let glass=tag.class=="sgla";
     let glass_tint=if glass {let rgb=[r.f32(at+0x54)?,r.f32(at+0x58)?,r.f32(at+0x5c)?];if rgb.iter().any(|v|!(0.0..=1.0).contains(v)){return invalid("Glass background tint is invalid");}Some(rgb)}else{None};
     let model_detail=tag.class=="soso"&&tag.references.iter().any(|v|v.label=="Detail map");
-    tag.shader_preview=Some(ShaderPreview{reflection,glass_tint,detail_mask:if model_detail{r.u16(at+0xd6)?}else{0},detail_v_scale:if model_detail{shader_scale(r,at+0xec)?}else{1.},bump_is_specular:if glass{flags&8!=0}else{tag.class=="senv"&&flags&2!=0},alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
+    tag.shader_preview=Some(ShaderPreview{change_color_source:if tag.class=="soso"{Some(r.u16(at+76)?).filter(|v|*v<=4)}else{None},reflection,glass_tint,detail_mask:if model_detail{r.u16(at+0xd6)?}else{0},detail_v_scale:if model_detail{shader_scale(r,at+0xec)?}else{1.},bump_is_specular:if glass{flags&8!=0}else{tag.class=="senv"&&flags&2!=0},alpha_test:if tag.class=="soso"{flags&4==0}else{flags&1!=0},
         multipurpose_xbox:tag.class=="soso"&&flags&64!=0,bump_scale:if tag.class=="senv"{r.f32(at+0x124).ok().filter(|v|v.abs()<=1024.&&*v!=0.).unwrap_or(1.)}else{1.},
         two_sided:if glass{flags&4!=0}else{tag.class=="soso"&&flags&2!=0},uv_scale:if glass{[shader_scale(r,at+0x154)?;2]}else{uv_scale},
         alpha_blended:glass||tag.class=="soso"&&flags&8!=0,decal:if glass{flags&2!=0}else{tag.class=="soso"&&flags&8!=0},

@@ -10,6 +10,8 @@ import { chromium, expect as assertion } from '@playwright/test';
 
 const [application, destination, ownedMap] = process.argv.slice(2);
 const profileBsp = process.argv.includes('--profile-bsp');
+const only=process.argv.find(arg=>arg.startsWith('--only='))?.slice(7).split(',');
+const strict=process.argv.includes('--strict');
 if (!application || !destination || !ownedMap) throw Error('audit-workspaces-native <Spark.exe> <fresh-output> <owned-map>');
 const root = path.resolve(destination), expect = assertion.configure({ timeout: 90000 });
 await fs.mkdir(root);
@@ -55,11 +57,31 @@ async function layout(page) {
       if (!scrollable) clipped.push({ name: (element.getAttribute('aria-label') || element.textContent || element.getAttribute('placeholder') || element.tagName).trim().slice(0,90), left: Math.round(rect.left), right: Math.round(rect.right) });
     }
     const main = document.querySelector('.gs-workspace-shell');
-    const scrollAreas = [...document.querySelectorAll('main,section,aside,[role="tabpanel"],.gs-panel-content')].filter(element => {
+    const scrollAreas = [...document.querySelectorAll('main,section,aside,[role="tabpanel"],.gs-panel-content,.gs-workspace-content,.gs-settings-workspace,.interface-studio')].filter(element => {
       const css = getComputedStyle(element);
       return rendered(element) && /(auto|scroll)/.test(css.overflowY) && element.scrollHeight > element.clientHeight + 3;
     }).map(element => ({ className: element.className, available: element.clientHeight, content: element.scrollHeight }));
-    return { viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },
+    const header=document.querySelector('.gs-compact-header');
+    const controls=[...(header?.querySelectorAll('button,input,select,summary')??[])].filter(element=>{
+      if(!rendered(element))return false;
+      for(let p=element.parentElement;p&&p!==header;p=p.parentElement)
+        if(p instanceof HTMLDetailsElement&&!p.open&&element!==p.querySelector(':scope>summary')&&!p.querySelector(':scope>summary')?.contains(element))return false;
+      const r=element.getBoundingClientRect(),x=(r.left+r.right)/2,y=(r.top+r.bottom)/2;
+      if(r.width<2||x<0||x>innerWidth||y<0||y>innerHeight)return false;
+      for(let p=element.parentElement;p&&p!==header;p=p.parentElement){
+        const css=getComputedStyle(p),b=p.getBoundingClientRect();
+        if(/hidden|auto|scroll/.test(css.overflowX)&&(r.left<b.left-1||r.right>b.right+1))return false;
+      }
+      return true;
+    });
+    const headerOverlaps=[];
+    for(let i=0;i<controls.length;i++)for(let j=i+1;j<controls.length;j++){
+      const a=controls[i],b=controls[j];if(a.contains(b)||b.contains(a))continue;
+      const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
+      if(Math.min(ar.right,br.right)-Math.max(ar.left,br.left)>3&&Math.min(ar.bottom,br.bottom)-Math.max(ar.top,br.top)>3)
+        headerOverlaps.push([a.getAttribute('aria-label')||a.textContent.trim(),b.getAttribute('aria-label')||b.textContent.trim()]);
+    }
+    return { viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio },headerOverlaps,
       workspace: main?.getAttribute('data-workspace'), headings: [...document.querySelectorAll('h1')].filter(rendered).map(element => element.textContent),
       pageOverflow: document.documentElement.scrollWidth > innerWidth + 2, clippedControls: clipped.slice(0,24), routedToMore, scrollAreas,
       closeButtons: [...document.querySelectorAll('button[aria-label="Close window"]')].filter(rendered).length };
@@ -73,7 +95,9 @@ try {
   await invoke(main, 'save_settings', {settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
   const open = (await invoke(main, 'import_paths', { paths: [path.resolve(ownedMap)] }))[0];
   const forge = await invoke(main, 'create_quickforge_project', {title:'C50 layout arena',template:'smallIndoorArena',target:'mccSteam'});
-  for (const route of profileBsp ? ['bsp-workshop'] : [...routes, 'quickforge-arena', 'bsp-workshop']) {
+  const requested=profileBsp?['bsp-workshop']:[...routes,'quickforge-arena','bsp-workshop'];
+  if(only?.some(route=>!requested.includes(route)))throw Error('Unknown audit route');
+  for (const route of requested.filter(route=>!only||only.includes(route))) {
     const workspace = route === 'quickforge-arena' || route === 'bsp-workshop' ? 'world' : route;
     const document = route === 'quickforge-arena' || route === 'bsp-workshop' ? forge : open;
     const pages = new Set(browser.contexts().flatMap(c => c.pages()));
@@ -116,7 +140,7 @@ try {
         await page.getByLabel('More workspace drawers',{exact:true}).click();
       }
       entry.sizes.push({...result,requested:size,nativeSize:actual});
-      if (size.width === 800 || size.width === 1920) await page.screenshot({path:path.join(root,`${workspace}-${size.width}.png`)});
+      if (size.width === 800 || size.width === 1920) await page.screenshot({path:path.join(root,`${route}-${size.width}.png`)});
     }
     await cdp.send('Emulation.setDeviceMetricsOverride',{width:1280,height:720,deviceScaleFactor:1,mobile:false});
     // Exercise visible subview tabs, without map tabs or destructive actions.
@@ -164,6 +188,9 @@ try {
     await expect.poll(() => page.isClosed()).toBe(true);
   }
   report.originalMapUnchanged = await digest(ownedMap) === sourceHash;
+  if(strict)for(const entry of report.routes)for(const view of [...entry.sizes,...entry.subviews])
+    if(view.pageOverflow||view.clippedControls.length||view.headerOverlaps.length)
+      throw Error(`Unreachable/overlapping controls in ${entry.workspace}, ${view.name??view.viewport.width}`);
   expect(report.originalMapUnchanged).toBe(true);
   expect(report.errors).toEqual([]);
   report.complete = true;

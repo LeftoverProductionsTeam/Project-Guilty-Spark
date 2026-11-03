@@ -1,5 +1,29 @@
-import {chooseTool} from './helpers/navigation';
+import {chooseTool,openDrawer} from './helpers/navigation';
 import { test, expect } from '@playwright/test';
+
+test('Interface Studio keeps compact categories, keyboard navigation and saved place',async({page})=>{
+  await page.setViewportSize({width:1280,height:720});await page.goto('/');
+  await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+  const categories=page.getByRole('tablist',{name:'Interface categories'});
+  await expect(categories.getByRole('tab')).toHaveCount(4);
+  await expect(page.locator('.interface-theme-option')).toHaveCount(5);
+  const bounds=await page.locator('.interface-studio').evaluate(e=>({scroll:e.scrollHeight-e.clientHeight,extra:e.scrollWidth-e.clientWidth}));
+  expect(bounds.scroll).toBeLessThanOrEqual(2);expect(bounds.extra).toBe(0);
+  await categories.getByRole('tab',{name:'Appearance',exact:true}).focus();await page.keyboard.press('ArrowRight');
+  await expect(categories.getByRole('tab',{name:'Window',exact:true})).toBeFocused();
+  await expect(page.getByLabel('Whole window transparency',{exact:true})).toBeVisible();
+  await categories.getByRole('tab',{name:'Menu sounds',exact:true}).click();
+  await expect(page.getByLabel('UI sound volume',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Preview',exact:true})).toHaveCount(3);
+  expect(await page.locator('.interface-studio').evaluate(e=>e.scrollHeight-e.clientHeight)).toBeLessThanOrEqual(2);
+  await page.reload();await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();
+  await expect(categories.getByRole('tab',{name:'Menu sounds',exact:true})).toHaveAttribute('aria-selected','true');
+  await categories.getByRole('tab',{name:'Header art',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Local Halo bitmap · workbench header',exact:true})).toBeVisible();
+  await page.setViewportSize({width:800,height:600});
+  for(const name of ['Appearance','Window','Menu sounds','Header art'])await expect(categories.getByRole('tab',{name,exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(0);
+});
 test('runtime dock keeps all nine tools visible without a horizontal scrollbar',async({page})=>{
   for(const size of [{width:1500,height:950},{width:1280,height:768},{width:1024,height:640}]){
     await page.setViewportSize(size);await page.goto('/');
@@ -126,7 +150,7 @@ test('preservation and runtime workspaces disclose unavailable evidence without 
   await chooseTool(page,"Level editor");
   await page.getByRole('button',{name:'Connect to a running Halo game',exact:true}).click();
   await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');
-  await page.getByRole('button',{name:'Toggle Game connection',exact:true}).click();
+  await openDrawer(page,'Game connection');
   await expect(
     page.getByRole('heading', { name: 'Live Halo 1 objects · MCC' }),
   ).toBeVisible();

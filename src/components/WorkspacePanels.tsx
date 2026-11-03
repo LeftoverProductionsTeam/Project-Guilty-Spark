@@ -11,6 +11,7 @@ import { WindowControls } from './WindowFrame';
 import { changePanel, cleanLayout, defaultPanel } from '../workspaceLayout';
 import type { PanelPlacement, WorkspaceLayout } from '../workspaceLayout';
 import '../workspacePanels.css';
+import './mapTabsMenu.css';
 interface Descriptor {
   id: string;
   label: string;
@@ -65,25 +66,30 @@ export default function WorkspacePanels({
   const [frameError, setFrameError] = useState('');
   const [windowHost,setWindowHost]=useState<HTMLElement|null>(null);
   useEffect(()=>setWindowHost(document.getElementById('gs-window-actions')),[]);
-  const [panelButtons, setPanelButtons] = useState<HTMLDivElement | null>(null);
-  const [overflowing, setOverflowing] = useState(false);
+  useEffect(()=>{
+    const dismiss=(event:PointerEvent)=>{if(!(event.target instanceof Node))return;
+      for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open]'))
+        if(!menu.contains(event.target))menu.open=false;
+    };
+    window.addEventListener('pointerdown',dismiss);return()=>window.removeEventListener('pointerdown',dismiss);
+  },[]);
   const [contentHosts, setContentHosts] = useState<Record<string, HTMLDivElement | null>>({});
   const attachContent = useCallback((id:string,element:HTMLDivElement|null)=>setContentHosts(old=>old[id]===element?old:{...old,[id]:element}),[]);
   useEffect(() => setPeek(null), [id, workspace]);
   const [descriptors, setDescriptors] = useState<Descriptor[]>([]),
     [host, setHost] = useState<HTMLDivElement | null>(null),
     [counts, setCounts] = useState<Record<string, number>>({});
-  const shortcuts=useMemo(()=>{
-    const order=['Inspector','Object tags','Camera','Objects'];
-    const rank=(panel:Descriptor)=>{const index=order.indexOf(panel.label);return index<0?order.length:index;};
-    return [...descriptors].sort((a,b)=>rank(a)-rank(b));
+  const toolGroups=useMemo(()=>{
+    const groups=new Map<string,Descriptor[]>();
+    for(const panel of descriptors){
+      const group=['Inspector','Object tags','Objects','Asset library'].includes(panel.label)?'Edit & inspect'
+        :['Camera','Map sounds','Help'].includes(panel.label)?'View & sound'
+        :['Game connection','SparkLink','Live Studio','Co-edit setup'].includes(panel.label)?'Live & collaborate':'Project & build';
+      if(!groups.has(group))groups.set(group,[]);
+      groups.get(group)!.push(panel);
+    }
+    return [...groups];
   },[descriptors]);
-  useEffect(() => {
-    const element=panelButtons;if(!element)return;
-    const measure=()=>setOverflowing(element.scrollWidth>element.clientWidth+2);
-    measure();const observer=new ResizeObserver(measure);observer.observe(element);
-    return()=>observer.disconnect();
-  },[panelButtons,descriptors]);
   const context = useMemo<ContextValue>(
     () => ({
       contentHosts,
@@ -144,10 +150,7 @@ export default function WorkspacePanels({
           e.preventDefault();
           setPeek(null);
           setRaw((old) => changePanel(cleanLayout(old), panel, { open: false }));
-          const label = descriptors.find((value) => value.id === panel)?.label;
-          Array.from(document.querySelectorAll<HTMLButtonElement>('.gs-panel-buttons button'))
-            .find((button) => button.getAttribute('aria-label') === `Toggle ${label}`)
-            ?.focus();
+          document.querySelector<HTMLElement>('.gs-panel-overflow>summary')?.focus();
         } else if (fullscreen) {
           e.preventDefault();
           void changeFullscreen(false);
@@ -186,29 +189,19 @@ export default function WorkspacePanels({
           </button>
           {onPopout&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={onPopout}><SquareArrowOutUpRight size={14}/></button>}
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
-          <div className="gs-panel-buttons" ref={setPanelButtons}>
-            {shortcuts.map((panel) => (
-              <button
-                key={panel.id}
-                type="button"
-                aria-label={`Toggle ${panel.label}`}
-                aria-expanded={!!layout.panels[panel.id]?.open}
-                onClick={() => {
-                  context.update(panel.id, { open: !layout.panels[panel.id]?.open });
-                }}
-              >
-                {panel.label}
-                {counts[panel.id] > 0 && <span className="gs-panel-count">{counts[panel.id]}</span>}
-              </button>
-            ))}
-          </div>
-          {overflowing&&<details className="gs-panel-overflow">
-            <summary aria-label="More workspace drawers" title="All workspace drawers">More</summary>
-            <div role="menu" aria-label="Workspace drawers">{descriptors.map(panel=><button key={panel.id} role="menuitemcheckbox" aria-checked={!!layout.panels[panel.id]?.open} onClick={event=>{context.reveal(panel.id);event.currentTarget.closest('details')?.removeAttribute('open');}}>{panel.label}</button>)}</div>
+          {descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open)for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-layout-menu[open]'))menu.open=false;}} onKeyDown={event=>{
+            if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+            event.preventDefault();event.stopPropagation();event.currentTarget.open=true;
+            const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')],at=buttons.indexOf(document.activeElement as HTMLButtonElement);
+            const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
+            buttons[next]?.focus();
+          }}>
+            <summary aria-label="More workspace drawers" title="Workspace tools and panels">Tools <span aria-hidden="true">▾</span>{Object.values(counts).some(count=>count>0)&&<span className="gs-panel-count" aria-label="Tools need review">•</span>}</summary>
+            <div role="menu" aria-label="Workspace drawers">{toolGroups.map(([group,panels])=><section key={group} role="group" aria-label={group}><strong>{group}</strong>{panels.map(panel=><button key={panel.id} data-panel-shortcut={panel.id} role="menuitemcheckbox" aria-label={panel.label} aria-checked={!!layout.panels[panel.id]?.open} onClick={event=>{context.reveal(panel.id);event.currentTarget.closest('details')?.removeAttribute('open');}}>{panel.label}{counts[panel.id]>0&&<span className="gs-panel-count" aria-hidden="true">{counts[panel.id]}</span>}</button>)}</section>)}</div>
           </details>}
           <div className="gs-layout-actions">
             {actions}
-            <details className="gs-layout-menu">
+            <details className="gs-layout-menu" onToggle={event=>{if(event.currentTarget.open)for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-panel-overflow[open]'))menu.open=false;}}>
               <summary>Layout</summary>
               <div>
                 {descriptors.map((panel) => (

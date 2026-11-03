@@ -274,6 +274,9 @@ fn finite_model_float(r:&Reader, at:usize) -> Result<f32> {
 // Model geometry is displayed in cached bind-pose coordinates. A multi-node
 // preview is diagnostic only; bone transforms/animations are NOT reconstructed.
 fn gbxmodel_static_mesh(r: &Reader, region: Region, model_at: usize, raw_start:usize, raw_vertex_size:usize, raw_model_size:usize, xbox:bool) -> Result<MeshData> {
+    gbxmodel_variant_mesh(r,region,model_at,raw_start,raw_vertex_size,raw_model_size,xbox,None)
+}
+fn gbxmodel_variant_mesh(r:&Reader,region:Region,model_at:usize,raw_start:usize,raw_vertex_size:usize,raw_model_size:usize,xbox:bool,variant:Option<&str>)->Result<MeshData>{
     r.bytes(model_at,232)?;
     let (nodes,node_count)=region.block(r,model_at+184,156,64)?;
     let (geometries,n_geometries)=region.block(r,model_at+208,48,256)?;
@@ -281,23 +284,28 @@ fn gbxmodel_static_mesh(r: &Reader, region: Region, model_at: usize, raw_start:u
     if n_geometries==0 {return invalid("Model contains no geometry");}
     // Pick the first region's first valid LOD, without stacking all LODs.
     let (regions,n_regions)=region.block(r,model_at+196,76,32)?;
-    let mut selected=HashSet::new();
+    let mut selected=HashSet::new();let mut matched=variant.is_none();
     for i in 0..n_regions {
         let (perms,n)=region.block(r,regions+i*76+64,88,32)?;
         if n==0 {continue;}
-        let perm=perms;
+        let mut perm=perms;
+        if let Some(variant)=variant{for p in 0..n{let at=perms+p*88;if r.string(at,32)?.eq_ignore_ascii_case(variant){perm=at;matched=true;break;}}}
         // Offsets 64..72 are superlow, low, medium, high, superhigh.
         for off in [72,70,68,66,64] {
             let idx=r.u16(perm+off)? as usize;
             if idx<n_geometries { selected.insert(idx); break; }
         }
     }
+    if !matched{return invalid("Requested character variation does not exist in this source model");}
     if selected.is_empty() {selected.insert(0);}
     let label = if node_count>1 {"Halo CE gbxmodel bind-pose (skeletal animation not applied)"} else {"Halo CE gbxmodel static preview"};
     let mut mesh=MeshData{label:label.into(),source:"halo-model-untextured".into(),..Default::default()};
     let mut rig=(||->Result<crate::maps::ModelRig>{let mut bones=vec![];
         for i in 0..node_count{let at=nodes+i*156;let parent=r.u16(at+36)? as i16;if parent< -1||parent as isize>=node_count as isize||parent==i as i16{return invalid("Model skeleton parent is invalid");}
             let position=[r.f32(at+40)?,r.f32(at+44)?,r.f32(at+48)?];let rotation=[r.f32(at+52)?,r.f32(at+56)?,r.f32(at+60)?,r.f32(at+64)?];let length=rotation.iter().map(|v|v*v).sum::<f32>();if !(0.9..=1.1).contains(&length){return invalid("Model skeleton rotation is invalid");}
+            // Halo stores the inverse quaternion convention. Convert once at
+            // the native boundary, including bind poses used by collision.
+            let norm=length.sqrt();let rotation=[-rotation[0]/norm,-rotation[1]/norm,-rotation[2]/norm,rotation[3]/norm];
             bones.push(crate::maps::ModelBone{name:r.string(at,32)?,parent,position,rotation});
         }if bones.is_empty(){return invalid("Model skeleton unavailable");}
         for bone in &bones{let mut p=bone.parent;for depth in 0..=node_count{if p<0{break;}if depth==node_count{return invalid("Model skeleton contains a cycle");}p=bones[p as usize].parent;}}
@@ -472,6 +480,9 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
 
 /// The same bounded model reader for a source-authored sky model reference.
 pub fn cached_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],model_id:u32)->Result<MeshData>{
+    cached_model_variant_mesh(bytes,header,tags,model_id,None)
+}
+fn cached_model_variant_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],model_id:u32,variant:Option<&str>)->Result<MeshData>{
     if !matches!(header.version,5|6|7|13|609){return invalid("Model preview requires a supported Halo 1 cache");}
     let r=Reader(bytes);let region=tag_space(&r,header)?;
     let tag=tags.iter().find(|t|t.id==model_id&&t.class==if header.version==5{"mode"}else{"mod2"}&&!t.external)
@@ -480,7 +491,7 @@ pub fn cached_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],model_id:u32)
     let start=header.tag_offset as usize;
     let raw_start=r.u32(start+20)? as usize;let vertex_size=r.u32(start+28)? as usize;let total=r.u32(start+32)? as usize;
     if header.version!=5 && (vertex_size>total||raw_start.checked_add(total).is_none_or(|end|end>bytes.len())){return invalid("Sky model raw region escapes cache");}
-    let mut mesh=gbxmodel_static_mesh(&r,region,at,raw_start,vertex_size,total,header.version==5)?;
+    let mut mesh=if variant.is_some(){gbxmodel_variant_mesh(&r,region,at,raw_start,vertex_size,total,header.version==5,variant)?}else{gbxmodel_static_mesh(&r,region,at,raw_start,vertex_size,total,header.version==5)?};
     mesh.material_ranges.retain(|m|tags.iter().any(|t|t.id==m.shader_tag_id&&matches!(t.class.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla")));
     Ok(mesh)
 }
@@ -507,12 +518,43 @@ pub fn object_model_mesh(bytes:&[u8],header:&MapHeader,tags:&[Tag],object_id:u32
     let at=object.data_offset.ok_or_else(||crate::SparkError::Invalid("Object body unavailable".into()))?;
     if at<region.begin||at.checked_add(56).is_none_or(|end|end>region.end){return invalid("Object model dependency escapes tag region");}
     if r.fourcc(at+40)?!=if header.version==5{"mode"}else{"mod2"} {return invalid("Object does not reference a supported native world model");}
-    let model_id=r.u32(at+52)?;Ok((model_id,cached_model_mesh(bytes,header,tags,model_id)?))
+    let model_id=r.u32(at+52)?;let mut mesh=cached_model_mesh(bytes,header,tags,model_id)?;
+    mesh.change_colors=object_colors(&r,region,at)?;Ok((model_id,mesh))
+}
+fn object_colors(r:&Reader,region:Region,at:usize)->Result<Option<Vec<[f32;3]>>>{
+    if at.checked_add(380).is_none_or(|end|end>region.end){return Ok(None);}
+    let (table,count)=region.block(r,at+356,44,4)?;if count==0{return Ok(None);}
+    let mut colors=vec![];
+    for i in 0..count{let p=table+i*44;let (perms,n)=region.block(r,p+32,28,8)?;
+        // A deterministic authored permutation, never an invented team tint.
+        for j in 0..n{let weight=r.f32(perms+j*28)?;if !weight.is_finite()||!(0.0..=1.0).contains(&weight){return invalid("Object change color weight is invalid");}}
+        let selected=(0..n).find(|j|r.f32(perms+j*28).is_ok_and(|weight|weight>0.));
+        let color=selected.map_or(p+8,|j|perms+j*28+4);
+        let rgb=[r.f32(color)?,r.f32(color+4)?,r.f32(color+8)?];if rgb.iter().any(|v|!v.is_finite()||!(0.0..=1.0).contains(v)){return invalid("Object change color is invalid");}colors.push(rgb);
+    }Ok(Some(colors))
 }
 pub fn preview_owned_object_model(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<(u32,MeshData)>{
     let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
     if actual!=expected||actual!=inspection.sha256{return invalid("Model source changed during inspection");}
     object_model_mesh(&bytes,&header,&inspection.tags,object_id,0)
+}
+/// Preview-only, exact native region/permutation names; game tags are unchanged.
+pub fn preview_owned_object_variant(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32,variant:&str)->Result<(u32,MeshData)>{
+    if variant.is_empty()||variant.len()>32||variant.chars().any(char::is_control){return invalid("Invalid character variation name");}
+    let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
+    if actual!=expected||actual!=inspection.sha256{return invalid("Character variation source changed");}
+    let (id,original)=object_model_mesh(&bytes,&header,&inspection.tags,object_id,0)?;
+    let mut mesh=cached_model_variant_mesh(&bytes,&header,&inspection.tags,id,Some(variant))?;mesh.change_colors=original.change_colors;Ok((id,mesh))
+}
+pub fn owned_model_variants(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<Vec<String>>{
+    let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
+    if actual!=expected||actual!=inspection.sha256{return invalid("Character variation source changed");}
+    let (id,_)=object_model_mesh(&bytes,&header,&inspection.tags,object_id,0)?;
+    let model=inspection.tags.iter().find(|tag|tag.id==id).and_then(|tag|tag.data_offset).ok_or_else(||crate::SparkError::Invalid("Character model body unavailable".into()))?;
+    let r=Reader(&bytes);let region=tag_space(&r,&header)?;let (regions,count)=region.block(&r,model+196,76,32)?;
+    let mut names=std::collections::BTreeSet::new();
+    for i in 0..count{let (perms,n)=region.block(&r,regions+i*76+64,88,32)?;for p in 0..n{let name=r.string(perms+p*88,32)?;if !name.is_empty(){names.insert(name);}}}
+    Ok(names.into_iter().collect())
 }
 pub fn preview_owned_object_animations(path:&std::path::Path,expected:&str,inspection:&crate::maps::MapInspection,object_id:u32)->Result<NativeAnimations>{
     let (header,bytes,actual)=crate::maps::read_cache_snapshot_shared(path)?;
@@ -603,6 +645,17 @@ mod geometry_tests {
     fn put32(b:&mut [u8],at:usize,v:u32){b[at..at+4].copy_from_slice(&v.to_le_bytes());}
     fn put16(b:&mut [u8],at:usize,v:u16){b[at..at+2].copy_from_slice(&v.to_le_bytes());}
     fn putf(b:&mut [u8],at:usize,v:f32){b[at..at+4].copy_from_slice(&v.to_le_bytes());}
+    #[test]
+    fn authored_change_colors_use_positive_permutations_and_reject_corrupt_source() {
+        let mut b=vec![0u8;1024];let base=0x4044_0000;let region=Region{begin:0,end:b.len(),address:base};
+        assert!(object_colors(&Reader(&b),region,0).unwrap().is_none());
+        put32(&mut b,356,1);put32(&mut b,360,base+400);put32(&mut b,432,2);put32(&mut b,436,base+500);
+        putf(&mut b,528,1.);for(i,v)in [0.341176,0.403922,0.145098].iter().enumerate(){putf(&mut b,532+i*4,*v);}
+        let original=b.clone();assert_eq!(object_colors(&Reader(&b),region,0).unwrap(),Some(vec![[0.341176,0.403922,0.145098]]));assert_eq!(b,original);
+        putf(&mut b,528,f32::NAN);assert!(object_colors(&Reader(&b),region,0).is_err());putf(&mut b,528,1.);
+        putf(&mut b,532,f32::INFINITY);assert!(object_colors(&Reader(&b),region,0).is_err());putf(&mut b,532,0.3);
+        put32(&mut b,436,base+1020);assert!(object_colors(&Reader(&b),region,0).is_err());
+    }
     #[test]
     fn uncompressed_render_bsp_reads_real_surfaces_not_collision_edges() {
         let mut b=vec![0u8;0x5000];
@@ -768,6 +821,11 @@ mod geometry_tests {
         for(offset,count,at)in [(60,1,0x1600),(72,3,0x1700),(84,3,0x1800)]{put32(&mut b,0x1500+offset,count);put32(&mut b,0x1500+offset+4,address+at);}
         for i in 0..3{let at=0x1700+i*24;put32(&mut b,at,i as u32);put32(&mut b,at+4,((i+1)%3)as u32);put32(&mut b,at+8,((i+1)%3)as u32);put32(&mut b,at+20,u32::MAX);}
         let mesh=object_collision_mesh(&b,&header,&tags,1).unwrap().unwrap();assert_eq!(mesh.positions,[2.,3.,4.,3.,3.,4.,2.,4.,4.]);assert_eq!(mesh.indices,[0,1,2]);
+        putf(&mut b,0x600+60,std::f32::consts::FRAC_1_SQRT_2);putf(&mut b,0x600+64,std::f32::consts::FRAC_1_SQRT_2);
+        let (_,model)=object_model_mesh(&b,&header,&tags,1,0).unwrap();assert!(model.rig.unwrap().nodes[0].rotation[2]<0.);
+        let rotated=object_collision_mesh(&b,&header,&tags,1).unwrap().unwrap();
+        for(actual,expected)in rotated.positions.iter().zip([2.,3.,4.,2.,2.,4.,3.,3.,4.]){assert!((actual-expected).abs()<0.00001);}
+        putf(&mut b,0x600+60,0.);putf(&mut b,0x600+64,1.);
         put32(&mut b,0x1700+8,99);assert!(object_collision_mesh(&b,&header,&tags,1).is_err());put32(&mut b,0x1700+8,1);
         put32(&mut b,0x1500+88,address+0x3fff);assert!(object_collision_mesh(&b,&header,&tags,1).is_err());
         put32(&mut b,0x17c,u32::MAX);assert!(object_collision_mesh(&b,&header,&tags,1).unwrap().is_none());

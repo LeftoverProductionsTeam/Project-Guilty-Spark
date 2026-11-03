@@ -64,4 +64,7 @@ describe('Actual skeletal animation deformation', () => {
     m.rig!.weights[2] = 3;
     expect(() => animationDeformer(m, valid).sample(0)).toThrow(/influence/);
   });
+  it('refuses a matching checksum with different bone identities',()=>{
+    const c=clip();c.nodes[1].name='different bone';expect(()=>animationMapping(c,mesh().rig!)).toThrow(/names\/order/);
+  });
 });

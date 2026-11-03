@@ -97,6 +97,7 @@ import { firstVisitWorkspace, markFirstVisitSeen, WORKSPACE_TOOLTIPS } from './f
 import {ResizeEdges} from './components/WindowFrame';
 import SparkEmblem from './components/SparkEmblem';
 import ShowcaseChoice from './components/ShowcaseChoice';
+import {startLaunchVoice} from './launchVoice';
 import HeaderRuntime from './components/HeaderRuntime';
 import { Empty, IconButton, Pill, Toast, Notice } from './components/ui';
 import Library from './components/Library';
@@ -207,6 +208,8 @@ export default function App() {
     applyInterfacePreferences(interfacePreferences, document.documentElement);
   }, [interfacePreferences]);
   useEffect(() => () => { audioPlayer.current?.dispose(); audioPlayer.current = null; }, []);
+  useEffect(()=>{if(!native||!ready)return;const timer=setTimeout(()=>{void startLaunchVoice(data,()=>interfacePreferencesRef.current);},300);return()=>clearTimeout(timer);},[ready,data.dataDirectory]);
+  useEffect(()=>{if(native&&(!interfacePreferences.launchVoiceEnabled||interfacePreferences.launchVoiceVolume<=0))void call('stop_launch_voice').catch(()=>{});},[interfacePreferences.launchVoiceEnabled,interfacePreferences.launchVoiceVolume]);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: string } | null>(null);
   const [logs, setLogs] = useState<JobEvent[]>([]);

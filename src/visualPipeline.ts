@@ -44,11 +44,17 @@ export function createVisualPipeline(
     void main(){vec4 original=texture2D(tDiffuse,effectUv);vec3 c=max(original.rgb*exposure,vec3(0.0));
       if(filmic)c=clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.0,1.0);
       c=mix(vec3(dot(c,vec3(.2126,.7152,.0722))),c,saturation);c=(c-.18)*contrast+.18;
-      vec2 p=effectUv*2.0-1.0;c*=1.0-vignette*smoothstep(.25,1.4,dot(p,p));float a=preserveAlpha?max(texture2D(tAlpha,effectUv).a,clamp(max(c.r,max(c.g,c.b))*1.3,0.0,.45)):original.a;gl_FragColor=vec4(displayColor(c),a);}`,
+      vec2 p=effectUv*2.0-1.0;c*=1.0-vignette*smoothstep(.25,1.4,dot(p,p));vec3 rgb=displayColor(c);float a=original.a;
+      if(preserveAlpha){vec4 source=texture2D(tAlpha,effectUv);float surface=max(source.a,max(source.r,max(source.g,source.b)));
+        a=max(source.a,clamp(max(rgb.r,max(rgb.g,rgb.b)),0.0,surface>0.0?1.0:.45));rgb=clamp(rgb/max(a,.00001),0.0,1.0);}
+      gl_FragColor=vec4(rgb,a);}`,
   });
   // ShaderPass clones its initial uniforms, which clears render-target
   // textures. Bind the live coverage texture after that clone, or solid
-  // models inherit only the translucent bloom halo's alpha.
+  // models inherit only the translucent bloom halo's alpha. The saved render
+  // colors already include native additive/alpha blending. Convert that result
+  // to straight alpha for our non-premultiplied browser canvas; otherwise CSS
+  // applies the coverage a second time and makes Cortana almost invisible.
   grade.uniforms.tAlpha.value = alpha?.renderTarget.texture ?? null;
   grade.material.toneMapped = false;
   composer.addPass(render);

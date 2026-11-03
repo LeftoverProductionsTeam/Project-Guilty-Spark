@@ -23,7 +23,7 @@ async function setX(page,n){await closeChanges(page);await page.locator('.bsp-so
 async function state(page,id){const view=await invoke(page,'read_workspace_history',{projectId:id});if(!view.history)return null;return{...view,project:view.history.snapshots.find(s=>s.key===view.history.head.current)?.project};}
 async function acknowledged(page,id,n){await expect.poll(async()=>{const s=await state(page,id);return s?.project.quickForge.workshop?.brushes[0].position[0];}).toBe(n);return state(page,id);}
 async function nextPage(previous){let page;await expect.poll(()=>{page=pages().find(p=>!previous.has(p));return !!page;}).toBe(true);page.on('pageerror',e=>report.errors.push(String(e)));await expect(page.getByLabel('Native BSP Workshop')).toBeVisible();return page;}
-async function changes(page){if(!await page.getByRole('group',{name:'Workspace window ownership',exact:true}).isVisible())await page.getByRole('button',{name:'Toggle Changes',exact:true}).click();}
+async function changes(page){if(!await page.getByRole('group',{name:'Workspace window ownership',exact:true}).isVisible()){const tools=page.locator('.gs-panel-overflow');if(await tools.getAttribute('open')===null)await tools.locator('summary').click();await tools.getByRole('menuitemcheckbox',{name:'Changes',exact:true}).click();}}
 function step(name,data={}){report.cases.push({name,...data});console.log(JSON.stringify({passed:name,...data}));}
 try{
   await start();const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});

@@ -123,6 +123,9 @@ fn sound_data(path: &Path, expected_sha256: &str, tag_id: u32,resources:Option<(
     if sha256 != expected_sha256 {
         return invalid("Audio source checksum differs from the preserved project source");
     }
+    sound_data_snapshot(header,bytes,sha256,tag_id,resources,audio)
+}
+fn sound_data_snapshot(header:maps::MapHeader,bytes:std::sync::Arc<[u8]>,sha256:String,tag_id:u32,resources:Option<(&Path,&str)>,audio:Option<&crate::mcc_audio::Binding>)->Result<SoundData>{
     if ![5,6, 7, 609,13].contains(&header.version) || header.extended {
         return invalid("Audio preview requires an unextended classic or MCC Halo 1 cache with supported sound metadata");
     }
@@ -421,6 +424,15 @@ pub fn inspect_sound_with_resources(path:&Path,expected_sha256:&str,tag_id:u32,r
 pub fn inspect_sound_with_bindings(path:&Path,expected_sha256:&str,tag_id:u32,resources:Option<(&Path,&str)>,audio:Option<&crate::mcc_audio::Binding>)->Result<SoundInspection>{
     Ok(sound_data(path,expected_sha256,tag_id,resources,audio)?.report)
 }
+/// A dialogue catalog reads and hashes the original cache once. Each tag still
+/// runs the normal bounded metadata, sample and chain validation against that
+/// immutable snapshot. No audio bytes are retained in the returned catalog.
+pub fn inspect_sound_batch(path:&Path,expected_sha256:&str,tag_ids:&[u32],resources:Option<(&Path,&str)>)->Result<Vec<SoundInspection>>{
+    if tag_ids.is_empty()||tag_ids.len()>512||tag_ids.iter().collect::<std::collections::HashSet<_>>().len()!=tag_ids.len(){return invalid("Sound catalog requires 1 to 512 distinct tag IDs");}
+    let (header,bytes,actual)=maps::read_cache_snapshot_shared(path)?;
+    if actual!=expected_sha256{return invalid("Sound catalog source checksum differs");}
+    tag_ids.iter().map(|id|sound_data_snapshot(header.clone(),std::sync::Arc::clone(&bytes),actual.clone(),*id,resources,None).map(|data|data.report)).collect()
+}
 pub fn preview_sound(
     path: &Path,
     expected_sha256: &str,
@@ -717,6 +729,13 @@ mod tests {
         assert_eq!(preview.mime,"audio/wav");assert_eq!(preview.bytes.len(),172);assert_eq!(preview.source_sha256,hash);
         assert_eq!(&preview.bytes[44..46],&1000i16.to_le_bytes());assert_eq!(std::fs::read(&path).unwrap(),bytes);
         assert!(preview_sound(&path,&"f".repeat(64),0x1234,0,0).is_err());
+    }
+    #[test]fn dialogue_batch_preserves_exact_permutation_data_and_rejects_stale_or_duplicate_requests(){
+        let dir=tempfile::tempdir().unwrap();let path=dir.path().join("source.map");let bytes=sound_fixture(false);std::fs::write(&path,&bytes).unwrap();let hash=maps::hash_file(&path).unwrap();
+        let batch=inspect_sound_batch(&path,&hash,&[0x1234],None).unwrap();let single=inspect_sound(&path,&hash,0x1234).unwrap();
+        assert_eq!(serde_json::to_value(&batch[0]).unwrap(),serde_json::to_value(single).unwrap());
+        assert!(inspect_sound_batch(&path,&hash,&[0x1234,0x1234],None).is_err());assert!(inspect_sound_batch(&path,&hash,&[],None).is_err());
+        let mut changed=bytes.clone();changed[0xc00]^=1;std::fs::write(&path,changed).unwrap();assert!(inspect_sound_batch(&path,&hash,&[0x1234],None).is_err());
     }
     #[test]fn linked_permutation_metadata_keeps_roots_and_chunks_distinct(){
         let mut bytes=sound_fixture(false);

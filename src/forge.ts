@@ -132,6 +132,8 @@ export type ForgeNode =
   | { type: 'spawn'; value: ForgeSpawn }
   | { type: 'objective'; value: ForgeObjective };
 export interface ForgeAsset {
+  /** Optional exact native model variation for preview only. */
+  modelVariant?: string;
   tagId: number;
   key: string;
   name: string;

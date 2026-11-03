@@ -25,7 +25,7 @@ try{
  // NumberField displays seven significant digits; source bytes and edits are
  // checked independently below rather than comparing a float's raw spelling.
  const tagId=owned.project.scene[index].tagId,sourceField=owned.inspection.tags.find(t=>t.id===tagId).fields.find(f=>f.label==='Bounding radius'),original=Number(sourceField.value.toPrecision(7)),changed=Number((original+.125).toPrecision(7));
- await main.getByRole('button',{name:'Toggle Objects',exact:true}).click();await main.locator('.object-list .object-row').nth(index).locator('.object-name').click();await expect(drawer(main)).toBeVisible();await expect(drawer(main).getByRole('spinbutton',{name:'Bounding radius',exact:true})).toHaveValue(String(original));
+ {const tools=main.locator('.gs-panel-overflow');if(await tools.getAttribute('open')===null)await tools.locator('summary').click();await tools.getByRole('menuitemcheckbox',{name:'Objects',exact:true}).click();}await main.locator('.object-list .object-row').nth(index).locator('.object-name').click();await expect(drawer(main)).toBeVisible();await expect(drawer(main).getByRole('spinbutton',{name:'Bounding radius',exact:true})).toHaveValue(String(original));
  let previous=new Set(pages());await drawer(main).getByRole('button',{name:'Detach Object tags',exact:true}).click();let editor=await detached(previous);await expect(field(editor)).toHaveValue(String(original));
  expect((await invoke(main,'read_workspace_history',{projectId:id})).writable).toBe(false);expect((await invoke(editor,'read_workspace_history',{projectId:id})).writable).toBe(true);
  await expect(canvas).toHaveAttribute('data-qa-retained','tag-drawer-parent');expect(await editor.locator('.world-layout canvas').count()).toBe(0);

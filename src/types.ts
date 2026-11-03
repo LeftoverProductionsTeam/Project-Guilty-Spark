@@ -86,6 +86,10 @@ export interface ShaderStage {flags:number;constant0Source:number;constant0Funct
   constant0Lower:[number,number,number,number];constant0Upper:[number,number,number,number];constant1:[number,number,number,number];
   colorInputs:number[];colorOutputs:number[];alphaInputs:number[];alphaOutputs:number[]}
 export interface ShaderPreview {
+  changeColorSource?:number;
+  changeColor?:[number,number,number];
+  firstMapScreenspace?:boolean;
+  scaleFirstMapWithDistance?:boolean;
   detailMask?:number;
   detailVScale?:number;
   bumpIsSpecular?:boolean;
@@ -130,6 +134,7 @@ export interface SceneObject {
   sourceModel?: { projectId: string; sourceSha256: string; tagId: number; path: string; class: import('./forge').ForgePlacement['tagClass'] } | null;
 }
 export interface MeshData {
+  changeColors?:[number,number,number][]|null;
   rig?:ModelRig|null;
   positions: number[];
   indices: number[];

@@ -115,6 +115,33 @@ test('repeated frozen ticks do not inflate pairs or weight an unchanged frame re
   assert.equal(r.aiActorAcceptance, false);
 });
 
+test('a map restart cannot pair repeated numeric ticks across actor lifetimes',()=>{
+  const at=(tick,client=false)=>({...state,localTick:tick,serverTick:tick,actorPoolCount:client?0:1,
+    actors:[{...actor,actorId:client?none:actor.actorId}]});
+  const host={samples:[at(60),at(61),at(1),at(60)]};
+  const client={samples:[at(60,true),at(61,true)]};
+  const result=compareActorObservations(host,client);
+  assert.equal(result.tickContinuity.pairable,false);
+  assert.equal(result.tickContinuity.host.discontinuities,1);
+  assert.equal(result.exactTickFrames,0);assert.equal(result.sharedActualActorIds,0);
+  assert.equal(result.position,null);assert.equal(result.hostAuthorityObserved,false);
+  assert.equal(result.observationCoverage.hostObservations,4);
+  assert.equal(result.observationCoverage.hostRepeatedTickObservations,0);
+  assert.equal(result.fullLifecycleAcceptance,false);
+});
+
+test('client reconnect and uint32 wrap require a fresh scoped observation',()=>{
+  for(const clientSamples of [
+    [{...state,localTick:60},{...state,localTick:1}],
+    [{...state,serverTick:0xffffffff,localTick:0xffffffff},{...state,serverTick:0,localTick:0}],
+  ]) {
+    const result=compareActorObservations({samples:[state]},{samples:clientSamples});
+    assert.equal(result.tickContinuity.pairable,false);
+    assert.equal(result.tickContinuity.client.discontinuities,1);
+    assert.equal(result.exactTickFrames,0);assert.equal(result.aiActorAcceptance,false);
+  }
+});
+
 test('missing and mismatched identities are reported outside matched-pair distributions', () => {
   const second = { ...actor, id: actor.id + 1 };
   const h = {

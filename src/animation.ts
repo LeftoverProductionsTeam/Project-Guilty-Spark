@@ -51,6 +51,7 @@ export function animationMapping(clip: AnimationClip, rig: ModelRig): number[] {
   const exact = clip.checksum === rig.checksum;
   const names = new Map(clip.nodes.map((n, i) => [n.name.toLowerCase(), i]));
   if (names.size !== clip.nodes.length) throw Error('Animation has duplicate bone names.');
+  if(exact&&rig.nodes.some((node,index)=>node.name.toLowerCase()!==clip.nodes[index].name.toLowerCase()))throw Error('Animation checksum matches but bone names/order differ.');
   const mapping = rig.nodes.map((n, i) => (exact ? i : (names.get(n.name.toLowerCase()) ?? -1)));
   if (mapping.some((i) => i < 0))
     throw Error('Animation bone names do not match this biped. Automatic bone retargeting is unavailable.');
@@ -74,6 +75,7 @@ export function animationDeformer(mesh: MeshData, clip: AnimationClip) {
     !Number.isInteger(clip.frameCount) ||
     clip.frameCount < 1 ||
     clip.frameCount > 9000 ||
+    !Number.isFinite(clip.fps)||clip.fps<=0||clip.fps>240||
     clip.transforms.length !== clip.frameCount * n * 8 ||
     clip.transforms.length > 2_000_000 ||
     clip.transforms.some((v) => !Number.isFinite(v))
@@ -158,9 +160,10 @@ export function animationDeformer(mesh: MeshData, clip: AnimationClip) {
           weight = rig.weights[j],
           other = rig.weights[j + 1];
         if (
-          first >= n ||
-          second >= n ||
+          !Number.isInteger(first)||first<0||first >= n ||
+          !Number.isInteger(second)||second<0||second >= n ||
           !Number.isFinite(weight + other) ||
+          weight<0||other<0||weight>1||other>1||
           Math.abs(weight + other - 1) > 0.01
         )
           throw Error('Biped skin influence is invalid.');

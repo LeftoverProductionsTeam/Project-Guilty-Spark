@@ -43,6 +43,7 @@ use tauri::{Emitter, Manager, State};
 #[path="conversion_resources_native.rs"]mod conversion_resources_native;
 #[path="ce_source_recovery_native.rs"]mod ce_source_recovery_native;
 #[path="startup_native.rs"]mod startup_native;
+#[path="home_voice_native.rs"]mod home_voice_native;
 #[path="asset_sources_native.rs"] mod asset_sources_native;
 #[path="asset_import_native.rs"] mod asset_import_native;
 #[path="default_materials_native.rs"] mod default_materials_native;
@@ -148,6 +149,7 @@ struct AppState {
     ce_recovery:Mutex<ce_source_recovery_native::RecoveryState>,
     startup:startup_native::Startup,
     asset_sources:Mutex<asset_sources_native::Catalog>,
+    home_voice:Mutex<home_voice_native::LaunchState>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2351,17 +2353,24 @@ struct OwnedModelPreview {
     mesh:maps::MeshData,tags:Vec<maps::Tag>,resource_hashes:std::collections::BTreeMap<String,String>,
 }
 #[tauri::command]
-async fn preview_owned_object_model(app:tauri::AppHandle,project_id:String,tag_id:u32,source_sha256:String)->Reply<OwnedModelPreview>{
+async fn preview_owned_object_model(app:tauri::AppHandle,project_id:String,tag_id:u32,source_sha256:String,model_variant:Option<String>)->Reply<OwnedModelPreview>{
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;
         let source=project.source.as_ref().ok_or("Model source has no preserved map")?;
         if source.sha256!=source_sha256{return Err("Model reference source SHA-256 differs from the project".into());}
         let inspection=inspect(&state,&project)?;
-        let (model_id,mesh)=core::render::preview_owned_object_model(&source.preserved_path,&source.sha256,&inspection,tag_id).map_err(error)?;
+        let (model_id,mesh)=if let Some(variant)=model_variant{core::render::preview_owned_object_variant(&source.preserved_path,&source.sha256,&inspection,tag_id,&variant)}else{core::render::preview_owned_object_model(&source.preserved_path,&source.sha256,&inspection,tag_id)}.map_err(error)?;
         let mut ids:std::collections::HashSet<u32>=mesh.material_ranges.iter().map(|r|r.shader_tag_id).collect();
         for shader in inspection.tags.iter().filter(|t|ids.contains(&t.id)).collect::<Vec<_>>(){for reference in &shader.references{ids.insert(reference.target_id);}}
         let tags=inspection.tags.iter().filter(|t|ids.contains(&t.id)).cloned().collect();
         Ok(OwnedModelPreview{source_sha256:source.sha256.clone(),resource_sha256:source.resource_sha256.get("mcc-textures").or_else(||source.resource_sha256.get("bitmaps.map")).cloned(),object_tag_id:tag_id,model_tag_id:model_id,mesh,tags,resource_hashes:source.resource_sha256.clone()})
+    }).await.map_err(error)?
+}
+#[tauri::command]
+async fn owned_character_variants(app:tauri::AppHandle,project_id:String,tag_id:u32,source_sha256:String)->Reply<Vec<String>>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let project=lock(&state.library)?.get(&project_id).map_err(error)?;let source=project.source.as_ref().ok_or("Character source map is unavailable")?;
+        if source.sha256!=source_sha256{return Err("Character source identity differs".into());}let inspection=inspect(&state,&project)?;
+        core::render::owned_model_variants(&source.preserved_path,&source.sha256,&inspection,tag_id).map_err(error)
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -2773,6 +2782,7 @@ pub fn run() {
             ce_recovery:Mutex::new(Default::default()),
             startup:Default::default(),
             asset_sources:Default::default(),
+            home_voice:Default::default(),
             });
             let worker=app.handle().clone();
             tauri::async_runtime::spawn_blocking(move||{
@@ -2794,6 +2804,11 @@ pub fn run() {
             tauri::async_runtime::spawn_blocking(move||{if let Some(state)=app.try_state::<AppState>(){shared_editing::release_window(&state,&label);external_changes_native::release_window(&state,&label);runtime_workbench::release_window(&state,&label);invitations_native::release_window(&state,&label);community_host_native::release_window(&state,&label);ce_host_native::release_window(&state,&label);dependency_install::release_window(&state,&label);ce_setup::release_window(&state,&label);director_recording::release_window(&state,&label);working_tag_changes_native::release_window(&state,&label);conversion_resources_native::release_window(&state,&label);ce_source_recovery_native::release_window(&state,&label);}});
         }})
         .invoke_handler(tauri::generate_handler![
+            home_voice_native::prepare_launch_voice,
+            home_voice_native::play_launch_voice,
+            home_voice_native::stop_launch_voice,
+            home_voice_native::launch_voice_status,
+            owned_character_variants,
             external_browser::open_external_url,
             prepare_map_download,
             download_and_import_maps,
@@ -3108,6 +3123,7 @@ mod readiness_tests {
             ce_recovery:Mutex::new(Default::default()),
             startup:Default::default(),
             asset_sources:Default::default(),
+            home_voice:Default::default(),
         };
         (temp, state, p, record)
     }

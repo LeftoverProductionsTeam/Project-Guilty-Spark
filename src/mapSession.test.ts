@@ -70,3 +70,47 @@ test('quota failure retains in-memory preferences and a later save persists them
     'director.docked': true,
   });
 });
+
+test('camera preferences notify their map and key without waking other retained workspaces', async()=>{
+  const session=await import('./mapSession');
+  const camera=vi.fn(),query=vi.fn(),otherMap=vi.fn(),combined=vi.fn();
+  const stop=session.subscribeMapSession(['a'],'camera.world',camera);
+  session.subscribeMapSession(['a'],'tags.query',query);
+  session.subscribeMapSession(['b'],'camera.world',otherMap);
+  session.subscribeMapSession(['a','a','b'],'camera.world',combined);
+  session.writeMapSession('a','camera.world',{position:[1,2,3]});
+  expect(camera).toHaveBeenCalledTimes(1);expect(combined).toHaveBeenCalledTimes(1);
+  expect(query).not.toHaveBeenCalled();expect(otherMap).not.toHaveBeenCalled();
+  session.writeMapSession('a','camera.world',{position:[1,2,3]});
+  expect(camera).toHaveBeenCalledTimes(1);
+  stop();session.writeMapSession('a','camera.world',{position:[3,2,1]});
+  expect(camera).toHaveBeenCalledTimes(1);expect(combined).toHaveBeenCalledTimes(2);
+});
+
+test('a no-op write publishes a peer key that arrived before its storage notification',async()=>{
+  data.set(prefix+'a',JSON.stringify({mode:'world',layout:{width:300}}));
+  const session=await import('./mapSession');
+  const oldLayout=session.readMapSession('a','layout',null),changed=vi.fn(),mode=vi.fn();
+  session.subscribeMapSession(['a'],'layout',changed);session.subscribeMapSession(['a'],'mode',mode);
+  data.set(prefix+'a',JSON.stringify({mode:'world',layout:{width:400}}));
+  session.writeMapSession('a','mode','world');
+  expect(session.readMapSession('a','layout',null)).not.toBe(oldLayout);
+  expect(session.readMapSession('a','layout',null)).toEqual({width:400});
+  expect(changed).toHaveBeenCalledTimes(1);expect(mode).not.toHaveBeenCalled();
+});
+
+test('peer notifications retain object identity and ignore unrelated or malformed storage',async()=>{
+  data.set(prefix+'a',JSON.stringify({layout:{width:300},mode:'world'}));
+  const session=await import('./mapSession');const layout=session.readMapSession('a','layout',null);
+  const changed=vi.fn(),other=vi.fn();
+  session.subscribeMapSession(['a'],'layout',changed);session.subscribeMapSession(['b'],'mode',other);
+  const event=()=>window.dispatchEvent(Object.assign(new Event('storage'),{key:prefix+'a',newValue:data.get(prefix+'a')}));
+  data.set(prefix+'a',JSON.stringify({layout:{width:300},mode:'tags'}));event();
+  expect(session.readMapSession('a','layout',null)).toBe(layout);expect(changed).not.toHaveBeenCalled();
+  data.set(prefix+'a','malformed');event();expect(changed).not.toHaveBeenCalled();
+  data.set(prefix+'a',JSON.stringify({layout:{width:500},mode:'tags'}));event();
+  expect(changed).toHaveBeenCalledTimes(1);expect(other).not.toHaveBeenCalled();
+  data.clear();window.dispatchEvent(Object.assign(new Event('storage'),{key:null}));
+  expect(changed).toHaveBeenCalledTimes(2);expect(other).toHaveBeenCalledTimes(1);
+  expect(session.readMapSession('a','layout','reset')).toBe('reset');
+});

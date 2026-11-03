@@ -7,7 +7,7 @@ import type {ShaderPreview} from './types';
 import {sunlightPosition} from './environment';
 import {applyHaloBlend,genericCombiner,haloWaveGlsl} from './haloTransparency';
 export const extraTextureKey=(id:number,role:string)=>`${id}:${role}`;
-const vertex = `varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;
+const vertex = `varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;varying vec4 haloClip;
 attribute vec2 uv1;
 #ifdef USE_COLOR
 varying vec3 haloVertexColor;
@@ -16,9 +16,9 @@ void main(){
 #ifdef USE_COLOR
 haloVertexColor=color;
 #endif
-haloUv=uv;haloLightUv=uv1;haloNormal=normalize(normalMatrix*normal);vec4 view=modelViewMatrix*vec4(position,1.0);haloView=view.xyz;haloDepth=-view.z;gl_Position=projectionMatrix*view;}`;
+haloUv=uv;haloLightUv=uv1;haloNormal=normalize(normalMatrix*normal);vec4 view=modelViewMatrix*vec4(position,1.0);haloView=view.xyz;haloDepth=-view.z;haloClip=projectionMatrix*view;gl_Position=haloClip;}`;
 const fragment = `
-varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;
+varying vec2 haloUv;varying vec2 haloLightUv;varying float haloDepth;varying vec3 haloNormal,haloView;varying vec4 haloClip;
 #ifdef USE_COLOR
 varying vec3 haloVertexColor;
 #endif
@@ -34,10 +34,12 @@ uniform bool fogEnabled;uniform vec3 fogColor;uniform float fogNear,fogFar,fogMa
 uniform bool overrideLighting;uniform vec3 lightDirection,ambientFill,sunFill;
 uniform sampler2D normalMap,multipurpose;uniform bool hasNormal,hasMultipurpose,multipurposeXbox,linearOutput,enhancedNormal,enhancedSpecular,enhancedSelfIllum;
 uniform float normalScale,normalStrength,specularStrength,selfIllumStrength;
+uniform bool hasChangeColor,firstMapScreenspace,scaleFirstMapWithDistance;uniform vec3 changeColor;
 vec4 sourceColor(vec4 c){return baseEncoded?c:sRGBTransferOETF(c);}
 ${haloWaveGlsl}
 float animation(vec4 m){return haloWave(m.x,time/max(abs(m.y),0.001)+m.z)*m.w;}
-vec2 layerUv(int i){vec2 p=haloUv*layerScale[i]+layerOffset[i]+vec2(animation(motionU[i]),animation(motionV[i]));
+vec2 layerUv(int i){vec2 uv=haloUv;if(i==0&&firstMapScreenspace){uv=haloClip.xy/max(abs(haloClip.w),.00001)*.5+.5;if(scaleFirstMapWithDistance)uv=(uv-.5)*length(haloView)+.5;}
+vec2 p=uv*layerScale[i]+layerOffset[i]+vec2(animation(motionU[i]),animation(motionV[i]));
 float angle=layerRotation[i]+animation(motionRotation[i])*0.0174532925199433,c=cos(angle),s=sin(angle);
 return mat2(c,-s,s,c)*(p-rotationCenter[i])+rotationCenter[i];}
 vec4 stageSample(vec4 c,int i){if(mod(floor(float(layerFlags[i])/2.0),2.0)>0.5)c.rgb=vec3(c.a);return sourceColor(c);}
@@ -81,6 +83,7 @@ void main(){
       detailAmount=mod(float(detailMask),2.0)>0.5?1.0-selected:selected;}
     if(hasDetail)base.rgb=mix(base.rgb,detailBlend(base.rgb,detail,detailFunction),detailAmount);
     if(hasMicro)base.rgb=detailBlend(base.rgb,texture2D(microDetail,haloUv*detailScales.z).rgb,microFunction);
+    if(kind==1&&hasMultipurpose&&hasChangeColor){vec4 masks=texture2D(multipurpose,haloUv*baseScale);float mask=multipurposeXbox?masks.b:masks.a;base.rgb*=mix(vec3(1.0),changeColor,mask);}
     if(alphaTest){float mask=hasMask?texture2D(alphaMask,haloUv).a:base.a;if(mask<0.5)discard;}
     vec3 surface=base.rgb;
     if(hasLight)base.rgb*=texture2D(lightMap,haloLightUv).rgb;
@@ -221,6 +224,7 @@ export function createHaloMaterial(
     },
   });
   Object.assign(material.uniforms,{normalMap:{value:extra.normalMap??base},multipurpose:{value:extra.multipurpose??base},
+    hasChangeColor:{value:!!m?.changeColor},changeColor:{value:new THREE.Vector3(...(m?.changeColor??[1,1,1]))},firstMapScreenspace:{value:!!m?.firstMapScreenspace},scaleFirstMapWithDistance:{value:!!m?.scaleFirstMapWithDistance},
     hasNormal:{value:!!extra.normalMap},hasMultipurpose:{value:!!extra.multipurpose},multipurposeXbox:{value:!!m?.multipurposeXbox},linearOutput:{value:false},
     enhancedNormal:{value:false},enhancedSpecular:{value:false},enhancedSelfIllum:{value:false},normalScale:{value:m?.bumpScale||1},normalStrength:{value:1},specularStrength:{value:.35},selfIllumStrength:{value:1}});
   if(extra.normalMap&&!extra.alphaMask){material.uniforms.alphaMask.value=extra.normalMap;material.uniforms.hasMask.value=true;}

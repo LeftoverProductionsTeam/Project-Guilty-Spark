@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { native } from '../api';
 import type { Bootstrap } from '../types';
 import type { ForgeAsset } from '../forge';
-import { preloadHomeModels,isHaloMonitor } from '../homeShowcase';
+import { preloadHomeModels,preloadHomeCharacter } from '../homeShowcase';
+import {characterChoice,characterFromChoice,homeCharacters} from '../homeCharacters';
 import NativeModelPreview from './NativeModelPreview';
 import {useMapState} from '../mapSession';
 import {showcaseKey} from './ShowcaseChoice';
@@ -10,7 +11,7 @@ import {showcaseKey} from './ShowcaseChoice';
 export default function HomeModel({ data }: { data: Bootstrap }) {
   const [selection,setSelection]=useMapState('global','home.model','automatic');
   const [models, setModels] = useState<ForgeAsset[]>([]),
-    [index, setIndex] = useState(0),
+    [selectedModel,setSelectedModel]=useState<ForgeAsset|null>(null),
     [message, setMessage] = useState('Finding your Halo models…');
   useEffect(() => {
     let alive = true;
@@ -18,6 +19,8 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
       setMessage('Connect an owned Halo installation to preview its models.');
       return;
     }
+    setSelectedModel(null);setMessage('Finding your Halo character…');
+    const character=characterFromChoice(selection);
     void preloadHomeModels(data)
       .then((choices) => {
         if (!alive) return;
@@ -26,17 +29,14 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
           return;
         }
         setModels(choices);
-        const monitor = choices.findIndex(isHaloMonitor);
-        setIndex(monitor >= 0 ? monitor : Math.floor(Math.random() * choices.length));
       })
       .catch((error) => {
         if (alive) setMessage(String(error));
       });
-    return () => {
-      alive = false;
-    };
-  }, [data.dataDirectory, data.installation.mccPath]);
-  const model = models.find(asset=>showcaseKey(asset)===selection)??models[index % Math.max(1, models.length)];
+    if(character)void preloadHomeCharacter(data,character).then(asset=>{if(!alive)return;setSelectedModel(asset);if(!asset)setMessage(`Link campaign maps containing ${homeCharacters.find(c=>c.id===character)?.label} in Asset library.`);}).catch(error=>{if(alive)setMessage(String(error));});
+    return () => {alive=false;};
+  }, [data.dataDirectory, data.installation.mccPath,data.settings.preferredHalo,selection]);
+  const model = characterFromChoice(selection)?selectedModel:models.find(asset=>showcaseKey(asset)===selection);
   return (
     <div className="home-native-model">
       {model ? (
@@ -44,12 +44,14 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
       ) : (
         <span className="model-preview-loading">{message}</span>
       )}
-      {model && (
         <div className="home-model-caption">
-          <span>{model.name} · actual Halo model</span>
-          {models.length > 1 && <select aria-label="Home model" value={showcaseKey(model)} onChange={event=>setSelection(event.target.value)}>{models.map(asset=><option value={showcaseKey(asset)} key={showcaseKey(asset)}>{asset.name}</option>)}</select>}
+          <span>{model?`${model.name} · actual Halo model`:'Choose your Home character'}</span>
+          <select aria-label="Home model" value={selection} onChange={event=>setSelection(event.target.value)}>
+            <option value="automatic">Guilty Spark · default</option>
+            {homeCharacters.map(c=><option key={c.id} value={characterChoice(c.id)}>{c.label}</option>)}
+            <optgroup label="Other local models">{models.map(asset=><option value={showcaseKey(asset)} key={showcaseKey(asset)}>{asset.name}</option>)}</optgroup>
+          </select>
         </div>
-      )}
     </div>
   );
 }

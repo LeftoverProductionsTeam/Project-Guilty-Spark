@@ -51,6 +51,7 @@ fn rotation(r: &Reader, cursor: &mut usize) -> Result<[f32; 4]> {
     for v in &mut q {
         *v /= length;
     }
+    for v in &mut q[..3]{*v = -*v;}
     Ok(q)
 }
 fn translation(r: &Reader, cursor: &mut usize) -> Result<[f32; 3]> {
@@ -129,6 +130,7 @@ fn decode(r: &Reader, region: Region, at: usize, rig: &ModelRig) -> Result<Anima
         }
     }
     let clip = AnimationClip {
+        canonical_rotations: true,
         name: r.string(at, 32)?,
         fps: if clip_flags & 4 != 0 { 25. } else { 30. },
         frame_count: frames,
@@ -179,8 +181,8 @@ pub fn object_animation_clips(
     tags: &[Tag],
     object_id: u32,
 ) -> Result<NativeAnimations> {
-    if !matches!(header.version, 6 | 7 | 609 | 13) {
-        return invalid("Native animation preview requires a supported PC-derived Halo 1 cache");
+    if !matches!(header.version, 5 | 6 | 7 | 609 | 13) {
+        return invalid("Native animation preview requires a supported Halo 1 cache");
     }
     let object = tags
         .iter()
@@ -225,20 +227,13 @@ pub fn object_animation_clips(
             Ok((row, r.string(row, 32)?))
         })
         .collect::<Result<Vec<_>>>()?;
-    candidates.sort_by_key(|(_, name)| {
-        if name == "idle overlay" {
-            0
-        } else if name.ends_with("idle") {
-            1
-        } else {
-            2
-        }
-    });
+    candidates.sort_by_key(|(row,name)|preview_priority(name,r.u16(*row+32).unwrap_or(u16::MAX)));
     let mut clips = vec![];
     let mut unavailable = vec![];
     let mut kinds = vec![];
     let mut values = 0;
-    for (row, name) in candidates.into_iter().take(16) {
+    for (row, name) in candidates {
+        if clips.len()>=16{break;}
         let kind = r.u16(row + 32)?;
         if kind > 1 {
             unavailable.push(format!(
@@ -282,10 +277,25 @@ pub fn object_animation_clips(
         unavailable,
     })
 }
+/// Idle vehicle seats are valid clips but are unsuitable as a standing Home
+/// pose. Full standing clips precede overlays, seats and cinematic gestures.
+fn preview_priority(name:&str,kind:u16)->u8{
+    let name=name.to_ascii_lowercase();let base=name.split('%').next().unwrap_or(&name);
+    if kind==0&&base=="stand unarmed idle"{0}
+    else if kind==0&&base.starts_with("stand ")&&base.ends_with(" idle"){1}
+    else if kind==0&&base=="idle"{2}
+    else if name=="idle overlay"{3}
+    else if kind==0{4}else{5}
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]fn standing_source_idles_precede_seats_and_additive_controls(){
+        assert!(preview_priority("stand unarmed idle%1",0)<preview_priority("stand emotions",1));
+        assert!(preview_priority("stand rifle idle",0)<preview_priority("G-driver unarmed idle",0));
+        assert!(preview_priority("idle overlay",1)<preview_priority("left turn",0));
+    }
     fn fixture() -> (Vec<u8>, ModelRig, Region) {
         let mut b = vec![0; 512];
         let put16 =
@@ -377,6 +387,7 @@ mod tests {
     #[test]
     fn overlays_use_the_base_pose_rotation_translation_and_scale() {
         let mut clip = AnimationClip {
+            canonical_rotations: true,
             name: "overlay".into(),
             fps: 30.,
             frame_count: 1,

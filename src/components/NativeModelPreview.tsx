@@ -167,7 +167,7 @@ export default function NativeModelPreview({
   portrait = false,
   animate = true,
 }: {
-  asset: Pick<ForgeAsset, 'tagId' | 'sourceProjectId' | 'sourceSha256'>;
+  asset: Pick<ForgeAsset, 'tagId' | 'sourceProjectId' | 'sourceSha256' | 'modelVariant'>;
   live?: boolean;
   showcase?: boolean;
   portrait?: boolean;
@@ -176,8 +176,8 @@ export default function NativeModelPreview({
   onSnapshot?: (url: string) => void;
 }) {
   const placement = useMemo(
-    () => ({ tagId: asset.tagId, sourceProjectId: asset.sourceProjectId, sourceSha256: asset.sourceSha256 }),
-    [asset.sourceProjectId, asset.sourceSha256, asset.tagId],
+    () => ({ tagId: asset.tagId, sourceProjectId: asset.sourceProjectId, sourceSha256: asset.sourceSha256,modelVariant:asset.modelVariant }),
+    [asset.sourceProjectId, asset.sourceSha256, asset.tagId,asset.modelVariant],
   );
   const activity=useWorkspaceActivity();
   const [framing,setFraming]=useState<{preset:ModelViewPreset;revision:number}>({preset:'fit',revision:0});
@@ -223,13 +223,13 @@ export default function NativeModelPreview({
       environment ?? {
         ...DEFAULT_ENVIRONMENT,
         ambientColor: [0.9, 0.95, 1],
-        ambientIntensity: showcase ? 0.9 : 0.85,
+        ambientIntensity: showcase ? (view?.mesh.rig&&view.mesh.rig.nodes.length>1?0.45:0.9) : 0.85,
         sunColor: [1, 0.95, 0.88],
-        sunIntensity: showcase ? 1.1 : 1.6,
+        sunIntensity: showcase ? (view?.mesh.rig&&view.mesh.rig.nodes.length>1?0.55:1.1) : 1.6,
         sunAzimuth: -30,
         sunElevation: 35,
       },
-    [environment, showcase],
+    [environment, showcase,view?.mesh.rig?.nodes.length],
   );
   return (
     <div
@@ -240,10 +240,12 @@ export default function NativeModelPreview({
       data-model-tag={asset.tagId ?? undefined}
       data-model-source={asset.sourceProjectId ?? undefined}
       data-model-source-hash={asset.sourceSha256 ?? undefined}
+      data-model-variant={asset.modelVariant}
       data-model-triangles={view ? view.mesh.indices.length / 3 : 0}
       data-model-ready={!!view?.ready}
       data-native-animation-count={animations.value?.clips.length ?? 0}
       data-model-textures={view ? Object.keys(view.shaderTextures).length : 0}
+      data-model-material-gaps={view?[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])].filter(id=>!view.shaderTextures[id]||!view.shaderMetadata[id]).length:0}
       data-model-reflections={
         view
           ? Object.values(view.extraTextures).filter((texture) => texture instanceof THREE.CubeTexture).length

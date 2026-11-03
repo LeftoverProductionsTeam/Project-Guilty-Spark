@@ -197,7 +197,17 @@ fn roots(state: &AppState) -> Reply<Vec<(PathBuf, String, usize)>> {
             }
         }
     }
+    roots.extend(runtime_connections::owned_map_roots(state)?.into_iter().map(|(path,label)|(path,label,1)));
     Ok(roots)
+}
+/// One installed copy per stock campaign, preferring recoverable embedded
+/// Xbox audio. No drive-wide search, download, game launch or original writes.
+pub(super) fn home_voice_sources(state:&AppState)->Reply<Vec<PathBuf>>{
+    let mut rows=scan(&roots(state)?).maps;
+    rows.retain(|row|!row.archive&&["a10.map","a30.map","a50.map","b30.map","b40.map","c10.map","c20.map","c40.map","d20.map","d40.map"].contains(&row.name.to_ascii_lowercase().as_str()));
+    rows.sort_by_key(|row|(if row.cache_version==Some(5){0}else if row.cache_version==Some(13){2}else{1},row.name.clone(),row.id.clone()));
+    let mut names=BTreeSet::new();
+    Ok(rows.into_iter().filter(|row|names.insert(row.name.to_ascii_lowercase())).map(|row|row.path).collect())
 }
 #[tauri::command]
 pub(super) async fn discover_asset_sources(app: tauri::AppHandle) -> Reply<Inventory> {

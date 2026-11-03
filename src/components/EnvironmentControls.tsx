@@ -34,6 +34,7 @@ export default function EnvironmentControls({value,onChange,persisted=false,skyP
         ['sunAzimuth','Sun bearing (degrees)',-180,180,1,'Horizontal sun direction measured around Z axis.'],
         ['sunElevation','Sun elevation (degrees)',-90,90,1,'Positive values place sun above the horizon; negative values place it below.']] as const)
         .map(([key,label,min,max,step,help])=><div className="forge-field" title={help} key={key}>
+          <span className="gs-env-field-label">{label}</span>
           <NumberField label={label} value={value[key]} min={min} max={max} step={step} onCommit={n=>edit(key,n)}/>
         </div>)}
     </div>
@@ -41,8 +42,8 @@ export default function EnvironmentControls({value,onChange,persisted=false,skyP
       <input type="checkbox" checked={value.fogEnabled} onChange={e=>edit('fogEnabled',e.target.checked)}/> Enable preview distance fog
     </label>
     {value.fogEnabled && <div className="gs-env-grid">
-      <div className="forge-field"><NumberField label="Fog begins (world units)" value={value.fogNear} min={0} max={19999} step={1} onCommit={n=>edit('fogNear',n)}/></div>
-      <div className="forge-field"><NumberField label="Fog fully obscures (world units)" value={value.fogFar} min={1} max={20000} step={1} onCommit={n=>edit('fogFar',n)}/></div>
+      <div className="forge-field"><span className="gs-env-field-label">Fog begins · world units</span><NumberField label="Fog begins (world units)" value={value.fogNear} min={0} max={19999} step={1} onCommit={n=>edit('fogNear',n)}/></div>
+      <div className="forge-field"><span className="gs-env-field-label">Fog fully obscures · world units</span><NumberField label="Fog fully obscures (world units)" value={value.fogFar} min={1} max={20000} step={1} onCommit={n=>edit('fogFar',n)}/></div>
     </div>}
     {error && <Notice tone="warning">{error}</Notice>}
     <div className="analysis-actions">

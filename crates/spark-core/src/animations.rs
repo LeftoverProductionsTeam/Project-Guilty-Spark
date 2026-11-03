@@ -17,6 +17,10 @@ pub struct AnimationNode {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AnimationClip {
     pub name: String,
+    /// Older saved clips used Halo's inverse quaternion convention. Missing
+    /// metadata means legacy; verified reads convert only the in-memory copy.
+    #[serde(default)]
+    pub canonical_rotations: bool,
     pub fps: f32,
     pub frame_count: usize,
     pub checksum: u32,
@@ -221,9 +225,13 @@ pub fn parse_jma(text: &str, name: &str) -> Result<AnimationClip> {
         if transforms.len() % 8 < 3 {
             v /= 100.;
         }
+        // JMS/JMA use Halo's inverse quaternion convention too. Store the
+        // same canonical rotations as native model/animation previews.
+        if (3..6).contains(&(transforms.len()%8)){v = -v;}
         transforms.push(v);
     }
     let clip = AnimationClip {
+        canonical_rotations: true,
         name: name.into(),
         fps: fps as f32,
         frame_count: frames as usize,
@@ -241,7 +249,7 @@ pub fn verified_clip(asset: &AnimationAsset) -> Result<AnimationClip> {
     }
     verify_file(&asset.source_path, &asset.source_sha256)?;
     verify_file(&asset.data_path, &asset.data_sha256)?;
-    let clip: AnimationClip = serde_json::from_slice(&fs::read(&asset.data_path)?)?;
+    let mut clip: AnimationClip = serde_json::from_slice(&fs::read(&asset.data_path)?)?;
     clip.validate()?;
     if clip.frame_count != asset.frame_count
         || clip.checksum != asset.checksum
@@ -252,6 +260,10 @@ pub fn verified_clip(asset: &AnimationAsset) -> Result<AnimationClip> {
             .ne(asset.node_names.iter())
     {
         return invalid("Animation clip metadata differs from its preserved source");
+    }
+    if !clip.canonical_rotations {
+        for transform in clip.transforms.chunks_exact_mut(8){for v in &mut transform[3..6]{*v = -*v;}}
+        clip.canonical_rotations=true;
     }
     Ok(clip)
 }
@@ -291,15 +303,16 @@ pub fn jma_source(clip: &AnimationClip) -> Result<String> {
             .map_err(|_| bad("Animation source formatting failed"))?;
     }
     for transform in clip.transforms.chunks_exact(8) {
+        let sign=if clip.canonical_rotations{-1.}else{1.};
         writeln!(
             text,
             "{:.8}\t{:.8}\t{:.8}\n{:.8}\t{:.8}\t{:.8}\t{:.8}\n{:.8}",
             transform[0] * 100.,
             transform[1] * 100.,
             transform[2] * 100.,
-            transform[3],
-            transform[4],
-            transform[5],
+            sign*transform[3],
+            sign*transform[4],
+            sign*transform[5],
             transform[6],
             transform[7]
         )
@@ -748,6 +761,22 @@ mod tests {
         let mut legacy = c.clone();
         legacy.nodes[1].parent = -1;
         assert!(jma_source(&legacy).unwrap_err().to_string().contains("Reimport the preserved original JMA"));
+    }
+    #[test]fn halo_quaternion_import_and_native_export_roundtrip_without_changing_rotation(){
+        let text=source().replace("0 0 0 1","0 0 0.70710677 0.70710677");let clip=parse_jma(&text,"rotation").unwrap();
+        assert!((clip.transforms[5]+0.70710677).abs()<0.00001);
+        let decoded=parse_jma(&jma_source(&clip).unwrap(),"rotation").unwrap();assert_eq!(decoded.transforms,clip.transforms);
+    }
+    #[test]fn legacy_verified_clip_is_converted_in_memory_without_rewriting_its_hashed_source(){
+        let directory=tempfile::tempdir().unwrap();let source_path=directory.path().join("original.jma");let data_path=directory.path().join("clip.json");
+        let text=source().replace("0 0 0 1","0 0 0.70710677 0.70710677");fs::write(&source_path,&text).unwrap();
+        let canonical=parse_jma(&text,"rotation").unwrap();let mut legacy=canonical.clone();legacy.canonical_rotations=false;
+        for transform in legacy.transforms.chunks_exact_mut(8){for v in &mut transform[3..6]{*v = -*v;}}
+        let mut value=serde_json::to_value(&legacy).unwrap();value.as_object_mut().unwrap().remove("canonicalRotations");let bytes=serde_json::to_vec(&value).unwrap();fs::write(&data_path,&bytes).unwrap();
+        let asset=AnimationAsset{id:uuid::Uuid::new_v4().to_string(),name:legacy.name.clone(),kind:"clip".into(),source_sha256:maps::hash_file(&source_path).unwrap(),data_sha256:maps::hash_file(&data_path).unwrap(),source_path,data_path,frame_count:legacy.frame_count,fps:legacy.fps,checksum:legacy.checksum,node_names:legacy.nodes.iter().map(|n|n.name.clone()).collect(),animation_names:vec![legacy.name.clone()]};
+        let recovered=verified_clip(&asset).unwrap();assert!(recovered.canonical_rotations);assert_eq!(recovered.transforms,canonical.transforms);
+        assert_eq!(jma_source(&legacy).unwrap(),jma_source(&recovered).unwrap());assert_eq!(fs::read(&asset.data_path).unwrap(),bytes);
+        fs::write(&asset.data_path,b"corrupt").unwrap();assert!(verified_clip(&asset).is_err());
     }
     #[test]
     fn refuses_truncation_cycles_nonfinite_and_excess() {

@@ -21,6 +21,8 @@ export interface InterfacePreferences {
   schemaVersion: 1;
   theme: ThemeName;
   uiAudioEnabled: boolean;
+  launchVoiceEnabled:boolean;
+  launchVoiceVolume:number;
   uiVolume: number;
   reducedMotion: boolean;
   windowOpacity:number;
@@ -37,6 +39,8 @@ export const DEFAULT_INTERFACE: InterfacePreferences = {
   schemaVersion: 1,
   theme: 'covenant',
   uiAudioEnabled: false, // Never autoplay or assume user consent for local game sounds.
+  launchVoiceEnabled:true, // Explicit character greeting preference, independent of menu cues.
+  launchVoiceVolume:0.35,
   uiVolume: 0.3,
   reducedMotion: false,
   windowOpacity:1,
@@ -74,6 +78,8 @@ export function sanitizeInterfacePreferences(v: unknown): InterfacePreferences {
     theme: typeof v.theme === 'string' && (themeNames as readonly string[]).includes(v.theme)
       ? v.theme as ThemeName : DEFAULT_INTERFACE.theme,
     uiAudioEnabled: v.uiAudioEnabled === true,
+    launchVoiceEnabled:typeof v.launchVoiceEnabled==='boolean'?v.launchVoiceEnabled:DEFAULT_INTERFACE.launchVoiceEnabled,
+    launchVoiceVolume:typeof v.launchVoiceVolume==='number'&&Number.isFinite(v.launchVoiceVolume)?Math.max(0,Math.min(1,v.launchVoiceVolume)):DEFAULT_INTERFACE.launchVoiceVolume,
     uiVolume: typeof v.uiVolume === 'number' && Number.isFinite(v.uiVolume)
       ? Math.max(0, Math.min(1, v.uiVolume)) : DEFAULT_INTERFACE.uiVolume,
     reducedMotion: v.reducedMotion === true,

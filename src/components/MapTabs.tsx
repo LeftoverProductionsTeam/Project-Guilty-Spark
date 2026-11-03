@@ -1,7 +1,8 @@
-import { CornerUpLeft, ExternalLink, PackageOpen, X } from 'lucide-react';
-import { useLayoutEffect, useRef } from 'react';
+import { ChevronDown, CornerUpLeft, ExternalLink, PackageOpen, X } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MapDocuments } from '../mapDocuments';
 import { shouldDetachTab } from '../tabDetach';
+import './mapTabsMenu.css';
 export default function MapTabs({
   state,
   disabled,
@@ -20,11 +21,19 @@ export default function MapTabs({
   onReturn?: (id:string)=>void;
 }) {
   const tabs = useRef<HTMLDivElement>(null);
+  const menu=useRef<HTMLDetailsElement>(null),pendingFocus=useRef<string|null>(null);
+  const [query,setQuery]=useState('');
+  const matches=state.documents.filter(d=>`${d.history.current?.title} ${d.history.current?.source?.engine??'QuickForge'}`.toLowerCase().includes(query.toLowerCase()));
+  useEffect(()=>{
+    const outside=(event:PointerEvent)=>{if(menu.current?.open&&!menu.current.contains(event.target as Node))menu.current.open=false;};
+    window.addEventListener('pointerdown',outside);return()=>window.removeEventListener('pointerdown',outside);
+  },[]);
   const drag=useRef<{id:string;pointer:number;x:number;y:number}|null>(null),suppressClick=useRef<string|null>(null);
   useLayoutEffect(() => {
     const list=tabs.current;if(!list)return;
     const reveal=()=>list.querySelector('[aria-selected="true"]')?.closest('.map-tab')?.scrollIntoView({block:'nearest',inline:'nearest'});
     reveal();const observer=new ResizeObserver(reveal);observer.observe(list);
+    if(pendingFocus.current===state.activeId){pendingFocus.current=null;list.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus();}
     return()=>observer.disconnect();
   }, [state.activeId,state.documents.length]);
   if (!state.documents.length) return null;
@@ -62,19 +71,10 @@ export default function MapTabs({
                   list?.querySelectorAll<HTMLButtonElement>('[role=tab]')[n]?.focus(),
                 );
               }}
-              title={`${d.history.current?.source?.scenarioPath ?? 'Editable source project'} · drag out to move to another window`}
+              title={`${d.history.current?.title} · ${d.history.current?.source?.engine??'QuickForge source'} · ${d.history.current?.source?.scenarioPath ?? 'Editable source project'} · drag out to move to another window`}
             >
               {d.history.dirty && <span aria-label="Unsaved changes">● </span>}
               <span className="map-tab-title">{d.history.current?.title}</span>
-            </button>
-            <button
-              className="map-tab-action"
-              title="Open map in another window"
-              aria-label={'Open ' + d.history.current?.title + ' in another window'}
-              disabled={disabled}
-              onClick={() => onWindow(d.id)}
-            >
-              <ExternalLink size={12} />
             </button>
             <button
               className="map-tab-action"
@@ -88,6 +88,34 @@ export default function MapTabs({
           </div>
         ))}
       </div>
+      {state.documents.length>1&&<details ref={menu} className="gs-map-switcher" onToggle={event=>{
+        if(event.currentTarget.open){for(const other of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open]'))other.open=false;requestAnimationFrame(()=>menu.current?.querySelector('input')?.focus());}
+      }} onKeyDown={event=>{
+        if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector<HTMLElement>('summary')?.focus();return;}
+        const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled)')];
+        if(!buttons.length)return;
+        const input=event.target instanceof HTMLInputElement;
+        if(event.key==='Enter'&&input){event.preventDefault();buttons[0].click();return;}
+        if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key)||(input&&['Home','End'].includes(event.key)))return;
+        event.preventDefault();event.stopPropagation();const at=buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
+        buttons[next]?.focus();
+      }}>
+        <summary aria-label="Choose open map" title="Switch maps by full name; search or open a map in another window" onClick={()=>{if(!menu.current?.open)setQuery('');}}>Maps <small>{state.documents.length}</small><ChevronDown size={11}/></summary>
+        <div className="gs-map-switcher-popup" role="menu" aria-label="Open map switcher">
+          <input type="search" aria-label="Search open maps" placeholder="Map name or runtime…" value={query} maxLength={160} onChange={event=>setQuery(event.target.value)}/>
+          <div className="gs-map-switcher-list">{matches.map(d=><div key={d.id} className="gs-map-choice-row">
+            <button role="menuitemradio" aria-label={d.history.current?.title} aria-checked={state.activeId===d.id} disabled={disabled} onClick={()=>{
+              if(menu.current)menu.current.open=false;
+              if(state.activeId===d.id)requestAnimationFrame(()=>tabs.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus());
+              else pendingFocus.current=d.id;
+              onSelect(d.id);
+            }}><strong>{d.history.dirty&&<span aria-label="Unsaved changes">● </span>}{d.history.current?.title}</strong><small>{d.history.current?.source?.engine??'QuickForge source'}</small></button>
+            <button aria-label={'Open '+d.history.current?.title+' in another window'} title="Open in another window" disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;onWindow(d.id);}}><ExternalLink size={13}/></button>
+          </div>)}</div>
+          {!matches.length&&<p role="status">No open maps match.</p>}
+        </div>
+      </details>}
       {onReturn&&state.activeId&&<button className="small-button" aria-label="Return to main" disabled={disabled} title="Save this map and return its editing history to the main Spark window" onClick={()=>onReturn(state.activeId!)}><CornerUpLeft size={14}/>Return to main</button>}
       <button className="small-button" title="Transfer assets between open maps" aria-label="Transfer assets" disabled={disabled} onClick={onAssets}>
         <PackageOpen size={14} /> Transfer assets

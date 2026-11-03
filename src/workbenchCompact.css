@@ -162,13 +162,15 @@
 .gs-home-button{font-size:10px;letter-spacing:.7px;min-height:26px;padding:3px 6px;}
 #gs-header-workspace-tools{display:flex;flex:1 1 330px;min-width:0;align-items:center;}
 #gs-header-workspace-tools .gs-workspace-tools{height:32px;min-height:32px;padding:0;gap:3px;border:0;background:transparent;flex:1;min-width:0;}
-#gs-header-workspace-tools .gs-panel-buttons{overflow:hidden;max-width:260px;}
+#gs-header-workspace-tools .gs-workspace-tools>button{width:28px;min-width:28px;height:28px;min-height:28px;padding:4px;}
+#gs-header-workspace-tools .gs-panel-buttons{overflow:hidden;max-width:clamp(0px,calc(100vw - 1200px),260px);}
 #gs-header-workspace-tools .gs-panel-buttons button{min-height:26px;padding:3px 6px;font-size:10px;}
 #gs-header-workspace-tools .gs-layout-actions{gap:3px;margin:0;}
-.application .gs-compact-header .map-tab-bar{flex:0 0 clamp(240px,29vw,520px);min-width:0;width:auto;margin:0;padding:0;border:0;background:transparent;gap:4px;}
+.application .gs-compact-header .map-tab-bar{flex:2 1 540px;max-width:760px;min-width:0;width:auto;margin:0;padding:0;border:0;background:transparent;gap:4px;}
 .application .gs-compact-header .map-tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;}
 .application .gs-compact-header .map-tab-bar>.small-button{flex:none;width:28px;min-width:28px;padding:4px;font-size:0;gap:0;}
 .application .gs-compact-header .map-tab button[role=tab]{flex:1;min-width:0;}
+.application.gs-drawers>.gs-compact-header .map-tab{flex:0 0 164px;width:164px;min-width:min(144px,100%);max-width:min(180px,100%);}
 .application .map-tab-title{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;}
 #gs-header-workspace-tools .gs-panel-overflow{position:relative;}
 #gs-header-workspace-tools .gs-panel-overflow>div{top:calc(100% + 4px);right:0;}
@@ -274,9 +276,31 @@ html[data-gs-fullscreen=true] #gs-header-workspace-tools .gs-panel-buttons butto
 .application .community-server-browser .server-filter{display:inline-flex;min-width:180px;width:35%;margin:3px 5px 3px 0;gap:4px;align-items:center;}
 .application .community-server-browser .server-filter input{width:100%;}
 @media(max-width:1600px){.gs-compact-header .studio-header-label,.gs-compact-header .gs-header-find kbd,.gs-compact-header .editor-sound-issue{display:none;}.gs-compact-header .editor-sound-controls input[type=range]{width:35px;}.gs-compact-header .header-actions>button.gs-header-find{font-size:0;gap:0;}.gs-runtime-switch select{width:90px;}}
-@media(max-width:1300px){.application .gs-compact-header .map-tab-bar{flex-basis:240px;}.application .gs-compact-header .map-tab{max-width:200px;}}
+@media(max-width:1300px){.application .gs-compact-header .map-tab-bar{flex-basis:440px;}.application .gs-compact-header .map-tab{max-width:180px;}}
 @media(max-width:1100px){#gs-header-workspace-tools .gs-panel-buttons{flex:0 0 0;visibility:hidden;}}
-@media(max-width:950px){.application .gs-compact-header .map-tab-bar{flex-basis:168px;}.application .gs-compact-header .map-tab{max-width:130px;}.gs-compact-header .header-actions>.icon-button,.gs-compact-header .studio-header-button strong{display:none;}.gs-compact-header .gs-layout-menu>summary{font-size:9px;padding:2px;}.gs-compact-header .editor-sound-controls>button:not([aria-pressed]){font-size:0;width:24px;padding:3px;}.gs-compact-header .editor-sound-controls>button:not([aria-pressed])::after{content:'▶';font-size:12px;}.director-heading p{max-width:230px;}.gs-runtime-switch select{width:78px;}}
+/* Reserve the toolbar's actual width before shrinking the tab strip. Its
+   controls must not paint over the runtime selector or window controls. */
+#gs-header-workspace-tools{flex-shrink:0;flex-basis:auto;}
+.application .gs-compact-header .map-tab-bar{flex-shrink:1;min-width:168px;}
+.application.gs-drawers>.gs-compact-header .map-tab{max-width:min(200px,100%);}
+.application .gs-env-field-label{display:block;font-size:10px;line-height:1.3;margin-bottom:3px;}
+.application .bsp-tools button.selected{box-shadow:inset 0 1px #ffffff16;border-color:color-mix(in srgb,var(--accent) 40%,var(--line));background:color-mix(in srgb,var(--accent) 12%,var(--panel));border-radius:5px;}
+.application .bsp-source-list{max-height:110px;overflow:auto;flex:none;}
+@media(max-width:1100px){
+  .application.gs-drawers>.gs-compact-header .map-tab-bar{flex-basis:320px;min-width:168px;}
+  :root .application.gs-drawers>.gs-compact-header{gap:2px;padding-inline:4px;}
+  .application .gs-compact-header .gs-spark-navigation{width:60px;min-width:60px;}
+  #gs-header-workspace-tools .gs-workspace-tools{gap:2px;}
+  .gs-compact-header .editor-sound-controls{gap:3px;}
+  .gs-compact-header .editor-sound-controls input[type=range]{width:28px;}
+  .gs-compact-header .editor-sound-controls meter{display:none;}
+}
+@media(max-width:1100px){.application .gs-compact-header .map-tab-bar{flex-basis:168px;}.application .gs-compact-header .map-tab{max-width:130px;}.gs-compact-header .header-actions>.icon-button,.gs-compact-header .studio-header-button strong{display:none;}.gs-compact-header .gs-layout-menu>summary{font-size:9px;padding:2px;}.gs-compact-header .editor-sound-controls>button:not([aria-pressed]){font-size:0;width:24px;padding:3px;}.gs-compact-header .editor-sound-controls>button:not([aria-pressed])::after{content:'▶';font-size:12px;}.director-heading p{max-width:230px;}.gs-runtime-switch select{width:78px;}}
+@media(max-width:1100px){
+  .application .gs-compact-header .gs-runtime-switch select{width:60px;}
+  .application .gs-compact-header .gs-header-find{width:28px;min-width:28px;padding:4px;}
+  #gs-header-workspace-tools [aria-label='Workflow navigation']>button{width:24px;min-width:24px;padding:3px;}
+}
 .application .online-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .application .online-toolbar .runtime-picker{order:-1;display:flex;align-items:center;gap:6px;}
 .application .online-toolbar .tabs{margin:0;}
