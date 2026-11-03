@@ -213,3 +213,17 @@
   font-size: 0.75rem;
   pointer-events: none;
 }
+
+.forge-logic-events { border-block: 1px solid var(--border); margin-block: 6px; padding-block: 7px; }
+.forge-logic-events > summary { cursor: pointer; font-weight: 600; font-size: 12px; }
+.forge-logic-events > summary span { float: right; opacity: .7; font-size: 10px; font-weight: 400; }
+.forge-logic-content { display: grid; gap: 8px; padding-top: 8px; min-width: 0; }
+.forge-logic-pair { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
+.forge-logic-content label { font-size: 11px; min-width: 0; }
+.forge-logic-pair label { display: grid; gap: 3px; align-content: start; }
+.forge-logic-content input:not([type="checkbox"]), .forge-logic-content select, .forge-logic-content textarea { width: 100%; min-width: 0; font-size: 11px; padding: 5px 6px; }
+.forge-logic-content button { font-size: 11px; min-height: 26px; padding: 4px 7px; }
+.forge-logic-content .forge-hint { margin: 0; }
+.forge-logic-rule { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 7px; }
+.forge-logic-rule-heading { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 5px; }
+.forge-logic-content textarea { font-family: var(--font-mono,monospace); resize: vertical; }

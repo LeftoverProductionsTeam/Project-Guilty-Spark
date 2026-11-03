@@ -1,7 +1,7 @@
 import AssetSourceBrowser from './AssetSourceBrowser';
 import LibraryAssetPreview from './LibraryAssetPreview';
 import { useMemo } from 'react';
-import type { PointerEvent } from 'react';
+import type { PointerEvent, ReactNode } from 'react';
 import { useMapState } from '../mapSession';
 import type { ViewportAsset } from '../viewportAssets';
 import type { MapDocument } from '../mapDocuments';
@@ -26,6 +26,7 @@ export default function ViewportAssetLibrary({
   importModel,
   importSound,
   busy = false,
+  scenarioTools,
 }: {
   projectId: string;
   assets: ViewportAsset[];
@@ -36,6 +37,7 @@ export default function ViewportAssetLibrary({
   importModel?: () => void;
   importSound?: () => void;
   busy?: boolean;
+  scenarioTools?: ReactNode;
 }) {
   const [query, setQuery] = useMapState(projectId, 'viewport.library.query', ''),
     [source, setSource] = useMapState(projectId, 'viewport.library.source', 'all'),
@@ -50,7 +52,9 @@ export default function ViewportAssetLibrary({
         (item) =>
           (source === 'all' || item.sourceId === source) &&
           (kind === 'all' ||
-            (kind === 'models'
+            (kind === 'doors'
+              ? item.kind === 'model' && item.asset.class === 'mach'
+              : kind === 'models'
               ? item.kind === 'model' || item.kind === 'mesh'
               : item.kind === 'sound' || item.kind === 'customSound')) &&
           `${item.name} ${item.path}`.toLowerCase().includes(query.toLowerCase()),
@@ -88,6 +92,7 @@ export default function ViewportAssetLibrary({
           >
             <option value="all">Models and sounds</option>
             <option value="models">Models</option>
+            <option value="doors">Doors & devices</option>
             <option value="sounds">Sounds</option>
           </select>
         </label>
@@ -111,6 +116,8 @@ export default function ViewportAssetLibrary({
           )}
         </div>
       </div>
+      {scenarioTools}
+      {kind==='doors'&&<p className="subtle">Drag a door preview onto the map, then drop a Trigger volume nearby. Select either to connect an action in the Inspector.</p>}
       <div className="viewport-asset-list">
         {shown.slice(0, 150).map((item) => (
           <article key={item.key}>
@@ -158,7 +165,7 @@ export default function ViewportAssetLibrary({
           </article>
         ))}
       </div>
-      {!shown.length && <p>No matching assets. Open another map or import a custom model or sound.</p>}
+      {!shown.length && <p>{kind==='doors'?'No doors in the loaded sources. Use Installed maps & downloads to load assets from a campaign map such as a10.':'No matching assets. Open another map or import a custom model or sound.'}</p>}
       {shown.length > 150 && (
         <small>150 of {shown.length} shown. Narrow the search to find another asset.</small>
       )}

@@ -7,7 +7,7 @@ fn main()->Result<(),Box<dyn std::error::Error>>{
     let header=inspection.header.clone();let bytes=std::fs::read(&path)?;let sha=maps::hash_file(&path)?;
     if sha!=inspection.sha256{return Err("Map changed during inspection".into());}
     let mut rows=vec![];
-    for tag in inspection.tags.iter().filter(|t|matches!(t.class.as_str(),"vehi"|"scen"|"weap"|"eqip"|"bipd")).take(64){
+    for tag in inspection.tags.iter().filter(|t|matches!(t.class.as_str(),"vehi"|"scen"|"weap"|"eqip"|"bipd"|"mach")).take(64){
         let model=render::object_model_mesh(&bytes,&header,&inspection.tags,tag.id,0);
         let collision=render::object_collision_mesh(&bytes,&header,&inspection.tags,tag.id);
         let bounds=|mesh:&maps::MeshData|{let mut min=[f32::INFINITY;3];let mut max=[f32::NEG_INFINITY;3];for p in mesh.positions.chunks_exact(3){for i in 0..3{min[i]=min[i].min(p[i]);max[i]=max[i].max(p[i]);}}serde_json::json!({"min":min,"max":max,"triangles":mesh.indices.len()/3})};

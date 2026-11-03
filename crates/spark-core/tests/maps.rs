@@ -5,6 +5,20 @@ use spark_core::{
     maps::{self, parse_header},
 };
 #[test]
+fn device_machine_placement_retains_native_identity_transform_and_source_bytes() {
+    let d=tempfile::tempdir().unwrap();let path=d.path().join("door.map");
+    for version in [6,7,609,13] {
+        let mut bytes=fixture(version);fourcc(&mut bytes,0x828+64,"mach");
+        put_u32(&mut bytes,0x1000+0x294,1);put_u32(&mut bytes,0x1000+0x298,pointer(version,0x3400));
+        put_u32(&mut bytes,0x1000+0x2a0,1);put_u32(&mut bytes,0x1000+0x2a4,pointer(version,0x3500));
+        put_u32(&mut bytes,0x350c,0xe0000002);put_f32(&mut bytes,0x3408,14.);put_f32(&mut bytes,0x341c,0.5);
+        std::fs::write(&path,&bytes).unwrap();let report=maps::inspect_map(&path,None).unwrap();
+        let door=report.objects.iter().find(|o|o.kind=="Machine").unwrap();assert_eq!(door.tag_id,Some(0xe0000002));assert_eq!(door.position,[14.,0.,0.]);assert_eq!(door.rotation,[0.,0.,0.5]);
+        assert!(!report.diagnostics.iter().any(|d|d.code=="LEGACY_PLACEMENT_CLASS"&&d.message.starts_with("Machine")));assert_eq!(std::fs::read(&path).unwrap(),bytes);
+        put_u32(&mut bytes,0x1000+0x294,5000);std::fs::write(&path,&bytes).unwrap();let report=maps::inspect_map(&path,None).unwrap();assert!(report.diagnostics.iter().any(|d|d.code=="SCENARIO_BLOCK"&&d.message.starts_with("Machine")));
+    }
+}
+#[test]
 fn sound_scenery_accepts_ssce_and_retains_real_cross_class_warnings() {
     let d = tempfile::tempdir().unwrap();
     let path = d.path().join("sound-scenery.map");

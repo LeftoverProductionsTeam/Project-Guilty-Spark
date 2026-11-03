@@ -1,6 +1,8 @@
 import { pointInsideWorkshop } from './bspWorkshop';
 import type { BuildRecord, OpenProject, RuntimeId, Vec3 } from './types';
 import type { EditorEnvironment } from './environment';
+import { removeLogicReferences } from './nativeLogic';
+import type { LogicTrigger, NativeLogicDocument, NativeLogicSource } from './nativeLogic';
 
 export type BrushKind = 'room' | 'box' | 'wall' | 'floor' | 'ramp' | 'stairs' | 'platform' | 'terrain' | 'caveTunnel';
 export type ForgeMode =
@@ -30,7 +32,7 @@ export interface ForgePlacement extends ForgeEntity {
   publishedAssetId?: string;
   tagId: number | null;
   tagPath: string;
-  tagClass: 'scen' | 'weap' | 'eqip' | 'vehi' | 'bipd' | 'itmc';
+  tagClass: 'scen' | 'weap' | 'eqip' | 'vehi' | 'bipd' | 'itmc' | 'mach';
   sourceProjectId: string | null;
   sourceSha256: string | null;
   rotation: Vec3;
@@ -58,6 +60,7 @@ export interface StudioNativeDocument { source: StudioNativeSource; fields: {id:
 export interface QuickForgeDocument {
   workshop?: import('./bspWorkshop').BspWorkshopSource;
   native?: StudioNativeDocument;
+  logic?: NativeLogicDocument;
   schemaVersion: number;
   name: string;
   template: string;
@@ -88,6 +91,7 @@ export interface GeometryIssue {
   triangleIndices: number[];
 }
 export interface GeometryReport {
+  logicPreview?:NativeLogicSource;
   valid: boolean;
   issues: GeometryIssue[];
   vertices: number;
@@ -127,6 +131,7 @@ export interface QuickForgeBuildReceipt {
   toolIdentities: Record<string, string>;
 }
 export type ForgeNode =
+  | { type: 'trigger'; value: LogicTrigger }
   | { type: 'brush'; value: ForgeBrush }
   | { type: 'placement'; value: ForgePlacement }
   | { type: 'spawn'; value: ForgeSpawn }
@@ -177,18 +182,20 @@ export function forgeNodes(doc: QuickForgeDocument): ForgeNode[] {
     ...doc.placements.map((value) => ({ type: 'placement' as const, value })),
     ...doc.spawns.map((value) => ({ type: 'spawn' as const, value })),
     ...doc.objectives.map((value) => ({ type: 'objective' as const, value })),
+    ...(doc.logic?.triggers??[]).map(value=>({type:'trigger' as const,value})),
   ];
 }
 export function nodeRotation(node: ForgeNode): Vec3 {
-  return node.type === 'brush' || node.type === 'placement' ? node.value.rotation : [0, 0, node.value.facing];
+  return node.type === 'brush' || node.type === 'placement' || node.type==='trigger' ? node.value.rotation : [0, 0, node.value.facing];
 }
 export function patchForgeNode(node: ForgeNode, patch: Partial<ForgeEntity> & { team?: number }): ForgeNode {
   // These fields are shared by all variants; team is excluded for geometry.
   const { team, ...common } = patch;
-  if (node.type === 'brush') return { ...node, value: { ...node.value, ...common } };
+  if (node.type === 'brush' || node.type==='trigger') return { ...node, value: { ...node.value, ...common } } as ForgeNode;
   return { ...node, value: { ...node.value, ...common, ...(team === undefined ? {} : { team }) } } as ForgeNode;
 }
 export function nodeCategory(node: ForgeNode): string {
+  if(node.type==='trigger')return 'Trigger volumes';
   return node.type === 'brush'
     ? 'Geometry'
     : node.type === 'spawn'
@@ -202,6 +209,7 @@ export function nodeCategory(node: ForgeNode): string {
             bipd: 'Characters',
             scen: 'Scenery',
             itmc: 'Item collections',
+            mach: 'Doors & devices',
           }[node.value.tagClass];
 }
 export function mapForgeNodes(
@@ -214,6 +222,7 @@ export function mapForgeNodes(
     placements: doc.placements.map((value) => update({ type: 'placement', value }).value as ForgePlacement),
     spawns: doc.spawns.map((value) => update({ type: 'spawn', value }).value as ForgeSpawn),
     objectives: doc.objectives.map((value) => update({ type: 'objective', value }).value as ForgeObjective),
+    ...(doc.logic?{logic:{...doc.logic,triggers:doc.logic.triggers.map(value=>update({type:'trigger',value}).value as LogicTrigger)}}:{}),
   };
 }
 export function transformForgeNode(
@@ -229,11 +238,13 @@ export function transformForgeNode(
     scale.some((n) => n <= 0)
   )
     throw new Error('Use finite transforms and positive dimensions within ±2048 world units.');
-  if (node.type === 'brush') {
+  if (node.type === 'brush' || node.type==='trigger') {
+    if (node.type === 'trigger' && (position.some(n => Math.abs(n) > 1500) || Math.abs(rotation[0]) > 0.00001 || Math.abs(rotation[1]) > 0.00001))
+      throw new Error('Native trigger volumes support yaw rotation within ±1500 world units.');
     const dimensions = node.value.dimensions.map((value, i) => value * scale[i]) as Vec3;
-    if (dimensions.some((n) => n < 0.1 || n > 512))
-      throw new Error('Brush dimensions must stay between 0.1 and 512 world units.');
-    return { ...node, value: { ...node.value, position, rotation, dimensions } };
+    if (dimensions.some((n) => n < 0.1 || n > (node.type==='trigger'?128:512)))
+      throw new Error(node.type === 'trigger' ? 'Trigger dimensions must stay between 0.1 and 128 world units.' : 'Brush dimensions must stay between 0.1 and 512 world units.');
+    return { ...node, value: { ...node.value, position, rotation, dimensions } } as ForgeNode;
   }
   if (node.type === 'placement') return { ...node, value: { ...node.value, position, rotation } };
   if (node.type === 'spawn') return { ...node, value: { ...node.value, position, facing: rotation[2] } };
@@ -241,12 +252,14 @@ export function transformForgeNode(
 }
 export function removeForgeNodes(doc: QuickForgeDocument, ids: string[]): QuickForgeDocument {
   const keep = (value: ForgeEntity) => value.locked || !ids.includes(value.id);
+  const removed=new Set(forgeNodes(doc).filter(n=>!keep(n.value)).map(n=>n.value.id));
   return {
     ...doc,
     geometry: doc.geometry.filter(keep),
     placements: doc.placements.filter(keep),
     spawns: doc.spawns.filter(keep),
     objectives: doc.objectives.filter(keep),
+    ...(doc.logic?{logic:removeLogicReferences(doc,removed)}:{}),
   };
 }
 export function duplicateForgeNodes(
@@ -270,7 +283,8 @@ export function appendForgeNodes(doc:QuickForgeDocument,nodes:ForgeNode[],offset
     if (copy.type === 'brush') result.geometry.push(copy.value);
     else if (copy.type === 'placement') result.placements.push(copy.value);
     else if (copy.type === 'spawn') result.spawns.push(copy.value);
-    else result.objectives.push(copy.value);
+    else if(copy.type==='objective') result.objectives.push(copy.value);
+    else {result.logic??={schemaVersion:1,triggers:[],devices:[],rules:[]};result.logic.triggers.push(copy.value);}
   }
   return { document: result, ids: created };
 }
@@ -311,7 +325,7 @@ export function createBrush(kind: BrushKind, point: Vec3, materialId: string): F
 export function catalogAssets(open: OpenProject): ForgeAsset[] {
   if (!open.inspection || !open.project.source) return [];
   return open.inspection.tags
-    .filter((tag) => ['scen', 'weap', 'eqip', 'vehi', 'bipd', 'itmc'].includes(tag.class))
+    .filter((tag) => ['scen', 'weap', 'eqip', 'vehi', 'bipd', 'itmc', 'mach'].includes(tag.class))
     .map((tag) => ({
       key: `${open.project.id}:${tag.id}`,
       tagId: tag.id,

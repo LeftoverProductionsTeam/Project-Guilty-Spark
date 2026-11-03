@@ -168,6 +168,7 @@ pub mod bsp_audio;
 pub mod custom_sounds;
 
 pub mod native_asset_imports;
+pub mod native_logic;
 
 /// Stable lowercase byte encoding for persisted identities. Keep this separate
 /// from a digest library's output wrapper so upgrades cannot change receipts.

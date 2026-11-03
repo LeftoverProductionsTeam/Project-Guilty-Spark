@@ -653,6 +653,7 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         (0x240, 0x24c, 120, "Vehicle"),
         (0x258, 0x264, 40, "Equipment"),
         (0x270, 0x27c, 92, "Weapon"),
+        (0x294, 0x2a0, 64, "Machine"),
         (0x2dc, 0x2e8, 40, "Sound scenery"),
     ] {
         match placements(
@@ -1283,6 +1284,7 @@ fn placements(
             "Vehicle" => "vehi",
             "Equipment" => "eqip",
             "Weapon" => "weap",
+            "Machine" => "mach",
             "Sound scenery" => "ssce",
             _ => "",
         };

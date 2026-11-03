@@ -215,6 +215,55 @@ pub(super) fn working_source(
     }
     Ok(path)
 }
+
+/// QuickForge parents predate working-tags hash manifests. An accepted handoff
+/// already owns a full immutable starting inventory; verify that exact copy
+/// against the validated parent's tags before using changed-file validation.
+/// Never turn the current edited tree into its own trusted baseline.
+fn quickforge_compilation_baseline(
+    state: &AppState,
+    project: &Project,
+    build: &BuildRecord,
+    parent: &Path,
+    source: &Path,
+) -> Reply<Option<(transaction::Inventory, PathBuf)>> {
+    let receipt_path = parent.join("quickforge-receipt.json");
+    if !receipt_path.is_file() { return Ok(None); }
+    let active: Option<ActiveSource> = lock(&state.library)?.setting(&source_key(&project.id)).map_err(error)?;
+    let Some(active) = active else { return Ok(None); };
+    let fingerprint = project.fingerprint().map_err(error)?;
+    if active.project_id != project.id || active.parent_build_id != build.id || active.fingerprint != fingerprint {
+        return Err("Accepted native source belongs to a different project revision".into());
+    }
+    let history: Vec<SessionSummary> = lock(&state.library)?.setting(&history_key(&project.id)).map_err(error)?;
+    if history.len() > 32 { return Err("Native handoff history exceeds its supported bound".into()); }
+    let known = history.iter().find(|item| item.id == active.session_id)
+        .ok_or("Accepted native source has no recorded handoff ownership")?;
+    let session = load(state, &active.session_id, &known.owner, &project.id)?;
+    if session.parent_build_id != build.id || session.fingerprint != fingerprint || !session.revisions.contains(&active.revision_id) {
+        return Err("Accepted native source does not match its starting handoff".into());
+    }
+    let selected = working_source(state, project, &build.id, &parent.join("workspace/tags"))?;
+    if fs::canonicalize(selected).map_err(error)? != source {
+        return Err("Only the selected accepted native revision may reuse its starting inventory".into());
+    }
+    core::reject_links(&receipt_path).map_err(error)?;
+    let receipt: core::forge_build::QuickForgeBuildReceipt =
+        serde_json::from_slice(&bounded_read(&receipt_path, 4 * 1024 * 1024)?).map_err(error)?;
+    if receipt.schema_version != 1 || receipt.job_id != build.id || receipt.project_id != project.id
+        || receipt.project_fingerprint != fingerprint || receipt.status != "validated"
+        || receipt.build.as_ref().is_none_or(|record| record.id != build.id || record.sha256 != build.sha256
+            || record.project_fingerprint != fingerprint || record.status != "validated") {
+        return Err("QuickForge parent receipt no longer proves the starting native revision".into());
+    }
+    let workspace = receipt.sources.ok_or("QuickForge parent source is unavailable")?.directory;
+    core::reject_links(&workspace).map_err(error)?;
+    let workspace = fs::canonicalize(workspace).map_err(error)?;
+    if !workspace.starts_with(parent) { return Err("QuickForge starting source escaped its validated job".into()); }
+    let preserved = root(state, &session.id)?.join("baseline");
+    let baseline = transaction::verified_starting_inventory(&preserved, &workspace.join("tags"), &session.initial_baseline).map_err(error)?;
+    Ok(Some((baseline, preserved)))
+}
 /// Preserve the core compiler's parent-job containment boundary. Accepted
 /// external revisions are copied into a fresh input below that validated job,
 /// rather than making SDK or arbitrary cross-job folders compiler inputs.
@@ -231,7 +280,12 @@ pub(super) fn compilation_source(
     let parent = fs::canonicalize(&parent).map_err(error)?;
     core::reject_links(tags).map_err(error)?;
     let source = fs::canonicalize(tags).map_err(error)?;
-    let baseline = working_tag_changes_native::baseline(&parent)?.unwrap_or_default();
+    let recorded = working_tag_changes_native::baseline(&parent)?;
+    let (baseline, starting) = if let Some(recorded) = recorded {
+        (recorded, None)
+    } else if let Some((verified, preserved)) = quickforge_compilation_baseline(state, project, build, &parent, &source)? {
+        (verified, Some(preserved))
+    } else { (Default::default(), None) };
     let current = transaction::inventory(&source).map_err(error)?;
     let mut health = core::native_tag_integrity::Cache::default()
         .scan(&source, &baseline, &current, u64::MAX)
@@ -240,7 +294,7 @@ pub(super) fn compilation_source(
         state,
         project,
         &source,
-        None,
+        starting.as_ref().map(|path| (path.as_path(), &baseline)),
         &baseline,
         &current,
         &mut health,

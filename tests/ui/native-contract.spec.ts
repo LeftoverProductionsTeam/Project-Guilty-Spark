@@ -2,6 +2,50 @@ import {chooseTool,openDrawer} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
 import { test, expect, type Page } from '@playwright/test';
 
+test('C63 dropped trigger exposes door setup and preserves one-action history and immediate Save',async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic door setup',template:'customBlank',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],spawns:[],objectives:[],placements:[{id:'door',name:'Corridor door',tagClass:'mach',tagPath:'levels/a10/devices/doors/door small/door small',tagId:null,sourceProjectId:null,sourceSha256:null,position:[4,0,0],rotation:[0,0,0],team:0,respawnSeconds:0,visible:true,locked:false}]})));
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');await openDrawer(page,'Asset library');
+  const library=page.getByRole('region',{name:'Asset library panel',exact:true});
+  await library.getByRole('combobox',{name:'Asset library type',exact:true}).selectOption('doors');
+  await expect(library).toContainText('campaign map such as a10');
+  await library.getByRole('button',{name:'Trigger volume',exact:true}).click();
+  const inspector=page.getByRole('region',{name:'Inspector panel',exact:true});
+  await expect(inspector.getByRole('spinbutton',{name:'Trigger width',exact:true})).toHaveValue('3');
+  await expect(inspector.locator('.forge-logic-events')).toHaveAttribute('open','');
+  await expect(inspector.getByRole('combobox',{name:'Logic target device',exact:true})).toHaveValue('door');
+  await inspector.getByRole('button',{name:'Cover both sides',exact:true}).click();
+  await expect(inspector.getByRole('spinbutton',{name:'Trigger width',exact:true})).toHaveValue('6');
+  await inspector.getByRole('button',{name:'Enter → Open',exact:true}).click();await page.keyboard.press('Control+s');
+  const saved=()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge);
+  await expect.poll(async()=>(await saved())?.logic.rules.length).toBe(1);
+  await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');
+  await expect.poll(async()=>(await saved())?.logic.rules.length).toBe(0);
+  await page.keyboard.press('Control+y');await page.keyboard.press('Control+s');
+  await expect.poll(async()=>(await saved())?.logic.rules.length).toBe(1);
+  const width=inspector.getByRole('spinbutton',{name:'Trigger width',exact:true});await width.fill('4');await width.press('Tab');await page.keyboard.press('Control+s');
+  await expect.poll(async()=>(await saved())?.logic.triggers[0].dimensions[0]).toBe(4);
+  await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');
+  await expect.poll(async()=>(await saved())?.logic.triggers[0].dimensions[0]).toBe(6);
+  expect((await saved()).logic.rules[0]).toMatchObject({once:false,event:{kind:'enter'},actions:[{kind:'devicePosition',targetId:'door',value:1}]});
+});
+
+test('C63 immediate Undo then Save in one frame saves the undone revision',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  const field=page.getByLabel('Velocity',{exact:true});await field.fill('31');await field.press('Tab');
+  await page.evaluate(()=>{
+    const w=window as any;w.__sparkMock.calls.length=0;
+    const input=document.querySelector<HTMLInputElement>('input[aria-label="Velocity"]')!;
+    const original=window.requestAnimationFrame,queue:FrameRequestCallback[]=[];
+    window.requestAnimationFrame=callback=>{queue.push(callback);return 0;};
+    try{
+      input.focus();input.dispatchEvent(new KeyboardEvent('keydown',{key:'z',ctrlKey:true,bubbles:true,cancelable:true}));
+      document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'s',ctrlKey:true,bubbles:true,cancelable:true}));
+    }finally{window.requestAnimationFrame=original;}
+    for(const callback of queue)callback(performance.now());
+  });
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((c:any)=>c.command==='save_project')?.args.project.tagEdits)).toEqual([]);
+});
+
 test('C61 build notifications use source-bound metadata and retain unsaved edits without reopening map buffers',async({page})=>{
   await mockDesktop(page);await openFixture(page);const field=page.getByLabel('Velocity',{exact:true});await field.fill('39');await field.press('Tab');
   await page.evaluate(()=>{const m=(window as any).__sparkMock;m.calls.length=0;m.emit('spark:library-changed');});
@@ -1111,13 +1155,18 @@ test('a second map window receives a shared listing refresh without another HTTP
 test('runtime dock remembers each map target and rejects a late tool preview from another map', async ({page}) => {
   await mockDesktop(page); await openFixture(page);
   const dock = page.getByRole('contentinfo', {name:'Runtime & Tools Dock'});
-  await dock.getByRole('combobox', {name:'Active map runtime'}).selectOption('openCe');
+  const runtime=page.getByRole('combobox', {name:'Active Halo runtime'});
+  await expect(dock.getByRole('combobox')).toHaveCount(0);
+  await runtime.selectOption('openCe');
   await chooseTool(page,"Map library");
   await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();
-  await expect(dock.getByRole('combobox',{name:'Active map runtime'})).toHaveValue('mccSteam');
+  // The header also remembers the default for a newly opened map. Give this
+  // second map its own explicit target, then verify both map choices persist.
+  await expect(runtime).toHaveValue('openCe');
+  await runtime.selectOption('mccSteam');
   await page.getByRole('tab',{name:/Synthetic baseline/}).click();
-  await expect(dock.getByRole('combobox',{name:'Active map runtime'})).toHaveValue('openCe');
-  await dock.getByRole('combobox',{name:'Active map runtime'}).selectOption('mccSteam');
+  await expect(runtime).toHaveValue('openCe');
+  await runtime.selectOption('mccSteam');
   await page.evaluate(() => {
     const w=window as any, original=w.__TAURI_INTERNALS__.invoke;
     w.__TAURI_INTERNALS__.invoke=async(command:string,args:any) => {
@@ -1736,8 +1785,16 @@ test('onboarding keeps four primary runtimes and does not inherit MCC guidance f
   await page.goto('/?workspace=get-started');
   const choices = page.getByRole('group',{name:'Your Halo edition',exact:true});
   await expect(choices.getByRole('button')).toHaveCount(4);
-  for (const name of ['Halo CE in MCC','Halo Custom Edition','OpenCE','ChupathingyCE'])
-    await expect(choices.getByRole('button',{name:new RegExp(name)})).toBeVisible();
+  for (const name of ['Halo CE in MCC','Halo Custom Edition','OpenCE','ChupathingyCE']) {
+    const card=choices.getByRole('button',{name:new RegExp(name)});
+    await expect(card).toBeVisible();
+    await expect(card.locator('.gs-halo-emblem svg')).toHaveCount(1);
+    await expect(card.locator('.gs-halo-best-for')).toContainText('Best for');
+    await expect(card.getByLabel('Runtime features')).toBeVisible();
+    await expect(card.locator('.gs-halo-status')).toBeVisible();
+  }
+  await expect(choices).not.toContainText('compatibility evidence');
+  await expect(choices).not.toContainText('Register this separately');
   await choices.getByRole('button',{name:/Halo Custom Edition/}).click();
   await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
   await expect(page.getByRole('combobox',{name:'Setup editing kit generation',exact:true})).toHaveValue('h1aEk');
@@ -2259,7 +2316,7 @@ test('connected thread-release faults disable object, sprint and camera writes w
   await expect(page.getByRole('button',{name:'Toggle in-game third person',exact:true})).toBeDisabled();
   await page.locator('.native-sprint-controls>summary').click();await expect(page.getByRole('button',{name:'Enable native sprint',exact:true})).toBeDisabled();
   await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');await expect(page.getByRole('button',{name:'Apply live object position',exact:true})).toBeDisabled();
-  await page.getByRole('combobox',{name:'Active map runtime',exact:true}).selectOption('openCe');
+  await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption('openCe');
   await expect(page.getByText('This connection remains bound to MCC.',{exact:false})).toBeVisible();
   const release=page.getByRole('button',{name:'Retry thread release & disconnect',exact:true});await release.click();await expect(page.getByText('Synthetic thread release still incomplete',{exact:false})).toBeVisible();await expect(release).toBeEnabled();
   await page.evaluate(()=>{(window as any).__threadRelease.fail=false;});await release.click();await expect(page.getByText('Synthetic owned thread release acknowledged and temporary data restored.',{exact:true})).toBeVisible();
@@ -2277,11 +2334,11 @@ test('selecting a non-MCC game never enables the MCC connect operation',async({p
   const connect=page.getByRole('button',{name:'Connect current Halo 1 session',exact:true});
   await expect(connect).toBeEnabled();
   for(const runtime of ['haloCustomEdition','openCe','chupathingyCe']){
-    await page.getByRole('combobox',{name:'Active map runtime',exact:true}).selectOption(runtime);
+    await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption(runtime);
     await expect(connect).toBeDisabled();await expect(consent).toBeDisabled();
     await expect(page.getByText('This runtime has no validated Spark Live Link write adapter.',{exact:false})).toBeVisible();
   }
-  await page.getByRole('combobox',{name:'Active map runtime',exact:true}).selectOption('mccSteam');
+  await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption('mccSteam');
   await expect(connect).toBeEnabled();
 });
 

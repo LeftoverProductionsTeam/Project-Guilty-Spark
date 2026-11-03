@@ -413,7 +413,7 @@ impl Runner<'_> {
         // staged BSP must not be treated as safe to terminate mid-write.
         // A requested cancellation/soft timeout is honored *between* write
         // phases, after the current native process exits by itself.
-        let protected_write_phase = matches!(phase, "structure" | "lightmaps" | "scenario" | "bsp-structure" | "bsp-lightmaps");
+        let protected_write_phase = matches!(phase, "structure" | "lightmaps" | "scenario" | "bsp-structure" | "bsp-lightmaps" | "logic-names" | "logic-scenario" | "logic-script");
         let mut deferred_cancel = false;
         let mut deferred_timeout = false;
         let mut output = String::new();

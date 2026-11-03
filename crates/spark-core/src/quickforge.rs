@@ -33,6 +33,8 @@ pub struct QuickForgeDocument {
     pub workshop: Option<crate::bsp_workshop::Workshop>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native: Option<crate::studio_native::Document>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logic: Option<crate::native_logic::Document>,
     pub schema_version: u32,
     pub name: String,
     pub template: String,
@@ -222,6 +224,8 @@ pub struct GeometryIssue {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeometryReport {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logic_preview: Option<crate::native_logic::Source>,
     pub valid: bool,
     pub issues: Vec<GeometryIssue>,
     pub vertices: usize,
@@ -424,6 +428,7 @@ pub fn validate_portable_document(doc: &QuickForgeDocument) -> Result<()> {
 fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<()> {
     crate::bsp_workshop::validate_source(doc)?;
     crate::studio_native::validate(doc)?;
+    crate::native_logic::validate(doc)?;
     if doc.schema_version != SCHEMA_VERSION
         || doc.name.trim().is_empty()
         || doc.name.len() > 100
@@ -509,7 +514,7 @@ fn validate_document_scope(doc: &QuickForgeDocument, portable: bool) -> Result<(
         {
             return invalid("Asset tag paths must omit the tag class extension");
         }
-        if !["scen", "weap", "eqip", "vehi", "bipd", "itmc"].contains(&p.tag_class.as_str())
+        if !["scen", "weap", "eqip", "vehi", "bipd", "itmc", "mach"].contains(&p.tag_class.as_str())
             || !finite(&p.position)
             || !finite(&p.rotation)
             || !(-1..=15).contains(&p.team)
@@ -577,6 +582,7 @@ pub fn create_arena(name: &str, template: &str) -> Result<QuickForgeDocument> {
     let mut doc = QuickForgeDocument {
         workshop: None,
         native: None,
+        logic: None,
         schema_version: 1,
         name: name.into(),
         template: template.into(),
@@ -1396,6 +1402,7 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<GeometryReport> {
         r.issues.extend(netgame_flag_issues(doc));
         r.issues.extend(scenario_issues(doc));
         r.valid=!r.issues.iter().any(|i|i.severity=="error");
+        r.logic_preview=crate::native_logic::generate(doc)?;
         return Ok(r);
     }
     let mesh = preview_mesh(doc)?;
@@ -1549,6 +1556,7 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<GeometryReport> {
     }
     let components=roots.iter().collect::<std::collections::BTreeSet<_>>().len();
     Ok(GeometryReport {
+        logic_preview: crate::native_logic::generate(doc)?,
         valid,
         issues,
         vertices: mesh.positions.len() / 3,
@@ -1646,6 +1654,7 @@ fn class_extension(class: &str) -> Result<&'static str> {
         "vehi" => Ok("vehicle"),
         "bipd" => Ok("biped"),
         "itmc" => Ok("item_collection"),
+        "mach" => Ok("device_machine"),
         _ => invalid("Unsupported scenario asset class"),
     }
 }
@@ -1821,7 +1830,7 @@ pub fn scenario_commands(doc: &QuickForgeDocument) -> Result<Vec<ForgeCommand>> 
             add_set(&mut args, format!("{prefix}.item_collection"), collection);
             edit_command(&mut commands, &scenario_tag, args);
         } else {
-            let (array,palette)=match p.tag_class.as_str(){"scen"=>("scenery","scenery_palette"),"vehi"=>("vehicles","vehicle_palette"),"bipd"=>("bipeds","biped_palette"),"weap"=>("weapons","weapon_palette"),"eqip"=>("equipment","equipment_palette"),_=>return invalid("Campaign item_collection placement needs an encounter/equipment translation that is not implemented")};
+            let (array,palette)=match p.tag_class.as_str(){"scen"=>("scenery","scenery_palette"),"vehi"=>("vehicles","vehicle_palette"),"bipd"=>("bipeds","biped_palette"),"weap"=>("weapons","weapon_palette"),"eqip"=>("equipment","equipment_palette"),"mach"=>("machines","machine_palette"),_=>return invalid("Campaign item_collection placement needs an encounter/equipment translation that is not implemented")};
             let index = *palette_counts.entry(array).or_default();
             *palette_counts.get_mut(array).unwrap() += 1;
             let mut args = vec![
@@ -1836,6 +1845,10 @@ pub fn scenario_commands(doc: &QuickForgeDocument) -> Result<Vec<ForgeCommand>> 
             ];
             add_set(&mut args, format!("{palette}[{index}].name"), reference);
             let prefix = format!("{array}[{index}]");
+            if p.tag_class == "mach" {
+                add_set(&mut args, format!("{prefix}.power_group"), "-1");
+                add_set(&mut args, format!("{prefix}.position_group"), "-1");
+            }
             add_set(&mut args, format!("{prefix}.type"), index.to_string());
             add_set(&mut args, format!("{prefix}.name"), "-1");
             add_set(&mut args, format!("{prefix}.position"), vector(p.position));
@@ -1867,6 +1880,7 @@ pub fn scenario_commands(doc: &QuickForgeDocument) -> Result<Vec<ForgeCommand>> 
             edit_command(&mut commands, &scenario_tag, args);
         }
     }
+    commands.extend(crate::native_logic::scenario_commands(doc, &scenario)?);
     for (i, o) in doc.objectives.iter().enumerate() {
         let mut args = vec![
             "-I".into(),
@@ -2061,6 +2075,7 @@ pub fn export_sources(doc: &QuickForgeDocument, output: &Path) -> Result<SourceE
         atomic_write(&staged_jms,jms.as_bytes(),false)?;
         atomic_write(&staged_commands,&serde_json::to_vec_pretty(&export.commands)?,false)?;
         atomic_write(&staged_environment,&serde_json::to_vec_pretty(&environment_intent)?,false)?;
+        crate::native_logic::export(doc,&staging,&export.scenario_path)?;
         atomic_write(&staging.join("source-export.json"),&serde_json::to_vec_pretty(&export)?,false)?;
         let roundtrip: QuickForgeDocument=serde_json::from_slice(&fs::read(&staged_doc)?)?;
         if roundtrip!=*doc || maps::hash_file(&staged_jms)?!=export.jms_sha256 {

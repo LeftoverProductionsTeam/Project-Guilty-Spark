@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "continuation": "C63",
+  "baseCommit": "9d03f10c86f43e0ebf26a2c2b2adde8a42ecb1ae",
+  "branch": "master",
+  "complete": true,
+  "scope": "Native door authoring and H1A Standalone two-way acceptance; existing external-source reconciliation preserved",
+  "privateEvidenceRoot": ".local/c63-universal-halo-20261103",
+  "developmentApp": {
+    "sha256": "ba0a8b565a0b87dda10f41eb0f4132305b724cfd95e8a4b57e444f354e88463e",
+    "relativePath": ".local/c63-universal-halo-20261103/validation-target/debug/GuiltySpark.exe",
+    "installer": false
+  },
+  "humanGameplay": {
+    "schemaVersion": 1,
+    "recordedAt": "2026-11-03T21:41:34.4905412Z",
+    "buildId": "2785b92d-63c3-4995-a0c2-2ff250c704c4",
+    "projectFingerprint": "9d06a485defe15a173b6ea3da52801a2449ebdc037ff6a785c19edbf5e40f52a",
+    "cacheSha256": "4fc40e656e24cc9ca7461325c0290ef93cf95f63c3a6d69af4bd4efddfb3f99e",
+    "humanReport": "Opens both ways; crossed and returned; closed normally",
+    "entryOpenedDoor": true,
+    "outboundPassage": true,
+    "doorClosedBeforeReturn": true,
+    "returnPassage": true,
+    "accepted": true,
+    "runtime": "Halo 1 MCC Editing Kit Standalone (loose tags from this exact build)",
+    "retailMccCacheLoadVerified": false,
+    "normalWrapperExitCode": 0,
+    "standaloneProcessId": 18332,
+    "debugOverlay": "native debug_trigger_volumes, not authored geometry",
+    "stockDoorSha256": "7ba01243af80e594f284992b39b4125095e39e7f4c702c8c87674b6c19fabdf8",
+    "nativeDoorTagChanged": false,
+    "earlierFailuresPreserved": [
+      "door-playtest-failed.json",
+      "door-corrected-playtest-result.json"
+    ]
+  },
+  "independentReadback": {
+    "schemaVersion": 1,
+    "accepted": true,
+    "cacheSha256": "4fc40e656e24cc9ca7461325c0290ef93cf95f63c3a6d69af4bd4efddfb3f99e",
+    "projectFingerprint": "9d06a485defe15a173b6ea3da52801a2449ebdc037ff6a785c19edbf5e40f52a",
+    "extractorSha256": "ded684bc2730b836719071dcdc505a78e5dca3730f19e9a30527ac725180c138",
+    "editorSha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+    "scope": "Independent native cache extraction and native tag-editor readback; gameplay is recorded separately.",
+    "cacheUnchanged": true,
+    "values": {
+      "object_names.count": "1",
+      "machines.count": "1",
+      "machine_palette.count": "1",
+      "trigger_volumes.count": "1",
+      "scripts.count": "2",
+      "globals.count": "1",
+      "object_names[0].name": "gs_obj_4d20b359d6db",
+      "machines[0].name": "0",
+      "machines[0].position": "14.000000,0.000000,0.000000",
+      "machines[0].rotation": "0.000000,-0.000000,0.000000",
+      "machines[0].power_group": "65535",
+      "machines[0].position_group": "65535",
+      "machine_palette[0].name": "levels\\a10\\devices\\doors\\door small\\door small.device_machine",
+      "machines[0].machine_flags.does_not_operate_automatically": "1",
+      "trigger_volumes[0].type": "rotational",
+      "trigger_volumes[0].name": "gs_tv_a25613be680e",
+      "trigger_volumes[0].starting_corner": "11.000000,-1.500000,0.000000",
+      "trigger_volumes[0].ending_corner_offset": "6.000000,3.000000,3.000000",
+      "trigger_volumes[0].rotation_vector_forward": "1.000000,0.000000,0.000000",
+      "trigger_volumes[0].rotation_vector_up": "0.000000,0.000000,1.000000",
+      "scripts[0].name": "gs_logic_init",
+      "scripts[1].name": "gs_evt_c32b4f96bd58",
+      "door.bounding_radius": "0.900000",
+      "scripts[0].script_type": "startup",
+      "scripts[1].script_type": "continuous"
+    }
+  },
+  "nativeAuthoring": {
+    "actualIpc": true,
+    "mockedIpc": false,
+    "appSha256": "412210178af810797dc8f9bb6804bf717a1e48c4aa2fc601aaa6c49b090bb767",
+    "doorPointerDrop": true,
+    "triggerPointerDrop": true,
+    "recursiveNativeImport": true,
+    "oneActionUndoRedo": true,
+    "immediateUndoSaveAndReopen": true,
+    "nativeBuildId": "b29909c6-bf23-4f0d-88bd-36add584dbc1",
+    "cacheSha256": "8358ef30b169c5d540dc46fad1a917401bc574eb2a2c20f634c3366bd56952fb",
+    "buildAcceptanceMs": 271323.00009999995
+  },
+  "externalEdit": {
+    "tool": "Actual installed Invader CLI through production Baboon handoff/reconciliation",
+    "externalChecksAppSha256": "412210178af810797dc8f9bb6804bf717a1e48c4aa2fc601aaa6c49b090bb767",
+    "buildAppSha256": "ba0a8b565a0b87dda10f41eb0f4132305b724cfd95e8a4b57e444f354e88463e",
+    "postFixCorruptionRetest": {
+      "rejected": true,
+      "elapsedMs": 37919.754700000005
+    },
+    "baboonGuiEdited": false,
+    "nativeNoOp": {
+      "semanticIdentity": true,
+      "byteIdentical": true,
+      "scope": "Actual Invader same-field save; a harmless rewrite is not classified as semantic corruption."
+    },
+    "corruptionInjectedBy": "QA fixture, not Baboon or Invader",
+    "invalidDetectionMs": 26744.442200000005,
+    "reconcileRejectedInvalidSave": true,
+    "restoredOriginalBeforeSemanticEdit": true,
+    "writerConfidence": "unknown",
+    "semanticDifferences": [
+      {
+        "before": "bounding_radius (0.900000)                                              float32",
+        "after": "bounding_radius (0.500000)                                              float32"
+      }
+    ],
+    "validDetectionMs": 26376.11189999999,
+    "acceptedRevision": "dcccd9ae-7619-405c-863b-fa71396b77da",
+    "startingTagFilesVerified": 11564,
+    "regenerationGuardRetained": true,
+    "compiledBoundingRadius": 0.5,
+    "nativeBuild": {
+      "id": "028ae591-6fec-4f15-aacd-7546e2d5f92e",
+      "target": "mcc-cea",
+      "status": "validated",
+      "sha256": "3504cd8f59ed31279c10d4907b20d4bdb499fce3e511d8039d573d80c8e0153b",
+      "projectFingerprint": "4b2963768910833de1d40911f855a5c55f58f4760e18717c8b4c39a07873440e"
+    },
+    "nativeBuildMs": 866398.8753,
+    "originalLogicScriptNamesRetained": [
+      "gs_logic_init",
+      "gs_evt_b9b2bf499f11"
+    ],
+    "validExternalBytesRetained": true,
+    "parentCacheUnchanged": true,
+    "readbackInSeparateLibrary": true,
+    "readbackAppSha256": "f45610e9b8c2c8b44e4891a1a324cb620a3c09063d7383f102263d558eb2cb14",
+    "sourceProjectWritten": false,
+    "gameplayOfExternalRevisionTested": false
+  },
+  "regressions": {
+    "rustPassed": 676,
+    "rustOptInIgnored": 8,
+    "rustSuites": 45,
+    "frontendPassed": 371,
+    "frontendFiles": 88,
+    "browserPassed": 159,
+    "offlineProgramsPassed": 59,
+    "typescript": "passed",
+    "viteEmbeddedBuild": "passed",
+    "finalExampleCheck": "passed",
+    "initialBrowserRun": "158 passed, one 30-second Web Audio evaluation timeout; preserved unchanged.",
+    "isolatedAudioRerun": "passed",
+    "fullSerialBrowserRerun": "159 passed"
+  },
+  "ledger": {
+    "priorRows": 472,
+    "totalRows": 475,
+    "priorBytes": 1001461,
+    "priorSha256": "aad57672fe87c3cd2077df325b18d353ddf573a0c73b7f7940142b2403794c51",
+    "priorBytePrefixUnchanged": true
+  },
+  "protectedReleases": {
+    "schemaVersion": 1,
+    "verified": true,
+    "files": [
+      {
+        "name": "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe",
+        "sha256": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749"
+      },
+      {
+        "name": "Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip",
+        "sha256": "ff6c9e4dea48126680c2a9b8536dfb2185fab5ac445c7d4f306b9bed52e07069"
+      },
+      {
+        "name": "Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip",
+        "sha256": "c6ea81b25bfae352d76df58557a82daef44b72ba11bf778d0e2eee9f56ae03f0"
+      },
+      {
+        "name": "Project_Guilty_Spark_0.4.1_windows_x64_manifest.json",
+        "sha256": "c00f7afc9b1d57963bbe0234ef4c3c992a574136a27cbf34dca83354fe2a0b52"
+      }
+    ],
+    "C62EmbeddedSha256": "861c7835afda103769f16d0c0c6371bb684089183b5cefaf7045e081b7851fd9",
+    "C61ReleaseSha256": "d5aa90b439e7663315b213156ced095f5d3e9b5b09917534f400f7683ed9f5d9"
+  },
+  "remainingGates": [
+    "Retail MCC packaged-cache load",
+    "Other-runtime/device/event gameplay",
+    "Complete cryo-glass and renderer parity",
+    "Manual Baboon GUI edited save in this continuation",
+    "Structural compiled-map editing",
+    "Megaworld returned traversal",
+    "Full game-peer AI and human Firefight",
+    "Separate-computer SparkLink"
+  ],
+  "remotePushOrPublication": false
+}

@@ -61,6 +61,10 @@ fn workshop_playtest_scenario(document:&quickforge::QuickForgeDocument,receipt_p
 /// This verifies the source/build identities but does not certify player movement.
 #[cfg(windows)]
 pub fn workshop_playtest(receipt:&QuickForgeBuildReceipt,kit:&Path)->Result<()> {
+    workshop_playtest_with_debug(receipt,kit,false)
+}
+#[cfg(windows)]
+pub fn workshop_playtest_with_debug(receipt:&QuickForgeBuildReceipt,kit:&Path,debug:bool)->Result<()> {
     if receipt.status!="validated" {return invalid("Only a validated native Workshop build can be playtested");}
     let sources=receipt.sources.as_ref().ok_or_else(||SparkError::Invalid("Missing source receipt".into()))?;
     let build=receipt.build.as_ref().ok_or_else(||SparkError::Invalid("Missing native build receipt".into()))?;
@@ -72,7 +76,8 @@ pub fn workshop_playtest(receipt:&QuickForgeBuildReceipt,kit:&Path)->Result<()> 
     let exe=kit.join("halo_tag_test.exe");crate::reject_links(&exe)?;
     let alias=crate::native_workspace::Alias::new(&sources.directory)?;
     let init_name=format!("spark-workshop-{}.txt",uuid::Uuid::new_v4());
-    project::atomic_write(&sources.directory.join(&init_name),format!("game_variant slayer\r\nmap_name \"{}\"\r\n",scenario).as_bytes(),false)?;
+    let debug_commands=if debug {"debug_trigger_volumes true\r\ndebug_scripting true\r\n"}else{""};
+    project::atomic_write(&sources.directory.join(&init_name),format!("game_variant slayer\r\nmap_name \"{}\"\r\n{}",scenario,debug_commands).as_bytes(),false)?;
     let mut command=std::process::Command::new(exe);
     command.current_dir(kit).args(["-window","-vidmode","1280,720","-tags_dir"]).arg(alias.path().join("tags")).arg("-data_dir").arg(alias.path().join("data")).arg("-exec").arg(alias.path().join(init_name));
     use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);
@@ -109,7 +114,7 @@ fn target(runtime: RuntimeId)->Result<(&'static str,u32)> {
     }
 }
 pub fn dependency_path(root:&Path,path:&str,class:&str)->Result<PathBuf> {
-    let extension=match class {"senv"|"shader_environment"=>"shader_environment","soso"|"shader_model"=>"shader_model","sky "|"sky"=>"sky","weap"|"weapon"=>"weapon","eqip"|"equipment"=>"equipment","itmc"|"item_collection"=>"item_collection","vehi"|"vehicle"=>"vehicle","scen"|"scenery"=>"scenery","actv"|"actor_variant"=>"actor_variant","bipd"|"biped"=>"biped",_=>return invalid(format!("Unsupported build dependency class {class}"))};
+    let extension=match class {"senv"|"shader_environment"=>"shader_environment","soso"|"shader_model"=>"shader_model","sky "|"sky"=>"sky","weap"|"weapon"=>"weapon","eqip"|"equipment"=>"equipment","itmc"|"item_collection"=>"item_collection","vehi"|"vehicle"=>"vehicle","scen"|"scenery"=>"scenery","actv"|"actor_variant"=>"actor_variant","bipd"|"biped"=>"biped","mach"|"device_machine"=>"device_machine",_=>return invalid(format!("Unsupported build dependency class {class}"))};
     let file=root.join(safe_relative(&format!("{path}.{extension}"))?);
     crate::reject_links(&file)?;
     Ok(file)
@@ -265,6 +270,7 @@ pub fn run_prepared_job(
         let tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
         if tags.as_ref().is_none_or(|p|!p.is_dir()){receipt.blockers.push("Legal editable base tags are missing. Select the extracted HCEEK tags folder in Settings.".into());}
         for name in ["invader-edit","invader-build","invader-info"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
+        if document.logic.is_some()&&invader(tools,"invader-script").is_none(){receipt.blockers.push("Logic / Events requires invader-script in the selected Invader folder before staging native sources".into());}
         let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
         let imported=crate::native_asset_imports::available_files(import_root,project)?;
         if let Some(tags)=tags.as_ref().filter(|p|p.is_dir()) {
@@ -282,6 +288,7 @@ pub fn run_prepared_job(
         if !receipt.blockers.is_empty(){receipt.status="blocked".into();return Ok(());}
         let (engine,version)=engine.unwrap(); let tool=tool.unwrap();
         let mut executables=vec![("haloTool",tool.clone()),("invaderEdit",invader(tools,"invader-edit").unwrap()),("invaderInfo",invader(tools,"invader-info").unwrap())];
+        if document.logic.is_some(){executables.push(("invaderScript",invader(tools,"invader-script").unwrap()));}
         if document.runtime_id!=RuntimeId::MccSteam{executables.push(("invaderBuild",invader(tools,"invader-build").unwrap()));}
         for (name,path) in executables {
             crate::reject_links(&path)?;receipt.tool_identities.insert(name.into(),maps::hash_file(&path)?);
@@ -303,6 +310,7 @@ pub fn run_prepared_job(
         if scenario_file.parent().is_some_and(|p|p.exists()){return invalid("Generated scenario namespace already exists in the supplied tags. Choose a unique project name; stale BSP/lightmap/item tags cannot be accepted as new output.");}
         let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
         custom.compile(workspace,&tool,&halo_tool_prefix(tools.hek_flavor.as_deref(),workspace,&stage)?,&invader(tools,"invader-edit").unwrap(),&runner)?;
+        let mut reviewed_new_logic_names=false;
         for (index,command) in sources.commands.iter().enumerate() {
             if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
             for expected in &command.expected_outputs {
@@ -323,6 +331,14 @@ pub fn run_prepared_job(
                 other=>return invalid(format!("Unsupported compiler command {other}")),
             };
             args.extend(command.args.clone());
+            if command.phase=="logic-names"&&!reviewed_new_logic_names {
+                // Only a new Tool-generated scenario may receive this bounded
+                // Sapien-style name table. Never disable editing safeguards on
+                // existing user tags or arbitrary caller-provided commands.
+                let count=runner.run(&invader(tools,"invader-edit").unwrap(),&["-t".into(),stage.to_string_lossy().into_owned(),"-C".into(),"object_names".into(),format!("{}.scenario",sources.scenario_path)],workspace,"logic-names-review",45)?;
+                if count.trim()!="0"{return invalid("Logic naming requires an empty new scenario table; existing names and handwritten references are protected");}
+                reviewed_new_logic_names=true;
+            }
             let output=runner.run(&executable,&args,workspace,&command.phase,(25+index*45/sources.commands.len().max(1)) as u8)?;
             if let Some(line)=output.lines().find(|line|{let text=line.to_ascii_lowercase();text.contains("### error")||text.contains("exception halt")||text.contains("exception_breakpoint")}){return invalid(format!("{} compiler rejected the source: {}",command.phase,line.chars().take(400).collect::<String>()));}
             for expected in &command.expected_outputs {
@@ -333,6 +349,7 @@ pub fn run_prepared_job(
         let output_dir=directory.join("output");fs::create_dir(&output_dir)?;
         crate::powerups::prepare(project,&sources.scenario_path,workspace,&stage,&invader(tools,"invader-edit").unwrap(),&runner)?;
         crate::native_audio::prepare(project,&sources.scenario_path,workspace,&stage,&invader(tools,"invader-edit").unwrap(),&runner)?;
+        crate::native_logic::compile(document,workspace,&sources.scenario_path,&invader(tools,"invader-edit").unwrap(),engine,&runner)?;
         let output=output_dir.join(format!("{}.map",sources.bsp_name));
         if document.runtime_id==RuntimeId::MccSteam {
             crate::engine_machinima::prepare(project,&sources.scenario_path,workspace,&invader(tools,"invader-edit").unwrap(),&runner,0)?;
@@ -352,6 +369,7 @@ pub fn run_prepared_job(
         project::atomic_write(&workspace.join("native-sound-classes.json"),&serde_json::to_vec_pretty(&sound_classes)?,false)?;
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
         crate::native_audio::verify_compiled(project,&inspected,&output)?;
+        crate::native_logic::verify_compiled(document,&inspected)?;
         let _=crate::native_asset_imports::available_files(import_root,project)?;
         crate::powerups::verify_compiled(project,&inspected,workspace)?;
         custom.verify_cache(&inspected,&output)?;

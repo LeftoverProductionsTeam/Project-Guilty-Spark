@@ -207,6 +207,12 @@ function NodeVisual({
       </mesh>
     );
   }
+  if(node.type==='trigger')return <mesh>
+    <boxGeometry args={node.value.dimensions}/>
+    <meshBasicMaterial color={selected?'#b3ffe5':'#5dd0a7'} transparent opacity={selected?0.12:0.04} depthWrite={false}/>
+    <Edges color={selected?'#b3ffe5':'#5dd0a7'}/>
+    {selected&&<ViewportLabel position={[0,0,node.value.dimensions[2]/2+0.2]} text={node.value.name}/>}
+  </mesh>;
   if(node.type==='placement'||node.type==='spawn')return ownedModel?<Mesh data={ownedModel.mesh} shaderTextures={ownedModel.shaderTextures} shaderMetadata={ownedModel.shaderMetadata} extraTextures={ownedModel.extraTextures} wireframe={wireframe}/>:null;
   const spawn = false, objective = node.type === 'objective';
   const color = error
@@ -542,7 +548,7 @@ function ForgeScene(props: ForgeViewportProps) {
   const transformable =
     cameraMode === 'orbit' &&
     chosen.length > 0 &&
-    (mode !== 'scale' || (chosen.length === 1 && chosen[0].type === 'brush'));
+    (mode !== 'scale' || (chosen.length === 1 && (chosen[0].type === 'brush' || chosen[0].type === 'trigger')));
   return (
     <>
       <PerspectiveCamera

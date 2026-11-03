@@ -30,7 +30,7 @@ pub fn extension(class:&str)->Result<&'static str>{
     match class {
         "scnr"=>Ok("scenario"),"sbsp"=>Ok("scenario_structure_bsp"),
         "weap"=>Ok("weapon"),"proj"=>Ok("projectile"),"bipd"=>Ok("biped"),
-        "scen"=>Ok("scenery"),"vehi"=>Ok("vehicle"),"eqip"=>Ok("equipment"),
+        "scen"=>Ok("scenery"),"vehi"=>Ok("vehicle"),"eqip"=>Ok("equipment"),"garb"=>Ok("garbage"),
         "itmc"=>Ok("item_collection"),"bitm"=>Ok("bitmap"),
         "senv"=>Ok("shader_environment"),"soso"=>Ok("shader_model"),
         "schi"=>Ok("shader_transparent_chicago"),"scex"=>Ok("shader_transparent_chicago_extended"),

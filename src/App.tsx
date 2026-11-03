@@ -10,6 +10,7 @@ import type {LearningSection,WorkflowRoute} from './workflowHistory';
 import {librarySoundEmitters} from './viewportAssets';
 import {projectMutationPending} from './projectMutation';
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import LiveStudioIndicator from './components/LiveStudioIndicator';
@@ -320,7 +321,10 @@ export default function App() {
     const active=document.activeElement;
     const targetId=active instanceof HTMLElement?active.closest<HTMLElement>('[data-history-project]')?.dataset.historyProject??documentsRef.current.activeId:documentsRef.current.activeId;
     if(targetId&&projectMutationPending(targetId))return;
-    const apply=()=>{if(!targetId||projectMutationPending(targetId))return;const h=documentsRef.current.documents.find(d=>d.id===targetId)?.history;const candidate=type==='undo'?h?.past.at(-1):h?.future[0];const localOnly=(p:Project)=>JSON.stringify({...p,quickForge:null,modifiedAt:'',history:[],builds:[]});const hasUnsharedChange=!!candidate&&!!h?.current&&localOnly(candidate)!==localOnly(h.current);if(!hasUnsharedChange&&!window.dispatchEvent(new CustomEvent('guilty-spark-studio-undo',{cancelable:true,detail:{projectId:targetId,redo:type==='redo'}})))return;dispatchDocument({type:'history',id:targetId,action:{type}});};
+    const apply=()=>{if(!targetId||projectMutationPending(targetId))return;const h=documentsRef.current.documents.find(d=>d.id===targetId)?.history;const candidate=type==='undo'?h?.past.at(-1):h?.future[0];const localOnly=(p:Project)=>JSON.stringify({...p,quickForge:null,modifiedAt:'',history:[],builds:[]});const hasUnsharedChange=!!candidate&&!!h?.current&&localOnly(candidate)!==localOnly(h.current);if(!hasUnsharedChange&&!window.dispatchEvent(new CustomEvent('guilty-spark-studio-undo',{cancelable:true,detail:{projectId:targetId,redo:type==='redo'}})))return;
+      // A following Ctrl+S can run in this same animation frame. Publish the
+      // history revision before its save callback captures a project snapshot.
+      flushSync(()=>dispatchDocument({type:'history',id:targetId,action:{type}}));};
     if(native&&targetId&&!windowHistories.current.writable(targetId))return;
     if(active instanceof HTMLInputElement&&['number','range'].includes(active.type)){
       active.blur();requestAnimationFrame(apply);
@@ -1275,7 +1279,7 @@ export default function App() {
                 onSetup={()=>{setStudioGuide(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'co-edit-setup'}})));}}
                 onOpen={id=>{void openStudioProject(id);}}
               />
-              <HeaderRuntime value={data.settings.preferredHalo??'mccSteam'} onChange={id=>{setDependencyRuntime(id);void applySettings({...data.settings,preferredHalo:id}).catch(()=>{});}}/>
+              <HeaderRuntime value={dependencyRuntime} onChange={id=>{setDependencyRuntime(id);void applySettings({...data.settings,preferredHalo:id}).catch(()=>{});}}/>
               <button
                 className="gs-header-find"
                 title="Search all Spark tools and workspaces (Ctrl+K)"

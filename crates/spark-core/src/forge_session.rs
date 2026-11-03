@@ -24,6 +24,7 @@ pub fn merge(
     let native = crate::studio_native::merge(&base.native, &next.native, &current.native)?;
     let workshop =
         crate::studio_workshop::merge(&base.workshop, &next.workshop, &current.workshop)?;
+    let logic = crate::native_logic::merge(&base.logic, &next.logic, &current.logic)?;
     let b = serde_json::to_value(base)?;
     let n = serde_json::to_value(next)?;
     let mut c = serde_json::to_value(current)?;
@@ -31,7 +32,7 @@ pub fn merge(
         if b.get(key) == Some(value) {
             continue;
         }
-        if key == "native" || key == "workshop" {
+        if key == "native" || key == "workshop" || key == "logic" {
             continue;
         }
         if [
@@ -101,6 +102,7 @@ pub fn merge(
     let mut doc: QuickForgeDocument = serde_json::from_value(c)?;
     doc.native = native;
     doc.workshop = workshop;
+    doc.logic = logic;
     quickforge::validate_portable_document(&doc)?;
     Ok(doc)
 }

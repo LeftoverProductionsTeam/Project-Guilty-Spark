@@ -332,4 +332,46 @@ mod tests {
         assert_eq!(second.checked_files, 2);
         assert_eq!(second.pending_files, 0);
     }
+    #[test]
+    fn verified_starting_bytes_exclude_untouched_stale_crc_but_never_hide_a_new_bad_save() {
+        let root = tempfile::tempdir().unwrap();
+        let parent = root.path().join("parent");
+        let preserved = root.path().join("preserved");
+        let edited = root.path().join("edited");
+        let mut original = tag(b"previously compiled native source fixture");
+        original[40] ^= 1; // Original header CRC is stale; never repair it by guessing.
+        for folder in [&parent, &preserved, &edited] {
+            fs::create_dir(folder).unwrap();
+            fs::write(folder.join("same.weapon"), &original).unwrap();
+        }
+        let expected = crate::tool_transaction::inventory(&parent).unwrap();
+        let baseline = crate::tool_transaction::verified_starting_inventory(&preserved, &parent, &expected).unwrap();
+        let mut cache = Cache::default();
+        let old = cache.scan(&edited, &baseline, &expected, u64::MAX).unwrap();
+        assert!(!old.blocked());
+        assert_eq!(old.checked_files, 0, "Unchanged native input is not a newly edited tag");
+        fs::write(edited.join("same.weapon"), b"bad save").unwrap();
+        let bad = crate::tool_transaction::inventory(&edited).unwrap();
+        assert!(cache.scan(&edited, &baseline, &bad, u64::MAX).unwrap().blocked());
+        fs::write(parent.join("same.weapon"), b"changed parent").unwrap();
+        assert!(crate::tool_transaction::verified_starting_inventory(&preserved, &parent, &expected).is_err());
+        fs::write(parent.join("same.weapon"), &original).unwrap();
+        fs::write(preserved.join("same.weapon"), b"changed preserved copy").unwrap();
+        assert!(crate::tool_transaction::verified_starting_inventory(&preserved, &parent, &expected).is_err());
+        assert!(crate::tool_transaction::verified_starting_inventory(&parent, &parent, &Hashes::new()).is_err());
+    }
+    #[test]
+    fn standard_garbage_class_is_known_but_still_requires_matching_extension_and_payload() {
+        let root = tempfile::tempdir().unwrap();
+        let mut bytes = tag(b"header verification fixture, not semantic gameplay evidence");
+        bytes[36..40].copy_from_slice(b"garb");
+        let file = root.path().join("piece.garbage");
+        fs::write(&file, &bytes).unwrap();
+        assert_eq!(inspect(root.path(), "piece.garbage", &maps::hash_file(&file).unwrap()).unwrap().state, "checked");
+        fs::write(root.path().join("piece.weapon"), &bytes).unwrap();
+        assert_eq!(inspect(root.path(), "piece.weapon", &maps::hash_file(&file).unwrap()).unwrap().state, "invalid");
+        bytes.push(1);
+        fs::write(&file, &bytes).unwrap();
+        assert_eq!(inspect(root.path(), "piece.garbage", &maps::hash_file(&file).unwrap()).unwrap().state, "invalid");
+    }
 }

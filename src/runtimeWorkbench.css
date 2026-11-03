@@ -49,7 +49,7 @@
 .working-tag-changes li>span{text-transform:capitalize;color:var(--accent);}
 .runtime-dock-actions {
   display: grid;
-  grid-template-columns: minmax(125px, 1.5fr) repeat(9, minmax(0, 1fr));
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 5px;
 }
 .runtime-dock-actions > button {
@@ -88,20 +88,6 @@
 }
 .runtime-dock-actions > button[data-state='unavailable'] small {
   color: #c3ccd6;
-}
-.runtime-dock-picker {
-  display: flex;
-  align-items: stretch;
-  min-width: 0;
-}
-.runtime-dock-picker select {
-  width: 100%;
-  min-width: 0;
-  padding: 4px;
-  font-size: 11px;
-  color: inherit;
-  background: var(--panel, #101921);
-  border-color: var(--line);
 }
 .runtime-dock-notice {
   position: absolute;
@@ -308,7 +294,7 @@
 @media (max-width: 1200px) {
   .runtime-dock-actions {
     gap: 3px;
-    grid-template-columns: minmax(115px, 1.2fr) repeat(9, minmax(0, 1fr));
+    grid-template-columns: repeat(9, minmax(0, 1fr));
   }
   .runtime-dock-actions > button > span {
     gap: 3px;

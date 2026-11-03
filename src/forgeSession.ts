@@ -41,6 +41,7 @@ export function mergeForge(
     n = next as unknown as Record<string, unknown>,
     result = structuredClone(current) as unknown as Record<string, unknown>;
   for (const key of Object.keys(n)) {
+    if (key === 'logic') continue; // Optional graph, including deletion, is merged atomically below.
     if (same(b[key], n[key])) continue;
     if (key === 'workshop') {
       result.workshop = mergeWorkshop(base.workshop, next.workshop, current.workshop, forceRemote);
@@ -135,6 +136,12 @@ export function mergeForge(
         throw new Error(`Concurrent edit conflict: ${key}`);
       result[key] = structuredClone(n[key]);
     }
+  }
+  // Optional logic deletion must be merged too; absent JSON keys are otherwise
+  // missed. Conflicting graphs remain explicit instead of overwriting peers.
+  if(!same(base.logic,next.logic)) {
+    if(!forceRemote&&!same(current.logic,base.logic)&&!same(current.logic,next.logic))throw Error('Concurrent Logic / Events conflict; retain both drafts');
+    if(next.logic)result.logic=structuredClone(next.logic);else delete result.logic;
   }
   return result as unknown as QuickForgeDocument;
 }

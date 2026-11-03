@@ -132,7 +132,7 @@ pub fn allowed_addition(
             .is_some_and(|b| {
                 matches!(
                     b.tag_class.as_str(),
-                    "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc"
+                    "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc" | "mach"
                 )
             })
 }
@@ -212,7 +212,7 @@ pub fn prepare(
         .ok_or_else(|| SparkError::Invalid("Import source tag is missing".into()))?;
     if !matches!(
         tag.class.as_str(),
-        "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc" | "snd!" | "lsnd" | "senv"
+        "scen" | "vehi" | "bipd" | "weap" | "eqip" | "itmc" | "mach" | "snd!" | "lsnd" | "senv"
     ) {
         return invalid("This native asset class has no verified automatic import workflow yet");
     }

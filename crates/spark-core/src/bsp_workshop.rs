@@ -547,6 +547,7 @@ pub fn report(doc: &QuickForgeDocument) -> Result<GeometryReport> {
         }
     }
     Ok(GeometryReport {
+        logic_preview: None,
         valid: !issues.iter().any(|i| i.severity == "error"),
         issues,
         vertices: mesh.positions.len() / 3,

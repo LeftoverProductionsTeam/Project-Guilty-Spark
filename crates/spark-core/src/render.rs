@@ -446,7 +446,7 @@ pub fn static_object_models(bytes: &[u8], header: &MapHeader, tags: &[Tag], obje
         return (models,vec!["Model vertex/index data is outside the bounded cache region".into()]);
     }
     let requested=objects.iter().filter(|o|matches!(o.kind.as_str(),"Scenery"|"Vehicle"|"Equipment"|"Weapon"|"Biped"|"Netgame item")).filter_map(|o|o.tag_id)
-        .chain(tags.iter().filter(|t|matches!(t.class.as_str(),"scen"|"vehi"|"weap"|"eqip"|"bipd")).map(|t|t.id));
+        .chain(tags.iter().filter(|t|matches!(t.class.as_str(),"scen"|"vehi"|"weap"|"eqip"|"bipd"|"mach")).map(|t|t.id));
     for object_id in requested {
         if !processed.insert(object_id) {continue;}
         if processed.len()>MAX_MODEL_TYPES {notes.push("Model preview capped at 128 distinct object types".into());break;}

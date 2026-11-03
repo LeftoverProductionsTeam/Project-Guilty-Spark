@@ -376,20 +376,6 @@ export default function RuntimeDock({
           </button>
         </div>
         <div className="runtime-dock-actions">
-          <label className="runtime-dock-picker">
-            <span className="gs-sr-only">Active map runtime</span>
-            <select
-              aria-label="Active map runtime"
-              value={selected}
-              onChange={(e) => setRuntime(e.target.value as RuntimeId)}
-            >
-              {Object.entries(runtimeNames).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
           {actions.map(([id, label, Icon]) => {
             const action = report?.actions.find((a) => a.id === id);
             const state = action?.availability ?? 'setupRequired';

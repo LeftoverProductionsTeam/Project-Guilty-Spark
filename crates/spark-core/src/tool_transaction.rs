@@ -77,6 +77,21 @@ pub fn inventory(root: &Path) -> Result<Inventory> {
     Ok(result)
 }
 
+/// Reuse an immutable, previously compiled starting revision only when both its
+/// preserved copy and the parent input still match every recorded byte. Native
+/// header/semantic checks then apply to actual edits, not untouched SDK files.
+pub fn verified_starting_inventory(
+    preserved: &Path,
+    parent: &Path,
+    expected: &Inventory,
+) -> Result<Inventory> {
+    crate::working_tag_changes::validate_baseline(expected)?;
+    if expected.is_empty() || inventory(preserved)? != *expected || inventory(parent)? != *expected {
+        return invalid("The preserved starting tags or compiled parent source changed; no integrity baseline can be reused");
+    }
+    Ok(expected.clone())
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Change {

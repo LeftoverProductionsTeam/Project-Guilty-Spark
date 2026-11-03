@@ -36,7 +36,7 @@ function validate(value: unknown): asserts value is ForgeClipboard {
   for (const node of clip.nodes) {
     if (
       !node ||
-      !['brush', 'placement', 'spawn', 'objective'].includes(node.type) ||
+      !['brush', 'placement', 'spawn', 'objective', 'trigger'].includes(node.type) ||
       !node.value ||
       !text(node.value.id, 128) ||
       ids.has(node.value.id) ||
@@ -53,7 +53,7 @@ function validate(value: unknown): asserts value is ForgeClipboard {
       throw Error('The copied geometry kind is unsupported.');
     if (
       node.type === 'placement' &&
-      (!['scen', 'weap', 'eqip', 'vehi', 'bipd', 'itmc'].includes(node.value.tagClass) ||
+      (!['scen', 'weap', 'eqip', 'vehi', 'bipd', 'itmc', 'mach'].includes(node.value.tagClass) ||
         !text(node.value.tagPath))
     )
       throw Error('The copied asset class or native tag path is unsupported.');

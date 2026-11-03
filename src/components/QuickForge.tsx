@@ -83,6 +83,8 @@ import type {
 import { HelpTip, IconButton, Notice, NumberField, PageTitle, Pill } from './ui';
 import ForgeViewport from './ForgeViewport';
 import BspWorkshop from './BspWorkshop';
+import LogicEvents from './LogicEvents';
+import { addLogicTrigger, type NativeLogicSource } from '../nativeLogic';
 import {workshopSurfaceSelection} from '../bspWorkshop';
 import type {BspTool} from '../bspWorkshop';
 import EnvironmentControls from './EnvironmentControls';
@@ -163,6 +165,7 @@ const templates = [
 type PaletteItem =
   | { type: 'brush'; kind: BrushKind }
   | { type: 'spawn' }
+  | { type: 'trigger' }
   | { type: 'hillPolygon' }
   | { type: 'teleportPair' }
   | { type: 'objective'; kind: ForgeObjective['kind'] }
@@ -472,6 +475,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         edit(placed.project, `${replaceId ? 'Replace' : 'Place'} ${item.name}`);
         setSelected([placed.selectedId]);
         setWorkshopSelected(null);
+        setTab('properties');
+        revealPanel('forge-inspector');
       } else if (item.kind === 'mesh') {
         await library.onPlaceMesh(item, point, replaceId);
         setSelected([]);
@@ -1042,6 +1047,15 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     }
     let next = structuredClone(doc),
       id = '';
+    if (item.type === 'trigger') {
+      if ((doc.logic?.triggers.length ?? 0) >= 64) {
+        notify('This map already has 64 trigger volumes.', 'error');
+        return;
+      }
+      const added=addLogicTrigger(doc,[point[0],point[1],point[2]+1.5]);
+      next=added.document;
+      id=added.id;
+    }
     if (item.type === 'brush') {
       if (doc.geometry.length >= 256) {
         notify('QuickForge currently supports at most 256 brushes.', 'error');
@@ -1178,6 +1192,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     setSelected([id]);
     setSelectedZone(null);
     setTab('properties');
+    if(item.type==='trigger'||item.type==='asset')revealPanel('forge-inspector');
   }
   function draggable(item: PaletteItem) {
     return {
@@ -1686,6 +1701,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                       [
                         'brush',
                         'spawn',
+                        'trigger',
                         'objective',
                         'asset',
                         'zone',
@@ -1939,6 +1955,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                 <ViewportAssetLibrary
                   projectId={project.id}
                   assets={catalog}
+                  scenarioTools={<div className="button-row forge-logic-drop-tools">
+                    <button {...draggable({type:'trigger'})} title="Drag onto a floor to create a resizable trigger box. Its Logic / Events controls open in the Inspector."
+                      onClick={()=>add({type:'trigger'},chosen[0]?.value.position??doc.spawns[0]?.position??[0,0,0])}>
+                      <Box size={15}/>Trigger volume
+                    </button>
+                    <small>Drop → resize → choose a door action</small>
+                  </div>}
                   begin={assetDrag.begin}
                   activate={assetDrag.activate}
                   canReplace={
@@ -2182,6 +2205,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                         <HelpTip help="Spawn points, objective markers and AI zones author scenario metadata. They do not create game entities until the scenario/tag pipeline compiles them." />
                       </div>
                       <div className="forge-brush-palette">
+                        <button
+                          {...draggable({ type: 'trigger' })}
+                          title="Drag a trigger box onto the map. Resize it with the gizmo or Inspector, then choose a door action or edit its HaloScript in Logic / Events."
+                          onClick={() => add({type:'trigger'},chosen[0]?.value.position??doc.spawns[0]?.position??[0,0,0])}
+                        >
+                          <Box size={18} />Trigger volume
+                        </button>
                         <button
                           title="Add a player starting marker to the scenario source; the Halo scenario must be compiled and tested for spawn validity."
                           {...draggable({ type: 'spawn' })}
@@ -2551,6 +2581,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                             ['eqip', 'Equipment / powerups'],
                             ['vehi', 'Vehicles'],
                             ['scen', 'Scenery'],
+                            ['mach', 'Doors & devices'],
                             ['bipd', 'Characters'],
                             ['itmc', 'Item collections'],
                           ] as const
@@ -2601,6 +2632,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                       changeNode={changeNode}
                       commit={commit}
                       notify={notify}
+                      logicSource={validatedDoc === doc ? report?.logicPreview : undefined}
+                      onSelectLogic={id => { setSelected([id]); setTab('properties'); }}
                     />
                   )}
                   {tab === 'firefight' && (
@@ -3235,12 +3268,16 @@ function ForgeProperties({
   changeNode,
   commit,
   notify,
+  logicSource,
+  onSelectLogic,
 }: {
   document: QuickForgeDocument;
   chosen: ForgeNode[];
   changeNode: (update: (node: ForgeNode) => ForgeNode, description: string) => void;
   commit: (doc: QuickForgeDocument, description: string) => void;
   notify: Props['notify'];
+  logicSource?: NativeLogicSource;
+  onSelectLogic: (id: string) => void;
 }) {
   const node = chosen.length === 1 ? chosen[0] : null;
   const [terrainX, setTerrainX] = useState(4);
@@ -3276,7 +3313,7 @@ function ForgeProperties({
         scale: Vec3 = [1, 1, 1];
       if (property === 'position') pos[axis] = value;
       else if (property === 'rotation') rot[axis] = (value * Math.PI) / 180;
-      else if (current.type === 'brush') scale[axis] = value / current.value.dimensions[axis];
+      else if (current.type === 'brush' || current.type === 'trigger') scale[axis] = value / current.value.dimensions[axis];
       return transformForgeNode(current, pos, rot, scale);
     }, `Edit ${property}`);
   }
@@ -3286,6 +3323,7 @@ function ForgeProperties({
         <strong>{chosen.length ? `${chosen.length} selected` : 'Map properties'}</strong>
         <Pill>{node ? nodeCategory(node) : doc.gameMode}</Pill>
       </div>
+      <LogicEvents document={doc} node={node} source={logicSource} commit={commit} onSelect={onSelectLogic} />
       {node ? (
         <fieldset disabled={node.value.locked}>
           <label className="forge-field">
@@ -3324,12 +3362,18 @@ function ForgeProperties({
                   value={(rotation[i] * 180) / Math.PI}
                   min={-36000}
                   max={36000}
-                  disabled={(node.type === 'spawn' || node.type === 'objective') && i !== 2}
+                  disabled={(node.type === 'spawn' || node.type === 'objective' || node.type === 'trigger') && i !== 2}
                   onCommit={(value) => transform(i, value, 'rotation')}
                 />
               </label>
             ))}
           </div>
+          {node.type === 'trigger' && <>
+            <h4>Trigger size · world units</h4>
+            <div className="forge-vector">{['Width', 'Depth', 'Height'].map((axis, i) => <label key={axis}>
+              {axis}<NumberField label={`Trigger ${axis.toLowerCase()}`} value={node.value.dimensions[i]} min={0.1} max={128} onCommit={value => transform(i, value, 'dimensions')} />
+            </label>)}</div>
+          </>}
           {node.type === 'brush' && (
             <>
               <h4>Dimensions · world units</h4>

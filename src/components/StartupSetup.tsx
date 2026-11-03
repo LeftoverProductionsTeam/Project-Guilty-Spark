@@ -1,28 +1,41 @@
 import { useEffect,useRef,useState } from 'react';
+import { Check, Gamepad2, Globe2, Hammer, Users, type LucideIcon } from 'lucide-react';
 import type { Bootstrap, RuntimeId, Settings, Workspace } from '../types';
 import ConnectGames from './ConnectGames';
 import CustomEditionSetup from './CustomEditionSetup';
 import { primaryRuntimes, useRuntimeConnections } from '../useRuntimeConnections';
-const halos: { id: RuntimeId; name: string; description: string }[] = [
+const halos: { id: RuntimeId; name: string; icon: LucideIcon; description: string; bestFor: string; offers: string[] }[] = [
   {
     id: 'mccSteam',
     name: 'Halo CE in MCC',
-    description: 'Steam MCC plus the separate Halo: CE Mod Tools - MCC kit.',
+    icon: Gamepad2,
+    description: 'The official Halo collection, with classic and remastered Combat Evolved.',
+    bestFor: 'Creating and playing MCC mods.',
+    offers: ['Campaign & multiplayer', 'Steam Workshop', 'Official mod tools'],
   },
   {
     id: 'haloCustomEdition',
     name: 'Halo Custom Edition',
-    description: 'Classic CE with a matching HEK or explicitly reviewed compatible tagset.',
+    icon: Hammer,
+    description: 'The classic PC edition built for community maps and Halo modding.',
+    bestFor: 'Classic custom maps and original editing tools.',
+    offers: ['Custom maps', 'Dedicated servers', 'Halo Editing Kit'],
   },
   {
     id: 'chupathingyCe',
     name: 'ChupathingyCE',
-    description: 'Register this separately installed runtime in Online.',
+    icon: Users,
+    description: 'A community Halo port bringing the Xbox experience to modern devices.',
+    bestFor: 'Co-op and split-screen with friends.',
+    offers: ['Online campaign co-op', 'Split-screen', 'Community servers'],
   },
   {
     id: 'openCe',
     name: 'OpenCE',
-    description: 'Keep this runtime’s tools, content and compatibility evidence separate.',
+    icon: Globe2,
+    description: 'A community Halo port with online co-op, custom maps and browser play.',
+    bestFor: 'Community multiplayer across devices.',
+    offers: ['Online campaign co-op', 'Custom Edition maps', 'Map downloads'],
   },
 ];
 export default function StartupSetup({
@@ -80,14 +93,13 @@ export default function StartupSetup({
       <ol className="gs-setup-progress" aria-label="Setup progress">
         <li aria-current={step === 0 ? 'step' : undefined}>1 · Choose your Halo</li>
         <li aria-current={step === 1 ? 'step' : undefined}>2 · Connect tools</li>
-        <li>3 · How-to & Glossary</li>
+        <li>3 · Learning center</li>
       </ol>
       {step === 0 ? (
         <section className="analysis-card">
           <h2>Which Halo are you working with?</h2>
           <p>
-            Choose your main edition. You can connect more editions later, each with its own tools and build
-            targets.
+            Choose where you want to create and play. You can switch later or connect more than one Halo.
           </p>
           <div className="gs-halo-choices" role="group" aria-label="Your Halo edition">
             {primaryRuntimes.map(id => halos.find(h => h.id === id)!).map((h) => {
@@ -95,6 +107,7 @@ export default function StartupSetup({
               const candidate = connections.detected.find(item => item.runtimeId === h.id);
               const connected = installed?.validation === 'pass';
               const status = connected ? 'Connected' : candidate ? (candidate.contentReady ? 'Detected' : 'Needs content') : connections.checking ? 'Checking…' : 'Not connected';
+              const RuntimeIcon = h.icon;
               return (
               <button
                 key={h.id}
@@ -104,9 +117,15 @@ export default function StartupSetup({
                 title={installed?.root ?? candidate?.root ?? h.description}
                 onClick={() => setChoice(h.id)}
               >
-                <strong>{h.name}</strong>
-                <small>{h.description}</small>
-                <span>{status}</span>
+                <span className="gs-halo-card-heading">
+                  <span className="gs-halo-emblem" aria-hidden="true"><RuntimeIcon size={25} strokeWidth={1.6} /></span>
+                  <strong>{h.name}</strong>
+                  {choice === h.id && <Check className="gs-halo-selected" size={15} aria-hidden="true" />}
+                </span>
+                <small className="gs-halo-description">{h.description}</small>
+                <span className="gs-halo-best-for"><b>Best for</b> {h.bestFor}</span>
+                <span className="gs-halo-offers" aria-label="Runtime features">{h.offers.map(offer => <span key={offer}>{offer}</span>)}</span>
+                <span className="gs-halo-status" data-ready={connected || !!candidate?.contentReady}><i aria-hidden="true" />{status}</span>
               </button>
               );
             })}

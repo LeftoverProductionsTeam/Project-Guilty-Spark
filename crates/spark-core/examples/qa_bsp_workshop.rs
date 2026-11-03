@@ -12,10 +12,13 @@ use std::{
 };
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let a: Vec<_> = std::env::args().collect();
-    if a.len() != 5 && !(a.len() == 6 && a[5] == "--ce") {
-        return Err("qa_bsp_workshop <H1A kit> <owned source tags> <Invader> <fresh acceptance directory> [--ce]".into());
+    if a.len() < 5 {
+        return Err("qa_bsp_workshop <H1A kit> <owned source tags> <Invader> <fresh acceptance directory> [--ce] [--logic] [--snapshot frozen-project.gsproject]".into());
     }
-    let ce = a.len() == 6;
+    let mut snapshot=None;let mut i=5;
+    while i<a.len(){match a[i].as_str(){"--ce"|"--logic"=>i+=1,"--snapshot" if i+1<a.len()&&snapshot.is_none()=>{snapshot=Some(Path::new(&a[i+1]));i+=2;},_=>return Err("Unknown or incomplete acceptance argument".into())}}
+    if snapshot.is_some()&&a.iter().any(|flag|flag=="--ce"||flag=="--logic"){return Err("A frozen snapshot is rebuilt exactly; do not combine it with template modifiers".into());}
+    let ce = a.iter().any(|flag|flag=="--ce");
     let root = Path::new(&a[4]);
     if root.exists() {
         return Err("Acceptance directory must be fresh".into());
@@ -28,6 +31,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     d.materials[0].name = "example_tutorial_metal_floor".into();
     d.materials[0].shader_path =
         Some("levels/test/tutorial/shaders/example_tutorial_metal_floor".into());
+    if a.iter().any(|flag|flag=="--logic") {
+        // Exact owned door mesh/collision readback is ±0.675 wide, 1.05 high,
+        // with its closed face in the Y/Z plane. Fit the real corridor rather
+        // than stretching the device or leaving a walk-around gap.
+        let corridor=d.workshop.as_mut().unwrap().brushes.iter_mut().find(|b|b.id=="corridor").unwrap();
+        corridor.scale=[1.,0.3375,0.35];
+        for (i,start) in d.spawns.iter_mut().enumerate(){start.position=[4.+i as f32,0.,0.1];start.facing=0.;}
+        // Owned stock SDK reference, not a synthetic native asset. All compiler
+        // inputs are copied and hashed by the existing isolated build pipeline.
+        d.placements.push(q::ForgePlacement {
+            id:"benchmark-door".into(),name:"Corridor door".into(),
+            tag_path:"levels/a10/devices/doors/door small/door small".into(),tag_class:"mach".into(),
+            position:[14.,0.,0.],rotation:[0.,0.,0.],
+            team:0,respawn_seconds:0,tag_id:None,source_project_id:None,source_sha256:None,
+            visible:true,locked:false,published_asset_id:None,
+        });
+        d.logic=Some(serde_json::from_value(serde_json::json!({
+            "schemaVersion":1,
+            "triggers":[{"id":"benchmark-trigger","name":"Open corridor door","position":[14.,0.,1.5],"rotation":[0.,0.,0.],"dimensions":[6.,3.,3.],"visible":true,"locked":false}],
+            "devices":[{"placementId":"benchmark-door","initialPosition":0.,"powered":true}],
+            "rules":[{"id":"benchmark-open","name":"Enter → open corridor door","enabled":true,"once":false,
+                "event":{"kind":"enter","triggerId":"benchmark-trigger"},
+                "actions":[{"kind":"devicePosition","targetId":"benchmark-door","value":1.}]}]
+        }))?);
+    }
     if ce {
         d.runtime_id = spark_core::runtime::RuntimeId::HaloCustomEdition;
         d.materials[0].name = "cap_metal".into();
@@ -53,15 +81,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         shader_path: None,
         color: [0., 1., 1.],
     });
+    let (portal_width,portal_height)=if d.logic.is_some(){(0.675,1.05)}else{(2.,3.)};
     d.workshop.as_mut().unwrap().portals = [8., 20.]
         .iter()
         .enumerate()
         .map(|(i, x)| w::Portal {
             id: format!("door-{i}"),
             material_id: "portal".into(),
-            points: vec![[*x, -2., 0.], [*x, 2., 0.], [*x, 2., 3.], [*x, -2., 3.]],
+            points: vec![[*x, -portal_width, 0.], [*x, portal_width, 0.], [*x, portal_width, portal_height], [*x, -portal_width, portal_height]],
         })
         .collect();
+    let snapshot_hash=if let Some(path)=snapshot {
+        // Rebuild the frozen pre-handoff source into a fresh diagnostic job.
+        // Never replace the live project or its accepted external revisions.
+        spark_core::reject_links(path)?;
+        let hash=spark_core::maps::hash_file(path)?;
+        p=project::load_project(path)?;
+        d=p.quick_forge.clone().ok_or("Snapshot has no QuickForge source")?;
+        if d.workshop.is_none(){return Err("Snapshot is not a BSP Workshop source".into());}
+        Some(hash)
+    }else{None};
     let report = q::validate(&d)?;
     if !report.valid {
         return Err(format!("{:?}", report.issues).into());
@@ -92,9 +131,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(
         root.join("acceptance.json"),
         serde_json::to_vec_pretty(
-            &serde_json::json!({"schemaVersion":1,"kind":"native-bsp-workshop-acceptance","geometry":report,"receipt":receipt,"sourceReopenedExactly":true,"gameplayVerified":false,"runtime":if ce{"halo-custom-edition"}else{"mcc-h1a"},"customEditionBuildVerified":ce&&receipt.status=="validated"}),
+            &serde_json::json!({"schemaVersion":1,"kind":"native-bsp-workshop-acceptance","geometry":report,"receipt":receipt,"sourceReopenedExactly":true,"snapshotSourceSha256":snapshot_hash,"gameplayVerified":false,"runtime":if ce{"halo-custom-edition"}else{"mcc-h1a"},"customEditionBuildVerified":ce&&receipt.status=="validated"}),
         )?,
     )?;
+    if let (Some(path),Some(expected))=(snapshot,snapshot_hash){if spark_core::maps::hash_file(path)?!=expected{return Err("Frozen input changed during diagnostic rebuild".into());}}
     if receipt.status != "validated" {
         return Err(receipt.blockers.join("\n").into());
     }
