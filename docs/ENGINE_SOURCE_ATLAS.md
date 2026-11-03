@@ -1,6 +1,6 @@
 # Engine Source Atlas — C52
 
-Reviewed 2026-11-02 from local master `c0f43f39b7a055f289603547b238ef00f534fabc`. This is a source-to-workflow map, not a claim that every upstream feature works in the installed games. [The structured index](fixtures/engine-source-index.json) contains 30 behavior records, exact source locations, file hashes, owners, inputs/outputs, Spark owners, gaps, integration methods and acceptance gates.
+Originally reviewed 2026-11-02 from local master `c0f43f39b7a055f289603547b238ef00f534fabc`. C58 revalidates the same six pins on 2026-11-03 and appends six cache/resource/local-console references, retaining the original 30 records. [The structured index](fixtures/engine-source-index.json) now contains 36 behavior records with exact source locations, file hashes, owners, inputs/outputs, Spark owners, gaps, integration methods and acceptance gates. This remains source research, not installed-game acceptance; see the [C58 matrix and trials](CONTINUATION_58_COMPATIBILITY.md).
 
 ## Revisions, scope and source integrity
 

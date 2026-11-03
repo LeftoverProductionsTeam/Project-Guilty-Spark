@@ -1,0 +1,918 @@
+{
+  "schemaVersion": 1,
+  "continuation": "C58",
+  "baseCommit": "682dcfd1d7d141cc3bc55ce13aaa8b8fd54b36b6",
+  "sourceCommit": "e2269e7fccd6249c6ee603fda22599355b3c4d48",
+  "version": "0.4.1",
+  "verifiedOn": "2026-11-03T09:05:43.484Z",
+  "acceptance": "scoped source/runtime contract and native compiler acceptance; retail gameplay and universal conversion remain open",
+  "regressions": {
+    "rust": {
+      "passed": 661,
+      "failed": 0,
+      "ignored": 8
+    },
+    "frontend": 354,
+    "browser": 153,
+    "offlineScripts": 59,
+    "engineSourceProjects": 6,
+    "engineSourceBehaviors": 36
+  },
+  "artifact": {
+    "kind": "local Windows x64 embedded development executable",
+    "path": "target/release/GuiltySpark.exe",
+    "bytes": 42578944,
+    "sha256": "96305d69a02fa7f63cb69bea07654aeb5b4e1bba7ed4409c4f70d9785f951861",
+    "installerUpdated": false,
+    "portableUpdated": false,
+    "sourceDistributionUpdated": false,
+    "remotePublished": false
+  },
+  "sourceSignature": [
+    {
+      "file": "crates/spark-core/examples/qa_conversion_readback.rs",
+      "sha256": "b75d1d536984c7e840ce163ebdacbedcefba9333730797f9e3e11a59b8ca87dc",
+      "bytes": 1636
+    },
+    {
+      "file": "crates/spark-core/src/build.rs",
+      "sha256": "036287b63cfb87cb95893a229851101da73ebdba2f09c46590a342266054eb82",
+      "bytes": 52168
+    },
+    {
+      "file": "crates/spark-core/src/lib.rs",
+      "sha256": "85b43d3a86220b93369960a83f7a90b398d8e42552e8dcbe610a52fe17765a02",
+      "bytes": 5630
+    },
+    {
+      "file": "crates/spark-core/src/native_workspace.rs",
+      "sha256": "eb3ea6b1663c3ecaba8b061601ec65b868dec365e3a6eba4b92056ccf5ad89e3",
+      "bytes": 7833
+    },
+    {
+      "file": "crates/spark-core/src/portability.rs",
+      "sha256": "829bbacb6d0499606e436da257f3043a0504b7b92d24e84956d9372604982640",
+      "bytes": 21830
+    },
+    {
+      "file": "crates/spark-core/src/runtime.rs",
+      "sha256": "c9e8debe86d6db955f1d4b52d3cfe3bdab646f316f04985bf92164af0ff38b06",
+      "bytes": 40914
+    },
+    {
+      "file": "crates/spark-core/src/source_identity.rs",
+      "sha256": "d36e6865c9c66d79d129a998ad8dc90f3a62687b9c9186d89db62677be2997dc",
+      "bytes": 9272
+    },
+    {
+      "file": "crates/spark-core/tests/source_identity.rs",
+      "sha256": "86848be1c85d07465455a043aea907dcc1ad065d9fe1f6d6a91a8bea1b11974d",
+      "bytes": 5475
+    },
+    {
+      "file": "docs/fixtures/engine-source-index.json",
+      "sha256": "52eef9dd6ff95bb7661da36b0838ab5772064c62de6389bce5617338df5fca87",
+      "bytes": 66654
+    },
+    {
+      "file": "scripts/test-source-runtime-native.mjs",
+      "sha256": "151b72a5c8d15b9bd93555872733829a316eda2becc2f49ed709aaa6c336312f",
+      "bytes": 11184
+    },
+    {
+      "file": "src-tauri/src/app.rs",
+      "sha256": "a0f6ff0171c8b83f2002f2be86633bf0d1231cea5e782731a2a7fe6154bd9bc0",
+      "bytes": 186631
+    },
+    {
+      "file": "src-tauri/src/default_materials_native.rs",
+      "sha256": "ad265c0e489573dfc678c6a32a2afed9774b6867f1ad10d392c764958d66bf6d",
+      "bytes": 8699
+    },
+    {
+      "file": "src-tauri/src/runtime_connections.rs",
+      "sha256": "76a2423f30076baccfd488ec4b260e6bbe577e82e21e053aeb16283046aa7d6f",
+      "bytes": 12912
+    },
+    {
+      "file": "src-tauri/src/runtime_workbench.rs",
+      "sha256": "d34344b75a7422ed7670be0d44a5133db9507d145893ba2e9e308f5604ae8a19",
+      "bytes": 57969
+    },
+    {
+      "file": "src-tauri/src/texture_resources_native.rs",
+      "sha256": "c77fcc5c70fc6752372f911f32dbf0541e70b04ebdbfd9f30e26418e300d366a",
+      "bytes": 18325
+    },
+    {
+      "file": "src/App.tsx",
+      "sha256": "b040dfba327dc8be2ad0cb693fc2586b8d064c016cc55271b026c18671936f6a",
+      "bytes": 107219
+    },
+    {
+      "file": "src/components/CompatibilityTable.tsx",
+      "sha256": "975d882f081cb19bf983f2127f41dfe48ad7895b042671cbec266a64b9960a86",
+      "bytes": 1173
+    },
+    {
+      "file": "src/components/LevelEditorWorkspace.tsx",
+      "sha256": "07918f71cd614086f88bc4b72b9bcb9049f3f034564ac5998e38e65e14a93b21",
+      "bytes": 5347
+    },
+    {
+      "file": "src/components/LiveEditor.tsx",
+      "sha256": "c492ac0b0f8afe631f6e419b0725a877bb9ed1d615174d64a3d680eb32e3612c",
+      "bytes": 11472
+    },
+    {
+      "file": "src/components/LiveObjectInspector.tsx",
+      "sha256": "aab191eb3929289c60539a320b1b4de545028d569c29db47c85b648abfe62fe9",
+      "bytes": 14582
+    },
+    {
+      "file": "src/components/MapSourceIdentity.tsx",
+      "sha256": "d82dedc2be7730895944598b5538d090bcdb6efd281d76d75bdb0973af8e6b8c",
+      "bytes": 4173
+    },
+    {
+      "file": "src/components/MapTools.tsx",
+      "sha256": "2c6d012c73d6e510c5160e51c4dbe211fa08f44e04014914a7951b1a9c45a0bf",
+      "bytes": 1583
+    },
+    {
+      "file": "src/components/Runtimes.tsx",
+      "sha256": "ceb754cd9b81be7f52833d9d20116640e7c992e416876a85f230feb9edb79593",
+      "bytes": 36436
+    },
+    {
+      "file": "src/mapTools.css",
+      "sha256": "e38f6f9b31d3870e8288ce5a81eb26778bfd0ba0ae0540c4fb914c2f4dbaaaab",
+      "bytes": 1588
+    },
+    {
+      "file": "src/runtimeCompatibility.ts",
+      "sha256": "bad83531dd089011f4740223cb973c18b94151cc9e1760c9401b0fd80917d697",
+      "bytes": 5319
+    },
+    {
+      "file": "src/runtimeTexturePreview.test.ts",
+      "sha256": "9fcd617c1b07e249e7df1e0df816c6f9de472d3b8a8d6ead4af082ae107cf2b7",
+      "bytes": 12216
+    },
+    {
+      "file": "src/runtimeTexturePreview.ts",
+      "sha256": "beab6d3fb81b0ca64f5c2a3f6653d4d801c07ae7527d49881eb65a0b3bf18562",
+      "bytes": 9304
+    },
+    {
+      "file": "src/sourceIdentity.test.ts",
+      "sha256": "4562068b33c416a75c874ae6eb80becae702ac1baf109a753c5ef39c9f95a78e",
+      "bytes": 1781
+    },
+    {
+      "file": "src/sourceIdentity.ts",
+      "sha256": "bc0f62a32d8aa3e6e421896813e1ebe3744d98b5befa19abd9ca2c8197dc6be0",
+      "bytes": 2981
+    },
+    {
+      "file": "tests/ui/native-contract.spec.ts",
+      "sha256": "57381a93886fa974837c35760ac925b401a27711a5547d9dcf4a4f2880d25554",
+      "bytes": 208103
+    }
+  ],
+  "previousGood": {
+    "sha256": "a137815efd4f55720033c4aa24ce517306ca51918152185dd532c2eb6281827f",
+    "preserved": true
+  },
+  "originalMapsUnchanged": true,
+  "separateDirtyCheckoutUnchanged": true,
+  "native": {
+    "sourcePanelVerified": true,
+    "mockBridge": false,
+    "cases": [
+      {
+        "runtimeId": "mccSteam",
+        "cacheVersion": 13,
+        "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "readback": {
+          "renderTriangles": 5503,
+          "collisionTriangles": 5940,
+          "modelTypes": 68,
+          "tags": 2425,
+          "typedFields": 8044
+        },
+        "hostingIndependent": true,
+        "originalRuntime": "mccSteam"
+      },
+      {
+        "runtimeId": "haloCustomEdition",
+        "cacheVersion": 609,
+        "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "readback": {
+          "renderTriangles": 5503,
+          "collisionTriangles": 5940,
+          "modelTypes": 68,
+          "tags": 2455,
+          "typedFields": 5702
+        },
+        "hostingIndependent": true,
+        "originalRuntime": "haloCustomEdition"
+      },
+      {
+        "runtimeId": "openCe",
+        "cacheVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "readback": {
+          "renderTriangles": 364774,
+          "collisionTriangles": 367004,
+          "modelTypes": 70,
+          "tags": 3357,
+          "typedFields": 10858
+        },
+        "hostingIndependent": true,
+        "originalRuntime": "openCe"
+      },
+      {
+        "runtimeId": "chupathingyCe",
+        "cacheVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "readback": {
+          "renderTriangles": 364774,
+          "collisionTriangles": 367004,
+          "modelTypes": 70,
+          "tags": 3357,
+          "typedFields": 10858
+        },
+        "hostingIndependent": true,
+        "originalRuntime": "openCe"
+      },
+      {
+        "runtimeId": "custom_maps",
+        "cacheVersion": 609,
+        "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "readback": {
+          "renderTriangles": 5503,
+          "collisionTriangles": 5940,
+          "modelTypes": 68,
+          "tags": 2455,
+          "typedFields": 5702
+        },
+        "hostingIndependent": true,
+        "originalRuntime": "haloCustomEdition"
+      }
+    ],
+    "sceneLifecycle": {
+      "executableSha256": "fc9e2b6193c6f6d9ff988278b0d39a983747f3fdbdeca7cafadd28f1f0c53e73",
+      "resources": [
+        {
+          "relativePath": "shaders/fx.bin",
+          "sha256": "94af9b2675745c6c5753d6939193202a9b1c49090424b092222a2070b5730a10",
+          "bytes": 801785
+        },
+        {
+          "relativePath": "shaders/psh.bin",
+          "sha256": "3cb63336cca69789d410fa018c2a598b03c4b8508387f17ac4abc6e00348b71b",
+          "bytes": 10216
+        },
+        {
+          "relativePath": "shaders/vsh.bin",
+          "sha256": "e1910a8c55f378d1d17e34df02935e29c91a3ed878dfbe4838e4739e0465e8a5",
+          "bytes": 141304
+        }
+      ],
+      "launched": true,
+      "stoppedWhenOwningWindowClosed": true,
+      "gameplayVerified": false
+    }
+  },
+  "conversion": {
+    "source": {
+      "build": "01.00.00.0609",
+      "classes": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actv": 4,
+        "ant!": 3,
+        "antr": 22,
+        "bipd": 2,
+        "bitm": 448,
+        "coll": 38,
+        "colo": 4,
+        "cont": 12,
+        "deca": 38,
+        "devc": 23,
+        "effe": 350,
+        "eqip": 14,
+        "flag": 1,
+        "font": 3,
+        "foot": 5,
+        "grhi": 2,
+        "hmt ": 1,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 14,
+        "jpt!": 81,
+        "lens": 28,
+        "ligh": 39,
+        "lsnd": 17,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 10,
+        "mod2": 70,
+        "part": 106,
+        "pctl": 12,
+        "phys": 5,
+        "pphy": 30,
+        "proj": 21,
+        "sbsp": 1,
+        "scen": 19,
+        "scex": 10,
+        "schi": 44,
+        "scnr": 1,
+        "senv": 15,
+        "sgla": 6,
+        "sky ": 1,
+        "smet": 4,
+        "snd!": 333,
+        "snde": 1,
+        "soso": 117,
+        "spla": 1,
+        "ssce": 1,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 8,
+        "udlg": 1,
+        "unhi": 5,
+        "ustr": 100,
+        "vehi": 6,
+        "weap": 20,
+        "wind": 1,
+        "wphi": 22
+      },
+      "collisionTriangles": 5940,
+      "diagnostics": [
+        {
+          "code": "DECAL_PREVIEW_UNAVAILABLE",
+          "message": "Decal has no exact internal bitmap metadata",
+          "severity": "warning"
+        },
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "modelTypes": 68,
+      "placements": 186,
+      "renderTriangles": 5503,
+      "scenario": "levels\\test\\bloodgulch\\bloodgulch",
+      "scenarioType": 1,
+      "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "version": 609
+    },
+    "target": {
+      "build": "01.03.43.0000",
+      "classes": {
+        "DeLa": 324,
+        "Soul": 1,
+        "actv": 4,
+        "ant!": 3,
+        "antr": 22,
+        "bipd": 2,
+        "bitm": 448,
+        "coll": 38,
+        "colo": 4,
+        "cont": 12,
+        "deca": 38,
+        "devc": 23,
+        "effe": 350,
+        "eqip": 14,
+        "flag": 1,
+        "font": 2,
+        "foot": 5,
+        "grhi": 2,
+        "hmt ": 1,
+        "hud#": 1,
+        "hudg": 1,
+        "itmc": 14,
+        "jpt!": 81,
+        "lens": 28,
+        "ligh": 39,
+        "lsnd": 17,
+        "matg": 1,
+        "metr": 2,
+        "mgs2": 10,
+        "mod2": 70,
+        "part": 106,
+        "pctl": 12,
+        "phys": 5,
+        "pphy": 30,
+        "proj": 21,
+        "sbsp": 1,
+        "scen": 19,
+        "scex": 10,
+        "schi": 44,
+        "scnr": 1,
+        "senv": 15,
+        "sgla": 6,
+        "sky ": 1,
+        "smet": 4,
+        "snd!": 333,
+        "snde": 1,
+        "soso": 117,
+        "spla": 1,
+        "ssce": 1,
+        "str#": 1,
+        "tagc": 4,
+        "trak": 8,
+        "udlg": 1,
+        "unhi": 5,
+        "ustr": 54,
+        "vehi": 6,
+        "weap": 20,
+        "wind": 1,
+        "wphi": 22
+      },
+      "collisionTriangles": 5940,
+      "diagnostics": [
+        {
+          "code": "RUNTIME_TEST_PENDING",
+          "message": "Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability.",
+          "severity": "warning"
+        }
+      ],
+      "modelTypes": 68,
+      "placements": 186,
+      "renderTriangles": 5503,
+      "scenario": "levels\\test\\bloodgulch\\bloodgulch",
+      "scenarioType": 1,
+      "sha256": "6ce8de58af57901a68bc77007cdd9dc1ee65a2bee76cbd3866e4af110ae71c77",
+      "version": 13
+    },
+    "build": {
+      "id": "f76b3ab9-5fd1-403e-baef-30e6a8aa92a9",
+      "target": "mcc-cea",
+      "sha256": "6ce8de58af57901a68bc77007cdd9dc1ee65a2bee76cbd3866e4af110ae71c77",
+      "projectFingerprint": "a24f389f758a25b416c04fece391520d700dfa1533272c1c1407d0d8d452ab57"
+    },
+    "semantic": {
+      "unchangedAuditedFields": 4643,
+      "changedPairedFields": 0,
+      "unpairedAuditedFields": 1059,
+      "missingTagCount": 47,
+      "addedTagCount": 0,
+      "scope": "Native class/path identities and Spark-audited fields only. Reference datums resolve to native class/path; offsets and cache IDs may legitimately change. Lists cap at 256 tags/512 changes; totals are complete. Unknown fields, shader appearance, scripts, object behavior and gameplay are not semantic-equivalence claims."
+    },
+    "decodedImages": 121,
+    "decodedReflectionCubes": 12,
+    "decodedAmbienceSamples": 1,
+    "audioHeard": false,
+    "visualParityVerified": false,
+    "retailCacheLoaded": false,
+    "metadataTemplate": {
+      "blocked": "Error: page.evaluate: Choose an unpublished Excession metadata template folder in Settings"
+    },
+    "standaloneExitCode": 1,
+    "playerGameplayVerified": false
+  },
+  "peerTrials": [
+    {
+      "family": "opence",
+      "verdict": {
+        "status": "sampled-state-disagreement",
+        "selectedComparison": "exactTicks",
+        "joinMarkersObserved": true,
+        "bidirectionalPacketCountersObserved": true,
+        "atLeastTwoMachinePlayersObserved": true,
+        "completeInventoryParity": false,
+        "humanPlayAccepted": false,
+        "aiActorAcceptance": false,
+        "twoComputerAcceptance": false,
+        "renderingOrAudioAcceptance": false,
+        "nativeDebugLogsChecked": true,
+        "nativeContentAcceptance": false,
+        "universalCrossRuntimeCompatibility": false,
+        "listingGateChangeAuthorized": false
+      },
+      "exactTickSamplePairs": 52,
+      "playerComparisons": 104,
+      "stateFields": {
+        "alive": {
+          "compared": 104,
+          "agree": 104,
+          "notComparable": 0
+        },
+        "health": {
+          "compared": 78,
+          "agree": 78,
+          "notComparable": 26
+        },
+        "shield": {
+          "compared": 78,
+          "agree": 75,
+          "notComparable": 26
+        },
+        "score": {
+          "compared": 104,
+          "agree": 104,
+          "notComparable": 0
+        },
+        "kills": {
+          "compared": 104,
+          "agree": 104,
+          "notComparable": 0
+        },
+        "deaths": {
+          "compared": 104,
+          "agree": 104,
+          "notComparable": 0
+        },
+        "friendlyFireKills": {
+          "compared": 104,
+          "agree": 104,
+          "notComparable": 0
+        },
+        "team": {
+          "compared": 104,
+          "agree": 104,
+          "notComparable": 0
+        },
+        "machine": {
+          "compared": 104,
+          "agree": 104,
+          "notComparable": 0
+        }
+      },
+      "stateDisagreements": {
+        "total": 3,
+        "truncated": false,
+        "examples": [
+          {
+            "hostTick": 330,
+            "clientTick": 330,
+            "id": 0,
+            "fields": {
+              "shield": {
+                "host": 0.91,
+                "client": 0.9,
+                "nextObservation": {
+                  "hostTick": 360,
+                  "clientTick": 360,
+                  "agrees": true
+                }
+              }
+            }
+          },
+          {
+            "hostTick": 1170,
+            "clientTick": 1170,
+            "id": 0,
+            "fields": {
+              "shield": {
+                "host": 0.57,
+                "client": 0.58,
+                "nextObservation": {
+                  "hostTick": 1200,
+                  "clientTick": 1200,
+                  "agrees": false
+                }
+              }
+            }
+          },
+          {
+            "hostTick": 1200,
+            "clientTick": 1200,
+            "id": 0,
+            "fields": {
+              "shield": {
+                "host": 0.82,
+                "client": 0.83,
+                "nextObservation": {
+                  "hostTick": 1230,
+                  "clientTick": 1230,
+                  "agrees": true
+                }
+              }
+            }
+          }
+        ]
+      },
+      "positionDeltas": [
+        {
+          "id": 0,
+          "count": 45,
+          "minimum": 0.001,
+          "median": 0.02912044,
+          "p95": 0.05441507,
+          "maximum": 0.06899275
+        },
+        {
+          "id": 1,
+          "count": 33,
+          "minimum": 0,
+          "median": 0.045,
+          "p95": 0.07233948,
+          "maximum": 0.08025584
+        }
+      ],
+      "execution": [
+        {
+          "runtime": "opence-build-335",
+          "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+          "exitCode": 0,
+          "inputsUnchanged": true
+        },
+        {
+          "runtime": "opence-build-335",
+          "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+          "exitCode": 0,
+          "inputsUnchanged": true
+        }
+      ],
+      "visualOrAudioAcceptance": false
+    },
+    {
+      "family": "chupa",
+      "verdict": {
+        "status": "sampled-state-disagreement",
+        "selectedComparison": "exactTicks",
+        "joinMarkersObserved": true,
+        "bidirectionalPacketCountersObserved": true,
+        "atLeastTwoMachinePlayersObserved": true,
+        "completeInventoryParity": false,
+        "humanPlayAccepted": false,
+        "aiActorAcceptance": false,
+        "twoComputerAcceptance": false,
+        "renderingOrAudioAcceptance": false,
+        "nativeDebugLogsChecked": true,
+        "nativeContentAcceptance": false,
+        "universalCrossRuntimeCompatibility": false,
+        "listingGateChangeAuthorized": false
+      },
+      "exactTickSamplePairs": 46,
+      "playerComparisons": 92,
+      "stateFields": {
+        "alive": {
+          "compared": 92,
+          "agree": 92,
+          "notComparable": 0
+        },
+        "health": {
+          "compared": 76,
+          "agree": 76,
+          "notComparable": 16
+        },
+        "shield": {
+          "compared": 76,
+          "agree": 74,
+          "notComparable": 16
+        },
+        "score": {
+          "compared": 92,
+          "agree": 92,
+          "notComparable": 0
+        },
+        "kills": {
+          "compared": 92,
+          "agree": 92,
+          "notComparable": 0
+        },
+        "deaths": {
+          "compared": 92,
+          "agree": 92,
+          "notComparable": 0
+        },
+        "friendlyFireKills": {
+          "compared": 92,
+          "agree": 92,
+          "notComparable": 0
+        },
+        "team": {
+          "compared": 92,
+          "agree": 92,
+          "notComparable": 0
+        },
+        "machine": {
+          "compared": 92,
+          "agree": 92,
+          "notComparable": 0
+        }
+      },
+      "stateDisagreements": {
+        "total": 2,
+        "truncated": false,
+        "examples": [
+          {
+            "hostTick": 690,
+            "clientTick": 690,
+            "id": 0,
+            "fields": {
+              "shield": {
+                "host": 0.57,
+                "client": 0.58,
+                "nextObservation": {
+                  "hostTick": 720,
+                  "clientTick": 720,
+                  "agrees": false
+                }
+              }
+            }
+          },
+          {
+            "hostTick": 720,
+            "clientTick": 720,
+            "id": 0,
+            "fields": {
+              "shield": {
+                "host": 0.82,
+                "client": 0.83,
+                "nextObservation": {
+                  "hostTick": 750,
+                  "clientTick": 750,
+                  "agrees": true
+                }
+              }
+            }
+          }
+        ]
+      },
+      "positionDeltas": [
+        {
+          "id": 0,
+          "count": 40,
+          "minimum": 0.001,
+          "median": 0.03324154,
+          "p95": 0.075,
+          "maximum": 0.09938813
+        },
+        {
+          "id": 1,
+          "count": 36,
+          "minimum": 0,
+          "median": 0.04687217,
+          "p95": 0.07271864,
+          "maximum": 0.07605919
+        }
+      ],
+      "execution": [
+        {
+          "runtime": "chupathingy-v0.8.1d",
+          "exeSha256": "b2f8ea992ed4031461bc638f8af80c08ec8905c5f73c97c483e86f25273b18d4",
+          "exitCode": 0,
+          "inputsUnchanged": true
+        },
+        {
+          "runtime": "chupathingy-v0.8.1d",
+          "exeSha256": "b2f8ea992ed4031461bc638f8af80c08ec8905c5f73c97c483e86f25273b18d4",
+          "exitCode": 0,
+          "inputsUnchanged": true
+        }
+      ],
+      "visualOrAudioAcceptance": false
+    }
+  ],
+  "tools": [
+    {
+      "name": "tool.exe",
+      "sha256": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+      "bytes": 7224560
+    },
+    {
+      "name": "sapien.exe",
+      "sha256": "44b1208d8c663d22654072664007e2ddcbe781bd738525ddd164125757dde4c8",
+      "bytes": 7501040
+    },
+    {
+      "name": "guerilla.exe",
+      "sha256": "0fafb97046b6f8e93ddf95d0f92f802b708585377b9fb552775ff7a9394ccfa9",
+      "bytes": 5129968
+    },
+    {
+      "name": "halo_tag_test.exe",
+      "sha256": "fc9e2b6193c6f6d9ff988278b0d39a983747f3fdbdeca7cafadd28f1f0c53e73",
+      "bytes": 8945904
+    },
+    {
+      "name": "invader-build.exe",
+      "sha256": "5606801ebea1677bbb22387717fc3cb8cb2606f445ae674630f91604b2c92b1a",
+      "bytes": 19570176
+    },
+    {
+      "name": "invader-extract.exe",
+      "sha256": "ded684bc2730b836719071dcdc505a78e5dca3730f19e9a30527ac725180c138",
+      "bytes": 17238016
+    }
+  ],
+  "research": {
+    "checkoutsVerified": true,
+    "copiedEngineModules": 0,
+    "index": "docs/fixtures/engine-source-index.json",
+    "licenseReviewBoundariesRetained": true
+  },
+  "preservedLedger": {
+    "rows": 464,
+    "bytes": 988670,
+    "sha256": "941987294e7facfea388feae1093fcf75b3e01673fa0a29ef4bc7bdf5801671d"
+  },
+  "privateEvidence": [
+    {
+      "path": ".local/c58-universal-runtime-20261103/rust-all-final.log",
+      "sha256": "48cfbfac6053dad8e19217df002a63117b09dfaccb0465eb55436e732cb50f64",
+      "bytes": 72503
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/frontend-combined.log",
+      "sha256": "56e97569c7bc52b5c7264117fcbb63c75a1d55be7203f2136736b25ec0188d4f",
+      "bytes": 715
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/browser-final.log",
+      "sha256": "591be4d494c71df9b0939d127c49f26de447e9edba724fa252d5d15f4c75861a",
+      "bytes": 28279
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/offline-combined.log",
+      "sha256": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+      "bytes": 10670
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/committed-source-build.log",
+      "sha256": "266dea1239fe4d9bf46c1eea6d1e2b5a4e38ebce7c0d5e3ad2e7fcf412ff81fb",
+      "bytes": 63
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/source-index-final.log",
+      "sha256": "8ce1ea61d4d89bd3e6d7c42dbf1aaaa5479a9ae27beacf373a2a9ca2d73497f4",
+      "bytes": 150
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/native-contract-final/acceptance.json",
+      "sha256": "59786e74ffe5de3e6656c6c039b19fa594f1b95d04f7cb7387343507130ae1b9",
+      "bytes": 87513
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/native-lifecycle-final/acceptance.json",
+      "sha256": "9ac1f400ec1185fb41cf2605c31c28aadaa9aa953c8643657fa264f444f67e90",
+      "bytes": 88025
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/ce-to-mcc-build.json",
+      "sha256": "457d99c9c220971ad101558b0dea3614e0a294c638ac95b2075412468939db20",
+      "bytes": 622
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/conversion-semantic.json",
+      "sha256": "767088115e84a747e7413049e5ab060dcb12ba984c80e8498cfb05db2e0322b0",
+      "bytes": 10526
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/converted-native-render.json",
+      "sha256": "85a76a111b99a7037a4886f5f5cf4f4ca8b656781249c577272c832188bafcf6",
+      "bytes": 644896
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/converted-scene/acceptance.json",
+      "sha256": "611517217835712c8d9cd930064862cc9e152bf1690398dd8d5f384329b58ade",
+      "bytes": 3596
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/converted-scene-b/acceptance.json",
+      "sha256": "a52f2444f12ee167604a4516d21f30a1b1ec15a6a11bc2f8b633b94287d3a0f9",
+      "bytes": 4129
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/converted-scene-c/acceptance.json",
+      "sha256": "a53a4469b859f622510da286be45e50ddbf37893e20b018b22724aaf9666227d",
+      "bytes": 4120
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/opence-ce-tunnel/execution.json",
+      "sha256": "0bbca3fc73584cf45bd065d2511bf98e59010f1ff2baa907936da62ef1c25e94",
+      "bytes": 7008
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/chupa-ce-tunnel/execution.json",
+      "sha256": "7d3ac4666bc035f51e93ebedae5f9b51b30a080d5e4ad8309b34d58858f10518",
+      "bytes": 7434
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/opence-analysis.log",
+      "sha256": "c98f46b82ad34ef2890de9a88defdf4002b1a0ff227a6b634167d4271879b5ba",
+      "bytes": 77521
+    },
+    {
+      "path": ".local/c58-universal-runtime-20261103/chupa-analysis.log",
+      "sha256": "e43f56a0e4d9b88b97b4f690606cde89b1cf8904c1d2939f91c377ed56fe7f30",
+      "bytes": 77260
+    }
+  ],
+  "remaining": [
+    "Official scenario-specific Excession metadata and retail MCC cache playtest",
+    "Returned stable Standalone gameplay/visual/audio check",
+    "Strict community peer-state disagreements and complete inventory/AI parity",
+    "Typed exact-release non-MCC Live Link write adapters",
+    "Independent Xbox/legacy PC/Mac/HaloMD conversion engineering",
+    "Zero player-verified Megaworld region connections; original walkthrough gate unchanged",
+    "General direct compiled-map topology still unfinished"
+  ]
+}
