@@ -3,7 +3,7 @@ import { call, native } from '../api';
 import { Notice } from './ui';
 interface ModuleStatus {
   configured: boolean;
-  appId: number;
+  appId: number|null;
   testMode: boolean;
   detail: string;
 }
@@ -41,6 +41,7 @@ export default function SteamSessionTools({ onReady }: { onReady?: (ready: boole
       setBusy(false);
     }
   }
+  if(status&&!status.testMode)return <p className="subtle" role="status">{status.detail}</p>;
   return (
     <div className="steam-session-tools">
       <strong>Steam · Spacewar test mode (480)</strong>

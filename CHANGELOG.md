@@ -1,5 +1,14 @@
 # Changelog
 
+## C59 — Detachable workspaces and durable collaboration rollover
+
+- Detach eligible drawers into native windows, retain original layout/placement and return the single-writer editing lease and durable history to the originating window. Keep independent maps editable and stale observer drafts recoverable.
+- Pause actual GL draws for parked/minimized editors, query native visibility without idle polling and retain two warm map GPU views per window. Preserve document, selection and Undo/Redo when a retired renderer is recreated.
+- Release the history mutex before native window construction and restore reserved ownership if creation fails. Keep destroy-event history recovery off the native UI thread.
+- Add explicit durable LAN/VPN session rollover at the acknowledged source revision, with preserved journals/snapshots, fresh invitations and a fresh shared Undo history. Keep operation errors visible across successful background polls.
+- Separate Online Host/Join/Collaborate, compact detached chrome/tabs and refuse production Spacewar test transport. Preserve debug research, source transactions and external-tool reconciliation.
+- Validate real native layouts/windows/history/GPU lifecycle and three-process BSP/native-build/crash/offline-edit/rollover/Radmin behavior. Separate-computer networking and physical monitor removal remain open. [Exact results](docs/CONTINUATION_59_WORKSPACE.md).
+
 ## C56 — Native AI combat and game-peer recovery
 
 - Retain each native round encounter's captured unit list so dead corpses are cleaned up alongside living actors. Allow a two-second death-animation grace. Preserve bounded solo rules, real living-count progression and refusal of missing spawns or defeat; do not generate kills or damage.

@@ -1,0 +1,507 @@
+{
+  "schemaVersion": 1,
+  "continuation": "C59",
+  "date": "2026-11-03",
+  "scope": "Professional native workspace and editor collaboration; game replication remains separate",
+  "source": {
+    "baseCommit": "88505dedd56d60168600ce94480c464bc6b73e7d",
+    "commitAssociation": "The local master commit containing this receipt; tested source files are hash-bound below.",
+    "files": {
+      "crates/spark-core/src/snapshots.rs": "e939b6033150d7a846aa0b78eb3066fd27e6da641c94163ccac717613c0c2152",
+      "crates/spark-core/src/studio_session.rs": "cbd8868c2aaf0749977e7cdd424d62247279521d71b805bc922c16d8d2aeec90",
+      "scripts/audit-workspaces-native.mjs": "047a5d12b30891ea2d217c4672447c6761e65fc5e0a01e1d38632f2b1a7e114b",
+      "scripts/test-native-window-frame.mjs": "a393dba23b25229acf6e184316f658df00835f8e41c5a0c85def5db469f84106",
+      "scripts/test-sparklink-rollover-native.mjs": "e6d8e1dd3a5f95ca6a3aae8fa21626b59f34937a5c9a74e50574e8c27b88c724",
+      "scripts/test-sparklink-workshop-native.mjs": "26439c3fdee626e341fb5cdb377d82e7cc1e8c9c53b8d0793363a34bf6929595",
+      "scripts/test-window-history-native.mjs": "17c28b59de011c550082782cdc6bb488a3702208fec53fb2de1dee6d5b1c8c61",
+      "scripts/test-workspace-lifecycle-native.mjs": "aba97ec4ffc7eda41ed7d86e523581a801c80588ede60083ea5c05bd20d1a453",
+      "src-tauri/capabilities/main.json": "0e0605bdb0670f5c1e2903c559719a2971199fa1f12de9bb0dfadfd4fe6ff6e0",
+      "src-tauri/src/app.rs": "6946202632e19ff29115630ed73e3f86db4b46be7f2558b04a2238288eaf69d3",
+      "src-tauri/src/shared_editing.rs": "347aea08dda861d4bff51ec1557a62d18fdb85a59239f1213d93ed228d8e0acd",
+      "src-tauri/src/steam_bridge.rs": "c8bf377a64bdec4f590b7a3eb42fb045a146c7f4d237b2813fd802bbf4317296",
+      "src-tauri/src/workspace_windows.rs": "3bf66185cbe5439dfbc37966352638150160f5e54fe4efe42481140f6639e3b5",
+      "src/App.tsx": "29800ea09b2b44968b68729e753568ff654e20ef2d6617dccead19b0d67ce0d1",
+      "src/components/ForgeCollaboration.tsx": "147a295e2abd051e1a1ad4c014d51bb35efc91562e2bc88b9f4800ce84f45086",
+      "src/components/HostingWorkspace.tsx": "f980629bceea0302aa288f4122b2e20728531dbd151f97477ec7a454c00cb5de",
+      "src/components/MapTabs.tsx": "fd612e6d81b978697a7ab99c18c482bf7ba3440581f0653db5151466d0845f90",
+      "src/components/RetainedLevelView.tsx": "78e6512cb8044774d7eea706a70bfe66a2f32d779b40375e112273e21485804c",
+      "src/components/Runtimes.tsx": "2f18e4a898fd72ac40383684761f6553c7df9ecf99f813ca33eabbe4b32d1818",
+      "src/components/SteamSessionTools.tsx": "4756b2485732d74e156e356fc766cd0854345690e5521ed4162467a8d081911c",
+      "src/components/ViewportActivity.tsx": "07927cb1f09132f3e2bcdc3612022d1c9996224750aec1f8bcf8487a5480b88a",
+      "src/components/WorkspacePanels.tsx": "fe8e838c6ae370074aa22fbbee8eca5c742efdbabfc5b23c987bbcd0b065ee3f",
+      "src/components/studio.css": "6da8f1c07c38ff7c78cab0e3892af16dc2364a55071d15f3d44ae135ab1debc5",
+      "src/detachedPanels.test.ts": "409d674ab3dd118266c072db062859657cc47128ffd8f75e329efd5c52e5e53d",
+      "src/detachedPanels.ts": "a3fadfd138b2318f30811b1613829f3c93b2a5274d87f06b4b952076bc614823",
+      "src/forge.css": "5dbe8563129b2397e4bbc492650a236208f994a0f0f16428f7ad423bb23b9075",
+      "src/hosting.css": "db16170eb1296161773247db084b479976885e61eb8cf1cc7d110d6ec8764c3e",
+      "src/studioClient.ts": "cb243224559604732098d47772cfed5c2ddbbf0d28117963abf353b246bdecfd",
+      "src/windowFocus.ts": "4775202a3f4b2b963a9ba7bc050ff399868860f8a4a6dd9421fb7b16835d683f",
+      "src/workbenchCompact.css": "aa95e68df79d3d00514c902d468a29393c73e3b62808884c11bf8801b5792b5e",
+      "src/workspacePanels.css": "5df2618a9dc1ee3dd53f34883a83eeabecee310f450998f837b7051b61210023",
+      "tests/ui/native-contract.spec.ts": "034f11236fdfd309f576a94dc6bcc776b00d7f9aa74ed52fca4bca2f690c091d"
+    }
+  },
+  "artifact": {
+    "path": "target/release/GuiltySpark.exe",
+    "version": "0.4.1",
+    "bytes": 42814976,
+    "sha256": "6ff7e2b869efdf6e5fe979c336b80128ea0d331911a65b766ec84fbdf291ca7b",
+    "kind": "Embedded Windows x64 release-mode test executable",
+    "newInstaller": false,
+    "newPortableZip": false,
+    "linuxAccepted": false,
+    "remotePushed": false,
+    "publicReleaseUploaded": false
+  },
+  "preservation": {
+    "previousGoodExeSha256": "96305d69a02fa7f63cb69bea07654aeb5b4e1bba7ed4409c4f70d9785f951861",
+    "expectedPreviousGoodExeSha256": "96305d69a02fa7f63cb69bea07654aeb5b4e1bba7ed4409c4f70d9785f951861",
+    "priorLedgerBytes": 994687,
+    "priorLedgerSha256": "e5a416ca154a2201e6e1b576d34679dc63750aa11e4cf9e258090fdbfb4bd88b",
+    "priorLedgerPrefixUnchanged": true,
+    "priorRequirements": 468,
+    "requirements": 472,
+    "oldCheckoutStatusUnchanged": true,
+    "separateDirtyCheckoutModifiedByThisPass": false,
+    "experimentalHistoryDiscarded": false,
+    "priorRepositoryLedgerBytes": 994678,
+    "priorRepositoryLedgerSha256": "11d41c34145f64ed42c6f06eae7bf5468deeebf5a13eb6c4cd28ce6706c3dca0",
+    "priorRepositoryLedgerPrefixUnchanged": true,
+    "lineEndings": "Existing nine working-copy CRLFs are retained locally; the repository LF filter preserves the exact preceding Git blob bytes."
+  },
+  "regressions": {
+    "rust": {
+      "passed": 664,
+      "failed": 0,
+      "ignored": 8,
+      "command": "node scripts/cargo.mjs test --workspace --locked"
+    },
+    "frontend": {
+      "passed": 355,
+      "files": 85,
+      "command": "pnpm test"
+    },
+    "browser": {
+      "passed": 154,
+      "syntheticContractSuite": true,
+      "command": "pnpm test:ui"
+    },
+    "offline": {
+      "scripts": 59,
+      "command": "pnpm test:offline"
+    },
+    "productionFrontendAndEmbeddedBuild": true
+  },
+  "acceptance": {
+    "layout": {
+      "appSha256": "6ff7e2b869efdf6e5fe979c336b80128ea0d331911a65b766ec84fbdf291ca7b",
+      "routeCases": 25,
+      "nativeWorkspaceRoutes": 23,
+      "geometryViews": 2,
+      "viewportAndSubviewStates": 126,
+      "complete": true,
+      "errors": [],
+      "sourceMapUnchanged": true,
+      "dpiEmulated": true,
+      "physicalMonitorTransferTested": false
+    },
+    "nativeLifecycle": {
+      "appSha256": "6ff7e2b869efdf6e5fe979c336b80128ea0d331911a65b766ec84fbdf291ca7b",
+      "cases": [
+        {
+          "name": "Pointer drag detaches the actual Inspector; selection, draft and authoritative history converge; stale observer writes are retained and refused"
+        },
+        {
+          "name": "Editing a second map while the detached panel edits the first preserves both documents; closing returns the lease without stealing the active map; Undo/Redo and original Canvas survive"
+        },
+        {
+          "name": "Inactive editor pauses its actual GL clears and resumes the same Canvas and selection",
+          "parkedGlClearsOver650ms": 0
+        },
+        {
+          "name": "Native minimization pauses the actual viewport and restoring resumes it without unloading the document",
+          "minimizedGlClearsOver650ms": 0
+        },
+        {
+          "name": "A third map retires the oldest actual GPU context; returning rehydrates its renderer while preserving document, selection and Undo/Redo",
+          "warmGpuMapLimit": 2,
+          "openDocuments": 3
+        },
+        {
+          "name": "Native size/position survive close and reopen; an offscreen saved window is recovered onto an available monitor",
+          "placement": {
+            "size": {
+              "width": 610,
+              "height": 690
+            },
+            "position": {
+              "x": 100,
+              "y": 80
+            }
+          },
+          "recovered": {
+            "x": 0,
+            "y": 390
+          }
+        },
+        {
+          "name": "A non-map drawer returns to the native window that opened it, including nested pop-outs"
+        },
+        {
+          "name": "Online exposes source collaboration separately from game hosting; production Steam test identities are refused natively"
+        }
+      ],
+      "physicalMonitors": 1,
+      "physicalMonitorDisconnectTested": false
+    },
+    "windowHistory": {
+      "appSha256": "6ff7e2b869efdf6e5fe979c336b80128ea0d331911a65b766ec84fbdf291ca7b",
+      "cases": [
+        {
+          "name": "moving a real Workshop retains project identity, selected brush and Undo/Redo",
+          "projectId": "37e02cfc-f488-46fe-aa51-c3e83524c0f8",
+          "selectionRetained": true
+        },
+        {
+          "name": "another native window observes the same committed transform",
+          "propagationMs": 882,
+          "independentWriter": false
+        },
+        {
+          "name": "editing lease transfer shares Undo/Redo; stale revision is rejected with a durable draft"
+        },
+        {
+          "name": "rapid committed edits converge in the observing window without losing the final notification"
+        },
+        {
+          "name": "independent map remains unchanged and its snapshot cannot enter the other map history"
+        },
+        {
+          "name": "abrupt process death recovers acknowledged unsaved transform and its Undo/Redo"
+        },
+        {
+          "name": "closing and reopening a pop-out saves the map and preserves its history"
+        },
+        {
+          "name": "pointer drag detaches a real tab; Return to main transfers the editing lease and durable Undo/Redo"
+        }
+      ]
+    },
+    "frame": {
+      "schemaVersion": 1,
+      "applicationSha256": "6ff7e2b869efdf6e5fe979c336b80128ea0d331911a65b766ec84fbdf291ca7b",
+      "mockedIpc": false,
+      "complete": true,
+      "errors": [],
+      "restored": {
+        "x": 16,
+        "y": 16,
+        "width": 1484,
+        "height": 934,
+        "viewport": [
+          1500,
+          950
+        ],
+        "margin": "16px 0px 0px 16px",
+        "borderRadius": "36px 20px 32px 16px"
+      },
+      "doubleClickMaximized": true,
+      "frameworkDoubleClickRoundTrip": true,
+      "fullscreenUsesCompleteViewportAndRestoresCorner": true,
+      "nativeShadowEnabledInSource": false,
+      "osCompositeVisualVerification": false
+    },
+    "collaboration": {
+      "appSha256": "6ff7e2b869efdf6e5fe979c336b80128ea0d331911a65b766ec84fbdf291ca7b",
+      "nativeProcesses": 3,
+      "separateLibraries": 3,
+      "physicalMachines": 1,
+      "mockedIpc": false,
+      "stages": {
+        "threeIndependentWorkshopEditors": {
+          "tls": true,
+          "durable": true,
+          "network": "actual private LAN interface",
+          "participants": 3
+        },
+        "simultaneousUiBrushEdits": true,
+        "participantSpecificBspUndoRedo": true,
+        "actualMouseDragGhosts": {
+          "perspectiveAndOrthographic": true,
+          "uncommittedRevisionUnchanged": true,
+          "clearedAfterGesture": true,
+          "actualGeometryCommittedAndRenderedByAllEditors": true
+        },
+        "conflictsReplayViewerAndBuildPermissions": true,
+        "expiredEditorLeaseReauthenticatesSameIdentity": {
+          "pausedNativeEditorJavaScriptMs": 11500,
+          "networkOutageSimulated": false
+        },
+        "sustainedNativeBspEditing": {
+          "commits": 240,
+          "durationMs": 74355.322,
+          "history": 100,
+          "revision": 247,
+          "acknowledgedOperations": 247,
+          "journalBytes": 1140147
+        },
+        "frozenSharedBspNativeBuild": {
+          "jobId": "61d820ba-4ebe-492d-9d23-b7f722fa7f9d",
+          "durationMs": 107910.71919999999,
+          "sessionRevision": 247,
+          "newerRevision": 248,
+          "cacheVersion": 13,
+          "compiledCollisionTriangles": 58,
+          "cacheSha256": "f94cbbbbf0643fb5accb2211f5930273e547891e48c1617ec285b706d8ca4b1e",
+          "cacheBytes": 88880670,
+          "portals": 2,
+          "readbackTags": 2239
+        },
+        "twoGenuineOfflineUiEditsRetained": {
+          "operationId": "89b22ab5-c915-42e5-aca0-aa6900db02f3",
+          "baseline": 248,
+          "pendingSourceSha256": "b34f040eaac25660818305c914a407072c67a2ec76a9748baabc920fcb5ebb70",
+          "newerDraftSourceSha256": "b8d2bed0727b813c6b2a88b7ee4ef780eb14973f0d75f1adb656be5aa747e8de"
+        },
+        "ownerProcessDeathRecoversSourceHistoryAndPendingIdentity": {
+          "originalOperationId": "89b22ab5-c915-42e5-aca0-aa6900db02f3",
+          "author": "8488ae92-a2e8-4472-ad55-c970e5f36f29",
+          "beforeRevision": 248,
+          "afterRevision": 250,
+          "genuineOfflineUiEdits": 2,
+          "originalOperationAppliedOnce": true,
+          "newerLocalDraftPreserved": true
+        },
+        "durableRolloverReinvitesThreeProcessesWithoutChangingThePreviousJournal": {
+          "elapsedMs": 7132.3891,
+          "previousSession": "4a970e1f-5629-4c26-a5a5-941545a1a892",
+          "previousRevision": 250,
+          "session": "ac92df5e-9a52-407a-ad94-bc25d0d274e7",
+          "newBaselineRevision": 0,
+          "convergedRevision": 3,
+          "oldJournalPreserved": true,
+          "newInvitationsRequired": true,
+          "sharedUndoStartsFresh": true
+        },
+        "radminInterfaceThreeProcessConvergence": {
+          "scope": "Radmin adapter, same physical machine",
+          "crossComputer": false,
+          "remoteVpnTunnelTested": false,
+          "revision": 3
+        },
+        "revokedParticipantCannotReconnect": true
+      },
+      "measurements": {
+        "simultaneous actual UI edits": {
+          "samples": [
+            993.1814000000013
+          ],
+          "medianMs": 993.1814000000013
+        },
+        "early sustained commits": {
+          "samples": [
+            410.7837999999974,
+            891.5025999999998,
+            888.7645000000048,
+            913.8306000000011,
+            890.6589999999997,
+            892.6322999999975,
+            392.5052999999971,
+            895.2105999999985,
+            899.8884000000035,
+            880.5950000000012,
+            894.0699000000022,
+            374.9311000000016
+          ],
+          "medianMs": 891.0807999999997
+        },
+        "late sustained commits": {
+          "samples": [
+            909.4572999999946,
+            904.7606999999989,
+            918.8157999999967,
+            891.766300000003,
+            892.0372000000061,
+            912.1111000000092,
+            897.238200000007,
+            899.8126000000047,
+            899.2816000000021,
+            390.49069999999483,
+            894.4395000000077,
+            887.8539999999921
+          ],
+          "medianMs": 898.2599000000046
+        }
+      },
+      "memory": [
+        {
+          "label": "before sustained edits",
+          "elapsedMs": 38574.7712,
+          "samples": [
+            {
+              "actor": "owner",
+              "Documents": 1,
+              "Nodes": 10053,
+              "LayoutDuration": 0.000225,
+              "TaskDuration": 0.031261,
+              "JSHeapUsedSize": 85662916,
+              "JSHeapTotalSize": 87277568
+            },
+            {
+              "actor": "editor-b",
+              "Documents": 1,
+              "Nodes": 10201,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.02683,
+              "JSHeapUsedSize": 86977424,
+              "JSHeapTotalSize": 88326144
+            },
+            {
+              "actor": "editor-c",
+              "Documents": 1,
+              "Nodes": 10131,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.0409,
+              "JSHeapUsedSize": 135930620,
+              "JSHeapTotalSize": 137461760
+            }
+          ]
+        },
+        {
+          "label": "mid sustained edits",
+          "elapsedMs": 75506.2959,
+          "samples": [
+            {
+              "actor": "owner",
+              "Documents": 1,
+              "Nodes": 10100,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.027964,
+              "JSHeapUsedSize": 86450308,
+              "JSHeapTotalSize": 88588288
+            },
+            {
+              "actor": "editor-b",
+              "Documents": 1,
+              "Nodes": 10248,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.02834,
+              "JSHeapUsedSize": 87747852,
+              "JSHeapTotalSize": 89636864
+            },
+            {
+              "actor": "editor-c",
+              "Documents": 1,
+              "Nodes": 10178,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.027953,
+              "JSHeapUsedSize": 136869804,
+              "JSHeapTotalSize": 138510336
+            }
+          ]
+        },
+        {
+          "label": "after sustained edits",
+          "elapsedMs": 112924.4368,
+          "samples": [
+            {
+              "actor": "owner",
+              "Documents": 1,
+              "Nodes": 10100,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.025173,
+              "JSHeapUsedSize": 86927840,
+              "JSHeapTotalSize": 88850432
+            },
+            {
+              "actor": "editor-b",
+              "Documents": 1,
+              "Nodes": 10248,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.028469,
+              "JSHeapUsedSize": 88146068,
+              "JSHeapTotalSize": 90161152
+            },
+            {
+              "actor": "editor-c",
+              "Documents": 1,
+              "Nodes": 10178,
+              "LayoutDuration": 0,
+              "TaskDuration": 0.025255,
+              "JSHeapUsedSize": 137287588,
+              "JSHeapTotalSize": 138772480
+            }
+          ]
+        }
+      ],
+      "networkScopes": [
+        "private",
+        "private",
+        "radminVpn"
+      ],
+      "gameLaunched": false,
+      "gamePeerReplicationTested": false,
+      "crossComputerTested": false,
+      "steamRelayTested": false
+    },
+    "pendingRolloverRejection": {
+      "appSha256": "6ff7e2b869efdf6e5fe979c336b80128ea0d331911a65b766ec84fbdf291ca7b",
+      "cases": [
+        {
+          "name": "Three actual processes converge on an acknowledged source revision",
+          "revision": 1
+        },
+        {
+          "name": "An active host detaches its native Inspector, publishes an actual transform to both peer processes and returns the same authority",
+          "nativeProcesses": 3,
+          "nativeWindowsAtPeak": 4,
+          "sessionUnchanged": true,
+          "revision": 2
+        },
+        {
+          "name": "Rejected rollover retains its pending operation and old authority; successful polls do not erase the actionable error"
+        },
+        {
+          "name": "UI rollover rotates the authority and three native processes rejoin its exact source",
+          "elapsedMs": 6006.517900000001,
+          "oldSession": "9e75b6a6-7408-4648-a9a7-56ffaae9918f",
+          "session": "f311afdc-8fae-435f-8017-60a1e93f2706",
+          "oldRevision": 2,
+          "newRevision": 0,
+          "oldHistoryRetained": true,
+          "sharedUndoStartsFresh": true
+        }
+      ],
+      "commandTimings": [
+        {
+          "name": "spark.ipc.forge_session_rollover",
+          "start": 11998.799999982119,
+          "duration": 16.900000005960464
+        },
+        {
+          "name": "spark.ipc.forge_session_rollover",
+          "start": 12106.5,
+          "duration": 32.79999998211861
+        }
+      ]
+    }
+  },
+  "privateEvidenceRoot": ".local/c59-professional-workspace-20261103",
+  "evidenceFiles": {
+    "layout": "workspace-layouts-complete/audit.json",
+    "lifecycle": "lifecycle-complete/acceptance.json",
+    "history": "window-history-complete/acceptance.json",
+    "frame": "window-frame-complete/acceptance.json",
+    "collaboration": "sparklink-final-source/acceptance.json",
+    "rolloverRejection": "rollover-detached-host/acceptance.json"
+  },
+  "limitations": [
+    "Only one physical computer and one monitor available.",
+    "Radmin acceptance is through the local adapter, not a remote VPN tunnel.",
+    "No full OS-window-session restore or whole-process RAM budget accepted.",
+    "No authorized production Steam application integration; Spacewar release path disabled.",
+    "No new Halo gameplay, audio listening, game-peer AI parity or Megaworld two-way traversal.",
+    "General direct compiled-map topology editing remains unfinished."
+  ],
+  "failedEvidenceRetained": true
+}

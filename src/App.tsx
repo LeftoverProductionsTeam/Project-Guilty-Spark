@@ -109,6 +109,7 @@ import WorkbenchGuide from './components/WorkbenchGuide';
 import LevelEditorWorkspace from './components/LevelEditorWorkspace';
 import { WORKBENCH_GUIDES } from './workbenchGuide';
 import type { WorkspaceFinderItem } from './workspaceFinder';
+import { canDetachPanel, requestedPanel } from './detachedPanels';
 import Tags from './components/Tags';
 import Build from './components/Build';
 const World = lazy(() => import('./components/World'));
@@ -218,6 +219,13 @@ export default function App() {
   const [createModal, setCreateModal] = useState(false);
   const [assetTransferOpen,setAssetTransferOpen]=useState(false);
   const [studioGuide,setStudioGuide]=useState(false);
+  const returnPanelRequested=useRef(false);
+  useEffect(()=>{
+    if(!native)return;
+    const returning=()=>{returnPanelRequested.current=true;void getCurrentWindow().close().catch(error=>{returnPanelRequested.current=false;notice(String(error),'error');});};
+    window.addEventListener('gs:return-panel-to-origin',returning);
+    return()=>window.removeEventListener('gs:return-panel-to-origin',returning);
+  },[]);
   const [newTitle, setNewTitle] = useState('Untitled workshop');
   const [dragging, setDragging] = useState(false);
   const [help, setHelp] = useState(false);
@@ -450,10 +458,12 @@ export default function App() {
         for(const doc of documentsRef.current.documents){const p=doc.history.current;if(p&&doc.history.dirty&&windowHistories.current.writable(p.id)){await windowHistories.current.persist(p.id,doc.history);await call('save_project',{project:p});dispatchDocument({type:'saved',id:p.id,project:p});}}
         await windowHistories.current.flush();
         const query=new URLSearchParams(location.search),original=query.get('project');
-        if(query.get('panel')==='object-tags'&&original&&documentsRef.current.documents.some(d=>d.id===original)&&windowHistories.current.writable(original))
-          await call('return_project_to_main',{id:original,workspace:returnWorkspace()??'world',panel:'object-tags',allowMissingMain:true});
+        if(original&&documentsRef.current.documents.some(d=>d.id===original)&&windowHistories.current.writable(original))
+          await call('return_project_to_main',{id:original,workspace:returnWorkspace()??requestedWorkspace()??'world',panel:query.get('panel'),allowMissingMain:true,activate:returnPanelRequested.current});
+        if(!original&&requestedPanel())await call('return_workspace_panel',{allowMissingOrigin:true});
         await call('close_application');
       } catch (error) {
+        returnPanelRequested.current=false;
         closingRef.current = false;
         setClosing(false);
         notice(
@@ -557,17 +567,32 @@ export default function App() {
   }, [notice]);
   const initialWindowProject=useRef(false);
   useEffect(()=>{
-    if(!native||!ready||getCurrentWindow().label!=='main')return;
+    if(!native||!ready)return;
     let alive=true;
-    const pending=listen<{id:string;workspace:Workspace|null;panel?:string|null}>('spark:reattach-project',({payload})=>{
+    const pending=listen<{id:string;workspace:Workspace|null;panel?:string|null;activate?:boolean}>('spark:reattach-project',({payload})=>{
       if(!/^[0-9a-f-]{36}$/i.test(payload.id))return;
       void call<OpenProject>('open_project',{id:payload.id}).then(async opened=>{
-        if(!alive)return;await load(opened);if(alive){setWorkspace(payload.workspace??rememberedWorkspace(opened.project,opened.inspection));
-          if(payload.panel==='object-tags')requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'object-tags'}})));}
+        if(!alive)return;
+        const prior=documentsRef.current.activeId,priorWorkspace=workspaceRef.current;
+        await load(opened);if(alive){
+          if(payload.activate===false&&prior&&prior!==payload.id){dispatchDocument({type:'select',id:prior});setWorkspace(priorWorkspace);}
+          else {setWorkspace(payload.workspace??rememberedWorkspace(opened.project,opened.inspection));
+            if(payload.panel)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:payload.panel}})));}}
       }).catch(error=>notice(`Returned map remains saved in your library: ${String(error)}`,'error'));
     });
     return()=>{alive=false;void pending.then(stop=>stop());};
   },[ready,load,notice,setWorkspace]);
+  useEffect(()=>{
+    if(!native||!ready)return;
+    const pending=listen<{workspace:Workspace;panel:string|null}>('spark:reattach-panel',({payload})=>{
+      if(!nav.some(item=>item.id===payload.workspace))return;
+      setWorkspace(payload.workspace);
+      if(payload.panel)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:payload.panel}})));
+    });
+    const recover=()=>void call('recover_workspace_window').catch(error=>notice(`Window placement: ${String(error)}`,'error'));
+    window.addEventListener('focus',recover);
+    return()=>{window.removeEventListener('focus',recover);void pending.then(stop=>stop());};
+  },[ready,notice,setWorkspace]);
   useEffect(()=>{const query=new URLSearchParams(location.search),id=query.get('project');if(!native||!ready||!id||initialWindowProject.current)return;initialWindowProject.current=true;if(!/^[0-9a-f-]{36}$/i.test(id)){notice('Invalid map window identity.','error');return;}void call<OpenProject>('open_project',{id}).then(async open=>{await load(open);const tag=Number(query.get('tag'));if(query.get('panel')==='object-tags'&&query.has('tag')&&open.inspection?.tags.some(t=>t.id===tag))writeMapSession(open.project.id,'tags.focus',tag);setWorkspace(requestedWorkspace()??rememberedWorkspace(open.project,open.inspection));}).catch(e=>notice(String(e),'error'));},[ready,load,notice]);
   useEffect(() => {
     if (!native) return;
@@ -750,6 +775,13 @@ export default function App() {
       setBusy(false);
     }
   }
+  async function openStudioProject(id:string) {
+    writeMapSession(id,'studio.openRequest',true);
+    await openProject(id,'quickforge');
+    // A retained editor is already mounted, so its initial saved-request effect
+    // will not run again. Use the same reveal event as the header indicator.
+    requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-live-studio-open',{detail:{projectId:id}})));
+  }
   function selectMap(id:string){if(document.activeElement instanceof HTMLElement)document.activeElement.blur();requestAnimationFrame(()=>{const map=documentsRef.current.documents.find(d=>d.id===id);dispatchDocument({type:'select',id});if(map?.history.current)setWorkspace(rememberedWorkspace(map.history.current,map.inspection));});}
   async function flushWindowHandoff(id:string){
     if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
@@ -771,6 +803,22 @@ export default function App() {
       return true;
     }catch(error){notice(String(error),'error');return false;}
     finally{closingDocuments.current.delete(id);setBusy(false);}
+  }
+  async function detachWorkspacePanel(panel:string):Promise<boolean>{
+    if(!native||busy||activeJob||!canDetachPanel(workspaceRef.current,panel,!!current))return false;
+    const id=current?.id;
+    if(id&&(!windowHistories.current.writable(id)||closingDocuments.current.has(id))){notice('Choose Edit here in Changes before moving this editing panel.');return false;}
+    if(id)closingDocuments.current.add(id);setBusy(true);
+    try{
+      if(id){
+        await flushWindowHandoff(id);
+        await call('open_project_window',{id,workspace:workspaceRef.current,originWorkspace:workspaceRef.current,panel});
+        const attached=await windowHistories.current.attach(id);setWindowWriters(old=>({...old,[id]:attached.status.writable}));
+        if(attached.history)dispatchDocument({type:'window-history',id,history:attached.history});
+      }else await call('open_workspace_window',{workspace:workspaceRef.current,panel});
+      return true;
+    }catch(error){notice(String(error),'error');return false;}
+    finally{if(id)closingDocuments.current.delete(id);setBusy(false);}
   }
   async function closeMap(id:string,separateWindow:boolean|'main'=false){
     if(closingDocuments.current.has(id))return;
@@ -1007,7 +1055,7 @@ export default function App() {
     return [...visitedLevelViews.current].map(id=>{
     const map=documents.documents.find(map=>map.id===id),project=map?.history.current??null;
     const active=inLevelEditor&&id===(current?.id??'new');
-    return <RetainedLevelView key={id} id={id} active={active} graphicsResident={warm.has(id)}>
+    return <RetainedLevelView key={id} id={id} active={active} graphicsResident={warm.has(id)} renderGraphics={!requestedPanel(location.search,workspace)}>
       <Suspense fallback={<div className="loading">Opening level editor…</div>}>
         <LevelEditorWorkspace defaultRuntime={data.settings.preferredHalo??undefined} entries={data.entries} onBuild={()=>setWorkspace('build')} project={project} inspection={map?.inspection??null} assetMeshes={map?.meshes??{}} intent={active?workspace as 'world'|'quickforge'|'live':'world'} onSourceEdit={edit} onImportMap={()=>void importFiles()} onContinue={id=>void openProject(id,'world')} onDirector={()=>void openRecordingDirector()}
           source={sourceView(map)} newMap={forgeView(null)} notify={notice} onBeforeResources={()=>save(false,project?.id)} onResourcesConnected={applyResourceMetadata}
@@ -1083,7 +1131,7 @@ export default function App() {
         <Compare entries={data.entries} currentId={current?.id} dirty={history.dirty} onSave={() => save()} />
       );
     if (workspace === 'runtimes')
-      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} settings={data.settings} onSettings={openDependencySetup} onOpenWorkspace={setWorkspace} edit={edit} />;
+      return <Runtimes project={current} dirty={history.dirty} onSave={() => save()} settings={data.settings} onSettings={openDependencySetup} onOpenWorkspace={setWorkspace} onCollaborate={()=>{setStudioGuide(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'co-edit-setup'}})));}} edit={edit} />;
     if (!current) return commonEmpty;
     switch (workspace) {
       case 'firefight': return <Firefight key={current.id} project={current} entries={data.entries} edit={edit} />;
@@ -1158,7 +1206,7 @@ export default function App() {
   return (
     <>
       <div className="gs-window-content">
-        <div className="application gs-drawers" inert={closing || undefined}>
+        <div className="application gs-drawers" data-panel-window={requestedPanel(location.search,workspace)??undefined} inert={closing || undefined}>
           <header
             id="gs-window-header"
             className="app-header gs-compact-header"
@@ -1215,10 +1263,7 @@ export default function App() {
                 projectId={current?.id ?? null}
                 canHost={!!current?.quickForge}
                 onSetup={()=>{setStudioGuide(true);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'co-edit-setup'}})));}}
-                onOpen={(id) => {
-                  writeMapSession(id,'studio.openRequest',true);
-                  void openProject(id,'quickforge').then(()=>requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-live-studio-open',{detail:{projectId:id}}))));
-                }}
+                onOpen={id=>{void openStudioProject(id);}}
               />
               <HeaderRuntime value={data.settings.preferredHalo??'mccSteam'} onChange={id=>{setDependencyRuntime(id);void applySettings({...data.settings,preferredHalo:id}).catch(()=>{});}}/>
               <button
@@ -1381,6 +1426,8 @@ export default function App() {
             >
               <WorkspacePanels
                 onPopout={() => void popoutWorkspace()}
+                onDetachPanel={detachWorkspacePanel}
+                canDetachPanel={panel=>canDetachPanel(workspace,panel,!!current)}
                 onNavigationToggle={toggleNavigation}
                 navigationOpen={sidebarOpen}
                 id={current?.id ?? 'global'}
@@ -1530,8 +1577,8 @@ export default function App() {
                   </WorkspacePanel>
                 )}
                 {studioGuide&&<WorkspacePanel id="co-edit-setup" label="Co-edit setup" defaultDock="right">
-                  <p>Choose an editable map, then host or join SparkLink over LAN/VPN. The SparkLink drawer also offers the optional Steam Spacewar test connection.</p>
-                  {documents.documents.filter(d=>d.history.current?.quickForge).map(d=><button key={d.id} onClick={()=>{writeMapSession(d.id,'studio.openRequest',true);setStudioGuide(false);void openProject(d.id,'quickforge');}}>{d.history.current?.title} · open SparkLink</button>)}
+                  <p>Choose an editable map, then host or join SparkLink with a private LAN/VPN invitation. Steam invitations require an authorized Spark application integration.</p>
+                  {documents.documents.filter(d=>d.history.current?.quickForge).map(d=><button key={d.id} onClick={()=>{setStudioGuide(false);void openStudioProject(d.id);}}>{d.history.current?.title} · open SparkLink</button>)}
                   <button disabled={busy} onClick={()=>void createQuickForge('Shared map','emptyArena',dependencyRuntime).then(()=>{const project=historyRef.current.current;if(project?.quickForge){writeMapSession(project.id,'studio.openRequest',true);window.dispatchEvent(new CustomEvent('guilty-spark-live-studio-open',{detail:{projectId:project.id}}));setStudioGuide(false);}})}>Create shared editable map</button>
                   <small>Editor collaboration and in-game multiplayer are separate connections. Each participant keeps a separate project copy.</small>
                 </WorkspacePanel>}

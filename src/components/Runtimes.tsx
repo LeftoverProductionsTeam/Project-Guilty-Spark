@@ -88,6 +88,7 @@ export default function Runtimes({
   settings,
   onSettings,
   onOpenWorkspace,
+  onCollaborate,
   edit,
 }: {
   project: Project | null;
@@ -96,13 +97,14 @@ export default function Runtimes({
   settings: Settings;
   onSettings: () => void;
   onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge' | 'creator') => void;
+  onCollaborate:()=>void;
   edit:(project:Project,description:string)=>void;
 }) {
   const [reports, setReports] = useState<RuntimeReport[]>([]);
   const [selected, setSelected] = useMapState<RuntimeId>(project?.id??'global','hosting.runtime',project?.quickForge?.runtimeId ?? settings.preferredHalo ?? 'mccSteam');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useMapState<'choose'|'runtime'|'friends'|'hosting'|'gameplay'|'servers'>(project?.id??'global','hosting.tab','choose');
+  const [tab, setTab] = useMapState<'choose'|'runtime'|'friends'|'hosting'|'gameplay'|'servers'|'collaborate'>(project?.id??'global','hosting.tab','choose');
   const alive = useRef(true);
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -147,14 +149,15 @@ export default function Runtimes({
       {error && <Notice>{error}</Notice>}
       <div className="online-toolbar">
       <div className="tabs workspace-tabs" aria-label="Online workspaces">
+        <button className={tab === 'hosting' ? 'selected' : ''} onClick={() => setTab('hosting')}>Host game</button>
         <button className={tab === 'servers' ? 'selected' : ''} onClick={() => setTab('servers')}>Join server</button>
+        <button className={tab === 'collaborate' ? 'selected' : ''} onClick={() => setTab('collaborate')}>Collaborate</button>
         <button className={tab === 'runtime' ? 'selected' : ''} onClick={() => setTab('runtime')}>
           Runtime adapters
         </button>
         <button className={tab === 'friends' ? 'selected' : ''} onClick={() => setTab('friends')}>
           Friends preflight
         </button>
-        <button className={tab === 'hosting' ? 'selected' : ''} onClick={() => setTab('hosting')}>Host game</button>
         <button className={tab === 'gameplay' ? 'selected' : ''} onClick={() => setTab('gameplay')}>Gameplay controls</button>
       </div>
       {loading && !reports.length && (
@@ -184,8 +187,14 @@ export default function Runtimes({
       </div>
       {tab==='gameplay'&&<GameplayControls key={project?.id??'global'} project={project} edit={edit} onEditor={()=>onOpenWorkspace('quickforge')}/>}
       {tab==='servers'&&<PlayAndServers project={project} runtime={selected} onRuntime={setSelected} onSetup={()=>setTab('runtime')} onSettings={onSettings} onHost={()=>setTab('hosting')} onFriends={()=>setTab('friends')}/>}
-      {tab==='choose'&&<p className="subtle">Select your Halo, then choose Join server or Host game. Setup and gameplay controls stay with this runtime.</p>}
-      {report && tab!=='choose' && tab!=='gameplay' && tab!=='servers' &&
+      {tab==='choose'&&<p className="subtle">Choose your Halo, then Host, Join or Collaborate. Game hosting and shared source editing use separate connections.</p>}
+      {tab==='collaborate'&&<section className="analysis-card online-collaborate" aria-label="Collaborate on source">
+        <h2>SparkLink · create together</h2>
+        <p>Share editable source, native tags and BSP brushes using a private LAN/VPN invitation. Each creator keeps a separate project copy, camera and recoverable edits.</p>
+        <button onClick={onCollaborate}>Set up editor collaboration</button>
+        <small>Game co-op uses Host or Join. Steam editor invitations require an authorized application integration; this release uses LAN/VPN.</small>
+      </section>}
+      {report && tab!=='choose' && tab!=='gameplay' && tab!=='servers' && tab!=='collaborate' &&
         (tab === 'runtime' ? (
           <>
             <CompatibilityTable/>

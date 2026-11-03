@@ -3,7 +3,6 @@ import { call, native } from '../api';
 import { useMapState } from '../mapSession';
 import type { Project, RuntimeReport } from '../types';
 import { Notice, Pill } from './ui';
-import SteamSessionTools from './SteamSessionTools';
 import '../hosting.css';
 type Action = 'testSolo' | 'hostLan' | 'hostPrivateOnline' | 'joinFriend' | 'dedicatedServer';
 interface Result {
@@ -154,14 +153,6 @@ export default function HostingWorkspace({
         </>
       )}
       {!native && <p>Open Spark on the desktop to inspect the matching runtime and hosting plan.</p>}
-      <details>
-        <summary>Steam editor connection · Spacewar test (480)</summary>
-        <SteamSessionTools />
-        <p>
-          Use Shared QuickForge to host or join with a private invite. Steam transports Spark source; the
-          running Halo match remains its own session.
-        </p>
-      </details>
     </section>
   );
 }

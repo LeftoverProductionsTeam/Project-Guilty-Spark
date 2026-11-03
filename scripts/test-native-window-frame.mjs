@@ -97,7 +97,7 @@ try {
       if (
         target &&
         e.contains(target) &&
-        !target.closest('button,a,input,select,textarea,[role="button"],[role="tab"]')
+        !target.closest('button,a,input,select,textarea,label,summary,[contenteditable="true"],[role="button"],[role="tab"],[tabindex]:not([tabindex="-1"]),[data-tauri-drag-region="false"]')
       )
         return { x, y: box.height / 2 };
     }

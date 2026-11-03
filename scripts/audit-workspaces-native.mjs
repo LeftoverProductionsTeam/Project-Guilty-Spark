@@ -32,7 +32,11 @@ const child = spawn(exe, [], { windowsHide: true, stdio: 'ignore', env: { ...pro
 const routes = ['library','map-finder','get-started','features','learning','how-to','community','world','tags','assets','scenario','build','preservation','settings','compare','runtimes','live','quickforge','firefight','interface','creator','machinima','academy'];
 const mapRoutes = new Set(['world','tags','assets','scenario','build','preservation','compare','live','quickforge','firefight','creator','machinima']);
 let browser, main;
-const invoke = (page, command, args = {}) => page.evaluate(({command,args}) => window.__TAURI_INTERNALS__.invoke(command,args), {command,args});
+const invoke = async (page, command, args = {}, timeout = 120000) => {
+  let timer;
+  try{return await Promise.race([page.evaluate(({command,args}) => window.__TAURI_INTERNALS__.invoke(command,args), {command,args}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(`Native command timed out: ${command}`)),timeout);})]);}
+  finally{clearTimeout(timer);}
+};
 const save = () => fs.writeFile(path.join(root, 'audit.json'), JSON.stringify(report, null, 2));
 async function layout(page) {
   return page.evaluate(() => {
@@ -182,7 +186,7 @@ try {
     }
     await save();
     console.log(JSON.stringify({workspace,clipped:entry.sizes.map(s => s.clippedControls.length),subviews:entry.subviews.length}));
-    await invoke(page,'close_application').catch(error => {
+    await invoke(page,'close_application',{},15000).catch(error => {
       if (!/Target page, context or browser has been closed/.test(String(error))) throw error;
     });
     await expect.poll(() => page.isClosed()).toBe(true);
@@ -197,7 +201,7 @@ try {
 } catch (error) { report.errors.push(String(error)); process.exitCode = 1; }
 finally {
   await save();
-  if (main) await invoke(main,'close_application').catch(()=>{});
+  if (main) await invoke(main,'close_application',{},5000).catch(()=>{});
   await browser?.close().catch(()=>{});
   if (child.exitCode === null) child.kill();
 }

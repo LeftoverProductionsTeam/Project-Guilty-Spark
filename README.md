@@ -21,6 +21,8 @@ An open-source Halo 1 creation and interoperability studio combining native modd
 
 **Future research stays visible:** expanded campaign co-op, accepted 128-player gameplay, four-region engine streaming, PC split-screen, VR and tracked interactions. These remain requirements, not advertised production capabilities.
 
+**C59 workspace acceptance:** eligible drawers and map tabs detach into native windows with original-window return, saved placement and durable history. Minimized/inactive editors stop drawing; two warm map renderers per window retain document state while older GPU contexts can be released. Online separates Host, Join and source collaboration. Three independent Spark processes pass native BSP compilation, host-crash/offline-edit recovery and explicit durable session rollover with fresh invitations. The 23-route native layout audit passes; physical multi-monitor removal and two-computer LAN/VPN remain unverified. Release builds refuse the Spacewar test bridge. [Exact evidence and limits](docs/CONTINUATION_59_WORKSPACE.md).
+
 ## Real accomplishments
 
 - Native geometry/collision compilation and a user-verified Custom Edition Workshop playthrough.

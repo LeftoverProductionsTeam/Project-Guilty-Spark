@@ -10,6 +10,12 @@ use std::{
     time::Duration,
 };
 type Reply<T> = Result<T, String>;
+/// Preserve the Spacewar investigation without exposing its test identity as a
+/// production transport. An authorized application integration remains separate.
+pub fn research_enabled()->bool { cfg!(debug_assertions) }
+pub fn require_research()->Reply<()> {
+    if research_enabled(){Ok(())}else{Err("Steam test identifiers are disabled in release builds. Use LAN/VPN; production Steam invitations require an authorized application integration.".into())}
+}
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Manifest {
@@ -82,6 +88,7 @@ pub struct Bridge {
 }
 impl Bridge {
     pub fn start(directory: &Path, pinned: &str, args: &[String]) -> Reply<Self> {
+        require_research()?;
         let (directory, _) = validate(directory, Some(pinned))?;
         let mut command = Command::new(directory.join("SparkSteamBridge.exe"));
         command

@@ -20,6 +20,7 @@
     "core:window:allow-set-fullscreen",
     "core:window:allow-set-fullscreen-on-monitor",
     "core:window:allow-set-size",
+    "core:window:allow-set-position",
     "core:window:allow-is-focused"
   ]
 }

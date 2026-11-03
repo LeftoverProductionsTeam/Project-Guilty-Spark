@@ -60,9 +60,11 @@ export default function ForgeCollaboration({
     [expanded, setExpanded] = useState(false);
   const [linkGame, setLinkGame] = useState(false),
     [steamReady, setSteamReady] = useState(false),
+    [steamResearch, setSteamResearch] = useState(false),
     [working, setWorking] = useState(false),
     [restoring, setRestoring] = useState(native),
     [error, setError] = useState(''),
+    [actionError, setActionError] = useState(''),
     [message, setMessage] = useState(''),
     [paused, setPaused] = useState(false),
     [showKey, setShowKey] = useState(false);
@@ -108,6 +110,14 @@ export default function ForgeCollaboration({
     operation = useRef(0),
     sessionRef = useRef<Info | null>(null);
   sessionRef.current = session;
+  useEffect(()=>{
+    let alive=true;
+    if(native)void call<{testMode:boolean}>('steam_module_status').then(status=>{
+      if(!alive)return;setSteamResearch(status.testMode);
+      if(!status.testMode&&transport==='steamSpacewar')setTransport('lan');
+    }).catch(()=>{});
+    return()=>{alive=false;};
+  },[projectId]);
   useEffect(() => {
     dragPreview.current = null;
     previewSequence.current = 0;
@@ -382,11 +392,12 @@ export default function ForgeCollaboration({
     actionRequest.current = request;
     setWorking(true);
     setError('');
+    setActionError('');
     setMessage('');
     try {
       await action();
     } catch (e) {
-      if (active.current && request === operation.current) setError(String(e));
+      if (active.current && request === operation.current) {setActionError(String(e));setMessage('');}
     } finally {
       if (actionRequest.current === request) actionRequest.current = null;
       if (active.current && request === operation.current) setWorking(false);
@@ -539,6 +550,9 @@ export default function ForgeCollaboration({
         onToggle={(e) => setExpanded(e.currentTarget.open)}
       >
         <summary>SparkLink · Shared source{session ? ' · active' : ''}</summary>
+        {error && <Notice tone="error">{error}</Notice>}
+        {actionError && <Notice tone="error">{actionError}</Notice>}
+        {message && <p role="status">{message}</p>}
         <p className="subtle">
           Live Studio shares BSP brushes, source geometry, placements, spawns, materials and environment. Each
           creator keeps their camera. Admitted native fields and complete scenery assets share the same
@@ -577,10 +591,10 @@ export default function ForgeCollaboration({
                 onChange={(e) => setTransport(e.target.value as Transport)}
               >
                 <option value="lan">Private LAN / VPN · TLS</option>
-                <option value="steamSpacewar">Steam · Spacewar test (480)</option>
+                {steamResearch&&<option value="steamSpacewar">Steam · development test only</option>}
               </select>
             </label>
-            {transport === 'steamSpacewar' ? (
+            {transport === 'steamSpacewar' && steamResearch ? (
               <SteamSessionTools onReady={setSteamReady} />
             ) : (
               <>
@@ -738,9 +752,11 @@ export default function ForgeCollaboration({
                   <div className="studio-history-row" key={row.directoryId}>
                     <span>
                       {row.title} · {new Date(row.createdAt).toLocaleString()}
+                      {history.some(next=>next.previousSessionId===row.sessionId)&&<small>Archived after rollover · recover the newer session</small>}
+                      {row.previousRevision!==undefined&&<small>Continues source from revision {row.previousRevision}</small>}
                     </span>
                     <button
-                      disabled={busy || transport === 'steamSpacewar'}
+                      disabled={busy || transport === 'steamSpacewar' || history.some(next=>next.previousSessionId===row.sessionId)}
                       onClick={() =>
                         void perform(async () => {
                           await onSave();
@@ -835,9 +851,6 @@ export default function ForgeCollaboration({
                   ? 'TLS 1.3'
                   : 'Legacy cleartext'}
               {roundTrip !== null ? ` · ${roundTrip} ms response` : ''}
-              {view?.operationLimit
-                ? ` · ${view.acknowledgedOperations ?? 0}/${view.operationLimit} acknowledged operations`
-                : ''}
             </p>
             {view?.operationLimit && view.operationLimit - (view.acknowledgedOperations ?? 0) < 256 && (
               <Notice>
@@ -942,6 +955,27 @@ export default function ForgeCollaboration({
                 Redo my shared edit
               </button>
               <button onClick={() => exportDraft()}>Export local draft</button>
+              {session.role==='host'&&session.transport==='lan'&&view?.durable&&<button
+                disabled={busy||paused||!!pending.current}
+                title="Preserve this journal and start a new session at the exact acknowledged revision. Creators need a new invitation; shared Undo begins a fresh history."
+                onClick={()=>void perform(async()=>{
+                  setMessage('Waiting for acknowledged edits…');
+                  // perform() has fenced new polls. A poll already in flight
+                  // may finish normally before the revision is checked.
+                  const deadline=performance.now()+5000;
+                  while(inFlight.current&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,25));
+                  if(inFlight.current||pending.current||queuedReverse.current.length||!shared.current||json(latest.current.doc)!==json(shared.current.document))
+                    throw Error('Wait for every local edit and shared history request to be acknowledged before starting a fresh session.');
+                  setMessage('Saving the acknowledged source…');
+                  await onSave();
+                  setMessage('Starting the next private session…');
+                  const next=await call<Info>('forge_session_rollover',{projectId,sessionId:session.sessionId,revision:shared.current.revision,displayName});
+                  if(!active.current)return;
+                  setSession(next);sessionRef.current=next;setEndpoint(next.endpoint);setKey(next.key??'');setInvite('');setShowKey(false);
+                  if(next.view)accept(next.view);
+                  setHistory(await call<StudioRecord[]>('forge_studio_history',{projectId}));
+                  setMessage('New private session ready. Copy a fresh invitation for each collaborator. The previous journal is retained; shared Undo starts from this source revision.');
+                })}>New session from this revision</button>}
               {paused ? (
                 <button disabled={busy} onClick={() => void perform(useShared)}>
                   Use shared version and resume
@@ -1005,7 +1039,8 @@ export default function ForgeCollaboration({
               </p>
             )}
             <details>
-              <summary>Shared activity · {view?.history?.length ?? 0} recent transactions</summary>
+              <summary>Activity &amp; recovery · {view?.history?.length ?? 0} recent changes</summary>
+              <p className="subtle">{view?.acknowledgedOperations??0}/{view?.operationLimit??4096} acknowledged operations. Older sessions remain in recovery history.</p>
               <ol>
                 {view?.history?.map((row) => (
                   <li key={row.id}>
@@ -1087,8 +1122,6 @@ export default function ForgeCollaboration({
             onFocus={(e) => e.currentTarget.select()}
           />
         )}
-        {message && <p role="status">{message}</p>}
-        {error && <Notice tone="error">{error}</Notice>}
         <p className="subtle">
           Keep invitations private. TLS pins the host certificate supplied in the invitation; names are chosen
           labels. No firewall rule, public listener, cloud account or game-file transfer is configured

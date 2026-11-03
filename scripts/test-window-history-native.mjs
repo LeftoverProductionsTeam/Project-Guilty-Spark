@@ -65,7 +65,7 @@ try{
   previous=new Set(pages());const tab=main.getByRole('tab',{name:'C43 history A',exact:true});const bounds=await tab.boundingBox();
   await main.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await main.mouse.down();await main.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height+110,{steps:12});await main.mouse.up();
   const dragged=await nextPage(previous);await value(dragged,.75);await setX(dragged,2.25);await acknowledged(dragged,id,2.25);
-  await dragged.getByRole('button',{name:'Return to main',exact:true}).click();await value(main,2.25);
+  await dragged.getByRole('button',{name:'Return map to workspace',exact:true}).click();await value(main,2.25);
   expect((await state(main,id)).writable).toBe(true);expect((await state(dragged,id)).writable).toBe(false);
   await main.keyboard.press('Control+z');await value(main,.75);await main.keyboard.press('Control+y');await value(main,2.25);await acknowledged(main,id,2.25);
   await main.screenshot({path:path.join(output,'reattached-after-tab-drag.png')});

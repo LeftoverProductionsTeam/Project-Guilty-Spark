@@ -1,6 +1,8 @@
 # Share a QuickForge map with SparkLink
 
-Use the same C39 development build on each Windows PC. Each creator needs their own owned Halo source/assets and any tools used locally. Spark does not send installed game files, tool executables or arbitrary local folders to guests.
+Use the same compatible Spark build on each Windows PC. Each creator needs their own owned Halo source/assets and any tools used locally. Spark does not send installed game files, tool executables or arbitrary local folders to guests. C59's fresh acceptance uses three independent processes on one computer; two-computer LAN/VPN remains unverified.
+
+**Online → choose runtime → Collaborate** opens the source-editing setup. Pick an editable map to open its SparkLink drawer. Host/Join game controls remain separate. Release builds do not offer the Spacewar test bridge; production Steam invitations require an authorized application integration.
 
 1. Open or create a QuickForge map in **Level editor**. Click **Live Studio · Solo** in the compact header.
 2. Enter your display name. Choose **Private LAN / VPN · TLS**. For another PC, enter this host PC's private LAN/VPN IPv4 address; `127.0.0.1` connects applications on this PC only. Host the editing session.
@@ -28,6 +30,10 @@ The drawer can export or restore a retained unacknowledged draft. **Clear retain
 - Names are chosen display labels, not verified identities. An Editor invitation grants editing access. Revoke a leaked participant and copy fresh invitations; possession of the old invitation alone will no longer admit new guests.
 - If recovery reports a corrupt/mismatched journal, retain the entire session folder and project snapshots for diagnosis. Spark refuses the active checkpoint rather than discarding acknowledged history. Do not manually replace the head file with an older checkpoint and call it recovered.
 - Ordinary tool switching keeps each open QuickForge project's synchronization controller mounted. The native-content test changes a shared field and player-start name while another participant is in the Tag editor, then verifies the rendered map on return. Conflicting unacknowledged drafts still require deliberate review.
+
+## Start a fresh durable session
+
+For a long-running host, wait until local edits/history requests are acknowledged and external tools have finished reconciliation, then choose **New session from this revision**. Spark snapshots the project and starts a new durable TLS authority with exactly that source at revision 0. Share fresh invitations: old invitations stop working and shared Undo begins a fresh history. Previous journals are retained and marked archived; they cannot silently become a competing recovered host. A refused rollover leaves the current authority and pending draft intact. This is an explicit action, not automatic host election or silent deletion of acknowledged operations.
 
 ## First acceptance test
 

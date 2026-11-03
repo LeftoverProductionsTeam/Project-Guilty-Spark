@@ -46,6 +46,10 @@ pub(super) struct StudioRecord {
     project_id: String,
     title: String,
     created_at: String,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    previous_session_id:Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    previous_revision:Option<u64>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -193,6 +197,9 @@ pub(super) fn recover(
         .into_iter()
         .find(|r| r.directory_id == directory_id && r.project_id == project_id)
         .ok_or("This project has no matching retained SparkLink session")?;
+    if history(state,&project_id)?.iter().any(|row|row.previous_session_id.as_deref()==Some(&record.session_id)) {
+        return Err("This session has rolled over. Recover its newer session; the previous journal remains preserved for review.".into());
+    }
     let mut slot = lock(&state.forge_session)?;
     if slot.is_some() {
         return Err("Leave the active session before recovering another".into());
@@ -463,6 +470,8 @@ pub(super) fn host(
             project_id: project_id.clone(),
             title: p.title.clone(),
             created_at: chrono::Utc::now().to_rfc3339(),
+            previous_session_id:None,
+            previous_revision:None,
         });
         lock(&state.library)?
             .set_setting(&history_key(&project_id), &rows)
@@ -484,6 +493,36 @@ pub(super) fn host(
     let info = info(&session, p.title, Some(view), true);
     *slot = Some(session);
     Ok(info)
+}
+pub(super) fn rollover(state:&AppState,owner:&str,project_id:String,session_id:String,revision:u64,display_name:String)->Reply<Info> {
+    check_document_owner(state,&project_id,owner)?;
+    if pending(state,owner,&project_id)?.is_some(){return Err("Resolve the retained unacknowledged edit before rolling over this session".into());}
+    if runtime_workbench::has_running(state,&project_id)?{return Err("Finish external-tool reconciliation before rolling over the session".into());}
+    let p=lock(&state.library)?.get(&project_id).map_err(error)?;
+    let mut rows=history(state,&project_id)?;
+    if rows.len()>=32{return Err("This project retains 32 sessions. Existing journals are preserved; review them before starting another.".into());}
+    let mut slot=lock(&state.forge_session)?;
+    let session=slot.as_ref().ok_or("No active SparkLink session")?;
+    if session.project_id!=project_id||session.id!=session_id||session.owner!=owner||!session.studio||session.transport!=Transport::Lan {
+        return Err("Only the current owner can roll over this map's durable LAN/VPN session".into());
+    }
+    let Peer::Host(host)=&session.peer else{return Err("Only the authoritative host can roll over a session".into())};
+    let current=session.peer.poll().map_err(error)?;
+    if current.revision!=revision{return Err("The shared revision changed. Review it before starting a new session.".into());}
+    studio_native_source::matches(state,&project_id,&current.document)?;
+    snapshot_project_state(state,&p,core::snapshots::BEFORE_SHARED_ROLLOVER)?;
+    let directory_id=uuid::Uuid::new_v4().to_string();
+    let next=host.rollover(revision,&directory(state,&directory_id)?,&display_name,|next_id|{
+        rows.push(StudioRecord{directory_id:directory_id.clone(),session_id:next_id.into(),project_id:project_id.clone(),title:p.title.clone(),created_at:chrono::Utc::now().to_rfc3339(),previous_session_id:Some(session_id.clone()),previous_revision:Some(revision)});
+        lock(&state.library).map_err(core::SparkError::Invalid)?.set_setting(&history_key(&project_id),&rows)
+    }).map_err(error)?;
+    let endpoint=next.endpoint.to_string();
+    let peer=Peer::Host(next);
+    let view=peer.poll().map_err(error)?;
+    let next=Session{project_id,id:view.session_id.clone(),peer,transport:Transport::Lan,endpoint,lan:session.lan,game:session.game.clone(),owner:owner.into(),directory_id:Some(directory_id),studio:true,_bridge:None};
+    let result=info(&next,p.title,Some(view),true);
+    *slot=Some(next);
+    Ok(result)
 }
 fn info(session: &Session, title: String, view: Option<View>, own: bool) -> Info {
     Info {

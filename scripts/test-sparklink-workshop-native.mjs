@@ -738,6 +738,39 @@ try {
     originalOperationAppliedOnce: true,
     newerLocalDraftPreserved: true,
   });
+  // C59: roll a converged durable authority forward through the real UI. Fresh
+  // invitations reset the bounded operation log; the old journal stays intact.
+  await Promise.all(actors.map((x) => save(x, current.document)));
+  const sealedSession=a.session,sealedDirectory=a.directory,sealedHead=await fs.readFile(path.join(sessionRoot,'head.json'));
+  const rolloverBegan=performance.now();
+  await panel(a);
+  await a.page.evaluate(()=>{window.c59RolloverClicks=0;document.addEventListener('click',event=>{if(event.target.closest?.('button')?.textContent==='New session from this revision')window.c59RolloverClicks++;});});
+  await expect(a.panel.getByRole('button',{name:'New session from this revision',exact:true})).toBeEnabled();
+  await a.panel.getByRole('button',{name:'New session from this revision',exact:true}).click();
+  await expect.poll(async()=> (await status(a)).sessionId).not.toBe(sealedSession);
+  const rolled=await status(a);a.session=rolled.sessionId;a.directory=rolled.directoryId;
+  expect(rolled.view.document).toEqual(current.document);expect(rolled.view.revision).toBe(0);expect(rolled.view.acknowledgedOperations).toBe(0);
+  expect(await fs.readFile(path.join(sessionRoot,'head.json'))).toEqual(sealedHead);
+  await expect(a.call('forge_session_invite',{projectId:a.id,sessionId:sealedSession,address:lan.address,viewer:false})).rejects.toThrow();
+  const lineage=await a.call('forge_studio_history',{projectId:a.id});
+  expect(lineage.find(row=>row.directoryId===a.directory)).toMatchObject({previousSessionId:sealedSession,previousRevision:current.revision});
+  await expect(a.call('forge_studio_recover',{projectId:a.id,directoryId:sealedDirectory,address:lan.address,displayName:a.slug,transport:'lan'})).rejects.toThrow(/rolled over/i);
+  await a.page.getByRole('button',{name:'Close SparkLink',exact:true}).click();
+  for(const x of [b,c])await leave(x);
+  const freshInvite=await invitation(a,lan.address);await join(b,freshInvite);await join(c,freshInvite);
+  await converge(rolled.view);
+  for(const x of actors)expect((await view(x)).canUndo).toBe(false);
+  base=await view(a);
+  await Promise.all([
+    update(a,base,d=>{d.workshop.brushes[0].name='Rollover owner';}),
+    update(b,base,d=>{d.workshop.brushes[1].name='Rollover editor B';}),
+    update(c,base,d=>{d.workshop.brushes[2].name='Rollover editor C';}),
+  ]);
+  current=await view(a);expect(current.revision).toBe(3);await converge(current);
+  await mark('durableRolloverReinvitesThreeProcessesWithoutChangingThePreviousJournal',{
+    elapsedMs:performance.now()-rolloverBegan,previousSession:sealedSession,previousRevision:lineage.find(row=>row.directoryId===a.directory).previousRevision,
+    session:rolled.sessionId,newBaselineRevision:0,convergedRevision:current.revision,oldJournalPreserved:true,newInvitationsRequired:true,sharedUndoStartsFresh:true,
+  });
   await Promise.all(actors.map((x) => save(x, current.document)));
   for (const x of [b, c, a]) await leave(x);
   // Repeat actual endpoint traffic using the OS-identified Radmin interface.
@@ -792,6 +825,10 @@ try {
   receipt.stack = e.stack;
   receipt.pageErrors = errors;
   for (const a of actors) {
+    receipt.uiAlerts??={};
+    receipt.uiAlerts[a.slug]=await a.page?.locator('[role="alert"]').allTextContents().catch(()=>[]);
+    receipt.uiAlerts[a.slug+':notices']=await a.page?.locator('.notice.error').allTextContents().catch(()=>[]);
+    receipt.uiAlerts[a.slug+':rolloverClicks']=await a.page?.evaluate(()=>window.c59RolloverClicks).catch(()=>null);
     await a.page?.screenshot({ path: path.join(a.dir, 'failure.png') }).catch(() => {});
   }
   await fs.writeFile(path.join(root, 'failure.json'), JSON.stringify(receipt, null, 2));

@@ -57,9 +57,33 @@
 .gs-panel-buttons [aria-expanded='true'] {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-  box-shadow: inset 0 -2px var(--accent);
+  box-shadow: inset 0 1px #ffffff12;
   color: var(--text);
 }
+
+/* A native panel window reuses the workspace's controls and document, without
+   spending another viewport or layering a drawer over an empty map canvas. */
+.gs-workspace-shell[data-detached-panel] .gs-workspace-content { display: none; }
+.gs-workspace-shell[data-detached-panel] .gs-panel-layer { inset: 0; }
+.gs-workspace-panel[data-detached='true'] {
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.gs-workspace-panel[data-detached='true'] .gs-panel-drag { cursor: default; }
+.gs-workspace-panel[data-detached='true'] > .gs-panel-resize { display: none; }
+.gs-workspace-panel[data-detached='true'] > header { min-height: 28px; padding-block: 3px; }
+.gs-workspace-panel[data-detached='true'] > .gs-panel-content { padding: 8px 10px; }
+.application[data-panel-window] .map-tab-bar,
+.application[data-panel-window] .runtime-dock,
+.application[data-panel-window] .project-breadcrumbs { display: none; }
+.application[data-panel-window] .gs-compact-header :is(.header-actions,.header-context,.gs-layout-actions) { display: none; }
+#gs-header-workspace-tools .gs-workspace-tools > button.gs-return-panel { width:auto;min-width:64px;display:inline-flex;gap:4px;white-space:nowrap; }
 .gs-panel-buttons > button:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .gs-panel-count {
   background: var(--accent);
@@ -726,7 +750,7 @@ html[data-gs-fullscreen='true'] .gs-workspace-shell { --gs-tools-height: 30px; }
 .application .map-tab .map-tab-action:hover, .application .map-tab:focus-within .map-tab-action { opacity: 1; }
 .application .map-tab-bar > button { border-color: transparent; background: transparent; font-size: 11px; padding: 5px 7px; }
 :root[data-gs-theme='dark-glow'] .gs-panel-buttons > button { background: transparent !important; border-color: transparent; box-shadow: none; }
-:root[data-gs-theme='dark-glow'] .gs-panel-buttons > button[aria-expanded='true'] { background: color-mix(in srgb, var(--accent) 10%, var(--panel)) !important; border-color: color-mix(in srgb, var(--accent) 28%, transparent); box-shadow: inset 0 -2px var(--accent); }
+:root[data-gs-theme='dark-glow'] .gs-panel-buttons > button[aria-expanded='true'] { background: color-mix(in srgb, var(--accent) 10%, var(--panel)) !important; border-color: color-mix(in srgb, var(--accent) 28%, transparent); box-shadow: inset 0 1px #ffffff12; }
 :root[data-gs-theme='dark-glow'] .map-tab button { background: transparent !important; box-shadow: none; }
 
 .application .gs-compact-header > .map-tab-bar { flex: 1; min-width: 0; height: 100%; min-height: 0; background: transparent; border: 0; padding: 0 8px; }

@@ -116,7 +116,7 @@ export default function MapTabs({
           {!matches.length&&<p role="status">No open maps match.</p>}
         </div>
       </details>}
-      {onReturn&&state.activeId&&<button className="small-button" aria-label="Return to main" disabled={disabled} title="Save this map and return its editing history to the main Spark window" onClick={()=>onReturn(state.activeId!)}><CornerUpLeft size={14}/>Return to main</button>}
+      {onReturn&&state.activeId&&<button className="small-button" aria-label="Return map to workspace" disabled={disabled} title="Save this map and return its editing history to the Spark window that opened it" onClick={()=>onReturn(state.activeId!)}><CornerUpLeft size={14}/>Return</button>}
       <button className="small-button" title="Transfer assets between open maps" aria-label="Transfer assets" disabled={disabled} onClick={onAssets}>
         <PackageOpen size={14} /> Transfer assets
       </button>

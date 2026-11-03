@@ -64,6 +64,9 @@
   justify-content: space-between;
   margin-block: 0.5rem;
 }
+.studio-history-row > span { min-width:0;flex:1; }
+.studio-history-row small { display:block;font-size:10px;color:var(--muted); }
+.studio-panel > .notice { margin:6px 0;padding:8px;font-size:11px; }
 .studio-differences > div {
   display: grid;
   gap: 0.25rem;

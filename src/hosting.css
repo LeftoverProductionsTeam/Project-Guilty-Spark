@@ -69,6 +69,7 @@
   border: 0;
 }
 .application .online-toolbar .runtime-picker {
+  order: -1;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -76,6 +77,21 @@
   margin: 4px 0;
   width: auto;
   font-size: 11px;
+}
+.application .online-collaborate {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 12px;
+}
+.online-collaborate h2 { font-size: 15px; margin: 0; }
+.online-collaborate p { margin: 0; grid-column: 1; }
+.online-collaborate button { grid-column: 2; grid-row: 1 / 3; }
+.online-collaborate small { grid-column: 1 / -1; color: var(--muted); }
+@media (max-width: 650px) {
+  .application .online-collaborate { grid-template-columns: minmax(0,1fr); }
+  .online-collaborate button { grid-column: 1; grid-row: auto; justify-self: start; }
 }
 .application .online-toolbar .runtime-picker select {
   width: clamp(160px, 20vw, 250px);

@@ -2,12 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal, SquareArrowOutUpRight, Expand, Shrink } from 'lucide-react';
+import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal, SquareArrowOutUpRight, Expand, Shrink, CornerUpLeft } from 'lucide-react';
 import { useMapState,readMapSession,writeMapSession } from '../mapSession';
 import {native} from '../api';
 import {getCurrentWindow} from '@tauri-apps/api/window';
 import { useWindowFullscreen } from '../useWindowFullscreen';
 import { WindowControls } from './WindowFrame';
+import { requestedPanel } from '../detachedPanels';
 import { changePanel, cleanLayout, defaultPanel } from '../workspaceLayout';
 import type { PanelPlacement, WorkspaceLayout } from '../workspaceLayout';
 import '../workspacePanels.css';
@@ -27,6 +28,9 @@ interface ContextValue {
   update: (id: string, p: Partial<PanelPlacement>) => void;
   attention: (id: string, count: number) => void;
   reveal: (id: string) => void;
+  detach?: (id:string)=>Promise<boolean>;
+  canDetach?: (id:string)=>boolean;
+  detached: string|null;
 }
 const Context = createContext<ContextValue | null>(null);
 function HeaderTools({children}:{children:ReactNode}){
@@ -42,6 +46,8 @@ export default function WorkspacePanels({
   onNavigationToggle,
   navigationOpen,
   onPopout,
+  onDetachPanel,
+  canDetachPanel,
 }: {
   id: string;
   workspace: string;
@@ -50,7 +56,10 @@ export default function WorkspacePanels({
   onNavigationToggle: () => void;
   navigationOpen: boolean;
   onPopout?:()=>void;
+  onDetachPanel?:(id:string)=>Promise<boolean>;
+  canDetachPanel?:(id:string)=>boolean;
 }) {
+  const detached=native?requestedPanel(location.search,workspace):null;
   const windowLayoutId=native?`${id}:window:${getCurrentWindow().label}`:id;
   const [raw, setRaw] = useMapState<WorkspaceLayout>(windowLayoutId, `layout.${workspace}`, () => readMapSession<WorkspaceLayout>(id,`layout.${workspace}`,{
     version: 1,
@@ -59,7 +68,7 @@ export default function WorkspacePanels({
   }));
   // A new detached view inherits the last layout, then arranges its own panels.
   // Moving a drawer on one monitor must not cover another window's inspector.
-  useEffect(()=>{if(!native)return;const persist=()=>writeMapSession(id,`layout.${workspace}`,raw);persist();window.addEventListener('gs:save-viewport-context',persist);return()=>window.removeEventListener('gs:save-viewport-context',persist);},[id,workspace,raw]);
+  useEffect(()=>{if(!native||detached)return;const persist=()=>writeMapSession(id,`layout.${workspace}`,raw);persist();window.addEventListener('gs:save-viewport-context',persist);return()=>window.removeEventListener('gs:save-viewport-context',persist);},[id,workspace,raw,detached]);
   const layout = useMemo(() => cleanLayout(raw), [raw]);
   const { fullscreen, change: changeFullscreen, error: windowError } = useWindowFullscreen();
   const [peek, setPeek] = useState<string | null>(null);
@@ -97,6 +106,9 @@ export default function WorkspacePanels({
       host,
       panels: layout.panels,
       peek,
+      detach:onDetachPanel,
+      canDetach:canDetachPanel,
+      detached,
       register: (d) => {
         setDescriptors((previous) => (previous.some((p) => p.id === d.id) ? previous : [...previous, d]));
         if (d.defaultDock)
@@ -119,7 +131,7 @@ export default function WorkspacePanels({
         setRaw((old) => changePanel(cleanLayout(old), panel, { open: true }));
       },
     }),
-    [host, layout, peek, setRaw, contentHosts, attachContent],
+    [host, layout, peek, setRaw, contentHosts, attachContent,onDetachPanel,canDetachPanel,detached],
   );
   useEffect(()=>{const open=(e:Event)=>{const id=(e as CustomEvent).detail?.id;if(typeof id==='string'&&descriptors.some(d=>d.id===id))context.reveal(id);};window.addEventListener('guilty-spark-reveal-drawer',open);return()=>window.removeEventListener('guilty-spark-reveal-drawer',open);},[context,descriptors]);
   useEffect(() => {
@@ -138,7 +150,10 @@ export default function WorkspacePanels({
         e.preventDefault();
         void changeFullscreen();
       }
-      if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) {
+      if(e.key==='Escape'&&detached&&fullscreen&&!document.querySelector('[role="dialog"]')){
+        e.preventDefault();void changeFullscreen(false);return;
+      }
+      if (e.key === 'Escape' && !detached && !document.querySelector('[role="dialog"]')) {
         const menu=document.querySelector<HTMLDetailsElement>('.gs-panel-options[open],.gs-panel-overflow[open],.gs-layout-menu[open]');
         if(menu){e.preventDefault();menu.open=false;menu.querySelector<HTMLElement>('summary')?.focus();return;}
         const panel =
@@ -167,7 +182,7 @@ export default function WorkspacePanels({
           placement.dock === 'bottom'||placement.dock==='top' ? Math.min(placement.height, 360) : Math.min(placement.width, 440);
   return (
     <Context.Provider value={context}>
-      <div className="gs-workspace-shell" data-fullscreen={fullscreen} data-workspace={workspace}>
+      <div className="gs-workspace-shell" data-fullscreen={fullscreen} data-workspace={workspace} data-detached-panel={detached??undefined}>
         <HeaderTools><nav className="gs-workspace-tools" aria-label="Workspace panels">
           {!windowHost&&<button
             className="gs-navigation-toggle"
@@ -187,9 +202,10 @@ export default function WorkspacePanels({
           >
             {fullscreen ? <Shrink size={16}/> : <Expand size={16}/>}
           </button>
-          {onPopout&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={onPopout}><SquareArrowOutUpRight size={14}/></button>}
+          {onPopout&&!detached&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={onPopout}><SquareArrowOutUpRight size={14}/></button>}
+          {detached&&<button className="gs-return-panel" aria-label="Return panel to workspace" title="Save and return this panel to its original workspace" onClick={()=>window.dispatchEvent(new Event('gs:return-panel-to-origin'))}><CornerUpLeft size={14}/>Return</button>}
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
-          {descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open)for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-layout-menu[open]'))menu.open=false;}} onKeyDown={event=>{
+          {!detached&&descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open)for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-layout-menu[open]'))menu.open=false;}} onKeyDown={event=>{
             if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
             event.preventDefault();event.stopPropagation();event.currentTarget.open=true;
             const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')],at=buttons.indexOf(document.activeElement as HTMLButtonElement);
@@ -201,7 +217,7 @@ export default function WorkspacePanels({
           </details>}
           <div className="gs-layout-actions">
             {actions}
-            <details className="gs-layout-menu" onToggle={event=>{if(event.currentTarget.open)for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-panel-overflow[open]'))menu.open=false;}}>
+            {!detached&&<details className="gs-layout-menu" onToggle={event=>{if(event.currentTarget.open)for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-panel-overflow[open]'))menu.open=false;}}>
               <summary>Layout</summary>
               <div>
                 {descriptors.map((panel) => (
@@ -226,7 +242,7 @@ export default function WorkspacePanels({
                   Reset layout
                 </button>
               </div>
-            </details>
+            </details>}
           </div>
           {windowHost&&createPortal(<WindowControls
             notify={setFrameError}
@@ -296,12 +312,14 @@ export function WorkspacePanel({
     ...defaultPanel(),
     ...(defaultDock ? { dock: defaultDock } : {}),
   };
-  const drag = useRef<{ pointer: number; x: number; y: number; left: number; top: number; moved:boolean } | null>(null);
+  const detached=context?.detached===id;
+  const detachAction=onDetach??(context?.canDetach?.(id)&&context?.detach?()=>context.detach!(id):undefined);
+  const drag = useRef<{ pointer: number; x: number; y: number; left: number; top: number; moved:boolean; placement:PanelPlacement } | null>(null);
   const resize=useRef<{pointer:number;x:number;y:number;width:number;height:number}|null>(null);
   const [detaching,setDetaching]=useState(false),[detachError,setDetachError]=useState('');
   const detach=()=>{
-    if(!onDetach||detaching)return;setDetaching(true);setDetachError('');
-    void onDetach().then(moved=>{if(moved)context?.update(id,{open:false});}).catch(error=>setDetachError(String(error))).finally(()=>setDetaching(false));
+    if(!detachAction||detaching)return;setDetaching(true);setDetachError('');
+    void detachAction().then(moved=>{if(moved)context?.update(id,{open:false});}).catch(error=>setDetachError(String(error))).finally(()=>setDetaching(false));
   };
   if (!context) return <>{children}</>;
   if (!context.host) return null;
@@ -326,10 +344,11 @@ export function WorkspacePanel({
             context.update(id, { width, height });
         }
       }}
-      hidden={!active || !placement.open}
+      hidden={!active || (context.detached? !detached : !placement.open)}
       className="gs-workspace-panel"
       data-panel-id={id}
       data-dock={placement.dock}
+      data-detached={detached||undefined}
       style={styles}
       aria-label={`${label} panel`}
     >
@@ -337,7 +356,7 @@ export function WorkspacePanel({
         <span
           className="gs-panel-drag"
           onPointerDown={(e) => {
-            if (e.button !== 0 || !section.current||!context.host) return;
+            if (e.button !== 0 || detached || !section.current||!context.host) return;
             e.preventDefault();
             e.currentTarget.setPointerCapture(e.pointerId);
             const rect=section.current.getBoundingClientRect(),layer=context.host.getBoundingClientRect();
@@ -348,6 +367,7 @@ export function WorkspacePanel({
               left: rect.left-layer.left,
               top: rect.top-layer.top,
               moved:false,
+              placement:{...placement},
             };
           }}
           onPointerMove={(e) => {
@@ -363,7 +383,7 @@ export function WorkspacePanel({
             }
           }}
           onPointerUp={(event) => {
-            if(drag.current?.moved&&onDetach&&(event.clientX<0||event.clientY<0||event.clientX>innerWidth||event.clientY>innerHeight)){drag.current=null;detach();return;}
+            if(drag.current?.moved&&detachAction&&(event.clientX<0||event.clientY<0||event.clientX>innerWidth||event.clientY>innerHeight)){context.update(id,drag.current.placement);drag.current=null;detach();return;}
             if(drag.current?.moved&&context.host){
               const layer=context.host.getBoundingClientRect(),x=event.clientX-layer.left,y=event.clientY-layer.top;
               const dock=x<28?'left':x>layer.width-28?'right':y<28?'top':y>layer.height-28?'bottom':'float';
@@ -376,8 +396,8 @@ export function WorkspacePanel({
           <PanelLeftClose size={15} />
           {label}
         </span>
-        {native&&onDetach&&<button aria-label={`Detach ${label}`} title={`Move ${label} to a separate native editing window`} disabled={detaching} onClick={detach}><SquareArrowOutUpRight size={14}/></button>}
-        <details className="gs-panel-options">
+        {native&&detachAction&&!context.detached&&<button aria-label={`Detach ${label}`} title={`Move ${label} to a separate native editing window`} disabled={detaching} onClick={detach}><SquareArrowOutUpRight size={14}/></button>}
+        {!detached&&<details className="gs-panel-options">
           <summary aria-label={`${label} drawer options`} title="Drawer position, size and pinning"><SlidersHorizontal size={14}/></summary>
       <div className="gs-panel-placement">
         <select
@@ -415,10 +435,10 @@ export function WorkspacePanel({
           />
         </label>
       </div>
-        </details>
-        <button aria-label={`Close ${label}`} onClick={() => context.update(id, { open: false })}>
+        </details>}
+        {!detached&&<button aria-label={`Close ${label}`} onClick={() => context.update(id, { open: false })}>
           <X size={15} />
-        </button>
+        </button>}
       </header>
       <div className="gs-panel-content">{detachError&&<p role="alert">{detachError}</p>}{children}<div ref={appendHost} className="gs-panel-addons"/></div>
       <div className="gs-panel-resize" role="separator" tabIndex={0} aria-label={`Resize ${label} drawer`}

@@ -65,6 +65,8 @@ export interface StudioRecord {
   projectId: string;
   title: string;
   createdAt: string;
+  previousSessionId?:string;
+  previousRevision?:number;
 }
 /** A bounded semantic conflict review; the full retained source stays separate. */
 export function studioDifferences(

@@ -2,6 +2,21 @@ import {chooseTool,openDrawer} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
 import { test, expect, type Page } from '@playwright/test';
 
+test('C59 Online separates game hosting, compatible joins and source collaboration',async({page})=>{
+  await mockDesktop(page);await page.goto('/');await chooseTool(page,'Online');
+  await page.getByRole('button',{name:'Host game',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Hosting and servers',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Collaborate',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Hosting and servers',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('region',{name:'Collaborate on source',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Set up editor collaboration',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Co-edit setup panel',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Close Co-edit setup',exact:true}).click();
+  await page.getByRole('button',{name:'Join server',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Collaborate on source',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Host game',exact:true})).toHaveCount(1);
+});
+
 async function mockDesktop(page: Page) {
   await page.addInitScript(() => {
     localStorage.setItem('guilty-spark-first-run-seen-v1', 'yes');

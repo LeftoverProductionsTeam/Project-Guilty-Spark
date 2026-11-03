@@ -202,6 +202,7 @@ struct Response {
     error: Option<String>,
 }
 struct Room {
+    sealed: bool,
     journal: Journal,
     storage: Option<Storage>,
     online: BTreeMap<String, Instant>,
@@ -216,6 +217,7 @@ struct Room {
 }
 impl Room {
     fn publish(&mut self, next: Journal) -> Result<()> {
+        if self.sealed { return invalid("This session rolled over. Retain any pending draft and join the host's new private invitation."); }
         if let Some(storage) = &mut self.storage {
             storage.store(&next)?;
         }
@@ -251,6 +253,7 @@ impl Room {
         revision: u64,
         brush: Option<crate::studio_workshop::BrushTransform>,
     ) -> Result<()> {
+        if self.sealed {return invalid("This session rolled over. Retain your draft and join the new private invitation.");}
         if author != "host"
             && self
                 .journal
@@ -387,6 +390,9 @@ impl Room {
         Ok(())
     }
     fn handle(&mut self, r: Request) -> Result<Response> {
+        if self.sealed && !matches!(r.command,Command::Leave) {
+            return invalid("This session rolled over. Retain any pending draft and join the host's new private invitation.");
+        }
         if r.schema_version != PROTOCOL_VERSION {
             return invalid("SparkLink protocol differs; use matching Spark versions");
         }
@@ -635,6 +641,7 @@ impl Host {
             certificate: tls.map(|t| t.certificate),
             in_flight: AtomicUsize::new(0),
             room: Mutex::new(Room {
+                sealed: false,
                 journal,
                 storage,
                 online: BTreeMap::new(),
@@ -737,6 +744,30 @@ impl Host {
     }
     pub fn close(&self) {
         self.stop.store(true, Ordering::Relaxed);
+    }
+    /// Fence the old authority only after the new durable listener and its local
+    /// recovery record exist. The room lock excludes late accepted proposals.
+    /// Old journals and identities are preserved; fresh keys require reinvites.
+    pub fn rollover(
+        &self, expected_revision:u64, root:&Path, host_name:&str,
+        record:impl FnOnce(&str)->Result<()>,
+    )->Result<Arc<Self>> {
+        self.open()?;
+        let mut room=locked(&self.room)?;
+        if room.sealed || room.journal.revision!=expected_revision {
+            return invalid("The shared revision changed before rollover. Refresh and review the latest acknowledged source first.");
+        }
+        if room.storage.is_none() || !room.encrypted {
+            return invalid("Rollover requires a durable encrypted SparkLink session");
+        }
+        let SocketAddr::V4(address)=self.endpoint else{return invalid("Rollover requires a private IPv4 listener")};
+        let next=Self::persistent_scoped(room.journal.document.clone(),*address.ip(),room.game.clone(),root,host_name,true,self.network_scope)?;
+        let session_id=locked(&next.room)?.journal.session_id.clone();
+        if let Err(reason)=record(&session_id){next.close();return Err(reason);}
+        room.sealed=true;
+        room.previews.clear();
+        self.close();
+        Ok(next)
     }
     pub fn role(&self, id: &str, role: Role, revoke: bool) -> Result<View> {
         self.open()?;
@@ -1069,6 +1100,35 @@ impl Peer {
 }
 #[cfg(test)]
 mod studio_tests {
+    #[test]
+    fn rollover_fences_the_old_authority_and_preserves_both_durable_journals() {
+        let temp=tempfile::tempdir().unwrap();
+        let doc=crate::bsp_workshop::example().unwrap();
+        let old_dir=temp.path().join("old");
+        let host=Host::persistent(doc.clone(),Ipv4Addr::LOCALHOST,None,&old_dir,"Owner",true).unwrap();
+        let (guest,joined)=Guest::join_studio(&host.endpoint.to_string(),&host.key(),host.certificate.as_deref(),"Artist",None,Duration::from_secs(2)).unwrap();
+        let artist=Peer::Guest(guest);
+        let mut edited=doc.clone();edited.workshop.as_mut().unwrap().brushes[0].position[0]=0.25;
+        let committed=artist.propose(joined.revision,edited.clone()).unwrap();
+        let old_head=std::fs::read(old_dir.join("head.json")).unwrap();
+        // A failed metadata write leaves the previous host usable and unchanged.
+        assert!(host.rollover(committed.revision,&temp.path().join("failed"),"Owner",|_|invalid("disk fixture failure")).is_err());
+        assert_eq!(artist.poll().unwrap().revision,committed.revision);
+        assert!(host.rollover(0,&temp.path().join("stale"),"Owner",|_|Ok(())).is_err());
+        let new_dir=temp.path().join("new");
+        let next=host.rollover(committed.revision,&new_dir,"Owner",|id|{assert_ne!(id,committed.session_id);Ok(())}).unwrap();
+        assert_ne!(next.key(),host.key());
+        assert_ne!(next.certificate,host.certificate);
+        assert!(Peer::Host(host.clone()).propose(committed.revision,doc.clone()).is_err());
+        // A request that already passed Host::open still cannot publish after
+        // the room lock was released by rollover.
+        { let mut room=host.room.lock().unwrap();let candidate=room.journal.propose(&uuid::Uuid::new_v4().to_string(),"host",committed.revision,doc.clone()).unwrap();assert!(room.commit("host",candidate).is_err()); }
+        assert_eq!(std::fs::read(old_dir.join("head.json")).unwrap(),old_head);
+        let (joined_new,view)=Guest::join_studio(&next.endpoint.to_string(),&next.key(),next.certificate.as_deref(),"Artist",None,Duration::from_secs(2)).unwrap();
+        assert_eq!(view.document,edited);assert_eq!(view.revision,0);assert_eq!(view.acknowledged_operations,0);
+        assert!(!view.can_undo);assert!(new_dir.join("head.json").exists());
+        Peer::Guest(joined_new).leave();next.close();host.close();
+    }
     #[test]
     fn workshop_drag_previews_are_ephemeral_bounded_and_viewers_cannot_publish_them() {
         let temp = tempfile::tempdir().unwrap();

@@ -6,11 +6,11 @@ import { EditorAudioScope } from './EditorAudio';
 /** Park the editor without losing document/UI state. Only its expensive Canvas
  * subtree may be retired by the bounded warm-view policy. Closing the document
  * still performs ordinary disposal of the complete editor. */
-export default function RetainedLevelView({id,active,graphicsResident=true,children}:{id:string;active:boolean;graphicsResident?:boolean;children:ReactNode}) {
+export default function RetainedLevelView({id,active,graphicsResident=true,renderGraphics=true,children}:{id:string;active:boolean;graphicsResident?:boolean;renderGraphics?:boolean;children:ReactNode}) {
   const slot = useRef<HTMLDivElement>(null);
   const [host] = useState(() => document.createElement('div'));
   const [parking] = useState(() => document.createDocumentFragment());
-  const resident=active||graphicsResident;
+  const resident=renderGraphics&&(active||graphicsResident);
   const activity = useMemo(() => ({active,graphicsResident:resident,scope:`level:${id}`}),[id,active,resident]);
   useLayoutEffect(() => {
     host.className = 'gs-retained-level-content';
