@@ -885,6 +885,49 @@ pub struct CompiledRouteReport {
     pub collision_triangles: usize,
     pub walk_samples: Vec<usize>,
 }
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledWalkthroughStart {
+    pub id: String,
+    pub position: [f32; 3],
+    pub floor_height: Option<f64>,
+    pub issue: Option<String>,
+}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledWalkthroughReport {
+    pub cache_sha256: String,
+    pub collision_triangles: usize,
+    pub forward_samples: usize,
+    pub return_samples: usize,
+    pub starts: Vec<CompiledWalkthroughStart>,
+    pub player_traversal_verified: bool,
+}
+/// Reuse the exact compiled collision checker in both directions and for the
+/// scenario's starts. It deliberately grants no native physics/portal/scenery
+/// or player acceptance, even when every geometric sample is clear.
+pub fn verify_compiled_walkthrough(path: &Path, route: &BspAssembly) -> Result<CompiledWalkthroughReport> {
+    route.validate()?;
+    let inspection = maps::inspect_map(path, path.parent())?;
+    let (collision, _) = maps::collision_source(path, &inspection)?;
+    let checker = crate::bsp_clearance::RouteChecker::new(&collision)?;
+    let forward_samples = checker.verify(route)?;
+    let mut reverse = route.clone();
+    reverse.tunnel_points.reverse();
+    let return_samples = checker.verify(&reverse)?;
+    let points = inspection.objects.iter().filter(|o| o.kind == "Player spawn").collect::<Vec<_>>();
+    if points.is_empty() || points.len() > 4096 {
+        return invalid("Walkthrough requires 1-4096 actual native player starts");
+    }
+    let starts = points.into_iter().map(|p| {
+        let result = checker.verify_start(p.position.map(f64::from));
+        CompiledWalkthroughStart { id: p.id.clone(), position: p.position,
+            floor_height: result.as_ref().ok().copied(), issue: result.err().map(|e| e.to_string()) }
+    }).collect();
+    Ok(CompiledWalkthroughReport { cache_sha256: inspection.sha256,
+        collision_triangles: collision.indices.len()/3, forward_samples, return_samples, starts,
+        player_traversal_verified: false })
+}
 /// Recheck earlier connections after extending a world. Routes must use the
 /// compiled world's coordinates; BSP checks do not include scenery or physics.
 pub fn verify_compiled_routes(path: &Path, routes: &[BspAssembly]) -> Result<CompiledRouteReport> {

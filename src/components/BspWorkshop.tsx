@@ -743,6 +743,9 @@ export default function BspWorkshop(props: Props) {
       data-source-valid={props.report?.valid ?? false}
       data-textures={Object.keys(materialPreview.textures).length}
       data-workshop-preview-count={ghosts.length}
+      data-selected-brush={brush?.id ?? ''}
+      data-selected-face={face?.id ?? ''}
+      data-geometry-tool={tool}
     >
       <div className="bsp-toolbar">
         <strong>BSP Workshop</strong>

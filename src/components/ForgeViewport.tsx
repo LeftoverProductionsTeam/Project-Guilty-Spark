@@ -68,6 +68,8 @@ export interface ForgeViewportProps {
   snapshot: ForgeSnapshot | null;
   selected: string[];
   onSelect: (id: string | null, additive: boolean) => void;
+  onGeometrySelect?: (selection: {brushId:string;faceId?:string}) => void;
+  geometrySelection?: {brushId:string;faceId?:string} | null;
   onTransform: (nodes: ForgeNode[],duplicate?:boolean) => void;
   mode: 'translate' | 'rotate' | 'scale';
   snap: number;
@@ -570,6 +572,8 @@ function ForgeScene(props: ForgeViewportProps) {
           wire={wireframe}
           textures={props.surfaceTextures ?? {}}
           views={props.surfaceViews}
+          onSelect={props.onGeometrySelect}
+          selection={props.geometrySelection}
         />
       )}
       {props.showHillAreas && <HillRegions objectives={doc.objectives} />}

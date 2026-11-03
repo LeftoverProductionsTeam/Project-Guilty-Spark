@@ -97,6 +97,7 @@ export default function BspSurfaces({
       onClick={
         onSelect
           ? (e) => {
+              if (e.button !== 0 || e.delta > 5) return;
               e.stopPropagation();
               const hit = surface.hits[e.faceIndex ?? -1];
               if (hit) onSelect({ brushId: hit.brushId, faceId: hit.faceId });

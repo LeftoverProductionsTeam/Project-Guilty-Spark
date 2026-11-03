@@ -1,4 +1,8 @@
 .forge-workspace { display:flex; flex-direction:column; flex:1; min-height:0; background:#0e1720; }
+.forge-source-actions { position:absolute;top:8px;left:8px;z-index:5;display:flex;align-items:center;flex-wrap:wrap;gap:5px;max-width:calc(100% - 16px);padding:5px 7px;border:1px solid var(--line,#344352);border-radius:8px;background:var(--panel,#121725);font-size:11px; }
+.forge-source-actions strong { overflow:hidden;text-overflow:ellipsis;max-width:200px;white-space:nowrap; }
+.forge-source-actions select { width:auto;max-width:225px;min-height:28px; }
+.forge-source-actions small { color:var(--text-muted,#a2b4bf);font-size:10px; }
 .forge-topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:11px 17px; border-bottom:1px solid #2b3f4b; background:#17242c; flex-shrink:0; }
 .forge-topbar > div { display:flex; align-items:center; gap:11px; }
 .forge-topbar strong { letter-spacing:.5px; color:#bdeed8; }

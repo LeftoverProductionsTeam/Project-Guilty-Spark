@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
+import { PerspectiveCamera, Vector3 } from 'three';
 const expect = assertion.configure({ timeout: 45000 }),
   a = process.argv.slice(2);
 if (a.length !== 2 && a.length !== 5)
@@ -216,6 +217,69 @@ try {
   expect(refused).toBe(true);
   expect((await state()).workshop).toEqual(before.workshop);
   receipt.invalidEditRefusedWithoutSourceMutation = true;
+  // Use native evaluated source and real pointer raycasts, never injected React
+  // selection/state. The Objects view must hand its selected source face to the
+  // existing Workshop and a single Undo must retire the whole extrusion.
+  async function editClickedSurface() {
+    const source = await state();
+    const mesh = await call('quickforge_preview', {document: source});
+    await page.getByRole('button', {name: 'Objects & gameplay', exact: true}).click();
+    const canvas = page.locator('.forge-viewport canvas');
+    await expect(canvas).toHaveAttribute('data-gs-camera', /position/);
+    await expect(page.getByText('Current geometry validated', {exact: true})).toBeVisible();
+    // Let the newly mounted camera's retained position and orbit target settle
+    // before projecting native face centers into the actual viewport.
+    await page.waitForTimeout(250);
+    const box = await canvas.boundingBox();
+    const pose = JSON.parse(await canvas.getAttribute('data-gs-camera'));
+    const camera = new PerspectiveCamera(55, box.width / box.height, 0.03, 20000);
+    camera.position.fromArray(pose.position);
+    camera.quaternion.fromArray(pose.quaternion);
+    camera.updateMatrixWorld();
+    const surface = page.locator('.forge-source-actions');
+    const candidates = [];
+    for (const part of mesh.parts) {
+      if (!source.workshop.brushes.some(b => b.id === part.brushId)) continue;
+      for (let i = part.indexStart; i < part.indexStart + part.indexCount; i += 3) {
+        const vertices = mesh.indices.slice(i, i + 3).map(v => new Vector3().fromArray(mesh.positions, v * 3));
+        const center = vertices.reduce((p, v) => p.add(v), new Vector3()).multiplyScalar(1 / 3);
+        const normal = vertices[1].clone().sub(vertices[0]).cross(vertices[2].clone().sub(vertices[0]));
+        // Extend a wall. Lowering the entire room floor would detach the
+        // example's solid ramp and correctly fail the connected-source gate.
+        if (Math.abs(normal.clone().normalize().z) > 0.25) continue;
+        if (normal.dot(camera.position.clone().sub(center)) <= 0) continue;
+        center.project(camera);
+        if (Math.abs(center.x) < 0.85 && Math.abs(center.y) < 0.8 && center.z < 1)
+          candidates.push({x: box.x + (center.x + 1) * box.width / 2, y: box.y + (1 - center.y) * box.height / 2});
+      }
+    }
+    expect(candidates.length).toBeGreaterThan(0);
+    receipt.surfacePointerTrial = {pose, box, candidateCount: candidates.length, attempts: []};
+    for (const point of candidates) {
+      await page.mouse.click(point.x, point.y);
+      await page.waitForTimeout(80);
+      receipt.surfacePointerTrial.attempts.push({...point, selected: await surface.isVisible()});
+      if (await surface.isVisible()) break;
+    }
+    await expect(surface).toBeVisible();
+    const face = await surface.getAttribute('data-source-face');
+    await page.screenshot({path: path.join(root, 'clicked-editable-surface.png')});
+    await page.getByLabel('Edit selected source geometry').selectOption('face');
+    const workshop = page.getByLabel('Native BSP Workshop');
+    await expect(workshop).toHaveAttribute('data-selected-face', face);
+    await expect(workshop).toHaveAttribute('data-geometry-tool', 'face');
+    const brushId = await workshop.getAttribute('data-selected-brush');
+    expect(source.workshop.brushes.find(b => b.id === brushId)?.faces.some(f => f.id === face)).toBe(true);
+    await page.getByRole('button', {name: 'Extrude face', exact: true}).click();
+    await expect(page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();
+    await save();
+    await expect.poll(async () => (await state()).workshop.brushes.length).toBe(source.workshop.brushes.length + 1);
+    const extruded = await state();
+    receipt.clickedSurfaceEditing = {brushId, faceId: face, sourceBrushes: source.workshop.brushes.length,
+      extrudedBrushes: extruded.workshop.brushes.length, source: extruded.workshop, nativeCompilationVerified: false};
+    return source.workshop;
+  }
+  let beforeExtrusion;
   if (a.length === 5) {
     const details = page
       .locator('.bsp-source-fields details')
@@ -242,6 +306,7 @@ try {
     await page.getByRole('button', { name: 'Add exact doorway portal', exact: true }).click();
     await expect(page.locator('.bsp-workshop footer')).toContainText('2 authored portals');
     await save();
+    beforeExtrusion = await editClickedSurface();
     const started = Date.now();
     await expect(page.getByRole('button', { name: 'Build & check playtest', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Build & check playtest', exact: true }).click();
@@ -253,9 +318,26 @@ try {
       .toBe('validated');
     const compiled = await call('quickforge_build_report', { projectId: created.project.id });
     receipt.nativeBuild = { durationMs: Date.now() - started, ...compiled };
+    receipt.clickedSurfaceEditing.nativeCompilationVerified = true;
+    receipt.clickedSurfaceEditing.nativeOutputSha256 = await hash(compiled.build.output);
     const imported = await call('import_paths', { paths: [compiled.build.output] });
     const textureSource = imported.find((p) => p.inspection?.header.version === 13);
     expect(textureSource).toBeTruthy();
+    const authored = await call('quickforge_preview', {document: await state()});
+    const bounds = positions => [0, 1, 2].map(axis => {
+      let lo = Infinity, hi = -Infinity;
+      for (let i = axis; i < positions.length; i += 3) {lo = Math.min(lo, positions[i]); hi = Math.max(hi, positions[i]);}
+      return [lo, hi];
+    });
+    const expectedBounds = bounds(authored.positions);
+    const nativeBounds = {};
+    for (const [name, mesh] of [['collision', textureSource.inspection.mesh], ['render', textureSource.inspection.renderMesh]]) {
+      expect(mesh?.indices.length).toBeGreaterThan(0);
+      nativeBounds[name] = bounds(mesh.positions);
+      for (let axis = 0; axis < 3; axis++) for (let end = 0; end < 2; end++)
+        expect(nativeBounds[name][axis][end]).toBeCloseTo(expectedBounds[axis][end], 3);
+    }
+    receipt.clickedSurfaceEditing.compiledBoundsReadback = {expectedBounds, ...nativeBounds};
     receipt.compiledTextureSource = textureSource.project.source.sha256;
     await page.reload();
     await page
@@ -269,12 +351,17 @@ try {
     await page
       .getByRole('combobox', { name: 'Workshop texture source', exact: true })
       .selectOption(textureSource.project.id);
-    await expect(page.getByLabel('Native BSP Workshop')).toHaveAttribute('data-textures', '1', {
-      timeout: 60000,
-    });
+    await expect.poll(async () => Number(await page.getByLabel('Native BSP Workshop').getAttribute('data-textures')),
+      {timeout: 60000}).toBeGreaterThan(0);
+    receipt.compiledMaterialPreviews = Number(await page.getByLabel('Native BSP Workshop').getAttribute('data-textures'));
     receipt.exactCompiledTextureRendered = true;
     await sources.locator('summary').click();
   }
+  else beforeExtrusion = await editClickedSurface();
+  await page.keyboard.press('Control+z');
+  await save();
+  await expect.poll(async () => (await state()).workshop).toEqual(beforeExtrusion);
+  receipt.clickedSurfaceEditing.oneActionUndo = true;
   await page.screenshot({ path: path.join(root, 'workshop-four-views.png') });
   await page.reload();
   await page

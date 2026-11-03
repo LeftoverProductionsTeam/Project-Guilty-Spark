@@ -9,6 +9,7 @@ import {
   viewAxes,
   snapNumber,
   workshopFromPrimitives,
+  workshopSurfaceSelection,
 } from './bspWorkshop';
 import { beginProjectMutation, projectMutationPending } from './projectMutation';
 import { cross, sub, dot } from './bspWorkshop';
@@ -40,6 +41,20 @@ function manifold(b: BspBrush) {
   return [...edges.values()].every((v) => v.length === 2 && v[0] !== v[1]);
 }
 describe('editable Workshop source', () => {
+  it('resolves a clicked evaluated face only against its current source brush', () => {
+    const brush = boxBrush('room', 'space', [-2, -2, 0], [2, 2, 3], 'metal');
+    const source = {schemaVersion: 1 as const, brushes: [brush], portals: []};
+    const pick = {brushId: brush.id, faceId: brush.faces[0].id};
+    const selection = workshopSurfaceSelection(source, pick)!;
+    expect(selection.vertices).toEqual(brush.faces[0].vertices);
+    selection.vertices.reverse();
+    expect(selection.vertices).not.toEqual(brush.faces[0].vertices);
+    expect(workshopSurfaceSelection(source, {...pick, brushId: 'foreign'})).toBeNull();
+    expect(workshopSurfaceSelection(source, {...pick, faceId: 'stale-face'})).toBeNull();
+    expect(workshopSurfaceSelection({...source, brushes: []}, pick)).toBeNull();
+    expect(workshopSurfaceSelection(undefined, pick)).toBeNull();
+    expect(workshopSurfaceSelection(source, null)).toBeNull();
+  });
   it('creates a closed box and true triangular ramp with positive solid orientation', () => {
     const b = boxBrush('box', 'space', [-1, -2, 0], [1, 2, 3], 'metal');
     expect(volume(b)).toBe(24);

@@ -29,6 +29,14 @@ export interface BspWorkshopSource {
   brushes: BspBrush[];
   portals: BspPortal[];
 }
+/** Resolve evaluated triangle provenance against the current editable source.
+ * An imported native triangle does not become brush source by being selected. */
+export function workshopSurfaceSelection(source: BspWorkshopSource | undefined,
+  pick: {brushId:string;faceId?:string} | null) {
+  const brush = source?.brushes.find(b => b.id === pick?.brushId);
+  const face = brush?.faces.find(f => f.id === pick?.faceId);
+  return brush && face ? {brushId:brush.id,faceId:face.id,vertices:[...face.vertices]} : null;
+}
 export type BspView = 'perspective' | 'top' | 'front' | 'side';
 export type BspTool =
   | 'select'

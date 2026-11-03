@@ -238,6 +238,25 @@ fn closest(p: V, t: Tri) -> V {
 pub(crate) struct RouteChecker { index: Index }
 impl RouteChecker {
     pub(crate) fn new(mesh: &MeshData) -> Result<Self> { Ok(Self { index: Index::new(mesh)? }) }
+    /// Static standing-capsule check, not a native movement/scenery test.
+    pub(crate) fn verify_start(&self, position: V) -> Result<f64> {
+        if position.iter().any(|v| !v.is_finite() || v.abs() > 4096.) {
+            return invalid("Player start has nonfinite or unsupported coordinates");
+        }
+        let mut scratch = vec![];
+        let floor = self.index.floor(position, &mut scratch)
+            .ok_or_else(|| SparkError::Invalid("Player start has no nearby supporting BSP floor".into()))?;
+        if position[2] < floor - 0.02 || position[2] - floor > 0.25 {
+            return invalid("Player start is embedded in or too far above its supporting BSP floor");
+        }
+        for height in [0.20, 0.36, 0.52] {
+            let p = [position[0], position[1], floor + height];
+            if !self.index.clear_segment(p, p, 0.18, &mut scratch) {
+                return invalid("Player start standing capsule intersects BSP walls or ceiling");
+            }
+        }
+        Ok(floor)
+    }
     pub(crate) fn verify(&self, assembly: &BspAssembly) -> Result<usize> {
     assembly.validate()?;
     let index = &self.index;
@@ -377,6 +396,15 @@ mod tests {
     fn capsule_checks_head_and_sides_instead_of_only_the_camera() {
         assert!(verify_route(&corridor(2., 0.65), &plan()).is_err());
         assert!(verify_route(&corridor(0.30, 1.6), &plan()).is_err());
+    }
+    #[test]
+    fn starting_capsules_require_close_floor_and_clear_body_not_just_a_valid_coordinate() {
+        let check = RouteChecker::new(&corridor(2., 1.6)).unwrap();
+        assert_eq!(check.verify_start([5., 0., 0.125]).unwrap(), 0.);
+        for p in [[5., 0., 0.5], [5., 0., -0.1], [5., 0.95, 0.125], [11., 0., 0.125], [f64::NAN, 0., 0.]] {
+            assert!(check.verify_start(p).is_err(), "{p:?}");
+        }
+        assert!(RouteChecker::new(&corridor(2., 0.65)).unwrap().verify_start([5.,0.,0.125]).is_err());
     }
     #[test]
     fn a_thin_shoulder_obstacle_between_samples_blocks_both_directions() {

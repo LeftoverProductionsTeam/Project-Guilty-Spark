@@ -3,6 +3,14 @@ use spark_core::{bsp_assembly, library::Library, maps, Result};
 use std::{fs, path::Path, sync::atomic::AtomicBool};
 fn main() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
+    if a.len() == 4 && a[1] == "--verify-walkthrough" {
+        let p = spark_core::project::load_project(Path::new(&a[3]))?;
+        let route = p.bsp_assembly.as_ref().ok_or_else(|| spark_core::SparkError::Invalid("Project has no connection route".into()))?;
+        let report = bsp_assembly::verify_compiled_walkthrough(Path::new(&a[2]), route)?;
+        println!("{}", serde_json::to_string(&report)?);
+        if report.starts.iter().any(|s| s.issue.is_some()) { std::process::exit(2); }
+        return Ok(());
+    }
     if a.len() >= 4 && a[1] == "--verify-cache" {
         if a.len() > 19 {
             return Err(spark_core::SparkError::Invalid("Choose at most 16 connection projects".into()));
@@ -55,6 +63,7 @@ fn main() -> Result<()> {
     if a.len() != 6 {
         eprintln!("qa_bsp_assembly <base.map> <donor.map> <donor BSP index> <donor tags> <fresh output directory>");
         eprintln!("qa_bsp_assembly --verify-cache <compiled.map> <connection-project.gsproject> [...]");
+        eprintln!("qa_bsp_assembly --verify-walkthrough <compiled.map> <connection-project.gsproject>");
         std::process::exit(2);
     }
     let out = Path::new(&a[5]);

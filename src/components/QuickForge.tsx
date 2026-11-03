@@ -82,6 +82,8 @@ import type {
 import { HelpTip, IconButton, Notice, NumberField, PageTitle, Pill } from './ui';
 import ForgeViewport from './ForgeViewport';
 import BspWorkshop from './BspWorkshop';
+import {workshopSurfaceSelection} from '../bspWorkshop';
+import type {BspTool} from '../bspWorkshop';
 import EnvironmentControls from './EnvironmentControls';
 import { environmentValue, validateEnvironment } from '../environment';
 import { inspectScenarioRisks } from '../scenarioSafety';
@@ -313,6 +315,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
   const activity=useWorkspaceActivity();
   const { project, document: doc, data, edit, notify } = props;
   const [bspMode, setBspMode] = useMapState(project.id, 'forge.bspWorkshop', !!doc.workshop);
+  const [surfaceSelection, setSurfaceSelection] = useMapState<{brushId:string;faceId?:string}|null>(project.id, 'forge.sourceSurface', () => null);
   const [bspBusy, setBspBusy] = useState(false);
   const [selected, setSelected] = useMapState<string[]>(project.id, 'forge.selection', []),
     [selectedZone, setSelectedZone] = useMapState<string | null>(project.id, 'forge.zone', null);
@@ -885,6 +888,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     );
   }
   function select(id: string | null, additive: boolean) {
+    setSurfaceSelection(null);
     setWorkshopSelected(null);
     setSelectedZone(null);
     setSelected((items) =>
@@ -1337,6 +1341,15 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       (!!receipt.sources &&
         !!report &&
         (receipt.sourceDocumentSha256 ?? receipt.sources.sourceSha256) !== report.sourceSha256));
+  const sourceSurface = snapshot?.document === doc ? workshopSurfaceSelection(doc.workshop, surfaceSelection) : null;
+  const sourceBrush = doc.workshop?.brushes.find(b => b.id === sourceSurface?.brushId);
+  function editSurface(tool: BspTool) {
+    const selection = workshopSurfaceSelection(doc.workshop, surfaceSelection);
+    if (!selection || snapshot?.document !== doc) return;
+    writeMapSession(project.id, 'bsp.selection', {...selection, vertices: tool === 'face' ? selection.vertices : undefined});
+    writeMapSession(project.id, 'bsp.tool', tool);
+    setBspMode(true);
+  }
   return (
     <div className={`forge-workspace ${bspMode ? 'bsp-active' : ''}`}>
       <div className="bsp-editor-switch" role="group" aria-label="Geometry authoring mode">
@@ -1799,6 +1812,13 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                   snapshot={snapshot}
                   selected={selected}
                   onSelect={select}
+                  geometrySelection={sourceSurface}
+                  onGeometrySelect={selection => {
+                    if (!workshopSurfaceSelection(doc.workshop, selection) || snapshot?.document !== doc) return;
+                    setSurfaceSelection(selection);
+                    setSelected([]);
+                    setSelectedZone(null);
+                  }}
                   onTransform={(updated,asCopy) => {
                     try {
                       let snapped: ForgeNode[] = updated;
@@ -1919,6 +1939,25 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                     Enter walk sandbox · Esc releases
                   </button>
                 )}
+                {sourceSurface && cameraMode !== 'walk' && cameraMode !== 'machinima' && <div className="forge-source-actions" data-source-face={sourceSurface.faceId}>
+                  <strong>{sourceBrush?.name} · {sourceSurface.faceId}</strong>
+                  <select aria-label="Edit selected source geometry" value="" onChange={e => editSurface(e.target.value as BspTool)}>
+                    <option value="" disabled>Edit geometry…</option>
+                    <optgroup label="Reshape editable source">
+                      <option value="face">Extend / extrude face</option>
+                      <option value="vertex">Raise / move vertices</option>
+                      <option value="edge">Edit edges</option>
+                      <option value="clip">Cut / clip volume</option>
+                    </optgroup>
+                    <optgroup label="Construct and finish">
+                      <option value="drawSpace">Tunnel / cave passage</option>
+                      <option value="drawSolid">Road / bridge slab</option>
+                      <option value="material">Assign material / UVs</option>
+                    </optgroup>
+                  </select>
+                  <button onClick={()=>setSurfaceSelection(null)}>Deselect surface</button>
+                  <small title="Existing Workshop operations edit brush source. Halo Tool must rebuild native collision, portals and lightmaps. Draw passages overlapping both source rooms; solid slabs must lie inside playable space.">Editable source · rebuild for Halo</small>
+                </div>}
                 <div className="forge-viewport-note">
                   {cameraMode === 'fly'
                     ? 'Hold RMB + drag to look · RMB + WASD fly · R/F up/down · Shift boost'
