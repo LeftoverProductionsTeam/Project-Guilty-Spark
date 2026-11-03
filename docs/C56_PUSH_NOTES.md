@@ -2,6 +2,8 @@
 
 Local master worktree: `D:\Project Guilty Spark\.local\c39-native-collaboration`. Continues `83a0b2ba9abbf96bc108bb43ff86d0af2ad4adb6`; the separate dirty root checkout remains untouched. Nothing is pushed or published. See the [native engineering report](CONTINUATION_56_NATIVE_AI.md) and [metadata receipt](fixtures/c56-native-ai.json) for source/build identities and exact limits.
 
+Verified source/build commit: `c52206fb66bf2d64d0e91132d4d054320b94acec`. The follow-up receipt commit records the build and native startup against this immutable source. Windows x64 development executable: `target/release/GuiltySpark.exe`, version `0.4.1`, SHA-256 `53e8de1ea577dd50003f4c24ae872c5bce65bfaa256f00dcd7528a2ba2e6a56b`. This is not a new installer/portable release. Both the previous-good C55 executable and pre-commit C56 executable are preserved privately.
+
 Suggested summary:
 
 **C56: Fix native Firefight corpse ownership and verify actual AI combat and OpenCE reconnect behavior**

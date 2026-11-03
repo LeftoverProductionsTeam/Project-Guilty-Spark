@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "continuation": 56,
   "startingMaster": "83a0b2ba9abbf96bc108bb43ff86d0af2ad4adb6",
-  "sourceCommit": null,
+  "sourceCommit": "c52206fb66bf2d64d0e91132d4d054320b94acec",
   "scope": "Native engine actor/combat/reconnect observations; separate partial runtime gates, no universal gameplay acceptance",
   "enginePins": [
     {
@@ -381,6 +381,7 @@
       "offline-tests.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
       "all-native-analysis-tests-final.log": "300eb9e52fd77ee6090df908b6d0ffdd61ad028d66a9b21fda4dc65b28a894ff",
       "application-build.log": "661bfc9100447612e075b6c3beb43d7d9746b4b861b1212ba07487a442c5f929",
+      "application-build-committed.log": "2c0500399e4e0b7e0a7881e39374ecb493cd4e57ed92d60f30a2242695939523",
       "typescript-check.log": "1f345e6ac1f9e6ae7c4e70d1f0c8c9f8b8f80218269a1b4473f9ac63a9d4a253",
       "observer-build-50ms.log": "152c5b09ff0c0ee331e6803e2c91fbbbb337d6541d12d339590a8afe0b09e2cb"
     }
@@ -390,16 +391,14 @@
     "platform": "windows-x64",
     "path": "target/release/GuiltySpark.exe",
     "bytes": 42592256,
-    "sha256": "bed1afbd3508aa6fb008eed61479a0a00c41ff942ae9b970eb06cf177e29cfa9",
+    "sha256": "53e8de1ea577dd50003f4c24ae872c5bce65bfaa256f00dcd7528a2ba2e6a56b",
     "developmentOnly": true,
     "installerOrPortableProduced": false,
     "nativeStartup": {
       "schemaVersion": 1,
-      "sourceCommit": null,
-      "sourceBaseCommit": "83a0b2ba9abbf96bc108bb43ff86d0af2ad4adb6",
-      "uncommittedSource": true,
+      "sourceCommit": "c52206fb66bf2d64d0e91132d4d054320b94acec",
       "applicationVersion": "0.4.1",
-      "executableSha256": "bed1afbd3508aa6fb008eed61479a0a00c41ff942ae9b970eb06cf177e29cfa9",
+      "executableSha256": "53e8de1ea577dd50003f4c24ae872c5bce65bfaa256f00dcd7528a2ba2e6a56b",
       "mockedIpc": false,
       "complete": true,
       "platform": "windows-x64",
@@ -410,13 +409,13 @@
         "native application version matches",
         "embedded frontend bytes match build"
       ],
-      "windowShellMs": 873.6726000000001,
-      "nativeBootstrapMs": 1694.4466,
-      "workspaceReadyMs": 2025.0517,
+      "windowShellMs": 835.4833,
+      "nativeBootstrapMs": 1046.4731000000002,
+      "workspaceReadyMs": 1384.6853,
       "workspaceReady": true,
       "errors": [],
-      "sourceClaim": "Fresh isolated native bootstrap and embedded frontend identity; source was uncommitted during this smoke test",
-      "receiptSha256": "3e8653d9cd5043b5321aacb37960a00d5293ae2cd59e529cd2299a10bcebdea6"
+      "sourceClaim": "Native window, IPC and embedded frontend verified against the committed C56 source",
+      "receiptSha256": "175cf1ecf84cb352a968822413ac8b3c31e265ba9a61bc4a4affe7c8d667db4b"
     }
   },
   "preservation": {
