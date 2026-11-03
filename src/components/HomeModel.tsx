@@ -6,7 +6,12 @@ import { preloadHomeModels,preloadHomeCharacter } from '../homeShowcase';
 import {characterChoice,characterFromChoice,homeCharacters} from '../homeCharacters';
 import NativeModelPreview from './NativeModelPreview';
 import {useMapState} from '../mapSession';
+import {sourceSurfaceEnvironment} from '../environment';
 import {showcaseKey} from './ShowcaseChoice';
+
+// Home is a studio display, rather than an actor at the source map's sky origin.
+// Reuse neutral inspection lighting; native materials and map views stay intact.
+const homeLighting=sourceSurfaceEnvironment();
 
 export default function HomeModel({ data }: { data: Bootstrap }) {
   const [selection,setSelection]=useMapState('global','home.model','automatic');
@@ -38,14 +43,14 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
   }, [data.dataDirectory, data.installation.mccPath,data.settings.preferredHalo,selection]);
   const model = characterFromChoice(selection)?selectedModel:models.find(asset=>showcaseKey(asset)===selection);
   return (
-    <div className="home-native-model">
+    <div className="home-native-model" data-lighting="studio">
       {model ? (
-        <NativeModelPreview key={showcaseKey(model)} asset={model} showcase/>
+        <NativeModelPreview key={showcaseKey(model)} asset={model} showcase environment={homeLighting}/>
       ) : (
         <span className="model-preview-loading">{message}</span>
       )}
         <div className="home-model-caption">
-          <span>{model?`${model.name} · actual Halo model`:'Choose your Home character'}</span>
+          <span title="Studio lighting for Home. Map lighting is unchanged.">{model?`${model.name} · actual Halo model`:'Choose your Home character'}</span>
           <select aria-label="Home model" value={selection} onChange={event=>setSelection(event.target.value)}>
             <option value="automatic">Guilty Spark · default</option>
             {homeCharacters.map(c=><option key={c.id} value={characterChoice(c.id)}>{c.label}</option>)}

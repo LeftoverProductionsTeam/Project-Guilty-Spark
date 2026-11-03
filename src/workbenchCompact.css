@@ -317,3 +317,36 @@ html[data-gs-fullscreen=true] #gs-header-workspace-tools .gs-panel-buttons butto
 .application .library-asset-preview .native-model-preview{min-height:60px;}
 .application .viewport-asset-source code{font-size:9px;max-height:26px;overflow:hidden;}
 .application .viewport-asset-list article>button:last-child{font-size:10px;min-height:23px;padding:3px 6px;}
+/* Selection stays first in the same Inspector; shared renderer controls use
+   the drawer width instead of a long stack in every 3D workspace. */
+.application .world-inspector-selection{padding:8px;flex-shrink:0;border-bottom:1px solid var(--line);}
+.application .world-inspector-selection .inspector-section{margin-top:8px;padding-top:8px;}
+.application .world-inspector-selection .transform-field{margin-bottom:6px;}
+.application .gs-render-features{padding:8px 10px;}
+.application .gs-render-features>label{margin:7px 0;}
+.application .gs-render-scope{margin:5px 0;font-size:10px;}
+.application .gs-render-feature-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:9px 12px;min-width:0;margin:8px 0;}
+.application .gs-render-feature-controls label{min-width:0;margin:0;gap:4px;font-size:11px;line-height:1.35;}
+.application .gs-render-feature-group{display:grid;gap:6px;align-content:start;min-width:0;}
+.application .gs-render-feature-controls .gs-render-range{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 5px;}
+.application .gs-render-range>span{grid-column:1;grid-row:1;}
+.application .gs-render-range>output{grid-column:2;grid-row:1;min-width:0;}
+.application .gs-render-feature-controls .gs-render-range>input[type=range]{grid-column:1/-1;grid-row:2;width:100%;min-width:0;margin:0;}
+.application .gs-render-feature-controls select{width:100%;min-width:0;}
+.application .gs-render-notes{margin-top:7px;}
+.application .gs-render-notes>summary{font-size:10px;}
+.application .gs-render-notes small{display:block;margin-top:5px;}
+
+.application .world-inspector-heading{height:26px;padding:3px 8px;}
+.application .world-inspector-selection{overflow:visible;}
+.application .world-inspector-selection .section-label{margin-bottom:6px;}
+.application .world-inspector-selection .transform-field{margin:6px 0;}
+.application .world-inspector-selection .transform-field>label{margin-bottom:4px;}
+
+/* Image quality belongs to the same compact renderer group, without a native
+   fieldset frame or large default label margins. */
+.application .gs-render-quality{min-width:0;border:0;border-bottom:1px solid var(--line);padding:5px 0 7px;margin:4px 0 7px;display:flex;align-items:center;flex-wrap:wrap;gap:5px 10px;}
+.application .gs-render-quality legend{padding:0;font-size:10px;color:var(--muted);}
+.application .gs-render-quality label{display:flex;align-items:center;gap:5px;margin:0;font-size:11px;}
+.application .gs-render-quality input[type=range]{width:110px;min-width:50px;margin:0;}
+.application .gs-render-quality small{flex-basis:100%;font-size:10px;line-height:1.35;}

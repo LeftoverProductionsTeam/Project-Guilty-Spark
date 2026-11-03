@@ -1,5 +1,12 @@
 # Runtime and operation compatibility — Continuation 42
 
+## C61 scope — November 3, 2026
+
+The native build-history projection preserves source identity and adds no runtime adapter or gameplay permission. Home uses existing neutral inspection lights; 16 real native character/runtime-selection checks preserve exact source/material/variant identity and saved choices. A compatible linked campaign source may supply a character absent from the selected runtime. Full map/asset rendering parity remains separately gated.
+
+New OpenCE no-allies player-input trials load a native cache, observe hostile fire/player defeat/cleanup and a real client rejoin. The round is not won, client round globals do not follow the host, and full lifecycle/vehicle/score/rejoin parity remains unaccepted. CE/MCC/Chupathingy AI and non-MCC live-write findings do not change. [Exact C61 matrix/evidence](CONTINUATION_61_WORKFLOW_NATIVE.md), [receipt](fixtures/c61-workflow-native.json).
+
+
 ## C60 scope clarification — November 3, 2026
 
 C60 repairs ordered library refresh and reuses existing source-resource/window owners. It adds **no new runtime format, game adapter, AI replication claim or conversion guarantee**. Fresh native checks retain exact source identities, complete renderer counters, shared BSP native compilation, window/Undo recovery and session rollover. C49 Windows payload/startup acceptance is separate from current-source features; Linux/macOS remain unverified. [Current maintenance evidence and blockers](CONTINUATION_60_RELEASE_MAINTENANCE.md).

@@ -1,0 +1,1213 @@
+{
+  "schemaVersion": 1,
+  "continuation": "C61",
+  "baseCommit": "cd73fae00c122ee8d59c5553e376d457fa99be13",
+  "branch": "master",
+  "complete": true,
+  "scope": "Scoped performance/UI repair and native acceptance evidence; unfinished flagships stay open",
+  "application": {
+    "path": "target/release/GuiltySpark.exe",
+    "sha256": "d5aa90b439e7663315b213156ced095f5d3e9b5b09917534f400f7683ed9f5d9",
+    "bytes": 42968064,
+    "version": "0.4.1",
+    "newInstallerOrPortableProduced": false,
+    "productionFileSha256": {
+      "src-tauri/src/app.rs": "6cea2209317fadbd43284b03ff6d4aa29c1c6a004a03b5e3b1096293c75995af",
+      "src/App.tsx": "ebb1c9c856b57f53a26a660cb2ea35c909ad06c02f76317bfe98653b7edf90f9",
+      "src/components/HomeModel.tsx": "8dd3f482ac96cd7c36f0881b5213ed4bf7eeffebd63544d9eaeb7e962137145c",
+      "src/components/RenderFeatures.tsx": "d70ba309acd022afe2c24939408154f97bd4063f892f5795cd7a2bfe1d084bd0",
+      "src/components/World.tsx": "b4c5287107c6461efba61fc8e7777d53922c6788f91a8b25d3dc189cd10e8c62",
+      "src/libraryReceipts.ts": "6f20a53fa56b60ab12a48432d5b2a67e5299830ee4beea6f0941fc9e309c4e02",
+      "src/types.ts": "bf876399018ccc9a59013a663963f6729abd9ff36cfcfecf95bec02b35845415",
+      "src/workbenchCompact.css": "af5b6033e8029307398f41e63a99ddf185dd5af909190f874df0e23b4cd26d2a"
+    }
+  },
+  "buildStatus": {
+    "beforeMedianMs": 113.94999998807907,
+    "afterMedianMs": 1.449999988079071,
+    "beforeBytes": 8192319,
+    "afterBytes": 146,
+    "sourceSha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+    "buildRecordHashesEqual": true,
+    "emptyHistoryBenchmark": true,
+    "beforeBursts": [
+      {
+        "trial": 1,
+        "notifications": 40,
+        "observedToQuietMs": 901.9729000000007,
+        "bootstrapReads": 2,
+        "fullProjectReads": 2,
+        "buildMetadataReads": 0
+      },
+      {
+        "trial": 2,
+        "notifications": 40,
+        "observedToQuietMs": 890.7350000000006,
+        "bootstrapReads": 2,
+        "fullProjectReads": 2,
+        "buildMetadataReads": 0
+      },
+      {
+        "trial": 3,
+        "notifications": 40,
+        "observedToQuietMs": 888.1175000000003,
+        "bootstrapReads": 2,
+        "fullProjectReads": 2,
+        "buildMetadataReads": 0
+      }
+    ],
+    "afterBursts": [
+      {
+        "trial": 1,
+        "notifications": 40,
+        "observedToQuietMs": 1118.9635000000017,
+        "bootstrapReads": 2,
+        "fullProjectReads": 0,
+        "buildMetadataReads": 2
+      },
+      {
+        "trial": 2,
+        "notifications": 40,
+        "observedToQuietMs": 1005.2760999999991,
+        "bootstrapReads": 2,
+        "fullProjectReads": 0,
+        "buildMetadataReads": 2
+      },
+      {
+        "trial": 3,
+        "notifications": 40,
+        "observedToQuietMs": 999.7612999999983,
+        "bootstrapReads": 2,
+        "fullProjectReads": 0,
+        "buildMetadataReads": 2
+      }
+    ],
+    "previousNativeCommandsPreserved": 255,
+    "newReadOnlyCommand": "project_build_history",
+    "grantsNativeLaunchReadiness": false
+  },
+  "home": {
+    "nativeCases": 16,
+    "identityUnchanged": {
+      "modelSourceHash": "08cd04eb76fbd61e57016fb592d95491905c61e021702a45e1359a4551abe15b",
+      "modelTag": "3809935779",
+      "modelVariant": "sgt_johnson-100",
+      "modelTriangles": "1330",
+      "modelTextures": "6",
+      "modelReflections": "3",
+      "nativeAnimationCount": "16",
+      "modelMaterialGaps": "0"
+    },
+    "beforePixels": {
+      "opaque": 22404,
+      "meanLuminance": 11.89084744688464,
+      "nearBlackFraction": 0.6684074272451348,
+      "clippedFraction": 0
+    },
+    "afterPixels": {
+      "opaque": 22388,
+      "meanLuminance": 55.11357450419795,
+      "nearBlackFraction": 0.10197427193139182,
+      "clippedFraction": 0
+    },
+    "cases": [
+      {
+        "runtime": "mccSteam",
+        "character": "johnson",
+        "sourceVersion": 13,
+        "sourceSha256": "08cd04eb76fbd61e57016fb592d95491905c61e021702a45e1359a4551abe15b",
+        "tagId": "3809935779",
+        "variant": "sgt_johnson-100",
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "mccSteam",
+        "character": "chief",
+        "sourceVersion": 13,
+        "sourceSha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+        "tagId": "3972860759",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "mccSteam",
+        "character": "cortana",
+        "sourceVersion": 13,
+        "sourceSha256": "08cd04eb76fbd61e57016fb592d95491905c61e021702a45e1359a4551abe15b",
+        "tagId": "3807969669",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "mccSteam",
+        "character": "monitor",
+        "sourceVersion": 13,
+        "sourceSha256": "879707dace9bd7facaeb2d61adf640af9178384c2417fcd5b4145d520a9a71ca",
+        "tagId": "3785621552",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "haloCustomEdition",
+        "character": "johnson",
+        "sourceVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "tagId": "3809935779",
+        "variant": "sgt_johnson-100",
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "haloCustomEdition",
+        "character": "chief",
+        "sourceVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "tagId": "3986033695",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "haloCustomEdition",
+        "character": "cortana",
+        "sourceVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "tagId": "3807969669",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "haloCustomEdition",
+        "character": "monitor",
+        "sourceVersion": 5,
+        "sourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+        "tagId": "3785621552",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "openCe",
+        "character": "johnson",
+        "sourceVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "tagId": "3809935779",
+        "variant": "sgt_johnson-100",
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "openCe",
+        "character": "chief",
+        "sourceVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "tagId": "3986033695",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "openCe",
+        "character": "cortana",
+        "sourceVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "tagId": "3807969669",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "openCe",
+        "character": "monitor",
+        "sourceVersion": 5,
+        "sourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+        "tagId": "3785621552",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "chupathingyCe",
+        "character": "johnson",
+        "sourceVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "tagId": "3809935779",
+        "variant": "sgt_johnson-100",
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "chupathingyCe",
+        "character": "chief",
+        "sourceVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "tagId": "3986033695",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "chupathingyCe",
+        "character": "cortana",
+        "sourceVersion": 5,
+        "sourceSha256": "f7461e5b6eaf0314c4f03a1c6e43752b06ae3e4782b70b240a8c15e5f634b3ce",
+        "tagId": "3807969669",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      },
+      {
+        "runtime": "chupathingyCe",
+        "character": "monitor",
+        "sourceVersion": 5,
+        "sourceSha256": "b5fb3db5b111280e8494c5ec7612604d7facd1e0a511987afa38a228a115a896",
+        "tagId": "3785621552",
+        "variant": null,
+        "materialGaps": "0",
+        "sourcePreserved": true,
+        "choiceRetained": true
+      }
+    ],
+    "scope": "Home uses existing neutral inspection lights. Normal asset/map/portrait previews and native shaders/tags are unchanged. These checks are not universal visual or gameplay parity."
+  },
+  "ui": {
+    "workspaceRoutes": 23,
+    "geometryViews": 2,
+    "states": 126,
+    "errors": [],
+    "rendererBeforeHeight": 1019.25,
+    "rendererAfterHeight": 682.59375,
+    "rangeControls": 11,
+    "selectControls": 2,
+    "selectedTransformsAboveFoldAtThreeSizes": true,
+    "durableUndo": true,
+    "retainedCanvas": true
+  },
+  "performance": {
+    "complete": true,
+    "scope": "Final C61 map quality is unchanged. Home lighting intentionally uses the existing neutral inspection rig; Home/GPU timings are descriptive rather than an unchanged-appearance speedup. The existing strict generic comparison remains unmodified and the earlier matched-lighting comparison is retained.",
+    "beforeSha256": "195070aba1f3f12346996d6d9c1d99323620ba9a0e6b89513e113254e23c1ecf",
+    "afterSha256": "d5aa90b439e7663315b213156ced095f5d3e9b5b09917534f400f7683ed9f5d9",
+    "conditions": {
+      "profile": "fresh library and WebView profile; process-cold, not flushed OS disk cache",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "focusEmulation": true,
+      "qualityUnchanged": true,
+      "capturePixelProof": true,
+      "nativeBase64Supported": true,
+      "mapViewport": {
+        "width": 1444,
+        "height": 904
+      },
+      "contentViewport": {
+        "width": 1428,
+        "height": 888
+      }
+    },
+    "metrics": {
+      "coldShellMs": {
+        "before": [
+          1128.6523,
+          1143.1257
+        ],
+        "after": [
+          1187.0596,
+          1132.6902
+        ],
+        "beforeMedian": 1135.8890000000001,
+        "afterMedian": 1159.8749
+      },
+      "warmShellMs": {
+        "before": [
+          904.6706000000049,
+          943.9705000000031
+        ],
+        "after": [
+          830.8551000000007,
+          903.1679999999978
+        ],
+        "beforeMedian": 924.320550000004,
+        "afterMedian": 867.0115499999993
+      },
+      "firstShowcaseMs": {
+        "before": [
+          4442.7741000000005,
+          4544.16
+        ],
+        "after": [
+          4627.5252,
+          4592.304
+        ],
+        "beforeMedian": 4493.46705,
+        "afterMedian": 4609.9146
+      },
+      "firstTexturedMap1Ms": {
+        "before": [
+          8892.2136,
+          8828.0327
+        ],
+        "after": [
+          9093.8904,
+          9037.639700000002
+        ],
+        "beforeMedian": 8860.12315,
+        "afterMedian": 9065.765050000002
+      },
+      "firstTexturedMap2Ms": {
+        "before": [
+          5878.7521000000015,
+          5926.799299999999
+        ],
+        "after": [
+          6548.190699999999,
+          6132.899799999999
+        ],
+        "beforeMedian": 5902.7757,
+        "afterMedian": 6340.545249999999
+      },
+      "repeatSwitchMs": {
+        "before": [
+          1017.2507999999943,
+          1022.0727000000043,
+          1023.0647000000026,
+          892.4369000000006,
+          925.1656999999977,
+          915.3766999999934,
+          1029.8047000000006,
+          1025.1131999999998
+        ],
+        "after": [
+          968.8294999999998,
+          965.0648000000001,
+          1048.101300000002,
+          952.6340999999957,
+          924.1088999999993,
+          1039.8349999999991,
+          1026.8371000000043,
+          916.8966
+        ],
+        "beforeMedian": 1019.6617499999993,
+        "afterMedian": 966.94715
+      },
+      "catalogMs": {
+        "before": [
+          2681.6569000000018,
+          2679.054600000003
+        ],
+        "after": [
+          3453.072100000005,
+          3292.934300000001
+        ],
+        "beforeMedian": 2680.3557500000024,
+        "afterMedian": 3373.003200000003
+      },
+      "warmShowcaseMs": {
+        "before": [
+          2520.6977999999945,
+          2532.5898000000016
+        ],
+        "after": [
+          2498.5107999999964,
+          2525.407699999996
+        ],
+        "beforeMedian": 2526.643799999998,
+        "afterMedian": 2511.9592499999962
+      }
+    },
+    "memory": {
+      "showcase-process-cpu-gpu-memory": {
+        "before": [
+          {
+            "cpuMachinePercent": 5.541034773284314,
+            "privateMiB": 927.171875,
+            "workingSetMiB": 1037.11328125,
+            "gpu3dPercent": 6,
+            "gpuDedicatedMiB": 141.69921875
+          },
+          {
+            "cpuMachinePercent": 7.664161392405063,
+            "privateMiB": 1252.30859375,
+            "workingSetMiB": 1259.63671875,
+            "gpu3dPercent": 6,
+            "gpuDedicatedMiB": 150.1640625
+          }
+        ],
+        "after": [
+          {
+            "cpuMachinePercent": 7.051613684395914,
+            "privateMiB": 1416.3828125,
+            "workingSetMiB": 1465.71875,
+            "gpu3dPercent": 7,
+            "gpuDedicatedMiB": 150.6640625
+          },
+          {
+            "cpuMachinePercent": 6.517500906782734,
+            "privateMiB": 1254.078125,
+            "workingSetMiB": 1254.125,
+            "gpu3dPercent": 7,
+            "gpuDedicatedMiB": 150.6640625
+          }
+        ]
+      },
+      "map-1-process-cpu-gpu-memory": {
+        "before": [
+          {
+            "cpuMachinePercent": 2.3079763663220088,
+            "privateMiB": 1437.29296875,
+            "workingSetMiB": 1509.34375,
+            "gpu3dPercent": 14,
+            "gpuDedicatedMiB": 203.1484375
+          },
+          {
+            "cpuMachinePercent": 2.5614754098360653,
+            "privateMiB": 1385.7890625,
+            "workingSetMiB": 1470.0078125,
+            "gpu3dPercent": 14,
+            "gpuDedicatedMiB": 203.12890625
+          }
+        ],
+        "after": [
+          {
+            "cpuMachinePercent": 2.8321746512481645,
+            "privateMiB": 1391.80859375,
+            "workingSetMiB": 1479.0234375,
+            "gpu3dPercent": 14,
+            "gpuDedicatedMiB": 203.25390625
+          },
+          {
+            "cpuMachinePercent": 3.2194368131868134,
+            "privateMiB": 1478.5390625,
+            "workingSetMiB": 1554.53125,
+            "gpu3dPercent": 15,
+            "gpuDedicatedMiB": 203.25390625
+          }
+        ]
+      },
+      "map-2-process-cpu-gpu-memory": {
+        "before": [
+          {
+            "cpuMachinePercent": 2.3713438189845473,
+            "privateMiB": 1950.265625,
+            "workingSetMiB": 1923.17578125,
+            "gpu3dPercent": 14,
+            "gpuDedicatedMiB": 359.87890625
+          },
+          {
+            "cpuMachinePercent": 2.9081456801470584,
+            "privateMiB": 1867.23046875,
+            "workingSetMiB": 1846.6875,
+            "gpu3dPercent": 7,
+            "gpuDedicatedMiB": 359.6328125
+          }
+        ],
+        "after": [
+          {
+            "cpuMachinePercent": 3.6102786420204978,
+            "privateMiB": 1880.7265625,
+            "workingSetMiB": 1868.8125,
+            "gpu3dPercent": 5,
+            "gpuDedicatedMiB": 359.65234375
+          },
+          {
+            "cpuMachinePercent": 2.715651298938895,
+            "privateMiB": 1972.71484375,
+            "workingSetMiB": 1943.37109375,
+            "gpu3dPercent": 15,
+            "gpuDedicatedMiB": 359.68359375
+          }
+        ]
+      },
+      "repeat-switch-memory": {
+        "before": [
+          {
+            "cpuMachinePercent": 3.2540163859392166,
+            "privateMiB": 1918.2265625,
+            "workingSetMiB": 1894.39453125,
+            "gpu3dPercent": 14,
+            "gpuDedicatedMiB": 362.328125
+          },
+          {
+            "cpuMachinePercent": 2.3003312476996687,
+            "privateMiB": 1849.078125,
+            "workingSetMiB": 1816.0859375,
+            "gpu3dPercent": 14,
+            "gpuDedicatedMiB": 360.90234375
+          }
+        ],
+        "after": [
+          {
+            "cpuMachinePercent": 3.643098062296269,
+            "privateMiB": 1826.4296875,
+            "workingSetMiB": 1834.65234375,
+            "gpu3dPercent": 5,
+            "gpuDedicatedMiB": 362.65234375
+          },
+          {
+            "cpuMachinePercent": 2.86697247706422,
+            "privateMiB": 1931.51953125,
+            "workingSetMiB": 1902.85546875,
+            "gpu3dPercent": 14,
+            "gpuDedicatedMiB": 361.82421875
+          }
+        ]
+      },
+      "after-maps-home-memory": {
+        "before": [
+          {
+            "cpuMachinePercent": 0.9351979742173113,
+            "privateMiB": 2177.37109375,
+            "workingSetMiB": 2016.8984375,
+            "gpu3dPercent": 6,
+            "gpuDedicatedMiB": 485.48828125
+          },
+          {
+            "cpuMachinePercent": 1.2297453703703702,
+            "privateMiB": 2095.578125,
+            "workingSetMiB": 1945.8046875,
+            "gpu3dPercent": 8,
+            "gpuDedicatedMiB": 483.9453125
+          }
+        ],
+        "after": [
+          {
+            "cpuMachinePercent": 1.1900503138847858,
+            "privateMiB": 2205.3515625,
+            "workingSetMiB": 2086.44140625,
+            "gpu3dPercent": 6,
+            "gpuDedicatedMiB": 488.56640625
+          },
+          {
+            "cpuMachinePercent": 0.8959288990825688,
+            "privateMiB": 2346.609375,
+            "workingSetMiB": 2176.31640625,
+            "gpu3dPercent": 8,
+            "gpuDedicatedMiB": 490.8203125
+          }
+        ]
+      },
+      "warm-process-memory": {
+        "before": [
+          {
+            "cpuMachinePercent": 1.402796961325967,
+            "privateMiB": 882.203125,
+            "workingSetMiB": 958.95703125,
+            "gpu3dPercent": 6,
+            "gpuDedicatedMiB": 143.1328125
+          },
+          {
+            "cpuMachinePercent": 1.4059039313399777,
+            "privateMiB": 874.15234375,
+            "workingSetMiB": 947.12109375,
+            "gpu3dPercent": 6,
+            "gpuDedicatedMiB": 144.36328125
+          }
+        ],
+        "after": [
+          {
+            "cpuMachinePercent": 0.46673943014705876,
+            "privateMiB": 786.671875,
+            "workingSetMiB": 847.1484375,
+            "gpu3dPercent": 7,
+            "gpuDedicatedMiB": 142.94140625
+          },
+          {
+            "cpuMachinePercent": 0.783815213425757,
+            "privateMiB": 787.80078125,
+            "workingSetMiB": 845.0703125,
+            "gpu3dPercent": 8,
+            "gpuDedicatedMiB": 142.84765625
+          }
+        ]
+      }
+    },
+    "mapQuality": [
+      {
+        "label": "C61-complete-a",
+        "phase": "first-textured-map-1",
+        "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": {
+          "source": 8,
+          "rendered": 8,
+          "omitted": 0
+        },
+        "triangles": 72884,
+        "geometries": 57
+      },
+      {
+        "label": "C61-complete-a",
+        "phase": "map-switch-1-to-1",
+        "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": {
+          "source": 8,
+          "rendered": 8,
+          "omitted": 0
+        },
+        "triangles": 72884,
+        "geometries": 57
+      },
+      {
+        "label": "C61-complete-a",
+        "phase": "map-switch-3-to-1",
+        "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": {
+          "source": 8,
+          "rendered": 8,
+          "omitted": 0
+        },
+        "triangles": 72884,
+        "geometries": 57
+      },
+      {
+        "label": "C61-complete-a",
+        "phase": "first-textured-map-2",
+        "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": null,
+        "triangles": 72873,
+        "geometries": 55
+      },
+      {
+        "label": "C61-complete-a",
+        "phase": "map-switch-2-to-2",
+        "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": null,
+        "triangles": 72873,
+        "geometries": 55
+      },
+      {
+        "label": "C61-complete-a",
+        "phase": "map-switch-4-to-2",
+        "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": null,
+        "triangles": 72873,
+        "geometries": 55
+      },
+      {
+        "label": "C61-complete-b",
+        "phase": "first-textured-map-1",
+        "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": {
+          "source": 8,
+          "rendered": 8,
+          "omitted": 0
+        },
+        "triangles": 72884,
+        "geometries": 57
+      },
+      {
+        "label": "C61-complete-b",
+        "phase": "map-switch-1-to-1",
+        "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": {
+          "source": 8,
+          "rendered": 8,
+          "omitted": 0
+        },
+        "triangles": 72884,
+        "geometries": 57
+      },
+      {
+        "label": "C61-complete-b",
+        "phase": "map-switch-3-to-1",
+        "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": {
+          "source": 8,
+          "rendered": 8,
+          "omitted": 0
+        },
+        "triangles": 72884,
+        "geometries": 57
+      },
+      {
+        "label": "C61-complete-b",
+        "phase": "first-textured-map-2",
+        "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": null,
+        "triangles": 72873,
+        "geometries": 55
+      },
+      {
+        "label": "C61-complete-b",
+        "phase": "map-switch-2-to-2",
+        "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": null,
+        "triangles": 72873,
+        "geometries": 55
+      },
+      {
+        "label": "C61-complete-b",
+        "phase": "map-switch-4-to-2",
+        "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+        "sourceShaders": 159,
+        "lightmaps": 15,
+        "reflectionBindings": 73,
+        "decals": null,
+        "triangles": 72873,
+        "geometries": 55
+      }
+    ],
+    "homeStudioLighting": {
+      "previewEnabled": true,
+      "skyColor": [
+        0.051,
+        0.098,
+        0.133
+      ],
+      "ambientColor": [
+        0.69,
+        0.83,
+        0.91
+      ],
+      "ambientIntensity": 0.5,
+      "sunColor": [
+        1,
+        0.92,
+        0.77
+      ],
+      "sunIntensity": 0.65,
+      "sunAzimuth": -35,
+      "sunElevation": 50,
+      "fogEnabled": false,
+      "fogColor": [
+        0.3,
+        0.43,
+        0.51
+      ],
+      "fogNear": 25,
+      "fogFar": 180,
+      "fogMaximumDensity": 0.95
+    },
+    "homeMaterialAndGeometryIdentityUnchanged": true,
+    "homeLightingChangedIntentionally": true,
+    "failedOrSupersededRunsPreserved": true
+  },
+  "collaboration": {
+    "testedAppSha256": "1ec644484fa1007718b866028fb50abc1b0df05c71e2bf345bf45afb5da0d4db",
+    "physicalMachines": 1,
+    "nativeProcesses": 3,
+    "separateLibraries": true,
+    "mockedIpc": false,
+    "sustained": {
+      "commits": 240,
+      "durationMs": 75571.3516,
+      "history": 100,
+      "revision": 247,
+      "acknowledgedOperations": 247,
+      "journalBytes": 1140171
+    },
+    "nativeBuild": {
+      "jobId": "ff574a60-5b76-4115-9e09-226b765f261b",
+      "durationMs": 131978.9252,
+      "sessionRevision": 247,
+      "newerRevision": 248,
+      "cacheVersion": 13,
+      "compiledCollisionTriangles": 58,
+      "cacheSha256": "f94cbbbbf0643fb5accb2211f5930273e547891e48c1617ec285b706d8ca4b1e",
+      "cacheBytes": 88880670,
+      "portals": 2,
+      "readbackTags": 2239
+    },
+    "crashOfflineRecovery": true,
+    "rolloverAndRevocation": true,
+    "radminSameComputer": true,
+    "latencies": [
+      {
+        "kind": "simultaneous actual UI edits",
+        "ms": 922.9102999999996
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 896.7425000000003
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 906.3604000000014
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 889.8554999999978
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 390.55219999999827
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 886.011900000005
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 887.8373999999967
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 883.0241999999998
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 887.2653999999966
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 892.3162999999986
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 889.1987999999983
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 909.8813999999984
+      },
+      {
+        "kind": "early sustained commits",
+        "ms": 898.3152000000046
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 418.6906000000017
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 933.7100000000064
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 918.5291999999899
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 905.5292000000045
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 953.3008000000118
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 926.034599999999
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 906.9176999999909
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 909.3264999999956
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 412.61819999999716
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 914.9398999999976
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 921.9560999999958
+      },
+      {
+        "kind": "late sustained commits",
+        "ms": 897.0481
+      }
+    ],
+    "finalHomeOnlyFrontendRevisionRetestedSeparately": true,
+    "crossComputerAccepted": false
+  },
+  "nativeAI": {
+    "runtime": "OpenCE build 335",
+    "sourceRevision": "da8d455623cf50002e6a798b1980068fd3ca0292",
+    "cacheSha256": "5bb403ec83bf63d3491d81b3b55a150dd3e5e8980108ea76797682a1a46412a4",
+    "nativeProcesses": 3,
+    "humanInput": false,
+    "playerInput": "engine bot:1",
+    "alliedActors": false,
+    "syntheticDamageHooks": false,
+    "soloUnits": [
+      {
+        "id": 3800563720,
+        "tag": 3817210386,
+        "team": 3,
+        "isPlayer": false,
+        "firstTick": 244,
+        "lastTick": 1109,
+        "samples": 560,
+        "healthFirst": 1,
+        "healthMin": 1,
+        "healthLast": 1,
+        "shieldFirst": 1,
+        "shieldMin": 1,
+        "deathFirstTick": null,
+        "absentAfter": true,
+        "displacement": 3.9460096149944115,
+        "animationStates": 24,
+        "firedTicks": [
+          340,
+          343,
+          382,
+          417,
+          455,
+          579,
+          614,
+          658,
+          698,
+          878,
+          920,
+          959,
+          1072
+        ],
+        "targets": [
+          3799056386
+        ]
+      },
+      {
+        "id": 3800367107,
+        "tag": 3817210386,
+        "team": 3,
+        "isPlayer": false,
+        "firstTick": 244,
+        "lastTick": 1109,
+        "samples": 560,
+        "healthFirst": 1,
+        "healthMin": 1,
+        "healthLast": 1,
+        "shieldFirst": 0,
+        "shieldMin": 0,
+        "deathFirstTick": null,
+        "absentAfter": true,
+        "displacement": 5.228218984756006,
+        "animationStates": 24,
+        "firedTicks": [
+          655,
+          697,
+          774,
+          810,
+          850,
+          887,
+          930,
+          974
+        ],
+        "targets": [
+          3799056386
+        ]
+      },
+      {
+        "id": 3799056386,
+        "tag": 3881567720,
+        "team": 1,
+        "isPlayer": true,
+        "firstTick": 7,
+        "lastTick": 1682,
+        "samples": 48,
+        "healthFirst": 1,
+        "healthMin": -0.039999835193157196,
+        "healthLast": -0.039999835193157196,
+        "shieldFirst": 1,
+        "shieldMin": 0,
+        "deathFirstTick": 1135,
+        "absentAfter": false,
+        "displacement": 4.236736309036238,
+        "animationStates": 31,
+        "firedTicks": [
+          47,
+          137,
+          219,
+          227,
+          311,
+          317,
+          401,
+          407,
+          493,
+          497,
+          585,
+          587,
+          677,
+          767,
+          857,
+          947,
+          1037
+        ],
+        "targets": []
+      },
+      {
+        "id": 3807838211,
+        "tag": 3881567720,
+        "team": 1,
+        "isPlayer": true,
+        "firstTick": 1226,
+        "lastTick": 1682,
+        "samples": 14,
+        "healthFirst": 1,
+        "healthMin": 1,
+        "healthLast": 1,
+        "shieldFirst": 1,
+        "shieldMin": 1,
+        "deathFirstTick": null,
+        "absentAfter": false,
+        "displacement": 3.914183642843507,
+        "animationStates": 12,
+        "firedTicks": [
+          1307,
+          1397,
+          1487,
+          1577,
+          1667
+        ],
+        "targets": []
+      }
+    ],
+    "soloRound": "Wave 1 defeat, score 0; cleanup and player respawn observed",
+    "firstPeer": {
+      "exactTickFrames": 321,
+      "sharedActualActorIds": 2,
+      "movingActorIds": 2,
+      "firingActorIds": 1,
+      "worldSpacePosition": {
+        "count": 408,
+        "median": 0.030828548049330513,
+        "p95": 0.03612681068786682,
+        "maximum": 0.052068795939877593
+      },
+      "health": {
+        "count": 408,
+        "median": 0,
+        "p95": 0,
+        "maximum": 0
+      },
+      "shield": {
+        "count": 408,
+        "median": 0,
+        "p95": 0,
+        "maximum": 0
+      }
+    },
+    "rejoinedPeer": {
+      "exactTickFrames": 232,
+      "sharedActualActorIds": 0
+    },
+    "nativeFaultsObserved": false,
+    "fullAiAcceptance": false,
+    "humanFirefightWin": false,
+    "sharedRoundScore": false,
+    "automaticOriginalZombieRelease": false,
+    "thirdPartyEngineCodeImported": false
+  },
+  "regressions": {
+    "rustPassed": 666,
+    "rustOptInIgnored": 8,
+    "frontendPassed": 366,
+    "browserPassed": 157,
+    "offlinePrograms": 59,
+    "nativeDiagnosticTests": 37,
+    "pythonReleaseContracts": 10,
+    "nodeDraftContracts": 6,
+    "nativeLifecycleCases": 8,
+    "nativeHistoryCases": 8,
+    "nativeRolloverCases": 4,
+    "pinnedResearchProjects": 6,
+    "pinnedBehaviors": 36
+  },
+  "storage": {
+    "removedAtUtc": "2026-11-03T15:06:52.0812056Z",
+    "target": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\incremental",
+    "logicalBytesRemoved": 8500691720.0,
+    "filesRemoved": 27630,
+    "targetAbsent": true,
+    "freeBytesBefore": 431763439616,
+    "freeBytesAfter": 438700294144,
+    "sourceOrGameDataRemoved": false,
+    "releaseArtifactsRemoved": false
+  },
+  "preservation": {
+    "csvRows": 472,
+    "csvSha256": "aad57672fe87c3cd2077df325b18d353ddf573a0c73b7f7940142b2403794c51",
+    "legacyDirtyCheckoutStatusUnchanged": true,
+    "previousGoodBuildPreserved": true,
+    "researchAndFailedRunsRetained": true,
+    "sealedC49Sha256": {
+      "Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip": "c6ea81b25bfae352d76df58557a82daef44b72ba11bf778d0e2eee9f56ae03f0",
+      "Project_Guilty_Spark_0.4.1_windows_x64_manifest.json": "c00f7afc9b1d57963bbe0234ef4c3c992a574136a27cbf34dca83354fe2a0b52",
+      "Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip": "ff6c9e4dea48126680c2a9b8536dfb2185fab5ac445c7d4f306b9bed52e07069",
+      "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749",
+      "SHA256SUMS-windows-x64.txt": "ea47e113b4613c59eea87521a4600bf4a950db1b73e0d51559cee86f0f3cce69"
+    }
+  },
+  "release": {
+    "sourceCommit": "cb07581597de11e83d1c10bafad526e8b031f27e",
+    "intendedNewTag": "v0.4.1-preview.1",
+    "uploadBundle": ".local/c60-release-maintenance-20261103/upload-ready/C49-preview-cb07581",
+    "ownerWillUpload": true,
+    "publicReleases": [],
+    "publicMaster": "cd73fae00c122ee8d59c5553e376d457fa99be13",
+    "checkedAtUtc": "2026-11-03T14:59:23.3084195Z",
+    "writeAttempted": false,
+    "linuxVerified": false,
+    "macosVerified": false
+  },
+  "remaining": [
+    "Human two-way Timberland\u2013Sidewinder walkthrough; 0 player-verified region connections",
+    "Human Firefight win; full game-peer AI lifecycle, score and vehicle parity",
+    "Automatic original Zombie carrier release",
+    "Whole-process RAM budget and longer endurance",
+    "Structural compiled-map and arbitrary imported-terrain editing",
+    "General non-MCC live writes and target-specific gameplay/audio/conversion parity",
+    "Two-computer LAN/VPN and physical monitor recovery; authorized production Steam",
+    "Owner GitHub upload/publication and real Linux/macOS builds/startup"
+  ]
+}

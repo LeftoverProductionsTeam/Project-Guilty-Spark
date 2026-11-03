@@ -1,6 +1,15 @@
 import { it, expect } from 'vitest';
-import { checkedSaveReceipt, applyLibraryReceipt } from './libraryReceipts';
-import type { Bootstrap, LibraryEntry, Project } from './types';
+import { checkedSaveReceipt, applyLibraryReceipt, applyBuildHistory } from './libraryReceipts';
+import type { Bootstrap, LibraryEntry, Project, ProjectBuildHistory } from './types';
+it('build metadata preserves unsaved authored content, dependencies and retained history',()=>{
+  const project={id:'a',source:{sha256:'exact-source'},scene:[{id:'unsaved placement'}],tagEdits:[{tagId:1,value:9}],assets:[{id:'owned dependency'}],history:[{id:'undo'}],builds:[]} as unknown as Project;
+  const receipt={projectId:'a',sourceSha256:'exact-source',builds:[{id:'native-output',status:'validated',projectFingerprint:'older saved revision'}]} as ProjectBuildHistory;
+  const merged=applyBuildHistory(project,receipt);
+  expect(merged.builds).toBe(receipt.builds);for(const key of ['source','scene','tagEdits','assets','history'] as const)expect(merged[key]).toBe(project[key]);
+  expect(project.builds).toEqual([]);
+  for(const wrong of [{...receipt,projectId:'b'},{...receipt,sourceSha256:'other-source'},{...receipt,builds:null},null])expect(()=>applyBuildHistory(project,wrong as ProjectBuildHistory)).toThrow('does not match');
+  expect(applyBuildHistory({id:'local',source:null} as Project,{projectId:'local',sourceSha256:null,builds:[]}).builds).toEqual([]);
+});
 it('refuses a save receipt for a different project, source or cache while admitting asset workspaces', () => {
   const project={id:'a',source:{sha256:'owned',cacheVersion:7}} as Project;
   const entry={id:'a',sha256:'owned',version:7} as LibraryEntry;

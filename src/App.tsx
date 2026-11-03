@@ -58,6 +58,7 @@ import type {
   MeshData,
   OpenProject,
   Project,
+  ProjectBuildHistory,
   RuntimeId,
   Settings,
   Workspace,
@@ -74,7 +75,7 @@ import type { OwnedBitmapPreview } from './ownedBitmapPreview';
 import { initialHistory, thumbnail } from './editor';
 import type {HistoryAction} from './editor';
 import {activeDocument,documentReducer,emptyMapDocuments} from './mapDocuments';
-import {applyLibraryReceipt,checkedSaveReceipt} from './libraryReceipts';
+import {applyLibraryReceipt,checkedSaveReceipt,applyBuildHistory} from './libraryReceipts';
 import {createLatestRefresh} from './latestRefresh';
 import {WindowHistories,queuedWindowRefresh} from './windowHistory';
 import MapTabs from './components/MapTabs';
@@ -605,8 +606,9 @@ export default function App() {
     if (!native) return;
     let alive=true;
     const failed=(error:unknown)=>{if(alive)notice(String(error),'error');};
-    const builds=createLatestRefresh<string,OpenProject>(id=>call<OpenProject>('open_project',{id}),open=>{
-      if(historyRef.current.current?.id===open.project.id)dispatch({type:'builds',project:open.project});
+    const builds=createLatestRefresh<string,ProjectBuildHistory>(id=>call<ProjectBuildHistory>('project_build_history',{id}),receipt=>{
+      const current=historyRef.current.current;
+      if(current?.id===receipt.projectId)dispatch({type:'builds',project:applyBuildHistory(current,receipt)});
     });
     const unsubs: Promise<() => void>[] = [];
     unsubs.push(

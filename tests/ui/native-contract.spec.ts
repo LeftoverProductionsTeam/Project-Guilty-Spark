@@ -2,6 +2,29 @@ import {chooseTool,openDrawer} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
 import { test, expect, type Page } from '@playwright/test';
 
+test('C61 build notifications use source-bound metadata and retain unsaved edits without reopening map buffers',async({page})=>{
+  await mockDesktop(page);await openFixture(page);const field=page.getByLabel('Velocity',{exact:true});await field.fill('39');await field.press('Tab');
+  await page.evaluate(()=>{const m=(window as any).__sparkMock;m.calls.length=0;m.emit('spark:library-changed');});
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.some((r:any)=>r.command==='project_build_history'))).toBe(true);
+  await expect(field).toHaveValue('39');expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((r:any)=>r.command==='open_project').length)).toBe(0);
+  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{const value=await original(command,args);return command==='project_build_history'?{...value,sourceSha256:'wrong source'}:value;};w.__sparkMock.emit('spark:library-changed');});
+  await expect(page.getByText(/Build history does not match this project source\. Your working draft is retained\./)).toBeVisible();await expect(field).toHaveValue('39');
+});
+
+test('C61 Inspector puts selected transforms before global settings and keeps all renderer controls reachable',async({page})=>{
+  await page.setViewportSize({width:1280,height:720});await mockDesktop(page);
+  await page.evaluate(()=>{(window as any).__sparkMock.projects.a.project.scene=[{id:'synthetic-selection',name:'Synthetic selected object',kind:'Scenery',tagId:null,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1],visible:true,sourceOffset:null,rotationOffset:null,assetId:null}];});
+  await openFixture(page);await chooseTool(page,'Level editor');
+  await openDrawer(page,'Objects');await page.locator('.object-name').first().click();await openDrawer(page,'Inspector');
+  const panel=page.getByRole('region',{name:'Inspector panel',exact:true}),selected=panel.locator('.world-inspector-selection');
+  await expect(selected).toBeVisible();const selection=await selected.boundingBox(),global=await panel.locator('.gs-render-features').boundingBox();expect(selection!.y).toBeLessThan(global!.y);
+  await panel.locator('.gs-render-features>summary').click();await panel.getByLabel('Enable renderer enhancements',{exact:true}).check();
+  const controls=panel.locator('.gs-render-feature-controls');await expect(controls.getByLabel('Bloom strength',{exact:true})).toBeVisible();
+  const bloom=controls.getByLabel('Bloom strength',{exact:true}),before=await bloom.inputValue();await bloom.focus();await page.keyboard.press('End');await expect(bloom).toHaveValue('2');
+  expect(await controls.evaluate(e=>e.scrollWidth<=e.clientWidth+1)).toBe(true);await page.keyboard.press('Control+z');
+  await expect(bloom).toHaveValue(before);
+});
+
 test('C60 late library replies cannot overwrite a newer snapshot or an open map edit',async({page})=>{
   await mockDesktop(page);await openFixture(page);const field=page.getByLabel('Velocity',{exact:true});await field.fill('31');await field.press('Tab');
   await page.evaluate(()=>{
@@ -235,6 +258,7 @@ async function mockDesktop(page: Page) {
           if(mock.enforceTransfer){mock.transferredId=args.id;await new Promise(resolve=>setTimeout(resolve,80));}
           return 'synthetic-map-window';
         }
+        if (command === 'project_build_history') {const p=projects[args.id].project;return structuredClone({projectId:p.id,sourceSha256:p.source?.sha256??null,builds:p.builds});}
         if (command === 'open_project') {if(mock.delayOpen){const delay=mock.delayOpen;mock.delayOpen=0;await new Promise(resolve=>setTimeout(resolve,delay));}return structuredClone(projects[args.id]);}
         if (command === 'prepare_native_asset_import') {
           const source = projects[args.sourceProjectId];

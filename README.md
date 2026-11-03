@@ -47,6 +47,8 @@ An open-source Halo 1 creation and interoperability studio combining native modd
 
 [C51 system audit, repairs and measured limits](docs/C51_SYSTEM_REPAIR.md) · [C51 native gameplay results](docs/CONTINUATION_51_ENGINEERING.md) · [C50 regressions/performance](docs/CONTINUATION_50_ENGINEERING.md) · [BSP Workshop](docs/BSP_WORKSHOP.md) · [C48 collaboration evidence](docs/CONTINUATION_48_ENGINEERING.md).
 
+C61 makes native build-status updates source-bound and lightweight, puts selected transforms first, compacts the shared renderer controls and gives Home neutral studio lighting so Johnson is visible. Real native tests cover 16 character/runtime selections and 126 workspace states. Native player/AI trials retain the failed wave and incomplete shared-state gates. [C61 evidence, measurements and remaining work](docs/CONTINUATION_61_WORKFLOW_NATIVE.md) · [Push/upload handoff](docs/C61_PUSH_NOTES.md).
+
 ## Four Halo runtimes, explicit capabilities
 
 | Capability | MCC Halo 1 | Custom Edition | OpenCE | ChupathingyCE |
@@ -66,7 +68,7 @@ A runtime selector does not translate networking protocols. [Detailed compatibil
 
 **[GitHub Releases — Windows upload pending](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/releases).** A public release must attach an x64 `_Setup.exe`, complete `_Portable.zip`, SHA-256 checksums and the exact source/version manifest.
 
-The fresh anonymous API check on **November 3, 2026, 12:53 UTC** returned **no public releases**. C49's accepted installer/portable/source set was rechecked and its two Windows applications launched again; those local files are not public downloads. Its exact source is `cb07581597de11e83d1c10bafad526e8b031f27e`. C50–C60 source improvements are not retroactively included in that candidate. The draft-only [release workflow](.github/workflows/release.yml) requires known pushed source, regression/package checks, verified asset downloads and owner approval before publication. Actions artifacts are not Release assets. [Exact files and draft-upload instructions](docs/C60_PUSH_NOTES.md).
+The fresh anonymous API check on **November 3, 2026, 14:59 UTC** returned **no public releases**. C49's accepted installer/portable/source set was rechecked and its two Windows applications launched again; those local files are not public downloads. Its exact source is `cb07581597de11e83d1c10bafad526e8b031f27e`. C50–C61 source improvements are not retroactively included in that candidate. The draft-only [release workflow](.github/workflows/release.yml) requires known pushed source, regression/package checks, verified asset downloads and owner approval before publication. Actions artifacts are not Release assets. [Exact files and draft-upload instructions](docs/C60_PUSH_NOTES.md).
 
 Windows 10/11 x64 requires [Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/); the installer can offer it when missing. **No Linux package is advertised as verified:** AppImage and `.deb` builds must compile and launch first. macOS also has no accepted native package/startup test. No Halo game, maps, models, SDK, proprietary bank or optional Steam bridge is bundled.
 

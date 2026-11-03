@@ -1,5 +1,16 @@
 # Changelog
 
+## C61 — Source-bound status, compact inspection and Home lighting
+
+- Replace full decoded-map status refreshes with source-bound build metadata; retain unsaved edits, durable history, existing native admission and every prior command.
+- Put selected-object transforms before scene settings; compact shared rendering/quality controls without removing parameters.
+- Use the existing neutral inspection lights for Home so Johnson is visible; retain native source materials, color, variation, rig, animation and saved character choice.
+- Verify 16 native character/runtime selections, 126 layout states, source rendering, three-process source/BSP compilation and recovery. Record the actual no-allies native wave defeat, player respawn and incomplete peer score/AI/rejoin gates.
+- Measure status IPC at 8.2 MB to 146 bytes and about 114 to 1.45 ms for the empty-history workload. General startup/catalog/RAM results remain mixed.
+- Remove only an inactive generated compiler cache after tests; preserve originals, research, source history and all five sealed C49 release files. Keep public release upload/approval with the owner.
+- Validation: 666 Rust passed / 8 opt-in ignored; 366 frontend; 157 browser; 59 offline; 37 native diagnostics; 10 Python + 6 release contracts. [C61 report](docs/CONTINUATION_61_WORKFLOW_NATIVE.md).
+
+
 ## C59 — Detachable workspaces and durable collaboration rollover
 
 - Detach eligible drawers into native windows, retain original layout/placement and return the single-writer editing lease and durable history to the originating window. Keep independent maps editable and stale observer drafts recoverable.

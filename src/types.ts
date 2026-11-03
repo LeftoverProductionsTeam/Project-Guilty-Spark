@@ -204,6 +204,12 @@ export interface BuildRecord {
   message: string;
   projectFingerprint: string;
 }
+/** Read-only build metadata, never decoded map buffers or a launch permission. */
+export interface ProjectBuildHistory {
+  projectId: string;
+  sourceSha256: string | null;
+  builds: BuildRecord[];
+}
 export interface EngineBuildTarget {
   id:string;name:string;runtimeId:RuntimeId;builder:'h1a-tool'|'invader-mcc'|'invader-ce'|'unsupported';
   hekDirectory:string|null;hekFlavor:'h1aEk'|'legacyHek'|null;tagsDirectory:string|null;

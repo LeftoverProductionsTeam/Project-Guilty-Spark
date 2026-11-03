@@ -1651,6 +1651,114 @@ export default function World({
       )}
       <WorkspacePanel id="inspector" label="Inspector">
         <aside className="panel inspector">
+          <div className="panel-heading world-inspector-heading">
+            <strong>{chosen?.kind ?? 'Scene settings'}</strong>
+          </div>
+          {chosen && (
+            <div className="inspector-body world-inspector-selection">
+              {chosen.sourceModel && (
+                <>
+                  <p className="subtle">
+                    Source-linked model preview · compile editable scenario/model tags before a game build.
+                  </p>
+                  {modelIssues[forgeModelKey(sourcePlacement(chosen)!)] && (
+                    <Notice>{modelIssues[forgeModelKey(sourcePlacement(chosen)!)]}</Notice>
+                  )}
+                  <button
+                    onClick={() => openObjectTag(chosen.sourceModel!.tagId, chosen.sourceModel!.projectId)}
+                  >
+                    Edit model source tags
+                  </button>
+                </>
+              )}
+              {chosen.tagId !== null &&
+                !resolveObjectMesh(inspection, chosen.tagId, chosen.assetId, assetMeshes) && (
+                  <Notice tone="warning">
+                    This source model is unavailable in the current reader. Its item is not drawn. The
+                    placement remains editable in the hierarchy.
+                  </Notice>
+                )}
+              <label className="field-label">
+                Object name
+                <input value={chosen.name} onChange={(e) => update({ ...chosen, name: e.target.value })} />
+              </label>
+              <div className="inspector-section">
+                <div className="section-label">Transform</div>
+                {(['position', 'rotation', 'scale'] as const).map((property) => (
+                  <div className="transform-field" key={property}>
+                    <label>
+                      {property === 'rotation'
+                        ? 'Yaw / pitch / roll'
+                        : property[0].toUpperCase() + property.slice(1)}
+                      {property === 'rotation' && <small>degrees</small>}
+                    </label>
+                    <div className="vector-inputs">
+                      {chosen[property].map((value, i) => (
+                        <div key={i}>
+                          <span className={`axis-${i}`}>
+                            {property === 'rotation' ? ['Y', 'P', 'R'][i] : ['X', 'Y', 'Z'][i]}
+                          </span>
+                          <NumberField
+                            value={
+                              property === 'rotation' ? Number(((value * 180) / Math.PI).toFixed(3)) : value
+                            }
+                            label={`${property} ${i}`}
+                            disabled={
+                              property === 'rotation' &&
+                              i > 0 &&
+                              ['Player spawn', 'Netgame item'].includes(chosen.kind)
+                            }
+                            min={property === 'scale' ? 0.001 : -1e6}
+                            step={property === 'rotation' ? 1 : property === 'scale' ? 0.01 : 0.1}
+                            onCommit={(v) => {
+                              try {
+                                update({
+                                  ...chosen,
+                                  [property]: replaceVector(
+                                    chosen[property],
+                                    i,
+                                    property === 'rotation' ? (v * Math.PI) / 180 : v,
+                                  ),
+                                });
+                              } catch (e) {
+                                notify(String(e));
+                              }
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {chosen.sourceOffset !== null && (
+                <Notice>
+                  Native rebuild: position and rotation. Scale and new instances are editor-only.
+                </Notice>
+              )}
+              <div className="inspector-actions">
+                <button onClick={duplicate}>
+                  <Copy size={14} />
+                  Duplicate
+                </button>
+                <button
+                  onClick={() => {
+                    edit(
+                      { ...project, scene: project.scene.filter((o) => o.id !== chosen.id) },
+                      `Remove ${chosen.name} from editor`,
+                    );
+                    setSelected(null);
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Remove
+                </button>
+              </div>
+              <div className="subtle">
+                Source object ID <code>{chosen.id}</code>
+              </div>
+            </div>
+          )}
           {!cinematic && (
             <VisibilityZones
               project={project}
@@ -1660,10 +1768,6 @@ export default function World({
             />
           )}
           <RenderFeatures project={project} edit={edit} />
-          <div className="panel-heading">
-            <strong>Inspector</strong>
-            {chosen && <Pill>{chosen.kind}</Pill>}
-          </div>
           <details className="gs-world-environment-panel">
             <summary title="Temporary local fog, sun and ambient preview for comparing your owned map. Never modifies or exports a compiled Halo map.">
               Environment · preview sun, ambient &amp; fog
@@ -2160,112 +2264,7 @@ export default function World({
               </div>
             </div>
           )}
-          {chosen ? (
-            <div className="inspector-body">
-              {chosen.sourceModel && (
-                <>
-                  <p className="subtle">
-                    Source-linked model preview · compile editable scenario/model tags before a game build.
-                  </p>
-                  {modelIssues[forgeModelKey(sourcePlacement(chosen)!)] && (
-                    <Notice>{modelIssues[forgeModelKey(sourcePlacement(chosen)!)]}</Notice>
-                  )}
-                  <button
-                    onClick={() => openObjectTag(chosen.sourceModel!.tagId, chosen.sourceModel!.projectId)}
-                  >
-                    Edit model source tags
-                  </button>
-                </>
-              )}
-              {chosen.tagId !== null &&
-                !resolveObjectMesh(inspection, chosen.tagId, chosen.assetId, assetMeshes) && (
-                  <Notice tone="warning">
-                    This source model is unavailable in the current reader. Its item is not drawn. The
-                    placement remains editable in the hierarchy.
-                  </Notice>
-                )}
-              <label className="field-label">
-                Object name
-                <input value={chosen.name} onChange={(e) => update({ ...chosen, name: e.target.value })} />
-              </label>
-              <div className="inspector-section">
-                <div className="section-label">Transform</div>
-                {(['position', 'rotation', 'scale'] as const).map((property) => (
-                  <div className="transform-field" key={property}>
-                    <label>
-                      {property === 'rotation'
-                        ? 'Yaw / pitch / roll'
-                        : property[0].toUpperCase() + property.slice(1)}
-                      {property === 'rotation' && <small>degrees</small>}
-                    </label>
-                    <div className="vector-inputs">
-                      {chosen[property].map((value, i) => (
-                        <div key={i}>
-                          <span className={`axis-${i}`}>
-                            {property === 'rotation' ? ['Y', 'P', 'R'][i] : ['X', 'Y', 'Z'][i]}
-                          </span>
-                          <NumberField
-                            value={
-                              property === 'rotation' ? Number(((value * 180) / Math.PI).toFixed(3)) : value
-                            }
-                            label={`${property} ${i}`}
-                            disabled={
-                              property === 'rotation' &&
-                              i > 0 &&
-                              ['Player spawn', 'Netgame item'].includes(chosen.kind)
-                            }
-                            min={property === 'scale' ? 0.001 : -1e6}
-                            step={property === 'rotation' ? 1 : property === 'scale' ? 0.01 : 0.1}
-                            onCommit={(v) => {
-                              try {
-                                update({
-                                  ...chosen,
-                                  [property]: replaceVector(
-                                    chosen[property],
-                                    i,
-                                    property === 'rotation' ? (v * Math.PI) / 180 : v,
-                                  ),
-                                });
-                              } catch (e) {
-                                notify(String(e));
-                              }
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {chosen.sourceOffset !== null && (
-                <Notice>
-                  Position and rotation can be rebuilt through Invader. Per-instance scale and new Halo
-                  instances are editor-only.
-                </Notice>
-              )}
-              <div className="inspector-actions">
-                <button onClick={duplicate}>
-                  <Copy size={14} />
-                  Duplicate
-                </button>
-                <button
-                  onClick={() => {
-                    edit(
-                      { ...project, scene: project.scene.filter((o) => o.id !== chosen.id) },
-                      `Remove ${chosen.name} from editor`,
-                    );
-                    setSelected(null);
-                  }}
-                >
-                  <Trash2 size={14} />
-                  Remove
-                </button>
-              </div>
-              <div className="subtle">
-                Source object ID <code>{chosen.id}</code>
-              </div>
-            </div>
-          ) : (
+          {!chosen && (
             <div className="inspector-placeholder">
               <Move3D size={26} />
               <p>Select an object in the scene or hierarchy to edit its transform.</p>

@@ -543,6 +543,24 @@ async fn open_project(app: tauri::AppHandle, id: String) -> Reply<OpenProject> {
     .await
     .map_err(error)?
 }
+#[derive(Debug, Serialize)]
+#[serde(rename_all="camelCase")]
+struct ProjectBuildHistory {
+    project_id: String,
+    source_sha256: Option<String>,
+    builds: Vec<BuildRecord>,
+}
+fn project_build_history_state(state:&AppState,id:&str)->Reply<ProjectBuildHistory> {
+    let p=lock(&state.library)?.get(id).map_err(error)?;
+    // Keep exactly the preserved-source admission used by open_project. Borrow
+    // its verified Arc; do not clone/serialize geometry for a status notification.
+    if p.source.is_some(){let _=inspect(state,&p)?;}
+    Ok(ProjectBuildHistory{project_id:p.id,source_sha256:p.source.map(|s|s.sha256),builds:p.builds})
+}
+#[tauri::command]
+async fn project_build_history(app:tauri::AppHandle,id:String)->Reply<ProjectBuildHistory>{
+    tauri::async_runtime::spawn_blocking(move||project_build_history_state(&app.state::<AppState>(),&id)).await.map_err(error)?
+}
 #[tauri::command]
 async fn connect_mcc_texture_resources(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String)->Reply<OpenProject>{
     let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;let mut p=lock(&state.library)?.get(&project_id).map_err(error)?;let i=inspect(&state,&p)?;
@@ -2921,6 +2939,7 @@ pub fn run() {
             default_materials_native::inspect_map_source,
             default_materials_native::compatible_bitmap_targets,
             open_project,
+            project_build_history,
             connect_mcc_texture_resources,
             create_project,
             create_quickforge_project,
@@ -3081,6 +3100,39 @@ mod readiness_tests {
             home_voice:Default::default(),
         };
         (temp, state, p, record)
+    }
+    #[test]
+    fn build_history_projection_is_read_only_and_does_not_serialize_authored_content() {
+        let(_temp,state,p,record)=fixture();
+        lock(&state.library).unwrap().save(&p,None).unwrap();
+        let file=lock(&state.library).unwrap().get(&p.id).unwrap();
+        let before=serde_json::to_vec(&file).unwrap();
+        let receipt=project_build_history_state(&state,&p.id).unwrap();
+        assert_eq!(receipt.project_id,p.id);assert_eq!(receipt.source_sha256,None);
+        assert_eq!(receipt.builds.len(),1);assert_eq!(receipt.builds[0].id,record.id);
+        let json=serde_json::to_value(&receipt).unwrap();
+        assert_eq!(json.as_object().unwrap().len(),3);
+        assert!(json.get("scene").is_none()&&json.get("inspection").is_none());
+        assert_eq!(before,serde_json::to_vec(&lock(&state.library).unwrap().get(&p.id).unwrap()).unwrap());
+        assert!(project_build_history_state(&state,"../../outside").is_err());
+    }
+    #[test]
+    fn build_history_projection_preserves_native_source_admission_without_migration() {
+        let(_temp,state,mut p,_)=fixture();
+        let inspection:MapInspection=serde_json::from_value(serde_json::json!({
+            "header":{"version":609,"engine":"synthetic","name":"metadata fixture","build":"","scenarioType":1,"fileSize":2048,"declaredSize":2048,"tagOffset":2048,"tagSize":0,"crc32":0,"flags":0,"demoLayout":false,"compressed":false,"extended":false,"legacyTagSizeRepair":false},
+            "sha256":"a".repeat(64),"scenarioPath":"levels/test/fixture","tags":[],"objects":[],"mesh":{"positions":[0,0,0,1,0,0,0,1,0],"indices":[0,1,2],"label":"synthetic","source":"synthetic"},"encounters":[],"scripts":[],"resources":[],"diagnostics":[]
+        })).unwrap();
+        p.source=Some(serde_json::from_value(serde_json::json!({"originalPath":state.root.join("synthetic.map"),"preservedPath":state.root.join("synthetic.map"),"sha256":"a".repeat(64),"cacheVersion":609,"engine":"synthetic","scenarioPath":"levels/test/fixture","archive":null,"resourceDirectory":null,"resourceSha256":{}})).unwrap());
+        p.source_scene_version=0;
+        let path=state.root.join("projects").join(&p.id).join("project.gsproject");
+        core::project::save_project(&path,&p).unwrap();
+        lock(&state.inspections).unwrap().insert(p.id.clone(),Arc::new(inspection));
+        let before=fs::read(&path).unwrap();
+        assert_eq!(project_build_history_state(&state,&p.id).unwrap().source_sha256,Some("a".repeat(64)));
+        assert_eq!(fs::read(&path).unwrap(),before);
+        p.source.as_mut().unwrap().cache_version=13;core::project::save_project(&path,&p).unwrap();
+        assert!(project_build_history_state(&state,&p.id).unwrap_err().contains("identity"));
     }
     #[test]
     fn direct_outputs_do_not_hide_a_current_native_source_build() {
