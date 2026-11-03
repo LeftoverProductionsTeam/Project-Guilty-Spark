@@ -1,14 +1,54 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseRuntimeHealth, nativeSoundStreamingFailures } from './native-runtime-health.mjs';
-import { analyzeRun } from './analyze-community-runtime-native.mjs';
+import { analyzeRun, selectNativeExecutions } from './analyze-community-runtime-native.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 
+test('reconnect analysis selects a real lifetime without rewriting evidence or accepting overlaps', () => {
+  const r = (instance, pid, start, end) => ({
+    instance,
+    role: instance === 'host' ? 'host' : 'client',
+    pid,
+    startedAt: `2026-11-03T04:00:${start}.000Z`,
+    exitedAt: `2026-11-03T04:00:${end}.000Z`,
+    exitCode: 0,
+    forced: false,
+    inputsUnchanged: true,
+  });
+  const receipt = {
+    reconnectRequested: true,
+    executed: [r('host', 1, '00', '59'), r('client', 2, '02', '22'), r('client-rejoin', 3, '27', '50')],
+  };
+  assert.deepEqual(
+    selectNativeExecutions(receipt, 'client-rejoin').map((r) => r.pid),
+    [1, 3],
+  );
+  assert.deepEqual(
+    selectNativeExecutions(receipt, 'client').map((r) => r.pid),
+    [1, 2],
+  );
+  assert.throws(() => selectNativeExecutions(receipt), /two native/);
+  for (const change of [
+    { pid: 2 },
+    { startedAt: '2026-11-03T04:00:20.000Z' },
+    { forced: true },
+    { inputsUnchanged: false },
+    { exitCode: 1 },
+  ]) {
+    const bad = structuredClone(receipt);
+    Object.assign(bad.executed[2], change);
+    assert.throws(() => selectNativeExecutions(bad, 'client-rejoin'), /reconnect|Reconnect/);
+  }
+  const traversal = { executed: [{ role: 'host', instance: '../elsewhere' }, { role: 'client' }] };
+  assert.throws(() => selectNativeExecutions(traversal), /instance/);
+});
+
 test('engine repairs to animation hierarchy remain semantic faults with the exact native tag', () => {
-  const text = "the map 'zombie_apocalypse' is corrected: tag 'gs_compat\\carrier_idle\\carrier_idle' (antr): animation_graph_check has the root node's sibling 1: none\n" +
+  const text =
+    "the map 'zombie_apocalypse' is corrected: tag 'gs_compat\\carrier_idle\\carrier_idle' (antr): animation_graph_check has the root node's sibling 1: none\n" +
     "the map 'zombie_apocalypse' is corrected: tag 'gs_compat\\carrier_idle\\carrier_idle' (antr): animation_graph_check has node 1 unreached from the root: made the root's child";
   const result = parseRuntimeHealth(text);
   assert.equal(result.status, 'native-faults-observed');
@@ -18,9 +58,15 @@ test('engine repairs to animation hierarchy remain semantic faults with the exac
 });
 
 test('native compiler sound omissions override success without confusing optional pack notices', () => {
-  const optional = 'Failed to read data file header sounds\n### FAILED TO OPEN DATA-CACHE FILE.\nsuccessfully built cache file.';
+  const optional =
+    'Failed to read data file header sounds\n### FAILED TO OPEN DATA-CACHE FILE.\nsuccessfully built cache file.';
   assert.equal(nativeSoundStreamingFailures(optional).length, 0);
-  assert.equal(nativeSoundStreamingFailures('streaming tags...failed to load sound for adding to cache file.\nsuccessfully built cache file.').length, 1);
+  assert.equal(
+    nativeSoundStreamingFailures(
+      'streaming tags...failed to load sound for adding to cache file.\nsuccessfully built cache file.',
+    ).length,
+    1,
+  );
   assert.throws(() => nativeSoundStreamingFailures('x'.repeat(16 * 1024 * 1024 + 1)), /bound/);
 });
 
@@ -60,25 +106,43 @@ test('invalid blocks, failed biped exits and deferred actor capacity cannot hide
   const h = parseRuntimeHealth(
     "successfully joined a net game\n#-1 is not a block element index in [#0,#0): an empty one is used\ncouldn't teleport the biped out far enough from the vehicle...\nlast line repeated 7 times\nWARNING: cannot create mounted weapons for zombie container, exceeded MAXIMUM_NUMBER_OF_MOUNTED_WEAPON_UNITS",
   );
-  assert.deepEqual(h.faults.map((f) => f.kind), [
-    'invalidBlockReference', 'bipedExitPlacementFailed', 'mountedActorCapacityExceeded',
-  ]);
+  assert.deepEqual(
+    h.faults.map((f) => f.kind),
+    ['invalidBlockReference', 'bipedExitPlacementFailed', 'mountedActorCapacityExceeded'],
+  );
   assert.equal(h.faults[1].minimumOccurrences, 8);
   assert.equal(h.status, 'native-faults-observed');
   assert.equal(h.contentAcceptance, false);
+});
+
+test('a joined fallback map does not hide a refused native campaign selection', () => {
+  const h = parseRuntimeHealth(
+    'chupathingyce: network test: c50_carrier@ce is not a campaign level, for co-op\nsuccessfully joined a net game',
+  );
+  assert.equal(h.status, 'native-faults-observed');
+  assert.equal(h.faults[0].kind, 'nativeScenarioRefused');
+  assert.equal(h.contentAcceptance, false);
+  const spawns = parseRuntimeHealth(
+    'NETGAME MAP FAILURE: failed to find enough spawn points for slayer 0/4\nNETGAME MAP FAILURE: failed to find any equipment for slayer',
+  );
+  assert.equal(spawns.faults[0].kind, 'nativeMultiplayerSetupFailed');
+  assert.equal(spawns.faults[0].minimumOccurrences, 2);
 });
 
 test('runtime sample truncation and cleared wrong-class references remain content faults', () => {
   // Synthetic messages; genuine source/cache/runtime records remain separate.
   const h = parseRuntimeHealth(
     "the map 'example' is corrected: tag 'sound\\custom\\music' (snd!): pitch_ranges[0].permutations[0].samples has 8691840 bytes, more than the game's 4194304: cut to 4194304\n" +
-    "the map 'example' is corrected: tag 'weapons\\pistol\\melee' (jpt!): sound names e1ca0056, not a tag of snd! (wrong group: instance handle e1ca0056, group 'jpt!'): none\n" +
-    "the map 'example' is corrected: tag 'ui\\strings' (ustr): strings[0] is not terminated: terminated",
+      "the map 'example' is corrected: tag 'weapons\\pistol\\melee' (jpt!): sound names e1ca0056, not a tag of snd! (wrong group: instance handle e1ca0056, group 'jpt!'): none\n" +
+      "the map 'example' is corrected: tag 'ui\\strings' (ustr): strings[0] is not terminated: terminated",
   );
-  assert.deepEqual(h.faults.map((f) => [f.kind, f.source]), [
-    ['nativeSoundSampleTruncated', 'sound/custom/music (snd!)'],
-    ['nativeDependencyCleared', 'weapons/pistol/melee (jpt!)'],
-  ]);
+  assert.deepEqual(
+    h.faults.map((f) => [f.kind, f.source]),
+    [
+      ['nativeSoundSampleTruncated', 'sound/custom/music (snd!)'],
+      ['nativeDependencyCleared', 'weapons/pistol/melee (jpt!)'],
+    ],
+  );
   assert.equal(h.status, 'native-faults-observed');
   assert.equal(h.contentAcceptance, false);
 });

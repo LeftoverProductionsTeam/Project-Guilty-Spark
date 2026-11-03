@@ -519,7 +519,58 @@ function executionRecord(entry) {
   };
 }
 
-export function analyzeRun(directory) {
+// Reconnect evidence retains all three original process records. Select one
+// client lifetime without rewriting the receipt or concatenating game epochs.
+export function selectNativeExecutions(receipt, clientInstance) {
+  if (clientInstance === undefined) {
+    if (receipt.executed?.length !== 2) throw Error('Expected two native processes');
+    return ['host', 'client'].map((role) => {
+      const matches = receipt.executed.filter((v) => v && v.role === role);
+      if (matches.length !== 1) throw Error('Expected exactly one execution record for ' + role);
+      if (matches[0].instance !== undefined && matches[0].instance !== role)
+        throw Error('Unexpected native process instance');
+      return matches[0];
+    });
+  }
+  if (
+    !['client', 'client-rejoin'].includes(clientInstance) ||
+    receipt.reconnectRequested !== true ||
+    receipt.executed?.length !== 3
+  )
+    throw Error('Expected explicit reconnect process selection');
+  const records = ['host', 'client', 'client-rejoin'].map((instance) => {
+    const matches = receipt.executed.filter((r) => r?.instance === instance);
+    if (matches.length !== 1) throw Error('Expected unique reconnect instance');
+    const r = matches[0];
+    if (
+      r.role !== (instance === 'host' ? 'host' : 'client') ||
+      !Number.isSafeInteger(r.pid) ||
+      r.pid <= 0 ||
+      r.exitCode !== 0 ||
+      r.forced !== false ||
+      r.inputsUnchanged !== true
+    )
+      throw Error('Incomplete reconnect process');
+    return r;
+  });
+  const [host, first, rejoin] = records,
+    at = (r, key) => Date.parse(r[key]);
+  if (
+    new Set(records.map((r) => r.pid)).size !== 3 ||
+    !records.every((r) => Number.isFinite(at(r, 'startedAt')) && Number.isFinite(at(r, 'exitedAt'))) ||
+    !(
+      at(host, 'startedAt') <= at(first, 'startedAt') &&
+      at(first, 'startedAt') < at(first, 'exitedAt') &&
+      at(first, 'exitedAt') < at(rejoin, 'startedAt') &&
+      at(rejoin, 'startedAt') < at(rejoin, 'exitedAt') &&
+      at(rejoin, 'exitedAt') <= at(host, 'exitedAt')
+    )
+  )
+    throw Error('Reconnect requires independent, ordered client lifetimes within the held host');
+  return [host, clientInstance === 'client' ? first : rejoin];
+}
+
+export function analyzeRun(directory, { clientInstance } = {}) {
   const root = path.resolve(directory),
     receiptInput = readBounded(root, 'execution.json', LIMITS.receiptBytes);
   const receipt = JSON.parse(receiptInput.text);
@@ -528,22 +579,17 @@ export function analyzeRun(directory) {
     typeof receipt !== 'object' ||
     receipt.schemaVersion !== 1 ||
     !Array.isArray(receipt.executed) ||
-    receipt.executed.length !== 2 ||
     !Array.isArray(receipt.errors)
   )
     throw new Error('Expected bounded execution metadata with an executed array');
-  const entries = ['host', 'client'].map((role) => {
-    const matches = receipt.executed.filter((v) => v && v.role === role);
-    if (matches.length !== 1) throw new Error('Expected exactly one execution record for ' + role);
-    return matches[0];
-  });
-  const roles = ['host', 'client'].map((role) =>
-    parseLog(readBounded(root, role + '/stdio.log', LIMITS.logBytes), role),
+  const entries = selectNativeExecutions(receipt, clientInstance);
+  const roles = entries.map((entry) =>
+    parseLog(readBounded(root, (entry.instance ?? entry.role) + '/stdio.log', LIMITS.logBytes), entry.role),
   );
   const [host, client] = roles,
     records = entries.map(executionRecord);
   const nativeHealth = entries.map((entry) => {
-    const relative = entry.role + '/logs/debug.txt';
+    const relative = (entry.instance ?? entry.role) + '/logs/debug.txt';
     if (!fs.existsSync(path.join(root, relative))) {
       if (entry.nativeDebugLog) throw Error('Recorded native debug log is missing');
       return { role: entry.role, checked: false, status: 'unavailable', contentAcceptance: false };
@@ -648,7 +694,7 @@ export function analyzeRun(directory) {
       records,
       logs: roles.map((r) => ({
         role: r.role,
-        path: r.role + '/stdio.log',
+        path: (entries.find((e) => e.role === r.role).instance ?? r.role) + '/stdio.log',
         bytes: r.bytes,
         sha256: r.sha256,
         samples: r.samples.length,

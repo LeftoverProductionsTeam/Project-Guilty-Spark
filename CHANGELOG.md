@@ -1,5 +1,14 @@
 # Changelog
 
+## C56 — Native AI combat and game-peer recovery
+
+- Retain each native round encounter's captured unit list so dead corpses are cleaned up alongside living actors. Allow a two-second death-animation grace. Preserve bounded solo rules, real living-count progression and refusal of missing spawns or defeat; do not generate kills or damage.
+- Prove a native infantry lifecycle and two actual AI-cleared waves with 400 wave-clear points. Human player-cleared Firefight and game listening remain pending.
+- Observe actual OpenCE targets/damage through its exact publisher executable/PDB and read-only process access. Collect more frequent lightweight samples while keeping expensive censuses and observation duration bounded. Preserve strict tick-reset, source/hash and readback checks.
+- Exercise true process exit/rejoin with a held host and verified isolated player profile. Analyze selected client lifetimes from the original receipt; never rewrite or concatenate sessions. Native peers observe a hostile created after reconnection, including combat, death and cleanup. Retain measured health/position discrepancies and host-local script globals.
+- Treat native campaign-selector refusals and missing multiplayer starts/equipment as faults. Keep failed Chupathingy candidates and the failed MCC solo UI build. A corrected Chupathingy CE multiplayer research map loads without classified faults, but does not complete cooperative Firefight or AI parity.
+- Exercise the original zombie weapon/projectile/effect/carrier chain. Automatic rider release remains blocked; preserve all experimental seating/physics source and previous-good builds. [Exact results and remaining gates](docs/CONTINUATION_56_NATIVE_AI.md).
+
 ## C54 — Character rendering, compact menus and scoped stability
 
 - Replace the crowded drawer shortcut strip with grouped Tools and searchable Maps menus. Preserve tab drag-out, native window controls, per-map place/history and keyboard access. Split Interface Studio into four remembered compact categories; label lighting/fog fields visibly.

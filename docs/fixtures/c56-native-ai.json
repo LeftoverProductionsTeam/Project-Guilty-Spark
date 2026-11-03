@@ -1,0 +1,556 @@
+{
+  "schemaVersion": 1,
+  "continuation": 56,
+  "startingMaster": "83a0b2ba9abbf96bc108bb43ff86d0af2ad4adb6",
+  "sourceCommit": null,
+  "scope": "Native engine actor/combat/reconnect observations; separate partial runtime gates, no universal gameplay acceptance",
+  "enginePins": [
+    {
+      "id": "opence",
+      "revision": "899219cc0a14b03bc12f0517a1e9ee4c37158af8",
+      "status": [],
+      "licenseSha256": "e0eedba615d5cd1b986afb6c5b3a4b1ae33713e7e9dc74d19daec5e3221f9d2e",
+      "statusUnchanged": true
+    },
+    {
+      "id": "chupa",
+      "revision": "9990568507eede8b81edd5437a4860de5465c408",
+      "status": [],
+      "licenseSha256": "11e7357d374f1b4ae05dc1cb642529aa6db2e2a60df0137bad7dcb7c9b5d71ad",
+      "statusUnchanged": true
+    },
+    {
+      "id": "halo-bnunu",
+      "revision": "2e376b992e920bcc3a094727475c17daef71ec8c",
+      "status": [],
+      "licenseSha256": "f4e7f373b9b996950337e8d41a4a2939c2d90b7725e9baf3d5084a22717ad328",
+      "statusUnchanged": true
+    }
+  ],
+  "installedRuntimeIdentities": {
+    "opence": {
+      "release": "build-335",
+      "revision": "da8d455623cf50002e6a798b1980068fd3ca0292",
+      "exeSha256": "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0",
+      "pdbSha256": "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800"
+    },
+    "chupa": {
+      "release": "v0.8.1d",
+      "revision": "844242abdfb9d5ad51332808cb50b66266796801",
+      "exeSha256": "b2f8ea992ed4031461bc638f8af80c08ec8905c5f73c97c483e86f25273b18d4"
+    }
+  },
+  "acceptance": {
+    "nativeActorLifecycleObserved": true,
+    "playerClearedFirefightAccepted": false,
+    "aiClearedTwoWaveRoundObserved": true,
+    "openCeNativeCombatAndReconnectObserved": true,
+    "fullMultiplayerAiParity": false,
+    "vehicleInteractionsAccepted": false,
+    "twoComputersAccepted": false,
+    "zombieWeaponCreatesCarrierAndRider": true,
+    "automaticZombieReleaseAccepted": false,
+    "zombieCombatRestored": false,
+    "chupaNativeCeMultiplayerLoads": true,
+    "chupaAiLifecycleAccepted": false,
+    "mccCandidateCompiled": false,
+    "stockCeMultiplayerAiAccepted": false,
+    "heardGameAudio": false
+  },
+  "openCeInitialPair": {
+    "exactTicks": 404,
+    "sharedActorIds": 5,
+    "identityCoverage": {
+      "hostAiUnitTicks": 1094,
+      "matchedAiUnitTicks": 1094,
+      "missingClientUnitTicks": 0,
+      "knownAiMissingHostUnitTicks": 0,
+      "unclassifiedClientUnitTicks": 0,
+      "mismatchedTagUnitTicks": 0,
+      "examples": []
+    },
+    "position": {
+      "count": 1094,
+      "median": 0.01855872927991033,
+      "p95": 0.070835763566663,
+      "maximum": 0.13645227353370504
+    },
+    "health": {
+      "count": 1094,
+      "median": 0.000013709068298339844,
+      "p95": 0.000027179718017578125,
+      "maximum": 0.20002436637878418
+    },
+    "fullLifecycleAcceptance": false,
+    "executionSha256": "46feae9ea4aebc04f7240555213c4c48d58f46b70e134ee8b8de57ebb19b654f"
+  },
+  "openCeRejoin": {
+    "physicalComputers": 1,
+    "nativeProcessesOverTime": 3,
+    "maximumSimultaneousProcesses": 2,
+    "noPlayerInput": true,
+    "profileOnlyReuse": true,
+    "exactTicks": 369,
+    "sharedActorIds": 3,
+    "movingActorIds": 3,
+    "firingActorIds": 2,
+    "identityCoverage": {
+      "hostAiUnitTicks": 836,
+      "matchedAiUnitTicks": 836,
+      "missingClientUnitTicks": 0,
+      "knownAiMissingHostUnitTicks": 0,
+      "unclassifiedClientUnitTicks": 0,
+      "mismatchedTagUnitTicks": 0,
+      "examples": []
+    },
+    "position": {
+      "count": 836,
+      "median": 0.008894009238633585,
+      "p95": 0.06437840091509203,
+      "maximum": 0.06870625629590552
+    },
+    "health": {
+      "count": 836,
+      "median": 0,
+      "p95": 0.00002181529998779297,
+      "maximum": 0.23999983072280884
+    },
+    "continuity": {
+      "pairable": true,
+      "host": {
+        "monotonic": true,
+        "repeatedTickObservations": 0,
+        "discontinuities": 0,
+        "examples": []
+      },
+      "client": {
+        "monotonic": true,
+        "repeatedTickObservations": 0,
+        "discontinuities": 0,
+        "examples": []
+      },
+      "refusal": null,
+      "sessionIdentityVerified": false
+    },
+    "fullLifecycleAcceptance": false,
+    "nativeFaultsObserved": false,
+    "executionSha256": "38394d681c1d331425c77edb29d9877982d385abca936bf8d74345164ba6e8bd",
+    "actors": [
+      {
+        "instance": "host",
+        "pid": 40412,
+        "readErrors": {
+          "crossed tick while reading": 16
+        },
+        "hostiles": [
+          {
+            "id": 3805741073,
+            "team": 3,
+            "tag": 3817210386,
+            "firstTick": 1232,
+            "lastTick": 1465,
+            "samples": 103,
+            "healthFirst": 1,
+            "healthMin": -0.16000017523765564,
+            "healthLast": -0.16000017523765564,
+            "shieldFirst": 0,
+            "shieldMin": 0,
+            "deathFirstTick": 1404,
+            "absentAfter": true,
+            "displacementFromFirstMax": 2.131777418296255,
+            "animationStates": 5,
+            "lastFiredTicks": [
+              1266
+            ],
+            "observedTargets": [
+              3799711748,
+              3799908363
+            ]
+          }
+        ],
+        "scriptGlobalsHostOnly": true
+      },
+      {
+        "instance": "client",
+        "pid": 36048,
+        "readErrors": {
+          "crossed tick while reading": 2
+        },
+        "hostiles": [],
+        "scriptGlobalsHostOnly": true
+      },
+      {
+        "instance": "client-rejoin",
+        "pid": 5888,
+        "readErrors": {
+          "crossed tick while reading": 2
+        },
+        "hostiles": [
+          {
+            "id": 3805741073,
+            "team": 3,
+            "tag": 3817210386,
+            "firstTick": 1232,
+            "lastTick": 1450,
+            "samples": 106,
+            "healthFirst": 1,
+            "healthMin": -0.19999998807907104,
+            "healthLast": -0.19999998807907104,
+            "shieldFirst": 0,
+            "shieldMin": 0,
+            "deathFirstTick": 1387,
+            "absentAfter": true,
+            "displacementFromFirstMax": 2.174183627684862,
+            "animationStates": 8,
+            "lastFiredTicks": [
+              1266
+            ],
+            "observedTargets": []
+          }
+        ],
+        "scriptGlobalsHostOnly": true
+      }
+    ]
+  },
+  "chupa": {
+    "selectedMode": "CE native multiplayer research map, not cooperative campaign",
+    "nativeFaultsObserved": false,
+    "verdict": {
+      "status": "sampled-state-disagreement",
+      "selectedComparison": "exactTicks",
+      "joinMarkersObserved": true,
+      "bidirectionalPacketCountersObserved": true,
+      "atLeastTwoMachinePlayersObserved": true,
+      "completeInventoryParity": false,
+      "humanPlayAccepted": false,
+      "aiActorAcceptance": false,
+      "twoComputerAcceptance": false,
+      "renderingOrAudioAcceptance": false,
+      "nativeDebugLogsChecked": true,
+      "nativeContentAcceptance": false,
+      "universalCrossRuntimeCompatibility": false,
+      "listingGateChangeAuthorized": false
+    },
+    "exactPlayerTicks": 34,
+    "stateDisagreements": {
+      "total": 4,
+      "truncated": false,
+      "examples": [
+        {
+          "hostTick": 660,
+          "clientTick": 660,
+          "id": 0,
+          "fields": {
+            "shield": {
+              "host": 0.3,
+              "client": 0.29,
+              "nextObservation": {
+                "hostTick": 690,
+                "clientTick": 690,
+                "agrees": false
+              }
+            }
+          }
+        },
+        {
+          "hostTick": 690,
+          "clientTick": 690,
+          "id": 0,
+          "fields": {
+            "shield": {
+              "host": 0.55,
+              "client": 0.54,
+              "nextObservation": {
+                "hostTick": 720,
+                "clientTick": 720,
+                "agrees": false
+              }
+            }
+          }
+        },
+        {
+          "hostTick": 720,
+          "clientTick": 720,
+          "id": 0,
+          "fields": {
+            "shield": {
+              "host": 0.8,
+              "client": 0.79,
+              "nextObservation": {
+                "hostTick": 750,
+                "clientTick": 750,
+                "agrees": true
+              }
+            }
+          }
+        },
+        {
+          "hostTick": 870,
+          "clientTick": 870,
+          "id": 0,
+          "fields": {
+            "shield": {
+              "host": 0.68,
+              "client": 0.76,
+              "nextObservation": {
+                "hostTick": 900,
+                "clientTick": 900,
+                "agrees": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "completeInventoryParity": false
+  },
+  "candidates": {
+    "previousGood": "9d9c1f5ecf12873eba262dc07f12822f04b2e09113d0410cbe1e7f9df0999eaa",
+    "candidates": [
+      {
+        "kind": "rejoin",
+        "name": "c56_rejoin_ai",
+        "compiled": true,
+        "gameplayAccepted": false,
+        "controllerSha256": "8452213b1f58d919ad4e72e9226fbe349975afae643a4393d1a517add2bf275b",
+        "cacheSha256": "d59097fba2bdf70d38022df9d529a1552c675d03e2fbb638d260f3190fdd5723",
+        "cacheVersion": 609,
+        "scenarioType": 0,
+        "bytes": 64256576
+      },
+      {
+        "kind": "mp-equipment",
+        "name": "c56_firefight_mp3",
+        "compiled": true,
+        "gameplayAccepted": false,
+        "cacheSha256": "a16fc148b3f41b9ce6039ff589840acbd3a04fa27602ce8ddd4049d21182735a",
+        "cacheVersion": 609,
+        "scenarioType": 1,
+        "bytes": 97782572
+      },
+      {
+        "kind": "mcc",
+        "name": "c56_firefight_mcc",
+        "compiled": false,
+        "gameplayAccepted": false,
+        "error": "Error: mcc-cache: rg_mp.unit_hud_interface\r\nWARNING: Health panel background has high resolution scaling enabled, but on\r\nthe target engine this modifies offset instead of scale.\r\n...in ui\\hud\\cyborg_mp.unit_hud_interface\r\nWARNING: Health panel meter has high resolution scaling enabled, but on the\r\ntarget engine this modifies offset instead of scale.\r\n...in ui\\hud\\cyborg_mp.unit_hud_interface\r\nWARNING: Meter #0 background has high resolution scaling enabled, but on the\r\ntarget engine this modifies offset instead of scale.\r\n...in ui\\hud\\cyborg_mp.unit_hud_interface\r\nWARNING: Meter #0 meter has high resolution scaling enabled, but on the target\r\nengine this modifies offset instead of scale.\r\n...in ui\\hud\\cyborg_mp.unit_hud_interface\r\nWARNING (minor): Function scale is set to 20626.480625° (360 radians). This is\r\na errorneous default value set by older tools.\r\n...in effects\\lights\\coop teleport.lens_flare\r\nWARNING (minor): Function scale is set to 20626.480625° (360 radians). This is\r\na errorneous default value set by older tools.\r\n...in effects\\lights\\coop teleport circular.lens_flare\r\nFailed to find ui\\ui_tags_loaded_solo_scenario_type.tag_collection\r\nFailed to compile the map.\r\ntag path is invalid\r\n"
+      }
+    ],
+    "previousGoodUnchanged": true
+  },
+  "rejoinLifecycle": {
+    "cacheSha256": "68890089fda55c49e8e11fcb4baa5a0c821ac9cd03277ddcad3dda93d1ca4e54",
+    "controllerSha256": "58be67a212188d213e99206664d3beb8366930305f5e242c97ba42d59f48305e",
+    "cacheVersion": 609,
+    "scenarioType": 0,
+    "nativeRoundAcceptance": false,
+    "scope": "Native AI lifecycle after genuine reconnection, no human input, no synthetic damage or kill"
+  },
+  "chupaFinalMap": {
+    "cacheSha256": "b37172d871246493f81e0d64692545df252515633617dcfc7ce0004560be11ad",
+    "cacheVersion": 609,
+    "scenarioType": 1,
+    "gameplayAccepted": false
+  },
+  "weaponCarrier": {
+    "cacheSha256": "7601dbbd0cdee92218d3c6941ad3260a3edb96ed060a99e42eb6a2f31b07e4f3",
+    "carrierAndRiderObserved": true,
+    "automaticExit": false,
+    "syntheticImpactOrKillHooks": false,
+    "playerInput": "engine bot; no human",
+    "nativeFaultsObserved": false
+  },
+  "regressions": {
+    "rust": {
+      "passed": 655,
+      "ignored": 8,
+      "suites": 44
+    },
+    "frontend": {
+      "passed": 351,
+      "files": 83
+    },
+    "browser": 152,
+    "offlinePrograms": 59,
+    "nativeAnalysisAndReleaseGuards": 48,
+    "typescript": true,
+    "logs": {
+      "rust-tests-final.log": "2ae00464f695fa32e8ad979c45e05badcc28f4d2692949619715553de28f4a84",
+      "frontend-tests.log": "a664446e1269ce71b8cc09a86bcfd02999f9aea0814f099ca31bafe1790a00d5",
+      "browser-tests.log": "208a6e7c938b2738234bd1b764caf275cebcf7d5558969fbe391f08eba8308cd",
+      "offline-tests.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+      "all-native-analysis-tests-final.log": "300eb9e52fd77ee6090df908b6d0ffdd61ad028d66a9b21fda4dc65b28a894ff",
+      "application-build.log": "661bfc9100447612e075b6c3beb43d7d9746b4b861b1212ba07487a442c5f929",
+      "typescript-check.log": "1f345e6ac1f9e6ae7c4e70d1f0c8c9f8b8f80218269a1b4473f9ac63a9d4a253",
+      "observer-build-50ms.log": "152c5b09ff0c0ee331e6803e2c91fbbbb337d6541d12d339590a8afe0b09e2cb"
+    }
+  },
+  "application": {
+    "version": "0.4.1",
+    "platform": "windows-x64",
+    "path": "target/release/GuiltySpark.exe",
+    "bytes": 42592256,
+    "sha256": "bed1afbd3508aa6fb008eed61479a0a00c41ff942ae9b970eb06cf177e29cfa9",
+    "developmentOnly": true,
+    "installerOrPortableProduced": false,
+    "nativeStartup": {
+      "schemaVersion": 1,
+      "sourceCommit": null,
+      "sourceBaseCommit": "83a0b2ba9abbf96bc108bb43ff86d0af2ad4adb6",
+      "uncommittedSource": true,
+      "applicationVersion": "0.4.1",
+      "executableSha256": "bed1afbd3508aa6fb008eed61479a0a00c41ff942ae9b970eb06cf177e29cfa9",
+      "mockedIpc": false,
+      "complete": true,
+      "platform": "windows-x64",
+      "checks": [
+        "initial workspace finished loading and its heading is visible",
+        "native window and frontend visible",
+        "native bootstrap returned",
+        "native application version matches",
+        "embedded frontend bytes match build"
+      ],
+      "windowShellMs": 873.6726000000001,
+      "nativeBootstrapMs": 1694.4466,
+      "workspaceReadyMs": 2025.0517,
+      "workspaceReady": true,
+      "errors": [],
+      "sourceClaim": "Fresh isolated native bootstrap and embedded frontend identity; source was uncommitted during this smoke test",
+      "receiptSha256": "3e8653d9cd5043b5321aacb37960a00d5293ae2cd59e529cd2299a10bcebdea6"
+    }
+  },
+  "preservation": {
+    "dirtyRootStatusUnchanged": true,
+    "readOnlyEngineTreesUnchanged": true,
+    "previousGoodC55": {
+      "path": ".local/c56-engine-ai-20261102/GuiltySpark-c55.exe",
+      "bytes": 42592768,
+      "sha256": "35d690902dc4ddd1f68efbca7e93d09990db3293fd4ac77923738d9db6467130"
+    },
+    "sealedC49": [
+      {
+        "path": ".local\\releases\\C49-preview-cb07581\\Project_Guilty_Spark_0.4.1_cb07581597de_Source.zip",
+        "bytes": 26186072,
+        "sha256": "c6ea81b25bfae352d76df58557a82daef44b72ba11bf778d0e2eee9f56ae03f0"
+      },
+      {
+        "path": ".local\\releases\\C49-preview-cb07581\\Project_Guilty_Spark_0.4.1_windows_x64_manifest.json",
+        "bytes": 4879,
+        "sha256": "c00f7afc9b1d57963bbe0234ef4c3c992a574136a27cbf34dca83354fe2a0b52"
+      },
+      {
+        "path": ".local\\releases\\C49-preview-cb07581\\Project_Guilty_Spark_0.4.1_windows_x64_Portable.zip",
+        "bytes": 13941863,
+        "sha256": "ff6c9e4dea48126680c2a9b8536dfb2185fab5ac445c7d4f306b9bed52e07069"
+      },
+      {
+        "path": ".local\\releases\\C49-preview-cb07581\\Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe",
+        "bytes": 10107686,
+        "sha256": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749"
+      },
+      {
+        "path": ".local\\releases\\C49-preview-cb07581\\SHA256SUMS-windows-x64.txt",
+        "bytes": 469,
+        "sha256": "ea47e113b4613c59eea87521a4600bf4a950db1b73e0d51559cee86f0f3cce69"
+      }
+    ],
+    "previousGoodRoundUnchanged": true,
+    "allPriorFailedRunsRetained": true
+  },
+  "privateRuns": {
+    "combat-a": {
+      "receiptSha256": "d404cfabd970f42833c456e0f823a948ff55261b26663d0473fbfdc87cdf6c49",
+      "acceptedAsFullGameplay": false
+    },
+    "combat-b": {
+      "receiptSha256": "5d4581e70902613147e41f02afad4c8ee6abb464a28c797e201463ea83a77b4a",
+      "acceptedAsFullGameplay": false
+    },
+    "combat-c": {
+      "receiptSha256": "7fc8323f909aca0c31e95d8db1c72aedb1d84d39a0b3dcb288f47be995fbf7c6",
+      "acceptedAsFullGameplay": false
+    },
+    "combat-d": {
+      "receiptSha256": "0b962112dfeec49d1efacc5403a8fe1361e38c30339a2c7fb00d6b56b6455941",
+      "acceptedAsFullGameplay": false
+    },
+    "round-rendered-b": {
+      "receiptSha256": "32efd5c5e02b372d938b91d05d5312013c468c3a57512fa40f76cce88dcf431d",
+      "acceptedAsFullGameplay": false
+    },
+    "opence-two-games": {
+      "receiptSha256": "471efa9814a3674edd04df61121da585382c55863b70a5e0eb6a4253d50f73cf",
+      "acceptedAsFullGameplay": false
+    },
+    "opence-scoped": {
+      "receiptSha256": "46feae9ea4aebc04f7240555213c4c48d58f46b70e134ee8b8de57ebb19b654f",
+      "acceptedAsFullGameplay": false
+    },
+    "opence-reconnect": {
+      "receiptSha256": "7076262fb5b253a79b25a9f8464a918455e9cb042c03a8e4ec3856eb7e2aaecf",
+      "acceptedAsFullGameplay": false
+    },
+    "opence-reconnect-2": {
+      "receiptSha256": "e62b13d2b9804145d8a52a31a67dc6233c697fa9b31248958f327128f207a417",
+      "acceptedAsFullGameplay": false
+    },
+    "opence-reconnect-3": {
+      "receiptSha256": "ed5ad66fada95532f49abfd2f908bfeff2e4b259c3c30152afd81368606c70eb",
+      "acceptedAsFullGameplay": false
+    },
+    "opence-reconnect-4": {
+      "receiptSha256": "dd126dd5305a846ba652587717014ac3bec63f0cc87a814514ac22f185b3aa53",
+      "acceptedAsFullGameplay": false
+    },
+    "opence-reconnect-5": {
+      "receiptSha256": "ae8a2a5c10b4ce328659eb5d021198d94e0868d5bcbb952d4e74527b4faab669",
+      "acceptedAsFullGameplay": false
+    },
+    "opence-reconnect-6": {
+      "receiptSha256": "99502f527b07ca133e4901559e5ef4455d8579278f3ed5a449f9473ecc670e1f",
+      "acceptedAsFullGameplay": false
+    },
+    "opence-reconnect-7": {
+      "receiptSha256": "38394d681c1d331425c77edb29d9877982d385abca936bf8d74345164ba6e8bd",
+      "acceptedAsFullGameplay": false
+    },
+    "chupa-two-games": {
+      "receiptSha256": "676e59b6a3b3dc11073d157e5aa165f30778b6a7162a178c993cb7ae96b5f5a0",
+      "acceptedAsFullGameplay": false
+    },
+    "chupa-native-mp": {
+      "receiptSha256": "1f7b7e4e12612190444694d21651898a9d3d2e8287c7d165594f97350cdd00fe",
+      "acceptedAsFullGameplay": false
+    },
+    "chupa-native-mp2": {
+      "receiptSha256": "c853bad45bed2fcde31049e4539c12449b3af8b7af083d9c14324c8573333e7c",
+      "acceptedAsFullGameplay": false
+    },
+    "chupa-native-mp3": {
+      "receiptSha256": "6a12916c93163e587377a0841cd2b1f3a5c66f6f0f6dd448da1c1bc0aa02afda",
+      "acceptedAsFullGameplay": false
+    },
+    "chupa-native-mp4": {
+      "receiptSha256": "1ca60ba8293575079db22eec19adad702521a2793c856b1bdda439cc3f2ad3b8",
+      "acceptedAsFullGameplay": false
+    },
+    "weapon-carrier": {
+      "receiptSha256": "167fe78fa5846f973772042325b41567445c591209e230dc0ba8af28828469de",
+      "acceptedAsFullGameplay": false
+    }
+  },
+  "publicDistribution": {
+    "newInstaller": false,
+    "newPortable": false,
+    "newLinuxPackage": false,
+    "uploaded": false,
+    "published": false
+  },
+  "next": [
+    "Human player-cleared native Firefight and actual game audiovisual inspection",
+    "Host-owned shared round score/HUD and lifecycle/vehicle acceptance across real game peers",
+    "Automatic original zombie rider release, combat and safe cleanup; staggered carrier capacity stress",
+    "MCC solo UI dependency/toolchain and independent stock CE/Chupa co-op feasibility",
+    "Second-computer LAN/VPN/Steam, long-session soak and direct compiled-map/imported-BSP backlog"
+  ]
+}

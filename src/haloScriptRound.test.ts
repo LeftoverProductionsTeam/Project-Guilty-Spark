@@ -28,9 +28,23 @@ describe('opt-in native Firefight round source',()=>{
     expect(out.content).toContain('(unit_get_health gs_ff_player)');
     expect(out.content.slice(out.content.indexOf('(script static void gs_wave_01'),out.content.indexOf('(script continuous gs_firefight'))).not.toContain('(players)');
     expect(out.content).toContain('(set gs_ff_state 5)');
-    expect(out.content).not.toMatch(/unit_kill|ai_kill|damage_object|object_destroy|ai_erase_all|cheat/);
+    expect(out.content).not.toMatch(/unit_kill|ai_kill|damage_object|ai_erase_all|cheat/);
     expect(out.dependencies).toHaveLength(2);
     expect(out.generatedOnly).toBe(true);
+  });
+  it('captures encounter units before combat and cleans their corpses without deleting players or unrelated objects',()=>{
+    const out=exportHaloCeFirefightRound(nativeRoundFixture());
+    const source=out.content;
+    expect(source).toContain('(global object_list gs_ff_units_w01_g01 (ai_actors gs_w01_g01))');
+    expect(source.indexOf('(set gs_ff_units_w01_g01 (ai_actors gs_w01_g01))',source.indexOf('(ai_place gs_w01_g01)')))
+      .toBeLessThan(source.indexOf('(sleep_until (= (ai_living_count gs_w01_g01) 2)'));
+    const cleanup=source.slice(source.indexOf('(script static void gs_ff_clean_w01_g01'),source.indexOf('(script static void gs_ff_clean_w02_g01'));
+    expect(cleanup.indexOf('(list_get gs_ff_units_w01_g01 1)')).toBeLessThan(cleanup.indexOf('(list_get gs_ff_units_w01_g01 0)'));
+    expect(cleanup).toContain('(ai_erase gs_w01_g01)');
+    expect(cleanup).not.toMatch(/players|gs_ff_player|object_destroy_all|containing|by_definition/);
+    expect(source).toContain('(if (= gs_ff_state 3) (sleep 60))');
+    expect(source.match(/\(gs_ff_clean_w01_g01\)/g)).toHaveLength(2);
+    expect(out.warnings.some(w=>w.includes('corpses'))).toBe(true);
   });
   it('refuses rules it cannot implement rather than silently dropping them',()=>{
     const config=nativeRoundFixture();

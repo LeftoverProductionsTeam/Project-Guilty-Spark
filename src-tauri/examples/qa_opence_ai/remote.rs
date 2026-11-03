@@ -134,33 +134,57 @@ impl Remote {
         let datum = typ(meta, "hs_global_datum");
         let pointer = u32(&self.read_symbol(meta, "global_scenario", 4)?, 0);
         let block_type = &field(scenario, "hs_globals")["type"];
-        let block = self.read(pointer as u64 + offset(scenario, "hs_globals") as u64,
-            definition(block_type)["bytes"].as_u64().unwrap() as usize)?;
+        let block = self.read(
+            pointer as u64 + offset(scenario, "hs_globals") as u64,
+            definition(block_type)["bytes"].as_u64().unwrap() as usize,
+        )?;
         let count = u32(&block, offset(block_type, "count")) as usize;
-        if count > 256 { return Err("script global census exceeds bound".into()); }
-        if count == 0 { return Ok(json!([])); }
+        if count > 256 {
+            return Err("script global census exceeds bound".into());
+        }
+        if count == 0 {
+            return Ok(json!([]));
+        }
         let stride = global["bytes"].as_u64().unwrap() as usize;
-        let globals = self.read(u32(&block, offset(block_type, "address")) as u64, count * stride)?;
+        let globals = self.read(
+            u32(&block, offset(block_type, "address")) as u64,
+            count * stride,
+        )?;
         // The constant count is optimized out; the publisher PDB retains the
         // actual external-global array extent. Never substitute a guessed count.
-        let external = symbol(meta, "hs_external_globals")["layout"]["count"].as_u64()
-            .filter(|count| *count > 0 && *count <= 512).ok_or("external global layout differs")? as usize;
+        let external = symbol(meta, "hs_external_globals")["layout"]["count"]
+            .as_u64()
+            .filter(|count| *count > 0 && *count <= 512)
+            .ok_or("external global layout differs")? as usize;
         let (maximum, datum_stride, _, values) = self.pool(meta, "hs_global_data")?;
-        if maximum > 1024 || external + count > maximum as usize || datum_stride as u64 != datum["bytes"].as_u64().unwrap() {
+        if maximum > 1024
+            || external + count > maximum as usize
+            || datum_stride as u64 != datum["bytes"].as_u64().unwrap()
+        {
             return Err("script global pool layout differs".into());
         }
         let mut out = vec![];
         for index in 0..count {
             let row = &globals[index * stride..(index + 1) * stride];
             let name_start = offset(global, "name");
-            let name = &row[name_start..name_start+32];
-            let name = String::from_utf8_lossy(&name[..name.iter().position(|b| *b == 0).unwrap_or(32)]);
+            let name = &row[name_start..name_start + 32];
+            let name =
+                String::from_utf8_lossy(&name[..name.iter().position(|b| *b == 0).unwrap_or(32)]);
             // Only Spark's explicit test/controller state, never arbitrary script strings/pointers.
-            if !name.starts_with("gs_ff_") { continue; }
+            if !name.starts_with("gs_ff_") {
+                continue;
+            }
             let kind = u16(row, offset(global, "type"));
-            if !matches!(kind, 5 | 7 | 8) { continue; }
-            let value = self.read(values as u64 + ((external + index) * datum_stride as usize) as u64, datum_stride as usize)?;
-            if u16(&value, offset(datum, "identifier")) != 0xaced { return Err("script global salt differs".into()); }
+            if !matches!(kind, 5 | 7 | 8) {
+                continue;
+            }
+            let value = self.read(
+                values as u64 + ((external + index) * datum_stride as usize) as u64,
+                datum_stride as usize,
+            )?;
+            if u16(&value, offset(datum, "identifier")) != 0xaced {
+                return Err("script global salt differs".into());
+            }
             let at = offset(datum, "value");
             let number = match kind {
                 5 => i64::from(value[at] != 0),
@@ -181,6 +205,13 @@ impl Remote {
         let bytes = self.read(address as u64, maximum as usize * stride as usize)?;
         let meta_type = &field(actor, "meta")["type"];
         let state_type = &field(actor, "state")["type"];
+        let target_type = &field(actor, "target")["type"];
+        let input_type = &field(actor, "input")["type"];
+        let prop = typ(meta, "prop_datum");
+        let (prop_max, prop_stride, _, prop_address) = self.pool(meta, "prop_data")?;
+        if prop_stride as u64 != prop["bytes"].as_u64().unwrap() {
+            return Err("target prop pool layout differs".into());
+        }
         // Resolve the verified PDB layout once per census, not for each object.
         let actor_id = offset(actor, "identifier");
         let actor_meta = offset(actor, "meta");
@@ -208,12 +239,32 @@ impl Remote {
             }
             let m = &entry[actor_meta..];
             let s = &entry[actor_state..];
+            let target = &entry[offset(actor, "target")..];
+            let input = &entry[offset(actor, "input")..];
+            let target_prop = u32(target, offset(target_type, "target_prop_index"));
+            let target_slot = (target_prop & 0xffff) as usize;
+            let target_unit = if target_prop != u32::MAX && target_slot < prop_max as usize {
+                let p = self.read(
+                    prop_address as u64 + (target_slot * prop_stride as usize) as u64,
+                    prop_stride as usize,
+                )?;
+                // A recycled prop must never be attributed to the old target.
+                (u16(&p, offset(prop, "identifier")) == (target_prop >> 16) as u16)
+                    .then(|| u32(&p, offset(prop, "unit_index")))
+            } else {
+                None
+            };
             pool.push(json!({
                 "id": ((salt as u32) << 16) | index as u32,
                 "unitId": u32(m, a_unit), "actorTag": u32(m, a_tag), "variantTag": u32(m, a_variant),
                 "active": m[a_active], "frozen": m[a_frozen], "dormant": m[a_dormant],
                 "eraseNextTick": m[a_erase], "encounterless": m[a_encounterless], "team": u16(m, a_team),
-                "mode": u16(s, a_mode), "action": u16(s, a_action), "combatStatus": u16(s, a_combat)
+                "mode": u16(s, a_mode), "action": u16(s, a_action), "combatStatus": u16(s, a_combat),
+                "targetType":u16(target,offset(target_type,"target_type")),
+                "targetPropId":target_prop,"targetUnitId":target_unit,
+                "targetLastVisibleTick":u32(target,offset(target_type,"target_last_visible_time")),
+                "pathfindingSurface":u32(input,offset(input_type,"pathfinding_surface_index")),
+                "recentBodyDamage":f32(input,offset(input_type,"recent_body_damage"))
             }));
         }
         let header = typ(meta, "object_header_datum");
@@ -299,6 +350,8 @@ impl Remote {
                     "animationAction": u[u_animation + offset(unit_animation, "action")] as i8,
                     "animationIndex": u16(o, o_animation_state + offset(object_state, "index")),
                     "animationFrame": u16(o, o_animation_state + offset(object_state, "frame_index"))
+                    ,"lastDamageCategory":u16(u,offset(unit_type,"last_damage_category")),
+                    "timeOfDeath":u32(u,offset(unit_type,"time_of_death"))
                 });
             } else if kind == 2 {
                 let w = &bytes[weapon_start..];
@@ -505,16 +558,20 @@ pub fn observe(meta: &Value, expected: &str, pid: u32, role: &str, details: bool
                 "schemaVersion":1,"runtime":"opence-build-335",
                 "role":role,"pid":pid,"base":base,"readOnly":true,
                 "exeSha256":super::EXE_SHA256,"pdbSha256":super::PDB_SHA256,
-                "pdb":meta["module"],"atomicSnapshot":false,"detailedCensus":details
+                "pdb":meta["module"],"atomicSnapshot":false,"detailedCensus":details,
+                "sampleIntervalMs":50
             })
         );
-        for sample in 0..760 {
+        // Keep the same bounded observation duration while reducing phase
+        // aliasing between independent 30 Hz game processes. Census reads stay
+        // at roughly 1 Hz; lightweight actor controls are sampled at 20 Hz.
+        for sample in 0..1520 {
             let mut code = 0;
             if GetExitCodeProcess(remote.handle, &mut code) == 0 || code != STILL_ACTIVE as u32 {
                 break;
             }
             let read_started = Instant::now();
-            let result = remote.snapshot(meta, role, sample % 10 == 0, details);
+            let result = remote.snapshot(meta, role, sample % 20 == 0, details);
             println!(
                 "{}",
                 match result {
@@ -524,7 +581,7 @@ pub fn observe(meta: &Value, expected: &str, pid: u32, role: &str, details: bool
                         json!({"sample":sample,"elapsedMs":begin.elapsed().as_millis(),"error":e}),
                 }
             );
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(Duration::from_millis(50));
         }
     }
 }

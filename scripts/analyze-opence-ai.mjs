@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { analyzeRun } from './analyze-community-runtime-native.mjs';
+import { analyzeRun, selectNativeExecutions } from './analyze-community-runtime-native.mjs';
 export const OPEN_CE_AI = Object.freeze({
   exe: '788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0',
   pdb: 'b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800',
@@ -30,11 +30,13 @@ export function parseActorObservation(text, record) {
   if (typeof text !== 'string' || Buffer.byteLength(text) > 32 * 1024 * 1024)
     throw Error('Actor observation exceeds limit');
   const lines = text.trim().split(/\r?\n/);
-  if (lines.length > 1002 || lines.some((l) => l.length > 1024 * 1024))
+  if (lines.length > 1522 || lines.some((l) => l.length > 1024 * 1024))
     throw Error('Too many or oversized actor records');
   const rows = lines.map((l) => JSON.parse(l));
   const header = rows.shift(),
     footer = rows.pop();
+  const interval = header?.sampleIntervalMs ?? 100;
+  if (![50, 100].includes(interval)) throw Error('Unknown bounded actor sampling interval');
   if (
     header?.schemaVersion !== 1 ||
     header.runtime !== 'opence-build-335' ||
@@ -56,7 +58,12 @@ export function parseActorObservation(text, record) {
   let previous = -1,
     elapsed = -1;
   for (const row of rows) {
-    if (!uint(row.sample, 759) || row.sample <= previous || !finite(row.elapsedMs) || row.elapsedMs < elapsed)
+    if (
+      !uint(row.sample, interval === 50 ? 1519 : 759) ||
+      row.sample <= previous ||
+      !finite(row.elapsedMs) ||
+      row.elapsedMs < elapsed
+    )
       throw Error('Invalid actor observation ordering');
     previous = row.sample;
     elapsed = row.elapsedMs;
@@ -182,21 +189,35 @@ const distribution = (a) => {
   };
 };
 export function compareActorObservations(host, client) {
-  const continuity=(samples)=>{
-    let repeated=0;const discontinuities=[];
-    for(let i=1;i<samples.length;i++) {
-      const before=samples[i-1],after=samples[i];
-      if(after.serverTick===before.serverTick)repeated++;
-      if(after.serverTick<before.serverTick||after.localTick<before.localTick)
-        discontinuities.push({sample:after.sample??i,serverBefore:before.serverTick,serverAfter:after.serverTick,localBefore:before.localTick,localAfter:after.localTick});
+  const continuity = (samples) => {
+    let repeated = 0;
+    const discontinuities = [];
+    for (let i = 1; i < samples.length; i++) {
+      const before = samples[i - 1],
+        after = samples[i];
+      if (after.serverTick === before.serverTick) repeated++;
+      if (after.serverTick < before.serverTick || after.localTick < before.localTick)
+        discontinuities.push({
+          sample: after.sample ?? i,
+          serverBefore: before.serverTick,
+          serverAfter: after.serverTick,
+          localBefore: before.localTick,
+          localAfter: after.localTick,
+        });
     }
-    return {monotonic:discontinuities.length===0,repeatedTickObservations:repeated,discontinuities:discontinuities.length,examples:discontinuities.slice(0,16)};
+    return {
+      monotonic: discontinuities.length === 0,
+      repeatedTickObservations: repeated,
+      discontinuities: discontinuities.length,
+      examples: discontinuities.slice(0, 16),
+    };
   };
-  const hostContinuity=continuity(host.samples),clientContinuity=continuity(client.samples);
+  const hostContinuity = continuity(host.samples),
+    clientContinuity = continuity(client.samples);
   // The observer has no native session/epoch identity. The same numeric tick
   // after a map restart, reconnect or wrap must never match another lifetime.
   // Keep every raw observation, but require a fresh scoped run before pairing.
-  const pairable=hostContinuity.monotonic&&clientContinuity.monotonic;
+  const pairable = hostContinuity.monotonic && clientContinuity.monotonic;
   const byTick = new Map(host.samples.map((s) => [s.serverTick, s]));
   const clientByTick = new Map(client.samples.map((s) => [s.serverTick, s]));
   const hostAiIds = new Set(
@@ -234,7 +255,7 @@ export function compareActorObservations(host, client) {
   // Select the last observation per tick on BOTH sides for the comparison;
   // repeated postgame observations must not inflate evidence or weight medians.
   for (const c of clientByTick.values()) {
-    if(!pairable)continue;
+    if (!pairable) continue;
     const h = byTick.get(c.serverTick);
     if (!h) continue;
     frames++;
@@ -294,9 +315,15 @@ export function compareActorObservations(host, client) {
     }
   }
   return {
-    tickContinuity:{pairable,host:hostContinuity,client:clientContinuity,
-      refusal:pairable?null:'Tick reset/wrap without a native session identity; collect a fresh scoped host/client observation.',
-      sessionIdentityVerified:false},
+    tickContinuity: {
+      pairable,
+      host: hostContinuity,
+      client: clientContinuity,
+      refusal: pairable
+        ? null
+        : 'Tick reset/wrap without a native session identity; collect a fresh scoped host/client observation.',
+      sessionIdentityVerified: false,
+    },
     exactTickFrames: frames,
     sharedActualActorIds: ids.size,
     movingActorIds: moving.size,
@@ -340,7 +367,7 @@ export function compareActorObservations(host, client) {
     note: 'Every distinct-tick matched pair remains in the raw distributions; missing identities and coordinate-space differences are reported separately. Same-tick process reads are not atomic engine packets; counters advance separately from position, damage, seat and control updates. No parity or latency threshold is approved here.',
   };
 }
-export function analyzeActors(directory, { diagnosticOnly = false } = {}) {
+export function analyzeActors(directory, { diagnosticOnly = false, clientInstance } = {}) {
   if (typeof diagnosticOnly !== 'boolean') throw Error('Explicit diagnostic mode required');
   const root = path.resolve(directory),
     receiptBytes = boundedFile(path.join(root, 'execution.json'), 1024 * 1024),
@@ -351,7 +378,6 @@ export function analyzeActors(directory, { diagnosticOnly = false } = {}) {
     receipt.routerFirewallChanges !== false ||
     receipt.originalInputMapsUnchanged !== true ||
     !Array.isArray(receipt.executed) ||
-    receipt.executed.length !== 2 ||
     !Array.isArray(receipt.errors) ||
     receipt.errors.length > 128 ||
     receipt.errors.some((error) => typeof error !== 'string' || error.length > 1000) ||
@@ -360,10 +386,9 @@ export function analyzeActors(directory, { diagnosticOnly = false } = {}) {
     throw Error('Private native execution and preserved source receipt required');
   const observations = [];
   const identities = [];
-  for (const role of ['host', 'client']) {
-    const matches = receipt.executed.filter((r) => r.role === role);
-    if (matches.length !== 1) throw Error('One process per role required');
-    const r = matches[0],
+  const selected = selectNativeExecutions(receipt, clientInstance);
+  for (const r of selected) {
+    const role = r.role,
       ai = r.aiObserver;
     if (
       r.runtime !== 'opence-build-335' ||
@@ -380,13 +405,14 @@ export function analyzeActors(directory, { diagnosticOnly = false } = {}) {
       !/^[a-f0-9]{64}$/.test(ai.sha256)
     )
       throw Error('Incomplete or unsupported native actor observer');
-    const bytes = boundedFile(path.join(root, role, 'ai-observer.ndjson'), 32 * 1024 * 1024);
+    const bytes = boundedFile(path.join(root, r.instance ?? role, 'ai-observer.ndjson'), 32 * 1024 * 1024);
     if (digest(bytes) !== ai.logSha256) throw Error('Actor observation checksum mismatch');
     const text = new TextDecoder('utf8', { fatal: true }).decode(bytes);
     const observed = parseActorObservation(text, r);
     observations.push(observed);
     identities.push({
       role,
+      instance: r.instance ?? role,
       pid: r.pid,
       observerSha256: ai.sha256,
       logSha256: digest(bytes),
@@ -421,7 +447,7 @@ export function analyzeActors(directory, { diagnosticOnly = false } = {}) {
     identities[0].observerSha256 !== identities[1].observerSha256
   )
     throw Error('Two independent matching observers required');
-  const native = analyzeRun(root),
+  const native = analyzeRun(root, { clientInstance }),
     comparison = compareActorObservations(...observations);
   const sampledControls =
     comparison.hostAuthorityObserved &&
@@ -436,6 +462,7 @@ export function analyzeActors(directory, { diagnosticOnly = false } = {}) {
     executionSha256: digest(receiptBytes),
     runtime: 'opence-build-335',
     mode: receipt.mode,
+    selectedClientInstance: clientInstance ?? 'client',
     diagnosticOnly,
     failedExecution: diagnosticOnly
       ? {
@@ -453,7 +480,7 @@ export function analyzeActors(directory, { diagnosticOnly = false } = {}) {
     nativeFaultsObserved: native.nativeHealth.some((h) => h.status === 'native-faults-observed'),
     aiActorAcceptance: false,
     limitations: [
-      'One physical computer, scripted player input, null rendering and dummy audio.',
+      `One physical computer, ${selected.some((r) => r.settings?.HALO_TEST_INPUT) ? 'engine bot player input' : 'no scripted player input'}, null rendering and dummy audio.`,
       'Only upstream build-335 actor telemetry is observed. This is not a new MCC/CE protocol bridge, authoring path, or complete Zombie Apocalypse conversion.',
       'Damage/death, late join, reconnect, script/encounter coverage, audiovisual playback and cross-computer acceptance remain distinct gates.',
     ],
@@ -461,9 +488,17 @@ export function analyzeActors(directory, { diagnosticOnly = false } = {}) {
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    if (process.argv.length !== 4 || !['--run', '--diagnostic-run'].includes(process.argv[2]))
-      throw Error('Usage: node scripts/analyze-opence-ai.mjs --run|--diagnostic-run <private-native-pair>');
-    const r = analyzeActors(process.argv[3], { diagnosticOnly: process.argv[2] === '--diagnostic-run' });
+    if (
+      process.argv.length !== 4 ||
+      !['--run', '--diagnostic-run', '--rejoined-run'].includes(process.argv[2])
+    )
+      throw Error(
+        'Usage: node scripts/analyze-opence-ai.mjs --run|--diagnostic-run|--rejoined-run <private-native-run>',
+      );
+    const r = analyzeActors(process.argv[3], {
+      diagnosticOnly: process.argv[2] === '--diagnostic-run',
+      ...(process.argv[2] === '--rejoined-run' ? { clientInstance: 'client-rejoin' } : {}),
+    });
     process.stdout.write(JSON.stringify(r, null, 2) + '\n');
     if (
       r.diagnosticOnly ||

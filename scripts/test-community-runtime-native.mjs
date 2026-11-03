@@ -1,7 +1,8 @@
 // Opt-in private native game QA using exact publisher-verified release files.
 // Supply lawfully owned Xbox data already extracted by the runtime or another
 // reviewed source. This script never imports an ISO, downloads content or installs.
-// Actual engine test hooks drive scripted player input, not human play or AI.
+// Optional engine bot input is not human play. Native-AI runs disable the
+// synthetic impact/kill hooks; only the engine simulates the authored actors.
 // Inspect both logs with analyze-community-runtime-native.mjs after execution.
 // No public discovery, downloads, UPnP or arbitrary process/command input.
 import fs from 'node:fs/promises';
@@ -24,6 +25,10 @@ for (let at = 2; at < process.argv.length; at += 2) {
       '--ai-symbols',
       '--ai-details',
       '--diagnostic-no-audio',
+      '--late-join-seconds',
+      '--native-ai',
+      '--player-input',
+      '--rejoin',
     ].includes(process.argv[at]) ||
     !process.argv[at + 1] ||
     args.has(process.argv[at])
@@ -37,7 +42,7 @@ if (
   )
 )
   throw Error(
-    'Required: --host-id pinned-id --host-dir official-release-folder --client-id pinned-id --client-dir official-release-folder --maps owned-Xbox-maps-folder --output fresh-directory [--mode bloodgulch:slayer|a30:coop|b30:coop|ce:slayer] [--ai-symbols verified-PDB-directory]',
+    'Required: --host-id pinned-id --host-dir official-release-folder --client-id pinned-id --client-dir official-release-folder --maps owned-Xbox-maps-folder --output fresh-directory [--mode bloodgulch:slayer|a30:coop|b30:coop|ce:slayer|ce:coop] [--ce-map native-cache] [--native-ai true] [--player-input bot|none] [--late-join-seconds 2..30] [--rejoin true] [--ai-symbols verified-PDB-directory --ai-details true] [--diagnostic-no-audio true]',
   );
 const hostId = args.get('--host-id'),
   clientId = args.get('--client-id'),
@@ -46,16 +51,32 @@ const allowed = ['opence-build-329', 'chupathingy-v0.8.1c', 'opence-build-335', 
 const isOpenCe = (id) => id.startsWith('opence-build-');
 if (
   ![hostId, clientId].every((id) => allowed.includes(id)) ||
-  !['bloodgulch:slayer', 'a30:coop', 'b30:coop', 'ce:slayer'].includes(mode)
+  !['bloodgulch:slayer', 'a30:coop', 'b30:coop', 'ce:slayer', 'ce:coop'].includes(mode)
 )
   throw Error('Use the exact pinned test releases and reviewed game modes');
-if ((mode === 'ce:slayer') !== args.has('--ce-map'))
-  throw Error('ce:slayer requires an explicitly selected native Custom Edition cache');
+if (mode.startsWith('ce:') !== args.has('--ce-map'))
+  throw Error('A CE test requires an explicitly selected native Custom Edition cache');
+const lateJoinSeconds = args.has('--late-join-seconds') ? Number(args.get('--late-join-seconds')) : 2;
+if (!Number.isSafeInteger(lateJoinSeconds) || lateJoinSeconds < 2 || lateJoinSeconds > 30)
+  throw Error('Late joining must be an explicit integer from 2 to 30 seconds');
+if (args.has('--native-ai') && !['true', 'false'].includes(args.get('--native-ai')))
+  throw Error('Native AI observation requires an explicit true/false value');
+const nativeAi = args.get('--native-ai') === 'true';
+const playerInput = args.get('--player-input') ?? 'bot';
+if (!['bot', 'none'].includes(playerInput)) throw Error('Use explicit bot or none player input');
+if (args.has('--rejoin') && !['true', 'false'].includes(args.get('--rejoin')))
+  throw Error('Rejoining requires an explicit true/false value');
+const rejoin = args.get('--rejoin') === 'true';
+if (rejoin && (hostId !== 'opence-build-335' || clientId !== hostId || !nativeAi || lateJoinSeconds > 5))
+  throw Error(
+    'Rejoining is scoped to two exact OpenCE build-335 native-AI copies and a 2..5 second initial join',
+  );
 const noAudio = args.get('--diagnostic-no-audio') === 'true';
 if (
   args.has('--diagnostic-no-audio') &&
   (!['true', 'false'].includes(args.get('--diagnostic-no-audio')) ||
-    hostId !== 'opence-build-335' || clientId !== hostId)
+    hostId !== 'opence-build-335' ||
+    clientId !== hostId)
 )
   throw Error('Audio isolation requires an explicit true/false value and two exact OpenCE build-335 copies');
 const output = path.resolve(args.get('--output')),
@@ -118,13 +139,13 @@ if (args.has('--ce-map')) {
   if (
     bytes.subarray(0, 4).toString('ascii') !== 'daeh' ||
     bytes.readUInt32LE(4) !== 609 ||
-    bytes.readUInt16LE(0x60) !== 1 ||
+    bytes.readUInt16LE(0x60) !== (mode === 'ce:coop' ? 0 : 1) ||
     bytes.subarray(0x20, 0x40).toString('ascii').split('\0')[0] !== name
   )
-    throw Error('The selected map must be an actual CE multiplayer cache with its native filename');
+    throw Error('The selected map must have the matching native CE scenario type and filename');
   ceMap = { source, name, bytes: bytes.length, sha256: hash(bytes), cacheVersion: 609 };
 }
-const selectedMapName = mode.endsWith(':coop') ? mode.split(':')[0] + '.map' : 'bloodgulch.map';
+const selectedMapName = mode.endsWith(':coop') && !ceMap ? mode.split(':')[0] + '.map' : 'bloodgulch.map';
 const sourceNames = ['ui.map', 'carousel.map', selectedMapName];
 const extraction = { files: [] };
 for (const name of sourceNames) {
@@ -190,6 +211,9 @@ const report = {
   twoComputers: false,
   publicListing: false,
   routerFirewallChanges: false,
+  plannedProcessCount: rejoin ? 3 : 2,
+  maximumSimultaneousProcesses: 2,
+  reconnectRequested: rejoin,
   executed: [],
   errors: [],
   diagnosticAudioDisabled: noAudio,
@@ -199,13 +223,50 @@ const report = {
 };
 const children = [];
 const completions = [];
-async function launch(role, id) {
-  const root = path.join(output, role),
+const abortedChildren = new Set();
+async function launch(role, id, instance = role) {
+  const root = path.join(output, instance),
     client = path.resolve(args.get(role === 'host' ? '--host-dir' : '--client-dir'));
   await fs.mkdir(root);
   await fs.mkdir(path.join(root, 'data'));
   await fs.mkdir(path.join(root, 'data', 'maps'));
-  await fs.mkdir(path.join(root, 'save'));
+  const reusedProfile = [];
+  if (instance === 'client-rejoin') {
+    // Only the closed, isolated first client's generated profile is reused.
+    // Never import a user's installed saves or follow a link out of the test.
+    const sourceRoot = path.join(output, 'client', 'save', 'z', 'saved', 'player_profiles');
+    const targetRoot = path.join(root, 'save', 'z', 'saved', 'player_profiles');
+    await fs.mkdir(path.dirname(targetRoot), { recursive: true });
+    let entries = 0,
+      bytes = 0;
+    await fs.cp(sourceRoot, targetRoot, {
+      recursive: true,
+      errorOnExist: true,
+      force: false,
+      filter: async (source) => {
+        const stat = await fs.lstat(source);
+        entries++;
+        bytes += stat.isFile() ? stat.size : 0;
+        if (
+          stat.isSymbolicLink() ||
+          (!stat.isFile() && !stat.isDirectory()) ||
+          entries > 128 ||
+          bytes > 8 * 1024 * 1024
+        )
+          throw Error('Isolated reconnect profile exceeds regular-file bounds');
+        if (stat.isFile())
+          reusedProfile.push({
+            path: path.relative(sourceRoot, source),
+            sha256: hash(await fs.readFile(source)),
+          });
+        return true;
+      },
+    });
+    if (!reusedProfile.length) throw Error('Isolated reconnect player profile is missing');
+    for (const file of reusedProfile)
+      if (hash(await fs.readFile(path.join(targetRoot, file.path))) !== file.sha256)
+        throw Error('Reconnected profile copy differs');
+  } else await fs.mkdir(path.join(root, 'save'));
   await fs.mkdir(path.join(root, 'logs'));
   // Installed folders now contain user maps, profiles and configuration. Copy
   // ONLY the exact publisher inventory; never copy or rewrite those user files.
@@ -270,13 +331,17 @@ async function launch(role, id) {
       HALO_LOG_ROOT: path.join(root, 'logs'),
       HALO_NETWORK_TEST:
         role === 'host'
-          ? `host:${ceMap ? (isOpenCe(id) ? 'custom_maps\\' + ceMap.name : ceMap.name + '@ce') + ':slayer' : mode}`
+          ? `host:${ceMap ? (isOpenCe(id) ? 'custom_maps\\' + ceMap.name : ceMap.name + '@ce') + (mode === 'ce:coop' ? ':coop' : ':slayer') : mode}`
           : 'join',
       HALO_NETWORK_TEST_START: '12',
-      HALO_NETWORK_TEST_SHOOT: aiObserver ? '0' : '4',
-      HALO_NETWORK_TEST_KILL: aiObserver ? '0' : '17',
-      HALO_TEST_INPUT: role === 'host' ? 'bot:1' : 'bot:2',
-      HALO_EXIT_AFTER: role === 'host' ? '80' : '60',
+      HALO_NETWORK_TEST_SHOOT: aiObserver || nativeAi || mode.endsWith(':coop') ? '0' : '4',
+      HALO_NETWORK_TEST_KILL: aiObserver || nativeAi || mode.endsWith(':coop') ? '0' : '17',
+      // Native encounter counts must not silently change when another player
+      // joins an exact-count AI acceptance fixture. This is a supported engine
+      // co-op setting, not a replacement replication or damage implementation.
+      ...(mode === 'ce:coop' ? { HALO_NET_COOP_ENEMIES_MODE: 'none' } : {}),
+      HALO_TEST_INPUT: playerInput === 'none' ? '' : role === 'host' ? 'bot:1' : 'bot:2',
+      HALO_EXIT_AFTER: role === 'host' ? '80' : instance === 'client-rejoin' ? '28' : rejoin ? '30' : '60',
       HALO_NET_ADDRESS: role === 'host' ? '127.0.0.210' : '127.0.0.211',
       HALO_NET_BROADCAST: role === 'host' ? '127.0.0.211' : '127.0.0.210',
       HALO_HIDDEN_WINDOW: 'true',
@@ -301,6 +366,8 @@ async function launch(role, id) {
   });
   children.push(child);
   const record = {
+    instance,
+    ...(reusedProfile.length ? { reusedProfile } : {}),
     role,
     renderer: isOpenCe(id) ? 'native-null' : 'hidden-native-window',
     runtime: id,
@@ -314,7 +381,8 @@ async function launch(role, id) {
   };
   report.executed.push(record);
   let observer, observerDone;
-  if (aiObserver) {
+  const startAiObserver = (playingTick) => {
+    if (!aiObserver || observer) return;
     const log = createWriteStream(path.join(root, 'ai-observer.ndjson'), { flags: 'wx' });
     const errors = createWriteStream(path.join(root, 'ai-observer.stderr.log'), { flags: 'wx' });
     record.aiObserver = {
@@ -323,6 +391,9 @@ async function launch(role, id) {
       pdbSha256: aiObserver.pdbSha256,
       readOnly: true,
       detailedCensus: aiDetails,
+      scope: 'after-first-native-playing-tick',
+      readinessTick: playingTick,
+      attachedAt: new Date().toISOString(),
     };
     observer = spawn(
       aiObserver.executable,
@@ -352,17 +423,26 @@ async function launch(role, id) {
         resolve();
       }),
     );
-  }
+  };
   console.log(JSON.stringify({ started: role, runtime: id, pid: child.pid }));
   let bytes = 0,
-    forced = false;
+    forced = false,
+    readinessTail = '';
   const capture = (data) => {
     bytes += data.length;
     if (bytes > 32 * 1024 * 1024) {
       forced = true;
       child.kill();
       report.errors.push(role + ' log limit');
-    } else log.write(data);
+    } else {
+      log.write(data);
+      // Lobby/menu ticks have their own lifetime. Wait for the actual engine's
+      // gameplay telemetry before attaching; retain the complete original log.
+      // Later game/checkpoint resets still fail the existing continuity guard.
+      readinessTail = (readinessTail + data.toString('utf8')).slice(-8192);
+      const playing = readinessTail.match(/(?:^|\n)halo-linux: network test: tick ([1-9][0-9]{0,9}) player /);
+      if (playing) startAiObserver(Number(playing[1]));
+    }
   };
   child.stdout.on('data', capture);
   child.stderr.on('data', capture);
@@ -378,6 +458,8 @@ async function launch(role, id) {
     });
     child.once('close', async (code, signal) => {
       clearTimeout(watchdog);
+      if (aiObserver && !observerDone)
+        report.errors.push(role + ' never reached native gameplay observation readiness');
       if (observerDone) {
         const timer = setTimeout(() => {
           record.aiObserver.forced = true;
@@ -390,7 +472,8 @@ async function launch(role, id) {
       }
       record.exitCode = code;
       record.signal = signal;
-      record.forced = forced;
+      record.forced = forced || abortedChildren.has(child.pid);
+      if (abortedChildren.has(child.pid)) record.abortReason = 'test orchestration aborted';
       record.exitedAt = new Date().toISOString();
       await new Promise((finish) => log.end(finish));
       try {
@@ -433,7 +516,7 @@ async function launch(role, id) {
           exited: role,
           code,
           signal,
-          forced,
+          forced: record.forced,
           bytes,
           inputsUnchanged: record.inputsUnchanged,
         }),
@@ -446,10 +529,16 @@ async function launch(role, id) {
 }
 try {
   const host = await launch('host', hostId);
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+  await new Promise((resolve) => setTimeout(resolve, lateJoinSeconds * 1000));
   if (host.child.exitCode !== null) throw Error('Host exited before client launch');
   const client = await launch('client', clientId);
-  await Promise.all([host.done, client.done]);
+  if (rejoin) {
+    await client.done;
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    if (host.child.exitCode !== null) throw Error('Host exited before reconnect');
+    const reconnect = await launch('client', clientId, 'client-rejoin');
+    await Promise.all([host.done, reconnect.done]);
+  } else await Promise.all([host.done, client.done]);
   for (const record of report.executed)
     if (record.exitCode !== 0 || record.forced || !record.inputsUnchanged)
       report.errors.push(record.role + ' did not exit cleanly with unchanged map input');
@@ -457,7 +546,11 @@ try {
     'Pending analysis of both native game logs; a zero exit is not connection/gameplay proof.';
 } catch (error) {
   report.errors.push(String(error));
-  for (const child of children) if (child.exitCode === null) child.kill();
+  for (const child of children)
+    if (child.exitCode === null) {
+      abortedChildren.add(child.pid);
+      child.kill();
+    }
   await Promise.allSettled(completions);
 }
 for (const file of extraction.files) {

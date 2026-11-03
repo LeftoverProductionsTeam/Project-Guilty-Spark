@@ -67,6 +67,20 @@ test('refuses mismatched identity, incomplete readback, duplicate actors and non
     /Invalid/,
   );
 });
+test('faster native sampling is explicitly identified and keeps duration/count bounds', () => {
+  const rows = [
+    { ...header, sampleIntervalMs: 50 },
+    { sample: 1400, elapsedMs: 70000, state },
+    { completed: true, inputsRechecked: true },
+  ];
+  const encoded = () => rows.map((r) => JSON.stringify(r)).join('\n');
+  assert.equal(parseActorObservation(encoded(), record).samples.length, 1);
+  rows[0].sampleIntervalMs = 100;
+  assert.throws(() => parseActorObservation(encoded(), record), /ordering/);
+  rows[0].sampleIntervalMs = 1;
+  assert.throws(() => parseActorObservation(encoded(), record), /interval/);
+});
+
 test('retains actor discrepancies and never promotes telemetry to full AI acceptance', () => {
   const h = parseActorObservation(text(), record),
     c = {
@@ -115,30 +129,44 @@ test('repeated frozen ticks do not inflate pairs or weight an unchanged frame re
   assert.equal(r.aiActorAcceptance, false);
 });
 
-test('a map restart cannot pair repeated numeric ticks across actor lifetimes',()=>{
-  const at=(tick,client=false)=>({...state,localTick:tick,serverTick:tick,actorPoolCount:client?0:1,
-    actors:[{...actor,actorId:client?none:actor.actorId}]});
-  const host={samples:[at(60),at(61),at(1),at(60)]};
-  const client={samples:[at(60,true),at(61,true)]};
-  const result=compareActorObservations(host,client);
-  assert.equal(result.tickContinuity.pairable,false);
-  assert.equal(result.tickContinuity.host.discontinuities,1);
-  assert.equal(result.exactTickFrames,0);assert.equal(result.sharedActualActorIds,0);
-  assert.equal(result.position,null);assert.equal(result.hostAuthorityObserved,false);
-  assert.equal(result.observationCoverage.hostObservations,4);
-  assert.equal(result.observationCoverage.hostRepeatedTickObservations,0);
-  assert.equal(result.fullLifecycleAcceptance,false);
+test('a map restart cannot pair repeated numeric ticks across actor lifetimes', () => {
+  const at = (tick, client = false) => ({
+    ...state,
+    localTick: tick,
+    serverTick: tick,
+    actorPoolCount: client ? 0 : 1,
+    actors: [{ ...actor, actorId: client ? none : actor.actorId }],
+  });
+  const host = { samples: [at(60), at(61), at(1), at(60)] };
+  const client = { samples: [at(60, true), at(61, true)] };
+  const result = compareActorObservations(host, client);
+  assert.equal(result.tickContinuity.pairable, false);
+  assert.equal(result.tickContinuity.host.discontinuities, 1);
+  assert.equal(result.exactTickFrames, 0);
+  assert.equal(result.sharedActualActorIds, 0);
+  assert.equal(result.position, null);
+  assert.equal(result.hostAuthorityObserved, false);
+  assert.equal(result.observationCoverage.hostObservations, 4);
+  assert.equal(result.observationCoverage.hostRepeatedTickObservations, 0);
+  assert.equal(result.fullLifecycleAcceptance, false);
 });
 
-test('client reconnect and uint32 wrap require a fresh scoped observation',()=>{
-  for(const clientSamples of [
-    [{...state,localTick:60},{...state,localTick:1}],
-    [{...state,serverTick:0xffffffff,localTick:0xffffffff},{...state,serverTick:0,localTick:0}],
+test('client reconnect and uint32 wrap require a fresh scoped observation', () => {
+  for (const clientSamples of [
+    [
+      { ...state, localTick: 60 },
+      { ...state, localTick: 1 },
+    ],
+    [
+      { ...state, serverTick: 0xffffffff, localTick: 0xffffffff },
+      { ...state, serverTick: 0, localTick: 0 },
+    ],
   ]) {
-    const result=compareActorObservations({samples:[state]},{samples:clientSamples});
-    assert.equal(result.tickContinuity.pairable,false);
-    assert.equal(result.tickContinuity.client.discontinuities,1);
-    assert.equal(result.exactTickFrames,0);assert.equal(result.aiActorAcceptance,false);
+    const result = compareActorObservations({ samples: [state] }, { samples: clientSamples });
+    assert.equal(result.tickContinuity.pairable, false);
+    assert.equal(result.tickContinuity.client.discontinuities, 1);
+    assert.equal(result.exactTickFrames, 0);
+    assert.equal(result.aiActorAcceptance, false);
   }
 });
 

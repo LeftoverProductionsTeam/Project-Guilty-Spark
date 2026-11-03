@@ -165,19 +165,36 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
     return {groups,count:groups.reduce((n,g)=>n+g.count,0),score:groups.reduce((n,g)=>n+g.points,0)};
   });
   if(waves.reduce((n,w)=>n+w.score,0)*config.rounds>2147483647)throw Error('Native round score exceeds Halo long range.');
+  const owned=(ref:string)=>`gs_ff_units_${ref.slice(3)}`;
+  const clean=(ref:string)=>`gs_ff_clean_${ref.slice(3)}`;
   const lines=heading('Firefight native round candidate · solo encounter controller');
   lines.push('; State: 0 idle, 1 preparing, 2 active, 3 intermission, 4 complete, 5 refused/defeated.',
     '; Score is team wave-clear points, not player kill attribution or a native HUD/medal implementation.',
     '(global boolean gs_ff_start false)','(global short gs_ff_state 0)','(global short gs_ff_round 0)',
-    '(global short gs_ff_wave 0)','(global long gs_ff_score 0)','(global long gs_ff_cleared 0)','(global unit gs_ff_player none)','',
-    '(script static void gs_ff_reset');
-  for(const wave of waves)for(const group of wave.groups)lines.push(`  (ai_erase ${group.ref})`);
+    '(global short gs_ff_wave 0)','(global long gs_ff_score 0)','(global long gs_ff_cleared 0)','(global unit gs_ff_player none)','');
+  for(const wave of waves)for(const group of wave.groups)
+    lines.push(`(global object_list ${owned(group.ref)} (ai_actors ${group.ref}))`);
+  lines.push('');
+  for(const wave of waves)for(const group of wave.groups){
+    lines.push(`(script static void ${clean(group.ref)}`,`  (ai_force_active ${group.ref} false)`);
+    // Native ai_erase no longer owns a unit after its actor dies. Retain the
+    // exact encounter's salted unit references before combat, then delete its
+    // captured corpses too. Descending slots also tolerate list compaction.
+    // The existing 32-actor/group bound keeps this finite without a shared loop
+    // counter or arbitrary object-name/definition-wide deletion.
+    for(let slot=group.count-1;slot>=0;slot--)
+      lines.push(`  (object_destroy (list_get ${owned(group.ref)} ${slot}))`);
+    lines.push(`  (ai_erase ${group.ref})`,`  (set ${owned(group.ref)} (ai_actors ${group.ref}))`,')','');
+  }
+  lines.push('(script static void gs_ff_reset');
+  for(const wave of waves)for(const group of wave.groups)lines.push(`  (${clean(group.ref)})`);
   lines.push('  (set gs_ff_score 0)','  (set gs_ff_cleared 0)','  (set gs_ff_round 0)','  (set gs_ff_wave 0)',')','');
   waves.forEach((wave,w)=>{
     const counts=wave.groups.map(g=>`(ai_living_count ${g.ref})`), living=counts.length===1?counts[0]:`(+ ${counts.join(' ')})`;
     lines.push(`(script static void gs_wave_${String(w+1).padStart(2,'0')}`, '  (if (!= gs_ff_state 5) (begin',
       '    (set gs_ff_state 2)',`    (set gs_ff_wave ${w+1})`);
-    for(const group of wave.groups)lines.push(`    (ai_place ${group.ref})`,`    (ai_force_active ${group.ref} true)`);
+    for(const group of wave.groups)lines.push(`    (ai_place ${group.ref})`,
+      `    (set ${owned(group.ref)} (ai_actors ${group.ref}))`,`    (ai_force_active ${group.ref} true)`);
     const exact=wave.groups.map(g=>`(= (ai_living_count ${g.ref}) ${g.count})`), ready=exact.length===1?exact[0]:`(and ${exact.join(' ')})`;
     lines.push(`    (sleep_until ${ready} 1 ${ticks(config.spawnTimeoutMs)})`,
       `    (if (not ${ready}) (set gs_ff_state 5))`,
@@ -187,7 +204,10 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
       '        (begin',`          (set gs_ff_score (+ gs_ff_score ${wave.score}))`,
       `          (set gs_ff_cleared (+ gs_ff_cleared ${wave.count}))`,
       '          (set gs_ff_state 3)',
-      '        )','        (set gs_ff_state 5)', '      )','    ))','  ))',')','');
+      '        )','        (set gs_ff_state 5)', '      )','    ))',
+      '    (if (= gs_ff_state 3) (sleep 60))');
+    for(const group of wave.groups)lines.push(`    (${clean(group.ref)})`);
+    lines.push('  ))',')','');
   });
   lines.push('(script continuous gs_firefight','  (sleep_until gs_ff_start 1)','  (set gs_ff_start false)',
     '  (gs_ff_reset)','  (set gs_ff_state 1)',
@@ -201,13 +221,13 @@ export function exportHaloCeFirefightRound(config:FirefightConfig):ScriptExport 
       `  (if (!= gs_ff_state 5) (sleep ${ticks(config.intermissionMs)}))`);
   }
   lines.push('  (if (!= gs_ff_state 5) (set gs_ff_state 4))');
-  for(const wave of waves)for(const group of wave.groups)lines.push(`  (ai_force_active ${group.ref} false)`);
   lines.push(')','');
   return {...conservative,content:lines.join('\r\n'),activation:'(set gs_ff_start true)',scenarioType:'singleplayer',warnings:[
     'Experimental native solo round source. Build only into a separate reviewed singleplayer/campaign scenario with these exact encounters/counts and safe spawn/navigation data.',
     'Start or request another round with (set gs_ff_start true). The continuous controller resets only its own encounters and score, then waits for actual living counts to reach zero.',
     'Missing/partial spawns, a dead player or the authored wave deadline refuse progression. No phantom success, forced kills or invulnerability is generated.',
     'Wave-clear points are a script global, not per-player kill credit, medals or a Halo HUD. External scripts must not erase or respawn these owned encounters during a round.',
+    'Each cleared wave allows two seconds for native death animation, then removes only its captured units/corpses before the authored intermission. Defeat and partial-spawn refusal also clean owned units. Encounters must be not initially created and exclusively owned by this controller.',
     'Solo only. Team lives, revives, supplies, difficulty scaling, infection and multiplayer AI are separate gates. Native compilation is not human gameplay acceptance.',
   ]};
 }
