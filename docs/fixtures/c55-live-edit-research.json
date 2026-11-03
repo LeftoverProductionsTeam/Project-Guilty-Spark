@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "codeCheckpoint": "a4d1ce1",
+  "inputDocuments": {
+    "SPARK_LIVE_EDIT_AND_UI_AUDIT_20261103.md": "df105d3bd491eaaf62774aaf72b42b2f7ea1f4b47edc9d5f8bf610ccd3ceac7d",
+    "RESEARCH_DELTA_20261103_LIVE_EDIT.jsonl": "ef20689a1451518addcbf61ce9cfd91b3cb69e2f21bbcca0221800a80db6932e"
+  },
+  "researchEntries": 14,
+  "allIdsReconciled": true,
+  "originalStatusesPreserved": true,
+  "priorFeatureLedgerRows": 462,
+  "featureLedgerSha256": "1c5fab3a5ecc7773c59a3c7811fed1239e738f0181fd29b127845e24f48f2c13",
+  "applicationCodeChanged": false,
+  "newLiveOrGameplayAcceptance": false,
+  "unsafeAnimationOrAiWritesAdded": false,
+  "remotePush": false
+}

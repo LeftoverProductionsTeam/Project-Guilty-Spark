@@ -18,4 +18,6 @@ Validation includes the full Rust/frontend/browser/offline regressions, real GPU
 
 Verified development executable: `target/release/GuiltySpark.exe`, 42,592,768 bytes, SHA-256 `35d690902dc4ddd1f68efbca7e93d09990db3293fd4ac77923738d9db6467130`. The native runs cover five source cases, 11 interactive model previews, five measured auditions, exact BSP shader drawers, recursive editing/build/readback and corruption refusal. The corrected call observer has a positive control; earlier empty wrapper traces are explicitly excluded.
 
+The later documentation commit preserves the owner's two new live-edit/UI research files byte-for-byte and reconciles all 14 findings against this checkpoint. It adds existing-code evidence, exact remaining gates and the next compact Source / Build / Game workflow work. The supplied unverified Discord reports stay unverified, and all 462 prior CSV requirements remain unchanged. This research integration adds no live animation/AI writes or new gameplay acceptance.
+
 Review the local history and Git status before pushing. Use normal Git operations; retain commits and report the actual rejection if repository rules block a push. Do not force-push or bypass the ruleset. Public release publication still requires separate approval.
