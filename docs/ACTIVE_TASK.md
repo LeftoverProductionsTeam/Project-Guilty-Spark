@@ -1,31 +1,31 @@
 # Active engineering checkpoint
 
-Task: C68 native authoring — verified device/source milestone; broader directive retained
+Task: C69 validation seal, then Universal Tool Integration & Synergy
 Status: active
-Starting revision: 5b11e6d
-Latest verified revision: 5bd6e090bb24b1753145e033e38d52b7da829f8a; C68 production, regressions and actual native evidence verified; subsequent seal is documentation only
-Next action: Resume remaining native-authoring gates after verifying current HEAD and the C68 evidence hashes. The focused two-door gameplay test is cross both doors, wait for closure, return through both. While human control is unavailable, continue the preserved source-adoption/native authoring queue without promoting that gameplay gate. No cleanup, branch/worktree, push, install or publication.
+Starting revision: e3ae8fa
+Latest verified revision: e3ae8fa plus C69 working source; complete native and regression receipts recorded
+Next action: Commit the verified C69 batch locally, then extend the existing capability registry and test installed Blender through the native source/compiler path. Do not push or publish.
 
 ## Acceptance
 
-Scoped native milestone passes: ordinary scenario/device references, two independent trigger/rule sets, original companion .hsc files, exact comment/CRLF preservation, existing Undo/Save/reopen and real native tools. New C68 game loading/traversal, actual Baboon GUI edit, other-runtime C68 compilation/gameplay, externally handwritten source adoption, peers and release acceptance remain unverified. Entire Native Halo Authoring Revolution remains active in PENDING_REQUESTS.md.
+Preserve C69 CI/UI work and all native pipelines. Latest full tool directive is retained in PENDING_REQUESTS.md and the owned artifact copy. Finish real editor/DCC/compiler handoffs using documented interfaces; do not invent tool endpoints or promote compilation to gameplay.
 
 ## Verified milestones
 
-Evidence root .local/artifacts/c68-native-authoring-20261104. native-ui-sixth/acceptance.json passes real app controls/IPC, pointer drop, Ctrl+C/V, behavior copy, numeric Undo/immediate Save, reopen, Invader/H1A compilation and independent device/volume readback. Native cache SHA 9964e6ddafb30d5b83353d486882ab0d17f6c67ffd922305030acc86a877afbb; seven scripts. syntax-acceptance.json separately proves actual undefined-function refusal (manual_original.hsc:8:27), unchanged good scenario/cache and corrected compilation/readback using only four copied files. external-second/acceptance.json passes genuine Invader edit, corrupted QA save rejection, restoration/reconcile/build; output 7daa13c165dacad7eedddde04c9479fadcffceabb3c54d4aaedad0dae6c68b4b. All three original source files and 1801 baseline tag hashes survive. Full regressions: Rust705/8ignored, frontend390/92files, browser161, offline59, Node8; TypeScript/frontend/embedded app builds pass. Requirements CSV475 and15 selected protected C49/C63 artifact hashes unchanged. Report/metadata/push notes are in docs.
+C69: archive 20/20 ordinary and 20/20 aliased; locked Rust 708 passed/8 ignored; frontend397/93; browser163; offline59 programs; CI native Node37. Native lifecycle8 and expanded Flow14 pass. Native asset/logic authoring, job navigation, Invader script/native cache compilation, corrupted-save rejection and external reconciliation/readback pass. Warm 54-switch loop makes zero new model/bitmap/cube reads after initial full-map loading settles. All15 protected artifacts and unchanged475-row requirement ledger rehashed.
 
 ## Changed work
 
-Existing native_logic, LogicEvents Inspector, nativeLogic and clipboard extended, not replaced. Optional handwritten modules export as ordinary sibling .hsc sources, with safe names, exact hashes, target budgets and refusal of collisions/changed exported files. Explicit behavior copy creates independent identities and rotated trigger offsets, refusing mixed graphs or existing destination behavior. Clipboard carries source-bound import receipts and keeps original document tag paths; only compiler staging applies the namespace. Tests, private original source fixture and native harness updated. All prior source/research/build/history retained.
+Existing catalog/navigation/window manager extended, source-bound view retention, Open work, named layouts, optional cached-portrait desktop companion, honest loading/failure/retry, reduced-motion transitions and compact Community/Interface UI. No parallel source owner, renderer, tool launcher or window database. Latest tool directive inspected: current catalog already has21 records and source-aware native handoffs; Blender5.2 is installed, Halo addon not found in its user directory. Tool registry changes not yet made.
 
 ## Failures and blockers
 
-Failed trials first–fifth remain: missing inherited fixture source; donor imported but unopened; assertion before deferred Undo/Save; restored drawer hiding Build; intermediate clipboard namespace wrongly assigned and correctly refused; development-server executable used as standalone. These are not passes. External-first passed an enclosing Baboon folder and stopped before preparation; external-second uses the actual nested program folder and passes. Same-value Invader rewrite is byte-identical; no new byte-different Baboon rewrite acceptance. Windows Computer Use cannot initialize (helper_unknown_error/setup refresh), so no actual C68 game input or manual Baboon GUI observation. C63 prior human two-way result remains separate.
+See CONTINUATION_69_SPARK_FLOW.md for failed trials and exact boundaries. Initial IPC wrapper was not valid native instrumentation; final uses existing profiler with positive controls. Warm preview requests were initial whole-map batches, not a reload. Native malformed-model Retry now genuinely passed. Physical monitor disconnect, exact all-child tab/camera restoration, manual Baboon GUI, new gameplay and public release remain unverified. Storage exceeds review budget; no cleanup authorized/performed.
 
 ## Operations and safe checkpoint
 
-All test/build/app processes owned by this pass ended; no game left running. Current debug binary is embedded (tauri/custom-protocol), not a packaged release. No whole SDK copied:1774 bounded base inputs plus23 native imported door tags; no mutable hardlinks. Completed health scan:153545399351 logical workspace bytes; C68 retained evidence2781640396bytes/13341files. These are logical bytes, not allocation; no cleanup authorized/performed. Canonical master is the only local branch/worktree. Rehash metadata before reusing a cache or resuming a trial. Never overwrite accepted output.
+Evidence .local/artifacts/c69-spark-flow-20261104; final flow-release-eleventh/acceptance.json complete14, native-authoring-second complete, native-reconcile complete. Shared Cargo/cache and bounded C66 tags reused. C49 release unchanged. Vite loopback1532 may remain owned/running. No active native compiler job. Exact next action is local C69 commit then tool integration in canonical master.
 
 ## Deferred requests
 
-Full available latest directive and missing/resolved attachment identity are preserved in PENDING_REQUESTS.md. Broader native geometry/seam/material/lightmap/Blender/Mantle/OpenTool workflow, recovered-source adoption, Creator Freedom/Error Doctor/animation/fog/vehicle phases, C66 prepared shared-source materialization, AI/Zombie/game-peer work, Megaworld walkthrough, multi-computer collaboration and release gates remain. Direct structural compiled-map editing stays unfinished. C49 release, C63 human door/external-edit evidence and C67 recovery are protected.
+Complete Universal Tool Integration & Synergy instructions preserved in tool-integration-directive.txt; priority editors/compiler/DCC and compact help/action cards. Entire Spark Flow and native authoring directives remain partially open. Source Guardian/Error Doctor, rendering/audio, AI and gameplay peers, Zombie, Megaworld, separate computers and clean-machine release stay in PENDING_REQUESTS.md and existing ledgers. No missing application queue entries inferred.

@@ -25,6 +25,9 @@ export interface InterfacePreferences {
   launchVoiceVolume:number;
   uiVolume: number;
   reducedMotion: boolean;
+  workspaceTransitions:boolean;
+  shieldLoading:boolean;
+  restoreWorkspaceLayout:boolean;
   windowOpacity:number;
   windowTint:string;
   windowTintStrength:number;
@@ -43,6 +46,9 @@ export const DEFAULT_INTERFACE: InterfacePreferences = {
   launchVoiceVolume:0.35,
   uiVolume: 0.3,
   reducedMotion: false,
+  workspaceTransitions:true,
+  shieldLoading:true,
+  restoreWorkspaceLayout:false,
   windowOpacity:1,
   windowTint:'#65c5ff',
   windowTintStrength:0,
@@ -83,6 +89,9 @@ export function sanitizeInterfacePreferences(v: unknown): InterfacePreferences {
     uiVolume: typeof v.uiVolume === 'number' && Number.isFinite(v.uiVolume)
       ? Math.max(0, Math.min(1, v.uiVolume)) : DEFAULT_INTERFACE.uiVolume,
     reducedMotion: v.reducedMotion === true,
+    workspaceTransitions:v.workspaceTransitions!==false,
+    shieldLoading:v.shieldLoading!==false,
+    restoreWorkspaceLayout:v.restoreWorkspaceLayout===true,
     windowOpacity:typeof v.windowOpacity==='number'&&Number.isFinite(v.windowOpacity)?Math.max(.1,Math.min(1,v.windowOpacity)):1,
     windowTint:typeof v.windowTint==='string'&&/^#[0-9a-f]{6}$/i.test(v.windowTint)?v.windowTint.toLowerCase():DEFAULT_INTERFACE.windowTint,
     windowTintStrength:typeof v.windowTintStrength==='number'&&Number.isFinite(v.windowTintStrength)?Math.max(0,Math.min(.5,v.windowTintStrength)):0,
@@ -115,6 +124,8 @@ export function saveInterfacePreferences(preferences: InterfacePreferences, stor
 export function applyInterfacePreferences(preferences: InterfacePreferences, root: HTMLElement): void {
   root.dataset.gsTheme = preferences.theme;
   root.dataset.gsReducedMotion = preferences.reducedMotion ? 'true' : 'false';
+  root.dataset.gsWorkspaceTransitions=String(preferences.workspaceTransitions);
+  root.dataset.gsShieldLoading=String(preferences.shieldLoading);
   root.style.setProperty('--gs-window-opacity',String(preferences.windowOpacity));
   root.style.setProperty('--gs-window-tint',preferences.windowTint);
   root.style.setProperty('--gs-window-tint-strength',String(preferences.windowTintStrength));

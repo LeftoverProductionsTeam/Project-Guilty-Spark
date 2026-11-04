@@ -1,5 +1,17 @@
 # Pending engineering requests
 
+## Universal Tool Integration & Synergy — received November 4, 2026
+
+Latest user directive, full available instructions preserved at `.local/artifacts/c69-spark-flow-20261104/tool-integration-directive.txt`. Extend the existing tool capability registry, Games & Tools cards, Source Guardian and source-aware handoff; no parallel launcher or invented APIs. Audit provenance, license, formats, edition support, documented automation/manual boundaries, prerequisites, source roots and test evidence for Guerilla/Sapien/Halo Tool, Invader, Baboon, Blender + Halo addon, Mantle, OpenTool, Reclaimer/Mozzarilla and Excession. Complete genuine tag-editor, geometry/DCC and compiler round trips where installed tools permit. Preserve C69 CI/UI work and finish its active validation before integration changes. Receipt is not acceptance; missing tools or manual/gameplay gates remain explicit. No push/publication or optional installation newly authorized.
+
+## Spark Flow final master UI and GitHub CI failure — received November 4, 2026
+
+New active priority from `C:/Users/patri/.codex/attachments/fcce5421-4f9f-43c3-a916-721317229b30/Pasted text.txt` and the supplied failed-build log at `C:/Users/patri/.codex/attachments/c77fda17-4e9d-4be9-8648-7020131f7e95/Pasted text.txt`. Both complete files are preserved under `.local/artifacts/c69-spark-flow-20261104/`, with hashes in its directive record. The complete 1,176-line UI directive was read. It supersedes overlapping older UI/navigation prompts, preserving the native engineering, Creator's Gauntlet and feature requirements.
+
+First repair/reproduce the P0 Windows archive-test cleanup failure without weakening archive/removal guards or removing accumulated data. Then audit and extend the existing Orb, workspace/window routes, document/history owners, view persistence, settings and renderer readiness. Required scope includes window-local workspace switching, Return to Work, contextual navigation, safe multiwindow/session restoration, fades and honest shield-loading feedback, bounded resources and real native-app acceptance tests A–P. Preserve the established design and all current editors; no parallel window manager/store/renderer/launcher. Use the real application harness, not ChatGPT Computer Use. Never promote screenshots/mocks into native or gameplay acceptance. No push/publication authorized.
+
+The C68 scoped native milestone and remaining Native Halo Authoring Revolution/other engineering queue below remain intact. Record precise verified substeps; do not call the complete Spark Flow directive accepted until its full native acceptance is met.
+
 ## Native Halo Authoring Revolution — received November 4, 2026
 
 Active user priority, continuing actual `5b11e6d` on sole local master. The message's attachment path `C:/Users/patri/.codex/attachments/3cc8a6b9-3af7-4dc9-b0f2-cc12546f4a45/Pasted text.txt` is absent. A single matching-title copy was found at `C:/Users/patri/.codex/attachments/31f760f7-ea6a-4927-be8f-28288f7c7b41/Pasted text.txt`, read completely and preserved at `.local/artifacts/c68-native-authoring-20261104/directive.txt`, SHA-256 `9ea312fa68d79f723a87b9a3797d52344ee619dec8031e64073749bfc5fc8976`. This records the available copy without pretending its bytes were verified against the absent path.

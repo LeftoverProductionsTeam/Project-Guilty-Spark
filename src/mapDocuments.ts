@@ -21,6 +21,7 @@ export type DocumentAction =
   | { type: 'external-revision'; previousId: string; open: OpenProject; replaceClean: boolean }
   | { type: 'resources'; project: Project; inspection?:MapInspection|null; kind?:'audio' }
   | { type: 'select'; id: string }
+  | { type:'reorder';ids:string[] }
   | { type: 'close'; id: string }
   | { type: 'history'; action: HistoryAction; id?: string }
   | { type: 'mesh'; id: string; assetId: string; mesh: MeshData }
@@ -38,6 +39,11 @@ function inspectionUnchanged(previous:MapInspection|null|undefined,incoming:MapI
     JSON.stringify([source.resourceDirectory,source.resourceSha256,source.audioResources,incoming.diagnostics,incoming.resources]);
 }
 export function documentReducer(state: MapDocuments, action: DocumentAction): MapDocuments {
+  if(action.type==='reorder'){
+    if(action.ids.length!==state.documents.length||new Set(action.ids).size!==action.ids.length||action.ids.some(id=>!state.documents.some(d=>d.id===id)))return state;
+    if(action.ids.every((id,index)=>state.documents[index].id===id))return state;
+    return {...state,documents:action.ids.map(id=>state.documents.find(d=>d.id===id)!)};
+  }
   if(action.type==='window-history')return {...state,documents:state.documents.map(d=>d.id===action.id&&action.history.current?.id===d.id?{...d,history:action.history}:d)};
   if (action.type === 'external-revision') {
     const previous = state.documents.find(document => document.id === action.previousId);

@@ -5,6 +5,12 @@ import type {Project} from './types';
 const project=(id:string):Project=>({schemaVersion:1,id,title:id,createdAt:'',modifiedAt:'',source:null,provenance:{creator:'',community:'',releaseYear:null,description:'',sourceUrl:'',permissions:''},scene:[],assets:[],tagEdits:[],history:[],builds:[]});
 const open=(state:MapDocuments,p:Project)=>documentReducer(state,{type:'open',open:{project:p,inspection:null}});
 describe('Independent open map documents',()=>{
+  it('reorders only the existing document objects without editing source or histories',()=>{
+    const before=open(open(emptyMapDocuments(100),project('a')),project('b'));
+    const after=documentReducer(before,{type:'reorder',ids:['b','a']});
+    expect(after.activeId).toBe('b');expect(after.documents[0]).toBe(before.documents[1]);expect(after.documents[1].history).toBe(before.documents[0].history);
+    for(const ids of [['a','a'],['a'],['b','foreign']])expect(documentReducer(before,{type:'reorder',ids})).toBe(before);
+  });
   it('invalidates only the saved map and retains edits made while its save was pending',()=>{
     const a=project('a'),b=project('b');let state=open(open(emptyMapDocuments(100),a),b);
     state=documentReducer(state,{type:'history',id:'a',action:{type:'edit',project:{...a,title:'Saved A'},description:'First edit'}});

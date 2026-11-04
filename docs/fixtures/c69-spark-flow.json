@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "continuation": "C69",
+  "recordedAt": "2026-11-04T13:50:49.270Z",
+  "startingCommit": "e3ae8fa67e190ceeb9aaa943b3dbd9aafa95bff9",
+  "branch": "master",
+  "privateEvidenceRoot": ".local/artifacts/c69-spark-flow-20261104",
+  "entireSparkFlowDirectiveComplete": false,
+  "githubHostedRerun": false,
+  "remotePublication": false,
+  "regression": {
+    "rust": {
+      "passed": 708,
+      "failed": 0,
+      "ignored": 8
+    },
+    "frontend": {
+      "tests": 397,
+      "files": 93
+    },
+    "browser": {
+      "passed": 163
+    },
+    "offlinePrograms": 59,
+    "ciNativeNode": 37,
+    "continuityHealthNode": 9,
+    "archiveCanonical": 20,
+    "archiveAliased": 20,
+    "nativeStorageNode": 1
+  },
+  "native": {
+    "flowCases": 14,
+    "lifecycleCases": 8,
+    "flowAppSha256": "3bb0fe744e7ba21979a27e271ac898c33282b99b3f617551d29e14967903886c",
+    "compilerAppSha256": "777b4f11da72e8f5147f5c3c3ac8a4e107b8beb0d395c575675fed640ca69835",
+    "authoringJob": "a7a88447-d8b2-4d8a-8b45-8f8764dc5743",
+    "authoringCacheSha256": "ce027c1b3eadadecec7af07dd4bf578f5620d0bdc9fca2b8bc42c4a8a1f1e2b7",
+    "externalJob": "31a637bc-96fb-4375-b7cc-ef0f0f7346c5",
+    "externalCacheSha256": "2038e46e7b1f63c0d923daa1f4a2b4a956d380f19e076bdc40ced53457ab5b5e",
+    "externalGuiEdited": false,
+    "gameplayAccepted": false,
+    "originalTagInventory": 1801,
+    "invalidDetectionMs": 4705.922600000005
+  },
+  "measurements": {
+    "conditions": "One machine, embedded Windows development app, fresh owned profile/library, existing bounded C66 tags; warm resource load settled before navigation measurement; GC-normalized WebView heap, not process memory/VRAM",
+    "timing": {
+      "coldBootstrapMs": 967.011,
+      "firstLibraryReadyMs": 885.7643000000003,
+      "fixtureSetupMs": 3339.0823,
+      "newWorkspaceWindowMs": 694.6745999999985,
+      "retainedLevelReturnMs": 690.7079000000012,
+      "nativePreviewReadyMs": 423.6186999999991,
+      "initialMapResourcesSettleMs": 2916.253700000001,
+      "retainedPreviewReturnMs": 122.7332000000024
+    },
+    "retentionSamples": [
+      {
+        "Documents": 1,
+        "Nodes": 31996,
+        "TaskDuration": 0.169451,
+        "JSHeapUsedSize": 163311524,
+        "JSHeapTotalSize": 167124992
+      },
+      {
+        "Documents": 1,
+        "Nodes": 32061,
+        "TaskDuration": 2.715488,
+        "JSHeapUsedSize": 164144108,
+        "JSHeapTotalSize": 167911424
+      },
+      {
+        "Documents": 1,
+        "Nodes": 32079,
+        "TaskDuration": 5.197029,
+        "JSHeapUsedSize": 164625536,
+        "JSHeapTotalSize": 167124992
+      },
+      {
+        "Documents": 1,
+        "Nodes": 32097,
+        "TaskDuration": 7.656932,
+        "JSHeapUsedSize": 165307720,
+        "JSHeapTotalSize": 169222144
+      }
+    ],
+    "retentionCycles": 18,
+    "retentionNativeReads": [],
+    "physicalMonitorDisconnectVerified": false
+  },
+  "preservation": {
+    "protectedArtifacts": 15,
+    "ledgerSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
+    "sourceCacheSha256": "b53c7543526c709c53344e814a746c0687c3f6ed7691d720e4764c54c0549103"
+  },
+  "storage": {
+    "logicalBytes": 159566787184,
+    "uniqueFileBytes": 158370923662,
+    "errors": [],
+    "warnings": [
+      "Uncommitted tracked source exists; preserve it before consolidation or cleanup.",
+      "Measured logical storage exceeds 80 GiB. Review ownership and retained evidence before cleanup."
+    ]
+  },
+  "limitations": [
+    "No new C69 game/player or manual Baboon GUI acceptance",
+    "No physical second-monitor disconnect test",
+    "Named layout restoration does not reproduce every child tab set, per-window camera or fullscreen flag",
+    "No clean-machine installer/Linux/macOS acceptance; C49 remains the accepted candidate",
+    "No whole-process CPU/GPU/VRAM endurance or exact prior-source startup comparison",
+    "Remaining full Spark Flow and native tool integration scope stays in PENDING_REQUESTS.md"
+  ]
+}

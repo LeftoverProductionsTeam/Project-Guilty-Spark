@@ -32,6 +32,11 @@ describe('local Halo interface profiles', () => {
   it('does not crash on malformed saved data', () => {
     expect(readInterfacePreferences({ getItem: () => '{broken' })).toEqual(DEFAULT_INTERFACE);
   });
+  it('keeps fades and shield feedback optional and preserves them with reduced motion',()=>{
+    const prefs=sanitizeInterfacePreferences({schemaVersion:1,workspaceTransitions:false,shieldLoading:false,reducedMotion:true});
+    const values=new Map<string,string>();const root={dataset:{},style:{setProperty:(key:string,value:string)=>values.set(key,value)}} as unknown as HTMLElement;
+    applyInterfacePreferences(prefs,root);expect(root.dataset.gsWorkspaceTransitions).toBe('false');expect(root.dataset.gsShieldLoading).toBe('false');expect(root.dataset.gsReducedMotion).toBe('true');
+  });
   it('keeps legacy profiles and sanitizes editable glow colors and intensity',()=>{
     const legacy=sanitizeInterfacePreferences({schemaVersion:1,theme:'unsc'});
     expect(legacy.theme).toBe('unsc');

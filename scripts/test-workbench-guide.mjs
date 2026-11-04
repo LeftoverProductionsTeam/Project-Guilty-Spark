@@ -36,7 +36,7 @@ const app=readFileSync('src/App.tsx','utf8');
 const compactApp=app.replace(/\s+/g,'');
 assert.ok(compactApp.includes('<WorkbenchGuidekey={workspace}') && app.includes('data.settings.hekDirectory'));
 assert.ok(compactApp.includes('inspection.sha256.toLowerCase()===current.source.sha256.toLowerCase()'));
-assert.ok(compactApp.includes('keywords:`${WORKBENCH_GUIDES[id].can}'));
+assert.ok(readFileSync('src/workspaceCatalog.ts','utf8').replace(/\s+/g,'').includes('keywords:`${WORKBENCH_GUIDES[id].can}'));
 const ui=readFileSync('src/components/ui.tsx','utf8');
 for (const token of ['onMouseEnter','onMouseLeave','onFocus','onBlur','aria-describedby={visible ? id : undefined}',"event.key === 'Escape'","event.stopPropagation()"])
   assert.ok(ui.includes(token),`Tooltip misses ${token}`);

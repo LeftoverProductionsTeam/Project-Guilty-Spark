@@ -169,7 +169,7 @@ export default function Library({
               /* Preview caching is optional. */
             }
             return (
-              <button key={entry.id} className="map-card" disabled={busy} onClick={() => onOpen(entry)}>
+              <button key={entry.id} className="map-card" data-project-id={entry.id} disabled={busy} onClick={() => onOpen(entry)}>
                 <div className="map-thumbnail">
                   {preview ? (
                     <img src={preview} alt={`Collision geometry overview of ${entry.title}`} />

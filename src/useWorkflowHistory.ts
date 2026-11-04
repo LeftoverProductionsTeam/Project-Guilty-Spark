@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useReducer, useRef } from 'react';
-import { startWorkflow, travelWorkflow, visitWorkflow, workflowTarget } from './workflowHistory';
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef,useState } from 'react';
+import { travelWorkflow, visitWorkflow, workflowTarget, recentWorkflow,restoreWorkflowSnapshot,workflowSnapshot } from './workflowHistory';
+import {readMapSession,writeMapSession} from './mapSession';
+import {native} from './api';
+import {getCurrentWindow} from '@tauri-apps/api/window';
 import type { WorkflowRoute } from './workflowHistory';
 import type { Workspace } from './types';
 
@@ -8,15 +11,22 @@ export function useWorkflowHistory(
   mapWorkspaces: Workspace[],
   restore: (route: WorkflowRoute) => void,
   available: (route: WorkflowRoute) => boolean,
+  capture:(route:WorkflowRoute)=>WorkflowRoute=route=>route,
 ) {
-  const history = useRef(startWorkflow(route)),
-    latest = useRef({ restore, available }),
+  const session=`global:window:${native?getCurrentWindow().label:'browser'}`;
+  const [initial]=useState(()=>restoreWorkflowSnapshot(readMapSession(session,'workflow.history',null),route));
+  const history=useRef(initial);
+  const
+    latest = useRef({ restore, available, capture }),
     moving = useRef(false);
-  latest.current = { restore, available };
-  const [, redraw] = useReducer((n) => n + 1, 0);
+  latest.current = { restore, available, capture };
+  const [revision, redraw] = useReducer((n) => n + 1, 0);
+  useEffect(()=>writeMapSession(session,'workflow.history',workflowSnapshot(history.current)),[revision,session]);
   useLayoutEffect(() => {
-    const next = visitWorkflow(history.current, route, mapWorkspaces.includes(route.workspace));
+    const before=history.current;
+    const next = visitWorkflow(before, route, mapWorkspaces.includes(route.workspace));
     if (next !== history.current) {
+      if(next.back.at(-1)===before.current)next.back[next.back.length-1]=latest.current.capture(before.current);
       history.current = next;
       redraw();
     }
@@ -31,8 +41,10 @@ export function useWorkflowHistory(
       const next = travelWorkflow(history.current, direction, latest.current.available);
       if (next === history.current) return;
       window.dispatchEvent(new Event('gs:save-viewport-context'));
-      history.current = next;
-      latest.current.restore(next.current);
+      const current=latest.current.capture(history.current.current);
+      const recorded=travelWorkflow({...history.current,current},direction,latest.current.available);
+      history.current = recorded;
+      latest.current.restore(recorded.current);
       redraw();
     });
   }, []);
@@ -60,6 +72,8 @@ export function useWorkflowHistory(
     };
   }, [travel]);
   return {
+    recent:recentWorkflow(history.current),
+    restore:(route:WorkflowRoute)=>{if(latest.current.available(route)){window.dispatchEvent(new Event('gs:save-viewport-context'));latest.current.restore(route);}},
     back: workflowTarget(history.current, 'back', available),
     forward: workflowTarget(history.current, 'forward', available),
     goBack: () => travel('back'),

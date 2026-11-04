@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { startWorkflow, travelWorkflow, visitWorkflow, workflowTarget } from './workflowHistory';
+import { startWorkflow, travelWorkflow, visitWorkflow, workflowTarget,restoreWorkflowSnapshot,workflowSnapshot } from './workflowHistory';
 import type { WorkflowRoute } from './workflowHistory';
 const route = (
   workspace: WorkflowRoute['workspace'],
@@ -7,6 +7,13 @@ const route = (
   settingsTab: WorkflowRoute['settingsTab'] = 'tools',
 ): WorkflowRoute => ({ workspace, projectId, settingsTab });
 describe('workflow location history stays separate from edit history', () => {
+  it('restores bounded recent places without reopening maps or accepting unknown routes',()=>{
+    let history=startWorkflow(route('tags','a'));history=visitWorkflow(history,route('assets','a'),true);history=visitWorkflow(history,route('creator','b'),true);
+    const snapshot=workflowSnapshot(history),restored=restoreWorkflowSnapshot(snapshot,route('library',null));
+    expect(restored.current.workspace).toBe('library');expect(restored.back.map(r=>r.workspace)).toEqual(['tags','assets','creator']);
+    expect(restoreWorkflowSnapshot({version:1,recent:[{...route('tags'),workspace:'https://example.com'}]},route('library')).back).toEqual([]);
+    expect(restoreWorkflowSnapshot({version:1,recent:Array(100).fill(route('tags'))},route('library')).back).toHaveLength(24);
+  });
   it('returns to the exact learning section without recording background tab preferences as navigation',()=>{
     const guides:WorkflowRoute={...route('learning'),learningSection:'guides'};
     const glossary:WorkflowRoute={...guides,learningSection:'glossary'};

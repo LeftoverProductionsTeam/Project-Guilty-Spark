@@ -5,6 +5,7 @@ import type { InterfacePreferences, CueName, ThemeName } from '../interfacePrefe
 import { cueNames, DEFAULT_INTERFACE } from '../interfacePreferences';
 import { PageTitle, Pill } from './ui';
 import {useMapState} from '../mapSession';
+import {native} from '../api';
 import './interfaceStudio.css';
 
 const themes: { id: ThemeName; title: string; description: string }[] = [
@@ -35,6 +36,7 @@ export default function InterfaceStudio({
   homeModelSettings?:ReactNode;
 }) {
   const [savedSection,setSection]=useMapState('global','interface.section','appearance');
+  const [desktopOrb,setDesktopOrb]=useMapState('global','workspace.desktopOrb',false);
   const [launchVoiceStatus]=useMapState('global','home.voice.status','One matching character line per launch; no repeats until all recoverable lines have played.');
   const section=['appearance','window','sounds','art'].includes(savedSection)?savedSection:'appearance';
   const [bitmapQuery,setBitmapQuery]=useState('');
@@ -68,9 +70,14 @@ export default function InterfaceStudio({
           {preferences.theme === theme.id && <Pill tone="green">Selected</Pill>}
         </button>)}
       </div>
+      <div className="interface-behavior-settings" role="group" aria-label="Workspace behavior">
       <label className="interface-control"><input type="checkbox" checked={preferences.reducedMotion}
         onChange={(event) => onChange({ ...preferences, reducedMotion: event.target.checked })}/>
         Reduced motion and interface transitions</label>
+      <label className="interface-control"><input type="checkbox" checked={preferences.workspaceTransitions} onChange={e=>onChange({...preferences,workspaceTransitions:e.target.checked})}/>Subtle workspace fades</label>
+      <label className="interface-control"><input type="checkbox" checked={preferences.shieldLoading} onChange={e=>onChange({...preferences,shieldLoading:e.target.checked})}/>Shield loading animation</label>
+      <label className="interface-control"><input type="checkbox" checked={preferences.restoreWorkspaceLayout} onChange={e=>onChange({...preferences,restoreWorkspaceLayout:e.target.checked})}/>Restore my saved workspace layout on launch</label>
+      </div>
       <small className="interface-palette-note">Original palettes. Use Header art for a verified image from your maps.</small>
     </section>
     <section className="analysis-card gs-glow-workshop" aria-label="Dark Glow colors">
@@ -90,6 +97,8 @@ export default function InterfaceStudio({
     </>}
     {section==='window'&&<section className="analysis-card gs-window-appearance">
       <h2>Window glass</h2>
+      <label className="interface-control"><input type="checkbox" disabled={!native} checked={desktopOrb===true} onChange={event=>setDesktopOrb(event.target.checked)}/>Show desktop Spark companion</label>
+      <small>Optional shortcut to Open Work. Drag to move; Esc or × hides it. Uses your saved monitor portrait.</small>
       <p>Adjust the window’s controls, panels, text and viewport. The Spark corner emblem stays solid.</p>
       <label>Window transparency · {Math.round((1-preferences.windowOpacity)*100)}%
         <input aria-label="Whole window transparency" type="range" min="0" max="90" step="1" value={Math.round((1-preferences.windowOpacity)*100)} onChange={e=>onChange({...preferences,windowOpacity:1-Number(e.target.value)/100})}/>

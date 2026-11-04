@@ -3,6 +3,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
+import stat
 import tempfile
 import unittest
 
@@ -11,19 +13,40 @@ v = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(v)
 
 
+class OwnedTestDirectory:
+    """Pin the newly allocated directory, not its possibly aliased spelling.
+
+    Windows runners may give tempfile a short/junction-backed parent. Resolve
+    once at allocation and verify the same directory identity before removal.
+    There is deliberately no finalizer that could bypass a refused cleanup.
+    """
+    def __init__(self):
+        self.name = tempfile.mkdtemp(prefix='spark-vault-test-')
+        self.root = v.resolved(self.name)
+        if self.root.parent != v.resolved(tempfile.gettempdir()):
+            raise ValueError('Allocated test root leaves the intended temporary parent')
+        meta = os.stat(v.native(self.root), follow_symlinks=False)
+        self.identity = (meta.st_dev, meta.st_ino)
+
+    def cleanup(self):
+        current = v.resolved(self.name)
+        if current != self.root:
+            raise ValueError('Temporary test root changed')
+        if not os.path.lexists(v.native(current)):
+            return
+        meta = os.stat(v.native(current), follow_symlinks=False)
+        if (not stat.S_ISDIR(meta.st_mode)
+                or getattr(meta, 'st_file_attributes', 0) & 0x400
+                or (meta.st_dev, meta.st_ino) != self.identity):
+            raise ValueError('Temporary test root identity changed')
+        shutil.rmtree(v.native(self.root))
+
+
 class VaultTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        def cleanup_owned_temp():
-            import shutil
-            root=Path(self.temp.name).absolute()
-            if v.resolved(root)!=root:
-                raise ValueError('Temporary test root changed')
-            if os.path.exists(v.native(root)):
-                shutil.rmtree(v.native(root))
-            self.temp.cleanup()
-        self.addCleanup(cleanup_owned_temp)
-        v.WORKSPACE = Path(self.temp.name).resolve()
+        self.temp = OwnedTestDirectory()
+        self.addCleanup(self.temp.cleanup)
+        v.WORKSPACE = self.temp.root
         self.source = v.WORKSPACE/'.local/run'
         self.source.mkdir(parents=True)
         for name, data in [('world.map',b'native map test bytes'),('halo.exe',b'owned executable test bytes'),('config.toml',b'option=true')]:
@@ -31,6 +54,49 @@ class VaultTests(unittest.TestCase):
         self.plan = v.WORKSPACE/'plan.json'
         self.plan.write_text(json.dumps(['.local/run']),encoding='utf-8')
         self.vault = v.WORKSPACE/'.local/vault'
+
+    def test_cleanup_accepts_equivalent_native_spelling(self):
+        owned = OwnedTestDirectory()
+        self.addCleanup(owned.cleanup)
+        (owned.root/'fixture.txt').write_bytes(b'owned test data')
+        owned.name = v.native(owned.root)
+        owned.cleanup()
+        self.assertFalse(owned.root.exists())
+        self.assertTrue((self.source/'world.map').exists())
+
+    def test_cleanup_refuses_a_different_directory(self):
+        owned = OwnedTestDirectory()
+        self.addCleanup(owned.cleanup)
+        original = owned.name
+        try:
+            owned.name = str(self.source)
+            with self.assertRaisesRegex(ValueError, 'root changed'):
+                owned.cleanup()
+            self.assertTrue((self.source/'world.map').exists())
+            self.assertTrue(owned.root.exists())
+        finally:
+            owned.name = original
+
+    def test_cleanup_refuses_a_replaced_directory_at_the_same_path(self):
+        owned = OwnedTestDirectory()
+        self.addCleanup(owned.cleanup)
+        moved = owned.root.with_name(owned.root.name+'-original')
+        owned.root.rename(moved)
+        try:
+            owned.root.mkdir()
+            marker = owned.root/'replacement.txt'
+            marker.write_bytes(b'new directory must remain')
+            with self.assertRaisesRegex(ValueError, 'identity changed'):
+                owned.cleanup()
+            self.assertEqual(marker.read_bytes(), b'new directory must remain')
+            self.assertTrue(moved.exists())
+        finally:
+            # Only the one test-created marker and its otherwise empty new
+            # directory are removed; unexpected additions make rmdir refuse.
+            if owned.root.exists():
+                (owned.root/'replacement.txt').unlink(missing_ok=True)
+                owned.root.rmdir()
+            moved.rename(owned.root)
 
     def prepared(self):
         v.prepare(self.plan,self.vault)

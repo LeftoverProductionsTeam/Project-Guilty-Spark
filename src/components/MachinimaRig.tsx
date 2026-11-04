@@ -10,6 +10,7 @@ import type { CameraShot } from '../creatorStudio';
 import { sampleCamera, takeDuration } from '../machinima';
 import type { CameraPose, MachinimaSettings } from '../machinima';
 import type { Vec3 } from '../types';
+import {useWorkspaceActivity} from './WorkspaceActivity';
 export interface DirectorTransport {
   time: number;
   playing: boolean;
@@ -61,8 +62,13 @@ export default function MachinimaRig({
   renderProfile?:RenderFeatures|null;
 }) {
   const { camera, scene, gl, size, viewport } = useThree();
+  const {active}=useWorkspaceActivity();
   const features=renderFeatures(renderProfile);
   const clock = useRef({ time: transport.time, stamp: performance.now(), lastUi: 0 });
+  useEffect(()=>{
+    clock.current.stamp=performance.now();
+    return()=>{if(active&&transport.playing)clock.current.time+=(performance.now()-clock.current.stamp)*settings.speed;};
+  },[active,transport.playing,settings.speed]);
   const lens = useMemo(() => features.enabled||settings.depthOfField?createVisualPipeline(gl,scene,camera,features.enabled&&features.bloom,settings.depthOfField):null, [gl,scene,camera,features.enabled,features.bloom,settings.depthOfField]);
   useEffect(
     () => () => {
@@ -86,6 +92,7 @@ export default function MachinimaRig({
     };
   }, [bridge, gl]);
   useFrame(() => {
+    if(!active)return;
     const now = performance.now(),
       duration = takeDuration(shots),
       elapsed = clock.current.time + (transport.playing ? (now - clock.current.stamp) * settings.speed : 0);

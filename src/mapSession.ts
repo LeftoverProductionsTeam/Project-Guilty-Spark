@@ -6,6 +6,12 @@ const cache = new Map<string, Record<string, unknown>>(),
   unpersisted = new Map<string, Record<string, unknown>>(),
   listeners = new Map<string, Map<string, Set<() => void>>>();
 const prefix = 'guilty-spark-map-session-v1:';
+let viewWindow:string|null=null;
+/** Camera/selection/scroll are window-local. The last shared snapshot is still
+ * written for an explicit handoff/new window, never used to reset a live peer. */
+export function configureMapViewWindow(label:string|null){viewWindow=label&&/^[\w-]{1,60}$/.test(label)?label:null;}
+const viewKey=(key:string)=>/^(camera\.|preview\.camera\.|scroll\.|viewport\.tags\.|tags\.(selection|focus|query|filter|classes|limit)$|world\.(selection|surface-selection|view|fly|ortho|bsp|mode|start)$|forge\.(selection|sourceSurface|tab|bspWorkshop|zone|cameraMode|mode)$|bsp\.(view\.|selection$|tool$|maximized$)|creator-studio-pane$)/.test(key);
+function scoped(id:string,key:string){return viewWindow&&id!=='global'&&!id.includes(':window:')&&viewKey(key)?`${id}:window:${viewWindow}`:id;}
 // Re-read the storage string on every write for peer-window changes, but do not
 // repeatedly decode an unchanged portrait/camera/layout record. Bound the extra
 // serialized snapshots independently of the existing per-map view cache.
@@ -18,7 +24,7 @@ function rememberStored(id:string,text:string|null,value:Record<string,unknown>)
 
 /** Subscribe only to the remembered values this view actually reads. */
 export function subscribeMapSession(ids:readonly string[], key:string, listener:()=>void) {
-  const unique=[...new Set(ids)];
+  const unique=[...new Set(ids.map(id=>scoped(id,key)))];
   for(const id of unique) {
     let keys=listeners.get(id);
     if(!keys)listeners.set(id,keys=new Map());
@@ -96,7 +102,8 @@ function record(id: string) {
   return value!;
 }
 export function readMapSession<T>(id: string, key: string, fallback: T): T {
-  const value = record(id);
+  const local=scoped(id,key),value = record(local);
+  if(local!==id&&!Object.hasOwn(value,key)&&Object.hasOwn(record(id),key))value[key]=record(id)[key];
   return Object.hasOwn(value, key) ? (value[key] as T) : fallback;
 }
 /** One stable subscription for source maps in a multi-map asset viewport. */
@@ -109,6 +116,11 @@ export function useMapSessionValues(ids: readonly string[], key: string, fallbac
 }
 export function writeMapSession<T>(id: string, key: string, value: T) {
   if (!id || id.length > 128 || !/^[\w.:-]{1,80}$/.test(key)) return;
+  const local=scoped(id,key);
+  if(local!==id){writeRecord(id,key,value);writeRecord(local,key,value);return;}
+  writeRecord(id,key,value);
+}
+function writeRecord<T>(id:string,key:string,value:T){
   // Another native WebView may have saved a different key since this cache loaded.
   const before=record(id);
   const old = merged(merged(before, stored(id) ?? {}), unpersisted.get(id) ?? {});
@@ -141,7 +153,8 @@ export function useMapState<T>(
   initial: T | (() => T),
 ): [T, Dispatch<SetStateAction<T>>] {
   const get = () => {
-    const r = record(id);
+    const local=scoped(id,key),r = record(local);
+    if(local!==id&&!Object.hasOwn(r,key)&&Object.hasOwn(record(id),key))r[key]=record(id)[key];
     let valid = Object.hasOwn(r, key);
     if (valid && typeof initial !== 'function') {
       const v = r[key];

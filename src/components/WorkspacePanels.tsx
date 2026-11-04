@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -48,6 +48,12 @@ export default function WorkspacePanels({
   onPopout,
   onDetachPanel,
   canDetachPanel,
+  onSaveLayout,
+  onRestoreLayout,
+  layoutName,
+  layoutNames,
+  onLayoutName,
+  onListLayouts,
 }: {
   id: string;
   workspace: string;
@@ -58,8 +64,21 @@ export default function WorkspacePanels({
   onPopout?:()=>void;
   onDetachPanel?:(id:string)=>Promise<boolean>;
   canDetachPanel?:(id:string)=>boolean;
+  onSaveLayout?:()=>void;
+  onRestoreLayout?:()=>void;
+  layoutName?:string;
+  layoutNames?:string[];
+  onLayoutName?:(name:string)=>void;
+  onListLayouts?:()=>void;
 }) {
   const detached=native?requestedPanel(location.search,workspace):null;
+  const contentRoot=useRef<HTMLDivElement>(null);
+  useLayoutEffect(()=>{
+    const root=contentRoot.current;
+    if(!root||document.documentElement.dataset.gsWorkspaceTransitions==='false'||document.documentElement.dataset.gsReducedMotion==='true'||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    const animation=root.animate?.([{opacity:.82},{opacity:1}],{duration:160,easing:'ease-out'});
+    return()=>animation?.cancel();
+  },[id,workspace]);
   const windowLayoutId=native?`${id}:window:${getCurrentWindow().label}`:id;
   const [raw, setRaw] = useMapState<WorkspaceLayout>(windowLayoutId, `layout.${workspace}`, () => readMapSession<WorkspaceLayout>(id,`layout.${workspace}`,{
     version: 1,
@@ -217,9 +236,12 @@ export default function WorkspacePanels({
           </details>}
           <div className="gs-layout-actions">
             {actions}
-            {!detached&&<details className="gs-layout-menu" onToggle={event=>{if(event.currentTarget.open)for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-panel-overflow[open]'))menu.open=false;}}>
+            {!detached&&<details className="gs-layout-menu" onToggle={event=>{if(event.currentTarget.open){onListLayouts?.();for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-panel-overflow[open]'))menu.open=false;}}}>
               <summary>Layout</summary>
               <div>
+                {onLayoutName&&<label className="gs-layout-profile">Window layout<input aria-label="Window layout name" maxLength={80} value={layoutName??'Studio'} list="gs-saved-layouts" onChange={event=>onLayoutName(event.target.value)}/><datalist id="gs-saved-layouts">{layoutNames?.map(name=><option key={name} value={name}/>)}</datalist></label>}
+                {onSaveLayout&&<button onClick={onSaveLayout}>Save workspace windows</button>}
+                {onRestoreLayout&&<button onClick={onRestoreLayout}>Restore workspace windows</button>}
                 {descriptors.map((panel) => (
                   <label key={panel.id}>
                     <input
@@ -252,6 +274,7 @@ export default function WorkspacePanels({
         </nav></HeaderTools>
         <div
           className="gs-workspace-content"
+          ref={contentRoot}
           style={{ paddingLeft: padding.left, paddingRight: padding.right, paddingTop:padding.top, paddingBottom: padding.bottom }}
         >
           {children}

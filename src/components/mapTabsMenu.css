@@ -1,4 +1,7 @@
 .gs-map-switcher{position:relative;flex:none;min-width:0;}
+.gs-tab-context{display:grid;gap:3px;z-index:260;min-width:180px;padding:5px;border:1px solid var(--line);border-radius:7px;background:var(--panel);box-shadow:0 8px 24px #0006;}
+.application .gs-tab-context>button{text-align:left;background:transparent;border:0;padding:5px 8px;font-size:11px;}
+.map-tab[data-pinned=true] .map-tab-title{max-width:130px;}
 .gs-map-switcher>summary{display:flex;align-items:center;gap:4px;list-style:none;cursor:pointer;white-space:nowrap;min-height:26px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;font-size:10px;}
 .gs-map-switcher>summary::-webkit-details-marker{display:none;}
 .gs-map-switcher>summary small{font-size:9px;color:var(--muted);}

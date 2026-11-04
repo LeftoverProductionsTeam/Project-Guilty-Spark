@@ -288,7 +288,7 @@ try {
   await open();
   if (!resume) {
     const objectMode = page.getByRole('button', { name: 'Objects & gameplay', exact: true });
-    if (await objectMode.isVisible()) await objectMode.click();
+    await expect(objectMode).toBeVisible();await objectMode.click();
     const baseGeometry = await state();
     expect(baseGeometry.workshop).toEqual(seedProject.quickForge.workshop);
     await chooseTool(page, 'Map library');
@@ -298,6 +298,8 @@ try {
       .click();
     await page.getByRole('tab', { name: receipt.projectTitle, exact: true }).click();
     await chooseTool(page, 'Level editor');
+    await expect(objectMode).toBeVisible();
+    if(!await objectMode.evaluate(el=>el.classList.contains('selected')))await objectMode.click();
     await openDrawer(page, 'Asset library');
     const assets = page.getByRole('region', { name: 'Asset library panel', exact: true });
     await assets
@@ -434,6 +436,19 @@ try {
     await expect(panel).toBeHidden();
   }
   await page.getByRole('button', { name: 'Build & check playtest', exact: true }).click();
+  // C69: keep the genuine job visible while using another workspace. This is
+  // the native compiler, not an emulated timer or an alternate build entrypoint.
+  await chooseTool(page,'Creator Studio');
+  await page.getByRole('button',{name:'Open work and workspace windows',exact:true}).click();
+  const runningTasks=page.getByRole('dialog',{name:'Open work',exact:true}).getByRole('region',{name:'Running tasks',exact:true});
+  // Named sections are exposed as regions only when they carry an accessible name.
+  await expect(runningTasks).toBeVisible();
+  await expect(runningTasks).toContainText(receipt.projectTitle);
+  const activeBuild=(await call('bootstrap')).logs.findLast(l=>l.projectId===receipt.projectId&&l.progress<100);
+  expect(activeBuild?.jobId).toBeTruthy();
+  receipt.flowDuringBuild={workspace:'creator',jobId:activeBuild.jobId,workshopUnchanged:JSON.stringify((await state()).workshop)===JSON.stringify(receipt.sourceDocument.workshop)};
+  expect(receipt.flowDuringBuild.workshopUnchanged).toBe(true);
+  await page.keyboard.press('Escape');
   const began = performance.now(),
     phases = [];
   let last = '';

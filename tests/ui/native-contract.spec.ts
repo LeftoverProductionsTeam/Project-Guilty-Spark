@@ -836,7 +836,8 @@ test('custom tag names stay map-owned, saved and undoable without changing sourc
   expect(await page.evaluate(()=>(window as any).__sparkMock.projects.a.inspection.tags[0].path)).toBe('weapons/test');
   await chooseTool(page,'Compare variants');await chooseTool(page,'Tag editor');
   await expect(page.locator('.tag-detail-heading h2')).toHaveText('My custom pistol');
-  await rename.locator('summary').click();
+  // The retained tag workspace keeps its expanded rename editor on return.
+  await expect(rename).toHaveAttribute('open','');
   await rename.getByRole('textbox',{name:'Custom tag name',exact:true}).fill('../escape');
   await rename.getByRole('button',{name:'Rename tag',exact:true}).click();
   await expect(rename.getByRole('alert')).toContainText('relative tag path');
@@ -1112,7 +1113,7 @@ test('in-app downloads open all imported maps and retain an already open edited 
     if(command==='download_and_import_maps')return [structuredClone(w.__sparkMock.projects.a),structuredClone(w.__sparkMock.projects.b)];
     return original(command,args);
   };});
-  await chooseTool(page,"Community maps");await page.getByLabel('Direct map download URL').fill('https://example.com/arena.zip');await page.getByLabel('Downloaded map action').selectOption('tags');await page.getByRole('button',{name:'Download & import map',exact:true}).click();
+  await chooseTool(page,"Community maps");await page.getByRole('tab',{name:'Download & import',exact:true}).click();await page.getByLabel('Direct map download URL').fill('https://example.com/arena.zip');await page.getByLabel('Downloaded map action').selectOption('tags');await page.getByRole('button',{name:'Download & import map',exact:true}).click();
   await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toBeVisible();await expect(page.getByRole('tab',{name:/Synthetic baseline/})).toBeVisible();await expect(page.getByRole('spinbutton').first()).toHaveValue('20');
 });
 
@@ -1457,7 +1458,7 @@ test('native camera position edits persist across tools and restore through the 
   const camera=page.locator('.native-camera-controls');await camera.locator('summary').click();
   await camera.getByRole('button',{name:'Enable third-person camera',exact:true}).click();await expect(camera.getByText('Third-person camera active',{exact:false})).toBeVisible();
   await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).fill('-0.45');await camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true}).press('Enter');await camera.getByRole('button',{name:'Apply camera position',exact:true}).click();
-  await chooseTool(page,"Tag editor");await chooseTool(page,"Online");await camera.locator('summary').click();
+  await chooseTool(page,"Tag editor");await chooseTool(page,"Online");await expect(camera.locator('details').first()).toHaveAttribute('open','');
   await expect(camera.getByRole('spinbutton',{name:'Camera shoulder offset',exact:true})).toHaveValue('-0.45');
   await camera.getByRole('button',{name:'Restore original camera',exact:true}).click();await expect(camera.getByText('Original camera selected',{exact:false})).toBeVisible();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='live_mcc_camera_configure'));expect(calls.map((c:any)=>c.args.enabled)).toEqual([true,true,false]);expect(calls[1].args.config.right).toBe(-.45);

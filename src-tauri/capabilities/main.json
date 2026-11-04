@@ -3,7 +3,7 @@
   "identifier": "main",
   "description": "Editor events and explicitly requested custom window controls. Filesystem/process operations use validated Rust commands.",
   "windows": [
-    "main", "editor-*", "director-*", "workspace-*"
+    "main", "editor-*", "director-*", "workspace-*", "spark-orb"
   ],
   "permissions": [
     "core:default",

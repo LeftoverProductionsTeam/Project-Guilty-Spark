@@ -620,6 +620,12 @@
       "featureId": "native-external-roundtrip",
       "kind": "diagnostic",
       "scope": "Actual recursive native asset extraction, namespaced import, dependency-staged compilation and unchanged-build reuse; not new gameplay acceptance."
+    },
+    {
+      "artifact": "scripts/test-spark-flow-native.mjs",
+      "featureId": "tabs",
+      "kind": "workflow",
+      "scope": "Real desktop Open work, window-local roles, retained model/source views, authoritative history, saved layout and source-bound navigation. Gameplay and physical monitor removal are separate acceptance gates."
     }
   ]
 }

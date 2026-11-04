@@ -14,9 +14,11 @@ const editionNames: Record<CatalogEdition, string> = {
 export default function MapCatalog({
   onChoose,
   busy,
+  onArchives,
 }: {
   onChoose: (map: CatalogMap) => void;
   busy: boolean;
+  onArchives?:()=>void;
 }) {
   const [query, setQuery] = useState(''),
     [edition, setEdition] = useState<CatalogEdition | 'all'>('all'),
@@ -34,7 +36,7 @@ export default function MapCatalog({
         </div>
         <small>Maintained selection · checked 28 October 2026</small>
       </header>
-      <nav className="gs-full-catalogs" aria-label="Browse complete community map catalogs"><strong>Browse more maps</strong>{COMMUNITY_MAP_SOURCES.filter(source=>source.catalog).map(source=><ExternalBrowserLink key={source.id} href={source.url}>{source.title} ↗</ExternalBrowserLink>)}<button onClick={()=>document.querySelector('.gs-map-sources')?.scrollIntoView({behavior:'smooth',block:'start'})}>All archives & editions</button></nav>
+      <nav className="gs-full-catalogs" aria-label="Browse complete community map catalogs"><strong>Browse more maps</strong>{COMMUNITY_MAP_SOURCES.filter(source=>source.catalog).map(source=><ExternalBrowserLink key={source.id} href={source.url}>{source.title} ↗</ExternalBrowserLink>)}<button onClick={()=>onArchives?onArchives():document.querySelector('.gs-map-sources')?.scrollIntoView({behavior:'smooth',block:'start'})}>All archives & editions</button></nav>
       <div className="gs-catalog-filters">
         <input
           aria-label="Search maps and authors"

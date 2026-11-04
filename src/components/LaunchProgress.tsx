@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { call, native } from '../api';
 import { Orbit, Sparkles } from 'lucide-react';
+import ShieldLoading from './ShieldLoading';
 import './launchProgress.css';
 interface Progress {
   phase: string;
@@ -51,6 +52,7 @@ export default function LaunchProgress() {
       <p className="gs-launch-eyebrow">PROJECT GUILTY SPARK</p>
       <h1>Your next world is coming online.</h1>
       <p role="status">{progress.phase}…</p>
+      <ShieldLoading phase={progress.ready?null:progress.phase}/>
       <div
         className="gs-launch-track"
         role="progressbar"

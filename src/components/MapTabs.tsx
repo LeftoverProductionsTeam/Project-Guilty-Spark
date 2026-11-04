@@ -1,7 +1,10 @@
-import { ChevronDown, CornerUpLeft, ExternalLink, PackageOpen, X } from 'lucide-react';
+import { ChevronDown, CornerUpLeft, ExternalLink, PackageOpen, Pin, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { MapDocuments } from '../mapDocuments';
 import { shouldDetachTab } from '../tabDetach';
+import {useMapState} from '../mapSession';
+import {native} from '../api';
+import {getCurrentWindow} from '@tauri-apps/api/window';
 import './mapTabsMenu.css';
 export default function MapTabs({
   state,
@@ -11,6 +14,7 @@ export default function MapTabs({
   onWindow,
   onAssets,
   onReturn,
+  onReorder,
 }: {
   state: MapDocuments;
   disabled: boolean;
@@ -19,14 +23,23 @@ export default function MapTabs({
   onWindow: (id: string) => void;
   onAssets: () => void;
   onReturn?: (id:string)=>void;
+  onReorder?:(ids:string[])=>void;
 }) {
   const tabs = useRef<HTMLDivElement>(null);
   const menu=useRef<HTMLDetailsElement>(null),pendingFocus=useRef<string|null>(null);
   const [query,setQuery]=useState('');
+  const [pinned,setPinned]=useMapState<string[]>(`global:window:${native?getCurrentWindow().label:'browser'}`,'tabs.pinned',[]);
+  const [context,setContext]=useState<{id:string;x:number;y:number}|null>(null);
+  const contextRoot=useRef<HTMLDivElement>(null);
+  const pin=(id:string)=>{
+    const next=pinned.includes(id)?pinned.filter(value=>value!==id):[...pinned,id];setPinned(next);
+    onReorder?.([...state.documents.filter(d=>next.includes(d.id)),...state.documents.filter(d=>!next.includes(d.id))].map(d=>d.id));
+  };
   const matches=state.documents.filter(d=>`${d.history.current?.title} ${d.history.current?.source?.engine??'QuickForge'}`.toLowerCase().includes(query.toLowerCase()));
   useEffect(()=>{
-    const outside=(event:PointerEvent)=>{if(menu.current?.open&&!menu.current.contains(event.target as Node))menu.current.open=false;};
-    window.addEventListener('pointerdown',outside);return()=>window.removeEventListener('pointerdown',outside);
+    const outside=(event:PointerEvent)=>{if(menu.current?.open&&!menu.current.contains(event.target as Node))menu.current.open=false;if(contextRoot.current&&!contextRoot.current.contains(event.target as Node))setContext(null);};
+    const key=(event:KeyboardEvent)=>{if(event.key==='Escape')setContext(null);};
+    window.addEventListener('pointerdown',outside);window.addEventListener('keydown',key);return()=>{window.removeEventListener('pointerdown',outside);window.removeEventListener('keydown',key);};
   },[]);
   const drag=useRef<{id:string;pointer:number;x:number;y:number}|null>(null),suppressClick=useRef<string|null>(null);
   useLayoutEffect(() => {
@@ -41,7 +54,7 @@ export default function MapTabs({
     <div className="map-tab-bar">
       <div ref={tabs} className="map-tabs" role="tablist" aria-label="Open maps">
         {state.documents.map((d) => (
-          <div className={'map-tab' + (d.id === state.activeId ? ' active' : '')} key={d.id}>
+          <div className={'map-tab' + (d.id === state.activeId ? ' active' : '')} key={d.id} data-map-tab-id={d.id} data-pinned={pinned.includes(d.id)||undefined} onContextMenu={e=>{e.preventDefault();setContext({id:d.id,x:Math.min(innerWidth-190,e.clientX),y:Math.min(innerHeight-130,e.clientY)});}}>
             <button
               role="tab"
               aria-selected={d.id === state.activeId}
@@ -52,9 +65,19 @@ export default function MapTabs({
               onPointerMove={event=>{const origin=drag.current,strip=tabs.current?.getBoundingClientRect();if(!origin||origin.pointer!==event.pointerId||!strip)return;
                 event.currentTarget.closest<HTMLElement>('.map-tab')?.toggleAttribute('data-detaching',shouldDetachTab(origin,{x:event.clientX,y:event.clientY},strip));}}
               onPointerUp={event=>{const origin=drag.current,strip=tabs.current?.getBoundingClientRect();drag.current=null;event.currentTarget.closest('.map-tab')?.removeAttribute('data-detaching');
-                if(origin&&strip&&origin.pointer===event.pointerId&&shouldDetachTab(origin,{x:event.clientX,y:event.clientY},strip)){suppressClick.current=d.id;onWindow(d.id);}}}
+                if(origin&&strip&&origin.pointer===event.pointerId){
+                  if(shouldDetachTab(origin,{x:event.clientX,y:event.clientY},strip)){suppressClick.current=d.id;onWindow(d.id);}
+                  else if(Math.abs(event.clientX-origin.x)>8&&event.clientY>=strip.top&&event.clientY<=strip.bottom){
+                    const target=document.elementFromPoint(event.clientX,event.clientY)?.closest<HTMLElement>('[data-map-tab-id]')?.dataset.mapTabId;
+                    if(target&&target!==d.id&&pinned.includes(target)===pinned.includes(d.id)){const ids=state.documents.map(item=>item.id);ids.splice(ids.indexOf(d.id),1);ids.splice(ids.indexOf(target),0,d.id);suppressClick.current=d.id;onReorder?.(ids);}
+                  }
+                }}}
               onPointerCancel={event=>{drag.current=null;event.currentTarget.closest('.map-tab')?.removeAttribute('data-detaching');}}
               onKeyDown={(e) => {
+                if(e.altKey&&e.shiftKey&&['ArrowLeft','ArrowRight'].includes(e.key)){
+                  e.preventDefault();const ids=state.documents.map(item=>item.id),at=ids.indexOf(d.id),next=at+(e.key==='ArrowLeft'?-1:1);
+                  if(next>=0&&next<ids.length&&pinned.includes(ids[next])===pinned.includes(d.id)){[ids[at],ids[next]]=[ids[next],ids[at]];onReorder?.(ids);}return;
+                }
                 if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
                 e.preventDefault();
                 const list = e.currentTarget.closest('[role=tablist]'),
@@ -74,6 +97,7 @@ export default function MapTabs({
               title={`${d.history.current?.title} · ${d.history.current?.source?.engine??'QuickForge source'} · ${d.history.current?.source?.scenarioPath ?? 'Editable source project'} · drag out to move to another window`}
             >
               {d.history.dirty && <span aria-label="Unsaved changes">● </span>}
+              {pinned.includes(d.id)&&<Pin size={10} aria-label="Pinned tab"/>}
               <span className="map-tab-title">{d.history.current?.title}</span>
             </button>
             <button
@@ -88,6 +112,12 @@ export default function MapTabs({
           </div>
         ))}
       </div>
+      {context&&<div className="gs-tab-context" ref={contextRoot} role="menu" aria-label="Map tab actions" style={{position:'fixed',left:Math.max(8,context.x),top:Math.max(8,context.y)}}>
+        <button role="menuitem" disabled={disabled} onClick={()=>{pin(context.id);setContext(null);}}>{pinned.includes(context.id)?'Unpin tab':'Pin tab'}</button>
+        <button role="menuitem" disabled={disabled} onClick={()=>{onWindow(context.id);setContext(null);}}>Move to another window</button>
+        {onReturn&&<button role="menuitem" disabled={disabled} onClick={()=>{onReturn(context.id);setContext(null);}}>Return to original window</button>}
+        <button role="menuitem" disabled={disabled} onClick={()=>{onClose(context.id);setContext(null);}}>Save and close map</button>
+      </div>}
       {state.documents.length>1&&<details ref={menu} className="gs-map-switcher" onToggle={event=>{
         if(event.currentTarget.open){for(const other of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open]'))other.open=false;requestAnimationFrame(()=>menu.current?.querySelector('input')?.focus());}
       }} onKeyDown={event=>{

@@ -10,6 +10,8 @@ import type {MapDownloadAction} from './MapDownload';
 import type {OpenProject} from '../types';
 import MapCatalog from './MapCatalog';
 import type {CatalogMap} from '../mapCatalog';
+import {useMapState} from '../mapSession';
+import './communityFlow.css';
 
 const FILTERS: {value: CommunityMapFilter; label: string}[] = [
   {value: 'all', label: 'All archives'}, {value: 'halo-ce', label: 'Custom Edition'},
@@ -21,8 +23,9 @@ export default function CommunityMaps({onImport, onImportConvert, currentMapTitl
   onImport: () => void; onImportConvert: () => void; currentMapTitle: string|null; onConvertCurrent: () => void; onLibrary: () => void; busy: boolean;
   onDownloaded?:(opened:OpenProject[],action:MapDownloadAction)=>void|Promise<void>;targetLabel?:string;
 }) {
-  const [query, setQuery] = useState('');
-  const [audience, setAudience] = useState<CommunityMapFilter>('all');
+  const [section,setSection]=useMapState<'maps'|'import'|'archives'>('global','community.section','maps');
+  const [query, setQuery] = useMapState('global','community.query','');
+  const [audience, setAudience] = useMapState<CommunityMapFilter>('global','community.edition','all');
   const [filename, setFilename] = useState('');
   const [copyState, setCopyState] = useState<string>('');
   const [selectedMap,setSelectedMap]=useState<CatalogMap|null>(null),[downloading,setDownloading]=useState(false);
@@ -30,19 +33,26 @@ export default function CommunityMaps({onImport, onImportConvert, currentMapTitl
   const extensionAdvice = filename.trim() ? describeCommunityDownload(filename) : null;
   return <div className="analysis-page gs-map-discovery">
     <PageTitle eyebrow="HALO MODDING ARCHIVES / CREATE • PRESERVE • SHARE"
-      title="Discover community maps. Preserve your favorites."
-      description="Browse original releases, open their maps in Spark, and check conversion to your Halo runtime. Each map keeps its own resources and compatibility report."
+      title="Community maps"
+      description="Browse releases, import a map, then check its native build targets."
       actions={<><button className="small-button" onClick={onLibrary}><FolderOpen size={16}/> Your map library</button>
         <button className="primary" onClick={onImportConvert} disabled={!native || busy}><ArrowDownToLine size={16}/>{busy?'Importing…':'Import & convert to MCC'}</button></>}/>
-    <MapCatalog busy={busy||downloading} onChoose={map=>{setSelectedMap(map);requestAnimationFrame(()=>document.querySelector('.gs-direct-map-download')?.scrollIntoView({block:'start',behavior:'smooth'}));}}/>
+    <nav className="gs-community-tabs" role="tablist" aria-label="Community map workflow" onKeyDown={e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const nav=e.currentTarget,values=['maps','import','archives'] as const;setSection(values[(values.indexOf(section)+(e.key==='ArrowRight'?1:2))%3]);requestAnimationFrame(()=>nav.querySelector<HTMLButtonElement>('[aria-selected=true]')?.focus());}}>{([['maps','Browse maps'],['import','Download & import'],['archives','Archives & help']] as const).map(([id,label])=><button role="tab" key={id} aria-selected={section===id} tabIndex={section===id?0:-1} onClick={()=>setSection(id)}>{label}</button>)}</nav>
+    <div className="gs-community-body" data-scroll-id={`community-${section}`}>
+    <div hidden={section!=='maps'}><MapCatalog busy={busy||downloading} onArchives={()=>setSection('archives')} onChoose={map=>{setSelectedMap(map);setSection('import');}}/></div>
+    <div hidden={section!=='import'}>
     <MapDownload onDownloaded={onDownloaded} busy={busy} targetLabel={targetLabel} selection={selectedMap?.directDownload?{url:selectedMap.directDownload,label:selectedMap.title}:null} onActiveChange={setDownloading}/>
     <Notice tone="info">Direct releases can download into Spark. Publisher pages and Workshop releases open in your browser. Downloaded originals stay separate from installed game maps.</Notice>
+    <details className="gs-community-help"><summary>How downloading, importing and conversion work</summary>
     <div className="gs-download-steps" aria-label="Download and import steps">
       <div><b>01</b><strong>Find a map</strong><p>Open an archive below. Confirm its author, edition, required resources and permission.</p></div>
       <div><b>02</b><strong>Download into Spark</strong><p>Paste the direct author/package link above, or import a package you already downloaded.</p></div>
       <div><b>03</b><strong>Inspect in Spark</strong><p>Choose Import downloaded map. Spark preserves, hashes and validates supported files.</p></div>
       <div><b>04</b><strong>Convert to MCC</strong><p>Choose Import &amp; convert to MCC. Prepare installed MCC tools, resolve the compatibility report, then build and playtest the separate MCC package.</p></div>
     </div>
+    </details>
+    </div>
+    <div hidden={section!=='archives'}>
     <section className="analysis-card gs-map-sources" aria-label="Community map archives">
       <div className="gs-section-tools"><div><div className="eyebrow">ARCHIVE NAVIGATOR</div><h2>Historic and active community catalogs</h2></div>
         <HelpTip help="The list below contains static, researched archive landing pages. It does not read or download their files. Each archive controls its own availability, copyright and download behavior."/></div>
@@ -73,6 +83,8 @@ export default function CommunityMaps({onImport, onImportConvert, currentMapTitl
       {copyState && <p className="gs-map-copy-status" role="status">{copyState}</p>}
       {!matching.length && <div className="gs-map-empty" role="status"><Search size={21}/><strong>No matching archive</strong><p>Try All archives or remove the search filter. Spark does not claim to search remote maps.</p><button onClick={()=>{setQuery('');setAudience('all');}}>Clear filters</button></div>}
     </section>
+    </div>
+    <div hidden={section!=='import'}>
     <section className="analysis-card gs-map-file-advisor"><div className="gs-section-tools"><div><div className="eyebrow">BEFORE IMPORTING</div><h2>Know what you downloaded</h2></div><HelpTip help="Only the filename's extension is checked here. It is a convenience hint, not virus scanning, signature verification or an assertion that the file is safe."/></div>
       <label htmlFor="gs-map-file-name">Optional: enter a downloaded filename to see the next step</label>
       <input id="gs-map-file-name" value={filename} onChange={e=>setFilename(e.target.value)} maxLength={180} placeholder="example: classic_arena.zip or bloodgulch.map"/>
@@ -81,5 +93,7 @@ export default function CommunityMaps({onImport, onImportConvert, currentMapTitl
       {currentMapTitle&&<p className="subtle">Open map: {currentMapTitle}. Conversion runs from Build &amp; playtest and keeps its own resources, targets and logs.</p>}
       <p className="subtle">Halo CE, Halo PC, Demo/Mac, HaloMD, Xbox and MCC caches are not interchangeable merely because the extension says <code>.map</code>. Archives can have missing shared resources; inspect errors and check the author's release notes before attempting a build.</p>
     </section>
+    </div>
+    </div>
   </div>;
 }

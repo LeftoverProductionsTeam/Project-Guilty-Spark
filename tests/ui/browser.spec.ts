@@ -99,6 +99,7 @@ test('sidebar keeps every workspace visible in tall and short windows', async ({
   for (const size of [{width:1280,height:944},{width:1280,height:768},{width:1024,height:640}]) {
     await page.setViewportSize(size);await page.goto('/');
     const sidebar=page.locator('.sidebar');
+    await expect(page.getByRole('button',{name:'Toggle workspace navigation',exact:true})).toBeVisible();
     if(!await sidebar.isVisible())await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await expect(sidebar.getByRole('navigation',{name:'Workspaces'})).toBeVisible();
     const overflow=await sidebar.evaluate(element=>{
       const box=element.getBoundingClientRect();

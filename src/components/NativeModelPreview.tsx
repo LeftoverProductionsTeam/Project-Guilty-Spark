@@ -37,6 +37,8 @@ import '../nativeModelPreview.css';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import { readMapSession, writeMapSession } from '../mapSession';
 import { modelFitPosition, validModelPreviewCamera } from '../modelPreviewCamera';
+import ShieldLoading from './ShieldLoading';
+import ViewportActivity from './ViewportActivity';
 import type { ModelViewPreset } from '../modelPreviewCamera';
 
 function Snapshot({ ready, onSnapshot }: { ready: boolean; onSnapshot: (url: string) => void }) {
@@ -50,6 +52,11 @@ function Snapshot({ ready, onSnapshot }: { ready: boolean; onSnapshot: (url: str
       requestAnimationFrame(() => onSnapshot(gl.domElement.toDataURL('image/png')));
     }
   });
+  return null;
+}
+function FirstUsableFrame({ready,onReady}:{ready:boolean;onReady:()=>void}){
+  const sent=useRef(false);
+  useFrame(()=>{if(ready&&!sent.current){sent.current=true;requestAnimationFrame(onReady);}});
   return null;
 }
 function Model({
@@ -188,7 +195,8 @@ export default function NativeModelPreview({
   const activity=useWorkspaceActivity();
   const [framing,setFraming]=useState<{preset:ModelViewPreset;revision:number}>({preset:'fit',revision:0});
   const identity=useMemo(()=>({projectId:asset.sourceProjectId??'',sourceHash:asset.sourceSha256??'',tagId:asset.tagId??0}),[asset.sourceProjectId,asset.sourceSha256,asset.tagId]);
-  const { models, failures } = useOwnedForgeModels([placement]);
+  const [retry,setRetry]=useState(0);
+  const { models, failures } = useOwnedForgeModels([placement],{[placement.sourceProjectId??'']:`preview:${retry}`});
   const animations = useNativeModelAnimations(placement, showcase&&animate);
   const [clipIndex, setClipIndex] = useState(0);
   const [playing, setPlaying] = useState(() => !matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -233,6 +241,14 @@ export default function NativeModelPreview({
       environment ?? (sourceLighting?.key===key?sourceLighting.value?.environment:null) ?? sourceSurfaceEnvironment(),
     [environment,sourceLighting,key],
   );
+  const [firstFrame,setFirstFrame]=useState('');
+  // Decoded data may stay warm while its actual GPU context is retired. A new
+  // context must paint before reporting readiness, just like the initial one.
+  useEffect(()=>{if(!activity.graphicsResident)setFirstFrame('');},[activity.graphicsResident]);
+  const lightingReady=!!environment||sourceLighting?.key===key;
+  const animationReady=!showcase||!animate||!!animations.value||!!animations.error;
+  const usable=!!view?.ready&&!failures[key]&&lightingReady&&animationReady;
+  const pendingPhase=failures[key]?null:!view?'Reading native geometry':!view.ready?'Loading source textures & reflections':!lightingReady?'Reading source lighting':!animationReady?'Reading native animation':firstFrame!==key?'Preparing first viewport frame':null;
   return (
     <div
       className={`native-model-preview${showcase ? ' native-model-showcase' : ''}`}
@@ -245,6 +261,8 @@ export default function NativeModelPreview({
       data-model-variant={asset.modelVariant}
       data-model-triangles={view ? view.mesh.indices.length / 3 : 0}
       data-model-ready={!!view?.ready}
+      data-model-first-frame={firstFrame===key}
+      data-model-loading-phase={pendingPhase??undefined}
       data-native-animation-count={animations.value?.clips.length ?? 0}
       data-native-self-illumination={view?Object.values(view.shaderMetadata).filter(m=>m.selfIllumination?.source===0&&[...m.selfIllumination.lower,...m.selfIllumination.upper].some(v=>v>0)).length:0}
       data-model-lighting={environment?'custom':sourceLighting?.key===key&&sourceLighting.value?.environment?'source':'inspection'}
@@ -273,6 +291,7 @@ export default function NativeModelPreview({
             gl.toneMapping = THREE.NoToneMapping;
           }}
         >
+          <ViewportActivity continuous={!!((live||onSnapshot)&&visible)}/>
           <Suspense fallback={null}>
             <SceneEnvironment value={value} maximumFogDensity={sourceLighting?.key===key?sourceLighting.value?.fogMaximumDensity??1:1} overrideLighting transparentBackground={showcase} />
             {showcase && <SceneEffects settings={showcaseFeatures} transparentBackground />}
@@ -286,16 +305,15 @@ export default function NativeModelPreview({
               identity={identity}
               framing={framing}
             />
+            <FirstUsableFrame key={key} ready={usable} onReady={()=>setFirstFrame(key)}/>
             {onSnapshot && <Snapshot ready={!!view.ready&&(!!environment||sourceLighting?.key===key)} onSnapshot={onSnapshot} />}
           </Suspense>
         </Canvas>
       ) : (
-        <span className="model-preview-loading">
-          {failures[key] ? 'Model unavailable' : 'Reading the actual Halo model…'}
-        </span>
+        failures[key]?<span className="model-preview-loading">Model unavailable</span>:null
       )}
-      {failures[key] && <small role="status">{failures[key]}</small>}
-      {view&&!view.ready&&!failures[key]&&<small className="model-material-loading" role="status">Loading source textures &amp; reflections…</small>}
+      <ShieldLoading phase={pendingPhase} active={activity.active&&visible}/>
+      {failures[key] && <small role="status">{failures[key]} <button type="button" onClick={()=>{setFirstFrame('');setRetry(n=>n+1);}}>Retry preview</button></small>}
       {!showcase&&sourceLighting?.key===key&&!sourceLighting.value?.environment&&!environment&&<small className="model-lighting-status">Source lighting unavailable · inspection lighting</small>}
       {!showcase&&live&&<div className="native-model-view-controls" aria-label="Model preview controls">
         <button type="button" title="Fit the complete model to this preview" onClick={()=>setFraming(value=>({preset:'fit',revision:value.revision+1}))}>Fit / Reset</button>

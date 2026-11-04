@@ -30,6 +30,31 @@ test('a warm window merges a peer preference before saving a different key', asy
   });
   expect(session.readMapSession('a', 'layout', null)).toBe(layout);
 });
+test('native windows inherit a handoff once, then retain independent selections and cameras',async()=>{
+  const session=await import('./mapSession');
+  session.configureMapViewWindow('main');
+  session.writeMapSession('a','world.selection','door-a');
+  const mainChanged=vi.fn();const stop=session.subscribeMapSession(['a'],'world.selection',mainChanged);
+  session.configureMapViewWindow('editor-one');
+  expect(session.readMapSession('a','world.selection',null)).toBe('door-a');
+  session.writeMapSession('a','world.selection','door-b');
+  expect(mainChanged).not.toHaveBeenCalled();
+  session.configureMapViewWindow('main');
+  expect(session.readMapSession('a','world.selection',null)).toBe('door-a');
+  session.writeMapSession('a','world.selection','door-c');expect(mainChanged).toHaveBeenCalledTimes(1);
+  session.configureMapViewWindow('editor-one');expect(session.readMapSession('a','world.selection',null)).toBe('door-b');
+  session.configureMapViewWindow('editor-two');expect(session.readMapSession('a','world.selection',null)).toBe('door-c');
+  stop();
+});
+test('shared non-view preferences and source revision isolation survive window-local UI scoping',async()=>{
+  const session=await import('./mapSession');session.configureMapViewWindow('main');
+  session.writeMapSession('a','studio.openRequest',true);session.writeMapSession('a','camera.world.PerspectiveCamera',{position:[1,2,3]});
+  session.configureMapViewWindow('editor-one');expect(session.readMapSession('a','studio.openRequest',false)).toBe(true);
+  session.writeMapSession('a','studio.openRequest',false);session.writeMapSession('a','camera.world.PerspectiveCamera',{position:[4,5,6]});
+  session.configureMapViewWindow('main');expect(session.readMapSession('a','studio.openRequest',true)).toBe(false);
+  expect(session.readMapSession('a','camera.world.PerspectiveCamera',null)).toEqual({position:[1,2,3]});
+  expect(session.readMapSession('b','camera.world.PerspectiveCamera',null)).toBeNull();
+});
 test('a storage event refreshes just that map without replacing unchanged objects', async () => {
   data.set(prefix + 'a', JSON.stringify({ workspace: 'world', layout: { width: 300 } }));
   data.set(prefix + 'b', JSON.stringify({ workspace: 'tags' }));

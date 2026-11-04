@@ -1,0 +1,23 @@
+.gs-open-work{position:relative;flex:none;min-width:0;}
+.gs-nav-heading{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.application .gs-nav-heading>button{font-size:9px;padding:1px 5px;min-height:17px;border:0;background:transparent;color:var(--accent);}
+.gs-open-work>button{display:flex;align-items:center;gap:4px;max-width:142px;}
+.gs-open-work>button>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gs-open-work-popup{position:absolute;z-index:210;top:calc(100% + 8px);right:0;width:min(420px,calc(100vw - 28px));border:1px solid var(--line);border-radius:10px;background:var(--panel);box-shadow:0 12px 36px #0006;padding:8px;display:grid;gap:7px;}
+.gs-open-work-popup>header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 3px;}
+.gs-open-work-popup>header>button{border:0;}
+.gs-open-work-search{display:flex;align-items:center;gap:6px;}
+.gs-open-work-search input{min-width:0;width:100%;}
+.gs-role-choice{display:flex;gap:5px;align-items:end;}
+.gs-role-choice label{display:grid;gap:3px;flex:1;font-size:10px;color:var(--muted);}
+.gs-role-choice select{width:100%;}
+.gs-open-work-groups{max-height:min(62vh,540px);overflow:auto;overscroll-behavior:contain;}
+.gs-open-work-groups h3{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:9px 4px 4px;}
+.application .gs-open-work-groups .gs-work-row{width:100%;display:flex;gap:8px;align-items:center;text-align:left;padding:5px 7px;min-height:34px;border:0;border-radius:5px;background:transparent;}
+.gs-work-row>span{display:grid;gap:2px;flex:1;min-width:0;}
+.gs-work-row strong{font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600;}
+.gs-work-row small{font-size:10px;color:var(--muted);}
+.application .gs-work-row:hover,.application .gs-work-row:focus-visible{background:color-mix(in srgb,var(--accent) 12%,var(--surface));}
+.gs-open-work-popup footer{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:7px;}
+.gs-open-work-popup footer small{font-size:9px;color:var(--muted);}
+@media(max-width:1200px){.gs-open-work>button>span{display:none;}}

@@ -1,0 +1,9 @@
+html[data-gs-desktop-orb=true],html[data-gs-desktop-orb=true] body,html[data-gs-desktop-orb=true] #root{margin:0;width:100%;height:100%;min-width:0;min-height:0;background:transparent!important;overflow:hidden;}
+.spark-desktop-orb{position:relative;display:grid;place-items:center;width:100%;height:100%;}
+.spark-desktop-open{display:grid;place-items:center;width:78px;height:78px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--text);cursor:pointer;touch-action:none;}
+.spark-desktop-open img{display:block;width:78px;height:78px;object-fit:contain;pointer-events:none;filter:drop-shadow(0 0 3px #57dfff55);}
+.spark-desktop-open span{display:grid;place-items:center;width:64px;height:64px;border:1px solid var(--accent);border-radius:50%;background:var(--panel);font-size:10px;}
+.spark-desktop-open:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.spark-desktop-hide{position:absolute;top:3px;right:3px;width:21px;height:21px;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--text);opacity:0;cursor:pointer;}
+.spark-desktop-orb:hover .spark-desktop-hide,.spark-desktop-orb:focus-within .spark-desktop-hide{opacity:1;}
+.spark-desktop-error{position:absolute;bottom:1px;font-size:8px;color:var(--text);background:var(--panel);}

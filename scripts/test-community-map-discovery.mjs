@@ -28,7 +28,8 @@ for(const fragment of ['fetch(', 'window.location', 'download=', 'eval(', 'shell
 const app=readFileSync('src/App.tsx','utf8');
 assert.ok(app.includes("workspace === 'map-finder'"));
 assert.ok(app.replace(/\s+/g,'').includes('<CommunityMapsonImport={()=>voidimportFiles()}'));
-assert.ok(app.includes("{ id: 'map-finder', label: 'Community maps'"));
+assert.ok(app.includes("from './workspaceCatalog'"));
+assert.ok(readFileSync('src/workspaceCatalog.ts','utf8').includes("{ id: 'map-finder', label: 'Community maps'"));
 const importer=readFileSync('src-tauri/src/app.rs','utf8');
 assert.ok(importer.includes('archive::import_archive'));
 assert.ok(importer.includes('ext == "map" || ext == "yelo"'));

@@ -9,6 +9,7 @@ export async function openDrawer(page: Page, name: string) {
   } else await page.getByRole('button',{name:`Toggle ${name}`,exact:true}).click();
 }
 export async function chooseTool(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Toggle workspace navigation', exact: true }).waitFor({state:'visible'});
   const drawer = page.locator('.gs-navigation-drawer');
   if (!(await drawer.isVisible()))
     await page.getByRole('button', { name: 'Toggle workspace navigation', exact: true }).click();

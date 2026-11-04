@@ -1,0 +1,13 @@
+.gs-shield-loading{display:grid;gap:5px;max-width:290px;padding:6px 9px;border-radius:5px;background:color-mix(in srgb,var(--panel) 92%,transparent);color:var(--text);font-size:10px;pointer-events:none;}
+.gs-shield-segments{display:flex;gap:3px;height:6px;}
+.gs-shield-segments i{flex:1;transform:skewX(-19deg);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);background:var(--accent);animation:gs-shield-recharge 1100ms ease-in-out infinite;}
+@keyframes gs-shield-recharge{0%,100%{opacity:.2}50%{opacity:1}}
+.gs-shield-loading[data-paused=true] i{animation-play-state:paused;}
+[data-gs-reduced-motion=true] .gs-shield-segments i,[data-gs-shield-loading=false] .gs-shield-segments i{animation:none;opacity:.65;}
+@media(prefers-reduced-motion:reduce){.gs-shield-segments i{animation:none;opacity:.65}}
+.native-model-preview>.gs-shield-loading{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;width:min(230px,90%);}
+.native-model-preview[data-model-first-frame=true] canvas{animation:gs-preview-ready 160ms ease-out;}
+@keyframes gs-preview-ready{from{opacity:.82}to{opacity:1}}
+[data-gs-reduced-motion=true] .native-model-preview canvas{animation:none!important;}
+[data-gs-workspace-transitions=false] .native-model-preview canvas{animation:none!important;}
+@media(prefers-reduced-motion:reduce){.native-model-preview canvas{animation:none!important}}

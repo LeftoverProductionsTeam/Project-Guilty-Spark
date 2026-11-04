@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import {WorkspacePanel} from './WorkspacePanels';
+import {useWorkspaceActivity} from './WorkspaceActivity';
 import { Camera, Clapperboard, Pause, Play, Plus, Square, Download, Upload, Video } from 'lucide-react';
 import type { Bootstrap, MapInspection, MeshData, OpenProject, Project, Vec3 } from '../types';
 import type { CameraShot } from '../creatorStudio';
@@ -157,6 +158,7 @@ export default function MachinimaWorkspace({
   onSave,
   onResourcesConnected,
 }: Props) {
+  const {active}=useWorkspaceActivity();
   const studio = project.studio ?? emptyCreatorStudio(),
     shots = studio.shots,
     settings = studio.machinima ?? DEFAULT_MACHINIMA;
@@ -188,13 +190,16 @@ export default function MachinimaWorkspace({
   const rememberedTime=useRef(time);rememberedTime.current=time;useEffect(()=>()=>writeMapSession(project.id,'director.time',rememberedTime.current),[project.id]);
   useEffect(() => {
     mounted.current = true;
+    return()=>{mounted.current=false;stopRecording.current?.();};
+  },[]);
+  useEffect(() => {
+    if(!active)return;
     const timer = setInterval(() => setCaptureReady(!!bridge.current.canvas), 300);
     return () => {
-      mounted.current = false;
       clearInterval(timer);
       stopRecording.current?.();
     };
-  }, []);
+  }, [active]);
   useEffect(() => {
     if (!shots.some((s) => s.id === selected)) setSelected(shots[0]?.id ?? '');
   }, [shots, selected]);

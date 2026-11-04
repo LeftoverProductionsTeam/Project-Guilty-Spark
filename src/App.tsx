@@ -7,6 +7,10 @@ import type { ForgeMaterial } from './forge';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from './nativeAssetImport';
 import LaunchProgress from './components/LaunchProgress';
 import {useWorkflowHistory} from './useWorkflowHistory';
+import {captureWorkflowPlace,restoreWorkflowPlace} from './workflowPlace';
+import {useWorkspaceWindows} from './useWorkspaceWindows';
+import type {SavedWorkspaceLayout} from './useWorkspaceWindows';
+import OpenWork from './components/OpenWork';
 import type {LearningSection,WorkflowRoute} from './workflowHistory';
 import {librarySoundEmitters} from './viewportAssets';
 import {projectMutationPending} from './projectMutation';
@@ -94,7 +98,7 @@ import RetainedLevelView from './components/RetainedLevelView';
 import type { MapDocument } from './mapDocuments';
 import WorkspacePanels,{WorkspacePanel}from'./components/WorkspacePanels';
 import NavigationSettings from'./components/NavigationSettings';
-import {readMapSession,writeMapSession,useMapState,copyMapViewSession} from './mapSession';
+import {readMapSession,writeMapSession,useMapState,copyMapViewSession,configureMapViewWindow} from './mapSession';
 import AssetTransfer,{transferTag} from './components/AssetTransfer';
 import type {TransferSelection} from './components/AssetTransfer';
 import {readHistoryLimit,saveHistoryLimit} from './historyPreferences';
@@ -112,8 +116,7 @@ import DependencyPanel from './components/DependencyPanel';
 import WorkspaceFinder from './components/WorkspaceFinder';
 import WorkbenchGuide from './components/WorkbenchGuide';
 import LevelEditorWorkspace from './components/LevelEditorWorkspace';
-import { WORKBENCH_GUIDES } from './workbenchGuide';
-import type { WorkspaceFinderItem } from './workspaceFinder';
+import {workspaceCatalog as nav, mapWorkspaces, navGroups, finderItems} from './workspaceCatalog';
 import { canDetachPanel, requestedPanel } from './detachedPanels';
 import Tags from './components/Tags';
 import Build from './components/Build';
@@ -134,42 +137,15 @@ const LearningCenter = lazy(() => import('./components/LearningCenter'));
 const GettingStarted = lazy(() => import('./components/GettingStarted'));
 const Features = lazy(() => import('./components/Features'));
 const CommunityThanks = lazy(() => import('./components/CommunityThanks'));
-const nav = [
-  { id: 'get-started', label: 'Start here', icon: Compass },
-  { id: 'features', label: 'Features & workflows', icon: BookOpen },
-  { id: 'library', label: 'Map library', icon: LibraryBig },
-  { id: 'map-finder', label: 'Community maps', icon: Globe2 },
-  { id: 'quickforge', label: 'Level editor', icon: Layers3 },
-  { id: 'learning', label: 'Learning center', icon: GraduationCap },
-  { id: 'community', label: 'Community Thanks', icon: Heart },
-  { id: 'firefight', label: 'Firefight rules', icon: Flame },
-  { id: 'world', label: 'World editor', icon: Box },
-  { id: 'tags', label: 'Tag editor', icon: FileCode2 },
-  { id: 'assets', label: 'Asset workshop', icon: Hammer },
-  { id: 'scenario', label: 'AI & scenario', icon: Users },
-  { id: 'build', label: 'Build & playtest', icon: ArrowUpRight },
-  { id: 'compare', label: 'Compare variants', icon: ArrowLeftRight },
-  { id: 'runtimes', label: 'Online', icon: Server },
-  { id: 'live', label: 'Live Lab', icon: Unplug },
-  { id: 'interface', label: 'Interface Studio', icon: Palette },
-  { id: 'creator', label: 'Creator Studio', icon: BookOpen },
-  { id: 'machinima', label: 'Machinima', icon: Clapperboard },
-] as const;
-const mapWorkspaces:Workspace[]=['world','quickforge','live','tags','assets','scenario','build','firefight','creator','machinima','preservation'];
+configureMapViewWindow(native?getCurrentWindow().label:null);
 function requestedWorkspace():Workspace|null{const value=new URLSearchParams(location.search).get('workspace');if(value==='how-to'||value==='academy')return 'learning';return nav.some(item=>item.id===value)||value==='settings'||value==='preservation'?value as Workspace:null;}
 function returnWorkspace():Workspace|null{const value=new URLSearchParams(location.search).get('returnWorkspace');return nav.some(item=>item.id===value)?value as Workspace:null;}
 function initialLearningSection():LearningSection{const query=new URLSearchParams(location.search);if(query.get('workspace')==='academy'||query.has('lesson'))return 'academy';if(query.get('workspace')==='how-to')return 'guides';const saved=query.get('workspace')==='learning'?query.get('section')??readMapSession<string>('global','learning.section','guides'):readMapSession<string>('global','learning.section','guides');return saved==='academy'||saved==='glossary'?saved:'guides';}
 function rememberedWorkspace(project:Project,inspection?:MapInspection|null):Workspace{const fallback:Workspace=project.quickForge?'quickforge':inspection?.header.scenarioType===2?'tags':'world';const stored=readMapSession<Workspace>(project.id,'workspace',fallback);return mapWorkspaces.includes(stored)?stored:fallback;}
-const navGroups = [["Level Editor",["quickforge"]],["Tags & Assets",["tags","assets","compare"]],["Gameplay Creator",["machinima","scenario","firefight","creator"]],["Projects & Testing",["library","build","runtimes"]],["Learn & Community",["get-started","features","learning","map-finder","community"]]] as const;
-const finderItems: readonly WorkspaceFinderItem[] = [
-  {id:'quickforge',label:'QuickForge',help:'Open the map viewer. QuickForge tools follow the open document.',keywords:'level editor geometry brushes tunnels forge'},
-  ...nav.map(({id,label}) => ({id,label,help:WORKSPACE_TOOLTIPS[id] ?? '',keywords:`${WORKBENCH_GUIDES[id].can} ${WORKBENCH_GUIDES[id].cannot} ${WORKBENCH_GUIDES[id].tip} ${id==='learning'?'how-to how to glossary modding academy tutorials lessons':''}`})),
-  {id:'preservation',label:'Preservation record',help:WORKSPACE_TOOLTIPS.preservation ?? '',keywords:WORKBENCH_GUIDES.preservation.tip},
-  {id:'settings',label:'Settings & tools',help:WORKSPACE_TOOLTIPS.settings ?? '',keywords:WORKBENCH_GUIDES.settings.tip},
-];
 export default function App() {
   const [data, setData] = useState<Bootstrap>(browserBootstrap);
   const [ready, setReady] = useState(!native);
+  const [initialDocumentReady,setInitialDocumentReady]=useState(()=>!new URLSearchParams(location.search).has('project'));
   const [documents,dispatchDocument]=useReducer(documentReducer,readHistoryLimit(),emptyMapDocuments);
   const windowHistories=useRef(new WindowHistories());
   const closingDocuments=useRef(new Set<string>());
@@ -183,6 +159,7 @@ export default function App() {
   useEffect(()=>saveHistoryLimit(history.limit),[history.limit]);
   const inspection=activeMap?.inspection??null,meshes=activeMap?.meshes??{};
   const visitedLevelViews=useRef(new Set<string>());
+  const visitedWorkspaces=useRef(new Map<string,{workspace:Workspace;projectId:string|null}>());
   const visitedHome=useRef(false);
   const [workspace, setWorkspaceState] = useState<Workspace>(()=>requestedWorkspace()??firstVisitWorkspace());
   const [learningSection,setLearningSection]=useState<LearningSection>(initialLearningSection);
@@ -310,9 +287,12 @@ export default function App() {
   const documentsRef=useRef(documents);
   documentsRef.current=documents;
   const workflow=useWorkflowHistory({workspace,projectId:activeMap?.id??null,settingsTab,learningSection},mapWorkspaces,route=>{
+    const target=documentsRef.current.documents.find(d=>d.id===route.projectId)?.history.current;
+    if(mapWorkspaces.includes(route.workspace)&&!restoreWorkflowPlace(route,target)){notice('This place belongs to an older source revision. The current map stays open.','warning');return;}
     if(route.projectId&&documentsRef.current.documents.some(d=>d.id===route.projectId))dispatchDocument({type:'select',id:route.projectId});
     setSettingsTabState(route.settingsTab);if(route.learningSection)setLearningSection(route.learningSection);workspaceRef.current=route.workspace;setWorkspaceState(route.workspace);
-  },route=>!mapWorkspaces.includes(route.workspace)||(route.projectId?documentsRef.current.documents.some(d=>d.id===route.projectId):!documentsRef.current.activeId));
+  },route=>!mapWorkspaces.includes(route.workspace)||(route.projectId?documentsRef.current.documents.some(d=>d.id===route.projectId):!documentsRef.current.activeId),route=>mapWorkspaces.includes(route.workspace)?captureWorkflowPlace(route,documentsRef.current.documents.find(d=>d.id===route.projectId)?.history.current):route);
+  const workspaceWindows=useWorkspaceWindows({workspace,project:activeMap?.id??null,section:workspace==='learning'?learningSection:workspace==='settings'?settingsTab:null,dirty:history.dirty,documents:documents.documents.map(d=>d.id)},ready&&initialDocumentReady);
   function routeTitle(route:WorkflowRoute|null,direction:'Back'|'Forward'){
     if(!route)return direction==='Back'?'No previous workspace':'No next workspace';
     const label=route.workspace==='learning'?`Learning center · ${route.learningSection??'guides'}`:nav.find(item=>item.id===route.workspace)?.label??(route.workspace==='settings'?(route.settingsTab==='dependencies'?'Dependencies & setup':'Games & tools'):route.workspace);
@@ -608,7 +588,7 @@ export default function App() {
     window.addEventListener('focus',recover);
     return()=>{window.removeEventListener('focus',recover);void pending.then(stop=>stop());};
   },[ready,notice,setWorkspace]);
-  useEffect(()=>{const query=new URLSearchParams(location.search),id=query.get('project');if(!native||!ready||!id||initialWindowProject.current)return;initialWindowProject.current=true;if(!/^[0-9a-f-]{36}$/i.test(id)){notice('Invalid map window identity.','error');return;}void call<OpenProject>('open_project',{id}).then(async open=>{await load(open);const tag=Number(query.get('tag'));if(query.get('panel')==='object-tags'&&query.has('tag')&&open.inspection?.tags.some(t=>t.id===tag))writeMapSession(open.project.id,'tags.focus',tag);setWorkspace(requestedWorkspace()??rememberedWorkspace(open.project,open.inspection));}).catch(e=>notice(String(e),'error'));},[ready,load,notice]);
+  useEffect(()=>{const query=new URLSearchParams(location.search),id=query.get('project');if(!native||!ready||!id||initialWindowProject.current)return;initialWindowProject.current=true;if(!/^[0-9a-f-]{36}$/i.test(id)){notice('Invalid map window identity.','error');return;}void call<OpenProject>('open_project',{id}).then(async open=>{await load(open);const tag=Number(query.get('tag'));if(query.get('panel')==='object-tags'&&query.has('tag')&&open.inspection?.tags.some(t=>t.id===tag))writeMapSession(open.project.id,'tags.focus',tag);setWorkspace(requestedWorkspace()??rememberedWorkspace(open.project,open.inspection));}).catch(e=>notice(String(e),'error')).finally(()=>setInitialDocumentReady(true));},[ready,load,notice]);
   useEffect(() => {
     if (!native) return;
     let alive=true;
@@ -799,7 +779,7 @@ export default function App() {
     // will not run again. Use the same reveal event as the header indicator.
     requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-live-studio-open',{detail:{projectId:id}})));
   }
-  function selectMap(id:string){if(document.activeElement instanceof HTMLElement)document.activeElement.blur();requestAnimationFrame(()=>{const map=documentsRef.current.documents.find(d=>d.id===id);dispatchDocument({type:'select',id});if(map?.history.current)setWorkspace(rememberedWorkspace(map.history.current,map.inspection));});}
+  function selectMap(id:string){if(document.activeElement instanceof HTMLElement)document.activeElement.blur();requestAnimationFrame(()=>{window.dispatchEvent(new Event('gs:save-viewport-context'));const map=documentsRef.current.documents.find(d=>d.id===id);dispatchDocument({type:'select',id});if(map?.history.current)setWorkspace(rememberedWorkspace(map.history.current,map.inspection));});}
   async function flushWindowHandoff(id:string){
     if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
     await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id);
@@ -846,6 +826,79 @@ export default function App() {
     setBusy(true);try{await flushWindowHandoff(id);if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call(separateWindow==='main'?'return_project_to_main':'open_project_window',{id,workspace:separateWindow==='main'?returnWorkspace()??workspaceRef.current:workspaceRef.current,...(separateWindow==='main'?{panel:new URLSearchParams(location.search).get('panel')}:{} )});}else if(native)await call('release_project_document',{id});await windowHistories.current.release(id);const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});}catch(e){notice(String(e),'error');}finally{closingDocuments.current.delete(id);setBusy(false);}
   }
   async function popoutWorkspace(){if(!native){notice('Workspace windows require the desktop application.');return;}if(current&&mapWorkspaces.includes(workspaceRef.current)){if(busy||activeJob){notice('Finish the current map operation before moving its workspace to another window.');return;}await closeMap(current.id,true);return;}try{const section=workspaceRef.current==='learning'?learningSection:workspaceRef.current==='settings'?settingsTab:null;await call('open_workspace_window',{workspace:workspaceRef.current,section,context:section==='academy'?readMapSession<string>('global','learning.lesson','preservation'):null});notice('Workspace opened in a resizable window. Drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
+  async function openWorkspaceView(target:Workspace,another=false){
+    if(!native){notice('Workspace windows require the desktop application.');return;}
+    try{
+      if(current&&mapWorkspaces.includes(target)){
+        if(busy){notice('Finish the current map operation before opening another view.');return;}
+        if(windowHistories.current.writable(current.id))await flushWindowHandoff(current.id);
+        await call('open_project_window',{id:current.id,workspace:target,observe:true,another});
+      }else await call('open_workspace_window',{workspace:target,section:target==='learning'?learningSection:target==='settings'?settingsTab:null,another});
+      await workspaceWindows.refresh();
+    }catch(e){notice(String(e),'error');}
+  }
+  async function returnToPlace(route:WorkflowRoute){
+    if(mapWorkspaces.includes(route.workspace)&&route.projectId&&!documentsRef.current.documents.some(d=>d.id===route.projectId)){
+      await openProject(route.projectId,route.workspace);await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+    }
+    workflow.restore(route);
+  }
+  const layoutOperation=useRef(false),startupLayout=useRef(false);
+  const [desktopOrb]=useMapState('global','workspace.desktopOrb',false);
+  useEffect(()=>{
+    if(!native||!ready||getCurrentWindow().label!=='main')return;
+    void call('show_spark_companion',{visible:desktopOrb===true}).catch(e=>notice(String(e),'error'));
+  },[ready,desktopOrb]);
+  useEffect(()=>{
+    if(!native)return;const subscription=listen('spark:command-hub',()=>window.dispatchEvent(new CustomEvent('gs:open-work',{detail:{open:true}})));
+    return()=>{void subscription.then(unlisten=>unlisten());};
+  },[]);
+  const [layoutName,setLayoutName]=useMapState('global','workspace.layoutName','Studio');
+  const [layoutNames,setLayoutNames]=useState<string[]>([]);
+  const listWorkspaceLayouts=()=>{if(native)void call<string[]>('workspace_layout_names').then(setLayoutNames).catch(e=>notice(String(e),'error'));};
+  async function saveWorkspaceLayout(){
+    if(!native||layoutOperation.current)return;layoutOperation.current=true;
+    try{window.dispatchEvent(new Event('gs:save-viewport-context'));await windowHistories.current.flush();const layout=await call<SavedWorkspaceLayout>('save_workspace_layout',{name:layoutName});listWorkspaceLayouts();notice(`Saved “${layoutName.trim()}” · ${layout.windows.length} workspace window${layout.windows.length===1?'':'s'}. Source changes keep their own recovery history.`,'success');}
+    catch(e){notice(String(e),'error');}finally{layoutOperation.current=false;}
+  }
+  async function restoreWorkspaceLayout(){
+    if(!native||layoutOperation.current||busy)return;layoutOperation.current=true;setBusy(true);
+    const failures:string[]=[];
+    try{
+      const name=layoutName;const layout=await call<SavedWorkspaceLayout>('read_workspace_layout',{name});await save();
+      const ids=[...new Set(layout.windows.flatMap(row=>[...row.view.documents,...(row.view.project?[row.view.project]:[])]))];
+      for(const id of ids){if(documentsRef.current.documents.some(d=>d.id===id))continue;try{await load(await call<OpenProject>('open_project',{id}));}catch(e){failures.push(`Map ${id}: ${String(e)}`);}}
+      await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+      const main=layout.windows.find(row=>row.main)!;
+      const project=documentsRef.current.documents.find(d=>d.id===main.view.project)?.history.current;
+      if(!main.view.project||project&&(project.source?.sha256??null)===main.sourceSha256){
+        if(project)dispatchDocument({type:'select',id:project.id});
+        if(main.view.section&&main.view.workspace==='settings')setSettingsTabState(main.view.section as WorkflowRoute['settingsTab']);
+        if(main.view.section&&main.view.workspace==='learning')setLearningSection(main.view.section as LearningSection);
+        setWorkspace(main.view.workspace);
+        await call('update_workspace_view',{view:{...main.view,documents:documentsRef.current.documents.map(d=>d.id)}});
+        await call('restore_workspace_placement',{label:workspaceWindows.label,index:layout.windows.indexOf(main),name});
+      }else failures.push('The main map source changed; its saved view was not applied.');
+      for(const [index,row] of layout.windows.entries()){
+        if(row.main)continue;
+        try{
+          const p=documentsRef.current.documents.find(d=>d.id===row.view.project)?.history.current;
+          if(row.view.project&&(!p||(p.source?.sha256??null)!==row.sourceSha256))throw Error('Saved map is unavailable or its source identity changed');
+          const label=await call<string>(row.view.project?'open_project_window':'open_workspace_window',row.view.project?
+            {id:row.view.project,workspace:row.view.workspace,section:row.view.section,observe:!row.writable,panel:row.panel,focusTag:row.focusTag,originWorkspace:row.panel?row.view.workspace:null}:
+            {workspace:row.view.workspace,section:row.view.section,panel:row.panel});
+          // New native windows are registered before their first WebView frame.
+          await call('restore_workspace_placement',{label,index,name});
+        }catch(e){failures.push(`${row.view.workspace}: ${String(e)}`);}
+      }
+      await workspaceWindows.refresh();
+      notice(failures.length?`Layout restored with ${failures.length} unavailable place${failures.length===1?'':'s'}: ${failures.join(' · ')}`:'Workspace windows restored. Existing source histories and other open windows are preserved.',failures.length?'warning':'success');
+    }catch(e){notice(String(e),'error');}finally{setBusy(false);layoutOperation.current=false;}
+  }
+  useEffect(()=>{
+    if(!native||!ready||startupLayout.current||getCurrentWindow().label!=='main'||new URLSearchParams(location.search).has('workspace')||new URLSearchParams(location.search).has('project'))return;
+    startupLayout.current=true;if(interfacePreferences.restoreWorkspaceLayout)void restoreWorkspaceLayout();
+  },[ready]);
   async function transferAsset(selection: TransferSelection) {
     const target=historyRef.current.current;
     if(!target)return;
@@ -1075,11 +1128,22 @@ export default function App() {
           }
           busy={busy}
         />);}
-  function content(){
-    if(workspace==='world'||workspace==='quickforge'||workspace==='live'||workspace==='library')return null;
-    return workspaceContent();
-  }
   const inLevelEditor=workspace==='world'||workspace==='quickforge'||workspace==='live';
+  const otherKey=`${mapWorkspaces.includes(workspace)?current?.id??'empty':'global'}:${workspace}`;
+  if(ready&&!inLevelEditor&&workspace!=='library'){
+    visitedWorkspaces.current.delete(otherKey);
+    visitedWorkspaces.current.set(otherKey,{workspace,projectId:mapWorkspaces.includes(workspace)?current?.id??null:null});
+  }
+  for(const [key,view] of visitedWorkspaces.current)if(view.projectId&&!documents.documents.some(d=>d.id===view.projectId))visitedWorkspaces.current.delete(key);
+  function retainedWorkspaces(){
+    const warm=new Set([...visitedWorkspaces.current.keys()].slice(-previewBudgets().warmEditors));
+    return [...visitedWorkspaces.current].map(([key,view])=>{
+      const map=view.projectId?documents.documents.find(d=>d.id===view.projectId):activeMap;
+      return <RetainedLevelView key={key} id={`workspace:${key}`} active={!inLevelEditor&&otherKey===key} graphicsResident={warm.has(key)}>
+        <Suspense fallback={<div className="loading">Opening workspace…</div>}><WorkspaceSession id={view.projectId??'global'} workspace={view.workspace}>{workspaceContent(view.workspace,map)}</WorkspaceSession></Suspense>
+      </RetainedLevelView>;
+    });
+  }
   if(ready&&workspace==='library')visitedHome.current=true;
   if(inLevelEditor&&ready){const id=current?.id??'new';visitedLevelViews.current.delete(id);visitedLevelViews.current.add(id);}
   for(const id of visitedLevelViews.current)if(id!=='new'&&!documents.documents.some(map=>map.id===id))visitedLevelViews.current.delete(id);
@@ -1098,7 +1162,10 @@ export default function App() {
       </Suspense>
     </RetainedLevelView>;
   });}
-  function workspaceContent() {
+  function workspaceContent(target:Workspace,map:MapDocument|undefined) {
+    // Retained workspaces always receive their own latest document. Never bind
+    // a hidden editor to whichever map happens to be active in this window.
+    const workspace=target,current=map?.history.current??null,inspection=map?.inspection??null,meshes=map?.meshes??{},history=map?.history??{...initialHistory,limit:documents.limit},activeMap=map;
     if (workspace === 'learning') return <LearningCenter project={current} inspection={inspection} settings={data.settings} section={learningSection} onSection={setLearningSection} navigate={setWorkspace}/>;
     if (workspace === 'get-started') return <GettingStarted data={data} project={current} onApply={applySettings} navigate={target => {markFirstVisitSeen();setWorkspace(target);}}/>;
     if (workspace === 'features') return <Features project={current} openMaps={documents.documents.length} navigate={setWorkspace}/>;
@@ -1157,8 +1224,8 @@ export default function App() {
           <Tags key={current.id} project={current} inspection={inspection} entries={data.entries} hasUnsavedChanges={history.dirty} onSave={()=>save(false,current.id)}
             onNativeEditor={()=>window.dispatchEvent(new CustomEvent('guilty-spark-runtime-tool',{detail:{projectId:current.id,actionId:'editTags'}}))}
             onSelectMap={(id) => { void openProject(id, 'tags'); }} edit={edit} notify={notice}
-            focusTagId={focusTagId} onFocusHandled={()=>setFocusTagId(null)}
-            onResources={()=>void action(async()=>{const id=current.id;await save();const open=await call<OpenProject|null>('choose_project_resources',{projectId:id});if(open)await applyResourceMetadata(open);return open;},'Map resources connected; sound samples are verified when opened.')}
+            focusTagId={documents.activeId===current.id?focusTagId:null} onFocusHandled={()=>writeMapSession(current.id,'tags.focus',null)}
+            onResources={()=>void action(async()=>{const id=current.id;await save(false,id);const open=await call<OpenProject|null>('choose_project_resources',{projectId:id});if(open)await applyResourceMetadata(open);return open;},'Map resources connected; sound samples are verified when opened.')}
             onAssignSound={(cue: CueName, ref: LocalCueReference) => {
               setInterfacePreferences((previous) => ({ ...previous, cues: { ...previous.cues, [cue]: ref } }));
               notice(`Assigned ${cue} sound locally. Enable UI audio in Interface Studio to hear it.`, 'success');
@@ -1221,7 +1288,7 @@ export default function App() {
   return (
     <>
       <div className="gs-window-content">
-        <div className="application gs-drawers" data-panel-window={requestedPanel(location.search,workspace)??undefined} inert={closing || undefined}>
+        <div className="application gs-drawers" data-panel-window={requestedPanel(location.search,workspace)??undefined} inert={closing || undefined} onWheelCapture={event=>{const field=event.target;if(field instanceof HTMLInputElement&&field.type==='number'&&document.activeElement===field)field.blur();}}>
           <header
             id="gs-window-header"
             className="app-header gs-compact-header"
@@ -1245,6 +1312,7 @@ export default function App() {
                 state={documents}
                 disabled={busy || closing}
                 onSelect={selectMap}
+                onReorder={ids=>dispatchDocument({type:'reorder',ids})}
                 onClose={(id) => void closeMap(id)}
                 onWindow={(id) => void closeMap(id, true)}
                 onReturn={native&&getCurrentWindow().label.startsWith('editor-')?(id)=>void closeMap(id,'main'):undefined}
@@ -1273,6 +1341,9 @@ export default function App() {
               </div>
             )}
             <div id="gs-header-workspace-tools"/>
+            <OpenWork workspace={workspace} documents={documents} entries={data.entries} windows={workspaceWindows.windows} recent={workflow.recent} error={workspaceWindows.error} jobs={logs}
+              onNavigate={setWorkspace} onSelect={selectMap} onRecent={route=>void returnToPlace(route)}
+              onFocus={label=>void workspaceWindows.focus(label).catch(e=>notice(String(e),'error'))} onRefresh={()=>void workspaceWindows.refresh()} onWindow={(target,another)=>void openWorkspaceView(target,another)}/>
             <div className="header-actions">
               <LiveStudioIndicator
                 projectId={current?.id ?? null}
@@ -1308,7 +1379,7 @@ export default function App() {
               if((e.target as HTMLElement).closest('.nav-item'))setSidebarOpen(false);
             }}
           >
-            <div className="sidebar-label">WORKSPACES</div>
+            <div className="sidebar-label gs-nav-heading"><span>WORKSPACES</span><button aria-label="Open work & recent places" onClick={()=>{setSidebarOpen(false);window.dispatchEvent(new Event('gs:open-work'));}}>Open work</button></div>
             <nav aria-label="Workspaces">
               {navGroups.map(([group, ids]) => (
                 <div className="gs-nav-group" key={group}>
@@ -1440,6 +1511,9 @@ export default function App() {
               )}
             >
               <WorkspacePanels
+                onSaveLayout={native?()=>void saveWorkspaceLayout():undefined}
+                onRestoreLayout={native?()=>void restoreWorkspaceLayout():undefined}
+                layoutName={layoutName} layoutNames={layoutNames} onLayoutName={native?setLayoutName:undefined} onListLayouts={listWorkspaceLayouts}
                 onPopout={() => void popoutWorkspace()}
                 onDetachPanel={detachWorkspacePanel}
                 canDetachPanel={panel=>canDetachPanel(workspace,panel,!!current)}
@@ -1600,15 +1674,7 @@ export default function App() {
                 {!ready ? (
                   <LaunchProgress />
                 ) : (
-                  <Suspense fallback={<div className="loading">Loading workspace…</div>}>
-                    <WorkspaceSession
-                      key={`${current?.id ?? 'global'}:${['world', 'quickforge', 'live'].includes(workspace) ? 'level' : workspace === 'interface' ? 'settings' : workspace}`}
-                      id={current?.id ?? 'global'}
-                      workspace={['world', 'quickforge', 'live'].includes(workspace) ? 'level' : workspace === 'interface' ? 'settings' : workspace}
-                    >
-                      {content()}
-                    </WorkspaceSession>
-                  </Suspense>
+                  retainedWorkspaces()
                 )}
                 {ready&&visitedHome.current&&<RetainedLevelView id="home-library" active={workspace==='library'} graphicsResident>
                   <Suspense fallback={<div className="loading">Opening your library…</div>}>

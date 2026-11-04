@@ -32,6 +32,7 @@ import type { MeshAssembly, MeshSnapMode, FaceDirection } from '../meshAssembly'
 import { downloadLocalText } from '../exportHelpers';
 import { reconcileSettingsDraft } from '../settings';
 import { Empty, Notice, NumberField, PageTitle, Pill } from './ui';
+import {useWorkspaceActivity} from './WorkspaceActivity';
 function PreviewMesh({ mesh }: { mesh: MeshData }) {
   const g = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -71,6 +72,7 @@ export function Assets({
   onImport: () => void;
   onWorld: () => void;
 }) {
+  const activity=useWorkspaceActivity();
   const modelAssets=project.assets.filter(asset=>asset.kind==='obj');
   const [chosen, setChosen] = useState<string | null>(modelAssets[0]?.id ?? null);
   const [exchangeFeedback, setExchangeFeedback] = useState('');
@@ -149,8 +151,8 @@ export function Assets({
             ))}
           </div>
           <div className="asset-preview surface">
-            {mesh ? (
-              <Canvas camera={{ position: [8, -8, 8], up: [0, 0, 1], fov: 50 }}>
+            {mesh&&activity.graphicsResident ? (
+              <Canvas frameloop={activity.active?'always':'never'} camera={{ position: [8, -8, 8], up: [0, 0, 1], fov: 50 }}>
                 <color attach="background" args={['#101820']} />
                 <ambientLight intensity={1.6} />
                 <directionalLight position={[10, -10, 20]} intensity={2} />
