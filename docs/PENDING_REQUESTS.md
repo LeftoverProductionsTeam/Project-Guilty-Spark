@@ -1,5 +1,9 @@
 # Pending engineering requests
 
+## Advanced Halo Engine Frontier — received November 4, 2026
+
+Full directive/receipt and current evidence: `.local/artifacts/advanced-engine-frontier-intake-20261104/` (received at `20ebf16`). Retain 128 real players; six-player campaign alongside the older eight-player aspiration; four-way local split-screen distinct from online play; actual concurrent four-region streaming after Timberland–Sidewinder traversal; and staged stereo/head-pose VR. These remain unaccepted experiments requiring pinned runtimes, flags, fixtures, budgets and measured native/game/peer evidence. Owner explicitly makes engine research nonblocking for editor, installer and community releases; this does not waive C69 or release-specific acceptance/publication approval. No new experiments started; no manual requeue.
+
 ## Installer, First-Run Experience & Smart Tool Setup — received November 4, 2026
 
 Full4,388-byte user directive, receipt (`2f5af5f`) and existing release/setup evidence: `.local/artifacts/installer-first-run-intake-20261104/`. Pending behind C69 human acceptance; no explicit deferral/priority change. Preserve sealed C49 installer/portable/source snapshot; five retained files hash-match, but host-local install/startup/uninstall is not clean-machine acceptance. Retain all six guided steps, seven runtime/source cards for this wizard, legitimate game/resource sourcing, informed verified optional tool installs, read-only path/version/resource/disk checks, persistent offline-capable setup and first real native map/edit/build/play. Legacy source cards do not imply unsupported desktop game execution. Clean Windows10/11/no-Halo VM and owned-Halo PC, upgrades/repair/uninstall/data preservation/WebView2/opt-in association gates remain open. No installs/system changes/download/builds/new UI or game tests; no manual requeue.
