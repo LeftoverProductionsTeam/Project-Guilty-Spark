@@ -2,6 +2,8 @@
 
 Starting revision: `fb75023f3896b4ae9a2f0236ee0576fcc59bf059`, clean local `master`. This pass preserves C63, C66, the existing 475-row requirements CSV, historical research and the sealed C49 Windows candidate. No branch, worktree, remote publication, installation or accumulated-data cleanup was performed.
 
+Verified implementation commit: `5ad68243127239046a9cbd61b318900ac9476d1c`. The following seal changes only documentation and checkpoint metadata. Final desktop executable SHA-256: `c62f77745ea16be59f3d32d9082a52657322b42fd08c9b67a1c9b2067f96574b` (development acceptance build, not a release installer).
+
 ## Working user workflow
 
 Open a preserved map → **Preservation record → Recover a Halo Project** → choose the scenario or an asset → **Review recovery** → **Recover into a separate project** → **Open recovered project**.
@@ -64,7 +66,9 @@ The extraction failure was checked against the pinned upstream [extraction imple
 
 `preservation.json` and `preservation-sealed.json` rehash all 15 selected protected C49/C63 artifacts unchanged. All 475 CSV requirements match the actual starting checkout byte for byte (SHA-256 `1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7`; the older C63 paragraph's different hash describes its preceding 472-row prefix). C63 remains the committed ancestor `056bc69`; its historical H1A Standalone human result remains **“Opens both ways; crossed and returned; closed normally.”** C67 does not extend that observation to its new recovered cache or retail MCC. C63's external Invader edit/corrupt-save rejection/restoration/reconcile/rebuild evidence remains complete and intact.
 
-One controlled sequential recovery/reuse pair measured **12.802 s → 3.562 s** with no duplicate native recovery data. Native model import/readback measured **1.088 s**; recovered-cache compile/readback **12.280 s**. The desktop whole-scenario recovery plus verification took **107.087 s** in one trial. These are scoped measurements, not a general startup/rendering performance claim.
+One controlled sequential recovery/reuse pair measured **12.802 s → 3.562 s** with no duplicate native recovery data. Native model import/readback measured **1.088 s**; recovered-cache compile/readback **12.280 s**. The desktop whole-scenario recovery plus verification took **107.087 s** in one trial; the final desktop verification/reuse trial took **22.479 s** under warm conditions. These are scoped measurements, not a general startup/rendering performance claim.
+
+To reproduce, build the current native desktop app and use `scripts/test-source-recovery-native.mjs` with a previously accepted isolated recovery fixture. The native example `qa_source_recovery` takes an owned cache, installed Invader folder, installed H1A kit and a fresh output directory. Its `--cache` mode takes a validated managed recovery library/ID plus those tool folders and a fresh output directory; `--readback` compares the original and resulting caches. Never point a writable benchmark output at a game installation or the only source copy. Reuse the retained accepted fixture instead of extracting another SDK.
 
 The 07:40Z storage-health scan reports 150,660,958,032 logical workspace bytes; C67 then accounted for 836,979,123 logical bytes / 8,646 files. Later evidence adds a small amount. Logical bytes are not NTFS allocation. This pass retains diagnostic/build evidence and does not claim space reclamation. Existing historical paths and the pending C66 prepared-source reuse gap are preserved. No accumulated source/evidence/runtime directory was deleted.
 

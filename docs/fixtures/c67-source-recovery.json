@@ -113,5 +113,6 @@
     "Partial folders, damaged projects, archives and broader Error Doctor/animation/environment/vehicle work remain open.",
     "No C67 game launch, human gameplay, multiplayer or clean-machine release acceptance.",
     "No accumulated-data deletion, remote push or public release; accepted C49 assets preserved."
-  ]
+  ],
+  "sourceCommit": "5ad68243127239046a9cbd61b318900ac9476d1c"
 }

@@ -1,33 +1,35 @@
 # Active engineering checkpoint
 
-Task: C67 Source Guardian compiled-cache project recovery, preserving C63 and C66
+Task: C67 Source Guardian recovery milestone and native engineering follow-through
 Status: active
-Starting revision: fb75023
-Latest verified revision: fb75023; clean sole local master at resumption
-Next action: Finish final desktop/native/regression acceptance for Source Guardian, record the scoped recovery result and limitations, then commit locally. Preserve C66 prepared-source reuse and broader recovery modes in pending work. No new human or multiplayer claims.
+Starting revision: fb75023f3896b4ae9a2f0236ee0576fcc59bf059
+Latest verified revision: fb75023 plus the verified C67 working tree; local source commit pending
+Next action: Commit the verified C67 recovery implementation locally, seal its source revision, then resume Native Error Doctor against retained genuine compiler/gameplay failures. Keep recovered-source adoption, changed-source reconciliation and additional recovery formats in pending work. No push or publication.
 
 ## Acceptance
 
-Review before writes; separate owned recovery output with standard native tags, supported recovered source files, exact hashes and fidelity/missing-data report. Native parsing and compilation remain separate from Standalone, retail runtime and human acceptance. No permission flag is required for supported local inspection.
+The compiled-cache recovery milestone passes actual desktop entrypoints, independent Invader native parsing/dependency closure, model reconstruction/import and H1A recovered-scenario compilation/readback. This is a scoped native gate, not complete original-authoring recovery, visual/audio parity, game execution, multiplayer or clean-machine release acceptance.
 
 ## Verified milestones
 
-C67 native-second/acceptance.json: 23 recovered tags parsed by actual Invader, one 106829-byte JMS recovered, independently recompiled by H1A Tool (1088 ms), source maps unchanged, corrupt recovery rejected/restored. Recovery 12802 ms; verified reuse 3562 ms with no duplicate native data. Desktop native-ui-first/acceptance.json: actual buttons/IPC, read-only review, recovery and navigation/reopen pass with no page errors. Fifteen C49/C63 protected artifacts rehash unchanged (preservation.json). First trial retained a Windows log-handle adoption failure; close-before-adoption is repaired.
+C67 native-second: 23 tags, one reconstructed JMS, independent model compilation, stale-plan refusal, corrupt native model rejection/restoration and unchanged source. One controlled recovery/reuse pair measured 12802/3562 ms with no duplicate native data. Whole recovered MCC scenario: 1795 tags and 139 reconstructed source files. H1A compiled cache eec9b92fd42ff64828103b82f1fa15d50f229fd41db08b2e01592cfab15cd4e3 retains all 1795 class/path identities, 66 render/collision triangles, two script names and five placements; native CRC matches. Compiler warnings remain. Native-ui-sealed uses the final debug app c62f77745ea16be59f3d32d9082a52657322b42fd08c9b67a1c9b2067f96574b with real buttons/IPC, per-root navigation/reuse and completed operation indicator, zero page errors.
 
-C63 is committed (056bc69, ancestor of HEAD). Its retained native-readback-final acceptance is complete with real external Invader editing, corrupt-save rejection, restored source, native rebuild and script readback. The accepted human door result remains: Opens both ways; crossed and returned; closed normally. No new human test of its later external-edited revision is inferred. C66 source 219ac94 retains bounded staging, ten unchanged reuse trials, source-aware resources and native compilation/readback. See docs/CONTINUATION_63_NATIVE_LOGIC.md and docs/CONTINUATION_66_STORAGE_AND_RECOVERY.md.
+Full Rust: 703 passed/8 ignored; frontend 387/92 files, browser 161, offline 59 and continuity/health/release Node 8 pass. TypeScript, frontend build and native debug build pass. Final recovery-focused Rust tests: 5 pass. Evidence under .local/artifacts/c67-recovery-20261104, exact report docs/CONTINUATION_67_SOURCE_GUARDIAN.md, metadata docs/fixtures/c67-source-recovery.json.
+
+Fifteen selected C49/C63 protected artifacts rehash unchanged (preservation-sealed.json). The 475-row requirements CSV matches the actual starting checkout byte for byte (1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7). C63 ancestor 056bc69, original two-way human Standalone acceptance and external edit/corruption/reconcile/build evidence remain intact. C66 bounded staging and reuse contracts remain.
 
 ## Changed work
 
-New user priority: Creator Freedom, Native Mastery & Project Preservation. Full attachment is preserved at C:/Users/patri/.codex/attachments/e81773c1-9b1b-4a21-b5cb-1b9718e41ad9/Pasted text.txt; SHA-256 1cc8bf2ea191478b785677f0573e755021b0e1ce2a4ab4fa5a0e8a1793384681. Its C63 prerequisite is already committed; verify retained evidence before proceeding. Existing recursive tag extraction and the installed version-pinned Invader recover/parser are being reused, not replaced.
+Existing Preservation workspace now offers Recover a Halo Project; existing extraction/short-path/resource identity/staging/storage/native progress systems are reused. Scenario extraction avoids the pinned recursive single-tag compiler defect while preserving all native cache tags. Shared H1A globals preparation preserves authored files. Recovered folders have independent standard tags/data and optional provenance reports; altered files cannot reuse old validation but remain accessible.
 
 ## Failures and blockers
 
-Human-only gameplay, real game-peer/second-computer acceptance and clean-machine releases remain unverified where recorded. No newer research archive has been imported; never replace canonical research with v6. C66 prepared shared-source forks have no exact reusable materialization contract yet. No additional accumulated-data deletion is authorized. User unavailable; no questions or fabricated acceptance.
+Retained genuine failures: native-first Windows open-log adoption, native-ui-second recursive scenario extraction with exit zero, native-cache-build missing H1A globals assertion. Repairs pass subsequent native tests. Compiler UI/meter/sound-cluster warnings remain. No C67 game/human/real-peer or clean-machine acceptance; no full original DCC/bitmap/BSP source recovery. Other runtime fixtures, partial/damaged project/archive recovery and recovered-source editor adoption/reconciliation remain open. No new first-person animation, fog/environment or vehicle seat/physics acceptance is claimed. User unavailable; no fabricated human result.
 
 ## Operations and safe checkpoint
 
-No new native job is active yet. No source, map, accepted C49/C63 build, research or failed trial has been deleted. Prior full checkpoint is preserved in ACTIVE_TASK.previous.md and Git history. Generated evidence will use .local/artifacts/c67-recovery-20261104; reuse installed tools and bounded fixtures.
+No native/game process started by this pass remains active. No full SDK copied, no new worktree/branch/clone, no accumulated-data deletion or remote write. Failed trials and previous-good output remain. The C49 sealed installer/portable/source and C63 door evidence are unchanged. Local source commit is the only pending mutation. Do not repeat the older C66 approved deletion or produce duplicate recovery libraries on resume.
 
 ## Deferred requests
 
-See docs/PENDING_REQUESTS.md for the preserved complete current directive and C66 storage follow-through. Continue the highest-impact recovery gate before Error Doctor, animation, environment and vehicle subphases. Preserve all existing feature ledgers and unknown Codex queue state. No push/publication.
+Full user attachment remains at C:/Users/patri/.codex/attachments/e81773c1-9b1b-4a21-b5cb-1b9718e41ad9/Pasted text.txt, SHA-256 1cc8bf2ea191478b785677f0573e755021b0e1ce2a4ab4fa5a0e8a1793384681. See PENDING_REQUESTS.md for this complete directive and C66 prepared shared-source materialization, preserved at fb75023:docs/ACTIVE_TASK.md. Keep the full AI, Live Link, SparkLink, Firefight/Zombies, campaign/machinima, Megaworld, direct compiled-map structural editing and release ledger. No queue state or new research import is inferred.

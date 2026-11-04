@@ -3,8 +3,8 @@
 Task: C67 Source Guardian recovery milestone and native engineering follow-through
 Status: active
 Starting revision: fb75023f3896b4ae9a2f0236ee0576fcc59bf059
-Latest verified revision: fb75023 plus the verified C67 working tree; local source commit pending
-Next action: Commit the verified C67 recovery implementation locally, seal its source revision, then resume Native Error Doctor against retained genuine compiler/gameplay failures. Keep recovered-source adoption, changed-source reconciliation and additional recovery formats in pending work. No push or publication.
+Latest verified revision: 5ad68243127239046a9cbd61b318900ac9476d1c; C67 implementation committed locally, accepted scoped recovery evidence sealed
+Next action: Resume Native Error Doctor against genuine retained C63/C67 failures, with source-linked diagnosis and independent revalidation. Preserve recovered-source adoption/reconciliation, other recovery formats and C66 prepared-source materialization in pending work. Do not repeat recovery libraries or old cleanup. No push/publication.
 
 ## Acceptance
 
@@ -28,7 +28,7 @@ Retained genuine failures: native-first Windows open-log adoption, native-ui-sec
 
 ## Operations and safe checkpoint
 
-No native/game process started by this pass remains active. No full SDK copied, no new worktree/branch/clone, no accumulated-data deletion or remote write. Failed trials and previous-good output remain. The C49 sealed installer/portable/source and C63 door evidence are unchanged. Local source commit is the only pending mutation. Do not repeat the older C66 approved deletion or produce duplicate recovery libraries on resume.
+No native/game process started by this pass remains active. No full SDK copied, no new worktree/branch/clone, no accumulated-data deletion or remote write. Failed trials and previous-good output remain. The C49 sealed installer/portable/source and C63 door evidence are unchanged. Verified implementation is committed locally; the final seal changes only documentation/checkpoint metadata. Do not repeat the older C66 approved deletion or produce duplicate recovery libraries on resume.
 
 ## Deferred requests
 
