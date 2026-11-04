@@ -8,8 +8,8 @@ import { prepareAssetImport, attachAssetImport, prepareSoundImport } from './nat
 import LaunchProgress from './components/LaunchProgress';
 import {useWorkflowHistory} from './useWorkflowHistory';
 import {captureWorkflowPlace,restoreWorkflowPlace} from './workflowPlace';
-import {useWorkspaceWindows} from './useWorkspaceWindows';
-import type {SavedWorkspaceLayout} from './useWorkspaceWindows';
+import {useWorkspaceWindows,wasLayoutWriter} from './useWorkspaceWindows';
+import type {SavedWorkspaceLayout,SavedWorkspaceWindow} from './useWorkspaceWindows';
 import OpenWork from './components/OpenWork';
 import type {LearningSection,WorkflowRoute} from './workflowHistory';
 import {librarySoundEmitters} from './viewportAssets';
@@ -31,6 +31,7 @@ import {
   Clapperboard,
   Heart,
   Box,
+  Check,
   ChevronRight,
   CircleHelp,
   FileCode2,
@@ -96,7 +97,7 @@ import MapTools from './components/MapTools';
 import WorkspaceSession from './components/WorkspaceSession';
 import RetainedLevelView from './components/RetainedLevelView';
 import type { MapDocument } from './mapDocuments';
-import WorkspacePanels,{WorkspacePanel}from'./components/WorkspacePanels';
+import WorkspacePanels,{WorkspacePanel,closeOtherHeaderMenus,headerMenuKeyDown}from'./components/WorkspacePanels';
 import NavigationSettings from'./components/NavigationSettings';
 import {readMapSession,writeMapSession,useMapState,copyMapViewSession,configureMapViewWindow} from './mapSession';
 import AssetTransfer,{transferTag} from './components/AssetTransfer';
@@ -116,7 +117,7 @@ import DependencyPanel from './components/DependencyPanel';
 import WorkspaceFinder from './components/WorkspaceFinder';
 import WorkbenchGuide from './components/WorkbenchGuide';
 import LevelEditorWorkspace from './components/LevelEditorWorkspace';
-import {workspaceCatalog as nav, mapWorkspaces, navGroups, finderItems} from './workspaceCatalog';
+import {workspaceCatalog as nav, mapWorkspaces, navGroups, finderItems, canonicalWorkspace, workspaceLabel} from './workspaceCatalog';
 import { canDetachPanel, requestedPanel } from './detachedPanels';
 import Tags from './components/Tags';
 import Build from './components/Build';
@@ -292,7 +293,11 @@ export default function App() {
     if(route.projectId&&documentsRef.current.documents.some(d=>d.id===route.projectId))dispatchDocument({type:'select',id:route.projectId});
     setSettingsTabState(route.settingsTab);if(route.learningSection)setLearningSection(route.learningSection);workspaceRef.current=route.workspace;setWorkspaceState(route.workspace);
   },route=>!mapWorkspaces.includes(route.workspace)||(route.projectId?documentsRef.current.documents.some(d=>d.id===route.projectId):!documentsRef.current.activeId),route=>mapWorkspaces.includes(route.workspace)?captureWorkflowPlace(route,documentsRef.current.documents.find(d=>d.id===route.projectId)?.history.current):route);
-  const workspaceWindows=useWorkspaceWindows({workspace,project:activeMap?.id??null,section:workspace==='learning'?learningSection:workspace==='settings'?settingsTab:null,dirty:history.dirty,documents:documents.documents.map(d=>d.id)},ready&&initialDocumentReady);
+  const workspaceWindows=useWorkspaceWindows({workspace,project:activeMap?.id??null,section:workspace==='learning'?learningSection:workspace==='settings'?settingsTab:null,dirty:history.dirty,documents:documents.documents.map(d=>d.id)},ready&&initialDocumentReady,()=>documentsRef.current.documents.flatMap(document=>{
+    const project=document.history.current;if(!project)return [];
+    const place=captureWorkflowPlace({workspace:workspaceRef.current,projectId:project.id,settingsTab},project).place;
+    return place?[{project:project.id,...place}]:[];
+  }));
   function routeTitle(route:WorkflowRoute|null,direction:'Back'|'Forward'){
     if(!route)return direction==='Back'?'No previous workspace':'No next workspace';
     const label=route.workspace==='learning'?`Learning center · ${route.learningSection??'guides'}`:nav.find(item=>item.id===route.workspace)?.label??(route.workspace==='settings'?(route.settingsTab==='dependencies'?'Dependencies & setup':'Games & tools'):route.workspace);
@@ -474,11 +479,11 @@ export default function App() {
     };
   }, [notice, save]);
   const load = useCallback(
-    async (open: OpenProject) => {
-      const observe=new URLSearchParams(location.search).get('observe')==='1';
+    async (open: OpenProject,writer?:boolean,activate=true) => {
+      const observe=writer===undefined?new URLSearchParams(location.search).get('observe')==='1':!writer;
       if(native&&!observe)await call('claim_project_document',{id:open.project.id});
       const attached=native?await windowHistories.current.attach(open.project.id):null;
-      dispatchDocument({type:'open',open});
+      dispatchDocument({type:'open',open,activate});
       if(attached){setWindowWriters(old=>({...old,[open.project.id]:attached.status.writable}));if(attached.history)dispatchDocument({type:'window-history',id:open.project.id,history:attached.history});}
       if(native&&(!attached||attached.status.writable)&&open.project.source){const version=open.project.source.cacheVersion;
         const command=[6,7,609].includes(version)?'auto_connect_classic_textures':version===13&&(!open.project.source.resourceSha256?.['mcc-textures']||!open.project.source.resourceSha256?.['mcc-shared-bitmaps.map'])?'connect_mcc_texture_resources':null;
@@ -568,11 +573,12 @@ export default function App() {
       if(!/^[0-9a-f-]{36}$/i.test(payload.id))return;
       void call<OpenProject>('open_project',{id:payload.id}).then(async opened=>{
         if(!alive)return;
-        const prior=documentsRef.current.activeId,priorWorkspace=workspaceRef.current;
-        await load(opened);if(alive){
-          if(payload.activate===false&&prior&&prior!==payload.id){dispatchDocument({type:'select',id:prior});setWorkspace(priorWorkspace);}
-          else {setWorkspace(payload.workspace??rememberedWorkspace(opened.project,opened.inspection));
-            if(payload.panel)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:payload.panel}})));}}
+        // An ordinary close returns ownership/content in the background. Never
+        // restore a captured active tab after async reads: the user may already
+        // have chosen a different map or workspace while the handoff settled.
+        await load(opened,undefined,payload.activate!==false);
+        if(alive&&payload.activate!==false){setWorkspace(payload.workspace??rememberedWorkspace(opened.project,opened.inspection));
+          if(payload.panel)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:payload.panel}})));}
       }).catch(error=>notice(`Returned map remains saved in your library: ${String(error)}`,'error'));
     });
     return()=>{alive=false;void pending.then(stop=>stop());};
@@ -858,35 +864,60 @@ export default function App() {
   const listWorkspaceLayouts=()=>{if(native)void call<string[]>('workspace_layout_names').then(setLayoutNames).catch(e=>notice(String(e),'error'));};
   async function saveWorkspaceLayout(){
     if(!native||layoutOperation.current)return;layoutOperation.current=true;
-    try{window.dispatchEvent(new Event('gs:save-viewport-context'));await windowHistories.current.flush();const layout=await call<SavedWorkspaceLayout>('save_workspace_layout',{name:layoutName});listWorkspaceLayouts();notice(`Saved “${layoutName.trim()}” · ${layout.windows.length} workspace window${layout.windows.length===1?'':'s'}. Source changes keep their own recovery history.`,'success');}
+    try{await windowHistories.current.flush();await workspaceWindows.capture();const layout=await call<SavedWorkspaceLayout>('save_workspace_layout',{name:layoutName});listWorkspaceLayouts();notice(`Saved “${layoutName.trim()}” · ${layout.windows.length} workspace window${layout.windows.length===1?'':'s'}. Source changes keep their own recovery history.`,'success');}
     catch(e){notice(String(e),'error');}finally{layoutOperation.current=false;}
+  }
+  async function restoreWindowView(row:SavedWorkspaceWindow){
+    const failures:string[]=[];
+    const restoredIds:string[]=[];
+    const ids=[...new Set([...row.view.documents,...(row.view.project?[row.view.project]:[])])];
+    for(const id of ids){
+      try{
+        const existing=documentsRef.current.documents.find(d=>d.id===id)?.history.current;
+        const open=existing?null:await call<OpenProject>('open_project',{id});
+        const project=existing??open!.project,place=row.view.places?.find(p=>p.project===id);
+        const expected=place?place.sourceSha256:(id===row.view.project?row.sourceSha256:undefined);
+        if(expected!==undefined&&(project.source?.sha256??null)!==expected)throw Error('Its source revision changed; saved view was not applied');
+        if(open){
+          const wantsWriter=wasLayoutWriter(row,id);
+          try{await load(open,wantsWriter);}catch(reason){
+            const owner=await call<import('./windowHistory').WindowHistoryStatus>('read_workspace_history',{projectId:id});
+            if(!wantsWriter||!owner.owner||owner.owner===workspaceWindows.label)throw reason;
+            await load(open,false);failures.push(`Map ${id}: another open window keeps its editing ownership; restored as a view`);
+          }
+        }
+        if(place)restoreWorkflowPlace({workspace:row.view.workspace,projectId:id,settingsTab,place},project);
+        restoredIds.push(id);
+      }catch(reason){failures.push(`Map ${id}: ${String(reason)}`);}
+    }
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+    // Loads dispatch asynchronously. Keep every successfully loaded ID even if
+    // React has not committed the last document ref when this frame runs.
+    const order=[...restoredIds,...documentsRef.current.documents.map(d=>d.id).filter(id=>!restoredIds.includes(id))];
+    dispatchDocument({type:'reorder',ids:order});
+    if(row.view.project&&restoredIds.includes(row.view.project))dispatchDocument({type:'select',id:row.view.project});
+    if(row.view.section&&row.view.workspace==='settings')setSettingsTabState(row.view.section as WorkflowRoute['settingsTab']);
+    if(row.view.section&&row.view.workspace==='learning')setLearningSection(row.view.section as LearningSection);
+    setWorkspace(row.view.workspace);
+    await call('update_workspace_view',{view:{...row.view,documents:order,places:[]}});
+    return failures;
   }
   async function restoreWorkspaceLayout(){
     if(!native||layoutOperation.current||busy)return;layoutOperation.current=true;setBusy(true);
     const failures:string[]=[];
     try{
       const name=layoutName;const layout=await call<SavedWorkspaceLayout>('read_workspace_layout',{name});await save();
-      const ids=[...new Set(layout.windows.flatMap(row=>[...row.view.documents,...(row.view.project?[row.view.project]:[])]))];
-      for(const id of ids){if(documentsRef.current.documents.some(d=>d.id===id))continue;try{await load(await call<OpenProject>('open_project',{id}));}catch(e){failures.push(`Map ${id}: ${String(e)}`);}}
-      await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
       const main=layout.windows.find(row=>row.main)!;
-      const project=documentsRef.current.documents.find(d=>d.id===main.view.project)?.history.current;
-      if(!main.view.project||project&&(project.source?.sha256??null)===main.sourceSha256){
-        if(project)dispatchDocument({type:'select',id:project.id});
-        if(main.view.section&&main.view.workspace==='settings')setSettingsTabState(main.view.section as WorkflowRoute['settingsTab']);
-        if(main.view.section&&main.view.workspace==='learning')setLearningSection(main.view.section as LearningSection);
-        setWorkspace(main.view.workspace);
-        await call('update_workspace_view',{view:{...main.view,documents:documentsRef.current.documents.map(d=>d.id)}});
-        await call('restore_workspace_placement',{label:workspaceWindows.label,index:layout.windows.indexOf(main),name});
-      }else failures.push('The main map source changed; its saved view was not applied.');
+      failures.push(...await restoreWindowView(main));
+      await call('restore_workspace_placement',{label:workspaceWindows.label,index:layout.windows.indexOf(main),name});
       for(const [index,row] of layout.windows.entries()){
         if(row.main)continue;
         try{
-          const p=documentsRef.current.documents.find(d=>d.id===row.view.project)?.history.current;
+          const p=row.view.project?(documentsRef.current.documents.find(d=>d.id===row.view.project)?.history.current??(await call<OpenProject>('open_project',{id:row.view.project})).project):null;
           if(row.view.project&&(!p||(p.source?.sha256??null)!==row.sourceSha256))throw Error('Saved map is unavailable or its source identity changed');
           const label=await call<string>(row.view.project?'open_project_window':'open_workspace_window',row.view.project?
-            {id:row.view.project,workspace:row.view.workspace,section:row.view.section,observe:!row.writable,panel:row.panel,focusTag:row.focusTag,originWorkspace:row.panel?row.view.workspace:null}:
-            {workspace:row.view.workspace,section:row.view.section,panel:row.panel});
+            {id:row.view.project,workspace:row.view.workspace,section:row.view.section,observe:!row.writable,panel:row.panel,focusTag:row.focusTag,originWorkspace:row.panel?row.view.workspace:null,another:true}:
+            {workspace:row.view.workspace,section:row.view.section,panel:row.panel,another:true});
           // New native windows are registered before their first WebView frame.
           await call('restore_workspace_placement',{label,index,name});
         }catch(e){failures.push(`${row.view.workspace}: ${String(e)}`);}
@@ -895,6 +926,19 @@ export default function App() {
       notice(failures.length?`Layout restored with ${failures.length} unavailable place${failures.length===1?'':'s'}: ${failures.join(' · ')}`:'Workspace windows restored. Existing source histories and other open windows are preserved.',failures.length?'warning':'success');
     }catch(e){notice(String(e),'error');}finally{setBusy(false);layoutOperation.current=false;}
   }
+  const restoredWindow=useRef(false);
+  useEffect(()=>{
+    if(!native||!ready||!initialDocumentReady)return;
+    let alive=true;
+    const apply=async()=>{
+      if(restoredWindow.current)return;
+      try{const row=await call<SavedWorkspaceWindow|null>('workspace_restore_context');if(!row||!alive)return;restoredWindow.current=true;
+        const failures=await restoreWindowView(row);if(failures.length)notice(`Workspace restored with unavailable views: ${failures.join(' · ')}`,'warning');
+      }catch(reason){notice(`Saved workspace: ${String(reason)}`,'error');}
+    };
+    const subscription=listen('spark:restore-workspace-view',()=>void apply());void apply();
+    return()=>{alive=false;void subscription.then(stop=>stop());};
+  },[ready,initialDocumentReady]);
   useEffect(()=>{
     if(!native||!ready||startupLayout.current||getCurrentWindow().label!=='main'||new URLSearchParams(location.search).has('workspace')||new URLSearchParams(location.search).has('project'))return;
     startupLayout.current=true;if(interfacePreferences.restoreWorkspaceLayout)void restoreWorkspaceLayout();
@@ -1285,6 +1329,8 @@ export default function App() {
         );
     }
   }
+  const orbWorkspace = workspace === 'world' || workspace === 'live' ? 'quickforge' : workspace === 'interface' ? 'settings' : canonicalWorkspace(workspace);
+  const orbWorkspaceTitle = workspaceLabel(orbWorkspace);
   return (
     <>
       <div className="gs-window-content">
@@ -1303,10 +1349,9 @@ export default function App() {
                 : undefined
             }
           >
-            <button className="brand gs-spark-navigation gs-navigation-toggle" onClick={()=>setSidebarOpen(value=>!value)} aria-label="Toggle workspace navigation" aria-expanded={sidebarOpen} aria-controls="gs-workspace-navigation" title="Guilty Spark · workspaces">
+            <button className="brand gs-spark-navigation gs-navigation-toggle" onClick={()=>setSidebarOpen(value=>!value)} aria-label="Toggle workspace navigation" aria-expanded={sidebarOpen} aria-controls="gs-workspace-navigation">
               <SparkEmblem data={data}/>
             </button>
-            <button className="gs-home-button" onClick={()=>setWorkspace('library')} title="Home · your maps and Halo model showcase">HOME</button>
             {documents.documents.length ? (
               <MapTabs
                 state={documents}
@@ -1340,11 +1385,17 @@ export default function App() {
                 )}
               </div>
             )}
+            <div className="gs-titlebar-drag-space" data-tauri-drag-region="deep" aria-hidden="true" />
             <div id="gs-header-workspace-tools"/>
             <OpenWork workspace={workspace} documents={documents} entries={data.entries} windows={workspaceWindows.windows} recent={workflow.recent} error={workspaceWindows.error} jobs={logs}
               onNavigate={setWorkspace} onSelect={selectMap} onRecent={route=>void returnToPlace(route)}
               onFocus={label=>void workspaceWindows.focus(label).catch(e=>notice(String(e),'error'))} onRefresh={()=>void workspaceWindows.refresh()} onWindow={(target,another)=>void openWorkspaceView(target,another)}/>
-            <div className="header-actions">
+            <details className="gs-studio-menu" onToggle={event=>{if(event.currentTarget.open)closeOtherHeaderMenus(event.currentTarget);}} onKeyDown={headerMenuKeyDown}>
+              <summary aria-label="Studio options" title="Halo runtime, collaboration, tools and help">Studio <span aria-hidden="true">▾</span></summary>
+            <div className="header-actions" onClickCapture={event=>{
+              if(!(event.target instanceof Element)||!event.target.closest('button'))return;
+              const menu=event.currentTarget.closest('details')!;menu.open=false;menu.querySelector<HTMLElement>('summary')?.focus();
+            }}>
               <LiveStudioIndicator
                 projectId={current?.id ?? null}
                 canHost={!!current?.quickForge}
@@ -1364,10 +1415,9 @@ export default function App() {
                 <Search size={15} />
                 Find tools <kbd>Ctrl K</kbd>
               </button>
-              <IconButton label="Help & shortcuts" onClick={() => setHelp(true)}>
-                <CircleHelp size={18} />
-              </IconButton>
+              <button onClick={() => setHelp(true)}><CircleHelp size={16}/><span>Help & shortcuts</span></button>
             </div>
+            </details>
             <div id="gs-window-actions" className="gs-window-actions" />
           </header>
           <aside
@@ -1379,21 +1429,17 @@ export default function App() {
               if((e.target as HTMLElement).closest('.nav-item'))setSidebarOpen(false);
             }}
           >
-            <div className="sidebar-label gs-nav-heading"><span>WORKSPACES</span><button aria-label="Open work & recent places" onClick={()=>{setSidebarOpen(false);window.dispatchEvent(new Event('gs:open-work'));}}>Open work</button></div>
+            <div className="sidebar-label gs-nav-heading"><strong className="gs-current-workspace" aria-label="Current workspace" aria-live="polite" title={`Current workspace: ${orbWorkspaceTitle}`}>{orbWorkspaceTitle}</strong><button aria-label="Open work & recent places" onClick={()=>{setSidebarOpen(false);window.dispatchEvent(new Event('gs:open-work'));}}>Open work</button></div>
             <nav aria-label="Workspaces">
               {navGroups.map(([group, ids]) => (
-                <div className="gs-nav-group" key={group}>
+                <div className={`gs-nav-group${group==='Home & first setup'?' gs-nav-home':''}`} key={group}>
                   <div className="sidebar-label">{group}</div>
                   {nav
                     .filter((item) => (ids as readonly string[]).includes(item.id))
                     .map(({ id, label, icon: Icon }) => (
                       <button
-                        className={
-                          workspace === id ||
-                          (id === 'quickforge' && (workspace === 'world' || workspace === 'live'))
-                            ? 'nav-item selected'
-                            : 'nav-item'
-                        }
+                        className={orbWorkspace === id ? 'nav-item selected' : 'nav-item'}
+                        aria-current={orbWorkspace === id ? 'page' : undefined}
                         key={id}
                         title={WORKSPACE_TOOLTIPS[id]}
                         aria-label={label}
@@ -1408,6 +1454,7 @@ export default function App() {
                         <span>{label}</span>
                         {id === 'library' && <small>{data.entries.length}</small>}
                         {id === 'build' && activeJob && <span className="live-dot pulse" />}
+                        {orbWorkspace === id && <Check size={13} className="gs-workspace-current-mark" aria-hidden="true" />}
                       </button>
                     ))}
                 </div>
@@ -1461,19 +1508,21 @@ export default function App() {
               </div>
               <button
                 className={workspace === 'preservation' ? 'nav-item selected' : 'nav-item'}
+                aria-current={orbWorkspace === 'preservation' ? 'page' : undefined}
                 onClick={() => setWorkspace('preservation')}
               >
                 <BookOpen size={17} />
                 <span>Preservation record</span>
+                {orbWorkspace === 'preservation' && <Check size={13} className="gs-workspace-current-mark" aria-hidden="true" />}
               </button>
               <button
-                className={
-                  workspace === 'settings' || workspace === 'interface' ? 'nav-item selected' : 'nav-item'
-                }
+                className={orbWorkspace === 'settings' ? 'nav-item selected' : 'nav-item'}
+                aria-current={orbWorkspace === 'settings' ? 'page' : undefined}
                 onClick={() => setWorkspace('settings')}
               >
                 <Settings2 size={17} />
                 <span>Settings &amp; tools</span>
+                {orbWorkspace === 'settings' && <Check size={13} className="gs-workspace-current-mark" aria-hidden="true" />}
               </button>
               <div className="local-only">
                 <ShieldCheck size={13} />
@@ -1521,9 +1570,9 @@ export default function App() {
                 navigationOpen={sidebarOpen}
                 id={current?.id ?? 'global'}
                 workspace={['world', 'quickforge', 'live'].includes(workspace) ? 'level' : workspace}
+                viewActions={current&&<EditorSoundControls projectId={current.id} />}
                 actions={
                   <>
-                    {current && <EditorSoundControls projectId={current.id} />}
                     <div role="group" aria-label="Workflow navigation">
                       <IconButton
                         label="Back to previous workspace"

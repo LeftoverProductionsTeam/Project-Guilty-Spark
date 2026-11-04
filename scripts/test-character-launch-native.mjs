@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import net from 'node:net';
 import {spawn} from 'node:child_process';
 import {chromium,expect as assertion} from '@playwright/test';
+import {chooseTool} from '../tests/ui/helpers/navigation.ts';
 const [appArg,outputArg,meterArg]=process.argv.slice(2);
 if(!meterArg)throw Error('test-character-launch-native <built.exe> <fresh-output> <owned-audio-meter.exe>');
 const requested=(value,allowed)=>{const list=value?value.split(','):allowed;if(!list.length||list.some(v=>!allowed.includes(v))||new Set(list).size!==list.length)throw Error('Invalid requested character test cases');return list;};
@@ -30,7 +31,7 @@ async function close(){
 }
 async function configure(runtime,character){
  const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,preferredHalo:runtime,autoBuild:false}});
- await page.getByRole('button',{name:'HOME',exact:true}).click();await expect(page.getByRole('combobox',{name:'Home model',exact:true})).toBeVisible();
+ await chooseTool(page,'Map library');await expect(page.getByRole('combobox',{name:'Home model',exact:true})).toBeVisible();
  await page.getByRole('combobox',{name:'Home model',exact:true}).selectOption(`character:${character}`);
  await page.evaluate(()=>{const key='guilty-spark:interface-v1';const current=JSON.parse(localStorage.getItem(key)||'{}');localStorage.setItem(key,JSON.stringify({...current,schemaVersion:1,launchVoiceEnabled:true,launchVoiceVolume:.22}));});
  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('guilty-spark-map-session-v1:global')||'{}')['home.model'])).toBe(`character:${character}`);

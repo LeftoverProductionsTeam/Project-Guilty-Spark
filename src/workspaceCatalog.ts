@@ -30,7 +30,7 @@ export const workspaceCatalog = [
   { id: 'settings', label: 'Settings & tools', icon: Settings2 },
 ] as const;
 export const mapWorkspaces:Workspace[]=['world','quickforge','live','tags','assets','scenario','build','firefight','creator','machinima','preservation'];
-export const navGroups = [["Level Editor",["quickforge"]],["Tags & Assets",["tags","assets","compare"]],["Gameplay Creator",["machinima","scenario","firefight","creator"]],["Projects & Testing",["library","build","runtimes"]],["Learn & Community",["get-started","features","learning","map-finder","community"]]] as const;
+export const navGroups = [["Home & first setup",["library","get-started"]],["Level Editor",["quickforge"]],["Tags & Assets",["tags","assets","compare"]],["Gameplay Creator",["machinima","scenario","firefight","creator"]],["Projects & Testing",["build","runtimes"]],["Learn & Community",["features","learning","map-finder","community"]]] as const;
 export const canonicalWorkspace = (value:Workspace):Workspace => value==='academy'||value==='how-to'?'learning':value;
 export const workspaceLabel = (value:Workspace) => workspaceCatalog.find(item=>item.id===canonicalWorkspace(value))?.label??value;
 export const finderItems:readonly WorkspaceFinderItem[]=[...workspaceCatalog.filter(item=>item.id==='quickforge'),...workspaceCatalog.filter(item=>item.id!=='quickforge')].map(({id,label})=>({id,label,help:WORKSPACE_TOOLTIPS[id]??'',keywords:`${WORKBENCH_GUIDES[id].can} ${WORKBENCH_GUIDES[id].cannot} ${WORKBENCH_GUIDES[id].tip} ${id==='quickforge'?'QuickForge geometry brushes tunnels forge':id==='learning'?'how-to how to glossary modding academy tutorials lessons':''}`}));

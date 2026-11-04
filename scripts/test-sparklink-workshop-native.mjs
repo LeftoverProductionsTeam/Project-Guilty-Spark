@@ -1,3 +1,4 @@
+import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in acceptance: three real desktop processes with isolated libraries.
 // Private LAN and a real Radmin adapter on ONE PC do not prove cross-PC delivery.
 import { chromium, expect as assertion } from '@playwright/test';
@@ -159,7 +160,7 @@ async function actor(slug) {
 }
 async function panel(a) {
   if (!(await a.page.getByRole('button', { name: 'Close SparkLink', exact: true }).isVisible()))
-    await a.page.getByRole('button', { name: /Live Studio ·/ }).click();
+    await openStudioMenu(a.page);await a.page.getByRole('button', { name: /Live Studio ·/ }).click();
   a.panel = a.page.locator('.studio-panel');
   await expect(a.panel).toBeVisible();
   if (!(await a.panel.evaluate((el) => el.open))) await a.panel.locator(':scope > summary').click();
@@ -183,7 +184,7 @@ async function host(a, address) {
     .toContainEqual(expect.stringContaining(address));
   await a.panel.getByRole('combobox', { name: 'Session network', exact: true }).selectOption(address);
   await a.panel.getByRole('button', { name: 'Host editing session', exact: true }).click();
-  await expect(a.page.getByRole('button', { name: 'Live Studio · Hosting', exact: true })).toBeVisible();
+  await openStudioMenu(a.page);await expect(a.page.getByRole('button', { name: 'Live Studio · Hosting', exact: true })).toBeVisible();
   const info = await status(a);
   a.session = info.sessionId;
   a.author = 'host';
@@ -200,7 +201,7 @@ async function join(a, text) {
   await a.panel.getByRole('textbox', { name: 'Studio display name', exact: true }).fill(a.slug);
   await a.panel.getByRole('textbox', { name: 'Private Spark invite', exact: true }).fill(text);
   await a.panel.getByRole('button', { name: 'Join private invite', exact: true }).click();
-  await expect(a.page.getByRole('button', { name: 'Live Studio · Connected', exact: true })).toBeVisible();
+  await openStudioMenu(a.page);await expect(a.page.getByRole('button', { name: 'Live Studio · Connected', exact: true })).toBeVisible();
   const info = await status(a);
   expect(info.view.encrypted && info.view.durable).toBe(true);
   a.session = info.sessionId;
@@ -435,7 +436,7 @@ try {
   await mark('participantSpecificBspUndoRedo');
   // A real held orthographic mouse drag emits wire ghosts without journal commits.
   await panel(b); // Close SparkLink overlay again if it covered the view.
-  await b.page.getByRole('button', { name: /Live Studio ·/ }).click();
+  await openStudioMenu(b.page);await b.page.getByRole('button', { name: /Live Studio ·/ }).click();
   await b.page.getByRole('button', { name: 'Move', exact: true }).click();
   const top = b.page.getByLabel('top orthographic editing view'),
     bounds = await top.boundingBox();

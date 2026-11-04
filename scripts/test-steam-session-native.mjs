@@ -1,3 +1,4 @@
+import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in actual Steam SDK/desktop integration. One account cannot prove relay.
 import { chromium, expect as check } from '@playwright/test';
 import fs from 'node:fs/promises';
@@ -95,7 +96,7 @@ async function actor(name) {
     .filter({ has: a.page.getByRole('heading', { name: made.project.title, exact: true }) })
     .click();
   await a.call('claim_project_document', { id: a.id });
-  await a.page.getByRole('button', { name: 'Live Studio · Solo', exact: true }).click();
+  await openStudioMenu(a.page);await a.page.getByRole('button', { name: 'Live Studio · Solo', exact: true }).click();
   a.panel = a.page.locator('.studio-panel');
   if (!(await a.panel.evaluate((el) => el.open))) await a.panel.locator(':scope > summary').click();
   await a.panel
@@ -116,7 +117,7 @@ try {
     remotePeerVerified: false,
   };
   await owner.panel.getByRole('button', { name: 'Host editing session', exact: true }).click();
-  await expect(owner.page.getByRole('button', { name: 'Live Studio · Hosting', exact: true })).toBeVisible();
+  await openStudioMenu(owner.page);await expect(owner.page.getByRole('button', { name: 'Live Studio · Hosting', exact: true })).toBeVisible();
   const hosted = await owner.call('forge_session_status', { projectId: owner.id });
   owner.session = hosted.sessionId;
   expect(hosted.transport).toBe('steamSpacewar');

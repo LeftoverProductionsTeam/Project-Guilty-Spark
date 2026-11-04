@@ -1,3 +1,4 @@
+import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in: three actual Windows Spark processes, three isolated owned libraries.
 // The Halo compiler is real; game clients, peers and custom binary transfers are not simulated.
 import { chromium, expect as pwExpect } from '@playwright/test';
@@ -141,7 +142,7 @@ async function start(actor, restart = false) {
     .filter({ has: actor.page.getByRole('heading', { name: actor.fixture.title, exact: true }) })
     .click();
   await actor.call('claim_project_document', { id: actor.id });
-  await actor.page.getByRole('button', { name: /Live Studio ·/ }).click();
+  await openStudioMenu(actor.page);await actor.page.getByRole('button', { name: /Live Studio ·/ }).click();
   await expect(actor.page.locator('.forge-workspace')).toBeVisible();
   await expect(actor.page.locator('.studio-panel')).toBeVisible();
   const summary = actor.page.locator('.studio-panel > summary');
@@ -214,7 +215,7 @@ async function joinUi(a, invitation) {
   await a.panel.getByRole('textbox', { name: 'Studio display name', exact: true }).fill(a.name);
   await a.panel.getByRole('textbox', { name: 'Private Spark invite', exact: true }).fill(invitation);
   await a.panel.getByRole('button', { name: 'Join private invite', exact: true }).click();
-  await expect(a.page.getByRole('button', { name: 'Live Studio · Connected', exact: true })).toBeVisible();
+  await openStudioMenu(a.page);await expect(a.page.getByRole('button', { name: 'Live Studio · Connected', exact: true })).toBeVisible();
   const info = await status(a);
   expect(info.view.encrypted).toBe(true);
   expect(info.view.durable).toBe(true);
@@ -254,7 +255,7 @@ try {
   if(await network.count())await network.selectOption('127.0.0.1');
   else await a.panel.getByRole('textbox', { name: 'Studio bind address', exact: true }).fill('127.0.0.1');
   await a.panel.getByRole('button', { name: 'Host editing session', exact: true }).click();
-  await expect(a.page.getByRole('button', { name: 'Live Studio · Hosting', exact: true })).toBeVisible();
+  await openStudioMenu(a.page);await expect(a.page.getByRole('button', { name: 'Live Studio · Hosting', exact: true })).toBeVisible();
   const hosted = await status(a);
   a.session = hosted.sessionId;
   a.author = 'host';
@@ -337,7 +338,7 @@ try {
   await converged(current);
   mark('genuineUiEditAcknowledged', true);
   // Undo is per author: C's spawn edit and A's material edit survive B's inverse transaction.
-  await b.page.getByRole('button', { name: /Live Studio ·/ }).click();
+  await openStudioMenu(b.page);await b.page.getByRole('button', { name: /Live Studio ·/ }).click();
   await b.page.locator('.forge-viewport canvas').click({ position: { x: 80, y: 80 } });
   await b.page.keyboard.press('Control+z');
   await expect
@@ -419,7 +420,7 @@ try {
   }
   mark('realModelTransformsReachRenderedEditors', true);
   // Camera motions are native UI events. Only B's local camera should move.
-  for (const x of actors) await x.page.getByRole('button', { name: /Live Studio ·/ }).click();
+  for (const x of actors) await openStudioMenu(x.page);await x.page.getByRole('button', { name: /Live Studio ·/ }).click();
   const cameras = await Promise.all(
     actors.map((x) => x.page.locator('.forge-viewport canvas').getAttribute('data-gs-camera-pose')),
   );
@@ -477,7 +478,7 @@ try {
     .filter({ has: b.page.getByRole('heading', { name: b.fixture.title, exact: true }) })
     .click();
   await b.call('claim_project_document', { id: b.id });
-  await b.page.getByRole('button', { name: /Live Studio ·/ }).click();
+  await openStudioMenu(b.page);await b.page.getByRole('button', { name: /Live Studio ·/ }).click();
   b.panel = b.page.locator('.studio-panel');
   expect(await b.call('forge_studio_pending', { projectId: b.id })).toEqual(pending);
   await expect(b.panel.getByText('Retained unacknowledged local edit', { exact: true })).toBeVisible();
@@ -612,7 +613,7 @@ try {
   await converged(current);
   for (const x of actors) {
     await x.page.setViewportSize({ width: 1500, height: 920 });
-    await x.page.getByRole('button', { name: /Live Studio ·/ }).click();
+    await openStudioMenu(x.page);await x.page.getByRole('button', { name: /Live Studio ·/ }).click();
     await expect(x.panel.locator('.studio-people')).toBeVisible();
     await expect(x.panel.locator('.studio-people')).toContainText(x.name);
     await x.page.screenshot({ path: path.join(output, `sparklink-${x.slug}.png`) });
@@ -631,7 +632,7 @@ try {
   expect(await b.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await b.page.setViewportSize({ width: 1500, height: 920 });
   // Abrupt host process death. The new process must recover exactly acknowledged work.
-  await a.page.getByRole('button', { name: /Live Studio ·/ }).click();
+  await openStudioMenu(a.page);await a.page.getByRole('button', { name: /Live Studio ·/ }).click();
   const history = await a.call('forge_studio_history', { projectId: a.id });
   const oldSession = a.session,
     oldRevision = current.revision,
@@ -664,7 +665,7 @@ try {
     .filter({ has: a.page.getByRole('heading', { name: a.fixture.title, exact: true }) })
     .click();
   await a.call('claim_project_document', { id: a.id });
-  await a.page.getByRole('button', { name: /Live Studio ·/ }).click();
+  await openStudioMenu(a.page);await a.page.getByRole('button', { name: /Live Studio ·/ }).click();
   a.panel = a.page.locator('.studio-panel');
   for (const x of [b, c]) {
     await leave(x);

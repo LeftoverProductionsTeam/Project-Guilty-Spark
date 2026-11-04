@@ -1,3 +1,4 @@
+import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Real local WebViews, persistent journal, window leases and process death.
 // No mock IPC, tool launch, game session or remote collaborator is used here.
 import fs from 'node:fs/promises';import path from 'node:path';import crypto from 'node:crypto';
@@ -12,7 +13,7 @@ const pages=()=>browser.contexts().flatMap(c=>c.pages()).filter(p=>p.url().inclu
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 async function start(){const endpoint=net.createServer();await new Promise(r=>endpoint.listen(0,'127.0.0.1',r));const port=endpoint.address().port;await new Promise(r=>endpoint.close(r));
   child=spawn(exe,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(output,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(output,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port} --disable-background-timer-throttling --disable-renderer-backgrounding`}});
-  await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);await expect.poll(()=>pages().length).toBeGreaterThan(0);main=pages()[0];main.on('pageerror',e=>report.errors.push(String(e)));await expect(main.getByRole('button',{name:'Pop out workspace',exact:true})).toBeVisible();
+  await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);await expect.poll(()=>pages().length).toBeGreaterThan(0);main=pages()[0];main.on('pageerror',e=>report.errors.push(String(e)));await expect(main.getByLabel('View and window options',{exact:true})).toBeVisible();
 }
 async function choose(page,name){const drawer=page.locator('.gs-navigation-drawer');if(!await drawer.isVisible())await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await drawer.getByRole('button',{name,exact:true}).click();}
 async function openProject(page,title){await choose(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:title,exact:true})}).click();await expect(page.getByLabel('Native BSP Workshop')).toBeVisible();}
@@ -34,7 +35,7 @@ try{
   await expect.poll(async()=>{const s=await state(main,id);const materials=s?.project.quickForge.materials;return !!materials?.length&&materials.every(m=>!!m.shaderPath);}).toBe(true);
   await setX(main,0.5);await acknowledged(main,id,0.5);
   await main.locator('.bsp-source-list button').nth(1).click();const selectedBrush=await main.locator('.bsp-source-list button.selected').innerText();
-  let previous=new Set(pages());await main.getByRole('button',{name:'Pop out workspace',exact:true}).click();const editor=await nextPage(previous);
+  let previous=new Set(pages());await openViewMenu(main);await main.getByRole('button',{name:'Pop out workspace',exact:true}).click();const editor=await nextPage(previous);
   await expect(editor.locator('.bsp-source-list button.selected')).toHaveText(selectedBrush);await value(editor,0.5);
   await editor.keyboard.press('Control+z');await value(editor,0);await acknowledged(editor,id,0);await editor.keyboard.press('Control+y');await value(editor,0.5);await acknowledged(editor,id,0.5);
   step('moving a real Workshop retains project identity, selected brush and Undo/Redo',{projectId:id,selectionRetained:true});
@@ -60,7 +61,7 @@ try{
   const savedBefore=(await invoke(observer,'open_project',{id})).project.quickForge.workshop.brushes[0].position[0];await setX(observer,1.25);await acknowledged(observer,id,1.25);expect(savedBefore).not.toBe(1.25);
   await main.screenshot({path:path.join(output,'multiple-windows.png')});child.kill();await expect.poll(()=>child.exitCode!==null||child.signalCode!==null).toBe(true);await browser.close().catch(()=>{});browser=null;
   await start();await openProject(main,'C43 history A');await value(main,1.25);await main.keyboard.press('Control+z');await value(main,0.75);await main.keyboard.press('Control+y');await value(main,1.25);await acknowledged(main,id,1.25);step('abrupt process death recovers acknowledged unsaved transform and its Undo/Redo');
-  previous=new Set(pages());await main.getByRole('button',{name:'Pop out workspace',exact:true}).click();const final=await nextPage(previous);await value(final,1.25);await final.getByRole('button',{name:'Close window',exact:true}).click();await expect.poll(()=>final.isClosed()).toBe(true);
+  previous=new Set(pages());await openViewMenu(main);await main.getByRole('button',{name:'Pop out workspace',exact:true}).click();const final=await nextPage(previous);await value(final,1.25);await final.getByRole('button',{name:'Close window',exact:true}).click();await expect.poll(()=>final.isClosed()).toBe(true);
   const saved=(await invoke(main,'open_project',{id})).project;expect(saved.quickForge.workshop.brushes[0].position[0]).toBe(1.25);await openProject(main,'C43 history A');await value(main,1.25);await main.keyboard.press('Control+z');await value(main,0.75);step('closing and reopening a pop-out saves the map and preserves its history');
   previous=new Set(pages());const tab=main.getByRole('tab',{name:'C43 history A',exact:true});const bounds=await tab.boundingBox();
   await main.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height/2);await main.mouse.down();await main.mouse.move(bounds.x+bounds.width/2,bounds.y+bounds.height+110,{steps:12});await main.mouse.up();

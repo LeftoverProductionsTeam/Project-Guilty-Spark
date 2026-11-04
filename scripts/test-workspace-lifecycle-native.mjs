@@ -16,7 +16,7 @@ const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await
 let child,browser,main;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
-async function nextPage(before){let page;await expect.poll(()=>{page=pages().find(page=>!before.has(page));return !!page;}).toBe(true);page.on('pageerror',error=>report.errors.push(String(error)));await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);return page;}
+async function nextPage(before){let page;await expect.poll(()=>{page=pages().find(page=>!before.has(page));return !!page;}).toBe(true);page.on('pageerror',error=>report.errors.push(String(error)));page.on('close',()=>{(report.closedWindows??=[]).push({url:page.url(),completedCases:report.cases.length,at:new Date().toISOString()});});await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);return page;}
 async function state(page,id){const status=await invoke(page,'read_workspace_history',{projectId:id});return {...status,project:status.history?.snapshots.find(s=>s.key===status.history.head.current)?.project};}
 function step(name,data={}){report.cases.push({name,...data});console.log(JSON.stringify({passed:name,...data}));}
 async function openProject(page,title){await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:title,exact:true})}).click();await expect(page.locator('.runtime-dock-heading>span').first()).toHaveText(title);await expect(page.locator('.forge-viewport canvas')).toBeVisible();}
@@ -49,10 +49,10 @@ try{
   await expect(detached.locator('.gs-workspace-panel:visible')).toHaveCount(1);await expect(detached.getByRole('button',{name:'Close Inspector',exact:true})).toHaveCount(0);
   const headerLayout=await detached.evaluate(()=>{
     const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {left:r.left,right:r.right};};
-    return {fullscreen:rect('[aria-label="Fullscreen editing"]'),returning:rect('[aria-label="Return panel to workspace"]'),window:rect('.gs-window-controls')};
+    return {view:rect('[aria-label="View and window options"]'),returning:rect('[aria-label="Return panel to workspace"]'),window:rect('.gs-window-controls')};
   });
-  expect(headerLayout.returning.left).toBeGreaterThanOrEqual(headerLayout.fullscreen.right);
-  expect(headerLayout.returning.right).toBeLessThanOrEqual(headerLayout.window.left);
+  expect(headerLayout.returning.right).toBeLessThanOrEqual(headerLayout.view.left);
+  expect(headerLayout.view.right).toBeLessThanOrEqual(headerLayout.window.left);
   await expect(detached.locator('.forge-viewport canvas')).toHaveCount(0);
   expect((await state(main,a.project.id)).writable).toBe(false);expect((await state(detached,a.project.id)).writable).toBe(true);
   await expect(x(detached)).toHaveValue('0.5');await setX(detached,1.25);const committed=await acknowledged(detached,a.project.id,1.25);await acknowledged(main,a.project.id,1.25);
@@ -72,7 +72,7 @@ try{
   expect((await Promise.all(rejectedFiles.map(name=>fs.readFile(path.join(journal,name),'utf8')))).some(text=>text.includes('Rejected stale observer'))).toBe(true);
   step('Pointer drag detaches the actual Inspector; selection, draft and authoritative history converge; stale observer writes are retained and refused');
   await detached.screenshot({path:path.join(root,'detached-inspector.png')});
-  await detached.getByRole('button',{name:'HOME',exact:true}).click();await expect(detached.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','library');await expect(detached.locator('.gs-workspace-shell')).not.toHaveAttribute('data-detached-panel');
+  await chooseTool(detached,'Map library');await expect(detached.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','library');await expect(detached.locator('.gs-workspace-shell')).not.toHaveAttribute('data-detached-panel');
   await chooseTool(detached,'Level editor');await expect(detached.locator('.gs-workspace-shell')).toHaveAttribute('data-detached-panel','forge-inspector');await inspector(detached);
   await openProject(main,'C59 map B');await inspector(main,true);
   const writes=await Promise.allSettled([setX(main,2.5),setX(detached,1.5)]);expect(writes.every(result=>result.status==='fulfilled')).toBe(true);
@@ -87,7 +87,7 @@ try{
     const gl=window.c59OriginalCanvas.getContext('webgl2'),clear=gl.clear.bind(gl);window.c59Draws=0;window.c59OriginalGl=gl;
     gl.clear=(...args)=>{window.c59Draws++;return clear(...args);};
   });
-  await chooseTool(main,'Tag editor');expect(await main.evaluate(()=>window.c59OriginalCanvas.dataset.gsEditorActivity)).toBe('paused');
+  await chooseTool(main,'Tag editor');await expect.poll(()=>main.evaluate(()=>window.c59OriginalCanvas.dataset.gsEditorActivity)).toBe('paused');
   await main.waitForTimeout(350);const parkedDraws=await main.evaluate(()=>window.c59Draws);await main.waitForTimeout(650);expect(await main.evaluate(()=>window.c59Draws)).toBe(parkedDraws);
   await chooseTool(main,'Level editor');await expect(main.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','level');await inspector(main);expect(await main.evaluate(()=>window.c59OriginalCanvas===document.querySelector('.forge-viewport canvas'))).toBe(true);
   step('Inactive editor pauses its actual GL clears and resumes the same Canvas and selection',{parkedGlClearsOver650ms:0});

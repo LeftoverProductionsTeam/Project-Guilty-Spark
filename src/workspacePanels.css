@@ -82,7 +82,8 @@
 .application[data-panel-window] .map-tab-bar,
 .application[data-panel-window] .runtime-dock,
 .application[data-panel-window] .project-breadcrumbs { display: none; }
-.application[data-panel-window] .gs-compact-header :is(.header-actions,.header-context,.gs-layout-actions) { display: none; }
+.application[data-panel-window] .gs-compact-header :is(.header-actions,.header-context,.gs-studio-menu),
+.application[data-panel-window] .gs-compact-header [aria-label='Workflow navigation'] { display: none; }
 #gs-header-workspace-tools .gs-workspace-tools > button.gs-return-panel { width:auto;min-width:64px;display:inline-flex;gap:4px;white-space:nowrap; }
 .gs-panel-buttons > button:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .gs-panel-count {
@@ -128,6 +129,18 @@
 }
 .gs-layout-menu .gs-layout-profile{display:grid;gap:4px;padding:4px 0 8px;font-size:11px;}
 .gs-layout-profile input{width:100%;min-width:0;min-height:28px;}
+.gs-view-menu{position:relative;}
+.gs-view-menu>summary{white-space:nowrap;list-style:none;}
+.gs-view-menu>summary::-webkit-details-marker{display:none;}
+.gs-view-menu>div{top:calc(100% + 7px);right:0;width:min(320px,calc(100vw - 28px));max-height:calc(100vh - 70px);overflow:auto;padding:8px;}
+.gs-view-commands{display:grid;gap:3px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+.application .gs-view-commands>button{display:flex;align-items:center;gap:7px;width:100%;padding:6px 8px;text-align:left;border:0;background:transparent;box-shadow:none;}
+.gs-view-commands>button>span{flex:1;}
+.gs-view-commands kbd{font-size:9px;color:var(--muted);}
+.gs-view-audio{display:grid;gap:5px;padding:8px 0;border-bottom:1px solid var(--line);}
+.gs-view-audio>strong{font-size:10px;font-weight:500;color:var(--muted);}
+.gs-compact-header .gs-view-audio .editor-sound-controls{width:100%;justify-content:space-between;}
+.gs-compact-header .gs-view-audio .editor-sound-controls input[type=range]{width:120px;}
 .gs-workspace-content {
   display: flex;
   flex-direction: column;
@@ -573,7 +586,7 @@ html[data-gs-fullscreen='true'] .gs-navigation-drawer {
   height: 40px !important;
   min-height: 0;
   visibility: visible;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 0;
   padding: 0 8px;
 }

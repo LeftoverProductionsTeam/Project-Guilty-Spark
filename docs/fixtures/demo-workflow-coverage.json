@@ -626,6 +626,12 @@
       "featureId": "tabs",
       "kind": "workflow",
       "scope": "Real desktop Open work, window-local roles, retained model/source views, authoritative history, saved layout and source-bound navigation. Gameplay and physical monitor removal are separate acceptance gates."
+    },
+    {
+      "artifact": "scripts/test-workspace-restart-native.mjs",
+      "featureId": "tabs",
+      "kind": "workflow",
+      "scope": "Layout → save workspace windows and optional restore-on-launch; a genuine second app process verifies independent tab sets, saved source-bound BSP selections/cameras, native window states and durable history. Physical monitor disconnect and gameplay remain separate."
     }
   ]
 }

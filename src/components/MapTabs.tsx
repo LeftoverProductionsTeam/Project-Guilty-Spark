@@ -28,6 +28,7 @@ export default function MapTabs({
   const tabs = useRef<HTMLDivElement>(null);
   const menu=useRef<HTMLDetailsElement>(null),pendingFocus=useRef<string|null>(null);
   const [query,setQuery]=useState('');
+  const [condensed,setCondensed]=useState(false);
   const [pinned,setPinned]=useMapState<string[]>(`global:window:${native?getCurrentWindow().label:'browser'}`,'tabs.pinned',[]);
   const [context,setContext]=useState<{id:string;x:number;y:number}|null>(null);
   const contextRoot=useRef<HTMLDivElement>(null);
@@ -42,6 +43,11 @@ export default function MapTabs({
     window.addEventListener('pointerdown',outside);window.addEventListener('keydown',key);return()=>{window.removeEventListener('pointerdown',outside);window.removeEventListener('keydown',key);};
   },[]);
   const drag=useRef<{id:string;pointer:number;x:number;y:number}|null>(null),suppressClick=useRef<string|null>(null);
+  useLayoutEffect(()=>{
+    const list=tabs.current;if(!list)return;
+    const resize=()=>{const gap=parseFloat(getComputedStyle(list).columnGap)||3;setCondensed(state.documents.length*144+Math.max(0,state.documents.length-1)*gap>list.clientWidth);};
+    resize();const observer=new ResizeObserver(resize);observer.observe(list);return()=>observer.disconnect();
+  },[state.documents.length]);
   useLayoutEffect(() => {
     const list=tabs.current;if(!list)return;
     const reveal=()=>list.querySelector('[aria-selected="true"]')?.closest('.map-tab')?.scrollIntoView({block:'nearest',inline:'nearest'});
@@ -51,10 +57,10 @@ export default function MapTabs({
   }, [state.activeId,state.documents.length]);
   if (!state.documents.length) return null;
   return (
-    <div className="map-tab-bar">
+    <div className="map-tab-bar" data-overflow={condensed?'dropdown':undefined} style={{width:Math.min(state.documents.length,8)*180+92}}>
       <div ref={tabs} className="map-tabs" role="tablist" aria-label="Open maps">
         {state.documents.map((d) => (
-          <div className={'map-tab' + (d.id === state.activeId ? ' active' : '')} key={d.id} data-map-tab-id={d.id} data-pinned={pinned.includes(d.id)||undefined} onContextMenu={e=>{e.preventDefault();setContext({id:d.id,x:Math.min(innerWidth-190,e.clientX),y:Math.min(innerHeight-130,e.clientY)});}}>
+          <div className={'map-tab' + (d.id === state.activeId ? ' active' : '')} hidden={condensed&&d.id!==state.activeId} key={d.id} data-map-tab-id={d.id} data-pinned={pinned.includes(d.id)||undefined} onContextMenu={e=>{e.preventDefault();setContext({id:d.id,x:Math.min(innerWidth-190,e.clientX),y:Math.min(innerHeight-130,e.clientY)});}}>
             <button
               role="tab"
               aria-selected={d.id === state.activeId}
@@ -89,10 +95,8 @@ export default function MapTabs({
                         ? state.documents.length - 1
                         : (i + (e.key === 'ArrowRight' ? 1 : -1) + state.documents.length) %
                           state.documents.length;
+                pendingFocus.current=state.documents[n].id;
                 onSelect(state.documents[n].id);
-                requestAnimationFrame(() =>
-                  list?.querySelectorAll<HTMLButtonElement>('[role=tab]')[n]?.focus(),
-                );
               }}
               title={`${d.history.current?.title} · ${d.history.current?.source?.engine??'QuickForge source'} · ${d.history.current?.source?.scenarioPath ?? 'Editable source project'} · drag out to move to another window`}
             >
@@ -119,7 +123,7 @@ export default function MapTabs({
         <button role="menuitem" disabled={disabled} onClick={()=>{onClose(context.id);setContext(null);}}>Save and close map</button>
       </div>}
       {state.documents.length>1&&<details ref={menu} className="gs-map-switcher" onToggle={event=>{
-        if(event.currentTarget.open){for(const other of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open]'))other.open=false;requestAnimationFrame(()=>menu.current?.querySelector('input')?.focus());}
+        if(event.currentTarget.open){for(const other of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))other.open=false;requestAnimationFrame(()=>menu.current?.querySelector('input')?.focus());}
       }} onKeyDown={event=>{
         if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector<HTMLElement>('summary')?.focus();return;}
         const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled)')];

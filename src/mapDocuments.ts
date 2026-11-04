@@ -17,7 +17,7 @@ export interface MapDocuments {
 }
 export type DocumentAction =
   | { type:'window-history';id:string;history:HistoryState }
-  | { type: 'open'; open: OpenProject }
+  | { type: 'open'; open: OpenProject; activate?: boolean }
   | { type: 'external-revision'; previousId: string; open: OpenProject; replaceClean: boolean }
   | { type: 'resources'; project: Project; inspection?:MapInspection|null; kind?:'audio' }
   | { type: 'select'; id: string }
@@ -82,7 +82,7 @@ export function documentReducer(state: MapDocuments, action: DocumentAction): Ma
     };
     return {
       ...state,
-      activeId: id,
+      activeId: action.activate === false && state.activeId ? state.activeId : id,
       documents: old ? state.documents.map((d) => (d.id === id ? doc : d)) : [...state.documents, doc],
     };
   }

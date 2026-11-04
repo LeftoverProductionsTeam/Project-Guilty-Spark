@@ -59,7 +59,7 @@ try {
  await page.getByRole('button',{name:'Objects & gameplay',exact:true}).click();await openDrawer(page,'Build tools');
  for(let i=0;i<4;i++){await openDrawer(page,'Build tools');await page.locator('.forge-tree-select').filter({hasText:new RegExp(`^Player ${i+1}$`)}).click();await openDrawer(page,'Inspector');await page.getByRole('button',{name:'Properties',exact:true}).click();await field('Position X',4+i);await field('Position Y',0);}
  await save();
- await expect(page.getByRole('combobox',{name:'Active Halo runtime',exact:true})).toHaveCount(1);await expect(page.locator('.runtime-dock select')).toHaveCount(0);
+ await expect(page.getByLabel('Active Halo runtime',{exact:true})).toHaveCount(1);await expect(page.locator('.runtime-dock select')).toHaveCount(0);
  await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.locator('h3',{hasText:source.project.title})}).click();
  await page.getByRole('tab',{name:created.project.title,exact:true}).click();await chooseTool(page,'Level editor');
  await openDrawer(page,'Asset library');const assets=page.getByRole('region',{name:'Asset library panel',exact:true});

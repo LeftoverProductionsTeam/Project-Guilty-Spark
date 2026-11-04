@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspaceActivity } from './WorkspaceActivity';
-import type { ReactNode } from 'react';
+import type { ReactNode, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu, PanelLeftClose, X, RotateCcw, SlidersHorizontal, SquareArrowOutUpRight, Expand, Shrink, CornerUpLeft } from 'lucide-react';
 import { useMapState,readMapSession,writeMapSession } from '../mapSession';
@@ -33,6 +33,16 @@ interface ContextValue {
   detached: string|null;
 }
 const Context = createContext<ContextValue | null>(null);
+export function closeOtherHeaderMenus(current:HTMLDetailsElement){
+  for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))if(menu!==current)menu.open=false;
+}
+export function headerMenuKeyDown(event:ReactKeyboardEvent<HTMLDetailsElement>){
+  if(event.target instanceof Element&&event.target.closest('input,select,textarea')||!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+  event.preventDefault();event.stopPropagation();const menu=event.currentTarget;menu.open=true;
+  const buttons=[...menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')],at=buttons.indexOf(document.activeElement as HTMLButtonElement);
+  const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
+  buttons[next]?.focus();
+}
 function HeaderTools({children}:{children:ReactNode}){
   const [host,setHost]=useState<HTMLElement|null>(null);
   useEffect(()=>setHost(document.getElementById('gs-header-workspace-tools')),[]);
@@ -43,6 +53,7 @@ export default function WorkspacePanels({
   workspace,
   children,
   actions,
+  viewActions,
   onNavigationToggle,
   navigationOpen,
   onPopout,
@@ -59,6 +70,7 @@ export default function WorkspacePanels({
   workspace: string;
   children: ReactNode;
   actions?: ReactNode;
+  viewActions?: ReactNode;
   onNavigationToggle: () => void;
   navigationOpen: boolean;
   onPopout?:()=>void;
@@ -96,7 +108,7 @@ export default function WorkspacePanels({
   useEffect(()=>setWindowHost(document.getElementById('gs-window-actions')),[]);
   useEffect(()=>{
     const dismiss=(event:PointerEvent)=>{if(!(event.target instanceof Node))return;
-      for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open]'))
+      for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))
         if(!menu.contains(event.target))menu.open=false;
     };
     window.addEventListener('pointerdown',dismiss);return()=>window.removeEventListener('pointerdown',dismiss);
@@ -169,12 +181,14 @@ export default function WorkspacePanels({
         e.preventDefault();
         void changeFullscreen();
       }
+      if(e.key==='Escape'&&!document.querySelector('[role="dialog"]')){
+        const menu=document.querySelector<HTMLDetailsElement>('.gs-panel-options[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]');
+        if(menu){e.preventDefault();menu.open=false;menu.querySelector<HTMLElement>('summary')?.focus();return;}
+      }
       if(e.key==='Escape'&&detached&&fullscreen&&!document.querySelector('[role="dialog"]')){
         e.preventDefault();void changeFullscreen(false);return;
       }
       if (e.key === 'Escape' && !detached && !document.querySelector('[role="dialog"]')) {
-        const menu=document.querySelector<HTMLDetailsElement>('.gs-panel-options[open],.gs-panel-overflow[open],.gs-layout-menu[open]');
-        if(menu){e.preventDefault();menu.open=false;menu.querySelector<HTMLElement>('summary')?.focus();return;}
         const panel =
           peek ??
           (Object.entries(layout.panels)
@@ -213,18 +227,9 @@ export default function WorkspacePanels({
           >
             <Menu size={16} />
           </button>}
-          <button
-            aria-label={fullscreen ? 'Exit fullscreen editing' : 'Fullscreen editing'}
-            aria-pressed={fullscreen}
-            title="Borderless fullscreen (F11). Escape returns to your workspace."
-            onClick={() => void changeFullscreen()}
-          >
-            {fullscreen ? <Shrink size={16}/> : <Expand size={16}/>}
-          </button>
-          {onPopout&&!detached&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={onPopout}><SquareArrowOutUpRight size={14}/></button>}
           {detached&&<button className="gs-return-panel" aria-label="Return panel to workspace" title="Save and return this panel to its original workspace" onClick={()=>window.dispatchEvent(new Event('gs:return-panel-to-origin'))}><CornerUpLeft size={14}/>Return</button>}
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
-          {!detached&&descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open)for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-layout-menu[open]'))menu.open=false;}} onKeyDown={event=>{
+          {!detached&&descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open)closeOtherHeaderMenus(event.currentTarget);}} onKeyDown={event=>{
             if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
             event.preventDefault();event.stopPropagation();event.currentTarget.open=true;
             const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')],at=buttons.indexOf(document.activeElement as HTMLButtonElement);
@@ -236,9 +241,15 @@ export default function WorkspacePanels({
           </details>}
           <div className="gs-layout-actions">
             {actions}
-            {!detached&&<details className="gs-layout-menu" onToggle={event=>{if(event.currentTarget.open){onListLayouts?.();for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-panel-overflow[open]'))menu.open=false;}}}>
-              <summary>Layout</summary>
+            <details className="gs-layout-menu gs-view-menu" onToggle={event=>{if(event.currentTarget.open){if(!detached)onListLayouts?.();closeOtherHeaderMenus(event.currentTarget);}}} onKeyDown={headerMenuKeyDown}>
+              <summary aria-label="View and window options">View <span aria-hidden="true">▾</span></summary>
               <div>
+                <section className="gs-view-commands" aria-label="Window view">
+                  <button aria-label={fullscreen?'Exit fullscreen editing':'Fullscreen editing'} aria-pressed={fullscreen} onClick={event=>{event.currentTarget.closest('details')!.open=false;void changeFullscreen();}}>{fullscreen?<Shrink size={15}/>:<Expand size={15}/>}<span>{fullscreen?'Exit fullscreen':'Fullscreen'}</span><kbd>F11</kbd></button>
+                  {onPopout&&!detached&&<button aria-label="Pop out workspace" title="Open this workspace in a resizable window for another monitor. Map editors transfer their saved project to that window." onClick={event=>{event.currentTarget.closest('details')!.open=false;onPopout();}}><SquareArrowOutUpRight size={15}/><span>Move workspace to a new window</span></button>}
+                </section>
+                {viewActions&&<section className="gs-view-audio" aria-label="Map preview sound"><strong>Map preview sound</strong>{viewActions}</section>}
+                {!detached&&<>
                 {onLayoutName&&<label className="gs-layout-profile">Window layout<input aria-label="Window layout name" maxLength={80} value={layoutName??'Studio'} list="gs-saved-layouts" onChange={event=>onLayoutName(event.target.value)}/><datalist id="gs-saved-layouts">{layoutNames?.map(name=><option key={name} value={name}/>)}</datalist></label>}
                 {onSaveLayout&&<button onClick={onSaveLayout}>Save workspace windows</button>}
                 {onRestoreLayout&&<button onClick={onRestoreLayout}>Restore workspace windows</button>}
@@ -263,8 +274,9 @@ export default function WorkspacePanels({
                   <RotateCcw size={13} />
                   Reset layout
                 </button>
+                </>}
               </div>
-            </details>}
+            </details>
           </div>
           {windowHost&&createPortal(<WindowControls
             notify={setFrameError}

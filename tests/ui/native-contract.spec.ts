@@ -1,4 +1,4 @@
-import {chooseTool,openDrawer} from './helpers/navigation';
+import {chooseTool,openDrawer,openViewMenu,openStudioMenu} from './helpers/navigation';
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
 import { test, expect, type Page } from '@playwright/test';
 
@@ -520,14 +520,14 @@ test('each workspace exposes one pop-out and retains Learning and Settings secti
   await mockDesktop(page);
   const routes:[string,string][]=[['Map library','library'],['Start here','get-started'],['Features & workflows','features'],['Learning center','learning'],['Community maps','map-finder'],['Community Thanks','community'],['Compare variants','compare'],['Firefight rules','firefight'],['Creator Studio','creator'],['Build & playtest','build'],['Online','runtimes'],['Asset workshop','assets'],['AI & scenario','scenario'],['Machinima','machinima'],['Tag editor','tags'],['Level editor','quickforge'],['Preservation record','preservation'],['Settings & tools','settings']];
   for(const [name,workspace] of routes){
-    await chooseTool(page,name);const popout=page.getByRole('button',{name:'Pop out workspace',exact:true});await expect(popout).toHaveCount(1);await popout.click();
+    await chooseTool(page,name);await openViewMenu(page);const popout=page.getByRole('button',{name:'Pop out workspace',exact:true});await expect(popout).toHaveCount(1);await popout.click();
     await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args.workspace)).toBe(workspace);
   }
-  await page.getByRole('tab',{name:'Dependencies & setup',exact:true}).click();await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await page.getByRole('tab',{name:'Dependencies & setup',exact:true}).click();await openViewMenu(page);await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args)).toEqual({workspace:'settings',section:'dependencies',context:null});
-  await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await page.getByRole('tab',{name:'Interface Studio',exact:true}).click();await openViewMenu(page);await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args)).toEqual({workspace:'settings',section:'interface',context:null});
-  await chooseTool(page,'Learning center');await page.getByRole('tab',{name:'Glossary',exact:true}).click();await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await chooseTool(page,'Learning center');await page.getByRole('tab',{name:'Glossary',exact:true}).click();await openViewMenu(page);await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args)).toEqual({workspace:'learning',section:'glossary',context:null});
 });
 
@@ -535,7 +535,7 @@ test('popping out a map editor saves the focused edit before transferring its do
   await mockDesktop(page);await openFixture(page);
   await page.evaluate(()=>{(window as any).__sparkMock.enforceTransfer=true;});
   const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('28');
-  await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await openViewMenu(page);await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(28);
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.findIndex((call:any)=>call.command==='open_project_window'))).toBeGreaterThan(0);
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);
@@ -617,7 +617,7 @@ test('C35 drawers remember each workspace and fullscreen preserves editing tools
  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,"Tag editor");await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,"Level editor");await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.getByLabel('Inspector position')).toHaveValue('float');
  await expect(page.getByRole('button',{name:'Focus mode',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Fullscreen editing',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
+ await openViewMenu(page);await page.getByRole('button',{name:'Fullscreen editing',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
  await expect(page.getByRole('region',{name:'Inspector panel',exact:true})).toBeVisible();await expect(page.getByRole('tablist',{name:'Open maps',exact:true})).toBeVisible();await expect(page.locator('.viewport-toolbar')).toBeVisible();await expect(page.locator('.runtime-dock')).toBeVisible();
  const full=await viewport.boundingBox();expect(full!.height).toBeGreaterThan(original!.height+8);
  const windowButtons=await page.getByRole('group',{name:'Window controls',exact:true}).boundingBox();expect(windowButtons!.y).toBeLessThanOrEqual(6);
@@ -639,7 +639,7 @@ test('object tags open in a hideable drawer without changing workspace, camera l
  await page.getByRole('button',{name:'Close Object tags',exact:true}).click();await expect(drawer).toBeHidden();
  await openDrawer(page,'Object tags');await expect(drawer.getByLabel('Velocity',{exact:true})).toHaveValue('23');expect(await viewport.boundingBox()).toEqual(before);
  await page.keyboard.press('Control+z');await expect(value).toHaveValue('10');await page.keyboard.press('Control+y');await expect(value).toHaveValue('23');
- await page.getByRole('button',{name:'Close Object tags',exact:true}).click();await page.getByRole('button',{name:'Fullscreen editing',exact:true}).click();
+ await page.getByRole('button',{name:'Close Object tags',exact:true}).click();await openViewMenu(page);await page.getByRole('button',{name:'Fullscreen editing',exact:true}).click();
  await openDrawer(page,'Object tags');await expect(drawer).toBeVisible();await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
 });
 
@@ -649,19 +649,21 @@ test('object tag dependencies stay selected through session updates until a new 
  await openDrawer(page,'Objects');await page.getByRole('button',{name:'Dependency test weapon',exact:true}).click();
  const drawer=page.getByRole('region',{name:'Object tags panel',exact:true});
  await drawer.getByRole('button',{name:'Model → dependency',exact:true}).click();await expect(drawer.locator('.viewport-tag-path')).toHaveText('models/dependency');
- await page.getByRole('slider',{name:'Map sound volume',exact:true}).fill('0.52');await expect(drawer.locator('.viewport-tag-path')).toHaveText('models/dependency');
+ await openViewMenu(page);await page.getByRole('slider',{name:'Map sound volume',exact:true}).fill('0.52');await expect(drawer.locator('.viewport-tag-path')).toHaveText('models/dependency');
+ await page.keyboard.press('Escape');
  await drawer.getByRole('button',{name:'Back to object tag',exact:true}).click();await expect(drawer.getByLabel('Velocity',{exact:true})).toBeVisible();
 });
 
 test('map audio preferences survive tag drawers, fullscreen and map switches independently',async({page})=>{
  await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await openViewMenu(page);
  const volume=page.getByRole('slider',{name:'Map sound volume',exact:true});await expect(volume).toHaveValue('0.35');
  await volume.fill('0.61');await page.getByRole('button',{name:'Mute map sounds',exact:true}).click();await expect(page.getByRole('button',{name:'Unmute map sounds',exact:true})).toHaveAttribute('aria-pressed','true');
- await openDrawer(page,'Object tags');await expect(page.getByRole('region',{name:'Object tags panel',exact:true})).toBeVisible();await page.getByRole('button',{name:'Close Object tags',exact:true}).click();await expect(volume).toHaveValue('0.61');
- await page.keyboard.press('F11');await expect(volume).toBeInViewport();await expect(page.getByRole('button',{name:'Unmute map sounds',exact:true})).toBeInViewport();await page.keyboard.press('Escape');
+ await openDrawer(page,'Object tags');await expect(page.getByRole('region',{name:'Object tags panel',exact:true})).toBeVisible();await page.getByRole('button',{name:'Close Object tags',exact:true}).click();await openViewMenu(page);await expect(volume).toHaveValue('0.61');
+ await page.keyboard.press('F11');await expect(volume).toBeInViewport();await expect(page.getByRole('button',{name:'Unmute map sounds',exact:true})).toBeInViewport();await page.keyboard.press('Escape');await expect(page.getByLabel('View and window options',{exact:true})).toBeFocused();await page.keyboard.press('Escape');
  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
- await expect(volume).toHaveValue('0.35');await expect(page.getByRole('button',{name:'Mute map sounds',exact:true})).toBeVisible();
- await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await expect(volume).toHaveValue('0.61');await expect(page.getByRole('button',{name:'Unmute map sounds',exact:true})).toBeVisible();
+ await openViewMenu(page);await expect(volume).toHaveValue('0.35');await expect(page.getByRole('button',{name:'Mute map sounds',exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await openViewMenu(page);await expect(volume).toHaveValue('0.61');await expect(page.getByRole('button',{name:'Unmute map sounds',exact:true})).toBeVisible();
 });
 
 test('cross-map model placement opens source tags and keeps undo and save in that source map',async({page})=>{
@@ -711,7 +713,7 @@ test('Find tools exposes downloads and explicit registered app launch while pres
      return original(command,args);
    };
  });
- await page.getByRole('button',{name:/Find tools/}).click();
+ await openStudioMenu(page);await page.getByRole('button',{name:/Find tools/}).click();
  const finder=page.getByRole('dialog');await expect(finder.getByRole('button',{name:'Launch Guerilla',exact:true})).toBeEnabled();
  await expect(finder.getByRole('link',{name:'Get Guerilla',exact:true})).toHaveAttribute('href','https://learn.microsoft.com/en-us/halo-master-chief-collection/');
  await finder.getByRole('textbox',{name:'Search workspaces'}).fill('Reclaimer');
@@ -736,7 +738,11 @@ test('one compact header contains map tabs and lowered reachable window actions'
  await expect(header.getByRole('tablist',{name:'Open maps',exact:true})).toBeVisible();await expect(page.locator('.main-content > .map-tab-bar')).toHaveCount(0);
  for(const label of ['Window','Focus mode','Collapse top bar','Show top bar'])await expect(page.getByRole('button',{name:label,exact:true})).toHaveCount(0);
  const controls=await page.getByRole('group',{name:'Window controls',exact:true}).boundingBox();const headerBox=await header.boundingBox();expect(Math.abs((controls!.y+controls!.height/2)-(headerBox!.y+headerBox!.height/2))).toBeLessThanOrEqual(1);expect(controls!.height).toBeLessThanOrEqual(28);await page.getByRole('button',{name:'Close window',exact:true}).click({trial:true});
- await expect(header.getByRole('button',{name:/Find tools/})).toBeVisible();
+ await expect(header.getByRole('button',{name:/Find tools/})).toBeHidden();await openStudioMenu(page);await expect(header.getByRole('button',{name:/Find tools/})).toBeVisible();await page.keyboard.press('Escape');await expect(header.getByLabel('Studio options',{exact:true})).toBeFocused();
+ const view=header.getByLabel('View and window options',{exact:true});await expect(view).toBeVisible();
+ await expect(header.getByRole('button',{name:'Fullscreen editing',exact:true})).toBeHidden();await view.focus();await view.press('ArrowDown');
+ await expect(header.getByRole('button',{name:'Fullscreen editing',exact:true})).toBeFocused();await view.press('End');await expect(page.getByRole('button',{name:'Reset layout',exact:true})).toBeFocused();
+ await page.keyboard.press('Escape');await expect(view).toBeFocused();await expect(header.getByRole('button',{name:'Fullscreen editing',exact:true})).toBeHidden();
 });
 
 test('narrow workspaces expose every drawer and Escape closes its options before the drawer',async({page})=>{
@@ -755,7 +761,7 @@ test('the single header reserves map-tab space and keeps overflow drawers reacha
  await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');
  await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();await chooseTool(page,'Level editor');
  await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-selected','true');
- for(const width of [1920,1440,1280,960,880]){
+ for(const width of [1920,1440,1280,960,880,800]){
   await page.setViewportSize({width,height:800});
   const header=page.locator('#gs-window-header');
   await expect.poll(()=>header.evaluate(element=>{
@@ -763,8 +769,18 @@ test('the single header reserves map-tab space and keeps overflow drawers reacha
    return children.every((child,index)=>child.left>=rect.left-1&&child.right<=rect.right+1&&(!index||children[index-1].right<=child.left+1));
   })).toBe(true);
   const tabs=page.getByRole('tablist',{name:'Open maps',exact:true}),active=page.getByRole('tab',{name:'Synthetic candidate',exact:true});
-  const bar=await page.locator('.map-tab-bar').boundingBox();expect(bar!.width).toBeGreaterThanOrEqual(168);
+  const bar=await page.locator('.map-tab-bar').boundingBox();expect(bar!.width).toBeGreaterThanOrEqual(144);
+  const drag=page.locator('.gs-titlebar-drag-space');expect((await drag.boundingBox())!.width).toBeGreaterThanOrEqual(48);await expect(drag).toHaveAttribute('data-tauri-drag-region','deep');
   await expect.poll(async()=>{const list=await tabs.boundingBox(),button=await active.locator('..').boundingBox();return button!.x>=list!.x-1&&button!.x+button!.width<=list!.x+list!.width+1;}).toBe(true);
+  if(width===1920){
+   // Tabs keep a readable cap; the explicit drag region owns spare space.
+   expect((await active.locator('..').boundingBox())!.width).toBeLessThanOrEqual(180);
+   await expect.poll(()=>tabs.evaluate(list=>{const items=[...list.querySelectorAll('.map-tab')],a=items[0].getBoundingClientRect(),b=items.at(-1)!.getBoundingClientRect();return Math.abs(list.getBoundingClientRect().width-(b.right-a.left));})).toBeLessThanOrEqual(6);
+   expect(await tabs.evaluate(list=>list.scrollWidth-list.clientWidth)).toBeLessThanOrEqual(1);
+   const tools=page.locator('#gs-header-workspace-tools'),lastTool=tools.locator('.gs-layout-menu > summary');
+   const toolsBox=await tools.boundingBox(),lastToolBox=await lastTool.boundingBox();expect(toolsBox!.x+toolsBox!.width-lastToolBox!.x-lastToolBox!.width).toBeLessThanOrEqual(6);
+  }
+  if(width===800){await expect(page.locator('.map-tab-bar')).toHaveAttribute('data-overflow','dropdown');await expect(tabs.getByRole('tab')).toHaveCount(1);await page.getByLabel('Choose open map',{exact:true}).click();await expect(page.getByRole('menu',{name:'Open map switcher'}).getByRole('menuitemradio')).toHaveCount(2);await page.keyboard.press('Escape');}
   const more=page.getByLabel('More workspace drawers',{exact:true});await expect(more).toBeVisible();await more.click();
   const menu=page.getByRole('menu',{name:'Workspace drawers',exact:true});await expect(menu).toBeInViewport();
   await menu.getByRole('menuitemcheckbox',{name:'Object tags',exact:true}).click();await expect(page.getByRole('region',{name:'Object tags panel',exact:true})).toBeVisible();
@@ -806,8 +822,14 @@ test('the Spark corner visual clears the curved frame and stays above window gla
   if(await button.getAttribute('aria-expanded')!=='true')await button.click();
   await expect(page.locator('.gs-navigation-drawer')).toBeVisible();
   await button.click();await expect(page.locator('.gs-navigation-drawer')).toBeHidden();
-  await page.getByRole('button',{name:'HOME',exact:true}).click();await expect(page.locator('.library-page')).toBeVisible();
+  await chooseTool(page,'Map library');await expect(page.locator('.library-page')).toBeVisible();
  }
+ for(const theme of ['halo-ce','unsc','covenant','forerunner','dark-glow']){
+  await page.evaluate(theme=>document.documentElement.dataset.gsTheme=theme,theme);await button.hover();
+  await expect(button).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(button).toHaveCSS('background-image','none');await expect(button).toHaveCSS('box-shadow','none');
+  await button.click();await expect(button).toHaveCSS('background-color','rgba(0, 0, 0, 0)');await expect(button).toHaveCSS('box-shadow','none');await button.click();
+ }
+ await expect(button).not.toHaveAttribute('title');
 });
 
 test('tag classes expand their matching tags and keep the selected editor when folded',async({page})=>{
@@ -903,7 +925,7 @@ test('drawers keep the existing themes and leave the map interactive without a s
 test('fullscreen from maximized restores the original mode and keeps mouse window actions reachable',async({page})=>{
  await mockDesktop(page);await page.getByRole('button',{name:'Maximize window',exact:true}).click();
  expect(await page.evaluate(()=>(window as any).__sparkMock.maximized)).toBe(true);
- await page.getByRole('button',{name:'Fullscreen editing',exact:true}).click();
+ await openViewMenu(page);await page.getByRole('button',{name:'Fullscreen editing',exact:true}).click();
  await expect(page.locator('html')).toHaveAttribute('data-gs-fullscreen','true');
  expect(await page.evaluate(()=>(window as any).__sparkMock.maximized)).toBe(false);
  await expect(page.getByRole('button',{name:'Close window',exact:true})).toBeInViewport();
@@ -1157,18 +1179,18 @@ test('a second map window receives a shared listing refresh without another HTTP
 test('runtime dock remembers each map target and rejects a late tool preview from another map', async ({page}) => {
   await mockDesktop(page); await openFixture(page);
   const dock = page.getByRole('contentinfo', {name:'Runtime & Tools Dock'});
-  const runtime=page.getByRole('combobox', {name:'Active Halo runtime'});
+  const runtime=page.getByLabel('Active Halo runtime',{exact:true});
   await expect(dock.getByRole('combobox')).toHaveCount(0);
-  await runtime.selectOption('openCe');
+  await openStudioMenu(page);await runtime.selectOption('openCe');
   await chooseTool(page,"Map library");
   await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();
   // The header also remembers the default for a newly opened map. Give this
   // second map its own explicit target, then verify both map choices persist.
   await expect(runtime).toHaveValue('openCe');
-  await runtime.selectOption('mccSteam');
+  await openStudioMenu(page);await runtime.selectOption('mccSteam');
   await page.getByRole('tab',{name:/Synthetic baseline/}).click();
   await expect(runtime).toHaveValue('openCe');
-  await runtime.selectOption('mccSteam');
+  await openStudioMenu(page);await runtime.selectOption('mccSteam');
   await page.evaluate(() => {
     const w=window as any, original=w.__TAURI_INTERNALS__.invoke;
     w.__TAURI_INTERNALS__.invoke=async(command:string,args:any) => {
@@ -1299,7 +1321,7 @@ test('home exposes four Halos and connects a discovered client only after an exa
     };
   });
   await chooseTool(page, 'Settings & tools');
-  await page.getByRole('button', { name: 'HOME', exact: true }).click();
+  await chooseTool(page,'Map library');
   const homes = page.getByRole('group', { name: 'Your Halo installations', exact: true });
   await expect(homes.getByRole('button')).toHaveCount(4);
   await homes.getByRole('button', { name: 'OpenCE · Detected', exact: true }).click();
@@ -1313,7 +1335,7 @@ test('home exposes four Halos and connects a discovered client only after an exa
   await expect(page.getByRole('button', { name: 'OpenCE · Connected', exact: true })).toHaveAttribute('data-connected', 'true');
   const requests = await page.evaluate(() => (window as any).__sparkMock.calls.filter((item: any) => item.command === 'connect_detected_halo'));
   expect(requests.at(-1).args).toEqual({ runtimeId: 'openCe', executableSha256: 'd'.repeat(64) });
-  await page.getByRole('button', { name: 'HOME', exact: true }).click();
+  await chooseTool(page,'Map library');
   await expect(page.getByRole('group', { name: 'Your Halo installations', exact: true }).getByRole('button', { name: 'OpenCE · Connected', exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as any).__sparkMock.calls.some((item: any) => ['launch_registered_runtime', 'launch_discovered_tool'].includes(item.command)))).toBe(false);
 });
@@ -1721,7 +1743,7 @@ test('shared keyboard history waits for a poll and unfinished undo without losin
       return previous(command,args);
     };
   });
-  await page.getByRole('button',{name:'Live Studio · Solo',exact:true}).click();
+  await openStudioMenu(page);await page.getByRole('button',{name:'Live Studio · Solo',exact:true}).click();
   await page.getByRole('button',{name:'Host editing session',exact:true}).click();
   await page.locator('.forge-viewport canvas').click({position:{x:50,y:50}});
   await page.evaluate(()=>{(window as any).__sparkGatePoll=true;});
@@ -1818,7 +1840,7 @@ test('settings keyboard navigation keeps focus when a lazy tab loads', async ({p
   await page.keyboard.press('ArrowLeft');
   await expect(page.getByRole('tab',{name:'Interface Studio',exact:true})).toBeFocused();
   await expect(page.getByRole('tablist',{name:'Settings sections',exact:true}).locator('[tabindex="0"]')).toHaveCount(1);
-  await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await openViewMenu(page);await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
   await expect.poll(() => page.evaluate(() => (window as any).__sparkMock.calls.filter((item:any) => item.command === 'open_workspace_window').at(-1)?.args)).toEqual({workspace:'settings',section:'interface',context:null});
   await page.goto('/?workspace=settings&section=interface');
   await expect(page.getByRole('tab',{name:'Interface Studio',exact:true})).toHaveAttribute('aria-selected','true');
@@ -2320,7 +2342,7 @@ test('connected thread-release faults disable object, sprint and camera writes w
   await expect(page.getByRole('button',{name:'Toggle in-game third person',exact:true})).toBeDisabled();
   await page.locator('.native-sprint-controls>summary').click();await expect(page.getByRole('button',{name:'Enable native sprint',exact:true})).toBeDisabled();
   await page.getByRole('combobox',{name:'Live Halo object',exact:true}).selectOption('12');await expect(page.getByRole('button',{name:'Apply live object position',exact:true})).toBeDisabled();
-  await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption('openCe');
+  await openStudioMenu(page);await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption('openCe');
   await expect(page.getByText('This connection remains bound to MCC.',{exact:false})).toBeVisible();
   const release=page.getByRole('button',{name:'Retry thread release & disconnect',exact:true});await release.click();await expect(page.getByText('Synthetic thread release still incomplete',{exact:false})).toBeVisible();await expect(release).toBeEnabled();
   await page.evaluate(()=>{(window as any).__threadRelease.fail=false;});await release.click();await expect(page.getByText('Synthetic owned thread release acknowledged and temporary data restored.',{exact:true})).toBeVisible();
@@ -2338,11 +2360,11 @@ test('selecting a non-MCC game never enables the MCC connect operation',async({p
   const connect=page.getByRole('button',{name:'Connect current Halo 1 session',exact:true});
   await expect(connect).toBeEnabled();
   for(const runtime of ['haloCustomEdition','openCe','chupathingyCe']){
-    await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption(runtime);
+    await openStudioMenu(page);await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption(runtime);
     await expect(connect).toBeDisabled();await expect(consent).toBeDisabled();
     await expect(page.getByText('This runtime has no validated Spark Live Link write adapter.',{exact:false})).toBeVisible();
   }
-  await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption('mccSteam');
+  await openStudioMenu(page);await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption('mccSteam');
   await expect(connect).toBeEnabled();
 });
 

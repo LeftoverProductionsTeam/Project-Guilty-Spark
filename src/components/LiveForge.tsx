@@ -6,12 +6,14 @@ import {Notice} from './ui';
 import LiveSessionRecovery from './LiveSessionRecovery';
 import { disconnectLiveSession } from '../liveSession';
 import type {EditPlan,EditExecution} from '../smartEdit';
+import {useWorkspaceActivity} from './WorkspaceActivity';
 interface LiveObject {datum:number;tagDatum:number;tagPath:string;kind:number;position:[number,number,number];player:boolean}
 interface LiveStatus {pid:number;sessionToken:string;cleanupPending?:boolean;experimental:boolean;detail:string;snapshot:{profile:string;identity:{scenario:string;checksum:number};objects:LiveObject[]}}
 interface Binding {sessionToken:string;placementId:string;datum:number;tagDatum:number;expectedPosition:number[]}
 /** Each binding is local to one process lifetime. Neither a peer's object datum
  * nor the mere presence of MCC enables writes on this machine. */
 export default function LiveForge({project,document:doc,selected}:{project:Project;document:QuickForgeDocument;selected:string[]}){
+  const {active:workspaceActive}=useWorkspaceActivity();
   const [status,setStatus]=useState<LiveStatus|null>(null),[mods,setMods]=useState(false),[enabled,setEnabled]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
   const [bindings,setBindings]=useState<Binding[]>([]),[objectId,setObjectId]=useState('');
   const current=useRef({doc,status,bindings});current.current={doc,status,bindings};
@@ -19,7 +21,8 @@ export default function LiveForge({project,document:doc,selected}:{project:Proje
   useEffect(()=>{setBindings([]);setObjectId('');setEnabled(false);applied.current.clear();},[status?.sessionToken]);
   const placement=doc.placements.find(p=>selected.includes(p.id));
   const candidates=status?.snapshot.objects.filter(o=>placement&&o.tagPath===placement.tagPath.replaceAll('\\','/').toLowerCase()&&({0:'bipd',1:'vehi',2:'weap',3:'eqip',6:'scen'} as Record<number,string>)[o.kind]===placement.tagClass)??[];
-  useEffect(()=>{mounted.current=true;void refresh().catch(()=>{});return()=>{mounted.current=false;sampleEpoch.current++;};},[]);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;sampleEpoch.current++;};},[]);
+  useEffect(()=>{if(native&&workspaceActive&&doc.runtimeId==='mccSteam')void refresh().catch(()=>{});},[workspaceActive,doc.runtimeId]);
   async function refresh(){const ticket=++sampleEpoch.current,next=await call<LiveStatus>('live_mcc_sample');if(mounted.current&&ticket===sampleEpoch.current)setStatus(next);return next;}
   async function apply(){
     if(running.current)return;const {doc,bindings,status:boundSession}=current.current;
@@ -38,8 +41,8 @@ export default function LiveForge({project,document:doc,selected}:{project:Proje
     }catch(error){if(mounted.current){setError(String(error));setEnabled(false);setStatus(null);setBindings([]);}}
     finally{running.current=false;if(mounted.current)setBusy(false);}
   }
-  useEffect(()=>{if(!enabled||!status)return;const timer=setInterval(()=>void apply(),150);return()=>clearInterval(timer);},[enabled,status?.pid,project.id]);
-  useEffect(()=>{if(!status)return;let active=true;const timer=setInterval(()=>{if(running.current)return;void refresh().catch(error=>{if(active){setStatus(null);setBindings([]);setEnabled(false);setError(String(error));}});},2000);return()=>{active=false;clearInterval(timer);};},[status?.pid]);
+  useEffect(()=>{if(!workspaceActive||doc.runtimeId!=='mccSteam'||!enabled||!status)return;const timer=setInterval(()=>void apply(),150);return()=>clearInterval(timer);},[enabled,status?.pid,project.id,workspaceActive,doc.runtimeId]);
+  useEffect(()=>{if(!workspaceActive||doc.runtimeId!=='mccSteam'||!status)return;let active=true;const timer=setInterval(()=>{if(running.current)return;void refresh().catch(error=>{if(active){setStatus(null);setBindings([]);setEnabled(false);setError(String(error));}});},2000);return()=>{active=false;clearInterval(timer);};},[status?.pid,workspaceActive,doc.runtimeId]);
   return <details className="forge-live-panel"><summary>Live Halo adapter · MCC</summary>
     <p>Experimental support for moving existing objects in MCC Halo 1, build 1.3528.0.0. Both executable hashes must match the reviewed profile.</p>
     {!status?<><LiveSessionRecovery disabled={busy} onBusyChange={value=>{running.current=value;sampleEpoch.current++;setBusy(value);}} onReleased={report=>{setStatus(null);setBindings([]);setEnabled(false);applied.current.clear();setError('');setMessage(report.detail);}}/><label><input type="checkbox" checked={mods} onChange={e=>setMods(e.target.checked)}/> I launched MCC using Anti-Cheat Disabled in Steam</label>

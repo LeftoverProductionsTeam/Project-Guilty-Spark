@@ -1,3 +1,4 @@
+import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in checks of the compiled desktop, real owned map imports and browser-rendered audio.
 // Uses a fresh library/profile. Does not launch Halo or write to an installed map/SDK.
 import { chromium, expect as baseExpect } from '@playwright/test';
@@ -309,16 +310,16 @@ try {
   await openCard('Native viewport base');
   if (focusedAudio) {
     await expect.poll(async () => Number(await meter.getAttribute('data-rms'))).toBeGreaterThan(0.005);
-    await volume.fill('0.8');
+    await openViewMenu(page);await volume.fill('0.8');
     await expect.poll(async () => Number(await meter.getAttribute('data-rms'))).toBeGreaterThan(0.05);
     const loud = Number(await meter.getAttribute('data-rms'));
-    await volume.fill('0.2');
+    await openViewMenu(page);await volume.fill('0.2');
     await expect.poll(async () => Number(await meter.getAttribute('data-rms'))).toBeLessThan(loud * 0.4);
     const quiet = Number(await meter.getAttribute('data-rms'));
     expect(quiet).toBeGreaterThan(0.003);
-    await page.getByRole('button', { name: 'Mute map sounds', exact: true }).click();
+    await openViewMenu(page);await page.getByRole('button', { name: 'Mute map sounds', exact: true }).click();
     await expect.poll(async () => Number(await meter.getAttribute('data-rms'))).toBe(0);
-    await page.getByRole('button', { name: 'Unmute map sounds', exact: true }).click();
+    await openViewMenu(page);await page.getByRole('button', { name: 'Unmute map sounds', exact: true }).click();
     await expect.poll(async () => Number(await meter.getAttribute('data-rms'))).toBeGreaterThan(0.003);
     receipt.checks.actualAudioMix = {
       loudRms: loud,
@@ -334,15 +335,15 @@ try {
       muted = await renderAudio(bytes, 0);
     expect(quiet.rms / loud.rms).toBeCloseTo(0.25, 5);
     expect(muted.rms).toBe(0);
-    await volume.fill('0.8');
+    await openViewMenu(page);await volume.fill('0.8');
     await expect(volume).toHaveValue('0.8');
-    await volume.fill('0.2');
-    await page.getByRole('button', { name: 'Mute map sounds', exact: true }).click();
+    await openViewMenu(page);await volume.fill('0.2');
+    await openViewMenu(page);await page.getByRole('button', { name: 'Mute map sounds', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Unmute map sounds', exact: true })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    await page.getByRole('button', { name: 'Unmute map sounds', exact: true }).click();
+    await openViewMenu(page);await page.getByRole('button', { name: 'Unmute map sounds', exact: true }).click();
     receipt.checks.independentCustomAudio = {
       kind: 'imported-native-bytes-WebView2-OfflineAudioContext',
       loudRms: loud.rms,

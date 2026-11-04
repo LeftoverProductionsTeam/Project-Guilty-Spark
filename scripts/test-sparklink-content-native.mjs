@@ -1,3 +1,4 @@
+import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in: three actual Windows Spark processes, three isolated owned libraries.
 // The Halo compiler is real; game clients, peers and custom binary transfers are not simulated.
 import { chromium, expect as pwExpect } from '@playwright/test';
@@ -149,7 +150,7 @@ async function start(actor, restart = false) {
     .filter({ has: actor.page.getByRole('heading', { name: actor.fixture.title, exact: true }) })
     .click();
   await actor.call('claim_project_document', { id: actor.id });
-  await actor.page.getByRole('button', { name: /Live Studio ·/ }).click();
+  await openStudioMenu(actor.page);await actor.page.getByRole('button', { name: /Live Studio ·/ }).click();
   await expect(actor.page.locator('.forge-workspace')).toBeVisible();
   await expect(actor.page.locator('.studio-panel')).toBeVisible();
   const summary = actor.page.locator('.studio-panel > summary');
@@ -222,7 +223,7 @@ async function joinUi(a, invitation) {
   await a.panel.getByRole('textbox', { name: 'Studio display name', exact: true }).fill(a.name);
   await a.panel.getByRole('textbox', { name: 'Private Spark invite', exact: true }).fill(invitation);
   await a.panel.getByRole('button', { name: 'Join private invite', exact: true }).click();
-  await expect(a.page.getByRole('button', { name: 'Live Studio · Connected', exact: true })).toBeVisible();
+  await openStudioMenu(a.page);await expect(a.page.getByRole('button', { name: 'Live Studio · Connected', exact: true })).toBeVisible();
   const info = await status(a);
   expect(info.view.encrypted).toBe(true);
   expect(info.view.durable).toBe(true);
@@ -276,7 +277,7 @@ try {
       const tab=x.page.getByRole('tab',{name:x.fixture.title,exact:true});
       await tab.click();
       await expect(x.page.locator('.forge-workspace')).toBeVisible();
-    await x.page.getByRole('button',{name:/Live Studio ·/}).click();
+    await openStudioMenu(x.page);await x.page.getByRole('button',{name:/Live Studio ·/}).click();
     await expect(x.panel).toBeVisible();
     if(!x.map.scenery||!x.map.pistol)throw Error('Owned map must contain the real boulder and pistol');
     await x.panel.getByRole('combobox',{name:'Native preview map',exact:true}).selectOption(x.map.projectId);
@@ -306,7 +307,7 @@ try {
   if(await network.count())await network.selectOption('127.0.0.1');
   else await a.panel.getByRole('textbox',{name:'Studio bind address',exact:true}).fill('127.0.0.1');
   await a.panel.getByRole('button',{name:'Host editing session',exact:true}).click();
-  await expect(a.page.getByRole('button',{name:'Live Studio · Hosting',exact:true})).toBeVisible();
+  await openStudioMenu(a.page);await expect(a.page.getByRole('button',{name:'Live Studio · Hosting',exact:true})).toBeVisible();
   const hosted=await status(a);a.session=hosted.sessionId;a.author='host';
   expect(hosted.view.encrypted&&hosted.view.durable).toBe(true);expect(hosted.view.revision).toBe(0);
   const invitation=await a.call('forge_session_invite',{projectId:a.id,sessionId:a.session,address:'127.0.0.1',viewer:false});
@@ -402,7 +403,7 @@ try {
   await a.page.getByRole('button',{name:'Tag editor',exact:true}).click();
   const outside=await update(c,await view(a),d=>{d.spawns[0].name='C edit while A uses Tag editor';d.native.fields[0].boundingRadius=0.275;});
   await expect(a.panel.getByLabel('Committed pistol bounding radius')).toHaveText(String(outside.result.document.native.fields[0].boundingRadius));
-  await a.page.getByRole('button',{name:/Live Studio ·/}).click();
+  await openStudioMenu(a.page);await a.page.getByRole('button',{name:/Live Studio ·/}).click();
   await contentConverged(outside.result);await expect(a.page.locator('.forge-tree-select').filter({hasText:'C edit while A uses Tag editor'})).toHaveCount(1);mark('synchronizationSurvivesWorkspaceChange',true);
   current=await view(a);
   for(let n=0;n<6;n++){
@@ -453,7 +454,7 @@ try {
   const recovered=await a.call('forge_studio_recover',{projectId:a.id,directoryId:recoveryRecord.directoryId,address:'127.0.0.1',displayName:a.name});
   expect(recovered.view.document).toEqual(beforeCrash.document);expect(recovered.view.revision).toBe(beforeCrash.revision);expect(recovered.sessionId).toBe(a.session);
   const fresh=await a.call('forge_session_invite',{projectId:a.id,sessionId:a.session,address:'127.0.0.1',viewer:false});expect(fresh).not.toBe(invitation);
-  await a.page.reload();await a.page.locator('.map-card').filter({has:a.page.getByRole('heading',{name:a.fixture.title,exact:true})}).click();await a.call('claim_project_document',{id:a.id});await a.page.getByRole('button',{name:/Live Studio ·/}).click();a.panel=a.page.locator('.studio-panel');
+  await a.page.reload();await a.page.locator('.map-card').filter({has:a.page.getByRole('heading',{name:a.fixture.title,exact:true})}).click();await a.call('claim_project_document',{id:a.id});await openStudioMenu(a.page);await a.page.getByRole('button',{name:/Live Studio ·/}).click();a.panel=a.page.locator('.studio-panel');
   for(const x of [b,c]){const identity=x.author;await leave(x);await joinUi(x,fresh);expect(x.author).toBe(identity);}
   await contentConverged(recovered.view);
   const replayAfter=await a.call('forge_session_update',{projectId:a.id,sessionId:a.session,revision:accepted.revision,document:accepted.document,operationId:accepted.operationId});expect(replayAfter.revision).toBe(beforeCrash.revision);

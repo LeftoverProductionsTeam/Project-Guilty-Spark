@@ -69,7 +69,7 @@ export default function OpenWork({workspace,documents,entries,windows,recent,err
   const failed=latestJobs.filter(job=>job.severity==='error'||['failed','blocked'].includes(job.phase)).slice(0,3);
   const choose=(action:()=>void)=>{setOpen(false);action();};
   return <div className="gs-open-work" ref={root}>
-    <button ref={button} aria-label="Open work and workspace windows" aria-expanded={open} title={`${workspaceLabel(workspace)} · Open work (Ctrl+Shift+P)`} onClick={()=>setOpen(value=>!value)}><AppWindow size={14}/><span>{workspaceLabel(workspace)}</span>{!!running.length&&<small aria-label={`${running.length} running task${running.length===1?'':'s'}`}>●</small>}<ChevronDown size={10}/></button>
+    <button ref={button} aria-label="Open work and workspace windows" aria-expanded={open} title={`${workspaceLabel(workspace)} · Open work (Ctrl+Shift+P)`} onClick={()=>setOpen(value=>!value)}><AppWindow size={14}/><span>Work</span>{!!running.length&&<small aria-label={`${running.length} running task${running.length===1?'':'s'}`}>●</small>}<ChevronDown size={10}/></button>
     {open&&<section className="gs-open-work-popup" role="dialog" aria-label="Open work">
       <header><strong>Open work</strong><button aria-label="Close open work" onClick={close}><X size={14}/></button></header>
       <label className="gs-open-work-search"><Search size={14}/><input ref={search} type="search" placeholder="Map, workspace or window…" aria-label="Search open work" value={query} maxLength={160} onChange={e=>setQuery(e.target.value)}/></label>

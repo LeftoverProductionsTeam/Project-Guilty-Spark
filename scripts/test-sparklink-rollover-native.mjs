@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import net from 'node:net';
 import {spawn} from 'node:child_process';
 import {chromium,expect as assertion} from '@playwright/test';
-import {openDrawer} from '../tests/ui/helpers/navigation.ts';
+import {openDrawer,openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 const [source,destination]=process.argv.slice(2),expect=assertion.configure({timeout:30000});
 if(!source||!destination)throw Error('Use test-sparklink-rollover-native <embedded exe> <fresh directory>');
 const root=path.resolve(destination);await fs.mkdir(root);const actors=[];
@@ -25,7 +25,7 @@ async function start(name){
   return a;
 }
 async function panel(a){
-  if(!await a.page.getByRole('button',{name:'Close SparkLink',exact:true}).isVisible())await a.page.getByRole('button',{name:/Live Studio ·/}).click();
+  if(!await a.page.getByRole('button',{name:'Close SparkLink',exact:true}).isVisible())await openStudioMenu(a.page);await a.page.getByRole('button',{name:/Live Studio ·/}).click();
   const panel=a.page.locator('.studio-panel');await expect(panel).toBeVisible();if(!await panel.evaluate(el=>el.open))await panel.locator(':scope>summary').click();return panel;
 }
 const status=a=>invoke(a,'forge_session_status',{projectId:a.id});

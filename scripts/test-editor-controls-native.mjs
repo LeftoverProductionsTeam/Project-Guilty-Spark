@@ -1,3 +1,4 @@
+import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in Windows desktop checks with real owned map/collision/GPU/native windows.
 // This does not launch Halo or certify gameplay, shader parity or game physics.
 import {chromium,expect as assertion} from '@playwright/test';
@@ -58,7 +59,7 @@ try{
   await navigate('Modding Academy');let previous=browser.contexts().flatMap(c=>c.pages());await page.getByRole('button',{name:'Pop out lesson',exact:true}).click();
   const lesson=await openedPage(previous,'workspace=academy');await expect(lesson.locator('.gs-academy')).toBeVisible();await expect(lesson.getByRole('group',{name:'Window controls'}).getByRole('button')).toHaveCount(3);
   expect(await lesson.evaluate(()=>window.__TAURI_INTERNALS__.invoke('plugin:window|is_fullscreen'))).toBe(false);await lesson.getByRole('button',{name:'Close window',exact:true}).click();await expect.poll(()=>lesson.isClosed()).toBe(true);await expect(page.locator('.gs-academy')).toBeVisible();await mark('tutorialWindow',{separateWebview:true,nativeWindowControlsAllowed:true,parentWorkspaceRetained:true});
-  await navigate('Level editor');await expect(page.locator('.world-layout')).toBeVisible();previous=browser.contexts().flatMap(c=>c.pages());await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+  await navigate('Level editor');await expect(page.locator('.world-layout')).toBeVisible();previous=browser.contexts().flatMap(c=>c.pages());await openViewMenu(page);await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
   const editor=await openedPage(previous,'project=');await expect(editor.locator('.world-layout')).toBeVisible();await expect(editor.getByRole('tab',{name:owned.project.title,exact:true})).toBeVisible();await expect(page.getByRole('tab',{name:owned.project.title,exact:true})).toHaveCount(0);
   await expect(call('claim_project_document',{id:owned.project.id})).rejects.toThrow(/another Spark window/i);await editor.getByRole('button',{name:'Close window',exact:true}).click();await expect.poll(()=>editor.isClosed()).toBe(true);await mark('mapWorkspacePopout',{savedBeforeMove:true,correctWorkspace:true,singleWriterOwnershipRetained:true});
   if(args.has('--classic-map')){

@@ -1,3 +1,4 @@
+import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in packaged Windows application test. Real IPC, owned source files and
 // native WebView rendering. No game-file writes, external downloads or mocks.
 import fs from 'node:fs/promises';
@@ -104,7 +105,7 @@ try{
   await picked.getByRole('button',{name:'Deselect surface',exact:true}).click();
   const observer=await observeNativeInvokes(page);await call('startup_status');expect(observer.commands).toContain('startup_status');
   const beforeMaterials=await world.getAttribute('data-source-shaders');
-  try{for(const runtime of ['haloCustomEdition','openCe','chupathingyCe','mccSteam']){await page.getByLabel('Active Halo runtime',{exact:true}).selectOption(runtime);await page.waitForTimeout(250);await expect(world).toHaveAttribute('data-material-loading','false');await expect(worldCanvas).toHaveAttribute('data-qa-retained','native-c53');}}finally{await observer.stop();}
+  try{for(const runtime of ['haloCustomEdition','openCe','chupathingyCe','mccSteam']){await openStudioMenu(page);await page.getByLabel('Active Halo runtime',{exact:true}).selectOption(runtime);await page.waitForTimeout(250);await expect(world).toHaveAttribute('data-material-loading','false');await expect(worldCanvas).toHaveAttribute('data-qa-retained','native-c53');}}finally{await observer.stop();}
   result.hostingSwitchObservation={method:'CDP function-call breakpoint',positiveControl:'startup_status',observedCommands:observer.commands};
   result.hostingSwitchReads=observer.commands.filter(command=>/preview_owned_(?:cache_bitmap|object_model|reflection_cube)/.test(command));expect(result.hostingSwitchReads).toEqual([]);expect(await world.getAttribute('data-source-shaders')).toBe(beforeMaterials);
   const wanted=entry.models.map(pattern=>{const tag=o.inspection.tags.find(t=>['scen','vehi','bipd','eqip','itmc','mod2','mode'].includes(t.class)&&new RegExp(pattern,'i').test(t.path));expect(tag,`Missing requested native model ${pattern}`).toBeTruthy();return tag;});

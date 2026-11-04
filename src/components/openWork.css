@@ -20,4 +20,3 @@
 .application .gs-work-row:hover,.application .gs-work-row:focus-visible{background:color-mix(in srgb,var(--accent) 12%,var(--surface));}
 .gs-open-work-popup footer{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:7px;}
 .gs-open-work-popup footer small{font-size:9px;color:var(--muted);}
-@media(max-width:1200px){.gs-open-work>button>span{display:none;}}

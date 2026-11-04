@@ -103,11 +103,154 @@
     ]
   },
   "limitations": [
+    "No new C69 human game/player or manual external GUI acceptance",
+    "No physical second-monitor disconnect or separate-computer acceptance",
+    "120-cycle resource measurement is not long-horizon leak closure",
+    "No clean-machine installer/Linux/macOS acceptance; accepted C49 candidate unchanged",
+    "C70 DCC/native round trip and full Asset Studio remain pending until predecessor acceptance or explicit deferral"
+  ],
+  "initialLimitations": [
     "No new C69 game/player or manual Baboon GUI acceptance",
     "No physical second-monitor disconnect test",
     "Named layout restoration does not reproduce every child tab set, per-window camera or fullscreen flag",
     "No clean-machine installer/Linux/macOS acceptance; C49 remains the accepted candidate",
     "No whole-process CPU/GPU/VRAM endurance or exact prior-source startup comparison",
     "Remaining full Spark Flow and native tool integration scope stays in PENDING_REQUESTS.md"
-  ]
+  ],
+  "followThrough": {
+    "recordedAt": "2026-11-04T18:27:45.535Z",
+    "baseCommit": "16d9c953b41b8114d50b6d9583b751b9419152c3",
+    "sourceCommit": null,
+    "status": "awaiting human acceptance",
+    "privateEvidenceRoot": ".local/artifacts/c71-native-asset-studio-20261104",
+    "testedWorkingTreeIncludesPreservedC70": true,
+    "sourceRecovery": "final-source/working-source-final.patch",
+    "regression": {
+      "frontend": {
+        "tests": 400,
+        "files": 93
+      },
+      "browser": {
+        "passed": 163,
+        "log": "browser-header-final.log"
+      },
+      "typescript": true,
+      "embeddedOptimizedBuild": true,
+      "rust": {
+        "passed": 711,
+        "ignored": 8,
+        "nativeCodeUnchangedSinceRun": true,
+        "log": "rust-ownership-final.log"
+      },
+      "offlinePrograms": 59,
+      "continuityHealthTests": 8
+    },
+    "native": {
+      "appSha256": "7001020924fb91783d31e3e0ff64bdada47ef9cacf9efb08ab0f5b0abcc47cfa",
+      "restartCaseGroups": 8,
+      "lifecycleCases": 8,
+      "flowCases": 14,
+      "restart": "restart-drag-dropdown/acceptance.json",
+      "lifecycle": "lifecycle-drag-dropdown/acceptance.json",
+      "flow": "flow-drag-dropdown/acceptance.json",
+      "sixMapHeader": {
+        "width": 1075.9375,
+        "span": 1075.9375,
+        "scrollExcess": 0
+      },
+      "narrowHeader": {
+        "dragWidth": 54,
+        "dragRegion": "deep"
+      },
+      "actualGamePlayed": false,
+      "physicalMonitorDisconnectVerified": false,
+      "timing": {
+        "coldBootstrapMs": 1215.5273000000002,
+        "firstLibraryReadyMs": 868.9935999999998,
+        "fixtureSetupMs": 3601.5809,
+        "newWorkspaceWindowMs": 675.6487999999954,
+        "retainedLevelReturnMs": 649.4707000000053,
+        "nativePreviewReadyMs": 307.1953000000067,
+        "initialMapResourcesSettleMs": 2883.8470000000016,
+        "retainedPreviewReturnMs": 140.2520000000004
+      }
+    },
+    "measurements": {
+      "conditions": "Same native map/model; separate owned Windows profiles; 120 cycles and 360 switches after warm-up. Starting process memory differs; short/noisy idle CPU samples; no general speedup or long-horizon leak claim.",
+      "before": {
+        "evidence": "flow-final-profile/acceptance.json",
+        "appSha256": "9ae086fa3c80405be20ebf9b0bf627fdace685df9fd7f5d895f7c4a9c1430d64",
+        "cycles": 120,
+        "workspaceSwitches": 360,
+        "hiddenMccSampleCalls": 132,
+        "newHeavyReads": [],
+        "sequenceMs": 85494.75899999999,
+        "heapBytes": [
+          163806836,
+          171550208
+        ],
+        "privateBytes": [
+          2101473280,
+          2232377344
+        ],
+        "dedicatedGpuBytes": [
+          370548736,
+          440315904
+        ],
+        "processCounts": [
+          8,
+          8
+        ],
+        "idleCpuPercentOneCore": 1.3487268018990073,
+        "ownedProfileBytes": [
+          318879182,
+          378372521
+        ]
+      },
+      "after": {
+        "evidence": "flow-activity-final/acceptance.json",
+        "appSha256": "2bafa20354b782f4b0103be2a1f4c908e4b49877514182c132b5b29668c46302",
+        "cycles": 120,
+        "workspaceSwitches": 360,
+        "hiddenMccSampleCalls": 0,
+        "newHeavyReads": [],
+        "sequenceMs": 86384.33299999998,
+        "heapBytes": [
+          164155876,
+          171827664
+        ],
+        "privateBytes": [
+          2315706368,
+          2354487296
+        ],
+        "dedicatedGpuBytes": [
+          461070336,
+          439660544
+        ],
+        "processCounts": [
+          8,
+          8
+        ],
+        "idleCpuPercentOneCore": 0.6778741865509761,
+        "ownedProfileBytes": [
+          318742266,
+          382400228
+        ]
+      }
+    },
+    "preservation": {
+      "protectedRecords": 17,
+      "verified": true,
+      "pendingC70UntrackedFiles": 3,
+      "receipt": "preservation-seal.json"
+    },
+    "storage": {
+      "recordedAt": "2026-11-04T17:59:58.954Z",
+      "logicalBytes": 169674587411,
+      "uniqueFileBytes": 168466232113,
+      "readErrors": 0,
+      "warning": "Above 80-GiB review budget. Original inputs, releases, failed evidence and pending code retained; no deletion authorized."
+    },
+    "remotePublication": false
+  }
 }

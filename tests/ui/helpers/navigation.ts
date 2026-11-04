@@ -1,4 +1,14 @@
 import type { Page } from '@playwright/test';
+export async function openStudioMenu(page: Page) {
+  const menu=page.locator('.gs-studio-menu');
+  if(await menu.getAttribute('open')===null)await menu.getByLabel('Studio options',{exact:true}).click();
+  return menu;
+}
+export async function openViewMenu(page: Page) {
+  const menu=page.locator('.gs-view-menu');
+  if(await menu.getAttribute('open')===null)await menu.getByLabel('View and window options',{exact:true}).click();
+  return menu;
+}
 export async function openDrawer(page: Page, name: string) {
   const panel=page.getByRole('region',{name:`${name} panel`,exact:true});
   if(await panel.isVisible())return;

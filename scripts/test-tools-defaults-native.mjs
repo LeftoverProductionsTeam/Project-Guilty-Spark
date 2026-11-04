@@ -1,3 +1,4 @@
+import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Actual Windows app/IPC/GPU and installed Guerilla launcher acceptance.
 // No file-picker interaction, installer execution, map compilation or game proof.
 import fs from 'node:fs/promises';
@@ -124,7 +125,7 @@ try {
       offset = bytes.readUInt32LE(60);
     selected.architecture = bytes.readUInt16LE(offset + 4) === 0x8664 ? 'x86_64' : 'x86';
     store();
-    await page.getByRole('button', { name: /Find tools/ }).click();
+    await openStudioMenu(page);await page.getByRole('button', { name: /Find tools/ }).click();
     const finder = page.getByRole('dialog');
     await expect(finder.getByRole('link', { name: 'Get Guerilla · tag editor', exact: true })).toBeVisible();
     await finder.getByRole('button', { name: 'Launch Guerilla · tag editor', exact: true }).click();
@@ -182,7 +183,7 @@ try {
       shaderCount: paths.length,
     };
   }
-  await page.getByRole('button', { name: /Find tools/ }).click();
+  await openStudioMenu(page);await page.getByRole('button', { name: /Find tools/ }).click();
   const search = page.getByRole('textbox', { name: 'Search workspaces' });
   await search.fill('QuickForge');
   await search.press('Enter');

@@ -12,6 +12,7 @@ pub(super) struct ReturnTarget {
 pub(super) struct WindowState {
     returns: HashMap<String, ReturnTarget>,
     views: HashMap<String, WorkspaceView>,
+    restorations: HashMap<String, SavedWorkspaceWindow>,
 }
 /// Navigation context only. Source data, permissions and Undo remain in their
 /// existing document/history owners; a window report cannot grant a write lease.
@@ -24,6 +25,15 @@ pub(super) struct WorkspaceView {
     pub dirty: bool,
     #[serde(default)]
     pub documents: Vec<String>,
+    #[serde(default)]
+    pub places: Vec<WorkspacePlace>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub(super) struct WorkspacePlace {
+    project: String,
+    source_sha256: Option<String>,
+    values: serde_json::Map<String, serde_json::Value>,
 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -44,6 +54,14 @@ fn check_view(view:&WorkspaceView)->Reply<()> {
         return Err("Invalid workspace project identity".into());
     }
     if view.documents.len()>64||view.documents.iter().any(|id|uuid::Uuid::parse_str(id).is_err())||view.documents.iter().collect::<std::collections::HashSet<_>>().len()!=view.documents.len(){return Err("Invalid open-map window context".into());}
+    if view.places.len()>64||view.places.iter().map(|p|&p.project).collect::<std::collections::HashSet<_>>().len()!=view.places.len()
+        ||serde_json::to_vec(&view.places).map_err(error)?.len()>256*1024{return Err("Saved view context exceeds its bounds".into());}
+    for place in &view.places {
+        if !view.documents.contains(&place.project)||place.values.len()>64
+            ||place.source_sha256.as_ref().is_some_and(|s|s.len()!=64||!s.bytes().all(|b|b.is_ascii_hexdigit()))
+            ||place.values.iter().any(|(key,value)|key.len()>80||serde_json::to_vec(value).map_or(true,|v|v.len()>=4096))
+            ||serde_json::to_vec(&place.values).map_err(error)?.len()>32768{return Err("Invalid source-bound workspace view".into());}
+    }
     Ok(())
 }
 fn focus_window(app:&tauri::AppHandle,label:&str)->Reply<()> {
@@ -59,6 +77,7 @@ pub(super) fn update_workspace_view(app:tauri::AppHandle,window:tauri::WebviewWi
     let state=app.state::<AppState>();
     if let Some(id)=&view.project{let _=lock(&state.library)?.get(id).map_err(error)?;}
     for id in &view.documents{let _=lock(&state.library)?.get(id).map_err(error)?;}
+    for place in &view.places {let project=lock(&state.library)?.get(&place.project).map_err(error)?;if project.source.as_ref().map(|s|&s.sha256)!=place.source_sha256.as_ref(){return Err("Workspace view belongs to a changed map source".into());}}
     let mut windows=lock(&state.workspace_windows)?;
     if windows.views.get(window.label())==Some(&view){return Ok(());}
     windows.views.insert(window.label().into(),view);
@@ -97,19 +116,30 @@ struct Placement { x:i32, y:i32, width:u32, height:u32 }
 pub(super) struct SavedWorkspaceWindow {
     main:bool,view:WorkspaceView,placement:Placement,writable:bool,
     panel:Option<String>,focus_tag:Option<u32>,source_sha256:Option<String>,
+    #[serde(default)]
+    maximized:bool,
+    #[serde(default)]
+    fullscreen:bool,
+    #[serde(default)]
+    owned_documents:Vec<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub(super) struct SavedWorkspaceLayout {schema_version:u32,windows:Vec<SavedWorkspaceWindow>}
 fn checked_layout(layout:&SavedWorkspaceLayout)->Reply<()> {
     if layout.schema_version!=1||layout.windows.is_empty()||layout.windows.len()>16||layout.windows.iter().filter(|w|w.main).count()!=1{return Err("The saved workspace layout is invalid; current windows remain open".into());}
+    let mut owners=std::collections::HashSet::new();
     for window in &layout.windows {
         check_view(&window.view)?;
+        if window.owned_documents.len()>64||window.owned_documents.iter().any(|id|!window.view.documents.contains(id))||window.owned_documents.iter().collect::<std::collections::HashSet<_>>().len()!=window.owned_documents.len(){return Err("Invalid saved document ownership context".into());}
+        let mut own=window.owned_documents.clone();if window.writable{if let Some(id)=&window.view.project{if !own.contains(id){own.push(id.clone());}}}
+        for id in own{if !owners.insert(id){return Err("Saved layout assigns the same source writer to multiple windows".into());}}
         if let Some(panel)=&window.panel {
             if !(panel=="object-tags"&&window.view.workspace=="tags"&&window.focus_tag.is_some()) {checked_panel(&window.view.workspace,panel,window.view.project.is_some())?;}
         }
         if window.source_sha256.as_ref().is_some_and(|s|s.len()!=64||!s.bytes().all(|b|b.is_ascii_hexdigit())){return Err("Invalid saved map source identity".into());}
     }
+    if serde_json::to_vec(layout).map_err(error)?.len()>1024*1024{return Err("Saved window layout exceeds one MiB; current layout remains unchanged".into());}
     Ok(())
 }
 type LayoutProfiles=std::collections::BTreeMap<String,SavedWorkspaceLayout>;
@@ -133,7 +163,7 @@ pub(super) fn save_workspace_layout(app:tauri::AppHandle,name:Option<String>)->R
         let position=window.outer_position().map_err(error)?;let size=window.inner_size().map_err(error)?;
         let panel=returns.get(&label).and_then(|r|r.panel.clone()).filter(|panel|checked_panel(&view.workspace,panel,view.project.is_some()).is_ok()||panel=="object-tags"&&view.workspace=="tags");
         let focus_tag=if panel.as_deref()==Some("object-tags")&&view.workspace=="tags"{window.url().map_err(error)?.query_pairs().find(|(k,_)|k=="tag").and_then(|(_,v)|v.parse().ok())}else{None};
-        windows.push(SavedWorkspaceWindow{main:label=="main",view:view.clone(),placement:Placement{x:position.x,y:position.y,width:size.width,height:size.height},writable:view.project.as_ref().is_some_and(|id|owners.get(id)==Some(&label)),panel,focus_tag,source_sha256:project.and_then(|p|p.source.map(|s|s.sha256))});
+        windows.push(SavedWorkspaceWindow{main:label=="main",view:view.clone(),placement:Placement{x:position.x,y:position.y,width:size.width,height:size.height},writable:view.project.as_ref().is_some_and(|id|owners.get(id)==Some(&label)),panel,focus_tag,source_sha256:project.and_then(|p|p.source.map(|s|s.sha256)),maximized:window.is_maximized().map_err(error)?,fullscreen:window.is_fullscreen().map_err(error)?,owned_documents:view.documents.iter().filter(|id|owners.get(*id)==Some(&label)).cloned().collect()});
     }
     if !windows.iter().any(|w|w.main){if let Some(window)=windows.first_mut(){window.main=true;}}
     windows.sort_by_key(|w|!w.main);let layout=SavedWorkspaceLayout{schema_version:1,windows};checked_layout(&layout)?;
@@ -163,7 +193,23 @@ pub(super) fn restore_workspace_placement(app:tauri::AppHandle,label:String,inde
     let view=lock(&state.workspace_windows)?.views.get(&label).cloned().ok_or("Workspace window is not ready")?;
     if view.workspace!=saved.view.workspace||view.project!=saved.view.project||view.section!=saved.view.section{return Err("Saved placement belongs to another workspace".into());}
     if let Some(id)=&view.project{let project=lock(&state.library)?.get(id).map_err(error)?;if project.source.as_ref().map(|s|&s.sha256)!=saved.source_sha256.as_ref(){return Err("Saved placement belongs to another source revision".into());}}
-    let window=app.get_webview_window(&label).ok_or("Workspace window has closed")?;apply_placement(&window,&saved.placement)
+    let window=app.get_webview_window(&label).ok_or("Workspace window has closed")?;
+    window.set_fullscreen(false).map_err(error)?;window.unmaximize().map_err(error)?;
+    apply_placement(&window,&saved.placement)?;
+    if saved.maximized{window.maximize().map_err(error)?;}
+    if saved.fullscreen{window.set_fullscreen(true).map_err(error)?;}
+    if !saved.main {
+        lock(&state.workspace_windows)?.restorations.insert(label,saved.clone());
+        window.emit("spark:restore-workspace-view",()).map_err(error)?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub(super) fn workspace_restore_context(state:State<AppState>,window:tauri::WebviewWindow)->Reply<Option<SavedWorkspaceWindow>> {
+    // Only a saved layout already assigned to this app-owned window is returned.
+    // Source identity is checked again by ordinary open/history admission.
+    Ok(lock(&state.workspace_windows)?.restorations.get(window.label()).cloned())
 }
 
 pub(super) fn checked_panel(workspace:&str,panel:&str,project:bool)->Reply<()> {
@@ -282,7 +328,7 @@ pub(super) fn return_workspace_panel(app:tauri::AppHandle,window:tauri::WebviewW
 /// view. Its durable history, including unsaved acknowledged edits, is retained.
 pub(super) fn release_window(app:&tauri::AppHandle,label:&str) {
     let Some(state)=app.try_state::<AppState>() else{return};
-    let target=state.workspace_windows.lock().ok().and_then(|mut s|{s.views.remove(label);s.returns.remove(label)});
+    let target=state.workspace_windows.lock().ok().and_then(|mut s|{s.views.remove(label);s.restorations.remove(label);s.returns.remove(label)});
     let _=app.emit("spark:workspace-windows",());
     let Some(target)=target else{return};
     let Some(id)=target.project else{return};
@@ -307,7 +353,7 @@ fn workspace_query(workspace:&str,context:Option<&str>,section:Option<&str>)->Re
 pub(super) async fn open_workspace_window(app:tauri::AppHandle,window:tauri::WebviewWindow,workspace:String,context:Option<String>,section:Option<String>,panel:Option<String>,another:Option<bool>)->Reply<String>{
     let mut query=workspace_query(&workspace,context.as_deref(),section.as_deref())?;
     if let Some(panel)=&panel {checked_panel(&workspace,panel,false)?;query.push_str(&format!("&panel={panel}"));}
-    let view=WorkspaceView{workspace:workspace.clone(),project:None,section:section.clone(),dirty:false,documents:Vec::new()};
+    let view=WorkspaceView{workspace:workspace.clone(),project:None,section:section.clone(),dirty:false,documents:Vec::new(),places:Vec::new()};
     // An explicit lesson requests its own context; don't focus a different one.
     if another!=Some(true)&&context.is_none(){if let Some(label)=existing_workspace(&app,window.label(),&view,panel.as_deref())?{focus_window(&app,&label)?;return Ok(label);}}
     if app.webview_windows().len()>=16{return Err("Close a Spark window before opening another workspace".into());}
@@ -327,14 +373,28 @@ pub(super) async fn open_workspace_window(app:tauri::AppHandle,window:tauri::Web
     for name in ["","  ","bad\nname",&"x".repeat(81)]{assert!(layout_name(Some(name)).is_err());}
 }
 #[test]fn saved_layouts_are_bounded_known_views_and_never_serialize_tool_execution(){
-    let window=SavedWorkspaceWindow{main:true,view:WorkspaceView{workspace:"learning".into(),project:None,section:Some("glossary".into()),dirty:false,documents:Vec::new()},placement:Placement{x:-30000,y:40000,width:900,height:700},writable:false,panel:None,focus_tag:None,source_sha256:None};
+    let window=SavedWorkspaceWindow{main:true,view:WorkspaceView{workspace:"learning".into(),project:None,section:Some("glossary".into()),dirty:false,documents:Vec::new(),places:Vec::new()},placement:Placement{x:-30000,y:40000,width:900,height:700},writable:false,panel:None,focus_tag:None,source_sha256:None,maximized:false,fullscreen:false,owned_documents:Vec::new()};
     assert!(checked_layout(&SavedWorkspaceLayout{schema_version:1,windows:vec![window.clone()]}).is_ok());
     assert!(checked_layout(&SavedWorkspaceLayout{schema_version:1,windows:vec![window.clone();17]}).is_err());
+    let mut writer=window.clone();let id=uuid::Uuid::new_v4().to_string();writer.view.project=Some(id.clone());writer.view.documents=vec![id.clone()];writer.writable=true;writer.owned_documents=vec![id];
+    let mut second=writer.clone();second.main=false;
+    assert!(checked_layout(&SavedWorkspaceLayout{schema_version:1,windows:vec![writer,second]}).is_err());
     let mut bad=window.clone();bad.main=false;assert!(checked_layout(&SavedWorkspaceLayout{schema_version:1,windows:vec![bad]}).is_err());
     let mut value=serde_json::to_value(SavedWorkspaceLayout{schema_version:1,windows:vec![window]}).unwrap();value["toolCommand"]=serde_json::json!("native-build");assert!(serde_json::from_value::<SavedWorkspaceLayout>(value).is_err());
 }
+#[test]fn saved_places_are_bounded_per_map_and_do_not_grant_document_ownership(){
+    let id=uuid::Uuid::new_v4().to_string();
+    let mut view=WorkspaceView{workspace:"world".into(),project:Some(id.clone()),section:None,dirty:false,documents:vec![id.clone()],places:vec![WorkspacePlace{project:id.clone(),source_sha256:Some("a".repeat(64)),values:serde_json::from_value(serde_json::json!({"world.selection":["source-object"],"bsp.view.top":{"zoom":2}})).unwrap()}]};
+    assert!(check_view(&view).is_ok());
+    view.places[0].project=uuid::Uuid::new_v4().to_string();assert!(check_view(&view).is_err());
+    view.places[0].project=id;view.places[0].values.insert("world.selection".into(),serde_json::json!("x".repeat(4096)));assert!(check_view(&view).is_err());
+    // Old named layouts remain readable; no new write permission field exists.
+    let legacy=serde_json::json!({"workspace":"library","project":null,"section":null,"dirty":false,"documents":[]});
+    assert!(serde_json::from_value::<WorkspaceView>(legacy.clone()).unwrap().places.is_empty());
+    let mut unauthorized=legacy;unauthorized["owner"]=serde_json::json!("main");assert!(serde_json::from_value::<WorkspaceView>(unauthorized).is_err());
+}
 #[test]fn window_context_is_navigation_only_and_checks_routes_sections_and_source_identity(){
-    let good=WorkspaceView{workspace:"tags".into(),project:Some(uuid::Uuid::new_v4().to_string()),section:None,dirty:true,documents:Vec::new()};
+    let good=WorkspaceView{workspace:"tags".into(),project:Some(uuid::Uuid::new_v4().to_string()),section:None,dirty:true,documents:Vec::new(),places:Vec::new()};
     assert!(check_view(&good).is_ok());
     assert!(check_view(&WorkspaceView{workspace:"https://example.com".into(),..good.clone()}).is_err());
     assert!(check_view(&WorkspaceView{section:Some("tools".into()),..good.clone()}).is_err());
@@ -407,7 +467,7 @@ pub(super) async fn open_project_window(app:tauri::AppHandle,window:tauri::Webvi
     let route=workspace.as_deref().map(workspace_windows::checked_workspace).transpose()?;
     let origin=origin_workspace.as_deref().map(workspace_windows::checked_workspace).transpose()?;
     workspace_query(route.unwrap_or("world"),None,section.as_deref())?;
-    let view=WorkspaceView{workspace:route.unwrap_or("world").into(),project:Some(id.clone()),section:section.clone(),dirty:false,documents:vec![id.clone()]};
+    let view=WorkspaceView{workspace:route.unwrap_or("world").into(),project:Some(id.clone()),section:section.clone(),dirty:false,documents:vec![id.clone()],places:Vec::new()};
     if another!=Some(true) {
         if let Some(existing)=existing_workspace(&app,window.label(),&view,panel.as_deref())?{
             if observe==Some(true)||lock(&state.document_owners)?.get(&id)==Some(&existing){drop(_history_guard);focus_window(&app,&existing)?;return Ok(existing);}

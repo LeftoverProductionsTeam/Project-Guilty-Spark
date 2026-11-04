@@ -1,3 +1,4 @@
+import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Real Windows/WebView acceptance. Uses an isolated library and only its own app process.
 // No mocked IPC, game launch, external tool execution or original project mutation.
 import fs from 'node:fs/promises';
@@ -41,7 +42,7 @@ async function spawnedPage(previous) {
     return !!page;
   }).toBe(true);
   page.on('pageerror', error => report.errors.push(String(error)));
-  await expect(page.getByRole('button', { name: 'Pop out workspace', exact: true })).toBeVisible();
+  await expect(page.getByLabel('View and window options',{exact:true})).toBeVisible();
   await expect(page.getByRole('button', { name: 'Close window', exact: true })).toHaveCount(1);
   return page;
 }
@@ -75,7 +76,7 @@ try {
     await main.getByRole('searchbox', { name: 'Search glossary', exact: true }).fill('Race vehicle');
     await expect(main.locator('.gs-glossary dt')).toHaveText(['Race vehicle and teleporter flags']);
     const previous = new Set(browser.contexts().flatMap(context => context.pages()));
-    await main.getByRole('button', { name: 'Pop out workspace', exact: true }).click();
+    await openViewMenu(main);await main.getByRole('button', { name: 'Pop out workspace', exact: true }).click();
     const glossary = await spawnedPage(previous);
     await expect(glossary.getByRole('tab', { name: 'Glossary', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(glossary.getByRole('searchbox', { name: 'Search glossary', exact: true })).toHaveValue('Race vehicle');
@@ -117,7 +118,7 @@ try {
     await main.locator('.map-card').filter({has:main.getByRole('heading',{name:'Native pop-out acceptance',exact:true})}).click();
     await choose(main,'Tag editor');
     const previousProjectPages=new Set(browser.contexts().flatMap(context=>context.pages()));
-    await main.getByRole('button',{name:'Pop out workspace',exact:true}).click();
+    await openViewMenu(main);await main.getByRole('button',{name:'Pop out workspace',exact:true}).click();
     const editor=await spawnedPage(previousProjectPages);
     expect(new URL(editor.url()).searchParams.get('project')).toBe(created.project.id);
     await expect(editor.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','tags');

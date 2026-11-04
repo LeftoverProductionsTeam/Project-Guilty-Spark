@@ -5,6 +5,16 @@ import type {Project} from './types';
 const project=(id:string):Project=>({schemaVersion:1,id,title:id,createdAt:'',modifiedAt:'',source:null,provenance:{creator:'',community:'',releaseYear:null,description:'',sourceUrl:'',permissions:''},scene:[],assets:[],tagEdits:[],history:[],builds:[]});
 const open=(state:MapDocuments,p:Project)=>documentReducer(state,{type:'open',open:{project:p,inspection:null}});
 describe('Independent open map documents',()=>{
+  it('background panel returns update their map without restoring an earlier active tab',()=>{
+    const a=project('a'),b=project('b'),openMaps=open(open(emptyMapDocuments(100),a),b);
+    const returning={...a,title:'Returned A'};
+    const background=documentReducer(openMaps,{type:'open',open:{project:returning,inspection:null},activate:false});
+    expect(background.activeId).toBe('b');expect(background.documents.find(d=>d.id==='a')!.history.current).toBe(returning);
+    expect(background.documents.find(d=>d.id==='b')).toBe(openMaps.documents.find(d=>d.id==='b'));
+    const latestChoice=documentReducer(openMaps,{type:'select',id:'a'});
+    expect(documentReducer(latestChoice,{type:'open',open:{project:returning,inspection:null},activate:false}).activeId).toBe('a');
+    expect(open(background,b).activeId).toBe('b');
+  });
   it('reorders only the existing document objects without editing source or histories',()=>{
     const before=open(open(emptyMapDocuments(100),project('a')),project('b'));
     const after=documentReducer(before,{type:'reorder',ids:['b','a']});

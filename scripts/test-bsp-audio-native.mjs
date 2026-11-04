@@ -1,3 +1,4 @@
+import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in native SDK QA in an isolated qa_runtime_library replica.
 // Rebuilds copied BSP tags, opens the new cache and checks the native window controls.
 import { chromium, expect as baseExpect } from '@playwright/test';
@@ -215,7 +216,7 @@ try {
   await expect(page.getByRole('button', { name: 'Maximize window', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Maximize window', exact: true }).click();
   await expect.poll(() => call('plugin:window|is_maximized', windowArgs)).toBe(true);
-  await page.getByRole('button', { name: 'Fullscreen editing', exact: true }).click();
+  await openViewMenu(page);await page.getByRole('button', { name: 'Fullscreen editing', exact: true }).click();
   await expect.poll(() => call('plugin:window|is_fullscreen', windowArgs)).toBe(true);
   await expect(page.getByRole('button', { name: 'Close window', exact: true })).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Close window', exact: true })).toBeInViewport();

@@ -31,7 +31,7 @@ try{
   browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);await expect.poll(()=>{page=browser.contexts().flatMap(c=>c.pages()).find(p=>p.url().includes('tauri.localhost'));return !!page;}).toBe(true);
   const call=(command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
   const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
-  await expect(page.getByRole('button',{name:'Pop out workspace',exact:true})).toBeVisible();
+  await expect(page.getByLabel('View and window options',{exact:true})).toBeVisible();
   const workshop=await call('create_quickforge_project',{title:'C43 Atlas and cache acceptance',template:'customBlank',target:'haloCustomEdition'});
   await page.reload();await page.locator('.map-card').filter({has:page.getByRole('heading',{name:workshop.project.title,exact:true})}).click();
   await page.getByRole('button',{name:'BSP Workshop',exact:true}).click();

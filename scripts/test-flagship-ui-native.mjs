@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import net from 'node:net';
 import {spawn} from 'node:child_process';
 import {chromium,expect as assertion} from '@playwright/test';
+import {chooseTool} from '../tests/ui/helpers/navigation.ts';
 const expect=assertion.configure({timeout:120000});
 if(process.argv.length!==4)throw Error('test-flagship-ui-native <built Spark.exe> <fresh output directory>');
 const [app,root]=process.argv.slice(2).map(p=>path.resolve(p));await fs.mkdir(root);
@@ -48,7 +49,7 @@ try{
  await expect(page.getByRole('button',{name:'Recheck tools',exact:true})).toBeEnabled();
  await expect.poll(()=>page.locator('.tool-ecosystem-compact .gs-tool-card').count()).toBeGreaterThan(0);
  await shot('runtimes');
- await page.getByRole('button',{name:'HOME',exact:true}).click();
+ await chooseTool(page,'Map library');
  const created=await call('create_quickforge_project',{title:'C51 native Workshop source',template:'customBlank',target:'mccSteam'});report.projectId=created.project.id;
  await page.reload();await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'C51 native Workshop source',exact:true})}).click();
  await page.getByRole('button',{name:'BSP Workshop',exact:true}).click();

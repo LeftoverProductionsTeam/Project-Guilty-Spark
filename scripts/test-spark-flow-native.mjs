@@ -4,12 +4,15 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
-import {spawn} from 'node:child_process';
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {chromium,expect as assertion} from '@playwright/test';
 import {chooseTool,openDrawer} from '../tests/ui/helpers/navigation.ts';
 const args=process.argv.slice(2);
 if(args.length!==3)throw Error('test-spark-flow-native <embedded exe> <fresh evidence root> <owned native map>');
 const [source,root,map]=args.map(p=>path.resolve(p)),expect=assertion.configure({timeout:45000});
+const cycles=Number(process.env.SPARK_FLOW_ENDURANCE_CYCLES??18),profile=process.env.SPARK_FLOW_PROFILE==='1';
+if(!Number.isInteger(cycles)||cycles<18||cycles>240||cycles%6)throw Error('Endurance cycles must be a multiple of six from 18 to 240');
 await fs.mkdir(root);const exe=path.join(root,'GuiltySpark-spark-flow.exe');await fs.copyFile(source,exe,fs.constants.COPYFILE_EXCL);
 const sha=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
 const report={schemaVersion:1,appSha256:await sha(exe),sourceMapSha256:await sha(map),mockedIpc:false,actualGamePlayed:false,complete:false,cases:[],errors:[],timing:{}};
@@ -29,6 +32,21 @@ async function role(page,value){await(await work(page)).getByLabel('Workspace in
 async function mapOpen(page,title){await chooseTool(page,'Map library');console.log('MAP_CHOICES',JSON.stringify({wanted:title,cards:await page.locator('.map-card h3').allTextContents()}));await page.locator('.map-card').filter({hasText:title}).click();await expect(page.locator('.runtime-dock-heading>span').first()).toHaveText(title);}
 async function inspector(page,select=false){if(select){await openDrawer(page,'Build tools');await page.getByRole('region',{name:'Build tools panel',exact:true}).locator('.forge-tree-select').first().click();}await openDrawer(page,'Inspector');await row(page).getByRole('button',{name:'Properties',exact:true}).click();await expect(x(page)).toBeVisible();}
 async function setX(page,value){await x(page).fill(String(value));await x(page).press('Tab');}
+async function ownedSize(){let bytes=0,files=0;const pending=[root];while(pending.length){const folder=pending.pop();for(const entry of await fs.readdir(folder,{withFileTypes:true})){const file=path.join(folder,entry.name);if(entry.isSymbolicLink())throw Error('Unexpected linked endurance output');if(entry.isDirectory())pending.push(file);else if(entry.isFile()){bytes+=(await fs.stat(file)).size;if(++files>100000)throw Error('Owned output inventory exceeds its bound');}}}return{bytes,files};}
+async function nativeMetrics(){
+  if(!profile||process.platform!=='win32')return null;
+  const pid=processHandle.pid;if(!Number.isSafeInteger(pid)||pid<=0)throw Error('Owned native process unavailable');
+  const script=`$ErrorActionPreference='Stop'
+$rootProcessId=${pid}
+$all=@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,PrivatePageCount,WorkingSetSize,UserModeTime,KernelModeTime)
+$owned=[Collections.Generic.HashSet[int]]::new();[void]$owned.Add($rootProcessId)
+for($depth=0;$depth -lt 16;$depth++){$changed=$false;foreach($item in $all){if($owned.Contains([int]$item.ParentProcessId) -and $owned.Add([int]$item.ProcessId)){$changed=$true}};if(!$changed){break}}
+$rows=@($all | Where-Object {$owned.Contains([int]$_.ProcessId)} | ForEach-Object {[pscustomobject]@{pid=[int]$_.ProcessId;name=$_.Name;privateBytes=[double]$_.PrivatePageCount;workingSetBytes=[double]$_.WorkingSetSize;cpuSeconds=([double]$_.UserModeTime+[double]$_.KernelModeTime)/10000000}})
+$gpu=@();$gpuIssue=$null
+try{$gpu=@(Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory | Where-Object {$match=[regex]::Match($_.Name,'^pid_(\\d+)_');$match.Success -and $owned.Contains([int]$match.Groups[1].Value)} | ForEach-Object {[pscustomobject]@{instance=$_.Name;dedicatedBytes=[double]$_.DedicatedUsage;sharedBytes=[double]$_.SharedUsage;totalCommittedBytes=[double]$_.TotalCommitted}})}catch{$gpuIssue=$_.Exception.Message}
+[pscustomobject]@{timestamp=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();processes=$rows;privateBytes=($rows | Measure-Object privateBytes -Sum).Sum;workingSetBytes=($rows | Measure-Object workingSetBytes -Sum).Sum;cpuSeconds=($rows | Measure-Object cpuSeconds -Sum).Sum;gpu=$gpu;gpuIssue=$gpuIssue} | ConvertTo-Json -Depth 6 -Compress`;
+  try{const result=await promisify(execFile)('powershell.exe',['-NoProfile','-Command',script],{windowsHide:true,timeout:30000,maxBuffer:1024*1024});return JSON.parse(result.stdout.trim());}catch(error){return{unavailable:String(error)};}
+}
 try{
   const start=performance.now();processHandle=spawn(exe,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
   await fs.writeFile(path.join(root,'owned-process.json'),JSON.stringify({pid:processHandle.pid,port}));
@@ -147,16 +165,25 @@ try{
   // Repeat a comparable three-workspace cycle after warm-up, with GC-normalized
   // WebView measurements. These are not VRAM-byte estimates or gameplay tests.
   await role(main,'tags');const cdp=await main.context().newCDPSession(main);await cdp.send('Performance.enable');
-  const metrics=async()=>{await main.waitForTimeout(750);await cdp.send('HeapProfiler.collectGarbage');return Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.filter(m=>['JSHeapUsedSize','JSHeapTotalSize','Nodes','Documents','TaskDuration'].includes(m.name)).map(m=>[m.name,m.value]));};
+  // Keep the opt-in measuring probe bounded too. Aggregate every observed IPC
+  // name before clearing timeline buffers, so "no repeated decode" stays an
+  // observed assertion rather than a consequence of dropping its evidence.
+  report.retentionNativeReads=[];report.retentionIpcCounts={};
+  const metrics=async()=>{await main.waitForTimeout(750);const names=await main.evaluate(()=>{const entries=performance.getEntriesByType('measure').map(e=>e.name);performance.clearMeasures();return entries;});for(const name of names){report.retentionIpcCounts[name]=(report.retentionIpcCounts[name]??0)+1;if(/preview_owned_object_model|preview_owned_cache_bitmap_batch|preview_owned_reflection_cube/.test(name))report.retentionNativeReads.push(name);}await cdp.send('HeapProfiler.collectGarbage');return Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.filter(m=>['JSHeapUsedSize','JSHeapTotalSize','Nodes','Documents','TaskDuration'].includes(m.name)).map(m=>[m.name,m.value]));};
   await main.evaluate(()=>{window.c69Fades=[];const animate=Element.prototype.animate;Element.prototype.animate=function(frames,options){if(this.classList.contains('gs-workspace-content'))window.c69Fades.push({frames,options});return animate.call(this,frames,options);};performance.clearMeasures();});
-  report.retentionSamples=[await metrics()];const loopStart=performance.now();
-  for(let batch=0;batch<3;batch++){for(let i=0;i<6;i++){await role(main,'creator');await role(main,'assets');await role(main,'tags');await expect(preview).toHaveAttribute('data-model-first-frame','true');}report.retentionSamples.push(await metrics());}
-  report.retentionCycleMs=performance.now()-loopStart;report.retentionCycles=18;
+  report.retentionSamples=[await metrics()];report.processSamples=profile?[await nativeMetrics()]:[];report.retentionStorageBefore=profile?await ownedSize():null;const loopStart=performance.now();
+  for(let batch=0;batch<cycles/6;batch++){for(let i=0;i<6;i++){await role(main,'creator');await role(main,'assets');await role(main,'tags');await expect(preview).toHaveAttribute('data-model-first-frame','true');}report.retentionSamples.push(await metrics());
+    if(profile&&(batch+1)%5===0){const prior=new Set(pages());await call(main,'open_workspace_window',{workspace:'learning',another:true});const temporary=await nextPage(prior);await role(temporary,'features');await close(temporary);report.processSamples.push(await nativeMetrics());}
+  }
+  report.retentionCycleMs=performance.now()-loopStart;report.retentionCycles=cycles;
+  report.retentionStorageAfter=profile?await ownedSize():null;
   expect(report.retentionSamples.at(-1).JSHeapUsedSize-report.retentionSamples[1].JSHeapUsedSize).toBeLessThan(48*1024*1024);
   expect(report.retentionSamples.at(-1).Documents).toBe(report.retentionSamples[0].Documents);
-  expect(await preview.evaluate(el=>el===window.c69Preview)).toBe(true);report.retentionNativeReads=await main.evaluate(()=>performance.getEntriesByType('measure').map(e=>e.name).filter(command=>/preview_owned_object_model|preview_owned_cache_bitmap_batch|preview_owned_reflection_cube/.test(command)));expect(report.retentionNativeReads).toEqual([]);
+  expect(await preview.evaluate(el=>el===window.c69Preview)).toBe(true);expect(report.retentionNativeReads).toEqual([]);expect(Object.values(report.retentionIpcCounts).reduce((n,value)=>n+value,0)).toBeGreaterThan(0);
+  expect(report.retentionIpcCounts['spark.ipc.live_mcc_sample']??0).toBe(0);
   report.fades=await main.evaluate(()=>window.c69Fades);expect(report.fades.length).toBeGreaterThan(0);expect(report.fades.every(f=>f.options.duration<=200&&f.frames.every(frame=>frame.opacity>=.8))).toBe(true);
-  mark('Eighteen repeated three-workspace cycles retain the native preview without new model/bitmap/cube reads and with bounded measured WebView growth',{samples:report.retentionSamples,cycles:18});
+  if(profile){await role(main,'creator');const before=await nativeMetrics();await main.waitForTimeout(2000);const after=await nativeMetrics();report.idleProcess={before,after,cpuPercentOneCore:before?.cpuSeconds!=null&&after?.cpuSeconds>=before.cpuSeconds?100000*(after.cpuSeconds-before.cpuSeconds)/(after.timestamp-before.timestamp):null};await role(main,'tags');}
+  mark('Repeated three-workspace cycles retain the native preview without new model/bitmap/cube reads and with bounded measured WebView growth',{samples:report.retentionSamples,cycles});
   // Exercise a genuine unavailable source, exclusively in this run's owned
   // imported copy. The exact bytes are restored even if a later assertion fails.
   const anotherTag=nativeMap.inspection.tags.find(t=>t.class==='weap'&&t.id!==Number(report.preview['data-model-tag']));expect(anotherTag).toBeTruthy();

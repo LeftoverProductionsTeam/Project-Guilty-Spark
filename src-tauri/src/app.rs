@@ -2887,6 +2887,7 @@ pub fn run() {
             workspace_windows::focus_workspace_window,
             workspace_windows::save_workspace_layout,
             workspace_windows::read_workspace_layout,
+            workspace_windows::workspace_restore_context,
             workspace_windows::workspace_layout_names,
             workspace_windows::show_spark_companion,
             workspace_windows::remember_spark_companion,

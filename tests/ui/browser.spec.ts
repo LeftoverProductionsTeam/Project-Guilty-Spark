@@ -1,4 +1,4 @@
-import {chooseTool,openDrawer} from './helpers/navigation';
+import {chooseTool,openDrawer,openStudioMenu} from './helpers/navigation';
 import { test, expect } from '@playwright/test';
 test('Storage keeps source cleanup separate from saved preview memory limits',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await page.goto('/');await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Storage & Cache',exact:true}).click();
@@ -34,7 +34,7 @@ test('runtime dock keeps all nine tools visible without a horizontal scrollbar',
   for(const size of [{width:1500,height:950},{width:1280,height:768},{width:1024,height:640}]){
     await page.setViewportSize(size);await page.goto('/');
     const dock=page.getByRole('contentinfo',{name:'Runtime & Tools Dock'});
-    await expect(page.getByRole('combobox',{name:'Active Halo runtime',exact:true})).toHaveCount(1);
+    await expect(page.getByLabel('Active Halo runtime',{exact:true})).toHaveCount(1);
     await expect(dock.getByRole('combobox')).toHaveCount(0);
     for(const name of ['Play Halo','Test Scene','Edit level','Edit tags','Build','Publish','Find games','Host','Legacy tools'])await expect(dock.getByRole('button',{name:new RegExp(`^${name}`)})).toBeVisible();
     const bounds=await dock.evaluate(element=>{const r=element.getBoundingClientRect();return {bottom:r.bottom,extra:element.scrollWidth-element.clientWidth,clipped:[...element.querySelectorAll('.runtime-dock-actions>button')].some(button=>button.getBoundingClientRect().right>r.right)};});
@@ -106,6 +106,8 @@ test('sidebar keeps every workspace visible in tall and short windows', async ({
       return {extra:element.scrollHeight-element.clientHeight,clipped:[...element.querySelectorAll('.nav-item')].filter(item=>{const r=item.getBoundingClientRect();return r.top<box.top-1||r.bottom>box.bottom+1;}).map(item=>item.textContent)};
     });
     expect(overflow,`${size.width}x${size.height}`).toEqual({extra:0,clipped:[]});
+    const rows=await sidebar.locator('.nav-item').evaluateAll(items=>['Map library','Start here','Tag editor'].map(name=>{const element=items.find(item=>item.getAttribute('aria-label')===name)!;return element.getBoundingClientRect().height;}));
+    expect(new Set(rows).size).toBe(1);
     await expect(sidebar.getByRole('button',{name:'Community Thanks',exact:true})).toBeVisible();
     await expect(sidebar.getByRole('button',{name:'Settings & tools',exact:true})).toBeVisible();
   }
@@ -114,6 +116,7 @@ test('workspace search keeps focus bounded and navigates with the keyboard', asy
   await page.goto('/');
   await expect(page.locator('#gs-window-header')).toBeVisible();
   const launcher=page.getByRole('button',{name:/Find tools/});
+  await openStudioMenu(page);
   await launcher.click();
   const search=page.getByRole('textbox',{name:'Search workspaces'});
   await expect(search).toBeFocused();
@@ -125,14 +128,16 @@ test('workspace search keeps focus bounded and navigates with the keyboard', asy
   await page.getByRole('button',{name:'Create a new Halo level',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Make a place to play.'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Create editable map',exact:true})).toBeDisabled();
-  await expect(page.locator('#gs-window-header')).toBeVisible();await launcher.click();await page.keyboard.press('Escape');
+  await expect(page.locator('#gs-window-header')).toBeVisible();await openStudioMenu(page);await launcher.click();await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(launcher).toBeFocused();
+  await expect(page.getByLabel('Studio options',{exact:true})).toBeFocused();
 });
 test('browser preview states native boundaries and navigates workspaces', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#gs-window-header')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'HOME', exact: true })).toBeVisible();
+  await expect(page.locator('#gs-window-header').getByRole('button', { name: 'HOME', exact: true })).toHaveCount(0);
+  await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();
+  const home=page.locator('.gs-nav-home');await expect(home).toContainText('Home & first setup');await expect(home.getByRole('button',{name:'Map library',exact:true})).toBeVisible();await expect(home.getByRole('button',{name:'Start here',exact:true})).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make a Halo world. Know what the engine needs.' })).toBeVisible();
   await chooseTool(page,"Map library");
   await expect(page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.' })).toBeVisible();
@@ -141,6 +146,15 @@ test('browser preview states native boundaries and navigates workspaces', async 
   await chooseTool(page,"Settings & tools");
   await expect(page.getByRole('heading', { name: 'Games & tools', exact: true })).toBeVisible();
   await expect(page.getByText('The desktop app checks installed tools and map sources.', { exact: false })).toBeVisible();
+  for(const name of ['Map library','Tag editor','Settings & tools']){
+    await chooseTool(page,name);await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();
+    const menu=page.locator('.gs-navigation-drawer'),selected=menu.locator('[aria-current="page"]');
+    await expect(menu.getByLabel('Current workspace',{exact:true})).toHaveText(name);
+    await expect(selected).toHaveCount(1);await expect(selected).toHaveAccessibleName(name);
+    await expect(selected.locator('.gs-workspace-current-mark')).toBeVisible();
+    expect(await selected.evaluate(element=>getComputedStyle(element,'::before').display)).toBe('none');
+    await page.getByRole('button',{name:'Toggle workspace navigation',exact:true}).click();
+  }
   await chooseTool(page,'Map library');
   await page.getByRole('button', { name: 'Import map or archive', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('desktop application');
@@ -175,6 +189,7 @@ test('help modal traps focus and restores it after Escape', async ({ page }) => 
   await page.goto('/');
   await expect(page.locator('#gs-window-header')).toBeVisible();
   const help = page.getByRole('button', { name: 'Help & shortcuts' });
+  await openStudioMenu(page);
   await help.click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Back to the workbench' }).focus();
@@ -182,7 +197,7 @@ test('help modal traps focus and restores it after Escape', async ({ page }) => 
   await expect(page.getByRole('button', { name: 'Close help' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(help).toBeFocused();
+  await expect(page.getByLabel('Studio options',{exact:true})).toBeFocused();
 });
 
 test('Dark Glow saves custom colors and keeps text white on dark surfaces',async({page})=>{
