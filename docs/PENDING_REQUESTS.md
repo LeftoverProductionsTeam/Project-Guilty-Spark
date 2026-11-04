@@ -1,5 +1,9 @@
 # Pending engineering requests
 
+## Final Product Quality, Platform Support & Release Engineering — received November 4, 2026
+
+Full direct message, receipt (`d610d14`) and evidence: `.local/artifacts/product-quality-release-intake-20261104/`. Pending behind C69; no predecessor deferral. All5 sealed C49 files/checksum content freshly verify, version0.4.1/source`cb07581`; newer master/C70 features are not shipped by that candidate. Retain exact-revision Windows installer/portable, WebView2/setup/discovery/GPU/multiwindow/native-tool/game/update/rollback/uninstall, clean-machine actual-deliverable creator workflow, Linux/macOS independent native package/launch/file/graphics gates, full measured performance and malformed-input/security/recovery matrix, truthful feature states and owner-approved publication. Existing tests do not close clean-machine/platform/game acceptance. No new package/install/publication or manual requeue. Full package-verifier rerun is blocked: Python command unavailable (exit9009); checksum verification passed.
+
 ## Final Universal Halo 1 Integration & Engineering Breakthrough — received November 4, 2026
 
 Requested`b9e07d41` file is absent; its folder is empty. Two exact-title alternatives match (36,528bytes/944lines/SHA53be22b1…); qualified full copy, provenance, receipt and A–L evidence map: `.local/artifacts/final-universal-integration-intake-20261104/`. Not verified against missing requested bytes. Retain all phases0–10 and internal integrity→interop→native creation→gameplay→creator/polish→future order, existing source/tool/Guardian architecture, genuine Mantle/Baboon round trips, native merge/traversal, AI/Zombie/retail MCC gameplay and compact runtime/tool workflow. Implementation remains pending behind C69; no explicit deferral or acceptance. Historical counts/build references are unverified as current. Reattach only if intended text differs; no new research/download/build/game/source work or manual requeue now.
