@@ -29,3 +29,5 @@ No owned native tests remain active after final checks. Evidence/recovery patche
 ## Deferred requests
 
 C70 Universal Tool Integration and complete Native Asset & Tag Studio instructions remain available in PENDING_REQUESTS/DIRECTIVE_LEDGER; no manual requeue needed. Earlier source/native/audio/rendering/AI/Megaworld/conversion/release obligations remain in their full ledgers. No new initiative, queue scheduler, branch/worktree, v6 research import or automatic cleanup was introduced.
+
+Newly received Halo Map Conversion & Legacy Preservation instructions are preserved pending at .local/artifacts/map-conversion-intake-20261104/directive.txt (receipt at530e0d0). No implementation, fork research/download, native build or playtest was started. The strict predecessor gate and exact C69 next action remain unchanged; no manual requeue needed.
