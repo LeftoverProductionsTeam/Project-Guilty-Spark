@@ -198,3 +198,82 @@ fn collaborative_logic_merges_independent_source_edits_but_never_silently_overwr
         .logic
         .is_none());
 }
+#[test]
+fn handwritten_modules_preserve_bytes_and_refuse_partial_overwrite_or_stale_validation() {
+    let mut doc = level();
+    let original = b"; Original author comment\r\n(global short user_counter 41)\r\n";
+    doc.logic
+        .as_mut()
+        .unwrap()
+        .handwritten_sources
+        .push(l::HandwrittenSource {
+            filename: "mission notes.hsc".into(),
+            content: String::from_utf8(original.to_vec()).unwrap(),
+        });
+    let root = tempfile::tempdir().unwrap();
+    let scenario = "levels/test/handwritten/handwritten";
+    let main = l::script_path(root.path(), scenario).unwrap();
+    let manual = main.parent().unwrap().join("mission notes.hsc");
+    std::fs::create_dir_all(manual.parent().unwrap()).unwrap();
+    std::fs::write(&manual, b"; external existing source").unwrap();
+    assert!(l::export(&doc, root.path(), scenario).is_err());
+    assert!(!main.exists());
+    assert_eq!(
+        std::fs::read(&manual).unwrap(),
+        b"; external existing source"
+    );
+    let fresh = tempfile::tempdir().unwrap();
+    l::export(&doc, fresh.path(), scenario).unwrap();
+    let path = l::script_path(fresh.path(), scenario)
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("mission notes.hsc");
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+    l::verify_exported_sources(&doc, fresh.path(), scenario).unwrap();
+    std::fs::write(&path, b"; external legitimate changed source\r\n").unwrap();
+    assert!(l::verify_exported_sources(&doc, fresh.path(), scenario).is_err());
+    assert_eq!(
+        std::fs::read(&path).unwrap(),
+        b"; external legitimate changed source\r\n"
+    );
+    assert_eq!(l::source_modules(&doc).unwrap()[1].regions.len(), 0);
+}
+#[test]
+fn source_names_encoding_and_native_target_budgets_are_not_silently_repaired() {
+    let module = |filename: &str, content: &str| l::HandwrittenSource {
+        filename: filename.into(),
+        content: content.into(),
+    };
+    for filename in [
+        "../escape.hsc",
+        "a/b.hsc",
+        "CON.hsc",
+        "gs_logic.hsc",
+        "global_scripts.hsc",
+        "file.HSC",
+    ] {
+        assert!(
+            l::validate_handwritten_sources(&[module(filename, "; source")]).is_err(),
+            "{filename}"
+        );
+    }
+    assert!(l::validate_handwritten_sources(&[
+        module("mission.hsc", "; source"),
+        module("MISSION.hsc", "; another")
+    ])
+    .is_err());
+    assert!(l::validate_handwritten_sources(&[module("mission.hsc", "\u{feff}; source")]).is_err());
+    let mut doc = level();
+    let old = serde_json::to_value(&doc).unwrap();
+    assert!(old["logic"].get("handwrittenSources").is_none());
+    doc.logic.as_mut().unwrap().handwritten_sources =
+        vec![module("large.hsc", &format!(";{}", "x".repeat(256 * 1024)))];
+    assert!(l::validate(&doc).is_ok());
+    doc.runtime_id = spark_core::runtime::RuntimeId::HaloCustomEdition;
+    assert!(l::validate(&doc).is_err());
+    doc.logic.as_mut().unwrap().handwritten_sources = (0..8)
+        .map(|i| module(&format!("user_{i}.hsc"), "; source"))
+        .collect();
+    assert!(l::validate(&doc).is_err());
+}

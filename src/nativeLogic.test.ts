@@ -1,5 +1,11 @@
 import { expect, it } from 'vitest';
-import { addLogicTrigger, centerDoorTrigger, connectDoor } from './nativeLogic';
+import {
+  addLogicTrigger,
+  addHandwrittenSource,
+  centerDoorTrigger,
+  connectDoor,
+  copyDeviceBehavior,
+} from './nativeLogic';
 import {
   appendForgeNodes,
   forgeGeometryKey,
@@ -45,15 +51,16 @@ function level() {
   const added = addLogicTrigger(base, [11, 0, 1.5]);
   return connectDoor(added.document, added.id, 'door');
 }
-it('makes simple door entry repeatable and explicitly centers a return-accessible trigger',()=>{
-  const d=level(),id=d.logic!.triggers[0].id;
+it('makes simple door entry repeatable and explicitly centers a return-accessible trigger', () => {
+  const d = level(),
+    id = d.logic!.triggers[0].id;
   expect(d.logic!.rules[0].once).toBe(false);
-  const fitted=centerDoorTrigger(d,id,'door');
-  expect(fitted.logic!.triggers[0]).toMatchObject({id,position:[14,0,1.5],dimensions:[6,3,3]});
+  const fitted = centerDoorTrigger(d, id, 'door');
+  expect(fitted.logic!.triggers[0]).toMatchObject({ id, position: [14, 0, 1.5], dimensions: [6, 3, 3] });
   expect(fitted.logic!.rules).toEqual(d.logic!.rules);
-  expect(d.logic!.triggers[0].position).toEqual([11,0,1.5]);
-  d.logic!.triggers[0].locked=true;
-  expect(()=>centerDoorTrigger(d,id,'door')).toThrow(/Unlock/);
+  expect(d.logic!.triggers[0].position).toEqual([11, 0, 1.5]);
+  d.logic!.triggers[0].locked = true;
+  expect(() => centerDoorTrigger(d, id, 'door')).toThrow(/Unlock/);
 });
 function project(doc: QuickForgeDocument): Project {
   return {
@@ -134,4 +141,63 @@ it('preserves locked trigger rules and merges or rejects graphs without overwrit
   expect(peer.logic!.rules[0].enabled).toBe(false);
   const clear = { ...d, logic: undefined };
   expect(mergeForge(d, clear, d).logic).toBeUndefined();
+});
+it('copies a complete device setup into independent rotated instance bindings with one Undo', () => {
+  const d = level();
+  d.placements.push({
+    ...structuredClone(d.placements[0]),
+    id: 'second-door',
+    name: 'Second door',
+    position: [28, 6, 0],
+    rotation: [0, 0, Math.PI / 2],
+  });
+  const original = structuredClone(d);
+  const copied = copyDeviceBehavior(d, 'door', 'second-door');
+  expect(d).toEqual(original);
+  const logic = copied.document.logic!;
+  expect(logic.devices.map((b) => b.placementId)).toEqual(['door', 'second-door']);
+  expect(logic.triggers[1].position).toEqual([28, 3, 1.5]);
+  expect(logic.triggers[1].rotation[2]).toBeCloseTo(Math.PI / 2);
+  expect(logic.rules[1].actions).toEqual([{ kind: 'devicePosition', targetId: 'second-door', value: 1 }]);
+  expect(logic.rules[1].event).toEqual({ kind: 'enter', triggerId: copied.triggerIds[0] });
+  expect(new Set(logic.rules.map((r) => r.id)).size).toBe(2);
+  const h = historyReducer(historyReducer(initialHistory, { type: 'load', project: project(d) }), {
+    type: 'edit',
+    project: project(copied.document),
+    description: 'Copy behavior',
+  });
+  expect(historyReducer(h, { type: 'undo' }).current?.quickForge).toEqual(d);
+  expect(() => copyDeviceBehavior(copied.document, 'door', 'second-door')).toThrow(/already has/);
+  const shared = structuredClone(d);
+  shared.logic!.rules[0].actions.push({ kind: 'devicePower', targetId: 'second-door', value: 1 });
+  expect(() => copyDeviceBehavior(shared, 'door', 'second-door')).toThrow();
+});
+it('preserves handwritten source bytes and refuses ambiguous imports or invisible graph changes', () => {
+  const d = level(),
+    content = '; original comment\r\n(global short user_counter 41)\r\n';
+  const added = addHandwrittenSource(d, 'mission notes.hsc', content);
+  expect(added.logic?.handwrittenSources).toEqual([{ filename: 'mission notes.hsc', content }]);
+  expect(d.logic?.handwrittenSources).toBeUndefined();
+  expect(() => addHandwrittenSource(added, 'MISSION NOTES.hsc', '; replacement')).toThrow(/already exists/);
+  for (const name of [
+    '../escape.hsc',
+    'CON.hsc',
+    'NUL.any.hsc',
+    'gs_logic.hsc',
+    'global_scripts.hsc',
+    'file.HSC',
+  ])
+    expect(() => addHandwrittenSource(d, name, content)).toThrow();
+  expect(() => addHandwrittenSource(d, 'user.hsc', '\ufeff; BOM')).toThrow(/ASCII/);
+  const manual = structuredClone(d);
+  manual.logic!.manualSource = '; retained manual override';
+  expect(() => connectDoor(manual, manual.logic!.triggers[0].id, 'door')).toThrow(/paused/);
+  expect(addHandwrittenSource(manual, 'user.hsc', content).logic?.manualSource).toBe(
+    manual.logic!.manualSource,
+  );
+  const peer = structuredClone(added);
+  peer.logic!.handwrittenSources![0].content = '; peer changed source';
+  const own = structuredClone(added);
+  own.logic!.rules[0].once = true;
+  expect(() => mergeForge(added, own, peer)).toThrow(/Logic/);
 });

@@ -17,6 +17,16 @@ pub struct Document {
     pub rules: Vec<Rule>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manual_source: Option<String>,
+    /// Original source modules are optional authoring metadata. Export writes
+    /// ordinary sibling .hsc files, never fields inside an asset tag.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub handwritten_sources: Vec<HandwrittenSource>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HandwrittenSource {
+    pub filename: String,
+    pub content: String,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -111,6 +121,31 @@ fn unit(value: f32) -> bool {
 }
 fn seconds(value: f32) -> bool {
     value.is_finite() && (0.0..=3600.0).contains(&value)
+}
+pub fn validate_handwritten_sources(sources: &[HandwrittenSource]) -> Result<()> {
+    if sources.len() > 14 {
+        return invalid("At most 14 handwritten source modules can accompany generated logic; the selected native target may permit fewer");
+    }
+    let mut names = BTreeSet::from(["gs_logic.hsc".to_owned(), "global_scripts.hsc".to_owned()]);
+    for source in sources {
+        let path = crate::safe_relative(&source.filename)?;
+        let stem = source.filename.strip_suffix(".hsc").unwrap_or("");
+        if path.components().count() != 1
+            || stem.is_empty()
+            || stem.len() > 31
+            || !stem.bytes().all(|b| b.is_ascii() && !b.is_ascii_control())
+            || !names.insert(source.filename.to_ascii_lowercase())
+        {
+            return invalid("Handwritten modules need unique plain .hsc filenames with a native name of 1–31 ASCII characters. gs_logic.hsc and global_scripts.hsc are reserved; no source is renamed automatically");
+        }
+        if source.content.is_empty()
+            || source.content.len() > 1024 * 1024
+            || source.content.bytes().any(|b| b == 0 || b > 127)
+        {
+            return invalid(format!("Handwritten source {} must contain ASCII text within 1 MiB; the selected target may allow less. Original bytes will not be silently converted", source.filename));
+        }
+    }
+    Ok(())
 }
 pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
     let Some(logic) = &doc.logic else {
@@ -217,6 +252,21 @@ pub fn validate(doc: &QuickForgeDocument) -> Result<()> {
         .is_some_and(|s| s.is_empty() || s.len() > 65536 || s.bytes().any(|b| b == 0 || b > 127))
     {
         return invalid("Manual HaloScript must be nonempty ASCII source within 64 KiB; native compilation still validates semantics");
+    }
+    validate_handwritten_sources(&logic.handwritten_sources)?;
+    let (files, bytes) = if doc.runtime_id == crate::runtime::RuntimeId::MccSteam {
+        (16, 1024 * 1024)
+    } else {
+        (8, 256 * 1024)
+    };
+    let generated = 1 + usize::from(doc.runtime_id == crate::runtime::RuntimeId::MccSteam);
+    if logic.handwritten_sources.len() + generated > files
+        || logic
+            .handwritten_sources
+            .iter()
+            .any(|s| s.content.len() > bytes)
+    {
+        return invalid(format!("Selected target permits {files} script source files and {bytes} bytes per file; generated/global source counts toward that budget. No source was omitted or truncated"));
     }
     Ok(())
 }
@@ -484,20 +534,81 @@ pub fn script_path(workspace: &std::path::Path, scenario: &str) -> Result<std::p
         .join(scenario.parent().unwrap())
         .join("scripts/gs_logic.hsc"))
 }
+/// The native compiler consumes these files as one scenario unit. It remains
+/// authoritative for function types, declarations, dependencies and budgets.
+pub fn source_modules(doc: &QuickForgeDocument) -> Result<Vec<Source>> {
+    let Some(generated) = generate(doc)? else {
+        return Ok(vec![]);
+    };
+    let mut modules = vec![generated];
+    for module in &doc.logic.as_ref().unwrap().handwritten_sources {
+        modules.push(Source {
+            filename: module.filename.clone(),
+            content: module.content.clone(),
+            sha256: crate::studio_native::digest(module.content.as_bytes()),
+            regions: vec![],
+            manual: true,
+        });
+    }
+    Ok(modules)
+}
 pub fn export(doc: &QuickForgeDocument, workspace: &std::path::Path, scenario: &str) -> Result<()> {
-    if let Some(source) = generate(doc)? {
-        let path = script_path(workspace, scenario)?;
+    let modules = source_modules(doc)?;
+    if modules.is_empty() {
+        return Ok(());
+    }
+    let directory = script_path(workspace, scenario)?
+        .parent()
+        .unwrap()
+        .to_owned();
+    // Preflight every destination before writing even the generated module.
+    // An existing manual file must never be replaced by a partial export.
+    for source in &modules {
+        let path = directory.join(&source.filename);
         crate::reject_links(&path)?;
         if path.exists() {
-            return invalid("Generated logic must not overwrite an existing handwritten script");
+            return invalid(format!(
+                "Logic export must not overwrite existing script {}; original source is unchanged",
+                source.filename
+            ));
         }
+    }
+    for source in &modules {
+        let path = directory.join(&source.filename);
         std::fs::create_dir_all(path.parent().unwrap())?;
         crate::project::atomic_write(&path, source.content.as_bytes(), false)?;
+    }
+    if let Some(source) = modules.first() {
         crate::project::atomic_write(
             &workspace.join("logic-source-map.json"),
             &serde_json::to_vec_pretty(&source)?,
             false,
         )?;
+    }
+    if modules.len() > 1 {
+        crate::project::atomic_write(
+            &workspace.join("logic-sources.json"),
+            &serde_json::to_vec_pretty(&modules)?,
+            false,
+        )?;
+    }
+    Ok(())
+}
+pub fn verify_exported_sources(
+    doc: &QuickForgeDocument,
+    workspace: &std::path::Path,
+    scenario: &str,
+) -> Result<()> {
+    let directory = script_path(workspace, scenario)?
+        .parent()
+        .unwrap()
+        .to_owned();
+    for module in source_modules(doc)? {
+        let input = directory.join(&module.filename);
+        crate::reject_links(&input)?;
+        if crate::maps::hash_file(&input)? != module.sha256 {
+            return invalid(format!("HaloScript {} changed after export; reconcile the originating source before compiling. Edited files remain intact", module.filename));
+        }
     }
     Ok(())
 }
@@ -563,9 +674,8 @@ pub(crate) fn compile(
     }
     let path = script_path(workspace, scenario)?;
     crate::reject_links(&path)?;
-    if crate::maps::hash_file(&path)? != source.sha256 {
-        return invalid("Logic source changed after export; review the originating project revision before compiling");
-    }
+    let modules = source_modules(doc)?;
+    verify_exported_sources(doc, workspace, scenario)?;
     // H1A recompiles source during build-cache-file. Its source indexing expects
     // the conventional globals file even when the level declares no globals.
     // Match the existing native machinima path, without replacing authored text.
@@ -576,7 +686,12 @@ pub(crate) fn compile(
     }
     let limit = if engine == "mcc-cea" { 16 } else { 8 };
     let mut count = usize::from(globals.is_file());
-    if globals.is_file() && std::fs::metadata(&globals)?.len() > 256 * 1024 {
+    let source_limit = if engine == "mcc-cea" {
+        1024 * 1024
+    } else {
+        256 * 1024
+    };
+    if globals.is_file() && std::fs::metadata(&globals)?.len() > source_limit {
         return invalid("Global HaloScript source exceeds the bounded source-file size");
     }
     for entry in std::fs::read_dir(path.parent().unwrap())? {
@@ -584,7 +699,7 @@ pub(crate) fn compile(
         crate::reject_links(&p)?;
         if p.extension().is_some_and(|x| x == "hsc") {
             count += 1;
-            if std::fs::metadata(&p)?.len() > 256 * 1024 {
+            if std::fs::metadata(&p)?.len() > source_limit {
                 return invalid("A HaloScript source exceeds the bounded source-file size");
             }
         }
@@ -636,6 +751,12 @@ pub(crate) fn compile(
             .map(|lines| compiler_diagnostic(&source, &lines))
             .unwrap_or_default();
         return invalid(format!("Logic / Events native compilation failed: {details}\n{error}. See gs_logic.hsc and logic-source-map.json; handwritten sources and the previous-good build remain unchanged"));
+    }
+    for module in &modules {
+        let input = path.parent().unwrap().join(&module.filename);
+        if crate::maps::hash_file(&input)? != module.sha256 {
+            return invalid(format!("Native script compilation changed original source {}; previous-good output is retained", module.filename));
+        }
     }
     Ok(())
 }

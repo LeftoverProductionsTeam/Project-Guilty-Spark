@@ -110,6 +110,26 @@ it('same-map copy/paste preserves native dependency bindings without extraction 
   expect(second.project.quickForge!.placements).toHaveLength(3);
   expect(new Set(second.project.quickForge!.placements.map((p) => p.id)).size).toBe(3);
   expect(first.project.quickForge!.placements[1].position).toEqual([2, 3, 0]);
+  expect(first.project.quickForge!.placements[1].tagPath).toBe(binding.tagPath);
+});
+it('copies imported bindings with the original document path and keeps native namespaces in the admission receipt', async () => {
+  const source = project();
+  source.nativeAssetImports = [binding];
+  source.quickForge!.placements[0].tagPath = binding.nativePath;
+  copyForgeSelection(source, ['boulder']);
+  const clip = readForgeSelection()!;
+  expect(clip.nativeImports).toEqual([binding]);
+  const target = { ...project(), id: 'other-map', quickForge: { ...project().quickForge!, placements: [] } };
+  const admitted = { ...binding, id: 'destination-binding', nativePath: 'gs_other/scenery/rocks/boulder' };
+  const prepare = vi.fn().mockResolvedValue(admitted);
+  const pasted = applyForgePaste(target, await prepareForgePaste(target, clip, prepare));
+  expect(prepare.mock.calls[0][1].path).toBe(binding.tagPath);
+  expect(pasted.project.quickForge!.placements[0].tagPath).toBe(binding.tagPath);
+  expect(pasted.project.nativeAssetImports).toEqual([admitted]);
+  expect(source.quickForge!.placements[0].tagPath).toBe(binding.nativePath);
+  const wrong = structuredClone(clip);
+  wrong.nativeImports[0].tagPath = 'another/native/tag';
+  await expect(prepareForgePaste(target, wrong, prepare)).rejects.toThrow(/differs/);
 });
 it('cross-map/runtime paste resolves original identity and rebases onto concurrent destination edits', async () => {
   const source = project();
@@ -137,9 +157,9 @@ it('cross-map/runtime paste resolves original identity and rebases onto concurre
   expect(() => applyForgePaste({ ...current, id: 'different-map' }, prepared)).toThrow(
     /destination map changed/,
   );
-  expect(() => applyForgePaste({ ...current, quickForge: { ...current.quickForge, runtimeId: 'mccSteam' } }, prepared)).toThrow(
-    /destination map changed/,
-  );
+  expect(() =>
+    applyForgePaste({ ...current, quickForge: { ...current.quickForge, runtimeId: 'mccSteam' } }, prepared),
+  ).toThrow(/destination map changed/);
 });
 it('paste after Undo restores the original native closure and refuses material changes during asynchronous preparation', async () => {
   const source = project();

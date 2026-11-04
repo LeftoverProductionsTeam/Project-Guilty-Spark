@@ -32,6 +32,8 @@ An open-source Halo 1 creation and interoperability studio combining native modd
 
 **C67 Source Guardian recovery:** Preservation → Recover a Halo Project reviews a map before creating separate standard tags and supported reconstructed source files. Actual desktop recovery, independent native parsing and a recovered 1,795-tag MCC scenario compile/readback pass. Original authoring history, complete visual/audio fidelity, other-runtime acceptance and gameplay of that recovered cache remain unverified. [Workflow, measurements and limitations](docs/CONTINUATION_67_SOURCE_GUARDIAN.md).
 
+**C68 native authoring:** Copy a placed door's behavior to an independent instance, and keep original handwritten `.hsc` files alongside generated events. Real desktop authoring, Undo/Save/reopen, native compiler rejection/recovery and external tag edit/reconcile/build tests pass. The two-door map compiles with seven native scripts; its new gameplay test remains open. [Workflow and exact evidence](docs/CONTINUATION_68_NATIVE_AUTHORING.md).
+
 ## Real accomplishments
 
 - Native geometry/collision compilation and a user-verified Custom Edition Workshop playthrough.

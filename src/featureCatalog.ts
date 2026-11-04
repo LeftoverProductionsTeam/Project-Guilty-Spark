@@ -57,6 +57,8 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     ['Open the rooms-and-corridor source in Level editor → Objects & gameplay. Open Asset library and choose a compatible owned campaign source, then Show → Doors & devices.',
      'Drag a door preview into the corridor. Resize and rotate it to fit. Drag Trigger volume from the same drawer, then select its box and open Inspector → Properties → Logic / Events.',
      'Choose From trigger and To door / device. Select Cover both sides, then Enter → Open. Leave Once off so the event can re-arm. Native HaloScript exposes the generated script for advanced edits.',
+     'For a second door, select that placed instance and use Reuse a device setup → Copy behavior. It receives its own trigger and rule names. Existing destination behavior is preserved; adjust the copied volume to fit.',
+     'Expand Handwritten scripts to import original .hsc modules alongside generated events. Comments and line endings are kept; native compilation checks the complete scenario. Manual override of generated source pauses visual connections.',
      'Save, build and launch the matching native scenario. Approach from one room, cross, let the door close and return. Undo/Redo and immediate Save keep both placement and event changes.'],
     'The stock a10 small-door demo passed a human outbound/return crossing in H1A Standalone. Other doors, retail MCC cache loading and the other runtimes each need their own gameplay test.'),
     prerequisites:['Editable QuickForge/BSP Workshop source','A compatible map containing a native machine door','Matching H1A tags/tools and Invader including invader-script'],workshopEntry:'objects'},

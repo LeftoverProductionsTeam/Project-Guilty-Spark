@@ -82,7 +82,23 @@ export function copyForgeSelection(project: Project, ids: string[]): number {
     nodes: structuredClone(nodes),
     materials: structuredClone(materials),
     nativeImports: structuredClone(
-      (project.nativeAssetImports ?? []).filter((b) => materials.some((m) => m.shaderPath === b.nativePath)),
+      (project.nativeAssetImports ?? []).filter(
+        (b) =>
+          materials.some((m) => m.shaderPath === b.nativePath) ||
+          nodes.some(
+            (n) =>
+              n.type === 'placement' &&
+              [b.tagPath, b.nativePath].some(
+                (path) =>
+                  n.value.tagPath.replaceAll('\\', '/').toLowerCase() ===
+                  path.replaceAll('\\', '/').toLowerCase(),
+              ) &&
+              n.value.tagId === b.tagId &&
+              n.value.tagClass === b.tagClass &&
+              n.value.sourceProjectId === b.sourceProjectId &&
+              n.value.sourceSha256 === b.sourceSha256,
+          ),
+      ),
     ),
   };
   validate(value);
@@ -176,16 +192,30 @@ export async function prepareForgePaste(
     // Authored loose-tag references have no compiled source to extract. They
     // remain local to their original map and undergo the normal build preflight.
     if (sameMap && v.sourceProjectId === null && v.sourceSha256 === null && v.tagId === null) continue;
-    await resolve({
+    // A copied imported instance may carry a staged path. Receipt metadata
+    // only locates its original identity; native admission still checks the
+    // actual original tag and complete dependency closure.
+    const origin = clip.nativeImports.find(
+      (b) =>
+        b.nativePath.replaceAll('\\', '/').toLowerCase() === v.tagPath.replaceAll('\\', '/').toLowerCase() &&
+        b.tagId === v.tagId &&
+        b.tagClass === v.tagClass &&
+        b.sourceProjectId === v.sourceProjectId &&
+        b.sourceSha256 === v.sourceSha256,
+    );
+    const admitted = await resolve({
       key: 'clipboard',
       name: v.name,
-      path: v.tagPath,
+      path: origin?.tagPath ?? v.tagPath,
       class: v.tagClass,
       tagId: v.tagId!,
       sourceProjectId: v.sourceProjectId!,
       sourceSha256: v.sourceSha256!,
       cacheVersion: 0,
     });
+    // Documents retain the original source identity. The native compiler's
+    // existing apply_quickforge binding rewrites only its staged copy.
+    v.tagPath = admitted.tagPath;
   }
   const materialMap = new Map<string, string>();
   for (const material of clip.materials) {
@@ -232,7 +262,11 @@ export function applyForgePaste(
   current: Project,
   paste: PreparedForgePaste,
 ): { project: Project; ids: string[] } {
-  if (current.id !== paste.targetId || !current.quickForge || current.quickForge.runtimeId !== paste.targetRuntime)
+  if (
+    current.id !== paste.targetId ||
+    !current.quickForge ||
+    current.quickForge.runtimeId !== paste.targetRuntime
+  )
     throw Error('The destination map changed during paste; no objects were added.');
   if (
     paste.reusedMaterials.some(

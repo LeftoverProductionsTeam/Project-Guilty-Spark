@@ -131,11 +131,11 @@ try {
   await page.reload();
   await page
     .locator('.map-card')
-    .filter({ has: page.locator('h3').filter({ hasText: /^C63 native Logic benchmark$/ }) })
+    .filter({ has: page.getByText(authoring.projectTitle ?? 'C63 native Logic benchmark', { exact: true }) })
     .click({ timeout: 120000 });
   await call('claim_project_document', { id: receipt.projectId });
   const project = (await call('open_project', { id: receipt.projectId })).project;
-  expect(project.quickForge.logic.rules).toHaveLength(1);
+  expect(project.quickForge.logic.rules).toHaveLength(authoring.logicRuleCount ?? 1);
   const built = await call('open_built_map', {
     projectId: project.id,
     buildId: authoring.nativeBuild.build.id,

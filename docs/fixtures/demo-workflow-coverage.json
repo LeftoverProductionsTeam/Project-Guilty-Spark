@@ -4,6 +4,12 @@
   "acceptance": "Workflow discoverability audit only; native compiler, rendering and gameplay evidence remain separate.",
   "artifacts": [
     {
+      "artifact": "scripts/test-native-logic-templates.mjs",
+      "featureId": "native-door-logic",
+      "kind": "diagnostic",
+      "scope": "Extends the accepted room/door source through actual desktop behavior copying, handwritten source import, Undo/Save/reopen, native compilation and independent instance readback. New gameplay remains separate."
+    },
+    {
       "artifact": "scripts/test-source-recovery-native.mjs",
       "featureId": "source-recovery",
       "kind": "diagnostic",

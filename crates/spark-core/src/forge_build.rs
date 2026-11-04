@@ -347,6 +347,7 @@ pub fn run_prepared_job(
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
         crate::native_audio::verify_compiled(project,&inspected,&output)?;
         crate::native_logic::verify_compiled(document,&inspected)?;
+        crate::native_logic::verify_exported_sources(document,workspace,&sources.scenario_path)?;
         if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported native inputs changed during compilation");}
         crate::powerups::verify_compiled(project,&inspected,workspace)?;
         custom.verify_cache(&inspected,&output)?;

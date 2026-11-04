@@ -1,5 +1,7 @@
 # Universal workbench continuation
 
+C68 extends the existing native door/source path with independent instance behavior and preserved handwritten HaloScript. Actual UI, native parsing/compilation and external tag edit/reconcile/build pass; the new two-door gameplay walkthrough remains unverified. Imported-terrain editing, seamless region traversal, full rendering/audio parity, runtime-specific AI/gameplay, recovered-source adoption, cross-computer collaboration and release gates are preserved. [C68 evidence and remaining authoring work](CONTINUATION_68_NATIVE_AUTHORING.md).
+
 C61 closes the redundant full-map build-status response, selected-Inspector ordering/spacing and Home's source-sky lighting error. It preserves all source guards and 472 existing CSV rows. The genuine no-allies native player trial ends in defeat at wave one/score zero; shared round globals, full AI/death/vehicle/rejoin parity and automatic original Zombie release remain open. Native source collaboration/BSP compilation/recovery pass on one computer. Whole-process RAM budgeting, imported-terrain/structural compiled-map editing, human traversal, target-specific gameplay/audio/conversion and separate-computer/authorized Steam acceptance remain priorities. [C61 results](CONTINUATION_61_WORKFLOW_NATIVE.md).
 
 

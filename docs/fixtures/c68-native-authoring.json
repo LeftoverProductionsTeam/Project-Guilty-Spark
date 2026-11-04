@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 1,
+  "continuation": "C68",
+  "recordedAt": "2026-11-04T10:08:30.625Z",
+  "startingCommit": "5b11e6de33114e9e4aba573e370d61f76e3f0918",
+  "branch": "master",
+  "scopedNativeMilestoneComplete": true,
+  "entireDirectiveComplete": false,
+  "scope": "Independent device instances, protected companion HaloScript and actual native external tag reconciliation/build",
+  "privateEvidenceRoot": ".local/artifacts/c68-native-authoring-20261104",
+  "appSha256": "c2d1c6518687a755cc48ae33dd935eaf07469b0fb19c0ceaa151e8a42e0dd502",
+  "tools": {
+    "invaderVersion": "0.55.0.r4134.33518109",
+    "scriptCompilerSha256": "a998bb84bb38bb71fb9d889c11babdfe142b9b2aa9ee33c6c37b0ef6b0ce0195",
+    "nativeBuildIdentities": {
+      "haloTool": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa",
+      "invaderDependency": "727e6983582f882b17a52822547ee1805c13856de912494ce28ff2a726a3b554",
+      "invaderEdit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invaderInfo": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4",
+      "invaderScript": "a998bb84bb38bb71fb9d889c11babdfe142b9b2aa9ee33c6c37b0ef6b0ce0195"
+    }
+  },
+  "originalSourceCacheSha256": "b53c7543526c709c53344e814a746c0687c3f6ed7691d720e4764c54c0549103",
+  "authoring": {
+    "projectId": "1da0ff5c-d0bd-4bf1-b4ae-754d6fb3fa2e",
+    "jobId": "b2693e35-6acb-4358-9b1a-cf3d22a03fa2",
+    "cacheSha256": "9964e6ddafb30d5b83353d486882ab0d17f6c67ffd922305030acc86a877afbb",
+    "mockedIpc": false,
+    "nativePointerDrop": true,
+    "copyPaste": true,
+    "independentDeviceBindings": true,
+    "oneActionBehaviorUndoRedo": true,
+    "immediateSaveAndTriggerUndo": true,
+    "saveReopen": true,
+    "handwrittenImport": true,
+    "sourceBytesExportedUnchanged": true,
+    "devices": 2,
+    "triggerVolumes": 2,
+    "rules": 4,
+    "scripts": [
+      "gs_logic_init",
+      "gs_evt_481b81c02744",
+      "gs_evt_f6d0edfde42d",
+      "gs_evt_726e14fc6696",
+      "gs_evt_2cf01e8be934",
+      "c68_manual_value",
+      "c68_manual_init"
+    ],
+    "independentNativeReadback": {
+      "machines[0].name": "0",
+      "trigger_volumes[0].type": "rotational",
+      "trigger_volumes[0].name": "gs_tv_b49487902825",
+      "trigger_volumes[0].starting_corner": "9.000000,-1.500000,0.000000",
+      "machines[1].name": "1",
+      "trigger_volumes[1].type": "rotational",
+      "trigger_volumes[1].name": "gs_tv_3f472409156f",
+      "trigger_volumes[1].starting_corner": "15.000000,-1.500000,0.000000"
+    },
+    "internalBuildMs": 89045,
+    "desktopBuildObservationMs": 99301.73270000001
+  },
+  "nativeSourceFailure": {
+    "complete": true,
+    "compilerSha256": "a998bb84bb38bb71fb9d889c11babdfe142b9b2aa9ee33c6c37b0ef6b0ce0195",
+    "copiedFiles": 4,
+    "elapsedMs": 228.38689999999997,
+    "invalidExit": 1,
+    "diagnostic": "Script compilation error: manual_original.hsc:8:27: error: function 'c68_unknown_native_function' is not defined\r\ntag data is invalid\r\n",
+    "previousGoodScenarioUnchanged": true,
+    "originalBuildAndSourcesUnchanged": true,
+    "restoredNativeScripts": [
+      "gs_logic_init",
+      "gs_evt_481b81c02744",
+      "gs_evt_f6d0edfde42d",
+      "gs_evt_726e14fc6696",
+      "gs_evt_2cf01e8be934",
+      "c68_manual_value",
+      "c68_manual_init"
+    ],
+    "gameplayVerified": false
+  },
+  "external": {
+    "complete": true,
+    "mockedIpc": false,
+    "baboonGuiEdited": false,
+    "nativeNoOp": {
+      "semanticIdentity": true,
+      "byteIdentical": true,
+      "scope": "Actual Invader same-field save; a harmless rewrite is not classified as semantic corruption."
+    },
+    "injectedWriter": "QA fixture, not Baboon or Invader",
+    "invalidSaveRefused": true,
+    "invalidDetectionMs": 4668.237599999993,
+    "validDetectionMs": 4949.224400000006,
+    "semanticChanges": [
+      {
+        "before": "bounding_radius (0.900000)                                              float32",
+        "after": "bounding_radius (0.500000)                                              float32"
+      }
+    ],
+    "compiledBoundingRadius": 0.5,
+    "baselineTagsRehashed": 1801,
+    "nativeBuildMs": 106577.7468,
+    "jobId": "fbc854f8-5fa3-42f8-a5b2-abbb08ddd1eb",
+    "cacheSha256": "7daa13c165dacad7eedddde04c9479fadcffceabb3c54d4aaedad0dae6c68b4b",
+    "sourcePreservation": {
+      "complete": true,
+      "inputManifest": {
+        "relativePath": "working-scripts-input.json",
+        "sha256": "09547fbf05fc546474a8c590dc8aa8549157b27c137d79856f2d675ad441297a",
+        "fileCount": 3
+      },
+      "files": [
+        {
+          "path": "global_scripts.hsc",
+          "originalSha256": "3db3b42d31cebc1632c418ce04c5e382b754f4c951eb464582d2acc19583cccc",
+          "externalBuildSha256": "3db3b42d31cebc1632c418ce04c5e382b754f4c951eb464582d2acc19583cccc"
+        },
+        {
+          "path": "levels/quickforge/c68_native_device_templates/scripts/gs_logic.hsc",
+          "originalSha256": "549fc4f1ff0aa06cc2519992e67c3a0791a78ac85fbb5af1a7b535c8afdd8714",
+          "externalBuildSha256": "549fc4f1ff0aa06cc2519992e67c3a0791a78ac85fbb5af1a7b535c8afdd8714"
+        },
+        {
+          "path": "levels/quickforge/c68_native_device_templates/scripts/manual_original.hsc",
+          "originalSha256": "8a5aaf369ffd46c9c4faccc875ca5829feb72ded3b8969699e15970e5436b33e",
+          "externalBuildSha256": "8a5aaf369ffd46c9c4faccc875ca5829feb72ded3b8969699e15970e5436b33e"
+        }
+      ],
+      "originalCacheUnchanged": true,
+      "externalCacheSha256": "7daa13c165dacad7eedddde04c9479fadcffceabb3c54d4aaedad0dae6c68b4b"
+    }
+  },
+  "regressions": {
+    "rustPassed": 705,
+    "rustIgnored": 8,
+    "ignored": [
+      {
+        "test": "app::runtime_workbench::tests::native_community_https_listing_is_bounded_and_redacted",
+        "reason": "Explicit read-only HTTPS provider check; requires internet, never joins a game"
+      },
+      {
+        "test": "live_mcc::windows::tests::native_camera_disconnect_rejects_a_stale_session",
+        "reason": "Requires the owner's running reviewed MCC Halo 1 session in official mods mode"
+      },
+      {
+        "test": "bsp_audio::tests::owned_campaign_painted_details_block_before_native_audio_serialization",
+        "reason": "requires explicitly selected owned MCC campaign cache/native BSP and installed Invader"
+      },
+      {
+        "test": "bsp_detail::tests::owned_painted_bsp_reads_all_values_and_blocks_changed_serialization",
+        "reason": "Requires explicit local owned BSP/Invader paths; never ships game data"
+      },
+      {
+        "test": "powerups::tests::owned_mcc_powerup_cache_compiles_and_contains_every_custom_pickup",
+        "reason": "requires SPARK_POWERUP_TAGS, SPARK_POWERUP_KIT and SPARK_POWERUP_INVADER"
+      },
+      {
+        "test": "tag_duplicates::owned_sdk_tests::owned_campaign_tag_duplicate_and_ui_cache_compile",
+        "reason": "Requires the owner's installed MCC maps, SDK tags and Invader; writes an isolated local job"
+      },
+      {
+        "test": "tag_renames::tests::owned_native_emitter_rename_compiles_with_updated_references",
+        "reason": "Requires the owner's native looping-emitter output, native SDK tags, H1A kit and Invader; compiles an isolated copy"
+      },
+      {
+        "test": "selected_owned_installation_inventory",
+        "reason": "requires an explicitly selected local MCC installation"
+      }
+    ],
+    "frontendPassed": 390,
+    "frontendFiles": 92,
+    "browserPassed": 161,
+    "offlineProgramsPassed": 59,
+    "continuityHealthPassed": 8,
+    "typeScript": true,
+    "frontendBuild": true,
+    "embeddedNativeAppBuild": true
+  },
+  "preservation": {
+    "requirementsRows": 475,
+    "requirementsSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
+    "protectedArtifactHashesRechecked": 15,
+    "currentWorktrees": 1,
+    "localBranches": [
+      "master"
+    ],
+    "workspaceLogicalBytesAtScan": 153545399351,
+    "retainedEvidenceAtScan": [
+      {
+        "bytes": 2781640396,
+        "files": 13341
+      }
+    ],
+    "productionFileHashesAtReport": {
+      "crates/spark-core/src/native_logic.rs": "ae28a9613a503327c3a6207224f96db8e34c7e8a1e7de369cdb912e909935172",
+      "crates/spark-core/src/forge_build.rs": "8fff1cf9d75bdde9cb8ed312a577c8cd001c7b5c24707748f9b03b0c84a366e5",
+      "src/nativeLogic.ts": "1f4163b2f892f9c004487b00b8dd62cee7cd1266bc43a5b393c6573122616e1f",
+      "src/components/LogicEvents.tsx": "c391e71a6bc2d078ee8ebf6649324c01e3d428d584807b16a55f1e4e04f5a1df",
+      "src/forgeClipboard.ts": "1725a59724927e9294a309c4957f847023aa9b7e69fba83c7995817745e88778",
+      "src/featureCatalog.ts": "4d9c6f554094d922b3c46bd39ba27173fa783cf8de932dbd97125b553f895657",
+      "src/forge.css": "4d10966008f05cf0406233ea4fdcc8cfb4f67bb93717c2ea1d00cb9c1f390424"
+    }
+  },
+  "evidence": [
+    "native-ui-sixth/acceptance.json",
+    "native-ui-sixth/syntax-acceptance.json",
+    "external-second/acceptance.json",
+    "external-source-preservation.json",
+    "preservation.json",
+    "rust-workspace.log",
+    "frontend-final.log",
+    "browser-final.log",
+    "offline-final.log",
+    "continuity-health-final.log",
+    "repository-health-final.json"
+  ],
+  "acceptanceNotClaimed": [
+    "C68 game loaded",
+    "C68 human traversal",
+    "Baboon manual GUI edited-save",
+    "Other-runtime C68 native compilation/gameplay",
+    "Externally handwritten source adoption",
+    "Game-peer replication",
+    "Clean-machine/release acceptance",
+    "Whole Native Authoring Revolution completion"
+  ],
+  "originalC63HumanResult": "Opens both ways; crossed and returned; closed normally",
+  "release": {
+    "acceptedC49Unchanged": true,
+    "c68PackagesCreated": false,
+    "pushed": false,
+    "published": false
+  }
+}

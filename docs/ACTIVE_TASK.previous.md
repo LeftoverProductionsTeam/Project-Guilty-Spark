@@ -1,35 +1,31 @@
 # Active engineering checkpoint
 
-Task: C67 Source Guardian recovery milestone and native engineering follow-through
+Task: C68 native authoring — independent device behavior and protected handwritten HaloScript
 Status: active
-Starting revision: fb75023f3896b4ae9a2f0236ee0576fcc59bf059
-Latest verified revision: fb75023 plus the verified C67 working tree; local source commit pending
-Next action: Commit the verified C67 recovery implementation locally, seal its source revision, then resume Native Error Doctor against retained genuine compiler/gameplay failures. Keep recovered-source adoption, changed-source reconciliation and additional recovery formats in pending work. No push or publication.
+Starting revision: 5b11e6d
+Latest verified revision: 5b11e6d; C68 source edits uncommitted on sole local master
+Next action: Finish actual desktop door drop, copy/paste, per-instance behavior, handwritten source, Undo/Save/reopen and native compile/readback in native-ui-third. Then run genuine external edit/reconcile/build and combined regressions. Preserve failed trials and all prior acceptance.
 
 ## Acceptance
 
-The compiled-cache recovery milestone passes actual desktop entrypoints, independent Invader native parsing/dependency closure, model reconstruction/import and H1A recovered-scenario compilation/readback. This is a scoped native gate, not complete original-authoring recovery, visual/audio parity, game execution, multiplayer or clean-machine release acceptance.
+Ordinary Halo scenario/device references and sibling .hsc modules; no custom native fields or required Spark runtime. Two device setups use independent trigger/rule/native identities. Original handwritten comments and CRLF are retained. Target budgets, filename collisions and changed exported files refuse unsafe adoption. User-facing controls and real Invader/H1A tools must pass independently from gameplay.
 
 ## Verified milestones
 
-C67 native-second: 23 tags, one reconstructed JMS, independent model compilation, stale-plan refusal, corrupt native model rejection/restoration and unchanged source. One controlled recovery/reuse pair measured 12802/3562 ms with no duplicate native data. Whole recovered MCC scenario: 1795 tags and 139 reconstructed source files. H1A compiled cache eec9b92fd42ff64828103b82f1fa15d50f229fd41db08b2e01592cfab15cd4e3 retains all 1795 class/path identities, 66 render/collision triangles, two script names and five placements; native CRC matches. Compiler warnings remain. Native-ui-sealed uses the final debug app c62f77745ea16be59f3d32d9082a52657322b42fd08c9b67a1c9b2067f96574b with real buttons/IPC, per-root navigation/reuse and completed operation indicator, zero page errors.
-
-Full Rust: 703 passed/8 ignored; frontend 387/92 files, browser 161, offline 59 and continuity/health/release Node 8 pass. TypeScript, frontend build and native debug build pass. Final recovery-focused Rust tests: 5 pass. Evidence under .local/artifacts/c67-recovery-20261104, exact report docs/CONTINUATION_67_SOURCE_GUARDIAN.md, metadata docs/fixtures/c67-source-recovery.json.
-
-Fifteen selected C49/C63 protected artifacts rehash unchanged (preservation-sealed.json). The 475-row requirements CSV matches the actual starting checkout byte for byte (1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7). C63 ancestor 056bc69, original two-way human Standalone acceptance and external edit/corruption/reconcile/build evidence remain intact. C66 bounded staging and reuse contracts remain.
+C68 focused native logic tests 9/9, frontend logic/clipboard 15/15, TypeScript and frontend build pass. Full frontend before final clipboard repair: 389 tests/92 files. Debug app rebuilt with changes, SHA-256 840568117022977ecffa46a6d2a4f57c67536c20ec04b18cb4233023c454d44b. No C68 native build or gameplay accepted yet. C63 prior human result remains: Opens both ways; crossed and returned; closed normally. C67 recovery/build evidence retained. Requirements CSV 475 rows, SHA-256 1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7.
 
 ## Changed work
 
-Existing Preservation workspace now offers Recover a Halo Project; existing extraction/short-path/resource identity/staging/storage/native progress systems are reused. Scenario extraction avoids the pinned recursive single-tag compiler defect while preserving all native cache tags. Shared H1A globals preparation preserves authored files. Recovered folders have independent standard tags/data and optional provenance reports; altered files cannot reuse old validation but remain accessible.
+Existing native_logic, LogicEvents Inspector, nativeLogic and clipboard paths extended. Source modules preserve exact ASCII bytes and target file/size budgets; export preflights collisions, hashes before/after native tools. Explicit behavior copy rotates independent trigger offsets and rebinds complete self-contained rules. Clipboard now carries original native placement binding and assigns admitted destination path. Tests and native desktop harness added; no replacement geometry system, new workspace or copied SDK. Full directive identity and unresolved scope remain in PENDING_REQUESTS.md.
 
 ## Failures and blockers
 
-Retained genuine failures: native-first Windows open-log adoption, native-ui-second recursive scenario extraction with exit zero, native-cache-build missing H1A globals assertion. Repairs pass subsequent native tests. Compiler UI/meter/sound-cluster warnings remain. No C67 game/human/real-peer or clean-machine acceptance; no full original DCC/bitmap/BSP source recovery. Other runtime fixtures, partial/damaged project/archive recovery and recovered-source editor adoption/reconciliation remain open. No new first-person animation, fog/environment or vehicle seat/physics acceptance is claimed. User unavailable; no fabricated human result.
+native-ui-first preserved handwritten source but stopped at paste: inherited fixture referred to an absent old source project, and test saved before async paste. Investigation also found/fixed the independent clipboard namespace bug. native-ui-second correctly imported a source cache but did not open it before Asset Library selection; it stopped before compilation. native-ui-third follows actual source-opening/drop flow. Windows Computer Use cannot initialize (helper_unknown_error/setup refresh); no new human/gameplay or Baboon GUI acceptance can be inferred. Do not use raw OS UI automation.
 
 ## Operations and safe checkpoint
 
-No native/game process started by this pass remains active. No full SDK copied, no new worktree/branch/clone, no accumulated-data deletion or remote write. Failed trials and previous-good output remain. The C49 sealed installer/portable/source and C63 door evidence are unchanged. Local source commit is the only pending mutation. Do not repeat the older C66 approved deletion or produce duplicate recovery libraries on resume.
+native-ui-third running through real app WebView/IPC, owned PID/port recorded in its directory. No game started. Uses accepted C66 geometry, small admitted source cache and bounded 1793-tag pool, not the full SDK. Original seed/cache hash-checked. Both failed trials, C49 release, C63/C67 evidence and research preserved. No cleanup, branch/worktree, push, publication or install.
 
 ## Deferred requests
 
-Full user attachment remains at C:/Users/patri/.codex/attachments/e81773c1-9b1b-4a21-b5cb-1b9718e41ad9/Pasted text.txt, SHA-256 1cc8bf2ea191478b785677f0573e755021b0e1ce2a4ab4fa5a0e8a1793384681. See PENDING_REQUESTS.md for this complete directive and C66 prepared shared-source materialization, preserved at fb75023:docs/ACTIVE_TASK.md. Keep the full AI, Live Link, SparkLink, Firefight/Zombies, campaign/machinima, Megaworld, direct compiled-map structural editing and release ledger. No queue state or new research import is inferred.
+Previous Creator Freedom/Error Doctor/animation/fog/vehicle phases and C66 shared-source materialization remain in PENDING_REQUESTS.md. Broader geometry/seams/material/lightmap/Blender/Mantle/OpenTool and cross-runtime gameplay/AI/Megaworld collaboration/release goals are retained. Manual source import is not code-to-graph conversion or independent native gameplay acceptance.

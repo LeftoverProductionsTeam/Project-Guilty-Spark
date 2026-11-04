@@ -227,3 +227,7 @@
 .forge-logic-rule { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 7px; }
 .forge-logic-rule-heading { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 5px; }
 .forge-logic-content textarea { font-family: var(--font-mono,monospace); resize: vertical; }
+.forge-logic-visual { display: grid; gap: 8px; min-width: 0; border: 0; margin: 0; padding: 0; }
+.forge-logic-visual:disabled { opacity: .65; }
+.forge-handwritten-sources > :not(summary) { margin-top: 6px; }
+.forge-handwritten-sources label { display: grid; gap: 3px; }
