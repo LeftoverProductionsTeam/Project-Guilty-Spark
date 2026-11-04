@@ -1,5 +1,7 @@
 # C68 — Independent device logic and protected HaloScript
 
+Implementation commit: `5bd6e090bb24b1753145e033e38d52b7da829f8a`. Subsequent evidence/checkpoint sealing is documentation only.
+
 This continues `5b11e6d` on the sole canonical local master. It extends the existing C63/C66 room-and-door source, native scenario generator, Inspector and native compiler. It does not replace the geometry editor, create a new scripting language or complete the entire Native Halo Authoring Revolution directive.
 
 The requested attachment path was absent. The one available matching-title copy was read and retained with its exact hash; this is not a claim that it matched the missing attachment byte for byte. Its identity and the complete remaining scope remain in [pending requests](PENDING_REQUESTS.md).

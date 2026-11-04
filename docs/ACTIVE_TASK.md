@@ -3,8 +3,8 @@
 Task: C68 native authoring — verified device/source milestone; broader directive retained
 Status: active
 Starting revision: 5b11e6d
-Latest verified revision: C68 production patch on sole local master, verified before local commit; app c2d1c6518687a755cc48ae33dd935eaf07469b0fb19c0ceaa151e8a42e0dd502
-Next action: Commit/seal the verified C68 files locally, then resume remaining native-authoring gates. Two-door gameplay needs an actual player: cross both doors, wait for closure, return through both. When human control is unavailable, continue the preserved source-adoption/native authoring queue without promoting that gameplay gate. No cleanup, branch/worktree, push, install or publication.
+Latest verified revision: 5bd6e090bb24b1753145e033e38d52b7da829f8a; C68 production, regressions and actual native evidence verified; subsequent seal is documentation only
+Next action: Resume remaining native-authoring gates after verifying current HEAD and the C68 evidence hashes. The focused two-door gameplay test is cross both doors, wait for closure, return through both. While human control is unavailable, continue the preserved source-adoption/native authoring queue without promoting that gameplay gate. No cleanup, branch/worktree, push, install or publication.
 
 ## Acceptance
 
