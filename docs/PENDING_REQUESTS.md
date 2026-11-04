@@ -1,5 +1,9 @@
 # Pending engineering requests
 
+## Community Interoperability & Island-Warfare Challenge — received November 4, 2026
+
+Requested file is absent; two exact-title alternatives match. Qualified full copy, receipt (`ad725de`) and evidence: `.local/artifacts/community-island-warfare-intake-20261104/`. Not byte-verified against the missing attachment. Pending behind C69; available text preserves P0 native door/export work before Mantle/BSP/runtime/AI and P2 islands/Conquest. No new implementation/research/build/game tests. Reattach only if intended content differs.
+
 ## PlayBridge Initiative — received November 4, 2026
 
 Complete 21,205-byte attachment, receipt (`75fa353`) and existing A–H evidence inventory: `.local/artifacts/playbridge-initiative-intake-20261104/` (`directive.txt`, `receipt.json`, `existing-evidence.json`). Pending behind actual C69 human acceptance; the attachment preserves current authoring/door work and supplies no explicit predecessor deferral. Its internal P0 order remains canonical GulchCE/direct-MCC evidence → documented Delta Hub → safe compatible-client join routing; P1 additional discovery/interoperability/memory budget, P2 deployment/conversion. Preserve all13 sections, tests A–H, legal/security/fidelity/source-identity limits and separate discovery/client/map/join/gameplay/parity labels. Delta backend/preflight already exist; canonical GulchCE, accepted direct-MCC gameplay, end-to-end public routing, full high-res budget and sustained peer matrix remain unaccepted. No new implementation/research/API calls/download/build/game test; no manual requeue needed.
