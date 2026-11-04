@@ -120,7 +120,7 @@
   "followThrough": {
     "recordedAt": "2026-11-04T18:27:45.535Z",
     "baseCommit": "16d9c953b41b8114d50b6d9583b751b9419152c3",
-    "sourceCommit": null,
+    "sourceCommit": "acfab8e945cf94c7aff028c0ef5703ae15b88f0d",
     "status": "awaiting human acceptance",
     "privateEvidenceRoot": ".local/artifacts/c71-native-asset-studio-20261104",
     "testedWorkingTreeIncludesPreservedC70": true,
@@ -249,8 +249,19 @@
       "logicalBytes": 169674587411,
       "uniqueFileBytes": 168466232113,
       "readErrors": 0,
-      "warning": "Above 80-GiB review budget. Original inputs, releases, failed evidence and pending code retained; no deletion authorized."
+      "warning": "Above 80-GiB review budget. Original inputs, releases, failed evidence and pending code retained; no deletion authorized.",
+      "afterAcceptance": {
+        "recordedAt": "2026-11-04T18:30:19.321Z",
+        "logicalBytes": 171485839108,
+        "uniqueFileBytes": 170277483810,
+        "readErrors": 0
+      }
     },
-    "remotePublication": false
+    "remotePublication": false,
+    "pendingSourcePreserved": {
+      "tracked": 15,
+      "untracked": 3,
+      "patchSha256": "b23400fde253c96052538ab881dadc1b639ace0646fcb98c094dd45eb9c67d28"
+    }
   }
 }

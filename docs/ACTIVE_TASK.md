@@ -3,7 +3,7 @@
 Task: C69 Spark Flow follow-through — remaining human acceptance
 Status: awaiting human verification
 Starting revision: 440dab1
-Latest verified revision: 16d9c95 base with verified C69 follow-through staged for its local source commit; tested working-tree app SHA-256 7001020924fb91783d31e3e0ff64bdada47ef9cacf9efb08ab0f5b0abcc47cfa
+Latest verified revision: acfab8e945cf94c7aff028c0ef5703ae15b88f0d C69 source commit; tested working-tree app SHA-256 7001020924fb91783d31e3e0ff64bdada47ef9cacf9efb08ab0f5b0abcc47cfa; C70 remains uncommitted
 Next action: When the user is available, request the recorded C69 creator-journey gameplay check using the existing native authoring cache: walk through both trigger-bound doors and return, confirming each opens and permits passage. Keep manual external GUI handoff, physical monitor removal and longer endurance open. Do not advance C70/Asset Studio without predecessor acceptance or explicit deferral.
 
 ## Acceptance

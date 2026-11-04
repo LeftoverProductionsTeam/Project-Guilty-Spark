@@ -1,31 +1,31 @@
 # Active engineering checkpoint
 
-Task: C69 Spark Flow restoration, compact navigation and feasible native acceptance
-Status: active
+Task: C69 Spark Flow follow-through — remaining human acceptance
+Status: awaiting human verification
 Starting revision: 440dab1
-Latest verified revision: 16d9c95 policy commit; C69 source repairs uncommitted and selectively staged
-Next action: Build the background panel-return race repair and compact Orb, then run affected actual-native lifecycle/restart/Flow checks. Inspect screenshots, preserve mixed-source identities, update results and commit only verified C69 repairs locally. Do not advance C70/Asset Studio without predecessor acceptance or explicit deferral.
+Latest verified revision: 16d9c95 base with verified C69 follow-through staged for its local source commit; tested working-tree app SHA-256 7001020924fb91783d31e3e0ff64bdada47ef9cacf9efb08ab0f5b0abcc47cfa
+Next action: When the user is available, request the recorded C69 creator-journey gameplay check using the existing native authoring cache: walk through both trigger-bound doors and return, confirming each opens and permits passage. Keep manual external GUI handoff, physical monitor removal and longer endurance open. Do not advance C70/Asset Studio without predecessor acceptance or explicit deferral.
 
 ## Acceptance
 
-One directive remains active. Reproduce/fix per-window maps/views/writer restoration and preserve source Undo. Latest user steering keeps smooth rectangular tabs, makes room through Tools/View/Work/Studio dropdowns, moves Home/first setup into the Orb and identifies the current workspace there with a compact title and one checked selected entry. No new navigation manager or editor.
+Latest requested UI fixes are implemented and verified: compact smooth capped tabs, automatic Maps dropdown under pressure, reserved native title-bar drag area, compact Home/setup rows in the Orb, one checked current workspace and title, no rectangular Spark button/tooltip background. One whole directive remains active in the ledger and is awaiting human acceptance. No question is sent while the user requests questions after the queue.
 
 ## Verified milestones
 
-Actual native restart-orb-final passes independent two-map tab sets, BSP faces/cameras, inactive-map writer, saved settings, maximize/fullscreen, six real tabs filling1315.94px and per-window Orb titles/checks. Full browser163 and focused compact Orb5 pass; TypeScript/frontend399 pass. Former lifecycle-view-panel-final8 and Flow-view-panel-final14 pass. Latest lifecycle-orb-compact passed native drag/ownership, then genuinely failed because a late panel return restored captured tabB after user selectedA. The existing load/reducer now accepts a background open, never restoring the stale choice; focused14 unit tests pass. Full updated acceptance follows. Controlled120 cycles/360 switches reduce hidden MCC polls132 to0; heavy decode reads0. Rust711/eight ignored and offline59 retained; native Rust unchanged.
+Final genuine embedded native restart8/lifecycle8/Flow14 all pass on the same app hash. Independent complete tab order, map views, inactive-map writer, preferences, native modes, actual source Undo and per-window navigation survive restart. Six actual maps fit the normal header; a900px native window collapses them into one active tab and a six-map dropdown, preserving54px of explicit drag space and working keyboard focus. Browser163, frontend400/93, TypeScript/optimized embedded build, offline59 and continuity/health8 pass. Preserved locked Rust711/eight ignored remains valid; no subsequent native Rust changes. See CONTINUATION_69_SPARK_FLOW.md and fixtures/c69-spark-flow.json.
 
 ## Changed work
 
-Existing window manager/hook/App gained source-bound saved places/tab sets/ownership/capture handshake. Hidden live UI polling/keys pause through existing activity context. Header dropdowns/Orb reuse current components and native controls. Home/setup now share normal compact menu rows; a demonstrated Dark Glow important background override on the Spark control is removed in idle/hover/open states, with no native tooltip box. Background native panel returns now preserve the latest active map/workspace atomically. Real tests use visible menus. All15 tracked C70 edits and3 new geometry files remain preserved and pending.
+Existing window manager/hook/capture flow retains complete source-bound state with bounded acknowledgments. Background panel returns no longer restore stale navigation; startup order uses successfully loaded IDs rather than a stale React ref. Existing activity context stops hidden live UI polling/keys: comparable120-cycle/360-switch trials reduce hidden MCC samples132→0, with no new model/bitmap/cube reads in either. Header/menu/tab changes reuse current components and source histories. All15 tracked C70 edits and3 new geometry files remain preserved pending; they are excluded from the C69 source commit.
 
 ## Failures and blockers
 
-Corrected pre-fix restart genuinely failed union/lost tabs; repaired runs pass. Vacuous earlier assertions and the wrong non-embedded build trial are retained as failures, not acceptance. Fixed detached View visibility and native fullscreen sound clipping; dependent tag test now closes the overlapping menu before selecting its drawer action. Physical second-monitor disconnect, longer endurance and full human external-tool/game creator journey remain open. No new gameplay or separate-computer acceptance.
+Pre-fix union/lost-tab and later queued-order/background-navigation failures are retained as failed evidence. Stale Home selectors, readiness/pause timing, one closed pop-out, non-embedded build and existing-destination refusal are recorded, with successful corrected actual-app runs kept separately. No new Halo gameplay, manual external GUI, second monitor/computer, clean-machine release or platform acceptance is inferred. The measured120-cycle resource pass is not long-horizon leak closure. No deferral permission was inferred.
 
 ## Operations and safe checkpoint
 
-Only fresh bounded native QA libraries/profiles and shared Cargo/frontend caches. Build with tauri/custom-protocol. Evidence under .local/artifacts/c71-native-asset-studio-20261104; preserved C49/C63 files,475-row ledger and canonical research hashes match preservation-final.json. No SDK regeneration, source clones, game-install changes, deletions, push or publication. Existing C49 release unchanged.
+No owned native tests remain active after final checks. Evidence/recovery patches are under .local/artifacts/c71-native-asset-studio-20261104. Final17 protected records and pending3 file hashes pass; C49 release/C63 accepted game cache,475-row ledger and canonical research remain unchanged. One canonical master/worktree; read-only storage snapshot169674587411 logical/168466232113 unique bytes, no read errors, still above review budget. QA profiles/shared builds grew; no deletion or SDK regeneration occurred. Development app is .local/build/cargo/release/GuiltySpark.exe, not a replacement C49 release. No push/publication/install/game-install changes.
 
 ## Deferred requests
 
-C70 Universal Tool Integration and the complete Native Asset & Tag Studio directive remain in PENDING_REQUESTS and DIRECTIVE_LEDGER with original source intact. No manual requeue needed. Earlier native/rendering/audio/AI/Megaworld/conversion/release requirements remain in their complete ledgers. User requested questions after queue; absence does not authorize deferring open C69 gates.
+C70 Universal Tool Integration and complete Native Asset & Tag Studio instructions remain available in PENDING_REQUESTS/DIRECTIVE_LEDGER; no manual requeue needed. Earlier source/native/audio/rendering/AI/Megaworld/conversion/release obligations remain in their full ledgers. No new initiative, queue scheduler, branch/worktree, v6 research import or automatic cleanup was introduced.
