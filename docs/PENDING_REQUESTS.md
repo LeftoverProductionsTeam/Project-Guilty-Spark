@@ -1,8 +1,18 @@
 # Pending engineering requests
 
+## Interrupted-work continuity audit — received November 4, 2026
+
+Current targeted priority, full received instructions preserved at `.local/artifacts/c70-tool-integration-20261104/continuity-audit/directive.txt` (delivered user message `01a1a6e8-1075-7e70-828b-863a052a9746`). Verify actual C69 implementation/acceptance and subsequent task delivery before further expansion. Keep all C70 uncommitted work and acceptance gaps. No scheduler changes, new queue system, v6 import or implementation of the separate report's five proposed findings. Findings and exact resume order are in `CONTINUITY_AUDIT_2026_11_04.md`.
+
+## Complete Native Asset & Tag Studio — title reported; delivery unverified
+
+The continuity-audit user message names this as a later queued initiative. No separate delivered full prompt was found in the five most recent actual chat turns, this pending index, or matching attachment text. Its scope must not be reconstructed from the title or confused with older Native Asset Completion/Native Authoring directives. No implementation or acceptance is established under this identity. The read-only app tools do not establish whether it remains queued or was consumed. If it is no longer pending in the app, the user must resend/requeue its complete instructions before this initiative can be implemented. C69 and Universal Tool Integration already have retained complete instructions and need no requeue.
+
 ## Universal Tool Integration & Synergy — received November 4, 2026
 
 Latest user directive, full available instructions preserved at `.local/artifacts/c69-spark-flow-20261104/tool-integration-directive.txt`. Extend the existing tool capability registry, Games & Tools cards, Source Guardian and source-aware handoff; no parallel launcher or invented APIs. Audit provenance, license, formats, edition support, documented automation/manual boundaries, prerequisites, source roots and test evidence for Guerilla/Sapien/Halo Tool, Invader, Baboon, Blender + Halo addon, Mantle, OpenTool, Reclaimer/Mozzarilla and Excession. Complete genuine tag-editor, geometry/DCC and compiler round trips where installed tools permit. Preserve C69 CI/UI work and finish its active validation before integration changes. Receipt is not acceptance; missing tools or manual/gameplay gates remain explicit. No push/publication or optional installation newly authorized.
+
+**Actual state after continuity audit:** genuinely started as C70 after local C69 commit `4de3c97`; 15 tracked implementation/test/config files plus three new source/test files are preserved in the current tree and a hash-verified recovery patch. The registry has descriptive operation/source/dependency/evidence metadata, compact help/project actions, installed version/Blender discovery and a bounded private OBJ fork/review/import path. TypeScript, 397 frontend tests and current Rust workspace (710 passed / eight ignored) pass after repairing a demonstrated interrupted Rust lifetime error. These are implementation/automated checks only. The real Blender edit → detected save → import/Undo → native compiler round trip and addon/OpenTool/Mantle acceptance are unfinished; there is no C70 feature acceptance commit. Reconcile the C69 remaining session-restoration gate first; do not declare either entire directive complete.
 
 ## Spark Flow final master UI and GitHub CI failure — received November 4, 2026
 

@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {AppWindow,ChevronDown,ExternalLink,Search,X} from 'lucide-react';
 import {workspaceCatalog,workspaceLabel} from '../workspaceCatalog';
 import type {MapDocuments} from '../mapDocuments';
@@ -22,7 +22,10 @@ export default function OpenWork({workspace,documents,entries,windows,recent,err
   const handoffCache=useRef(new Map<string,{at:number;value:typeof handoff}>());
   const root=useRef<HTMLDivElement>(null),button=useRef<HTMLButtonElement>(null),search=useRef<HTMLInputElement>(null);
   const close=()=>{setOpen(false);button.current?.focus();};
-  useEffect(()=>{if(open){onRefresh();requestAnimationFrame(()=>search.current?.focus());}},[open]);
+  // Focus before paint. A deferred animation-frame callback could steal focus
+  // after the user had already moved to the last control with the keyboard.
+  useLayoutEffect(()=>{if(open)search.current?.focus();},[open]);
+  useEffect(()=>{if(open)onRefresh();},[open]);
   useEffect(()=>{
     const dismiss=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node))setOpen(false);};
     const reveal=(event:Event)=>setOpen(value=>(event as CustomEvent).detail?.open===true?true:!value);

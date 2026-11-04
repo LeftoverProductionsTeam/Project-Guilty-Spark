@@ -1,31 +1,31 @@
 # Active engineering checkpoint
 
-Task: C69 Spark Flow — repair Windows CI and integrate retained multiwindow workflows
+Task: Interrupted-work audit complete; resume C69 remaining native restoration acceptance
 Status: active
-Starting revision: e3ae8fa
-Latest verified revision: e3ae8fa; C69 working edits preserved; release desktop tests recorded separately
-Next action: Complete the extended real native Flow and authoring/reconciliation tests, then full regressions, preservation checks, evidence ledger and local commit. Do not push or publish.
+Starting revision: 4de3c97fab465e2535844c8f1665e63e24e01d9f
+Latest verified revision: C69 local commit 4de3c97 plus preserved uncommitted C70 source; audit current Rust710/8 and frontend397 pass
+Next action: Run Spark Flow Test M through the existing native harness: capture named layout, each window's tabs/source/view/camera/history, restart the owned app/profile and compare. Repair only demonstrated restoration defects in the existing manager. Preserve C70 source; afterward finish its actual Blender/import/Undo/native-compiler round trip. Do not push/publish or start the undelivered Asset & Tag Studio initiative.
 
 ## Acceptance
 
-The exact supplied CI fails in archive-test cleanup before Cargo. Reproduce with a Windows directory alias and repair test-root identity without weakening production vault guards. Extend existing Spark session/window/history/rendering infrastructure; preserve all 23 routes and Halo features. Verify A–P through actual desktop/native tools, explicitly retaining physical-monitor, human gameplay and unavailable GUI gates. New directive forbids Computer Use in favor of the existing app harness.
+Full Spark Flow remains unaccepted. Real C69 lifecycle8/Flow14, native preview Retry, frozen build navigation and native source reconciliation passed. Open gates: complete per-window restart restoration/customization, physical multi-monitor removal, resource endurance and full Halo journey. Reconcile these explicitly rather than counting queued receipt as completion. Latest audit and full available tool directive retained in PENDING_REQUESTS.md; no queue/scheduler modifications.
 
 ## Verified milestones
 
-Archive cleanup now passes 20/20 both ordinary and NTFS-junction temporary roots, versus 17 aliased cleanup errors before repair; native-storage Node contract passes. Full locked Rust workspace passed before the latest companion commands; frontend 397/93 passed. Embedded release app completed 8/8 lifecycle cases including actual detach/reattach, independent map changes, source Undo, paused GL and bounded warm renderers; production Steam identity guard passed. First Flow run completed 8 cases: independent native window roles, shared authoritative revision, source/selection isolation, native pistol material/cube/first-frame readiness and same-preview return, layout restore and off-screen recovery. Current expanded tests add BSP face Recent Places and Back/Forward, named layouts, optional lightweight companion and build-task navigation.
+Audit rechecked actual master/sole worktree and local commit4de3c97. Completed C69 native receipts/executable and three input/output caches rehashed. All15 protected C49/C63 artifacts,475-row requirements and canonical engine-source index unchanged. Windows archive20/20 canonical +20/20 alias passed again. Current locked Rust710 passed/8 ignored, TypeScript and frontend397/93 passed after fixing three interrupted native guard-lifetime errors. Recorded C69 full browser163/offline59 and optimized embedded app build preserved. Focused audit browser result is in c70 audit-browser.log; inspect before claiming it passed.
 
 ## Changed work
 
-All C69 changes stay on canonical master. Shared workspace catalog, window inventory/roles, Open Work with real task/handoff summaries, source-bound navigation persistence, retained workspace state, named layouts, pinned/reordered tabs, subtle content fades, truthful shield loading/retry, compact Community Maps and Interface settings. Optional same-app desktop companion uses only the cached portrait and existing command hub, never a new document/backend/renderer. Existing native model/texture/source pipelines and source write leases remain authoritative.
+C70 genuinely started, not complete:17 tracked implementation/test/config files plus three new geometry source/test/component files. Extended existing22-record tool catalog, source/dependency/manual/API/evidence metadata, help/project cards, Blender executable/version discovery and private OBJ fork/review/hash-bound import. Existing history/ownership/source/native validators retained. Small exact patch/untracked recovery and manifest: .local/artifacts/c70-tool-integration-20261104/continuity-audit. No real DCC/compiler round trip yet; no C70 feature commit. Audit docs recorded separately.
 
 ## Failures and blockers
 
-Initial browser run: 153 passed, 8 failed. Seven focused reruns passed after fixing stale Home navigation, history-limit fallback, sidebar space and tests that expected previously lost state. Interface overflow is now corrected and its focused compact-category regression passes. Initial native authoring failed before asset import because the harness read a not-yet-mounted mode button synchronously; it now waits and explicitly selects Objects & gameplay. Extended Flow camera assertion sampled before wheel commit; it now waits for the actual camera update. All failed evidence is retained. No hosted GitHub rerun or new gameplay is claimed. Physical monitor disconnect and manual Baboon GUI remain unverified.
+Interrupted temporary MutexGuard borrowing failed Rust compilation; fixed with explicit scoped guards, full workspace now passes. C70 native UI/handoff and addon/OpenTool/Mantle remain unverified. C69 manual Baboon GUI/new native gameplay/physical second monitor/whole-process VRAM-endurance remain open. Complete Native Asset & Tag Studio appears only as a title in the audit; no separate delivered full prompt found in five recent turns or matching attachments. Cannot establish queue consumption; resend full prompt if no longer pending. C69/Tool Integration need no requeue.
 
 ## Operations and safe checkpoint
 
-Evidence: .local/artifacts/c69-spark-flow-20261104. Native authoring second run and Flow third run are active; check their logs/receipts before retrying. Apps use fresh owned test libraries and copied executables; one bounded C66 source/tag pool is reused, no full SDK copy. Existing Vite inspection server uses loopback port1532. Release source build completed; latest CSS/summary changes need final embed rebuild. No original file or previous-good build has been removed. Rehash protected C49/C63 artifacts and unchanged 475-requirement ledger before commit.
+Evidence .local/artifacts/c70-tool-integration-20261104; read CONTINUITY_AUDIT_2026_11_04.md. No active native compiler/game job. Focused browser audit may still be running; read log/session20562 before retry. No SDK/project regeneration, deletion, optional install/download, remote push or publication. C69 accepted dev executable is retained in flow-release-eleventh; current uncommitted source has only automated validation, not equivalent native acceptance. Original C49 release untouched.
 
 ## Deferred requests
 
-Keep complete directives in PENDING_REQUESTS.md, including native authoring, Source Guardian/Error Doctor, C66 materialization, rendering/audio parity, AI/Firefight/Zombie/game peers, Megaworld walkthrough, separate-computer collaboration and release acceptance. C69 does not promote C63 two-way human door acceptance to a new native cache or runtime. All history/research/C49 evidence remains protected.
+Universal Tool Integration full prompt retained; finish real native DCC/import/compiler acceptance after remaining C69 restoration gate is reconciled. Preserve earlier native authoring, Source Guardian, rendering/audio, AI/Firefight/Zombie/Megaworld, peers and release gates. Asset & Tag Studio complete instructions unavailable under that identity. Five November4 proposed research findings are not implemented; canonical research unchanged.
