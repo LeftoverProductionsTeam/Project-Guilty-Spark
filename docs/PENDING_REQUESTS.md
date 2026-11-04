@@ -1,5 +1,9 @@
 # Pending engineering requests
 
+## Universal Live Link — received November 4, 2026
+
+Full instructions, receipt at `7db2825` and evidence inventory: `.local/artifacts/universal-live-link-intake-20261104/` (`directive.txt`, `receipt.json`, `existing-evidence.json`). Pending behind C69 human verification; no explicit deferral/priority change or new implementation/build/game attachment/write/test. Preserve exact-build MCC operations and independent CE/OpenCE/Chupathingy/legacy limits. Typed permissions/identity/rollback, source versus compiled versus live revisions and all eight runtime acceptance steps remain required. Full instructions preserved; no manual requeue needed.
+
 ## SparkLink: Multiple Creators, One Live Project — received November 4, 2026
 
 Full message retained at `.local/artifacts/sparklink-live-project-intake-20261104/directive.txt` (UTF-8/LF, 2,971 bytes; SHA-256 `71140e3b1cc1a30893707578786c3eae11f2059f963a8fae1aeb8b30dee5712f`; receipt at `9a254c4`). Pending behind unchanged C69 acceptance; no explicit predecessor deferral/priority override received. All18 C70 source hashes match recovery. No new SparkLink implementation, build, session/listener or two-computer test was started. No manual requeue needed.
