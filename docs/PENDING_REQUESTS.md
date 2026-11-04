@@ -1,12 +1,16 @@
 # Pending engineering requests
 
+## Strict Directive Completion & Queue Control — received November 4, 2026
+
+Full instructions retained at `.local/artifacts/c71-native-asset-studio-20261104/strict-completion-directive.txt` from attachment `5e09dc26-d2fb-4d88-853f-2539e1e6ac8d`. The small additive AGENTS policy and bounded DIRECTIVE_LEDGER are verified separately; no queue scheduler, hooks or automation is introduced. Active engineering is C69 restoration and feasible Spark Flow acceptance. C70 and the now-received full Asset & Tag Studio directive are preserved pending, with their earlier valid source intact. Later initiatives cannot advance without predecessor acceptance or explicit deferral authorization. User is away and requests questions after the queue; absence is not deferral approval. The reported return of harsh highlighted tabs is a scoped C69 polish repair, not a new UI initiative.
+
 ## Interrupted-work continuity audit — received November 4, 2026
 
 Current targeted priority, full received instructions preserved at `.local/artifacts/c70-tool-integration-20261104/continuity-audit/directive.txt` (delivered user message `01a1a6e8-1075-7e70-828b-863a052a9746`). Verify actual C69 implementation/acceptance and subsequent task delivery before further expansion. Keep all C70 uncommitted work and acceptance gaps. No scheduler changes, new queue system, v6 import or implementation of the separate report's five proposed findings. Findings and exact resume order are in `CONTINUITY_AUDIT_2026_11_04.md`.
 
-## Complete Native Asset & Tag Studio — title reported; delivery unverified
+## Complete Native Asset & Tag Studio — complete instructions received November 4, 2026
 
-The continuity-audit user message names this as a later queued initiative. No separate delivered full prompt was found in the five most recent actual chat turns, this pending index, or matching attachment text. Its scope must not be reconstructed from the title or confused with older Native Asset Completion/Native Authoring directives. No implementation or acceptance is established under this identity. The read-only app tools do not establish whether it remains queued or was consumed. If it is no longer pending in the app, the user must resend/requeue its complete instructions before this initiative can be implemented. C69 and Universal Tool Integration already have retained complete instructions and need no requeue.
+The user has now delivered the full directive after the continuity audit. Exact available instructions are retained at `.local/artifacts/c71-native-asset-studio-20261104/directive.txt`; manual requeue is no longer necessary. The earlier title-only finding remains a historical audit fact, not the current delivery status. Continue existing Inspector/Asset Library/native format readers/QuickForge/Logic/source compilers, preserving distinct bounded cache editing and native rebuild routes. Cover edition-appropriate asset classes and fidelity diagnostics; no generic binary serializer, invented native script fields, parallel asset editor or preview-as-gameplay claim. Requested context tabs are Properties / Materials / Animation / Collision / Sound / Logic / Dependencies / Native Output with the existing interactive renderer. Acceptance requires a real object/dependencies/property/scenario behavior/native build/game verification plus independent compatible tag-editor readback. Preserve and finish C69 restart restoration and the started C70 DCC/native acceptance before calling their work complete. Receipt is not implementation or acceptance.
 
 ## Universal Tool Integration & Synergy — received November 4, 2026
 
