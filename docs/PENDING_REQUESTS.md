@@ -1,5 +1,9 @@
 # Pending engineering requests
 
+## AI Synchronization & Co-op Completion — received November 4, 2026
+
+Full instructions, receiving revision `2ac2778`, hashes and existing evidence are retained at `.local/artifacts/ai-sync-coop-intake-20261104/` (`directive.txt`, `receipt.json`, `existing-evidence.json`). Pending behind C69 human verification; no explicit deferral/priority change, implementation, network work, build, runtime probe or game test. Reuse native host networking and accepted lifecycle experiments; keep each runtime/version independent and unavailable telemetry distinct from zero. OpenCE peer lifecycle progress does not close health divergence, shared Firefight globals/victory, vehicles, active-combat rejoin or two-computer acceptance. Complete all lifecycle/ownership/bounded-update/diagnostic and actual peer-combat gates from the full directive after predecessor acceptance/explicit deferral. No manual requeue needed.
+
 ## Universal Live Link — received November 4, 2026
 
 Full instructions, receipt at `7db2825` and evidence inventory: `.local/artifacts/universal-live-link-intake-20261104/` (`directive.txt`, `receipt.json`, `existing-evidence.json`). Pending behind C69 human verification; no explicit deferral/priority change or new implementation/build/game attachment/write/test. Preserve exact-build MCC operations and independent CE/OpenCE/Chupathingy/legacy limits. Typed permissions/identity/rollback, source versus compiled versus live revisions and all eight runtime acceptance steps remain required. Full instructions preserved; no manual requeue needed.
@@ -56,11 +60,7 @@ After predecessor acceptance/explicit deferral, finish that exact traversal befo
 
 ## Community Field Intelligence & Native Halo Diagnostics — received November 4, 2026
 
-Full attachment preserved byte-for-byte at `.local/artifacts/community-field-intelligence-intake-20261104/directive.txt`; its receipt records 8,803 bytes, SHA-256 `795859fa6f3440a83a6ab07ad4cdcfa788d45111daadc593b4cff729f1d9ca6b` and receiving revision `da0f987`. The directive explicitly prohibits starting until earlier directives are accepted or explicitly deferred by the owner. C69 remains awaiting human verification; this is pending intake only, with no new upstream research, implementation, compiler run or gameplay acceptance. No manual requeue is needed.
-
-After that gate, verify community leads against version-pinned sources and current research: Foundry's released Blender/TagTest interfaces and supported editions (no assumed CE remote commands); documented Halo 1 object lighting/lightmap diagnostics; exact geometry-error selection/focus/correction through existing BSP/Blender tools; edition-specific authoritative scenario/source ownership (do not apply Halo 2 split resources to Halo 1); and reproducible creator workflow bottlenecks. Reuse Live Link, source-aware handoffs, renderer, validators and native build/reload paths rather than adding parallel systems. Distinguish later-engine demonstrations, approximate previews and genuine Halo 1 behavior.
-
-Classify verified findings as Spark defects, reproducible upstream bugs/contribution candidates or documented interoperability limits. Preserve attribution/licenses, canonical newer research, original assets, Undo, hashes, bounded resources and accepted builds. Acceptance requires a small supported Halo 1 source issue → authoritative source → safe correction → existing native compilation → independent inspection → intended-runtime evidence, with measured before/after performance when changes are made. No protected-process injection, unauthorized code/content reuse, public upstream reports/PRs or publication without approval. The complete attachment retains all eight sections and reporting requirements; this summary does not replace it. Exact next action remains the C69 checkpoint.
+Full 8,803-byte directive and receipt at `da0f987` remain in `.local/artifacts/community-field-intelligence-intake-20261104/`, SHA-256 `795859fa6f3440a83a6ab07ad4cdcfa788d45111daadc593b4cff729f1d9ca6b`. Expanded intake summary is preserved in local commit `d1ea0dd`. Pending until predecessor acceptance/explicit owner deferral. Verify Foundry edition/interface limits, Halo1 lighting/geometry diagnostics, source ownership, creator bottlenecks and upstream contributions against pinned evidence. All eight sections, native acceptance/performance/licensing limits remain in the full directive. No implementation/research or manual requeue.
 
 ## Halo Map Conversion & Legacy Preservation — received November 4, 2026
 
