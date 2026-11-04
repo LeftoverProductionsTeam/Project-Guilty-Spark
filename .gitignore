@@ -26,3 +26,8 @@ playwright-report/
 /gamestate.txt
 # Generated Python bytecode from local maintenance/packaging helpers.
 __pycache__/
+# User-owned installed runtimes are content, not distributable Spark source.
+/Halo Custom Edition/
+/opencehalo-windows-release/
+/chupathingyce-windows64-release/
+/test-results.zip

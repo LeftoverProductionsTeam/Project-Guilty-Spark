@@ -12,6 +12,8 @@
     "package": "tauri build",
     "test": "vitest run",
     "test:ui": "playwright test",
+    "health": "node scripts/repository-health.mjs --storage",
+    "test:repository-health": "node --test scripts/repository-health.test.mjs",
     "test:engine-sources": "node scripts/verify-engine-source-index.mjs",
     "check": "tsc -b",
     "format": "prettier --write src scripts docs README.md package.json vite.config.ts",

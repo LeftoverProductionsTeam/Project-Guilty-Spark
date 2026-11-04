@@ -1,5 +1,7 @@
 {
   "schemaVersion": 1,
+  "artifactsDirectory": ".local/artifacts",
+  "cargoOutputDirectory": ".local/build/cargo",
   "successfulRunsPerWorkflow": 2,
   "failedRunsPerWorkflow": 4,
   "archiveSuccessfulAfterDays": 7,
