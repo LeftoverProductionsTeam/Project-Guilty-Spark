@@ -2,7 +2,7 @@
 
 The repeated full-SDK copy defect is repaired for local Forge/BSP source builds, including separately validated recursive native imports. Real native compilation, unchanged-build reuse, a namespaced imported door and an Invader edit/reconcile/rebuild passed. This is a verified containment checkpoint, not a claim that every historical dataset, imported dependency graph or process allocation is now globally governed.
 
-Work continued in the single canonical `D:\Project Guilty Spark` master worktree. No new branch/worktree, push, release publication, original-resource mutation or additional accumulated-data deletion was performed. Starting HEAD was `929234044709dbe55546084fbebf59e371790909`; the tested changes were uncommitted during acceptance. Private receipts below identify binaries, inputs and outputs independently of Git.
+Work continued in the single canonical `D:\Project Guilty Spark` master worktree. No new branch/worktree, push, release publication, original-resource mutation or additional accumulated-data deletion was performed. Starting HEAD was `929234044709dbe55546084fbebf59e371790909`. The verified source is committed locally as **`219ac941ce83a2c01d0150c13968f84b6f6b18af`**; a final real desktop acceptance passed against that exact source. Private receipts identify binaries, inputs and outputs independently of Git.
 
 ## What caused the growth
 
@@ -15,6 +15,8 @@ Metadata inventory before this repair: **148,075,535,680 logical bytes / 670,527
 Large retained owners include `.local/c39-native-collaboration` (65,215,105,234 logical bytes), `.local/archives` (28,511,600,807), `.local/build` (6,018,408,034), and `.local/one-halo` (4,489,788,434). These mixed/source/archive roots are not cleanup candidates merely because of their names or sizes.
 
 Evidence: `.local/repository-consolidation-20261103/health-after.json`; `.local/artifacts/c66-storage-20261103/{attribution-before.json,health-final.json,health-verified.json}`. Parent/child directory totals overlap; later compiler output can change the snapshot.
+
+After retaining the exact committed-source acceptance app and desktop evidence, `health-sealed.json` at `2026-11-04T05:49:53.788Z` records **149,712,587,415 logical bytes / 676,688 files**, zero errors, one worktree and one local branch. Net logical growth from the starting snapshot is **1,637,051,735 bytes**. This later total includes the retained test application; it does not change the precise authorized-removal payload figure below.
 
 ## The one differing SDK file
 
@@ -160,3 +162,7 @@ The next cycle must read the active checkpoint and continue these bounded P0 gap
 - Continuity, repository-health and release-draft checks: **14 passed** (`c66-policy-final.log`). Python packaging tests could not start: no real interpreter is installed (WindowsApps aliases return exit 9009). Packaging code and sealed C49 assets were not changed; this is not a new package acceptance.
 - Real H1A/Invader compilation, corruption rejection/recovery, imported assets, reopening, unchanged reuse and actual desktop resource refusal are recorded separately. Gameplay, audible game sound, Baboon GUI and cross-computer collaboration were not newly tested.
 - Accepted C49 installer/portable/source assets and C64 release executable stay unchanged. This checkpoint produces source and a debug acceptance application, **not a new release installer**, upload or published download. No push/publication was attempted.
+
+Committed-source desktop acceptance: `native-committed-storage/acceptance.json`, no mocked IPC, no page errors. Storage settings were ready in **2,448 ms**, all four runtime folders measured the same **140,654,546,384 allocated bytes**, and native build/extraction still refused the incomplete Demo source before creating native jobs, extracted tags or SDK staging. The test reused the existing private source library instead of copying another SDK.
+
+Retained acceptance application: `.local/artifacts/c66-storage-20261103/accepted-app/GuiltySpark.exe`, **52,509,696 bytes**, SHA-256 **`0fb61f38b625c3d5b072d279c872bc7a3ae9cc1a852ef8dc95bd89fbbb8405f7`**. Its adjacent manifest binds clean source commit `219ac94`; it is a debug acceptance build, not an installer or a newly certified portable release. After the commit, 15 protected accepted artifacts were rehashed again and matched; the prior master remains an ancestor (`preservation-after-commit.json`).
