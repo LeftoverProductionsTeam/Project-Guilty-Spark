@@ -498,6 +498,21 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     ],
   ),
   f(
+    'source-recovery',
+    'Recover a Halo project',
+    'Projects',
+    'Recover native tags and supported model/script/string source from a preserved compiled map into a separate project.',
+    'Halo tools required',
+    'preservation',
+    true,
+    [
+      'Open your source map from Map Library, then open Preservation record.',
+      'Choose the scenario or an asset as the recovery root and review source identity, prerequisites and limitations.',
+      'Recover into a separate project, inspect the fidelity report, then open its standard tags and data with compatible tools.',
+    ],
+    'Native tag parsing and dependency validation do not prove original authoring equivalence, map compilation or gameplay. Archive/partial-project repair remains separate.',
+  ),
+  f(
     'snapshots',
     'Snapshots & project recovery',
     'Projects',

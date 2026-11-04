@@ -1,4 +1,5 @@
 import ProjectSnapshots from './ProjectSnapshots';
+import SourceRecovery from './SourceRecovery';
 import { renderIndices } from '../haloGeometry';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -386,7 +387,7 @@ export function Scenario({ inspection, onWorld }: { inspection: MapInspection | 
     </div>
   );
 }
-export function Preservation({ project, edit,onBeforeSave,onRestore }: { project: Project; edit: (p: Project, d: string) => void;onBeforeSave:()=>Promise<void>;onRestore:(p:import('../types').OpenProject)=>Promise<void> }) {
+export function Preservation({ project, inspection, edit,onBeforeSave,onRestore }: { project: Project; inspection: MapInspection|null; edit: (p: Project, d: string) => void;onBeforeSave:()=>Promise<void>;onRestore:(p:import('../types').OpenProject)=>Promise<void> }) {
   const v = project.provenance;
   return (
     <div className="preservation-page">
@@ -395,6 +396,7 @@ export function Preservation({ project, edit,onBeforeSave,onRestore }: { project
         title="Keep the story with the map."
         description="A record of the creator, community, source, and permission to preserve their work."
       />
+      <SourceRecovery project={project} inspection={inspection}/>
       <div className="preservation-columns">
         <ProjectSnapshots project={project} onBeforeSave={onBeforeSave} onRestore={onRestore}/>
         <section className="surface metadata-form">

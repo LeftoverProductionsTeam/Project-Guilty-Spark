@@ -45,6 +45,7 @@ use tauri::{Emitter, Manager, State};
 #[path="startup_native.rs"]mod startup_native;
 #[path="storage_native.rs"]mod storage_native;
 #[path="native_resources_native.rs"]mod native_resources_native;
+#[path="source_recovery_native.rs"]mod source_recovery_native;
 #[path="home_voice_native.rs"]mod home_voice_native;
 #[path="asset_sources_native.rs"] mod asset_sources_native;
 #[path="asset_import_native.rs"] mod asset_import_native;
@@ -1241,6 +1242,7 @@ async fn extract_selected_tag_tree(app: tauri::AppHandle, project_id: String, ta
             |e| event(&app,e),
         ).map_err(error);
         if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&job_id); }
+        event(&app,JobEvent{job_id,project_id:project.id,phase:if result.is_ok(){"extracted"}else{"extraction-failed"}.into(),severity:if result.is_ok(){"success"}else{"warning"}.into(),message:match &result {Ok(_)=>"Native extraction completed. Tag validation, compilation and gameplay remain separate.".into(),Err(problem)=>problem.chars().take(4096).collect()},progress:100,timestamp:chrono::Utc::now().to_rfc3339()});
         result
     }).await.map_err(error)?
 }
@@ -1741,6 +1743,10 @@ fn reveal_folder(state: State<AppState>, kind: String, id: Option<String>) -> Re
             let path=state.root.join("tag-exchanges").join(job_id).join("tags");
             core::reject_links(&path).map_err(error)?;
             path
+        },
+        "recoveredProject" => {
+            let recovery_id=id.ok_or("Missing recovered project ID")?;
+            core::source_recovery::directory(&state.root,&recovery_id).map_err(error)?
         },
         "tagImport" => {
             let ids=id.ok_or("Missing staged tag import IDs")?;
@@ -2922,6 +2928,9 @@ pub fn run() {
             audit_owned_bitmap_resources,
             cache_invader_installation,
             extract_selected_tag_tree,
+            source_recovery_native::review_project_recovery,
+            source_recovery_native::recover_halo_project,
+            source_recovery_native::inspect_project_recovery,
             list_tag_exchanges,
             stage_tag_exchange_into_project,
             bootstrap,

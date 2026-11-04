@@ -1177,7 +1177,7 @@ export default function App() {
       case 'scenario':
         return <Scenario inspection={inspection} onWorld={() => setWorkspace('world')} />;
       case 'preservation':
-        return <Preservation project={current} edit={edit} onBeforeSave={save} onRestore={load} />;
+        return <Preservation project={current} inspection={inspection} edit={edit} onBeforeSave={save} onRestore={load} />;
       case 'build':
         return current.quickForge ? <QuickForge key={current.id} project={current} data={data} edit={edit} onDefaultMaterials={materials=>materialDefaults(current!.id,materials)} onSharedDocument={document=>dispatch({type:'forge-remote',projectId:current!.id,document})} onCreate={createQuickForge} onSave={() => save()} onBuild={buildQuickForge} onRuntimes={() => setWorkspace('runtimes')} onSettings={() => setWorkspace('settings')} notify={notice} logs={logs} activeJob={activeJob} epoch={epoch+(activeMap?.savedRevision??0)} dirty={history.dirty} /> : current.source ? (
           <Build

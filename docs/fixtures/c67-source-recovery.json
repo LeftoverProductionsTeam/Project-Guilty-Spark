@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "continuation": "C67",
+  "recordedAt": "2026-11-04T08:11:28.986Z",
+  "startingCommit": "fb75023f3896b4ae9a2f0236ee0576fcc59bf059",
+  "branch": "master",
+  "scopedMilestoneComplete": true,
+  "entireDirectiveComplete": false,
+  "scope": "Compiled-cache native project recovery and independent model/cache compilation; no new gameplay acceptance",
+  "privateEvidenceRoot": ".local/artifacts/c67-recovery-20261104",
+  "userWorkflow": "Preservation record > Recover a Halo Project > Review recovery > Recover into a separate project",
+  "tools": {
+    "invaderVersion": "0.55.0.r4134.33518109",
+    "hashes": {
+      "invader-dependency": "727e6983582f882b17a52822547ee1805c13856de912494ce28ff2a726a3b554",
+      "invader-edit": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "invader-extract": "ded684bc2730b836719071dcdc505a78e5dca3730f19e9a30527ac725180c138",
+      "invader-info": "e53229f0d65c0ec0df5ce70f77ab690776fc9e2eb720ba0c221dd4470f8deef4",
+      "invader-recover": "ee49f29cef2880becf874932ac93ecf716a4b8ef1bc3d2b6ff00c212a38096df"
+    },
+    "haloToolSha256": "c492789e96dbe845891e0c0973bfb526a21230f570559e6f9fb695b8d2ca0afa"
+  },
+  "sourceSha256": "b53c7543526c709c53344e814a746c0687c3f6ed7691d720e4764c54c0549103",
+  "asset": {
+    "nativeTags": 23,
+    "reconstructedFiles": 1,
+    "stalePlanRefused": true,
+    "nativeParserRejectedCorruption": true,
+    "restored": true,
+    "reuseCreatedNoDuplicateNativeData": true
+  },
+  "scenario": {
+    "nativeTags": 1795,
+    "reconstructedFiles": 139,
+    "rebuiltCacheSha256": "eec9b92fd42ff64828103b82f1fa15d50f229fd41db08b2e01592cfab15cd4e3",
+    "cacheVersion": 13,
+    "crc32Mismatched": false,
+    "nativeScriptNames": [
+      "gs_evt_b9b2bf499f11",
+      "gs_logic_init"
+    ],
+    "sceneObjects": 5,
+    "collisionTriangles": 66,
+    "missingNativeTagIdentities": [],
+    "compilerWarningsRetained": true
+  },
+  "desktop": {
+    "appSha256": "c62f77745ea16be59f3d32d9082a52657322b42fd08c9b67a1c9b2067f96574b",
+    "actualNativeIpc": true,
+    "pageErrors": [],
+    "operationIndicatorCompleted": true,
+    "perRootRecoveryRetained": true
+  },
+  "stages": {
+    "sourceParsed": true,
+    "independentNativeReadback": true,
+    "nativeModelCompiled": true,
+    "nativeCacheCompiled": true,
+    "completeVisualAudioFidelity": false,
+    "actualGameLoaded": false,
+    "humanGameplayAccepted": false,
+    "realGamePeersAccepted": false,
+    "cleanMachineReleaseAccepted": false
+  },
+  "measurements": {
+    "conditions": "One controlled sequential asset recovery/reuse pair; individual native compiler trials. Not general startup/renderer performance.",
+    "recoveryMs": 12802,
+    "verifiedReuseMs": 3562,
+    "cacheCompileAndReadbackMs": 12280
+  },
+  "regressions": {
+    "rust": {
+      "passed": 703,
+      "failed": 0,
+      "ignored": 8,
+      "log": "rust-verified.log"
+    },
+    "frontend": {
+      "passed": 387,
+      "files": 92,
+      "log": "frontend-final.log"
+    },
+    "browser": {
+      "passed": 161,
+      "log": "browser.log"
+    },
+    "offline": {
+      "passed": 59,
+      "log": "offline.log"
+    },
+    "node": {
+      "passed": 8,
+      "log": "node-checks.log"
+    },
+    "typescriptAndFrontendBuild": true,
+    "nativeDesktopBuild": true
+  },
+  "preservation": {
+    "protectedArtifacts": 15,
+    "verified": true,
+    "requirementsCsvSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
+    "c63Ancestor": true,
+    "originalMapUnchanged": true,
+    "recoveredInputsUnchanged": true,
+    "originalC49Unchanged": true
+  },
+  "limitations": [
+    "MCC version-13 controlled fixture accepted; other runtime recovery needs independent acceptance.",
+    "Recovered tags are native reconstruction, not exact original authoring-source recovery.",
+    "No original DCC history, bitmap color plates, editable BSP JMS or stripped source promised.",
+    "Native compiler UI/meter/cluster sound warnings remain; valid CRC does not prove full fidelity.",
+    "No one-click recovered-source adoption/reconcile/build integration in this pass.",
+    "Partial folders, damaged projects, archives and broader Error Doctor/animation/environment/vehicle work remain open.",
+    "No C67 game launch, human gameplay, multiplayer or clean-machine release acceptance.",
+    "No accumulated-data deletion, remote push or public release; accepted C49 assets preserved."
+  ]
+}

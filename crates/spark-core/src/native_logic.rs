@@ -461,6 +461,22 @@ pub fn merge(
     }
     Ok(next.clone())
 }
+/// H1A indexes its conventional globals source even when there are no global
+/// definitions. Never replace authored source. Shared by native authored and
+/// recovered-project preparation; this is a generated compiler support file.
+pub fn ensure_h1a_global_source(workspace: &std::path::Path) -> Result<std::path::PathBuf> {
+    let globals = workspace.join("data/global_scripts.hsc");
+    crate::reject_links(&globals)?;
+    if !globals.exists() {
+        std::fs::create_dir_all(workspace.join("data"))?;
+        crate::project::atomic_write(
+            &globals,
+            b"; Spark generated level: no additional global script definitions.\r\n",
+            false,
+        )?;
+    }
+    Ok(globals)
+}
 pub fn script_path(workspace: &std::path::Path, scenario: &str) -> Result<std::path::PathBuf> {
     let scenario = crate::safe_relative(scenario)?;
     Ok(workspace
@@ -556,11 +572,7 @@ pub(crate) fn compile(
     let globals = workspace.join("data/global_scripts.hsc");
     crate::reject_links(&globals)?;
     if engine == "mcc-cea" && !globals.exists() {
-        crate::project::atomic_write(
-            &globals,
-            b"; Spark generated level: no additional global script definitions.\r\n",
-            false,
-        )?;
+        ensure_h1a_global_source(workspace)?;
     }
     let limit = if engine == "mcc-cea" { 16 } else { 8 };
     let mut count = usize::from(globals.is_file());

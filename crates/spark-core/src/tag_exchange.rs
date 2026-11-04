@@ -20,7 +20,7 @@ fn reusable_extraction(root:&Path,source:&project::Source,project_id:&str,query:
             if receipt.source_project_id!=project_id||receipt.source_sha256!=source.sha256||receipt.source_version!=source.cache_version||receipt.requested_tag!=query{return invalid("Different extraction revision");}
             let contract=p.join("extraction-inputs.json");reject_links(&contract)?;if fs::metadata(&contract)?.len()>65536{return invalid("Extraction contract too large");}
             let old:ExtractInputs=serde_json::from_slice(&fs::read(contract)?)?;
-            if old.schema_version!=1||old.tools!=inputs.tools||old.resources!=inputs.resources||fs::canonicalize(old.resource_directory)?!=fs::canonicalize(&inputs.resource_directory)?{return invalid("Extraction dependencies changed");}
+            if old.schema_version!=inputs.schema_version||old.tools!=inputs.tools||old.resources!=inputs.resources||fs::canonicalize(old.resource_directory)?!=fs::canonicalize(&inputs.resource_directory)?{return invalid("Extraction dependencies changed");}
             let (files,total)=inventory(&receipt.tag_root)?;if files!=receipt.files||total!=receipt.total_bytes{return invalid("Extracted tags changed");}Ok(receipt)
         })();
         if let Ok(mut receipt)=attempt{receipt.notice.push_str(" Reused exact source/tool/resource identities after fresh extracted-file hash checks; no duplicate extraction was created.");return Ok(Some(receipt));}
@@ -54,7 +54,7 @@ pub fn extension(class:&str)->Result<&'static str>{
         "senv"=>Ok("shader_environment"),"soso"=>Ok("shader_model"),
         "schi"=>Ok("shader_transparent_chicago"),"scex"=>Ok("shader_transparent_chicago_extended"),
         "sky "=>Ok("sky"),"actr"=>Ok("actor"),"actv"=>Ok("actor_variant"),
-        "mod2"=>Ok("gbxmodel"),"antr"=>Ok("model_animations"),
+        "mod2"=>Ok("gbxmodel"),"mode"=>Ok("model"),"antr"=>Ok("model_animations"),
         "snd!"=>Ok("sound"),"lsnd"=>Ok("sound_looping"),
         "effe"=>Ok("effect"),"jpt!"=>Ok("damage_effect"),
         "mach"=>Ok("device_machine"),"ctrl"=>Ok("device_control"),
@@ -175,7 +175,13 @@ pub fn extract_selected_tag(
         }
     }
     if [6,7,609].contains(&source.cache_version){crate::native_resources::review(source,inspection,resources)?;}
-    let inputs=ExtractInputs{schema_version:1,tools:std::collections::BTreeMap::from([("invader-extract".into(),maps::hash_file(&executable)?),("invader-info".into(),maps::hash_file(&info)?)]),resources:project::resource_hashes(resources)?,resource_directory:resources.to_owned()};
+    // Scenario recovery must not invoke Invader's recursive single-tag compiler:
+    // it receives empty script/data build parameters. Extract the complete cache
+    // in its supported non-recursive mode, keeping all tags and script source.
+    // Schema 2 cannot reuse an older partial scenario extraction. Asset scopes
+    // keep their exact schema-1 reuse and recursive dependency extraction.
+    let whole_cache=tag.class=="scnr";
+    let inputs=ExtractInputs{schema_version:if whole_cache{2}else{1},tools:std::collections::BTreeMap::from([("invader-extract".into(),maps::hash_file(&executable)?),("invader-info".into(),maps::hash_file(&info)?)]),resources:project::resource_hashes(resources)?,resource_directory:resources.to_owned()};
     if let Some(receipt)=reusable_extraction(managed_root,source,&project.id,&query,&inputs)?{return Ok(receipt);}
     let out_root=managed_root.join("tag-exchanges");
     reject_links(&out_root)?;fs::create_dir_all(&out_root)?;
@@ -202,12 +208,11 @@ pub fn extract_selected_tag(
         if !["false","0"].contains(&protected.trim().to_ascii_lowercase().as_str()){
             return invalid("Invader identifies the source cache as protected or unknown; extraction stopped");
         }
-        runner.run(&executable,&[
-            "--recursive".into(),"--search".into(),query.clone(),
-            "--tags".into(),tags.to_string_lossy().into_owned(),
-            "--maps".into(),resources.to_string_lossy().into_owned(),
-            extraction_input.to_string_lossy().into_owned(),
-        ],&staging,"extract",70)?;
+        let mut arguments=vec!["--tags".into(),tags.to_string_lossy().into_owned(),"--maps".into(),resources.to_string_lossy().into_owned()];
+        if whole_cache {arguments.push("--non-mp-globals".into());}
+        else {arguments.extend(["--recursive".into(),"--search".into(),query.clone()]);}
+        arguments.push(extraction_input.to_string_lossy().into_owned());
+        runner.run(&executable,&arguments,&staging,"extract",70)?;
         let (files,total_bytes)=inventory(&tags)?;
         if files.is_empty() || !files.iter().any(|f|f.path.eq_ignore_ascii_case(&expected.to_string_lossy().replace('\\',"/"))) {
             return invalid("Invader finished without producing the selected requested .tag file");

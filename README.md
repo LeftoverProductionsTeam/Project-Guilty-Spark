@@ -30,6 +30,8 @@ An open-source Halo 1 creation and interoperability studio combining native modd
 
 **C66 native storage containment:** Forge/BSP builds stage verified dependencies and reuse unchanged validated jobs. A real 23-tag imported door compiled with 1,774 base tags instead of the 11,538-tag SDK; ten unchanged requests added no native trees. Missing Demo resources stop before extraction, and an actual Invader edit/reconcile/rebuild passed. Settings → Storage & Cache adds reviewed limits, cleanup and connected Halo folder sizes with a combined total. Historical data and broader dependency coverage still need review. [Evidence and remaining limits](docs/CONTINUATION_66_STORAGE_AND_RECOVERY.md). [Active engineering checkpoint](docs/ACTIVE_TASK.md).
 
+**C67 Source Guardian recovery:** Preservation → Recover a Halo Project reviews a map before creating separate standard tags and supported reconstructed source files. Actual desktop recovery, independent native parsing and a recovered 1,795-tag MCC scenario compile/readback pass. Original authoring history, complete visual/audio fidelity, other-runtime acceptance and gameplay of that recovered cache remain unverified. [Workflow, measurements and limitations](docs/CONTINUATION_67_SOURCE_GUARDIAN.md).
+
 ## Real accomplishments
 
 - Native geometry/collision compilation and a user-verified Custom Edition Workshop playthrough.

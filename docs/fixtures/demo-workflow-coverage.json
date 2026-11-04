@@ -4,6 +4,18 @@
   "acceptance": "Workflow discoverability audit only; native compiler, rendering and gameplay evidence remain separate.",
   "artifacts": [
     {
+      "artifact": "scripts/test-source-recovery-native.mjs",
+      "featureId": "source-recovery",
+      "kind": "diagnostic",
+      "scope": "Actual desktop buttons, read-only plan, native recovery, reopening and separate validation stages in Preservation record; no mocked native IPC or gameplay claim."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_source_recovery.rs",
+      "featureId": "source-recovery",
+      "kind": "diagnostic",
+      "scope": "Real Source Guardian cache recovery, original preservation, stale-plan/corruption rejection, reuse and isolated native model recompilation. User entrypoint is Preservation record > Recover a Halo Project; gameplay remains separate."
+    },
+    {
       "artifact": "crates/spark-core/examples/qa_native_storage.rs",
       "featureId": "native-door-logic",
       "kind": "diagnostic",
