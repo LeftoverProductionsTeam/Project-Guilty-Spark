@@ -4,7 +4,7 @@ Task: C66 P0 complete file, dependency and storage architecture repair
 Status: active
 Starting revision: 929234044709dbe55546084fbebf59e371790909
 Latest verified revision: 219ac941ce83a2c01d0150c13968f84b6f6b18af; C66 repair committed locally on master
-Next action: Continue the remaining P0 historical/source ownership and prepared-shared-input review using the C66 lifecycle report, health-sealed.json and cleanup-review-manifest.json. Produce exact reviewable candidates before further cleanup. Do not repeat the completed duplicate removal or create a full SDK test copy. User is asleep: no questions; preserve human/approval-only gates for later.
+Next action: Close the prepared shared-source acceptance gap within the existing native collaboration path. studio_native_source::prepare_build currently creates a new build-UUID/tags fork for every request. Establish a small real native admission/materialization/build baseline before changing reuse; retain exact semantic/source/tool ownership checks and bounded complete-input fallback. Continue itemized historical/source review without deleting additional data. User unavailable: no questions or invented gameplay results.
 
 ## Acceptance
 
@@ -27,6 +27,9 @@ Evidence root: .local/artifacts/c66-storage-20261103. Full report: docs/CONTINUA
 
 ## Changed work
 
+Additive standing instruction received 2026-11-04: docs/ENGINEERING_CONTRACT.md is the permanent user contract, linked from AGENTS.md and REPOSITORY_POLICY.md. It preserves the active P0 task and complete feature/research ledger. It requires native-compatible outputs, runtime-specific contracts, explicit tool/content authorization and separate evidence stages through actual human/game-peer/release acceptance. Actual resumption HEAD was b1c5605, clean; the supplied 9d03f10 reference is historical. This change is repository guidance, not a new runtime acceptance claim.
+
+
 Source repair is committed as 219ac94 on sole local master: shared native reservations/process leases, atomic copies, exact resource admission, dependency subsets, schema-3 import-bound reuse, external transaction guards, Storage & Cache controls and bounded task continuity. Only this final evidence/checkpoint documentation follows that source commit. No branch/worktree, push or publication.
 
 Full regressions: 698 Rust passed, 8 explicit gated ignores; 387 frontend tests; 59 offline commands; TypeScript/Vite/debug native build; 14 continuity/health/release-draft checks. Full browser suite 161 passed, plus two current Storage/settings checks. Native acceptance is separate from automated unit counts.
@@ -36,6 +39,8 @@ Full regressions: 698 Rust passed, 8 explicit gated ignores; 387 frontend tests;
 Preserved failed attempts: native-first lacked an original import namespace; native-second exposed H1A mode-to-mod2 class binding, fixed with exact header-checked recursive resolution. Initial storage UI attempted an expensive automatic scan; scans are now explicit. Earlier SQL integer-type failure was corrected without suppressing its log. A malformed checkpoint update was refused atomically; the prior valid checkpoint stayed intact.
 
 Python packaging tests could not start because only WindowsApps aliases exist (exit 9009). Packaging source and sealed C49 assets are unchanged. No failed/skipped test is counted as passed.
+
+Source audit on 2026-11-04 confirmed that src-tauri/src/studio_native_source.rs::prepare_build creates a fresh frozen native fork for each build before core compilation. It has no exact reusable materialization contract yet. Existing three-process content tests require explicitly seeded private libraries; do not fabricate that state or rerun them with a whole SDK copy merely to satisfy this gate. No new native test was launched during this contract update.
 
 Prepared shared revisions retain their complete bounded input contract. Broader custom-model/sound/runtime graphs need controlled acceptance. Mixed historical libraries/archives require itemized ownership/dependency review and approval before further deletion. Cargo, WebView/driver data, permanent source history and global multi-window GPU memory have separate accounting limits; polling is not a filesystem quota.
 

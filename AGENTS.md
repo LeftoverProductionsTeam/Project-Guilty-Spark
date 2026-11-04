@@ -19,3 +19,10 @@
 - Keep a different received directive's identity and available complete instructions in the bounded pending-request record before deferring it. Do not silently replace unfinished work, invent missing queue messages or count receipt as completion. Explicit user priority changes override stale checkpoints.
 - `active` means resume after verification; `awaiting human verification` means request only the recorded action; `blocked` means explain the concrete blocker and stop automatic retries; `accepted` permits the next initiative. Never mark accepted until the recorded criteria pass. Report any known consumed request that needs manual requeue.
 - Keep this file-based safeguard lightweight: no new branch/worktree/database, daemon, hooks, scheduler changes, queue injection, automatic cleanup or rollback. Codex's application queue is outside repository control.
+
+## Permanent engineering contract
+
+- Read and apply `docs/ENGINEERING_CONTRACT.md` for every initiative. Preserve the complete requirements/research ledger and current implementations; inspect actual HEAD and unfinished work first.
+- Keep implemented source, automated tests, native readback, native compilation, game loading, human gameplay, real game-peer acceptance and clean-machine release acceptance distinct. Select the highest-impact missing native gate within the active task and use existing components and available native tools.
+- Standard exported Halo tags/maps must remain independently compatible. Do not invent native fields/classes, disguise cache formats, force Spark extensions or silently discard data. Optional authoring sidecars are separate.
+- Maintain runtime-specific contracts and upstream/license provenance. No security bypasses, unauthorized proprietary downloads or arbitrary remote tool execution. Optional installations, large downloads, game-install changes, public servers and publication require explicit authorization. Never infer permission to push/publish from a local commit.

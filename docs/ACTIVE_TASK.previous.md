@@ -45,7 +45,7 @@ C63 human gameplay remains independently accepted: “Opens both ways; crossed a
 
 All C66 native helpers and the final owned desktop window finished normally. Confirm actual process state before future accounting recovery/cleanup; do not terminate unrelated user tools. Last verified source checkpoint is 219ac94 and the retained accepted-app manifest. Native receipts and failed experiments are preserved.
 
-health-verified.json measured 149,567,397,034 logical bytes / 676,371 files, zero errors. Net logical growth was 1,491,861,354 bytes despite approved cleanup because accepted fixtures/compiler evidence were retained. health-sealed.json is the later snapshot after the retained acceptance app/desktop test. Neither logical count is NTFS allocation or net reclaimed space. No additional accumulated-data deletion occurred.
+health-verified.json measured 149,567,397,034 logical bytes / 676,371 files, zero errors. Net logical growth was 1,491,861,354 bytes despite approved cleanup because accepted fixtures/compiler evidence were retained. health-sealed.json at 2026-11-04T05:49:53.788Z is the later snapshot after the retained app/test: 149,712,587,415 logical bytes / 676,688 files, zero errors; net growth 1,637,051,735 bytes. Neither logical count is NTFS allocation or net reclaimed space. No additional accumulated-data deletion occurred.
 
 ## Deferred requests
 

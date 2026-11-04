@@ -4,6 +4,8 @@ Develop locally on **master** in **`D:\Project Guilty Spark`**. Do not create ro
 
 `AGENTS.md` makes this the permanent engineering instruction. External version-pinned engine/tool research is distinct from another Spark checkout. Preserve its licenses and history; inventory it rather than deleting it as an unexpected folder.
 
+The standing [engineering contract](ENGINEERING_CONTRACT.md) also governs every initiative: native compatibility, runtime-specific support, the eight-stage evidence ladder, content/tool authorization and complete user workflows. Apply it to the current active task; receiving the contract does not erase unfinished work or the requirements ledger.
+
 ## Read-only health check
 
 Run `node scripts/repository-health.mjs --storage` from the canonical root. `--root <directory>` selects an existing checkout and `--budget-gib <number>` overrides the warning budget. The command emits JSON; redirect it into a fresh `.local/artifacts` report if needed. It never deletes, installs hooks, changes Git/configuration, checks out a branch or accesses the network. It warns rather than blocking emergency recovery.
