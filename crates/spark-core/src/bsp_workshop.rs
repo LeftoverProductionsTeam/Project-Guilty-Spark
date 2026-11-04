@@ -29,8 +29,13 @@ pub struct Brush {
     pub position: V,
     pub rotation: V,
     pub scale: V,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub world_uv: bool,
     pub vertices: Vec<V>,
     pub faces: Vec<Face>,
+}
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -315,12 +320,15 @@ fn solid(b: &Brush, slots: &mut Vec<(String, String, String)>) -> Result<Manifol
         let slot = slots.len();
         slots.push((b.id.clone(), f.id.clone(), f.material_id.clone()));
         let n = face_check(b, f)?;
+        let world_n = if b.world_uv {
+            normal(world(b, b.vertices[f.vertices[0]]), world(b, b.vertices[f.vertices[1]]), world(b, b.vertices[f.vertices[2]]))
+        } else { n };
         for j in 1..f.vertices.len() - 1 {
             let first = gl.num_vert() as u64;
             for i in [f.vertices[0], f.vertices[j], f.vertices[j + 1]] {
                 let p = b.vertices[i];
                 gl.vert_properties.extend(world(b, p));
-                gl.vert_properties.extend(uv(p, n, f));
+                gl.vert_properties.extend(if b.world_uv { uv(world(b, p), world_n, f) } else { uv(p, n, f) });
             }
             gl.tri_verts.extend([first, first + 1, first + 2]);
             gl.face_id.push(slot as u64);
@@ -636,6 +644,7 @@ pub fn box_brush(id: &str, role: &str, lo: V, hi: V, material: &str) -> Brush {
         position: [0.; 3],
         rotation: [0.; 3],
         scale: [1.; 3],
+        world_uv: false,
         vertices,
         faces,
     }

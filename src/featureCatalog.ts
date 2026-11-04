@@ -1,5 +1,6 @@
 import type { Workspace } from './types';
-export type FeatureStatus = 'Built in' | 'Halo tools required' | 'Version specific' | 'Authoring';
+import type {BspTool} from './bspWorkshop';
+export type FeatureStatus = 'Built in' | 'Halo tools required' | 'Version specific' | 'Authoring' | 'Research';
 export interface SparkFeature {
   id: string;
   title: string;
@@ -10,6 +11,8 @@ export interface SparkFeature {
   needsProject: boolean;
   steps: string[];
   limit?: string;
+  prerequisites?: string[];
+  workshopEntry?: BspTool | 'objects';
 }
 const f = (
   id: string,
@@ -23,6 +26,63 @@ const f = (
   limit?: string,
 ): SparkFeature => ({ id, title, category, summary, status, workspace, needsProject, steps, limit });
 export const SPARK_FEATURES: readonly SparkFeature[] = [
+  {...f('native-ai-research','Native actor & multiplayer AI lab','Gameplay',
+    'Follow the native actor and Firefight acceptance path using real encounters and the runtime’s own game networking.',
+    'Research','scenario',true,
+    ['Inspect a compatible source map in AI & scenario. Use its actual actor variants and navigation. Prepare an isolated native working source and launch the matching Sapien from Games & tools to author an encounter, squad, firing positions and safe starts.',
+     'In Firefight rules, choose the real actor variants and finite solo waves. Export native round source and match its encounter names/counts in that scenario. Keep owned encounters not initially created; import/compile the scripts with the matching native kit.',
+     'Build working tag edits and load the exact output in the selected runtime. First verify one actor spawning, moving, attacking, taking damage, dying and being removed; then clear both waves and check score and restart.',
+     'For supported OpenCE research, host that same map and join with another real game process. Observe combat, death, cleanup, late join and reconnect on both. A SparkLink editor invitation is not this game connection.'],
+    'Native encounter construction still requires the companion scenario editor. OpenCE automated actor/peer observations and AI-cleared rounds are recorded; human-cleared Firefight and universal multiplayer AI are not accepted. MCC, stock CE and Chupathingy require separate support and tests.'),
+    prerequisites:['A compatible native scenario and actor/navigation tags','Matching Sapien and native compiler','Real game peers for multiplayer acceptance']},
+  f('zombie-original','Original Zombie Apocalypse recovery','Gameplay',
+    'Preserve the historical variants and inspect the original weapon → carrier → seated zombie mechanism.',
+    'Research','compare',false,
+    ['Import your original variants and matching resources into Map library. Compare variants, keeping the original map hashes and creator credits intact.',
+     'In Tag editor, follow the spawner weapon, projectile creation effect, invisible vehicle, seat, biped and actor-variant references. Use isolated native source and Baboon/Invader reconciliation for reviewed edits.',
+     'Use the compatible conversion/build route to produce a separate native map. In that runtime, test the original spawner, carrier stability, seat release, pursuit, combat, death and cleanup before trying bursts or game peers.'],
+    'The original carrier can be created in the recorded research candidate, but automatic seat release, zombie pursuit/combat and complete multiplayer restoration are still unresolved. Spark has no finished automatic “repair all zombies” command.'),
+  {...f('bsp-workshop','Rooms, corridors & named BSP volumes','BSP Workshop',
+    'Build the same editable rooms, hallway and ramp used in the native level demo.',
+    'Halo tools required','quickforge',true,
+    ['Map library → Create a map → Custom blank. Open Level editor → BSP Workshop. Choose Start with one room, or Two rooms + corridor + ramp to inspect the example.',
+     'For your own layout, choose Room or Corridor, set New volume height / depth, then drag its footprint in Top view. A corridor must overlap both rooms. Choose Ramp and draw it inside playable space.',
+     'Select a row under Named volumes. Change Volume name and press Enter. The name is saved with that volume; Move, Rotate, Scale and the Face/Edge/Vertex tools edit its existing source.',
+     'Use Diagnostics and Halo material paths & player starts. Save with Ctrl+S, then configure Build settings and choose Build & check playtest. Walk the corridor and ramp in the matching Halo runtime.'],
+    'These names organize source volumes. Native compilation joins them into level structure; they are not separately spawned game objects. Imported compiled landscapes need recoverable structural source before these operations apply.'),
+    prerequisites:['An editable QuickForge source map','A compatible editing kit, editable native tags and Invader for compilation'],workshopEntry:'select'},
+  {...f('native-door-logic','Door & two-way trigger demo','BSP Workshop',
+    'Drop an actual Halo door and an adjustable trigger, then connect a repeatable native event.',
+    'Halo tools required','quickforge',true,
+    ['Open the rooms-and-corridor source in Level editor → Objects & gameplay. Open Asset library and choose a compatible owned campaign source, then Show → Doors & devices.',
+     'Drag a door preview into the corridor. Resize and rotate it to fit. Drag Trigger volume from the same drawer, then select its box and open Inspector → Properties → Logic / Events.',
+     'Choose From trigger and To door / device. Select Cover both sides, then Enter → Open. Leave Once off so the event can re-arm. Native HaloScript exposes the generated script for advanced edits.',
+     'Save, build and launch the matching native scenario. Approach from one room, cross, let the door close and return. Undo/Redo and immediate Save keep both placement and event changes.'],
+    'The stock a10 small-door demo passed a human outbound/return crossing in H1A Standalone. Other doors, retail MCC cache loading and the other runtimes each need their own gameplay test.'),
+    prerequisites:['Editable QuickForge/BSP Workshop source','A compatible map containing a native machine door','Matching H1A tags/tools and Invader including invader-script'],workshopEntry:'objects'},
+  f('bsp-connections','Connect two owned maps with a tunnel','BSP Workshop',
+    'Reproduce the source-backed Timberland–Sidewinder assembly through the existing connection tool.',
+    'Halo tools required','world',true,
+    ['Open the destination map and donor map in separate tabs. Return to the destination → Level editor → Construction → Connect another map’s BSP.',
+     'Choose the donor and region, plan the connected tunnel and review the source anchors, elevation, tunnel size and original scenery option. Apply the connection as one project edit.',
+     'Check tunnel clearance and Visibility zones. Resolve source recovery or compiler errors and build a separate native output with the matching tools.',
+     'Load that output in Halo. Walk into the donor region and return, checking both mouths, floor and head clearance. Retain failures and rebuild the actual source.'],
+    'A compiled or loaded assembly is not a completed walkthrough. The Timberland–Sidewinder return-traversal gate is still open; atlas regions and loading separate maps are not seamless streaming.'),
+  f('megaworld-atlas','Megaworld Atlas & region planning','BSP Workshop',
+    'Inspect original map regions and plan their real native connections.',
+    'Authoring','quickforge',true,
+    ['Open BSP Workshop → Megaworld Atlas and choose an installed source map and BSP region.',
+     'Inspect bounds, materials, collision and retained source evidence. Use Connect another map’s BSP for a supported pair; the Atlas alone does not assemble the world.',
+     'Build and traverse each supported connection independently before expanding to another region.'],
+    'The all-Halo open world and engine-side streaming remain research. There is no finished one-click every-map gameplay demo.'),
+  f('native-external-roundtrip','Baboon / Invader edit-and-reconcile demo','Tags & assets',
+    'Keep editing in Spark while a compatible native tool saves its isolated working copy.',
+    'Halo tools required','tags',true,
+    ['Build a native source map, select a compatible tag, then expand Complete native tag editing → Baboon or Invader. Prepare the isolated source and open the displayed tag in the installed tool.',
+     'Make a supported field edit, save, then review the stable-save and semantic-integrity results in Spark. Invalid or incomplete saves must be restored or re-saved before reconciliation.',
+     'Keep the reviewed external edit as a new working revision. Close native editors and choose Build working tag edits; regenerating older brush source must not discard the accepted native changes.',
+     'Open the separate validated output and inspect the changed tag. Keep the original map, starting tags and previous-good output for comparison.'],
+    'The C63 round trip used a real Invader save through the production Baboon handoff. QA deliberately injected the corrupted save; it was not attributed to either editor. Unknown file writers stay unknown.'),
   f('native-firefight-round','Native solo Firefight round source','Gameplay','Extend an authored finite wave plan into native round state, wave-clear points, restart and failure handling.','Halo tools required','firefight',true,
     ['Set one player and one life, finite waves, zero difficulty/player scaling and no equipment or resupply overrides.',
       'Use Export native round source. Review its exact encounter/count plan and build in a separate native scenario.',
@@ -30,9 +90,9 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     'Native automated tests use separate scripted deaths, not player combat. The source refuses partial spawns and binds the original player biped. Encounter construction, score HUD, broader rules and co-op are not a one-click game build.'),
   f('native-asset-import','Drag models with native dependencies','Tags & assets','Find owned map assets and stage verified recursive tags when you drag a supported model into a map.','Halo tools required','world',true,['Open Asset library and choose an open, linked or discovered owned map. Inspect its actual model preview.','Drag the preview into the viewport. Spark checks source identity, extracts its dependencies and validates an isolated import.','Save and compile through the matching QuickForge or supported MCC source-map workflow, then inspect the resulting model and placement.'],'Native acceptance covers bounded scenery imports and matching source builds. Every asset class/runtime combination, arbitrary replacement, compressed animation and actual game loading are not yet accepted. Sounds can be auditioned and placed for editor rehearsal; compiled emitters are a separate gate.'),
   f('sparklink-native','SparkLink native source collaboration','Projects','Edit a supported native field, publish validated scenery and place it across independent Spark sessions.','Version specific','quickforge',true,['Open SparkLink from a QuickForge project and create a private invitation with the required creator roles.','Each participant admits the matching complete local source set. For an external native editor, expand External editor and prepare its private tool fork; open the displayed tag path in the compatible tool while everyone keeps editing.','Save in the external tool, review the stable save and explicitly propose the supported field. Wait for the acknowledged revision, resolve conflicts or undo your own changes, then let the owner build the frozen shared revision.'],'Native sharing is limited to pistol bounding radius and admitted complete scenery templates. Unsupported tool changes stay retained for separate review. Three processes on one Windows machine are verified; arbitrary binary uploads, multiple-computer acceptance and game-peer replication remain open.'),
-  f('ce-private-host','Host a private Custom Edition build','Online','Prepare an isolated CE server and matching client from an installed map or your validated project output.','Version specific','runtimes',true,['Choose Online → Host game → Halo Custom Edition. Select an installed map or the saved project’s validated CE build.','Choose a stock mode and player limit, then prepare and start the private server. Its native status appears in the same panel.','Prepare matching client and use First-run help if needed before Launch CE playtest. Stop the client or server independently.'],'Real native checks cover dedicated-server status, exact matching content, compilation, changed-file refusal and owned-process cleanup. This control is loopback-only. A genuine joined player, visual first-run completion and collision walkthrough remain unverified.'),
+  f('ce-private-host','Host a private Custom Edition build','Online','Prepare an isolated CE server and matching client from an installed map or your validated project output.','Version specific','runtimes',true,['Choose Online → Host game → Halo Custom Edition. Select an installed map or the saved project’s validated CE build.','Choose a stock mode and player limit, then prepare and start the private server. Its native status appears in the same panel.','Prepare matching client and use First-run help if needed before Launch CE playtest. Stop the client or server independently.'],'The isolated local CE path has a real joined player and player-confirmed Blood Gulch movement and two-room Workshop floor/corridor/ramp acceptance. This host control is loopback-only; internet hosting, arbitrary maps and combined-world return traversal need separate tests.'),
   f('ce-setup','Connect or install Custom Edition','Get started','Remember an existing CE installation or review a checked separate managed installation.','Version specific','settings',false,['Open Settings → Dependencies & setup and choose Halo Custom Edition.','Select the installed game folder, or review the offered checked archive installation.','Keep the original game untouched. Use the matching editing kit or reviewed separate source recovery for native builds.'],'Game discovery, download/extraction identity and startup dependencies are checked separately from licensing, visual first-run completion, a successful join and gameplay.'),
-  f('native-home-showcase','Animated native Halo showcase','Maps','Preview the actual owned monitor model and supported native animations with the shared material renderer.','Version specific','library',false,['Connect your owned Halo files and open Map library.','The centerpiece loads actual model geometry, source textures and reflections.','Choose a supported animation or pause playback while inspecting the model.'],'Native GPU acceptance covers the reviewed monitor idle/talking vertex animation. Missing resources remain explicit; compressed clips and complete game rendering parity remain open.'),
+  f('native-home-showcase','Animated native Halo showcase','Maps','Preview actual owned character geometry and supported native animations with the shared material renderer.','Version specific','library',false,['Connect your owned Halo files and open HOME / Map library.','Choose Guilty Spark, Master Chief, Sgt. Johnson or Cortana from Home model when their campaign assets are available. The choice is remembered.','Choose a supported animation or pause playback. Switching workspaces pauses the retained Home; returning resumes it. The corner monitor uses a locally saved picture after its first capture.'],'Native GPU acceptance covers reviewed source models and supported uncompressed clips. Missing resources remain explicit; compressed clips and complete game rendering parity remain open.'),
   f('smart-edit','Smart Edit · direct map copies','Tags & assets','Review one native edit plan from the tag tree, object drawer or build workspace.','Version specific','tags',true,['Open an MCC Halo 1 map and edit a supported scalar or existing placement.','Expand Save a map copy and review Automatic or a specific verified route.','Save and open the validated copy in another map tab. Native structural edits use compatible source tools; live bound moves have separate temporary plans.'],'The direct writer covers reviewed MCC cache 13 cells only and requires the tested Invader CRC/info tools. It does not extract or compile. New assets, arbitrary references/BSP changes, other direct-write editions and game-peer replication remain gated; native validation is not game-load acceptance.'),
   f('portability-lab','Portability Lab and Engine Preflight','Build & playtest','Compare native Halo editions, check reviewed compatibility hazards and verify untouched native bytes.','Built in','build',true,['Open Build & playtest → Portability Lab and choose up to eight existing runtime profiles. Inspect before preparing a conversion.','Verify untouched native bytes, then save JSON and readable findings. Native tags remain standard files; Spark metadata stays outside them.','Use the MCC build workflow, then Review native changes to compare class/path identities and inspected fields against a validated build.'],'Imported-cache conversion currently targets MCC. Byte preservation, native tag serialization, semantic comparison, compiler success, game loading and multiplayer are separate evidence. Unknown fields and unsupported target schemas remain explicit.'),
   f('workspace-drawers','Drawers and fullscreen editing','Get started','Keep maps and editing controls available with remembered drawers and one fullscreen mode.','Built in','world',false,['Use Menu for workspaces. The title and map tabs share one compact header with search, help and upper-right window controls.','Open a drawer from the tool strip or More. Its sliders icon contains edge, size and pinning options. Close and reopen it without changing the map or camera.','Press F11 for native fullscreen with thinner bars. Map tabs, viewport tools, runtime actions and open drawers stay available. Escape closes a popup or drawer first, then exits fullscreen.'],'Ctrl+Backslash opens navigation; The header remains visible in fullscreen. Each map remembers its own tools, selections and camera. Source-map format is separate from the chosen build/play runtime.'),

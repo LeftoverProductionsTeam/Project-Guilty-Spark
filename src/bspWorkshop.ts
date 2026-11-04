@@ -16,6 +16,8 @@ export interface BspBrush {
   position: Vec3;
   rotation: Vec3;
   scale: Vec3;
+  /** Omitted on older projects, whose authored local UVs remain unchanged. */
+  worldUv?: boolean;
   vertices: Vec3[];
   faces: BspFace[];
 }
@@ -31,16 +33,20 @@ export interface BspWorkshopSource {
 }
 /** Resolve evaluated triangle provenance against the current editable source.
  * An imported native triangle does not become brush source by being selected. */
-export function workshopSurfaceSelection(source: BspWorkshopSource | undefined,
-  pick: {brushId:string;faceId?:string} | null) {
-  const brush = source?.brushes.find(b => b.id === pick?.brushId);
-  const face = brush?.faces.find(f => f.id === pick?.faceId);
-  return brush && face ? {brushId:brush.id,faceId:face.id,vertices:[...face.vertices]} : null;
+export function workshopSurfaceSelection(
+  source: BspWorkshopSource | undefined,
+  pick: { brushId: string; faceId?: string } | null,
+) {
+  const brush = source?.brushes.find((b) => b.id === pick?.brushId);
+  const face = brush?.faces.find((f) => f.id === pick?.faceId);
+  return brush && face ? { brushId: brush.id, faceId: face.id, vertices: [...face.vertices] } : null;
 }
 export type BspView = 'perspective' | 'top' | 'front' | 'side';
 export type BspTool =
   | 'select'
   | 'drawSpace'
+  | 'drawPassage'
+  | 'drawRamp'
   | 'drawSolid'
   | 'move'
   | 'rotate'
@@ -51,6 +57,64 @@ export type BspTool =
   | 'clip'
   | 'material'
   | 'measure';
+export interface WorkshopSelection {
+  brushId: string;
+  faceId?: string;
+  vertices?: number[];
+}
+export type WorkshopShape = 'room' | 'corridor' | 'solid' | 'ramp';
+export function nextWorkshopName(brushes: readonly BspBrush[], label: string): string {
+  const names = new Set(brushes.map((b) => b.name.toLocaleLowerCase()));
+  for (let number = 1; number <= brushes.length + 1; number++) {
+    const name = `${label} ${number}`;
+    if (!names.has(name.toLocaleLowerCase())) return name;
+  }
+  throw Error('Choose a different volume name');
+}
+export function renameWorkshopBrush(brush: BspBrush, name: string): BspBrush {
+  const clean = name.trim();
+  if (!clean || /[\u0000-\u001f\u007f]/.test(clean) || new TextEncoder().encode(clean).length > 100)
+    throw Error('Use a volume name of 1–100 UTF-8 bytes without control characters.');
+  return { ...brush, name: clean };
+}
+/** The same convex source builders used by the example; no special demo objects. */
+export function drawWorkshopShape(
+  source: BspWorkshopSource,
+  shape: WorkshopShape,
+  lo: Vec3,
+  hi: Vec3,
+  material: string,
+  id: string,
+): BspBrush {
+  const brush =
+    shape === 'ramp'
+      ? rampBrush(id, lo, hi, material)
+      : boxBrush(id, shape === 'solid' ? 'solid' : 'space', lo, hi, material);
+  return {
+    ...brush,
+    worldUv: true,
+    name: nextWorkshopName(
+      source.brushes,
+      { room: 'Room', corridor: 'Corridor', solid: 'Solid', ramp: 'Ramp' }[shape],
+    ),
+  };
+}
+/** Move a face/edge/vertex along world axes without changing the other vertices. */
+export function moveWorkshopVertices(brush: BspBrush, vertices: readonly number[], delta: Vec3): BspBrush {
+  if (
+    !delta.every(Number.isFinite) ||
+    !vertices.length ||
+    vertices.some((i) => !Number.isInteger(i) || !brush.vertices[i])
+  )
+    throw Error('Select valid source vertices and a finite movement.');
+  const selected = new Set(vertices);
+  return {
+    ...brush,
+    vertices: brush.vertices.map((v, i) =>
+      selected.has(i) ? localVertex(brush, add(worldVertex(brush, v), delta)) : v,
+    ),
+  };
+}
 export const viewAxes: Record<Exclude<BspView, 'perspective'>, [number, number, number]> = {
   top: [0, 1, 2],
   front: [0, 2, 1],
@@ -77,6 +141,87 @@ export function faceNormal(brush: BspBrush, face: BspFace): Vec3 {
   const length = Math.hypot(...n);
   if (length < 1e-6) throw Error('Face is degenerate');
   return n.map((v) => v / length) as Vec3;
+}
+export function worldFaceNormal(brush: BspBrush, face: BspFace): Vec3 {
+  const [a, b, c] = face.vertices.map((i) => worldVertex(brush, brush.vertices[i]));
+  const n = cross(sub(b, a), sub(c, a)),
+    length = Math.hypot(...n);
+  if (length < 1e-6) throw Error('Face is degenerate');
+  return n.map((v) => v / length) as Vec3;
+}
+export function workshopFaceLabel(brush: BspBrush, face: BspFace) {
+  const normal = worldFaceNormal(brush, face);
+  const axis = [0, 1, 2].reduce((best, i) => (Math.abs(normal[i]) > Math.abs(normal[best]) ? i : best), 0);
+  return `${normal[axis] < 0 ? '−' : '+'}${'XYZ'[axis]} ${axis === 2 ? (normal[axis] < 0 ? 'floor' : 'ceiling') : 'wall'} · ${face.id}`;
+}
+/** Bridge matching, opposed convex source faces. Overlap into both rooms cuts
+ * real openings through the existing boolean builder; Tool still builds physics. */
+export function joinWorkshopFaces(
+  from: BspBrush,
+  fromFace: string,
+  to: BspBrush,
+  toFace: string,
+  id: string,
+  name: string,
+  overlap = 0.125,
+): BspBrush {
+  const a = from.faces.find((f) => f.id === fromFace),
+    b = to.faces.find((f) => f.id === toFace);
+  if (from.id === to.id || from.role !== 'space' || to.role !== 'space' || !a || !b)
+    throw Error('Choose faces on two different playable room / passage volumes.');
+  if (a.vertices.length !== 4 || b.vertices.length !== 4 || !(overlap >= 0.01 && overlap <= 1))
+    throw Error('Source face joins need two matching four-corner faces and a small overlap.');
+  const n = worldFaceNormal(from, a),
+    otherNormal = worldFaceNormal(to, b);
+  if (dot(n, otherNormal) > -0.99999) throw Error('Choose parallel faces that face toward each other.');
+  const points = a.vertices.map((i) => worldVertex(from, from.vertices[i]));
+  const other = b.vertices.map((i) => worldVertex(to, to.vertices[i])).reverse();
+  const center = (ring: Vec3[]): Vec3 =>
+    ring.reduce((v, p) => add(v, p.map((x) => x / ring.length) as Vec3), [0, 0, 0] as Vec3);
+  const firstCenter = center(points),
+    secondCenter = center(other),
+    separation = dot(sub(secondCenter, firstCenter), n);
+  if (separation < 0.01 || separation > 512)
+    throw Error('The chosen faces must face across a gap of 0.01–512 units.');
+  let ring: Vec3[] | null = null;
+  for (let shift = 0; shift < 4; shift++) {
+    const candidate = other.map((_, i) => other[(i + shift) % 4]);
+    if (
+      points.every((p, i) => Math.hypot(...sub(sub(p, firstCenter), sub(candidate[i], secondCenter))) < 1e-4)
+    ) {
+      ring = candidate;
+      break;
+    }
+  }
+  if (!ring)
+    throw Error(
+      'The selected faces need matching width and height. Draw a narrower Corridor when you want smaller openings.',
+    );
+  const result: BspBrush = {
+    ...structuredClone(from),
+    id,
+    name,
+    worldUv: true,
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+    vertices: [
+      ...points.map((p) => sub(p, n.map((v) => v * overlap) as Vec3)),
+      ...ring.map((p) => sub(p, otherNormal.map((v) => v * overlap) as Vec3)),
+    ],
+    faces: [
+      { ...structuredClone(a), id: 'base', vertices: [3, 2, 1, 0] },
+      { ...structuredClone(a), id: 'end', vertices: [4, 5, 6, 7] },
+      ...points.map((_, i) => ({
+        ...structuredClone(a),
+        id: `side-${i}`,
+        vertices: [i, (i + 1) % 4, ((i + 1) % 4) + 4, i + 4],
+      })),
+    ],
+  };
+  if (result.vertices.some((p) => p.some((v) => !Number.isFinite(v) || Math.abs(v) > 1500)))
+    throw Error('The connecting source would exceed Halo Workshop bounds.');
+  return result;
 }
 export function worldVertex(b: BspBrush, v: Vec3): Vec3 {
   const p = v.map((x, k) => x * b.scale[k]);
@@ -259,28 +404,29 @@ export function workshopExample(doc: QuickForgeDocument): QuickForgeDocument {
   d.workshop = {
     schemaVersion: 1,
     brushes: [
-      { ...boxBrush('room-a', 'space', [-8, -6, 0], [8, 6, 5], material), name: 'Room A' },
-      { ...boxBrush('corridor', 'space', [7, -2, 0], [21, 2, 3], material), name: 'Corridor' },
-      { ...boxBrush('room-b', 'space', [20, -6, 0], [36, 6, 5], material), name: 'Room B' },
-      rampBrush('ramp', [-3, -3, -0.5], [3, 1, 1.5], material),
+      { ...boxBrush('room-a', 'space', [-8, -6, 0], [8, 6, 5], material), name: 'Room A', worldUv: true },
+      { ...boxBrush('corridor', 'space', [7, -2, 0], [21, 2, 3], material), name: 'Corridor', worldUv: true },
+      { ...boxBrush('room-b', 'space', [20, -6, 0], [36, 6, 5], material), name: 'Room B', worldUv: true },
+      { ...rampBrush('ramp', [-3, -3, -0.5], [3, 1, 1.5], material), worldUv: true },
     ],
     portals: [],
   };
-  if (!d.spawns.length) d.spawns = [
-    [-5, -4, 0.1],
-    [-5, 4, 0.1],
-    [32, -4, 0.1],
-    [32, 4, 0.1],
-  ].map((position, i) => ({
-    id: `start-${i}`,
-    name: `Player ${i + 1}`,
-    position: position as Vec3,
-    facing: 0,
-    team: 0,
-    gameModes: ['slayer'],
-    visible: true,
-    locked: false,
-  }));
+  if (!d.spawns.length)
+    d.spawns = [
+      [-5, -4, 0.1],
+      [-5, 4, 0.1],
+      [32, -4, 0.1],
+      [32, 4, 0.1],
+    ].map((position, i) => ({
+      id: `start-${i}`,
+      name: `Player ${i + 1}`,
+      position: position as Vec3,
+      facing: 0,
+      team: 0,
+      gameModes: ['slayer'],
+      visible: true,
+      locked: false,
+    }));
   return d;
 }
 export function workshopFromPrimitives(doc: QuickForgeDocument): QuickForgeDocument {
@@ -322,11 +468,16 @@ export function pointInsideWorkshop(source: BspWorkshopSource, point: Vec3): boo
   if (!point.every(Number.isFinite)) return false;
   const inside = (brush: BspBrush, inclusive: boolean) => {
     const local = localVertex(brush, point);
-    return local.every(Number.isFinite) && brush.faces.every(face => {
-      const distance = dot(sub(local, brush.vertices[face.vertices[0]]), faceNormal(brush, face));
-      return inclusive ? distance <= 1e-5 : distance < -1e-5;
-    });
+    return (
+      local.every(Number.isFinite) &&
+      brush.faces.every((face) => {
+        const distance = dot(sub(local, brush.vertices[face.vertices[0]]), faceNormal(brush, face));
+        return inclusive ? distance <= 1e-5 : distance < -1e-5;
+      })
+    );
   };
-  return source.brushes.some(b => b.role === 'space' && inside(b, true)) &&
-    !source.brushes.some(b => b.role === 'solid' && inside(b, false));
+  return (
+    source.brushes.some((b) => b.role === 'space' && inside(b, true)) &&
+    !source.brushes.some((b) => b.role === 'solid' && inside(b, false))
+  );
 }

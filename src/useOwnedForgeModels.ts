@@ -11,6 +11,7 @@ import {configureSourceTexture} from './sourceTexture';
 import {extraTextureKey} from './haloMaterial';
 import {useTextureResourceScopes} from './textureResourceScope';
 import {nativeShaderTextureRole,glassWithoutDiffuse} from './nativeShaderTextures';
+import {nativePreviewResource} from './nativePreviewResources';
 
 export interface OwnedModelView {
   ready?: boolean;
@@ -56,7 +57,7 @@ export function useOwnedForgeModels(
         try {
           if(!native||!placement.sourceProjectId||!placement.sourceSha256||placement.tagId==null)throw new Error('An imported map and exact source tag are required');
           if(Object.keys(loaded).length>=128)throw new Error('The viewport model-type limit is full');
-          const result=await call<ModelResponse>('preview_owned_object_model',{projectId:placement.sourceProjectId,tagId:placement.tagId,sourceSha256:placement.sourceSha256,...(placement.modelVariant?{modelVariant:placement.modelVariant}:{})});
+          const result=await nativePreviewResource<ModelResponse>('preview_owned_object_model',{projectId:placement.sourceProjectId,tagId:placement.tagId,sourceSha256:placement.sourceSha256,...(placement.modelVariant?{modelVariant:placement.modelVariant}:{})},placement.sourceSha256);
           if(!live)return;
           if(result.sourceSha256!==placement.sourceSha256||result.objectTagId!==placement.tagId)throw new Error('Model source identity differs from its placement');
           const bytes=(result.mesh.positions.length+(result.mesh.normals?.length??0)+(result.mesh.uvs?.length??0)+result.mesh.indices.length+(result.mesh.rig?.weights.length??0))*4+(result.mesh.rig?.indices.length??0)*2;
@@ -94,7 +95,7 @@ export function useOwnedForgeModels(
                 sourceSha256: result.sourceSha256,
                 resourceSha256: result.resourceSha256,
               }));
-            const response=await call<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch',{projectId:placement.sourceProjectId,requests:targets.map(t=>({bitmapTagId:t.bitmapTagId,imageIndex:0}))});
+            const response=await nativePreviewResource<OwnedBitmapBatchResponse>('preview_owned_cache_bitmap_batch',{projectId:placement.sourceProjectId,requests:targets.map(t=>({bitmapTagId:t.bitmapTagId,imageIndex:0}))},placement.sourceSha256);
             if(!live)return;
             let images=decodeOwnedBitmapBatch(response,targets);
             if([...images.values()].some(i=>!i.image&&['missing-resource','resource-mismatch','resource-unavailable'].includes(i.errorCode??''))){

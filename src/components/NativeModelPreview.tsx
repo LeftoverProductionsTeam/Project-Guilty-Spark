@@ -74,6 +74,7 @@ function Model({
   const group = useRef<THREE.Group>(null),
     { camera, gl, invalidate } = useThree();
   const pointer=useRef({x:0,y:0});
+  const {active}=useWorkspaceActivity();
   const controls=useRef<ComponentRef<typeof OrbitControls>>(null);
   const sessionKey=`preview.camera.${identity.tagId}`;
   const remember=()=>{
@@ -121,7 +122,7 @@ function Model({
     if(!showcase)remember();
   }, [camera, fit, invalidate, showcase,portrait,identity.projectId,identity.sourceHash,sessionKey,framing]);
   useFrame((_, dt) => {
-    if (!group.current) return;
+    if (!group.current || !active) return;
     // Keep the left-facing resting pose, but let the right half of the page
     // turn the model far enough to face that side as well.
     const followYaw = pointer.current.x * (pointer.current.x > 0 ? 1 : 0.6);

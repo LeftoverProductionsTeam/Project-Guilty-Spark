@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { call } from './api';
+import {nativePreviewResource} from './nativePreviewResources';
 import { decodeOwnedBitmapPreview } from './ownedBitmapPreview';
 import type { OwnedBitmapPreview } from './ownedBitmapPreview';
 export interface OwnedCubeResponse {
@@ -134,11 +135,11 @@ export async function loadReflectionCube(
 }
 /** Raw bytes only; callers must validate/decode before creating any texture. */
 export function readReflectionCube(projectId: string, source: string, tagId: number) {
-  return call<OwnedCubeResponse>('preview_owned_reflection_cube', {
+  return nativePreviewResource<OwnedCubeResponse>('preview_owned_reflection_cube', {
     projectId,
     bitmapTagId: tagId,
     sourceSha256: source,
-  });
+  },source);
 }
 export function createReflectionCubeTexture(
   response: OwnedCubeResponse,

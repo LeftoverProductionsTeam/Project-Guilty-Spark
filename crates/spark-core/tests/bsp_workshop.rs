@@ -1,5 +1,33 @@
 use spark_core::{bsp_workshop as w, quickforge as q};
 #[test]
+fn world_sized_uvs_tile_when_scaled_and_legacy_local_layout_stays_unchanged() {
+    let mut doc = w::example().unwrap();
+    let source = doc.workshop.as_ref().unwrap().brushes[0].clone();
+    doc.workshop.as_mut().unwrap().brushes = vec![source];
+    doc.spawns[2].position = [5., -4., 0.1];
+    doc.spawns[3].position = [5., 4., 0.1];
+    doc.workshop.as_mut().unwrap().brushes[0].scale = [2., 3., 1.];
+    let legacy_json = serde_json::to_vec(&doc).unwrap();
+    assert!(!String::from_utf8_lossy(&legacy_json).contains("worldUv"));
+    let legacy = q::preview_mesh(&doc).unwrap();
+    doc.workshop.as_mut().unwrap().brushes[0].world_uv = true;
+    let world = q::preview_mesh(&doc).unwrap();
+    assert_eq!(world.positions, legacy.positions);
+    assert_eq!(world.normals, legacy.normals);
+    for part in world.parts.iter().filter(|p| p.face_id.as_deref() == Some("face-0")) {
+        for index in &world.indices[part.index_start as usize..(part.index_start + part.index_count) as usize] {
+            let i = *index as usize;
+            assert!((world.uvs[i * 2] - world.positions[i * 3]).abs() < 0.0001);
+            assert!((world.uvs[i * 2 + 1] - world.positions[i * 3 + 1]).abs() < 0.0001);
+        }
+    }
+    assert_ne!(world.uvs, legacy.uvs);
+    assert_ne!(q::export_jms(&doc).unwrap(), q::export_jms(&serde_json::from_slice(&legacy_json).unwrap()).unwrap());
+    doc.workshop.as_mut().unwrap().brushes[0].world_uv = false;
+    assert_eq!(serde_json::to_vec(&doc).unwrap(), legacy_json);
+    assert_eq!(serde_json::to_vec(&q::preview_mesh(&doc).unwrap()).unwrap(), serde_json::to_vec(&legacy).unwrap());
+}
+#[test]
 fn two_rooms_corridor_and_ramp_export_closed_inward_structure_with_exact_faces() {
     let d = w::example().unwrap();
     let r = q::validate(&d).unwrap();

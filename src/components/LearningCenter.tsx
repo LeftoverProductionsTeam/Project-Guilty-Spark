@@ -44,7 +44,7 @@ export default function LearningCenter({ project, inspection, settings, section,
     <section role="tabpanel" id="learning-content" aria-labelledby={`learning-${section}-tab`}>
       {section === 'academy' ? <Suspense fallback={<p role="status">Loading lessons…</p>}>
         <Academy embedded project={project} inspection={inspection} settings={settings} navigate={navigate} />
-      </Suspense> : <HowTo section={section} navigate={navigate} />}
+      </Suspense> : <HowTo section={section} navigate={navigate} project={project} />}
     </section>
   </div>;
 }

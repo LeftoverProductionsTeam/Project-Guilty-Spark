@@ -76,6 +76,8 @@ Windows 10/11 x64 requires [Microsoft Edge WebView2](https://developer.microsoft
 
 ## Inside the workbench
 
+**Reproduce the demos:** open **Learning center → Guides** for searchable steps, requirements and workspace buttons. Rooms, corridors and ramps can be drawn and named through **Level editor → BSP Workshop → Named volumes**. [User workflows and acceptance boundaries](docs/DEMO_WORKFLOWS.md).
+
 Genuine native application captures. Editor/compiler previews are work in progress; they do not prove game combat or multiplayer parity.
 
 ![C60 native map renderer with the actual MCC Blood Gulch source](docs/screenshots/c60/native-mcc-map.png)

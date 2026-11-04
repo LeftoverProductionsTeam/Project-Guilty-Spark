@@ -13,6 +13,9 @@ import RightMouseFly from './RightMouseFly';
 import ViewportSession from './ViewportSession';
 import { WrlErrorOverlay } from './ForgeViewport';
 import BspSurfaces from './BspSurfaces';
+import {BspSourcePicker, BspPartGizmo} from './BspSourceHandles';
+import BspWorkshopGuide from './BspWorkshopGuide';
+import {workshopPickGeometry, pickWorkshopOrtho, workshopPartSelection} from '../bspPicking';
 import type { WrlDiagnostics } from '../haloWrl';
 import { useWorkshopTextures } from '../useWorkshopTextures';
 import RendererQuality from './RendererQuality';
@@ -24,19 +27,24 @@ import { beginProjectMutation } from '../projectMutation';
 import { mergeForge } from '../forgeSession';
 import type { WorkshopPreview } from '../studioClient';
 import {
-  boxBrush,
-  rampBrush,
   clipBrush,
   extrudeFace,
   worldVertex,
-  localVertex,
   viewAxes,
   snapNumber,
   sub,
   workshopExample,
   workshopFromPrimitives,
+  drawWorkshopShape,
+  renameWorkshopBrush,
+  moveWorkshopVertices,
+  joinWorkshopFaces,
+  nextWorkshopName,
+  workshopFaceLabel,
+  worldFaceNormal,
+  dot,
 } from '../bspWorkshop';
-import type { BspBrush, BspFace, BspTool, BspView } from '../bspWorkshop';
+import type { BspBrush, BspTool, BspView, WorkshopSelection } from '../bspWorkshop';
 import type { ForgeMesh, GeometryReport, QuickForgeDocument } from '../forge';
 import type { Vec3, OpenProject } from '../types';
 import '../bspWorkshop.css';
@@ -47,6 +55,8 @@ interface Props {
   report: GeometryReport | null;
   onCommit: (d: QuickForgeDocument, label: string) => void;
   onBack: () => void;
+  onAssets: () => void;
+  onBuildSettings: () => void;
   readOnly?: boolean;
   materialSource?: OpenProject | null;
   materialBindings?: import('../types').NativeAssetImport[];
@@ -55,7 +65,7 @@ interface Props {
   onTextureSource?: (id: string) => void;
   onBusy?: (busy: boolean) => void;
 }
-type Selection = { brushId: string; faceId?: string; vertices?: number[] };
+type Selection = WorkshopSelection;
 function sendDrag(projectId: string, brush: BspBrush | null) {
   window.dispatchEvent(
     new CustomEvent('guilty-spark-workshop-drag', {
@@ -78,7 +88,9 @@ const toolList: [BspTool, string, string][] = [
     'Room',
     'Draw a playable room or connecting passage in an orthographic view. Overlap passages into both rooms.',
   ],
+  ['drawPassage', 'Corridor', 'Draw playable passage space overlapping both rooms. Name it in Volume name.'],
   ['drawSolid', 'Solid', 'Draw a solid slab/platform. Solid brushes subtract from playable space.'],
+  ['drawRamp', 'Ramp', 'Draw a ramp inside a room. In Top view it rises toward +Y; rotate it afterward.'],
   ['vertex', 'Vertex', 'Select and drag a vertex. Invalid/nonconvex results are rejected atomically.'],
   ['edge', 'Edge', 'Select an edge and drag both vertices.'],
   ['face', 'Face', 'Select a face to move its vertices or extrude a new brush.'],
@@ -222,6 +234,8 @@ function Ortho({
   useEffect(() => () => onGesture(false), []);
   const axes = viewAxes[view],
     svg = useRef<SVGSVGElement>(null);
+  const pickSurface = useMemo(() => workshopPickGeometry(brushes), [brushes]);
+  useEffect(() => () => pickSurface.geometry.dispose(), [pickSurface]);
   const [storedCamera, setCamera] = useMapState(projectId, `bsp.view.${view}`, {
     x: 12,
     y: view === 'top' ? 0 : 2,
@@ -241,13 +255,13 @@ function Ortho({
   } | null>(null);
   const width = 72 / camera.zoom,
     vertical = 36 / camera.zoom;
-  const point = (event: { clientX: number; clientY: number }): Vec3 => {
+  const point = (event: { clientX: number; clientY: number }, snapped = true): Vec3 => {
     const r = svg.current!.getBoundingClientRect(),
       p: Vec3 = [0, 0, 0];
-    p[axes[0]] = snapNumber(camera.x + ((event.clientX - r.left) / r.width) * width - width / 2, grid);
+    p[axes[0]] = snapNumber(camera.x + ((event.clientX - r.left) / r.width) * width - width / 2, snapped ? grid : 0);
     p[axes[1]] = snapNumber(
       camera.y - (((event.clientY - r.top) / r.height) * vertical - vertical / 2),
-      grid,
+      snapped ? grid : 0,
     );
     return p;
   };
@@ -264,28 +278,21 @@ function Ortho({
       return;
     }
     if (e.button !== 0) return;
-    if (tool === 'drawSpace' || tool === 'drawSolid' || tool === 'measure') {
+    if (['drawSpace', 'drawPassage', 'drawSolid', 'drawRamp', 'measure'].includes(tool)) {
       e.currentTarget.setPointerCapture(e.pointerId);
       setDrag({ start: p, end: p });
       onGesture(true);
       return;
     }
-    const element = e.target as Element,
-      id = element.getAttribute('data-brush'),
-      faceId = element.getAttribute('data-face') ?? undefined;
-    const b = brushes.find((b) => b.id === id);
-    if (!b) return;
-    const vertex = element.getAttribute('data-vertex'),
-      edge = element.getAttribute('data-edge');
-    const indices =
-      tool === 'vertex' && vertex !== null
-        ? [Number(vertex)]
-        : tool === 'edge' && edge !== null
-          ? edge.split(',').map(Number)
-          : tool === 'face' && faceId
-            ? b.faces.find((f) => f.id === faceId)?.vertices
-            : undefined;
-    onSelect({ brushId: b.id, faceId, vertices: indices });
+    const hit = pickWorkshopOrtho(pickSurface, view, point(e, false));
+    if (!hit) return;
+    const b = hit.brush, rect = svg.current!.getBoundingClientRect();
+    const pick = workshopPartSelection(b, hit.face, tool, {x: e.clientX, y: e.clientY}, v => ({
+      x: rect.left + ((v[axes[0]] - camera.x) / width + 0.5) * rect.width,
+      y: rect.top + (0.5 - (v[axes[1]] - camera.y) / vertical) * rect.height,
+    }));
+    const indices = pick.vertices;
+    onSelect(pick);
     if (tool === 'move' || indices) {
       e.currentTarget.setPointerCapture(e.pointerId);
       setDrag({ start: p, end: p, brush: b, indices });
@@ -299,13 +306,9 @@ function Ortho({
     setDrag(null);
     if (!drag.pan && tool !== 'measure') {
       if (drag.brush) {
-        const b = structuredClone(drag.brush);
-        if (drag.indices) {
-          b.vertices = b.vertices.map((v, i) =>
-            drag.indices!.includes(i) ? localVertex(b, worldVertex(b, v).map((x, k) => x + d[k]) as Vec3) : v,
-          );
-        } else b.position = b.position.map((x, k) => x + d[k]) as Vec3;
-        onMove(b);
+        if (Math.hypot(...d) > 1e-6) onMove(drag.indices
+          ? moveWorkshopVertices(drag.brush, drag.indices, d)
+          : {...drag.brush, position: drag.brush.position.map((x, k) => x + d[k]) as Vec3});
       } else if (Math.hypot(...d) > 0.01) {
         const lo: Vec3 = [0, 0, 0],
           hi: Vec3 = [height, height, height];
@@ -512,7 +515,9 @@ export default function BspWorkshop(props: Props) {
     [clipDistance, setClipDistance] = useState(0),
     [offset, setOffset] = useState<Vec3>([0, 0, 0]),
     [portalX, setPortalX] = useState(8);
+  const [seamTargetId, setSeamTargetId] = useState(''), [seamFaceId, setSeamFaceId] = useState('');
   const [materialId, setMaterialId] = useState(doc.materials.find((m) => !m.name.startsWith('+'))?.id ?? '');
+  const nameInput = useRef<HTMLInputElement>(null);
   const lease = useRef<(() => void) | null>(null),
     gestureBasis = useRef<QuickForgeDocument | null>(null),
     alive = useRef(true),
@@ -640,6 +645,17 @@ export default function BspWorkshop(props: Props) {
   const brush = w?.brushes.find((b) => b.id === selection?.brushId),
     face = brush?.faces.find((f) => f.id === selection?.faceId),
     disabled = busy || props.readOnly;
+  const seamTargets = w?.brushes.filter(b => b.role === 'space' && b.id !== brush?.id) ?? [];
+  const seamTarget = seamTargets.find(b => b.id === seamTargetId) ?? seamTargets[0];
+  const seamEnd = seamTarget?.faces.find(f => f.id === seamFaceId) ?? seamTarget?.faces.find(f =>
+    !!brush && !!face && dot(worldFaceNormal(brush, face), worldFaceNormal(seamTarget, f)) < -0.99999);
+  function chooseTool(next: BspTool) {
+    setTool(next);
+    if (selection && brush) setSelection({...selection,
+      vertices: next === 'face' ? face ? [...face.vertices] : undefined
+        : next === 'edge' && selection.vertices?.length === 2 || next === 'vertex' && selection.vertices?.length === 1
+          ? selection.vertices : undefined});
+  }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if(!activity.active)return;
@@ -683,7 +699,8 @@ export default function BspWorkshop(props: Props) {
   function newBrush(lo: Vec3, hi: Vec3) {
     if (!w) return;
     try {
-      const b = boxBrush(crypto.randomUUID(), tool === 'drawSolid' ? 'solid' : 'space', lo, hi, materialId);
+      const shape = tool === 'drawSolid' ? 'solid' : tool === 'drawRamp' ? 'ramp' : tool === 'drawPassage' ? 'corridor' : 'room';
+      const b = drawWorkshopShape(w, shape, lo, hi, materialId, crypto.randomUUID());
       void apply({ ...doc, workshop: { ...w, brushes: [...w.brushes, b] } }, 'Draw BSP volume');
       setSelection({ brushId: b.id });
     } catch (e) {
@@ -699,6 +716,14 @@ export default function BspWorkshop(props: Props) {
           Halo Tool builds the structure and collision in a separate job.
         </p>
         <div className="bsp-entry-actions">
+          <button disabled={disabled || !!doc.native} onClick={() => {
+            try {
+              const source = {schemaVersion: 1 as const, brushes: [], portals: []};
+              const room = drawWorkshopShape(source, 'room', [-8, -6, 0], [8, 6, 5], materialId, crypto.randomUUID());
+              void apply({...doc, geometry: [], workshop: {...source, brushes: [room]}}, 'Start Workshop with one room');
+              setSelection({brushId: room.id});
+            } catch (e) {setError(String(e));}
+          }}>Start with one room</button>
           <button
             disabled={disabled || !!doc.native}
             onClick={() => {
@@ -745,6 +770,8 @@ export default function BspWorkshop(props: Props) {
       data-workshop-preview-count={ghosts.length}
       data-selected-brush={brush?.id ?? ''}
       data-selected-face={face?.id ?? ''}
+      data-selected-vertices={selection?.vertices?.join(',') ?? ''}
+      data-part-gizmo={!!(selection?.vertices?.length && ['face', 'edge', 'vertex'].includes(tool) && !disabled)}
       data-geometry-tool={tool}
     >
       <div className="bsp-toolbar">
@@ -757,7 +784,7 @@ export default function BspWorkshop(props: Props) {
               className={tool === id ? 'selected' : ''}
               aria-pressed={tool === id}
               title={help}
-              onClick={() => setTool(id)}
+              onClick={() => chooseTool(id)}
             >
               {label}
             </button>
@@ -861,12 +888,14 @@ export default function BspWorkshop(props: Props) {
                         mesh={props.mesh}
                         doc={doc}
                         selection={selection}
-                        onSelect={setSelection}
+                        onSelect={tool === 'material' ? setSelection : undefined}
                         wire={wire}
                         textures={materialPreview.textures}
                         views={materialPreview.views}
                       />
                     )}
+                    {!['drawSpace', 'drawPassage', 'drawSolid', 'drawRamp', 'measure', 'material'].includes(tool) &&
+                      <BspSourcePicker brushes={w.brushes} tool={tool} onSelect={setSelection}/>}
                     {w.brushes.map((b) => (
                       <BrushOutline
                         key={b.id}
@@ -894,6 +923,10 @@ export default function BspWorkshop(props: Props) {
                         onDrag={gesture}
                       />
                     )}
+                    {brush && selection?.vertices?.length && ['face', 'edge', 'vertex'].includes(tool) && !disabled &&
+                      <BspPartGizmo key={`${brush.id}:${selection.vertices.join(',')}`} brush={brush}
+                        vertices={selection.vertices} snap={grid} onDrag={gesture}
+                        onChange={next => updateBrush(next, 'Move BSP face / edge / vertex')}/>}
                   </Canvas>
                 ) : (
                   <Ortho
@@ -966,13 +999,18 @@ export default function BspWorkshop(props: Props) {
           )}
         </div>
         <aside className="bsp-properties">
+          <BspWorkshopGuide draw={chooseTool} rename={() => {
+            if (!brush && w.brushes[0]) setSelection({brushId: w.brushes[0].id});
+            requestAnimationFrame(() => {nameInput.current?.focus(); nameInput.current?.select();});
+          }} objects={props.onAssets} build={props.onBuildSettings}/>
           <MegaworldAtlas projectId={projectId} />
           <div className="bsp-source-list">
-            <b>Source volumes</b>
+            <b>Named volumes <small>{w.brushes.length} editable</small></b>
             {w.brushes.map((b) => (
               <button
                 key={b.id}
                 className={brush?.id === b.id ? 'selected' : ''}
+                title={`${b.name} · ${b.role === 'space' ? 'Playable room / passage' : 'Solid geometry'}. Select to rename or reshape.`}
                 onClick={() => setSelection({ brushId: b.id })}
               >
                 {b.role === 'space' ? '◇' : '◆'} {b.name}
@@ -982,9 +1020,9 @@ export default function BspWorkshop(props: Props) {
           <div className="bsp-source-fields" aria-busy={busy}>
             <fieldset disabled={disabled}>
               <legend>{brush?.name ?? 'Construction'}</legend>
-              {['drawSpace', 'drawSolid'].includes(tool) && (
+              {['drawSpace', 'drawPassage', 'drawSolid', 'drawRamp'].includes(tool) && (
                 <NumberField
-                  label="New brush depth / height"
+                  label="New volume height / depth"
                   value={height}
                   min={0.1}
                   max={512}
@@ -995,13 +1033,18 @@ export default function BspWorkshop(props: Props) {
               {brush && (
                 <>
                   <label>
-                    Name
+                    Volume name
                     <input
+                      ref={nameInput}
+                      aria-label="Volume name"
                       key={brush.id + brush.name}
                       defaultValue={brush.name}
+                      maxLength={100}
+                      onKeyDown={e => {if (e.key === 'Enter') e.currentTarget.blur();}}
                       onBlur={(e) => {
-                        if (e.target.value !== brush.name)
-                          updateBrush({ ...brush, name: e.target.value }, 'Rename BSP brush');
+                        if (e.target.value !== brush.name) try {
+                          updateBrush(renameWorkshopBrush(brush, e.target.value), 'Rename BSP brush');
+                        } catch (error) {setError(String(error));}
                       }}
                     />
                   </label>
@@ -1024,6 +1067,11 @@ export default function BspWorkshop(props: Props) {
                     (v) => updateBrush({ ...brush, scale: v }, 'Scale BSP brush'),
                     0.1,
                   )}
+                  <label className="bsp-texture-density" title="Keep texture repetitions at a fixed world size when extending or resizing geometry. Older volumes retain their saved local UV layout until you enable this.">
+                    <input type="checkbox" checked={brush.worldUv ?? false}
+                      onChange={event => updateBrush({...brush, worldUv: event.target.checked}, 'Change BSP texture tiling space')}/>
+                    World-sized texture tiling
+                  </label>
                   <div className="bsp-inline">
                     <button
                       onClick={() => {
@@ -1072,7 +1120,7 @@ export default function BspWorkshop(props: Props) {
                       <option value="">Whole brush</option>
                       {brush.faces.map((f) => (
                         <option key={f.id} value={f.id}>
-                          {f.id} · {f.vertices.length} vertices
+                          {workshopFaceLabel(brush, f)}
                         </option>
                       ))}
                     </select>
@@ -1103,6 +1151,27 @@ export default function BspWorkshop(props: Props) {
                       >
                         Extrude face
                       </button>
+                      {brush.role === 'space' && <details className="bsp-seam-tools">
+                        <summary>Join source faces</summary>
+                        <p>Connect matching opposite faces with an overlapping corridor. For smaller openings, draw a Corridor into both rooms.</p>
+                        <label>To volume<select aria-label="Join target volume" value={seamTarget?.id ?? ''}
+                          onChange={event => {setSeamTargetId(event.target.value); setSeamFaceId('');}}>
+                          {!seamTargets.length && <option value="">Add another room first</option>}
+                          {seamTargets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select></label>
+                        <label>To face<select aria-label="Join target face" value={seamEnd?.id ?? ''} onChange={event => setSeamFaceId(event.target.value)}>
+                          <option value="" disabled>Choose an opposite face</option>
+                          {seamTarget?.faces.map(f => <option key={f.id} value={f.id}>{workshopFaceLabel(seamTarget, f)}</option>)}
+                        </select></label>
+                        <button disabled={!seamTarget || !seamEnd} onClick={() => {
+                          try {
+                            const next = joinWorkshopFaces(brush, face.id, seamTarget!, seamEnd!.id,
+                              crypto.randomUUID(), nextWorkshopName(w.brushes, 'Corridor'));
+                            void apply({...doc, workshop: {...w, brushes: [...w.brushes, next]}}, 'Join BSP source faces with corridor');
+                            setSelection({brushId: next.id});
+                          } catch (error) {setError(String(error));}
+                        }}>Create connecting corridor</button>
+                      </details>}
                     </>
                   )}
                   {selection?.vertices?.length ? (
@@ -1110,12 +1179,8 @@ export default function BspWorkshop(props: Props) {
                       {fields('Move selected vertices by', offset, setOffset)}
                       <button
                         onClick={() => {
-                          const b = structuredClone(brush);
-                          for (const i of selection.vertices!)
-                            b.vertices[i] = b.vertices[i].map((v, k) =>
-                              snapNumber(v + offset[k], grid),
-                            ) as Vec3;
-                          updateBrush(b, 'Move BSP sub-selection');
+                          updateBrush(moveWorkshopVertices(brush, selection.vertices!,
+                            offset.map(v => snapNumber(v, grid)) as Vec3), 'Move BSP sub-selection');
                         }}
                       >
                         Apply vertex / edge offset

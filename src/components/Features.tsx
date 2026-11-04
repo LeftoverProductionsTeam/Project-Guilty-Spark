@@ -4,6 +4,7 @@ import type { Project, Workspace } from '../types';
 import { PageTitle, Pill } from './ui';
 import '../features.css';
 import FlagshipOverview from './FlagshipOverview';
+import {featureWorkflowTarget, openFeatureWorkflow} from '../featureWorkflow';
 const toolNames: Partial<Record<Workspace, string>> = {
   world: 'Level Editor',
   quickforge: 'Level Editor',
@@ -106,9 +107,9 @@ export default function Features({
               </ol>
               {f.limit && <p className="subtle">{f.limit}</p>}
             </details>
-            <button onClick={() => navigate(f.needsProject && !project ? 'library' : f.workspace)}>
-              {f.needsProject && !project
-                ? 'Choose a map first'
+            <button onClick={() => openFeatureWorkflow(f, project, navigate)}>
+              {featureWorkflowTarget(f, project) === 'library' && f.workspace !== 'library'
+                ? f.workshopEntry ? 'Create or open source map' : 'Choose a map first'
                 : `Open ${toolNames[f.workspace] ?? f.workspace}`}
             </button>
           </article>

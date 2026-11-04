@@ -9,6 +9,7 @@ export function textureResourceScope(source: Project['source'] | undefined): str
   ]) : '';
 }
 const scopes = new Map<string,string>();
+export const textureResourceScopeForProject=(id:string)=>scopes.get(id)??'';
 const listeners = new Set<()=>void>();
 const subscribe = (listener:()=>void) => { listeners.add(listener); return ()=>{listeners.delete(listener);}; };
 /** Metadata only; never retain extra maps or pixels to keep a scope alive. */

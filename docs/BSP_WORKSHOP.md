@@ -1,5 +1,7 @@
 # Native BSP Workshop
 
+The current [demo workflows](DEMO_WORKFLOWS.md) add named volumes, explicit Room/Corridor/Ramp drawing, nearest-source-face picking, face/edge/vertex axes, matching-face corridor joins and opt-in world-distance UV tiling through the same source/compiler pipeline. Use **Learning center → Guides**, or **Build the demos · step by step** inside the Workshop. The historical evidence below retains its original scope; newer C63 human door acceptance is recorded separately in [C63](CONTINUATION_63_NATIVE_LOGIC.md).
+
 [C57](CONTINUATION_57_MEGAWORLD.md) adds direct source-face selection from Objects & gameplay into these existing tools, with native wall-extrusion/build/Undo acceptance. Its compiled Timberland–Sidewinder route and portal/start diagnostics retain a separate, still-pending two-way player gate. General imported-landscape reconstruction remains open.
 
 The [C43 continuation](CONTINUATION_43_ENGINEERING.md) adds an original BSP Atlas inside the properties panel and a reviewed native CE two-region assembly path. The new connected world compiles and loads on a private server; its physical two-way player walkthrough remains pending. The four-view/source workflow below remains in place.

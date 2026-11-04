@@ -476,11 +476,12 @@ test('one Learning center retains guides, glossary and Academy while returning t
   await expect(drawer.getByRole('button',{name:'Modding Academy',exact:true})).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('tablist',{name:'Learning sections'}).getByRole('tab')).toHaveCount(3);
-  await page.getByRole('button',{name:'Convert a classic map to MCC',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Find a demo or workflow',exact:true}).fill('Classic maps to MCC');
+  await page.getByRole('button',{name:'Classic maps to MCC',exact:true}).click();
   await page.getByRole('button',{name:'Open Build & playtest',exact:true}).click();
   await expect(page.getByRole('heading',{name:'From archive to in-game.',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Back to previous workspace',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Convert a classic map to MCC',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Classic maps to MCC',exact:true})).toBeVisible();
   await page.getByRole('tab',{name:'Glossary',exact:true}).click();
   await page.getByRole('searchbox',{name:'Search glossary',exact:true}).fill('Race vehicle');
   await expect(page.locator('.gs-glossary dt')).toHaveText(['Race vehicle and teleporter flags']);
@@ -510,7 +511,7 @@ test('one Learning center retains guides, glossary and Academy while returning t
   await page.getByRole('tab',{name:'Guides',exact:true}).focus();await page.keyboard.press('End');
   await expect(page.getByRole('tab',{name:'Academy',exact:true})).toBeFocused();
   await page.getByRole('tab',{name:'Guides',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Convert a classic map to MCC',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Classic maps to MCC',exact:true})).toBeVisible();
   await page.setViewportSize({width:800,height:650});
   expect(await page.locator('.learning-center').evaluate(element=>element.scrollWidth<=element.clientWidth)).toBe(true);
 });

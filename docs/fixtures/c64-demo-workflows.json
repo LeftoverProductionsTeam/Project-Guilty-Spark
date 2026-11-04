@@ -1,0 +1,220 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-03",
+  "sourceBase": "056bc69f4038a744b8afc5800b299697451c8dbb",
+  "changedSource": [
+    {
+      "file": "crates/spark-core/src/bsp_workshop.rs",
+      "sha256": "7cc0ed8f111f776ac99f64e60546a66e01a86a48a040224f9798d54563616850"
+    },
+    {
+      "file": "crates/spark-core/tests/bsp_workshop.rs",
+      "sha256": "95e9f4a8523857f4dbea16d524304060afafbf9ab1a1eae789a44eef9c5676c6"
+    },
+    {
+      "file": "src/App.tsx",
+      "sha256": "9247a18ea5ec3c1ffd0811594bc3782543b138d7a6d988363708fda0b9943665"
+    },
+    {
+      "file": "src/bspPicking.test.ts",
+      "sha256": "e053f8af858aaee3e18d13a51ecad69e3698f1a43fc60eaca08d1fab55a8d49f"
+    },
+    {
+      "file": "src/bspPicking.ts",
+      "sha256": "b6c64e133dc98c2e88419ebd74533b495e6a1097eac4819cf100a788ded3b2d1"
+    },
+    {
+      "file": "src/bspWorkshop.css",
+      "sha256": "0c15f9c730ba85cc1b10c23b8de79312841632e767ce61907909ad33ca4be05e"
+    },
+    {
+      "file": "src/bspWorkshop.test.ts",
+      "sha256": "e73d959d5100b2de390f1405cb352bbaf083415fa01ebe0c676f28b4e6167021"
+    },
+    {
+      "file": "src/bspWorkshop.ts",
+      "sha256": "4625aebdca3dbe6fc5da412f861f0f7c856394bcdf4ac5d905164c40851f2200"
+    },
+    {
+      "file": "src/components/BspSourceHandles.tsx",
+      "sha256": "d20a8c43d289553e36d8ee4440eaf4bca567ae16cb1a8e4ff42743a39f469e72"
+    },
+    {
+      "file": "src/components/BspWorkshop.tsx",
+      "sha256": "c30b569cfd91faf50cee4238bbb9efde8136c909631636b024d8471a5e6d87d6"
+    },
+    {
+      "file": "src/components/BspWorkshopGuide.tsx",
+      "sha256": "c42a75ac045d38b992f3495d394d97189ee699124e83429d60a778c4843d5187"
+    },
+    {
+      "file": "src/components/Features.tsx",
+      "sha256": "5b64af083800c4f900176135361c69fe110dce4e7e91d09a11d629b4318a26f6"
+    },
+    {
+      "file": "src/components/HomeModel.tsx",
+      "sha256": "045dbcfdb1f9afaaa4174a9622a8145f9fc4f80e3aabbf15b4385f6f530ad581"
+    },
+    {
+      "file": "src/components/HomeRuntimes.tsx",
+      "sha256": "0388f62debe89bd2678bfcd17eb7c23c1633b470fc01bc4edb356b4526e9482d"
+    },
+    {
+      "file": "src/components/HowTo.tsx",
+      "sha256": "1e6f84454acc5eb569aa1e20aff7c67a96197bfe5988ece0c8dfbd685cecbc0f"
+    },
+    {
+      "file": "src/components/LearningCenter.tsx",
+      "sha256": "c6423584197d8390872c2a3ead69a4cfb0b29dfd3ad9fe94e6b4c25442d7a66b"
+    },
+    {
+      "file": "src/components/NativeModelPreview.tsx",
+      "sha256": "495f178866c6e3cfb9aa2bb41be782ef881ba68af088ee1e8b9d1da2cca74507"
+    },
+    {
+      "file": "src/components/QuickForge.tsx",
+      "sha256": "99cf2b87ec971338a53b75dff1b4ba2ca6a56963a134fa1a2c2b4a6536dd95f6"
+    },
+    {
+      "file": "src/components/SparkEmblem.tsx",
+      "sha256": "b1052a945afdb3795a6735b21cd60afdc4a637bf97e40f08f993427787610e1d"
+    },
+    {
+      "file": "src/featureCatalog.ts",
+      "sha256": "6cfa060ca53e433cb1f1d89c0431e06eccb95774d59710ab936348cbd086f9f5"
+    },
+    {
+      "file": "src/featureWorkflow.test.ts",
+      "sha256": "1162e79a7fa2ec0ac9daee2676f21fca07909370fdc1cd3d6de68e6bf6b2b9cc"
+    },
+    {
+      "file": "src/featureWorkflow.ts",
+      "sha256": "cb6eb5fd6da1dd0688bbd23b5784b033e29b6f42417381c56d45f45bcd3d7bf6"
+    },
+    {
+      "file": "src/learningCenter.css",
+      "sha256": "64e318d46e97ef21f0364fd7198c8f55a57c21c701521e0df37de5fe8b6b4561"
+    },
+    {
+      "file": "src/nativePreviewResources.test.ts",
+      "sha256": "9768cfa43610fd715219b87b42297b8c8c7225f7b0fb370bb3cd553b526e21ef"
+    },
+    {
+      "file": "src/nativePreviewResources.ts",
+      "sha256": "9ab4437cc2623ba8a93a1171c1c8ba8e00709d8500fea92693c5fcc9b8addc0f"
+    },
+    {
+      "file": "src/ownedReflectionCube.ts",
+      "sha256": "eed1a33492e55c9f92ea704850e348e806659af97ed4c7f71f7d9a732ac15ba7"
+    },
+    {
+      "file": "src/sparkEmblemCache.test.ts",
+      "sha256": "46604f0bc89ac5526ef758be0428ccfb79f039db537e6606d030549ba676985e"
+    },
+    {
+      "file": "src/sparkEmblemCache.ts",
+      "sha256": "bc97acfc1eb97359c381692d89a8a18bb3390c0680069211100eb2f680289663"
+    },
+    {
+      "file": "src/textureResourceScope.ts",
+      "sha256": "441ee77ca0ce58ee28f588d801242bef1f63aca1b15f3efe5337282bd437844e"
+    },
+    {
+      "file": "src/useOwnedForgeModels.ts",
+      "sha256": "e20c8785b3aa4c8a8265c4d65951db38dfac12db391209345559488cbe398cba"
+    },
+    {
+      "file": "src/workbenchCompact.css",
+      "sha256": "7568ff42c4d7c7ca4ce68ada7a150c25f37cd9e3647b8becd386bd9efc5313b4"
+    }
+  ],
+  "changedSourceDigest": "28e894e10f8e470429f102ca75d92900ba9c3cc03319a1d07f260a480952239c",
+  "finalApplicationSha256": "26f17693e6ae2e6fb877191bacde6aafa20b721d041c44eb0ed0e8d1a0bb276d",
+  "compilerTestApplicationSha256": "4f544e6083947a94fa3751f48f89b439a53a2f9de82c0e407960aea6b27e5d41",
+  "workflows": 63,
+  "nativeArtifactMappings": 95,
+  "nativeUi": {
+    "mockedIpc": false,
+    "renameUndoImmediateSave": true,
+    "oneActionShapeUndo": true,
+    "oneActionJoinUndoRedo": true,
+    "nearestFacePointer": true,
+    "faceAxisPointerDrag": {
+      "start": {
+        "x": 228.18433795892258,
+        "y": 320.89174794034113
+      },
+      "end": {
+        "x": 232.6312732185895,
+        "y": 318.41073872377956
+      },
+      "movedVertices": [
+        0,
+        1,
+        5,
+        4
+      ]
+    },
+    "oneActionFaceDragUndo": true,
+    "nearestEdgePointer": true,
+    "reopenedSourceIdentical": true
+  },
+  "nativeCompiler": {
+    "jobId": "cea18351-5b53-4661-ac9e-9396b016bece",
+    "cacheSha256": "4690dafd6430821e4f7d2ca94ca0b1d6590dd7f7fb33b9ce2147a810ffb273ec",
+    "elapsedMs": 78970.4063,
+    "sourceSha256": "4690dafd6430821e4f7d2ca94ca0b1d6590dd7f7fb33b9ce2147a810ffb273ec",
+    "renderTriangles": 40,
+    "collisionTriangles": 40
+  },
+  "previewLifecycle": {
+    "firstProfilePortraitMs": 5543.4818,
+    "repeatLaunchPortraitMs": 791.1755000000012,
+    "firstHomeWaitMs": 202.5648999999994,
+    "homeResumeMs": 45.805499999998574,
+    "previewReadsOnHomeResume": [],
+    "cachedPictureSurvivesProcessRestart": true,
+    "homeRetainedCanvasAndAnimation": true,
+    "measurementConditions": "Same optimized executable, owned MCC model, one machine, real WebView/native calls. Fresh profile first load versus saved-profile relaunch; OS file cache not purged. Home resume measured after materials/animation were ready. Not a whole-application cold/warm benchmark."
+  },
+  "regressions": {
+    "rust": {
+      "passed": 677,
+      "ignored": 8,
+      "suites": 45
+    },
+    "frontend": {
+      "passed": 385,
+      "files": 91
+    },
+    "browser": {
+      "passed": 160,
+      "plusFinalGuideRerun": 1
+    },
+    "offline": {
+      "passed": 59
+    },
+    "typescript": true,
+    "frontendProductionBuild": true,
+    "windowsOptimizedBuild": true
+  },
+  "gameplay": "No new human gameplay claim. C63 two-sided H1A Standalone door acceptance remains separate and unchanged.",
+  "limitations": [
+    "General imported-terrain/structural compiled-map editing remains open.",
+    "Matching rectangular source-face joins are not arbitrary seam welding.",
+    "An edge gizmo and pure vertex transforms are tested; arbitrary vertex/edge deformations still undergo convex-source validation.",
+    "Native build uses fast draft radiosity; retail MCC loading, shader/audio parity and combined-world player return remain separate.",
+    "First-profile versus saved-profile timing is not a controlled whole-application before/after optimization benchmark.",
+    "Research/diagnostic mapping is not a completed in-app game mode."
+  ],
+  "localEvidence": {
+    "root": ".local/c63-bsp-workflow-20261103",
+    "native": "native-current/acceptance.json",
+    "compiler": "native-final-third/acceptance.json",
+    "preview": "portrait-current/acceptance.json",
+    "preservedFailedTrials": [
+      "native-final/failure.json",
+      "native-final-second/failure.json"
+    ]
+  }
+}

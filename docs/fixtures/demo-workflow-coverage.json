@@ -1,0 +1,577 @@
+{
+  "schemaVersion": 1,
+  "auditDate": "2026-11-03",
+  "acceptance": "Workflow discoverability audit only; native compiler, rendering and gameplay evidence remain separate.",
+  "artifacts": [
+    {
+      "artifact": "crates/spark-core/examples/qa_animation_source.rs",
+      "featureId": "animations",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_animation_take.rs",
+      "featureId": "animations",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_bsp_assembly.rs",
+      "featureId": "bsp-connections",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_bsp_audio.rs",
+      "featureId": "bsp-audio",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_bsp_mesh.rs",
+      "featureId": "bsp-connections",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_bsp_workshop.rs",
+      "featureId": "bsp-workshop",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_bsp_workshop_playtest.rs",
+      "featureId": "bsp-workshop",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_build.rs",
+      "featureId": "build",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_build_project.rs",
+      "featureId": "build",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_c35_workspace.rs",
+      "featureId": "build",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_character_catalog.rs",
+      "featureId": "native-home-showcase",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_classic_runtime.rs",
+      "featureId": "ce-private-host",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_compile_diagnostic.rs",
+      "featureId": "build",
+      "kind": "diagnostic",
+      "scope": "Read-only/negative integrity or format probe supporting the linked workflow; no corresponding game action is claimed."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_conversion_library.rs",
+      "featureId": "convert",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_conversion_readback.rs",
+      "featureId": "convert",
+      "kind": "diagnostic",
+      "scope": "Read-only/negative integrity or format probe supporting the linked workflow; no corresponding game action is claimed."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_convert.rs",
+      "featureId": "convert",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_corpus.rs",
+      "featureId": "library",
+      "kind": "diagnostic",
+      "scope": "Read-only/negative integrity or format probe supporting the linked workflow; no corresponding game action is claimed."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_imported_model.rs",
+      "featureId": "models",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_looping_audio.rs",
+      "featureId": "native-loop-emitters",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_map_materials.rs",
+      "featureId": "appearance",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_mcc_audio.rs",
+      "featureId": "spatial-audio",
+      "kind": "diagnostic",
+      "scope": "Read-only/negative integrity or format probe supporting the linked workflow; no corresponding game action is claimed."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_megaworld_atlas.rs",
+      "featureId": "megaworld-atlas",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_megaworld_ce.rs",
+      "featureId": "megaworld-atlas",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_model_collision.rs",
+      "featureId": "models",
+      "kind": "diagnostic",
+      "scope": "Read-only/negative integrity or format probe supporting the linked workflow; no corresponding game action is claimed."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_native_render.rs",
+      "featureId": "appearance",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_quickforge.rs",
+      "featureId": "bsp-workshop",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_recording_library.rs",
+      "featureId": "recording-director",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_repair_conversion_resources.rs",
+      "featureId": "convert",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_runtime_library.rs",
+      "featureId": "dependency-guide",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_sound_classes.rs",
+      "featureId": "spatial-audio",
+      "kind": "diagnostic",
+      "scope": "Read-only/negative integrity or format probe supporting the linked workflow; no corresponding game action is claimed."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_sound_export.rs",
+      "featureId": "spatial-audio",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_validate.rs",
+      "featureId": "library",
+      "kind": "diagnostic",
+      "scope": "Read-only/negative integrity or format probe supporting the linked workflow; no corresponding game action is claimed."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_visibility_zones.rs",
+      "featureId": "visibility-zones",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_working_tags.rs",
+      "featureId": "native-external-roundtrip",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_workshop_playtest.rs",
+      "featureId": "native-door-logic",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_workspace.rs",
+      "featureId": "library",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_zip.rs",
+      "featureId": "library",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_zombie_content.rs",
+      "featureId": "zombie-original",
+      "kind": "research",
+      "scope": "Original zombie carrier recovery remains an engineering investigation; automatic release/pursuit/combat is not a finished app operation."
+    },
+    {
+      "artifact": "scripts/recover-zombie-carriers-native.mjs",
+      "featureId": "zombie-original",
+      "kind": "research",
+      "scope": "Original zombie carrier recovery remains an engineering investigation; automatic release/pursuit/combat is not a finished app operation."
+    },
+    {
+      "artifact": "scripts/test-assets-startup-native.mjs",
+      "featureId": "library",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-baboon-edited-native.mjs",
+      "featureId": "native-external-roundtrip",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-baboon-native.mjs",
+      "featureId": "native-external-roundtrip",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-bitmap-restoration-native.mjs",
+      "featureId": "appearance",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-bsp-audio-native.mjs",
+      "featureId": "bsp-audio",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-bsp-user-workflows-native.mjs",
+      "featureId": "bsp-workshop",
+      "kind": "workflow",
+      "scope": "Real desktop pointer drawing, named volumes, source component selection, corridor joins, history, save/reopen and optional native compilation; gameplay remains separate."
+    },
+    {
+      "artifact": "scripts/test-bsp-workshop-native.mjs",
+      "featureId": "bsp-workshop",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-ce-host-native.mjs",
+      "featureId": "ce-private-host",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-ce-server-native.mjs",
+      "featureId": "ce-private-host",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-ce-source-recovery-native.mjs",
+      "featureId": "geometry",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-character-launch-native.mjs",
+      "featureId": "native-home-showcase",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-community-runtime-native.mjs",
+      "featureId": "setup",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-consolidated-native-workflow.mjs",
+      "featureId": "setup",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-conversion-repair-native.mjs",
+      "featureId": "convert",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-custom-edition-native.mjs",
+      "featureId": "ce-private-host",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-director-recording-native.mjs",
+      "featureId": "recording-director",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-editor-controls-native.mjs",
+      "featureId": "workspace-drawers",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-flagship-ui-native.mjs",
+      "featureId": "setup",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-home-showcase-native.mjs",
+      "featureId": "native-home-showcase",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-inspection-cache-native.mjs",
+      "featureId": "library",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-inspector-native.mjs",
+      "featureId": "workspace-drawers",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-living-workbench-native.mjs",
+      "featureId": "setup",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-main-track-audio-native.mjs",
+      "featureId": "spatial-audio",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-functionality.mjs",
+      "featureId": "setup",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-logic-authoring.mjs",
+      "featureId": "native-door-logic",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-logic-readback.mjs",
+      "featureId": "native-door-logic",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-logic-reconcile.mjs",
+      "featureId": "native-door-logic",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-loop-emitter.mjs",
+      "featureId": "native-loop-emitters",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-monitor-portrait.mjs",
+      "featureId": "native-home-showcase",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-music-conflict.mjs",
+      "featureId": "native-loop-emitters",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-operations.mjs",
+      "featureId": "native-external-roundtrip",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-save-integrity.mjs",
+      "featureId": "native-external-roundtrip",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-tag-drawer.mjs",
+      "featureId": "workspace-drawers",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-native-window-frame.mjs",
+      "featureId": "workspace-drawers",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-one-halo-native.mjs",
+      "featureId": "dependency-guide",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-portability-native.mjs",
+      "featureId": "convert",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-rendering-workflow-native.mjs",
+      "featureId": "appearance",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-runtime-textures-native.mjs",
+      "featureId": "appearance",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-runtime-workbench-native.mjs",
+      "featureId": "dependency-guide",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-session-identity-native.mjs",
+      "featureId": "sparklink-native",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-showcase-lighting-native.mjs",
+      "featureId": "native-home-showcase",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-smart-edit-native.mjs",
+      "featureId": "smart-edit",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-source-runtime-native.mjs",
+      "featureId": "dependency-guide",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-sparklink-content-native.mjs",
+      "featureId": "sparklink-native",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-sparklink-native.mjs",
+      "featureId": "sparklink-native",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-sparklink-rollover-native.mjs",
+      "featureId": "sparklink-native",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-sparklink-workshop-native.mjs",
+      "featureId": "sparklink-native",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-steam-session-native.mjs",
+      "featureId": "sparklink-native",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-texture-recovery-native.mjs",
+      "featureId": "appearance",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-tools-defaults-native.mjs",
+      "featureId": "dependency-guide",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-viewport-workflow-native.mjs",
+      "featureId": "viewport-assets",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-window-history-native.mjs",
+      "featureId": "tabs",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-working-tags-native.mjs",
+      "featureId": "native-external-roundtrip",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-workshop-objects-native.mjs",
+      "featureId": "viewport-assets",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-workspace-lifecycle-native.mjs",
+      "featureId": "tabs",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-workspace-popouts-native.mjs",
+      "featureId": "tabs",
+      "kind": "workflow",
+      "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    }
+  ]
+}

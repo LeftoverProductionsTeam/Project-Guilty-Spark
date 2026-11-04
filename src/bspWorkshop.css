@@ -139,7 +139,16 @@
 }
 .bsp-source-list > b {
   grid-column: 1/-1;
+  display:flex;
+  justify-content:space-between;
 }
+.bsp-source-list > b small {font-weight:400;color:var(--muted);}
+.bsp-workflow-guide {border-bottom:1px solid var(--line,#344352);padding:3px 0 7px;}
+.bsp-workflow-guide > summary {cursor:pointer;font-weight:600;}
+.bsp-workflow-guide ol {padding-left:18px;margin:8px 0;display:grid;gap:10px;}
+.bsp-workflow-guide li p {margin:3px 0;font-size:11px;}
+.bsp-workflow-guide button {font-size:10px;min-height:24px;padding:3px 5px;}
+.bsp-workflow-guide small {display:block;color:var(--muted);font-size:10px;line-height:1.45;}
 .bsp-source-list button {
   padding: 4px 5px;
   min-height: 25px;
@@ -166,6 +175,8 @@
   font-size: 10px;
   margin: 3px 0;
 }
+.bsp-source-fields .bsp-texture-density {display:flex;align-items:center;gap:5px;margin:6px 0;}
+.bsp-source-fields .bsp-texture-density input {width:auto;min-height:0;}
 .bsp-source-fields input,
 .bsp-source-fields select {
   font-size: 11px;

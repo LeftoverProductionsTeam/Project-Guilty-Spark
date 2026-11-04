@@ -1359,6 +1359,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
             onCommit={commit}
             onBusy={setBspBusy}
             onBack={() => setBspMode(false)}
+            onAssets={() => {setBspMode(false); revealPanel('asset-library');}}
+            onBuildSettings={() => setExpandedBuild(true)}
             readOnly={studioRole === 'viewer'}
             materialSource={materialOpen}
             materialBindings={project.nativeAssetImports}

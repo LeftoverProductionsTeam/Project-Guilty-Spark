@@ -24,7 +24,7 @@ export default function HomeModel({ data }: { data: Bootstrap }) {
       setMessage('Connect an owned Halo installation to preview its models.');
       return;
     }
-    setSelectedModel(null);setMessage('Finding your Halo character…');
+    setMessage('Finding your Halo character…');
     const character=characterFromChoice(selection);
     void preloadHomeModels(data)
       .then((choices) => {
