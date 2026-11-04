@@ -28,6 +28,8 @@ An open-source Halo 1 creation and interoperability studio combining native modd
 
 **C62 preservation cleanup:** the complete measured development footprint drops from **314.67 to 95.21 GiB allocated**, including recovery archives and new verification evidence. The first pass left 218.59 GiB; deeper verified archival reclaims another 123.37 GiB. Original runtimes, dirty worktrees, canonical SDK tags, accepted caches, diagnostic executables and the C49 release stay intact. Current-source three-process BSP/editor acceptance and post-cleanup native readback pass. [Measured storage, recovery instructions and limits](docs/CONTINUATION_62_SAFE_CLEANUP.md).
 
+**C66 native storage containment:** Forge/BSP builds stage verified dependencies and reuse unchanged validated jobs. A real 23-tag imported door compiled with 1,774 base tags instead of the 11,538-tag SDK; ten unchanged requests added no native trees. Missing Demo resources stop before extraction, and an actual Invader edit/reconcile/rebuild passed. Settings → Storage & Cache adds reviewed limits, cleanup and connected Halo folder sizes with a combined total. Historical data and broader dependency coverage still need review. [Evidence and remaining limits](docs/CONTINUATION_66_STORAGE_AND_RECOVERY.md). [Active engineering checkpoint](docs/ACTIVE_TASK.md).
+
 ## Real accomplishments
 
 - Native geometry/collision compilation and a user-verified Custom Edition Workshop playthrough.

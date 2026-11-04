@@ -1808,10 +1808,12 @@ test('settings keyboard navigation keeps focus when a lazy tab loads', async ({p
   await mockDesktop(page); await page.goto('/'); await chooseTool(page,'Settings & tools');
   const tools = page.getByRole('tab',{name:'Games & tools',exact:true});
   await tools.focus(); await page.keyboard.press('End');
-  await expect(page.getByRole('tab',{name:'Interface Studio',exact:true})).toBeFocused();
-  await expect(page.getByRole('tab',{name:'Interface Studio',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page.getByRole('tab',{name:'Storage & Cache',exact:true})).toBeFocused();
+  await expect(page.getByRole('tab',{name:'Storage & Cache',exact:true})).toHaveAttribute('aria-selected','true');
   await page.keyboard.press('Home');
   await expect(page.getByRole('tab',{name:'Dependencies & setup',exact:true})).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByRole('tab',{name:'Storage & Cache',exact:true})).toBeFocused();
   await page.keyboard.press('ArrowLeft');
   await expect(page.getByRole('tab',{name:'Interface Studio',exact:true})).toBeFocused();
   await expect(page.getByRole('tablist',{name:'Settings sections',exact:true}).locator('[tabindex="0"]')).toHaveCount(1);

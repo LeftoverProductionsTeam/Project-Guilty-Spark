@@ -115,7 +115,7 @@ pub(super) fn checked_workspace(value:&str)->Reply<&str>{
 fn workspace_query(workspace:&str,context:Option<&str>,section:Option<&str>)->Reply<String>{
     let workspace=checked_workspace(workspace)?;
     let mut query=format!("index.html?workspace={workspace}");
-    if let Some(section)=section{if !matches!((workspace,section),("learning","guides"|"glossary"|"academy")|("settings","tools"|"dependencies"|"interface")){return Err("Invalid workspace section".into());}query.push_str(&format!("&section={section}"));}
+    if let Some(section)=section{if !matches!((workspace,section),("learning","guides"|"glossary"|"academy")|("settings","tools"|"dependencies"|"interface"|"storage")){return Err("Invalid workspace section".into());}query.push_str(&format!("&section={section}"));}
     if let Some(context)=context{if !(workspace=="academy"||workspace=="learning"&&section==Some("academy"))||context.is_empty()||context.len()>64||!context.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'-'||b==b'_'){return Err("Invalid tutorial context".into());}query.push_str(&format!("&lesson={context}"));}
     Ok(query)
 }

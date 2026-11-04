@@ -24,7 +24,10 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     let tools=preflight(project,inspection)?;let started=Instant::now();
     let source=project.source.as_ref().unwrap();let plan=project.bsp_assembly.as_ref().unwrap();
     for s in [source,&plan.donor_source]{if maps::hash_file(&s.preserved_path)?!=s.sha256{return invalid("An original region changed after planning");}}
-    crate::reject_links(jobs)?;fs::create_dir_all(jobs)?;let dir=jobs.join(id);crate::reject_links(&dir)?;fs::create_dir(&dir)?;let dir=fs::canonicalize(dir)?;
+    crate::reject_links(jobs)?;fs::create_dir_all(jobs)?;let dir=jobs.join(id);
+    let base=tools.base_tags_directory.as_ref().unwrap();let inputs=crate::native_staging::inventory(base,&cancel)?;
+    let storage_lease=crate::storage::Store::for_output(&dir)?.reserve(&dir,Some(base),crate::storage::estimate_copy(inputs.files.len(),inputs.bytes).saturating_add(2*1024*1024*1024),crate::storage::Category::Staging,"Connected native BSP build; source copy and bounded dependency/compiler allowance")?;
+    crate::reject_links(&dir)?;fs::create_dir(&dir)?;storage_lease.mark_owned()?;let dir=fs::canonicalize(dir)?;
     let runner=Runner{id,project:&project.id,cancel:&cancel,event:&event};
     let edit=build::tool_path(&tools,"invader-edit").unwrap();let base_tags=tools.base_tags_directory.as_ref().unwrap();
     // Rebuilding painted detail transforms is not implemented. Refuse before
@@ -63,5 +66,6 @@ pub fn run(project:&Project,inspection:&MapInspection,jobs:&Path,id:&str,cancel:
     let record=BuildRecord{id:id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:"gbx-custom".into(),output:Some(file),sha256:Some(sha),message:"Two source regions and their authored connection compiled into one CE BSP; native dependencies, CRC and collision route checked. Player traversal remains unverified.".into(),project_fingerprint:project.fingerprint()?};
     project::atomic_write(&dir.join("megaworld-receipt.json"),&serde_json::to_vec_pretty(&serde_json::json!({"schemaVersion":1,"build":record,"durationMs":started.elapsed().as_millis(),"routes":routes,"detailSources":detail,"originalHashesVerified":true,"inputTags":hashes.len(),"residentBsps":compiled.mesh.parts.len(),"donorScenery":scenery.len(),"gameplayVerified":false,"streaming":false}))?,false)?;
     project::atomic_write(&dir.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
+    storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;
     runner.emit("validated","CE source compilation and readback passed; player walkthrough is still required",100,"success");Ok(record)
 }

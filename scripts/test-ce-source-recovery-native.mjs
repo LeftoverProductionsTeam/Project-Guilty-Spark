@@ -1,6 +1,7 @@
 // Opt-in real desktop/native IPC/geometry acceptance. No synthetic mesh or game proof.
 import { chromium, expect as assertion } from '@playwright/test';
 import fs from 'node:fs/promises';
+import {safeQaCopy} from './qa-safe-copy.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
@@ -108,7 +109,7 @@ try {
   };
 
   const input = path.join(root, 'reviewed-input');
-  await fs.cp(path.resolve(a[3]), input, { recursive: true, errorOnExist: true, force: false });
+  await safeQaCopy(path.resolve(a[3]), input, { recursive: true, errorOnExist: true, force: false });
   await open();
   await page.getByRole('button', { name: 'BSP Workshop', exact: true }).click();
   await page.getByRole('button', { name: 'Two rooms + corridor + ramp', exact: true }).click();

@@ -360,8 +360,19 @@ pub fn prepare_sdk_tags(
     if cache.exists() {
         return invalid("SDK preparation needs a fresh owned cache folder");
     }
-    fs::create_dir_all(cache)?;
     let before = maps::hash_file(&archive)?;
+    let extractor_hash=maps::hash_file(&extractor)?;
+    let parent=cache.parent().ok_or_else(||SparkError::Invalid("SDK cache has no owner directory".into()))?;
+    crate::reject_links(parent)?;fs::create_dir_all(parent)?;
+    // A repeated setup request reuses only this archive/extractor revision and
+    // a freshly rehashed complete tag inventory. Old count-only provenance
+    // does not authorize a cache hit.
+    for item in fs::read_dir(parent)?.take(64){let folder=item?.path();if crate::reject_links(&folder).is_err()||!folder.is_dir(){continue;}let provenance=folder.join("sdk-provenance.json");let manifest=folder.join("sdk-input-tags.json");
+        if !provenance.is_file()||!manifest.is_file(){continue;}
+        if fs::metadata(&provenance)?.len()>65536||fs::metadata(&manifest)?.len()>4*1024*1024{continue;}
+        let attempt=(||->Result<PathBuf>{let meta:serde_json::Value=serde_json::from_slice(&fs::read(&provenance)?)?;if meta["sourceSha256"]!=before||meta["extractorSha256"]!=extractor_hash{return invalid("Different SDK revision");}let hashes:crate::tool_transaction::Inventory=serde_json::from_slice(&fs::read(&manifest)?)?;if hashes.is_empty()||crate::tool_transaction::inventory(&folder.join("tags"))?!=hashes{return invalid("Prepared SDK changed");}Ok(folder.join("tags"))})();
+        if let Ok(tags)=attempt{return Ok(tags);}
+    }
     let cancel = std::sync::atomic::AtomicBool::new(false);
     let runner = Runner {
         id: job_id,
@@ -376,11 +387,13 @@ pub fn prepare_sdk_tags(
             "-slt".into(),
             archive.to_string_lossy().into_owned(),
         ],
-        cache,
+        parent,
         "sdk-inventory",
         5,
     )?;
     let (files, bytes) = sdk_tag_inventory(&listing)?;
+    let lease=crate::storage::Store::for_output(cache)?.reserve(cache,Some(&archive),crate::storage::estimate_copy(files,bytes).saturating_add(16*1024*1024),crate::storage::Category::Staging,"Shared verified SDK input preparation; retained, never disposable cache")?;
+    fs::create_dir(cache)?;lease.mark_owned()?;
     runner.emit(
         "sdk-extract",
         format!(
@@ -435,13 +448,16 @@ pub fn prepare_sdk_tags(
     if actual_files != files || actual_bytes != bytes {
         return invalid("SDK extracted file count or length differs from its inventory");
     }
+    let inventory=crate::tool_transaction::inventory(&tags)?;
+    project::atomic_write(&cache.join("sdk-input-tags.json"),&serde_json::to_vec(&inventory)?,false)?;
     project::atomic_write(
         &cache.join("sdk-provenance.json"),
         &serde_json::to_vec_pretty(
-            &serde_json::json!({"sourceSha256":before,"files":files,"bytes":bytes,"extractorSha256":maps::hash_file(&extractor)?}),
+            &serde_json::json!({"sourceSha256":before,"files":files,"bytes":bytes,"extractorSha256":extractor_hash}),
         )?,
         false,
     )?;
+    lease.finish(true,Some(before))?;
     runner.emit(
         "sdk-ready",
         "MCC SDK tags prepared. Your Halo choice and tool folders are saved.",

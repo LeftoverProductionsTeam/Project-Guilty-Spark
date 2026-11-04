@@ -4,6 +4,24 @@
   "acceptance": "Workflow discoverability audit only; native compiler, rendering and gameplay evidence remain separate.",
   "artifacts": [
     {
+      "artifact": "crates/spark-core/examples/qa_native_storage.rs",
+      "featureId": "native-door-logic",
+      "kind": "diagnostic",
+      "scope": "Storage and real-tool integrity regression for the existing Workshop door workflow; does not certify new gameplay. User controls remain in Build and playtest and Settings > Storage & Cache."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_safe_copy.rs",
+      "featureId": "native-door-logic",
+      "kind": "diagnostic",
+      "scope": "Engineering copy guard shared by native acceptance harnesses. Users do not run a private command to author a door or edit a map."
+    },
+    {
+      "artifact": "scripts/test-native-storage.mjs",
+      "featureId": "native-door-logic",
+      "kind": "diagnostic",
+      "scope": "Measures the existing native builder and unchanged-build reuse using a preserved door fixture. Player traversal remains the independent accepted C63 evidence."
+    },
+    {
       "artifact": "crates/spark-core/examples/qa_animation_source.rs",
       "featureId": "animations",
       "kind": "workflow",
@@ -572,6 +590,18 @@
       "featureId": "tabs",
       "kind": "workflow",
       "scope": "User-facing workflow; the artifact is separate engineering evidence, not a completion checkbox."
+    },
+    {
+      "artifact": "scripts/test-storage-settings-native.mjs",
+      "featureId": "dependency-guide",
+      "kind": "diagnostic",
+      "scope": "Real desktop Storage & Cache controls and Demo source preflight; proves missing resources stop before extraction/staging, not successful map conversion."
+    },
+    {
+      "artifact": "crates/spark-core/examples/qa_native_asset_storage.rs",
+      "featureId": "native-external-roundtrip",
+      "kind": "diagnostic",
+      "scope": "Actual recursive native asset extraction, namespaced import, dependency-staged compilation and unchanged-build reuse; not new gameplay acceptance."
     }
   ]
 }

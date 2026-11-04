@@ -408,11 +408,13 @@ pub fn atomic_write(path: &Path, bytes: &[u8], backup: bool) -> Result<Option<Pa
 }
 pub fn save_project(path: &Path, project: &Project) -> Result<()> {
     project.validate()?;
+    reject_links(path)?;
     let bytes = serde_json::to_vec_pretty(project)?;
     if bytes.len() > 32 * 1024 * 1024 {
         return invalid("Project JSON exceeds 32 MiB");
     }
     let _: Project = serde_json::from_slice(&bytes)?;
+    if path.is_file()&&fs::metadata(path)?.len()==bytes.len() as u64&&fs::read(path)?==bytes{return Ok(());}
     atomic_write(path, &bytes, true)?;
     Ok(())
 }

@@ -1,4 +1,5 @@
 import { retainAssetSource } from './assetSources';
+import {previewBudgets} from './resourceBudgets';
 import {runtimeTextureSource,defaultPreviewMaterials} from './runtimeTexturePreview';
 import {publishTextureResources,textureResourceScope} from './textureResourceScope';
 import type { NativeAssetImport } from './types';
@@ -85,6 +86,7 @@ import {EditorAudioProvider,EditorSoundControls} from './components/EditorAudio'
 import ExternalMapSync from './components/ExternalMapSync';
 import {hasSourceBoundEdits} from './externalMapSync';
 import SettingsPanel from './components/SettingsPanel';
+const StorageSettings=lazy(()=>import('./components/StorageSettings'));
 const GamesTools = lazy(() => import('./components/GamesTools'));
 import MapTools from './components/MapTools';
 import WorkspaceSession from './components/WorkspaceSession';
@@ -191,7 +193,7 @@ export default function App() {
   const toggleNavigation=()=>setSidebarOpen(open=>!open);
   useEffect(()=>{if(!sidebarOpen)return;const dismiss=(event:globalThis.PointerEvent)=>{if((event.target as HTMLElement).closest('#gs-workspace-navigation,.gs-navigation-toggle'))return;setSidebarOpen(false);};document.addEventListener('pointerdown',dismiss,true);return()=>document.removeEventListener('pointerdown',dismiss,true);},[sidebarOpen,setSidebarOpen]);
   useEffect(()=>{const key=(event:KeyboardEvent)=>{if(event.key==='Escape'&&sidebarOpen&&!document.querySelector('[role="dialog"]')){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(false);document.querySelector<HTMLButtonElement>('.gs-navigation-toggle')?.focus();}else if((event.ctrlKey||event.metaKey)&&event.code==='Backslash'&&!event.altKey&&!event.shiftKey){event.preventDefault();event.stopImmediatePropagation();setSidebarOpen(open=>!open);}};window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);},[sidebarOpen,setSidebarOpen]);
-  const [settingsTab,setSettingsTabState]=useState<WorkflowRoute['settingsTab']>(()=>{const section=new URLSearchParams(location.search).get('section');return section==='dependencies'||section==='interface'?section:'tools';});
+  const [settingsTab,setSettingsTabState]=useState<WorkflowRoute['settingsTab']>(()=>{const section=new URLSearchParams(location.search).get('section');return section==='dependencies'||section==='interface'||section==='storage'?section:'tools';});
   const setWorkspace=useCallback((next:Workspace)=>{if(next==='how-to'||next==='academy'){setLearningSection(next==='academy'?'academy':'guides');next='learning';}if(next===workspaceRef.current)return;window.dispatchEvent(new Event('gs:save-viewport-context'));workspaceRef.current=next;setWorkspaceState(next);},[]);
   const setSettingsTab=useCallback((next:WorkflowRoute['settingsTab'])=>setSettingsTabState(next),[]);
   const workspaceRef=useRef(workspace);
@@ -257,7 +259,7 @@ export default function App() {
   useEffect(()=>{if(!native)return;const stop=listen<string>('spark:director-docked',({payload})=>{if(typeof payload!=='string')return;writeMapSession(payload,'director.docked',true);if(historyRef.current.current?.id===payload)setWorkspace('machinima');});return()=>{void stop.then(stop=>stop());};},[]);
   const [dependencyRuntime,setDependencyRuntime]=useMapState<RuntimeId>(current?.id??'global','hosting.runtime',current?.quickForge?.runtimeId??current?.buildTargets?.find(t=>t.id===current.activeBuildTarget)?.runtimeId??data.settings.preferredHalo??'mccSteam');
   function openDependencySetup(){setSettingsTab('dependencies');setWorkspace('settings');}
-  function selectSettingsTab(tab:'tools'|'interface'|'dependencies'){setSettingsTab(tab);setWorkspace('settings');}
+  function selectSettingsTab(tab:WorkflowRoute['settingsTab']){setSettingsTab(tab);setWorkspace('settings');}
   const [ownedHeaderArt,setOwnedHeaderArt] = useState<{url:string;tagId:number}|null>(null);
   const [ownedHeaderLoading,setOwnedHeaderLoading] = useState(false);
   const [ownedHeaderStatus,setOwnedHeaderStatus] = useState('No local Halo bitmap selected.');
@@ -1084,7 +1086,7 @@ export default function App() {
   function retainedLevels(){
     // Keep the two most recently used maps warm. The editor components, native
     // payloads, draft/history and camera session survive graphics retirement.
-    const warm=new Set([...visitedLevelViews.current].filter(id=>id!=='new').slice(-2));
+    const warm=new Set([...visitedLevelViews.current].filter(id=>id!=='new').slice(-previewBudgets().warmEditors));
     return [...visitedLevelViews.current].map(id=>{
     const map=documents.documents.find(map=>map.id===id),project=map?.history.current??null;
     const active=inLevelEditor&&id===(current?.id??'new');
@@ -1123,7 +1125,7 @@ export default function App() {
       }} /></SettingsPanel>;
     if (workspace === 'settings')
       return (
-        <SettingsPanel tab={settingsTab} onTab={selectSettingsTab}>{settingsTab==='dependencies'?<div className="analysis-page">
+        <SettingsPanel tab={settingsTab} onTab={selectSettingsTab}>{settingsTab==='storage'?<StorageSettings/>:settingsTab==='dependencies'?<div className="analysis-page">
           <label className="field">Dependency target<select aria-label="Dependency target runtime" value={dependencyRuntime} onChange={e=>setDependencyRuntime(e.target.value as RuntimeId)}>
             <option value="mccSteam">Halo 1 · MCC (Steam)</option><option value="haloCustomEdition">Halo Custom Edition</option><option value="haloPc">Halo PC</option><option value="chupathingyCe">ChupathingyCE</option><option value="openCe">OpenCE</option><option value="haloPcTrial">Halo PC Trial</option><option value="macRetail">Halo Mac</option><option value="macDemo">Halo Mac Demo</option><option value="haloMd">HaloMD</option><option value="haloXbox">Halo Xbox</option>
           </select></label>

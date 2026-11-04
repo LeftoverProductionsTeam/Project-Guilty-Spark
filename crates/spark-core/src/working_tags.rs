@@ -522,8 +522,12 @@ fn run_with(
     }
     let prepared = prepare(project, input, jobs_root, job_id)?;
     let directory = checked_directory(jobs_root)?.join(job_id);
+    let staging=crate::native_staging::inventory(&prepared.tags,&cancel)?;
+    let estimate=crate::storage::estimate_copy(staging.files.len(),staging.bytes).saturating_add(1024*1024*1024);
+    let storage_lease=crate::storage::Store::for_output(&directory)?.reserve(&directory,Some(&prepared.tags),estimate,crate::storage::Category::Staging,"Reviewed native working-tag rebuild; isolated full-source fallback")?;
     crate::reject_links(&directory)?;
     fs::create_dir(&directory)?; // exclusive: existing jobs are never reused
+    storage_lease.mark_owned()?;
     let workspace = directory.join("workspace");
     fs::create_dir(&workspace)?;
     for folder in ["data", "maps"] {
@@ -602,16 +606,7 @@ fn run_with(
                 .join(safe_relative(relative)?);
             let target = workspace.join("data").join(safe_relative(relative)?);
             fs::create_dir_all(target.parent().unwrap())?;
-            let mut input_file = fs::File::open(&source)?;
-            let mut output_file = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&target)?;
-            std::io::copy(&mut input_file, &mut output_file)?;
-            drop(output_file);
-            if maps::hash_file(&source)? != *expected || maps::hash_file(&target)? != *expected {
-                return invalid("Native script changed during staging");
-            }
+            crate::native_staging::copy_file(&source,&target,fs::metadata(&source)?.len(),Some(expected),&cancel)?;
         }
         if script_hashes(prepared.source_data.as_deref(), &cancel)? != input_scripts {
             return invalid("Native script sources changed during staging");
@@ -758,6 +753,7 @@ fn run_with(
             "error"
         },
     );
+    if record.status=="validated"{storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;}else{drop(storage_lease);}
     Ok(record)
 }
 

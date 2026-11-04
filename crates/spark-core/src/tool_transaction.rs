@@ -60,6 +60,7 @@ pub fn inventory(root: &Path) -> Result<Inventory> {
                 .map_err(|_| SparkError::Invalid("Source escaped its root".into()))?
                 .to_string_lossy()
                 .replace('\\', "/");
+            crate::native_staging::admitted_relative(&relative)?;
             safe_relative(&relative)?;
             let hash = maps::hash_file(&path)?;
             let after = fs::metadata(&path)?;
@@ -202,7 +203,7 @@ fn copy_inventory(
         if cancel.load(Ordering::Relaxed) {
             return invalid("Source staging cancelled; all previous revisions remain available");
         }
-        let relative = safe_relative(relative)?;
+        let relative = crate::native_staging::admitted_relative(relative)?;
         let input = source.join(&relative);
         reject_links(&input)?;
         if maps::hash_file(&input)? != *expected {
@@ -211,22 +212,17 @@ fn copy_inventory(
             );
         }
         let output = destination.join(relative);
-        fs::create_dir_all(output.parent().unwrap())?;
-        let mut target = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&output)?;
-        // Stream into a fresh ordinary writable file; preserve bytes without
-        // inheriting the source SDK's read-only attribute or sharing its inode.
-        std::io::copy(&mut fs::File::open(&input)?, &mut target)?;
-        drop(target);
-        if maps::hash_file(&output)? != *expected {
-            return invalid(
-                "Copied source verification failed; previous source and build remain safe",
-            );
-        }
+        crate::native_staging::copy_file(&input,&output,fs::metadata(&input)?.len(),Some(expected),cancel)?;
     }
     Ok(())
+}
+fn reserve_revision(output:&Path,parts:&[(&Path,&Inventory)])->Result<crate::storage::Lease>{
+    let mut bytes=0u64;let mut files=0usize;
+    for (root,inventory) in parts {
+        crate::native_staging::destination(root,output)?;
+        for name in inventory.keys(){let file=root.join(crate::native_staging::admitted_relative(name)?);reject_links(&file)?;bytes=bytes.checked_add(fs::metadata(file)?.len()).ok_or_else(||SparkError::Invalid("Native revision size overflow".into()))?;files+=1;}
+    }
+    crate::storage::Store::for_output(output)?.reserve(output,parts.first().map(|p|p.0),crate::storage::estimate_copy(files,bytes),crate::storage::Category::Staging,"Preserved native baseline or reviewed external revision; full isolation fallback")
 }
 
 /// An immutable baseline is kept separately from the editor's writable fork.
@@ -236,11 +232,14 @@ pub fn fork(source: &Path, output: &Path, cancel: Arc<AtomicBool>) -> Result<Inv
     if cancel.load(Ordering::Relaxed) {
         return invalid("Source staging cancelled before creating a revision");
     }
+    let lease=reserve_revision(&output,&[(source,&hashes)])?;
     fs::create_dir(&output)?;
+    lease.mark_owned()?;
     copy_inventory(source, &output, &hashes, &cancel)?;
     if inventory(source)? != hashes || inventory(&output)? != hashes {
         return invalid("Source changed while staging; the partial fork is retained for diagnosis and cannot be accepted");
     }
+    use sha2::Digest;let revision=crate::hex_bytes(sha2::Sha256::digest(serde_json::to_vec(&hashes)?));lease.finish(true,Some(revision))?;
     Ok(hashes)
 }
 
@@ -283,7 +282,9 @@ pub fn reconcile(
             external_files.insert(change.path.clone(), hash.clone());
         }
     }
+    let lease=reserve_revision(&output,&[(working_root,&working_files),(external_root,&external_files)])?;
     fs::create_dir(&output)?;
+    lease.mark_owned()?;
     copy_inventory(working_root, &output, &working_files, &cancel)?;
     copy_inventory(external_root, &output, &external_files, &cancel)?;
     if inventory(working_root)? != *expected_working
@@ -298,6 +299,7 @@ pub fn reconcile(
             "Reconciled native source verification failed; the old revision remains available",
         );
     }
+    use sha2::Digest;let revision=crate::hex_bytes(sha2::Sha256::digest(serde_json::to_vec(&expected)?));lease.finish(true,Some(revision))?;
     Ok(review)
 }
 

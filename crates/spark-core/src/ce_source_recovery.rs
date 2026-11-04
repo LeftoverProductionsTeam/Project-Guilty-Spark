@@ -185,7 +185,28 @@ pub fn create(
     if cancel.load(Ordering::Relaxed) {
         return invalid("Source recovery cancelled before creating a copy");
     }
+    let inputs = crate::native_staging::inventory(&plan.source_tags, &cancel)?;
+    let original_bytes = plan
+        .corrections
+        .iter()
+        .try_fold(0u64, |bytes, correction| {
+            Ok::<_, crate::SparkError>(
+                bytes.saturating_add(fs::metadata(plan.source_tags.join(correction.tag))?.len()),
+            )
+        })?;
+    let manager = crate::storage::Store::for_output(&absolute)?;
+    let lease = manager.reserve(
+        &absolute,
+        Some(&plan.source_tags),
+        crate::storage::estimate_copy(
+            inputs.files.len() + plan.corrections.len() + 1,
+            inputs.bytes.saturating_add(original_bytes),
+        ),
+        crate::storage::Category::Staging,
+        "Reviewed CE source recovery and preserved originals",
+    )?;
     fs::create_dir(&absolute)?;
+    lease.mark_owned()?;
     let tags = absolute.join("tags");
     transaction::fork(&plan.source_tags, &tags, cancel.clone())?;
     let originals = absolute.join("originals");
@@ -193,12 +214,13 @@ pub fn create(
         let from = tags.join(c.tag);
         let to = originals.join(c.tag);
         fs::create_dir_all(to.parent().unwrap())?;
-        let mut output = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&to)?;
-        std::io::copy(&mut fs::File::open(from)?, &mut output)?;
-        output.sync_all()?;
+        crate::native_staging::copy_file(
+            &from,
+            &to,
+            fs::metadata(&from)?.len(),
+            Some(c.before_sha256),
+            &cancel,
+        )?;
         if maps::hash_file(&to)? != c.before_sha256 {
             return invalid("Original tag preservation failed; recovery was not started");
         }
@@ -254,6 +276,10 @@ pub fn create(
         .open(absolute.join("ce-source-recovery.json"))?;
     serde_json::to_writer_pretty(&mut file, &receipt)?;
     file.sync_all()?;
+    lease.finish(
+        true,
+        Some(maps::hash_file(&absolute.join("ce-source-recovery.json"))?),
+    )?;
     Ok(receipt)
 }
 

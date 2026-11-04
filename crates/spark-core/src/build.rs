@@ -195,11 +195,28 @@ pub fn compatibility(
         let found = selected_folder.map_or(resource.found, |folder| {
             folder.join(&resource.name).is_file()
         });
-        if resource.required && !found && !(native&&inspection.header.version==609) {
+        if resource.required && !found && !(native&&inspection.header.version==609&&resource.name=="bitmaps.map") && !(native&&inspection.header.version==13) {
             blockers.push(format!(
                 "Missing {} from the original source runtime; choose its resource folder",
                 resource.name
             ));
+        }
+    }
+    if inspection.diagnostics.iter().any(|d|d.code=="RESOURCE_LAYOUT_UNVERIFIED") {
+        blockers.push("Native bitmap or sound dependency metadata is incomplete. Review the source's resource diagnostics before extraction; a different hosting runtime cannot repair these bytes.".into());
+    }
+    if [6,7,609].contains(&inspection.header.version) {
+        if let Some(source)=&project.source {
+            if let Some(folder)=resource_folder(source,tools) {
+                // The reviewed CE indexed-bitmap fallback uses native tags
+                // rather than claiming a missing bitmaps.map is compatible.
+                let needs_classic=inspection.resources.iter().any(|r|r.required&&!(native&&inspection.header.version==609&&r.name=="bitmaps.map"&&!folder.join("bitmaps.map").is_file()));
+                if needs_classic {
+                    let mut required=inspection.clone();
+                    if native&&inspection.header.version==609&&!folder.join("bitmaps.map").is_file(){required.resources.retain(|r|r.name!="bitmaps.map");}
+                    if let Err(problem)=crate::native_resources::review(source,&required,folder){blockers.push(problem.to_string());}
+                }
+            }
         }
     }
     if inspection.header.compressed
@@ -311,6 +328,11 @@ impl Runner<'_> {
         if self.cancel.load(Ordering::Relaxed) {
             return invalid("Build cancelled");
         }
+        // The parent reserves a concrete budget before staging. Watch that
+        // owned output, never a stock SDK/installation. Safety exhaustion is
+        // an emergency rejection, distinct from ordinary deferred cancellation.
+        let budget=crate::storage::Store::existing_for_output(&cwd.join("tool-budget"))?.map(|store|store.tool_budget(cwd)).transpose()?.flatten();
+        if let Some(budget)=&budget{budget.check()?;}
         self.emit(
             phase,
             format!(
@@ -419,7 +441,12 @@ impl Runner<'_> {
         let mut output = String::new();
         let mut errors = vec![];
         let mut compile_errors = vec![];
+        let mut last_budget_check=Instant::now();
         let result = loop {
+            if last_budget_check.elapsed()>=Duration::from_secs(2){
+                if let Some(budget)=&budget{if let Err(problem)=budget.check(){let _=child.kill();let _=child.wait();break Err(problem);}}
+                last_budget_check=Instant::now();
+            }
             let mut interactive_shader=false;
             for (err, line) in rx.try_iter() {
                 if protected_write_phase&&line.to_ascii_lowercase().contains("choose a type for the shader") {interactive_shader=true;}
@@ -500,6 +527,7 @@ impl Runner<'_> {
             if phase!="bsp-detail"||err {self.emit(phase, line, progress, if err { "tool" } else { "info" });}
         }
         result?;
+        if let Some(budget)=&budget{budget.check()?;}
         if incomplete_output.load(Ordering::Relaxed) {
             return invalid("External tool output was truncated or unreadable. Validation cannot establish success from incomplete diagnostics; build stopped.");
         }
@@ -621,8 +649,12 @@ pub fn run_build(
     }
     safe_relative(&inspection.scenario_path)?;
     let dir = jobs_root.join(job_id);
+    let sdk_bytes=if let Some(tags)=tools.base_tags_directory.as_ref().filter(|p|p.is_dir()){let plan=crate::native_staging::inventory(tags,&cancel)?;crate::storage::estimate_copy(plan.files.len(),plan.bytes)}else{0};
+    let estimate=sdk_bytes.saturating_add(inspection.header.declared_size as u64*3).saturating_add(1024*1024*1024);
+    let storage_lease=crate::storage::Store::for_output(&dir)?.reserve(&dir,Some(&source.preserved_path),estimate,crate::storage::Category::Staging,"Imported-cache conversion: isolated input, native tags and compiler output")?;
     crate::reject_links(&dir)?;
     fs::create_dir_all(&dir)?;
+    storage_lease.mark_owned()?;
     let input_dir = dir.join("input");
     let tag_dir = dir.join("tags");
     let output_dir = dir.join("output");
@@ -877,6 +909,7 @@ pub fn run_build(
             "error"
         },
     );
+    if record.status=="validated"{storage_lease.finish(true,Some(record.project_fingerprint.clone()))?;}else{drop(storage_lease);}
     Ok(record)
 }
 

@@ -2,11 +2,30 @@
 //! Uses separately installed Invader; no cache edits, stock-tag overwrites or implicit imports.
 use crate::{build::{self,JobEvent,Runner,Toolchain},invalid,maps::{self,MapInspection},project::{self,Project},reject_links,safe_relative,Result,SparkError};
 use serde::{Deserialize,Serialize};
-use std::{fs,io::Read,path::{Path,PathBuf},sync::{Arc,atomic::AtomicBool}};
+use std::{fs,path::{Path,PathBuf},sync::{Arc,atomic::AtomicBool}};
 
 const MAX_FILES: usize = 4096;
 const MAX_TAG_BYTES: u64 = 64*1024*1024;
 const MAX_TOTAL: u64 = 512*1024*1024;
+#[derive(Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+struct ExtractInputs{schema_version:u32,tools:std::collections::BTreeMap<String,String>,resources:std::collections::BTreeMap<String,String>,resource_directory:PathBuf}
+fn reusable_extraction(root:&Path,source:&project::Source,project_id:&str,query:&str,inputs:&ExtractInputs)->Result<Option<TagExtractReceipt>>{
+    let out=root.join("tag-exchanges");if !out.is_dir(){return Ok(None);}let mut checked=0;
+    for entry in fs::read_dir(out)?{
+        let p=entry?.path();let Some(id)=p.file_name().and_then(|p|p.to_str())else{continue};if uuid::Uuid::parse_str(id).is_err(){continue;}
+        checked+=1;if checked>512{return invalid("More than 512 extraction jobs; review storage before creating another");}
+        let attempt=(||->Result<TagExtractReceipt>{
+            let receipt=load_receipt(root,id)?;
+            if receipt.source_project_id!=project_id||receipt.source_sha256!=source.sha256||receipt.source_version!=source.cache_version||receipt.requested_tag!=query{return invalid("Different extraction revision");}
+            let contract=p.join("extraction-inputs.json");reject_links(&contract)?;if fs::metadata(&contract)?.len()>65536{return invalid("Extraction contract too large");}
+            let old:ExtractInputs=serde_json::from_slice(&fs::read(contract)?)?;
+            if old.schema_version!=1||old.tools!=inputs.tools||old.resources!=inputs.resources||fs::canonicalize(old.resource_directory)?!=fs::canonicalize(&inputs.resource_directory)?{return invalid("Extraction dependencies changed");}
+            let (files,total)=inventory(&receipt.tag_root)?;if files!=receipt.files||total!=receipt.total_bytes{return invalid("Extracted tags changed");}Ok(receipt)
+        })();
+        if let Ok(mut receipt)=attempt{receipt.notice.push_str(" Reused exact source/tool/resource identities after fresh extracted-file hash checks; no duplicate extraction was created.");return Ok(Some(receipt));}
+    }Ok(None)
+}
 #[derive(Clone,Debug,PartialEq,Eq,Serialize,Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct ExtractedFile { pub path: String, pub bytes: u64, pub sha256: String }
@@ -155,13 +174,18 @@ pub fn extract_selected_tag(
             return invalid(format!("Extraction requires the source runtime resource {}",resource.name));
         }
     }
+    if [6,7,609].contains(&source.cache_version){crate::native_resources::review(source,inspection,resources)?;}
+    let inputs=ExtractInputs{schema_version:1,tools:std::collections::BTreeMap::from([("invader-extract".into(),maps::hash_file(&executable)?),("invader-info".into(),maps::hash_file(&info)?)]),resources:project::resource_hashes(resources)?,resource_directory:resources.to_owned()};
+    if let Some(receipt)=reusable_extraction(managed_root,source,&project.id,&query,&inputs)?{return Ok(receipt);}
     let out_root=managed_root.join("tag-exchanges");
     reject_links(&out_root)?;fs::create_dir_all(&out_root)?;
     let staging=out_root.join(format!(".pending-{job_id}"));
     let final_dir=out_root.join(job_id);
     reject_links(&staging)?;reject_links(&final_dir)?;
     if staging.exists() || final_dir.exists(){return invalid("Extraction job folder already exists");}
-    fs::create_dir(&staging)?;
+    let size=MAX_TOTAL.saturating_add(fs::metadata(&source.preserved_path)?.len()).saturating_add(16*1024*1024);
+    let mut lease=crate::storage::Store::for_output(&staging)?.reserve(&staging,Some(&source.preserved_path),size,crate::storage::Category::Staging,"Recursive native tag extraction; exact source/resource/tool binding")?;
+    fs::create_dir(&staging)?;lease.mark_owned()?;
     let result=(||->Result<TagExtractReceipt>{
         let tags=staging.join("tags");fs::create_dir(&tags)?;
         let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
@@ -203,10 +227,11 @@ pub fn extract_selected_tag(
             notice:"Actual tags extracted into a new isolated folder by installed Invader. Dependencies require inspection before copy/import into a separate tags tree. No map rebuild, Halo run, tag merge, or rights verification has occurred.".into(),
         };
         project::atomic_write(&staging.join("extraction-receipt.json"),&serde_json::to_vec_pretty(&receipt)?,false)?;
-        fs::rename(&staging,&final_dir)?;
+        project::atomic_write(&staging.join("extraction-inputs.json"),&serde_json::to_vec_pretty(&inputs)?,false)?;
+        lease.adopt(&final_dir)?;
         Ok(receipt)
     })();
-    if result.is_err(){let _=fs::remove_dir_all(&staging);}
+    if result.is_ok(){lease.finish(true,Some(source.sha256.clone()))?;}else{drop(lease);}
     result
 }
 /// A source-tag receipt is not an import approval. It identifies owner-selected
@@ -313,7 +338,9 @@ pub fn stage_into_project(target:&Project,managed_root:&Path,source_job:&str,job
     reject_links(&staging)?;
     reject_links(&finished)?;
     if staging.exists() || finished.exists(){return invalid("Destination staging job folder already exists");}
-    fs::create_dir(&staging)?;
+    crate::native_staging::destination(&extracted_dir,&staging)?;
+    let mut lease=crate::storage::Store::for_output(&staging)?.reserve(&staging,Some(&extracted_dir),crate::storage::estimate_copy(observed.len(),total).saturating_add(1024*1024),crate::storage::Category::Staging,"Verified cross-project native source import")?;
+    fs::create_dir(&staging)?;lease.mark_owned()?;
     let result=(||->Result<TagImportReceipt>{
         let tags=staging.join("tags");fs::create_dir(&tags)?;
         for file in &observed {
@@ -325,13 +352,7 @@ pub fn stage_into_project(target:&Project,managed_root:&Path,source_job:&str,job
             reject_links(&destination)?;
             // Create-new prevents any accidental overwrite if a local workspace
             // was tampered with while the staging request was running.
-            let reader=fs::File::open(&source)?;
-            let mut writer=fs::OpenOptions::new().write(true).create_new(true).open(&destination)?;
-            let copied=std::io::copy(&mut reader.take(file.bytes+1),&mut writer)?;
-            if copied!=file.bytes {
-                return invalid("Source tag size changed while staging; bounded copy refused");
-            }
-            writer.sync_all()?;
+            crate::native_staging::copy_file(&source,&destination,file.bytes,Some(&file.sha256),&AtomicBool::new(false))?;
             if maps::hash_file(&destination)?!=file.sha256 {
                 return invalid("Staged tag checksum mismatch; no import was committed");
             }
@@ -351,10 +372,10 @@ pub fn stage_into_project(target:&Project,managed_root:&Path,source_job:&str,job
             notice:"Files copied into a new Guilty Spark staging folder with verified SHA-256 hashes. They have not been merged into a scenario, compiled into a map, or installed in Halo; inspect dependencies and rights before any manual use.".into(),
         };
         project::atomic_write(&staging.join("import-receipt.json"),&serde_json::to_vec_pretty(&receipt)?,false)?;
-        fs::rename(&staging,&finished)?;
+        lease.adopt(&finished)?;
         Ok(receipt)
     })();
-    if result.is_err(){let _=fs::remove_dir_all(&staging);}
+    if result.is_ok(){lease.finish(true,Some(target_source.sha256.clone()))?;}else{drop(lease);}
     result
 }
 #[cfg(test)]

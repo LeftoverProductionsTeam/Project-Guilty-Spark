@@ -89,6 +89,7 @@ pub(super) async fn prepare_default_halo_materials(
         let path=asset_sources_native::default_material_map(&state,document.runtime_id)?;
         let (source,inspection)=lock(&state.library)?.import_map(&path,path.parent()).map_err(error)?;
         lock(&state.inspections)?.insert(source.id.clone(),Arc::new(inspection.clone()));
+        let source=native_resources_native::for_project(&state,&source,&inspection)?;
         let tools=editing_tools(&state,&source)?;
         let choices=[("surface","levels/test/bloodgulch/shaders/cap_metal",[0.35,0.4,0.42]),("grass","levels/test/bloodgulch/shaders/blood ground",[0.3,0.42,0.23])];
         let job=uuid::Uuid::new_v4().to_string();let cancel=Arc::new(AtomicBool::new(false));

@@ -1,5 +1,6 @@
 // Deliberately unsafe native tags remain in a separate QA copy; never launch it.
 import fs from 'node:fs/promises';
+import {safeQaCopy} from './qa-safe-copy.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -29,7 +30,7 @@ const run = (exe, args) =>
     maxBuffer: 4 * 1024 * 1024,
     timeout: 90000,
   });
-await fs.cp(accepted.build.sources.directory, workspace, {
+await safeQaCopy(accepted.build.sources.directory, workspace, {
   recursive: true,
   errorOnExist: true,
   force: false,

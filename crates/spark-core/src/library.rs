@@ -101,6 +101,24 @@ impl Library {
         self.db.execute("INSERT INTO settings(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![key,serde_json::to_string(value)?])?;
         Ok(())
     }
+    /// Cleanup must also preserve paths selected as SDKs, tools, resources or
+    /// runtime content. Stream existing settings, including future keys.
+    pub fn settings_reference_path(&self, path: &Path) -> Result<bool> {
+        let mut statement = self.db.prepare("SELECT length(CAST(value AS BLOB)), value FROM settings")?;
+        let mut rows = statement.query([])?;
+        let mut bytes = 0u64;
+        let mut count = 0usize;
+        while let Some(row) = rows.next()? {
+            bytes = bytes.saturating_add(row.get::<_, i64>(0)?.max(0) as u64);
+            count += 1;
+            if bytes > 16 * 1024 * 1024 || count > 4096 {
+                return invalid("Saved settings exceed cleanup's reference-review budget; no files were removed");
+            }
+            let value: serde_json::Value = serde_json::from_str(&row.get::<_, String>(1)?)?;
+            if crate::storage::document_references_path(&value, path) { return Ok(true); }
+        }
+        Ok(false)
+    }
     pub fn save(
         &self,
         project: &Project,

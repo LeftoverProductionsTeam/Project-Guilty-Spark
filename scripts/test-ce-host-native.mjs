@@ -3,6 +3,7 @@
 // --client-seconds opts into actual GUI client launches and owned-child cleanup.
 import { chromium, expect as assertion } from '@playwright/test';
 import fs from 'node:fs/promises';
+import {safeQaCopy} from './qa-safe-copy.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
@@ -85,7 +86,7 @@ if (projectChallenge) {
   expect(recoveredBefore).toEqual(recovery.recoveredInventory);
 }
 const runtime = path.join(output, 'runtime');
-await fs.cp(original, runtime, { recursive: true, force: false, errorOnExist: true });
+await safeQaCopy(original, runtime, { recursive: true, force: false, errorOnExist: true });
 if (args.has('--map'))
   await fs.copyFile(
     args.get('--map'),

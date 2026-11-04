@@ -1,4 +1,5 @@
 import { useReflectionTextures } from '../useReflectionTextures';
+import {texturePreviewBudget} from '../resourceBudgets';
 import {copySceneObject,readSceneObject,cloneSceneObject} from '../sceneClipboard';
 import { textureResourceScope } from '../textureResourceScope';
 import {fillRuntimeTexturePreviews} from '../runtimeTexturePreview';
@@ -127,7 +128,7 @@ function planWorldMaterialPreviews(inspection:MapInspection,_mesh:MeshData|null|
 }
 const EMPTY_SHADER_TEXTURES: Record<number, THREE.Texture> = {};
 const EMPTY_LIGHTMAP_TEXTURES: Record<string, THREE.Texture> = {};
-const MAX_WORLD_TEXTURE_BYTES=256*1024*1024;
+// User-configurable estimate for this viewport's owned texture payloads.
 function previewTextureBytes(texture:THREE.Texture){const image=texture.image as {width?:number;height?:number}|undefined;
   const raw=texture.userData.rgbaBytes??((image?.width??0)*(image?.height??0)*4);return Math.ceil(raw*(texture.generateMipmaps?4/3:1));}
 
@@ -619,8 +620,8 @@ export default function World({
   texturesRef.current = shaderTextures;
   function withinTextureBudget(texture:THREE.Texture,replaced?:THREE.Texture,queued:THREE.Texture[]=[]){
     const all=[...new Set([...residentTextures.current,...Object.values(texturesRef.current),...Object.values(lightmapsRef.current),...Object.values(extrasRef.current),...queued])].filter(t=>t!==replaced&&t!==texture);
-    if(all.reduce((sum,t)=>sum+previewTextureBytes(t),0)+previewTextureBytes(texture)>MAX_WORLD_TEXTURE_BYTES){
-      texture.dispose();throw new Error('The 256 MiB resident texture budget is full. Remove an image or use smaller previews.');
+    if(all.reduce((sum,t)=>sum+previewTextureBytes(t),0)+previewTextureBytes(texture)>texturePreviewBudget()){
+      texture.dispose();throw new Error(`The ${texturePreviewBudget()/1024**2} MiB resident texture budget is full. Review Storage & Cache limits before loading more images.`);
     }
     residentTextures.current.add(texture);texture.addEventListener('dispose',()=>residentTextures.current.delete(texture));
   }

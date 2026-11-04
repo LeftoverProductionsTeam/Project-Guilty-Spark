@@ -3,7 +3,7 @@ export type LearningSection = 'guides' | 'glossary' | 'academy';
 export interface WorkflowRoute {
   workspace: Workspace;
   projectId: string | null;
-  settingsTab: 'tools' | 'dependencies' | 'interface';
+  settingsTab: 'tools' | 'dependencies' | 'interface' | 'storage';
   learningSection?: LearningSection;
 }
 export interface WorkflowHistory {
@@ -13,7 +13,9 @@ export interface WorkflowHistory {
 }
 const LIMIT = 200;
 const same = (a: WorkflowRoute, b: WorkflowRoute) =>
-  a.workspace === b.workspace && a.projectId === b.projectId && a.settingsTab === b.settingsTab &&
+  a.workspace === b.workspace &&
+  a.projectId === b.projectId &&
+  a.settingsTab === b.settingsTab &&
   (a.workspace !== 'learning' || (a.learningSection ?? 'guides') === (b.learningSection ?? 'guides'));
 function lastAvailable(stack: WorkflowRoute[], available: (route: WorkflowRoute) => boolean) {
   for (let i = stack.length - 1; i >= 0; i--) if (available(stack[i])) return i;

@@ -12,8 +12,8 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    io::Write,
     path::{Path, PathBuf},
+    sync::atomic::AtomicBool,
 };
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -165,23 +165,13 @@ fn copy_new(source: &Path, target: &Path, files: &[ExtractedFile]) -> Result<()>
             return invalid("An extracted native tag changed; import refused");
         }
         fs::create_dir_all(to.parent().unwrap())?;
-        let mut reader = fs::File::open(&from)?;
-        let mut writer = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&to)?;
-        let copied = std::io::copy(
-            &mut std::io::Read::take(&mut reader, file.bytes + 1),
-            &mut writer,
+        crate::native_staging::copy_file(
+            &from,
+            &to,
+            file.bytes,
+            Some(&file.sha256),
+            &AtomicBool::new(false),
         )?;
-        writer.flush()?;
-        writer.sync_all()?;
-        if copied != file.bytes
-            || maps::hash_file(&to)? != file.sha256
-            || maps::hash_file(&from)? != file.sha256
-        {
-            return invalid("Native asset copy failed its exact byte readback");
-        }
     }
     Ok(())
 }
@@ -232,7 +222,18 @@ pub fn prepare(
     if directory.exists() {
         return invalid("Native import folder already exists");
     }
+    crate::native_staging::destination(&checked.tag_root, &directory)?;
+    let lease = crate::storage::Store::for_output(&directory)?.reserve(
+        &directory,
+        Some(&checked.tag_root),
+        crate::storage::estimate_copy(checked.files.len(), checked.total_bytes)
+            .saturating_mul(2)
+            .saturating_add(16 * 1024 * 1024),
+        crate::storage::Category::Staging,
+        "Namespaced native asset source and reference readback",
+    )?;
     fs::create_dir_all(&directory)?;
+    lease.mark_owned()?;
     let tags = directory.join("tags");
     fs::create_dir(&tags)?;
     copy_new(&checked.tag_root, &tags, &checked.files)?;
@@ -402,6 +403,7 @@ pub fn prepare(
         file_count: receipt.files.len(),
     };
     validate(std::slice::from_ref(&binding))?;
+    lease.finish(true, Some(binding.receipt_sha256.clone()))?;
     Ok(binding)
 }
 fn receipt(root: &Path, project: &Project, binding: &Binding) -> Result<(PathBuf, Receipt)> {
@@ -434,11 +436,21 @@ fn receipt(root: &Path, project: &Project, binding: &Binding) -> Result<(PathBuf
     Ok((tags, receipt))
 }
 pub fn available_files(root: &Path, project: &Project) -> Result<BTreeSet<String>> {
-    let mut files = BTreeSet::new();
+    Ok(source_hashes(root, project)?.into_keys().collect())
+}
+/// Revalidate project-owned import receipts and every immutable native input.
+/// The returned hashes authorize reuse, never a timestamp or source filename.
+pub fn source_hashes(root: &Path, project: &Project) -> Result<BTreeMap<String, String>> {
+    let mut files = BTreeMap::new();
     for binding in &project.native_asset_imports {
         let (_, receipt) = receipt(root, project, binding)?;
+        let prefix = format!("gs_assets_{}/", binding.id.replace('-', ""));
         for file in receipt.files {
-            files.insert(file.path);
+            if !file.path.starts_with(&prefix) || files.insert(file.path, file.sha256).is_some() {
+                return invalid(
+                    "Native import source escaped its identity or repeats an owned path",
+                );
+            }
         }
     }
     Ok(files)
@@ -451,6 +463,23 @@ pub fn stage(
     let mut hashes = BTreeMap::new();
     for binding in &project.native_asset_imports {
         let (tags, receipt) = receipt(root, project, binding)?;
+        let prefix = format!("gs_assets_{}", binding.id.replace('-', ""));
+        if receipt
+            .files
+            .iter()
+            .any(|file| !file.path.starts_with(&format!("{prefix}/")))
+        {
+            return invalid("Native import files escaped their owned namespace");
+        }
+        let path = destination.join(&prefix);
+        let bytes = receipt.files.iter().map(|file| file.bytes).sum();
+        let lease = crate::storage::Store::for_output(&path)?.reserve(
+            &path,
+            Some(&tags),
+            crate::storage::estimate_copy(receipt.files.len(), bytes),
+            crate::storage::Category::Staging,
+            "Native asset compiler inputs",
+        )?;
         copy_new(&tags, destination, &receipt.files)?;
         for file in &receipt.files {
             hashes.insert(file.path.clone(), file.sha256.clone());
@@ -458,6 +487,7 @@ pub fn stage(
         if tag_exchange::inventory(&tags)?.0 != receipt.files {
             return invalid("Native asset import changed during build staging");
         }
+        lease.finish(false, Some(binding.receipt_sha256.clone()))?;
     }
     Ok(hashes)
 }
@@ -664,6 +694,70 @@ pub(crate) fn append_scenario(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn reusable_import_inputs_require_exact_receipt_bytes_owned_paths_and_fresh_file_hashes() {
+        // Identity fixture only. Real Invader extraction/compilation is covered
+        // by qa_native_asset_storage, never inferred from these payload bytes.
+        let root = tempfile::tempdir().unwrap();
+        let mut project = Project::new("Import identity");
+        let id = uuid::Uuid::new_v4().to_string();
+        let path = native_path(&id, "scenery/rock", "scen");
+        let directory = folder(root.path(), &project.id, &id).unwrap();
+        let tags = directory.join("tags");
+        let file = tags.join(format!("{path}.scenery"));
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, b"source identity").unwrap();
+        let mut receipt = Receipt {
+            schema_version: 1,
+            target_project_id: project.id.clone(),
+            source_project_id: uuid::Uuid::new_v4().to_string(),
+            source_sha256: "a".repeat(64),
+            source_tag_id: 42,
+            source_tag_path: "scenery/rock".into(),
+            source_tag_class: "scen".into(),
+            native_path: path.clone(),
+            extraction_job_id: uuid::Uuid::new_v4().to_string(),
+            files: tag_exchange::inventory(&tags).unwrap().0,
+            tools: BTreeMap::new(),
+        };
+        let receipt_file = directory.join("import.json");
+        let bytes = serde_json::to_vec(&receipt).unwrap();
+        fs::write(&receipt_file, &bytes).unwrap();
+        project.native_asset_imports.push(Binding {
+            id,
+            source_project_id: receipt.source_project_id.clone(),
+            source_sha256: receipt.source_sha256.clone(),
+            tag_id: 42,
+            tag_class: "scen".into(),
+            tag_path: "scenery/rock".into(),
+            native_path: path,
+            receipt_sha256: crate::hex_bytes(Sha256::digest(&bytes)),
+            file_count: 1,
+        });
+        let expected = BTreeMap::from([(
+            receipt.files[0].path.clone(),
+            receipt.files[0].sha256.clone(),
+        )]);
+        assert_eq!(source_hashes(root.path(), &project).unwrap(), expected);
+        fs::write(&file, b"changed payload").unwrap();
+        assert!(source_hashes(root.path(), &project).is_err());
+        fs::write(&file, b"source identity").unwrap();
+        fs::write(&receipt_file, b"changed receipt").unwrap();
+        assert!(source_hashes(root.path(), &project).is_err());
+        fs::write(&receipt_file, &bytes).unwrap();
+        assert_eq!(source_hashes(root.path(), &project).unwrap(), expected);
+        project
+            .native_asset_imports
+            .push(project.native_asset_imports[0].clone());
+        assert!(source_hashes(root.path(), &project).is_err());
+        project.native_asset_imports.pop();
+        fs::rename(&file, tags.join("outside.scenery")).unwrap();
+        receipt.files = tag_exchange::inventory(&tags).unwrap().0;
+        let bytes = serde_json::to_vec(&receipt).unwrap();
+        fs::write(&receipt_file, &bytes).unwrap();
+        project.native_asset_imports[0].receipt_sha256 = crate::hex_bytes(Sha256::digest(bytes));
+        assert!(source_hashes(root.path(), &project).is_err());
+    }
     #[test]
     fn namespaces_identity_and_receipt_content_are_required_and_fingerprinted() {
         let mut project = Project::new("Native import");

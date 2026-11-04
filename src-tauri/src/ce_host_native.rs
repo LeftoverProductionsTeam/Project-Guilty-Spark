@@ -376,7 +376,13 @@ fn snapshot(
     }
     core::reject_links(directory).map_err(error)?;
     fs::create_dir_all(directory.parent().ok_or("Missing host parent")?).map_err(error)?;
+    let storage = core::storage::Store::for_output(directory).map_err(error)?;
+    let lease = storage.reserve(
+        directory, Some(root), core::storage::estimate_copy(files.len() + 4, bytes),
+        core::storage::Category::Staging, "Private CE host/client content snapshot",
+    ).map_err(error)?;
     fs::create_dir(directory).map_err(error)?;
+    lease.mark_owned().map_err(error)?;
     lock(&job.view)?.session_directory = Some(directory.into());
     let game = directory.join("game");
     fs::create_dir(&game).map_err(error)?;
@@ -433,6 +439,9 @@ fn snapshot(
     .map_err(error)?;
     fs::create_dir(directory.join("profile")).map_err(error)?;
     job.client.bind(&game, directory, hashes)?;
+    // The running game owns writable profiles/logs in this snapshot. Never
+    // advertise it as disposable merely because the copying phase completed.
+    lease.finish(true, Some(request.map_sha256.clone())).map_err(error)?;
     Ok(game)
 }
 fn query(port: u16) -> Reply<ce::Status> {

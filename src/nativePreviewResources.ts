@@ -1,10 +1,11 @@
 import {call} from './api';
 import {textureResourceScopeForProject} from './textureResourceScope';
+import {decodedPreviewBudget} from './resourceBudgets';
 
 type Command = 'preview_owned_object_model' | 'preview_owned_cache_bitmap_batch' | 'preview_owned_reflection_cube';
 type Entry = {promise:Promise<unknown>;bytes:number;until:number};
 const entries=new Map<string,Entry>();
-const MAX_BYTES=64*1024*1024,MAX_ENTRIES=128,MAX_PENDING=32;
+const MAX_ENTRIES=128,MAX_PENDING=32;
 let bytes=0,hits=0,misses=0;
 function remove(key:string,entry:Entry){if(entries.get(key)!==entry)return;entries.delete(key);bytes-=entry.bytes;}
 /** Shared native reads for immutable source revisions. Each consumer still uses
@@ -32,7 +33,7 @@ export async function nativePreviewResource<T>(command:Command,args:Record<strin
     if(incomplete||size>16*1024*1024){remove(key,entry);return value;}
     if(entries.get(key)===entry){
       entry.bytes=size;bytes+=size;entry.until=Date.now()+120000;
-      while(entries.size>MAX_ENTRIES||bytes>MAX_BYTES){const oldest=entries.keys().next().value!;remove(oldest,entries.get(oldest)!);}
+      while(entries.size>MAX_ENTRIES||bytes>decodedPreviewBudget()){const oldest=entries.keys().next().value!;remove(oldest,entries.get(oldest)!);}
     }
     return value;
   },error=>{remove(key,entry);throw error;});
@@ -41,5 +42,6 @@ export async function nativePreviewResource<T>(command:Command,args:Record<strin
   if(pending<MAX_PENDING)entries.set(key,entry);
   return structuredClone(await entry.promise) as T;
 }
-export function nativePreviewResourceStats(){return{entries:entries.size,bytes,maxBytes:MAX_BYTES,hits,misses};}
+export function nativePreviewResourceStats(){return{entries:entries.size,bytes,maxBytes:decodedPreviewBudget(),hits,misses};}
+export function trimNativePreviewResources(){while(bytes>decodedPreviewBudget()&&entries.size){const key=entries.keys().next().value!;remove(key,entries.get(key)!);}}
 export function clearNativePreviewResources(){entries.clear();bytes=0;hits=0;misses=0;}

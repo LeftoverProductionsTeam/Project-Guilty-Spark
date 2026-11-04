@@ -16,6 +16,7 @@ pub(super) async fn prepare_native_asset_import(
         let preserved=source.source.as_ref().ok_or("Asset source has no preserved Halo map")?;
         if preserved.sha256!=source_sha256{return Err("The dragged asset's source hash changed before extraction".into());}
         let inspection=inspect(&state,&source)?;
+        let source=native_resources_native::for_project(&state,&source,&inspection)?;
         let tools=editing_tools(&state,&source)?;
         let id=uuid::Uuid::new_v4().to_string();let extraction=uuid::Uuid::new_v4().to_string();
         let cancel=Arc::new(AtomicBool::new(false));

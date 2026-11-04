@@ -54,6 +54,9 @@ impl Effect {
         }
     }
 }
+pub(crate) fn source_dependencies(project:&Project)->Vec<String>{
+    project.powerups.iter().flat_map(|p|std::iter::once(p.effect.template().to_owned()).chain(p.model_tag.clone()).chain(p.pickup_sound.clone())).collect()
+}
 fn dependency(value: &str, extensions: &[&str]) -> Result<()> {
     if value.len() > 240
         || !extensions

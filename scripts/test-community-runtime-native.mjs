@@ -6,6 +6,7 @@
 // Inspect both logs with analyze-community-runtime-native.mjs after execution.
 // No public discovery, downloads, UPnP or arbitrary process/command input.
 import fs from 'node:fs/promises';
+import {safeQaCopy} from './qa-safe-copy.mjs';
 import { createWriteStream } from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -239,7 +240,7 @@ async function launch(role, id, instance = role) {
     await fs.mkdir(path.dirname(targetRoot), { recursive: true });
     let entries = 0,
       bytes = 0;
-    await fs.cp(sourceRoot, targetRoot, {
+    await safeQaCopy(sourceRoot, targetRoot, {
       recursive: true,
       errorOnExist: true,
       force: false,

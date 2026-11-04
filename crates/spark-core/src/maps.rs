@@ -780,6 +780,22 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         .or_else(|| path.parent())
         .unwrap_or(Path::new("."));
     let mut resources = vec![];
+    // A resident tag body can still reference raw pixels/samples outside the
+    // cache. The index's external-tag bit alone missed Demo/PC dependencies
+    // and let thousands of doomed extractions run with an empty maps folder.
+    let mut raw_resources = std::collections::BTreeSet::new();
+    if matches!(header.version,6|7|609|13) {
+        for tag in tags.iter().filter(|t|matches!(t.class.as_str(),"bitm"|"snd!")) {
+            match external_raw_resource(&r,&space,tag) {
+                Ok(Some(name))=>{raw_resources.insert(name);},
+                Ok(None)=>(),
+                Err(problem)=>{
+                    raw_resources.insert(if tag.class=="bitm"{"bitmaps.map"}else{"sounds.map"});
+                    diagnostics.push(Diagnostic::warning("RESOURCE_LAYOUT_UNVERIFIED",format!("{}: {problem}. Native extraction needs a verified source dependency review.",tag.path)));
+                }
+            }
+        }
+    }
     for (name, classes) in [
         ("bitmaps.map", vec!["bitm"]),
         ("sounds.map", vec!["snd!"]),
@@ -788,12 +804,13 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         let required = tags
             .iter()
             .any(|t| t.external && classes.contains(&t.class.as_str()))
+            || raw_resources.contains(name)
             || (header.version == 7 && name == "bitmaps.map");
         let found = folder.join(name).is_file();
         if required && !found {
             diagnostics.push(Diagnostic::warning("MISSING_RESOURCE",format!("{name} is required. Choose the original runtime's resource-map folder in Settings; MCC resources are not interchangeable with Demo/PC resources.")));
         }
-        resources.push(Resource{name:name.into(),required,found,reason:if required{"Referenced by source cache"}else{"Not proven necessary by tag index; the extraction tool checks raw-data dependencies"}.into()});
+        resources.push(Resource{name:name.into(),required,found,reason:if required{"Referenced by native tag or raw-data descriptors"}else{"No external reference observed in supported native descriptors; extraction still validates dependencies"}.into()});
     }
     diagnostics.push(Diagnostic::warning("RUNTIME_TEST_PENDING","Structural inspection is complete. Playability is only established by loading the resulting map in the target game. Multiplayer AI synchronization is a separate runtime capability."));
     Ok(MapInspection {
@@ -812,6 +829,30 @@ pub(crate) fn inspect_snapshot(path:&Path,resource_directory:Option<&Path>,mut h
         diagnostics,
         scenario_path,
     })
+}
+fn external_raw_resource(r:&Reader,space:&Space,tag:&Tag)->Result<Option<&'static str>> {
+    let resource=if tag.class=="bitm"{"bitmaps.map"}else{"sounds.map"};
+    if tag.external{return Ok(Some(resource));}
+    let at=tag.data_offset.ok_or_else(||SparkError::Invalid("Native resource tag has no resident body".into()))? as usize;
+    let size=if tag.class=="bitm"{108}else{164};
+    if at<space.begin||at.checked_add(size).is_none_or(|end|end>space.end){return invalid("Native resource body exceeds its tag region");}
+    if tag.class=="bitm" {
+        let (images,count)=space.block(r,at+0x60,48,2048)?;
+        for index in 0..count {
+            let image=images+index*48;
+            if r.fourcc(image)?!="bitm"{return invalid("Invalid native bitmap record signature");}
+            if r.u16(image+14)?&0x100!=0{return Ok(Some(resource));}
+        }
+    }else{
+        let (pitches,count)=space.block(r,at+152,72,8)?;
+        let mut total=0usize;
+        for index in 0..count {
+            let (samples,n)=space.block(r,pitches+index*72+60,124,256)?;
+            total+=n;if total>2048{return invalid("Sound permutation budget exceeded");}
+            for sample in 0..n {match r.u32(samples+sample*124+68)?{0=>(),1=>return Ok(Some(resource)),_=>return invalid("Unknown native sound raw-data flags")}}
+        }
+    }
+    Ok(None)
 }
 fn vec3(r: &Reader, at: usize) -> Result<[f32; 3]> {
     Ok([r.f32(at)?, r.f32(at + 4)?, r.f32(at + 8)?])

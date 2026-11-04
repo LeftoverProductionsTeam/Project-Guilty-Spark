@@ -93,6 +93,29 @@ pub(super) fn owned_map_roots(state:&AppState)->Reply<Vec<(PathBuf,String)>>{
     }}
     Ok(roots)
 }
+/// Size reporting reuses connected/detected installations and linked content;
+/// it never registers, launches or rewrites a runtime.
+pub(super) fn storage_roots(state: &AppState) -> Reply<Vec<(PathBuf, String)>> {
+    let mut roots = vec![];
+    if let Some(root) = lock(&state.installation)?.mcc_path.clone() { roots.push((root, "MCC installation".into())); }
+    let library = lock(&state.library)?;
+    let registrations: Vec<runtime::RuntimeRegistration> = library.setting("runtimeRegistrations").map_err(error)?;
+    let linked: Vec<PathBuf> = library.setting("assetSourceFolders").map_err(error)?;
+    drop(library);
+    for registration in registrations.into_iter().take(24) {
+        roots.push((registration.root, registration.runtime_id.name().into()));
+        if let Some(data) = registration.data_root { roots.push((data, format!("{} content", registration.runtime_id.name()))); }
+    }
+    for detected in discover(state)? {
+        roots.push((detected.root, detected.runtime_id.name().into()));
+        roots.push((detected.data_root, format!("{} content", detected.runtime_id.name())));
+    }
+    roots.extend(linked.into_iter().take(16).map(|path| {
+        let name = format!("Linked Halo folder · {}", path.file_name().unwrap_or_default().to_string_lossy()); (path, name)
+    }));
+    if let Some(path) = lock(&state.settings)?.resource_directory.clone() { roots.push((path, "Connected Halo resources".into())); }
+    Ok(roots)
+}
 /// Provenance uses original byte identity and installation roots, never the
 /// selected hosting runtime. Missing/changed originals or ambiguous shared
 /// roots leave provenance unknown; the preserved map remains inspectable.

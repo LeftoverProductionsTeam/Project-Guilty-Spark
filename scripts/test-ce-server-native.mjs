@@ -2,6 +2,7 @@
 // fresh short path; binds only loopback, disables public listing, never edits
 // the original runtime or claims movement/gameplay from a responding process.
 import fs from 'node:fs/promises';
+import {safeQaCopy} from './qa-safe-copy.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -52,7 +53,7 @@ const hash = async (file) =>
 const original = await hash(path.join(runtime, 'haloceded.exe'));
 const game = path.join(root, 'game'),
   profile = path.join(root, 'profile');
-await fs.cp(runtime, game, { recursive: true, force: false, errorOnExist: true });
+await safeQaCopy(runtime, game, { recursive: true, force: false, errorOnExist: true });
 await fs.mkdir(profile);
 const mapName = args.has('--map') ? path.basename(args.get('--map'), '.map') : 'bloodgulch';
 if (!/^[a-z0-9_]{1,31}$/.test(mapName))

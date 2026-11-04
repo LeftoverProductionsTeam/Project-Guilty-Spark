@@ -234,7 +234,20 @@ pub fn create(
             return invalid("A reviewed bitmap source changed; no repaired tagset was accepted");
         }
     }
+    let inputs = crate::native_staging::inventory(&plan.sdk_tags, cancel)?;
+    let manager = crate::storage::Store::for_output(destination)?;
+    let lease = manager.reserve(
+        destination,
+        Some(&plan.sdk_tags),
+        crate::storage::estimate_copy(
+            inputs.files.len() + plan.files.len() + 2,
+            inputs.bytes.saturating_add(total),
+        ),
+        crate::storage::Category::Staging,
+        "Reviewed classic bitmap source repair",
+    )?;
     fs::create_dir(destination)?;
+    lease.mark_owned()?;
     let tags = destination.join("tags");
     let hashes = forge_build::stage_tags(&plan.sdk_tags, &tags, cancel, |a, b, c, d| {
         progress(a, b, c, d)
@@ -255,19 +268,13 @@ pub fn create(
                 .parent()
                 .ok_or_else(|| SparkError::Invalid("Bitmap parent unavailable".into()))?,
         )?;
-        let mut input = fs::File::open(&file.source)?;
-        let mut output = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&target)?;
-        let copied = std::io::copy(&mut input.by_ref().take(MAX_BITMAP_BYTES + 1), &mut output)?;
-        if copied != file.bytes
-            || maps::hash_file(&file.source)? != file.sha256
-            || maps::hash_file(&target)? != file.sha256
-        {
-            return invalid("A bitmap changed during repair; incomplete copy retained");
-        }
-        output.sync_all()?;
+        crate::native_staging::copy_file(
+            &file.source,
+            &target,
+            file.bytes,
+            Some(&file.sha256),
+            cancel,
+        )?;
     }
     let inventory = destination.join("input-sdk-tags.json");
     project::atomic_write(&inventory, &serde_json::to_vec_pretty(&hashes)?, false)?;
@@ -288,6 +295,7 @@ pub fn create(
         &serde_json::to_vec_pretty(&receipt)?,
         false,
     )?;
+    lease.finish(true, Some(plan.source_sha256.clone()))?;
     Ok(receipt)
 }
 #[cfg(test)]

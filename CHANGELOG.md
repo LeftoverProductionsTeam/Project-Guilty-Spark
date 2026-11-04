@@ -1,5 +1,16 @@
 # Changelog
 
+## C66 — Native storage containment and task recovery
+
+- Replace repeated full SDK staging with recursive base dependencies and verified namespaced imports. Preserve the complete bounded contract for prepared shared revisions. Unchanged jobs require fresh source/import/tool/generated-output hashes.
+- Verify a real 23-tag imported door, native compilation/readback and ten unchanged schema-3 build reuses without another native tree.
+- Show installed/linked Halo folder sizes in Storage & Cache, with overlapping folders and physical files deduplicated in the combined allocation.
+- Add shared disk reservations, active-process leases, interrupted-output accounting, atomic verified tag copies and explicit ownership/reference-checked cleanup. Keep source, research and previous-good artifacts protected. Add Storage & Cache settings and bounded preview controls; defer expensive folder scans until requested.
+- Reject missing or incompatible native bitmap/sound resources before extraction. The actual Zombie Demo source now stops before any native job/SDK staging instead of reaching 1,380 extraction errors.
+- Prove native compilation, ten unchanged requests without growth, a real Invader radius edit to 0.5, corrupt-save rejection/recovery and independently read-back rebuilt content. Preserve the accepted two-way C63 door and sealed C49 releases. No new gameplay or universal compatibility claim.
+- Preserve existing AGENTS rules and add bounded atomic active-task checkpoints with one previous valid copy, distinct recovery states and durable deferred-request instructions. No hooks, daemon or application queue controller.
+- Remove only the already authorized 10,649 exact SDK duplicates (1,680,010,377 payload bytes). Retain the differing truncated bitmap and all mixed historical roots; no new deletion/publication. [Lifecycle audit, actual measurements and open P0 work](docs/CONTINUATION_66_STORAGE_AND_RECOVERY.md).
+
 ## C62 — Recoverable storage cleanup
 
 - Reduce the full measured footprint from 314.67 to 95.21 GiB allocated, including archives and new evidence (219.46 GiB net). The first completed pass left 218.59 GiB; deeper verified archival removes another 123.37 GiB. Keep all historical snapshots recoverable through five verified private vaults and actual restoration tests.

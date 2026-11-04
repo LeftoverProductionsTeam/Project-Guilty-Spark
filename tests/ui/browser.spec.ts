@@ -1,5 +1,11 @@
 import {chooseTool,openDrawer} from './helpers/navigation';
 import { test, expect } from '@playwright/test';
+test('Storage keeps source cleanup separate from saved preview memory limits',async({page})=>{
+ await page.setViewportSize({width:1280,height:720});await page.goto('/');await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Storage & Cache',exact:true}).click();
+ const panel=page.getByRole('region',{name:'Storage and cache settings'});await expect(panel).toBeVisible();await expect(panel.getByText('Open the desktop app to inspect local files and configure disk budgets.')).toBeVisible();await expect(panel.getByRole('button',{name:'Inspect storage',exact:true})).toBeDisabled();
+ await panel.locator('summary').filter({hasText:'Preview memory & graphics'}).click();await panel.getByLabel('Decoded preview cache').fill('32');await panel.getByLabel('Textures per viewport').fill('128');await panel.getByLabel('Warm map renderers').fill('1');await panel.getByRole('button',{name:'Save preview limits',exact:true}).click();
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('spark.previewBudgets.v1')!))).toEqual({decodedMiB:32,textureMiB:128,warmEditors:1});await page.reload();await chooseTool(page,'Settings & tools');await page.getByRole('tab',{name:'Storage & Cache',exact:true}).click();await panel.locator('summary').filter({hasText:'Preview memory & graphics'}).click();await expect(panel.getByLabel('Decoded preview cache')).toHaveValue('32');expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(0);
+});
 
 test('Interface Studio keeps compact categories, keyboard navigation and saved place',async({page})=>{
   await page.setViewportSize({width:1280,height:720});await page.goto('/');

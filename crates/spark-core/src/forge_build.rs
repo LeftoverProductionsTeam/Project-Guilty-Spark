@@ -151,67 +151,9 @@ pub fn audit_material_bindings(document:&quickforge::QuickForgeDocument,files:im
 /// Bounded copy of owner-selected editable tags, never hardlinks into an installation.
 /// Hashes cover every input copied so a later build can be compared meaningfully.
 pub(crate) fn stage_tags(source:&Path,destination:&Path,cancel:&AtomicBool,mut progress:impl FnMut(usize,usize,u64,u64))->Result<BTreeMap<String,String>> {
-    crate::reject_links(source)?;
-    if !source.is_dir(){return invalid("Select an extracted HCEEK tags directory, not compiled .map files");}
-    let source=source.canonicalize()?;
-    let destination_absolute=std::path::absolute(destination)?;
-    // Compare canonical existing ancestors so Windows verbatim paths and normal
-    // paths cannot bypass the source/destination containment guard.
-    let mut ancestor=destination_absolute.as_path();let mut missing=vec![];
-    while !ancestor.exists() {missing.push(ancestor.file_name().ok_or_else(||SparkError::Invalid("Invalid staging destination".into()))?.to_os_string());ancestor=ancestor.parent().ok_or_else(||SparkError::Invalid("Staging destination has no existing parent".into()))?;}
-    crate::reject_links(ancestor)?;
-    let mut canonical_destination=ancestor.canonicalize()?;for name in missing.into_iter().rev(){canonical_destination.push(name);}
-    if canonical_destination.starts_with(&source){return invalid("Build staging cannot be inside the source tags directory");}
-    if destination.exists() {
-        crate::reject_links(destination)?;
-        if fs::read_dir(destination)?.next().is_some(){return invalid("Tag staging destination must be empty");}
-    } else {fs::create_dir(destination)?;}
-    let mut stack=vec![(source.clone(),0usize)];
-    let mut files=vec![];
-    let mut bytes=0u64;
-    while let Some((directory,depth))=stack.pop(){
-        if depth>32{return invalid("Tag tree nesting exceeds 32 directories");}
-        for entry in fs::read_dir(directory)? {
-            if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
-            let entry=entry?; let path=entry.path(); crate::reject_links(&path)?;
-            let metadata=entry.metadata()?;
-            if metadata.is_dir(){stack.push((path,depth+1));continue;}
-            if !metadata.is_file(){return invalid("Only regular files are allowed in a tag tree");}
-            bytes=bytes.checked_add(metadata.len()).ok_or_else(||SparkError::Invalid("Tag size overflow".into()))?;
-            if metadata.len()>2*1024*1024*1024 || bytes>16*1024*1024*1024 || files.len()>=200000 {return invalid("Tag staging exceeds limits: 2 GiB/file, 16 GiB total, 200000 files");}
-            let relative=path.strip_prefix(&source).map_err(|_|SparkError::Invalid("Tag escaped source root".into()))?.to_path_buf();
-            safe_relative(&relative.to_string_lossy())?;
-            files.push((path,relative,metadata.len()));
-        }
-    }
-    let mut hashes=BTreeMap::new();let total=files.len();let mut copied=0u64;let mut last=Instant::now();let mut buffer=vec![0u8;1024*1024];
-    progress(0,total,0,bytes);
-    for (index,(path,relative,expected_size)) in files.into_iter().enumerate() {
-        if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
-        let output=destination.join(&relative); crate::reject_links(&output)?;
-        fs::create_dir_all(output.parent().unwrap())?;
-        use std::io::{Read,Write};use sha2::{Digest,Sha256};
-        // Hash the exact bytes while copying; a second source hash and output
-        // readback retain the consistency check without an extra source pass.
-        let mut input=fs::File::open(&path)?;let mut target=fs::OpenOptions::new().write(true).create_new(true).open(&output)?;
-        let mut digest=Sha256::new();let mut count=0u64;
-        loop {
-            if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
-            let read=input.read(&mut buffer)?;if read==0 {break;}
-            count=count.checked_add(read as u64).ok_or_else(||SparkError::Invalid("Tag copy size overflow".into()))?;
-            if count>expected_size {return invalid("Source tag size changed while staging");}
-            target.write_all(&buffer[..read])?;digest.update(&buffer[..read]);
-        }
-        drop(target);drop(input);
-        if count!=expected_size {return invalid("Source tag size changed while staging");}
-        let hash=crate::hex_bytes(digest.finalize());
-        #[cfg(windows)]{let mut p=fs::metadata(&output)?.permissions();p.set_readonly(false);fs::set_permissions(&output,p)?;}
-        if maps::hash_file(&output)?!=hash || maps::hash_file(&path)?!=hash{return invalid("Source tags changed while staging");}
-        hashes.insert(relative.to_string_lossy().replace('\\',"/"),hash);
-        copied+=count;
-        if last.elapsed().as_millis()>=500 || index+1==total {progress(index+1,total,copied,bytes);last=Instant::now();}
-    }
-    Ok(hashes)
+    crate::native_staging::destination(source,destination)?;
+    let plan=crate::native_staging::inventory(source,cancel)?;
+    crate::native_staging::copy(source,destination,&plan,cancel,&mut progress)
 }
 pub fn run_job(
     project:&Project,tools:&ForgeToolchain,jobs_root:&Path,job_id:&str,export_only:bool,
@@ -232,8 +174,15 @@ pub fn run_prepared_job(
     let document=&custom.document;
     let started=Instant::now();
     crate::reject_links(jobs_root)?;fs::create_dir_all(jobs_root)?;
+    if !export_only&&prepared.is_none()&&extra_blockers.is_empty(){
+        if let Some(receipt)=crate::forge_reuse::find(project,tools,jobs_root){on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool, compiled tags and map hashes match; no new tag tree was copied.",receipt.job_id)});return Ok(receipt);}
+    }
     let jobs_root=jobs_root.canonicalize()?;let directory=jobs_root.join(job_id);
+    let selected_tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
+    let estimate=if !export_only {if let Some(tags)=selected_tags.as_ref().filter(|p|p.is_dir()){let inputs=crate::native_staging::inventory(tags,&cancel)?;crate::storage::estimate_copy(inputs.files.len(),inputs.bytes).saturating_add(1024*1024*1024)}else{16*1024*1024}}else{16*1024*1024};
+    let storage_lease=crate::storage::Store::for_output(&directory)?.reserve(&directory,selected_tags.as_deref(),estimate,crate::storage::Category::Staging,"Native BSP build: inputs plus conservative compiler-output reserve")?;
     crate::reject_links(&directory)?;fs::create_dir(&directory)?;
+    storage_lease.mark_owned()?;
     let emit=|phase:&str,message:String,progress:u8,severity:&str|on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:phase.into(),severity:severity.into(),message,progress,timestamp:chrono::Utc::now().to_rfc3339()});
     let mut receipt=QuickForgeBuildReceipt{schema_version:1,job_id:job_id.into(),project_id:project.id.clone(),project_fingerprint:project.fingerprint()?,source_document_sha256:if custom.models.is_empty(){None}else{Some(quickforge::validate(project.quick_forge.as_ref().unwrap())?.source_sha256)},current:None,status:"failed".into(),duration_ms:0,sources:None,blockers:extra_blockers,warnings:vec!["Compiler integration requires an owner-installed HCEEK and extracted legal tags. Source exports and structural validation do not prove game loading or multiplayer.".into()],build:None,tool_identities:BTreeMap::new()};
     let result=(||->Result<()> {
@@ -269,7 +218,7 @@ pub fn run_prepared_job(
         if tool.is_none(){receipt.blockers.push("Halo 1 Editing Kit Tool is missing. Select the separately installed matching HEK or H1A kit folder in Settings.".into());}
         let tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
         if tags.as_ref().is_none_or(|p|!p.is_dir()){receipt.blockers.push("Legal editable base tags are missing. Select the extracted HCEEK tags folder in Settings.".into());}
-        for name in ["invader-edit","invader-build","invader-info"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
+        for name in ["invader-edit","invader-build","invader-info","invader-dependency"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
         if document.logic.is_some()&&invader(tools,"invader-script").is_none(){receipt.blockers.push("Logic / Events requires invader-script in the selected Invader folder before staging native sources".into());}
         let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
         let imported=crate::native_asset_imports::available_files(import_root,project)?;
@@ -287,15 +236,43 @@ pub fn run_prepared_job(
         }
         if !receipt.blockers.is_empty(){receipt.status="blocked".into();return Ok(());}
         let (engine,version)=engine.unwrap(); let tool=tool.unwrap();
-        let mut executables=vec![("haloTool",tool.clone()),("invaderEdit",invader(tools,"invader-edit").unwrap()),("invaderInfo",invader(tools,"invader-info").unwrap())];
+        let mut executables=vec![("haloTool",tool.clone()),("invaderEdit",invader(tools,"invader-edit").unwrap()),("invaderInfo",invader(tools,"invader-info").unwrap()),("invaderDependency",invader(tools,"invader-dependency").unwrap())];
         if document.logic.is_some(){executables.push(("invaderScript",invader(tools,"invader-script").unwrap()));}
         if document.runtime_id!=RuntimeId::MccSteam{executables.push(("invaderBuild",invader(tools,"invader-build").unwrap()));}
         for (name,path) in executables {
             crate::reject_links(&path)?;receipt.tool_identities.insert(name.into(),maps::hash_file(&path)?);
         }
-        emit("dependencies","Copying and hashing owner-selected tags into an isolated job".into(),15,"info");
+        emit("dependencies","Planning native inputs before copying any tag data".into(),15,"info");
         let workspace=&sources.directory;let stage=workspace.join("tags");
-        let hashes=stage_tags(tags.as_ref().unwrap(),&stage,&cancel,|done,total,bytes,total_bytes|emit("tag-staging",format!("Prepared {done}/{total} tags · {}/{} MiB",bytes/(1024*1024),total_bytes/(1024*1024)),(15+done*8/total.max(1)) as u8,"info"))?;
+        let source_tags=tags.as_ref().unwrap();
+        let all_inputs=crate::native_staging::inventory(source_tags,&cancel)?;
+        let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
+        // Local authored maps have a defined dependency set. Namespaced imports
+        // carry their separately verified complete closure and are staged below.
+        // Shared prepared revisions retain their complete input hash contract.
+        let mut model_class_bindings=std::collections::BTreeMap::new();
+        let plan=if prepared.is_none(){
+            let mut roots=std::collections::BTreeSet::from(["globals/globals.globals".to_owned()]);
+            for dependency in &sources.dependencies {
+                if generated.contains(&format!("{}.scenery",dependency.tag_path.replace('\\',"/")))&&dependency.tag_class=="scenery"{continue;}
+                if imported.contains(&format!("{}.{}",dependency.tag_path.replace('\\',"/"),dependency.tag_class)){continue;}
+                let file=dependency_path(source_tags,&dependency.tag_path,&dependency.tag_class)?;
+                roots.insert(file.strip_prefix(source_tags).map_err(|_|SparkError::Invalid("Source dependency escaped its root".into()))?.to_string_lossy().replace('\\',"/"));
+            }
+            roots.extend(crate::powerups::source_dependencies(project));
+            roots.retain(|path| !imported.contains(&path.replace('\\',"/").to_ascii_lowercase()));
+            let mut selected=std::collections::BTreeSet::new();
+            let mut visited=std::collections::BTreeSet::new();
+            while let Some(requested)=roots.pop_first() {
+                if !visited.insert(requested.clone()){continue;}if visited.len()>20000{return invalid("Native dependency planning exceeded its root budget");}
+                let log=runner.run(&invader(tools,"invader-dependency").unwrap(),&["-r".into(),"-t".into(),source_tags.to_string_lossy().into_owned(),requested.clone()],workspace,"dependencies",15)?;
+                let dependencies=crate::native_staging::dependency_plan(&log,source_tags,&requested,tools.hek_flavor.as_deref()==Some("h1aEk"))?;
+                selected.extend(dependencies.files);roots.extend(dependencies.followup);model_class_bindings.extend(dependencies.model_class_bindings);
+            }
+            crate::native_staging::selected_inventory(&all_inputs,&selected)?
+        }else{all_inputs.clone()};
+        project::atomic_write(&directory.join("staging-plan.json"),&serde_json::to_vec_pretty(&serde_json::json!({"source":source_tags,"sourceFiles":all_inputs.files.len(),"sourceBytes":all_inputs.bytes,"stagedFiles":plan.files.len(),"stagedBytes":plan.bytes,"dependencySubset":plan.files.len()<all_inputs.files.len(),"nativeModelClassBindings":model_class_bindings,"mutableHardlinks":false,"reservedDirectoriesExcluded":true}))?,false)?;
+        let hashes=crate::native_staging::copy(source_tags,&stage,&plan,&cancel,|done,total,bytes,total_bytes|emit("tag-staging",format!("Prepared {done}/{total} required tags · {}/{} MiB",bytes/(1024*1024),total_bytes/(1024*1024)),(15+done*8/total.max(1)) as u8,"info"))?;
         if prepared.is_some_and(|expected|expected!=&hashes) {return invalid("Prepared native revision changed before compilation; no Halo compiler was started");}
         if let Some(native)=&document.native {
             for asset in &native.assets {if hashes.get(&format!("{}.scenery",asset.tag_path()))!=Some(&asset.sha256){return invalid("Prepared source omitted or changed a published native asset");}}
@@ -303,12 +280,12 @@ pub fn run_prepared_job(
         }
         project::atomic_write(&directory.join("input-tags.json"),&serde_json::to_vec_pretty(&hashes)?,false)?;
         let import_hashes=crate::native_asset_imports::stage(import_root,project,&stage)?;
-        let mut combined_hashes=hashes.clone();combined_hashes.extend(import_hashes);
-        let material_blockers=audit_material_bindings(document,combined_hashes.keys())?;
+        let mut combined_hashes=hashes.clone();combined_hashes.extend(import_hashes.clone());
+        let source_names=all_inputs.files.iter().map(|f|&f.path).chain(combined_hashes.keys()).collect::<std::collections::BTreeSet<_>>();
+        let material_blockers=audit_material_bindings(document,source_names.into_iter())?;
         if !material_blockers.is_empty(){receipt.blockers.extend(material_blockers);receipt.status="blocked".into();return Ok(());}
         let scenario_file=stage.join(safe_relative(&format!("{}.scenario",sources.scenario_path))?);
         if scenario_file.parent().is_some_and(|p|p.exists()){return invalid("Generated scenario namespace already exists in the supplied tags. Choose a unique project name; stale BSP/lightmap/item tags cannot be accepted as new output.");}
-        let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
         custom.compile(workspace,&tool,&halo_tool_prefix(tools.hek_flavor.as_deref(),workspace,&stage)?,&invader(tools,"invader-edit").unwrap(),&runner)?;
         let mut reviewed_new_logic_names=false;
         for (index,command) in sources.commands.iter().enumerate() {
@@ -370,7 +347,7 @@ pub fn run_prepared_job(
         crate::native_asset_imports::verify_compiled(project,&inspected)?;
         crate::native_audio::verify_compiled(project,&inspected,&output)?;
         crate::native_logic::verify_compiled(document,&inspected)?;
-        let _=crate::native_asset_imports::available_files(import_root,project)?;
+        if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported native inputs changed during compilation");}
         crate::powerups::verify_compiled(project,&inspected,workspace)?;
         custom.verify_cache(&inspected,&output)?;
         if inspected.header.version!=version || !inspected.scenario_path.replace('\\',"/").eq_ignore_ascii_case(&sources.scenario_path.replace('\\',"/")) || inspected.header.scenario_type!=1 || inspected.mesh.indices.is_empty() {return invalid("Compiled map has wrong engine/scenario/type or no collision BSP");}
@@ -388,6 +365,7 @@ pub fn run_prepared_job(
             if !inspected.tags.iter().any(|tag|tag.class==placement.tag_class&&tag.path.replace('\\',"/").eq_ignore_ascii_case(&placement.tag_path.replace('\\',"/"))) {return invalid(format!("Built cache omits placed asset {}",placement.name));}
         }
         if maps::hash_file(&output)?!=inspected.sha256 {return invalid("Compiled output changed during verification; the modified artifact is rejected and the previous build is retained");}
+        crate::forge_reuse::record(&directory,source_tags,&stage,&hashes,&import_hashes,tools)?;
         let record=BuildRecord{id:job_id.into(),timestamp:chrono::Utc::now().to_rfc3339(),status:"validated".into(),target:engine.into(),output:Some(output.clone()),sha256:Some(inspected.sha256.clone()),message:"QuickForge BSP/scenario compiled and cache structure/CRC validated. Fast radiosity preview; target-game load, packaging and multiplayer remain untested.".into(),project_fingerprint:project.fingerprint()?};
         project::atomic_write(&directory.join("receipt.json"),&serde_json::to_vec_pretty(&record)?,false)?;
         receipt.build=Some(record);receipt.status="validated".into();Ok(())
@@ -395,6 +373,7 @@ pub fn run_prepared_job(
     if let Err(e)=result {receipt.blockers.push(e.to_string());receipt.status=if cancel.load(Ordering::Relaxed){"cancelled"}else{"failed"}.into();}
     receipt.duration_ms=started.elapsed().as_millis() as u64;
     project::atomic_write(&directory.join("quickforge-receipt.json"),&serde_json::to_vec_pretty(&receipt)?,false)?;
+    if matches!(receipt.status.as_str(),"validated"|"exported"){storage_lease.finish(true,Some(receipt.project_fingerprint.clone()))?;}else{drop(storage_lease);}
     emit(&receipt.status,if receipt.blockers.is_empty(){format!("QuickForge {} in {} ms",receipt.status,receipt.duration_ms)}else{receipt.blockers.join("\n")},100,if receipt.status=="validated"{"success"}else if receipt.status=="exported"{"info"}else{"error"});
     Ok(receipt)
 }

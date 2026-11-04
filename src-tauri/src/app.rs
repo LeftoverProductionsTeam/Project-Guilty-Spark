@@ -43,6 +43,8 @@ use tauri::{Emitter, Manager, State};
 #[path="conversion_resources_native.rs"]mod conversion_resources_native;
 #[path="ce_source_recovery_native.rs"]mod ce_source_recovery_native;
 #[path="startup_native.rs"]mod startup_native;
+#[path="storage_native.rs"]mod storage_native;
+#[path="native_resources_native.rs"]mod native_resources_native;
 #[path="home_voice_native.rs"]mod home_voice_native;
 #[path="asset_sources_native.rs"] mod asset_sources_native;
 #[path="asset_import_native.rs"] mod asset_import_native;
@@ -1225,6 +1227,7 @@ async fn extract_selected_tag_tree(app: tauri::AppHandle, project_id: String, ta
         let state = app.state::<AppState>();
         let project = lock(&state.library)?.get(&project_id).map_err(error)?;
         let inspection = inspect(&state, &project)?;
+        let project=native_resources_native::for_project(&state,&project,&inspection)?;
         let tools = editing_tools(&state, &project)?;
         let job_id = uuid::Uuid::new_v4().to_string();
         let cancel = Arc::new(AtomicBool::new(false));
@@ -1283,7 +1286,9 @@ async fn compatibility(app:tauri::AppHandle, id: String) -> Reply<build::Compati
         let p = lock(&state.library)?.get(&id).map_err(error)?;
         let i = inspect(&state, &p)?;
         if core::megaworld_build::selected(&p){let blockers=core::megaworld_build::preflight(&p,&i).err().map(|e|vec![e.to_string()]).unwrap_or_default();return Ok(build::CompatibilityReport{target:"gbx-custom".into(),pipeline:"Original CE regions → authored merged geometry → H1A structure/lightmaps → Invader CE cache → CRC/collision/scenery readback".into(),ready:blockers.is_empty(),blockers,warnings:vec!["One resident BSP; native compilation is separate from player traversal. Painted detail payloads are refused until transformed native preservation is implemented.".into()],bitmap_dependencies:None});}
-        Ok(build::compatibility(&p, &i, &project_tools(&state, &p)?))
+        let tools=project_tools(&state,&p)?;
+        let resolved=native_resources_native::for_project(&state,&p,&i).unwrap_or_else(|_|p.clone());
+        Ok(build::compatibility(&resolved, &i, &tools))
     }).await.map_err(error)?
 }
 #[tauri::command]
@@ -1310,18 +1315,7 @@ fn event(app: &tauri::AppHandle, e: JobEvent) {
     }
     let _ = app.emit("spark:job", &e);
     let logs = state.root.join("logs");
-    if fs::create_dir_all(&logs).is_ok() {
-        use std::io::Write;
-        if let Ok(mut f) = fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(logs.join(format!("{}.jsonl", e.job_id)))
-        {
-            if let Ok(line) = serde_json::to_string(&e) {
-                let _ = writeln!(f, "{line}");
-            }
-        }
-    }
+    if let Ok(mut line)=serde_json::to_vec(&e){line.push(b'\n');if let Err(problem)=core::storage::append_diagnostic(&logs,&format!("{}.jsonl",e.job_id),&line){eprintln!("Job log retained without further growth: {problem}");}}
 }
 fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     let _source_guard=native_operations_native::source_guard()?;
@@ -1331,6 +1325,9 @@ fn begin_build(app: tauri::AppHandle, id: String) -> Reply<String> {
     snapshot_project_state(&state,&project,"before-build")?;
     let inspection = inspect(&state, &project)?;
     let tools = project_tools(&state, &project)?;
+    let project=if project.source.as_ref().is_some_and(|s|[6,7].contains(&s.cache_version)){
+        native_resources_native::for_project(&state,&project,&inspection)?
+    }else{project};
     if core::megaworld_build::selected(&project){core::megaworld_build::preflight(&project,&inspection).map_err(error)?;}else{
         let report = build::compatibility(&project, &inspection, &tools);
         if !report.ready {return Err(report.blockers.join("\n"));}
@@ -2948,6 +2945,12 @@ pub fn run() {
             quickforge_export,
             quickforge_build,
             quickforge_build_report,
+            storage_native::storage_overview,
+            storage_native::storage_measure_folder,
+            storage_native::storage_measure_halos,
+            storage_native::storage_set_limits,
+            storage_native::storage_cleanup,
+            storage_native::storage_recover_accounting,
             firefight_catalog,
             firefight_validate,
             firefight_preview,
