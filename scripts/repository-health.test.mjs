@@ -26,7 +26,7 @@ test('classification protects originals, releases, native diagnostics and unknow
     assert.equal(classifyStorage(p).classification, 'Preserve', p);
   assert.equal(classifyStorage('.local/native-run/tags').classification, 'Requires Review');
   assert.equal(classifyStorage('node_modules').classification, 'Reusable Cache');
-  assert.equal(classifyStorage('.local/build/cargo/target/debug/deps').classification, 'Regenerable');
+  assert.equal(classifyStorage('.local/build/cargo/debug/deps').classification, 'Regenerable');
 });
 test('real filesystem scan is read-only, counts hardlinks once and does not follow directory links', () => {
   const parent = path.resolve('.local');

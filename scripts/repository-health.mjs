@@ -56,7 +56,7 @@ export function classifyStorage(relative) {
     )
   )
     return { classification: 'Preserve', purpose: 'User-owned runtime installation/content' };
-  if (parts.includes('target') || parts.includes('validation-target')) {
+  if (parts.includes('target') || parts.includes('validation-target') || p.startsWith('.local/build/cargo/')) {
     if (parts.includes('release') || parts.includes('examples'))
       return {
         classification: 'Preserve',
