@@ -1,5 +1,9 @@
 # Pending engineering requests
 
+## Multiplayer Hub, Hosting & Community Game Modes — received November 4, 2026
+
+Full directive, receipt (`c16f261`) and evidence: `.local/artifacts/multiplayer-hub-intake-20261104/`. Pending behind C69 human verification; no deferral/priority change, implementation, new server/client/network work or game test. Preserve runtime/protocol/map identity, separate Host/Join/Collaborate, native mode placement and authenticated provider boundaries. Real two-player mode/restart and negative-case acceptance remain required. No manual requeue.
+
 ## AI Synchronization & Co-op Completion — received November 4, 2026
 
 Full instructions, receiving revision `2ac2778`, hashes and existing evidence are retained at `.local/artifacts/ai-sync-coop-intake-20261104/` (`directive.txt`, `receipt.json`, `existing-evidence.json`). Pending behind C69 human verification; no explicit deferral/priority change, implementation, network work, build, runtime probe or game test. Reuse native host networking and accepted lifecycle experiments; keep each runtime/version independent and unavailable telemetry distinct from zero. OpenCE peer lifecycle progress does not close health divergence, shared Firefight globals/victory, vehicles, active-combat rejoin or two-computer acceptance. Complete all lifecycle/ownership/bounded-update/diagnostic and actual peer-combat gates from the full directive after predecessor acceptance/explicit deferral. No manual requeue needed.
