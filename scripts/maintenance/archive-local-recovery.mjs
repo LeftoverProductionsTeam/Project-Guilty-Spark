@@ -6,9 +6,11 @@ import fs from 'node:fs/promises';
 import {createReadStream, constants} from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {spawn} from 'node:child_process';
+import {spawn,execFile} from 'node:child_process';
 import {once} from 'node:events';
 import {fileURLToPath} from 'node:url';
+import {promisify} from 'node:util';
+import {createInterface} from 'node:readline';
 import {TagNodeIO} from './retire-local-tags.mjs';
 
 const {ordinaryPath,fingerprint,identity,same,relativeName,inside}=TagNodeIO;
@@ -190,9 +192,68 @@ export async function sealRecovery({inventory,outDir,select='all',maxUniqueBytes
 }
 function identityLike(r){return {dev:r.dev,ino:r.ino,bytes:r.bytes,mtimeNs:r.mtimeNs,ctimeNs:r.ctimeNs};}
 
+function providerRequested({preservationIndex,indexSha256,pythonExecutable}){
+  if(!preservationIndex&&!indexSha256&&!pythonExecutable)return false;
+  if(typeof preservationIndex!=='string'||typeof pythonExecutable!=='string'||!/^[a-f0-9]{64}$/.test(indexSha256??''))throw Error('Provider recovery requires an explicit preservation index, its SHA-256 and Python executable');
+  return true;
+}
+async function absentOrdinary(file){
+  if(typeof file!=='string'||!file)throw Error('An explicit original recovery path is required');
+  await ordinaryPath(file,{missing:true});try{await fs.lstat(file);return false;}catch(error){if(error.code==='ENOENT')return true;throw error;}
+}
+/** Optional compatibility transport for the existing verified qa-vault reader.
+ * Only an explicit pinned index can replace an absent historical location.
+ * This does not register, relocate or delete any preserved content. */
+export async function openPreservationProvider({workspace,preservationIndex,indexSha256,pythonExecutable}){
+  providerRequested({preservationIndex,indexSha256,pythonExecutable});
+  if(typeof workspace!=='string'||!path.isAbsolute(workspace)||!path.isAbsolute(pythonExecutable))throw Error('Provider recovery requires absolute source-workspace and Python paths');
+  workspace=path.resolve(workspace);preservationIndex=path.resolve(preservationIndex);pythonExecutable=path.resolve(pythonExecutable);
+  const indexProof=await fingerprint(preservationIndex,256*1024**2),indexBytes=await fs.readFile(preservationIndex);
+  if(indexProof.sha256!==indexSha256||sha(indexBytes)!==indexSha256)throw Error('Preservation index SHA-256 differs');
+  const index=JSON.parse(indexBytes),equal=(a,b)=>process.platform==='win32'?path.resolve(a).toLowerCase()===path.resolve(b).toLowerCase():path.resolve(a)===path.resolve(b);
+  if(index.schemaVersion!==1||index.kind!=='spark-preservation-index'||typeof index.root!=='string'||!path.isAbsolute(index.root)||!equal(index.root,path.join(workspace,'preserved'))||!index.objects||Array.isArray(index.objects))throw Error('Preservation index source identity differs');
+  await ordinaryPath(index.root);await ordinaryPath(pythonExecutable);
+  const script=fileURLToPath(new URL('./qa-vault.py',import.meta.url));const scriptProof=await fingerprint(script,2*1024**2);
+  const probe=await promisify(execFile)(pythonExecutable,['-I','-X','utf8','-c','import json,sys;print(json.dumps({"executable":sys.executable,"implementation":sys.implementation.name,"version":list(sys.version_info[:2])}))'],{windowsHide:true,timeout:15000,maxBuffer:65536});
+  const interpreter=JSON.parse(probe.stdout);if(interpreter.implementation!=='cpython'||interpreter.version?.[0]!==3||interpreter.version?.[1]<10||typeof interpreter.executable!=='string'||!equal(interpreter.executable,pythonExecutable))throw Error('Selected executable is not the expected Python 3 interpreter');
+  const child=spawn(pythonExecutable,['-I','-X','utf8',script,'--workspace',workspace,'recover-object',preservationIndex,'--index-sha256',indexSha256,'--requests','-'],{windowsHide:true,stdio:['pipe','pipe','pipe']});
+  const pending=new Map();let sequence=0,stderr='',closing=false,readyResolve,readyReject,settledReady=false,requestFailed=false;
+  const ready=new Promise((resolve,reject)=>{readyResolve=resolve;readyReject=reject;});
+  const closed=new Promise(resolve=>child.once('close',code=>{fail(Error(`Preservation reader exited ${code}: ${stderr.slice(-3000)}`));resolve(code);}));
+  function fail(error){if(!settledReady){settledReady=true;readyReject(error);}for(const item of pending.values()){clearTimeout(item.timer);item.reject(error);}pending.clear();}
+  child.on('error',fail);child.stdin.on('error',fail);child.stderr.on('data',bytes=>{if(stderr.length<65536)stderr+=bytes.toString();});
+  const reader=createInterface({input:child.stdout,crlfDelay:Infinity});
+  reader.on('line',line=>{try{
+    if(line.length>1024**2)throw Error('Preservation reader response exceeds its bound');const response=JSON.parse(line);
+    if(response.type==='ready'){if(settledReady||response.indexSha256!==indexSha256)throw Error('Preservation reader index acknowledgement differs');settledReady=true;readyResolve();return;}
+    const item=pending.get(response.id);if(!item)throw Error('Unexpected preservation-reader response');pending.delete(response.id);clearTimeout(item.timer);item.resolve(response);
+  }catch(error){fail(error);child.kill();}});
+  const stop=async()=>{if(closing)return closed;closing=true;child.stdin.end();const timer=setTimeout(()=>child.kill(),5000);try{return await closed;}finally{clearTimeout(timer);reader.close();}};
+  const startTimer=setTimeout(()=>{fail(Error('Preservation reader startup timed out'));child.kill();},30000);
+  try{await ready;}catch(error){await stop();throw error;}finally{clearTimeout(startTimer);}
+  return {
+    async restore({sha256,bytes,destination}){
+      try{
+      if(closing||!/^[a-f0-9]{64}$/.test(sha256)||!Number.isSafeInteger(bytes)||bytes<0||bytes>MAX_UNIQUE)throw Error('Invalid bounded recovery object');
+      const provider=index.objects[sha256];if(!provider||provider.bytes!==bytes||!['raw','zip-member','range'].includes(provider.kind))throw Error('Expected object is absent from the pinned preservation index');
+      relativeName(provider.path);if(provider.kind!=='raw'){if(!/^[a-f0-9]{64}$/.test(provider.containerSha256??'')||!Number.isSafeInteger(provider.containerBytes)||provider.containerBytes<0)throw Error('Invalid pinned archive provider');}
+      if(provider.kind==='zip-member')relativeName(provider.member);
+      if(provider.kind==='range'&&(!Number.isSafeInteger(provider.offset)||provider.offset<0||provider.offset+bytes>provider.containerBytes))throw Error('Invalid pinned range provider');
+      destination=path.resolve(destination);await ordinaryPath(path.dirname(destination));await ordinaryPath(destination,{missing:true});try{await fs.lstat(destination);throw Error('Recovery output already exists');}catch(error){if(error.code!=='ENOENT')throw error;}
+      const id=String(++sequence),response=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(Error('Preservation object read timed out'));child.kill();},300000);pending.set(id,{resolve,reject,timer});child.stdin.write(JSON.stringify({id,sha256,destination})+'\n',error=>{if(error){pending.delete(id);clearTimeout(timer);reject(error);}});});
+      if(response.ok!==true)throw Error(response.error??'Preservation object read failed');
+      if(response.sha256!==sha256||response.sourceSha256!==sha256||response.bytes!==bytes||response.indexSha256!==indexSha256||!equal(response.destination,destination)||response.fullReadback!==true||response.independentRegularFile!==true||response.provider?.kind!==provider.kind||response.provider?.path!==provider.path||(provider.kind!=='raw'&&(response.provider.containerSha256!==provider.containerSha256||response.provider.containerBytes!==provider.containerBytes))||(provider.kind==='zip-member'&&(response.crcVerified!==true||response.provider.member!==provider.member))||(provider.kind==='range'&&response.provider.offset!==provider.offset))throw Error('Preservation object acknowledgement differs from the pinned request');
+      const actual=await fingerprint(destination,MAX_UNIQUE);if(actual.sha256!==sha256||actual.bytes!==bytes||(await fs.lstat(destination)).nlink!==1)throw Error('Recovered provider bytes differ');await fs.chmod(destination,0o600);return response;
+      }catch(error){requestFailed=true;throw error;}
+    },
+    async close(){const code=await stop();if(code!==0&&!requestFailed)throw Error(`Preservation reader failed to finish (${code}): ${stderr.slice(-3000)}`);if((await fingerprint(script,2*1024**2)).sha256!==scriptProof.sha256||(await fingerprint(preservationIndex,256*1024**2)).sha256!==indexSha256)throw Error('Preservation reader source or index changed during recovery');},
+  };
+}
+
 /** Restore ordinary independent files, never links or original .local paths. */
-export async function restoreRecovery({archive,catalog,destination,relative=null,all=false,name=null,externalObjects={},externalFiles=[]}){
+export async function restoreRecovery({archive,catalog,destination,relative=null,all=false,name=null,externalObjects={},externalFiles=[],preservationIndex=null,indexSha256=null,pythonExecutable=null}){
   const objects=validateCatalog(catalog);destination=path.resolve(destination);
+  const providerOptions={workspace:catalog.workspace,preservationIndex,indexSha256,pythonExecutable},hasProvider=providerRequested(providerOptions);
   if(relative===null&&!all)throw Error('Choose one catalog file, or explicitly request whole artifact recovery');
   if(name!==null){relativeName(name);if(name.includes('/'))throw Error('Single-file recovery name must be a basename');if(relative===null)throw Error('Recovery name requires one explicit file');}
   if(catalog.workspace&&(destination.toLowerCase()===path.resolve(catalog.workspace).toLowerCase()||inside(path.resolve(catalog.workspace),destination)))throw Error('Restore into canonical workspace refused');
@@ -212,16 +273,22 @@ export async function restoreRecovery({archive,catalog,destination,relative=null
   const finishAliases=async(object,primary)=>{
     for(const row of byObject.get(object.object)){
       const full=await restorePath(row);if(full!==primary)await fs.copyFile(primary,full,constants.COPYFILE_EXCL);
-      const proof=await fingerprint(full,MAX_UNIQUE);if(proof.sha256!==object.sha256||proof.bytes!==object.bytes)throw Error('Restored independent file differs');
+      const proof=await fingerprint(full,MAX_UNIQUE);if(proof.sha256!==object.sha256||proof.bytes!==object.bytes||(await fs.lstat(full)).nlink!==1)throw Error('Restored independent file differs');
       result.push({relative:row.relative,bytes:proof.bytes,sha256:proof.sha256});
     }
   };
   const external=rows.length===1?externalObjects[rows[0].sha256]:null;
-  if(external){
+  const externalMissing=external?await absentOrdinary(external):false;
+  const foreign=rows.some(r=>!catalog.files.some(f=>f.relative===r.relative));
+  const providerNeeded=hasProvider&&(external?externalMissing:(foreign||await absentOrdinary(archive)));
+  if(providerNeeded){
+    const provider=await openPreservationProvider(providerOptions);
+    try{for(const [object,list]of byObject){const row=list[0],full=await restorePath(row);await provider.restore({sha256:row.sha256,bytes:row.bytes,destination:full});await finishAliases({object,sha256:row.sha256,bytes:row.bytes},full);}}finally{await provider.close();}
+  }else if(external){
     const row=rows[0],proof=await fingerprint(external,MAX_UNIQUE);if(proof.sha256!==row.sha256||proof.bytes!==row.bytes)throw Error('External CAS reference differs');
     const full=await restorePath(row);await fs.copyFile(external,full,constants.COPYFILE_EXCL);await finishAliases(row,full);
   }else{
-    if(rows.some(r=>!catalog.files.some(f=>f.relative===r.relative)))throw Error('Explicit verified external object mapping required');
+    if(foreign)throw Error('Explicit verified external object mapping required');
     const catalogBytes=Buffer.from(JSON.stringify(catalog,null,2)+'\n');
     await verifyArchive({archive,catalog,catalogBytes});
     const expected=[{object:'catalog.json',bytes:catalogBytes.length,sha256:sha(catalogBytes)},...objects];
@@ -250,7 +317,7 @@ async function main(){
   if(command==='inventory'){const data=await inventoryLocal({workspace:options.workspace});await exclusiveJson(options.output,data);console.log(JSON.stringify(data.totals));}
   else if(command==='seal'){const inventory=JSON.parse(await fs.readFile(options.inventory,'utf8'));const indexManifest=options['index-manifest']?JSON.parse(await fs.readFile(options['index-manifest'],'utf8')):null;console.log(JSON.stringify(await sealRecovery({inventory,outDir:options.output,select:options.select??'all',indexManifest,onProgress:r=>console.log(JSON.stringify(r))})));}
   else if(command==='verify'){const catalogBytes=await fs.readFile(options.catalog),catalog=JSON.parse(catalogBytes);console.log(JSON.stringify(await verifyArchive({archive:options.archive,catalog,catalogBytes})));}
-  else if(command==='restore'){const catalog=JSON.parse(await fs.readFile(options.catalog,'utf8'));const externalObjects=options['external-objects']?JSON.parse(await fs.readFile(options['external-objects'],'utf8')):{};const externalFiles=options['external-files']?JSON.parse(await fs.readFile(options['external-files'],'utf8')):[];console.log(JSON.stringify(await restoreRecovery({archive:options.archive,catalog,destination:options.destination,relative:options.relative??null,all:options.all==='yes',name:options.name??null,externalObjects,externalFiles})));}
+  else if(command==='restore'){const catalog=JSON.parse(await fs.readFile(options.catalog,'utf8'));const externalObjects=options['external-objects']?JSON.parse(await fs.readFile(options['external-objects'],'utf8')):{};const externalFiles=options['external-files']?JSON.parse(await fs.readFile(options['external-files'],'utf8')):[];console.log(JSON.stringify(await restoreRecovery({archive:options.archive,catalog,destination:options.destination,relative:options.relative??null,all:options.all==='yes',name:options.name??null,externalObjects,externalFiles,preservationIndex:options['preservation-index']??null,indexSha256:options['index-sha256']??null,pythonExecutable:options.python??null})));}
   else throw Error('Use inventory, seal, verify, or restore; this tool has no source deletion command');
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(e=>{console.error(e.stack);process.exitCode=1;});

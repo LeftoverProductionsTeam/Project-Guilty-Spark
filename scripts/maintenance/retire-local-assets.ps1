@@ -12,7 +12,9 @@ try{$plan=$manifestReader.ReadToEnd()|ConvertFrom-Json}finally{$manifestReader.D
 if($plan.workerSha256-and $plan.workerSha256-cne $env:SPARK_TRUSTED_SCRIPT_SHA){throw 'Reviewed immutable retirement worker changed'}
 $cacheMode=$plan.operation-eq 'dispose-obsolete-webview-caches'
 $archiveMode=$plan.operation-eq 'retire-obsolete-recovery-archive'
-if($plan.schemaVersion-ne 1-or (!$cacheMode-and !$archiveMode-and $plan.operation-ne 'preserve-obsolete-immutable-assets')-or !$plan.complete-or $plan.sourceDeletionPerformed){throw 'Incomplete immutable asset plan'}
+$preservedMode=$plan.operation-eq 'retire-preserved-redundancy'
+if(($plan.scopeMode-eq 'preserved-consolidation')-ne $preservedMode-or ($plan.scopeMode-and !$preservedMode)){throw 'Preserved consolidation requires its explicit operation and canonical scope mode'}
+if($plan.schemaVersion-ne 1-or (!$cacheMode-and !$archiveMode-and !$preservedMode-and $plan.operation-ne 'preserve-obsolete-immutable-assets')-or !$plan.complete-or $plan.sourceDeletionPerformed){throw 'Incomplete immutable asset plan'}
 $guard=if($SharedHelperPath){$SharedHelperPath}else{Join-Path $PSScriptRoot 'windows-sealed-files.cs'}
 if((Hash-File $guard)-cne $plan.guardSha256){throw 'Shared sealed-file guard changed after review'}
 if(-not ('SparkSealedFiles' -as [type])){Add-Type -Path $guard}
@@ -26,7 +28,16 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 public static class SparkImmutableDisposition {
   [StructLayout(LayoutKind.Sequential)] public struct DispositionEx { public uint Flags; }
+  [StructLayout(LayoutKind.Sequential)] public struct Standard { public long Allocation,End; public uint Links; public byte Pending,Directory; }
   [DllImport("kernel32.dll",SetLastError=true)] static extern bool SetFileInformationByHandle(SafeFileHandle h,int kind,ref DispositionEx value,uint size);
+  [DllImport("kernel32.dll",SetLastError=true)] static extern bool GetFileInformationByHandleEx(SafeFileHandle h,int kind,out Standard value,uint size);
+  public static long AllocatedUnlinkBytes(SafeFileHandle handle) {
+    Standard value;if(!GetFileInformationByHandleEx(handle,1,out value,(uint)Marshal.SizeOf(typeof(Standard))))throw new Win32Exception(Marshal.GetLastWin32Error(),"Read actual allocated file bytes");if(value.Allocation<0)throw new System.IO.IOException("Invalid native allocated-byte count");return value.Links==1?value.Allocation:0;
+  }
+  public static string HashRange(System.IO.Stream stream,long offset,long bytes) {
+    if(offset<0||bytes<0||offset>stream.Length||bytes>stream.Length-offset)throw new System.IO.IOException("Retained range exceeds its container");stream.Position=offset;var buffer=new byte[65536];
+    using(var hash=System.Security.Cryptography.SHA256.Create()){long remaining=bytes;while(remaining>0){int count=stream.Read(buffer,0,(int)Math.Min(buffer.Length,remaining));if(count==0)throw new System.IO.EndOfStreamException();hash.TransformBlock(buffer,0,count,buffer,0);remaining-=count;}hash.TransformFinalBlock(new byte[0],0,0);return BitConverter.ToString(hash.Hash).Replace("-","").ToLowerInvariant();}
+  }
   public static void DeleteReadonly(SafeFileHandle handle) {
     var value=new DispositionEx{Flags=0x11};
     if(!SetFileInformationByHandle(handle,21,ref value,(uint)Marshal.SizeOf(typeof(DispositionEx)))) {
@@ -54,26 +65,31 @@ function Source-Matches($file,$entry){
 function Content-Identity-Matches($file,$entry){
   return [SparkSealedFiles]::VolumeId($file.Identity)-ceq [string]$entry.dev-and [SparkSealedFiles]::Id($file.Identity)-ceq [string]$entry.ino-and [SparkSealedFiles]::Length($file.Identity)-eq [long]$entry.bytes-and [SparkSealedFiles]::ModifiedNs($file.Identity)-ceq [string]$entry.mtimeNs
 }
+function Open-SealedSource([string]$path){
+  try{return [SparkSealedFiles+File]::new($path,$true)}catch{$cause=$_.Exception;while($cause.InnerException){$cause=$cause.InnerException};$code=if($cause-is [ComponentModel.Win32Exception]){$cause.NativeErrorCode}else{'unknown'};throw "Cannot seal exclusive source access (native $code): $path"}
+}
 $workspace=[IO.Path]::GetFullPath($plan.workspace);Ordinary $workspace
 $local=Join-Path $workspace '.local';$vault=Join-Path $workspace 'preserved\immutable-assets'
-if(!$cacheMode-and !$archiveMode){Ordinary $vault;if([IO.Path]::GetFullPath($plan.vault)-ine $vault){throw 'Immutable vault ownership path differs'};$owner=Get-Content -LiteralPath (Join-Path $vault 'ownership.json') -Raw|ConvertFrom-Json;if($owner.kind-ne 'spark-private-immutable-assets'-or $owner.schemaVersion-ne 1-or [IO.Path]::GetFullPath($owner.workspace)-ine $workspace){throw 'Unknown immutable preservation owner'}}
+$scopeRoot=if($preservedMode){Join-Path $workspace 'preserved'}else{$local}
+if(!$cacheMode-and !$archiveMode-and !$preservedMode){Ordinary $vault;if([IO.Path]::GetFullPath($plan.vault)-ine $vault){throw 'Immutable vault ownership path differs'};$owner=Get-Content -LiteralPath (Join-Path $vault 'ownership.json') -Raw|ConvertFrom-Json;if($owner.kind-ne 'spark-private-immutable-assets'-or $owner.schemaVersion-ne 1-or [IO.Path]::GetFullPath($owner.workspace)-ine $workspace){throw 'Unknown immutable preservation owner'}}
 $nativeMode=$plan.nativeTagsExistingOnly-eq $true
+if($preservedMode-and ($nativeMode-or $plan.hardlinkLifecycle)){throw 'Preserved source consolidation never relaxes independent file identity'}
 $nativeClasses=@($NativeTagExtensions.Split('|')|Where-Object{$_});if(@($nativeClasses|Where-Object{$_-cnotmatch '^\.[a-z_]+$'}).Count){throw 'Invalid native classes from the trusted native-tag registry'}
 if($nativeMode){
   if($cacheMode-or !$plan.existingVaultOnly-or [long]$plan.totals.newVaultBytes-ne 0){throw 'Native-tag extras require strictly existing preservation blobs'}
   $nativeVault=Join-Path $workspace 'preserved\native-tags';Ordinary $nativeVault;if([IO.Path]::GetFullPath($plan.nativeVault)-ine $nativeVault){throw 'Native tag vault path differs'}
   $nativeOwner=Get-Content -LiteralPath (Join-Path $nativeVault 'ownership.json') -Raw|ConvertFrom-Json;if($nativeOwner.kind-ne 'spark-private-native-tags'-or $nativeOwner.schemaVersion-ne 1-or [IO.Path]::GetFullPath($nativeOwner.workspace)-ine $workspace){throw 'Unknown native tag preservation owner'}
 }elseif($nativeClasses.Count){throw 'Native classes supplied outside existing-CAS-only plan'}
-if($plan.entries.Count-lt 1-or $plan.entries.Count-gt $(if($cacheMode-or $nativeMode-or $archiveMode){100000}else{10000})-or [long]$plan.totals.inputBytes-gt $(if($cacheMode){4GB}elseif($archiveMode){16GB}else{80GB})-or [long]$plan.totals.uniqueBytes-gt 12GB){throw 'Immutable plan exceeds its bounded limits'}
+if($plan.entries.Count-lt 1-or $plan.entries.Count-gt $(if($preservedMode){30000}elseif($cacheMode-or $nativeMode-or $archiveMode){100000}else{10000})-or [long]$plan.totals.inputBytes-gt $(if($preservedMode){40GB}elseif($cacheMode){4GB}elseif($archiveMode){16GB}else{80GB})-or [long]$plan.totals.uniqueBytes-gt 12GB){throw 'Immutable plan exceeds its bounded limits'}
 $journalRoot=[IO.Path]::GetFullPath($Journal)
-if($journalRoot-ieq $local-or $journalRoot.StartsWith($local+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Retirement journal must remain outside .local'}
+if($journalRoot-ieq $scopeRoot-or $journalRoot.StartsWith($scopeRoot+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Retirement evidence must remain outside its protected source root'}
 [IO.Directory]::CreateDirectory($journalRoot)|Out-Null;Ordinary $journalRoot $true
 $log=[IO.File]::Open((Join-Path $journalRoot 'immutable-events.jsonl'),[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
 $writer=[IO.StreamWriter]::new($log,[Text.UTF8Encoding]::new($false));$writer.AutoFlush=$true
 function Event($value){$writer.WriteLine(($value|ConvertTo-Json -Depth 8 -Compress));$log.Flush($true)}
 function Process-Gate{
   foreach($p in @(Get-CimInstance Win32_Process|Where-Object{$_.Name-match '^(GuiltySpark.*|Spark-.*|halo.*|standalone|tool|invader-.*|baboon|sapien|guerilla|chupathingy.*|OpenCE.*|msedgewebview2|msedge|chrome|crashpad_handler)\.exe$'}|Select-Object ProcessId,ExecutablePath,CommandLine)){
-    if((([string]$p.ExecutablePath)+' '+([string]$p.CommandLine)).IndexOf($local,[StringComparison]::OrdinalIgnoreCase)-ge 0){throw "Active obsolete asset process: $($p.ProcessId)"}
+    if((([string]$p.ExecutablePath)+' '+([string]$p.CommandLine)).IndexOf($scopeRoot,[StringComparison]::OrdinalIgnoreCase)-ge 0){throw "Active source asset process: $($p.ProcessId)"}
   }
 }
 $directories=@{};$blobs=@{};$owners=@{};$archiveArtifacts=@{};$inodeStates=@{};$rows=[Collections.Generic.List[object]]::new();$removed=0;$removedBytes=[long]0;$removedAllocation=[long]0;$vaultAllocation=[long]0;$seen=@{}
@@ -86,8 +102,25 @@ function Protect-RecoveryArtifact([string]$file,[string]$sha256,[long]$limit,[bo
     if($json){$opened.Stream.Position=0;$reader=[IO.StreamReader]::new($opened.Stream,[Text.Encoding]::UTF8,$true,65536,$true);try{return $reader.ReadToEnd()|ConvertFrom-Json}finally{$reader.Dispose()}}
   }finally{$opened.Dispose()}
 }
+function Provider-Equal($left,$right){
+  if(!$left-or !$right){return $false};$names=@($left.PSObject.Properties.Name);if($names.Count-ne @($right.PSObject.Properties.Name).Count){return $false};foreach($name in $names){if($name-cnotin @($right.PSObject.Properties.Name)-or [string]$left.$name-cne [string]$right.$name){return $false}};return $true
+}
 try{
   Process-Gate
+  if($preservedMode){
+    Ordinary $scopeRoot;$proof=$plan.providerProof
+    # Node validates the complete index projection before invocation. Sealing
+    # its full SHA here avoids another large PowerShell index object graph.
+    Protect-RecoveryArtifact $proof.index $proof.indexSha256 128MB $false
+    $verification=Protect-RecoveryArtifact $proof.receipt $proof.receiptSha256 128MB $true
+    if($verification.schemaVersion-ne 1-or $verification.kind-ne 'spark-provider-verification'-or !$verification.complete-or !$verification.fullReadback-or $verification.indexSha256-cne $proof.indexSha256-or [IO.Path]::GetFullPath($verification.indexPath)-ine [IO.Path]::GetFullPath($proof.index)){throw 'Retained provider readback receipt is invalid'}
+    $verifiedObjects=@{};foreach($object in $verification.objects){if(!$object.fullReadback-or $object.sourceSha256-cne $object.sha256-or ($object.indexSha256-and $object.indexSha256-cne $proof.indexSha256)-or $object.sha256-cnotmatch '^[a-f0-9]{64}$'-or $verifiedObjects.ContainsKey($object.sha256)){throw 'Invalid duplicate verified provider object'};$verifiedObjects[$object.sha256]=$object}
+    $sourcePaths=@{};foreach($entry in $plan.entries){if(!$entry.sourceRelative.StartsWith('preserved/')){throw 'Preserved source leaves canonical namespace'};$full=Join-Relative $workspace $entry.sourceRelative;if($sourcePaths.ContainsKey($full)-or $full-ieq $proof.index-or $full-ieq $proof.receipt){throw 'Duplicate or protected preservation metadata source'};$sourcePaths[$full]=$true}
+    $providerHandles=@{};foreach($container in $proof.containers){$relative=[string]$container.path;$full=Join-Relative $scopeRoot $relative;if($sourcePaths.ContainsKey($full)-or $providerHandles.ContainsKey($relative)){throw 'Retained provider is itself scheduled for removal'};Protect-RecoveryArtifact $full $container.sha256 40GB $false
+      $handle=$archiveArtifacts[$full];$current=[pscustomobject]@{Identity=[SparkSealedFiles]::Information($handle);BasicIdentity=[SparkSealedFiles]::BasicInformation($handle)};if(!(Source-Matches $current $container)){throw 'Retained provider file identity changed'};$providerHandles[$relative]=$current
+    }
+    if($providerHandles.Count-lt 1-or $providerHandles.Count-gt 128){throw 'Retained container count exceeds its explicit bound'}
+  }
   if($archiveMode){
     $proof=$plan.archiveProof;$preserved=Join-Path $workspace 'preserved\recovery-metadata';$archive=[IO.Path]::GetFullPath($proof.archive);$catalog=[IO.Path]::GetFullPath($proof.catalog);$receipt=[IO.Path]::GetFullPath($proof.receipt)
     if(!$receipt.StartsWith($preserved+'\',[StringComparison]::OrdinalIgnoreCase)-or [IO.Path]::GetDirectoryName($archive)-ine [IO.Path]::GetDirectoryName($receipt)-or [IO.Path]::GetDirectoryName($catalog)-ine [IO.Path]::GetDirectoryName($receipt)){throw 'Recovery proof leaves canonical preservation owner'}
@@ -114,13 +147,20 @@ try{
   foreach($entry in $plan.entries){
     $relative=[string]$entry.sourceRelative
     $nativeEntry=$entry.preservationKind-eq 'native-tags';$extension=[IO.Path]::GetExtension($relative).ToLowerInvariant()
-    if(!$relative.StartsWith('.local/')-or (!$archiveMode-and @($relative.Split('/')|Where-Object{$_-in @('.git','node_modules','.toolchain','tools','archives','releases')}).Count)){throw 'Protected or unrelated immutable source'}
+    if($preservedMode){if(!$relative.StartsWith('preserved/')){throw 'Consolidation source is outside canonical preserved'}}elseif(!$relative.StartsWith('.local/')-or (!$archiveMode-and @($relative.Split('/')|Where-Object{$_-in @('.git','node_modules','.toolchain','tools','archives','releases')}).Count)){throw 'Protected or unrelated immutable source'}
     if($nativeEntry-and (!$nativeMode-or $extension-notin $nativeClasses)){throw 'Unrecognized native tag class'}
-    if((!$cacheMode-and !$archiveMode-and !$nativeEntry-and $extension-notin @('.map','.yelo','.exe','.dll','.pdb','.dmp'))-or $entry.sha256-cnotmatch '^[a-f0-9]{64}$'-or [long]$entry.bytes-lt 0-or [long]$entry.bytes-gt $(if($archiveMode){8GB}else{512MB})){throw 'Unsupported immutable source or size'}
+    if((!$cacheMode-and !$archiveMode-and !$preservedMode-and !$nativeEntry-and $extension-notin @('.map','.yelo','.exe','.dll','.pdb','.dmp'))-or $entry.sha256-cnotmatch '^[a-f0-9]{64}$'-or [long]$entry.bytes-lt 0-or [long]$entry.bytes-gt $(if($archiveMode-or $preservedMode){8GB}else{512MB})){throw 'Unsupported immutable source or size'}
     if($seen.ContainsKey($relative)){throw 'Duplicate immutable plan entry'};$seen[$relative]=$true
     foreach($excluded in $plan.excludedRoots){if($relative-eq $excluded-or $relative.StartsWith($excluded+'/',[StringComparison]::OrdinalIgnoreCase)){throw 'Immutable plan overlaps another owned retirement plan'}}
     $source=Join-Relative $workspace $relative;Protect-Parents $source
-    if($archiveMode){
+    if($preservedMode){
+      $provider=$entry.provider;$object=$verifiedObjects[$entry.sha256]
+      if(!$object-or $object.bytes-ne $entry.bytes-or !(Provider-Equal $provider $object.provider)-or $entry.providerRef.table-ne 'objects'-or $entry.providerRef.key-cne $entry.sha256-or $object.providerRef.table-ne 'objects'-or $object.providerRef.key-cne $entry.sha256-or $provider.bytes-ne $entry.bytes-or $provider.kind-notin @('raw','zip-member','range')-or !$providerHandles.ContainsKey($provider.path)){throw 'Source has no exact verified retained provider'}
+      if($provider.kind-eq 'zip-member'-and (!$object.crcVerified-or !$provider.member-or $provider.member.Contains('\')-or $provider.member.StartsWith('/')-or @($provider.member.Split('/')|Where-Object{!$_-or $_-eq '..'}).Count)){throw 'Archive member has no CRC-checked native readback'}
+      $retained=Join-Relative $scopeRoot $provider.path;$expectedSha=if($provider.kind-eq 'raw'){$entry.sha256}else{$provider.containerSha256};$expectedBytes=if($provider.kind-eq 'raw'){$entry.bytes}else{$provider.containerBytes};$container=@($proof.containers|Where-Object{$_.path-ceq $provider.path})[0]
+      if($expectedSha-cne $container.sha256-or [long]$expectedBytes-ne [long]$container.bytes-or ($source-ieq $retained)-or $retained.StartsWith($source+'\',[StringComparison]::OrdinalIgnoreCase)-or ([string]$entry.dev-ceq [SparkSealedFiles]::VolumeId($providerHandles[$provider.path].Identity)-and [string]$entry.ino-ceq [SparkSealedFiles]::Id($providerHandles[$provider.path].Identity))){throw 'Source aliases or disagrees with its retained provider'}
+      if($provider.kind-eq 'range'){$range=[SparkSealedFiles+File]::new($retained,$false);try{if([SparkImmutableDisposition]::HashRange($range.Stream,[long]$provider.offset,[long]$entry.bytes)-cne $entry.sha256){throw 'Retained provider range differs'}}finally{$range.Dispose()}}
+    }elseif($archiveMode){
       if($entry.namespace-or $entry.object-cne ('objects/'+$entry.sha256.Substring(0,2)+'/'+$entry.sha256)){throw 'Original source differs from reviewed archive object mapping'}
     }elseif($cacheMode){
       if(!$owners.ContainsKey($entry.ownerProfileRelative)-or !$relative.StartsWith($entry.ownerProfileRelative+'/',[StringComparison]::OrdinalIgnoreCase)){throw 'Cache has no proven adjacent Spark QA owner'}
@@ -141,8 +181,8 @@ try{
     }
     if($blobs[$blobKey].bytes-ne [long]$entry.bytes){throw 'Immutable hash/length collision'}
     }
-    $file=[SparkSealedFiles+File]::new($source,$true)
-    try{if(!(Source-Matches $file $entry)-or $file.Hash()-cne $entry.sha256){throw "Immutable source changed or replaced: $source"}
+    $file=Open-SealedSource $source
+    try{if(!(Source-Matches $file $entry)-or $file.Hash()-cne $entry.sha256-or ($preservedMode-and ($file.Identity.Links-ne 1-or [long]$entry.links-ne 1))){throw "Immutable source changed or replaced: $source"}
       if($plan.hardlinkLifecycle){
         if(!$archiveMode-or [long]$entry.links-lt 1-or [long]$entry.links-ne [long]$file.Identity.Links){throw 'Recovery source native link count changed'}
         $key=([string]$entry.dev)+'/'+([string]$entry.ino)
@@ -152,10 +192,10 @@ try{
     }finally{$file.Dispose()}
     $rows.Add(@{path=$source;entry=$entry})
   }
-  if($rows.Count-ne [int]$plan.totals.files-or (!$cacheMode-and !$archiveMode-and $blobs.Count-ne [int]$plan.totals.uniqueFiles)){throw 'Immutable plan totals differ'}
+  if($rows.Count-ne [int]$plan.totals.files-or (!$cacheMode-and !$archiveMode-and !$preservedMode-and $blobs.Count-ne [int]$plan.totals.uniqueFiles)){throw 'Immutable plan totals differ'}
   Process-Gate;Event @{event='all-source-and-blob-hashes-verified';manifestSha256=$PlanSha256;files=$rows.Count;uniqueBlobs=$blobs.Count;at=[DateTime]::UtcNow.ToString('o')}
   foreach($row in $rows){
-    $file=[SparkSealedFiles+File]::new($row.path,$true)
+    $file=Open-SealedSource $row.path
     $inode=$null
     try{
       if($plan.hardlinkLifecycle){
@@ -165,15 +205,17 @@ try{
         # The exact native link-count delta and fresh content identity/hash stay mandatory.
         $inode.ctimeNs=[SparkSealedFiles]::UnixNs($file.BasicIdentity.Change)
       }elseif(!(Source-Matches $file $row.entry)-or $file.Hash()-cne $row.entry.sha256){throw "Immutable source changed immediately before sealed deletion: $($row.path)"}
-      $linksBefore=[long]$file.Identity.Links;$ctimeBefore=[SparkSealedFiles]::UnixNs($file.BasicIdentity.Change);$allocation=$file.Allocation();if(($file.Identity.Attributes-band 1)-ne 0){[SparkImmutableDisposition]::DeleteReadonly($file.Handle)}else{$file.DeleteVerified()}
+      if($preservedMode-and $file.Identity.Links-ne 1){throw 'Preserved source gained an alias before deletion'}
+      $linksBefore=[long]$file.Identity.Links;$ctimeBefore=[SparkSealedFiles]::UnixNs($file.BasicIdentity.Change);$allocation=if($preservedMode){[SparkImmutableDisposition]::AllocatedUnlinkBytes($file.Handle)}else{$file.Allocation()};if(($file.Identity.Attributes-band 1)-ne 0){[SparkImmutableDisposition]::DeleteReadonly($file.Handle)}else{$file.DeleteVerified()}
     }finally{$file.Dispose()}
     if(Test-Path -LiteralPath $row.path){throw 'Sealed immutable delete did not remove source path'}
     if($inode){$inode.removed++}
     $removed++;$removedBytes+=[long]$row.entry.bytes;$removedAllocation+=$allocation
-    Event @{event=if($cacheMode){'deleted-owned-regenerable-cache'}elseif($archiveMode){'deleted-archive-preserved-source'}else{'deleted-verified-duplicate'};sourceRelative=$row.entry.sourceRelative;sha256=$row.entry.sha256;blobRelative=$row.entry.blobRelative;object=$row.entry.object;dev=$row.entry.dev;ino=$row.entry.ino;nativeLinksBefore=$linksBefore;ctimeNsBefore=$ctimeBefore;ownUnlinksForInode=if($inode){$inode.removed}else{0};bytes=[long]$row.entry.bytes;allocationReleased=$allocation;filesRemoved=$removed}
+    Event @{event=if($preservedMode){'deleted-preserved-redundancy'}elseif($cacheMode){'deleted-owned-regenerable-cache'}elseif($archiveMode){'deleted-archive-preserved-source'}else{'deleted-verified-duplicate'};sourceRelative=$row.entry.sourceRelative;sha256=$row.entry.sha256;blobRelative=$row.entry.blobRelative;object=$row.entry.object;provider=$row.entry.provider;dev=$row.entry.dev;ino=$row.entry.ino;nativeLinksBefore=$linksBefore;ctimeNsBefore=$ctimeBefore;ownUnlinksForInode=if($inode){$inode.removed}else{0};bytes=[long]$row.entry.bytes;allocationReleased=$allocation;filesRemoved=$removed}
   }
   $result=@{schemaVersion=1;complete=$true;manifestSha256=$PlanSha256;workerSha256=$env:SPARK_TRUSTED_SCRIPT_SHA;guardSha256=$plan.guardSha256;filesRemoved=$removed;logicalBytesRemoved=$removedBytes;fileAllocationBytesReleased=$removedAllocation;preservedUniqueBytes=[long]$plan.totals.uniqueBytes;preservedUniqueFileAllocationBytes=$vaultAllocation;newVaultBytes=[long]$plan.totals.newVaultBytes;netLogicalBytesAfterUniquePreservation=$removedBytes-[long]$plan.totals.uniqueBytes;netFileAllocationAfterUniquePreservation=$removedAllocation-$vaultAllocation;independentBlobs=$blobs.Count;existingMetadataTouched=$false;directoriesRemoved=0;at=[DateTime]::UtcNow.ToString('o')}
   if($archiveMode){$result.protectedArchiveSha256=$proof.archiveSha256;$result.protectedArchiveBytes=[long]$proof.archiveBytes;$result.protectedCatalogSha256=$proof.catalogSha256;$result.protectedCopyReceiptSha256=$proof.receiptSha256;$result.externalRecoveryIndexesRetired=0}
+  if($preservedMode){$result.scopeMode='preserved-consolidation';$result.providerIndexSha256=$proof.indexSha256;$result.providerVerificationReceiptSha256=$proof.receiptSha256;$result.retainedProviderContainers=$providerHandles.Count;$result.allocatedBytesMethod='FileStandardInfo.Allocation, single independent file unlink';$result.sourceDeletionPerformed=$removed-gt 0}
   Event @{event='complete';result=$result};$result|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $journalRoot 'immutable-purge-receipt.json') -Encoding UTF8;$result|ConvertTo-Json -Depth 8 -Compress
 }catch{Event @{event='stopped';error=$_.Exception.Message;filesRemoved=$removed;logicalBytesRemoved=$removedBytes;at=[DateTime]::UtcNow.ToString('o')};throw}
 finally{foreach($value in $blobs.Values){$value.handle.Dispose()};foreach($handle in $owners.Values){$handle.Dispose()};foreach($handle in $archiveArtifacts.Values){$handle.Dispose()};foreach($handle in $directories.Values){$handle.Dispose()};$writer.Dispose();$log.Dispose();$manifestStream.Dispose()}

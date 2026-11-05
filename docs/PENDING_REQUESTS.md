@@ -1,6 +1,6 @@
 # Pending engineering requests
 
-Current priority: the owner’s P0 emergency repository/storage repair (`9ff41c98`). Earlier “pending behind C69” / “no predecessor deferral” wording below records the interrupted intake state; it no longer prevents independent safe engineering. Intake preservation did not implement or accept these requests. Their original acceptance requirements remain open.
+Current priority: Part1 cleanup preservation/native-integrity gates passed; commit verified source locally then finish Part2 lightweight storage safeguards6819d078 before resuming C70. See P0_UNIFIED_STORAGE_PURGE_20261105.md and ACTIVE_TASK.md. Exact directives retained in artifacts/storage-v1/unified-purge-20261105. Only proved-unneeded canonical files/folders were removed; all unique source/history/originals/releases remain.
 
 Historical `.local` evidence paths below are provenance, not current output defaults. The P0 recovery indexes preserve former paths and exact content hashes under `preserved/`; do not recreate `.local` to satisfy an old reference. See `ACTIVE_TASK.md` for actual current work and verified results.
 

@@ -4,6 +4,9 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {fileURLToPath} from 'node:url';
 import {preserveTagTrees,verifyDeletionCandidate,restoreTagTree,rootsFromInventory,retireTagPlan,captureQuiescence,TagNodeIO} from './retire-local-tags.mjs';
 async function fixture(){
   const workspace=await fs.mkdtemp(path.join(os.tmpdir(),'spark-native-tags-'));
@@ -62,6 +65,34 @@ test('inventory selects topmost tag trees and excludes Git/source dependency roo
   assert.throws(()=>rootsFromInventory({canonicalDirectory:path.resolve('another'),storage:{directories}},workspace),/another workspace/);
   for(const relative of ['weapons/pistol.weapon','world/metal.shader_environment','textures/tree.BITMAP'])assert.equal(TagNodeIO.isNativeTagPath(relative),true);
   for(const relative of ['source.rs','tool.dll','../foreign.weapon','D:/original.weapon'])assert.equal(TagNodeIO.isNativeTagPath(relative),false);
+});
+test('old native-tag manifests recover missing blobs from an explicitly pinned ZIP provider',{
+  skip:!process.env.SPARK_RECOVERY_PYTHON?'Requires explicit SPARK_RECOVERY_PYTHON for genuine provider acceptance':false,
+},async()=>{
+  const f=await fixture();try{
+    const plan=await preserveTagTrees(f.options),tree=plan.trees[1],manifest=JSON.parse(await fs.readFile(tree.manifest,'utf8')),root=path.join(f.workspace,'preserved'),zip=path.join(root,'recovery-archives/fixture/payload.zip');await fs.mkdir(path.dirname(zip),{recursive:true});
+    const payloads=[];for(const entry of manifest.entries){const file=TagNodeIO.blobPath(plan.vault,entry.sha256);payloads.push({member:entry.sha256,data:(await fs.readFile(file)).toString('base64')});}
+    await promisify(execFile)(process.env.SPARK_RECOVERY_PYTHON,['-I','-c','import sys,json,zipfile,base64\nwith zipfile.ZipFile(sys.argv[1],"x",zipfile.ZIP_DEFLATED) as z:\n for r in json.loads(sys.argv[2]):z.writestr(r["member"],base64.b64decode(r["data"]))',zip,JSON.stringify(payloads)],{windowsHide:true});
+    const packed=await fs.readFile(zip),objects=Object.fromEntries(manifest.entries.map(entry=>[entry.sha256,{kind:'zip-member',path:'recovery-archives/fixture/payload.zip',member:entry.sha256,bytes:entry.bytes,containerSha256:crypto.createHash('sha256').update(packed).digest('hex'),containerBytes:packed.length}]));
+    const indexFile=path.join(root,'recovery-metadata/preservation-index.json');await fs.mkdir(path.dirname(indexFile),{recursive:true});const indexBytes=Buffer.from(JSON.stringify({schemaVersion:1,kind:'spark-preservation-index',workspace:f.workspace,root,objects,files:{},legacyVaults:{}}));await fs.writeFile(indexFile,indexBytes);
+    for(const entry of manifest.entries){const file=TagNodeIO.blobPath(plan.vault,entry.sha256);await fs.chmod(file,0o600);await fs.unlink(file);}
+    const options={manifest:tree.manifest,manifestSha256:tree.manifestSha256,preservationIndex:indexFile,indexSha256:crypto.createHash('sha256').update(indexBytes).digest('hex'),pythonExecutable:process.env.SPARK_RECOVERY_PYTHON};
+    const destination=path.join(root,'restored-native-tags/indexed/tags');assert.equal((await restoreTagTree({...options,destination})).files,2);
+    for(const entry of manifest.entries){const file=path.join(destination,...entry.relative.split('/'));assert.equal(crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex'),entry.sha256);assert.equal((await fs.lstat(file)).nlink,1);}
+    // Exercise module initialization through the actual CLI, not only imported
+    // functions: a top-level await here once deadlocked the provider import.
+    const cli=fileURLToPath(new URL('./retire-local-tags.mjs',import.meta.url));
+    const cliDestination=path.join(root,'restored-native-tags/cli-café-世界/tags');
+    const cliArgs=target=>[cli,'restore','--manifest',tree.manifest,'--sha256',tree.manifestSha256,'--destination',target,'--preservation-index',indexFile,'--index-sha256',options.indexSha256,'--python',process.env.SPARK_RECOVERY_PYTHON];
+    const cliResult=await promisify(execFile)(process.execPath,cliArgs(cliDestination),{windowsHide:true,timeout:30000});assert.equal(JSON.parse(cliResult.stdout).files,2);assert.equal(JSON.parse(cliResult.stdout).complete,true);
+    for(const entry of manifest.entries){const file=path.join(cliDestination,...entry.relative.split('/'));assert.equal(crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex'),entry.sha256);assert.equal((await fs.lstat(file)).nlink,1);}
+    const wrong=cliArgs(path.join(root,'restored-native-tags/cli-wrong-index/tags'));wrong[wrong.indexOf('--index-sha256')+1]='0'.repeat(64);await assert.rejects(promisify(execFile)(process.execPath,wrong,{windowsHide:true,timeout:30000}),error=>error.code===1&&/Preservation index SHA-256 differs/.test(error.stderr));
+    await fs.writeFile(path.join(destination,'weapons/custom.weapon'),'edited independent restored tag');assert.equal(await fs.readFile(path.join(f.workspace,f.roots[1],'weapons/custom.weapon'),'utf8'),'unique custom edit');assert.deepEqual(await fs.readFile(zip),packed);
+    await assert.rejects(restoreTagTree({...options,destination}),/EEXIST/);
+    const corrupt=TagNodeIO.blobPath(plan.vault,manifest.entries[0].sha256);await fs.writeFile(corrupt,'corrupted raw object');
+    await assert.rejects(restoreTagTree({...options,destination:path.join(root,'restored-native-tags/corrupt-raw/tags')}),/Restore blob verification failed/);
+    await assert.rejects(promisify(execFile)(process.execPath,cliArgs(path.join(root,'restored-native-tags/cli-corrupt-raw/tags')),{windowsHide:true,timeout:30000}),error=>error.code===1&&/Restore blob verification failed/.test(error.stderr));
+  }finally{await f.cleanup();}
 });
 async function retirement(f){
   const plan=await preserveTagTrees(f.options),file=path.join(f.options.journal,'plan.json');

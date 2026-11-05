@@ -1,30 +1,25 @@
 # Active engineering checkpoint
 
-Task: P0 emergency repository, storage and engineering workflow repair
-Status: implementation incomplete
-Starting revision: 6cff1b6eb283dec6ceb6d1b1ea53db749d900b72
-Latest verified revision: Current canonical master working tree builds; Rust721 passed/8 ignored, frontend400, browser164, offline59. Repair remains uncommitted.
-Next action: Complete the reviewed native empty-directory retirement (.local has zero files and links), measure storage, then rebuild and test the actual app/native edit after removal; commit locally.
+Task: Unified P0 storage purge Part 1 — validate preserved recovery and remove proved generated waste
+Status: automated acceptance incomplete
+Starting revision: 55e8256a374aa3ddd47c7a16cefe0dc126ce92fd
+Latest verified revision: Local master55e8256. Exact preserved retirement completed:18,826 files/21,813,688,368 allocated bytes removed;35 sealed providers intact. Historical project Undo/Redo17→19 and independent native tag/cache readback passed. Full Rust and frontend400 passed; final physical accounting/native-app rerun pending.
+Next action: Finish exact26-target QA scratch cleanup; run native app edit/save/reopen and independent native readback. Clear only audited reproducible dev-profile output through Cargo after regressions, retain release app and unique probes/evidence. Reinventory, commit Part1 locally, then implement missing Part2 safeguards in existing storage architecture.
 
 ## Acceptance
-Owner directive9ff41c98 explicitly authorizes .local removal after verified unique preservation and overrides the global human-only gate. Preserve all source, originals, research, histories and previous-good builds. No push, publication, reset, branch/worktree creation or unrelated feature initiative.
+Owner explicitly authorizes proved-unneeded canonical folders. Preserve unique source/history/reflogs/stashes/research/originals/C49/C63/user projects. No blind purge, full archive/SDK copy, external relocation, push/publication or system/shared-tool changes. Part2 waits for Part1 integrity gates; C70 waits for safeguards.
 
 ## Verified milestones
-All18 C70 originals preserved; canonical15 unchanged and3 intentional repairs documented. All67 Zombie originals750272565bytes and100 relocated release files750809520bytes freshly hash-verified; C49 untouched. C63 accepted two-way cache4fc40e65… and later3504cd8f… plus C57tunnelc84a1ed4… verified in preserved immutable store. Starting17Gitrefs unchanged, one master/worktree.
-OldCargo11250files retired after rescue; net native file allocation saved3152756566bytes. Native tags503903 source files fully retired,15988 independent blobs2199751458bytes rehashed, zero errors. Immutable1472copies51776780509bytes retired into258blobs12859174574bytes. OwnedWebView9067files1603160332bytes retired. ResidualCAS52745files8645708957bytes retired with0newblobs.
-Every residual seed file is covered exactly once:107869files18118078333bytes =52165metadata+52745CAS+2959supplement. Two standardZIP64 recovery archives2017823959bytes and1114398978bytes independently fully read back. Portable native/asset/Cargo indexes and originalsource snapshot included. Link targets never followed.
+Exact preserved plan9b2bca1c and final receiptff3dcd40 completed, postcheck proves all sources absent/providers stable/.local absent. New compression3,496,417,410B and pinned index8bf7c7a3 preserve154,539 objects,18,935 original named paths and8 legacy catalogs. Retirement bytes are gross, not net savings.39 Python provider fixtures,19 native-retirement tests and Node restore CLI/read-only refusals passed. Real Unicode two-tag CLI restore succeeded after fixing a module-load deadlock. Historical recovered project native readers and acknowledged Undo/Redo passed. Native Invader sound maximum_distance5 and accepted C63 cache CRC mismatch0 verified.
 
 ## Changed work
-Canonical outputs target/, artifacts/qa/, tools/ and protected preserved/. Obsolete .local writes rejected. Existing ownership ledger now checks source/output overlap, hashes and active ownership. Successful native builds dispose only their reproducible extractor input after output+source readback; editable tags remain protected. QA admission/disposal and shared Cargo cache admission are bounded. Original C70 manual handoff clicks now wait for background polling. Native minimized viewports cancel queued frames. Fresh-library direct map saving creates an owned bounded jobs folder.
-
-## Native acceptance
-Actual Tauri app launched. UI pistol bounding radius changed to.225; Undo/Redo/Save produced MCC map45c59624…, independently extracted/read by Invader with correct CRC. Original1b712ba7… unchanged; compilerRan=false for this direct route. Separate real Invader model compile/reopen passed3vertices/1triangle. Actual8 native workspace cases passed on button path, including0GL clears while inactive/minimized. Pointer-exit and position automation had intermittent failures; test now waits native window registration. Final post-cleanup rerun remains. No new game/human/physical monitor acceptance claimed.
+Existing qa-vault, archive-local-recovery and retire-local-tags/assets helpers extended with pinned providers, bounded copy-only compression and same-handle verified retirement. Existing policy reused. No competing storage manager. New opt-in historical project reader/history test. User-added docs/Master Engineering Prompts remains untouched and untracked pending provenance review.
 
 ## Failures and blockers
-Both archived-metadata retirements completed after the tested own-unlink hardlink lifecycle correction. Fresh no-follow scan: zero regular files, zero links;113784 empty directories are undergoing exact reviewed native deletion. C69 human gameplay/physical monitors and actual C70 DCC roundtrip remain open, not globally blocking.
+Git repacking was rejected by automatic approval review, citing earlier read-only scope/object-loss concern. No Git objects or protected refs/index changed; do not bypass using indirect pack/prune/GC. All6,514 objects retained, including459 unreachable objects. Partial-overlap archives retain unique members and are not disposable. Initial incorrect pnpm path failed before executing tests; actual pnpm frontend run passed. Clean-machine, human/physical monitor and game-peer gates remain unverified.
 
 ## Operations and safe checkpoint
-External source/recovery snapshot: C:/Users/patri/OneDrive/Documents/ChatGPT/GS/P0-Recovery-20261104. Native/immutable CAS and two verified ZIPs under D:/Project Guilty Spark/preserved. Cargo/tag/asset/archive workers closed. All459 captured reparse objects retired without following targets. Empty-directory plan e06c090c… root-reviewed and authorized; .local itself is last. Continuity agent owns exact native reparse/empty-directory planning. Do not repeat completed removals or regenerate SDK trees.
+Evidence:artifacts/storage-v1/preserved-consolidation-20261105 and artifacts/storage-v1/unified-purge-20261105. Exact QA cleanup delegated, no native app while it runs. Full physical baseline54,239,703,248 unique allocated file bytes after preserved retirement/before broad cleanup. External original game/SDK/app-data roots read-only. Source helpers tested before removal; accepted release QA app SHA43888167 retained.
 
 ## Deferred requests
-Earlier directive texts and requirements remain preserved in the portable recovery indexes and Git. Receipt/intake/ledger commits did not implement them. Finish this P0 repair before resuming existing C70 native-tool/DCC acceptance; keep human-only evidence unverified while progressing safe independent work.
+Part2 full text6819d078 preserved in unified-purge evidence, not yet implemented. C70 and all later task identities/full available instructions retained in existing ledgers. No scheduler/queue manager, no manual requeue established. User away; continue safe work and leave human-only gates explicit.

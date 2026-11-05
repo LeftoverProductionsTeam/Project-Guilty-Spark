@@ -4,8 +4,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import { assetSourcePath, cacheProfileRelative, planImmutableAssets, purgeImmutableAssets, planArchiveRetirement, resumeArchiveRetirement } from './retire-local-assets.mjs';
+import { assetSourcePath, cacheProfileRelative, planImmutableAssets, purgeImmutableAssets, planArchiveRetirement, resumeArchiveRetirement, preservedSourcePath, planPreservedConsolidation } from './retire-local-assets.mjs';
 import { inventoryLocal, sealRecovery } from './archive-local-recovery.mjs';
+import {TagNodeIO} from './retire-local-tags.mjs';
 const quiet=async()=>({blocking:[]});
 async function fixture(t) {
   const temporary=await fs.realpath(os.tmpdir()),root=await fs.mkdtemp(path.join(temporary,'spark-assets-retire-'));
@@ -116,7 +117,7 @@ test('real writes during an archive hardlink sequence are rejected even after an
   const out=path.join(f.root,'preserved','recovery-metadata','linked'),proof=await sealRecovery({inventory:await inventoryLocal({workspace:f.root}),outDir:out}),receipt=path.join(out,'copy-receipt.json'),p=await planArchiveRetirement({workspace:f.root,receipt,receiptSha256:crypto.createHash('sha256').update(await fs.readFile(receipt)).digest('hex'),journal:path.join(f.root,'linked-plan'),gate:quiet}),journal=path.join(f.root,'linked-purge');
   const running=purgeImmutableAssets({manifest:p.file,sha256:p.sha256,reviewedSha256:p.sha256,journal,gate:quiet});running.catch(()=>{});let changed=false;
   for(let n=0;n<5000&&!changed;n++){const log=await fs.readFile(path.join(journal,'immutable-events.jsonl'),'utf8').catch(()=> '');if(log.includes('deleted-archive-preserved-source')){try{await fs.writeFile(outside,'externally corrupted source');changed=true;}catch(error){if(!['EPERM','EBUSY','EACCES'].includes(error.code))throw error;}}if(!changed)await new Promise(resolve=>setTimeout(resolve,1));}
-  assert.equal(changed,true);await assert.rejects(running,/changed outside acknowledged hardlink lifecycle|source changed|replaced/i);const log=(await fs.readFile(path.join(journal,'immutable-events.jsonl'),'utf8')).trim().split(/\r?\n/).map(JSON.parse);assert.ok(log.at(-1).filesRemoved<68);assert.equal(crypto.createHash('sha256').update(await fs.readFile(proof.archive)).digest('hex'),proof.archiveSha256);
+  assert.equal(changed,true);await assert.rejects(running,/changed outside acknowledged hardlink lifecycle|source changed|replaced|cannot seal exclusive source access/i);const log=(await fs.readFile(path.join(journal,'immutable-events.jsonl'),'utf8')).trim().split(/\r?\n/).map(JSON.parse);assert.ok(log.at(-1).filesRemoved>0&&log.at(-1).filesRemoved<68);assert.equal(crypto.createHash('sha256').update(await fs.readFile(proof.archive)).digest('hex'),proof.archiveSha256);
 });
 
 test('an interrupted strict hardlink pass resumes only from exact durable own-unlink proofs',{skip:process.platform!=='win32'},async t=>{
@@ -125,4 +126,35 @@ test('an interrupted strict hardlink pass resumes only from exact durable own-un
   await assert.rejects(purgeImmutableAssets({manifest:p.file,sha256:predecessorSha,reviewedSha256:predecessorSha,journal,gate:quiet}),/source changed immediately/i);
   const events=path.join(journal,'immutable-events.jsonl'),eventsSha256=crypto.createHash('sha256').update(await fs.readFile(events)).digest('hex'),next=await resumeArchiveRetirement({manifest:p.file,sha256:predecessorSha,acknowledgements:[{manifest:p.file,manifestSha256:predecessorSha,events,eventsSha256}],journal:path.join(f.root,'continued-plan'),gate:quiet});assert.equal(next.priorRetiredLocalSources,1);assert.ok(next.metadataOnlyHardlinkRebases>0);
   const result=await purgeImmutableAssets({manifest:next.file,sha256:next.sha256,reviewedSha256:next.sha256,journal:path.join(f.root,'continued-apply'),gate:quiet});assert.equal(result.filesRemoved,6);assert.equal(await fs.readFile(outside,'utf8'),'native snapshot fixture');assert.equal((await fs.stat(outside)).nlink,1);
+});
+
+async function providerFixture(t,kind='zip-member'){
+  const f=await fixture(t),out=path.join(f.root,'preserved','recovery-metadata','provider'),proof=await sealRecovery({inventory:await inventoryLocal({workspace:f.root}),outDir:out}),data=await fs.readFile(path.join(f.source,'first.map')),sha=crypto.createHash('sha256').update(data).digest('hex'),source=path.join(f.root,'preserved','duplicate.map');await fs.writeFile(source,data);
+  let provider,retained;
+  if(kind==='zip-member'){assert.equal(proof.allObjectHashesVerified,true);retained=proof.archive;provider={kind,path:path.relative(path.join(f.root,'preserved'),retained).split(path.sep).join('/'),member:`objects/${sha.slice(0,2)}/${sha}`,bytes:data.length,containerSha256:proof.archiveSha256,containerBytes:proof.archiveBytes};}
+  else{retained=path.join(f.root,'preserved','retained.payload');await fs.writeFile(retained,kind==='range'?Buffer.concat([Buffer.from('header'),data,Buffer.from('tail')]):data);const parent=await TagNodeIO.fingerprint(retained);provider={kind,path:'retained.payload',bytes:data.length,...(kind==='range'?{offset:6,containerSha256:parent.sha256,containerBytes:parent.bytes}:{})};}
+  for(const name of ['first.map','second.map','old.exe','project.gsproject'])await fs.unlink(path.join(f.source,name));await fs.rmdir(f.source);await fs.rmdir(path.join(f.root,'.local'));
+  const index=path.join(f.root,'provider-index.json'),receipt=path.join(f.root,'provider-readback.json'),locator={schemaVersion:1,kind:'spark-preservation-index',root:path.join(f.root,'preserved'),objects:{[sha]:provider},files:{},legacyVaults:{}};await fs.writeFile(index,JSON.stringify(locator)+'\n');const indexSha256=crypto.createHash('sha256').update(await fs.readFile(index)).digest('hex'),container=await TagNodeIO.fingerprint(retained);
+  const verification={schemaVersion:1,kind:'spark-provider-verification',indexPath:index,indexSha256,complete:true,fullReadback:true,objects:[{sha256:sha,sourceSha256:sha,bytes:data.length,provider,providerRef:{table:'objects',key:sha},fullReadback:true,crcVerified:kind==='zip-member'}],containers:[{path:provider.path,...container}]};await fs.writeFile(receipt,JSON.stringify(verification)+'\n');const receiptSha256=crypto.createHash('sha256').update(await fs.readFile(receipt)).digest('hex');
+  return {...f,source,retained,data,sha,index,receipt,provider,options:{workspace:f.root,index,indexSha256,receipt,receiptSha256,sources:['preserved/duplicate.map'],journal:path.join(f.root,'consolidation-plan'),gate:quiet}};
+}
+
+test('preserved consolidation uses verified native ZIP, raw and exact-range providers without recreating .local',{skip:process.platform!=='win32'},async t=>{
+  for(const kind of ['zip-member','raw','range']){const f=await providerFixture(t,kind);await fs.chmod(f.source,0o444);const p=await planPreservedConsolidation(f.options),plan=JSON.parse(await fs.readFile(p.file,'utf8'));assert.equal(plan.scopeMode,'preserved-consolidation');assert.equal(plan.totals.files,1);
+    const result=await purgeImmutableAssets({manifest:p.file,sha256:p.sha256,reviewedSha256:p.sha256,journal:path.join(f.root,'consolidation-apply'),gate:quiet});assert.equal(result.filesRemoved,1);assert.equal(result.retainedProviderContainers,1);assert.equal(result.providerIndexSha256,f.options.indexSha256);assert.match(result.allocatedBytesMethod,/FileStandardInfo/);await assert.rejects(fs.stat(f.source),{code:'ENOENT'});assert.equal((await fs.stat(f.retained)).isFile(),true);await assert.rejects(fs.stat(path.join(f.root,'.local')),{code:'ENOENT'});assert.equal(crypto.createHash('sha256').update(await fs.readFile(f.index)).digest('hex'),f.options.indexSha256);}
+});
+
+test('preserved planning rejects foreign roots, provider sources, aliases and incomplete readback',{skip:process.platform!=='win32'},async t=>{
+  const f=await providerFixture(t,'raw');for(const name of ['.local/test.map','preserved/../outside.map','outside.map'])assert.throws(()=>preservedSourcePath(f.root,name));
+  await assert.rejects(planPreservedConsolidation({...f.options,sources:['preserved/retained.payload']}),/provider/);await assert.rejects(planPreservedConsolidation({...f.options,journal:path.join(f.root,'preserved','bad-evidence')}),/outside preserved/);
+  await fs.unlink(f.source);await fs.link(f.retained,f.source);await assert.rejects(planPreservedConsolidation(f.options),/independent/);await fs.unlink(f.source);await fs.writeFile(f.source,f.data);
+  const receipt=JSON.parse(await fs.readFile(f.receipt,'utf8'));receipt.fullReadback=false;await fs.writeFile(f.receipt,JSON.stringify(receipt));await assert.rejects(planPreservedConsolidation({...f.options,receiptSha256:crypto.createHash('sha256').update(await fs.readFile(f.receipt)).digest('hex')}),/incomplete/);assert.equal((await fs.stat(f.source)).isFile(),true);
+});
+
+test('changed provider index, receipt, container or source prevents preserved retirement',{skip:process.platform!=='win32'},async t=>{
+  for(const target of ['index','receipt','retained','source']){const f=await providerFixture(t),p=await planPreservedConsolidation(f.options);await fs.appendFile(f[target],'changed');await assert.rejects(purgeImmutableAssets({manifest:p.file,sha256:p.sha256,reviewedSha256:p.sha256,journal:path.join(f.root,'changed-provider'),gate:quiet}),/changed|replaced|projection/);assert.equal((await fs.stat(f.source)).isFile(),true);}
+});
+
+test('preserved scope cannot be smuggled into an obsolete-local plan',{skip:process.platform!=='win32'},async t=>{
+  const f=await providerFixture(t),p=await planPreservedConsolidation(f.options),plan=JSON.parse(await fs.readFile(p.file,'utf8'));delete plan.scopeMode;await fs.writeFile(p.file,JSON.stringify(plan));const sha256=crypto.createHash('sha256').update(await fs.readFile(p.file)).digest('hex');await assert.rejects(purgeImmutableAssets({manifest:p.file,sha256,reviewedSha256:sha256,journal:path.join(f.root,'bad-scope'),gate:quiet}),/explicit operation and scope/);assert.equal((await fs.stat(f.source)).isFile(),true);
 });

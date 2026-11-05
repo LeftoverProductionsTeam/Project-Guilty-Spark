@@ -6,6 +6,7 @@
 import fs from 'node:fs/promises';
 import {constants, createReadStream} from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {execFile,spawn} from 'node:child_process';
@@ -294,26 +295,46 @@ export async function retireTagPlan({plan:planFile,reviewedPlanSha256,processSna
     const result={schemaVersion:1,planSha256:reviewedPlanSha256,journal:file,complete:totals.retained===0,sourceDeletionPerformed:totals.filesRemoved>0,peakOwnedMemoryBytes,recordedAllocationReleasedBytes,allocationUnacknowledgedFiles:allocationUnknown.size,...totals};await atomicJson(path.join(journal,'retirement-result.json'),result);return result;
   }finally{await sealed?.close();await output?.close();await lock.close();await fs.unlink(path.join(vault,'retire.lock'));}
 }
-export async function restoreTagTree({manifest:manifestFile,manifestSha256,destination}){
+export async function restoreTagTree({manifest:manifestFile,manifestSha256,destination,preservationIndex=null,indexSha256=null,pythonExecutable=null}){
   const manifest=await readManifest(manifestFile,manifestSha256);const workspace=path.resolve(manifest.workspace),root=path.join(workspace,'preserved','restored-native-tags');destination=path.resolve(destination);
   if(!inside(root,destination)||path.basename(destination)!=='tags')throw Error('Restore requires a new preserved/restored-native-tags/<name>/tags tree');
   await ordinaryPath(destination,{missing:true});await fs.mkdir(path.dirname(destination),{recursive:true});await fs.mkdir(destination);
   const marker=path.join(destination,'.spark-restored-native-tags.json');await fs.writeFile(marker,JSON.stringify({schemaVersion:1,manifest:manifestFile,manifestSha256,complete:false}),{flag:'wx'});
   for(const directory of manifest.directories??[])if(directory.relative){relativeName(directory.relative);const target=path.join(destination,...directory.relative.split('/'));await ordinaryPath(target,{missing:true});await fs.mkdir(target,{recursive:true});}
-  for(const entry of manifest.entries){
-    relativeName(entry.relative);const blob=blobPath(manifest.vault,entry.sha256),before=await fingerprint(blob);if(before.sha256!==entry.sha256||before.bytes!==entry.bytes)throw Error('Restore blob verification failed');
-    const target=path.join(destination,...entry.relative.split('/'));await ordinaryPath(path.dirname(target),{missing:true});await fs.mkdir(path.dirname(target),{recursive:true});await ordinaryPath(path.dirname(target));await fs.copyFile(blob,target,constants.COPYFILE_EXCL);await fs.chmod(target,0o600);
-    const result=await fingerprint(target);if(result.sha256!==entry.sha256||result.bytes!==entry.bytes||(await fs.lstat(target)).nlink!==1)throw Error('Restored independent file verification failed');
-  }
+  let provider,staging,stagingIdentity;
+  try{
+    if(preservationIndex||indexSha256||pythonExecutable){
+      const {openPreservationProvider}=await import('./archive-local-recovery.mjs');
+      provider=await openPreservationProvider({workspace,preservationIndex,indexSha256,pythonExecutable});
+    }
+    for(const entry of manifest.entries){
+      if(!Number.isSafeInteger(entry.bytes)||entry.bytes<0||entry.bytes>512*MiB)throw Error('Native restore object exceeds its 512 MiB bound within the 2 GiB temporary budget');
+      relativeName(entry.relative);const blob=blobPath(manifest.vault,entry.sha256);let before;
+      try{before=await fingerprint(blob);}catch(error){if(error.code!=='ENOENT'||!provider)throw error;}
+      if(before&&(before.sha256!==entry.sha256||before.bytes!==entry.bytes))throw Error('Restore blob verification failed');
+      const target=path.join(destination,...entry.relative.split('/'));await ordinaryPath(path.dirname(target),{missing:true});await fs.mkdir(path.dirname(target),{recursive:true});await ordinaryPath(path.dirname(target));
+      if(before)await fs.copyFile(blob,target,constants.COPYFILE_EXCL);
+      else {
+        // The provider never writes inside protected preservation roots.
+        // Keep one bounded object in fresh owned TEMP, then use the existing
+        // exclusive independent-copy path into this new editable tag tree.
+        if(!staging){const tempRoot=path.resolve(os.tmpdir());await ordinaryPath(tempRoot);staging=await fs.mkdtemp(path.join(tempRoot,'spark-native-tag-restore-'));stagingIdentity=identity(await fs.lstat(staging,{bigint:true}));}
+        const staged=path.join(staging,'object');
+        try{await provider.restore({sha256:entry.sha256,bytes:entry.bytes,destination:staged});await fs.copyFile(staged,target,constants.COPYFILE_EXCL);}
+        finally{await ordinaryPath(staging);const current=identity(await fs.lstat(staging,{bigint:true}));if(current.dev!==stagingIdentity.dev||current.ino!==stagingIdentity.ino)throw Error('Owned recovery staging directory changed');await ordinaryPath(staged,{missing:true});await fs.unlink(staged).catch(error=>{if(error.code!=='ENOENT')throw error;});}
+      }
+      await fs.chmod(target,0o600);const result=await fingerprint(target);if(result.sha256!==entry.sha256||result.bytes!==entry.bytes||(await fs.lstat(target)).nlink!==1)throw Error('Restored independent file verification failed');
+    }
+  }finally{try{await provider?.close();}finally{if(staging){await ordinaryPath(staging);const current=identity(await fs.lstat(staging,{bigint:true}));if(current.dev!==stagingIdentity.dev||current.ino!==stagingIdentity.ino)throw Error('Owned recovery staging directory changed');await fs.rmdir(staging);}}}
   await atomicJson(marker,{schemaVersion:1,manifest:manifestFile,manifestSha256,complete:true,files:manifest.entries.length});return {destination,files:manifest.entries.length,complete:true};
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+async function main(){
   const [operation,...args]=process.argv.slice(2);const options={};for(let i=0;i<args.length;i+=2){if(!args[i]?.startsWith('--')||!args[i+1])throw Error('Expected named path arguments');options[args[i].slice(2)]=args[i+1];}
   if(operation==='plan'){
     if(!options.workspace||!options.inventory||!options.journal)throw Error('plan --workspace <root> --inventory <existing storage JSON> --journal <outside .local>');
     const inventory=JSON.parse(await fs.readFile(options.inventory,'utf8')),roots=rootsFromInventory(inventory,options.workspace);
     const result=await preserveTagTrees({workspace:options.workspace,roots,journal:options.journal,onProgress:value=>console.log(JSON.stringify({progress:true,...value}))});console.log(JSON.stringify({complete:result.complete,trees:result.trees.length,excluded:result.excluded.length,...result.totals}));
-  }else if(operation==='restore')console.log(JSON.stringify(await restoreTagTree({manifest:options.manifest,manifestSha256:options.sha256,destination:options.destination})));
+  }else if(operation==='restore')console.log(JSON.stringify(await restoreTagTree({manifest:options.manifest,manifestSha256:options.sha256,destination:options.destination,preservationIndex:options['preservation-index']??null,indexSha256:options['index-sha256']??null,pythonExecutable:options.python??null})));
   else if(operation==='quiescence'){if(!options.workspace||!options.output)throw Error('quiescence --workspace <root> --output <private snapshot>');const snapshot=await captureQuiescence(options.workspace);await atomicJson(path.resolve(options.output),snapshot);console.log(JSON.stringify(snapshot));}
   else if(operation==='retire'){if(!options.plan||!options['reviewed-plan-sha256']||!options['process-snapshot']||!options.journal)throw Error('retire --plan <complete plan> --reviewed-plan-sha256 <explicitly reviewed hash> --process-snapshot <recent quiescence JSON> --journal <outside .local>');const result=await retireTagPlan({plan:options.plan,reviewedPlanSha256:options['reviewed-plan-sha256'],processSnapshot:options['process-snapshot'],journal:options.journal,onProgress:value=>console.log(JSON.stringify({progress:true,...value}))});console.log(JSON.stringify(result));if(!result.complete)process.exitCode=2;}
   else throw Error('Use plan, restore, quiescence, or separately approved retire');
@@ -323,3 +344,6 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
 export const TagNodeIO=Object.freeze({ordinaryPath,fingerprint,same,identity,relativeName,blobPath,atomicJson,inside,
   isNativeTagPath:relative=>{try{return nativeExtensions.has(path.posix.extname(relativeName(relative)).slice(1).toLowerCase());}catch{return false;}},
 });
+// Finish module initialization before a CLI restore dynamically opens the
+// archive provider, which imports these shared read/identity primitives.
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(error=>{console.error(error.stack);process.exitCode=1;});
