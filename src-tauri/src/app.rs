@@ -71,6 +71,8 @@ fn error(e: impl std::fmt::Display) -> String {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 struct Settings {
+    mod_directory:Option<PathBuf>,
+    runtime_export_directories:std::collections::BTreeMap<String,PathBuf>,
     native_camera_shortcut:core::live_adapter::camera::Shortcut,
     steam_directory: Option<PathBuf>,
     mcc_directory: Option<PathBuf>,
@@ -93,6 +95,8 @@ struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            mod_directory:None,
+            runtime_export_directories:Default::default(),
             native_camera_shortcut:Default::default(),
             steam_directory: None,
             mcc_directory: None,
@@ -109,11 +113,16 @@ impl Default for Settings {
             preferred_halo:None,
             onboarding_completed:false,
             snapshot_interval_minutes:10,
-            snapshot_retention:20,
+            snapshot_retention:project::DEFAULT_AUTOMATIC_BACKUP_RETENTION,
         }
     }
 }
 impl Settings {
+    fn preserve_live_preferences(&mut self,previous:&Self) {
+        self.native_camera_shortcut=previous.native_camera_shortcut.clone();
+        self.mod_directory=previous.mod_directory.clone();
+        self.runtime_export_directories=previous.runtime_export_directories.clone();
+    }
     fn tools(&self) -> Toolchain {
         Toolchain {
             invader_directory: self.invader_directory.clone(),
@@ -121,6 +130,18 @@ impl Settings {
             h1a_directory:if self.hek_flavor.as_deref()==Some("h1aEk"){self.hek_directory.clone()}else{None},
             base_tags_directory:if self.hek_flavor.as_deref()==Some("h1aEk"){self.hek_tags_directory.clone().or_else(||self.hek_directory.as_ref().map(|p|p.join("tags")))}else{None},
         }
+    }
+}
+#[cfg(test)]
+mod preference_tests {
+    use super::Settings;
+    #[test]
+    fn stale_settings_form_preserves_folder_choices_owned_by_live_commands() {
+        let mut current=Settings::default();current.mod_directory=Some(std::path::PathBuf::from("selected-mod-folder"));
+        current.runtime_export_directories.insert("openCe".into(),"selected-export-folder".into());
+        let mut stale=Settings::default();stale.snapshot_retention=5;stale.preserve_live_preferences(&current);
+        assert_eq!(stale.mod_directory,current.mod_directory);assert_eq!(stale.runtime_export_directories,current.runtime_export_directories);assert_eq!(stale.snapshot_retention,5);
+        assert_eq!(Settings::default().snapshot_retention,3);
     }
 }
 struct AppState {
@@ -867,15 +888,30 @@ fn list_project_snapshots(state:State<AppState>,project_id:String)->Reply<Vec<co
     let lib=lock(&state.library)?;let _=lib.get(&project_id).map_err(error)?;
     core::snapshots::list(&lib.project_dir(&project_id).map_err(error)?).map_err(error)
 }
-fn snapshot_project_state(state:&AppState,p:&Project,reason:&str)->Reply<core::snapshots::SnapshotInfo> {
+fn snapshot_project_state(state:&AppState,p:&Project,reason:&str)->Reply<Option<core::snapshots::SnapshotInfo>> {
     let retention=lock(&state.settings)?.snapshot_retention;
     let dir=lock(&state.library)?.project_dir(&p.id).map_err(error)?;
-    core::snapshots::create(&dir,p,reason,retention).map_err(error)
+    if reason=="periodic"{core::snapshots::create_automatic(&dir,p,retention).map_err(error)}
+    else{core::snapshots::create(&dir,p,reason,retention.max(1)).map(Some).map_err(error)}
 }
 #[tauri::command]
-fn create_project_snapshot(state:State<AppState>,project_id:String,reason:String)->Reply<core::snapshots::SnapshotInfo> {
+fn create_project_snapshot(state:State<AppState>,project_id:String,reason:String)->Reply<Option<core::snapshots::SnapshotInfo>> {
     let p=lock(&state.library)?.get(&project_id).map_err(error)?;
     snapshot_project_state(&state,&p,&reason)
+}
+#[tauri::command]
+fn project_backup_overview(state:State<AppState>,project_id:String)->Reply<core::snapshots::Overview> {
+    let retention=lock(&state.settings)?.snapshot_retention;
+    let (project,directory)={let library=lock(&state.library)?;(library.get(&project_id).map_err(error)?,library.project_dir(&project_id).map_err(error)?)};
+    core::snapshots::overview(&directory,&project,retention).map_err(error)
+}
+#[tauri::command]
+fn cleanup_project_backups(state:State<AppState>,window:tauri::WebviewWindow,project_id:String,plan:core::snapshots::CleanupPlan,confirmed:bool)->Reply<core::snapshots::CleanupResult> {
+    let _history_guard=lock(&state.window_history)?;
+    check_document_owner(&state,&project_id,window.label())?;
+    let retention=lock(&state.settings)?.snapshot_retention;
+    let (project,directory)={let library=lock(&state.library)?;(library.get(&project_id).map_err(error)?,library.project_dir(&project_id).map_err(error)?)};
+    core::snapshots::cleanup(&directory,&project,retention,&plan,confirmed).map_err(error)
 }
 #[tauri::command]
 fn preview_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:String,sha256:String)->Reply<Project> {
@@ -888,7 +924,7 @@ fn restore_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:
     let lib=lock(&state.library)?;let current=lib.get(&project_id).map_err(error)?;
     let dir=lib.project_dir(&project_id).map_err(error)?;
     let mut restored=core::snapshots::preview(&dir,&current,&snapshot_id,&sha256).map_err(error)?;
-    core::snapshots::create(&dir,&current,"before-restore",lock(&state.settings)?.snapshot_retention).map_err(error)?;
+    core::snapshots::create(&dir,&current,"before-restore",lock(&state.settings)?.snapshot_retention.max(1)).map_err(error)?;
     restored.modified_at=chrono::Utc::now().to_rfc3339();restored.builds=current.builds;
     lib.save(&restored,None).map_err(error)?;drop(lib);
     lock(&state.inspections)?.remove(&project_id);
@@ -1160,13 +1196,27 @@ fn configure(app: &tauri::AppHandle, state: &AppState, mut settings: Settings) -
     let previous=lock(&state.settings)?.clone();
     // This preference has its own live command. An older Settings form must
     // not overwrite a shortcut changed while that form was open.
-    settings.native_camera_shortcut=previous.native_camera_shortcut.clone();
+    settings.preserve_live_preferences(&previous);
     let discovery_changed=previous.steam_directory!=settings.steam_directory||previous.mcc_directory!=settings.mcc_directory||lock(&state.watcher)?.is_none();
-    if !(1..=1440).contains(&settings.snapshot_interval_minutes) || !(1..=100).contains(&settings.snapshot_retention) {
-        return Err("Snapshot interval must be 1–1440 minutes and retention 1–100".into());
+    if !(1..=1440).contains(&settings.snapshot_interval_minutes) || settings.snapshot_retention>project::MAX_AUTOMATIC_BACKUP_RETENTION {
+        return Err("Snapshot interval must be 1–1440 minutes and automatic retention None (0) or 1–100".into());
     }
     if settings.hek_flavor.as_deref().is_some_and(|v| !matches!(v, "legacyHek" | "h1aEk")) {
         return Err("Select a known official Halo 1 Editing Kit family".into());
+    }
+    if settings.runtime_export_directories.len()>4 || settings.runtime_export_directories.keys().any(|key|!matches!(key.as_str(),"mccSteam"|"haloCustomEdition"|"openCe"|"chupathingyCe")) {
+        return Err("Export folders require one of the four supported Halo runtime identities".into());
+    }
+    if previous.mod_directory!=settings.mod_directory {
+        if let Some(folder)=&settings.mod_directory {
+            if !folder.is_absolute()||!folder.is_dir(){return Err("Choose an existing absolute mod folder".into());}
+            core::reject_links(folder).map_err(error)?;
+        }
+    }
+    for (runtime,folder) in &settings.runtime_export_directories {
+        if previous.runtime_export_directories.get(runtime)==Some(folder){continue;}
+        if !folder.is_absolute()||!folder.is_dir(){return Err("Choose an existing absolute runtime export folder".into());}
+        core::reject_links(folder).map_err(error)?;
     }
     for (before,next) in [
         (&previous.steam_directory,&settings.steam_directory),
@@ -2973,6 +3023,9 @@ pub fn run() {
             storage_native::storage_set_limits,
             storage_native::storage_cleanup,
             storage_native::storage_recover_accounting,
+            storage_native::storage_mod_locations,
+            storage_native::storage_choose_mod_location,
+            storage_native::storage_open_mod_location,
             firefight_catalog,
             firefight_validate,
             firefight_preview,
@@ -2982,6 +3035,8 @@ pub fn run() {
             save_project,
             list_project_snapshots,
             create_project_snapshot,
+            project_backup_overview,
+            cleanup_project_backups,
             preview_project_snapshot,
             restore_project_snapshot,
             export_project,

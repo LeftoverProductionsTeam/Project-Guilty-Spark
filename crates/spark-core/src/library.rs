@@ -184,7 +184,7 @@ impl Library {
                 .map(|i| i.header.scenario_type)
                 .or(previous.and_then(|p| p.scenario_type)),
         };
-        project::save_project(&file, project)?;
+        project::save_managed_project(&file, project)?;
         self.db.execute("INSERT INTO projects(id,summary) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET summary=excluded.summary",params![project.id,serde_json::to_string(&entry)?])?;
         Ok(entry)
     }

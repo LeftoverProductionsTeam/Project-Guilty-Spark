@@ -1,4 +1,4 @@
-import { assertQaOutputPath } from './native-qa-storage.mjs';
+import { assertQaOutputPath, beginQaStorage, waitForQaExit } from './native-qa-storage.mjs';
 // Opt-in real desktop acceptance. Separate WebViews, native ownership and disk
 // journals; never substitutes IPC responses or touches the user's projects.
 import fs from 'node:fs/promises';
@@ -15,13 +15,22 @@ const root=path.resolve(destination),expect=assertion.configure({timeout:45000})
 const detachMethod=process.env.SPARK_LIFECYCLE_DETACH_METHOD??'pointer';
 if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must be pointer or button');
 const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
+const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
+if(!['','20'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 edits');
 if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned map');
 await fs.mkdir(await assertQaOutputPath(root));
 const app=path.join(root,'GuiltySpark-workspace-lifecycle.exe');await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
 const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const finishStorage=repeatedEdits?await beginQaStorage(root,{workflow:'native-20-edits',appSha256:report.appSha256}):null;
 let child,browser,main;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
+async function launchNative(){
+  const server=net.createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));
+  child=spawn(app,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
+  await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+  await expect.poll(()=>pages().length).toBeGreaterThan(0);main=pages()[0];main.on('pageerror',error=>report.errors.push(String(error)));
+}
 async function nextPage(before){let page;await expect.poll(()=>{page=pages().find(page=>!before.has(page));return !!page;}).toBe(true);page.on('pageerror',error=>report.errors.push(String(error)));page.on('close',()=>{(report.closedWindows??=[]).push({url:page.url(),completedCases:report.cases.length,at:new Date().toISOString()});});await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);
   // WebView controls can mount while native construction is still applying its
   // saved placement. Wait for registration before testing a subsequent move.
@@ -30,6 +39,14 @@ async function nextPage(before){let page;await expect.poll(()=>{page=pages().fin
   return page;}
 async function state(page,id){const status=await invoke(page,'read_workspace_history',{projectId:id});return {...status,project:status.history?.snapshots.find(s=>s.key===status.history.head.current)?.project};}
 function step(name,data={}){report.cases.push({name,...data});console.log(JSON.stringify({passed:name,...data}));}
+async function storageSample(phase){
+  const overview=await invoke(main,'storage_overview'),folders=[];
+  for(const folder of overview.folders.filter(folder=>['Projects & preserved originals','Existing native jobs'].includes(folder.label))){
+    folders.push(await invoke(main,'storage_measure_folder',{folderId:folder.id}));
+  }
+  const process=JSON.parse((await promisify(execFile)('pwsh.exe',['-NoProfile','-File',path.resolve('scripts/profile-process-tree.ps1'),'-RootProcessId',String(child.pid)],{windowsHide:true,timeout:30000,maxBuffer:1024*1024})).stdout);
+  const row={phase,folders,process,at:new Date().toISOString()};(report.storageSamples??=[]).push(row);return row;
+}
 async function openProject(page,title){await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:title,exact:true})}).click();await expect(page.locator('.runtime-dock-heading>span').first()).toHaveText(title);await expect(page.locator('.forge-viewport canvas')).toBeVisible();}
 const panel=page=>page.getByRole('region',{name:'Inspector panel',exact:true});
 const x=page=>panel(page).getByRole('spinbutton',{name:'Position X',exact:true}).first();
@@ -42,10 +59,7 @@ async function setX(page,value){await x(page).fill(String(value));await x(page).
 async function acknowledged(page,id,value){await expect.poll(async()=>{const s=await state(page,id);return s.project?.quickForge.geometry[0]?.position[0];}).toBe(value);return state(page,id);}
 async function close(page){await page.getByRole('button',{name:'Close window',exact:true}).click();await expect.poll(()=>page.isClosed()).toBe(true);}
 try{
-  const server=net.createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));
-  child=spawn(app,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
-  await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
-  await expect.poll(()=>pages().length).toBeGreaterThan(0);main=pages()[0];main.on('pageerror',error=>report.errors.push(String(error)));
+  await launchNative();
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
   if(!nativeOnly){
   const a=await invoke(main,'create_quickforge_project',{title:'C59 map A',template:'smallIndoorArena',target:'haloCustomEdition'});
@@ -184,9 +198,75 @@ try{
     await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);
     await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
     await main.locator('.tag-row').filter({has:main.locator('strong',{hasText:/^pistol$/})}).click();
-    const radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true});
+    let radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true});
     const prior=await radius.inputValue();await radius.fill('0.225');await radius.press('Tab');
     await main.keyboard.press('Control+z');await expect(radius).toHaveValue(prior);await main.keyboard.press('Control+y');await expect(radius).toHaveValue('0.225');
+    if(repeatedEdits){
+      const baseline=await storageSample('textured-map-and-preview-ready');
+      const rows=[];let previous=.225;
+      for(let index=0;index<20;index++){
+        const value=Number((.226+index*.001).toFixed(3));
+        await radius.fill(String(value));await radius.press('Tab');
+        await main.keyboard.press('Control+z');await expect(radius).toHaveValue(String(previous));
+        await main.keyboard.press('Control+y');await expect(radius).toHaveValue(String(value));
+        await main.keyboard.press('Control+s');
+        await expect.poll(async()=>{
+          const project=(await invoke(main,'open_project',{id:opened.project.id})).project;
+          return project.tagEdits.find(edit=>edit.tagId===pistol.id&&edit.fieldKey==='bounding-radius')?.value;
+        }).toBe(value);
+        const snapshot=await invoke(main,'create_project_snapshot',{projectId:opened.project.id,reason:'periodic'});
+        rows.push({index:index+1,value,snapshotId:snapshot?.id??null});previous=value;
+        if((index+1)%5===0)await storageSample(`saved-edit-${index+1}`);
+      }
+      const backups=await invoke(main,'project_backup_overview',{projectId:opened.project.id});
+      expect(backups.automaticRetention).toBe(3);expect(backups.automatic.count).toBe(3);expect(backups.automaticAtCapacity).toBe(true);
+      expect(rows.filter(row=>row.snapshotId!==null)).toHaveLength(3);expect(backups.recovery.valid).toBe(true);
+      const recoveryLeaves=(await fs.readdir(path.join(root,'library/projects',opened.project.id))).filter(name=>name.startsWith('project.gsproject.bak'));
+      expect(recoveryLeaves).toEqual(['project.gsproject.bak']);
+      report.repeatedEdits={count:rows.length,rows,backups,peakIsSampled:true,notAnOsOrGpuQuota:true};
+      // Return to the original value so the existing independent native export
+      // readback remains comparable. Reopen only this same project/document.
+      await radius.fill('0.225');await radius.press('Tab');await main.keyboard.press('Control+s');
+      await expect.poll(async()=>(await invoke(main,'open_project',{id:opened.project.id})).project.tagEdits.find(edit=>edit.tagId===pistol.id&&edit.fieldKey==='bounding-radius')?.value).toBe(.225);
+      const stoppedPid=child.pid;await browser.close();child.kill();await waitForQaExit(child);await launchNative();
+      // The replacement WebView has its own Page; never carry a locator from
+      // the deliberately crashed process into the recovery acceptance checks.
+      radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true});
+      report.repeatedEdits.ownedProcessCrashRecovery={stoppedPid,restartedPid:child.pid,libraryReused:true,acknowledgedSaveOnly:true};
+      await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${opened.project.id}"]`).click();
+      await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);
+      await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
+      await main.locator('.tag-row').filter({has:main.locator('strong',{hasText:/^pistol$/})}).click();await expect(radius).toHaveValue('0.225');
+      const final=await storageSample('same-project-reopened-after20-edits');
+      const projectBytes=sample=>sample.folders.find(folder=>folder.label==='Projects & preserved originals')?.measurement?.logicalBytes;
+      const growth=projectBytes(final)-projectBytes(baseline);expect(Number.isFinite(growth)).toBe(true);expect(growth).toBeLessThan(32*1024**2);
+      report.repeatedEdits.projectLogicalGrowthBytes=growth;
+      report.repeatedEdits.sampledPeakPrivateBytes=Math.max(...report.storageSamples.map(row=>Number(row.process.privateBytes)));
+      const comparable=report.storageSamples.find(row=>row.phase==='saved-edit-20');
+      const memoryGrowth=Number(comparable.process.privateBytes)-Number(baseline.process.privateBytes);
+      expect(Number.isFinite(memoryGrowth)).toBe(true);expect(memoryGrowth).toBeLessThan(512*1024**2);
+      report.repeatedEdits.comparablePrivateMemoryGrowthBytes=memoryGrowth;
+      step('Twenty genuine native tag edits, author Undo/Redo, immediate saves and same-project reopen remain bounded',{edits:20,projectLogicalGrowthBytes:growth});
+      await chooseTool(main,'Settings & tools');await main.getByRole('tab',{name:'Storage & Cache',exact:true}).click();
+      const storage=main.getByRole('region',{name:'Storage and cache settings',exact:true});
+      await storage.getByLabel('Maximum automatic map backups',{exact:true}).selectOption('0');await storage.getByRole('button',{name:'Save limit',exact:true}).click();
+      await expect.poll(async()=>(await invoke(main,'open_project',{id:opened.project.id})).project.automaticBackupRetention).toBe(0);
+      expect(await invoke(main,'create_project_snapshot',{projectId:opened.project.id,reason:'periodic'})).toBeNull();
+      const disabled=await invoke(main,'project_backup_overview',{projectId:opened.project.id});expect(disabled.automatic.count).toBe(3);expect(disabled.recovery.valid).toBe(true);
+      await storage.getByRole('button',{name:'Back up now',exact:true}).click();
+      await expect.poll(async()=>(await invoke(main,'project_backup_overview',{projectId:opened.project.id})).manual.count).toBe(backups.manual.count+1);
+      await storage.getByRole('button',{name:'Review 3 old automatic backups',exact:true}).click();
+      await storage.getByLabel('Remove these reviewed automatic backups.',{exact:true}).check();await storage.getByRole('button',{name:'Remove reviewed backups',exact:true}).click();
+      await expect.poll(async()=>(await invoke(main,'project_backup_overview',{projectId:opened.project.id})).automatic.count).toBe(0);
+      const cleaned=await invoke(main,'project_backup_overview',{projectId:opened.project.id});expect(cleaned.manual.count).toBe(backups.manual.count+1);expect(cleaned.safety.count).toBe(backups.safety.count);expect(cleaned.recovery.valid).toBe(true);
+      await storage.getByLabel('Maximum automatic map backups',{exact:true}).selectOption('3');await storage.getByRole('button',{name:'Save limit',exact:true}).click();
+      await expect.poll(async()=>(await invoke(main,'open_project',{id:opened.project.id})).project.automaticBackupRetention).toBe(3);
+      report.repeatedEdits.explicitBackupReview={disabled,cleaned,manualBackupPreserved:true,automaticRotationClaimed:false};
+      const locations=await invoke(main,'storage_mod_locations');expect(locations.modDirectory).toBe(path.join(root,'library/Mods'));expect(await fs.stat(locations.modDirectory).catch(()=>null)).toBeNull();
+      report.repeatedEdits.modFolderReadDidNotAllocate=true;
+      await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');await main.locator('.tag-row').filter({has:main.locator('strong',{hasText:/^pistol$/})}).click();await expect(radius).toHaveValue('0.225');
+      step('Real Storage controls save None and manual backup, review exact automatic snapshots, and retain recovery/manual checkpoints');
+    }
     const smart=main.locator('.smart-edit').first();await smart.locator('summary').first().click();
     await smart.getByRole('button',{name:'Review save plan',exact:true}).click();
     await expect(smart.locator('.smart-edit-plan>strong')).toHaveText('Direct map copy');
@@ -208,4 +288,4 @@ try{
   }
   expect(report.errors).toEqual([]);report.complete=true;
 }catch(error){report.errors.push(String(error));report.failureStack=error.stack;process.exitCode=1;if(browser)for(const [i,page]of pages().entries())await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});}
-finally{await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));await browser?.close().catch(()=>{});if(child?.exitCode===null)child.kill();console.log(JSON.stringify({complete:report.complete,cases:report.cases.length,errors:report.errors}));}
+finally{await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));await browser?.close().catch(()=>{});if(child?.exitCode===null)child.kill();if(finishStorage){try{if(child)await waitForQaExit(child);if(report.complete){await finishStorage.registerDisposable(app);for(const name of ['Cache','Code Cache','GPUCache']){const cache=path.join(root,'webview/EBWebView/Default',name);if(await fs.stat(cache).catch(()=>null))await finishStorage.registerDisposable(cache);}}await finishStorage(report.complete?'passed':'failed');}catch(error){report.complete=false;report.errors.push(String(error));process.exitCode=1;await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));}}console.log(JSON.stringify({complete:report.complete,cases:report.cases.length,errors:report.errors}));}

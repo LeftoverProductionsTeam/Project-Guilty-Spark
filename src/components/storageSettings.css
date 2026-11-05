@@ -29,6 +29,38 @@
   margin: 0;
   font-size: 14px;
 }
+.gs-storage-project {
+  border: 1px solid var(--border, #415267);
+  border-radius: 8px;
+  padding: 9px;
+  display: grid;
+  gap: 6px;
+}
+.gs-storage-project h3 { margin: 0; font-size: 14px; }
+.gs-storage-project header > span { color: var(--muted, #a0b4c3); white-space: nowrap; }
+.gs-storage-backup-controls, .gs-storage-backup-usage, .gs-storage-retention {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.gs-storage-retention label { display: grid; gap: 4px; }
+.gs-storage-retention select { min-width: 135px; }
+.gs-storage-retention .number-field { width: 90px; }
+.gs-storage-retention input { width: 100%; min-width: 0; }
+.gs-storage-backup-usage { align-items: center; color: var(--muted, #a0b4c3); }
+.gs-storage-backup-usage > span + span { border-left: 1px solid var(--line); padding-left: 8px; }
+.gs-storage-backup-review { justify-self: start; }
+.gs-storage-backup-list { max-height: 150px; overflow: auto; }
+.gs-storage-backup-list li { padding: 4px 0; }
+.gs-storage-backup-list li > span { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.gs-storage-backup-list code { white-space: normal; }
+.gs-storage-location-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.gs-storage-location-row > div, .gs-storage-location-row > code { flex: 1; min-width: 0; }
+.gs-storage-location-row > strong { width: 108px; flex: none; }
+.gs-storage-location-row code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-storage-location-row button { flex: none; }
+.gs-storage-runtime-locations { display: grid; gap: 6px; margin-top: 8px; }
 .gs-storage p {
   margin: 4px 0;
   line-height: 1.4;
@@ -146,6 +178,9 @@
   color: #ffcba2;
 }
 @media (max-width: 780px) {
+  .gs-storage-location-row { flex-wrap: wrap; }
+  .gs-storage-location-row > div { flex-basis: 100%; }
+  .gs-storage-runtime-locations .gs-storage-location-row > code { flex-basis: calc(100% - 125px); }
   .gs-storage-limit-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

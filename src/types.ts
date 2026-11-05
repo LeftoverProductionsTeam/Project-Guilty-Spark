@@ -227,6 +227,8 @@ export interface NativeAssetImport {
   fileCount: number;
 }
 export interface Project {
+  /** Spark metadata only: 0 disables automatic backups; absent inherits the saved legacy preference. */
+  automaticBackupRetention?: number | null;
   nativeAssetImports?: NativeAssetImport[];
   tagDuplicates?: import('./tagDuplicates').TagDuplicate[];
   tagRenames?: import('./tagRenames').TagRename[];
@@ -288,6 +290,8 @@ export interface LibraryEntry {
   scenarioType: number | null;
 }
 export interface Settings {
+  modDirectory?: string | null;
+  runtimeExportDirectories?: Record<string, string>;
   nativeCameraShortcut?: {enabled:boolean;key:string};
   steamBridgeDirectory?: string | null;
   steamBridgeManifestSha256?: string | null;

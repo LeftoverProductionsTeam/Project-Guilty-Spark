@@ -24,3 +24,9 @@
 .gs-tool-inspection h3{font-size:14px;}
 .gs-tool-inspection code,.gs-tool-output{font-size:11px;white-space:pre-wrap;word-break:break-word;}
 .gs-tool-output{padding:12px;background:#0b131a;border:1px solid #263e45;max-height:260px;overflow:auto;}
+.gs-setup-mod-folder {border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;}
+.gs-setup-mod-folder summary {cursor:pointer;font-weight:600;}
+.gs-setup-mod-folder > div {display:flex;gap:8px;align-items:center;margin:6px 0;}
+.gs-setup-mod-folder code {flex:1;min-width:0;overflow-wrap:anywhere;font-size:11px;}
+.gs-setup-mod-folder small {display:block;color:var(--muted);line-height:1.4;}
+.gs-setup-mod-folder button {flex:none;}

@@ -13,6 +13,8 @@ use std::{
 use uuid::Uuid;
 
 pub const PROJECT_VERSION: u32 = 1;
+pub const DEFAULT_AUTOMATIC_BACKUP_RETENTION: usize = 3;
+pub const MAX_AUTOMATIC_BACKUP_RETENTION: usize = 100;
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Provenance {
@@ -104,6 +106,10 @@ pub struct EngineBuildTarget {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
+    /// Optional Spark authoring preference, never exported as a native tag field.
+    /// Absent older projects retain their existing application preference.
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    pub automatic_backup_retention: Option<usize>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
     pub native_asset_imports:Vec<crate::native_asset_imports::Binding>,
     #[serde(default,skip_serializing_if="Vec::is_empty")]
@@ -163,6 +169,7 @@ impl Project {
     pub fn new(title: &str) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
+            automatic_backup_retention:Some(DEFAULT_AUTOMATIC_BACKUP_RETENTION),
             native_asset_imports:vec![],
             tag_duplicates:vec![],
             tag_renames:vec![],
@@ -203,6 +210,9 @@ impl Project {
         next.active_build_target=Some(id);next.validate()?;*self=next;Ok(true)
     }
     pub fn validate(&self) -> Result<()> {
+        if self.automatic_backup_retention.is_some_and(|value|value>MAX_AUTOMATIC_BACKUP_RETENTION) {
+            return invalid("Automatic backup retention must be None (0) or 1–100");
+        }
         crate::native_asset_imports::validate(&self.native_asset_imports)?;
         crate::tag_duplicates::validate(&self.tag_duplicates)?;
         crate::tag_renames::validate(&self.tag_renames)?;
@@ -317,6 +327,11 @@ impl Project {
         }
         Ok(())
     }
+    pub fn effective_automatic_backup_retention(&self, legacy_default:usize)->Result<usize> {
+        let value=self.automatic_backup_retention.unwrap_or(legacy_default);
+        if value>MAX_AUTOMATIC_BACKUP_RETENTION{return invalid("Automatic backup retention must be None (0) or 1–100");}
+        Ok(value)
+    }
     pub fn fingerprint(&self) -> Result<String> {
         use sha2::{Digest, Sha256};
         let bytes = fingerprint_json(serde_json::to_vec(&(
@@ -406,7 +421,7 @@ pub fn atomic_write(path: &Path, bytes: &[u8], backup: bool) -> Result<Option<Pa
     }
     result
 }
-pub fn save_project(path: &Path, project: &Project) -> Result<()> {
+fn encoded_project(path:&Path,project:&Project)->Result<Vec<u8>> {
     project.validate()?;
     reject_links(path)?;
     let bytes = serde_json::to_vec_pretty(project)?;
@@ -414,9 +429,51 @@ pub fn save_project(path: &Path, project: &Project) -> Result<()> {
         return invalid("Project JSON exceeds 32 MiB");
     }
     let _: Project = serde_json::from_slice(&bytes)?;
+    Ok(bytes)
+}
+/// Serialize a portable descriptor without adopting or opening its references.
+/// Keep the established export/fixture contract and its unique previous copy;
+/// Library admission independently validates every referenced native input.
+pub fn save_project(path:&Path,project:&Project)->Result<()> {
+    let bytes=encoded_project(path,project)?;
     if path.is_file()&&fs::metadata(path)?.len()==bytes.len() as u64&&fs::read(path)?==bytes{return Ok(());}
-    atomic_write(path, &bytes, true)?;
+    atomic_write(path,&bytes,true)?;Ok(())
+}
+/// Repeated saves of an admitted managed document retain one fixed recovery
+/// revision. These new ownership checks do not alter portable serialization.
+pub(crate) fn save_managed_project(path:&Path,project:&Project)->Result<()> {
+    let bytes=encoded_project(path,project)?;
+    if path.is_file()&&fs::metadata(path)?.len()==bytes.len() as u64&&fs::read(path)?==bytes{return Ok(());}
+    if path.is_file() {
+        let previous=load_project(path)?;
+        // A validated source-less descriptor may receive its first source.
+        // Existing source bindings remain immutable; Library::save retains
+        // the independent native admission checks at the application boundary.
+        if previous.id!=project.id || (previous.source.is_some()&&!same_source_identity(&previous,project)) {
+            return invalid("Existing project identity differs; choose a new project path");
+        }
+        let recovery=project_recovery_path(path)?;reject_links(&recovery)?;
+        if recovery.exists() {
+            let recovered=load_project(&recovery).map_err(|_|crate::SparkError::Invalid("Existing project recovery backup is invalid; preserve and review it before saving".into()))?;
+            // The source-less initial revision is valid recovery for this
+            // same project. Never accept another nonempty source binding.
+            if recovered.id!=previous.id || (recovered.source.is_some()&&!same_source_identity(&recovered,&previous)) {
+                return invalid("Existing project recovery backup belongs to another source or project; it was retained");
+            }
+        }
+        // One independently written previous-good recovery copy is separate
+        // from optional versioned backups. Legacy UUID backups stay untouched.
+        atomic_write(&recovery,&fs::read(path)?,false)?;
+    }
+    atomic_write(path, &bytes, false)?;
     Ok(())
+}
+pub fn project_recovery_path(path:&Path)->Result<PathBuf> {
+    let name=path.file_name().ok_or_else(||crate::SparkError::Invalid("Project path has no filename".into()))?;
+    Ok(path.with_file_name(format!("{}.bak",name.to_string_lossy())))
+}
+pub(crate) fn same_source_identity(left:&Project,right:&Project)->bool {
+    left.source.as_ref().map(|s|(&s.sha256,&s.preserved_path))==right.source.as_ref().map(|s|(&s.sha256,&s.preserved_path))
 }
 pub fn load_project(path: &Path) -> Result<Project> {
     if fs::metadata(path)?.len() > 32 * 1024 * 1024 {
@@ -595,5 +652,52 @@ mod compiled_revision_tests {
         p.build_targets[0].name="My authored tool profile".into();let before=serde_json::to_value(&p).unwrap();
         assert!(!p.bind_compiled_mcc_tags("other/sdk".into(),"other/tags".into(),None).unwrap());
         assert_eq!(serde_json::to_value(p).unwrap(),before);
+    }
+}
+
+#[cfg(test)]
+mod backup_policy_tests {
+    use super::*;
+    #[test]
+    fn old_projects_inherit_and_new_projects_default_to_three_without_changing_native_identity() {
+        let mut p=Project::new("New");assert_eq!(p.automatic_backup_retention,Some(3));let native=p.fingerprint().unwrap();
+        p.automatic_backup_retention=Some(0);p.validate().unwrap();assert_eq!(native,p.fingerprint().unwrap());
+        let mut old=serde_json::to_value(&p).unwrap();old.as_object_mut().unwrap().remove("automaticBackupRetention");
+        let old:Project=serde_json::from_value(old).unwrap();assert_eq!(old.automatic_backup_retention,None);assert_eq!(old.effective_automatic_backup_retention(20).unwrap(),20);
+        p.automatic_backup_retention=Some(101);assert!(p.validate().is_err());assert!(p.effective_automatic_backup_retention(20).is_err());
+    }
+    #[test]
+    fn twenty_saves_keep_one_atomic_recovery_copy_and_preserve_legacy_backups() {
+        let dir=tempfile::tempdir().unwrap();let file=dir.path().join("project.gsproject");let mut p=Project::new("Initial");p.automatic_backup_retention=Some(0);
+        save_managed_project(&file,&p).unwrap();let legacy=dir.path().join(format!("project.gsproject.bak-{}",Uuid::new_v4()));fs::write(&legacy,b"original historical backup").unwrap();
+        for n in 1..=20 {p.title=format!("Edit {n}");save_managed_project(&file,&p).unwrap();}
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(),3);assert_eq!(load_project(&file).unwrap().title,"Edit 20");assert_eq!(load_project(&project_recovery_path(&file).unwrap()).unwrap().title,"Edit 19");
+        assert_eq!(fs::read(legacy).unwrap(),b"original historical backup");
+    }
+    #[test]
+    fn invalid_foreign_or_corrupt_recovery_cannot_change_the_current_project() {
+        let dir=tempfile::tempdir().unwrap();let file=dir.path().join("project.gsproject");let mut p=Project::new("Previous good");save_managed_project(&file,&p).unwrap();let before=fs::read(&file).unwrap();let recovery=project_recovery_path(&file).unwrap();
+        fs::write(&recovery,b"corrupt recovery evidence").unwrap();p.title="Not adopted".into();assert!(save_managed_project(&file,&p).is_err());assert_eq!(fs::read(&file).unwrap(),before);assert_eq!(fs::read(&recovery).unwrap(),b"corrupt recovery evidence");
+        let foreign=Project::new("Foreign original");fs::write(&recovery,serde_json::to_vec(&foreign).unwrap()).unwrap();assert!(save_managed_project(&file,&p).is_err());assert_eq!(fs::read(&file).unwrap(),before);
+        fs::remove_file(&recovery).unwrap();p.automatic_backup_retention=Some(101);assert!(save_managed_project(&file,&p).is_err());assert_eq!(fs::read(&file).unwrap(),before);assert!(!recovery.exists());
+    }
+    #[test]
+    fn source_less_initialization_retains_prior_revision_and_refuses_rebinding_an_existing_source() {
+        let dir=tempfile::tempdir().unwrap();let file=dir.path().join("project.gsproject");let mut p=Project::new("Source initialization");save_managed_project(&file,&p).unwrap();
+        p.source=Some(Source{original_path:dir.path().join("original.map"),preserved_path:dir.path().join("source.map"),sha256:"a".repeat(64),cache_version:609,engine:"synthetic".into(),scenario_path:"levels/test/fixture".into(),archive:None,resource_directory:None,resource_sha256:Default::default(),audio_resources:None});
+        save_managed_project(&file,&p).unwrap();let recovery=project_recovery_path(&file).unwrap();assert!(load_project(&recovery).unwrap().source.is_none());
+        // An independent native reader still rejects incorrect cache metadata;
+        // the serializer does not migrate it or replace that admission gate.
+        p.source.as_mut().unwrap().cache_version=13;save_managed_project(&file,&p).unwrap();assert_eq!(load_project(&recovery).unwrap().source.unwrap().cache_version,609);
+        let before=fs::read(&file).unwrap();let backup_before=fs::read(&recovery).unwrap();p.source.as_mut().unwrap().sha256="b".repeat(64);assert!(save_managed_project(&file,&p).is_err());assert_eq!(fs::read(&file).unwrap(),before);assert_eq!(fs::read(&recovery).unwrap(),backup_before);
+        p.source.as_mut().unwrap().sha256="a".repeat(64);let mut foreign=p.clone();foreign.source.as_mut().unwrap().sha256="b".repeat(64);fs::write(&recovery,serde_json::to_vec(&foreign).unwrap()).unwrap();p.title="Not adopted".into();assert!(save_managed_project(&file,&p).is_err());assert_eq!(fs::read(&file).unwrap(),before);
+    }
+    #[test]
+    fn portable_descriptor_serialization_keeps_unique_history_and_does_not_adopt_untrusted_inputs() {
+        let root=tempfile::tempdir().unwrap();let file=root.path().join("incoming.gsproject");let first=Project::new("Previous descriptor");save_project(&file,&first).unwrap();
+        let mut incoming=Project::new("Untrusted references");incoming.assets.push(Asset{id:"untrusted".into(),name:"Untrusted".into(),kind:"obj".into(),sha256:"a".repeat(64),path:PathBuf::from(r"\\server.invalid\share\untrusted.obj"),vertices:0,triangles:0,has_uvs:false,materials:vec![]});
+        save_project(&file,&incoming).unwrap();assert_eq!(load_project(&file).unwrap().id,incoming.id);
+        let backups=fs::read_dir(root.path()).unwrap().map(|entry|entry.unwrap().path()).filter(|p|p.file_name().unwrap().to_string_lossy().starts_with("incoming.gsproject.bak-")).collect::<Vec<_>>();assert_eq!(backups.len(),1);assert_eq!(load_project(&backups[0]).unwrap().id,first.id);
+        let library=crate::library::Library::open(&root.path().join("library")).unwrap();assert!(library.import_project(&file).unwrap_err().to_string().contains("No referenced input was opened"));assert!(library.list().unwrap().is_empty());
     }
 }

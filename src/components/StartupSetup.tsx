@@ -1,6 +1,7 @@
 import { useEffect,useRef,useState } from 'react';
-import { Check, Gamepad2, Globe2, Hammer, Users, type LucideIcon } from 'lucide-react';
+import { Check, FolderOpen, Gamepad2, Globe2, Hammer, Users, type LucideIcon } from 'lucide-react';
 import type { Bootstrap, RuntimeId, Settings, Workspace } from '../types';
+import { call, native } from '../api';
 import ConnectGames from './ConnectGames';
 import CustomEditionSetup from './CustomEditionSetup';
 import { primaryRuntimes, useRuntimeConnections } from '../useRuntimeConnections';
@@ -55,7 +56,31 @@ export default function StartupSetup({
     [error, setError] = useState('');
   const selectedRuntime = connections.reports.find(item => item.id === choice);
   const selectedCandidate = connections.detected.find(item => item.runtimeId === choice);
+  const [modDirectory, setModDirectory] = useState(data.settings.modDirectory ?? '');
+  const [choosingMods, setChoosingMods] = useState(false);
+  const [modError, setModError] = useState('');
   const mounted=useRef(true);useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+  useEffect(() => {
+    if (step !== 1 || !native) return;
+    let current = true;
+    void call<{ modDirectory: string }>('storage_mod_locations').then(locations => {
+      if (current) setModDirectory(locations.modDirectory);
+    }).catch(problem => { if (current) setModError(String(problem)); });
+    return () => { current = false; };
+  }, [step]);
+  async function chooseModFolder() {
+    if (!native || choosingMods) return;
+    setChoosingMods(true);
+    setModError('');
+    try {
+      const locations = await call<{ modDirectory: string }>('storage_choose_mod_location', { runtimeId: null, reset: false });
+      if (mounted.current) setModDirectory(locations.modDirectory);
+    } catch (problem) {
+      if (mounted.current) setModError(String(problem));
+    } finally {
+      if (mounted.current) setChoosingMods(false);
+    }
+  }
   async function save(settings: Settings, next: number) {
     setBusy(true);
     setError('');
@@ -156,6 +181,17 @@ export default function StartupSetup({
             </button>}
             <button onClick={() => navigate('runtimes')}>Runtime setup</button>
           </div>
+          <details className="gs-setup-mod-folder">
+            <summary>Mods &amp; exported maps · optional</summary>
+            <p>Would you like to choose a folder for your Halo mods and exported maps?</p>
+            <div><code>{modDirectory || 'Spark’s separate Mods folder (default)'}</code>
+              <button disabled={!native || busy || choosingMods} onClick={() => void chooseModFolder()}>
+                <FolderOpen size={14} />{choosingMods ? 'Choosing…' : 'Choose mod folder'}
+              </button>
+            </div>
+            <small>Keep the default or choose your own location. Original game maps stay in place. Change folders and per-Halo export preferences later in Settings → Storage.</small>
+            {modError && <p role="status">{modError} You can continue setup and choose a folder later.</p>}
+          </details>
           <ConnectGames
             data={data}
             onApply={onApply}

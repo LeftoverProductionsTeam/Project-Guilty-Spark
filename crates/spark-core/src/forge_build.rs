@@ -155,6 +155,122 @@ pub(crate) fn stage_tags(source:&Path,destination:&Path,cancel:&AtomicBool,mut p
     let plan=crate::native_staging::inventory(source,cancel)?;
     crate::native_staging::copy(source,destination,&plan,cancel,&mut progress)
 }
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeBuildPeak {
+    selected_tag_files: usize,
+    selected_tag_bytes: u64,
+    imported_tag_files: usize,
+    imported_tag_bytes: u64,
+    authored_source_bytes: u64,
+    compiler_output_bytes: u64,
+    reserved_bytes: u64,
+}
+
+fn native_build_peak(selected: &crate::native_staging::Inventory, imported: &crate::native_staging::Inventory, authored_source_bytes: u64) -> Result<NativeBuildPeak> {
+    let overflow = || SparkError::Invalid("Native build peak estimate overflow; no staging was allocated".into());
+    let payload = selected.bytes.checked_add(imported.bytes).and_then(|n| n.checked_add(authored_source_bytes)).ok_or_else(overflow)?;
+    // H1A can retain the compiler's map and its adopted output simultaneously.
+    // Keep the existing 1 GiB floor, scaling it for larger selected inputs.
+    let compiler_output_bytes = payload.checked_mul(2).ok_or_else(overflow)?.max(1024 * 1024 * 1024);
+    let copies = crate::storage::estimate_copy(selected.files.len(), selected.bytes)
+        .checked_add(crate::storage::estimate_copy(imported.files.len(), imported.bytes)).ok_or_else(overflow)?;
+    let reserved_bytes = copies.checked_add(authored_source_bytes).and_then(|n| n.checked_add(compiler_output_bytes)).ok_or_else(overflow)?;
+    Ok(NativeBuildPeak { selected_tag_files: selected.files.len(), selected_tag_bytes: selected.bytes,
+        imported_tag_files: imported.files.len(), imported_tag_bytes: imported.bytes,
+        authored_source_bytes, compiler_output_bytes, reserved_bytes })
+}
+
+fn admit_native_job(store: &crate::storage::Store, directory: &Path, source: Option<&Path>, estimate: u64) -> Result<crate::storage::Lease> {
+    store.reserve(directory, source, estimate, crate::storage::Category::Staging,
+        "Native BSP peak: validated dependency/import copies, authored sources and compiler/output headroom")
+        .map_err(|error| SparkError::Invalid(format!("Native build peak admission rejected ({estimate} bytes reserved); no new job or tag staging was created. {error}")))
+}
+
+fn authored_source_reserve(project: &Project, custom: &crate::model_build::Plan) -> Result<u64> {
+    let mut bytes = 16 * 1024 * 1024u64; // bounded source manifests, logs and authoring metadata
+    for extra in std::iter::once(quickforge::export_jms(&custom.document)?.len() as u64)
+        .chain(std::iter::once(serde_json::to_vec(project)?.len() as u64))
+        .chain(custom.models.iter().map(|model| (model.jms.len() as u64).saturating_mul(2))) {
+        bytes = bytes.checked_add(extra).ok_or_else(|| SparkError::Invalid("Native authored-source estimate overflow".into()))?;
+    }
+    Ok(bytes)
+}
+
+/// Resolve a future jobs path without creating it. Missing dependencies and
+/// rejected admission must not create a new job or writable source tree.
+fn future_jobs_root(root: &Path) -> Result<PathBuf> {
+    crate::reject_links(root)?;
+    let absolute = std::path::absolute(root)?;
+    let mut existing = absolute.as_path();
+    let mut missing = vec![];
+    while !existing.exists() {
+        missing.push(existing.file_name().ok_or_else(|| SparkError::Invalid("Jobs folder has no existing ancestor".into()))?.to_owned());
+        existing = existing.parent().ok_or_else(|| SparkError::Invalid("Jobs folder has no existing ancestor".into()))?;
+    }
+    if !existing.is_dir() { return invalid("Jobs folder ancestor is not a directory"); }
+    let mut resolved = fs::canonicalize(existing)?;
+    for name in missing.into_iter().rev() { resolved.push(name); }
+    Ok(resolved)
+}
+
+struct NativeInputs {
+    all: crate::native_staging::Inventory,
+    selected: crate::native_staging::Inventory,
+    imported: crate::native_staging::Inventory,
+    model_class_bindings: BTreeMap<String, String>,
+    dependency_tool_sha256: String,
+    peak: NativeBuildPeak,
+}
+
+fn validate_prepared_inventory(source: &Path, inventory: &crate::native_staging::Inventory, expected: &BTreeMap<String, String>) -> Result<()> {
+    if inventory.files.len() != expected.len() || inventory.files.iter().any(|file| !expected.contains_key(&file.path)) {
+        return invalid("Prepared native dependency inventory has missing or extra files; no job or tag staging was created");
+    }
+    for file in &inventory.files {
+        let input = source.join(crate::native_staging::admitted_relative(&file.path)?);
+        crate::reject_links(&input)?;
+        if maps::hash_file(&input)? != expected[&file.path] {
+            return invalid("Prepared native dependency source hash changed; no job or tag staging was created");
+        }
+    }
+    Ok(())
+}
+
+/// Use the same recursive Invader/H1A dependency contract as the compiler path.
+/// The callback is read-only; the returned inventory is reused, never replanned
+/// against a different source revision after storage has been admitted.
+fn dependency_subset(
+    source: &Path, all: &crate::native_staging::Inventory,
+    dependencies: &[quickforge::ForgeDependency], generated: &std::collections::BTreeSet<String>,
+    imported: &std::collections::BTreeSet<String>, extra_roots: std::collections::BTreeSet<String>,
+    h1a: bool, mut read: impl FnMut(&str) -> Result<String>,
+) -> Result<(crate::native_staging::Inventory, BTreeMap<String, String>)> {
+    let mut roots = std::collections::BTreeSet::from(["globals/globals.globals".to_owned()]);
+    for dependency in dependencies {
+        if generated.contains(&format!("{}.scenery", dependency.tag_path.replace('\\', "/"))) && dependency.tag_class == "scenery" { continue; }
+        if imported.contains(&format!("{}.{}", dependency.tag_path.replace('\\', "/"), dependency.tag_class)) { continue; }
+        let file = dependency_path(source, &dependency.tag_path, &dependency.tag_class)?;
+        roots.insert(file.strip_prefix(source).map_err(|_| SparkError::Invalid("Source dependency escaped its root".into()))?.to_string_lossy().replace('\\', "/"));
+    }
+    roots.extend(extra_roots);
+    roots.retain(|path| !imported.contains(&path.replace('\\', "/").to_ascii_lowercase()));
+    let mut selected = std::collections::BTreeSet::new();
+    let mut visited = std::collections::BTreeSet::new();
+    let mut bindings = BTreeMap::new();
+    while let Some(requested) = roots.pop_first() {
+        if !visited.insert(requested.clone()) { continue; }
+        if visited.len() > 20000 { return invalid("Native dependency planning exceeded its root budget"); }
+        let requested_file = source.join(crate::native_staging::admitted_relative(&requested)?);
+        crate::reject_links(&requested_file)?;
+        if !requested_file.is_file() { return invalid(format!("Native dependency is missing: {requested}. No job or tag staging was created.")); }
+        let log = read(&requested)?;
+        let dependencies = crate::native_staging::dependency_plan(&log, source, &requested, h1a)?;
+        selected.extend(dependencies.files); roots.extend(dependencies.followup); bindings.extend(dependencies.model_class_bindings);
+    }
+    Ok((crate::native_staging::selected_inventory(all, &selected)?, bindings))
+}
 pub fn run_job(
     project:&Project,tools:&ForgeToolchain,jobs_root:&Path,job_id:&str,export_only:bool,
     extra_blockers:Vec<String>,cancel:Arc<AtomicBool>,on_event:impl Fn(JobEvent)+Send+Sync,
@@ -173,14 +289,35 @@ pub fn run_prepared_job(
     uuid::Uuid::parse_str(job_id).map_err(|_|SparkError::Invalid("Job ID is not a UUID".into()))?;
     let document=&custom.document;
     let started=Instant::now();
-    crate::reject_links(jobs_root)?;fs::create_dir_all(jobs_root)?;
+    let jobs_root=future_jobs_root(jobs_root)?;
     if !export_only&&prepared.is_none()&&extra_blockers.is_empty(){
-        if let Some(receipt)=crate::forge_reuse::find(project,tools,jobs_root){on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool, compiled tags and map hashes match; no new tag tree was copied.",receipt.job_id)});return Ok(receipt);}
+        if let Some(receipt)=crate::forge_reuse::find(project,tools,&jobs_root){on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool, compiled tags and map hashes match; no new tag tree was copied.",receipt.job_id)});return Ok(receipt);}
     }
-    let jobs_root=jobs_root.canonicalize()?;let directory=jobs_root.join(job_id);
+    let directory=jobs_root.join(job_id);
     let selected_tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
-    let estimate=if !export_only {if let Some(tags)=selected_tags.as_ref().filter(|p|p.is_dir()){let inputs=crate::native_staging::inventory(tags,&cancel)?;crate::storage::estimate_copy(inputs.files.len(),inputs.bytes).saturating_add(1024*1024*1024)}else{16*1024*1024}}else{16*1024*1024};
-    let storage_lease=crate::storage::Store::for_output(&directory)?.reserve(&directory,selected_tags.as_deref(),estimate,crate::storage::Category::Staging,"Native BSP build: inputs plus conservative compiler-output reserve")?;
+    let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
+    let (requirements,source_blockers)=quickforge::source_requirements(document)?;
+    let native_inputs=if !export_only && extra_blockers.is_empty() && source_blockers.is_empty() && !cancel.load(Ordering::Relaxed) {
+        if let (Some(tags),Some(dependency_tool))=(selected_tags.as_ref().filter(|p|p.is_dir()),invader(tools,"invader-dependency")) {
+            let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
+            let imported=crate::native_asset_imports::staging_inventory(import_root,project)?;
+            let imported_names=imported.files.iter().map(|file|file.path.clone()).collect();
+            let all=crate::native_staging::inventory(tags,&cancel)?;
+            crate::reject_links(&dependency_tool)?;
+            let dependency_tool_sha256=maps::hash_file(&dependency_tool)?;
+            let (selected,model_class_bindings)=if let Some(expected)=prepared{validate_prepared_inventory(tags,&all,expected)?;(all.clone(),BTreeMap::new())}else{
+                dependency_subset(tags,&all,&requirements,&generated,&imported_names,
+                    crate::powerups::source_dependencies(project).into_iter().collect(),tools.hek_flavor.as_deref()==Some("h1aEk"),
+                    |requested|runner.run(&dependency_tool,&["-r".into(),"-t".into(),tags.to_string_lossy().into_owned(),requested.into()],tags,"dependencies",2))?
+            };
+            if maps::hash_file(&dependency_tool)?!=dependency_tool_sha256{return invalid("Native dependency tool changed while planning; no staging was allocated");}
+            let peak=native_build_peak(&selected,&imported,authored_source_reserve(project,&custom)?)?;
+            Some(NativeInputs{all,selected,imported,model_class_bindings,dependency_tool_sha256,peak})
+        }else{None}
+    }else{None};
+    let estimate=native_inputs.as_ref().map_or(16*1024*1024,|inputs|inputs.peak.reserved_bytes);
+    let storage_lease=admit_native_job(&crate::storage::Store::for_output(&directory)?,&directory,selected_tags.as_deref(),estimate)?;
+    crate::reject_links(&jobs_root)?;fs::create_dir_all(&jobs_root)?;
     crate::reject_links(&directory)?;fs::create_dir(&directory)?;
     storage_lease.mark_owned()?;
     let emit=|phase:&str,message:String,progress:u8,severity:&str|on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:phase.into(),severity:severity.into(),message,progress,timestamp:chrono::Utc::now().to_rfc3339()});
@@ -221,7 +358,7 @@ pub fn run_prepared_job(
         for name in ["invader-edit","invader-build","invader-info","invader-dependency"] {if name=="invader-build"&&document.runtime_id==RuntimeId::MccSteam{continue;}if invader(tools,name).is_none(){receipt.blockers.push(format!("{name} is missing from the selected Invader folder"));}}
         if document.logic.is_some()&&invader(tools,"invader-script").is_none(){receipt.blockers.push("Logic / Events requires invader-script in the selected Invader folder before staging native sources".into());}
         let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
-        let imported=crate::native_asset_imports::available_files(import_root,project)?;
+        let imported=if let Some(inputs)=&native_inputs {inputs.imported.files.iter().map(|file|file.path.clone()).collect()}else{crate::native_asset_imports::available_files(import_root,project)?};
         if let Some(tags)=tags.as_ref().filter(|p|p.is_dir()) {
             for dependency in &sources.dependencies {
                 if generated.contains(&format!("{}.scenery",dependency.tag_path.replace('\\',"/"))) && dependency.tag_class=="scenery" {continue;}
@@ -242,37 +379,17 @@ pub fn run_prepared_job(
         for (name,path) in executables {
             crate::reject_links(&path)?;receipt.tool_identities.insert(name.into(),maps::hash_file(&path)?);
         }
-        emit("dependencies","Planning native inputs before copying any tag data".into(),15,"info");
+        if native_inputs.as_ref().is_some_and(|inputs|receipt.tool_identities.get("invaderDependency")!=Some(&inputs.dependency_tool_sha256)){return invalid("Native dependency tool changed after admission; no tags were copied");}
+        emit("dependencies","Using admitted native dependency closure before copying tag data".into(),15,"info");
         let workspace=&sources.directory;let stage=workspace.join("tags");
         let source_tags=tags.as_ref().unwrap();
-        let all_inputs=crate::native_staging::inventory(source_tags,&cancel)?;
-        let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
+        let inputs=native_inputs.as_ref().ok_or_else(||SparkError::Invalid("Native inputs were not admitted before creating the job; no tags were copied".into()))?;
+        let all_inputs=&inputs.all;let plan=&inputs.selected;let model_class_bindings=&inputs.model_class_bindings;
         // Local authored maps have a defined dependency set. Namespaced imports
         // carry their separately verified complete closure and are staged below.
         // Shared prepared revisions retain their complete input hash contract.
-        let mut model_class_bindings=std::collections::BTreeMap::new();
-        let plan=if prepared.is_none(){
-            let mut roots=std::collections::BTreeSet::from(["globals/globals.globals".to_owned()]);
-            for dependency in &sources.dependencies {
-                if generated.contains(&format!("{}.scenery",dependency.tag_path.replace('\\',"/")))&&dependency.tag_class=="scenery"{continue;}
-                if imported.contains(&format!("{}.{}",dependency.tag_path.replace('\\',"/"),dependency.tag_class)){continue;}
-                let file=dependency_path(source_tags,&dependency.tag_path,&dependency.tag_class)?;
-                roots.insert(file.strip_prefix(source_tags).map_err(|_|SparkError::Invalid("Source dependency escaped its root".into()))?.to_string_lossy().replace('\\',"/"));
-            }
-            roots.extend(crate::powerups::source_dependencies(project));
-            roots.retain(|path| !imported.contains(&path.replace('\\',"/").to_ascii_lowercase()));
-            let mut selected=std::collections::BTreeSet::new();
-            let mut visited=std::collections::BTreeSet::new();
-            while let Some(requested)=roots.pop_first() {
-                if !visited.insert(requested.clone()){continue;}if visited.len()>20000{return invalid("Native dependency planning exceeded its root budget");}
-                let log=runner.run(&invader(tools,"invader-dependency").unwrap(),&["-r".into(),"-t".into(),source_tags.to_string_lossy().into_owned(),requested.clone()],workspace,"dependencies",15)?;
-                let dependencies=crate::native_staging::dependency_plan(&log,source_tags,&requested,tools.hek_flavor.as_deref()==Some("h1aEk"))?;
-                selected.extend(dependencies.files);roots.extend(dependencies.followup);model_class_bindings.extend(dependencies.model_class_bindings);
-            }
-            crate::native_staging::selected_inventory(&all_inputs,&selected)?
-        }else{all_inputs.clone()};
-        project::atomic_write(&directory.join("staging-plan.json"),&serde_json::to_vec_pretty(&serde_json::json!({"source":source_tags,"sourceFiles":all_inputs.files.len(),"sourceBytes":all_inputs.bytes,"stagedFiles":plan.files.len(),"stagedBytes":plan.bytes,"dependencySubset":plan.files.len()<all_inputs.files.len(),"nativeModelClassBindings":model_class_bindings,"mutableHardlinks":false,"reservedDirectoriesExcluded":true}))?,false)?;
-        let hashes=crate::native_staging::copy(source_tags,&stage,&plan,&cancel,|done,total,bytes,total_bytes|emit("tag-staging",format!("Prepared {done}/{total} required tags · {}/{} MiB",bytes/(1024*1024),total_bytes/(1024*1024)),(15+done*8/total.max(1)) as u8,"info"))?;
+        project::atomic_write(&directory.join("staging-plan.json"),&serde_json::to_vec_pretty(&serde_json::json!({"source":source_tags,"sourceFiles":all_inputs.files.len(),"sourceBytes":all_inputs.bytes,"stagedFiles":plan.files.len(),"stagedBytes":plan.bytes,"dependencySubset":plan.files.len()<all_inputs.files.len(),"nativeModelClassBindings":model_class_bindings,"peakReservation":inputs.peak,"mutableHardlinks":false,"reservedDirectoriesExcluded":true}))?,false)?;
+        let hashes=crate::native_staging::copy(source_tags,&stage,plan,&cancel,|done,total,bytes,total_bytes|emit("tag-staging",format!("Prepared {done}/{total} required tags · {}/{} MiB",bytes/(1024*1024),total_bytes/(1024*1024)),(15+done*8/total.max(1)) as u8,"info"))?;
         if prepared.is_some_and(|expected|expected!=&hashes) {return invalid("Prepared native revision changed before compilation; no Halo compiler was started");}
         if let Some(native)=&document.native {
             for asset in &native.assets {if hashes.get(&format!("{}.scenery",asset.tag_path()))!=Some(&asset.sha256){return invalid("Prepared source omitted or changed a published native asset");}}
@@ -382,6 +499,106 @@ pub fn run_prepared_job(
 #[cfg(test)]
 mod tool_generation_tests {
     use super::*;
+    #[test]
+    fn native_peak_uses_the_validated_subset_not_unrelated_sdk_bytes() {
+        use std::io::{Read, Write};
+        let root=tempfile::tempdir().unwrap();let tags=root.path().join("tags");
+        fs::create_dir_all(tags.join("globals")).unwrap();fs::create_dir_all(tags.join("bitmaps")).unwrap();
+        fs::write(tags.join("globals/globals.globals"),b"identity-only globals").unwrap();
+        fs::write(tags.join("bitmaps/used.bitmap"),b"identity-only bitmap").unwrap();
+        let cancel=AtomicBool::new(false);
+        let subset=|inventory:&crate::native_staging::Inventory|dependency_subset(&tags,inventory,&[],&Default::default(),&Default::default(),Default::default(),false,|_|Ok("bitmaps/used.bitmap".into())).unwrap().0;
+        let small=subset(&crate::native_staging::inventory(&tags,&cancel).unwrap());
+        let empty=crate::native_staging::Inventory{files:vec![],bytes:0};
+        let small_peak=native_build_peak(&small,&empty,16*1024*1024).unwrap();
+        // A genuine large metadata fixture, physically only one small cluster.
+        // Never allocate/copy a proprietary SDK to exercise peak admission.
+        let unrelated=tags.join("unrelated.bitmap");let mut file=fs::File::create(&unrelated).unwrap();
+        #[cfg(windows)] {
+            use std::os::windows::io::AsRawHandle;
+            #[link(name="kernel32")]
+            unsafe extern "system" { fn DeviceIoControl(handle:*mut std::ffi::c_void,code:u32,input:*mut std::ffi::c_void,input_bytes:u32,output:*mut std::ffi::c_void,output_bytes:u32,returned:*mut u32,overlapped:*mut std::ffi::c_void)->i32; }
+            let mut returned=0;
+            assert_ne!(unsafe{DeviceIoControl(file.as_raw_handle(),0x000900c4,std::ptr::null_mut(),0,std::ptr::null_mut(),0,&mut returned,std::ptr::null_mut())},0,"Sparse identity fixture requires native sparse-file support");
+        }
+        file.write_all(b"unused").unwrap();file.set_len(1024*1024*1024).unwrap();drop(file);
+        let before=fs::metadata(&unrelated).unwrap();
+        let all=crate::native_staging::inventory(&tags,&cancel).unwrap();assert!(all.bytes>=1024*1024*1024);
+        let selected=subset(&all);let peak=native_build_peak(&selected,&empty,16*1024*1024).unwrap();
+        assert_eq!(selected.files.len(),2);assert_eq!(peak.reserved_bytes,small_peak.reserved_bytes);
+        assert_eq!(peak.compiler_output_bytes,1024*1024*1024);
+        let input_hashes=selected.files.iter().map(|row|(row.path.clone(),maps::hash_file(&tags.join(&row.path)).unwrap())).collect::<BTreeMap<_,_>>();
+        let staged=root.path().join("staged");let hashes=crate::native_staging::copy(&tags,&staged,&selected,&cancel,|_,_,_,_|{}).unwrap();
+        assert_eq!(hashes,input_hashes);assert!(!staged.join("unrelated.bitmap").exists());
+        for (relative,hash) in hashes {assert_eq!(maps::hash_file(&tags.join(relative)).unwrap(),hash);}
+        assert_eq!(fs::metadata(&unrelated).unwrap().len(),before.len());
+        assert_eq!(fs::metadata(&unrelated).unwrap().modified().unwrap(),before.modified().unwrap());
+        let mut sentinel=[0;6];fs::File::open(&unrelated).unwrap().read_exact(&mut sentinel).unwrap();assert_eq!(&sentinel,b"unused");
+    }
+    #[test]
+    fn missing_native_dependency_fails_before_creating_jobs_or_running_a_tool() {
+        let root=tempfile::tempdir().unwrap();let tags=root.path().join("tags");fs::create_dir(&tags).unwrap();
+        let invader=root.path().join("invader");fs::create_dir(&invader).unwrap();
+        fs::write(invader.join(if cfg!(windows){"invader-dependency.exe"}else{"invader-dependency"}),b"must not execute").unwrap();
+        let mut project=Project::new("Admission fixture");let mut document=quickforge::create_arena("Admission fixture","sealedArena").unwrap();
+        for material in &mut document.materials {material.shader_path=Some("materials/fixture".into());}
+        document.sky_path=Some("sky/fixture".into());assert!(quickforge::source_requirements(&document).unwrap().1.is_empty());
+        project.quick_forge=Some(document);
+        let previous=root.path().join("previous-good.map");fs::write(&previous,b"retained previous map").unwrap();let previous_hash=maps::hash_file(&previous).unwrap();
+        let jobs=root.path().join("jobs");let tools=ForgeToolchain{hek_tags_directory:Some(tags.clone()),invader_directory:Some(invader),..Default::default()};
+        let error=run_job(&project,&tools,&jobs,&uuid::Uuid::new_v4().to_string(),false,vec![],Arc::new(AtomicBool::new(false)),|_|{}).unwrap_err();
+        assert!(error.to_string().contains("Native dependency is missing: globals/globals.globals"),"{error}");
+        assert!(!jobs.exists());assert_eq!(maps::hash_file(&previous).unwrap(),previous_hash);assert_eq!(fs::read_dir(tags).unwrap().count(),0);
+    }
+    #[test]
+    fn native_peak_budget_rejection_retains_previous_build_and_creates_no_job() {
+        let root=tempfile::tempdir().unwrap();let source=root.path().join("tags");fs::create_dir(&source).unwrap();
+        let previous=root.path().join("previous-good.map");fs::write(&previous,b"previous validated result").unwrap();let expected=maps::hash_file(&previous).unwrap();
+        let store=crate::storage::Store::open(&root.path().join("store")).unwrap();let mut limits=store.limits().unwrap();limits.per_operation_bytes=16*1024*1024;limits.minimum_free_bytes=0;store.set_limits(&limits).unwrap();
+        let selected=crate::native_staging::Inventory{files:vec![],bytes:0};let estimate=native_build_peak(&selected,&selected,16*1024*1024).unwrap();
+        let job=root.path().join("jobs/new-job");let error=admit_native_job(&store,&job,Some(&source),estimate.reserved_bytes).err().unwrap();
+        assert!(error.to_string().contains("Native build peak admission rejected"));assert!(error.to_string().contains("no new job"));
+        assert!(!job.parent().unwrap().exists());assert_eq!(maps::hash_file(&previous).unwrap(),expected);
+    }
+    #[test]
+    fn native_peak_includes_imports_dual_output_headroom_and_overflow_refusal() {
+        let selected=crate::native_staging::Inventory{files:vec![],bytes:600*1024*1024};
+        let imported=crate::native_staging::Inventory{files:vec![crate::native_staging::File{path:"owned/asset.bitmap".into(),bytes:200*1024*1024}],bytes:200*1024*1024};
+        let peak=native_build_peak(&selected,&imported,16*1024*1024).unwrap();
+        assert_eq!(peak.imported_tag_bytes,imported.bytes);assert_eq!(peak.imported_tag_files,1);assert!(peak.compiler_output_bytes>1024*1024*1024);
+        assert!(peak.reserved_bytes>=selected.bytes+imported.bytes+peak.authored_source_bytes+peak.compiler_output_bytes);
+        assert!(native_build_peak(&crate::native_staging::Inventory{files:vec![],bytes:u64::MAX},&imported,1).is_err());
+    }
+    #[test]
+    fn prepared_native_inventory_rejects_missing_extra_and_changed_sources_before_job_creation() {
+        let root=tempfile::tempdir().unwrap();let tags=root.path().join("tags");fs::create_dir_all(tags.join("globals")).unwrap();
+        let source=tags.join("globals/globals.globals");fs::write(&source,b"prepared source identity").unwrap();
+        let expected=BTreeMap::from([("globals/globals.globals".to_string(),maps::hash_file(&source).unwrap())]);
+        let cancel=AtomicBool::new(false);let inventory=crate::native_staging::inventory(&tags,&cancel).unwrap();
+        validate_prepared_inventory(&tags,&inventory,&expected).unwrap();
+        let staged=root.path().join("verified-copy");
+        assert_eq!(crate::native_staging::copy(&tags,&staged,&inventory,&cancel,|_,_,_,_|{}).unwrap(),expected,"Early validation must retain the complete original copy plan");
+        let invader=root.path().join("invader");fs::create_dir(&invader).unwrap();
+        fs::write(invader.join(if cfg!(windows){"invader-dependency.exe"}else{"invader-dependency"}),b"must not execute").unwrap();
+        let mut project=Project::new("Prepared admission");let mut document=quickforge::create_arena("Prepared admission","sealedArena").unwrap();
+        for material in &mut document.materials {material.shader_path=Some("materials/fixture".into());}
+        document.sky_path=Some("sky/fixture".into());project.quick_forge=Some(document);
+        let tools=ForgeToolchain{hek_tags_directory:Some(tags.clone()),invader_directory:Some(invader),..Default::default()};
+        let previous=root.path().join("previous-good.map");fs::write(&previous,b"accepted earlier output").unwrap();let previous_hash=maps::hash_file(&previous).unwrap();
+        let run=|name:&str,contract:&BTreeMap<String,String>|{
+            let jobs=root.path().join(name).join("jobs");
+            let error=run_prepared_job(&project,&tools,&jobs,&uuid::Uuid::new_v4().to_string(),false,vec![],Arc::new(AtomicBool::new(false)),Some(contract),|_|{}).unwrap_err();
+            assert!(!jobs.parent().unwrap().exists(),"No job ancestors may be allocated for a rejected prepared revision");
+            assert_eq!(maps::hash_file(&previous).unwrap(),previous_hash);
+            error.to_string()
+        };
+        let mut missing=expected.clone();missing.insert("missing.bitmap".into(),"0".repeat(64));
+        assert!(run("missing",&missing).contains("missing or extra"));
+        assert!(run("extra",&BTreeMap::new()).contains("missing or extra"));
+        fs::write(&source,b"new authored source bytes").unwrap();
+        assert!(run("changed",&expected).contains("source hash changed"));
+        assert_eq!(fs::read(&source).unwrap(),b"new authored source bytes");
+    }
     #[test]
     fn workshop_receipt_cannot_inject_console_grammar_or_select_another_scenario(){
         let doc=crate::bsp_workshop::example().unwrap();let expected=quickforge::scenario_path(&doc).unwrap();

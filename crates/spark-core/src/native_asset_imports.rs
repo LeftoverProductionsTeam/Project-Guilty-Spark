@@ -440,13 +440,13 @@ pub fn available_files(root: &Path, project: &Project) -> Result<BTreeSet<String
 }
 /// Revalidate project-owned import receipts and every immutable native input.
 /// The returned hashes authorize reuse, never a timestamp or source filename.
-pub fn source_hashes(root: &Path, project: &Project) -> Result<BTreeMap<String, String>> {
+fn validated_inputs(root: &Path, project: &Project) -> Result<BTreeMap<String, ExtractedFile>> {
     let mut files = BTreeMap::new();
     for binding in &project.native_asset_imports {
         let (_, receipt) = receipt(root, project, binding)?;
         let prefix = format!("gs_assets_{}/", binding.id.replace('-', ""));
         for file in receipt.files {
-            if !file.path.starts_with(&prefix) || files.insert(file.path, file.sha256).is_some() {
+            if !file.path.starts_with(&prefix) || files.insert(file.path.clone(), file).is_some() {
                 return invalid(
                     "Native import source escaped its identity or repeats an owned path",
                 );
@@ -454,6 +454,20 @@ pub fn source_hashes(root: &Path, project: &Project) -> Result<BTreeMap<String, 
         }
     }
     Ok(files)
+}
+pub fn source_hashes(root: &Path, project: &Project) -> Result<BTreeMap<String, String>> {
+    Ok(validated_inputs(root, project)?.into_iter().map(|(path, file)| (path, file.sha256)).collect())
+}
+/// The exact receipt- and payload-verified imports that `stage` will copy.
+/// Admission can count these bytes without copying tags or repeating private paths.
+pub fn staging_inventory(root: &Path, project: &Project) -> Result<crate::native_staging::Inventory> {
+    let mut bytes = 0u64;
+    let mut files = vec![];
+    for (path, file) in validated_inputs(root, project)? {
+        bytes = bytes.checked_add(file.bytes).ok_or_else(|| SparkError::Invalid("Native import staging size overflow".into()))?;
+        files.push(crate::native_staging::File { path, bytes: file.bytes });
+    }
+    Ok(crate::native_staging::Inventory { files, bytes })
 }
 pub fn stage(
     root: &Path,
@@ -739,17 +753,24 @@ mod tests {
             receipt.files[0].sha256.clone(),
         )]);
         assert_eq!(source_hashes(root.path(), &project).unwrap(), expected);
+        let planned = staging_inventory(root.path(), &project).unwrap();
+        assert_eq!(planned.files.len(), 1);
+        assert_eq!(planned.bytes, b"source identity".len() as u64);
+        assert_eq!(planned.files[0].path, receipt.files[0].path);
         fs::write(&file, b"changed payload").unwrap();
         assert!(source_hashes(root.path(), &project).is_err());
+        assert!(staging_inventory(root.path(), &project).is_err(), "Admission must rehash payloads, not trust old receipt sizes");
         fs::write(&file, b"source identity").unwrap();
         fs::write(&receipt_file, b"changed receipt").unwrap();
         assert!(source_hashes(root.path(), &project).is_err());
+        assert!(staging_inventory(root.path(), &project).is_err());
         fs::write(&receipt_file, &bytes).unwrap();
         assert_eq!(source_hashes(root.path(), &project).unwrap(), expected);
         project
             .native_asset_imports
             .push(project.native_asset_imports[0].clone());
         assert!(source_hashes(root.path(), &project).is_err());
+        assert!(staging_inventory(root.path(), &project).is_err());
         project.native_asset_imports.pop();
         fs::rename(&file, tags.join("outside.scenery")).unwrap();
         receipt.files = tag_exchange::inventory(&tags).unwrap().0;

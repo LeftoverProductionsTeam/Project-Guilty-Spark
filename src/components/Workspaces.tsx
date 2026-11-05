@@ -708,10 +708,9 @@ export function Preferences({
           <div className="setting-row"><label>Undo history</label><p>Retain up to this many editor actions per open project. Default: 100. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes. Saved snapshots are managed separately.</p>
             <NumberField label="Undo history limit" value={undoLimit} min={1} max={1000} step={1} onCommit={value=>{if(Number.isInteger(value))onUndoLimit?.(value);}}/>
           </div>
-          <div className="setting-row"><label>Periodic project snapshots</label><p>Keep versioned project edits and an automatic safety snapshot before builds. Original maps are preserved separately.</p>
+          <div className="setting-row"><label>Automatic backup timing</label><p>Back up changed project edits at this interval. Each map has its own backup limit in Settings → Storage.</p>
             <label>Interval in minutes<input type="number" min={1} max={1440} value={draft.snapshotIntervalMinutes??10} onChange={e=>setDraft({...draft,snapshotIntervalMinutes:Number(e.target.value)})}/></label>
-            <label>Snapshots to retain<input type="number" min={1} max={100} value={draft.snapshotRetention??20} onChange={e=>setDraft({...draft,snapshotRetention:Number(e.target.value)})}/></label>
-            <p>Open the current project’s Preservation record to preview and confirm a restore.</p></div>
+            <p>Manual backups and build/restore safety checkpoints stay separate. Open Preservation record to preview and restore a backup.</p></div>
         </section>
         {!embedded && <aside>
           <section className="surface">

@@ -1237,7 +1237,7 @@ export default function App() {
       }} /></SettingsPanel>;
     if (workspace === 'settings')
       return (
-        <SettingsPanel tab={settingsTab} onTab={selectSettingsTab}>{settingsTab==='storage'?<StorageSettings/>:settingsTab==='dependencies'?<div className="analysis-page">
+        <SettingsPanel tab={settingsTab} onTab={selectSettingsTab}>{settingsTab==='storage'?<StorageSettings project={current} settings={data.settings} onEditProject={edit} onBeforeSave={()=>save(false,current?.id)}/>:settingsTab==='dependencies'?<div className="analysis-page">
           <label className="field">Dependency target<select aria-label="Dependency target runtime" value={dependencyRuntime} onChange={e=>setDependencyRuntime(e.target.value as RuntimeId)}>
             <option value="mccSteam">Halo 1 · MCC (Steam)</option><option value="haloCustomEdition">Halo Custom Edition</option><option value="haloPc">Halo PC</option><option value="chupathingyCe">ChupathingyCE</option><option value="openCe">OpenCE</option><option value="haloPcTrial">Halo PC Trial</option><option value="macRetail">Halo Mac</option><option value="macDemo">Halo Mac Demo</option><option value="haloMd">HaloMD</option><option value="haloXbox">Halo Xbox</option>
           </select></label>

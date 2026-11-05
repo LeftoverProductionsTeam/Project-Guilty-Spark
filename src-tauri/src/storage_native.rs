@@ -24,6 +24,85 @@ pub(super) struct Report {
 fn store(state: &AppState) -> Reply<storage::Store> {
     storage::Store::for_output(&state.root.join("jobs").join("storage-inspection")).map_err(error)
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ModLocations {
+    mod_directory: PathBuf,
+    default_directory: PathBuf,
+    runtime_export_directories: std::collections::BTreeMap<String, PathBuf>,
+    exists: bool,
+    note: &'static str,
+}
+fn locations(state: &AppState) -> Reply<ModLocations> {
+    let settings = lock(&state.settings)?;
+    let default_directory = state.root.join("Mods");
+    let mod_directory = settings.mod_directory.clone().unwrap_or_else(|| default_directory.clone());
+    Ok(ModLocations {
+        exists: mod_directory.is_dir(), mod_directory, default_directory,
+        runtime_export_directories: settings.runtime_export_directories.clone(),
+        note: "These are optional destinations for your mods and exports. Connecting a folder does not copy installed maps. Native builds remain in their validated job until you deliberately export them.",
+    })
+}
+fn export_runtime_key(runtime: runtime::RuntimeId) -> Reply<String> {
+    if !matches!(runtime, runtime::RuntimeId::MccSteam | runtime::RuntimeId::HaloCustomEdition | runtime::RuntimeId::OpenCe | runtime::RuntimeId::ChupathingyCe) {
+        return Err("Choose MCC, Custom Edition, OpenCE or Chupathingy for a runtime export folder".into());
+    }
+    serde_json::to_value(runtime).map_err(error)?.as_str().map(str::to_owned)
+        .ok_or("Runtime identifier could not be saved".into())
+}
+#[tauri::command]
+pub(super) fn storage_mod_locations(state: State<AppState>) -> Reply<ModLocations> { locations(&state) }
+#[tauri::command]
+pub(super) async fn storage_choose_mod_location(
+    app: tauri::AppHandle, runtime_id: Option<runtime::RuntimeId>, reset: bool,
+) -> Reply<ModLocations> {
+    let runtime_key = runtime_id.map(export_runtime_key).transpose()?;
+    let selected = if reset { None } else {
+        let choice = rfd::AsyncFileDialog::new().set_title(if runtime_key.is_some() {
+            "Choose this Halo's mod export folder"
+        } else { "Choose your Halo mods folder" }).pick_folder().await;
+        let Some(choice) = choice else { return locations(&app.state::<AppState>()); };
+        let path = choice.path().to_path_buf();
+        if !path.is_absolute() || !path.is_dir() { return Err("Choose an existing folder for your mods".into()); }
+        core::reject_links(&path).map_err(error)?;
+        Some(fs::canonicalize(path).map_err(error)?)
+    };
+    let state = app.state::<AppState>();
+    // Update only these preference fields, after the chooser closes. Another
+    // window's newer tool/runtime/backup choices must not be overwritten.
+    let _write = lock(&state.settings_write)?;
+    let mut settings = lock(&state.settings)?.clone();
+    if let Some(key) = runtime_key {
+        if let Some(path) = selected { settings.runtime_export_directories.insert(key, path); }
+        else { settings.runtime_export_directories.remove(&key); }
+    } else { settings.mod_directory = selected; }
+    lock(&state.library)?.set_setting("preferences", &settings).map_err(error)?;
+    *lock(&state.settings)? = settings;
+    locations(&state)
+}
+#[tauri::command]
+pub(super) fn storage_open_mod_location(
+    state: State<AppState>, runtime_id: Option<runtime::RuntimeId>,
+) -> Reply<()> {
+    let settings = lock(&state.settings)?.clone();
+    let fallback = settings.mod_directory.clone().unwrap_or_else(|| state.root.join("Mods"));
+    let path = if let Some(runtime) = runtime_id {
+        settings.runtime_export_directories.get(&export_runtime_key(runtime)?).cloned().unwrap_or(fallback)
+    } else { fallback };
+    core::reject_links(&path).map_err(error)?;
+    if !path.is_dir() {
+        // Only the application-specific default may be created by this
+        // deliberate Open action. Missing selected folders are never rebuilt.
+        if path != state.root.join("Mods") || settings.mod_directory.is_some() {
+            return Err("The selected mods folder is unavailable. Choose its new location in Storage.".into());
+        }
+        fs::create_dir(&path).map_err(error)?;
+    }
+    #[cfg(windows)] { steam::command("explorer.exe").arg(&path).spawn().map_err(error)?; }
+    #[cfg(target_os = "macos")] { steam::command("open").arg(&path).spawn().map_err(error)?; }
+    #[cfg(target_os = "linux")] { steam::command("xdg-open").arg(&path).spawn().map_err(error)?; }
+    Ok(())
+}
 fn folders(state: &AppState, manager: &storage::Store) -> Reply<Vec<Folder>> {
     let mut candidates = vec![
         ("Projects & preserved originals", state.root.join("projects"), "Permanent source; never automatic cleanup"),
@@ -55,6 +134,14 @@ fn folders(state: &AppState, manager: &storage::Store) -> Reply<Vec<Folder>> {
         .into_iter()
         .map(|(label, path, policy)| (label.into(), path, policy, "spark"))
         .collect();
+    let mod_locations = locations(state)?;
+    listed.push(("Mods & exports".into(), mod_locations.mod_directory,
+        "User mod/export destination; never disposable cache", "spark"));
+    for (key, path) in mod_locations.runtime_export_directories {
+        let label = serde_json::from_value::<runtime::RuntimeId>(serde_json::Value::String(key))
+            .map(|runtime| format!("{} exports", runtime.name())).map_err(error)?;
+        listed.push((label, path, "User-selected runtime exports; protected from cleanup", "spark"));
+    }
     listed.extend(
         runtime_connections::storage_roots(state)?
             .into_iter()

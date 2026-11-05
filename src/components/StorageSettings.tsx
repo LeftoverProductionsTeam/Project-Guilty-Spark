@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { HardDrive, RefreshCw, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FolderOpen, HardDrive, RefreshCw, Trash2 } from 'lucide-react';
 import { call, native } from '../api';
+import type { Project, Settings } from '../types';
+import { NumberField } from './ui';
 import { nativePreviewResourceStats, trimNativePreviewResources } from '../nativePreviewResources';
 import { previewBudgets, savePreviewBudgets, type PreviewBudgets } from '../resourceBudgets';
 import './storageSettings.css';
@@ -56,6 +58,39 @@ interface HaloUsage {
   skippedLinks: number;
   measuredAt: string;
 }
+interface BackupUsage { count: number; logicalBytes: number; allocatedBytes: number | null }
+interface BackupOverview {
+  projectId: string;
+  automaticRetention: number;
+  automaticAtCapacity: boolean;
+  automaticBlockedReason: string | null;
+  inherited: boolean;
+  automatic: BackupUsage;
+  manual: BackupUsage;
+  safety: BackupUsage;
+  legacy: BackupUsage;
+  recovery: { present: boolean; valid: boolean; logicalBytes: number; allocatedBytes: number | null };
+  total: BackupUsage;
+  cleanup: {
+    projectId: string;
+    sourceSha256: string | null;
+    retention: number;
+    entries: { id: string; sha256: string; bytes: number }[];
+  };
+}
+interface ModLocations {
+  modDirectory: string;
+  defaultDirectory: string;
+  runtimeExportDirectories: Record<string, string>;
+  exists: boolean;
+  note: string;
+}
+const exportRuntimes = [
+  ['mccSteam', 'MCC Halo 1'],
+  ['haloCustomEdition', 'Custom Edition'],
+  ['openCe', 'OpenCE'],
+  ['chupathingyCe', 'Chupathingy'],
+] as const;
 const size = (bytes: number | null) =>
   bytes === null
     ? 'Unavailable'
@@ -75,8 +110,96 @@ const fields: [keyof Limits, string][] = [
   ['perOperationBytes', 'One operation'],
   ['minimumFreeBytes', 'Keep disk space free'],
 ];
-export default function StorageSettings() {
+const backupPresets = [0, 1, 3, 5, 10];
+export function automaticBackupLimit(project: Pick<Project, 'automaticBackupRetention'>, settings: Pick<Settings, 'snapshotRetention'>) {
+  return project.automaticBackupRetention ?? settings.snapshotRetention ?? 3;
+}
+export function BackupRetentionSelect({ value, disabled = false, onChange }: {
+  value: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  const [custom, setCustom] = useState(!backupPresets.includes(value));
+  useEffect(() => { if (!backupPresets.includes(value)) setCustom(true); }, [value]);
+  return <div className="gs-storage-retention">
+    <label>Maximum automatic map backups
+      <select aria-label="Maximum automatic map backups" value={custom ? 'custom' : String(value)} disabled={disabled}
+        onChange={event => {
+          const next = event.target.value;
+          setCustom(next === 'custom');
+          if (next !== 'custom') onChange(Number(next));
+          else if (value === 0) onChange(1);
+        }}>
+        <option value="0">None</option><option value="1">1</option><option value="3">3 (default)</option>
+        <option value="5">5</option><option value="10">10</option><option value="custom">Custom…</option>
+      </select>
+    </label>
+    {custom && <NumberField label="Custom automatic backup limit" value={Math.max(1, value)} min={1} max={100} step={1} disabled={disabled}
+      onCommit={next => { if (Number.isInteger(next) && next >= 1 && next <= 100) onChange(next); }} />}
+  </div>;
+}
+export default function StorageSettings({ project = null, settings = {}, onEditProject, onBeforeSave }: {
+  project?: Project | null;
+  settings?: Pick<Settings, 'snapshotRetention'>;
+  onEditProject?: (project: Project, title: string) => void;
+  onBeforeSave?: () => Promise<void>;
+}) {
   const [previews, setPreviews] = useState<PreviewBudgets>(previewBudgets);
+  const [locations, setLocations] = useState<ModLocations | null>(null);
+  const [locationsBusy, setLocationsBusy] = useState(false);
+  const [backup, setBackup] = useState<BackupOverview | null>(null);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupError, setBackupError] = useState('');
+  const [backupMessage, setBackupMessage] = useState('');
+  const [backupReview, setBackupReview] = useState(false);
+  const [backupApproved, setBackupApproved] = useState(false);
+  const activeProject = useRef(project?.id);
+  const projectGeneration = useRef(0);
+  if (activeProject.current !== project?.id) {
+    activeProject.current = project?.id;
+    ++projectGeneration.current;
+  }
+  const backupRequest = useRef(0);
+  const refreshBackups = useCallback(async (projectId: string) => {
+    const request = ++backupRequest.current;
+    const next = await call<BackupOverview>('project_backup_overview', { projectId });
+    if (activeProject.current === projectId && request === backupRequest.current) {
+      setBackup(next);
+      setBackupReview(false);
+      setBackupApproved(false);
+    }
+  }, []);
+  useEffect(() => {
+    ++backupRequest.current;
+    setBackup(null);
+    setBackupBusy(false);
+    setBackupError('');
+    setBackupMessage('');
+    setBackupReview(false);
+    setBackupApproved(false);
+    if (native && project) void refreshBackups(project.id).catch(problem => {
+      if (activeProject.current === project.id) setBackupError(String(problem));
+    });
+  }, [project?.id, refreshBackups]);
+  useEffect(() => { setBackupReview(false); setBackupApproved(false); }, [project?.automaticBackupRetention]);
+  async function backupAction(operation: (projectId: string) => Promise<void>) {
+    if (!native || !project || !onBeforeSave || backupBusy) return;
+    const id = project.id;
+    const generation = projectGeneration.current;
+    setBackupBusy(true);
+    setBackupError('');
+    setBackupMessage('');
+    try {
+      await onBeforeSave();
+      if (activeProject.current !== id || generation !== projectGeneration.current) return;
+      await operation(id);
+      if (activeProject.current === id && generation === projectGeneration.current) await refreshBackups(id);
+    } catch (problem) {
+      if (activeProject.current === id && generation === projectGeneration.current) setBackupError(String(problem));
+    } finally {
+      if (activeProject.current === id && generation === projectGeneration.current) setBackupBusy(false);
+    }
+  }
   const [haloUsage, setHaloUsage] = useState<HaloUsage | null>(null);
   const [measuring, setMeasuring] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null),
@@ -92,8 +215,12 @@ export default function StorageSettings() {
     setBusy(true);
     setError('');
     try {
-      const next = await call<Report>('storage_overview');
+      const [next, nextLocations] = await Promise.all([
+        call<Report>('storage_overview'),
+        call<ModLocations>('storage_mod_locations'),
+      ]);
       setReport(next);
+      setLocations(nextLocations);
       setHaloUsage(null);
       setLimits(next.managed.limits);
       setSelected([]);
@@ -109,6 +236,23 @@ export default function StorageSettings() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  async function modLocationAction(runtimeId: string | null, action: 'choose' | 'reset' | 'open') {
+    if (!native || locationsBusy) return;
+    setLocationsBusy(true);
+    setError('');
+    try {
+      if (action === 'open') {
+        await call('storage_open_mod_location', { runtimeId });
+        setLocations(await call<ModLocations>('storage_mod_locations'));
+      } else {
+        setLocations(await call<ModLocations>('storage_choose_mod_location', { runtimeId, reset: action === 'reset' }));
+      }
+    } catch (problem) {
+      setError(String(problem));
+    } finally {
+      setLocationsBusy(false);
+    }
+  }
   const measureFolder = async (folder: Report['folders'][number]) => {
     if (!native || measuring || folder.measurement) return;
     setMeasuring(folder.path);
@@ -166,6 +310,8 @@ export default function StorageSettings() {
     }
   };
   const memory = nativePreviewResourceStats();
+  const retention = project ? automaticBackupLimit(project, settings) : 3;
+  const unsavedBackupLimit = backup !== null && backup.automaticRetention !== retention;
   const eligible = report?.cleanup.eligible ?? [];
   const pages = Math.max(1, Math.ceil(eligible.length / 8));
   const folderRow = (folder: Report['folders'][number]) => (
@@ -210,10 +356,14 @@ export default function StorageSettings() {
           </h2>
           <p>Keep source and working builds safe. Review generated files before removing them.</p>
         </div>
-        <button disabled={!native || busy || !!measuring} onClick={() => void refresh()}>
-          <RefreshCw size={14} />
-          Inspect storage
-        </button>
+        <div className="gs-storage-actions">
+          <button disabled={!native || busy} onClick={() => {
+            void call('reveal_folder', { kind: 'data' }).catch(problem => setError(String(problem)));
+          }}><FolderOpen size={14} />Open Spark folder</button>
+          <button disabled={!native || busy || !!measuring} onClick={() => void refresh()}>
+            <RefreshCw size={14} />Inspect storage
+          </button>
+        </div>
       </header>
       {!native && (
         <p role="status">Open the desktop app to inspect local files and configure disk budgets.</p>
@@ -238,6 +388,77 @@ export default function StorageSettings() {
           Decoded preview memory
         </span>
       </div>
+      {locations && <section className="gs-storage-project gs-storage-locations" aria-label="Mods and export locations">
+        <div className="gs-storage-location-row">
+          <div><h3>Mods &amp; exports</h3><code title={locations.modDirectory}>{locations.modDirectory}</code></div>
+          <button disabled={locationsBusy} onClick={() => void modLocationAction(null, 'choose')}>Choose folder</button>
+          <button disabled={locationsBusy || locations.modDirectory === locations.defaultDirectory} onClick={() => void modLocationAction(null, 'reset')}>Use default</button>
+          <button disabled={locationsBusy} onClick={() => void modLocationAction(null, 'open')}><FolderOpen size={14} />Open</button>
+        </div>
+        <small>{locations.note}</small>
+        <details><summary>Separate export locations per Halo</summary>
+          <div className="gs-storage-runtime-locations">{exportRuntimes.map(([runtimeId, label]) => <div className="gs-storage-location-row" key={runtimeId}>
+            <strong>{label}</strong>
+            <code title={locations.runtimeExportDirectories[runtimeId] ?? locations.modDirectory}>{locations.runtimeExportDirectories[runtimeId] ?? 'Use mod folder'}</code>
+            <button disabled={locationsBusy} aria-label={`Choose ${label} export folder`} title={`Choose ${label} export folder`} onClick={() => void modLocationAction(runtimeId, 'choose')}><FolderOpen size={14} /></button>
+            <button disabled={locationsBusy || !locations.runtimeExportDirectories[runtimeId]} onClick={() => void modLocationAction(runtimeId, 'reset')}>Reset</button>
+            <button disabled={locationsBusy} aria-label={`Open ${label} export folder`} onClick={() => void modLocationAction(runtimeId, 'open')}>Open</button>
+          </div>)}</div>
+        </details>
+      </section>}
+      <section className="gs-storage-project" aria-label="Current project backups">
+        <header><h3>{project ? `${project.title} · backups` : 'Project backups'}</h3>
+          {backup && <span>{size(backup.total.allocatedBytes ?? backup.total.logicalBytes)} used</span>}
+        </header>
+        {project ? <>
+          <div className="gs-storage-backup-controls">
+            <BackupRetentionSelect key={project.id} value={retention} disabled={!native || backupBusy || !onEditProject}
+              onChange={automaticBackupRetention => onEditProject?.({ ...project, automaticBackupRetention }, 'Change automatic backup limit')} />
+            <button disabled={!native || backupBusy || !onBeforeSave} onClick={() => void backupAction(async () => {
+              setBackupMessage('Backup limit saved for this project.');
+            })}>{backupBusy ? 'Working…' : 'Save limit'}</button>
+            <button disabled={!native || backupBusy || !onBeforeSave} onClick={() => void backupAction(async projectId => {
+              await call('create_project_snapshot', { projectId, reason: 'manual' });
+              if (activeProject.current === projectId) setBackupMessage('Manual backup created.');
+            })}>Back up now</button>
+          </div>
+          <small>Per map, across revisions. At the limit, review old automatic backups to free a slot. None keeps Undo and crash recovery active.</small>
+          {unsavedBackupLimit && <small role="status">Save the new limit before reviewing old automatic backups.</small>}
+          {backup && <>
+            <div className="gs-storage-backup-usage">
+              <span>{backup.automatic.count} automatic · {size(backup.automatic.allocatedBytes ?? backup.automatic.logicalBytes)}</span>
+              <span>{backup.manual.count} manual</span><span>{backup.safety.count} safety checkpoints</span>
+              <span>Crash recovery · {backup.recovery.present ? size(backup.recovery.allocatedBytes ?? backup.recovery.logicalBytes) : 'Not needed yet'}</span>
+            </div>
+            {backup.automaticAtCapacity && !unsavedBackupLimit && <p role="status">Limit reached; review automatic backups to free a slot.</p>}
+            {backup.automaticBlockedReason && !backup.automaticAtCapacity && !unsavedBackupLimit && <small role="status">{backup.automaticBlockedReason}</small>}
+            <details><summary>What is kept</summary>
+              <p>Backups save project edits without duplicating original maps. Reviewing automatic backups leaves manual backups, build/restore safety checkpoints and recovery files intact.</p>
+              {backup.inherited && <p>This map uses its existing default limit. Choose a limit above to give it a separate policy.</p>}
+              {backup.legacy.count > 0 && <p>{backup.legacy.count} older checkpoints · {size(backup.legacy.allocatedBytes ?? backup.legacy.logicalBytes)} remain protected.</p>}
+              {backup.recovery.present && !backup.recovery.valid && <p role="alert">The recovery file needs review. It will not be removed here.</p>}
+              <p>Use Preservation record to preview and restore a backup.</p>
+            </details>
+            {backup.cleanup.entries.length > 0 && <button className="gs-storage-backup-review" disabled={backupBusy || unsavedBackupLimit || !onBeforeSave}
+              aria-expanded={backupReview} onClick={() => { setBackupReview(!backupReview); setBackupApproved(false); }}>
+              <Trash2 size={14} />Review {backup.cleanup.entries.length} old automatic backups
+            </button>}
+            {backupReview && !unsavedBackupLimit && <div className="gs-storage-confirm">
+              <p>Remove {backup.cleanup.entries.length} reviewed automatic backups from this project ({size(backup.cleanup.entries.reduce((sum, entry) => sum + entry.bytes, 0))}). Manual and safety checkpoints stay.</p>
+              <ul className="gs-storage-backup-list" aria-label="Automatic backups selected for removal">{backup.cleanup.entries.map(entry => <li key={entry.id}>
+                <span><code>{entry.id}</code><b>{size(entry.bytes)}</b></span><code>SHA-256 {entry.sha256}</code>
+              </li>)}</ul>
+              <label><input type="checkbox" checked={backupApproved} onChange={event => setBackupApproved(event.target.checked)} />Remove these reviewed automatic backups.</label>
+              <button disabled={!backupApproved || backupBusy} onClick={() => void backupAction(async projectId => {
+                const result = await call<{ files: number; logicalBytes: number }>('cleanup_project_backups', { projectId, plan: backup.cleanup, confirmed: true });
+                if (activeProject.current === projectId) setBackupMessage(`Removed ${result.files} old automatic backups (${size(result.logicalBytes)}).`);
+              })}>Remove reviewed backups</button>
+            </div>}
+          </>}
+          {backupMessage && <p role="status">{backupMessage}</p>}
+          {backupError && <p className="gs-storage-error" role="alert">{backupError}</p>}
+        </> : <p>Open a map or workspace to set its backup limit and view its storage usage.</p>}
+      </section>
       {report && (
         <>
           <section className="gs-storage-halos" aria-label="Halo directory storage">
@@ -285,7 +506,7 @@ export default function StorageSettings() {
         </>
       )}
       {limits && (
-        <details className="gs-storage-limits" open>
+        <details className="gs-storage-limits">
           <summary>Storage limits</summary>
           <div className="gs-storage-limit-grid">
             {fields.map(([key, label]) => (

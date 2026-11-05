@@ -8,7 +8,7 @@ export default function ProjectSnapshots({project,onBeforeSave,onRestore}:{proje
   async function refresh(){setItems(await call<Snapshot[]>('list_project_snapshots',{projectId:project.id}));}
   useEffect(()=>{setPreview(null);setConfirmed(false);if(native)void refresh().catch(e=>setError(String(e)));},[project.id]);
   async function action(f:()=>Promise<void>){setBusy(true);setError('');try{await f();await refresh();}catch(e){setError(String(e));}finally{setBusy(false);}}
-  return <section className="surface gs-snapshots"><h3>Project snapshots</h3><p>Versioned copies of your project edits. The original map and asset files stay in the managed library. Periodic snapshots default to every 10 minutes; interval and retention are in Settings.</p>
+  return <section className="surface gs-snapshots"><h3>Project snapshots</h3><p>Versioned copies of project edits; original maps stay in the managed library. Set this map’s automatic backup limit and review old automatic backups in Settings → Storage. Backup timing is in Games &amp; tools.</p>
     <button disabled={!native||busy} onClick={()=>void action(async()=>{await onBeforeSave();await call('create_project_snapshot',{projectId:project.id,reason:'manual'});})}>Create snapshot now</button>
     {items.length===0&&<p>No project snapshots yet.</p>}
     <ul>{items.map(info=><li key={info.id}><span>{new Date(info.createdAt).toLocaleString()} · {info.reason} · {info.title}</span> <button className="small-button" disabled={busy} onClick={()=>void action(async()=>{setConfirmed(false);setPreview({info,project:await call<Project>('preview_project_snapshot',{projectId:project.id,snapshotId:info.id,sha256:info.sha256})});})}>Preview restore</button></li>)}</ul>

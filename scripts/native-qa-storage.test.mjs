@@ -114,6 +114,8 @@ test('obsolete .local outputs and linked output ancestors are rejected before cr
   await assert.rejects(assertQaOutputPath(path.join(alias,'run')),/links|junctions/);
   const result=spawnSync(process.execPath,['scripts/cargo.mjs','--version'],{cwd:path.resolve('.'),env:{...process.env,CARGO_TARGET_DIR:obsolete},encoding:'utf8',windowsHide:true});
   assert.notEqual(result.status,0);assert.match(result.stderr,/obsolete .local/i);
+  const desktop=spawnSync(process.execPath,['scripts/desktop.mjs','info'],{cwd:path.resolve('.'),env:{...process.env,CARGO_TARGET_DIR:obsolete},encoding:'utf8',windowsHide:true});
+  assert.notEqual(desktop.status,0);assert.match(desktop.stderr,/obsolete .local/i);
   await assert.rejects(fs.stat(path.join(parent,'.local')),{code:'ENOENT'});
 }));
 

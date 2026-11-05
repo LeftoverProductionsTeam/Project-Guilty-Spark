@@ -2,6 +2,112 @@ import {chooseTool,openDrawer,openViewMenu,openStudioMenu} from './helpers/navig
 // These are synthetic IPC contract tests. They do not establish native runtime or gameplay verification.
 import { test, expect, type Page } from '@playwright/test';
 
+// IPC/UI interaction only; native snapshot integrity has independent Rust and
+// actual desktop acceptance. No game/filesystem result is inferred here.
+async function mockStorageControls(page: Page) {
+  await page.evaluate(() => {
+    const w = window as any, invoke = w.__TAURI_INTERNALS__.invoke, mock = w.__sparkMock;
+    const automatic: Record<string, number> = { a: 3, b: 1, c: 0 }, manual: Record<string, number> = { a: 1, b: 0, c: 0 };
+    const locations = { modDirectory: 'C:/Synthetic/Mods', defaultDirectory: 'C:/Synthetic/Mods', runtimeExportDirectories: {} as Record<string, string>, exists: true, note: 'Synthetic export preferences; no files are created.' };
+    const usage = (count: number) => ({ count, logicalBytes: count * 256, allocatedBytes: count * 4096 });
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any = {}) => {
+      if (!['storage_overview', 'storage_mod_locations', 'storage_choose_mod_location', 'storage_open_mod_location', 'project_backup_overview', 'create_project_snapshot', 'cleanup_project_backups'].includes(command)) return invoke(command, args);
+      mock.calls.push({ command, args: structuredClone(args) });
+      if (command === 'storage_overview') return { managed: { root: 'C:/Synthetic/storage', limits: { previewBytes: 1024 ** 3, stagingBytes: 1024 ** 3, diagnosticsBytes: 1024 ** 3, compilerBytes: 1024 ** 3, totalBytes: 8 * 1024 ** 3, perOperationBytes: 1024 ** 3, minimumFreeBytes: 1024 ** 3, abandonedDays: 7 }, entries: [], accountedBytes: 0, freeBytes: 20 * 1024 ** 3, legacyNote: '' }, folders: [], cleanup: { token: 'synthetic', eligible: [], protected: [], bytes: 0 }, note: 'Synthetic storage only.' };
+      if (command === 'storage_mod_locations') return structuredClone(locations);
+      if (command === 'storage_choose_mod_location') {
+        if (args.runtimeId) {
+          if (args.reset) delete locations.runtimeExportDirectories[args.runtimeId];
+          else locations.runtimeExportDirectories[args.runtimeId] = `C:/Chosen/${args.runtimeId}`;
+        } else locations.modDirectory = args.reset ? locations.defaultDirectory : 'C:/Chosen/Mods';
+        return structuredClone(locations);
+      }
+      if (command === 'storage_open_mod_location') return null;
+      if (command === 'create_project_snapshot') { manual[args.projectId]++; return { id: 'synthetic-manual', reason: 'manual' }; }
+      const project = mock.projects[args.projectId].project, retention = project.automaticBackupRetention ?? 3;
+      if (command === 'cleanup_project_backups') {
+        if (!args.confirmed || args.plan.projectId !== args.projectId || args.plan.retention !== retention) throw Error('Synthetic reviewed-plan mismatch');
+        automatic[args.projectId] -= args.plan.entries.length;
+        return { files: args.plan.entries.length, logicalBytes: args.plan.entries.length * 256 };
+      }
+      const count = automatic[args.projectId], eligible = count >= retention ? Math.min(count, count - retention + 1) : 0;
+      return { projectId: args.projectId, automaticRetention: retention, inherited: project.automaticBackupRetention == null, automaticAtCapacity: retention > 0 && count >= retention, automaticBlockedReason: retention === 0 ? 'Automatic backups are disabled for this project.' : null, automatic: usage(count), manual: usage(manual[args.projectId]), safety: usage(1), legacy: usage(1), recovery: { present: true, valid: true, logicalBytes: 512, allocatedBytes: 4096 }, total: usage(count + manual[args.projectId] + 3), cleanup: { projectId: args.projectId, sourceSha256: project.source.sha256, retention, entries: Array.from({ length: eligible }, (_, index) => ({ id: `automatic-${index}`, sha256: 'd'.repeat(64), bytes: 256 })) } };
+    };
+  });
+}
+
+test('first-run mod folder is optional and completed setup does not ask again', async ({ page }) => {
+  await mockDesktop(page); await mockStorageControls(page); await chooseTool(page, 'Start here');
+  await page.getByRole('button', { name: 'Continue to tools', exact: true }).click();
+  const setup = page.getByRole('region', { name: 'First launch Halo setup', exact: true });
+  await setup.getByText('Mods & exported maps · optional', { exact: true }).click();
+  await expect(setup).toContainText('Would you like to choose a folder for your Halo mods and exported maps?');
+  await expect(setup).toContainText('C:/Synthetic/Mods');
+  await setup.getByRole('button', { name: 'Choose mod folder', exact: true }).click();
+  await expect(setup).toContainText('C:/Chosen/Mods');
+  expect(await page.evaluate(() => (window as any).__sparkMock.calls.filter((row: any) => row.command === 'storage_choose_mod_location').map((row: any) => row.args))).toEqual([{ runtimeId: null, reset: false }]);
+  await setup.getByRole('button', { name: 'Configure tools later', exact: true }).click();
+  await expect(setup).toBeHidden();
+  await chooseTool(page, 'Start here');
+  await expect(page.getByRole('heading', { name: 'Your workbench is ready', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose mod folder', exact: true })).toHaveCount(0);
+});
+
+test('project backup limits preserve None, custom values, manual saves and map isolation', async ({ page }) => {
+  await mockDesktop(page); await openFixture(page); await mockStorageControls(page);
+  await chooseTool(page, 'Settings & tools'); await page.getByRole('tab', { name: 'Storage & Cache', exact: true }).click();
+  const backups = page.getByRole('region', { name: 'Current project backups', exact: true });
+  const choice = backups.getByRole('combobox', { name: 'Maximum automatic map backups', exact: true });
+  await expect(choice).toHaveValue('3');
+  await choice.selectOption('0'); await backups.getByRole('button', { name: 'Save limit', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__sparkMock.saved?.automaticBackupRetention)).toBe(0);
+  await expect(backups).toContainText('Undo and crash recovery');
+  await backups.getByRole('button', { name: 'Back up now', exact: true }).click();
+  await expect(backups).toContainText('2 manual');
+  const commands = await page.evaluate(() => (window as any).__sparkMock.calls);
+  const created = commands.findIndex((row: any) => row.command === 'create_project_snapshot');
+  expect(commands.slice(0, created).some((row: any) => row.command === 'save_project' && row.args.project.automaticBackupRetention === 0)).toBe(true);
+  await choice.selectOption('custom');
+  const custom = backups.getByRole('spinbutton', { name: 'Custom automatic backup limit', exact: true });
+  await custom.fill('7'); await custom.press('Tab'); await backups.getByRole('button', { name: 'Save limit', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__sparkMock.saved?.automaticBackupRetention)).toBe(7);
+  await chooseTool(page, 'Map library');
+  await page.locator('.map-card').filter({ has: page.getByRole('heading', { name: 'Synthetic candidate', exact: true }) }).click();
+  await chooseTool(page, 'Settings & tools'); await page.getByRole('tab', { name: 'Storage & Cache', exact: true }).click();
+  await expect(choice).toHaveValue('3');
+  await page.getByRole('tab', { name: /Synthetic baseline/ }).click();
+  await chooseTool(page, 'Settings & tools'); await page.getByRole('tab', { name: 'Storage & Cache', exact: true }).click();
+  await expect(backups.getByRole('spinbutton', { name: 'Custom automatic backup limit', exact: true })).toHaveValue('7');
+});
+
+test('storage reviews owned automatic backups before removal and keeps runtime export choices separate', async ({ page }, testInfo) => {
+  await mockDesktop(page); await openFixture(page); await mockStorageControls(page);
+  await chooseTool(page, 'Settings & tools'); await page.getByRole('tab', { name: 'Storage & Cache', exact: true }).click();
+  const backups = page.getByRole('region', { name: 'Current project backups', exact: true });
+  await expect(backups).toContainText('Limit reached');
+  await backups.getByRole('button', { name: 'Review 1 old automatic backups', exact: true }).click();
+  const remove = backups.getByRole('button', { name: 'Remove reviewed backups', exact: true });
+  await expect(remove).toBeDisabled();
+  const reviewed = backups.getByRole('list', { name: 'Automatic backups selected for removal', exact: true });
+  await expect(reviewed).toContainText('automatic-0'); await expect(reviewed).toContainText('d'.repeat(64));
+  expect(await page.evaluate(() => (window as any).__sparkMock.calls.some((row: any) => row.command === 'cleanup_project_backups'))).toBe(false);
+  await backups.getByRole('checkbox', { name: 'Remove these reviewed automatic backups.', exact: true }).check();
+  await remove.click(); await expect(backups).toContainText('2 automatic');
+  await expect(backups).toContainText('1 manual'); await expect(backups).toContainText('1 safety checkpoints');
+  expect(await page.evaluate(() => (window as any).__sparkMock.calls.find((row: any) => row.command === 'cleanup_project_backups').args)).toMatchObject({ projectId: 'a', confirmed: true, plan: { projectId: 'a', sourceSha256: 'a'.repeat(64), retention: 3 } });
+  const folders = page.getByRole('region', { name: 'Mods and export locations', exact: true });
+  await folders.getByText('Separate export locations per Halo', { exact: true }).click();
+  await folders.getByRole('button', { name: 'Choose OpenCE export folder', exact: true }).click();
+  await expect(folders).toContainText('C:/Chosen/openCe');
+  await folders.getByRole('button', { name: 'Open OpenCE export folder', exact: true }).click();
+  expect(await page.evaluate(() => (window as any).__sparkMock.calls.filter((row: any) => row.command === 'storage_open_mod_location').at(-1).args)).toEqual({ runtimeId: 'openCe' });
+  expect(await page.evaluate(() => (window as any).__sparkMock.calls.filter((row: any) => row.command === 'storage_choose_mod_location').map((row: any) => row.args))).toEqual([{ runtimeId: 'openCe', reset: false }]);
+  await page.setViewportSize({ width: 720, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole('region', { name: 'Storage and cache settings', exact: true }).screenshot({ path: testInfo.outputPath('storage-controls.png') });
+});
+
 test('C63 dropped trigger exposes door setup and preserves one-action history and immediate Save',async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic door setup',template:'customBlank',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],spawns:[],objectives:[],placements:[{id:'door',name:'Corridor door',tagClass:'mach',tagPath:'levels/a10/devices/doors/door small/door small',tagId:null,sourceProjectId:null,sourceSha256:null,position:[4,0,0],rotation:[0,0,0],team:0,respawnSeconds:0,visible:true,locked:false}]})));
   await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');await openDrawer(page,'Asset library');

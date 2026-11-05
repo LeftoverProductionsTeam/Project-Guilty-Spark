@@ -1,6 +1,6 @@
 # Pending engineering requests
 
-Current priority: Part1 cleanup preservation/native-integrity gates passed; commit verified source locally then finish Part2 lightweight storage safeguards6819d078 before resuming C70. See P0_UNIFIED_STORAGE_PURGE_20261105.md and ACTIVE_TASK.md. Exact directives retained in artifacts/storage-v1/unified-purge-20261105. Only proved-unneeded canonical files/folders were removed; all unique source/history/originals/releases remain.
+Current priority: Part1 is committed at13207fc. Part2's implemented storage safeguards pass full regressions, actual20-edit/crash-restart/backup/export acceptance and two native structural builds with reuse/corrupt-save/reconciliation proof. Final accounting/local commit are underway; explicit limitations remain in P0_LIGHTWEIGHT_STORAGE_ARCHITECTURE_20261105.md and ACTIVE_TASK.md. C70 and later acceptance remain preserved. Exact Part1/Part2 directives are in artifacts/storage-v1/unified-purge-20261105. Only proved-unneeded canonical files/folders are removed; all unique source/history/originals/releases remain.
 
 Historical `.local` evidence paths below are provenance, not current output defaults. The P0 recovery indexes preserve former paths and exact content hashes under `preserved/`; do not recreate `.local` to satisfy an old reference. See `ACTIVE_TASK.md` for actual current work and verified results.
 
