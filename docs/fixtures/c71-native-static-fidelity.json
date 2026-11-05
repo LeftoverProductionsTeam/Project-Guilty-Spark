@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "scope": "C71 static native model fidelity milestone",
+  "evidenceDirectory": "artifacts/qa/overnight-asset-fidelity-accepted",
+  "appSha256": "e085aa93abe5c641c407467224800aefc743f52dc09e95642c1da8ea5f903556",
+  "complete": true,
+  "desktopCases": 3,
+  "cacheSha256": "123673b4d2b2519c8fac88c1def02bfd0bc8e50276dba1957e1668b171ef6ae9",
+  "compileMs": 37189,
+  "assetFidelity": {
+    "nativeReadback": [
+      {
+        "bounds": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            1
+          ]
+        ],
+        "collisionTriangles": 12,
+        "fidelity": {
+          "maxPositionError": 0,
+          "maxUvError": 0,
+          "minimumNormalDot": 1,
+          "shaderPaths": [
+            "levels/a10/shaders/obj-door small"
+          ],
+          "triangles": 12,
+          "windingPreserved": true
+        },
+        "jmsSha256": "dd98306df511e92b891858890271886e492bb15b5ffef50380e82a012223bf63",
+        "renderTriangles": 12,
+        "sourceSha256": "1c30f6beef1cd1c3ab0bb3b7bc895c28321668958b37d5c06b2007230518d314",
+        "tag": "scenery/spark_ba9ac4c8e2c2/mesh_16e1ee204fb85f046584/mesh_16e1ee204fb85f046584"
+      },
+      {
+        "bounds": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1.5,
+            1,
+            1
+          ]
+        ],
+        "collisionTriangles": 12,
+        "fidelity": {
+          "maxPositionError": 0,
+          "maxUvError": 0,
+          "minimumNormalDot": 1,
+          "shaderPaths": [
+            "levels/a10/shaders/obj-door small"
+          ],
+          "triangles": 12,
+          "windingPreserved": true
+        },
+        "jmsSha256": "341fc6e33535859b7948fd08d89a194b3ad9b2e91181648e193c2d784d7f81c3",
+        "renderTriangles": 12,
+        "sourceSha256": "673ca847c8b6b014a5ad17a6b0ed34f346711e213300a422f0060923835d08bf",
+        "tag": "scenery/spark_ba9ac4c8e2c2/mesh_3b891ee943ecc354f45a/mesh_3b891ee943ecc354f45a"
+      }
+    ],
+    "preview": {
+      "transparentBackground": "false",
+      "modelTag": "3784114201",
+      "modelSource": "912da9e6-26ee-45f7-b469-948a30ccfda8",
+      "modelSourceHash": "123673b4d2b2519c8fac88c1def02bfd0bc8e50276dba1957e1668b171ef6ae9",
+      "modelTriangles": "12",
+      "modelReady": "true",
+      "modelFirstFrame": "true",
+      "nativeAnimationCount": "0",
+      "nativeSelfIllumination": "1",
+      "modelLighting": "source",
+      "modelLightingReady": "true",
+      "modelTextures": "1",
+      "modelMaterialGaps": "0",
+      "modelReflections": "1"
+    },
+    "exactEngineAppearanceClaimed": false
+  },
+  "rejectedInMemoryNativeProbes": [
+    "uv",
+    "normal",
+    "winding",
+    "shader"
+  ],
+  "probeEvidence": "artifacts/overnight-20261105/asset-fidelity-native-probes.log",
+  "gameplayAccepted": false,
+  "allAssetClassesAccepted": false,
+  "contextTabsComplete": false
+}

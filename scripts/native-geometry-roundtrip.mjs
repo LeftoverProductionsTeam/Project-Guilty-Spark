@@ -78,6 +78,24 @@ export async function nativeGeometryRoundTrip({main,root,invoke,expect,report,st
   }
   const reopened=await invoke(main,'open_built_map',{projectId:project.id,buildId:jobId});
   expect(reopened.inspection.objects.filter(o=>o.kind==='Scenery').length).toBeGreaterThanOrEqual(2);
+  if(process.env.SPARK_GEOMETRY_FIDELITY==='1'){
+    const fidelity=JSON.parse(await fs.readFile(path.join(job,'output/custom-model-verification.json'),'utf8'));
+    expect(fidelity).toHaveLength(2);
+    for(const model of fidelity){expect(model.fidelity.windingPreserved).toBe(true);expect(model.fidelity.maxUvError).toBeLessThanOrEqual(.00005);expect(model.fidelity.minimumNormalDot).toBeGreaterThanOrEqual(.999);}
+    await main.reload();await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${reopened.project.id}"]`).click();await chooseTool(main,'Tag editor');
+    const target=reopened.inspection.tags.find(tag=>tag.class==='scen'&&tag.path.replaceAll('\\','/')===modelSources[1].tag);
+    await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(target.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('scen');await main.locator('.tag-row').click();
+    const preview=main.getByRole('region',{name:'Actual model preview',exact:true}).locator('.native-model-preview');
+    await expect(preview).toHaveAttribute('data-model-ready','true',{timeout:90000});
+    await expect(preview).toHaveAttribute('data-model-first-frame','true',{timeout:90000});
+    await expect(preview).toHaveAttribute('data-model-material-gaps','0');
+    expect(Number(await preview.getAttribute('data-model-textures'))).toBeGreaterThan(0);
+    expect(Number(await preview.getAttribute('data-model-reflections'))).toBeGreaterThan(0);
+    await expect(preview).toHaveAttribute('data-model-triangles','12');
+    await main.screenshot({path:path.join(root,'compiled-asset-preview.png')});
+    report.assetFidelity={nativeReadback:fidelity,preview:await preview.evaluate(element=>({...element.dataset})),exactEngineAppearanceClaimed:false};
+    step('Compiled imported asset renders in the actual Tag Inspector with source textures/reflection cube and zero material gaps; strict native fidelity is recorded');
+  }
   expect(await hash(fixtureFile)).toBe(fixtureHash);expect(await hash(originalAsset.path)).toBe(assetHash);expect(await hash(baseline)).toBe(baselineHash);
   report.geometryRoundTrip={projectId:project.id,buildId:jobId,blenderSha256:toolHash,baselineSha256:baselineHash,editedSha256:reviewedHash,originalAssetSha256:assetHash,modelSources:native,output:build.output,outputSha256:build.sha256,crcMismatch:0,sourceProjectUnchanged:true,gameplayAccepted:false};
   step('DCC revised geometry compiles through actual H1A model/collision/scenery and map tools; independent Invader/native cache readback passes');

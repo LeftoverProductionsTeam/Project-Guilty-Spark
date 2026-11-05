@@ -16,6 +16,9 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+#[path = "model_fidelity.rs"]
+mod fidelity;
+pub use fidelity::{compare_render, FidelityReport, SourceMaterialRange};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,6 +31,10 @@ pub struct Model {
     pub radius: f32,
     pub bounds: [[f32; 3]; 2],
     pub shader_paths: Vec<String>,
+    #[serde(skip)]
+    expected_mesh: maps::MeshData,
+    #[serde(skip)]
+    expected_materials: Vec<SourceMaterialRange>,
     #[serde(skip)]
     pub jms: String,
 }
@@ -328,6 +335,16 @@ pub fn plan(project: &Project) -> Result<Plan> {
                 }
             }
             let jms_sha256 = crate::hex_bytes(Sha256::digest(jms.as_bytes()));
+            let mut expected_mesh=imported.mesh.clone();
+            expected_mesh.positions=positions.iter().flatten().copied().collect();
+            expected_mesh.normals=normals.iter().flatten().copied().collect();
+            // JMS -> Halo native convention: reverse the second/third corner
+            // and invert V. Independently checked against pinned Invader
+            // 696830ff src/model/jms.cpp Triangle::from_string / Vertex::from_string.
+            // Compare in cache space, not by accepting either winding/UV layout.
+            for triangle in expected_mesh.indices.chunks_exact_mut(3){triangle.swap(1,2);}
+            for uv in expected_mesh.uvs.chunks_exact_mut(2){uv[1]=1.-uv[1];}
+            let expected_materials=imported.mesh.parts.iter().map(|part|SourceMaterialRange{index_start:part.index_start,index_count:part.index_count,shader_path:bindings[imported.materials.iter().position(|name|name==&part.name).unwrap()].clone()}).collect();
             models.push(Model {
                 tag: tag.clone(),
                 source: asset.path.clone(),
@@ -338,6 +355,8 @@ pub fn plan(project: &Project) -> Result<Plan> {
                 radius,
                 bounds,
                 shader_paths: bindings.clone(),
+                expected_mesh,
+                expected_materials,
             });
             recipes.insert(recipe, tag.clone());
             tag
@@ -513,9 +532,9 @@ impl Plan {
         }
         Ok(())
     }
-    pub fn verify_cache(&self, inspection: &maps::MapInspection, output: &Path) -> Result<()> {
+    pub fn inspect_cache(&self, inspection: &maps::MapInspection, output: &Path) -> Result<Vec<serde_json::Value>> {
         if self.models.is_empty() {
-            return Ok(());
+            return Ok(vec![]);
         }
         let (_, bytes, hash) = maps::read_cache_snapshot(output)?;
         if hash != inspection.sha256 {
@@ -549,6 +568,7 @@ impl Plan {
                     "Compiled custom render/collision geometry differs from imported source",
                 );
             }
+            let fidelity=compare_render(&model.expected_mesh,&model.expected_materials,&mesh,&inspection.tags)?;
             for actual in [&mesh, &collision] {
                 for k in 0..3 {
                     let lo = actual
@@ -586,8 +606,13 @@ impl Plan {
                     );
                 }
             }
-            evidence.push(serde_json::json!({"tag":model.tag,"sourceSha256":model.source_sha256,"jmsSha256":model.jms_sha256,"renderTriangles":mesh.indices.len()/3,"collisionTriangles":collision.indices.len()/3,"bounds":model.bounds}));
+            evidence.push(serde_json::json!({"tag":model.tag,"sourceSha256":model.source_sha256,"jmsSha256":model.jms_sha256,"renderTriangles":mesh.indices.len()/3,"collisionTriangles":collision.indices.len()/3,"bounds":model.bounds,"fidelity":fidelity}));
         }
+        Ok(evidence)
+    }
+    pub fn verify_cache(&self, inspection: &maps::MapInspection, output: &Path) -> Result<()> {
+        let evidence=self.inspect_cache(inspection,output)?;
+        if evidence.is_empty(){return Ok(());}
         project::atomic_write(
             &output
                 .parent()

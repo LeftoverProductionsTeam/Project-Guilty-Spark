@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Overnight continuation — C70 accepted native milestone; C71 native asset fidelity next
+Task: Overnight continuation — C71 native static asset fidelity
 Status: implementation incomplete
-Starting revision: 67589b0
-Latest verified revision: c16186c export; C70 native DCC accepted2cases/0errors with app f149269e…; combined740Rust/9ignored,404frontend,169browser,59offline and8QA storage pass.
-Next action: Commit verified C70 material/dependency repair and actual Blender/native evidence, then resume Prompt06 native asset fidelity in existing model planner/readback/Inspector. No game/human/peer/platform gate promotion.
+Starting revision: 5155996
+Latest verified revision: 5155996 C70 accepted; C71 static fidelity9focused contracts/743fullRust tests with9ignored and actual3case desktop/DCC/native/preview gate pass. Cache123673b4…; actualpreview12triangles/1texture/1cube/0gaps. No game/human claim.
+Next action: Commit scoped C71 native static fidelity with readback evidence, then finish feasible existing Inspector/asset interaction and animation preview requirements. Keep full context tabs, all asset-class/edition, behavior/game and GUI handoff gates open.
 
 ## Acceptance
 Owner authorizes proved-unneeded canonical folders. Preserve all unique source/history/research/maps/tags/releases and existing C70 work. No full repository archive, full SDK copy, obsolete .local output, system/shared-tool deletion or original game changes. Native/test evidence is distinct from gameplay, clean-machine and peer acceptance.

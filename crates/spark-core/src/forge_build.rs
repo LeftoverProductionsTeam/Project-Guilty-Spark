@@ -291,7 +291,10 @@ pub fn run_prepared_job(
     let started=Instant::now();
     let jobs_root=future_jobs_root(jobs_root)?;
     if !export_only&&prepared.is_none()&&extra_blockers.is_empty(){
-        if let Some(receipt)=crate::forge_reuse::find(project,tools,&jobs_root){on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool, compiled tags and map hashes match; no new tag tree was copied.",receipt.job_id)});return Ok(receipt);}
+        if let Some(receipt)=crate::forge_reuse::find(project,tools,&jobs_root){
+            if !custom.models.is_empty(){let output=receipt.build.as_ref().and_then(|build|build.output.as_deref()).ok_or_else(||SparkError::Invalid("Reused model build has no native output".into()))?;custom.inspect_cache(&maps::inspect_map(output,None)?,output)?;custom.verify_sources()?;}
+            on_event(JobEvent{job_id:job_id.into(),project_id:project.id.clone(),phase:"validated".into(),severity:"success".into(),progress:100,timestamp:chrono::Utc::now().to_rfc3339(),message:format!("Reused verified build {}. Source, tool, compiled tags and map hashes match; no new tag tree was copied.",receipt.job_id)});return Ok(receipt);
+        }
     }
     let directory=jobs_root.join(job_id);
     let selected_tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
@@ -471,6 +474,7 @@ pub fn run_prepared_job(
         if crate::native_asset_imports::source_hashes(import_root,project)?!=import_hashes{return invalid("Imported native inputs changed during compilation");}
         crate::powerups::verify_compiled(project,&inspected,workspace)?;
         custom.verify_cache(&inspected,&output)?;
+        if !custom.models.is_empty(){emit("verify","Imported static models: native topology, winding, normals, UVs, shader identities and collision bounds match source.".into(),93,"info");}
         if inspected.header.version!=version || !inspected.scenario_path.replace('\\',"/").eq_ignore_ascii_case(&sources.scenario_path.replace('\\',"/")) || inspected.header.scenario_type!=1 || inspected.mesh.indices.is_empty() {return invalid("Compiled map has wrong engine/scenario/type or no collision BSP");}
         for check in ["crc32_mismatched","is_protected","stub_count"] {
             let value=runner.run(&invader(tools,"invader-info").unwrap(),&["-T".into(),check.into(),output.to_string_lossy().into_owned()],workspace,"verify",94)?;
