@@ -11,7 +11,7 @@ export async function nativeGeometryRoundTrip({main,root,invoke,expect,report,st
   if(typeof run!=='function')throw Error('Native geometry acceptance requires its owning QA process runner');
   const blender=path.resolve(process.env.SPARK_GEOMETRY_BLENDER??''),tags=path.resolve(process.env.SPARK_GEOMETRY_TAGS??''),kit=path.resolve(process.env.SPARK_GEOMETRY_KIT??'');
   for(const file of [blender,path.join(tags,'globals/globals.globals'),path.join(kit,'tool.exe'),path.join(invaderDirectory,'invader-edit.exe')])if(!(await fs.stat(file)).isFile())throw Error('Missing selected DCC/native input: '+file);
-  const fixtureFile=path.resolve('artifacts/qa/part2-native-structural-input/project.gsproject');
+  const fixtureFile=path.resolve('docs/fixtures/source-only-native-door.json');
   const fixtureHash=await hash(fixtureFile),fixture=JSON.parse(await fs.readFile(fixtureFile,'utf8'));
   const boot=await invoke(main,'bootstrap');
   await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,hekDirectory:kit,hekTagsDirectory:tags,hekFlavor:'h1aEk',invaderDirectory:path.resolve(invaderDirectory)}});
