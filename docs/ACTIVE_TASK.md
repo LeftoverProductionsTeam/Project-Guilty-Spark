@@ -3,8 +3,8 @@
 Task: P0 d09fc8a4 — purge sealed; Windows path identity repaired; default writers next
 Status: implementation incomplete
 Starting revision: a144499bcd1dd68879d4cac53cf0cedd733f1ee6; purge sealed at a83accfdc4257e2ccc5a46bcfafe41a52f754c66 on canonical local master
-Latest verified revision: a83accf plus tested Windows/native/tool-preflight work recorded in docs/fixtures/windows-storage-repair.json; source/checksum commit follows this checkpoint
-Next action: Refresh the SAME single outside-repository source review ZIP from the final committed source, including untracked Master prompts. Then finish production memory-first Save/history/multiwindow gates and external-tool successful-close/failure/cancel cleanup through existing owners. Keep memory backend opt-in until genuine acceptance. C71 publication/Smart Edit follows; no unauthorized push.
+Latest verified revision: b4bab0b6687c39fa8aaef0a06c351579a5b62674 locally commits the tested Windows/native/tool-preflight repair; exact evidence in docs/fixtures/windows-storage-repair.json.
+Next action: Finish production memory-first Save/reopen, unsaved-close/crash-loss warning, external-source-change and dual-window/history/native acceptance; keep Library::memory opt-in until these pass. workspace_history_native still writes durable snapshots, so do not flip Library::open alone. Complete external-tool success/failure/cancel lifetime cleanup in existing owners, then C71 publication/Smart Edit. Hosted CI waits for a future authorized push.
 
 ## Acceptance
 
@@ -26,7 +26,7 @@ Git full fsck passes;one master worktree;stash32a8cb1ef4b1aeed2d459e5ad26ef69e36
 
 Existing QA admission resolves missing output through its nearest trusted non-linked ancestor;Windows8.3/verbatim spellings share one owner. Existing source/link/nonce/content guards remain. Store reservations reuse native_staging resolver;legacy exact marker spelling remains disposable after proper checks. Store::location refuses source output before creating artifacts/storage-v1. Standalone executable validation now precedes launch folder allocation;Baboon copy identity rechecked. Successful tool lifetime cleanup remains open.
 
-f0832c9 replaces retired QA geometry input with committed native recipe;8d82c6b preserves SDK audio provenance/native independence;a83accf seals archive retirement/accounting. Obsolete844-row locator CSV survives in Git at292399c. Renderer,research,C71 source and Master prompts preserved. One outside-repo review ZIP (~30.62MiB) includes source/tests/docs/manifests,25prompts and ledger,excludes Git/Halo/deps/binaries/archives,and passes CRC/member hashes. Refresh that SAME package after this final local commit;do not make another.
+f0832c9 replaces retired QA geometry input with committed native recipe;8d82c6b preserves SDK audio provenance/native independence;a83accf seals archive retirement/accounting. Obsolete844-row locator CSV survives in Git at292399c. Renderer,research,C71 source and Master prompts preserved. One outside-repo review ZIP (~30.62MiB) includes source/tests/docs/manifests,25prompts and ledger,excludes Git/Halo/deps/binaries/archives,and passes CRC/member hashes. The SAME package is C:/Users/patri/OneDrive/Documents/ChatGPT/GS/Project_Guilty_Spark_Source_Review.zip. Its REVIEW_MANIFEST records the source commit and actual working/untracked bytes; refresh it in place only if it differs from final HEAD. Do not create a second archive.
 
 ## Failures and blockers
 
@@ -38,7 +38,7 @@ Production Library::open still persists/copies maps;memory backend stays opt-in 
 
 ## Operations and safe checkpoint
 
-No native/compiler task active;no generated repository tree or SDK/cache. One canonical master. Final source/checksum commit seals staged Git bytes without generating a second archive. Refresh existing outside-repo review package once;manifest identifies final commit and actual working/untracked bytes. Never overwrite accepted C49. Keep external Engineering proof bounded,then retire redundant metadata after compact integration.
+No native/compiler task active;no generated repository tree or SDK/cache. One canonical master. Current repair is committed locally and its staged-source checksums seal the tested files. This compact continuation checkpoint is committed separately; refresh the one review ZIP to final HEAD and verify all members. Its manifest identifies the commit and actual working/untracked bytes. Never overwrite accepted C49. Keep external Engineering proof bounded,then retire redundant metadata after compact integration.
 
 ## Deferred requests
 
