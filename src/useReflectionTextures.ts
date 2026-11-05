@@ -10,6 +10,7 @@ export function useReflectionTextures(
   project: Project,
   inspection: MapInspection | null,
   baseTextures: Record<number, THREE.Texture>,
+  usedShaderIds?:ReadonlySet<number>,
 ) {
   const session = useRef<{ scope: string; reader: ReflectionTextureSession } | null>(null);
   const [preview, setPreview] = useState<{
@@ -19,7 +20,7 @@ export function useReflectionTextures(
     loading:boolean;
   }>({ scope: '', cubes: {}, errors: {},loading:false });
   const shaders =
-    inspection?.tags.filter((tag) => tag.shaderPreview?.reflection && (baseTextures[tag.id]||glassWithoutDiffuse(tag.shaderPreview))) ?? [];
+    inspection?.tags.filter((tag) => (!usedShaderIds||usedShaderIds.has(tag.id))&&tag.shaderPreview?.reflection && (baseTextures[tag.id]||glassWithoutDiffuse(tag.shaderPreview))) ?? [];
   const scope = JSON.stringify([project.id, inspection?.sha256, textureResourceScope(project.source)]);
   const bitmapIds = [...new Set(shaders.map((tag) => tag.shaderPreview!.reflection!.bitmapTagId))];
   const targets = bitmapIds.join(',');

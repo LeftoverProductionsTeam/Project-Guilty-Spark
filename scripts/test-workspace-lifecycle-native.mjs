@@ -15,6 +15,8 @@ const root=path.resolve(destination),expect=assertion.configure({timeout:45000})
 const detachMethod=process.env.SPARK_LIFECYCLE_DETACH_METHOD??'pointer';
 if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must be pointer or button');
 const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
+const profilePreview=process.env.SPARK_LIFECYCLE_PROFILE==='1';
+if(profilePreview&&!nativeOnly)throw Error('Preview profiling requires native-only mode');
 const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
 if(!['','20'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 edits');
@@ -28,10 +30,12 @@ let child,browser,main;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
 async function launchNative(){
+  const started=performance.now();
   const server=net.createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));
   child=spawn(app,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
   await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   await expect.poll(()=>pages().length).toBeGreaterThan(0);main=pages()[0];main.on('pageerror',error=>report.errors.push(String(error)));
+  if(profilePreview)report.previewProfile={appWindowMs:performance.now()-started,conditions:'Fresh application/profile; OS file cache not cleared; same embedded app, source, settings and readiness checks',calls:[]};
 }
 async function nextPage(before){let page;await expect.poll(()=>{page=pages().find(page=>!before.has(page));return !!page;}).toBe(true);page.on('pageerror',error=>report.errors.push(String(error)));page.on('close',()=>{(report.closedWindows??=[]).push({url:page.url(),completedCases:report.cases.length,at:new Date().toISOString()});});await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);
   // WebView controls can mount while native construction is still applying its
@@ -179,11 +183,15 @@ try{
   if(nativeMap&&!geometryOnly){
     if(!invaderDirectory)throw Error('Native map acceptance requires the installed Invader directory');
     const original=await fs.readFile(path.resolve(nativeMap)),originalHash=crypto.createHash('sha256').update(original).digest('hex');
+    const importStarted=performance.now();
     const [opened]=await invoke(main,'import_paths',{paths:[path.resolve(nativeMap)]});
+    if(profilePreview)report.previewProfile.importMs=performance.now()-importStarted;
     expect(opened.project.source.cacheVersion).toBe(13);
     const pistol=opened.inspection.tags.find(tag=>tag.class==='weap'&&tag.path.replaceAll('\\','/').endsWith('weapons/pistol/pistol'));
     if(!pistol)throw Error('Owned native map does not contain the representative pistol');
     await main.reload();await chooseTool(main,'Map library');
+    if(profilePreview)await main.evaluate(()=>{window.__GS_PROFILE__=true;performance.clearMeasures();});
+    const viewportStarted=performance.now();
     await main.locator(`.map-card[data-project-id="${opened.project.id}"]`).click();
     await chooseTool(main,'Level editor');
     await expect(main.locator('.world-layout canvas')).toBeVisible();
@@ -197,6 +205,32 @@ try{
     })),{timeout:90000}).toEqual({loading:'false',pending:'0',reflections:'false'});
     const nativeViewport=await main.locator('.world-layout').evaluate(element=>({...element.dataset}));
     const nativeGeometry=await main.locator('.viewport-status').innerText();
+    if(profilePreview){
+      report.previewProfile.firstMapReadyMs=performance.now()-viewportStarted;
+      report.previewProfile.calls=await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration})=>({command:name.slice(10),ms:duration})));
+      expect(report.previewProfile.calls.some(call=>call.command==='preview_owned_cache_bitmap_batch')).toBe(true);
+      report.previewProfile.gauges=await main.evaluate(()=>window.__GS_PROFILE_GAUGES__??{});
+      report.previewProfile.viewport=nativeViewport;
+      const spartan=opened.inspection.tags.find(tag=>tag.class==='bipd'&&tag.references.some(ref=>ref.label==='Model'&&opened.inspection.tags.some(model=>model.id===ref.targetId&&model.class==='mod2'&&/characters[\\/]cyborg(?:_mp)?[\\/]cyborg(?:_mp)?$/i.test(model.path))));
+      const renderedModels=opened.project.scene.filter(object=>object.visible&&!object.sourceModel).flatMap(object=>{
+        const mesh=object.kind==='Player spawn'?opened.inspection.modelMeshes?.[spartan?.id]:object.assetId?undefined:opened.inspection.modelMeshes?.[object.tagId];return mesh?[mesh]:[];
+      });
+      const requiredIds=[...new Set([opened.inspection.renderMesh,...renderedModels].flatMap(mesh=>mesh?.materialRanges??[]).map(range=>range.shaderTagId))];
+      const requiredPrimaries=requiredIds.filter(id=>opened.inspection.tags.some(tag=>tag.id===id&&tag.primaryBitmapStatus==='resolved'));
+      const loaded=new Set(nativeViewport.sourceShaderIds.split(',').map(Number));for(const id of requiredPrimaries)expect(loaded.has(id)).toBe(true);
+      report.previewProfile.materialCoverage={allBspAndVisibleModelShaders:requiredIds,requiredPrimaries,loadedPrimaries:requiredPrimaries.filter(id=>loaded.has(id)),visibleObjects:opened.project.scene.filter(object=>object.visible).length,sourcePreserved:true};
+      report.previewProfile.performance=await main.locator('.world-layout canvas').evaluate(canvas=>JSON.parse(canvas.dataset.gsPerformance??'null'));
+      report.previewProfile.process=JSON.parse((await promisify(execFile)('pwsh.exe',['-NoProfile','-File',path.resolve('scripts/profile-process-tree.ps1'),'-RootProcessId',String(child.pid)],{windowsHide:true,timeout:30000,maxBuffer:1024*1024})).stdout);
+      const canvas=main.locator('.world-layout canvas');await canvas.evaluate(element=>window.c71WorldCanvas=element);
+      const requestsBefore=report.previewProfile.calls.length;await chooseTool(main,'Map library');
+      const resumeStarted=performance.now();await chooseTool(main,'Level editor');await expect(canvas).toBeVisible();
+      await expect(main.locator('.world-layout')).toHaveAttribute('data-material-loading','false');
+      report.previewProfile.resumeMs=performance.now()-resumeStarted;
+      report.previewProfile.sameCanvas=await canvas.evaluate(element=>element===window.c71WorldCanvas);expect(report.previewProfile.sameCanvas).toBe(true);
+      report.previewProfile.resumeCalls=(await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration})=>({command:name.slice(10),ms:duration})))).slice(requestsBefore);
+      expect(report.previewProfile.resumeCalls.filter(row=>row.command.startsWith('preview_owned_'))).toEqual([]);
+      expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
+    }
     expect(nativeGeometry).toMatch(/[\d,]+ visible triangles/);
     await main.screenshot({path:path.join(root,'owned-native-bsp.png')});
     step('Owned MCC map opens in actual native BSP viewport with source materials',{nativeViewport,nativeGeometry,engineParityClaimed:false});

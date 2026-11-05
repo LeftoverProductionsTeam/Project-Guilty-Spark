@@ -62,3 +62,34 @@ The first test used an incorrect fixture path and is retained as failed; input e
 Regressions:404frontend tests,170browser contracts,59offline scripts and13continuity/storage contracts pass; embedded application build passes. The coverage guard initially found the new read-only native fidelity diagnostic missing from the existing demo→user-workflow map; it is now mapped to Models without weakening that guard. The continuity guard also caught the overnight note preceding the pending-request title; only its heading order changed. Rust remains743passed/9existing ignored from the immediately preceding unchanged native source. Failed logs are retained. The475-row CSV hash remains unchanged.
 
 Next safe C71 work: investigate the measured surplus model/material work in map previews using existing planners. The tiny native fixture renders66BSPtriangles/6objects but requests118shader textures,188detail textures and11cubes; these counts alone do not prove a performance improvement. Profile comparable runs before changing scheduling, preserve every visible model/material/decal, and retain source/revision invalidation. Complete contextual Inspector and broader asset/game gates remain open. Broader conversion/Megaworld/AI/gameplay and all human/peer/release gates remain pending under their original identities. No new editor, networking stack, discovery manager or scheduler is introduced.
+
+### C71 measured world-preview scheduling
+
+The existing World planner was decoding materials for the entire recovered model index, including unplaced weapons, vehicles and scenery. It now schedules local native models actually used by visible scene objects, including the source Spartan used for player starts. Donor models retain their own source-aware loader; custom OBJ meshes retain their own materials. All BSPs, sky, lightmaps and decals remain included. Newly placed or revealed objects update the plan; moving the camera or an object does not discard the existing textures. Reflection scheduling uses the same required native shader IDs, including glass with no diffuse map. This changes scheduling only: no source data, hashes, native readers, rendering algorithms or bitmap validation are removed.
+
+Three sequential fresh app/profile trials before and after use the same79,527,766-byte MCC cache, settings and readiness checks. OS file caches were not cleared; these are fresh-window/map timings, not true OS-cold startup. The existing opt-in profiling module observes actual native IPC and decoded-resource gauges; responses are never mocked. The compared revised trials run without the browser regression suite. Full results: `artifacts/overnight-20261105/preview-performance-comparison.json`; inputs `preview-profile-baseline-1..3` and `preview-profile-idle-after-1..3` under `artifacts/qa/`.
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| Median first fully textured map |7,373.3ms|5,475.3ms (25.7% faster)|
+| Median fresh app window |557.1ms|554.6ms|
+| Median native import |2,245.4ms|2,195.1ms|
+| Median retained editor return |187.9ms|165.1ms|
+| Bitmap IPC batches |12|3|
+| Reflection batch calls |5|1|
+| Decoded bitmap cache misses |193|49|
+| Decoded cache estimated bytes |54,985,436|16,522,294|
+| Decoded cache evictions |65|0|
+| Median sampled process-tree private bytes |2,420,441,088|2,022,162,432|
+| Median sampled cumulative process CPU |35.72s|31.53s|
+| Median dedicated GPU allocation |124,764,160B|140,722,176B|
+
+No GPU-memory improvement is claimed: its sampled allocation increased. RAM and instantaneous FPS vary considerably; these are not peaks, sustained frame-rate proof or hard caps. Startup/import differences are small. All trials retain the same18last-pass draw calls,6,297rendered triangles,5geometries and23active textures. Actual readback verifies all six required BSP/visible-model primary shaders remain loaded. All six scene objects and183sky triangles remain. Home→Level Editor returns the same Canvas with zero new native preview calls. Before/after screenshots were visually checked; they are not pixel-identical (mean RGB-channel difference0.710/255 across the full window), and this is not stock-engine rendering parity. Original source and native0.225/CRC0 export checks pass in every measured run.
+
+Initial timing pilots attempted to replace Tauri's immutable invoke entrypoint and captured no calls; those IPC counts are unusable and excluded. The corrected profiler uses the already implemented opt-in performance measures. A separate after-series overlapped briefly with browser tests and is excluded from the timing comparison while retained as functional evidence. The interrupted browser run is retained; a complete fresh rerun passes170. The offline suite caught a missing explicit `.ts` extension in the new shared helper import; repaired without weakening the test. Frontend406/browser170/offline59/continuity-storage13 pass. Rust/native compiler source is unchanged from743/9ignored; the native source/compiler/fidelity milestones above stay independent.
+
+Two exact incomplete failed-QA leases were reconciled after verifying their owner processes had exited, their copied executables matched the recorded SHA and all run paths/files stayed within their bounds. Original records are retained in `artifacts/overnight-20261105/failed-qa-leases.json`; failed acceptance remains failed and no file was deleted. This releases abandoned reservation accounting, not disk space. No limit was widened, no SDK copied and no original game modified.
+
+Next C71 acceptance gap: actual read-only previews from each installed source family. Inspect the existing source-Spartan selector against Xbox's native `mode` relationship, then validate source identity/materials in the actual app. Keep game loading, gameplay, full-context asset authoring and independent GUI gates pending.
+
+The final rebuild after the offline-import repair is separately verified: app SHA`4fe5b2dc1249bab2396f6504dc5961694856429fb97228ce75e645468852aa42`; `artifacts/qa/preview-scope-final-native/acceptance.json` passes3actual cases/0errors, including native skeletal playback, normal shutdown, source-preserving edit/history and independent Invader readback. Its timing is not substituted for the three measured revised trials.

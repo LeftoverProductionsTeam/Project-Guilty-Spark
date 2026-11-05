@@ -52,7 +52,7 @@ import {renderFeatures} from '../renderFeatures';
 import MapDecals from './MapDecals';
 import {decalTextureRequests} from '../mapDecals';
 import { formatNumber, replaceVector } from '../editor';
-import { hasRenderGeometry, resolveBspMesh, resolveObjectMesh, shaderLegend } from '../renderView';
+import { hasRenderGeometry, resolveBspMesh, resolveObjectMesh, sceneModelMeshes, shaderLegend } from '../renderView';
 import { createPreviewEvidence } from '../qaEvidence';
 import { loadUserShaderTexture } from '../haloTexture';
 import { decodeHaloDds } from '../haloDds';
@@ -105,14 +105,14 @@ type ExtraTask={kind:'detail';shaderTagId:number;bitmapTagId:number;imageIndex:0
 type DecalTask=ReturnType<typeof decalTextureRequests>[number];
 type MaterialTask=OwnedMaterialPreviewTask|ExtraTask|DecalTask;
 interface SourceAppearance {sourceSha256:string;skyTagId:number|null;skyPath:string|null;environment:EditorEnvironment|null;fogMaximumDensity:number;skyMesh:MeshData|null;warnings:string[]}
-function planWorldMaterialPreviews(inspection:MapInspection,_mesh:MeshData|null|undefined,shaders:ReadonlySet<number>,lightmaps:ReadonlySet<string>,sky?:MeshData|null,extras:ReadonlySet<string>=new Set(),features?:Project['renderFeatures']) {
+function planWorldMaterialPreviews(inspection:MapInspection,models:readonly MeshData[],shaders:ReadonlySet<number>,lightmaps:ReadonlySet<string>,sky?:MeshData|null,extras:ReadonlySet<string>=new Set(),features?:Project['renderFeatures']) {
   const plan=planOwnedMaterialPreviews(inspection,inspection.renderMesh,shaders,lightmaps);
   const seen=new Set(plan.shaderTasks.map(t=>t.shaderTagId));
-  for(const model of [...Object.values(inspection.modelMeshes??{}).slice(0,256),...(sky?[sky]:[])]) {
+  for(const model of [...models,...(sky?[sky]:[])]) {
     const modelPlan=planOwnedMaterialPreviews(inspection,model,shaders,new Set());
     for(const task of modelPlan.shaderTasks)if(!seen.has(task.shaderTagId)){seen.add(task.shaderTagId);plan.shaderTasks.push(task);}
   }
-  const ids=new Set([...(inspection.renderMesh?.materialRanges??[]),...Object.values(inspection.modelMeshes??{}).flatMap(m=>m.materialRanges??[]),...(sky?.materialRanges??[])].map(r=>r.shaderTagId));
+  const ids=new Set([...(inspection.renderMesh?.materialRanges??[]),...models.flatMap(m=>m.materialRanges??[]),...(sky?.materialRanges??[])].map(r=>r.shaderTagId));
   const detailTasks:ExtraTask[]=[];
   for(const tag of inspection.tags.filter(t=>ids.has(t.id)&&t.shaderPreview)){
     const roles:Record<string,string>={'Primary detail map':'primaryDetail','Detail map':'primaryDetail','Secondary detail map':'secondaryDetail','Micro detail map':'microDetail'};
@@ -603,7 +603,12 @@ export default function World({
   const [textureNames, setTextureNames] = useState<Record<number, string>>({});
   const [lightmapTextures,setLightmapTextures] = useState<Record<string, THREE.Texture>>({});
   const [detailTextures, setExtraTextures] = useState<Record<string, THREE.Texture>>({});
-  const reflectionPreview = useReflectionTextures(project, inspection, shaderTextures);
+  const materialModels=useMemo(()=>sceneModelMeshes(inspection,project.scene),[inspection,project.scene]);
+  const materialShaderIds=useMemo(()=>new Set([
+    ...(inspection?.renderMesh?.materialRanges??[]),...materialModels.flatMap(mesh=>mesh.materialRanges??[]),
+    ...(sourceAppearance?.skyMesh?.materialRanges??[]),
+  ].map(range=>range.shaderTagId)),[inspection,materialModels,sourceAppearance]);
+  const reflectionPreview = useReflectionTextures(project, inspection, shaderTextures,materialShaderIds);
   const extraTextures = useMemo(
     () => ({ ...detailTextures, ...reflectionPreview.textures }),
     [detailTextures, reflectionPreview.textures],
@@ -682,7 +687,7 @@ export default function World({
     const recordedResource = (project.source?.resourceSha256?.['mcc-textures']??project.source?.resourceSha256?.['bitmaps.map']) ?? null;
     let tasks: MaterialTask[];
     try {
-      const plan = planWorldMaterialPreviews(inspection, inspection.renderMesh,
+      const plan = planWorldMaterialPreviews(inspection, materialModels,
         new Set(Object.keys(shaderTextures).map(Number)),new Set(Object.keys(lightmapTextures)),sourceAppearance?.skyMesh,new Set(Object.keys(extraTextures)),project.renderFeatures);
       const planned = kind === 'shader' ? plan.shaderTasks : kind === 'lightmap' ? plan.lightmapTasks :
         [...plan.shaderTasks.filter(t=>inspection.renderMesh!.materialRanges?.some(r=>r.shaderTagId===t.shaderTagId)), ...plan.lightmapTasks, ...plan.shaderTasks.filter(t=>!inspection.renderMesh!.materialRanges?.some(r=>r.shaderTagId===t.shaderTagId)),...plan.detailTasks];
@@ -1015,10 +1020,10 @@ export default function World({
   const availableLightmapPages = useMemo(() => inspectLightmapPages(previewMesh), [previewMesh]);
   const ownedPreviewPlan = useMemo(() => {
     if (!inspection?.renderMesh) return null;
-    try {return planWorldMaterialPreviews(inspection, inspection.renderMesh,
+    try {return planWorldMaterialPreviews(inspection, materialModels,
       new Set(Object.keys(shaderTextures).map(Number)), new Set(Object.keys(lightmapTextures)),sourceAppearance?.skyMesh,new Set(Object.keys(extraTextures)),project.renderFeatures);}
     catch {return null;}
-  }, [inspection,shaderTextures,lightmapTextures,extraTextures,sourceAppearance,project.renderFeatures]);
+  }, [inspection,materialModels,shaderTextures,lightmapTextures,extraTextures,sourceAppearance,project.renderFeatures]);
   useEffect(()=>{
     const scope=`${project.id}:${inspection?.sha256}:${textureScope}`;
     if(automaticScope.current!==scope){automaticScope.current=scope;automaticAttempts.current.clear();}

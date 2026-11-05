@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { hasRenderGeometry, resolveBspMesh, resolveObjectMesh } from './renderView';
-import type { MapInspection, MeshData } from './types';
+import { hasRenderGeometry, resolveBspMesh, resolveObjectMesh, sceneModelMeshes } from './renderView';
+import type { MapInspection, MeshData, SceneObject, Tag } from './types';
 
 const collision: MeshData = {
   label: 'Actual collision geometry', source: 'halo-collision',
@@ -47,6 +47,24 @@ describe('Guilty Spark real-world viewport resolution', () => {
     const empty = { ...inspection, mesh: { ...collision, indices: [] }, renderMesh: null };
     expect(resolveBspMesh(empty, 'render', 0)).toBeNull();
     expect(resolveBspMesh(null, 'render', 0)).toBeNull();
+  });
+  it('schedules only placed native models, including the owning Spartan for player starts',()=>{
+    const object:SceneObject={id:'placed',name:'Placed',kind:'Scenery',tagId:123,visible:true,assetId:null,sourceOffset:null,rotationOffset:null,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1]};
+    const tags:Tag[]=[{id:50,index:0,class:'mod2',path:'characters/cyborg_mp/cyborg_mp',dataOffset:0,external:false,fields:[],references:[]},{id:51,index:1,class:'bipd',path:'Renamed Spartan',dataOffset:0,external:false,fields:[],references:[{label:'Model',targetId:50,class:'mod2',offset:0}]}];
+    const source={...inspection,tags,modelMeshes:{123:render,51:collision,999:{...render,label:'Unplaced global asset'}}};
+    const objects=[object,{...object,id:'same'},{...object,id:'start',kind:'Player spawn',tagId:null},{...object,id:'hidden',visible:false,tagId:999}];
+    expect(sceneModelMeshes(source,objects)).toEqual([render,collision]);
+    expect(sceneModelMeshes(source,objects.map(o=>({...o,position:[100,50,1]})))).toEqual([render,collision]);
+    expect(sceneModelMeshes(source,[...objects,{...object,id:'new',tagId:999}])).toEqual([render,collision,source.modelMeshes[999]]);
+    expect(source.modelMeshes[999].label).toBe('Unplaced global asset');
+  });
+  it('never borrows local IDs for donor assets or custom meshes, and resumes newly shown objects',()=>{
+    const object:SceneObject={id:'placed',name:'Placed',kind:'Scenery',tagId:123,visible:true,assetId:null,sourceOffset:null,rotationOffset:null,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1]};
+    expect(sceneModelMeshes(inspection,[{...object,sourceModel:{projectId:'donor',sourceSha256:'b'.repeat(64),tagId:123,path:'donor/object',class:'scen'}},{...object,id:'obj',assetId:'custom-obj'}])).toEqual([]);
+    expect(sceneModelMeshes(inspection,[{...object,visible:false}])).toEqual([]);
+    expect(sceneModelMeshes(inspection,[object])).toEqual([render]);
+    expect(sceneModelMeshes(null,[object])).toEqual([]);
+    expect(sceneModelMeshes(inspection,[{...object,tagId:999}])).toEqual([]);
   });
 });
 

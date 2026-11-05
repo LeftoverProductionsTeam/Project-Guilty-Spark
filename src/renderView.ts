@@ -1,4 +1,5 @@
-import type { MapInspection, MeshData } from './types';
+import type { MapInspection, MeshData, SceneObject } from './types';
+import {sourceSpartan} from './sourceSpartan.ts';
 
 export type ViewMode = 'render' | 'smooth' | 'solid' | 'wireframe' | 'collision' | 'materials';
 
@@ -41,6 +42,22 @@ export function resolveObjectMesh(
   if (assetId) return assets[assetId];
   if (tagId === null) return undefined;
   return inspection?.modelMeshes?.[String(tagId)];
+}
+
+/** Match SceneObjectVisual's source ownership and visibility. The parsed tag
+ * index includes unplaced objects; their materials belong to their own asset
+ * previews, not every world load. Camera/BSP changes never evict loaded data. */
+export function sceneModelMeshes(inspection:MapInspection|null,objects:readonly SceneObject[]):MeshData[]{
+  if(!inspection)return [];
+  const meshes=new Set<MeshData>(),spartan=sourceSpartan(inspection);
+  for(const object of objects){
+    if(!object.visible||object.sourceModel)continue;
+    const mesh=object.kind==='Player spawn'
+      ?spartan?inspection.modelMeshes?.[spartan.id]:undefined
+      :object.assetId?undefined:resolveObjectMesh(inspection,object.tagId,null,{});
+    if(mesh)meshes.add(mesh);
+  }
+  return [...meshes];
 }
 
 export function hasRenderGeometry(inspection: MapInspection | null): boolean {
