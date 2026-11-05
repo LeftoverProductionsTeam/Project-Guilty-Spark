@@ -90,6 +90,38 @@ test('a new edit expires the visible plan and requires another review', async ({
     ),
   ).toBe(0);
 });
+
+test('explicit map export saves first, uses the chosen runtime and reports native refusal', async ({page})=>{
+  await page.getByRole('button',{name:'Review save plan',exact:true}).click();
+  await page.getByRole('button',{name:'Save validated map copy',exact:true}).click();
+  expect(await page.evaluate(()=>(window as any).calls.some((c:any)=>c.command==='storage_export_map'))).toBe(false);
+  await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+    if(command!=='storage_export_map')return invoke(command,args);w.calls.push({command,args});
+    if(args.runtimeId==='haloCustomEdition')throw Error('Build a compatible conversion before exporting');
+    return {output:'C:/Synthetic/Mods/Spark-job/native.map',reused:false};
+  };});
+  await page.locator('.map-export>summary').click();
+  await page.getByLabel('Map export runtime',{exact:true}).selectOption('haloCustomEdition');
+  await page.getByRole('button',{name:'Export to mods folder',exact:true}).click();
+  await expect(page.getByText('Error: Build a compatible conversion before exporting')).toBeVisible();
+  await page.getByLabel('Map export runtime',{exact:true}).selectOption('mccSteam');
+  await page.getByRole('button',{name:'Export to mods folder',exact:true}).click();
+  await expect(page.getByText('Native map exported and hash-verified.',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).saved)).toBe(4);
+  expect(await page.evaluate(()=>(window as any).calls.filter((c:any)=>c.command==='storage_export_map').map((c:any)=>c.args))).toEqual([
+    {projectId:'a',buildId:'job',runtimeId:'haloCustomEdition'}, {projectId:'a',buildId:'job',runtimeId:'mccSteam'}]);
+});
+
+test('a late export result never appears in a different map',async({page})=>{
+  await page.getByRole('button',{name:'Review save plan',exact:true}).click();
+  await page.getByRole('button',{name:'Save validated map copy',exact:true}).click();
+  await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='storage_export_map'?new Promise(resolve=>{w.releaseExport=()=>resolve({output:'C:/Private/map-a.map'});}):invoke(command,args);});
+  await page.locator('.map-export>summary').click();await page.getByRole('button',{name:'Export to mods folder',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>typeof(window as any).releaseExport)).toBe('function');
+  await page.getByRole('button',{name:'Switch map',exact:true}).click();await page.evaluate(()=>(window as any).releaseExport());
+  await expect(page.locator('.smart-edit')).toHaveAttribute('data-smart-edit-project','b');
+  await expect(page.getByText('C:/Private/map-a.map',{exact:true})).toHaveCount(0);
+});
 test('an automatic audio metadata refresh during save keeps the authored plan', async ({ page }) => {
   await page.evaluate(() => {
     (window as any).refreshAudio = true;

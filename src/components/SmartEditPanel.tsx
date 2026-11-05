@@ -7,6 +7,7 @@ import type { EditExecution, EditPlan, EditPreference } from '../smartEdit';
 import { useMapState } from '../mapSession';
 import { Notice, Pill } from './ui';
 import './smartEdit.css';
+import MapExport from './MapExport';
 
 /** One saved revision and the same desktop router for the tag and world views. */
 export default function SmartEditPanel({
@@ -229,6 +230,9 @@ export default function SmartEditPanel({
             >
               Show map folder
             </button>
+          )}
+          {result.status === 'validated' && (
+            <MapExport projectId={project.id} buildId={result.jobId} runtimeId={runtimeId} onSave={onSave}/>
           )}
           {result.status === 'validated' && (
             <button

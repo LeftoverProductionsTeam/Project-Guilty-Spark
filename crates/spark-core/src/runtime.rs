@@ -473,15 +473,7 @@ fn descriptor(id: RuntimeId) -> RuntimeReport {
     ];
     let map_families = families.into_iter().map(|(family, versions)| {
         let version = versions.first().copied().unwrap_or(0);
-        let supported = match id {
-            RuntimeId::MccSteam => version == 13,
-            RuntimeId::ChupathingyCe => [5, 7, 609].contains(&version),
-            RuntimeId::OpenCe => [5, 609].contains(&version),
-            RuntimeId::HaloPc | RuntimeId::MacRetail | RuntimeId::HaloMd => version == 7,
-            RuntimeId::HaloCustomEdition => version == 609,
-            RuntimeId::MacDemo | RuntimeId::HaloPcTrial => version == 6,
-            RuntimeId::HaloXbox => version == 5,
-        };
+        let supported = supports_map_version(id, version);
         MapFamilyCapability {
             family: family.into(), cache_versions: versions,
             status: if preservation { Unknown } else if supported { Supported } else { Unknown },
@@ -506,6 +498,19 @@ fn descriptor(id: RuntimeId) -> RuntimeReport {
             "No local gameplay or two-computer multiplayer result is attached to this report."
                 .into(),
         ],
+    }
+}
+
+/// Existing format-family contract. This is not gameplay or conversion proof.
+pub fn supports_map_version(id: RuntimeId, version: u32) -> bool {
+    match id {
+        RuntimeId::MccSteam => version == 13,
+        RuntimeId::ChupathingyCe => [5, 7, 609].contains(&version),
+        RuntimeId::OpenCe => [5, 609].contains(&version),
+        RuntimeId::HaloPc | RuntimeId::MacRetail | RuntimeId::HaloMd => version == 7,
+        RuntimeId::HaloCustomEdition => version == 609,
+        RuntimeId::MacDemo | RuntimeId::HaloPcTrial => version == 6,
+        RuntimeId::HaloXbox => version == 5,
     }
 }
 

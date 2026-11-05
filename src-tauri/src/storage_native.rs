@@ -51,6 +51,61 @@ fn export_runtime_key(runtime: runtime::RuntimeId) -> Reply<String> {
         .ok_or("Runtime identifier could not be saved".into())
 }
 #[tauri::command]
+pub(super) async fn storage_export_map(
+    app: tauri::AppHandle, project_id: String, build_id: String, runtime_id: runtime::RuntimeId,
+) -> Reply<build::MapExport> {
+    let key = export_runtime_key(runtime_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let project = lock(&state.library)?.get(&project_id).map_err(error)?;
+        let record = verified_build(&state, &project, &build_id)?;
+        let header = maps::inspect_header(record.output.as_ref().ok_or("Map output is missing")?).map_err(error)?;
+        if header.extended || !runtime::supports_map_version(runtime_id, header.version) {
+            return Err("This build has a different native cache format. Build a compatible conversion before exporting for this Halo.".into());
+        }
+        let settings = lock(&state.settings)?.clone();
+        let default = state.root.join("Mods");
+        let base = settings.runtime_export_directories.get(&key).cloned()
+            .or(settings.mod_directory.clone()).unwrap_or_else(|| default.clone());
+        if !base.is_absolute() { return Err("Choose an absolute export folder in Storage.".into()); }
+        core::reject_links(&base).map_err(error)?;
+        let mut protected: Vec<PathBuf> = ["projects", "jobs", "tag-exchanges", "archives", "storage-v1"]
+            .into_iter().map(|name| state.root.join(name)).collect();
+        let installation = lock(&state.installation)?.clone();
+        protected.extend([installation.mcc_path, installation.editing_tools].into_iter().flatten());
+        protected.extend(runtime_connections::discover(&state)?.into_iter().map(|item|item.root));
+        let registrations: Vec<runtime::RuntimeRegistration> = lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+        for registration in registrations {
+            protected.push(registration.root);
+            protected.extend(registration.data_root);
+        }
+        protected.extend([settings.hek_directory, settings.hek_tags_directory, settings.invader_directory].into_iter().flatten());
+        for root in protected.into_iter().filter(|p|p.exists()) {
+            core::reject_links(&root).map_err(error)?;
+            let root = fs::canonicalize(root).map_err(error)?;
+            // Selecting an ancestor is safe: only a fresh UUID child is ever
+            // created. Writing inside an installation/source tree is refused.
+            let resolved = if base.exists() { fs::canonicalize(&base).map_err(error)? }
+                else { fs::canonicalize(base.parent().ok_or("Export folder has no parent")?).map_err(error)?.join(base.file_name().ok_or("Export folder has no name")?) };
+            if resolved.starts_with(root) { return Err("Choose a mod/export folder outside original Halo installations, source tags and managed project/build storage.".into()); }
+        }
+        if !base.is_dir() {
+            if base!=default || settings.mod_directory.is_some() || settings.runtime_export_directories.contains_key(&key) {
+                return Err("Your export folder is unavailable. Choose its new location in Storage.".into());
+            }
+            fs::create_dir(&base).map_err(error)?;
+        }
+        let result = build::export_map_copy(&store(&state)?, &project_id, &record, runtime_id, &base).map_err(error)?;
+        // An edit in another window cannot make a completed export appear to
+        // describe a newer revision. Its receipt retains the exact old hash.
+        let current = lock(&state.library)?.get(&project_id).map_err(error)?;
+        if current.fingerprint().map_err(error)?!=record.project_fingerprint {
+            return Err(format!("The map changed during export. The verified earlier revision is retained at {}; rebuild before exporting the current edits.",result.output.display()));
+        }
+        Ok(result)
+    }).await.map_err(error)?
+}
+#[tauri::command]
 pub(super) fn storage_mod_locations(state: State<AppState>) -> Reply<ModLocations> { locations(&state) }
 #[tauri::command]
 pub(super) async fn storage_choose_mod_location(

@@ -21,7 +21,7 @@ if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned 
 await fs.mkdir(await assertQaOutputPath(root));
 const app=path.join(root,'GuiltySpark-workspace-lifecycle.exe');await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
 const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
-const finishStorage=repeatedEdits?await beginQaStorage(root,{workflow:'native-20-edits',appSha256:report.appSha256}):null;
+const finishStorage=await beginQaStorage(root,{workflow:repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256});
 let child,browser,main;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
@@ -285,6 +285,26 @@ try{
     const output=await invoke(main,'open_built_map',{projectId:opened.project.id,buildId:build.id});
     expect(output.inspection.tags.find(tag=>tag.class==='weap'&&tag.path===pistol.path).fields.find(field=>field.key==='bounding-radius').value).toBeCloseTo(.225,6);
     step('Real native tag edit, Undo/Redo, Save and direct map export pass independent Invader extraction/readback; original is unchanged',{sourceSha256:originalHash,output:build.output,outputSha256:build.sha256,readback:Number(readback.stdout.trim()),compilerRan:false});
+    if(process.env.SPARK_LIFECYCLE_EXPORT==='1'){
+      const exporter=smart.locator('.map-export');await exporter.locator('summary').click();
+      const modDirectory=path.join(root,'library/Mods');expect(await fs.stat(modDirectory).catch(()=>null)).toBeNull();
+      await exporter.getByLabel('Map export runtime',{exact:true}).selectOption('haloCustomEdition');
+      await exporter.getByRole('button',{name:'Export to mods folder',exact:true}).click();
+      await expect(exporter).toContainText('different native cache format');
+      expect(await fs.stat(modDirectory).catch(()=>null)).toBeNull();
+      await exporter.getByLabel('Map export runtime',{exact:true}).selectOption('mccSteam');
+      await exporter.getByRole('button',{name:'Export to mods folder',exact:true}).click();
+      await expect(exporter.getByRole('status')).toContainText('Native map exported and hash-verified.');
+      const outputPath=await exporter.getByRole('status').locator('code').innerText();
+      const exportHash=crypto.createHash('sha256').update(await fs.readFile(outputPath)).digest('hex');expect(exportHash).toBe(build.sha256);
+      const before=await fs.readdir(modDirectory);
+      await exporter.getByRole('button',{name:'Export to mods folder',exact:true}).click();
+      await expect(exporter.getByRole('status')).toContainText('Existing identical export verified.');
+      expect(await fs.readdir(modDirectory)).toEqual(before);
+      expect((await run(tool('invader-info'),['-T','crc32_mismatched',outputPath],{windowsHide:true,timeout:30000})).stdout.trim()).toBe('0');
+      report.nativeExport={output:outputPath,sha256:exportHash,reused:true,incompatibleRuntimeRefusedBeforeFolderCreation:true};
+      step('Actual desktop exports the native map into the configured default, reuses identical bytes and refuses unsupported target before allocation');
+    }
   }
   expect(report.errors).toEqual([]);report.complete=true;
 }catch(error){report.errors.push(String(error));report.failureStack=error.stack;process.exitCode=1;if(browser)for(const [i,page]of pages().entries())await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});}

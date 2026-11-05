@@ -18,6 +18,94 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MapExport {
+    pub project_id: String,
+    pub build_id: String,
+    pub project_fingerprint: String,
+    pub output: PathBuf,
+    pub sha256: String,
+    pub bytes: u64,
+    pub cache_version: u32,
+    pub runtime_id: crate::runtime::RuntimeId,
+    pub reused: bool,
+}
+
+/// Export a validated owned build, without conversion, overwriting or loading
+/// its bytes into RAM. The desktop verifies the job receipt/source revision
+/// and excludes original installation directories before calling this helper.
+pub fn export_map_copy(
+    manager: &crate::storage::Store, project_id: &str, build: &BuildRecord,
+    runtime_id: crate::runtime::RuntimeId, base: &Path,
+) -> Result<MapExport> {
+    use std::io::{Read, Write};
+    for id in [project_id, build.id.as_str()] {
+        uuid::Uuid::parse_str(id).map_err(|_| SparkError::Invalid("Invalid map export identity".into()))?;
+    }
+    if build.status != "validated" { return invalid("Export requires a validated build"); }
+    let source = build.output.as_ref().ok_or_else(|| SparkError::Invalid("Map output is missing".into()))?;
+    crate::reject_links(source)?; crate::reject_links(base)?;
+    let hash = build.sha256.as_ref().filter(|h| h.len()==64 && h.bytes().all(|c| c.is_ascii_hexdigit()))
+        .ok_or_else(|| SparkError::Invalid("Map export has no valid source hash".into()))?;
+    let header = maps::inspect_header(source)?;
+    if header.extended || !crate::runtime::supports_map_version(runtime_id, header.version) {
+        return invalid("This cache format cannot be exported for that runtime. Choose a compatible target or build a conversion first");
+    }
+    let bytes = fs::metadata(source)?.len();
+    if bytes > 768*1024*1024 || maps::hash_file(source)? != *hash {
+        return invalid("Map output changed or exceeds the supported export bound");
+    }
+    let name = source.file_name().and_then(|n| n.to_str()).ok_or_else(|| SparkError::Invalid("Map filename is unavailable".into()))?;
+    if safe_relative(name)?.components().count()!=1 || source.extension().is_none_or(|e| !e.eq_ignore_ascii_case("map")) {
+        return invalid("Export requires an ordinary native .map filename");
+    }
+    let base = fs::canonicalize(base)?;
+    let directory = base.join(format!("Spark-{}", build.id));
+    crate::reject_links(&directory)?;
+    let output = directory.join(name);
+    let receipt = directory.join("spark-map-export.json");
+    let mut result = MapExport { project_id: project_id.into(), build_id: build.id.clone(),
+        project_fingerprint: build.project_fingerprint.clone(), output: output.clone(),
+        sha256: hash.clone(), bytes, cache_version: header.version, runtime_id, reused: false };
+    if directory.exists() {
+        crate::reject_links(&receipt)?; crate::reject_links(&output)?;
+        let mut json = Vec::new();
+        fs::File::open(&receipt)?.take(65537).read_to_end(&mut json)?;
+        if json.len()>65536 { return invalid("Export receipt exceeds its bound"); }
+        let existing: MapExport = serde_json::from_slice(&json)?;
+        let mut expected = result.clone();
+        expected.runtime_id = existing.runtime_id;
+        if existing != expected || !crate::runtime::supports_map_version(existing.runtime_id, header.version)
+            || fs::metadata(&output)?.len()!=bytes || maps::hash_file(&output)?!=*hash {
+            return invalid("The existing export was changed or belongs to another revision; it was not overwritten");
+        }
+        result.reused = true;
+        return Ok(result);
+    }
+    let lease = manager.reserve(&directory, Some(source), crate::storage::estimate_copy(3, bytes.saturating_add(65536)),
+        crate::storage::Category::Staging, "Explicit native map export; user output, never disposable cache")?;
+    fs::create_dir(&directory)?; lease.mark_owned()?;
+    // A failed/interrupted new export remains owned and unacknowledged. It can
+    // never replace a prior good export or be adopted without this receipt.
+    let mut input = fs::File::open(source)?;
+    let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&output)?;
+    let mut digest = Sha256::new(); let mut buffer = [0u8; 65536]; let mut copied = 0u64;
+    loop {
+        let count = input.read(&mut buffer)?; if count==0 { break; }
+        copied += count as u64;
+        if copied>bytes { return invalid("Map changed while exporting; incomplete copy retained for review"); }
+        file.write_all(&buffer[..count])?; digest.update(&buffer[..count]);
+    }
+    file.sync_all()?; drop(file);
+    if copied!=bytes || crate::hex_bytes(digest.finalize())!=*hash || maps::hash_file(source)?!=*hash || maps::hash_file(&output)?!=*hash {
+        return invalid("Map export failed exact byte verification; previous-good output stays intact");
+    }
+    project::atomic_write(&receipt, &serde_json::to_vec_pretty(&result)?, false)?;
+    lease.finish(true, Some(build.project_fingerprint.clone()))?;
+    Ok(result)
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Toolchain {

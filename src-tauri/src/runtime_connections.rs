@@ -7,7 +7,7 @@ use super::*;
 #[serde(rename_all = "camelCase")]
 pub(super) struct Detected {
     runtime_id: runtime::RuntimeId,
-    root: PathBuf,
+    pub(super) root: PathBuf,
     executable: PathBuf,
     data_root: PathBuf,
     executable_sha256: String,
@@ -51,7 +51,7 @@ fn nearby_roots(anchors: impl IntoIterator<Item=PathBuf>) -> Vec<PathBuf> {
     }
     roots
 }
-fn discover(state: &AppState) -> Reply<Vec<Detected>> {
+pub(super) fn discover(state: &AppState) -> Reply<Vec<Detected>> {
     let mut found = Vec::new();
     if let Some(ce) = ce_setup::discover(state)? {
         let (executable, hash, _) = dependency_install::pe_identity(&ce.root.join("haloce.exe"))?;

@@ -18,6 +18,7 @@ import { call, native } from '../api';
 import { CheckRow, Notice, PageTitle, Pill } from './ui';
 import BuildTargets from './BuildTargets';
 import SmartEditPanel from './SmartEditPanel';
+import MapExport from './MapExport';
 import ConversionBitmapRepair from './ConversionBitmapRepair';
 import {useMapState,writeMapSession} from '../mapSession';
 import './portabilityLab.css';
@@ -304,6 +305,7 @@ export default function Build({
                       </small>
                       <p>{b.message}</p>
                       {b.output && <code>{b.output}</code>}
+                      {b.status==='validated'&&b.output&&<MapExport projectId={project.id} buildId={b.id} runtimeId={b.target.startsWith('mcc')?'mccSteam':project.quickForge?.runtimeId??'haloCustomEdition'} onSave={onSave}/>}
                     </div>
                     <Pill tone={b.status === 'validated' ? 'green' : 'amber'}>{b.status}</Pill>
                   </div>
