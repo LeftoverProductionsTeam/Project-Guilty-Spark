@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "sourceIntegrationCommit": "12f9d99",
+  "measurement": "FileStandardInfo.Allocation; root file IDs deduplicated; same scanner before/after; filesystem metadata/shared extents excluded",
+  "beforeAllocatedBytes": 55967217784,
+  "afterAllocatedBytes": 46632413328,
+  "reclaimedAllocatedBytes": 9334804456,
+  "errors": 0,
+  "topLevelDirectories": [
+    {
+      "path": ".git",
+      "allocatedBytes": 837464568,
+      "logicalBytes": 825439913,
+      "category": "Git history and Codex recovery"
+    },
+    {
+      "path": ".github",
+      "allocatedBytes": 58304,
+      "logicalBytes": 27198,
+      "category": "application source/documentation"
+    },
+    {
+      "path": ".research",
+      "allocatedBytes": 297605800,
+      "logicalBytes": 277214645,
+      "category": "canonical pinned research"
+    },
+    {
+      "path": ".toolchain",
+      "allocatedBytes": 2055546792,
+      "logicalBytes": 2129352590,
+      "category": "required build/test dependency"
+    },
+    {
+      "path": "artifacts",
+      "allocatedBytes": 2377933080,
+      "logicalBytes": 2367166850,
+      "category": "blocked historical/generated storage"
+    },
+    {
+      "path": "chupathingyce-windows64-release",
+      "allocatedBytes": 2533773960,
+      "logicalBytes": 2533687537,
+      "category": "protected user resource"
+    },
+    {
+      "path": "crates",
+      "allocatedBytes": 3296240,
+      "logicalBytes": 2861095,
+      "category": "application source/documentation"
+    },
+    {
+      "path": "docs",
+      "allocatedBytes": 35775992,
+      "logicalBytes": 33759277,
+      "category": "application source/documentation"
+    },
+    {
+      "path": "examples",
+      "allocatedBytes": 20480,
+      "logicalBytes": 20306,
+      "category": "application source/documentation"
+    },
+    {
+      "path": "Halo Custom Edition",
+      "allocatedBytes": 471072448,
+      "logicalBytes": 470801375,
+      "category": "protected user resource"
+    },
+    {
+      "path": "node_modules",
+      "allocatedBytes": 364696288,
+      "logicalBytes": 343675628,
+      "category": "required build/test dependency"
+    },
+    {
+      "path": "opencehalo-windows-release",
+      "allocatedBytes": 1886278392,
+      "logicalBytes": 1886200578,
+      "category": "protected user resource"
+    },
+    {
+      "path": "preserved",
+      "allocatedBytes": 30310548704,
+      "logicalBytes": 30307427820,
+      "category": "blocked historical/generated storage"
+    },
+    {
+      "path": "public",
+      "allocatedBytes": 328200,
+      "logicalBytes": 324701,
+      "category": "application source/documentation"
+    },
+    {
+      "path": "Pyros Zombie Apocolypse Mod Versions",
+      "allocatedBytes": 750432472,
+      "logicalBytes": 750272565,
+      "category": "protected user resource"
+    },
+    {
+      "path": "releases",
+      "allocatedBytes": 50250200,
+      "logicalBytes": 50240969,
+      "category": "accepted release exception"
+    },
+    {
+      "path": "reports",
+      "allocatedBytes": 4096,
+      "logicalBytes": 1685,
+      "category": "small source/verification receipt"
+    },
+    {
+      "path": "SAMPLE CODE",
+      "allocatedBytes": 713332488,
+      "logicalBytes": 695566741,
+      "category": "protected user resource"
+    },
+    {
+      "path": "scripts",
+      "allocatedBytes": 2995608,
+      "logicalBytes": 2482358,
+      "category": "application source/documentation"
+    },
+    {
+      "path": "src",
+      "allocatedBytes": 4454720,
+      "logicalBytes": 3471045,
+      "category": "application source/documentation"
+    },
+    {
+      "path": "src-tauri",
+      "allocatedBytes": 1762792,
+      "logicalBytes": 1540801,
+      "category": "application source/documentation"
+    },
+    {
+      "path": "target",
+      "allocatedBytes": 41144,
+      "logicalBytes": 35376,
+      "category": "small retained QA binaries; not compiler cache"
+    },
+    {
+      "path": "tests",
+      "allocatedBytes": 413176,
+      "logicalBytes": 369162,
+      "category": "application source/documentation"
+    },
+    {
+      "path": "tools",
+      "allocatedBytes": 528686376,
+      "logicalBytes": 525319514,
+      "category": "installed native test dependency"
+    }
+  ],
+  "thresholdBytes": 52428800,
+  "largeRows": 237,
+  "directoryTotalsNotAdditiveAcrossHardlinks": true,
+  "warehouseDeletionPerformed": false,
+  "pendingDecision": "Discard byte-unique obsolete experimental source snapshots and native test-map outputs; original Halo/user content, current source/Git, authoring recipe and accepted C49 remain protected. Automatic approval review rejected the broad roots.",
+  "remoteMasterVerifiedBeforeLocalIntegration": "a144499bcd1dd68879d4cac53cf0cedd733f1ee6",
+  "localIntegrationNotPushed": true,
+  "deleted": [
+    "Cargo debug and release compiler caches",
+    "two generated debug-symbol archives",
+    "one verified compiler-only archive volume",
+    "ten copied QA app hosts",
+    "two download archives whose1566files match installed tools",
+    "ten superseded application release copies",
+    "old dist/test-results/incremental and four incidental Tauri schemas"
+  ],
+  "protectedUserResourcesTouched": false,
+  "pendingHistoricalBlobInventory": "docs/source-only-pending-historical-blobs.csv",
+  "pendingHistoricalBlobs": 844,
+  "pendingHistoricalBlobBytes": 19084353,
+  "pendingHistoricalBlobsAreNotProvenMissingFeatures": true,
+  "protectedRootIso": {
+    "path": "Halo - Combat Evolved (USA).xiso.iso",
+    "allocatedBytes": 3728867328,
+    "touched": false
+  },
+  "auditThresholdIsDeletionAuthority": false,
+  "remainingDataDecisionRequired": true,
+  "measurementCheckpoint": "After verified deletions, before final small source/accounting commit",
+  "remainingLargeItemsClassified": 237,
+  "pendingHistoricalLocatorsVerified": 844,
+  "pendingHistoricalBackingProviders": 17,
+  "protectedOriginalHashesRechecked": 10,
+  "acceptedC49PackageVerifierPassed": true,
+  "typescriptRechecked": true,
+  "sourceHistoryPublication": "12f9d99 and this accounting checkpoint are local only; no push or publication performed"
+}

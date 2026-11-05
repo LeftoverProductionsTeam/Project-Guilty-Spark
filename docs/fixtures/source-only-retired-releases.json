@@ -470,5 +470,7 @@
       "releaseInfo": null,
       "releaseReadme": null
     }
-  ]
+  ],
+  "obsoleteReleaseDirectoriesRemoved": 10,
+  "integrationCommit": "12f9d99"
 }

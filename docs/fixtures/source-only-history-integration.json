@@ -8,7 +8,7 @@
   "missingCommits": false,
   "canonicalGitImportedOrRewritten": false,
   "archivedProductSnapshots": "Compared archived source hashes with canonical Git and reviewed C33/C39 product diffs. Current native/SparkLink/Guardian code is retained. Older layouts/readers/tool models must not overwrite it.",
-  "historicalExperiments": "Obsolete generated probes, dependencies, SDK copies, working environments and reports retired under final owner correction. Existing feature and research ledgers stay authoritative.",
+  "historicalExperiments": "Reviewed for retirement under final owner correction. Broad warehouse deletion was rejected by automatic approval review and is awaiting the specific owner decision; current source/history/originals remain protected. No warehouse deletion is claimed.",
   "requirementsLedgerSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
   "sourceAndKnowledgeDestinations": [
     "AGENTS.md",
