@@ -15,17 +15,23 @@ const root=path.resolve(destination),expect=assertion.configure({timeout:45000})
 const detachMethod=process.env.SPARK_LIFECYCLE_DETACH_METHOD??'pointer';
 if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must be pointer or button');
 const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
+const previewOnly=process.env.SPARK_LIFECYCLE_PREVIEW_ONLY==='1';
+const expectedCacheVersion=Number(process.env.SPARK_LIFECYCLE_CACHE_VERSION??'13');
+if(![5,6,7,13,609].includes(expectedCacheVersion)||expectedCacheVersion!==13&&!previewOnly||previewOnly&&!nativeOnly)throw Error('Other native cache families require explicit read-only preview acceptance');
 const profilePreview=process.env.SPARK_LIFECYCLE_PROFILE==='1';
 if(profilePreview&&!nativeOnly)throw Error('Preview profiling requires native-only mode');
 const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
 if(!['','20'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 edits');
 if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned map');
-if(nativeMap&&nativeMap!=='-'&&!(await fs.stat(path.resolve(nativeMap))).isFile())throw Error('Native acceptance input must be an existing owned cache');
-await fs.mkdir(await assertQaOutputPath(root));
+const inputInfo=nativeMap&&nativeMap!=='-'?await fs.stat(path.resolve(nativeMap)):null;
+if(inputInfo&&!inputInfo.isFile())throw Error('Native acceptance input must be an existing owned cache');
+if(previewOnly&&(!inputInfo||inputInfo.size>128*1024*1024))throw Error('The small read-only preview test requires a cache within128MiB; use the full reserved native workflow for larger fixtures');
+const reservationBytes=previewOnly?1024**3:4*1024**3;
+await fs.mkdir(await assertQaOutputPath(root,{reservationBytes}));
 const app=path.join(root,'GuiltySpark-workspace-lifecycle.exe');await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
-const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
-const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256});
+const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':previewOnly?'native-source-preview':repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
 let child,browser,main;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
@@ -186,9 +192,9 @@ try{
     const importStarted=performance.now();
     const [opened]=await invoke(main,'import_paths',{paths:[path.resolve(nativeMap)]});
     if(profilePreview)report.previewProfile.importMs=performance.now()-importStarted;
-    expect(opened.project.source.cacheVersion).toBe(13);
+    expect(opened.project.source.cacheVersion).toBe(expectedCacheVersion);
     const pistol=opened.inspection.tags.find(tag=>tag.class==='weap'&&tag.path.replaceAll('\\','/').endsWith('weapons/pistol/pistol'));
-    if(!pistol)throw Error('Owned native map does not contain the representative pistol');
+    if(!pistol&&!previewOnly)throw Error('Owned native map does not contain the representative pistol');
     await main.reload();await chooseTool(main,'Map library');
     if(profilePreview)await main.evaluate(()=>{window.__GS_PROFILE__=true;performance.clearMeasures();});
     const viewportStarted=performance.now();
@@ -233,7 +239,22 @@ try{
     }
     expect(nativeGeometry).toMatch(/[\d,]+ visible triangles/);
     await main.screenshot({path:path.join(root,'owned-native-bsp.png')});
-    step('Owned MCC map opens in actual native BSP viewport with source materials',{nativeViewport,nativeGeometry,engineParityClaimed:false});
+    step(`Owned native cache ${expectedCacheVersion} opens in actual BSP viewport with source materials`,{nativeViewport,nativeGeometry,engineParityClaimed:false});
+    if(previewOnly){
+      const actualSource=(await invoke(main,'open_project',{id:opened.project.id})).project.source;
+      expect(actualSource.sha256).toBe(originalHash);expect(actualSource.cacheVersion).toBe(expectedCacheVersion);
+      const spartan=opened.inspection.tags.find(tag=>tag.class==='bipd'&&tag.references.some(ref=>ref.label==='Model'&&ref.class===(expectedCacheVersion===5?'mode':'mod2')&&opened.inspection.tags.some(model=>model.id===ref.targetId&&model.class===ref.class&&/characters[\\/]cyborg(?:_mp)?[\\/]cyborg(?:_mp)?$/i.test(model.path))));
+      if(opened.project.scene.some(object=>object.kind==='Player spawn')){expect(spartan).toBeTruthy();expect(opened.inspection.modelMeshes?.[spartan.id]?.indices.length).toBeGreaterThan(0);}
+      const meshes=opened.project.scene.filter(object=>object.visible&&!object.sourceModel).flatMap(object=>{const mesh=object.kind==='Player spawn'?opened.inspection.modelMeshes?.[spartan?.id]:object.assetId?undefined:opened.inspection.modelMeshes?.[object.tagId];return mesh?[mesh]:[];});
+      const ids=[...new Set([opened.inspection.renderMesh,...meshes].flatMap(mesh=>mesh?.materialRanges??[]).map(range=>range.shaderTagId))];
+      const required=ids.filter(id=>opened.inspection.tags.some(tag=>tag.id===id&&tag.primaryBitmapStatus==='resolved'));
+      const loaded=new Set(nativeViewport.sourceShaderIds.split(',').map(Number));const missing=required.filter(id=>!loaded.has(id));expect(missing).toEqual([]);
+      const lightmaps=new Set(opened.inspection.renderMesh?.materialRanges?.filter(range=>range.hasLightmapUvs&&range.lightmapBitmapTagId!=null&&range.lightmapPage>=0).map(range=>`${range.bspIndex}:${range.lightmapPage}`)??[]);
+      expect(Number(nativeViewport.sourceLightmaps)).toBeGreaterThanOrEqual(lightmaps.size);
+      expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
+      report.sourcePreview={cacheVersion:expectedCacheVersion,engine:opened.inspection.header.engine,sourceSha256:originalHash,resources:actualSource.resourceSha256??{},requiredPrimaryShaders:required,missingPrimaryShaders:missing,requiredLightmapPages:lightmaps.size,spartanTagId:spartan?.id??null,spartanModelClass:expectedCacheVersion===5?'mode':'mod2',visibleObjects:opened.project.scene.filter(object=>object.visible).length,readOnly:true,gameplayAccepted:false};
+      step('Actual source-family preview loads every required placed/BSP primary shader and its native player-start model; original cache unchanged');
+    }else{
     if(process.env.SPARK_LIFECYCLE_ANIMATION==='1'){
       const actor=opened.inspection.tags.find(tag=>tag.class==='bipd'&&tag.references.some(ref=>ref.label==='Animation graph'));
       if(!actor)throw Error('Native animation acceptance requires a real biped with its own graph');
@@ -366,6 +387,7 @@ try{
       expect((await run(tool('invader-info'),['-T','crc32_mismatched',outputPath],{windowsHide:true,timeout:30000})).stdout.trim()).toBe('0');
       report.nativeExport={output:outputPath,sha256:exportHash,reused:true,incompatibleRuntimeRefusedBeforeFolderCreation:true};
       step('Actual desktop exports the native map into the configured default, reuses identical bytes and refuses unsupported target before allocation');
+    }
     }
   }
   expect(report.errors).toEqual([]);report.complete=true;

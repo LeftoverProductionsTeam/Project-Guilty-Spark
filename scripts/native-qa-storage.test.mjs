@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
+import {pathToFileURL} from 'node:url';
 import { assertQaOutputPath, beginQaStorage, disposeQaScratch, admitCargoOutput } from './native-qa-storage.mjs';
 import { safeQaCopy } from './qa-safe-copy.mjs';
 
@@ -20,6 +21,29 @@ async function fixture(run) {
 }
 const options = root => ({ workflow:'contract', appSha256:'a'.repeat(64), reservationBytes:512*1024, totalBytes:4*1024*1024, minimumFreeBytes:0, storageRoot:path.join(root,'catalog') });
 const mkdir = async directory => { await fs.mkdir(directory); return directory; };
+
+test('canonical admission honors a tighter reservation without exempting later larger work',()=>fixture(async parent=>{
+  const root=await mkdir(path.join(parent,'isolated-policy'));
+  await fs.mkdir(path.join(root,'scripts/maintenance'),{recursive:true});await fs.mkdir(path.join(root,'artifacts'));
+  // Only this module and a tiny policy fixture; never a repository/SDK copy.
+  const moduleFile=path.join(root,'scripts/native-qa-storage.mjs');
+  await fs.copyFile(new URL('./native-qa-storage.mjs',import.meta.url),moduleFile);
+  const policy=JSON.parse(await fs.readFile(new URL('./maintenance/retention-policy.json',import.meta.url),'utf8'));
+  await fs.writeFile(path.join(root,'scripts/maintenance/retention-policy.json'),JSON.stringify({...policy,qaRunBytes:100,qaTotalBytes:200,qaMinimumFreeBytes:0}));
+  await fs.writeFile(path.join(root,'artifacts/evidence.bin'),Buffer.alloc(120));
+  const result=spawnSync(process.execPath,['--input-type=module','-e',`
+    import assert from 'node:assert/strict';import path from 'node:path';
+    const {assertQaOutputPath}=await import(process.argv[1]);const root=process.argv[2];
+    await assertQaOutputPath(path.join(root,'artifacts/small'),{reservationBytes:40});
+    await assert.rejects(assertQaOutputPath(path.join(root,'artifacts/large')),/budget is exhausted/);
+    await assertQaOutputPath(path.join(root,'artifacts/metadata'),{reservationBytes:0});
+    for(const reservationBytes of [-1,101,NaN])await assert.rejects(assertQaOutputPath(path.join(root,'artifacts/invalid'),{reservationBytes}),/per-run reservation/);
+    console.log('tighter reservation enforced; aggregate cap unchanged');
+  `,pathToFileURL(moduleFile).href,root],{encoding:'utf8',windowsHide:true,timeout:30000});
+  assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/aggregate cap unchanged/);
+  assert.equal((await fs.stat(path.join(root,'artifacts/evidence.bin'))).size,120);
+  assert.deepEqual(await fs.readdir(path.join(root,'artifacts')),['evidence.bin']);
+}));
 
 test('shared Cargo admission reuses one cache and refuses growth without deleting accepted output', () => fixture(async parent => {
   const cache=await mkdir(path.join(parent,'target'));

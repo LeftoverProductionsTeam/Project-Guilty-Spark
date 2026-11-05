@@ -66,6 +66,14 @@ describe('Guilty Spark real-world viewport resolution', () => {
     expect(sceneModelMeshes(null,[object])).toEqual([]);
     expect(sceneModelMeshes(inspection,[{...object,tagId:999}])).toEqual([]);
   });
+  it('uses the source cache model class for Xbox player-start previews, independent of hosting runtime',()=>{
+    const start:SceneObject={id:'start',name:'Start',kind:'Player spawn',tagId:null,visible:true,assetId:null,sourceOffset:null,rotationOffset:null,position:[0,0,0],rotation:[0,0,0],scale:[1,1,1]};
+    const tags:Tag[]=[{id:50,index:0,class:'mode',path:'characters/cyborg/cyborg',dataOffset:0,external:false,fields:[],references:[]},{id:51,index:1,class:'bipd',path:'Renamed Xbox biped',dataOffset:0,external:false,fields:[],references:[{label:'Model',targetId:50,class:'mode',offset:0}]}];
+    const xbox={...inspection,header:{...inspection.header,version:5},tags,modelMeshes:{51:render}};
+    expect(sceneModelMeshes(xbox,[start])).toEqual([render]);
+    expect(sceneModelMeshes({...xbox,header:{...xbox.header,version:13}},[start])).toEqual([]);
+    expect(sceneModelMeshes({...xbox,tags:tags.map(tag=>tag.id===51?{...tag,references:[{...tag.references[0],class:'mod2'}]}:tag)},[start])).toEqual([]);
+  });
 });
 
 describe('BSP material lens (actual shader identities, not textures)', () => {

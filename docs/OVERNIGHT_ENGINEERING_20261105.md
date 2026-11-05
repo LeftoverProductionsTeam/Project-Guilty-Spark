@@ -93,3 +93,24 @@ Two exact incomplete failed-QA leases were reconciled after verifying their owne
 Next C71 acceptance gap: actual read-only previews from each installed source family. Inspect the existing source-Spartan selector against Xbox's native `mode` relationship, then validate source identity/materials in the actual app. Keep game loading, gameplay, full-context asset authoring and independent GUI gates pending.
 
 The final rebuild after the offline-import repair is separately verified: app SHA`4fe5b2dc1249bab2396f6504dc5961694856429fb97228ce75e645468852aa42`; `artifacts/qa/preview-scope-final-native/acceptance.json` passes3actual cases/0errors, including native skeletal playback, normal shutdown, source-preserving edit/history and independent Invader readback. Its timing is not substituted for the three measured revised trials.
+
+### C71 installed-source preview acceptance
+
+The existing source-Spartan selector incorrectly required PC-family `mod2` even for Xbox cache5. The native parser already supports Xbox `mode` correctly. The selector now follows the cache's actual class and exact biped→Model relationship, retaining path identity and refusing wrong-class references. Hosting preferences never choose the source class. This repairs player-start model/material selection for Xbox-derived content without changing native parsing or inventing geometry.
+
+Actual Windows app SHA`a30c48ce0f16eb205ef3382a09ff74d306120a9ab1fbce7ee4c6ef45d9a148a5` passes8read-only cases across four installed-source contexts. These are three cache families: MCC13, CE609 and the identical Xbox5Blood Gulch bytes installed separately with OpenCE and Chupathingy. They are not four engine/gameplay tests. [Bounded receipt](fixtures/c71-source-family-previews.json), screenshots and complete results under `artifacts/qa/source-preview-{mcc,ce,opence,chupa}`.
+
+| Source context | Required primary shaders loaded | Lightmap pages | Reflection cubes | Visible objects | Player model class |
+| --- | ---: | ---: | ---: | ---: | --- |
+| MCC native fixture |6/6|1|4|6|mod2|
+| Custom Edition Blood Gulch |116/116|15|11|186|mod2|
+| OpenCE installed Xbox Blood Gulch |106/106|15|11|166|mode|
+| Chupathingy installed Xbox Blood Gulch |106/106|15|11|166|mode|
+
+CE automatically pins its original bitmaps.map, sounds.map and loc.map and loads native textures with no folder prompt or compatible-runtime replacement. Xbox images are internal. CE and Xbox frames were visually inspected, including terrain, the native base decal and player-start models. Each test verifies unchanged original map SHA, actual native render readiness and normal app shutdown. This does not prove accurate appearance of every vehicle/effect, audible sound, animation on every model, actual game loading, conversion, Live Link, AI or gameplay. Xbox a10 and Halo Demo's full visual gates remain separate; this small read-only fixture mode explicitly admits inputs≤128MiB.
+
+The first attempt correctly refused further4GiB desktop reservations before creating directories. Investigation found the canonical path check always charged4GiB even when the existing run API declared a tighter reservation. It now honors that declaration and rechecks any later larger operation. Read-only small-cache QA reserves1GiB; its three runs retain172,483,514/181,014,028/181,013,737logicalbytes. The16GiB aggregate cap,4GiB maximum/default, free-space floor, source/ownership/hash checks and no-automatic-deletion policy are unchanged. Sealing/disposal does not reserve another new payload. A real filesystem unit fixture proves small admission, refusal of a later oversized reservation, invalid-input refusal and unchanged retained evidence. This is sized admission, not an OS hard disk quota or permission to delete protected data.
+
+Final regressions:407frontend tests,59offline scripts and14continuity/storage contracts pass. The fresh full Rust workspace passes743/0failed/9existing opt-in ignored; no native core code changed in the preview-selector step. The full170browser rerun is recorded in `source-family-browser.log`. TypeScript and embedded application builds pass. Git fsck reports no integrity failure; dangling objects are preserved, not pruned. The cumulative475CSV requirement bytes remain unchanged.
+
+The current scoped native milestones are complete and locally committed. Full Prompt06/C71 remains implementation-incomplete: finish the existing Inspector's contextual materials/animation/collision/sound/logic/dependencies/native-output flow, wider asset-class fidelity/native exports, a combined object/property/scenario-behavior→game workflow and independent GUI editor acceptance. Preserve all later queue identities. No new installers, portable bundles, source archives, game/server launches or publication were produced. C49 remains the separately preserved older release candidate; these source commits are not a new distributed release.

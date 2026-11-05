@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const policy = JSON.parse(await fs.readFile(new URL('./maintenance/retention-policy.json', import.meta.url), 'utf8'));
-let canonicalBudgetChecked = false;
+let canonicalBudgetChecked = 0;
 const key = (value) => process.platform === 'win32' ? value.toLowerCase() : value;
 const contains = (parent, child) => {
   const relative = path.relative(key(parent), key(child));
@@ -26,7 +26,9 @@ async function noLinks(file) {
   }
 }
 /** Runs before a harness creates its output, including legacy copied commands. */
-export async function assertQaOutputPath(root) {
+export async function assertQaOutputPath(root,{reservationBytes=policy.qaRunBytes}={}) {
+  if(!Number.isSafeInteger(reservationBytes)||reservationBytes<0||reservationBytes>policy.qaRunBytes)
+    throw Error('QA path admission exceeds the canonical per-run reservation');
   const absolute = path.resolve(root);
   if (absolute.split(path.sep).some((part) => part.toLowerCase() === '.local'))
     throw Error('Obsolete .local output is disabled. Use artifacts/qa/<run> or a reviewed external QA directory.');
@@ -41,15 +43,17 @@ export async function assertQaOutputPath(root) {
     // Every historical harness goes through admission before mkdir, even if it
     // does not opt into disposable cleanup. Retained evidence is never evicted
     // to make a new run fit; stop generation and require an ownership review.
-    if (!canonicalBudgetChecked) {
+    // Honor the caller's tighter run budget. A successful small admission
+    // must not exempt a later, larger operation from its own check.
+    if (reservationBytes>canonicalBudgetChecked) {
       const existing = await fs.stat(generated).catch((error) => { if (error.code === 'ENOENT') return null; throw error; });
       const used = existing ? await measure(generated, policy.qaTotalBytes) : { bytes: 0 };
       const volume = await fs.statfs(existing ? generated : projectRoot);
-      if (used.bytes + policy.qaRunBytes > policy.qaTotalBytes)
+      if (used.bytes + reservationBytes > policy.qaTotalBytes)
         throw Error('Canonical QA storage budget is exhausted; no new output admitted');
-      if (Number(volume.bavail) * Number(volume.bsize) < policy.qaRunBytes + policy.qaMinimumFreeBytes)
+      if (Number(volume.bavail) * Number(volume.bsize) < reservationBytes + policy.qaMinimumFreeBytes)
         throw Error('QA admission would violate the minimum free-disk budget');
-      canonicalBudgetChecked = true;
+      canonicalBudgetChecked = reservationBytes;
     }
   }
   return absolute;
@@ -144,7 +148,7 @@ async function atomicJson(file, value) {
 /** Refuses active, changed, linked and unrelated files before deleting anything.
  * Recovery never guesses that an abandoned or unsealed job is disposable. */
 export async function disposeQaScratch(runRoot, seal, { ownerFinished = false } = {}) {
-  const absolute = await assertQaOutputPath(runRoot), target = path.resolve(seal.path);
+  const absolute = await assertQaOutputPath(runRoot,{reservationBytes:0}), target = path.resolve(seal.path);
   if (seal.schemaVersion !== 1 || key(seal.root) !== key(absolute) || target === absolute || !contains(absolute, target) || !Array.isArray(seal.inventory?.rows))
     throw Error('Disposable ownership does not match this QA run');
   if (seal.ownerPid !== process.pid || !ownerFinished) {
@@ -171,7 +175,7 @@ export async function disposeQaScratch(runRoot, seal, { ownerFinished = false } 
   return { bytes: current.bytes, files: current.files };
 }
 export async function sealQaScratch(runRoot, file, maximumBytes = policy.qaRunBytes) {
-  const absolute = await assertQaOutputPath(runRoot), target = path.resolve(file);
+  const absolute = await assertQaOutputPath(runRoot,{reservationBytes:0}), target = path.resolve(file);
   if (target === absolute || !contains(absolute, target) || !Number.isSafeInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > policy.qaRunBytes)
     throw Error('Disposable ownership requires a bounded descendant of its run');
   return { schemaVersion: 1, root: absolute, path: target, ownerPid: process.pid, inventory: await snapshot(target, maximumBytes) };
@@ -189,12 +193,12 @@ export async function waitForQaExit(child) {
   });
 }
 export async function beginQaStorage(root, { workflow, appSha256, reservationBytes = policy.qaRunBytes, storageRoot = path.join(projectRoot, policy.qaDirectory), minimumFreeBytes = policy.qaMinimumFreeBytes, totalBytes = policy.qaTotalBytes }) {
-  const absolute = await assertQaOutputPath(root), real = await fs.realpath(absolute);
+  const absolute = await assertQaOutputPath(root,{reservationBytes}), real = await fs.realpath(absolute);
   if (key(real) !== key(absolute)) throw Error('QA evidence must use an independent non-aliased directory');
   if (!/^[\w.-]{1,80}$/.test(workflow) || !/^[a-f0-9]{64}$/.test(appSha256)) throw Error('QA workflow/application identity is invalid');
   if (![reservationBytes, minimumFreeBytes, totalBytes].every(Number.isSafeInteger) || reservationBytes < 1 || reservationBytes > policy.qaRunBytes || totalBytes < reservationBytes || totalBytes > policy.qaTotalBytes || minimumFreeBytes < 0)
     throw Error('QA reservation exceeds the canonical storage limits');
-  storageRoot = await assertQaOutputPath(storageRoot);
+  storageRoot = await assertQaOutputPath(storageRoot,{reservationBytes});
   await fs.mkdir(storageRoot, { recursive: true });
   const leases = path.join(storageRoot, '.leases');
   await fs.mkdir(leases, { recursive: true });
