@@ -18,8 +18,11 @@ const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
 const previewOnly=process.env.SPARK_LIFECYCLE_PREVIEW_ONLY==='1';
 const contextOnly=process.env.SPARK_LIFECYCLE_TAG_CONTEXTS==='1';
 if(contextOnly&&(!nativeOnly||previewOnly))throw Error('Native asset-context acceptance requires native-only mode and its own small bounded run');
+const contextReadOnly=process.env.SPARK_LIFECYCLE_CONTEXT_READ_ONLY==='1';
+if(contextReadOnly&&!contextOnly)throw Error('Read-only asset contexts require the explicit native asset-context mode');
+const readOnly=previewOnly||contextReadOnly;
 const expectedCacheVersion=Number(process.env.SPARK_LIFECYCLE_CACHE_VERSION??'13');
-if(![5,6,7,13,609].includes(expectedCacheVersion)||expectedCacheVersion!==13&&!previewOnly||previewOnly&&!nativeOnly)throw Error('Other native cache families require explicit read-only preview acceptance');
+if(![5,6,7,13,609].includes(expectedCacheVersion)||expectedCacheVersion!==13&&!readOnly||previewOnly&&!nativeOnly)throw Error('Other native cache families require explicit read-only preview acceptance');
 const profilePreview=process.env.SPARK_LIFECYCLE_PROFILE==='1';
 if(profilePreview&&!nativeOnly)throw Error('Preview profiling requires native-only mode');
 const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
@@ -38,7 +41,7 @@ await finishStorage.createScratch('application');
 await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
 await finishStorage.createScratch('library');
 await finishStorage.createScratch('webview');
-if(nativeOnly&&!previewOnly)await finishStorage.createScratch('independent-native-tags');
+if(nativeOnly&&!readOnly)await finishStorage.createScratch('independent-native-tags');
 if(geometryOnly)await finishStorage.createScratch('independent-model-tags');
 const runOwned=async(...args)=>{const pending=promisify(execFile)(...args);if(pending.child)await finishStorage.trackProcess(pending.child);return pending;};
 const interrupt=async()=>{try{await finishStorage.interrupt();}finally{process.exit(130);}};
@@ -125,7 +128,7 @@ try{
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
   if(geometryOnly){
     const {nativeGeometryRoundTrip}=await import('./native-geometry-roundtrip.mjs');
-    await nativeGeometryRoundTrip({main,root,invoke,expect,report,step,invaderDirectory});
+    await nativeGeometryRoundTrip({main,root,invoke,expect,report,step,invaderDirectory,run:runOwned});
   }
   if(!nativeOnly&&!geometryOnly){
   const a=await invoke(main,'create_quickforge_project',{title:'C59 map A',template:'smallIndoorArena',target:'haloCustomEdition'});
@@ -237,7 +240,7 @@ try{
   await chooseTool(main,'Level editor');await inspector(main);await acknowledged(main,a.project.id,1.5);
   }
   if(nativeMap&&!geometryOnly){
-    if(!invaderDirectory)throw Error('Native map acceptance requires the installed Invader directory');
+    if(!readOnly&&!invaderDirectory)throw Error('Native map acceptance requires the installed Invader directory');
     const original=await fs.readFile(path.resolve(nativeMap)),originalHash=crypto.createHash('sha256').update(original).digest('hex');
     const importStarted=performance.now();
     const [opened]=await invoke(main,'import_paths',{paths:[path.resolve(nativeMap)]});
@@ -302,7 +305,7 @@ try{
       const lightmaps=new Set(opened.inspection.renderMesh?.materialRanges?.filter(range=>range.hasLightmapUvs&&range.lightmapBitmapTagId!=null&&range.lightmapPage>=0).map(range=>`${range.bspIndex}:${range.lightmapPage}`)??[]);
       expect(Number(nativeViewport.sourceLightmaps)).toBeGreaterThanOrEqual(lightmaps.size);
       expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
-      report.sourcePreview={cacheVersion:expectedCacheVersion,engine:opened.inspection.header.engine,sourceSha256:originalHash,resources:actualSource.resourceSha256??{},requiredPrimaryShaders:required,missingPrimaryShaders:missing,requiredLightmapPages:lightmaps.size,spartanTagId:spartan?.id??null,spartanModelClass:expectedCacheVersion===5?'mode':'mod2',visibleObjects:opened.project.scene.filter(object=>object.visible).length,readOnly:true,gameplayAccepted:false};
+      report.sourcePreview={cacheVersion:expectedCacheVersion,engine:opened.inspection.header.engine,sourceSha256:originalHash,resources:actualSource.resourceSha256??{},requiredPrimaryShaders:required,missingPrimaryShaders:missing,requiredLightmapPages:lightmaps.size,spartanTagId:spartan?.id??null,spartanModelClass:expectedCacheVersion===5?'mode':'mod2',visibleObjects:opened.project.scene.filter(object=>object.visible).length,readOnly,gameplayAccepted:false};
       step('Actual source-family preview loads every required placed/BSP primary shader and its native player-start model; original cache unchanged');
       if(contextOnly){
         if(!pistol)throw Error('Native asset-context acceptance requires the actual pistol');
@@ -312,7 +315,7 @@ try{
         const tabs=main.getByRole('tablist',{name:'Asset contexts',exact:true}),area=main.getByRole('region',{name:'Actual model preview',exact:true}),preview=area.locator('.native-model-preview'),canvas=area.locator('canvas');
         await expect(tabs.getByRole('tab')).toHaveCount(8);await expect(preview).toHaveAttribute('data-model-first-frame','true',{timeout:90000});
         await canvas.evaluate(element=>window.c71ContextCanvas=element);const camera=await canvas.getAttribute('data-gs-preview-camera');
-        const radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true}),prior=await radius.inputValue();await radius.fill('0.225');
+        const radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true}),prior=await radius.inputValue();if(!contextReadOnly)await radius.fill('0.225');
         await tabs.getByRole('tab',{name:'Materials',exact:true}).click();const materialSelector=main.getByRole('combobox',{name:'Asset material',exact:true});await expect(materialSelector).toBeVisible();
         const selectedShader=Number(await materialSelector.inputValue()),usedShaders=(await preview.getAttribute('data-model-shader-ids')).split(',').map(Number);expect(usedShaders).toContain(selectedShader);
         const selectedBitmap=Number(await main.getByRole('combobox',{name:'Asset bitmap',exact:true}).inputValue());expect(opened.inspection.tags.find(tag=>tag.id===selectedShader).references.filter(ref=>ref.class==='bitm').map(ref=>ref.targetId)).toContain(selectedBitmap);
@@ -332,12 +335,15 @@ try{
         expect(Number(await preview.getAttribute('data-collision-triangles'))).toBe(collision.indices.length/3);
         await main.screenshot({path:path.join(root,'native-context-collision.png')});
         for(const label of ['Dependencies','Native Output','Logic','Animation','Properties'])await tabs.getByRole('tab',{name:label,exact:true}).click();
-        await expect(radius).toHaveValue('0.225');await main.keyboard.press('Control+z');await expect(radius).toHaveValue(prior);await main.keyboard.press('Control+y');await expect(radius).toHaveValue('0.225');
+        if(!contextReadOnly){await expect(radius).toHaveValue('0.225');await main.keyboard.press('Control+z');await expect(radius).toHaveValue(prior);await main.keyboard.press('Control+y');await expect(radius).toHaveValue('0.225');}
+        else await expect(radius).toHaveValue(prior);
         await tabs.getByRole('tab',{name:'Collision',exact:true}).click();await expect(preview).toHaveAttribute('data-collision-status','ready');
         await tabs.getByRole('tab',{name:'Properties',exact:true}).click();await expect(preview).toHaveAttribute('data-model-first-frame','true');
         expect(await canvas.evaluate(element=>element===window.c71ContextCanvas)).toBe(true);expect(await canvas.getAttribute('data-gs-preview-camera')).toBe(camera);
         const calls=await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration})=>({command:name.slice(10),ms:duration})));
         expect(calls.filter(call=>call.command==='preview_owned_object_collision')).toHaveLength(1);
+        let editEvidence={undoRedoSaveReopen:false,compilerRan:false,gameplayAccepted:false};
+        if(!contextReadOnly){
         await main.keyboard.press('Control+s');await expect.poll(async()=>(await invoke(main,'open_project',{id:opened.project.id})).project.tagEdits.find(edit=>edit.tagId===pistol.id&&edit.fieldKey==='bounding-radius')?.value).toBe(.225);
         const smart=main.locator('.smart-edit:visible').first();await smart.locator('summary').first().click();await smart.getByRole('button',{name:'Review save plan',exact:true}).click();await expect(smart.locator('.smart-edit-plan>strong')).toHaveText('Direct map copy');await smart.getByRole('button',{name:'Save validated map copy',exact:true}).click();await expect(smart.locator('.smart-edit-result>strong')).toHaveText('Validated copy ready');
         const edited=(await invoke(main,'open_project',{id:opened.project.id})).project,build=edited.builds.at(-1);
@@ -347,7 +353,12 @@ try{
         await run(tool('invader-extract'),['-s',pistol.path+'.weapon','-t',tags,build.output],{windowsHide:true,timeout:30000});
         const readback=Number((await run(tool('invader-edit'),['-t',tags,'-G','bounding_radius',pistol.path+'.weapon'],{windowsHide:true,timeout:30000})).stdout.trim());expect(readback).toBeCloseTo(.225,6);
         await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${opened.project.id}"]`).click();await chooseTool(main,'Tag editor');await expect(radius).toHaveValue('0.225');
-        report.assetContexts={sourceSha256:originalHash,tagId:pistol.id,selectedShader,selectedBitmap,usedShaders,reflectionInspection:{tagId:reflectionId,faces},collisionTriangles:collision.indices.length/3,sameCanvas:true,sameCamera:true,collisionReads:1,calls,undoRedoSaveReopen:true,output:build.output,outputSha256:build.sha256,independentInvaderReadback:readback,compilerRan:false,gameplayAccepted:false};
+        editEvidence={...editEvidence,undoRedoSaveReopen:true,output:build.output,outputSha256:build.sha256,independentInvaderReadback:readback};
+        }else{
+          const unchanged=(await invoke(main,'open_project',{id:opened.project.id})).project;
+          expect(unchanged.tagEdits).toEqual(opened.project.tagEdits);expect(unchanged.builds).toEqual(opened.project.builds);
+        }
+        report.assetContexts={sourceSha256:originalHash,tagId:pistol.id,selectedShader,selectedBitmap,usedShaders,reflectionInspection:{tagId:reflectionId,faces},collisionTriangles:collision.indices.length/3,sameCanvas:true,sameCamera:true,collisionReads:1,calls,readOnly:contextReadOnly,...editEvidence};
         let playable;
         const candidates=opened.inspection.tags.filter(tag=>tag.class==='snd!').sort((a,b)=>Number(/teleporter_loop/.test(b.path))-Number(/teleporter_loop/.test(a.path))).slice(0,8);
         for(const tag of candidates){const inspected=await invoke(main,'inspect_sound',{projectId:opened.project.id,tagId:tag.id});if(inspected.sourceSha256!==originalHash)throw Error('Native sound source differs');if(inspected.permutations.some(sample=>sample.available)){playable=tag;break;}}
@@ -363,7 +374,7 @@ try{
         await main.screenshot({path:path.join(root,'native-context-sound.png')});
         await nativeTagAnimation(opened);
         expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
-        step('Actual asset contexts retain one native preview/camera, reuse real collision, and preserve Undo/Save/reopen and independently read native output',report.assetContexts);
+        step(contextReadOnly?'Actual read-only asset contexts retain native materials/cubemap/collision/animation/audio without editing tags or creating a build':'Actual asset contexts retain one native preview/camera, reuse real collision, and preserve Undo/Save/reopen and independently read native output',report.assetContexts);
       }
     }else{
     if(process.env.SPARK_LIFECYCLE_ANIMATION==='1')await nativeTagAnimation(opened);
@@ -504,6 +515,7 @@ finally{
     // outside scratch. No abandoned browser profile or full library is kept.
     if(report.complete&&report.geometryRoundTrip?.output)
       await finishStorage.retain(report.geometryRoundTrip.output,'Accepted native geometry fixture for the next independent readback');
+    await physicalSample('before-cleanup');
     await finishStorage(report.complete?'passed':'failed');
   }catch(error){report.complete=false;report.errors.push(String(error));process.exitCode=1;}}
   await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));

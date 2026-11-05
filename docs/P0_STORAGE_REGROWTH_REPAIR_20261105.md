@@ -2,7 +2,7 @@
 
 Source checkpoint: local master `0d04cc7`. The owner's cb4f5ad4 directive supersedes earlier cleanup prompts. No push, publication, original game changes, source reset, full repository archive or new SDK tree.
 
-## Measured result
+## Measured storage checkpoint
 
 Same unchanged Windows FileStandardInfo.Allocation scanner, same five absolute roots, no followed links, deduplicated volume/file IDs. Sizes are allocated **file content**, excluding filesystem metadata and uncertain shared/compressed extents. Parent/child totals must not be added; hardlinks are deduplicated per subtree.
 
@@ -15,7 +15,15 @@ Same unchanged Windows FileStandardInfo.Allocation scanner, same five absolute r
 
 Net canonical allocation reduction: **11,755,489,776 bytes (10.95 GiB)**, after acceptance workloads and new diagnostics. Observed D: free space increased 11,745,722,368 bytes; volume movement also includes other activity and filesystem overhead. External recovery, user app data, MCC Halo1 and the editing kit have unchanged allocations. Raw scan paths and file IDs remain intact. The second invocation omitted display IDs; its contiguous root blocks were associated through their exact recorded absolute root-summary paths, with no altered allocation values.
 
-Full accounting, every top-level directory, all **480** remaining files/directories/collections over40MiB, ownership classifications and references: `artifacts/storage-v1/regrowth-repair-20261105/storage-accounting.json`, `remaining-over-40MiB.csv`, `physical-before.jsonl`, `physical-after-storage.jsonl`. Small-file collections are included, not hidden behind the threshold.
+Full accounting, every top-level directory, ownership classifications and references: `artifacts/storage-v1/regrowth-repair-20261105/storage-accounting.json`, `remaining-over-40MiB.csv`, `physical-before.jsonl`, `physical-after-storage.jsonl`. The storage checkpoint has480large rows; the final inventory below has487. Small-file collections are included, not hidden behind the threshold.
+
+## Final accounting after resumed C71
+
+The same unchanged scanner, in the original PowerShell7 runtime, finishes with0errors after C71's actual native tests: **55,956,550,104allocated bytes (52.11GiB)**. Net reduction from the original baseline is **11,651,074,456bytes (10.85GiB)**. Final QA allocation is2,224,180,912bytes; target6,549,947,008; preserved31,865,210,080. D: free space is up11,646,332,928bytes from the original reading; that volume-wide movement includes unrelated activity/metadata and is not substituted for the file-allocation measurement.
+
+The104,415,320-byte increase since the storage checkpoint is reviewed engineering evidence: five bounded C71 context runs, the current79,527,766-byte accepted native DCC cache, source/Git changes and metadata inventory. Context runs retain about3MB each and remove every fresh application/library/WebView/extraction tree. The DCC run registers9writers, removes475,571,928logical scratch bytes and retains one validated map plus compact Blender/compiler/readback proof. No SDK tree survives it. This retained output is deliberate, rather than unexplained cumulative staging.
+
+Exact final inventory: `physical-final-accepted.jsonl`, `storage-accounting.json` → `finalEngineeringFollowThrough`, and the updated487-row `remaining-over-40MiB.csv`. The scanner excludes its own live output; subsequently written compact reports/Git commit metadata are outside that timestamp. External-root allocations remain the separately recorded storage-checkpoint measurements, not falsely fresh scans. A .NET Framework whole-root attempt encountered one historical long-path limit and was excluded. Its compact exact error/result/SHA and the superseded intermediate scan are preserved in `superseded-measurements.json`;19,237,731bytes of redundant generated metadata reports were retired after hash/identity checks. No source, map, archive or historical native evidence was removed in that step.
 
 ## Deleted and protected
 
@@ -51,4 +59,4 @@ No fresh Halo gameplay, human hearing, physical two-computer/monitor or clean-ma
 
 ## Exact continuation
 
-Storage gates above are verified. Commit this source repair locally, then resume C71's final actual-native bitmap/cubemap/animation context test from0d04cc7 using the declared-scratch runner. Preserve all later prompt identities and the CSV. Human/game/peer/platform gates remain pending. Current source and all original evidence stay in the canonical checkout; no mandatory branches or remote operations.
+Storage repair is committed47f5d9d. C71's final bitmap/cubemap/animation contexts now pass: actual MCC edit/history/Invader readback plus read-only CE609 and Xbox5content at both installed OpenCE/Chupathingy locations. An uncovered DCC child-runner gap was repaired within the existing lifecycle harness and verified through real Blender/H1A compilation/independent readback. See OVERNIGHT_ENGINEERING_20261105.md and fixtures/c71-native-contexts.json. All25preserved directives04–28 were reviewed without marking them implemented. Remaining C71asset-class authoring and combined object/behavior→Halo→independent GUI acceptance stay open; human/game/peer/platform/release gates are not waived. All475requirements remain byte-identical. Local commits only; no push or publication.

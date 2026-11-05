@@ -3,11 +3,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
 import {chooseTool} from '../tests/ui/helpers/navigation.ts';
-const run=promisify(execFile),hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
-export async function nativeGeometryRoundTrip({main,root,invoke,expect,report,step,invaderDirectory}){
+const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
+export async function nativeGeometryRoundTrip({main,root,invoke,expect,report,step,invaderDirectory,run}){
+  // The owning lifecycle runner registers every DCC/extraction child with the
+  // same live budget and interruption lease as the actual application.
+  if(typeof run!=='function')throw Error('Native geometry acceptance requires its owning QA process runner');
   const blender=path.resolve(process.env.SPARK_GEOMETRY_BLENDER??''),tags=path.resolve(process.env.SPARK_GEOMETRY_TAGS??''),kit=path.resolve(process.env.SPARK_GEOMETRY_KIT??'');
   for(const file of [blender,path.join(tags,'globals/globals.globals'),path.join(kit,'tool.exe'),path.join(invaderDirectory,'invader-edit.exe')])if(!(await fs.stat(file)).isFile())throw Error('Missing selected DCC/native input: '+file);
   const fixtureFile=path.resolve('artifacts/qa/part2-native-structural-input/project.gsproject');

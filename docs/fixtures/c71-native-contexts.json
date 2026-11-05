@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "scope": "C71 actual native MCC asset contexts",
+  "evidence": "artifacts/qa/c71-native-contexts-storage-verified/acceptance.json",
+  "sourceCheckpoint": "0d04cc76685056b0347ee96c96d33158a7775db3",
+  "storageRepairCommit": "47f5d9df67b7476ed879ac5d4c5176c340966ce3",
+  "appSha256": "6ef4c1c9c375835f16ef899ccd6c6e72013f1fa26f595f8dd20a985d88ca0e6f",
+  "sourceSha256": "123673b4d2b2519c8fac88c1def02bfd0bc8e50276dba1957e1668b171ef6ae9",
+  "actualDesktopCases": 4,
+  "mockedIpc": false,
+  "sameCanvasAndCamera": true,
+  "contexts": [
+    "Properties",
+    "Materials",
+    "Animation",
+    "Collision",
+    "Sound",
+    "Logic",
+    "Dependencies",
+    "Native Output"
+  ],
+  "originalDiffusePixels": true,
+  "distinctCubemapFaces": 6,
+  "cubemapFaceDimensions": [
+    64,
+    64
+  ],
+  "collisionTriangles": 36,
+  "uiCollisionRequests": 1,
+  "nativeAnimationClips": 16,
+  "nativeAnimationBones": 19,
+  "playPauseResumeStaticRestore": true,
+  "undoRedoSaveReopen": true,
+  "independentInvaderBoundingRadius": 0.225,
+  "outputSha256": "801e13fea795582f237d7f7c4ad152e476b77ad6d891d2ede52b19977a3fdf84",
+  "nativeCompilerRanInThisTest": false,
+  "windowsOwnedAudioPeak": 0.14244,
+  "audioStopsOnContextChange": true,
+  "sourcePreserved": true,
+  "allocatedBytes": {
+    "beforeLaunch": 45809664,
+    "beforeCleanup": 371795632,
+    "afterCleanup": 3080192,
+    "peakIsNotContinuouslyMeasured": true
+  },
+  "retainedFiles": 10,
+  "humanHearingAccepted": false,
+  "gameplayAccepted": false,
+  "exactEngineAppearanceClaimed": false,
+  "entireAssetStudioComplete": false,
+  "installedReadOnlyContexts": [
+    {
+      "installation": "ce",
+      "evidence": "artifacts/qa/c71-ce-contexts/acceptance.json",
+      "appSha256": "6ef4c1c9c375835f16ef899ccd6c6e72013f1fa26f595f8dd20a985d88ca0e6f",
+      "cacheVersion": 609,
+      "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "resources": {
+        "bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+        "loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+        "sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2"
+      },
+      "readOnly": true,
+      "cases": 4,
+      "collisionTriangles": 36,
+      "cubemapFaceCount": 6,
+      "distinctCubemapFaceHashes": 6,
+      "animationClips": 16,
+      "bones": 19,
+      "audioPeak": 0.4054885,
+      "allocatedSamples": [
+        {
+          "phase": "before-launch",
+          "allocatedBytes": 45806064
+        },
+        {
+          "phase": "before-cleanup",
+          "allocatedBytes": 227353992
+        },
+        {
+          "phase": "after-cleanup",
+          "allocatedBytes": 2863600
+        }
+      ],
+      "retainedFiles": 10,
+      "nativeCompilerRan": false,
+      "gameRuntimeLaunched": false,
+      "humanHearingAccepted": false,
+      "gameplayAccepted": false
+    },
+    {
+      "installation": "opence",
+      "evidence": "artifacts/qa/c71-opence-contexts/acceptance.json",
+      "appSha256": "6ef4c1c9c375835f16ef899ccd6c6e72013f1fa26f595f8dd20a985d88ca0e6f",
+      "cacheVersion": 5,
+      "sourceSha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+      "resources": {},
+      "readOnly": true,
+      "cases": 4,
+      "collisionTriangles": 36,
+      "cubemapFaceCount": 6,
+      "distinctCubemapFaceHashes": 6,
+      "animationClips": 16,
+      "bones": 19,
+      "audioPeak": 0.4071117,
+      "allocatedSamples": [
+        {
+          "phase": "before-launch",
+          "allocatedBytes": 45806064
+        },
+        {
+          "phase": "before-cleanup",
+          "allocatedBytes": 235492832
+        },
+        {
+          "phase": "after-cleanup",
+          "allocatedBytes": 2888176
+        }
+      ],
+      "retainedFiles": 10,
+      "nativeCompilerRan": false,
+      "gameRuntimeLaunched": false,
+      "humanHearingAccepted": false,
+      "gameplayAccepted": false
+    },
+    {
+      "installation": "chupa",
+      "evidence": "artifacts/qa/c71-chupa-contexts/acceptance.json",
+      "appSha256": "6ef4c1c9c375835f16ef899ccd6c6e72013f1fa26f595f8dd20a985d88ca0e6f",
+      "cacheVersion": 5,
+      "sourceSha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f",
+      "resources": {},
+      "readOnly": true,
+      "cases": 4,
+      "collisionTriangles": 36,
+      "cubemapFaceCount": 6,
+      "distinctCubemapFaceHashes": 6,
+      "animationClips": 16,
+      "bones": 19,
+      "audioPeak": 0.4071117,
+      "allocatedSamples": [
+        {
+          "phase": "before-launch",
+          "allocatedBytes": 45806064
+        },
+        {
+          "phase": "before-cleanup",
+          "allocatedBytes": 236004832
+        },
+        {
+          "phase": "after-cleanup",
+          "allocatedBytes": 2900464
+        }
+      ],
+      "retainedFiles": 10,
+      "nativeCompilerRan": false,
+      "gameRuntimeLaunched": false,
+      "humanHearingAccepted": false,
+      "gameplayAccepted": false
+    }
+  ],
+  "finalMccRerun": {
+    "evidence": "artifacts/qa/c71-mcc-contexts-final/acceptance.json",
+    "cases": 4,
+    "sourceReadOnly": false,
+    "assetContextsReadOnly": false,
+    "independentReadback": 0.225,
+    "outputSha256": "801e13fea795582f237d7f7c4ad152e476b77ad6d891d2ede52b19977a3fdf84",
+    "allocatedAfterCleanup": 3072616
+  },
+  "ownedDccFollowThrough": {
+    "evidence": "artifacts/qa/c71-owned-dcc-native/acceptance.json",
+    "cases": 2,
+    "blenderSha256": "e27fbfea8564aa645d4463cb0949695fd85562b9de6df9561b06859a1074adf7",
+    "outputSha256": "8d4c3dc93c22b6cd29d95bd36b8d8e597ef90f95c581b2e0950fe2ff654aa63e",
+    "nativeCompilerRan": true,
+    "independentInvaderReadback": true,
+    "sourceProjectUnchanged": true,
+    "modelBounds": [
+      [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          1
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1.5,
+          1,
+          1
+        ]
+      ]
+    ],
+    "trackedWriters": 9,
+    "peakLogicalBytes": 555103565,
+    "disposedLogicalBytes": 475571928,
+    "allocatedSamples": [
+      {
+        "phase": "before-launch",
+        "allocatedBytes": 45806184
+      },
+      {
+        "phase": "before-cleanup",
+        "allocatedBytes": 558426840
+      },
+      {
+        "phase": "after-cleanup",
+        "allocatedBytes": 79548736
+      }
+    ],
+    "gameplayAccepted": false
+  }
+}
