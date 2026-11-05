@@ -1,29 +1,46 @@
 {
   "schemaVersion": 1,
-  "sourceIntegrationCommit": "12f9d99",
-  "measurement": "FileStandardInfo.Allocation; root file IDs deduplicated; same scanner before/after; filesystem metadata/shared extents excluded",
+  "sourceIntegrationCommits": [
+    "12f9d99",
+    "292399c",
+    "f0832c9",
+    "8d82c6b"
+  ],
+  "measuredAt": "2026-11-05T22:15:14.2952954Z",
+  "measurement": "FileStandardInfo.Allocation; directory totals deduplicate volume/file IDs; allocation excludes filesystem metadata, compression/shared extent reclaimability",
   "beforeAllocatedBytes": 55967217784,
-  "afterAllocatedBytes": 46632413328,
-  "reclaimedAllocatedBytes": 9334804456,
+  "beforeThisPurgeAllocatedBytes": 46633208176,
+  "afterAllocatedBytes": 14003631448,
+  "reclaimedAllocatedBytes": 41963586336,
+  "thisPurgeReclaimedAllocatedBytes": 32629576728,
+  "logicalBytes": 14321835899,
   "errors": 0,
+  "osFreeSpace": {
+    "beforeBytes": 839944458240,
+    "afterBytes": 840353705984,
+    "deltaBytes": 409247744,
+    "scope": "After classified large archive/copy removals, before final metadata/QA deletion segment",
+    "fullPurgeBaselineUnavailable": true,
+    "notEquivalentToAllFreedFileBytes": true
+  },
   "topLevelDirectories": [
     {
       "path": ".git",
-      "allocatedBytes": 837464568,
-      "logicalBytes": 825439913,
-      "category": "Git history and Codex recovery"
+      "allocatedBytes": 837903728,
+      "logicalBytes": 825809352,
+      "category": "Git history and recovery references"
     },
     {
       "path": ".github",
       "allocatedBytes": 58304,
       "logicalBytes": 27198,
-      "category": "application source/documentation"
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": ".research",
       "allocatedBytes": 297605800,
       "logicalBytes": 277214645,
-      "category": "canonical pinned research"
+      "category": "canonical pinned source research"
     },
     {
       "path": ".toolchain",
@@ -32,40 +49,34 @@
       "category": "required build/test dependency"
     },
     {
-      "path": "artifacts",
-      "allocatedBytes": 2377933080,
-      "logicalBytes": 2367166850,
-      "category": "blocked historical/generated storage"
-    },
-    {
       "path": "chupathingyce-windows64-release",
       "allocatedBytes": 2533773960,
       "logicalBytes": 2533687537,
-      "category": "protected user resource"
+      "category": "protected user Halo source/runtime"
     },
     {
       "path": "crates",
       "allocatedBytes": 3296240,
       "logicalBytes": 2861095,
-      "category": "application source/documentation"
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": "docs",
-      "allocatedBytes": 35775992,
-      "logicalBytes": 33759277,
-      "category": "application source/documentation"
+      "allocatedBytes": 36234744,
+      "logicalBytes": 34220862,
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": "examples",
       "allocatedBytes": 20480,
       "logicalBytes": 20306,
-      "category": "application source/documentation"
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": "Halo Custom Edition",
       "allocatedBytes": 471072448,
       "logicalBytes": 470801375,
-      "category": "protected user resource"
+      "category": "protected user Halo source/runtime"
     },
     {
       "path": "node_modules",
@@ -77,115 +88,119 @@
       "path": "opencehalo-windows-release",
       "allocatedBytes": 1886278392,
       "logicalBytes": 1886200578,
-      "category": "protected user resource"
+      "category": "protected user Halo source/runtime"
     },
     {
       "path": "preserved",
-      "allocatedBytes": 30310548704,
-      "logicalBytes": 30307427820,
-      "category": "blocked historical/generated storage"
+      "allocatedBytes": 58777600,
+      "logicalBytes": 58776769,
+      "category": "automatic-review-blocked obsolete index"
     },
     {
       "path": "public",
       "allocatedBytes": 328200,
       "logicalBytes": 324701,
-      "category": "application source/documentation"
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": "Pyros Zombie Apocolypse Mod Versions",
       "allocatedBytes": 750432472,
       "logicalBytes": 750272565,
-      "category": "protected user resource"
+      "category": "protected user Halo source/runtime"
     },
     {
       "path": "releases",
       "allocatedBytes": 50250200,
       "logicalBytes": 50240969,
-      "category": "accepted release exception"
+      "category": "accepted C49 release"
     },
     {
       "path": "reports",
       "allocatedBytes": 4096,
       "logicalBytes": 1685,
-      "category": "small source/verification receipt"
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": "SAMPLE CODE",
       "allocatedBytes": 713332488,
       "logicalBytes": 695566741,
-      "category": "protected user resource"
+      "category": "protected user Halo source/runtime"
     },
     {
       "path": "scripts",
       "allocatedBytes": 2995608,
-      "logicalBytes": 2482358,
-      "category": "application source/documentation"
+      "logicalBytes": 2482340,
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": "src",
       "allocatedBytes": 4454720,
       "logicalBytes": 3471045,
-      "category": "application source/documentation"
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": "src-tauri",
       "allocatedBytes": 1762792,
       "logicalBytes": 1540801,
-      "category": "application source/documentation"
-    },
-    {
-      "path": "target",
-      "allocatedBytes": 41144,
-      "logicalBytes": 35376,
-      "category": "small retained QA binaries; not compiler cache"
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": "tests",
       "allocatedBytes": 413176,
       "logicalBytes": 369162,
-      "category": "application source/documentation"
+      "category": "canonical source/configuration/documentation"
     },
     {
       "path": "tools",
       "allocatedBytes": 528686376,
       "logicalBytes": 525319514,
-      "category": "installed native test dependency"
+      "category": "installed native editing tools"
     }
   ],
-  "thresholdBytes": 52428800,
-  "largeRows": 237,
-  "directoryTotalsNotAdditiveAcrossHardlinks": true,
-  "warehouseDeletionPerformed": false,
-  "pendingDecision": "Discard byte-unique obsolete experimental source snapshots and native test-map outputs; original Halo/user content, current source/Git, authoring recipe and accepted C49 remain protected. Automatic approval review rejected the broad roots.",
-  "remoteMasterVerifiedBeforeLocalIntegration": "a144499bcd1dd68879d4cac53cf0cedd733f1ee6",
-  "localIntegrationNotPushed": true,
-  "deleted": [
-    "Cargo debug and release compiler caches",
-    "two generated debug-symbol archives",
-    "one verified compiler-only archive volume",
-    "ten copied QA app hosts",
-    "two download archives whose1566files match installed tools",
-    "ten superseded application release copies",
-    "old dist/test-results/incremental and four incidental Tauri schemas"
-  ],
-  "protectedUserResourcesTouched": false,
-  "pendingHistoricalBlobInventory": "docs/source-only-pending-historical-blobs.csv",
-  "pendingHistoricalBlobs": 844,
-  "pendingHistoricalBlobBytes": 19084353,
-  "pendingHistoricalBlobsAreNotProvenMissingFeatures": true,
   "protectedRootIso": {
     "path": "Halo - Combat Evolved (USA).xiso.iso",
     "allocatedBytes": 3728867328,
     "touched": false
   },
-  "auditThresholdIsDeletionAuthority": false,
-  "remainingDataDecisionRequired": true,
-  "measurementCheckpoint": "After verified deletions, before final small source/accounting commit",
-  "remainingLargeItemsClassified": 237,
-  "pendingHistoricalLocatorsVerified": 844,
-  "pendingHistoricalBackingProviders": 17,
+  "thresholdBytes": 52428800,
+  "largeRows": 137,
+  "directoryTotalsNotAdditiveAcrossHardlinks": true,
+  "obsoleteArchivePayloadsRemoved": true,
+  "artifactsExists": false,
+  "targetExists": false,
+  "preservedRemainingFiles": [
+    {
+      "path": "preserved/recovery-metadata/preservation-index.json",
+      "logicalBytes": 58776769,
+      "automaticReviewReason": "Recovery/ownership safeguard; active input to maintenance restoration. Deletion rejected; left intact."
+    }
+  ],
+  "ownerDiscardAuthorization": "Yes, discard obsolete experiments; call_9kVYkmZREb2Wcz6YI4QBNFHZ",
+  "protectedUserResourcesTouched": false,
   "protectedOriginalHashesRechecked": 10,
+  "sdkHashRechecked": true,
+  "requirementsLedgerRows": 475,
+  "requirementsLedgerSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
   "acceptedC49PackageVerifierPassed": true,
-  "typescriptRechecked": true,
-  "sourceHistoryPublication": "12f9d99 and this accounting checkpoint are local only; no push or publication performed"
+  "gitFullFsckPassed": true,
+  "remoteMasterReadOnlyVerified": "292399ce947d8a627426bd8c6a5d9d5f8d96288c",
+  "noPushOrPublication": true,
+  "retired": [
+    "650 obsolete storage/overnight audit files",
+    "8 cold QA archive groups, 10 consolidated object ZIPs and 2 residual ZIPs",
+    "1793 exact SDK duplicate files; 3626 exact SDK/map/QA copies",
+    "1855 individually classified QA files and 29 final QA intermediates",
+    "5 final SDK-derived/generated native tags",
+    "obsolete catalog/journal/seal/ownership receipts and 2515 empty directories",
+    "4 superseded generated target files"
+  ],
+  "nativePostPurgeAcceptance": "source-only-native-validation.json: real H1A compilation, 10 unchanged requests, corruption refusal/recovery and independent edited native readback; temporary output disposed. No gameplay retest.",
+  "remainingAcceptance": [
+    "specific preservation index deletion blocked by automatic review",
+    "Windows QA/Rust path guard repairs and hosted CI",
+    "memory-first production defaults and actual save/multiwindow gates",
+    "C71 stale authored edit publication and Smart Edit UI entrypoint",
+    "independent platform/release/gameplay/peer gates"
+  ],
+  "measurementCheckpoint": "After archive/QA/metadata retirement; before final small documentation/Git commit. Source and Git can change slightly afterward."
 }

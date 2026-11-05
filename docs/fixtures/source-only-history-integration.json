@@ -8,7 +8,7 @@
   "missingCommits": false,
   "canonicalGitImportedOrRewritten": false,
   "archivedProductSnapshots": "Compared archived source hashes with canonical Git and reviewed C33/C39 product diffs. Current native/SparkLink/Guardian code is retained. Older layouts/readers/tool models must not overwrite it.",
-  "historicalExperiments": "Owner specifically approved obsolete byte-unique experiments. Eight cold QA archive groups, ten consolidated ZIPs and two residual ZIPs have been retired after source/history integration; associated QA files and obsolete receipts are being removed. No original Halo/runtime/mod/Git/C49 resource was deleted.",
+  "historicalExperiments": "Owner-approved obsolete archive/test payloads and associated QA/metadata have been removed. Only the specifically automatic-review-blocked preservation index remains. All current source, refs/stash, original user Halo resources and accepted C49 are protected.",
   "requirementsLedgerSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
   "sourceAndKnowledgeDestinations": [
     "AGENTS.md",
@@ -36,5 +36,10 @@
     "prototypeNamespace": "gs_assets_40c1717dda7f44fabf510d514960eaac",
     "purpose": "Obsolete Unicode-path/native-normalization consolidation test. Original stock tag/sample payload remains in the protected SDK; not a unique supplied recording or mod."
   },
-  "remainingCleanupBlocker": "Automatic approval review specifically refuses deletion of preserved/recovery-metadata/preservation-index.json as a recovery safeguard. No bypass; it contains no live native payload providers after the approved archive retirement."
+  "remainingCleanupBlocker": "Automatic approval review specifically refuses deletion of preserved/recovery-metadata/preservation-index.json as a recovery safeguard. No bypass; it contains no live native payload providers after the approved archive retirement.",
+  "historicalUnmatchedRecords": {
+    "rows": 844,
+    "payloadBytes": 19084353,
+    "disposition": "Obsolete historical experiments discarded under explicit owner approval after integration. Prior locator CSV is in Git history at 292399c, not a current restoration promise."
+  }
 }
