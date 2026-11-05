@@ -87,6 +87,18 @@ async function snapshot(root, maxBytes = policy.qaRunBytes) {
   return { rows, bytes, files: rows.filter((row) => !row.directory).length };
 }
 async function measure(root, maxBytes) {
+  // WebView can atomically rename its last temp file after the app exits.
+  // Restart the entire bounded measurement; never skip an unknown file or
+  // weaken the hash/identity checks used for disposable deletion.
+  for (let attempt = 0; ; attempt++) {
+    try { return await measureOnce(root, maxBytes); }
+    catch (error) {
+      if (error.code !== 'ENOENT' || attempt >= 4) throw error;
+      await new Promise(resolve => setTimeout(resolve, 100 * 2 ** attempt));
+    }
+  }
+}
+async function measureOnce(root, maxBytes) {
   await noLinks(root);
   let bytes = 0, files = 0;
   const pending = [root];

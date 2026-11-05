@@ -73,6 +73,36 @@ fn source_hash_material_binding_and_closed_collision_are_required_before_any_nat
     assert!(!dir.path().join("tags").exists());
 }
 #[test]
+fn model_only_shader_is_not_a_bsp_material_and_resolves_its_real_native_class() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut p = source(dir.path());
+    let before = p.fingerprint().unwrap();
+    let doc = p.quick_forge.as_mut().unwrap();
+    let mut material = doc.materials[0].clone();
+    // The OBJ fixture names its material explicitly, unlike the room's surface.
+    doc.materials[0].name = "BSP_floor".into();
+    material.id = "model-only".into();
+    material.shader_path = Some("objects/own/model_surface".into());
+    doc.materials.push(material);
+    let authored = p.fingerprint().unwrap();
+    assert_ne!(before, authored);
+    let plan = model_build::plan(&p).unwrap();
+    assert_eq!(p.fingerprint().unwrap(), authored);
+    assert!(!plan.document.materials.iter().any(|m| m.id == "model-only"));
+    let (bsp, _) = spark_core::quickforge::source_requirements(&plan.document).unwrap();
+    assert!(!bsp.iter().any(|d| d.tag_path == "objects/own/model_surface"));
+    let shader = "objects/own/model_surface.shader_model";
+    let dependencies = plan.shader_dependencies([shader]).unwrap();
+    assert_eq!(dependencies.len(), 1);
+    assert_eq!(dependencies[0].tag_path, "objects/own/model_surface");
+    assert_eq!(dependencies[0].tag_class, "shader_model");
+    assert!(plan.models[0].jms.contains("model_surface\n<none>"));
+    assert!(plan.shader_dependencies([shader, "other/model_surface.shader_environment"]).is_err());
+    assert!(plan.shader_dependencies(["other/model_surface.shader_model"]).is_err());
+    assert!(plan.shader_dependencies(["objects/own/model_surface.shader_transparent_glass"]).is_err());
+    assert_eq!(plan.shader_dependencies(["objects/own/model_surface.shader_environment"]).unwrap()[0].tag_class, "shader_environment");
+}
+#[test]
 fn transformed_models_share_only_identical_recipes_and_preserve_authored_source() {
     let dir = tempfile::tempdir().unwrap();
     let mut p = source(dir.path());

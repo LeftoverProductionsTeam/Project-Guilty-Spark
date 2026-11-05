@@ -296,13 +296,14 @@ pub fn run_prepared_job(
     let directory=jobs_root.join(job_id);
     let selected_tags=tools.hek_tags_directory.clone().or_else(||tools.hek_directory.as_ref().map(|p|p.join("tags")));
     let runner=Runner{id:job_id,project:&project.id,cancel:&cancel,event:&on_event};
-    let (requirements,source_blockers)=quickforge::source_requirements(document)?;
+    let (mut requirements,source_blockers)=quickforge::source_requirements(document)?;
     let native_inputs=if !export_only && extra_blockers.is_empty() && source_blockers.is_empty() && !cancel.load(Ordering::Relaxed) {
         if let (Some(tags),Some(dependency_tool))=(selected_tags.as_ref().filter(|p|p.is_dir()),invader(tools,"invader-dependency")) {
             let import_root=jobs_root.parent().ok_or_else(||SparkError::Invalid("Managed jobs folder has no library root".into()))?;
             let imported=crate::native_asset_imports::staging_inventory(import_root,project)?;
             let imported_names=imported.files.iter().map(|file|file.path.clone()).collect();
             let all=crate::native_staging::inventory(tags,&cancel)?;
+            requirements.extend(custom.shader_dependencies(all.files.iter().chain(imported.files.iter()).map(|file| &file.path))?);
             crate::reject_links(&dependency_tool)?;
             let dependency_tool_sha256=maps::hash_file(&dependency_tool)?;
             let (selected,model_class_bindings)=if let Some(expected)=prepared{validate_prepared_inventory(tags,&all,expected)?;(all.clone(),BTreeMap::new())}else{
@@ -325,7 +326,9 @@ pub fn run_prepared_job(
     let result=(||->Result<()> {
         if cancel.load(Ordering::Relaxed){return invalid("Build cancelled");}
         emit("geometry","Validating editable geometry and writing JMS source".into(),5,"info");
-        let sources=quickforge::export_sources(document,&directory.join("workspace"))?;
+        let mut sources=quickforge::export_sources(document,&directory.join("workspace"))?;
+        // Include resolved model shader classes in the native build receipt.
+        sources.dependencies.extend(requirements.iter().filter(|dependency|dependency.kind=="modelShader").cloned());
         match crate::native_audio::plan(project) {
             Ok(placements) if !placements.is_empty()=>{project::atomic_write(&sources.directory.join("native-audio-intent.json"),&serde_json::to_vec_pretty(&placements)?,false)?;},
             Err(error)=>receipt.blockers.push(error.to_string()),

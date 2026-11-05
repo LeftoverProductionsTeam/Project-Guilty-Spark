@@ -15,13 +15,14 @@ const root=path.resolve(destination),expect=assertion.configure({timeout:45000})
 const detachMethod=process.env.SPARK_LIFECYCLE_DETACH_METHOD??'pointer';
 if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must be pointer or button');
 const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
+const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
 if(!['','20'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 edits');
 if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned map');
 await fs.mkdir(await assertQaOutputPath(root));
 const app=path.join(root,'GuiltySpark-workspace-lifecycle.exe');await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
-const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
-const finishStorage=await beginQaStorage(root,{workflow:repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256});
+const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256});
 let child,browser,main;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
@@ -61,7 +62,11 @@ async function close(page){await page.getByRole('button',{name:'Close window',ex
 try{
   await launchNative();
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
-  if(!nativeOnly){
+  if(geometryOnly){
+    const {nativeGeometryRoundTrip}=await import('./native-geometry-roundtrip.mjs');
+    await nativeGeometryRoundTrip({main,root,invoke,expect,report,step,invaderDirectory});
+  }
+  if(!nativeOnly&&!geometryOnly){
   const a=await invoke(main,'create_quickforge_project',{title:'C59 map A',template:'smallIndoorArena',target:'haloCustomEdition'});
   const b=await invoke(main,'create_quickforge_project',{title:'C59 map B',template:'smallIndoorArena',target:'haloCustomEdition'});
   await invoke(main,'create_quickforge_project',{title:'C59 map C',template:'smallIndoorArena',target:'haloCustomEdition'});
@@ -170,7 +175,7 @@ try{
   await main.screenshot({path:path.join(root,'online-collaboration.png')});
   await chooseTool(main,'Level editor');await inspector(main);await acknowledged(main,a.project.id,1.5);
   }
-  if(nativeMap){
+  if(nativeMap&&!geometryOnly){
     if(!invaderDirectory)throw Error('Native map acceptance requires the installed Invader directory');
     const original=await fs.readFile(path.resolve(nativeMap)),originalHash=crypto.createHash('sha256').update(original).digest('hex');
     const [opened]=await invoke(main,'import_paths',{paths:[path.resolve(nativeMap)]});

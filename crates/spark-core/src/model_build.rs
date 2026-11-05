@@ -27,6 +27,7 @@ pub struct Model {
     pub triangles: usize,
     pub radius: f32,
     pub bounds: [[f32; 3]; 2],
+    pub shader_paths: Vec<String>,
     #[serde(skip)]
     pub jms: String,
 }
@@ -73,7 +74,7 @@ fn shaders(doc: &QuickForgeDocument, names: &[String]) -> Result<Vec<String>> {
         let path=material.shader_path.as_ref().unwrap();safe_relative(path)?;
         let name=path.rsplit(['/', '\\']).next().unwrap();
         if name.is_empty() || name.len()>100 || !name.bytes().all(|b|b.is_ascii_alphanumeric()||b"_ -".contains(&b)) {return invalid("Imported model shader needs a safe native material basename");}
-        Ok(name.to_string())
+        Ok(path.replace('\\', "/"))
     }).collect()
 }
 fn read_source(asset: &Asset) -> Result<assets::ObjImport> {
@@ -285,7 +286,7 @@ pub fn plan(project: &Project) -> Result<Plan> {
             let mut jms = String::from("8200\n0\n1\nframe\n-1\n-1\n0\t0\t0\t1\n0\t0\t0\n");
             writeln!(jms, "{}", bindings.len()).unwrap();
             for shader in &bindings {
-                writeln!(jms, "{shader}\n<none>").unwrap();
+                writeln!(jms, "{}\n<none>", shader.rsplit('/').next().unwrap()).unwrap();
             }
             writeln!(jms, "0\n1\n__unnamed\n{}", positions.len()).unwrap();
             let mut bounds = [[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]];
@@ -336,6 +337,7 @@ pub fn plan(project: &Project) -> Result<Plan> {
                 triangles: imported.mesh.indices.len() / 3,
                 radius,
                 bounds,
+                shader_paths: bindings.clone(),
             });
             recipes.insert(recipe, tag.clone());
             tag
@@ -362,6 +364,13 @@ pub fn plan(project: &Project) -> Result<Plan> {
             published_asset_id: None,
         });
     }
+    if !models.is_empty() {
+        // The source palette also contains model-only shader bindings. Keep the
+        // original project intact, but do not export those as BSP materials.
+        let used = crate::quickforge::preview_mesh(&doc)?.parts.into_iter()
+            .map(|part| part.material_id).collect::<BTreeSet<_>>();
+        doc.materials.retain(|material| used.contains(&material.id));
+    }
     crate::quickforge::validate_document(&doc)?;
     Ok(Plan {
         document: doc,
@@ -369,6 +378,35 @@ pub fn plan(project: &Project) -> Result<Plan> {
     })
 }
 impl Plan {
+    /// Resolve exact native shader classes before staging. Tool resolves JMS
+    /// basenames, so even an otherwise valid full path must be unambiguous.
+    pub fn shader_dependencies(&self, files: impl IntoIterator<Item = impl AsRef<str>>) -> Result<Vec<crate::quickforge::ForgeDependency>> {
+        let mut inventory = BTreeMap::<String, BTreeSet<String>>::new();
+        for (index, file) in files.into_iter().enumerate() {
+            if index >= 200000 { return invalid("Model shader inventory exceeds 200000 files"); }
+            let file = file.as_ref().replace('\\', "/").to_ascii_lowercase();
+            safe_relative(&file)?;
+            let Some((tag, extension)) = file.rsplit_once('.') else { continue };
+            if extension == "shader" || extension.starts_with("shader_") {
+                inventory.entry(tag.rsplit('/').next().unwrap().into()).or_default().insert(file);
+            }
+        }
+        let paths = self.models.iter().flat_map(|model| &model.shader_paths).collect::<BTreeSet<_>>();
+        let mut dependencies = Vec::new();
+        for path in paths {
+            let normalized = path.to_ascii_lowercase();
+            let basename = normalized.rsplit('/').next().unwrap();
+            let candidates = inventory.get(basename).ok_or_else(|| fail(format!("Missing model shader '{path}'; select its native tag source before compiling")))?;
+            if candidates.len() != 1 { return invalid(format!("Model shader '{path}' has {} JMS basename matches; select a uniquely named native shader", candidates.len())); }
+            let file = candidates.first().unwrap();
+            let (tag, class) = file.rsplit_once('.').unwrap();
+            if tag != normalized || !matches!(class, "shader_model" | "shader_environment") {
+                return invalid(format!("Model shader '{path}' needs an exact shader_model or shader_environment source; no class substitution is allowed"));
+            }
+            dependencies.push(crate::quickforge::ForgeDependency { kind: "modelShader".into(), tag_path: path.clone(), tag_class: class.into(), source_project_id: None, source_sha256: None });
+        }
+        Ok(dependencies)
+    }
     pub fn generated(&self) -> BTreeSet<String> {
         self.models
             .iter()

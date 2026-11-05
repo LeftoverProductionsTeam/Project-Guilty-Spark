@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Overnight continuation — C70 genuine Blender source round trip and native compilation
+Task: Overnight continuation — C70 accepted native milestone; C71 native asset fidelity next
 Status: implementation incomplete
 Starting revision: 67589b0
-Latest verified revision: Local commit containing overnight export report:3core/6browser/135native-unit/13storage checks and3genuine Windows app cases pass; configured export works, wrong format refused, existing identical output reused.
-Next action: Exercise existing C70 Blender fork/save-detection/review/import/author-Undo/save/reopen and native compile/readback using restored106MB dependency pool. Keep human/game/peer/platform acceptance pending; no new systems or SDK copies.
+Latest verified revision: c16186c export; C70 native DCC accepted2cases/0errors with app f149269e…; combined740Rust/9ignored,404frontend,169browser,59offline and8QA storage pass.
+Next action: Commit verified C70 material/dependency repair and actual Blender/native evidence, then resume Prompt06 native asset fidelity in existing model planner/readback/Inspector. No game/human/peer/platform gate promotion.
 
 ## Acceptance
 Owner authorizes proved-unneeded canonical folders. Preserve all unique source/history/research/maps/tags/releases and existing C70 work. No full repository archive, full SDK copy, obsolete .local output, system/shared-tool deletion or original game changes. Native/test evidence is distinct from gameplay, clean-machine and peer acceptance.
@@ -20,7 +20,7 @@ Existing per-project snapshots, Library-managed fixed recovery, Storage preferen
 Automatic review rejected Git repacking and implicit periodic-backup deletion; no bypass. All Git objects retained; backup allocation cap stops at capacity, explicit UUID/SHA review frees slots; no rolling rotation. First native20 completed edits then failed a harness locator bound to closed Page; corrected retry passed. First shutdown's transient WebView temp left a conservative incomplete lease; explicit dead-owner review now records failed/inactive retainedusage175,450,279B, prior records preserved; failure acceptance staysfalse. Native compiler polling/reservations are not OS hard quotas. Configured folder export now works through deliberate Build/Smart Edit actions; it never installs or converts automatically. Clean-machine, human/game-peer, wider runtime, physical multi-monitor and C70 DCC gates remain open.
 
 ## Operations and safe checkpoint
-Export native acceptance is complete and its app closed. No game or server launched. Actual native evidence artifacts/qa/part2-native20-recovery-fixed and part2-native-structural; compact evidence artifacts/storage-v1/lightweight-architecture-20261105. Current release-target app is tested Part2 QA source, not a new installer/release. Accepted C49 and previous-good43888167 app remain protected. Final inventory/protected-hash/Git integrity checks pass; local commit containing this checkpoint records verified source. Four exact failed-QA scratch targets/46files retired54,054,048allocatedB;235retainedfiles exact, ownershiprecord alone reconciled. Cargo devclean822reproduciblefiles.
+Export native acceptance complete. C70 actual DCC acceptance complete; all owned app/compiler/Blender processes exited. Evidence artifacts/qa/overnight-dcc-native-accepted,2cases/0errors; native cache6039f1b4…/79,527,766B,1→1.5width preserved in render/collision. 1,778requiredtags staged104,921,176B; original sources hash-match. No game launched. No game or server launched. Actual native evidence artifacts/qa/part2-native20-recovery-fixed and part2-native-structural; compact evidence artifacts/storage-v1/lightweight-architecture-20261105. Current release-target app is tested Part2 QA source, not a new installer/release. Accepted C49 and previous-good43888167 app remain protected. Final inventory/protected-hash/Git integrity checks pass; local commit containing this checkpoint records verified source. Four exact failed-QA scratch targets/46files retired54,054,048allocatedB;235retainedfiles exact, ownershiprecord alone reconciled. Cargo devclean822reproduciblefiles.
 
 ## Deferred requests
 Owner overnight directive explicitly permits continuing independent objectives while human/approval gates stay pending. Existing per-directory native disk monitoring is not an OS-enforced filesystem quota; do not modify global volume quotas to claim a pass. No implicit backup pruning, publication or original installation writes.

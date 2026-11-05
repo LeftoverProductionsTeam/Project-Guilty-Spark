@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "scope": "C70 Blender OBJ native round trip",
+  "appSha256": "f149269e055b05e3cff63a74a2d0dd093100cd35b5cc9d09f25983a045d90768",
+  "evidenceDirectory": "artifacts/qa/overnight-dcc-native-accepted",
+  "actualDesktopCases": 2,
+  "complete": true,
+  "geometry": {
+    "projectId": "7e5cc969-308a-4d0b-9913-c274473a439f",
+    "buildId": "6679f288-df83-480a-9f42-d261fc7570f0",
+    "blenderSha256": "e27fbfea8564aa645d4463cb0949695fd85562b9de6df9561b06859a1074adf7",
+    "baselineSha256": "1c30f6beef1cd1c3ab0bb3b7bc895c28321668958b37d5c06b2007230518d314",
+    "editedSha256": "673ca847c8b6b014a5ad17a6b0ed34f346711e213300a422f0060923835d08bf",
+    "originalAssetSha256": "1c30f6beef1cd1c3ab0bb3b7bc895c28321668958b37d5c06b2007230518d314",
+    "modelSources": [
+      {
+        "tag": "scenery/spark_7e5cc969308a/mesh_16e1ee204fb85f046584/mesh_16e1ee204fb85f046584",
+        "sourceSha256": "1c30f6beef1cd1c3ab0bb3b7bc895c28321668958b37d5c06b2007230518d314",
+        "bounds": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            1
+          ]
+        ],
+        "triangles": 12,
+        "renderGeometries": 1,
+        "collisionNodes": 1
+      },
+      {
+        "tag": "scenery/spark_7e5cc969308a/mesh_3b891ee943ecc354f45a/mesh_3b891ee943ecc354f45a",
+        "sourceSha256": "673ca847c8b6b014a5ad17a6b0ed34f346711e213300a422f0060923835d08bf",
+        "bounds": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1.5,
+            1,
+            1
+          ]
+        ],
+        "triangles": 12,
+        "renderGeometries": 1,
+        "collisionNodes": 1
+      }
+    ],
+    "output": "\\\\?\\D:\\Project Guilty Spark\\artifacts\\qa\\overnight-dcc-native-accepted\\library\\jobs\\6679f288-df83-480a-9f42-d261fc7570f0\\output\\c70_genuine_blender_round_trip.map",
+    "outputSha256": "6039f1b4c257ad8eed750ab33b5c4f3cf157e0232d20bb41d59ab2dcd7675b32",
+    "crcMismatch": 0,
+    "sourceProjectUnchanged": true,
+    "gameplayAccepted": false
+  },
+  "nativeCompileMs": 37091,
+  "gameLoaded": false,
+  "humanAccepted": false,
+  "addonTested": false
+}

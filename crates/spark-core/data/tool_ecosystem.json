@@ -983,7 +983,7 @@
           "Halo addon installation/export and native animation handoff remain independent acceptance gates"
         ],
         "integrationTests": [
-          "Native DCC round trip pending this continuation; do not treat installed Blender as acceptance"
+          "C70 Windows Blender 5.2 OBJ edit/save detection, reviewed import, Undo/Redo/save/reopen, H1A scenery/collision/cache compilation and independent Invader readback passed; docs/OVERNIGHT_ENGINEERING_20261105.md. Addon export and actual game acceptance remain separate."
         ],
         "whenToUse": "Create organic terrain, model scenery, or author animations beyond brush geometry.",
         "documentation": "https://github.com/General-101/Halo-Asset-Blender-Development-Toolset/blob/81e86bf98aee4607a2159ff9a22a223a1a91c9d7/README.md"
