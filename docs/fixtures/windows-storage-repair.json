@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "sourceBaseCommit": "a83accfdc4257e2ccc5a46bcfafe41a52f754c66",
+  "testedWorkingTree": true,
+  "host": "Windows x64 local; not hosted GitHub CI",
+  "workingTreeFileSha256": {
+    "scripts/native-qa-storage.mjs": "0b0e5092af803d8e8e3db5595c64957deb1fdb3450479a26d4602cba1b9d46a5",
+    "scripts/native-qa-storage.test.mjs": "2c57065f93ba325f144a3809fa3ed95dcefff42cbd3652db3955abf7c9d452d8",
+    "crates/spark-core/src/native_staging.rs": "ef7d89819d550bf44a6a98bcda0e241bac9bd06a12d0f53c857eb6891298d56f",
+    "crates/spark-core/src/storage.rs": "eb1d38f830907b744e390b35fbe26c8b3e779b49edbee2ec3a1f05929a427ac6",
+    "src-tauri/src/tool_ecosystem_native.rs": "59d0b856de1de1fa2fb3a6742bc293f249ab86555676e2d902c0b7efe3b39eb1"
+  },
+  "reproduction": {
+    "real83ShortPath": true,
+    "priorError": "QA evidence must use an independent non-aliased directory",
+    "verbatimPathPriorFailure": "EISDIR lstat C:",
+    "plainLocalBefore": {
+      "passed": 20,
+      "failed": 0
+    },
+    "hostedFailureAt": "292399ce947d8a627426bd8c6a5d9d5f8d96288c"
+  },
+  "repair": {
+    "canonicalizeNearestTrustedExistingAncestor": true,
+    "acceptWindowsShortCaseVerbatimSpellings": true,
+    "rejectRealJunctionsAndSourceOverlap": true,
+    "ownershipAndContentSealsPreserved": true,
+    "reuseNativeStagingResolver": true,
+    "refuseRepositoryStorageLedgerBeforeCreation": true,
+    "legacyOwnerSpellingStillDisposableAfterExactChecks": true,
+    "validateToolExecutableBeforeAllocating": true,
+    "sourceOnlyDefaultsFullyComplete": false
+  },
+  "javaScriptStorage": {
+    "passed": 22,
+    "failed": 0,
+    "skipped": 0,
+    "realInlineShortTempChildVerified": true
+  },
+  "rustWorkspace": {
+    "passed": 750,
+    "failed": 0,
+    "ignored": 9,
+    "suites": 52,
+    "temporaryOutputDisposed": true,
+    "disposedLogicalBytes": 3085947198
+  },
+  "toolPreflightNativeUnit": {
+    "passed": 3,
+    "failed": 0,
+    "actualTauriApplicationCompiled": true,
+    "noGuiOrGameplayAcceptanceClaimed": true,
+    "missingMalformedExecutableLeavesNoFolder": true,
+    "sourceCheckoutRefusedBeforeAllocation": true,
+    "temporaryOutputDisposed": true,
+    "disposedLogicalBytes": 1711260857
+  },
+  "native": {
+    "complete": true,
+    "sourceFixture": "docs/fixtures/source-only-native-door.json",
+    "sourceUnchanged": true,
+    "stockInputs": 1793,
+    "stockInputBytes": 105215093,
+    "sdkArchiveSha256": "6c9c156237c78ab1b983080495fdcff698a3f15fe0baaadb1c663654d27f7bd4",
+    "originalSdkUnchanged": true,
+    "compiledTags": 1796,
+    "compiledCacheSha256": "b53c7543526c709c53344e814a746c0687c3f6ed7691d720e4764c54c0549103",
+    "freshBuildMs": 26136,
+    "unchangedRequests": 10,
+    "additionalNativeTrees": 0,
+    "sameAllocatedAfterRepeats": true,
+    "repeatAllocatedBytes": 270587248,
+    "corruptSaveBlocked": true,
+    "nativeParserRejectedCorruption": true,
+    "exactRecovery": true,
+    "independentCompiledRadius": 0.5,
+    "validNativeEditAccepted": true,
+    "nativeStages": [
+      {
+        "name": "Native storage helper build",
+        "milliseconds": 60668
+      },
+      {
+        "name": "Real H1A compile, unchanged reuse, external corruption recovery and native readback",
+        "milliseconds": 159691
+      }
+    ],
+    "temporaryOutputDisposed": true,
+    "disposedLogicalBytes": 585082521,
+    "peakLogicalBytes": 1330987151,
+    "gameplayRetested": false
+  },
+  "reviewPackage": {
+    "oneSourceOnlyArchive": true,
+    "outsideRepository": true,
+    "includesActualUntrackedMasterPrompts": 25,
+    "requirementsLedgerRows": 475,
+    "notReleaseOrRecoveryArchive": true
+  },
+  "openGates": [
+    "Hosted Windows/Linux CI: no authorized push or workflow result; Linux/WSL unavailable locally",
+    "Production memory-first default requires explicit save/reopen, crash-loss warning, original-change and dual-window/native acceptance",
+    "Successful/failed/cancelled external-tool close lifecycle still requires bounded cleanup; preflight only repaired here",
+    "C71 current draft publication and failed Smart Edit UI selector",
+    "Exact preservation-index.json deletion remains refused by automatic review",
+    "Human gameplay, game peers, clean-machine and independent platform/release acceptance"
+  ]
+}

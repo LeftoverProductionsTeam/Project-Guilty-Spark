@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { spawnSync, spawn } from 'node:child_process';
+import { spawnSync, spawn, execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import {
   assertQaOutputPath,
@@ -40,6 +40,57 @@ async function fixture(run) {
     await fs.rm(root, { recursive: true });
   }
 }
+
+test('uncreated output resolves through its trusted ancestor without allocating a directory', () =>
+  fixture(async (parent) => {
+    const output = path.join(parent, 'not-created', 'nested');
+    assert.equal(await assertQaOutputPath(output), output);
+    await assert.rejects(fs.stat(path.dirname(output)), { code: 'ENOENT' });
+    const alias = path.join(parent, 'alias');
+    await fs.symlink(parent, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    await assert.rejects(assertQaOutputPath(path.join(alias, 'not-created', 'nested')), /links|junctions/);
+    await fs.writeFile(path.join(parent, 'file'), 'original');
+    await assert.rejects(assertQaOutputPath(path.join(parent, 'file', 'child')), /directory|ENOTDIR/);
+    assert.equal(await fs.readFile(path.join(parent, 'file'), 'utf8'), 'original');
+  }));
+
+test('Windows short, verbatim and case spellings share the same real disposable owner', {
+  skip: process.platform !== 'win32',
+}, () => fixture(async (parent) => {
+  const short = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    '(New-Object -ComObject Scripting.FileSystemObject).GetFolder($env:SPARK_TEST_ALIAS).ShortPath'], {
+    env: { ...process.env, SPARK_TEST_ALIAS: parent }, encoding: 'utf8', windowsHide: true,
+  }).trim();
+  const spellings = [path.toNamespacedPath(parent), parent[0].toLowerCase() + parent.slice(1), short];
+  for (const [i, spelling] of spellings.entries()) {
+    const supplied = path.join(spelling, `run-${i}`), canonical = path.join(parent, `run-${i}`);
+    assert.equal(await assertQaOutputPath(supplied), canonical);
+    await assert.rejects(fs.stat(canonical), { code: 'ENOENT' });
+    await fs.mkdir(supplied);
+    const finish = await beginQaStorage(supplied, options(parent));
+    const scratch = await finish.createScratch('library');
+    await fs.writeFile(path.join(scratch, 'tiny.tag'), 'test-only bytes');
+    const result = await finish('passed');
+    assert.equal(result.root, canonical);
+    assert.equal(result.disposedBytes, 15);
+    await assert.rejects(fs.stat(scratch), { code: 'ENOENT' });
+  }
+  for (const spelling of [path.toNamespacedPath(path.resolve('src')), path.resolve('src').toLowerCase()])
+    await assert.rejects(assertQaOutputPath(path.join(spelling, 'must-not-create')), /canonical source/);
+  await assert.rejects(exportDevelopmentBuild(parent, path.toNamespacedPath(path.resolve('src', 'must-not-export'))), /outside the source/);
+
+  // Reproduce the hosted runner's short TEMP username in the actual inline
+  // wrapper, not just by comparing normalized strings.
+  const env = { ...process.env, TEMP: short, TMP: short };
+  for (const name of ['CARGO_TARGET_DIR', 'SPARK_BUILD_WORKSPACE', 'SPARK_BUILD_NONCE',
+    'SPARK_GENERATED_ROOT', 'SPARK_QA_STORAGE_ROOT']) delete env[name];
+  const source = new URL('./native-qa-storage.mjs', import.meta.url).href;
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e',
+    `import {withDevelopmentWorkspace} from ${JSON.stringify(source)};await withDevelopmentWorkspace('short-temp-regression',async()=>{}, {reservationBytes:8*1024**2});`],
+    { env, encoding: 'utf8', windowsHide: true });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /"temporaryOutputDisposed":true/);
+}));
 test('external frontend configuration uses the unambiguous embedded file-list type', () => {
   const directory = path.resolve(os.tmpdir(), 'Spark build with spaces', 'web');
   const config = JSON.parse(JSON.stringify(embeddedFrontendConfig(directory)));

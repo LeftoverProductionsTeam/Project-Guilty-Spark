@@ -233,12 +233,12 @@ pub fn reject_obsolete_repository_output(output: &Path) -> Result<()> {
     Ok(())
 }
 impl Store {
-    /// QA libraries under the canonical checkout share one ledger. Installed
-    /// applications use their selected data root. No new checkout is created.
+    /// Generated output must already belong to an external operation or the
+    /// user's selected library. Never regenerate a ledger inside source.
     fn location(output: &Path) -> Result<PathBuf> {
         reject_links(output)?;
         reject_obsolete_repository_output(output)?;
-        let absolute = std::path::absolute(output)?;
+        let absolute = crate::native_staging::canonical_destination(output)?;
         let parent = absolute
             .parent()
             .ok_or_else(|| fail("Generated output has no parent"))?;
@@ -248,9 +248,10 @@ impl Store {
         let library = parent
             .ancestors()
             .find(|p| p.join("library.sqlite3").is_file());
-        let root = if let Some(repo) = repository {
-            repo.join("artifacts/storage-v1")
-        } else if let Some(library) = library {
+        if repository.is_some() {
+            return invalid("Source-only checkout: generated output requires an owned external disposable workspace or a selected user library");
+        }
+        let root = if let Some(library) = library {
             library.join("storage-v1")
         } else {
             parent.join(".spark-storage-v1")
@@ -352,7 +353,7 @@ impl Store {
         description: &str,
     ) -> Result<Lease> {
         reject_links(path)?;
-        let path = std::path::absolute(path)?;
+        let path = crate::native_staging::canonical_destination(path)?;
         let source = source
             .map(|source| {
                 reject_links(source)?;
@@ -668,13 +669,13 @@ impl Store {
     /// changed bytes and other entries' source dependencies still refuse removal.
     pub fn dispose_completed(&self, path: &Path) -> Result<u64> {
         reject_links(path)?;
-        let path = std::path::absolute(path)?;
-        {
+        let path = crate::native_staging::canonical_destination(path)?;
+        let owned_path = {
             let _guard = lock(&self.root.join("catalog.lock"))?;
             let mut rows = self.entries()?;
             let row = rows
                 .iter_mut()
-                .find(|row| row.path == path)
+                .find(|row| crate::native_staging::canonical_destination(&row.path).is_ok_and(|stored| stored == path))
                 .filter(|row| {
                     row.category == Category::Staging
                         && !row.protected
@@ -686,14 +687,18 @@ impl Store {
             // This records the consumer's explicit end-of-lifetime declaration,
             // never a new snapshot of potentially changed files.
             row.state = "disposable".into();
+            // Existing ledgers/ownership markers keep their recorded spelling;
+            // accepting an equivalent lookup must not rewrite their identity.
+            let owned_path = row.path.clone();
             write(&self.root.join("entries.json"), &rows)?;
-        }
+            owned_path
+        };
         let plan = self.cleanup_plan()?;
         let row = plan
             .eligible
             .iter()
             .find(|row| {
-                row.path == path && row.category == Category::Staging && row.state == "disposable"
+                row.path == owned_path && row.category == Category::Staging && row.state == "disposable"
             })
             .ok_or_else(|| fail("Staging is active, protected, referenced or changed; retained"))?;
         self.cleanup(&plan, &[row.id.clone()], true)
@@ -776,7 +781,7 @@ impl Lease {
     }
     pub fn adopt(&mut self, target: &Path) -> Result<()> {
         reject_links(target)?;
-        let target = std::path::absolute(target)?;
+        let target = crate::native_staging::canonical_destination(target)?;
         if target.parent() != self.path.parent() || target.exists() {
             return invalid("Generated adoption requires a new sibling directory");
         }
@@ -1373,7 +1378,7 @@ mod tests {
         );
     }
     #[test]
-    fn deeply_nested_qa_libraries_use_the_same_repository_budget() {
+    fn repository_outputs_refuse_a_persistent_ledger_before_any_creation() {
         let root = tempfile::tempdir().unwrap();
         fs::write(root.path().join("Cargo.toml"), "# fixture repository").unwrap();
         fs::write(root.path().join("AGENTS.md"), "Preserve source").unwrap();
@@ -1383,13 +1388,12 @@ mod tests {
         }
         fs::create_dir_all(&nested).unwrap();
         fs::write(nested.join("library.sqlite3"), b"fixture library marker").unwrap();
-        let shallow = Store::for_output(&root.path().join("jobs/job")).unwrap();
-        let deep = Store::for_output(&nested.join("jobs/job")).unwrap();
-        assert_eq!(shallow.root(), deep.root());
-        assert_eq!(
-            shallow.root(),
-            fs::canonicalize(root.path().join("artifacts/storage-v1")).unwrap()
-        );
+        assert!(Store::for_output(&root.path().join("jobs/job")).is_err());
+        assert!(Store::for_output(&nested.join("jobs/job")).is_err());
+        assert!(Store::existing_for_output(&nested.join("jobs/job")).is_err());
+        assert!(!root.path().join("artifacts").exists());
+        assert!(!nested.join("storage-v1").exists());
+        assert!(!nested.join(".spark-storage-v1").exists());
         assert!(!root.path().join(".local").exists());
     }
     #[test]
@@ -1431,6 +1435,105 @@ mod tests {
             fs::read(source.join("native.tag")).unwrap(),
             b"original native input"
         );
+    }
+    #[test]
+    fn reservations_resolve_existing_ancestors_and_reject_source_overlap() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("ledger")).unwrap();
+        let source = root.path().join("OriginalNativeTags");
+        fs::create_dir_all(source.join("existing")).unwrap();
+        let native = source.join("original.tag");
+        fs::write(&native, b"original bytes").unwrap();
+        for output in [
+            source.clone(),
+            root.path().to_owned(),
+            source.join("existing/next"),
+            source.join("not-created/nested"),
+            source.join("not-created/../new-job"),
+        ] {
+            assert!(store.reserve(&output, Some(&source), 65536, Category::Staging, "source overlap").is_err(), "{}", output.display());
+        }
+        let relative_source = std::env::current_dir().unwrap();
+        assert!(store.reserve(Path::new("./uncreated-native-job"), Some(&relative_source), 65536, Category::Staging, "relative overlap").is_err());
+        assert!(!relative_source.join("uncreated-native-job").exists());
+        assert!(store.overview().unwrap().entries.is_empty());
+        assert_eq!(fs::read(&native).unwrap(), b"original bytes");
+        let output = root.path().join("outside/new-job");
+        let lease = store.reserve(&output, Some(&source), 65536, Category::Staging, "valid sibling").unwrap();
+        assert_eq!(store.overview().unwrap().entries[0].path, crate::native_staging::canonical_destination(&output).unwrap());
+        assert!(!output.exists());
+        fs::create_dir_all(&output).unwrap();
+        lease.finish_disposable().unwrap();
+        assert!(store.overview().unwrap().entries.is_empty());
+    }
+    #[test]
+    fn reservations_reject_real_link_ancestors_before_recording_a_lease() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("ledger")).unwrap();
+        let source = root.path().join("original");
+        fs::create_dir(&source).unwrap();
+        let link = root.path().join("alias");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&source, &link).unwrap();
+        #[cfg(windows)]
+        {
+            let result = std::process::Command::new("cmd.exe").args(["/d", "/c", "mklink", "/J"]).arg(&link).arg(&source).output().unwrap();
+            assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+        }
+        assert!(store.reserve(&link.join("not-created/job"), Some(&source), 65536, Category::Staging, "alias overlap").is_err());
+        assert!(!source.join("not-created").exists());
+        assert!(store.overview().unwrap().entries.is_empty());
+    }
+    #[cfg(windows)]
+    #[test]
+    fn windows_native_output_spelling_cannot_evade_containment_or_create_source_ledger() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("ledger")).unwrap();
+        let source = root.path().join("LongNativeSourceFolder");
+        fs::create_dir(&source).unwrap();
+        // Exercise GetShortPathNameW against a real Windows directory. On a
+        // volume with 8.3 names disabled, the API returns the ordinary spelling.
+        use std::os::windows::ffi::{OsStrExt, OsStringExt};
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn GetShortPathNameW(long: *const u16, short: *mut u16, length: u32) -> u32;
+        }
+        let wide: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
+        let mut short = vec![0u16; 32768];
+        let length = unsafe { GetShortPathNameW(wide.as_ptr(), short.as_mut_ptr(), short.len() as u32) };
+        assert!(length > 0 && (length as usize) < short.len());
+        let short = PathBuf::from(std::ffi::OsString::from_wide(&short[..length as usize]));
+        let verbatim = fs::canonicalize(&source).unwrap();
+        for spelling in [source.clone(), short, verbatim, PathBuf::from(source.to_string_lossy().to_lowercase())] {
+            assert!(store.reserve(&spelling.join("uncreated/job"), Some(&source), 65536, Category::Staging, "Windows containment").is_err());
+        }
+        assert!(store.overview().unwrap().entries.is_empty());
+        fs::write(source.join("Cargo.toml"), "# fixture").unwrap();
+        fs::write(source.join("AGENTS.md"), "owner").unwrap();
+        assert!(Store::for_output(&source.join("jobs/new")).is_err());
+        assert!(!source.join("artifacts").exists());
+    }
+    #[cfg(windows)]
+    #[test]
+    fn completed_legacy_path_spelling_keeps_its_exact_owner_during_disposal() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("ledger")).unwrap();
+        let output = root.path().join("legacy-output");
+        let lease = store.reserve(&output, None, 65536, Category::Staging, "legacy spelling fixture").unwrap();
+        fs::create_dir(&output).unwrap();
+        fs::write(output.join("test.tag"), b"test-only native output").unwrap();
+        lease.finish(false, None).unwrap();
+        let mut rows = store.entries().unwrap();
+        rows[0].path = output.clone();
+        write(&store.root.join("entries.json"), &rows).unwrap();
+        let file = marker(&output);
+        let mut owner: Owner = read_json(&file).unwrap();
+        owner.path = output.clone();
+        write(&file, &owner).unwrap();
+        assert!(store.dispose_completed(&output).unwrap() > 0);
+        assert!(!output.exists());
+        assert!(!file.exists());
+        assert!(store.overview().unwrap().entries.is_empty());
     }
     #[test]
     fn completed_disposable_staging_is_removed_without_accumulating_equivalent_jobs() {

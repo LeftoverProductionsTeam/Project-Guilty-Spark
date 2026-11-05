@@ -8,24 +8,16 @@ import { execFileSync, execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import os from 'node:os';
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const policy = JSON.parse(
   await fs.readFile(new URL('./maintenance/retention-policy.json', import.meta.url), 'utf8'),
 );
-const defaultQaRoot =
-  process.env.SPARK_QA_STORAGE_ROOT ??
-  path.join(
-    os.tmpdir(),
-    'GuiltySpark-QA-' +
-      crypto.createHash('sha256').update(projectRoot.toLowerCase()).digest('hex').slice(0, 12),
-  );
-const key = (value) => (process.platform === 'win32' ? value.toLowerCase() : value);
 const ordinary = (value) =>
   process.platform === 'win32' && value.startsWith('\\\\?\\')
-    ? value.startsWith('\\\\?\\UNC\\')
+    ? value.slice(0, 8).toUpperCase() === '\\\\?\\UNC\\'
       ? '\\\\' + value.slice(8)
       : value.slice(4)
     : value;
+const key = (value) => (process.platform === 'win32' ? ordinary(value).toLowerCase() : value);
 const contains = (parent, child) => {
   const relative = path.relative(key(parent), key(child));
   return (
@@ -43,7 +35,7 @@ const isLive = (pid) => {
   }
 };
 async function noLinks(file) {
-  for (let current = path.resolve(file); ; current = path.dirname(current)) {
+  for (let current = path.resolve(ordinary(file)); ; current = path.dirname(current)) {
     const info = await fs.lstat(current).catch((error) => {
       if (error.code === 'ENOENT') return null;
       throw error;
@@ -53,6 +45,36 @@ async function noLinks(file) {
     if (path.dirname(current) === current) break;
   }
 }
+// Resolve even an uncreated output through its nearest existing, non-linked
+// ancestor. Windows TEMP commonly contains an 8.3 username: that spelling and
+// a verbatim prefix are not a junction or permission to escape the source guard.
+async function canonicalOutputPath(file) {
+  const absolute = path.resolve(ordinary(file));
+  await noLinks(absolute);
+  const missing = [];
+  for (let ancestor = absolute; ; ancestor = path.dirname(ancestor)) {
+    const info = await fs.lstat(ancestor).catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (info) {
+      if (missing.length && !info.isDirectory()) throw Error('QA output ancestor is not a directory');
+      const real = path.resolve(ordinary(await fs.realpath(ancestor)));
+      await noLinks(real);
+      return path.join(real, ...missing.reverse());
+    }
+    if (path.dirname(ancestor) === ancestor) throw Error('QA output has no trusted existing ancestor');
+    missing.push(path.basename(ancestor));
+  }
+}
+const projectRoot = await canonicalOutputPath(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
+const defaultQaRoot =
+  process.env.SPARK_QA_STORAGE_ROOT ??
+  path.join(
+    os.tmpdir(),
+    'GuiltySpark-QA-' +
+      crypto.createHash('sha256').update(key(projectRoot)).digest('hex').slice(0, 12),
+  );
 /** Runs before a harness creates its output, including legacy copied commands. */
 export async function assertQaOutputPath(
   root,
@@ -62,7 +84,7 @@ export async function assertQaOutputPath(
   const maximum = operation === 'build' ? policy.cargoCacheBytes : policy.qaRunBytes;
   if (!Number.isSafeInteger(reservationBytes) || reservationBytes < 0 || reservationBytes > maximum)
     throw Error('QA path admission exceeds the canonical per-run reservation');
-  const absolute = path.resolve(root);
+  const absolute = await canonicalOutputPath(root);
   if (absolute.split(path.sep).some((part) => part.toLowerCase() === '.local'))
     throw Error('Obsolete .local output is disabled. Use an owned external disposable workspace.');
   if (
@@ -492,7 +514,7 @@ export async function recoverQaScratch(root, { storageRoot = defaultQaRoot } = {
  * Recovery never guesses that an abandoned or unsealed job is disposable. */
 export async function disposeQaScratch(runRoot, seal, { ownerFinished = false } = {}) {
   const absolute = await assertQaOutputPath(runRoot, { reservationBytes: 0 }),
-    target = path.resolve(seal.path);
+    target = await canonicalOutputPath(seal.path);
   if (
     seal.schemaVersion !== 1 ||
     key(seal.root) !== key(absolute) ||
@@ -530,7 +552,7 @@ export async function disposeQaScratch(runRoot, seal, { ownerFinished = false } 
 }
 export async function sealQaScratch(runRoot, file, maximumBytes = policy.qaRunBytes) {
   const absolute = await assertQaOutputPath(runRoot, { reservationBytes: 0 }),
-    target = path.resolve(file);
+    target = await canonicalOutputPath(file);
   if (
     target === absolute ||
     !contains(absolute, target) ||
@@ -576,7 +598,7 @@ export async function beginQaStorage(
   },
 ) {
   const absolute = await assertQaOutputPath(root, { reservationBytes, operation }),
-    real = await fs.realpath(absolute);
+    real = ordinary(await fs.realpath(absolute));
   if (key(real) !== key(absolute)) throw Error('QA evidence must use an independent non-aliased directory');
   if (!/^[\w.-]{1,80}$/.test(workflow) || !/^[a-f0-9]{64}$/.test(appSha256))
     throw Error('QA workflow/application identity is invalid');
@@ -784,7 +806,7 @@ export async function beginQaStorage(
     return target;
   };
   finish.retain = async (file, reason) => {
-    const target = path.resolve(ordinary(file)),
+    const target = await canonicalOutputPath(file),
       relative = path.relative(absolute, target);
     if (
       finished ||
@@ -820,7 +842,7 @@ export async function beginQaStorage(
     return finish('interrupted');
   };
   finish.registerDisposable = async (file) => {
-    const target = path.resolve(file);
+    const target = await canonicalOutputPath(file);
     if (
       finished ||
       target === absolute ||
@@ -854,8 +876,7 @@ export async function withDevelopmentWorkspace(
       'Explicit Cargo output is disabled: obsolete .local and retained caches are not allowed. Use an owned disposable parent operation.',
     );
   if (process.env.SPARK_BUILD_WORKSPACE) {
-    const run = path.resolve(process.env.SPARK_BUILD_WORKSPACE);
-    await assertQaOutputPath(run, { reservationBytes: 0 });
+    const run = await assertQaOutputPath(process.env.SPARK_BUILD_WORKSPACE, { reservationBytes: 0 });
     if (contains(projectRoot, run)) throw Error('Build workspace must be outside source');
     const record = JSON.parse(await fs.readFile(path.join(run, 'storage-run.json'), 'utf8'));
     if (
@@ -869,17 +890,16 @@ export async function withDevelopmentWorkspace(
       throw Error('Build workspace owner/nonce is not active');
     const directory = path.join(run, 'output');
     await noLinks(directory);
-    if (path.resolve(process.env.SPARK_GENERATED_ROOT ?? '') !== directory)
+    if (key(await canonicalOutputPath(process.env.SPARK_GENERATED_ROOT ?? '')) !== key(directory))
       throw Error('Generated output escaped its build owner');
-    if (path.resolve(process.env.CARGO_TARGET_DIR ?? '') !== path.join(directory, 'target'))
+    if (key(await canonicalOutputPath(process.env.CARGO_TARGET_DIR ?? '')) !== key(path.join(directory, 'target')))
       throw Error(
         'Compiler output escaped its build owner; obsolete .local and retained cache overrides are refused',
       );
     return action({ directory, env: { ...process.env }, trackProcess: async () => {} });
   }
   const identity = crypto.createHash('sha256').update(key(projectRoot)).digest('hex').slice(0, 12);
-  const base = path.join(os.tmpdir(), `GuiltySpark-Development-${identity}`);
-  await assertQaOutputPath(base, { reservationBytes: 0 });
+  const base = await assertQaOutputPath(path.join(os.tmpdir(), `GuiltySpark-Development-${identity}`), { reservationBytes: 0 });
   await fs.mkdir(base, { recursive: true });
   // Recover ONLY declared scratch from dead owners. Unknown files and running
   // compilers stay protected; do not evict them to satisfy a new reservation.
@@ -1059,10 +1079,10 @@ export const embeddedFrontendConfig = (directory) => ({ build: { frontendDist: [
  * the application and package files are admitted; never copy a target tree. */
 export async function exportDevelopmentBuild(release, destination) {
   if (!path.isAbsolute(destination)) throw Error('Choose an absolute build export folder');
-  const output = path.resolve(destination);
+  const output = await canonicalOutputPath(destination);
   if (contains(projectRoot, output) || contains(output, projectRoot))
     throw Error('Build exports must be outside the source checkout');
-  release = path.resolve(release);
+  release = await canonicalOutputPath(release);
   if (contains(release, output) || contains(output, release))
     throw Error('Build export and disposable compiler output must be separate');
   await noLinks(release);

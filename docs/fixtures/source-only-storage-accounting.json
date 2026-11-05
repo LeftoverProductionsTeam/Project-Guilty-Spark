@@ -6,14 +6,14 @@
     "f0832c9",
     "8d82c6b"
   ],
-  "measuredAt": "2026-11-05T22:15:14.2952954Z",
+  "measuredAt": "2026-11-05T22:59:00.5278041Z",
   "measurement": "FileStandardInfo.Allocation; directory totals deduplicate volume/file IDs; allocation excludes filesystem metadata, compression/shared extent reclaimability",
   "beforeAllocatedBytes": 55967217784,
   "beforeThisPurgeAllocatedBytes": 46633208176,
-  "afterAllocatedBytes": 14003631448,
-  "reclaimedAllocatedBytes": 41963586336,
-  "thisPurgeReclaimedAllocatedBytes": 32629576728,
-  "logicalBytes": 14321835899,
+  "afterAllocatedBytes": 14003398200,
+  "reclaimedAllocatedBytes": 41963819584,
+  "thisPurgeReclaimedAllocatedBytes": 32629809976,
+  "logicalBytes": 14321584034,
   "errors": 0,
   "osFreeSpace": {
     "beforeBytes": 839944458240,
@@ -26,8 +26,8 @@
   "topLevelDirectories": [
     {
       "path": ".git",
-      "allocatedBytes": 837903728,
-      "logicalBytes": 825809352,
+      "allocatedBytes": 838084176,
+      "logicalBytes": 825968295,
       "category": "Git history and recovery references"
     },
     {
@@ -56,14 +56,14 @@
     },
     {
       "path": "crates",
-      "allocatedBytes": 3296240,
-      "logicalBytes": 2861095,
+      "allocatedBytes": 3304432,
+      "logicalBytes": 2868002,
       "category": "canonical source/configuration/documentation"
     },
     {
       "path": "docs",
-      "allocatedBytes": 36234744,
-      "logicalBytes": 34220862,
+      "allocatedBytes": 35812856,
+      "logicalBytes": 33797205,
       "category": "canonical source/configuration/documentation"
     },
     {
@@ -129,7 +129,7 @@
     {
       "path": "scripts",
       "allocatedBytes": 2995608,
-      "logicalBytes": 2482340,
+      "logicalBytes": 2486827,
       "category": "canonical source/configuration/documentation"
     },
     {
@@ -141,7 +141,7 @@
     {
       "path": "src-tauri",
       "allocatedBytes": 1762792,
-      "logicalBytes": 1540801,
+      "logicalBytes": 1542640,
       "category": "canonical source/configuration/documentation"
     },
     {
@@ -197,10 +197,14 @@
   "nativePostPurgeAcceptance": "source-only-native-validation.json: real H1A compilation, 10 unchanged requests, corruption refusal/recovery and independent edited native readback; temporary output disposed. No gameplay retest.",
   "remainingAcceptance": [
     "specific preservation index deletion blocked by automatic review",
-    "Windows QA/Rust path guard repairs and hosted CI",
+    "Hosted Windows/Linux CI verification remains pending; local Windows path regressions pass.",
     "memory-first production defaults and actual save/multiwindow gates",
     "C71 stale authored edit publication and Smart Edit UI entrypoint",
     "independent platform/release/gameplay/peer gates"
   ],
-  "measurementCheckpoint": "After archive/QA/metadata retirement; before final small documentation/Git commit. Source and Git can change slightly afterward."
+  "measurementCheckpoint": "After full Windows workspace, real native compiler/reuse/recovery/readback, standalone preflight and source checks; before final small source/Git checksum commit.",
+  "postRepairAllocationChangeBytes": -233248,
+  "postRepairAllocationChangeReason": "Retired obsolete 844-row locator CSV plus small current source/tests/evidence/Git changes; no artifacts/target/.local/dist/test-results or retained native SDK tree.",
+  "postRepairNativeEvidence": "windows-storage-repair.json",
+  "temporaryRawScanBytesRetiredAfterCompaction": 66138544
 }

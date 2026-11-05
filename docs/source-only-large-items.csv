@@ -7,8 +7,8 @@ file,.git/objects/ca/396da3b08b312754dd98d3b426f602fe93a7ac,191063204,191066112,
 directory,.git/objects/ca,191114199,191157920,Git history and recovery references,"Git fsck passed; refs, stash and reflogs retained. No history rewrite or forced pruning."
 file,.git/objects/ea/6700079298af903fefd6c2d6b9a937b1363c64,199243290,199245824,Git history and recovery references,"Git fsck passed; refs, stash and reflogs retained. No history rewrite or forced pruning."
 directory,.git/objects/ea,199414205,199481600,Git history and recovery references,"Git fsck passed; refs, stash and reflogs retained. No history rewrite or forced pruning."
-directory,.git/objects,825409272,837464152,Git history and recovery references,"Git fsck passed; refs, stash and reflogs retained. No history rewrite or forced pruning."
-directory,.git,825809352,837903728,Git history and recovery references,"Git fsck passed; refs, stash and reflogs retained. No history rewrite or forced pruning."
+directory,.git/objects,825567517,837644600,Git history and recovery references,"Git fsck passed; refs, stash and reflogs retained. No history rewrite or forced pruning."
+directory,.git,825968295,838084176,Git history and recovery references,"Git fsck passed; refs, stash and reflogs retained. No history rewrite or forced pruning."
 directory,.research/c52-engine-intelligence/chupa,71663637,76242992,canonical pinned source research,Version-pinned licensed engine/tool research; not generated test data.
 directory,.research/c52-engine-intelligence/halo-bnunu,47540440,53715504,canonical pinned source research,Version-pinned licensed engine/tool research; not generated test data.
 directory,.research/c52-engine-intelligence/opence/port,50232233,53474752,canonical pinned source research,Version-pinned licensed engine/tool research; not generated test data.
@@ -111,7 +111,7 @@ directory,tools/baboon-v0.3.2/baboon-windows-x86_64,104052398,107314472,installe
 directory,tools/baboon-v0.3.2,104052398,107314472,installed native editing tools,Installed Invader/Baboon used by native compilation and independent readback.
 directory,tools/invader,421267116,421371904,installed native editing tools,Installed Invader/Baboon used by native compilation and independent readback.
 directory,tools,525319514,528686376,installed native editing tools,Installed Invader/Baboon used by native compilation and independent readback.
-small-file-collection,.git/objects,192201270,204243032,Git history and recovery references,"Git fsck passed; refs, stash and reflogs retained. No history rewrite or forced pruning."
+small-file-collection,.git/objects,192359515,204423480,Git history and recovery references,"Git fsck passed; refs, stash and reflogs retained. No history rewrite or forced pruning."
 small-file-collection,.research/c52-engine-intelligence,62979292,63004672,canonical pinned source research,Version-pinned licensed engine/tool research; not generated test data.
 small-file-collection,.research/c52-engine-intelligence,69898593,74849992,canonical pinned source research,Version-pinned licensed engine/tool research; not generated test data.
 small-file-collection,.toolchain/cargo,100129087,101122048,required build/test dependency,One reusable dependency/toolchain installation required by locked builds; no retained compiler output.

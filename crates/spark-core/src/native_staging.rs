@@ -33,14 +33,25 @@ pub fn admitted_relative(relative: &str) -> Result<PathBuf> {
     }
     Ok(path)
 }
-pub fn destination(source: &Path, output: &Path) -> Result<PathBuf> {
-    reject_links(source)?;
-    let source = fs::canonicalize(source)?;
+/// Give missing outputs the identity of their trusted existing ancestor. In
+/// particular, canonical Windows sources use verbatim/expanded 8.3 spellings.
+/// Never compare one of those against an unresolved destination string.
+pub(crate) fn canonical_destination(output: &Path) -> Result<PathBuf> {
     reject_links(output)?;
     let absolute = std::path::absolute(output)?;
     let mut ancestor = absolute.as_path();
     let mut missing = vec![];
-    while !ancestor.exists() {
+    loop {
+        match fs::symlink_metadata(ancestor) {
+            Ok(metadata) => {
+                if !missing.is_empty() && !metadata.is_dir() {
+                    return invalid("Native output ancestor is not a directory");
+                }
+                break;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
         missing.push(
             ancestor
                 .file_name()
@@ -56,6 +67,12 @@ pub fn destination(source: &Path, output: &Path) -> Result<PathBuf> {
     for name in missing.into_iter().rev() {
         result.push(name);
     }
+    Ok(result)
+}
+pub fn destination(source: &Path, output: &Path) -> Result<PathBuf> {
+    reject_links(source)?;
+    let source = fs::canonicalize(source)?;
+    let result = canonical_destination(output)?;
     if result.starts_with(&source) || source.starts_with(&result) {
         return invalid("Native staging must be outside its source and cannot contain its source");
     }

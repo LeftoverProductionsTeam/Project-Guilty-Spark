@@ -57,6 +57,19 @@ fn user_launcher(state:&AppState,id:&str)->Reply<Option<UserLauncher>>{
     let selected:Option<UserLauncher>=lock(&state.library)?.setting(&launcher_key(id)).map_err(error)?;
     Ok(selected.map(|mut item|{item.available=item.tool_id==id&&dependency_install::pe_identity(&item.path).is_ok_and(|(path,sha,arch)|path==item.path&&sha==item.sha256&&arch==item.architecture);item}))
 }
+// Standalone launch is still distinct from a source handoff. Reject a missing,
+// changed or invalid executable before allocating even an empty launch folder.
+fn standalone_folder(root:&Path,candidate:&Path)->Reply<(PathBuf,String,PathBuf)>{
+    let(executable,identity,_)=dependency_install::pe_identity(candidate)?;
+    let folder=root.join("tool-launches").join(uuid::Uuid::new_v4().to_string());
+    core::reject_links(&folder).map_err(error)?;
+    // Read-only admission also refuses source-checkout output; it must not
+    // create the storage ledger merely to assess a failed launch.
+    core::storage::Store::existing_for_output(&folder).map_err(error)?;
+    fs::create_dir_all(folder.join("tags")).map_err(error)?;
+    fs::create_dir(folder.join("data")).map_err(error)?;
+    Ok((executable,identity,folder))
+}
 #[cfg(all(test,windows))]mod launcher_tests{
     use super::*;
     #[test]fn standalone_launch_profiles_do_not_enable_commands_or_foreign_runtimes(){
@@ -64,6 +77,19 @@ fn user_launcher(state:&AppState,id:&str)->Reply<Option<UserLauncher>>{
         assert!(launch_profile("reclaimer","mccSteam").is_ok());
         for id in ["invaderNative","haloTool","../../arbitrary.exe","unknown"]{assert!(launch_profile(id,"mccSteam").is_err());}
         assert!(launch_profile("guerilla","openCe").is_err());
+    }
+    #[test]fn invalid_standalone_executable_allocates_no_launch_or_storage_folder(){
+        let parent=tempfile::tempdir().unwrap();let root=parent.path().join("application");
+        assert!(standalone_folder(&root,&parent.path().join("missing.exe")).is_err());
+        let bad=parent.path().join("not-a-program.exe");fs::write(&bad,b"invalid executable").unwrap();
+        assert!(standalone_folder(&root,&bad).is_err());
+        assert!(!root.exists());assert_eq!(fs::read(&bad).unwrap(),b"invalid executable");
+    }
+    #[test]fn standalone_preflight_refuses_source_checkout_before_allocating(){
+        let parent=tempfile::tempdir().unwrap();let root=parent.path();
+        fs::write(root.join("Cargo.toml"),"# source fixture").unwrap();fs::write(root.join("AGENTS.md"),"owner").unwrap();
+        assert!(standalone_folder(root,&std::env::current_exe().unwrap()).is_err());
+        assert!(!root.join("tool-launches").exists());assert!(!root.join("artifacts").exists());
     }
 }
 /// Explicit owner selection registers an ordinary app launcher, not a native
@@ -249,22 +275,27 @@ pub(super) async fn launch_discovered_tool(app:tauri::AppHandle,window:tauri::We
     let report=tool_ecosystem_report(app.clone(),runtime_id,project_id).await?;
     let row=report.tools.into_iter().find(|r|r.definition.id==tool_id).ok_or("Unknown catalog tool")?;
     tauri::async_runtime::spawn_blocking(move||{
-        let state=app.state::<AppState>();let folder=state.root.join("tool-launches").join(uuid::Uuid::new_v4().to_string());core::reject_links(&folder).map_err(error)?;fs::create_dir_all(folder.join("tags")).map_err(error)?;fs::create_dir(folder.join("data")).map_err(error)?;
+        let state=app.state::<AppState>();
         let selected=user_launcher(&state,&tool_id)?;
-        let (executable,cwd)=if let Some(selected)=selected{
+        let installed=if selected.is_none()&&tool_id=="baboon"{Some(baboon_native::installation(&state)?)}else{None};
+        let candidate=if let Some(selected)=selected{
             if !selected.available{return Err("The selected application changed or is missing. Locate it again before launching; no process was started.".into());}
-            (selected.path,folder.clone())
-        }else if tool_id=="baboon"{
-            let kit=folder.join("kit");fs::create_dir_all(kit.join("tags")).map_err(error)?;
-            let installed=baboon_native::installation(&state)?;let exe=core::baboon::prepare_instance(&installed,&folder.join("editor"),&kit).map_err(error)?;(exe,folder.clone())
+            selected.path
+        }else if let Some(installed)=&installed{
+            installed.executable.clone()
         }else if tool_id=="blenderHalo"{
-            (row.executable.ok_or("Locate an installed Blender application")?,folder.clone())
+            row.executable.ok_or("Locate an installed Blender application")?
         }else{
             if !["sapien","guerilla","tagTest","invaderEditor"].contains(&tool_id.as_str())||row.assessment.state=="requiresRuntime"{return Err("Locate the installed application first. Its standalone launcher does not establish a verified map handoff.".into());}
-            let executable=row.executable.ok_or("Locate the installed tool or open its official download")?;(executable,folder.clone())
+            row.executable.ok_or("Locate the installed tool or open its official download")?
         };
-        let(executable,identity,_)=dependency_install::pe_identity(&executable)?;
-        let mut command=std::process::Command::new(&executable);command.current_dir(cwd).stdin(Stdio::null());
+        let(mut executable,identity,folder)=standalone_folder(&state.root,&candidate)?;
+        if let Some(installed)=installed{
+            let kit=folder.join("kit");fs::create_dir_all(kit.join("tags")).map_err(error)?;
+            executable=core::baboon::prepare_instance(&installed,&folder.join("editor"),&kit).map_err(error)?;
+            if dependency_install::pe_identity(&executable)?.1!=identity{return Err("The prepared application differs from its verified installation; no process was started.".into());}
+        }
+        let mut command=std::process::Command::new(&executable);command.current_dir(&folder).stdin(Stdio::null());
         if tool_id=="baboon"{command.arg("-HCEEK");}
         if tool_id=="blenderHalo"{command.arg("--disable-autoexec");}
         let child=command.spawn().map_err(error)?;
