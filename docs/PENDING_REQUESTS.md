@@ -1,8 +1,8 @@
+# Pending engineering requests
+
 ## Overnight continuation — 5 November 2026
 
 Owner explicitly authorizes safe independent work while human/approval gates remain pending. Configured native map export committed c16186c. Existing C70 Blender OBJ edit/reconcile/history/native compiler/independent readback now passes in the actual Windows application; see OVERNIGHT_ENGINEERING_20261105.md and fixtures/c70-tool-roundtrip.json. Manual/addon/wider tool/game acceptance remains pending. Resume Prompt06 Native Asset & Tag Studio in the existing asset/Inspector/native paths; preserve all earlier and later requirement identities. No manual requeue, new scheduler or full SDK copies.
-
-# Pending engineering requests
 
 Current priority: Part1 is committed at13207fc. Part2's implemented storage safeguards pass full regressions, actual20-edit/crash-restart/backup/export acceptance and two native structural builds with reuse/corrupt-save/reconciliation proof. Final accounting/local commit are underway; explicit limitations remain in P0_LIGHTWEIGHT_STORAGE_ARCHITECTURE_20261105.md and ACTIVE_TASK.md. C70 and later acceptance remain preserved. Exact Part1/Part2 directives are in artifacts/storage-v1/unified-purge-20261105. Only proved-unneeded canonical files/folders are removed; all unique source/history/originals/releases remain.
 

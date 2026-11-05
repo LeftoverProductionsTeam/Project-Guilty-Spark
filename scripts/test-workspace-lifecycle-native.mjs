@@ -19,6 +19,7 @@ const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
 if(!['','20'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 edits');
 if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned map');
+if(nativeMap&&nativeMap!=='-'&&!(await fs.stat(path.resolve(nativeMap))).isFile())throw Error('Native acceptance input must be an existing owned cache');
 await fs.mkdir(await assertQaOutputPath(root));
 const app=path.join(root,'GuiltySpark-workspace-lifecycle.exe');await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
 const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
@@ -199,6 +200,28 @@ try{
     expect(nativeGeometry).toMatch(/[\d,]+ visible triangles/);
     await main.screenshot({path:path.join(root,'owned-native-bsp.png')});
     step('Owned MCC map opens in actual native BSP viewport with source materials',{nativeViewport,nativeGeometry,engineParityClaimed:false});
+    if(process.env.SPARK_LIFECYCLE_ANIMATION==='1'){
+      const actor=opened.inspection.tags.find(tag=>tag.class==='bipd'&&tag.references.some(ref=>ref.label==='Animation graph'));
+      if(!actor)throw Error('Native animation acceptance requires a real biped with its own graph');
+      await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(actor.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('bipd');await main.locator('.tag-row').click();
+      const area=main.getByRole('region',{name:'Actual model preview',exact:true}),preview=area.locator('.native-model-preview');
+      await expect(preview).toHaveAttribute('data-model-ready','true',{timeout:90000});
+      const canvas=area.locator('canvas');await canvas.evaluate(element=>window.c71PreviewCanvas=element);
+      const animate=area.getByRole('checkbox',{name:'Native animation',exact:true});await animate.check();
+      await expect.poll(async()=>Number(await preview.getAttribute('data-native-animation-count')),{timeout:90000}).toBeGreaterThan(0);
+      const clipCount=Number(await preview.getAttribute('data-native-animation-count'));
+      const frame=()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsAnimation??'null'));
+      await expect.poll(async()=>(await frame())?.source).toBe('verified-skeletal-animation');
+      const initial=await frame();expect(initial.bones).toBeGreaterThan(0);expect(initial.frames).toBeGreaterThan(1);expect(initial.samplePosition.every(Number.isFinite)).toBe(true);await expect.poll(async()=>(await frame())?.time).toBeGreaterThan(initial.time+.1);
+      await area.getByRole('button',{name:'Pause model animation',exact:true}).click();await expect.poll(async()=>(await frame())?.playing).toBe(false);
+      const paused=await frame();await main.waitForTimeout(150);expect((await frame()).time).toBe(paused.time);
+      await area.getByRole('button',{name:'Play model animation',exact:true}).click();await expect.poll(async()=>(await frame())?.time).toBeGreaterThan(paused.time);
+      await main.screenshot({path:path.join(root,'native-tag-animation.png')});
+      await animate.uncheck();await expect.poll(()=>canvas.evaluate(element=>element.dataset.gsAnimation??null)).toBeNull();
+      expect(await canvas.evaluate(element=>element===window.c71PreviewCanvas)).toBe(true);
+      report.tagAnimation={actorPath:actor.path,clips:clipCount,bones:initial.bones,source:initial.source,pausedTime:paused.time,sameCanvas:true,gameplayAccepted:false};
+      step('Actual Tag Inspector plays and pauses the selected biped native skeleton/animation, then restores its static model without replacing the viewport');
+    }
     await chooseTool(main,'Tag editor');
     await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);
     await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
@@ -313,4 +336,28 @@ try{
   }
   expect(report.errors).toEqual([]);report.complete=true;
 }catch(error){report.errors.push(String(error));report.failureStack=error.stack;process.exitCode=1;if(browser)for(const [i,page]of pages().entries())await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});}
-finally{await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));await browser?.close().catch(()=>{});if(child?.exitCode===null)child.kill();if(finishStorage){try{if(child)await waitForQaExit(child);if(report.complete){await finishStorage.registerDisposable(app);for(const name of ['Cache','Code Cache','GPUCache']){const cache=path.join(root,'webview/EBWebView/Default',name);if(await fs.stat(cache).catch(()=>null))await finishStorage.registerDisposable(cache);}}await finishStorage(report.complete?'passed':'failed');}catch(error){report.complete=false;report.errors.push(String(error));process.exitCode=1;await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));}}console.log(JSON.stringify({complete:report.complete,cases:report.cases.length,errors:report.errors}));}
+finally{
+  // Successful acceptance closes the actual application normally before
+  // sealing its regenerable cache. Abrupt termination leaves WebView writers
+  // flushing files after the parent exits; those files must never be deleted
+  // against an unstable hash inventory.
+  if(report.complete&&browser){
+    try{for(const page of pages().reverse()){if(!page.isClosed())await close(page);}if(child)await waitForQaExit(child);report.gracefulAppClose=true;}
+    catch(error){report.complete=false;report.errors.push('Normal QA app close failed: '+String(error));process.exitCode=1;}
+  }
+  await browser?.close().catch(()=>{});
+  if(child?.exitCode===null)child.kill();
+  if(finishStorage){try{
+    if(child)await waitForQaExit(child);
+    if(report.complete){
+      await finishStorage.registerDisposable(app);
+      for(const name of ['Cache','Code Cache','GPUCache']){
+        const cache=path.join(root,'webview/EBWebView/Default',name);
+        if(await fs.stat(cache).catch(()=>null))await finishStorage.registerDisposable(cache);
+      }
+    }
+    await finishStorage(report.complete?'passed':'failed');
+  }catch(error){report.complete=false;report.errors.push(String(error));process.exitCode=1;}}
+  await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));
+  console.log(JSON.stringify({complete:report.complete,cases:report.cases.length,errors:report.errors}));
+}

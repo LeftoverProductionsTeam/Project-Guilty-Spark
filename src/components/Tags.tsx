@@ -65,6 +65,7 @@ export default function Tags({
   );
   const [expanded, setExpanded] = useMapState<Record<string,boolean>>(project.id,'tags.classes',{});
   const [advanced, setAdvanced] = useMapState(project.id,'tags.advanced',false);
+  const [animatePreview,setAnimatePreview] = useMapState(project.id,'tags.preview.animation',false);
   const [extractingTag,setExtractingTag] = useState<number|null>(null);
   const [exchangeJobs,setExchangeJobs] = useState<{
     jobId:string;sourceProjectId:string;sourceEngine:string;sourceVersion:number;
@@ -561,7 +562,8 @@ export default function Tags({
             </Notice>
             </div>
             {selectedModel&&<section className="tag-model-preview" aria-label="Actual model preview">
-              <NativeModelPreview key={`${project.id}:${selectedModel.tagId}`} asset={selectedModel} environment={project.worldEnvironment}/>
+              {selectedTag.references.some(reference=>reference.label==='Animation graph')&&<label className="tag-preview-animation-toggle checkbox-label"><input type="checkbox" checked={animatePreview} onChange={event=>setAnimatePreview(event.target.checked)}/> Native animation</label>}
+              <NativeModelPreview key={`${project.id}:${selectedModel.tagId}`} asset={selectedModel} environment={project.worldEnvironment} animate={animatePreview&&selectedTag.references.some(reference=>reference.label==='Animation graph')}/>
             </section>}
           </div>
         ) : (

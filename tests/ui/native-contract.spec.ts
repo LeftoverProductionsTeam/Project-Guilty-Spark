@@ -570,6 +570,26 @@ async function openFixture(page: Page) {
   await expect(page.getByRole('heading', { name: 'test', exact: true })).toBeVisible();
 }
 
+test('native tag animation is opt-in, reports missing clips and reuses the exact graph response',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const w=window as any,open=w.__sparkMock.projects.a;
+    open.inspection.tags.push({id:700,index:1,class:'bipd',path:'characters/test_actor',external:false,fields:[],references:[{label:'Animation graph',targetId:701,class:'antr',offset:40}]},{id:701,index:2,class:'antr',path:'characters/test_graph',external:false,fields:[],references:[]});
+    const invoke=w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command!=='preview_owned_object_animations')return invoke(command,args);
+      w.__sparkMock.calls.push({command,args});
+      return {sourceSha256:args.sourceSha256,animations:{objectTagId:args.tagId,graphTagId:701,clips:[],unavailable:['Synthetic unsupported animation fixture']}};
+    };
+  });
+  await openFixture(page);await page.getByRole('textbox',{name:'Search tags',exact:true}).fill('test_actor');await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('bipd');await page.locator('.tag-row').click();
+  const preview=page.getByRole('region',{name:'Actual model preview',exact:true}),toggle=preview.getByRole('checkbox',{name:'Native animation',exact:true});
+  await expect(toggle).not.toBeChecked();
+  const requests=()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='preview_owned_object_animations').length);
+  expect(await requests()).toBe(0);await toggle.check();await expect(preview.getByText('Native animation unavailable',{exact:true})).toBeVisible();expect(await requests()).toBe(1);
+  await toggle.uncheck();await expect(preview.getByText('Native animation unavailable',{exact:true})).toHaveCount(0);await toggle.check();await expect(preview.getByText('Native animation unavailable',{exact:true})).toBeVisible();expect(await requests()).toBe(1);
+});
+
 
 test('one Learning center retains guides, glossary and Academy while returning to edited maps',async({page})=>{
   await mockDesktop(page);await openFixture(page);

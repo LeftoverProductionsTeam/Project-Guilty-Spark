@@ -184,6 +184,12 @@
       "scope": "Read-only/negative integrity or format probe supporting the linked workflow; no corresponding game action is claimed."
     },
     {
+      "artifact": "crates/spark-core/examples/qa_model_fidelity.rs",
+      "featureId": "models",
+      "kind": "diagnostic",
+      "scope": "Read-only native topology/winding/UV/normal/shader and negative in-memory probe for the existing Asset workshop OBJ → assigned materials → Build workflow. Original project/cache are preserved; no gameplay claim."
+    },
+    {
       "artifact": "crates/spark-core/examples/qa_native_render.rs",
       "featureId": "appearance",
       "kind": "workflow",

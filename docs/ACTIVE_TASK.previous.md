@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: Overnight continuation — C71 native static asset fidelity
+Task: Overnight continuation — C71 native animation in existing Tag Inspector
 Status: implementation incomplete
-Starting revision: 5155996
-Latest verified revision: 5155996 C70 accepted. C71 focused9Rust tests and actual accepted-cache fidelity audit pass:24triangles total,0position/UVerror,normaldot1,correctshader/winding;4in-memory native corruption probes rejected. No accepted cache/evidence rewritten.
-Next action: Run rebuilt actual desktop DCC/compile/fidelity/Tag-preview acceptance with SPARK_GEOMETRY_FIDELITY=1, then relevant regressions and local C71 checkpoint. Preserve unimplemented context tabs, full asset classes, behavior/game and independent GUI gates.
+Starting revision: 5963506
+Latest verified revision: 5963506 static fidelity committed; C70 export/DCC and C71 native3case compiler/texture/reflection preview accepted. New opt-in tag animation source typechecks and focused browser contract passes; actual playback still pending.
+Next action: Inspect actual Tag animation native-only run artifacts/qa/overnight-tag-animation-corrected/session35847. First run rejected a wrong test input path; guard now checks inputs before creating QA app. UI workflow guard found missing diagnostic→models mapping; corrected,404frontend tests pass. Finish real playback and combined UI/offline validation, then local commit.
 
 ## Acceptance
 Owner authorizes proved-unneeded canonical folders. Preserve all unique source/history/research/maps/tags/releases and existing C70 work. No full repository archive, full SDK copy, obsolete .local output, system/shared-tool deletion or original game changes. Native/test evidence is distinct from gameplay, clean-machine and peer acceptance.

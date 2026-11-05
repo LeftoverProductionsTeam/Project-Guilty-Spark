@@ -178,7 +178,7 @@ export default function NativeModelPreview({
   onSnapshot,
   showcase = false,
   portrait = false,
-  animate = true,
+  animate = showcase,
 }: {
   asset: Pick<ForgeAsset, 'tagId' | 'sourceProjectId' | 'sourceSha256' | 'modelVariant'>;
   live?: boolean;
@@ -197,7 +197,7 @@ export default function NativeModelPreview({
   const identity=useMemo(()=>({projectId:asset.sourceProjectId??'',sourceHash:asset.sourceSha256??'',tagId:asset.tagId??0}),[asset.sourceProjectId,asset.sourceSha256,asset.tagId]);
   const [retry,setRetry]=useState(0);
   const { models, failures } = useOwnedForgeModels([placement],{[placement.sourceProjectId??'']:`preview:${retry}`});
-  const animations = useNativeModelAnimations(placement, showcase&&animate);
+  const animations = useNativeModelAnimations(placement, animate);
   const [clipIndex, setClipIndex] = useState(0);
   const [playing, setPlaying] = useState(() => !matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [animationError, setAnimationError] = useState('');
@@ -209,7 +209,7 @@ export default function NativeModelPreview({
   const clip = animations.value?.clips[clipIndex];
   const animation = useMemo<AnimationPreview | undefined>(
     () =>
-      clip && !animationError
+      animate && clip && !animationError
         ? {
             clip,
             targetTagId: asset.tagId ?? 0,
@@ -221,7 +221,7 @@ export default function NativeModelPreview({
             rootMotion: false,
           }
         : undefined,
-    [clip, playing, live, activity.active,asset.tagId, animationError],
+    [animate,clip, playing, live, activity.active,asset.tagId, animationError],
   );
   const key = forgeModelKey(placement),
     view = models[key];
@@ -246,7 +246,7 @@ export default function NativeModelPreview({
   // context must paint before reporting readiness, just like the initial one.
   useEffect(()=>{if(!activity.graphicsResident)setFirstFrame('');},[activity.graphicsResident]);
   const lightingReady=!!environment||sourceLighting?.key===key;
-  const animationReady=!showcase||!animate||!!animations.value||!!animations.error;
+  const animationReady=!animate||!!animations.value||!!animations.error;
   const usable=!!view?.ready&&!failures[key]&&lightingReady&&animationReady;
   const pendingPhase=failures[key]?null:!view?'Reading native geometry':!view.ready?'Loading source textures & reflections':!lightingReady?'Reading source lighting':!animationReady?'Reading native animation':firstFrame!==key?'Preparing first viewport frame':null;
   return (
@@ -322,18 +322,18 @@ export default function NativeModelPreview({
         </select>
         <span>Drag orbit · wheel zoom · right-drag pan</span>
       </div>}
-      {showcase && (
+      {animate && (
         <div className="native-model-animation-controls">
           {!!animations.value?.clips.length && !animationError ? (
             <>
               <button
                 onClick={() => setPlaying((value) => !value)}
-                aria-label={playing ? 'Pause showcase animation' : 'Play showcase animation'}
+                aria-label={showcase?(playing?'Pause showcase animation':'Play showcase animation'):(playing?'Pause model animation':'Play model animation')}
               >
                 {playing ? 'Ⅱ' : '▶'}
               </button>
               <select
-                aria-label="Showcase animation"
+                aria-label={showcase?'Showcase animation':'Model animation'}
                 value={clipIndex}
                 onChange={(event) => setClipIndex(Number(event.target.value))}
               >

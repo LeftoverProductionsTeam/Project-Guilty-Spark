@@ -184,6 +184,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
       'Import a map with the required model tags.',
       'Open Level editor and select the item or player start.',
       'Inspect its tag or transform in the sidebar.',
+      'For custom static scenery, import a closed OBJ in Asset workshop, assign its Halo shaders in Custom model, save and build. Native readback checks surfaces, normals, UVs, shader identity and collision bounds before accepting output.',
     ],
     'Unsupported or missing models are reported; Spark does not substitute diamond models.',
   ),
@@ -451,6 +452,7 @@ export const SPARK_FEATURES: readonly SparkFeature[] = [
     [
       'Drop JMA/JMM sources or import animations in Machinima. FBX uses the installed MCC converter.',
       'Select an animation and matching biped; play, pause, scrub or adjust speed.',
+      'To inspect an existing map’s animation, open the owning biped in Tag editor and enable Native animation in its preview. Choose a clip and pause or resume without rebuilding the viewport.',
       'Assign a custom action or a complete model_animations graph, then rebuild for game changes.',
     ],
     'Bone count, hierarchy and checksum are checked. Live animation-graph swapping is not enabled.',
