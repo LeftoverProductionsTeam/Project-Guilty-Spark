@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from '../native-qa-storage.mjs';
 // Re-open a sealed older candidate without comparing it to newer dist/ bytes.
 // Its original acceptance remains in the manifest; this is a fresh startup and
 // payload check of that exact immutable candidate, not a new source release.
@@ -20,7 +21,7 @@ if(portableHash!==m.executableSha256)throw Error('Extracted portable differs fro
 const app=path.resolve(candidate),appHash=sha(await fs.readFile(app));
 let payload={portableExecutableSha256:portableHash,installedExecutableSha256:appHash,bundleMarkerRewrite:'none'};
 if(appHash!==portableHash)payload=JSON.parse((await exec(python,['-B','scripts/release/package.py','windows-payload',path.resolve(portable),app])).stdout);
-await fs.mkdir(root);
+await fs.mkdir(await assertQaOutputPath(root));
 const endpoint=net.createServer();await new Promise(r=>endpoint.listen(0,'127.0.0.1',r));const port=endpoint.address().port;await new Promise(r=>endpoint.close(r));
 const began=performance.now(),child=spawn(app,[],{cwd:path.dirname(app),windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-address=127.0.0.1 --remote-debugging-port=${port}`}});
 let browser;

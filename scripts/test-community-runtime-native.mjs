@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in private native game QA using exact publisher-verified release files.
 // Supply lawfully owned Xbox data already extracted by the runtime or another
 // reviewed source. This script never imports an ISO, downloads content or installs.
@@ -83,7 +84,7 @@ if (
 const output = path.resolve(args.get('--output')),
   fixtures = path.resolve(args.get('--maps')),
   label = path.basename(output);
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const publisher = JSON.parse(
   await fs.readFile(new URL('../docs/fixtures/c36-community-client-files.json', import.meta.url), 'utf8'),
 );
@@ -228,7 +229,7 @@ const abortedChildren = new Set();
 async function launch(role, id, instance = role) {
   const root = path.join(output, instance),
     client = path.resolve(args.get(role === 'host' ? '--host-dir' : '--client-dir'));
-  await fs.mkdir(root);
+  await fs.mkdir(await assertQaOutputPath(root));
   await fs.mkdir(path.join(root, 'data'));
   await fs.mkdir(path.join(root, 'data', 'maps'));
   const reusedProfile = [];

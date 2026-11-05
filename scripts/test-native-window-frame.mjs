@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Actual WebView/Tauri title-bar events and OS maximize state. No mocked IPC.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -9,7 +10,7 @@ const expect = assertion.configure({ timeout: 45000 }),
   args = process.argv.slice(2);
 if (args.length !== 2) throw Error('test-native-window-frame <built Spark.exe> <fresh-root>');
 const [app, root] = args.map((p) => path.resolve(p));
-await fs.mkdir(root);
+await fs.mkdir(await assertQaOutputPath(root));
 const exe = path.join(root, 'GuiltySpark-window-qa.exe');
 await fs.copyFile(app, exe, fs.constants.COPYFILE_EXCL);
 const report = {

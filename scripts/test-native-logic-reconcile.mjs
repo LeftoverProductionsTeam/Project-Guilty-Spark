@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real native IPC + installed Invader + Halo Tool, using the preserved UI-authored benchmark.
 // Deliberate QA corruption is never attributed to Baboon or Invader.
 import { chromium, expect as assertion } from '@playwright/test';
@@ -29,7 +30,7 @@ if (
 )
   throw Error('Requires completed real native authoring acceptance');
 const data = path.join(path.dirname(input), 'library');
-await fs.mkdir(output, { recursive: false });
+await fs.mkdir(await assertQaOutputPath(output), { recursive: false });
 const hash = (b) => crypto.createHash('sha256').update(b).digest('hex'),
   readHash = async (p) => hash(await fs.readFile(p));
 const parentPath = authoring.nativeBuild.build.output;

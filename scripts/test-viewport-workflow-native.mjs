@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in checks of the compiled desktop, real owned map imports and browser-rendered audio.
 // Uses a fresh library/profile. Does not launch Halo or write to an installed map/SDK.
@@ -31,7 +32,7 @@ const focusedAudio = options.get('--audio-mode') !== 'offline';
 const output = options.get('--output'),
   data = path.join(output, 'library'),
   hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const exe = path.join(output, 'GuiltySpark-viewport-qa.exe');
 await fs.copyFile(options.get('--app'), exe, fs.constants.COPYFILE_EXCL);
 const inputs = await Promise.all(

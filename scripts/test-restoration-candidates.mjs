@@ -3,8 +3,8 @@ import { createReadStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-const root = (await readFile('.local/qa/restoration-temp-root.txt', 'utf8')).trim();
-const candidates = JSON.parse(await readFile('.local/qa/candidates.json', 'utf8')).filter(
+const root = (await readFile('artifacts/qa/restoration-temp-root.txt', 'utf8')).trim();
+const candidates = JSON.parse(await readFile('artifacts/qa/candidates.json', 'utf8')).filter(
   (c) => c.scenarioType === 1,
 );
 const resources = path.resolve('Pyros Zombie Apocolypse Mod Versions/Zombie Apocalypse/maps');
@@ -22,7 +22,7 @@ for (const candidate of candidates) {
     continue;
   }
   seen.set(before, candidate.path);
-  const args = [root, candidate.path, path.resolve('.local/tools/invader'), resources];
+  const args = [root, candidate.path, path.resolve('tools/invader'), resources];
   console.log(`Testing ${path.relative(process.cwd(), candidate.path)}`);
   const result = await new Promise((resolve, reject) => {
     const child = spawn(path.resolve('target/debug/examples/qa_build.exe'), args, {
@@ -44,7 +44,7 @@ for (const candidate of candidates) {
   if (before !== after) throw new Error('Source integrity changed during test');
   results.push({ ...candidate, sha256: before, sourceUnchanged: true, ...result });
   console.log(result.stdout.slice(-2200) || result.stderr);
-  await writeFile('.local/qa/restoration-build-results.json', JSON.stringify(results, null, 2));
+  await writeFile('artifacts/qa/restoration-build-results.json', JSON.stringify(results, null, 2));
 }
-await writeFile('.local/qa/restoration-build-results.json', JSON.stringify(results, null, 2));
+await writeFile('artifacts/qa/restoration-build-results.json', JSON.stringify(results, null, 2));
 console.log('Candidate report complete. No source file was modified or game package installed.');

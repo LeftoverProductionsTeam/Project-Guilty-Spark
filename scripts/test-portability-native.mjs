@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in owned-source C36 acceptance. Fresh libraries, native UI, real H1A Tool.
 // No game launch, public joining, SDK-master edit or installation.
 import fs from 'node:fs/promises';
@@ -48,11 +49,11 @@ const output = path.resolve(args.get('--output')),
     gameLaunched: false,
     gameMemoryTouched: false,
   };
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const median = (rows) => [...rows].sort((a, b) => a - b)[Math.floor(rows.length / 2)];
 async function launch(input, name) {
   const root = path.join(output, name);
-  await fs.mkdir(root);
+  await fs.mkdir(await assertQaOutputPath(root));
   const executable = path.join(root, 'GuiltySpark-qa.exe');
   await fs.copyFile(path.resolve(input), executable, fs.constants.COPYFILE_EXCL);
   const server = net.createServer();

@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real desktop home-model check. Actual IPC, source pixels and native
 // skeletal animation; no substitute model or mocked native content.
 import fs from 'node:fs/promises';
@@ -17,7 +18,7 @@ if (
 )
   throw Error('Use --app built.exe --output fresh-directory [--baseline true]');
 const output = path.resolve(args.get('--output'));
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const exe = path.join(output, 'GuiltySpark-home-qa.exe');
 await fs.copyFile(path.resolve(args.get('--app')), exe, fs.constants.COPYFILE_EXCL);
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');

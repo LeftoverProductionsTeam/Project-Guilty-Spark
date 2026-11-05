@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in actual Steam SDK/desktop integration. One account cannot prove relay.
 import { chromium, expect as check } from '@playwright/test';
@@ -12,7 +13,7 @@ if (args.length !== 3)
 const [app, root, module] = args.map((p) => path.resolve(p)),
   expect = check.configure({ timeout: 45000 }),
   actors = [];
-await fs.mkdir(root, { recursive: false });
+await fs.mkdir(await assertQaOutputPath(root), { recursive: false });
 const hash = async (p) =>
   crypto
     .createHash('sha256')

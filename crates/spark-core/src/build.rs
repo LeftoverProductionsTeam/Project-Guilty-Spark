@@ -622,6 +622,67 @@ pub fn validate_existing_mcc(
     Ok(record)
 }
 use std::io::Read;
+/// The edited/decompressed extractor input is reproducible from the immutable
+/// source and saved project. Keep it outside the accepted editable tag job so
+/// its consumer can end its lifetime without weakening that job's protection.
+struct TransientInput {
+    directory: PathBuf,
+    lease: crate::storage::Lease,
+    source: PathBuf,
+    source_sha256: String,
+}
+impl TransientInput {
+    fn create(jobs_root: &Path, source: &Path, source_sha256: &str, maximum_bytes: u64) -> Result<Self> {
+        let library = jobs_root.parent().ok_or_else(|| SparkError::Invalid("Native jobs have no library owner".into()))?;
+        let scratch = library.join("scratch");
+        crate::reject_links(&scratch)?;
+        fs::create_dir_all(&scratch)?;
+        let directory = scratch.join(format!("native-input-{}", uuid::Uuid::new_v4()));
+        let lease = crate::storage::Store::for_output(&directory)?.reserve(
+            &directory, Some(source), crate::storage::estimate_copy(1, maximum_bytes),
+            crate::storage::Category::Staging,
+            "Disposable edited/decompressed native extractor input; original cache and accepted editable tags retained",
+        )?;
+        fs::create_dir(&directory)?;
+        lease.mark_owned()?;
+        Ok(Self { directory, lease, source: source.to_owned(), source_sha256: source_sha256.into() })
+    }
+    fn finish(self, record: &BuildRecord, receipt: &Path) -> Result<u64> {
+        if record.status != "validated" {
+            return invalid("Incomplete native input remains owned for recovery");
+        }
+        let output = record.output.as_ref().ok_or_else(|| SparkError::Invalid("Validated native output is missing".into()))?;
+        if crate::storage::document_references_path(&serde_json::json!(output), &self.directory) {
+            return invalid("Native output still uses its input staging folder; source was retained");
+        }
+        crate::reject_links(output)?;
+        let output_sha256 = maps::hash_file(output)?;
+        if record.sha256.as_deref() != Some(output_sha256.as_str())
+            || maps::hash_file(&self.source)? != self.source_sha256
+        {
+            return invalid("Native output or preserved original changed; input was retained");
+        }
+        let input_hashes = crate::tool_transaction::inventory(&self.directory)?;
+        if input_hashes.len() != 1 || input_hashes.keys().any(|name| !name.ends_with(".map")) {
+            return invalid("Native input contains unexpected data; retained for review");
+        }
+        let mut evidence = serde_json::json!({
+            "schemaVersion": 1, "kind": "transient-native-extractor-input",
+            "sourceSha256": self.source_sha256, "derivedInputHashes": input_hashes,
+            "acceptedOutputSha256": output_sha256, "disposed": false,
+            "scope": "Extractor input only; accepted editable tags, original cache and output retained"
+        });
+        project::atomic_write(receipt, &serde_json::to_vec_pretty(&evidence)?, false)?;
+        let bytes = self.lease.finish_disposable()?;
+        evidence["disposed"] = true.into();
+        evidence["bytesReleased"] = bytes.into();
+        project::atomic_write(receipt, &serde_json::to_vec_pretty(&evidence)?, false)?;
+        Ok(bytes)
+    }
+}
+#[cfg(test)]
+#[path = "../tests/common/mod.rs"]
+mod lifecycle_fixture;
 pub fn run_build(
     project: &Project,
     inspection: &MapInspection,
@@ -651,15 +712,17 @@ pub fn run_build(
     safe_relative(&inspection.scenario_path)?;
     let dir = jobs_root.join(job_id);
     let sdk_bytes=if let Some(tags)=tools.base_tags_directory.as_ref().filter(|p|p.is_dir()){let plan=crate::native_staging::inventory(tags,&cancel)?;crate::storage::estimate_copy(plan.files.len(),plan.bytes)}else{0};
-    let estimate=sdk_bytes.saturating_add(inspection.header.declared_size as u64*3).saturating_add(1024*1024*1024);
+    let estimate=sdk_bytes.saturating_add(inspection.header.declared_size as u64*2).saturating_add(1024*1024*1024);
     let storage_lease=crate::storage::Store::for_output(&dir)?.reserve(&dir,Some(&source.preserved_path),estimate,crate::storage::Category::Staging,"Imported-cache conversion: isolated input, native tags and compiler output")?;
     crate::reject_links(&dir)?;
     fs::create_dir_all(&dir)?;
     storage_lease.mark_owned()?;
-    let input_dir = dir.join("input");
+    let input_workspace = TransientInput::create(jobs_root, &source.preserved_path, &source.sha256,
+        fs::metadata(&source.preserved_path)?.len().max(inspection.header.declared_size as u64))?;
+    let input_dir = input_workspace.directory.clone();
     let tag_dir = dir.join("tags");
     let output_dir = dir.join("output");
-    for p in [&input_dir, &tag_dir, &output_dir] {
+    for p in [&tag_dir, &output_dir] {
         fs::create_dir(p)?;
     }
     let runner = Runner {
@@ -895,6 +958,13 @@ pub fn run_build(
             project_fingerprint: project.fingerprint()?,
         },
     };
+    if record.status == "validated" {
+        input_workspace.finish(&record, &dir.join("transient-input-receipt.json"))?;
+    } else {
+        // Failure/cancellation/interruption keeps the owned partial input and
+        // its lease for recovery; it is never certified disposable.
+        drop(input_workspace);
+    }
     project::atomic_write(
         &dir.join("receipt.json"),
         &serde_json::to_vec_pretty(&record)?,
@@ -919,6 +989,135 @@ fn core_check_reused_tag(file:&Path,relative:&str)->Result<()>{crate::reject_lin
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn lifecycle_record(output: &Path) -> BuildRecord {
+        let inspection = maps::inspect_map(output, None).unwrap();
+        assert_eq!(inspection.header.version, 13);
+        assert_eq!(inspection.tags.len(), 4);
+        BuildRecord {
+            id: uuid::Uuid::new_v4().to_string(), timestamp: "fixture".into(),
+            status: "validated".into(), target: "mcc-cea".into(),
+            output: Some(output.to_owned()), sha256: Some(maps::hash_file(output).unwrap()),
+            message: "Native-format lifecycle fixture; not a compiler or gameplay acceptance".into(),
+            project_fingerprint: "fixture-project".into(),
+        }
+    }
+    #[test]
+    fn native_input_lifetime_disposes_after_output_readback_without_removing_editable_tags() {
+        let root = tempfile::tempdir().unwrap();
+        let library = root.path().join("library");
+        let jobs = library.join("jobs");
+        fs::create_dir_all(&jobs).unwrap();
+        fs::write(library.join("library.sqlite3"), b"fixture library owner").unwrap();
+        let source = root.path().join("original.map");
+        let original = lifecycle_fixture::fixture(13);
+        fs::write(&source, &original).unwrap();
+        let source_sha = maps::hash_file(&source).unwrap();
+        let store = crate::storage::Store::for_output(&jobs.join("fixture")).unwrap();
+        for _ in 0..3 {
+            let job = jobs.join(uuid::Uuid::new_v4().to_string());
+            let parent = store.reserve(&job, Some(&source), 1024*1024,
+                crate::storage::Category::Staging, "Accepted native source/output owner").unwrap();
+            fs::create_dir(&job).unwrap();
+            fs::create_dir(job.join("tags")).unwrap();
+            fs::write(job.join("tags/authored.weapon"), b"unique editable native source").unwrap();
+            let input = TransientInput::create(&jobs, &source, &source_sha, original.len() as u64).unwrap();
+            let scratch = input.directory.clone();
+            copy_verified_source(&source, &source_sha, &scratch.join("fixture.map")).unwrap();
+            let mut built = original.clone();
+            built[0x1804..0x1808].copy_from_slice(&0.75f32.to_le_bytes());
+            let output = job.join("accepted.map");
+            fs::write(&output, built).unwrap();
+            let record = lifecycle_record(&output);
+            assert!(input.finish(&record, &job.join("transient-input-receipt.json")).unwrap() > 0);
+            assert!(!scratch.exists());
+            assert_eq!(maps::hash_file(&source).unwrap(), source_sha);
+            assert_eq!(maps::hash_file(&output).unwrap(), record.sha256.clone().unwrap());
+            assert_eq!(fs::read(job.join("tags/authored.weapon")).unwrap(), b"unique editable native source");
+            let receipt: serde_json::Value = serde_json::from_slice(&fs::read(job.join("transient-input-receipt.json")).unwrap()).unwrap();
+            assert_eq!(receipt["disposed"], true);
+            assert_eq!(receipt["derivedInputHashes"]["fixture.map"], source_sha);
+            parent.finish(true, Some(record.project_fingerprint)).unwrap();
+            assert!(store.overview().unwrap().entries.iter().all(|entry| entry.protected));
+            assert_eq!(fs::read_dir(library.join("scratch")).unwrap().count(), 0);
+        }
+        assert!(!root.path().join(".local").exists());
+    }
+    #[test]
+    fn native_input_interruption_or_unaccepted_output_retains_its_owned_copy() {
+        let root = tempfile::tempdir().unwrap();
+        let library = root.path().join("library");
+        let jobs = library.join("jobs");
+        fs::create_dir_all(&jobs).unwrap();
+        fs::write(library.join("library.sqlite3"), b"fixture library owner").unwrap();
+        let source = root.path().join("original.map");
+        let bytes = lifecycle_fixture::fixture(13);
+        fs::write(&source, &bytes).unwrap();
+        let source_sha = maps::hash_file(&source).unwrap();
+        let store = crate::storage::Store::for_output(&jobs.join("fixture")).unwrap();
+        let interrupted = TransientInput::create(&jobs, &source, &source_sha, bytes.len() as u64).unwrap();
+        let interrupted_path = interrupted.directory.clone();
+        copy_verified_source(&source, &source_sha, &interrupted_path.join("fixture.map")).unwrap();
+        drop(interrupted);
+        assert!(interrupted_path.join("fixture.map").is_file());
+        assert_eq!(store.overview().unwrap().entries[0].state, "failed");
+        let input = TransientInput::create(&jobs, &source, &source_sha, bytes.len() as u64).unwrap();
+        let scratch = input.directory.clone();
+        copy_verified_source(&source, &source_sha, &scratch.join("fixture.map")).unwrap();
+        let output = root.path().join("output.map");
+        fs::write(&output, &bytes).unwrap();
+        let record = lifecycle_record(&output);
+        fs::write(&output, b"changed output").unwrap();
+        assert!(input.finish(&record, &root.path().join("receipt.json")).is_err());
+        assert!(scratch.join("fixture.map").is_file());
+        assert_eq!(maps::hash_file(&source).unwrap(), source_sha);
+        assert!(store.overview().unwrap().entries.iter().all(|entry| entry.state == "failed"));
+    }
+    #[test]
+    fn native_input_is_retained_when_it_is_itself_the_only_accepted_output() {
+        let root = tempfile::tempdir().unwrap();
+        let jobs = root.path().join("library/jobs");
+        fs::create_dir_all(&jobs).unwrap();
+        let source = root.path().join("original.map");
+        let bytes = lifecycle_fixture::fixture(13);
+        fs::write(&source, &bytes).unwrap();
+        let sha = maps::hash_file(&source).unwrap();
+        let input = TransientInput::create(&jobs, &source, &sha, bytes.len() as u64).unwrap();
+        let output = input.directory.join("fixture.map");
+        copy_verified_source(&source, &sha, &output).unwrap();
+        let record = lifecycle_record(&output);
+        assert!(input.finish(&record, &root.path().join("receipt.json")).is_err());
+        assert_eq!(maps::hash_file(&output).unwrap(), sha);
+    }
+    #[test]
+    fn unchanged_sdk_preparation_reuses_verified_tags_without_executing_or_copying_again() {
+        let root = tempfile::tempdir().unwrap();
+        let kit = root.path().join("kit");
+        fs::create_dir_all(kit.join("bin/x64")).unwrap();
+        let archive = kit.join("HCEEK.7z");
+        let extractor = kit.join("bin/x64/7zr.exe");
+        fs::write(&archive, b"SDK archive identity fixture; not an actual SDK archive").unwrap();
+        fs::write(&extractor, b"Reuse must return before this non-executable fixture is invoked").unwrap();
+        let caches = root.path().join("library/sdk-cache");
+        let prepared = caches.join("prepared");
+        let tags = prepared.join("tags");
+        fs::create_dir_all(tags.join("globals")).unwrap();
+        fs::write(tags.join("globals/globals.globals"), b"small retained input hash fixture").unwrap();
+        let hashes = crate::tool_transaction::inventory(&tags).unwrap();
+        fs::write(prepared.join("sdk-input-tags.json"), serde_json::to_vec(&hashes).unwrap()).unwrap();
+        fs::write(prepared.join("sdk-provenance.json"), serde_json::to_vec(&serde_json::json!({
+            "sourceSha256": maps::hash_file(&archive).unwrap(),
+            "extractorSha256": maps::hash_file(&extractor).unwrap(),
+        })).unwrap()).unwrap();
+        for _ in 0..3 {
+            let id = uuid::Uuid::new_v4().to_string();
+            let candidate = caches.join(&id);
+            assert_eq!(crate::conversion::prepare_sdk_tags(&kit, &candidate, "fixture", &id,
+                |_| panic!("An identical verified SDK must not start extraction")).unwrap(), tags);
+            assert!(!candidate.exists());
+            assert_eq!(crate::tool_transaction::inventory(&tags).unwrap(), hashes);
+            assert_eq!(fs::read_dir(&caches).unwrap().count(), 1);
+        }
+    }
     #[test]
     fn sound_stream_failure_overrides_success_footer_without_rejecting_optional_pack_notices() {
         assert!(native_compile_errors("Failed to read data file header sounds\n### FAILED TO OPEN DATA-CACHE FILE.\nsuccessfully built cache file.").is_empty());

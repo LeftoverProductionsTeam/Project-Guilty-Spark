@@ -9,10 +9,11 @@ if (process.platform !== 'win32' || outputIndex < 0 || !process.argv[outputIndex
 const output = path.resolve(process.argv[outputIndex + 1]),
   root = process.cwd();
 if (
-  ![path.resolve('releases'), path.resolve('.local')].some((base) => output.startsWith(base + path.sep)) ||
+  ![path.resolve('releases'), path.resolve('artifacts')].some((base) => output.startsWith(base + path.sep)) ||
+  output.split(path.sep).some((part) => part.toLowerCase() === '.local') ||
   fs.existsSync(output)
 )
-  throw Error('Choose a fresh module folder under releases/ or .local/');
+  throw Error('Choose a fresh module folder under releases/ or artifacts/; obsolete .local output is disabled.');
 const build = spawnSync(
   process.execPath,
   [

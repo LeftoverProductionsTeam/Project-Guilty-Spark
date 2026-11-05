@@ -3,11 +3,11 @@ import { mkdir, writeFile, existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-const directory = path.resolve('.local/tools/invader');
+const directory = path.resolve('tools/invader');
 await promisify(mkdir)(directory, { recursive: true });
 const url =
   'https://github.com/SnowyMouse/invader/releases/download/0.55.0/invader-0.55.0-r4134-33518109-win32.7z';
-const archive = path.resolve('.local/tools/invader-0.55.0.7z');
+const archive = path.resolve('tools/invader-0.55.0.7z');
 if (!existsSync(archive)) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);

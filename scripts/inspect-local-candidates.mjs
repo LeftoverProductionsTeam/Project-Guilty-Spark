@@ -44,6 +44,6 @@ async function walk(directory) {
   }
 }
 await walk(root);
-await mkdir('.local/qa', { recursive: true });
-await writeFile('.local/qa/candidates.json', JSON.stringify(found, null, 2));
+await mkdir('artifacts/qa', { recursive: true });
+await writeFile('artifacts/qa/candidates.json', JSON.stringify(found, null, 2));
 console.log(JSON.stringify(found, null, 2));

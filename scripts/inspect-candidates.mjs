@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-const candidates = JSON.parse(await readFile('.local/qa/candidates.json', 'utf8'));
+const candidates = JSON.parse(await readFile('artifacts/qa/candidates.json', 'utf8'));
 const reports = [];
 for (const candidate of candidates.filter((c) => c.kind !== 'resource/other')) {
   const result = spawnSync(path.resolve('target/debug/examples/inspect.exe'), [candidate.path], {
@@ -28,4 +28,4 @@ for (const candidate of candidates.filter((c) => c.kind !== 'resource/other')) {
     }),
   );
 }
-await writeFile('.local/qa/restoration-inspection.json', JSON.stringify(reports, null, 2));
+await writeFile('artifacts/qa/restoration-inspection.json', JSON.stringify(reports, null, 2));

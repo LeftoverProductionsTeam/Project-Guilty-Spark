@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in native test. Requires approved Baboon installation and an isolated QA library.
 // A human checks the real Baboon window; automation controls only Spark's own test API.
 import { chromium, expect } from '@playwright/test';
@@ -24,7 +25,7 @@ const data = args.get('--data'),
 const fixture = JSON.parse(await fs.readFile(path.join(data, 'spark-native-ui-fixture.json'), 'utf8'));
 if (!fixture.nativeFixture || fixture.schemaVersion !== 1)
   throw Error('Only an explicit private replica is accepted.');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const exe = path.join(output, 'GuiltySpark-baboon-qa.exe');
 await fs.copyFile(args.get('--app'), exe, fs.constants.COPYFILE_EXCL);
 const hash = (b) => crypto.createHash('sha256').update(b).digest('hex');

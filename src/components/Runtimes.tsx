@@ -96,7 +96,7 @@ export default function Runtimes({
   onSave: () => Promise<void>;
   settings: Settings;
   onSettings: () => void;
-  onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge' | 'creator') => void;
+  onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge' | 'creator' | 'assets') => void;
   onCollaborate:()=>void;
   edit:(project:Project,description:string)=>void;
 }) {

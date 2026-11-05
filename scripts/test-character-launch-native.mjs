@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real packaged Windows process launches, native Halo models/audio and durable
 // local profile. No mocked IPC, game launch, downloaded bytes or original edits.
 import fs from 'node:fs/promises';
@@ -11,7 +12,7 @@ const [appArg,outputArg,meterArg]=process.argv.slice(2);
 if(!meterArg)throw Error('test-character-launch-native <built.exe> <fresh-output> <owned-audio-meter.exe>');
 const requested=(value,allowed)=>{const list=value?value.split(','):allowed;if(!list.length||list.some(v=>!allowed.includes(v))||new Set(list).size!==list.length)throw Error('Invalid requested character test cases');return list;};
 const runtimes=requested(process.env.SPARK_CHARACTER_QA_RUNTIMES,['mccSteam','haloCustomEdition','openCe','chupathingyCe']),characters=requested(process.env.SPARK_CHARACTER_QA_CHARACTERS,['monitor','johnson','chief','cortana']);
-const root=path.resolve(outputArg);await fs.mkdir(root);const exe=path.join(root,'GuiltySpark-character-qa.exe');await fs.copyFile(path.resolve(appArg),exe,fs.constants.COPYFILE_EXCL);
+const root=path.resolve(outputArg);await fs.mkdir(await assertQaOutputPath(root));const exe=path.join(root,'GuiltySpark-character-qa.exe');await fs.copyFile(path.resolve(appArg),exe,fs.constants.COPYFILE_EXCL);
 const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
 const report={schemaVersion:1,complete:false,appSha256:await hash(exe),mockedIpc:false,cases:[],errors:[],limitations:['Windows output meter is not human listening or Halo game playback.','A runtime lacking campaign characters/dialogue may use a linked compatible original campaign source.','No in-game multiplayer replication is tested here.']};
 const expect=assertion.configure({timeout:180000});let browser,page,child;

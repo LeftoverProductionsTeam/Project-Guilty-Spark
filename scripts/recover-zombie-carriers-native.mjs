@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Explicit owner-run research recipe. It accepts only the hashed C45 reviewed
 // experimental tagset, copies it, and invokes local native tools in that copy.
 // No download, game launch, runtime patch, remote command or original write.
@@ -237,7 +238,7 @@ async function execute(argv) {
     );
   for (const [tag, expected] of Object.entries(pins.files))
     if (new Map(before).get(tag) !== expected) throw Error('Recovery input identity differs');
-  await fs.mkdir(output);
+  await fs.mkdir(await assertQaOutputPath(output));
   const tags = path.join(output, 'tags');
   await fs.mkdir(tags);
   const report = {

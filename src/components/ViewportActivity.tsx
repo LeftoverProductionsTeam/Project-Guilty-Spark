@@ -5,14 +5,23 @@ import { useWorkspaceActivity } from './WorkspaceActivity';
 /** Static editors draw on changes. Camera/gizmo gestures, source walking and
  * recording keep their full frame clock; retained inactive maps never draw. */
 export default function ViewportActivity({ continuous = false }: { continuous?: boolean }) {
-  const { setFrameloop, invalidate, gl } = useThree();
+  const { setFrameloop, invalidate, gl, get } = useThree();
   const {active} = useWorkspaceActivity();
   useEffect(() => {
     const canvas = gl.domElement;
     let focused = !document.hidden, visible = !document.hidden, pressed = false;
     let settle: ReturnType<typeof setTimeout> | undefined;
     const refresh = (focused: boolean) => {
-      if (!active || !visible || document.hidden) {gl.domElement.dataset.gsEditorActivity='paused';setFrameloop('never');clearTimeout(settle);return;}
+      if (!active || !visible || document.hidden) {
+        setFrameloop('never');
+        // R3F stops accepting invalidations in "never", but an already queued
+        // demand frame survives. WebView2 can defer it until after minimization.
+        // Retire that pending frame as well; resuming explicitly invalidates.
+        get().internal.frames = 0;
+        gl.domElement.dataset.gsEditorActivity = 'paused';
+        clearTimeout(settle);
+        return;
+      }
       const interactive = focused && (pressed || document.pointerLockElement === canvas);
       gl.domElement.dataset.gsEditorActivity = continuous ? 'continuous' : interactive ? 'interactive' : focused ? 'idle' : 'background';
       setFrameloop(continuous || interactive ? 'always' : 'demand');
@@ -41,6 +50,6 @@ export default function ViewportActivity({ continuous = false }: { continuous?: 
       canvas.removeEventListener('lostpointercapture', up);
       document.removeEventListener('pointerlockchange', pointerLock);
     };
-  }, [active, continuous, setFrameloop, invalidate, gl]);
+  }, [active, continuous, setFrameloop, invalidate, gl, get]);
   return null;
 }

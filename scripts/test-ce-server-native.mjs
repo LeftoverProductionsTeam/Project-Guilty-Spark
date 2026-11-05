@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real CE engine smoke test. Copies an already inspected runtime into a
 // fresh short path; binds only loopback, disables public listing, never edits
 // the original runtime or claims movement/gameplay from a responding process.
@@ -44,7 +45,7 @@ if (root.length > 130) throw Error('Use a short fresh output folder for this leg
 const relative = path.relative(runtime, root);
 if (!relative || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative)))
   throw Error('Output must be outside the original game');
-await fs.mkdir(root);
+await fs.mkdir(await assertQaOutputPath(root));
 const hash = async (file) =>
   crypto
     .createHash('sha256')

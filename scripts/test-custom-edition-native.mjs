@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real Windows/Spark/HTTPS/extraction acceptance. No mocked IPC, installer
 // execution, registry changes, original game writes or public game connections.
 import { chromium, expect as assertion } from '@playwright/test';
@@ -20,7 +21,7 @@ for (let i = 2; i < process.argv.length; i += 2) {
 if (args.size !== 3) throw Error('All three named arguments required');
 const output = args.get('--output'),
   original = args.get('--existing');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const hash = async (file) =>
   crypto
     .createHash('sha256')

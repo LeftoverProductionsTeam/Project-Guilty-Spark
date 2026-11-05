@@ -32,6 +32,7 @@ export function classifyStorage(relative) {
     return { classification: 'Preserve', purpose: 'Git history, refs and worktree administration' };
   if (
     parts.includes('.research') ||
+    parts.includes('preserved') ||
     parts.includes('archives') ||
     parts.includes('releases') ||
     parts.some((x) => /^c49-preview-|^pyros zombie|^sample code$/.test(x))
@@ -77,10 +78,10 @@ export function classifyStorage(relative) {
       classification: 'Regenerable',
       purpose: 'Frontend build/report output; source and acceptance records remain separate',
     };
-  if (parts.includes('.local') || parts.includes('test-results'))
+  if (parts.includes('.local') || parts.includes('artifacts') || parts.includes('test-results'))
     return {
       classification: 'Requires Review',
-      purpose: 'Owned local jobs, tags, maps, logs, captures or evidence; not disposable by age or extension',
+      purpose: 'Owned jobs, tags, maps, logs or evidence; only explicitly sealed disposable output can be removed automatically',
     };
   return { classification: 'Preserve', purpose: 'Source, documentation or unclassified user input' };
 }

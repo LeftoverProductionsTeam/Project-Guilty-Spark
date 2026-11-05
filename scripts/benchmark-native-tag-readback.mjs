@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Explicit owner-run benchmark. Reads existing tags through a pinned local
 // Invader, replays only recorded -G/-C requests, and never edits or launches Halo.
 import fs from 'node:fs/promises';
@@ -86,7 +87,7 @@ for (const group of groups)
       Array.from({ length: args.length / 2 }, (_, i) => (args[i * 2] === '-C' ? '0' : '')).join('\n') + '\n',
   });
 const output = path.resolve(options.get('--output'));
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 let serial = 0,
   invocations = 0;
 async function native(tag, args) {

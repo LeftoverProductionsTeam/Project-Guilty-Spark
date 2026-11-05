@@ -6,9 +6,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath($TestRoot)
-$allowed = if ($env:RUNNER_TEMP) { [IO.Path]::GetFullPath($env:RUNNER_TEMP) } else { [IO.Path]::GetFullPath((Join-Path (Get-Location) '.local')) }
+if ($root.Split([IO.Path]::DirectorySeparatorChar) -contains '.local') { throw 'The obsolete .local output tree is disabled.' }
+$allowed = if ($env:RUNNER_TEMP) { [IO.Path]::GetFullPath($env:RUNNER_TEMP) } else { [IO.Path]::GetFullPath((Join-Path (Get-Location) 'artifacts\qa')) }
 if (!$root.StartsWith($allowed.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
-  throw 'Installation test must stay inside the runner temp or this workspace .local directory.'
+  throw 'Installation test must stay inside the runner temp or this workspace artifacts\qa directory.'
 }
 $install = Join-Path $root 'installed'
 $receipt = Join-Path $root 'installation.json'

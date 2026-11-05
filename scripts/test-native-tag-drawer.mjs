@@ -1,10 +1,11 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real Windows tag drawer handoff. Separate native WebViews share the existing
 // durable journal and one writer lease, rather than a second editable map copy.
 import fs from 'node:fs/promises';import path from 'node:path';import crypto from 'node:crypto';
 import net from 'node:net';import {spawn} from 'node:child_process';import {chromium,expect as assertion} from '@playwright/test';
 const [app,destination,map]=process.argv.slice(2);if(!map)throw Error('test-native-tag-drawer <packaged.exe> <fresh-output> <owned-MCC.map>');
 const expect=assertion.configure({timeout:90000}),output=path.resolve(destination),hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
-await fs.mkdir(output);const exe=path.join(output,'GuiltySpark-tag-drawer.exe');await fs.copyFile(path.resolve(app),exe,fs.constants.COPYFILE_EXCL);
+await fs.mkdir(await assertQaOutputPath(output));const exe=path.join(output,'GuiltySpark-tag-drawer.exe');await fs.copyFile(path.resolve(app),exe,fs.constants.COPYFILE_EXCL);
 const report={complete:false,mockedIpc:false,appSha256:await hash(exe),sourceSha256:await hash(map),cases:[],errors:[],limitations:['Two native windows on one machine; no second physical monitor or in-game acceptance.']};
 const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));
 const child=spawn(exe,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(output,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(output,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});

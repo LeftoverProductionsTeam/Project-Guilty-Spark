@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in native SDK QA in an isolated qa_runtime_library replica.
 // Rebuilds copied BSP tags, opens the new cache and checks the native window controls.
@@ -36,7 +37,7 @@ if (
   normalize(seed.sourceJob) === normalize(data)
 )
   throw Error('Only the explicit replica fixture is accepted');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const executable = path.join(output, 'GuiltySpark-bsp-audio-qa.exe');
 await fs.copyFile(path.resolve(options.get('--app')), executable, fs.constants.COPYFILE_EXCL);
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');

@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in: three actual Windows Spark processes, three isolated owned libraries.
 // The Halo compiler is real; game clients, peers and custom binary transfers are not simulated.
@@ -26,7 +27,7 @@ if (!['--app','--root','--kit','--invader','--map','--template-tags'].every(key=
 if (args.has('--baboon-edited-tag')&&!externalTools) throw Error('Baboon save replay requires --external-tools');
 const root = args.get('--root'),
   output = path.join(root, `run-${new Date().toISOString().replace(/[:.]/g,'-')}`);
-await fs.mkdir(output); // Fresh evidence directory; never overwrite a previous attempt.
+await fs.mkdir(await assertQaOutputPath(output)); // Fresh evidence directory; never overwrite a previous attempt.
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 const hashFile = async (f) => sha(await fs.readFile(f));
 async function sourceInventory(root) {

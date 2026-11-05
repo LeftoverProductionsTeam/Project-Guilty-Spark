@@ -1,5 +1,6 @@
 import ProjectSnapshots from './ProjectSnapshots';
 import SourceRecovery from './SourceRecovery';
+import GeometryToolHandoff from './GeometryToolHandoff';
 import { renderIndices } from '../haloGeometry';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -65,11 +66,13 @@ export function Assets({
   project,
   meshes,
   onImport,
+  onImportRevised,
   onWorld,
 }: {
   project: Project;
   meshes: Record<string, MeshData>;
   onImport: () => void;
+  onImportRevised:(path:string,sha256:string)=>Promise<void>;
   onWorld: () => void;
 }) {
   const activity=useWorkspaceActivity();
@@ -183,6 +186,7 @@ export function Assets({
               <Pill key={m}>{m}</Pill>
             ))}
             <div className="section-label">Geometry exchange</div>
+            {asset&&<GeometryToolHandoff key={asset.id} projectId={project.id} assetId={asset.id} onImport={onImportRevised}/>}
             <button type="button" className="small-button" disabled={!mesh || !asset} title="Save the selected imported mesh as source OBJ for use in another compatible project. Shader bitmaps and collision are not copied." onClick={() => {
               try {
                 if (!asset || !mesh) throw new Error('Select an imported source asset');

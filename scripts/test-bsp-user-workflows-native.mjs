@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real Spark/WebView + native source operations. No injected selection or mesh.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -11,7 +12,7 @@ if (!destination)
   throw Error('test-bsp-user-workflows-native <Spark.exe> <fresh-output> [H1A-kit tags Invader]');
 const root = path.resolve(destination),
   expect = assertion.configure({ timeout: 60000 });
-await fs.mkdir(root);
+await fs.mkdir(await assertQaOutputPath(root));
 const data = path.join(root, 'library'),
   exe = path.join(root, 'Spark-workflows.exe');
 await fs.copyFile(path.resolve(app), exe, fs.constants.COPYFILE_EXCL);

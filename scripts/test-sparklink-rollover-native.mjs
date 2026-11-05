@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Three independent desktop processes, separate libraries, real TLS authority.
 // The application's existing opt-in profiler records IPC timing without replacing IPC.
 import fs from 'node:fs/promises';
@@ -9,7 +10,7 @@ import {chromium,expect as assertion} from '@playwright/test';
 import {openDrawer,openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 const [source,destination]=process.argv.slice(2),expect=assertion.configure({timeout:30000});
 if(!source||!destination)throw Error('Use test-sparklink-rollover-native <embedded exe> <fresh directory>');
-const root=path.resolve(destination);await fs.mkdir(root);const actors=[];
+const root=path.resolve(destination);await fs.mkdir(await assertQaOutputPath(root));const actors=[];
 const report={schemaVersion:1,physicalMachines:1,nativeProcesses:3,separateLibraries:3,mockedIpc:false,applicationIpcTiming:true,crossComputerTested:false,gameReplicationTested:false,complete:false,cases:[],errors:[]};
 const invoke=(a,command,args={})=>a.page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 async function start(name){

@@ -149,6 +149,12 @@
   overflow: hidden;
 }
 .gs-tool-emblem-heading{display:flex;align-items:center;gap:9px;min-width:0;grid-column:1/-1;}
+.gs-tool-emblem-heading .gs-help-wrapper{margin-left:auto;flex:none;}
+.gs-tool-editions,.gs-tool-use{grid-column:1/-1;}
+.gs-tool-editions{font-size:10px;color:var(--muted);}
+.gs-tool-contract{display:grid;grid-template-columns:6rem minmax(0,1fr);gap:5px;font-size:11px;}
+.gs-tool-contract :is(dt,dd){margin:0;overflow-wrap:anywhere;}
+.gs-tool-contract dt{color:var(--muted);}
 .gs-tool-emblem-heading strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
 .gs-tool-emblem{display:grid;place-items:center;flex:none;width:34px;height:34px;border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:11px 7px;background:color-mix(in srgb,var(--accent) 8%,var(--panel));color:var(--accent);}
 .gs-tool-options{grid-column:1/-1;font-size:11px;min-width:0;}

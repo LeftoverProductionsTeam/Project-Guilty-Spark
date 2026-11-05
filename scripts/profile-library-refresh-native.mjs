@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real native event/IPC and owned process counters. No mocked replies or game files.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -10,7 +11,7 @@ import {chooseTool} from '../tests/ui/helpers/navigation.ts';
 const [application,output,label]=process.argv.slice(2);
 if(!application||!output||!label)throw Error('profile-library-refresh-native <embedded exe> <fresh directory> <label>');
 const expect=assertion.configure({timeout:45000}),root=path.resolve(output),exec=promisify(execFile);
-await fs.mkdir(root);
+await fs.mkdir(await assertQaOutputPath(root));
 const app=path.join(root,'GuiltySpark-refresh.exe');await fs.copyFile(path.resolve(application),app,fs.constants.COPYFILE_EXCL);
 const report={schemaVersion:1,label,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,complete:false,bursts:[],memory:[],errors:[]};
 const server=net.createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;await new Promise(r=>server.close(r));

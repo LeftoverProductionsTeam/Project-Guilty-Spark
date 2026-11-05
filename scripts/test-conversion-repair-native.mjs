@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Explicit owned native QA: review classic tags -> separate SDK -> MCC conversion -> editor.
 // Never launches Halo, runs archive contents, or changes the original cache/SDK tagset.
 import { chromium, expect } from '@playwright/test';
@@ -25,7 +26,7 @@ const data = path.resolve(options.get('--data')),
 const fixture = JSON.parse(await fs.readFile(path.join(data, 'spark-conversion-ui-fixture.json'), 'utf8'));
 if (fixture.nativeFixture !== true || fixture.schemaVersion !== 1 || fixture.sourceCacheVersion !== 609)
   throw Error('Only a fresh qa_conversion_library fixture is accepted');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const executable = path.join(output, 'GuiltySpark-conversion-qa.exe');
 await fs.copyFile(path.resolve(options.get('--app')), executable, fs.constants.COPYFILE_EXCL);
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');

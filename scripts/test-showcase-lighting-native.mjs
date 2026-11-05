@@ -1,10 +1,11 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Genuine Home character render, source/variant identity and saved-choice QA.
 // Pixel samples describe the preview, not in-game lighting or human listening.
 import fs from 'node:fs/promises';import path from 'node:path';import net from 'node:net';import crypto from 'node:crypto';import {spawn} from 'node:child_process';import {chromium,expect as assertion} from '@playwright/test';
 const [application,destination]=process.argv.slice(2);if(!destination)throw Error('test-showcase-lighting-native <app> <fresh output>');
 const list=(value,allowed)=>{const a=value?value.split(','):allowed;if(!a.length||a.some(v=>!allowed.includes(v))||new Set(a).size!==a.length)throw Error('Unsupported QA case');return a;};
 const runtimes=list(process.env.SPARK_CHARACTER_QA_RUNTIMES,['mccSteam','haloCustomEdition','openCe','chupathingyCe']),characters=list(process.env.SPARK_CHARACTER_QA_CHARACTERS,['johnson','chief','cortana','monitor']);
-const root=path.resolve(destination),expect=assertion.configure({timeout:180000}),hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');await fs.mkdir(root);const exe=path.join(root,'GuiltySpark-showcase-QA.exe');await fs.copyFile(path.resolve(application),exe,fs.constants.COPYFILE_EXCL);
+const root=path.resolve(destination),expect=assertion.configure({timeout:180000}),hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');await fs.mkdir(await assertQaOutputPath(root));const exe=path.join(root,'GuiltySpark-showcase-QA.exe');await fs.copyFile(path.resolve(application),exe,fs.constants.COPYFILE_EXCL);
 const report={complete:false,mockedIpc:false,applicationSha256:await hash(exe),cases:[],errors:[],gameplayAccepted:false};const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));
 const child=spawn(exe,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});let browser,page;
 const call=(command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});

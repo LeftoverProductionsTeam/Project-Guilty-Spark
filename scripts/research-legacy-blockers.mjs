@@ -1,7 +1,7 @@
 import { readFile, writeFile, open } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-const candidates = JSON.parse(await readFile('.local/qa/candidates.json', 'utf8')).filter(
+const candidates = JSON.parse(await readFile('artifacts/qa/candidates.json', 'utf8')).filter(
   (c) => c.scenarioType === 1,
 );
 for (const c of candidates) {
@@ -18,7 +18,7 @@ for (const c of candidates) {
   });
   if (path.basename(c.path) === 'apocolypse_1.map') {
     for (const check of ['external_bitmaps_count', 'external_sounds_count']) {
-      const r = spawnSync(path.resolve('.local/tools/invader/invader-info.exe'), ['-T', check, c.path], {
+      const r = spawnSync(path.resolve('tools/invader/invader-info.exe'), ['-T', check, c.path], {
         encoding: 'utf8',
         windowsHide: true,
       });

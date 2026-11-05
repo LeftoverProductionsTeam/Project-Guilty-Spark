@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Native build-status workload on a real owned map. The two explicit read
 // contracts return the same build records; only open_project includes geometry.
 import fs from 'node:fs/promises';
@@ -11,7 +12,7 @@ import {chooseTool} from '../tests/ui/helpers/navigation.ts';
 const [application,destination,input,command,label]=process.argv.slice(2);
 if(!label||!['open_project','project_build_history'].includes(command))throw Error('profile-project-status-native <app> <fresh output> <owned map> <open_project|project_build_history> <label>');
 const root=path.resolve(destination),file=path.resolve(input),expect=assertion.configure({timeout:90000}),exec=promisify(execFile),hash=b=>crypto.createHash('sha256').update(b).digest('hex');
-await fs.mkdir(root);const app=path.join(root,'GuiltySpark-project-status.exe');await fs.copyFile(path.resolve(application),app,fs.constants.COPYFILE_EXCL);
+await fs.mkdir(await assertQaOutputPath(root));const app=path.join(root,'GuiltySpark-project-status.exe');await fs.copyFile(path.resolve(application),app,fs.constants.COPYFILE_EXCL);
 const report={schemaVersion:1,label,appSha256:hash(await fs.readFile(app)),sourceSha256:hash(await fs.readFile(file)),readCommand:command,roundTrips:[],bursts:[],memory:[],mockedIpc:false,gameplayVerified:false,complete:false,errors:[]};
 const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));
 const child=spawn(app,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});

@@ -2,8 +2,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-const session=await import(new URLSearchParams(location.search).has('baseline')
-  ? '/.local/c54-workbench-polish-20261102/baseline-mapSession.ts' : '/src/mapSession.ts');
+const parameters=new URLSearchParams(location.search);
+const baseline=parameters.get('baselineSource');
+if(parameters.has('baseline')&&!baseline)throw Error('Provide the preserved baselineSource module explicitly.');
+const session=await import(parameters.has('baseline') ? baseline! : '/src/mapSession.ts');
 const {useMapState,writeMapSession,readMapSession}=session;
 
 const maps = 40, fields = 12, portrait=new URLSearchParams(location.search).has('portrait');

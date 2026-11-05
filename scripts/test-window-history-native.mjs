@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Real local WebViews, persistent journal, window leases and process death.
 // No mock IPC, tool launch, game session or remote collaborator is used here.
@@ -6,7 +7,7 @@ import net from 'node:net';import {spawn} from 'node:child_process';
 import {chromium,expect as assertion} from '@playwright/test';
 const expect=assertion.configure({timeout:60000});
 const [app,destination]=process.argv.slice(2);if(!app||!destination)throw Error('test-window-history-native <Spark.exe> <fresh output>');
-const output=path.resolve(destination);await fs.mkdir(output);const exe=path.join(output,'Spark-window-history.exe');await fs.copyFile(path.resolve(app),exe,fs.constants.COPYFILE_EXCL);
+const output=path.resolve(destination);await fs.mkdir(await assertQaOutputPath(output));const exe=path.join(output,'Spark-window-history.exe');await fs.copyFile(path.resolve(app),exe,fs.constants.COPYFILE_EXCL);
 const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(exe)).digest('hex'),mockedIpc:false,complete:false,cases:[],errors:[]};
 let child,browser,main;
 const pages=()=>browser.contexts().flatMap(c=>c.pages()).filter(p=>p.url().includes('tauri.localhost'));

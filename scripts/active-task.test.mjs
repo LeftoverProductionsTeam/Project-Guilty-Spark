@@ -3,15 +3,32 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { parseCheckpoint, writeCheckpoint } from './active-task.mjs';
 const fixture = (status) =>
   `Task: C66 P0\nStatus: ${status}\nStarting revision: abc\nLatest verified revision: abc\nNext action: Inspect the existing native receipt before retrying.\n## Acceptance\nNative checks remain open.\n## Verified milestones\nSource preserved.\n## Changed work\nUncommitted storage repair.\n## Failures and blockers\nNo human traversal retest.\n## Operations and safe checkpoint\nVerify actual processes.\n## Deferred requests\nNone received.\n`;
-test('fresh recovery identifies unfinished work; accepted and blocked states do not loop', () => {
+test('unfinished implementation and automated acceptance continue engineering', () => {
   assert.equal(parseCheckpoint(fixture('active')).recovery, 'resume-after-verification');
-  assert.equal(parseCheckpoint(fixture('blocked')).recovery, 'review-blocker');
-  assert.equal(parseCheckpoint(fixture('awaiting human verification')).recovery, 'verify-human');
+  assert.equal(parseCheckpoint(fixture('implementation incomplete')).recovery, 'continue-implementation');
+  assert.equal(
+    parseCheckpoint(fixture('automated acceptance incomplete')).recovery,
+    'continue-automated-acceptance',
+  );
+});
+test('human and technical gates remain open without deadlocking independent engineering', () => {
+  for (const [status, recovery] of [
+    ['awaiting human verification', 'preserve-human-gate-and-continue-independent'],
+    ['technically blocked', 'review-dependency-and-continue-independent'],
+    ['blocked', 'review-dependency-and-continue-independent'],
+  ]) {
+    const state = parseCheckpoint(fixture(status));
+    assert.equal(state.status, status);
+    assert.equal(state.recovery, recovery);
+    assert.equal(state.independentWork, 'continue-when-safe');
+    assert.equal(state.nextAction, 'Inspect the existing native receipt before retrying.');
+  }
   assert.equal(parseCheckpoint(fixture('accepted')).recovery, 'ready-for-next');
+  for (const receiptOnlyStatus of ['received', 'queued', 'archived', 'committed', 'completed'])
+    assert.throws(() => parseCheckpoint(fixture(receiptOnlyStatus)), /supported Status/);
 });
 test('updating or accepting the active task never consumes a deferred request', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'spark-continuity-pending-'));
@@ -48,14 +65,17 @@ test('atomic update retains one valid checkpoint; invalid or oversized writes pr
     fs.rmSync(root, { recursive: true });
   }
 });
-test('existing repository rules remain intact before the additive continuity section', () => {
-  const section = '\n## Active-task continuity and interruption recovery';
-  const prior = execFileSync('git', ['show', 'HEAD:AGENTS.md'], { encoding: 'utf8' })
-    .replaceAll('\r\n', '\n')
-    .split(section)[0]
-    .trimEnd();
+test('repository recovery rules preserve safety without requiring obsolete cache roots or human deadlock', () => {
   const current = fs.readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
-  assert.equal(current.split(section)[0].trimEnd(), prior);
+  assert.match(current, /canonical development directory is `D:\\Project Guilty Spark`/);
+  assert.match(current, /Work on local `master`/);
+  assert.match(current, /Never push or publish without authorization/);
+  assert.match(current, /No security bypasses, unauthorized proprietary downloads or arbitrary remote tool execution/);
+  assert.match(current, /changed, unique, ambiguous, active and accepted-release files remain protected/);
+  assert.match(current, /Do not recreate the obsolete repository `\.local` directory/);
+  assert.doesNotMatch(current, /`\.local\/(?:tools|build|artifacts)[^`]*`/);
+  assert.match(current, /Do not block unrelated, safely executable engineering/);
+  assert.doesNotMatch(current, /obtaining explicit user authorization to defer before starting another directive/);
   const pending = fs.readFileSync(new URL('../docs/PENDING_REQUESTS.md', import.meta.url), 'utf8');
   assert.ok(pending.startsWith('# Pending engineering requests'));
   assert.ok(Buffer.byteLength(pending) <= 32768);

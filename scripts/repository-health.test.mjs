@@ -20,16 +20,18 @@ test('classification protects originals, releases, native diagnostics and unknow
     'Halo Custom Edition/maps',
     'opencehalo-windows-release/maps',
     '.local/archives/C62',
+    'preserved/native-projects/unique-source',
     'target/release',
     '.local/x/validation-target/debug/examples',
   ])
     assert.equal(classifyStorage(p).classification, 'Preserve', p);
   assert.equal(classifyStorage('.local/native-run/tags').classification, 'Requires Review');
+  assert.equal(classifyStorage('artifacts/qa/native-run/library').classification, 'Requires Review');
   assert.equal(classifyStorage('node_modules').classification, 'Reusable Cache');
   assert.equal(classifyStorage('.local/build/cargo/debug/deps').classification, 'Regenerable');
 });
 test('real filesystem scan is read-only, counts hardlinks once and does not follow directory links', () => {
-  const parent = path.resolve('.local');
+  const parent = path.resolve('artifacts/qa');
   fs.mkdirSync(parent, { recursive: true });
   const root = fs.mkdtempSync(path.join(parent, 'health-contract-'));
   try {

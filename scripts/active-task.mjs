@@ -5,13 +5,25 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 const maximum = 32 * 1024;
+// These are recovery instructions, not a queue scheduler or proof of acceptance.
+// Legacy active/blocked checkpoints remain readable without restoring the old
+// rule that a human-only check stops all independent engineering.
+const recoveries = new Map([
+  ['active', 'resume-after-verification'],
+  ['implementation incomplete', 'continue-implementation'],
+  ['automated acceptance incomplete', 'continue-automated-acceptance'],
+  ['awaiting human verification', 'preserve-human-gate-and-continue-independent'],
+  ['technically blocked', 'review-dependency-and-continue-independent'],
+  ['blocked', 'review-dependency-and-continue-independent'],
+  ['accepted', 'ready-for-next'],
+]);
 export function parseCheckpoint(text) {
   if (Buffer.byteLength(text) > maximum)
     throw Error('Keep the active checkpoint within 32 KiB; reference evidence.');
   const field = (name) => text.match(new RegExp(`^${name}: (.+)$`, 'm'))?.[1]?.trim();
   const task = field('Task'),
     status = field('Status');
-  if (!task || !['active', 'blocked', 'awaiting human verification', 'accepted'].includes(status))
+  if (!task || !recoveries.has(status))
     throw Error('Checkpoint requires Task and an explicit supported Status.');
   for (const label of ['Starting revision', 'Latest verified revision', 'Next action'])
     if (!field(label)) throw Error(`Checkpoint requires ${label}.`);
@@ -28,14 +40,10 @@ export function parseCheckpoint(text) {
     task,
     status,
     nextAction: field('Next action'),
-    recovery:
-      status === 'accepted'
-        ? 'ready-for-next'
-        : status === 'blocked'
-          ? 'review-blocker'
-          : status === 'awaiting human verification'
-            ? 'verify-human'
-            : 'resume-after-verification',
+    recovery: recoveries.get(status),
+    // No parsed status grants permission to skip its evidence requirements.
+    // Safe independent work remains possible while those requirements are open.
+    independentWork: 'continue-when-safe',
   };
 }
 function regularAncestors(file) {

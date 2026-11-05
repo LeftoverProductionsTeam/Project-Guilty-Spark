@@ -40,6 +40,16 @@ pub struct Tool {
     pub cache_versions: Vec<u32>,
     #[serde(default)]
     pub release_url: Option<String>,
+    pub workflow: ToolWorkflow,
+}
+/// Documentation is descriptive metadata, never an executable command plan.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub struct ToolWorkflow {
+    pub when_to_use: String, pub outputs: Vec<String>, pub dependencies: Vec<String>,
+    pub source_directory: String, pub documented_operations: Vec<String>,
+    pub manual_operations: Vec<String>, pub limitations: Vec<String>,
+    pub integration_tests: Vec<String>, pub documentation: String,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -78,6 +88,11 @@ pub fn validate(catalog: &Catalog) -> Result<()> {
             || tool.maintainer.is_empty()
         {
             return invalid("A tool needs official provenance and licensing context");
+        }
+        let w=&tool.workflow;
+        if w.when_to_use.is_empty()||w.source_directory.is_empty()||!w.documentation.starts_with("https://")
+            ||[&w.outputs,&w.dependencies,&w.documented_operations,&w.manual_operations,&w.limitations,&w.integration_tests].iter().any(|v|v.is_empty()||v.len()>24||v.iter().any(|s|s.is_empty()||s.len()>1600)){
+            return invalid("A tool needs bounded source, operation, dependency and evidence documentation");
         }
         if !["official", "invader", "community"].contains(&tool.group.as_str())
             || !["externalGui", "integratedCli", "sourceHandoff"].contains(&tool.mode.as_str())
@@ -208,6 +223,8 @@ pub struct Context {
     pub owned_native_tags: bool,
     #[serde(default)]
     pub cache_version: Option<u32>,
+    #[serde(default)]
+    pub geometry_source: bool,
 }
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -239,14 +256,14 @@ pub fn assess(tool: &Tool, context: &Context, installed: &Installation) -> Asses
         && tool
             .inputs
             .iter()
-            .any(|s| s == &context.source_kind || (s == "nativeH1" && context.owned_native_tags));
+            .any(|s| s == &context.source_kind || (s == "nativeH1" && context.owned_native_tags) || (s=="sourceGeometry"&&context.geometry_source));
     let (state, detail) = if !tool.families.contains(&context.family) {
         (
             "requiresRuntime",
             "This tool targets another Halo family; it is not recommended for this map.",
         )
     } else if tool.integration == "upstreamOnly" {
-        ("researchOnly","Upstream capability only. A source-aware Spark handoff has not been verified; no executable or download is offered.")
+        ("researchOnly","Official setup and standalone application selection are available. A source-aware Spark handoff has not been verified for this tool.")
     } else if !tool.platforms.contains(&context.host)
         || !tool.runtimes.contains(&context.runtime_id)
     {
@@ -300,6 +317,7 @@ mod tests {
             source_kind: "mccCache".into(),
             owned_native_tags: false,
             cache_version: Some(13),
+            geometry_source: false,
         }
     }
     #[test]

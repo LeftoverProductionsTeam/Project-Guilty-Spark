@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Comparable native application profiling. Existing content/validation remains enabled.
 import { chromium, expect as assertion } from '@playwright/test';
 import fs from 'node:fs/promises';
@@ -14,7 +15,7 @@ if (args.length !== 5)
   throw Error('profile-native-workbench <Spark.exe> <fresh-root> <owned-map-A> <owned-map-B> <label>');
 const [app, root, mapA, mapB] = args.slice(0, 4).map((p) => path.resolve(p));
 const label = args[4];
-await fs.mkdir(root, { recursive: false });
+await fs.mkdir(await assertQaOutputPath(root), { recursive: false });
 const data = path.join(root, 'library');
 await fs.mkdir(data);
 const hash = async (p) =>

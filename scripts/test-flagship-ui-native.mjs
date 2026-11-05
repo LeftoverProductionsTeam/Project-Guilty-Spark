@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real Windows application check. No mocked IPC, game/tool execution,
 // downloads, memory writes or installed-game changes. Fresh owned library only.
 import fs from 'node:fs/promises';
@@ -9,7 +10,7 @@ import {chromium,expect as assertion} from '@playwright/test';
 import {chooseTool} from '../tests/ui/helpers/navigation.ts';
 const expect=assertion.configure({timeout:120000});
 if(process.argv.length!==4)throw Error('test-flagship-ui-native <built Spark.exe> <fresh output directory>');
-const [app,root]=process.argv.slice(2).map(p=>path.resolve(p));await fs.mkdir(root);
+const [app,root]=process.argv.slice(2).map(p=>path.resolve(p));await fs.mkdir(await assertQaOutputPath(root));
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex'),exe=path.join(root,'GuiltySpark-C51-qa.exe');
 await fs.copyFile(app,exe,fs.constants.COPYFILE_EXCL);
 const report={schemaVersion:1,mockedIpc:false,complete:false,appSha256:hash(await fs.readFile(exe)),errors:[],screenshots:[],layouts:[]};

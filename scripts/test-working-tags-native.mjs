@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Explicit owned QA: real external tag save -> stable observation -> native build -> new cache.
 // Requires a fresh qa_runtime_library fixture. Never writes SDK masters or launches Halo.
 import { chromium, expect } from '@playwright/test';
@@ -34,7 +35,7 @@ if (
   path.resolve(seed.sourceJob) === data
 )
   throw Error('Only the explicit replica fixture is accepted');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const executable = path.join(output, 'GuiltySpark-working-tags-qa.exe');
 await fs.copyFile(path.resolve(options.get('--app')), executable, fs.constants.COPYFILE_EXCL);
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');

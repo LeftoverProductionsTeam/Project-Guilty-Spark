@@ -1,10 +1,14 @@
 // Opt-in browser workload, not startup/GPU/native-game performance evidence.
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
+import path from 'node:path';
 import {chromium} from '@playwright/test';
 const [url,destination]=process.argv.slice(2);
 if(!url?.startsWith('http://127.0.0.1:')||!destination)throw Error('measure-ui-preferences <loopback-fixture-url> <fresh-report.json>');
-const sourcePath=new URL(url).searchParams.has('baseline')?'.local/c54-workbench-polish-20261102/baseline-mapSession.ts':'src/mapSession.ts';
+const sourcePath=new URL(url).searchParams.has('baseline')?process.env.SPARK_BASELINE_SOURCE:'src/mapSession.ts';
+if(!sourcePath)throw Error('Set SPARK_BASELINE_SOURCE to the preserved baseline source when requesting a baseline measurement.');
+if(path.isAbsolute(sourcePath)||sourcePath.split(/[\\/]/).includes('..'))throw Error('SPARK_BASELINE_SOURCE must be a project-relative preserved module path.');
+const pageUrl=new URL(url);if(pageUrl.searchParams.has('baseline'))pageUrl.searchParams.set('baselineSource','/'+sourcePath.replaceAll('\\','/'));
 const source=await fs.readFile(sourcePath,'utf8');
 const browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined});
 const report={schemaVersion:1,scope:'Real React UI preference subscriptions; no maps or GPU work',sourcePath,
@@ -12,7 +16,7 @@ const report={schemaVersion:1,scope:'Real React UI preference subscriptions; no 
 try {
   for(let i=0;i<3;i++) {
     const context=await browser.newContext();const page=await context.newPage();
-    await page.goto(url);await page.waitForFunction(()=>typeof window.sessionWorkload==='function');
+    await page.goto(pageUrl.href);await page.waitForFunction(()=>typeof window.sessionWorkload==='function');
     const served=await page.evaluate(async sourcePath=>(await fetch('/'+sourcePath)).text(),sourcePath);
     if(served.includes('storedRecords')!==source.includes('storedRecords')||served.includes('function subscribeMapSession')!==source.includes('function subscribeMapSession'))throw Error('Vite is serving a stale preference module; restart the owned test server');
     const result=await page.evaluate(()=>window.sessionWorkload());

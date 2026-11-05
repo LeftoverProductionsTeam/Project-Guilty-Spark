@@ -8,6 +8,9 @@ dist/
 .toolchain/
 .research/
 .local/
+/artifacts/
+/tools/
+/preserved/
 test-results/
 playwright-report/
 *.gsproject.bak*

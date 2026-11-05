@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in desktop acceptance against real native IPC and owner-selected Halo tools.
 // Gameplay and third-party GUI interaction remain separate acceptance gates.
 import { chromium, expect as assertion } from '@playwright/test';
@@ -11,7 +12,7 @@ import { openDrawer, chooseTool } from '../tests/ui/helpers/navigation.ts';
 const expect=assertion.configure({timeout:45000}),a=process.argv.slice(2),resume=a.length===7&&a[6]==='--resume-build';
 if(a.length!==6&&!resume)throw Error('test-native-logic-authoring <Spark exe> <fresh root> <H1A kit> <owned tags> <Invader> <owned MCC source map with a device_machine> [--resume-build]');
 const [app,root,kit,tags,invader,cache]=a.slice(0,6).map(p=>path.resolve(p));
-if(!resume)await fs.mkdir(root,{recursive:false});const data=path.join(root,'library');if(!resume)await fs.mkdir(data);
+if(!resume)await fs.mkdir(await assertQaOutputPath(root),{recursive:false});const data=path.join(root,'library');if(!resume)await fs.mkdir(data);
 const hash=async p=>crypto.createHash('sha256').update(await fs.readFile(p)).digest('hex');
 const receipt={schemaVersion:1,appSha256:await hash(app),sourceCacheSha256:await hash(cache),mockedIpc:false,gameplayVerified:false,externalGuiEdited:false,complete:false};
 if(resume){const previous=JSON.parse(await fs.readFile(path.join(root,'failure.json'),'utf8'));if(previous.mockedIpc!==false||!previous.oneActionConnectionUndoRedo||!previous.saveReopenPreservesLogic||!previous.triggerTransformUndo||previous.sourceCacheSha256!==receipt.sourceCacheSha256||previous.appSha256!==receipt.appSha256)throw Error('Resume requires the same executable/source and recorded genuine UI authoring checks');Object.assign(receipt,previous,{error:undefined,stack:undefined,resumedBuild:true,authoringEvidence:'failure.json',complete:false});}

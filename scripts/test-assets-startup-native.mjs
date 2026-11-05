@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real desktop/native IPC/geometry acceptance. No synthetic mesh or game proof.
 import { chromium, expect as assertion } from '@playwright/test';
 import fs from 'node:fs/promises';
@@ -13,7 +14,7 @@ if (a.length !== 5)
   );
 const app = path.resolve(a[0]),
   root = path.resolve(a[1]);
-await fs.mkdir(root, { recursive: false });
+await fs.mkdir(await assertQaOutputPath(root), { recursive: false });
 const data = path.join(root, 'library');
 await fs.mkdir(data);
 const hash = async (p) =>

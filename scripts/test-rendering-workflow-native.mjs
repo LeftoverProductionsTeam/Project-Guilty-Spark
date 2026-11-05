@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in native Blood Gulch rendering and workflow regression. Fresh library/profile; originals are read-only.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -18,7 +19,7 @@ if (
   );
 const output = path.resolve(args.get('--output')),
   hash = (b) => crypto.createHash('sha256').update(b).digest('hex');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const exe = path.join(output, 'GuiltySpark-render-qa.exe');
 await fs.copyFile(path.resolve(args.get('--app')), exe, fs.constants.COPYFILE_EXCL);
 const inputs = [path.resolve(args.get('--demo')), path.resolve(args.get('--mcc'))],

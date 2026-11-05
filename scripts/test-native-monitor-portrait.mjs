@@ -1,8 +1,9 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Actual source-derived corner image, cache reuse and menu/text hit regions.
 // No image is bundled or fetched from the internet; the owner's installed
 // campaign model is rendered once through Spark's normal native reader.
 import fs from 'node:fs/promises';import path from 'node:path';import crypto from 'node:crypto';import net from 'node:net';import {spawn} from 'node:child_process';import {chromium,expect as assertion} from '@playwright/test';
-const [app,destination]=process.argv.slice(2);if(!destination)throw Error('test-native-monitor-portrait <packaged.exe> <fresh-output>');const root=path.resolve(destination),expect=assertion.configure({timeout:120000});await fs.mkdir(root);const exe=path.join(root,'GuiltySpark-monitor-portrait.exe');await fs.copyFile(path.resolve(app),exe,fs.constants.COPYFILE_EXCL);
+const [app,destination]=process.argv.slice(2);if(!destination)throw Error('test-native-monitor-portrait <packaged.exe> <fresh-output>');const root=path.resolve(destination),expect=assertion.configure({timeout:120000});await fs.mkdir(await assertQaOutputPath(root));const exe=path.join(root,'GuiltySpark-monitor-portrait.exe');await fs.copyFile(path.resolve(app),exe,fs.constants.COPYFILE_EXCL);
 const report={complete:false,mockedIpc:false,appSha256:crypto.createHash('sha256').update(await fs.readFile(exe)).digest('hex'),errors:[]};
 const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));const launch=()=>spawn(exe,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});let child=launch(),browser,page;
 const firstLaunch=performance.now();

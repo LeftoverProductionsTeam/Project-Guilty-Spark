@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in desktop + real Invader/H1A acceptance. No game audio or multiplayer claim.
 import { chromium, expect as assertion } from '@playwright/test';
 import fs from 'node:fs/promises';
@@ -12,7 +13,7 @@ if (args.length !== 6)
     'test-native-loop-emitter <built Spark exe> <fresh root> <H1A kit> <owned native tags> <Invader> <owned MCC source map>',
   );
 const [app, root, kit, tags, invader, sourceMap] = args.map((p) => path.resolve(p));
-await fs.mkdir(root, { recursive: false });
+await fs.mkdir(await assertQaOutputPath(root), { recursive: false });
 const data = path.join(root, 'library');
 await fs.mkdir(data);
 const hash = async (p) =>

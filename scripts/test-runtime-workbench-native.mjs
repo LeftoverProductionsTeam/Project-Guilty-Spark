@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Explicit native UI acceptance using a fresh library or qa_runtime_library fixture.
 // No game/tool launch, process attachment, deployment or game-memory writes.
 // node scripts/test-runtime-workbench-native.mjs --app <built.exe> --output <fresh-dir>
@@ -17,7 +18,7 @@ for (let i = 2; i < process.argv.length; i += 2) {
 }
 if (!options.has('--app') || !options.has('--output')) throw new Error('A built native executable and a fresh output directory are required.');
 const output = path.resolve(options.get('--output'));
-await fs.mkdir(output); // exclusive, never overwrite a prior receipt or application data
+await fs.mkdir(await assertQaOutputPath(output)); // exclusive, never overwrite a prior receipt or application data
 const data = options.has('--data') ? path.resolve(options.get('--data')) : path.join(output, 'library');
 let fixture = null;
 if (options.has('--data')) {

@@ -84,6 +84,10 @@ pub struct Entry {
     pub parent_id: Option<String>,
     #[serde(default)]
     pub snapshot: String,
+    /// Byte identity at completion. Old metadata-only records remain protected
+    /// until their owner records a fresh, content-verified completion.
+    #[serde(default)]
+    pub content_snapshot: String,
 }
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -213,11 +217,27 @@ pub fn document_references_path(document: &serde_json::Value, target: &Path) -> 
     }
     false
 }
+/// Reject retired development roots before even creating a library/ledger.
+/// A normal Linux ~/.local/share installation is outside a Spark source tree.
+pub fn reject_obsolete_repository_output(output: &Path) -> Result<()> {
+    let absolute = std::path::absolute(output)?;
+    for component in absolute.ancestors() {
+        if component.file_name().is_some_and(|name| name.eq_ignore_ascii_case(".local")) {
+            if let Some(repo) = component.parent().filter(|repo| {
+                repo.join("Cargo.toml").is_file() && repo.join("src-tauri/tauri.conf.json").is_file()
+            }) {
+                return invalid(format!("This launch/output points at the retired {} development folder. Use a normal project location; preserved recovery data remains under preserved/.", repo.join(".local").display()));
+            }
+        }
+    }
+    Ok(())
+}
 impl Store {
     /// QA libraries under the canonical checkout share one ledger. Installed
     /// applications use their selected data root. No new checkout is created.
     fn location(output: &Path) -> Result<PathBuf> {
         reject_links(output)?;
+        reject_obsolete_repository_output(output)?;
         let absolute = std::path::absolute(output)?;
         let parent = absolute
             .parent()
@@ -229,7 +249,7 @@ impl Store {
             .ancestors()
             .find(|p| p.join("library.sqlite3").is_file());
         let root = if let Some(repo) = repository {
-            repo.join(".local/storage-v1")
+            repo.join("artifacts/storage-v1")
         } else if let Some(library) = library {
             library.join("storage-v1")
         } else {
@@ -333,6 +353,18 @@ impl Store {
     ) -> Result<Lease> {
         reject_links(path)?;
         let path = std::path::absolute(path)?;
+        let source = source
+            .map(|source| {
+                reject_links(source)?;
+                fs::canonicalize(source).map_err(SparkError::from)
+            })
+            .transpose()?;
+        if source
+            .as_ref()
+            .is_some_and(|source| document_references_path(&serde_json::json!(source), &path))
+        {
+            return invalid("Generated output must not contain or be inside its source tree");
+        }
         if path.exists() {
             return invalid("Storage reservations require a new owned output path");
         }
@@ -394,7 +426,7 @@ impl Store {
             id: id.clone(),
             category,
             path: path.clone(),
-            source: source.map(Path::to_owned),
+            source,
             source_revision: None,
             state: "active".into(),
             reserved_bytes: bytes,
@@ -405,6 +437,7 @@ impl Store {
             description: description.chars().take(240).collect(),
             parent_id: parent.map(|e| e.id),
             snapshot: String::new(),
+            content_snapshot: String::new(),
         });
         write(&self.root.join("entries.json"), &entries)?;
         Ok(Lease {
@@ -429,9 +462,18 @@ impl Store {
             .find(|e| e.id == id)
             .ok_or_else(|| fail("Storage reservation disappeared"))?;
         let measured = measure(&row.path)?;
+        let content = if protected {
+            String::new()
+        } else {
+            content_snapshot(&row.path, self.limits()?.per_operation_bytes)?
+        };
+        if !protected && measure(&row.path)?.fingerprint != measured.fingerprint {
+            return invalid("Generated output changed during completion; retained for recovery");
+        }
         row.logical_bytes = measured.logical_bytes;
         row.allocated_bytes = measured.allocated_bytes;
         row.snapshot = measured.fingerprint;
+        row.content_snapshot = content;
         row.state = state.into();
         row.protected = protected;
         row.modified = now();
@@ -460,9 +502,14 @@ impl Store {
             // Only the caller's own native operation can certify adoption. A stopped
             // process leaves a failed, reviewable output; it never becomes accepted.
             let m = measure(&row.path)?;
+            let content = content_snapshot(&row.path, self.limits()?.per_operation_bytes)?;
+            if measure(&row.path)?.fingerprint != m.fingerprint {
+                return invalid("Interrupted output is still changing; retained for recovery");
+            }
             row.logical_bytes = m.logical_bytes;
             row.allocated_bytes = m.allocated_bytes;
             row.snapshot = m.fingerprint;
+            row.content_snapshot = content;
             row.state = "failed".into();
             row.modified = now();
             if row.path.exists() {
@@ -503,12 +550,16 @@ impl Store {
                 && !referenced_source
                 && (row.state == "failed"
                     || row.state == "active" && now().saturating_sub(row.modified) >= age
-                    || row.category == Category::Preview && row.state == "ready");
+                    || row.category == Category::Preview && row.state == "ready"
+                    || row.category == Category::Staging && row.state == "disposable");
             // Accepted trees can contain thousands of files. Never walk protected
             // output merely to decide that it is protected.
             let can = possible
                 && !row.snapshot.is_empty()
-                && measure(&row.path).is_ok_and(|m| m.fingerprint == row.snapshot);
+                && !row.content_snapshot.is_empty()
+                && measure(&row.path).is_ok_and(|m| m.fingerprint == row.snapshot)
+                && content_snapshot(&row.path, self.limits()?.per_operation_bytes)
+                    .is_ok_and(|snapshot| snapshot == row.content_snapshot);
             if can {
                 eligible.push(row.clone());
             } else {
@@ -562,7 +613,17 @@ impl Store {
             }) {
                 return invalid("An accepted/active output or source dependency now references this temporary folder; cleanup refused");
             }
-            let _lease = lock(&self.root.join("leases").join(format!("{id}.lock")))?;
+            // A completed parent must not sweep a still-held child lease, even
+            // during the brief completion/release transition in another process.
+            let lease_files = entries
+                .iter()
+                .filter(|entry| entry.path.starts_with(&row.path))
+                .map(|entry| self.root.join("leases").join(format!("{}.lock", entry.id)))
+                .collect::<Vec<_>>();
+            let leases = lease_files
+                .iter()
+                .map(|path| lock(path))
+                .collect::<Result<Vec<_>>>()?;
             reject_links(&row.path)?;
             // Only outputs created under a successful reserve() are admitted. The
             // marker binds the absolute path; unknown/legacy directories have no marker.
@@ -572,7 +633,12 @@ impl Store {
                 return invalid("Generated output ownership changed; cleanup refused");
             }
             let measured = measure(&row.path)?;
-            if measured.logical_bytes != row.logical_bytes || measured.fingerprint != row.snapshot {
+            if measured.logical_bytes != row.logical_bytes
+                || measured.fingerprint != row.snapshot
+                || content_snapshot(&row.path, self.limits()?.per_operation_bytes)?
+                    != row.content_snapshot
+                || measure(&row.path)?.fingerprint != row.snapshot
+            {
                 return invalid("Generated output changed since preview; cleanup refused");
             }
             if row.path.is_dir() {
@@ -585,8 +651,52 @@ impl Store {
             entries.retain(|e| e.id != *id);
             entries.retain(|e| !e.path.starts_with(&row.path));
             write(&self.root.join("entries.json"), &entries)?;
+            drop(leases);
+            for file in lease_files {
+                // These UUID files are empty synchronization records owned by
+                // the removed entries. Preserve any unexpected changed content.
+                reject_links(&file)?;
+                if fs::metadata(&file)?.len() == 0 {
+                    fs::remove_file(file)?;
+                }
+            }
         }
         Ok(removed)
+    }
+    /// Dispose only an explicitly completed, unprotected staging entry. Call
+    /// after its native consumer has finished; accepted outputs, live leases,
+    /// changed bytes and other entries' source dependencies still refuse removal.
+    pub fn dispose_completed(&self, path: &Path) -> Result<u64> {
+        reject_links(path)?;
+        let path = std::path::absolute(path)?;
+        {
+            let _guard = lock(&self.root.join("catalog.lock"))?;
+            let mut rows = self.entries()?;
+            let row = rows
+                .iter_mut()
+                .find(|row| row.path == path)
+                .filter(|row| {
+                    row.category == Category::Staging
+                        && !row.protected
+                        && matches!(row.state.as_str(), "ready" | "disposable")
+                })
+                .ok_or_else(|| {
+                    fail("Only completed, unprotected staging can be declared disposable")
+                })?;
+            // This records the consumer's explicit end-of-lifetime declaration,
+            // never a new snapshot of potentially changed files.
+            row.state = "disposable".into();
+            write(&self.root.join("entries.json"), &rows)?;
+        }
+        let plan = self.cleanup_plan()?;
+        let row = plan
+            .eligible
+            .iter()
+            .find(|row| {
+                row.path == path && row.category == Category::Staging && row.state == "disposable"
+            })
+            .ok_or_else(|| fail("Staging is active, protected, referenced or changed; retained"))?;
+        self.cleanup(&plan, &[row.id.clone()], true)
     }
 }
 pub struct ToolBudget {
@@ -655,6 +765,14 @@ impl Lease {
         self.finished = true;
         self.held.take();
         Ok(())
+    }
+    /// Use only for scratch staging whose final consumer has already finished.
+    /// `finish(false, ..)` remains available while another native step needs it.
+    pub fn finish_disposable(self) -> Result<u64> {
+        let store = self.store.clone();
+        let path = self.path.clone();
+        self.finish(false, None)?;
+        store.dispose_completed(&path)
     }
     pub fn adopt(&mut self, target: &Path) -> Result<()> {
         reject_links(target)?;
@@ -892,6 +1010,54 @@ pub fn measure(root: &Path) -> Result<Measurement> {
     identities.sort();
     out.fingerprint = crate::hex_bytes(sha2::Sha256::digest(serde_json::to_vec(&identities)?));
     Ok(out)
+}
+/// Content verification is reserved for unprotected generated output and
+/// disposal. Read-only folder totals and accepted native sources keep their
+/// metadata-only accounting; they are never hashed merely to permit cleanup.
+fn content_snapshot(root: &Path, maximum_bytes: u64) -> Result<String> {
+    reject_links(root)?;
+    let mut pending = if root.exists() {
+        vec![(root.to_owned(), 0usize)]
+    } else {
+        vec![]
+    };
+    let mut rows = vec![];
+    let mut bytes = 0u64;
+    while let Some((path, depth)) = pending.pop() {
+        reject_links(&path)?;
+        let metadata = fs::metadata(&path)?;
+        if depth > 64 || rows.len() >= 200000 {
+            return invalid("Generated content verification exceeds its bounded file/depth limit");
+        }
+        let relative = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
+        if metadata.is_dir() {
+            rows.push((relative, String::new()));
+            for child in fs::read_dir(&path)? {
+                if pending.len() >= 200000 {
+                    return invalid(
+                        "Generated content verification exceeds its pending-file limit",
+                    );
+                }
+                pending.push((child?.path(), depth + 1));
+            }
+        } else if metadata.is_file() {
+            bytes = bytes
+                .checked_add(metadata.len())
+                .ok_or_else(|| fail("Generated content size overflow"))?;
+            if bytes > maximum_bytes {
+                return invalid(
+                    "Generated content exceeds its operation budget; retained for review",
+                );
+            }
+            rows.push((relative, crate::maps::hash_file(&path)?));
+        } else {
+            return invalid("Generated content contains a special file; retained for review");
+        }
+    }
+    rows.sort();
+    Ok(crate::hex_bytes(sha2::Sha256::digest(serde_json::to_vec(
+        &rows,
+    )?)))
 }
 pub fn estimate_copy(files: usize, bytes: u64) -> u64 {
     bytes.saturating_add((files as u64).saturating_mul(65536))
@@ -1132,6 +1298,19 @@ fn file_identity(path: &Path) -> Option<(u64, u64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stale_native_data_override_cannot_recreate_retired_repository_folder() {
+        let root=tempfile::tempdir().unwrap();let repo=root.path().join("Spark");
+        fs::create_dir_all(repo.join("src-tauri")).unwrap();
+        fs::write(repo.join("Cargo.toml"),b"[workspace]").unwrap();
+        fs::write(repo.join("src-tauri/tauri.conf.json"),b"{}").unwrap();
+        let retired=repo.join(".local/old-library");
+        assert!(crate::library::Library::open(&retired).is_err());
+        assert!(Store::for_output(&retired.join("jobs/new")).is_err());
+        assert!(!repo.join(".local").exists());
+        assert!(crate::library::Library::open(&repo.join("artifacts/qa/current/library")).is_ok());
+        assert!(crate::library::Library::open(&root.path().join("home/.local/share/spark")).is_ok());
+    }
     #[cfg(windows)]
     #[test]
     fn connected_halo_scan_reports_junctions_without_walking_or_certifying_them() {
@@ -1207,6 +1386,138 @@ mod tests {
         let shallow = Store::for_output(&root.path().join("jobs/job")).unwrap();
         let deep = Store::for_output(&nested.join("jobs/job")).unwrap();
         assert_eq!(shallow.root(), deep.root());
+        assert_eq!(
+            shallow.root(),
+            fs::canonicalize(root.path().join("artifacts/storage-v1")).unwrap()
+        );
+        assert!(!root.path().join(".local").exists());
+    }
+    #[test]
+    fn external_library_keeps_its_storage_owner_without_creating_repository_data() {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(
+            root.path().join("library.sqlite3"),
+            b"selected external library",
+        )
+        .unwrap();
+        let store = Store::for_output(&root.path().join("jobs/job")).unwrap();
+        assert_eq!(
+            store.root(),
+            fs::canonicalize(root.path().join("storage-v1")).unwrap()
+        );
+        assert!(!root.path().join("artifacts").exists());
+        assert!(!root.path().join(".local").exists());
+    }
+    #[test]
+    fn reservations_refuse_outputs_nested_in_their_original_source() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("ledger")).unwrap();
+        let source = root.path().join("original-tags");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("native.tag"), b"original native input").unwrap();
+        let output = source.join("job").join("tags");
+        assert!(store
+            .reserve(
+                &output,
+                Some(&source),
+                65536,
+                Category::Staging,
+                "recursive copy"
+            )
+            .is_err());
+        assert!(!output.exists());
+        assert!(store.overview().unwrap().entries.is_empty());
+        assert_eq!(
+            fs::read(source.join("native.tag")).unwrap(),
+            b"original native input"
+        );
+    }
+    #[test]
+    fn completed_disposable_staging_is_removed_without_accumulating_equivalent_jobs() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("ledger")).unwrap();
+        let source = root.path().join("native.tag");
+        fs::write(&source, b"preserved source").unwrap();
+        for attempt in 0..12 {
+            let output = root.path().join(format!("scratch-{attempt}"));
+            let lease = store
+                .reserve(
+                    &output,
+                    Some(&source),
+                    65536,
+                    Category::Staging,
+                    "disposable compiler scratch",
+                )
+                .unwrap();
+            fs::create_dir(&output).unwrap();
+            fs::write(output.join("native.tag"), b"small native staging fixture").unwrap();
+            lease.mark_owned().unwrap();
+            assert!(store.dispose_completed(&output).is_err());
+            lease.finish_disposable().unwrap();
+            assert!(!output.exists());
+            assert!(!marker(&output).exists());
+            let overview = store.overview().unwrap();
+            assert!(overview.entries.is_empty());
+            assert_eq!(overview.accounted_bytes, 0);
+            assert_eq!(
+                fs::read_dir(store.root().join("leases")).unwrap().count(),
+                0
+            );
+        }
+        assert_eq!(fs::read(source).unwrap(), b"preserved source");
+        assert!(!root.path().join(".local").exists());
+    }
+    #[test]
+    fn disposable_cleanup_refuses_same_size_changed_bytes_with_restored_timestamp() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("ledger")).unwrap();
+        let output = root.path().join("scratch");
+        let lease = store
+            .reserve(&output, None, 65536, Category::Staging, "completed scratch")
+            .unwrap();
+        fs::create_dir(&output).unwrap();
+        let file = output.join("native.tag");
+        fs::write(&file, b"old!").unwrap();
+        lease.finish(false, None).unwrap();
+        assert!(store.cleanup_plan().unwrap().eligible.is_empty());
+        let before = measure(&output).unwrap();
+        let modified = fs::metadata(&file).unwrap().modified().unwrap();
+        fs::write(&file, b"new!").unwrap();
+        fs::File::options()
+            .write(true)
+            .open(&file)
+            .unwrap()
+            .set_times(fs::FileTimes::new().set_modified(modified))
+            .unwrap();
+        assert_eq!(measure(&output).unwrap().fingerprint, before.fingerprint);
+        assert!(store.dispose_completed(&output).is_err());
+        assert_eq!(fs::read(file).unwrap(), b"new!");
+    }
+    #[test]
+    fn disposable_staging_under_an_active_or_accepted_native_parent_is_retained() {
+        let root = tempfile::tempdir().unwrap();
+        let store = Store::open(&root.path().join("ledger")).unwrap();
+        let parent = root.path().join("native-build");
+        let parent_lease = store
+            .reserve(&parent, None, 131072, Category::Staging, "native owner")
+            .unwrap();
+        fs::create_dir(&parent).unwrap();
+        let child = parent.join("tags");
+        let child_lease = store
+            .reserve(&child, None, 65536, Category::Staging, "native input")
+            .unwrap();
+        fs::create_dir(&child).unwrap();
+        fs::write(child.join("authored.tag"), b"accepted native source").unwrap();
+        child_lease.finish(false, None).unwrap();
+        assert!(store.dispose_completed(&child).is_err());
+        parent_lease
+            .finish(true, Some("accepted-native-revision".into()))
+            .unwrap();
+        assert!(store.dispose_completed(&child).is_err());
+        assert_eq!(
+            fs::read(child.join("authored.tag")).unwrap(),
+            b"accepted native source"
+        );
     }
     #[test]
     fn saved_source_references_protect_equivalent_windows_paths_and_settings() {

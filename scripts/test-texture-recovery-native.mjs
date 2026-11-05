@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in, real WebView2 / native IPC test. Uses owned files read-only and
 // changes only a fresh QA library and private resource copies beneath --output.
 import fs from 'node:fs/promises';
@@ -12,7 +13,7 @@ const expect=baseExpect.configure({timeout:60000}),args=new Map();
 for(let i=2;i<process.argv.length;i+=2)args.set(process.argv[i],process.argv[i+1]);
 if(!args.get('--app')||!args.get('--output')||!args.get('--map')||[...args.keys()].some(k=>!['--app','--output','--map'].includes(k)))throw Error('Required: --app built.exe --output fresh-directory --map owned-classic.map');
 const output=path.resolve(args.get('--output')),input=path.resolve(args.get('--map'));
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const exe=path.join(output,'GuiltySpark-texture-recovery.exe');
 await fs.copyFile(path.resolve(args.get('--app')),exe,fs.constants.COPYFILE_EXCL);
 const canonical=value=>JSON.parse(JSON.stringify(value));

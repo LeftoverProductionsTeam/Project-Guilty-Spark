@@ -41,13 +41,13 @@ fn folders(state: &AppState, manager: &storage::Store) -> Reply<Vec<Folder>> {
         .filter(|root| root.join("Cargo.toml").is_file())
     {
         candidates.push((
-            "Research/recovery archives",
-            root.join(".local/archives"),
-            "Requires content/provenance review; retained",
+            "Preserved source, recovery data & archives",
+            root.join("preserved"),
+            "Verified unique source, recovery records and previous-good data; never disposable cache",
         ));
         candidates.push((
             "Shared Rust compiler output",
-            root.join(".local/build/cargo"),
+            root.join("target"),
             "Compiler intermediates and accepted applications; no blanket deletion",
         ));
     }

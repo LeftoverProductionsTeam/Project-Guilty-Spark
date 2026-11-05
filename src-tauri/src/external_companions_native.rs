@@ -65,6 +65,7 @@ fn context(
         .into(),
         owned_native_tags: false,
         cache_version: project.and_then(|p| p.source.map(|s| s.cache_version)),
+        geometry_source: false,
     })
 }
 fn inspect(reg: &Registration, root: &Path) -> Reply<()> {
@@ -223,6 +224,7 @@ mod tests {
             flavor: None,
             source_kind: "classicCache".into(),
             cache_version: Some(609),
+            geometry_source: false,
             owned_native_tags: false,
         };
         assert!(launch_plan(&reg, &root, &context, false).is_err());

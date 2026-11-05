@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real owned-cache / native IPC / WebView2 acceptance. No mock IPC, source
 // rewrites, guessed filename aliases, or game-memory access. Private QA only.
 import fs from 'node:fs/promises';
@@ -14,7 +15,7 @@ const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const source=await fs.readFile(input),resource=await fs.readFile(path.join(folder,'bitmaps.map'));
 const sourceHash=hash(source),resourceHash=hash(resource);
 if(sourceHash!=='b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d'||resourceHash!=='5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea')throw Error('This gate requires the exact original owned Zombie map and bitmap pack.');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const exe=path.join(output,'GuiltySpark-bitmap-restoration.exe');await fs.copyFile(path.resolve(args.get('--app')),exe,fs.constants.COPYFILE_EXCL);
 const receipt={schemaVersion:1,appSha256:hash(await fs.readFile(exe)),sourceSha256:sourceHash,resourceSha256:resourceHash,mockedIpc:false,complete:false,javascriptOrGpuErrors:[],gameLaunched:false};
 const server=net.createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;await new Promise(r=>server.close(r));

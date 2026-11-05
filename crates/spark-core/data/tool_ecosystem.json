@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-30",
+  "reviewedAt": "2026-11-04",
   "tools": [
     {
       "id": "sapien",
@@ -43,7 +43,33 @@
         }
       ],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          ".scenario and native source changes"
+        ],
+        "dependencies": [
+          "Matching H1A Editing Kit or classic HEK",
+          "Compiled BSP and complete matching tag tree"
+        ],
+        "sourceDirectory": "The current project’s validated working tags plus its matching data folder",
+        "documentedOperations": [
+          "Documented GUI: open a compatible .scenario in the installed kit"
+        ],
+        "manualOperations": [
+          "Edit scenario objects/AI/environment and save in Sapien"
+        ],
+        "limitations": [
+          "Kit generations differ; a compiled .map is not editable loose-tag source",
+          "No automatic Sapien UI editing endpoint is assumed"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Place AI, encounters, objects and environment settings in a compiled source scenario.",
+        "documentation": "https://learn.microsoft.com/en-us/halo-master-chief-collection/"
+      },
+      "releaseUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/"
     },
     {
       "id": "guerilla",
@@ -86,7 +112,32 @@
         }
       ],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Ordinary loose Halo tags"
+        ],
+        "dependencies": [
+          "Matching H1A Editing Kit or classic HEK",
+          "Complete native dependency tree"
+        ],
+        "sourceDirectory": "Project-bound validated native working tags",
+        "documentedOperations": [
+          "Documented GUI: open native tags under the matching kit tag root"
+        ],
+        "manualOperations": [
+          "Edit/save tag fields and references in Guerilla"
+        ],
+        "limitations": [
+          "Source identity and kit generation must match; native validation/build still required"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Edit a weapon’s firing behavior or other full native tag properties.",
+        "documentation": "https://learn.microsoft.com/en-us/halo-master-chief-collection/"
+      },
+      "releaseUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/"
     },
     {
       "id": "baboon",
@@ -123,7 +174,36 @@
         }
       ],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Native MCC loose tags; supported comparisons and reference navigation"
+        ],
+        "dependencies": [
+          "Reviewed Baboon portable build and matching definitions",
+          "Validated project-bound native working tag tree"
+        ],
+        "sourceDirectory": "Prepared Baboon editing-kit fork; immutable baseline and reconciled revisions remain separate",
+        "documentedOperations": [
+          "Reviewed installed Baboon -HCEEK launch through the existing handoff",
+          "No remote automation endpoint is registered"
+        ],
+        "manualOperations": [
+          "Change native fields in the GUI, save and close before reconciliation/build"
+        ],
+        "limitations": [
+          "Current upstream HEAD does not certify the installed pinned release",
+          "Exact supported class/definition generation matters",
+          "C69 Invader reconciliation is not a new Baboon GUI edited-save pass"
+        ],
+        "integrationTests": [
+          "Existing Baboon installation/definition/hash and source-fork tests",
+          "C69 shared reconciliation: deliberate QA corruption refused, valid Invader field save built; Baboon GUI edit unverified"
+        ],
+        "whenToUse": "Use structured native tag properties and reference navigation in a modern GUI.",
+        "documentation": "https://github.com/Zoephie/Baboon/blob/640088c1edd68864a1aeb5c400ee37ac18edd95c/README.md"
+      },
+      "releaseUrl": "https://github.com/Zoephie/Baboon/releases"
     },
     {
       "id": "tagTest",
@@ -160,7 +240,31 @@
         }
       ],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Runtime diagnostics and gameplay observations"
+        ],
+        "dependencies": [
+          "Matching official Standalone and complete tags/data"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "Existing documented test-scene handoff from the source-aware runtime workbench"
+        ],
+        "manualOperations": [
+          "Load and play the exact native scenario; report the actual behavior"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "C63 two-way door human acceptance belongs to its prior exact cache; not automatically transferred to new maps"
+        ],
+        "whenToUse": "Test working tags in the official H1A Standalone development runtime.",
+        "documentation": "https://learn.microsoft.com/en-us/halo-master-chief-collection/"
+      },
+      "releaseUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/"
     },
     {
       "id": "haloTool",
@@ -204,7 +308,37 @@
         }
       ],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Native BSP/model/collision tags",
+          "Baked lightmap tags",
+          "Target-specific .map cache"
+        ],
+        "dependencies": [
+          "Matching official kit and complete working tags",
+          "Native JMS/data input for the requested operation"
+        ],
+        "sourceDirectory": "Fresh owned build job workspace/tags and workspace/data",
+        "documentedOperations": [
+          "tool structure <level-directory> <bsp-name>",
+          "tool lightmaps <scenario> <bsp-name> <quality> <stop>",
+          "tool build-cache-file <scenario> (generation-specific flags are chosen by Spark)"
+        ],
+        "manualOperations": [
+          "Inspect compiler diagnostics; test the exact validated output in the target game"
+        ],
+        "limitations": [
+          "Command lines differ by kit generation",
+          "Exit code alone never proves a valid or playable cache"
+        ],
+        "integrationTests": [
+          "C69 native authoring and external-tag build: actual H1A Tool, cache CRC/index and scenario readback passed; gameplay unverified"
+        ],
+        "whenToUse": "Rebuild structural geometry, imported models, radiosity and native caches.",
+        "documentation": "https://learn.microsoft.com/en-us/halo-master-chief-collection/"
+      },
+      "releaseUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/"
     },
     {
       "id": "invaderEditor",
@@ -290,7 +424,32 @@
         }
       ],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Native loose tags"
+        ],
+        "dependencies": [
+          "Reviewed Invader executable for the operation",
+          "Compatible owned source tags/cache and exact original resource requirements"
+        ],
+        "sourceDirectory": "Project-bound native tags, never a compiled map as a loose tag",
+        "documentedOperations": [
+          "invader-edit-qt: documented desktop editor; Spark uses the existing source handoff"
+        ],
+        "manualOperations": [
+          "Edit and save through the Qt GUI"
+        ],
+        "limitations": [
+          "Qt GUI acceptance is independent of invader-edit CLI tests"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Browse and edit compatible loose tags with Invader’s structured editor.",
+        "documentation": "https://github.com/SnowyMouse/invader/tree/33518109"
+      },
+      "releaseUrl": "https://invader.opencarnage.net/"
     },
     {
       "id": "invaderBuild",
@@ -332,7 +491,32 @@
         }
       ],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Target-specific validated .map cache"
+        ],
+        "dependencies": [
+          "Reviewed Invader executable for the operation",
+          "Compatible owned source tags/cache and exact original resource requirements"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "invader-build -g <target> -t <tags> -m <output> <scenario>"
+        ],
+        "manualOperations": [
+          "Open a separate working copy through the application and save it; review the result in Spark"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "Existing native build regressions and map-specific builds; no universal runtime/gameplay claim"
+        ],
+        "whenToUse": "Build a supported target cache from complete source tags.",
+        "documentation": "https://github.com/SnowyMouse/invader/tree/33518109"
+      },
+      "releaseUrl": "https://invader.opencarnage.net/"
     },
     {
       "id": "invaderExtract",
@@ -419,7 +603,33 @@
         }
       ],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Loose tags and extraction diagnostics"
+        ],
+        "dependencies": [
+          "Reviewed Invader executable for the operation",
+          "Compatible owned source tags/cache and exact original resource requirements"
+        ],
+        "sourceDirectory": "Fresh extraction job with exact source cache/resource identities",
+        "documentedOperations": [
+          "invader-extract -t <output-tags> <source-map> with reviewed target/resource options"
+        ],
+        "manualOperations": [
+          "Open a separate working copy through the application and save it; review the result in Spark"
+        ],
+        "limitations": [
+          "Protected/missing/shared resources can prevent complete recovery",
+          "A zero exit with per-tag failures is rejected"
+        ],
+        "integrationTests": [
+          "C67 recovered scenario compile/readback; archive/extraction failure regressions"
+        ],
+        "whenToUse": "Recover real loose tags and their dependencies from a supported owned cache.",
+        "documentation": "https://github.com/SnowyMouse/invader/tree/33518109"
+      },
+      "releaseUrl": "https://invader.opencarnage.net/"
     },
     {
       "id": "invaderInfo",
@@ -509,7 +719,32 @@
         }
       ],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Read-only native metadata/diagnostics"
+        ],
+        "dependencies": [
+          "Reviewed Invader executable for the operation",
+          "Compatible owned source tags/cache and exact original resource requirements"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "invader-info <map> with reviewed read-only arguments"
+        ],
+        "manualOperations": [
+          "Open a separate working copy through the application and save it; review the result in Spark"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "Existing cache index/CRC and native source identity gates"
+        ],
+        "whenToUse": "Inspect native cache metadata, index, scenario and resource requirements.",
+        "documentation": "https://github.com/SnowyMouse/invader/tree/33518109"
+      },
+      "releaseUrl": "https://invader.opencarnage.net/"
     },
     {
       "id": "invaderNative",
@@ -540,7 +775,38 @@
       "handler": "nativeFields",
       "legacy": [],
       "version": "0.55.0.r4134.33518109",
-      "sha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12"
+      "sha256": "02e5f41da7f5dbfade250921869239f8d21c36c336cb0be081a9910dca17aa12",
+      "workflow": {
+        "outputs": [
+          "Native loose-tag edits",
+          "Compiled native scenario script data"
+        ],
+        "dependencies": [
+          "Reviewed Invader executable for the operation",
+          "Compatible owned source tags/cache and exact original resource requirements"
+        ],
+        "sourceDirectory": "Prepared isolated tags/data revision; exact dependency hashes retained",
+        "documentedOperations": [
+          "invader-edit -t <tags> -G <field> <tag>",
+          "invader-edit -t <tags> -S <field> <value> <tag>",
+          "invader-script -g <target> -t <tags> -d <data> <scenario>"
+        ],
+        "manualOperations": [
+          "Review field/schema and semantic diff; reconcile before native rebuild"
+        ],
+        "limitations": [
+          "Only reviewed commands are registered; no arbitrary shell/peer tool execution",
+          "Semantic no-op differs from corrupt source; original files remain retained"
+        ],
+        "integrationTests": [
+          "C69: actual radius 0.9 to 0.5 edit, native readback/reconciliation and compiled readback passed",
+          "C69: invalid HSC refused and corrected original source recompiles",
+          "C69 same-value save was byte-identical; no new byte-different GUI rewrite acceptance"
+        ],
+        "whenToUse": "Read or change supported native fields and compile HaloScript through reviewed operations.",
+        "documentation": "https://github.com/SnowyMouse/invader/tree/33518109"
+      },
+      "releaseUrl": "https://invader.opencarnage.net/"
     },
     {
       "id": "invaderDependency",
@@ -571,7 +837,32 @@
       "handler": "dependencies",
       "legacy": [],
       "version": "0.55.0.r4134.33518109",
-      "sha256": "727e6983582f882b17a52822547ee1805c13856de912494ce28ff2a726a3b554"
+      "sha256": "727e6983582f882b17a52822547ee1805c13856de912494ce28ff2a726a3b554",
+      "workflow": {
+        "outputs": [
+          "Dependency paths and missing-reference diagnostics"
+        ],
+        "dependencies": [
+          "Reviewed Invader executable for the operation",
+          "Compatible owned source tags/cache and exact original resource requirements"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "invader-dependency through reviewed native dependency operations"
+        ],
+        "manualOperations": [
+          "Open a separate working copy through the application and save it; review the result in Spark"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "Existing dependency/hash and native compile preflight regressions"
+        ],
+        "whenToUse": "Audit a tag’s native dependencies before import or compilation.",
+        "documentation": "https://github.com/SnowyMouse/invader/tree/33518109"
+      },
+      "releaseUrl": "https://invader.opencarnage.net/"
     },
     {
       "id": "invaderRepair",
@@ -602,16 +893,42 @@
       "handler": "repair",
       "legacy": [],
       "version": "0.55.0.r4134.33518109",
-      "sha256": "094c844b9bdc494341d0fd08c07bd0d23344ea224c71205ce9846e46452205f3"
+      "sha256": "094c844b9bdc494341d0fd08c07bd0d23344ea224c71205ce9846e46452205f3",
+      "workflow": {
+        "outputs": [
+          "Reviewed native source changes and diagnostics"
+        ],
+        "dependencies": [
+          "Reviewed Invader executable for the operation",
+          "Compatible owned source tags/cache and exact original resource requirements"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "invader-bludgeon only through existing reviewed repair operations"
+        ],
+        "manualOperations": [
+          "Open a separate working copy through the application and save it; review the result in Spark"
+        ],
+        "limitations": [
+          "Never blanket-repair original maps or accept an unreviewed repair as correct",
+          "Source Guardian retains recovery and previous-good revisions"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Review a supported native repair on a preserved working copy.",
+        "documentation": "https://github.com/SnowyMouse/invader/tree/33518109"
+      },
+      "releaseUrl": "https://invader.opencarnage.net/"
     },
     {
       "id": "blenderHalo",
-      "label": "Halo Asset Blender Toolset",
+      "label": "Blender + Halo toolset",
       "group": "community",
       "mode": "sourceHandoff",
-      "purpose": "Upstream JMS/JMA and edition-specific asset workflows; no verified Spark Blender handoff yet.",
+      "purpose": "Model organic terrain, scenery and animations; exchange reviewed OBJ source with Spark.",
       "modifiesFiles": true,
-      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "caveat": "The OBJ handoff uses Blender itself. Native JMS/JMA addon export requires a separately installed compatible Halo addon; addon acceptance is separate.",
       "filename": null,
       "location": "external",
       "maintainer": "General-101 / Steven Garcia and contributors",
@@ -625,15 +942,53 @@
         "halo2",
         "halo3"
       ],
-      "runtimes": [],
+      "runtimes": [
+        "mccSteam",
+        "haloCustomEdition",
+        "openCe",
+        "chupathingyCe"
+      ],
       "inputs": [
+        "forgeSource",
         "sourceGeometry"
       ],
-      "integration": "upstreamOnly",
-      "handler": "research",
+      "integration": "sourceHandoff",
+      "handler": "geometryHandoff",
       "legacy": [],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Reviewed OBJ geometry for Spark",
+          "JMS/JMA native source via a separately installed compatible Halo addon",
+          ".blend authoring project"
+        ],
+        "dependencies": [
+          "Blender; installed version and executable are checked",
+          "Optional General-101 Halo addon for JMS/JMA export; not needed for OBJ exchange"
+        ],
+        "sourceDirectory": "One prepared geometry-handoffs/<id>/working.obj; baseline.obj and original asset are retained",
+        "documentedOperations": [
+          "Blender --disable-autoexec standalone GUI; no project Python execution endpoint",
+          "Blender documented OBJ Import/Export",
+          "Halo addon File Import/Export for supported JMS/JMA generations"
+        ],
+        "manualOperations": [
+          "Import working.obj into Blender, edit, export OBJ back to working.obj",
+          "Review changes in Spark and import the revised copy; assign native Halo materials before building"
+        ],
+        "limitations": [
+          "MTL images, rigs and animation are not carried by the OBJ exchange",
+          "Complete UVs and closed bounded geometry are required by native static scenery build",
+          "Halo addon installation/export and native animation handoff remain independent acceptance gates"
+        ],
+        "integrationTests": [
+          "Native DCC round trip pending this continuation; do not treat installed Blender as acceptance"
+        ],
+        "whenToUse": "Create organic terrain, model scenery, or author animations beyond brush geometry.",
+        "documentation": "https://github.com/General-101/Halo-Asset-Blender-Development-Toolset/blob/81e86bf98aee4607a2159ff9a22a223a1a91c9d7/README.md"
+      },
+      "releaseUrl": "https://github.com/General-101/Halo-Asset-Blender-Development-Toolset/releases"
     },
     {
       "id": "osoyoos",
@@ -642,7 +997,7 @@
       "mode": "sourceHandoff",
       "purpose": "Optional editing-kit profile launcher; source-aware Spark execution is not implemented.",
       "modifiesFiles": true,
-      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "caveat": "Official setup/standalone selection is available; a managed current-project round trip has not been verified. ",
       "filename": null,
       "location": "external",
       "maintainer": "num0005 and contributors",
@@ -666,7 +1021,31 @@
       "handler": "research",
       "legacy": [],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Tool-specific source or inspection output; validate before adoption"
+        ],
+        "dependencies": [
+          "Separately installed application and compatible owned Halo content"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "No automatic project command is registered for this tool"
+        ],
+        "manualOperations": [
+          "Open a separate working copy through the application and save it; review the result in Spark"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Optional editing-kit profile launcher; source-aware Spark execution is not implemented.",
+        "documentation": "https://github.com/num0005/Osoyoos-Launcher"
+      },
+      "releaseUrl": "https://github.com/num0005/Osoyoos-Launcher/releases"
     },
     {
       "id": "mozzarilla",
@@ -675,7 +1054,7 @@
       "mode": "sourceHandoff",
       "purpose": "Legacy loose-tag/OpenSauce candidate; module-specific installation and native handoff remain unverified.",
       "modifiesFiles": true,
-      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "caveat": "Official setup/standalone selection is available; a managed current-project round trip has not been verified. ",
       "filename": null,
       "location": "external",
       "maintainer": "Sigmmma / MosesOfEgypt and contributors",
@@ -695,7 +1074,31 @@
       "handler": "research",
       "legacy": [],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Compatible loose tags"
+        ],
+        "dependencies": [
+          "MEK/Mozzarilla, Python/Tk dependencies and matching tag definitions"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "Use the documented Mozzarilla GUI; no arbitrary Python module execution is exposed"
+        ],
+        "manualOperations": [
+          "Open an isolated compatible source tag, edit/save, then validate with its matching toolchain"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Edit legacy Halo loose tags using the MEK structured tag editor.",
+        "documentation": "https://github.com/Sigmmma/mek/blob/578d8c57b1ec1f716b23cd3a7191a400a955b178/README.md"
+      },
+      "releaseUrl": "https://github.com/Sigmmma/mek/releases"
     },
     {
       "id": "refinery",
@@ -704,7 +1107,7 @@
       "mode": "sourceHandoff",
       "purpose": "Legacy cache extraction/recovery candidate; MCC support and Spark execution remain unverified.",
       "modifiesFiles": true,
-      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "caveat": "Official setup/standalone selection is available; a managed current-project round trip has not been verified. ",
       "filename": null,
       "location": "external",
       "maintainer": "Sigmmma / MosesOfEgypt and contributors",
@@ -725,7 +1128,31 @@
       "handler": "research",
       "legacy": [],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Supported extracted tags and diagnostics"
+        ],
+        "dependencies": [
+          "MEK/Refinery dependencies and compatible original resources"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "Use the documented Refinery GUI; automatic extraction is not registered"
+        ],
+        "manualOperations": [
+          "Extract into a separate source tree and inspect failures before importing"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Recover supported tag data from legacy compiled maps.",
+        "documentation": "https://github.com/Sigmmma/mek/blob/578d8c57b1ec1f716b23cd3a7191a400a955b178/README.md"
+      },
+      "releaseUrl": "https://github.com/Sigmmma/mek/releases"
     },
     {
       "id": "reclaimer",
@@ -734,7 +1161,7 @@
       "mode": "sourceHandoff",
       "purpose": "Compiled-cache inspection and asset extraction research; not a native rebuild guarantee.",
       "modifiesFiles": true,
-      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "caveat": "Official setup/standalone selection is available; a managed current-project round trip has not been verified. ",
       "filename": null,
       "location": "external",
       "maintainer": "Gravemind2401 and contributors",
@@ -759,7 +1186,31 @@
       "handler": "research",
       "legacy": [],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Format-specific model/texture exports"
+        ],
+        "dependencies": [
+          "Separately installed Reclaimer and supported source format"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "Use documented desktop asset browser/export actions; no automatic map handoff is registered"
+        ],
+        "manualOperations": [
+          "Open preserved cache, select supported asset and export source for Spark import"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Inspect compiled assets and recover supported model/texture source.",
+        "documentation": "https://github.com/Gravemind2401/Reclaimer/blob/36224d7a4581f2a1f255099bf706aa56be9f6e21/README.md"
+      },
+      "releaseUrl": "https://github.com/Gravemind2401/Reclaimer/releases"
     },
     {
       "id": "assembly",
@@ -768,7 +1219,7 @@
       "mode": "sourceHandoff",
       "purpose": "Generation-specific cache editing research; source tags remain authoritative.",
       "modifiesFiles": true,
-      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "caveat": "Official setup/standalone selection is available; a managed current-project round trip has not been verified. ",
       "filename": null,
       "location": "external",
       "maintainer": "XboxChaos and contributors",
@@ -794,7 +1245,31 @@
       "handler": "research",
       "legacy": [],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Tool-specific source or inspection output; validate before adoption"
+        ],
+        "dependencies": [
+          "Separately installed application and compatible owned Halo content"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "No automatic project command is registered for this tool"
+        ],
+        "manualOperations": [
+          "Open a separate working copy through the application and save it; review the result in Spark"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Generation-specific cache editing research; source tags remain authoritative.",
+        "documentation": "https://github.com/XboxChaos/Assembly"
+      },
+      "releaseUrl": "https://github.com/XboxChaos/Assembly/releases"
     },
     {
       "id": "excession",
@@ -803,7 +1278,7 @@
       "mode": "sourceHandoff",
       "purpose": "Publishing companion research; existing owned-package preparation is separate from verified Excession validation.",
       "modifiesFiles": true,
-      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "caveat": "Official setup/standalone selection is available; a managed current-project round trip has not been verified. ",
       "filename": null,
       "location": "external",
       "maintainer": "Microsoft / Halo Studios",
@@ -827,7 +1302,33 @@
       "handler": "research",
       "legacy": [],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Official package metadata and Workshop submission"
+        ],
+        "dependencies": [
+          "Official installed Excession, Steam and an owned compatible MCC build"
+        ],
+        "sourceDirectory": "Dedicated mod/package root separate from stock maps and saved source",
+        "documentedOperations": [
+          "Documented GUI: create mod package, choose mod root, configure map metadata",
+          "Spark separately supports validated local package creation from exact Excession template"
+        ],
+        "manualOperations": [
+          "Create/review metadata and explicitly publish through Excession when authorized"
+        ],
+        "limitations": [
+          "Publishing is a separate approved user action",
+          "Local package validation is not a verified Workshop upload or game load"
+        ],
+        "integrationTests": [
+          "Existing package/path/manifest/hash regressions; no new Excession GUI/Workshop acceptance"
+        ],
+        "whenToUse": "Create official MCC mod metadata and manage a Workshop package.",
+        "documentation": "https://learn.microsoft.com/en-us/halo-master-chief-collection/excession/creatingmodpackage/creatinghome"
+      },
+      "releaseUrl": "https://learn.microsoft.com/en-us/halo-master-chief-collection/excession/creatingmodpackage/creatinghome"
     },
     {
       "id": "foundry",
@@ -836,7 +1337,7 @@
       "mode": "sourceHandoff",
       "purpose": "Current upstream identifies H1 through H4 editing kits; exact per-game import/export routes and the Spark handoff remain unverified.",
       "modifiesFiles": true,
-      "caveat": "Upstream capability is not a completed Spark integration. No download or process launch is offered.",
+      "caveat": "Official setup/standalone selection is available; a managed current-project round trip has not been verified. ",
       "filename": null,
       "location": "external",
       "maintainer": "ILoveAGoodCrisp and contributors",
@@ -862,7 +1363,31 @@
       "handler": "research",
       "legacy": [],
       "version": null,
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Tool-specific source or inspection output; validate before adoption"
+        ],
+        "dependencies": [
+          "Separately installed application and compatible owned Halo content"
+        ],
+        "sourceDirectory": "An isolated compatible source copy; never the only original",
+        "documentedOperations": [
+          "No automatic project command is registered for this tool"
+        ],
+        "manualOperations": [
+          "Open a separate working copy through the application and save it; review the result in Spark"
+        ],
+        "limitations": [
+          "Standalone launch is not a verified source handoff, conversion, game load or gameplay result"
+        ],
+        "integrationTests": [
+          "Catalog/launcher validation only; no native tool round trip accepted for this profile"
+        ],
+        "whenToUse": "Current upstream identifies H1 through H4 editing kits; exact per-game import/export routes and the Spark handoff remain unverified.",
+        "documentation": "https://github.com/ILoveAGoodCrisp/Foundry"
+      },
+      "releaseUrl": "https://github.com/ILoveAGoodCrisp/Foundry/releases"
     },
     {
       "id": "openceMantle",
@@ -877,17 +1402,113 @@
       "maintainer": "SutlabSol / OpenCE Mantle contributors",
       "sourceUrl": "https://github.com/SutlabSol/OpenCE-Mantle",
       "releaseUrl": "https://github.com/SutlabSol/OpenCE-Mantle/releases",
-      "license": "External application, not bundled. Upstream documents GPL-3.0 generated definitions and combined distribution; review upstream licensing before any reuse. No code, definitions or assets are copied into Spark.",
-      "platforms": ["windows"],
-      "families": ["halo1"],
-      "runtimes": ["haloCustomEdition"],
-      "inputs": ["classicCache"],
-      "cacheVersions": [609],
+      "license": "GPL-3.0 upstream; external application only, no engine code incorporated.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "haloCustomEdition"
+      ],
+      "inputs": [
+        "classicCache"
+      ],
+      "cacheVersions": [
+        609
+      ],
       "integration": "externalCompanion",
       "handler": "externalCompanion",
       "legacy": [],
       "version": "0.7.0 (upstream release reviewed; installed version unverified)",
-      "sha256": null
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Supported PC CE cache 609 exports"
+        ],
+        "dependencies": [
+          "Separately installed Mantle executable",
+          "Actual compatible Custom Edition PC cache (609)"
+        ],
+        "sourceDirectory": "Isolated .map copy opened manually inside Mantle",
+        "documentedOperations": [
+          "Only standalone application launch is registered; no map argument/API is invented"
+        ],
+        "manualOperations": [
+          "Open an isolated compatible map in Mantle; use its GUI donor/edit/export operations"
+        ],
+        "limitations": [
+          "Not a direct MCC cache editor",
+          "Mantle startup/save round trip remains unverified in Spark",
+          "No source import or donor behavior is inferred from a successful launch"
+        ],
+        "integrationTests": [
+          "Existing actual-cache-version/runtime/hash checks and explicit-launch refusal tests only"
+        ],
+        "whenToUse": "Use Mantle’s compiled Custom Edition cache and donor BSP/object workflows.",
+        "documentation": "https://github.com/SutlabSol/OpenCE-Mantle/blob/a35300cafcf438d2952c13abc9bac408740332f2/README.md"
+      }
+    },
+    {
+      "id": "openTool",
+      "label": "OpenTool · H1A lightmaps",
+      "group": "community",
+      "mode": "externalGui",
+      "purpose": "Bake native H1A lightmaps with the upstream Blender/Cycles lightmapper.",
+      "modifiesFiles": true,
+      "caveat": "Official setup/standalone selection is available; a managed current-project round trip has not been verified. Its BSP builder is not started.",
+      "filename": null,
+      "location": "external",
+      "maintainer": "Moot / HiIAmMoot and contributors",
+      "sourceUrl": "https://github.com/HiIAmMoot/OpenTool",
+      "releaseUrl": "https://github.com/HiIAmMoot/OpenTool/releases",
+      "license": "GPL-3.0-only per upstream license statement. Separate application; not redistributed.",
+      "platforms": [
+        "windows"
+      ],
+      "families": [
+        "halo1"
+      ],
+      "runtimes": [
+        "mccSteam"
+      ],
+      "inputs": [
+        "nativeH1"
+      ],
+      "integration": "upstreamOnly",
+      "handler": "research",
+      "legacy": [],
+      "version": null,
+      "sha256": null,
+      "workflow": {
+        "outputs": [
+          "Stock-format H1A BSP/lightmap bitmap and optional new scenario tags"
+        ],
+        "dependencies": [
+          "OpenTool Windows app and Blender 5.2+",
+          "Complete H1A tags; source installation additionally requires documented Python/LLVM/SlangPy dependencies"
+        ],
+        "sourceDirectory": "Separate complete H1A working tags; choose new output tag names and an owned bake work folder",
+        "documentedOperations": [
+          "Upstream: OpenTool-cli check",
+          "Upstream: lightmap.py bake --tags <tags> <scenario> <bsp> --out-bsp <new> --out-scenario <new> --work <folder>",
+          "Upstream validate/diff; commands are documented, not executed by Spark"
+        ],
+        "manualOperations": [
+          "Select tags/scenario/BSP and choose new tag names in OpenTool; review outputs before native build"
+        ],
+        "limitations": [
+          "Structure BSP builder is not started upstream",
+          "No Spark bake, native adoption or game-side lightmap acceptance yet",
+          "Do not use in-place/no-backups options on original tags"
+        ],
+        "integrationTests": [
+          "Metadata/launcher validation only; backend not installed or bake-tested in this continuation"
+        ],
+        "whenToUse": "Try an alternative native H1A lightmap bake after geometry is compiled.",
+        "documentation": "https://github.com/HiIAmMoot/OpenTool/blob/c7db6748dece156cc1beaf42eeb2e3e506b4a6a1/README.md"
+      }
     }
   ],
   "companionCandidates": [

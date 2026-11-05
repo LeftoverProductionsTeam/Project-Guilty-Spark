@@ -430,6 +430,15 @@ if __name__=='__main__':
     retain = sub.add_parser('retention');retain.add_argument('manifests');retain.add_argument('--policy',default=str(pathlib.Path(__file__).with_name('retention-policy.json')))
     args = parser.parse_args()
     WORKSPACE = pathlib.Path(args.workspace).resolve()
+    # Historical catalogs remain readable for recovery, but old command lines
+    # must not regenerate the removed development tree. Retention is read-only;
+    # new archive/probe writes require the repaired generated-data locations.
+    if args.command in {'prepare', 'prove-restore'}:
+        output = pathlib.Path(args.vault if args.command == 'prepare' else args.destination).absolute()
+        if '.local' in output.parts:
+            parser.error('Obsolete .local output is disabled. Preserve/read the existing archive; use the current artifacts/ recovery workflow for new output.')
+    if args.command == 'restore':
+        parser.error('Legacy in-place restore would recreate .local. Preserve this archive and recover to a reviewed artifacts/ or preserved/ destination instead; no archive bytes were changed.')
     if args.command=='prepare': prepare(args.plan,args.vault,args.seed,args.merge_seed_catalog)
     elif args.command=='restore': restore(args.vault,args.only)
     elif args.command=='prove-restore': print(json.dumps(prove_restore(args.vault,args.destination,args.samples)),flush=True)

@@ -57,6 +57,7 @@ pub struct Library {
 impl Library {
     pub fn open(root: &Path) -> Result<Self> {
         crate::reject_links(root)?;
+        crate::storage::reject_obsolete_repository_output(root)?;
         fs::create_dir_all(root)?;
         let db = Connection::open(root.join("library.sqlite3"))?;
         db.pragma_update(None, "journal_mode", "WAL")?;

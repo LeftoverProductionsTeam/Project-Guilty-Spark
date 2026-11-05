@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real Windows acceptance. Requires the owner's MCC map, installed
 // Invader/H1A tools and a fresh QA library. No game memory or stock writes.
 import { chromium, expect as pwExpect } from '@playwright/test';
@@ -27,7 +28,7 @@ const data = args.get('--data'),
   seed = JSON.parse(await fs.readFile(path.join(data, 'qa-seed-receipt.json'), 'utf8'));
 if (!fixture.nativeFixture || fixture.projectId !== seed.projectId || path.resolve(seed.library) !== data)
   throw Error('Only an isolated QA replica is accepted');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const exe = path.join(output, 'GuiltySpark-smart-edit-qa.exe');
 await fs.copyFile(args.get('--app'), exe, fs.constants.COPYFILE_EXCL);
 const hash = (b) => crypto.createHash('sha256').update(b).digest('hex'),

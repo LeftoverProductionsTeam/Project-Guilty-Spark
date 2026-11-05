@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in: installed BSP Atlas UI, real map decoding and bounded cache readback.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -8,7 +9,7 @@ import {chromium,expect as assertion} from '@playwright/test';
 const expect=assertion.configure({timeout:90000});
 const [app,destination,mapsDirectory]=process.argv.slice(2);
 if(!app||!destination||!mapsDirectory)throw Error('test-inspection-cache-native <Spark.exe> <fresh output> <owned maps directory>');
-const output=path.resolve(destination);await fs.mkdir(output);
+const output=path.resolve(destination);await fs.mkdir(await assertQaOutputPath(output));
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const files=[];
 for(const item of await fs.readdir(mapsDirectory,{withFileTypes:true})){

@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in packaged Windows application test. Real IPC, owned source files and
 // native WebView rendering. No game-file writes, external downloads or mocks.
@@ -11,7 +12,7 @@ const [appArg,rootArg,configurationArg]=process.argv.slice(2);
 if(!configurationArg)throw Error('test-native-functionality <packaged.exe> <fresh-output> <owned-inputs.json>');
 const root=path.resolve(rootArg),configuration=JSON.parse(await fs.readFile(configurationArg,'utf8'));
 const expect=assertion.configure({timeout:120000});
-await fs.mkdir(root);const exe=path.join(root,'GuiltySpark-native-functionality.exe');await fs.copyFile(path.resolve(appArg),exe,fs.constants.COPYFILE_EXCL);
+await fs.mkdir(await assertQaOutputPath(root));const exe=path.join(root,'GuiltySpark-native-functionality.exe');await fs.copyFile(path.resolve(appArg),exe,fs.constants.COPYFILE_EXCL);
 const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
 const report={schemaVersion:1,complete:false,mockedIpc:false,appSha256:await hash(exe),maps:[],checks:{},errors:[],limitations:['No game visual parity, physical speaker listening, secondary physical display or Halo gameplay acceptance.']};
 const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));

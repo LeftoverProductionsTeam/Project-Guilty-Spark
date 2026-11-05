@@ -22,6 +22,28 @@ struct Row {
     installation_issue: Option<String>,
     external_companion: Option<external_companions_native::Status>,
     user_launcher: Option<UserLauncher>,
+    installed_version: Option<String>,
+}
+#[cfg(windows)]
+fn file_version(path:&Path)->Option<String>{
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW,GetFileVersionInfoW,VerQueryValueW,VS_FIXEDFILEINFO};
+    let file:Vec<u16>=path.as_os_str().encode_wide().chain(Some(0)).collect();
+    unsafe {
+        let size=GetFileVersionInfoSizeW(file.as_ptr(),std::ptr::null_mut());if size==0||size>1024*1024{return None;}
+        let mut bytes=vec![0u8;size as usize];if GetFileVersionInfoW(file.as_ptr(),0,size,bytes.as_mut_ptr().cast())==0{return None;}
+        let mut value=std::ptr::null_mut();let mut length=0;let root=[b'\\' as u16,0];
+        if VerQueryValueW(bytes.as_ptr().cast(),root.as_ptr(),&mut value,&mut length)==0||value.is_null()||length<std::mem::size_of::<VS_FIXEDFILEINFO>() as u32{return None;}
+        let info=std::ptr::read_unaligned(value.cast::<VS_FIXEDFILEINFO>());
+        if info.dwSignature!=0xfeef04bd{return None;}
+        Some(format!("{}.{}.{}.{}",info.dwFileVersionMS>>16,info.dwFileVersionMS&65535,info.dwFileVersionLS>>16,info.dwFileVersionLS&65535))
+    }
+}
+#[cfg(not(windows))]fn file_version(_path:&Path)->Option<String>{None}
+fn installed_blender()->Option<PathBuf>{
+    let root=PathBuf::from(std::env::var_os("ProgramFiles")?).join("Blender Foundation");core::reject_links(&root).ok()?;
+    let mut folders=fs::read_dir(root).ok()?.take(32).filter_map(|item|item.ok()).filter(|e|e.file_name().to_string_lossy().starts_with("Blender ")).map(|e|e.path()).collect::<Vec<_>>();folders.sort();
+    folders.into_iter().rev().map(|p|p.join("blender.exe")).find(|p|p.is_file()&&core::reject_links(p).is_ok())
 }
 #[derive(Clone,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -120,6 +142,7 @@ pub(super) async fn tool_ecosystem_report(
             cache_version: project
                 .as_ref()
                 .and_then(|p| p.source.as_ref().map(|s| s.cache_version)),
+            geometry_source: project.as_ref().is_some_and(|p|p.assets.iter().any(|a|a.kind=="obj")||p.quick_forge.is_some()),
         };
         let catalog = ecosystem::catalog().map_err(error)?;
         let mut tools = Vec::new();
@@ -139,6 +162,8 @@ pub(super) async fn tool_ecosystem_report(
                 if !value.available {
                     installation_issue = Some(value.detail.clone());
                 }
+            } else if definition.id=="blenderHalo" {
+                if let Some(path)=installed_blender(){installed.found=true;executable=Some(path);}
             } else if definition.location == "baboon" {
                 match baboon_native::installation(&state) {
                     Ok(value) => {
@@ -192,6 +217,8 @@ pub(super) async fn tool_ecosystem_report(
             }
             let assessment = ecosystem::assess(definition, &context, &installed);
             let user_launcher=user_launcher(&state,&definition.id)?;
+            let installed_version=installed.version.clone().or_else(||if installed.sha256.is_some()&&installed.sha256==definition.sha256{definition.version.clone()}else{None})
+                .or_else(||user_launcher.as_ref().filter(|l|l.available).map(|l|&l.path).or(executable.as_ref()).and_then(|p|file_version(p)));
             tools.push(Row {
                 definition: definition.clone(),
                 assessment,
@@ -199,6 +226,7 @@ pub(super) async fn tool_ecosystem_report(
                 installation_issue,
                 external_companion,
                 user_launcher,
+                installed_version,
             });
         }
         Ok(Report {
@@ -229,6 +257,8 @@ pub(super) async fn launch_discovered_tool(app:tauri::AppHandle,window:tauri::We
         }else if tool_id=="baboon"{
             let kit=folder.join("kit");fs::create_dir_all(kit.join("tags")).map_err(error)?;
             let installed=baboon_native::installation(&state)?;let exe=core::baboon::prepare_instance(&installed,&folder.join("editor"),&kit).map_err(error)?;(exe,folder.clone())
+        }else if tool_id=="blenderHalo"{
+            (row.executable.ok_or("Locate an installed Blender application")?,folder.clone())
         }else{
             if !["sapien","guerilla","tagTest","invaderEditor"].contains(&tool_id.as_str())||row.assessment.state=="requiresRuntime"{return Err("Locate the installed application first. Its standalone launcher does not establish a verified map handoff.".into());}
             let executable=row.executable.ok_or("Locate the installed tool or open its official download")?;(executable,folder.clone())
@@ -236,8 +266,42 @@ pub(super) async fn launch_discovered_tool(app:tauri::AppHandle,window:tauri::We
         let(executable,identity,_)=dependency_install::pe_identity(&executable)?;
         let mut command=std::process::Command::new(&executable);command.current_dir(cwd).stdin(Stdio::null());
         if tool_id=="baboon"{command.arg("-HCEEK");}
+        if tool_id=="blenderHalo"{command.arg("--disable-autoexec");}
         let child=command.spawn().map_err(error)?;
         project::atomic_write(&folder.join("launch.json"),&serde_json::to_vec_pretty(&(&tool_id,&executable,&identity,child.id())).map_err(error)?,false).map_err(error)?;
         Ok(format!("Opened {} (PID {}). No map or original tag path was passed. Use its managed map action for a verified handoff.",profile.label,child.id()))
+    }).await.map_err(error)?
+}
+
+#[tauri::command]
+pub(super) async fn prepare_geometry_handoff(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,asset_id:String)->Reply<core::geometry_exchange::Prepared>{
+    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
+        let lib=lock(&state.library)?;
+        core::geometry_exchange::prepare(&lib,&project_id,&asset_id).map_err(error)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+pub(super) async fn review_geometry_handoff(app:tauri::AppHandle,project_id:String,id:String)->Reply<core::geometry_exchange::Review>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let lib=lock(&state.library)?;core::geometry_exchange::review(&lib,&project_id,&id).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+pub(super) async fn geometry_handoff_status(app:tauri::AppHandle,project_id:String,id:String)->Reply<core::geometry_exchange::Stamp>{
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let lib=lock(&state.library)?;core::geometry_exchange::stamp(&lib,&project_id,&id).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+pub(super) async fn launch_geometry_tool(app:tauri::AppHandle,window:tauri::WebviewWindow,project_id:String,id:String)->Reply<String>{
+    let owner=window.label().to_string();tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();check_document_owner(&state,&project_id,&owner)?;
+        let prepared=core::geometry_exchange::prepared(&*lock(&state.library)?,&project_id,&id).map_err(error)?;
+        let selected=user_launcher(&state,"blenderHalo")?;
+        let executable=if let Some(selected)=selected{if !selected.available{return Err("The selected Blender application changed. Locate it again before launch.".into());}selected.path}else{installed_blender().ok_or("Install or locate Blender in Games & tools first")?};
+        let(executable,sha256,_)=dependency_install::pe_identity(&executable)?;
+        let folder=prepared.working_path.parent().ok_or("Invalid geometry handoff directory")?;
+        let launches=folder.join("launches");core::reject_links(&launches).map_err(error)?;fs::create_dir_all(&launches).map_err(error)?;
+        if fs::read_dir(&launches).map_err(error)?.count()>=16{return Err("This handoff retains sixteen launch records; keep it for recovery and prepare another before launching again.".into());}
+        let child=std::process::Command::new(&executable).arg("--disable-autoexec").current_dir(folder).stdin(Stdio::null()).spawn().map_err(error)?;
+        project::atomic_write(&launches.join(format!("{}.json",uuid::Uuid::new_v4())),&serde_json::to_vec_pretty(&serde_json::json!({"tool":"blenderHalo","pid":child.id(),"executable":executable,"sha256":sha256,"arguments":["--disable-autoexec"],"writerConfirmed":false})).map_err(error)?,false).map_err(error)?;
+        Ok(format!("Opened Blender (PID {}). Import working.obj, edit, then export OBJ back to the displayed working path. No script or native tag was passed.",child.id()))
     }).await.map_err(error)?
 }

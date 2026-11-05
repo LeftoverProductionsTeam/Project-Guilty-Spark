@@ -1,5 +1,9 @@
 # Pending engineering requests
 
+Current priority: the owner’s P0 emergency repository/storage repair (`9ff41c98`). Earlier “pending behind C69” / “no predecessor deferral” wording below records the interrupted intake state; it no longer prevents independent safe engineering. Intake preservation did not implement or accept these requests. Their original acceptance requirements remain open.
+
+Historical `.local` evidence paths below are provenance, not current output defaults. The P0 recovery indexes preserve former paths and exact content hashes under `preserved/`; do not recreate `.local` to satisfy an old reference. See `ACTIVE_TASK.md` for actual current work and verified results.
+
 ## Creator's Gauntlet — received November 4, 2026
 
 Requested`5098df5f` file is absent/empty folder. One same-title alternative (27,326bytes/762lines/SHAccd22dfd…) is retained with qualified provenance/receipt/evidence in `.local/artifacts/creators-gauntlet-intake-20261104/`; not verified against missing requested bytes. Available text explicitly starts after P0 storage/ownership/dependency/resource repairs and remaining engineering directives. Preserve all14 sections, Golden Map phases A–G,14-field acceptance matrix,nine evidence levels,ten deliverables,actual UI/external-tool/four-runtime/native/game journeys,fix-and-retest,budget/fault/demo/release gates. Reuse the existing desktop harness; no Computer Use or backend substitution. C69 remains awaiting human acceptance; no new Gauntlet/matrix/harness/build/game/cleanup started. Reattach only if intended text differs.

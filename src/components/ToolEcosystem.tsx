@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Box, FileCode2, Hammer, Layers3, Tags, Wrench } from 'lucide-react';
 import { call, native } from '../api';
 import type { Project, RuntimeId, Settings } from '../types';
-import { Notice, Pill } from './ui';
+import { HelpTip, Notice, Pill } from './ui';
 import BaboonTools from './BaboonTools';
 import './nativeTools.css';
 interface ToolDefinition {
@@ -22,6 +22,7 @@ interface ToolDefinition {
   handler: string;
   version: string | null;
   releaseUrl?: string | null;
+  workflow?: {whenToUse:string;outputs:string[];dependencies:string[];sourceDirectory:string;documentedOperations:string[];manualOperations:string[];limitations:string[];integrationTests:string[];documentation:string};
 }
 interface ToolRow {
   definition: ToolDefinition;
@@ -35,6 +36,7 @@ interface ToolRow {
   };
   executable: string | null;
   installationIssue: string | null;
+  installedVersion?: string | null;
   externalCompanion?: {
     registration: { path: string; executableSha256: string };
     available: boolean;
@@ -84,7 +86,7 @@ export default function ToolEcosystem({
   runtime: RuntimeId;
   settings: Settings;
   onSettings: () => void;
-  onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge') => void;
+  onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge' | 'assets') => void;
 }) {
   const [report, setReport] = useState<EcosystemReport | null>(null),
     [error, setError] = useState(''),
@@ -129,6 +131,7 @@ export default function ToolEcosystem({
     return () => window.removeEventListener('guilty-spark-native-source-changed', changed);
   }, [projectId, refresh]);
   function open(tool: ToolDefinition) {
+    if(tool.handler==='geometryHandoff'){onOpenWorkspace('assets');return;}
     const actionId = tool.id === 'haloTool' && report?.context.ownedNativeTags ? 'workingTags' : tool.handler;
     if (['editLevel', 'editTags', 'testScene', 'workingTags'].includes(actionId) && projectId) {
       onOpenWorkspace('quickforge');
@@ -182,25 +185,19 @@ export default function ToolEcosystem({
     const desktop = tool.mode
       ? tool.mode !== 'integratedCli'
       : ['sapien', 'guerilla', 'tagTest', 'invaderEditor', 'baboon'].includes(tool.id);
-    const actionName =
-      tool.handler === 'editTags'
-        ? 'tag editing'
-        : tool.handler === 'editLevel'
-          ? 'level editing'
-          : tool.handler === 'testScene'
-            ? 'test scene'
-            : 'managed workflow';
     const installed=assessment.executableFound||!!row.userLauncher?.available||!!row.externalCompanion?.available;
     const Icon=/blender|foundry|reclaimer/i.test(tool.id)?Box:/sapien|osoyoos/i.test(tool.id)?Layers3:/build|haloTool/i.test(tool.id)?Hammer:/tag|baboon|guerilla|mozzarilla|invaderEditor/i.test(tool.id)?Tags:/extract|assembly|refinery/i.test(tool.id)?FileCode2:Wrench;
     return (
       <article className="gs-tool-card" key={tool.id} data-tool-id={tool.id}>
-        <header className="gs-tool-emblem-heading"><span className="gs-tool-emblem" aria-hidden="true"><Icon size={22}/></span><strong title={tool.label}>{tool.label}</strong></header>
+        <header className="gs-tool-emblem-heading"><span className="gs-tool-emblem" aria-hidden="true"><Icon size={22}/></span><strong title={tool.label}>{tool.label}</strong><HelpTip label={`When to use ${tool.label}`} help={`${tool.workflow?.whenToUse??tool.purpose} ${tool.workflow?.sourceDirectory??tool.caveat}`}/></header>
         <Pill tone={assessment.canUseWorkflow ? 'green' : 'muted'}>
           {compact&&installed?'Installed':stateNames[assessment.state] ?? assessment.state}
         </Pill>
         <p className="gs-tool-purpose" title={tool.purpose}>
           {tool.purpose}
         </p>
+        {!!tool.runtimes?.length&&<small className="gs-tool-editions" title={tool.runtimes.join(', ')}>{tool.runtimes.map(id=>({mccSteam:'MCC H1',haloCustomEdition:'CE',openCe:'OpenCE',chupathingyCe:'Chupa'}[id]??id)).join(' · ')}</small>}
+        {assessment.canUseWorkflow&&tool.id!=='baboon'&&tool.integration!=='externalCompanion'&&<button className="gs-tool-use" onClick={()=>open(tool)} disabled={busy}>Use with Current Project</button>}
         {(assessment.executableFound || row.userLauncher?.available) &&
           desktop &&
           tool.integration !== 'externalCompanion' && (
@@ -278,17 +275,6 @@ export default function ToolEcosystem({
             {row.externalCompanion && <p className="subtle">{row.externalCompanion.detail}</p>}
           </>
         )}
-        {!['upstreamOnly', 'externalCompanion'].includes(tool.integration) && tool.id !== 'baboon' && (
-          <button
-            type="button"
-            className="small-button"
-            aria-label={`${compact ? 'Edit map · ' : 'Open '}${actionName}`}
-            disabled={!assessment.canUseWorkflow}
-            onClick={() => open(tool)}
-          >
-            {compact ? (tool.handler === 'build' ? 'Build map' : 'Edit map') : `Open ${actionName}`}
-          </button>
-        )}
         <details>
           <summary>Formats, source &amp; license</summary>
           {compact && assessment.canUseWorkflow && <p>{assessment.detail}</p>}
@@ -300,6 +286,17 @@ export default function ToolEcosystem({
           </p>
           {row.installationIssue && <p>{row.installationIssue}</p>}
           <p>{tool.license}</p>
+          <p>Installed version: {row.installedVersion??'Not verified'}{row.executable?` · ${row.executable}`:row.userLauncher?` · ${row.userLauncher.path}`:''}</p>
+          {tool.workflow&&<dl className="gs-tool-contract">
+            <dt>Outputs</dt><dd>{tool.workflow.outputs.join(' · ')}</dd>
+            <dt>Needs</dt><dd>{tool.workflow.dependencies.join(' · ')}</dd>
+            <dt>Working source</dt><dd>{tool.workflow.sourceDirectory}</dd>
+            <dt>Documented operations</dt><dd>{tool.workflow.documentedOperations.map(operation=><div key={operation}>{operation}</div>)}</dd>
+            <dt>Manual steps</dt><dd>{tool.workflow.manualOperations.join(' · ')}</dd>
+            <dt>Limits</dt><dd>{tool.workflow.limitations.join(' · ')}</dd>
+            <dt>Integration evidence</dt><dd>{tool.workflow.integrationTests.join(' · ')}</dd>
+            <dt>Reference</dt><dd><a href={tool.workflow.documentation} target="_blank" rel="noreferrer">Reviewed documentation</a></dd>
+          </dl>}
           {row.externalCompanion && (
             <p className="subtle">
               {row.externalCompanion.registration.path}

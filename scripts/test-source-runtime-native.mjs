@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Explicit owned Windows acceptance: actual IPC, registered runtimes and native
 // map imports. No mock bridge, original game writes or gameplay-success claim.
 import fs from 'node:fs/promises';
@@ -15,7 +16,7 @@ for(let i=2;i<process.argv.length;i+=2){
 }
 if(args.size!==(args.has('--scene-lifecycle')?11:10)||args.has('--scene-lifecycle')&&args.get('--scene-lifecycle')!=='true')throw Error('Required: --app --data --output --mcc --ce --opence --chupa --kit --invader --sdk; optional --scene-lifecycle true launches an owned Standalone preview');
 const output=args.get('--output'),data=args.get('--data');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const digest=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const hash=async file=>digest(await fs.readFile(file));
 const executable=path.join(output,'GuiltySpark-source-contract.exe');

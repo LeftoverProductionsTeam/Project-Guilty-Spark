@@ -23,7 +23,7 @@ GATES = {"rust-workspace", "typescript", "frontend", "offline", "browser",
          "native-diagnostics", "release-pipeline"}
 SOURCE_ROOTS = {"src", "src-tauri", "crates", "scripts", "tests", "docs",
                 "examples", "public", ".github"}
-FORBIDDEN_PARTS = {".git", ".local", ".research", ".toolchain", "node_modules",
+FORBIDDEN_PARTS = {".git", ".local", ".research", ".toolchain", "node_modules", "artifacts", "tools", "preserved",
                    "target", "dist", "__pycache__"}
 FORBIDDEN_SUFFIXES = {".map", ".yelo", ".iso", ".xiso", ".xbe", ".exe", ".dll",
                       ".pdb", ".sqlite3", ".db", ".pem", ".pfx", ".p12", ".key"}

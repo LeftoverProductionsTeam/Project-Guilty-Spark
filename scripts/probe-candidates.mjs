@@ -1,13 +1,13 @@
 import { readFile, writeFile, open } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-const input = JSON.parse(await readFile('.local/qa/candidates.json', 'utf8'));
+const input = JSON.parse(await readFile('artifacts/qa/candidates.json', 'utf8'));
 const reports = [];
 for (const candidate of input.filter((c) => c.scenarioType === 1)) {
   const report = { path: candidate.path };
   for (const check of ['is_protected', 'protection_issues', 'tags_count']) {
     const r = spawnSync(
-      path.resolve('.local/tools/invader/invader-info.exe'),
+      path.resolve('tools/invader/invader-info.exe'),
       ['-T', check, candidate.path],
       { encoding: 'utf8', windowsHide: true, maxBuffer: 1024 * 1024 },
     );
@@ -25,4 +25,4 @@ for (const candidate of input.filter((c) => c.scenarioType === 1)) {
   reports.push(report);
   console.log(JSON.stringify(report));
 }
-await writeFile('.local/qa/candidate-tool-probes.json', JSON.stringify(reports, null, 2));
+await writeFile('artifacts/qa/candidate-tool-probes.json', JSON.stringify(reports, null, 2));

@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Three independent Spark processes and private libraries. Only owned loopback
 // sessions are used. No real player's credentials, game process or mock IPC.
 import { chromium, expect as assertion } from '@playwright/test';
@@ -11,7 +12,7 @@ const expect = assertion.configure({ timeout: 45000 }),
   [binary, destination] = process.argv.slice(2);
 if (!binary || !destination) throw Error('test-session-identity-native <Spark.exe> <fresh acceptance root>');
 const root = path.resolve(destination);
-await fs.mkdir(root);
+await fs.mkdir(await assertQaOutputPath(root));
 const receipt = {
     schemaVersion: 1,
     nativeProcesses: 3,

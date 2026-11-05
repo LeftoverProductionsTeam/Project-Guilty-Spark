@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { admitCargoOutput } from './native-qa-storage.mjs';
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const local = path.join(projectRoot, '.toolchain');
 const bin = path.join(local, 'cargo/bin');
@@ -18,11 +19,16 @@ const env = existsSync(executable)
   : { ...process.env };
 // A single regenerable output cache, independent of the terminal's location.
 // Explicit caller overrides and debuggable profiles remain available.
-env.CARGO_TARGET_DIR ??= path.join(projectRoot, '.local/build/cargo');
+env.CARGO_TARGET_DIR ??= path.join(projectRoot, 'target');
+if (path.resolve(env.CARGO_TARGET_DIR).split(path.sep).some((part) => part.toLowerCase() === '.local'))
+  throw Error('The obsolete .local output tree is disabled. Use the shared root target/ cache or a reviewed external output directory.');
 env.CARGO_PROFILE_DEV_DEBUG ??= '0';
 env.CARGO_PROFILE_TEST_DEBUG ??= '0';
 env.CARGO_INCREMENTAL ??= '0';
+if (!rustup && ['build','test','check','clippy','bench','run','doc','rustc'].includes(process.argv[2]))
+  await admitCargoOutput(env.CARGO_TARGET_DIR);
 const child = spawn(existsSync(executable) ? executable : tool, process.argv.slice(rustup ? 3 : 2), {
+  cwd: projectRoot,
   env,
   stdio: 'inherit',
   windowsHide: true,

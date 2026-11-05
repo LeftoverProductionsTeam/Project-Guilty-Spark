@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real desktop IPC and source preflight. No native compile, SDK copy, cleanup,
 // game launch or mocked commands. Existing source files remain read-only.
 import fs from 'node:fs/promises';
@@ -13,7 +14,7 @@ if (!sdk)
   throw Error(
     'test-storage-settings-native <built.exe> <fresh-output> <owned-Demo-map> <H1A-kit> <Invader> <SDK-tags> [prior-passing-output]',
   );
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const hash = async (file) => {
   const h = crypto.createHash('sha256');
   const handle = await fs.open(file, 'r');

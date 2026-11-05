@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Real Windows/WebView acceptance. Uses an isolated library and only its own app process.
 // No mocked IPC, game launch, external tool execution or original project mutation.
@@ -14,7 +15,7 @@ const app = path.resolve(option('--app', 'target/release/GuiltySpark.exe'));
 const destination = option('--output');
 if (!destination) throw Error('Choose a new --output directory for the isolated acceptance record.');
 const output = path.resolve(destination), baseline = args.includes('--baseline');
-await fs.mkdir(output); // Refuse to overwrite a previous result.
+await fs.mkdir(await assertQaOutputPath(output)); // Refuse to overwrite a previous result.
 const exe = path.join(output, 'GuiltySpark-workspace-qa.exe');
 await fs.copyFile(app, exe, fs.constants.COPYFILE_EXCL);
 const report = { schemaVersion: 1, appSha256: crypto.createHash('sha256').update(await fs.readFile(exe)).digest('hex'),

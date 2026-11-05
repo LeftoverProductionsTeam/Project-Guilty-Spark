@@ -585,6 +585,23 @@ pub(super) async fn smart_edit_execute(
         }
     }
 }
+fn prepare_direct_job(root: &Path, id: &str, source: &Path, source_bytes: u64) -> Reply<(PathBuf, core::storage::Lease)> {
+    uuid::Uuid::parse_str(id).map_err(error)?;
+    let jobs = root.join("jobs");
+    let job = jobs.join(id);
+    core::reject_links(&job).map_err(error)?;
+    let lease = core::storage::Store::for_output(&job).map_err(error)?.reserve(
+        &job, Some(source), source_bytes.saturating_mul(2).saturating_add(16*1024*1024),
+        core::storage::Category::Staging, "Direct native cache copy: bounded candidate and retained validated output",
+    ).map_err(error)?;
+    // A fresh library has never run a compiler, so jobs need not exist yet.
+    // Create that parent only after admission, and keep exclusive job ownership.
+    fs::create_dir_all(&jobs).map_err(error)?;
+    core::reject_links(&job).map_err(error)?;
+    fs::create_dir(&job).map_err(error)?;
+    lease.mark_owned().map_err(error)?;
+    Ok((job, lease))
+}
 fn direct(app: &tauri::AppHandle, owner: &str, plan: Plan, analysis: Analysis) -> Reply<Execution> {
     let _guard = native_operations_native::source_guard()?;
     let state = app.state::<AppState>();
@@ -606,9 +623,7 @@ fn direct(app: &tauri::AppHandle, owner: &str, plan: Plan, analysis: Analysis) -
     check_info(&info, &source.preserved_path)?;
     snapshot_project_state(&state, &p, "before-build")?;
     let id = uuid::Uuid::new_v4().to_string();
-    let job = state.root.join("jobs").join(&id);
-    core::reject_links(&job).map_err(error)?;
-    fs::create_dir(&job).map_err(error)?;
+    let (job, storage_lease) = prepare_direct_job(&state.root, &id, &source.preserved_path, bytes.len() as u64)?;
     let candidate = job.join("candidate.map");
     let output_dir = job.join("output");
     fs::create_dir(&output_dir).map_err(error)?;
@@ -718,6 +733,7 @@ fn direct(app: &tauri::AppHandle, owner: &str, plan: Plan, analysis: Analysis) -
     lock(&state.jobs)?.remove(&id);
     match result {
         Ok(record) => {
+            storage_lease.finish(true, Some(record.project_fingerprint.clone())).map_err(error)?;
             event(
                 app,
                 JobEvent {
@@ -762,6 +778,21 @@ fn direct(app: &tauri::AppHandle, owner: &str, plan: Plan, analysis: Analysis) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn first_direct_copy_admits_and_creates_jobs_without_a_prior_compiler_run() {
+        let root=tempfile::tempdir().unwrap();
+        let library=root.path().join("library");fs::create_dir(&library).unwrap();
+        let source=root.path().join("original.map");fs::write(&source,b"untouched source").unwrap();
+        let id=uuid::Uuid::new_v4().to_string();
+        assert!(!library.join("jobs").exists());
+        let(job,lease)=prepare_direct_job(&library,&id,&source,16).unwrap();
+        fs::write(job.join("accepted.map"),b"accepted output").unwrap();
+        lease.finish(true,Some("verified revision".into())).unwrap();
+        assert!(prepare_direct_job(&library,&id,&source,16).is_err());
+        assert_eq!(fs::read(job.join("accepted.map")).unwrap(),b"accepted output");
+        assert_eq!(fs::read(source).unwrap(),b"untouched source");
+        assert!(!root.path().join(".local").exists());
+    }
     #[test]
     fn live_journal_records_attempts_before_observations_and_refuses_full_files() {
         let root = tempfile::tempdir().unwrap();

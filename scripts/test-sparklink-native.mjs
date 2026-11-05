@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in: three actual Windows Spark processes, three isolated owned libraries.
 // The Halo compiler is real; game clients, peers and custom binary transfers are not simulated.
@@ -21,7 +22,7 @@ for (let n = 2; n < process.argv.length; n += 2) {
 if (args.size !== 5) throw Error('All five named arguments are required');
 const root = args.get('--root'),
   output = path.join(root, 'run');
-await fs.mkdir(output); // Fresh evidence directory; never overwrite a previous attempt.
+await fs.mkdir(await assertQaOutputPath(output)); // Fresh evidence directory; never overwrite a previous attempt.
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 const hashFile = async (f) => sha(await fs.readFile(f));
 async function sourceInventory(root) {

@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real Spark -> checked private game copy -> CE dedicated process test.
 // No mocked IPC, original game writes, public host, client join or gameplay claim.
 // --client-seconds opts into actual GUI client launches and owned-child cleanup.
@@ -48,7 +49,7 @@ if (projectChallenge && !['--kit', '--invader', '--recovery'].every((key) => arg
 const output = args.get('--output'),
   original = args.get('--runtime');
 if (output.length > 115) throw Error('Choose a short fresh output directory for CE');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const hash = async (file) =>
   crypto
     .createHash('sha256')

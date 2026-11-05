@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Finish independent readback of an already compiled external revision without
 // replacing a project the owner may have continued editing during compilation.
 import fs from 'node:fs/promises';
@@ -14,7 +15,7 @@ const prior=JSON.parse(await fs.readFile(input,'utf8'));
 if(prior.mockedIpc!==false||!prior.reconciled?.accepted||!prior.invalidReconcileRejected||!prior.postFixCorruptionRetest?.rejected||prior.build?.status!=='validated')throw Error('Requires genuine accepted source, refused corruption and validated native build evidence');
 const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
 expect(await hash(prior.build.output)).toBe(prior.build.sha256);
-await fs.mkdir(output,{recursive:false});
+await fs.mkdir(await assertQaOutputPath(output),{recursive:false});
 const executable=path.join(output,'GuiltySpark-readback.exe');await fs.copyFile(app,executable,fs.constants.COPYFILE_EXCL);
 const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));
 const child=spawn(executable,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(output,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(output,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});

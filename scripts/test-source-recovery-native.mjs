@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Actual desktop UI + native IPC against a previously accepted, isolated
 // recovery library. No mocked backend, full SDK copy, game or public session.
 import fs from 'node:fs/promises';
@@ -15,7 +16,7 @@ if (!baseline.complete || baseline.mockedNativeTools || !baseline.originalSource
 const library = path.join(prior, 'library');
 if ((await fs.realpath(library)).toLowerCase() !== library.toLowerCase())
   throw Error('Native QA library must be a physical directory');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const hash = async (file) => {
   const sum = crypto.createHash('sha256'),
     handle = await fs.open(file, 'r');

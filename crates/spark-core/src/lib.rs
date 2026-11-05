@@ -25,6 +25,7 @@ pub mod ce_host;
 pub mod community_lan;
 pub mod tool_transaction;
 pub mod tool_ecosystem;
+pub mod geometry_exchange;
 pub mod native_operations;
 pub mod tag_renames;
 pub mod smart_edit;

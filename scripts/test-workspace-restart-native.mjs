@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Same owned native profile across two genuine app processes. No mocked IPC,
 // SDK copies, source leases granted by layout data, or simulated game evidence.
 import fs from 'node:fs/promises';
@@ -10,7 +11,7 @@ import {chooseTool,openDrawer,openViewMenu,openStudioMenu} from '../tests/ui/hel
 const args=process.argv.slice(2);
 if(args.length!==2)throw Error('test-workspace-restart-native <embedded exe> <fresh evidence root>');
 const [source,root]=args.map(p=>path.resolve(p)),expect=assertion.configure({timeout:45000});
-await fs.mkdir(root);const exe=path.join(root,'GuiltySpark-restart.exe');await fs.copyFile(source,exe,fs.constants.COPYFILE_EXCL);
+await fs.mkdir(await assertQaOutputPath(root));const exe=path.join(root,'GuiltySpark-restart.exe');await fs.copyFile(source,exe,fs.constants.COPYFILE_EXCL);
 const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(exe)).digest('hex'),mockedIpc:false,actualGamePlayed:false,complete:false,cases:[]};
 const server=net.createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;await new Promise(r=>server.close(r));
 let child,browser;

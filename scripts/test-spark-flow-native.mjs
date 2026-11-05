@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real Tauri/WebView2 acceptance. Own process/library/profile; no mocked IPC,
 // synthetic game success, original source writes or optional downloads.
 import fs from 'node:fs/promises';
@@ -13,7 +14,7 @@ if(args.length!==3)throw Error('test-spark-flow-native <embedded exe> <fresh evi
 const [source,root,map]=args.map(p=>path.resolve(p)),expect=assertion.configure({timeout:45000});
 const cycles=Number(process.env.SPARK_FLOW_ENDURANCE_CYCLES??18),profile=process.env.SPARK_FLOW_PROFILE==='1';
 if(!Number.isInteger(cycles)||cycles<18||cycles>240||cycles%6)throw Error('Endurance cycles must be a multiple of six from 18 to 240');
-await fs.mkdir(root);const exe=path.join(root,'GuiltySpark-spark-flow.exe');await fs.copyFile(source,exe,fs.constants.COPYFILE_EXCL);
+await fs.mkdir(await assertQaOutputPath(root));const exe=path.join(root,'GuiltySpark-spark-flow.exe');await fs.copyFile(source,exe,fs.constants.COPYFILE_EXCL);
 const sha=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
 const report={schemaVersion:1,appSha256:await sha(exe),sourceMapSha256:await sha(map),mockedIpc:false,actualGamePlayed:false,complete:false,cases:[],errors:[],timing:{}};
 const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));

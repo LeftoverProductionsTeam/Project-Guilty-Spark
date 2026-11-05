@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openViewMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in Windows desktop checks with real owned map/collision/GPU/native windows.
 // This does not launch Halo or certify gameplay, shader parity or game physics.
@@ -11,7 +12,7 @@ const expect=assertion.configure({timeout:45000}),args=new Map();
 for(let i=2;i<process.argv.length;i+=2){if(!['--app','--root','--map','--classic-map'].includes(process.argv[i])||!process.argv[i+1]||args.has(process.argv[i]))throw Error('Use unique named local file arguments');args.set(process.argv[i],path.resolve(process.argv[i+1]));}
 if(!args.has('--app')||!args.has('--root')||!args.has('--map'))throw Error('app, root and owned MCC map are required');
 const output=path.join(args.get('--root'),'run-'+new Date().toISOString().replace(/[:.]/g,'-'));
-await fs.mkdir(output,{recursive:true});const data=path.join(output,'library');await fs.mkdir(data);
+await fs.mkdir(await assertQaOutputPath(output),{recursive:true});const data=path.join(output,'library');await fs.mkdir(data);
 const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
 const originalHash=await hash(args.get('--map')),receipt={schemaVersion:1,mockedIpc:false,gameLaunched:false,gameplayTested:false,acceptanceComplete:false,appSha256:await hash(args.get('--app')),mapSha256:originalHash},errors=[];
 const mark=async(key,value)=>{receipt[key]=value;await fs.writeFile(path.join(output,'partial-receipt.json'),JSON.stringify(receipt,null,2));console.log(key,JSON.stringify(value));};

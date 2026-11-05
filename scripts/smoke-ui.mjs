@@ -63,7 +63,7 @@ await page.getByRole('button', { name: 'Map library', exact: false }).first().cl
 await expect(page.locator('.map-card img')).toBeVisible();
 await page.screenshot({ path: 'docs/screenshots/library.png' });
 await writeFile(
-  '.local/qa/ui-smoke.json',
+  'artifacts/qa/ui-smoke.json',
   JSON.stringify(
     {
       timestamp: new Date().toISOString(),

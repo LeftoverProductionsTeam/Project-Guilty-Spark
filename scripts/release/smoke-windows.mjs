@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from '../native-qa-storage.mjs';
 // Real packaged WebView2 + native IPC. A fresh isolated library, no Halo required.
 import { chromium, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
@@ -10,7 +11,7 @@ if (process.platform !== 'win32' || !application || !/^[a-f0-9]{40}$/.test(commi
   throw Error('smoke-windows <packaged executable> <full source commit> <fresh evidence directory>');
 const app = path.resolve(application),
   root = path.resolve(output);
-await fs.mkdir(root, { recursive: false });
+await fs.mkdir(await assertQaOutputPath(root), { recursive: false });
 const hash = (data) => crypto.createHash('sha256').update(data).digest('hex');
 const version = JSON.parse(await fs.readFile('package.json')).version;
 const server = net.createServer();

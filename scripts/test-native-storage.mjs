@@ -17,7 +17,7 @@ const output = args.at(-1);
 const helperName = importedAsset ? 'qa_native_asset_storage' : 'qa_native_storage';
 const helper = path.join(
   root,
-  '.local/build/cargo/release/examples',
+  'target/release/examples',
   `${helperName}${process.platform === 'win32' ? '.exe' : ''}`,
 );
 if (!fs.existsSync(helper))

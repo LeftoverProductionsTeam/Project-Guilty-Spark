@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Extend the accepted C63/C66 Workshop source through real desktop controls.
 // No mocked IPC, new geometry system, game automation or copied complete SDK.
 // The executable must embed its frontend (tauri/custom-protocol), not require Vite.
@@ -19,7 +20,7 @@ if (args.length !== 7 && !resume && !syntaxOnly)
     'test-native-logic-templates <Spark.exe> <accepted Workshop project> <accepted cache> <bounded tags> <H1A kit> <Invader> <fresh output> [--resume-build | --check-syntax]',
   );
 const [app, seed, cache, tags, kit, invader, output] = args.slice(0, 7).map((p) => path.resolve(p));
-if (!resume && !syntaxOnly) await fs.mkdir(output);
+if (!resume && !syntaxOnly) await fs.mkdir(await assertQaOutputPath(output));
 const hash = async (p) =>
   crypto
     .createHash('sha256')
@@ -29,7 +30,7 @@ const hash = async (p) =>
 // source files. Never run this check against an accepted writable source tree.
 async function checkNativeSyntax(accepted) {
   const root = path.join(output, 'syntax-trial');
-  await fs.mkdir(root);
+  await fs.mkdir(await assertQaOutputPath(root));
   const scenario = accepted.nativeBuild.sources.scenarioPath,
     workspace = accepted.nativeBuild.sources.directory,
     tagName = `${scenario.replaceAll('\\', '/')}.scenario`,

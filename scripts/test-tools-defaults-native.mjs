@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Actual Windows app/IPC/GPU and installed Guerilla launcher acceptance.
 // No file-picker interaction, installer execution, map compilation or game proof.
@@ -12,7 +13,7 @@ import { DatabaseSync } from 'node:sqlite';
 const [input, destination] = process.argv.slice(2);
 if (!input || !destination) throw Error('Use built Spark executable and a fresh output directory');
 const output = path.resolve(destination);
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const exe = path.join(output, 'GuiltySpark-tools-qa.exe');
 await fs.copyFile(path.resolve(input), exe, fs.constants.COPYFILE_EXCL);
 const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex'),

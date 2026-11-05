@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in native main-track import/save/undo plus production audio rendering over owned source bytes.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -22,7 +23,7 @@ if (args.size !== 3)
 const output = path.resolve(args.get('--output')),
   source = path.resolve(args.get('--map')),
   hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const executable = path.join(output, 'GuiltySpark-main-tracks-qa.exe');
 await fs.copyFile(path.resolve(args.get('--app')), executable, fs.constants.COPYFILE_EXCL);
 const before = hash(await fs.readFile(source));

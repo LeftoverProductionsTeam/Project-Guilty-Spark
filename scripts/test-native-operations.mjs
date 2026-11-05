@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real Windows/Invader/Tool acceptance. Requires a fresh owned QA replica.
 // No synthetic result, game launch, public upload or original-source write.
 import { chromium, expect as playwrightExpect } from '@playwright/test';
@@ -32,7 +33,7 @@ if (
   path.resolve(seed.library) !== data
 )
   throw Error('Only an explicit isolated QA replica is accepted');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const exe = path.join(output, 'GuiltySpark-native-operations-qa.exe');
 await fs.copyFile(args.get('--app'), exe, fs.constants.COPYFILE_EXCL);
 const hash = (b) => crypto.createHash('sha256').update(b).digest('hex'),

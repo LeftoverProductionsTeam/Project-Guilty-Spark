@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in, single private-host experiment. No downloads, installation, public
 // servers, joining, MCC DLL loading, process attachment or game-file changes.
 // The MCC-content case tests the community runtime's bootstrap, not cross-play.
@@ -85,7 +86,7 @@ for (const name of mode === 'discovery'
 }
 const probe = fileURLToPath(new URL('../target/debug/examples/one_halo_discovery.exe', import.meta.url));
 if (mode === 'discovery') await fs.access(probe);
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 for (const dir of ['data', 'data/maps', 'save', 'logs']) await fs.mkdir(path.join(output, dir));
 for (const { file, bytes } of binaries)
   await fs.writeFile(path.join(output, file.name), bytes, { flag: 'wx' });

@@ -27,7 +27,7 @@ export default function GamesTools({
   onSelectMap: (id: string) => void;
   onLibrary: () => void;
   onSetup: (id: RuntimeId) => void;
-  onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge') => void;
+  onOpenWorkspace: (target: 'tags' | 'build' | 'quickforge' | 'assets') => void;
   children: ReactNode;
 }) {
   const [runtime, setRuntime] = useMapState<RuntimeId>(

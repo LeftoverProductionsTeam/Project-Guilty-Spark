@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Native C35 desktop verification. Owned QA library only; no game attach or memory writes.
 import { chromium, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
@@ -25,7 +26,7 @@ const data = path.resolve(args.get('--data')),
 const fixture = JSON.parse(await fs.readFile(path.join(data, 'spark-c35-fixture.json'), 'utf8'));
 if (fixture.nativeFixture !== true || fixture.schemaVersion !== 1)
   throw Error('Only an explicit C35 QA library is accepted');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const executable = path.join(output, 'GuiltySpark-C35-native-qa.exe');
 await fs.copyFile(path.resolve(args.get('--app')), executable, fs.constants.COPYFILE_EXCL);
 const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');

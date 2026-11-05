@@ -1,22 +1,33 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real desktop acceptance. Separate WebViews, native ownership and disk
 // journals; never substitutes IPC responses or touches the user's projects.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
-import {spawn} from 'node:child_process';
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {chromium,expect as assertion} from '@playwright/test';
 import {chooseTool,openDrawer} from '../tests/ui/helpers/navigation.ts';
-const [source,destination]=process.argv.slice(2);
+const [source,destination,nativeMap,invaderDirectory]=process.argv.slice(2);
 if(!source||!destination)throw Error('Use: test-workspace-lifecycle-native <embedded exe> <fresh evidence directory>');
 const root=path.resolve(destination),expect=assertion.configure({timeout:45000});
-await fs.mkdir(root);
+const detachMethod=process.env.SPARK_LIFECYCLE_DETACH_METHOD??'pointer';
+if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must be pointer or button');
+const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
+if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned map');
+await fs.mkdir(await assertQaOutputPath(root));
 const app=path.join(root,'GuiltySpark-workspace-lifecycle.exe');await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
-const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
 let child,browser,main;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
-async function nextPage(before){let page;await expect.poll(()=>{page=pages().find(page=>!before.has(page));return !!page;}).toBe(true);page.on('pageerror',error=>report.errors.push(String(error)));page.on('close',()=>{(report.closedWindows??=[]).push({url:page.url(),completedCases:report.cases.length,at:new Date().toISOString()});});await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);return page;}
+async function nextPage(before){let page;await expect.poll(()=>{page=pages().find(page=>!before.has(page));return !!page;}).toBe(true);page.on('pageerror',error=>report.errors.push(String(error)));page.on('close',()=>{(report.closedWindows??=[]).push({url:page.url(),completedCases:report.cases.length,at:new Date().toISOString()});});await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);
+  // WebView controls can mount while native construction is still applying its
+  // saved placement. Wait for registration before testing a subsequent move.
+  const label=await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label);
+  await expect.poll(async()=>(await invoke(page,'workspace_window_inventory')).some(window=>window.label===label)).toBe(true);
+  return page;}
 async function state(page,id){const status=await invoke(page,'read_workspace_history',{projectId:id});return {...status,project:status.history?.snapshots.find(s=>s.key===status.history.head.current)?.project};}
 function step(name,data={}){report.cases.push({name,...data});console.log(JSON.stringify({passed:name,...data}));}
 async function openProject(page,title){await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:title,exact:true})}).click();await expect(page.locator('.runtime-dock-heading>span').first()).toHaveText(title);await expect(page.locator('.forge-viewport canvas')).toBeVisible();}
@@ -36,6 +47,7 @@ try{
   await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   await expect.poll(()=>pages().length).toBeGreaterThan(0);main=pages()[0];main.on('pageerror',error=>report.errors.push(String(error)));
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
+  if(!nativeOnly){
   const a=await invoke(main,'create_quickforge_project',{title:'C59 map A',template:'smallIndoorArena',target:'haloCustomEdition'});
   const b=await invoke(main,'create_quickforge_project',{title:'C59 map B',template:'smallIndoorArena',target:'haloCustomEdition'});
   await invoke(main,'create_quickforge_project',{title:'C59 map C',template:'smallIndoorArena',target:'haloCustomEdition'});
@@ -44,7 +56,8 @@ try{
   await main.locator('.forge-viewport canvas').evaluate(canvas=>{window.c59OriginalCanvas=canvas;});
   await panel(main).getByLabel('Inspector drawer options',{exact:true}).click();await main.getByLabel('Inspector position',{exact:true}).selectOption('float');await main.getByLabel('Inspector size',{exact:true}).fill('420');await panel(main).getByLabel('Inspector drawer options',{exact:true}).click();
   const before=new Set(pages()),handle=await panel(main).locator('.gs-panel-drag').boundingBox();
-  await main.mouse.move(handle.x+30,handle.y+handle.height/2);await main.mouse.down();await main.mouse.move(-45,-45,{steps:15});await main.mouse.up();
+  if(detachMethod==='button')await panel(main).getByRole('button',{name:'Detach Inspector',exact:true}).click();
+  else{await main.mouse.move(handle.x+30,handle.y+handle.height/2);await main.mouse.down();await main.mouse.move(-45,-45,{steps:15});await main.mouse.up();}
   let detached=await nextPage(before);await expect(detached.locator('.gs-workspace-shell')).toHaveAttribute('data-detached-panel','forge-inspector');await inspector(detached);
   await expect(detached.locator('.gs-workspace-panel:visible')).toHaveCount(1);await expect(detached.getByRole('button',{name:'Close Inspector',exact:true})).toHaveCount(0);
   const headerLayout=await detached.evaluate(()=>{
@@ -70,7 +83,7 @@ try{
   const rejectedFiles=(await fs.readdir(journal)).filter(name=>name.startsWith('rejected-'));
   expect(rejectedFiles.length).toBeGreaterThan(0);
   expect((await Promise.all(rejectedFiles.map(name=>fs.readFile(path.join(journal,name),'utf8')))).some(text=>text.includes('Rejected stale observer'))).toBe(true);
-  step('Pointer drag detaches the actual Inspector; selection, draft and authoritative history converge; stale observer writes are retained and refused');
+  step(`${detachMethod==='pointer'?'Pointer drag':'Native button'} detaches the actual Inspector; selection, draft and authoritative history converge; stale observer writes are retained and refused`);
   await detached.screenshot({path:path.join(root,'detached-inspector.png')});
   await chooseTool(detached,'Map library');await expect(detached.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','library');await expect(detached.locator('.gs-workspace-shell')).not.toHaveAttribute('data-detached-panel');
   await chooseTool(detached,'Level editor');await expect(detached.locator('.gs-workspace-shell')).toHaveAttribute('data-detached-panel','forge-inspector');await inspector(detached);
@@ -142,6 +155,57 @@ try{
   step('Online exposes source collaboration separately from game hosting; production Steam test identities are refused natively');
   await main.screenshot({path:path.join(root,'online-collaboration.png')});
   await chooseTool(main,'Level editor');await inspector(main);await acknowledged(main,a.project.id,1.5);
+  }
+  if(nativeMap){
+    if(!invaderDirectory)throw Error('Native map acceptance requires the installed Invader directory');
+    const original=await fs.readFile(path.resolve(nativeMap)),originalHash=crypto.createHash('sha256').update(original).digest('hex');
+    const [opened]=await invoke(main,'import_paths',{paths:[path.resolve(nativeMap)]});
+    expect(opened.project.source.cacheVersion).toBe(13);
+    const pistol=opened.inspection.tags.find(tag=>tag.class==='weap'&&tag.path.replaceAll('\\','/').endsWith('weapons/pistol/pistol'));
+    if(!pistol)throw Error('Owned native map does not contain the representative pistol');
+    await main.reload();await chooseTool(main,'Map library');
+    await main.locator(`.map-card[data-project-id="${opened.project.id}"]`).click();
+    await chooseTool(main,'Level editor');
+    await expect(main.locator('.world-layout canvas')).toBeVisible();
+    await expect.poll(async()=>Number(await main.locator('.world-layout').getAttribute('data-source-shaders')),{timeout:90000}).toBeGreaterThan(0);
+    // A false loading flag between batches is not completion. Wait for the
+    // pending source-material queue and reflection worker together.
+    await expect.poll(()=>main.locator('.world-layout').evaluate(element=>({
+      loading:element.dataset.materialLoading,
+      pending:element.dataset.pendingMaterials,
+      reflections:element.dataset.reflectionLoading,
+    })),{timeout:90000}).toEqual({loading:'false',pending:'0',reflections:'false'});
+    const nativeViewport=await main.locator('.world-layout').evaluate(element=>({...element.dataset}));
+    const nativeGeometry=await main.locator('.viewport-status').innerText();
+    expect(nativeGeometry).toMatch(/[\d,]+ visible triangles/);
+    await main.screenshot({path:path.join(root,'owned-native-bsp.png')});
+    step('Owned MCC map opens in actual native BSP viewport with source materials',{nativeViewport,nativeGeometry,engineParityClaimed:false});
+    await chooseTool(main,'Tag editor');
+    await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);
+    await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
+    await main.locator('.tag-row').filter({has:main.locator('strong',{hasText:/^pistol$/})}).click();
+    const radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true});
+    const prior=await radius.inputValue();await radius.fill('0.225');await radius.press('Tab');
+    await main.keyboard.press('Control+z');await expect(radius).toHaveValue(prior);await main.keyboard.press('Control+y');await expect(radius).toHaveValue('0.225');
+    const smart=main.locator('.smart-edit').first();await smart.locator('summary').first().click();
+    await smart.getByRole('button',{name:'Review save plan',exact:true}).click();
+    await expect(smart.locator('.smart-edit-plan>strong')).toHaveText('Direct map copy');
+    await smart.getByRole('button',{name:'Save validated map copy',exact:true}).click();
+    await expect(smart.locator('.smart-edit-result>strong')).toHaveText('Validated copy ready');
+    const edited=(await invoke(main,'open_project',{id:opened.project.id})).project,build=edited.builds.at(-1);
+    const proof=JSON.parse(await fs.readFile(path.join(root,'library','jobs',build.id,'smart-edit-receipt.json'),'utf8'));
+    expect(proof.compilerRan).toBe(false);expect(proof.allOtherBytesPreserved).toBe(true);
+    const run=promisify(execFile),tool=name=>path.join(path.resolve(invaderDirectory),name+'.exe');
+    const crc=await run(tool('invader-info'),['-T','crc32_mismatched',build.output],{windowsHide:true,timeout:30000});expect(crc.stdout.trim()).toBe('0');
+    const tags=path.join(root,'independent-native-tags');await fs.mkdir(tags);
+    await run(tool('invader-extract'),['-s',pistol.path+'.weapon','-t',tags,build.output],{windowsHide:true,timeout:30000});
+    const readback=await run(tool('invader-edit'),['-t',tags,'-G','bounding_radius',pistol.path+'.weapon'],{windowsHide:true,timeout:30000});
+    expect(Number(readback.stdout.trim())).toBeCloseTo(.225,6);
+    expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
+    const output=await invoke(main,'open_built_map',{projectId:opened.project.id,buildId:build.id});
+    expect(output.inspection.tags.find(tag=>tag.class==='weap'&&tag.path===pistol.path).fields.find(field=>field.key==='bounding-radius').value).toBeCloseTo(.225,6);
+    step('Real native tag edit, Undo/Redo, Save and direct map export pass independent Invader extraction/readback; original is unchanged',{sourceSha256:originalHash,output:build.output,outputSha256:build.sha256,readback:Number(readback.stdout.trim()),compilerRan:false});
+  }
   expect(report.errors).toEqual([]);report.complete=true;
 }catch(error){report.errors.push(String(error));report.failureStack=error.stack;process.exitCode=1;if(browser)for(const [i,page]of pages().entries())await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});}
 finally{await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));await browser?.close().catch(()=>{});if(child?.exitCode===null)child.kill();console.log(JSON.stringify({complete:report.complete,cases:report.cases.length,errors:report.errors}));}

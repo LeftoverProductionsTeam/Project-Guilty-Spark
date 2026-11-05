@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real packaged-app layout survey. Separate owned profile, real IPC and native
 // windows; no game/tool execution. DPI emulation is reported, not monitor proof.
 import fs from 'node:fs/promises';
@@ -14,7 +15,7 @@ const only=process.argv.find(arg=>arg.startsWith('--only='))?.slice(7).split(','
 const strict=process.argv.includes('--strict');
 if (!application || !destination || !ownedMap) throw Error('audit-workspaces-native <Spark.exe> <fresh-output> <owned-map>');
 const root = path.resolve(destination), expect = assertion.configure({ timeout: 90000 });
-await fs.mkdir(root);
+await fs.mkdir(await assertQaOutputPath(root));
 const exe = path.join(root, 'GuiltySpark-audit.exe');
 await fs.copyFile(path.resolve(application), exe, fs.constants.COPYFILE_EXCL);
 const digest = async file => crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');

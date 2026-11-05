@@ -1,8 +1,9 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real native source-map Inspector, layout, durable edit/Undo and renderer scope.
 // The --baseline mode records the pre-change layout without accepting it.
 import fs from 'node:fs/promises';import path from 'node:path';import net from 'node:net';import crypto from 'node:crypto';import {spawn} from 'node:child_process';import {chromium,expect as assertion} from '@playwright/test';import {openDrawer} from '../tests/ui/helpers/navigation.ts';
 const [application,destination,input]=process.argv.slice(2),baseline=process.argv.includes('--baseline');if(!input)throw Error('test-inspector-native <app> <fresh output> <owned MCC map> [--baseline]');
-const root=path.resolve(destination),file=path.resolve(input),expect=assertion.configure({timeout:90000}),digest=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');await fs.mkdir(root);const exe=path.join(root,'GuiltySpark-inspector.exe');await fs.copyFile(path.resolve(application),exe,fs.constants.COPYFILE_EXCL);
+const root=path.resolve(destination),file=path.resolve(input),expect=assertion.configure({timeout:90000}),digest=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');await fs.mkdir(await assertQaOutputPath(root));const exe=path.join(root,'GuiltySpark-inspector.exe');await fs.copyFile(path.resolve(application),exe,fs.constants.COPYFILE_EXCL);
 const report={complete:false,mockedIpc:false,baseline,applicationSha256:await digest(exe),sourceSha256:await digest(file),cases:[],errors:[],gameplayAccepted:false};const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));
 const child=spawn(exe,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});let browser,page;
 const invoke=(command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});

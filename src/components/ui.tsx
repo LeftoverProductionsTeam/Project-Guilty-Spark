@@ -193,7 +193,7 @@ export function Toast({ message, tone, onClose }: { message: string; tone: strin
  * Hover, keyboard focus and touch-accessible help. Escape hides the popup
  * without moving focus; focusing or hovering again reopens it.
  */
-export function HelpTip({help}:{help:string}) {
+export function HelpTip({help,label='Explain this field'}:{help:string;label?:string}) {
   const id = useId();
   const anchor=useRef<HTMLSpanElement>(null),bubble=useRef<HTMLSpanElement>(null);
   const [position,setPosition]=useState({left:8,top:8});
@@ -210,7 +210,7 @@ export function HelpTip({help}:{help:string}) {
   return <span ref={anchor} className={`gs-help-wrapper ${visible ? 'is-visible' : ''}`}
     onMouseEnter={()=>{setHovered(true);setDismissed(false);}}
     onMouseLeave={()=>setHovered(false)}>
-    <button type="button" className="gs-helptip" aria-label="Explain this field"
+    <button type="button" className="gs-helptip" aria-label={label}
       aria-describedby={visible ? id : undefined}
       onFocus={()=>{setFocused(true);setDismissed(false);}}
       onBlur={()=>{setFocused(false);setDismissed(false);}}

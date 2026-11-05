@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const forbidden = new Set([
   '.local',
@@ -14,12 +15,17 @@ const forbidden = new Set([
   'node_modules',
   'storage-v1',
   '.spark-storage-v1',
+  'artifacts',
+  'preserved',
 ]);
 export async function safeQaCopy(source, destination, options = {}) {
   source = path.resolve(source);
   destination = path.resolve(destination);
+  await assertQaOutputPath(destination);
   if (options.dereference) throw Error('QA copies cannot follow source links');
   if ((await fs.lstat(source)).isSymbolicLink()) throw Error('QA copy refuses a linked source root');
+  if ((await fs.realpath(source)).toLowerCase() !== source.toLowerCase())
+    throw Error('QA copy refuses a linked or aliased source ancestor');
   const contains = (parent, child) => {
     const relative = path.relative(parent, child);
     return (
@@ -67,9 +73,11 @@ export async function safeQaCopy(source, destination, options = {}) {
     process.env.SPARK_QA_COPY_HELPER ??
     path.join(
       root,
-      '.local/build/cargo/release/examples',
+      'target/release/examples',
       process.platform === 'win32' ? 'qa_safe_copy.exe' : 'qa_safe_copy',
     );
+  if (path.resolve(executable).split(path.sep).some((part) => part.toLowerCase() === '.local'))
+    throw Error('Use the current native copy helper in target/release/examples, not the obsolete .local tree');
   await fs.access(executable).catch(() => {
     throw Error(
       'Build the shared qa_safe_copy helper before an isolated recursive trial: node scripts/cargo.mjs build -p spark-core --example qa_safe_copy --release --locked',

@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Real desktop/WebView2 IPC and GPU materials. No compiler tools or original
 // bitmap pack are configured for the standalone first-load phase.
 import fs from 'node:fs/promises';
@@ -16,7 +17,7 @@ if (args.size !== 3 || !['--app', '--output', '--map'].every((k) => args.has(k))
   throw Error('Use --app built.exe --output fresh-directory --map owned-Zombie-Apocalypse.map');
 const output = path.resolve(args.get('--output')),
   input = path.resolve(args.get('--map'));
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 await fs.mkdir(path.join(output, 'download'));
 const hash = async (p) =>
   crypto

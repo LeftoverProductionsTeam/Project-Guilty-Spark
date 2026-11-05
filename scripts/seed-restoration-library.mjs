@@ -15,11 +15,11 @@ if (initial.apiVersion !== 1) throw new Error('Unsupported desktop API');
 console.log('Actual application data:', initial.dataDirectory);
 const settings = {
   ...initial.settings,
-  invaderDirectory: path.resolve('.local/tools/invader'),
+  invaderDirectory: path.resolve('tools/invader'),
   resourceDirectory: path.resolve('Pyros Zombie Apocolypse Mod Versions/Zombie Apocalypse/maps'),
 };
 await call('save_settings', { settings });
-const candidates = JSON.parse(await readFile('.local/qa/candidates.json', 'utf8')).filter(
+const candidates = JSON.parse(await readFile('artifacts/qa/candidates.json', 'utf8')).filter(
   (c) => c.kind !== 'resource/other',
 );
 const imported = [];
@@ -65,7 +65,7 @@ for (const candidate of candidates) {
     imported.push({ source: candidate.path, error: String(e) });
   }
 }
-await writeFile('.local/qa/application-restoration-library.json', JSON.stringify(imported, null, 2));
+await writeFile('artifacts/qa/application-restoration-library.json', JSON.stringify(imported, null, 2));
 await page.reload();
 await page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.' }).waitFor();
 console.log('Prepared', imported.length, 'candidate projects in the actual application library.');

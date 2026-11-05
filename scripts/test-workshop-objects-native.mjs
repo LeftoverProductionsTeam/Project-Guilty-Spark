@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in real desktop/native IPC/geometry acceptance. No synthetic mesh or game proof.
 import { chromium, expect as assertion } from '@playwright/test';
 import fs from 'node:fs/promises';
@@ -5,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
-import {beginQaStorage} from './native-qa-storage.mjs';
+import {beginQaStorage,waitForQaExit} from './native-qa-storage.mjs';
 import {openDrawer} from '../tests/ui/helpers/navigation.ts';
 const expect = assertion.configure({ timeout: 45000 }),
   a = process.argv.slice(2);
@@ -15,7 +16,7 @@ if (a.length !== 2 && a.length !== 5)
   );
 const app = path.resolve(a[0]),
   root = path.resolve(a[1]);
-await fs.mkdir(root, { recursive: false });
+await fs.mkdir(await assertQaOutputPath(root), { recursive: false });
 const data = path.join(root, 'library');
 await fs.mkdir(data);
 const hash = async (p) =>
@@ -39,6 +40,7 @@ const port = server.address().port;
 await new Promise((r) => server.close(r));
 const exe = path.join(root, 'GuiltySpark-workshop-qa.exe');
 await fs.copyFile(app, exe, fs.constants.COPYFILE_EXCL);
+await finishStorage.registerDisposable(exe);
 const child = spawn(exe, [], {
   windowsHide: true,
   stdio: 'ignore',
@@ -396,5 +398,6 @@ try {
 } finally {
   await browser?.close();
   child.kill();
+  await waitForQaExit(child);
   await finishStorage(receipt.complete?'passed':'failed');
 }

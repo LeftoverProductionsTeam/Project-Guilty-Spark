@@ -16,7 +16,7 @@ try {
   page.on('pageerror', (e) => errors.push(e.message));
   const call = (command, args = {}) =>
     page.evaluate(({ command, args }) => window.__TAURI_INTERNALS__.invoke(command, args), { command, args });
-  const imported = JSON.parse(await readFile('.local/qa/application-restoration-library.json', 'utf8'));
+  const imported = JSON.parse(await readFile('artifacts/qa/application-restoration-library.json', 'utf8'));
   const demo = imported.find((p) => p.title === 'Zombie Apocalypse · Demo');
   if (!demo) throw new Error('Import the owner-supplied candidates first');
   const initial = await call('bootstrap');
@@ -208,7 +208,7 @@ try {
     'Native build history and library thumbnails',
   ];
   await writeFile(
-    '.local/qa/restoration-desktop.json',
+    'artifacts/qa/restoration-desktop.json',
     JSON.stringify(
       {
         timestamp: new Date().toISOString(),

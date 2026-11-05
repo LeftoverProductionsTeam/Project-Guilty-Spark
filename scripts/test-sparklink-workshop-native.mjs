@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in acceptance: three real desktop processes with isolated libraries.
 // Private LAN and a real Radmin adapter on ONE PC do not prove cross-PC delivery.
@@ -7,7 +8,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
-import {beginQaStorage} from './native-qa-storage.mjs';
+import {beginQaStorage,waitForQaExit} from './native-qa-storage.mjs';
 const expect = assertion.configure({ timeout: 45000 }),
   args = process.argv.slice(2);
 if (args.length !== 5)
@@ -15,7 +16,7 @@ if (args.length !== 5)
     'test-sparklink-workshop-native <Spark exe> <fresh evidence root> <H1A kit> <source tags> <Invader>',
   );
 const [app, root, kit, tags, invader] = args.map((p) => path.resolve(p));
-await fs.mkdir(root, { recursive: false });
+await fs.mkdir(await assertQaOutputPath(root), { recursive: false });
 await fs.copyFile(new URL(import.meta.url), path.join(root, 'harness.mjs'), fs.constants.COPYFILE_EXCL);
 const hash = (b) => crypto.createHash('sha256').update(b).digest('hex'),
   fileHash = async (p) => hash(await fs.readFile(p));
@@ -155,6 +156,7 @@ async function actor(slug) {
   const a = { slug, dir, data, exe: path.join(dir, 'GuiltySpark-C48-qa.exe') };
   actors.push(a);
   await fs.copyFile(app, a.exe, fs.constants.COPYFILE_EXCL);
+  await finishStorage.registerDisposable(a.exe);
   await start(a);
   return a;
 }
@@ -840,6 +842,7 @@ try {
   for (const a of actors) {
     await a.browser?.close().catch(() => {});
     a.child?.kill();
+    if (a.child) await waitForQaExit(a.child);
   }
   await finishStorage(receipt.complete?'passed':'failed');
 }

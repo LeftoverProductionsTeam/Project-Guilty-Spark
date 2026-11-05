@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Deliberately unsafe native tags remain in a separate QA copy; never launch it.
 import fs from 'node:fs/promises';
 import {safeQaCopy} from './qa-safe-copy.mjs';
@@ -14,7 +15,7 @@ if (root.length > 90) throw Error('Use a short owned test directory');
 const accepted = JSON.parse(await fs.readFile(acceptedFile, 'utf8'));
 if (!accepted.complete || accepted.build?.status !== 'validated')
   throw Error('A genuine accepted native emitter build is required');
-await fs.mkdir(root);
+await fs.mkdir(await assertQaOutputPath(root));
 const workspace = path.join(root, 'workspace');
 const hash = async (file) =>
   crypto

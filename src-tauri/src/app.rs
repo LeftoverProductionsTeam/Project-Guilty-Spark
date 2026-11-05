@@ -1,4 +1,5 @@
 use notify::Watcher;
+use sha2::Digest;
 #[path="texture_resources_native.rs"] mod texture_resources_native;
 #[path="workspace_windows.rs"] mod workspace_windows;
 #[path="workspace_history_native.rs"] mod workspace_history_native;
@@ -206,7 +207,7 @@ fn find_local_invader(state:&AppState)->Option<PathBuf>{
     if let Ok(executable)=std::env::current_exe(){if let Some(directory)=executable.parent(){anchors.push(directory.to_path_buf());}}
     let mut seen=std::collections::HashSet::new();
     for anchor in anchors {for parent in anchor.ancestors().take(10).filter(|p|p.parent().is_some()) {
-        for suffix in [".local/tools/invader","tools/invader"] {
+        for suffix in ["tools/invader"] {
             let candidate=parent.join(suffix);
             if !seen.insert(candidate.clone())||!candidate.is_dir()||core::reject_links(&candidate).is_err(){continue;}
             let names=if cfg!(windows){["invader-extract.exe","invader-info.exe","invader-build.exe"]}else{["invader-extract","invader-info","invader-build"]};
@@ -1460,7 +1461,7 @@ async fn copy_project_asset(app:tauri::AppHandle,window:tauri::WebviewWindow,sou
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();check_document_owner(&state,&target_id,&owner)?;let lib=lock(&state.library)?;let(project,asset,imported)=core::asset_transfer::copy_obj(&lib,&source_id,&asset_id,&target_id).map_err(error)?;Ok(AssetResult{project,asset,mesh:imported.mesh,warnings:imported.warnings})}).await.map_err(error)?
 }
 #[tauri::command]
-async fn import_asset(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, path: Option<PathBuf>) -> Reply<Option<AssetResult>> {
+async fn import_asset(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, path: Option<PathBuf>, expected_sha256: Option<String>) -> Reply<Option<AssetResult>> {
     let owner=window.label().to_string();
     let path=if let Some(path)=path{path}else{let file = rfd::AsyncFileDialog::new()
         .set_title("Import OBJ geometry into the Asset Workshop")
@@ -1481,6 +1482,7 @@ async fn import_asset(app: tauri::AppHandle, window: tauri::WebviewWindow, id: S
         let mut bytes=Vec::new();
         std::io::Read::read_to_end(&mut std::io::Read::take(fs::File::open(&path).map_err(error)?,64*1024*1024+1),&mut bytes).map_err(error)?;
         if bytes.len()>64*1024*1024{return Err("OBJ exceeds 64 MiB".into());}
+        if expected_sha256.as_ref().is_some_and(|expected|expected.len()!=64||!expected.bytes().all(|b|b.is_ascii_hexdigit())||core::hex_bytes(sha2::Sha256::digest(&bytes))!=*expected){return Err("External geometry changed after review. Review the completed save again before importing; no asset was added.".into());}
         let imported=assets::parse_obj(std::str::from_utf8(&bytes).map_err(error)?).map_err(error)?;
         let lib = lock(&state.library)?;
         let mut p = lib.get(&id).map_err(error)?;
@@ -3005,6 +3007,10 @@ pub fn run() {
             validate_existing,
             cancel_build,
             import_asset,
+            tool_ecosystem_native::prepare_geometry_handoff,
+            tool_ecosystem_native::review_geometry_handoff,
+            tool_ecosystem_native::geometry_handoff_status,
+            tool_ecosystem_native::launch_geometry_tool,
             import_custom_sound,
             preview_custom_sound,
             inspect_map_ambience,

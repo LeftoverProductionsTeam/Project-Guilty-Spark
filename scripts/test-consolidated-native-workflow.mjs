@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Opt-in native loose-tag import/placement -> Spark detection/build/reopen.
 // Uses a fresh qa_runtime_library replica. Never launches Halo or edits SDK tags.
 import { chromium, expect } from '@playwright/test';
@@ -33,7 +34,7 @@ if (
   path.resolve(seed.library) !== data
 )
   throw Error('Only an explicit isolated QA replica is accepted');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const hash = (b) => crypto.createHash('sha256').update(b).digest('hex');
 const readHash = async (p) => hash(await fs.readFile(p));
 async function inventory(root, relative = '', result = {}) {

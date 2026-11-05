@@ -1070,13 +1070,14 @@ export default function App() {
     const jobId = await call<string>('quickforge_build', { projectId: project.id });
     setActiveJob(jobId);
   }
-  async function importAsset(position?:Vec3,path?:string) {
+  async function importAsset(position?:Vec3,path?:string,expectedSha256?:string,expectedProjectId?:string) {
     const target=historyRef.current.current;
     if (!target) return;
+    if(expectedProjectId&&target.id!==expectedProjectId){notice('Return to the handoff’s map before importing this geometry.','error');return;}
     setBusy(true);
     try {
       if (historyRef.current.dirty) await save();
-      const result = await call<AssetResult | null>('import_asset', { id: target.id,...(path?{path}:{}) });
+      const result = await call<AssetResult | null>('import_asset', { id: target.id,...(path?{path}:{}),...(expectedSha256?{expectedSha256}:{}) });
       if (result) {
         dispatchDocument({type:'history',id:target.id,action:{type:'assets',project:result.project}});
         dispatchDocument({type:'mesh',id:result.project.id,assetId:result.asset.id,mesh:result.mesh});
@@ -1282,6 +1283,7 @@ export default function App() {
             project={current}
             meshes={meshes}
             onImport={() => void importAsset()}
+            onImportRevised={(path,sha256)=>importAsset(undefined,path,sha256,current.id)}
             onWorld={() => setWorkspace('world')}
           />
         );

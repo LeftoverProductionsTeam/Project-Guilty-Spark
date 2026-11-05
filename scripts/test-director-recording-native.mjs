@@ -1,3 +1,4 @@
+import { assertQaOutputPath } from './native-qa-storage.mjs';
 // Actual Director UI -> native reservation/chunks/publication -> independent video decode.
 // Uses the visible named-take workflow. Does not drive the OS Save/capture pickers or a game.
 import { chromium, expect } from '@playwright/test';
@@ -37,7 +38,7 @@ const includeMapAudio = args.has('--map-audio');
 const fixture = JSON.parse(await fs.readFile(path.join(data, 'spark-recording-fixture.json'), 'utf8'));
 if (!fixture.nativeFixture || fixture.schemaVersion !== 1)
   throw Error('Use qa_recording_library with an owned map');
-await fs.mkdir(output);
+await fs.mkdir(await assertQaOutputPath(output));
 const takes = path.join(output, 'takes');
 await fs.mkdir(takes);
 const executable = path.join(output, 'GuiltySpark-recording-qa.exe');
