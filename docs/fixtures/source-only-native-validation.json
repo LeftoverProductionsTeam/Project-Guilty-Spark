@@ -34,7 +34,7 @@
           "sourceCubes": "4",
           "pendingMaterials": "0"
         },
-        "nativeGeometry": "66 visible triangles\n37 object model types resolved\n5 objects\nHalo coordinates \u00c2\u00b7 Z up\nViewport performance\nEditor preview",
+        "nativeGeometry": "66 visible triangles\n37 object model types resolved\n5 objects\nHalo coordinates Â· Z up\nViewport performance\nEditor preview",
         "engineParityClaimed": false
       },
       {
@@ -67,9 +67,16 @@
       "originalArchiveUnchanged": true,
       "retainedSdkTree": false
     },
-    "freshBuildMs": 25878,
+    "freshBuildMs": 26979,
     "permanentExtractedSdkRequired": false,
-    "sourceFixtureUsed": "docs/fixtures/source-only-native-door.json"
+    "sourceFixtureUsed": "docs/fixtures/source-only-native-door.json",
+    "postArchiveRetirementVerified": true,
+    "postPurgeVerificationAt": "2026-11-05T21:47:01.729Z",
+    "additionalNativeTreesDuringReuse": 0,
+    "nativeHelperBuildMs": 66367,
+    "completeNativeRunMs": 175640,
+    "sourceArchiveUnchanged": true,
+    "temporaryOutputDisposed": true
   },
   "nativeAuthoringFixture": {
     "file": "docs/fixtures/source-only-native-door.json",

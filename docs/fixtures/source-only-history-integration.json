@@ -8,7 +8,7 @@
   "missingCommits": false,
   "canonicalGitImportedOrRewritten": false,
   "archivedProductSnapshots": "Compared archived source hashes with canonical Git and reviewed C33/C39 product diffs. Current native/SparkLink/Guardian code is retained. Older layouts/readers/tool models must not overwrite it.",
-  "historicalExperiments": "Reviewed for retirement under final owner correction. Broad warehouse deletion was rejected by automatic approval review and is awaiting the specific owner decision; current source/history/originals remain protected. No warehouse deletion is claimed.",
+  "historicalExperiments": "Owner specifically approved obsolete byte-unique experiments. Eight cold QA archive groups, ten consolidated ZIPs and two residual ZIPs have been retired after source/history integration; associated QA files and obsolete receipts are being removed. No original Halo/runtime/mod/Git/C49 resource was deleted.",
   "requirementsLedgerSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
   "sourceAndKnowledgeDestinations": [
     "AGENTS.md",
@@ -22,5 +22,19 @@
     "scripts/maintenance/physical-audit.cs",
     "scripts/maintenance/physical-audit-main.cs"
   ],
-  "originalUserResourcesRetired": false
+  "originalUserResourcesRetired": false,
+  "retiredSdkAudioExperiment": {
+    "originalSdk": "HCEEK.7z (protected, SHA-256 pinned in source-only-h1a-inputs.json)",
+    "soundMember": "tags/sound/sfx/ambience/computers/covey_uplink.sound",
+    "sdkSoundSha256": "337fe46290f28dd22def63ead5528f14b75c3366c0792fc791dff9ecf63edd8c",
+    "normalizedPrototypeSha256": "691f492faf8ddc00ba2ab71dda253da655a4acbfca470efe59d165f3f1d7f16f",
+    "bytes": 201192,
+    "changedMetadataBytes": 144,
+    "changedSamplesAfterByte1024": 0,
+    "loopingMember": "tags/sound/sfx/ambience/computers/covy_uplink.sound_looping",
+    "sdkLoopingSha256": "60d6036c241f8e10fb96daad4cc6c94d3b004d36a07c90273d478db86ec0c518",
+    "prototypeNamespace": "gs_assets_40c1717dda7f44fabf510d514960eaac",
+    "purpose": "Obsolete Unicode-path/native-normalization consolidation test. Original stock tag/sample payload remains in the protected SDK; not a unique supplied recording or mod."
+  },
+  "remainingCleanupBlocker": "Automatic approval review specifically refuses deletion of preserved/recovery-metadata/preservation-index.json as a recovery safeguard. No bypass; it contains no live native payload providers after the approved archive retirement."
 }
