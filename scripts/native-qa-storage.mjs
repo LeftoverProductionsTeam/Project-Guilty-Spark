@@ -1,15 +1,17 @@
-// Bounded native QA ownership. Evidence and unfinished libraries are retained;
-// only explicitly sealed, unchanged disposable files can be removed.
+// Bounded native QA ownership. Source/unknown files stay protected. A harness
+// may declare a NEW scratch namespace before any writer starts; that namespace
+// is disposable on success, failure or recovery, with explicit retained files.
 import fs from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const policy = JSON.parse(await fs.readFile(new URL('./maintenance/retention-policy.json', import.meta.url), 'utf8'));
-let canonicalBudgetChecked = 0;
 const key = (value) => process.platform === 'win32' ? value.toLowerCase() : value;
+const ordinary = value => process.platform === 'win32' && value.startsWith('\\\\?\\')
+  ? value.startsWith('\\\\?\\UNC\\') ? '\\\\' + value.slice(8) : value.slice(4) : value;
 const contains = (parent, child) => {
   const relative = path.relative(key(parent), key(child));
   return relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith('..' + path.sep));
@@ -45,7 +47,7 @@ export async function assertQaOutputPath(root,{reservationBytes=policy.qaRunByte
     // to make a new run fit; stop generation and require an ownership review.
     // Honor the caller's tighter run budget. A successful small admission
     // must not exempt a later, larger operation from its own check.
-    if (reservationBytes>canonicalBudgetChecked) {
+    if (reservationBytes > 0) {
       const existing = await fs.stat(generated).catch((error) => { if (error.code === 'ENOENT') return null; throw error; });
       const used = existing ? await measure(generated, policy.qaTotalBytes) : { bytes: 0 };
       const volume = await fs.statfs(existing ? generated : projectRoot);
@@ -53,7 +55,6 @@ export async function assertQaOutputPath(root,{reservationBytes=policy.qaRunByte
         throw Error('Canonical QA storage budget is exhausted; no new output admitted');
       if (Number(volume.bavail) * Number(volume.bsize) < reservationBytes + policy.qaMinimumFreeBytes)
         throw Error('QA admission would violate the minimum free-disk budget');
-      canonicalBudgetChecked = reservationBytes;
     }
   }
   return absolute;
@@ -145,6 +146,132 @@ async function atomicJson(file, value) {
   await fs.writeFile(temporary, JSON.stringify(value, null, 2), { flag: 'wx' });
   await fs.rename(temporary, file);
 }
+/** Sampling is a stop threshold, not an OS disk quota: a native tool can write
+ * between samples. Never advertise it as a hard per-write filesystem limit. */
+export function watchOutputBudget(root, { budget, minimumFree = 0, intervalMs = policy.qaSampleIntervalMs, onExceeded = async () => {} }) {
+  if (![budget, minimumFree, intervalMs].every(Number.isSafeInteger) || budget < 1 || minimumFree < 0 || intervalMs < 10)
+    throw Error('Invalid output monitor limits');
+  const state = { peakLogicalBytes: 0, peakFiles: 0, samples: 0, error: null, stopped: false };
+  let pending, timer;
+  const sample = () => {
+    if (pending) return pending;
+    pending = (async () => {
+      try {
+        const exists=await fs.lstat(root).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+        const used = exists ? await measure(root, Number.MAX_SAFE_INTEGER) : {bytes:0,files:0};
+        let volumeRoot=path.resolve(root);
+        while(!await fs.stat(volumeRoot).catch(error=>{if(error.code==='ENOENT')return null;throw error;}))volumeRoot=path.dirname(volumeRoot);
+        const volume = await fs.statfs(volumeRoot);
+        state.samples++; state.peakLogicalBytes = Math.max(state.peakLogicalBytes, used.bytes);
+        state.peakFiles = Math.max(state.peakFiles, used.files);
+        if (used.bytes > budget || Number(volume.bavail) * Number(volume.bsize) < minimumFree)
+          throw Error('Generated output crossed its storage budget or minimum free-disk floor');
+      } catch (error) {
+        if (!state.error) {
+          state.error = String(error); clearInterval(timer);
+          try { await onExceeded(error); } catch (stopError) { state.stopError = String(stopError); }
+        }
+      }
+    })().finally(() => { pending = null; });
+    return pending;
+  };
+  timer = setInterval(() => { void sample(); }, intervalMs); timer.unref();
+  return { state, sample, async stop() { clearInterval(timer); if (pending) await pending; state.stopped = true; return { ...state }; } };
+}
+/** Stop only a child explicitly launched by this harness, including its native
+ * descendants on Windows. Never discover/kill processes by a generic name. */
+export async function stopQaProcess(child) {
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
+  if (process.platform === 'win32') {
+    await new Promise((resolve, reject) => execFile('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, timeout: 30000 }, error => {
+      if (error && child.exitCode === null && child.signalCode === null) reject(error); else resolve();
+    }));
+  } else child.kill('SIGTERM');
+  await waitForQaExit(child);
+}
+async function scratchRegistry(root, value) {
+  await atomicJson(path.join(root, 'scratch-ownership.json'), value);
+}
+async function unlinkOwned(file, row) {
+  try { await fs.unlink(file); }
+  catch (error) {
+    if (process.platform !== 'win32' || error.code !== 'EPERM') throw error;
+    // copyFile can inherit Windows' read-only attribute from preserved tags.
+    // Clear it only on this independently owned exact file, never a hardlink
+    // to an original. Locked/active files still fail and remain protected.
+    const current=await fs.lstat(file,{bigint:true});
+    if (current.nlink!==1n || String(current.dev)!==row.dev || String(current.ino)!==row.ino || Number(current.size)!==row.bytes || await fileHash(file)!==row.sha256)
+      throw Error('Read-only scratch is shared or changed; retained');
+    await fs.chmod(file,0o600); await fs.unlink(file);
+  }
+}
+async function retireDeclaredScratch(root, registry) {
+  if (registry.schemaVersion !== 1 || key(registry.root) !== key(root) || !Array.isArray(registry.directories) || !Array.isArray(registry.retained))
+    throw Error('Unknown scratch ownership is protected');
+  let bytes = 0, files = 0;
+  for (const declaration of registry.directories) {
+    const target = path.resolve(root, declaration.relative);
+    if (target === root || !contains(root, target)) throw Error('Scratch ownership escaped its run');
+    await noLinks(target);
+    const info = await fs.lstat(target, { bigint: true }).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    if (!info) continue;
+    if (!info.isDirectory() || String(info.dev) !== declaration.dev || String(info.ino) !== declaration.ino)
+      throw Error('Scratch root identity changed; retained for review');
+    const inventory = await snapshot(target, policy.qaRunBytes);
+    const kept = registry.retained.filter(row => contains(target, path.resolve(root, row.relative)));
+    for (const row of kept) {
+      const actual = inventory.rows.find(item => key(path.resolve(target, item.path)) === key(path.resolve(root, row.relative)));
+      if (!actual || actual.directory || actual.sha256 !== row.sha256 || actual.bytes !== row.bytes)
+        throw Error('Retained fixture changed; scratch cleanup refused');
+    }
+    for (const row of [...inventory.rows].sort((a,b) => b.path.length - a.path.length)) {
+      const file = path.join(target, row.path);
+      if (kept.some(keep => contains(file, path.resolve(root, keep.relative)))) continue;
+      await noLinks(file);
+      const current = await fs.lstat(file, { bigint: true });
+      if (String(current.dev) !== row.dev || String(current.ino) !== row.ino || current.isDirectory() !== row.directory)
+        throw Error('Scratch file identity changed; cleanup stopped');
+      if (row.directory) await fs.rmdir(file);
+      else {
+        if (Number(current.size) !== row.bytes || String(current.mtimeNs) !== row.modified || await fileHash(file) !== row.sha256)
+          throw Error('Scratch file changed during cleanup; cleanup stopped');
+        await unlinkOwned(file,row); bytes += row.bytes; files++;
+      }
+    }
+  }
+  return { bytes, files };
+}
+/** Explicit restart recovery, never an automatic eviction of old libraries.
+ * Only previously declared fresh namespaces and dead recorded writers qualify. */
+export async function recoverQaScratch(root, { storageRoot = path.join(projectRoot, policy.qaDirectory) } = {}) {
+  const absolute = await assertQaOutputPath(root, { reservationBytes: 0 });
+  const record = JSON.parse(await fs.readFile(path.join(absolute, 'storage-run.json'), 'utf8'));
+  if (record.schemaVersion !== 3 || !Array.isArray(record.writers) || key(record.root) !== key(absolute) || isLive(record.ownerPid) || record.writers.some(isLive) || !record.active)
+    throw Error('Unknown or active QA ownership protects recovery data');
+  await noLinks(path.join(absolute, 'scratch-ownership.json'));
+  const registry = JSON.parse(await fs.readFile(path.join(absolute, 'scratch-ownership.json'), 'utf8'));
+  if (registry.nonce !== record.nonce) throw Error('Scratch recovery nonce differs');
+  const leases = path.join(await assertQaOutputPath(storageRoot, { reservationBytes: 0 }), '.leases');
+  const leaseFile = path.join(leases, crypto.createHash('sha256').update(key(absolute)).digest('hex') + '.json');
+  await noLinks(leaseFile);
+  const lease = JSON.parse(await fs.readFile(leaseFile, 'utf8'));
+  if (lease.nonce !== record.nonce || key(lease.root) !== key(absolute)) throw Error('Recovery lease differs; retained');
+  let sealedBytes = 0;
+  const sealsFile = path.join(absolute, 'disposable-seals.json');
+  if (await fs.stat(sealsFile).catch(() => null)) {
+    await noLinks(sealsFile);
+    if ((await fs.stat(sealsFile)).size > 8*1024**2) throw Error('Recovery seal inventory exceeds its bound');
+    const seals = JSON.parse(await fs.readFile(sealsFile, 'utf8'));
+    if (!Array.isArray(seals) || seals.length > 128 || seals.some(seal => seal.ownerPid !== record.ownerPid)) throw Error('Recovery disposable owner differs');
+    for (const seal of seals) sealedBytes += (await disposeQaScratch(absolute, seal)).bytes;
+  }
+  const disposed = await retireDeclaredScratch(absolute, registry);
+  const measured = await measure(absolute, policy.qaRunBytes);
+  const result = { ...record, status: 'interrupted', active: false, recoveredAt: new Date().toISOString(), logicalBytes: measured.bytes, files: measured.files, disposedBytes: disposed.bytes + sealedBytes };
+  await atomicJson(path.join(absolute, 'storage-run.json'), result);
+  await atomicJson(leaseFile, result);
+  return result;
+}
 /** Refuses active, changed, linked and unrelated files before deleting anything.
  * Recovery never guesses that an abandoned or unsealed job is disposable. */
 export async function disposeQaScratch(runRoot, seal, { ownerFinished = false } = {}) {
@@ -169,7 +296,7 @@ export async function disposeQaScratch(runRoot, seal, { ownerFinished = false } 
     else {
       if (Number(info.size) !== row.bytes || String(info.mtimeNs) !== row.modified || await fileHash(file) !== row.sha256)
         throw Error('QA disposable content changed; cleanup stopped');
-      await fs.unlink(file);
+      await unlinkOwned(file,row);
     }
   }
   return { bytes: current.bytes, files: current.files };
@@ -203,7 +330,23 @@ export async function beginQaStorage(root, { workflow, appSha256, reservationByt
   const leases = path.join(storageRoot, '.leases');
   await fs.mkdir(leases, { recursive: true });
   const lock = path.join(leases, 'admission.lock');
-  const guard = await fs.open(lock, 'wx').catch(() => { throw Error('QA admission is already active or interrupted; inspect the owned lock before retrying'); });
+  let guard;
+  for (let attempt=0; !guard; attempt++) {
+    try { guard=await fs.open(lock,'wx'); }
+    catch(error) {
+      if(error.code!=='EEXIST')throw error;
+      // Brief contention is expected with independent QA processes. Wait only
+      // for a well-formed live owner; never delete/adopt an interrupted lock.
+      let owner;
+      try {
+        await noLinks(lock);if((await fs.stat(lock)).size>4096)throw Error('Unknown lock');
+        owner=JSON.parse(await fs.readFile(lock,'utf8'));
+      } catch { throw Error('QA admission is already active or interrupted; inspect the owned lock before retrying'); }
+      if(attempt>=50||owner.schemaVersion!==1||typeof owner.nonce!=='string'||!Number.isSafeInteger(owner.ownerPid)||!isLive(owner.ownerPid))
+        throw Error('QA admission is already active or interrupted; inspect the owned lock before retrying');
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+  }
   const lockText = JSON.stringify({ schemaVersion: 1, ownerPid: process.pid, nonce: crypto.randomUUID(), root: absolute, startedAt: new Date().toISOString() });
   await guard.writeFile(lockText); await guard.sync();
   const lockIdentity = await guard.stat({ bigint: true });
@@ -218,7 +361,7 @@ export async function beginQaStorage(root, { workflow, appSha256, reservationByt
       const file = path.join(leases, entry); await noLinks(file);
       if ((await fs.stat(file)).size > 65536) throw Error('QA reservation metadata exceeds its bound');
       const row = JSON.parse(await fs.readFile(file, 'utf8'));
-      if (row.schemaVersion !== 2 || !Number.isSafeInteger(row.reservedBytes) || !Number.isSafeInteger(row.logicalBytes ?? 0)) throw Error('Unknown QA reservation is protected');
+      if (![2,3].includes(row.schemaVersion) || !Number.isSafeInteger(row.reservedBytes) || !Number.isSafeInteger(row.logicalBytes ?? 0)) throw Error('Unknown QA reservation is protected');
       reserved += row.active || row.status === 'incomplete' ? Math.max(row.reservedBytes, row.logicalBytes ?? 0) : row.logicalBytes;
     }
     const existing = await measure(storageRoot, totalBytes), own = await measure(absolute, reservationBytes);
@@ -228,7 +371,7 @@ export async function beginQaStorage(root, { workflow, appSha256, reservationByt
     const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: projectRoot, encoding: 'utf8', windowsHide: true }).trim();
     const sourceDirty = !!execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: projectRoot, encoding: 'utf8', windowsHide: true }).trim();
     const harness = path.resolve(process.argv[1]);
-    record = { schemaVersion: 2, workflow, root: absolute, sourceCommit, sourceDirty, harness, harnessSha256: await fileHash(harness), appSha256, ownerPid: process.pid, startedAt: new Date().toISOString(), status: 'incomplete', active: true, reservedBytes: reservationBytes, logicalBytes: own.bytes, files: own.files, automaticDeletion: 'sealed-disposable-only' };
+    record = { schemaVersion: 3, nonce: crypto.randomUUID(), workflow, root: absolute, sourceCommit, sourceDirty, harness, harnessSha256: await fileHash(harness), appSha256, ownerPid: process.pid, writers: [], startedAt: new Date().toISOString(), status: 'incomplete', active: true, reservedBytes: reservationBytes, logicalBytes: own.bytes, files: own.files, automaticDeletion: 'sealed-or-declared-fresh-scratch-only' };
     await fs.writeFile(output, JSON.stringify(record, null, 2), { flag: 'wx' });
     await fs.writeFile(leaseFile, JSON.stringify(record), { flag: 'wx' });
   } finally {
@@ -239,15 +382,53 @@ export async function beginQaStorage(root, { workflow, appSha256, reservationByt
     await fs.unlink(lock);
   }
   const disposables = [];
+  const registry = { schemaVersion: 1, root: absolute, nonce: record.nonce, directories: [], retained: [] };
+  const writers = new Set();
+  const monitor = watchOutputBudget(absolute, { budget: reservationBytes, minimumFree: minimumFreeBytes, onExceeded: async () => {
+    await Promise.all([...writers].map(stopQaProcess));
+  } });
   let finished = false;
   const finish = async (status) => {
-    if (finished || !['passed', 'failed'].includes(status)) throw Error('One explicit native QA outcome required');
+    if (finished || !['passed', 'failed', 'interrupted'].includes(status)) throw Error('One explicit native QA outcome required');
+    if ([...writers].some(child => child.exitCode === null && child.signalCode === null)) throw Error('Active QA writer protects scratch');
+    await monitor.sample(); const monitoring = await monitor.stop();
     let disposedBytes = 0;
     for (const seal of disposables) disposedBytes += (await disposeQaScratch(absolute, seal, { ownerFinished: true })).bytes;
+    const scratch = await retireDeclaredScratch(absolute, registry); disposedBytes += scratch.bytes;
     const measured = await measure(absolute, reservationBytes);
-    const result = { ...record, status, active: false, finishedAt: new Date().toISOString(), logicalBytes: measured.bytes, files: measured.files, disposedBytes };
+    const evidenceOverBudget = measured.bytes > policy.qaEvidenceBytes + registry.retained.reduce((sum,row) => sum + row.bytes, 0);
+    const result = { ...record, status: monitoring.error || evidenceOverBudget ? 'failed' : status, active: false, finishedAt: new Date().toISOString(), logicalBytes: measured.bytes, files: measured.files, disposedBytes, retained: registry.retained, monitoring, evidenceOverBudget };
     await atomicJson(output, result); await atomicJson(leaseFile, result); finished = true;
+    if (monitoring.error || evidenceOverBudget) throw Error(monitoring.error ?? 'QA diagnostic evidence exceeds its defined retention budget');
+    return result;
   };
+  finish.createScratch = async (relative) => {
+    const target = path.resolve(absolute, relative);
+    if (finished || target === absolute || !contains(absolute, target) || path.dirname(target) !== absolute || !/^[\w.-]{1,80}$/.test(relative))
+      throw Error('Fresh scratch must be a named direct child of its run');
+    await noLinks(target); await fs.mkdir(target); // EEXIST: never adopt user data.
+    const info = await fs.lstat(target, { bigint: true });
+    registry.directories.push({ relative, dev: String(info.dev), ino: String(info.ino) });
+    await scratchRegistry(absolute, registry);
+    return target;
+  };
+  finish.retain = async (file, reason) => {
+    const target = path.resolve(ordinary(file)), relative = path.relative(absolute, target);
+    if (finished || typeof reason !== 'string' || reason.length < 8 || reason.length > 256 || registry.retained.length >= 128 || !registry.directories.some(row => contains(path.resolve(absolute,row.relative),target)))
+      throw Error('Retained fixture needs an owned scratch file and an explicit bounded reason');
+    await noLinks(target); const info = await fs.stat(target);
+    if (!info.isFile() || registry.retained.some(row => key(row.relative) === key(relative)) || registry.retained.reduce((sum,row)=>sum+row.bytes,0) + info.size > policy.qaRetainedFixtureBytes)
+      throw Error('Retained fixture exceeds its bound or repeats an entry');
+    registry.retained.push({ relative, bytes: info.size, sha256: await fileHash(target), reason });
+    await scratchRegistry(absolute, registry);
+  };
+  finish.trackProcess = async (child) => {
+    if (finished || !child?.pid || typeof child.kill !== 'function') throw Error('QA writer must be an owned child process');
+    writers.add(child); record.writers = [...writers].map(child => child.pid);
+    await atomicJson(output, record); await atomicJson(leaseFile, record);
+  };
+  finish.sample = monitor.sample;
+  finish.interrupt = async () => { await Promise.all([...writers].map(stopQaProcess)); return finish('interrupted'); };
   finish.registerDisposable = async (file) => {
     const target = path.resolve(file);
     if (finished || target === absolute || !contains(absolute, target) || target === output || disposables.some((seal) => contains(seal.path, target) || contains(target, seal.path)))

@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { admitCargoOutput } from './native-qa-storage.mjs';
+import { admitCargoOutput, watchOutputBudget, stopQaProcess } from './native-qa-storage.mjs';
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const local = path.join(projectRoot, '.toolchain');
 const bin = path.join(local, 'cargo/bin');
@@ -25,12 +25,16 @@ if (path.resolve(env.CARGO_TARGET_DIR).split(path.sep).some((part) => part.toLow
 env.CARGO_PROFILE_DEV_DEBUG ??= '0';
 env.CARGO_PROFILE_TEST_DEBUG ??= '0';
 env.CARGO_INCREMENTAL ??= '0';
-if (!rustup && ['build','test','check','clippy','bench','run','doc','rustc'].includes(process.argv[2]))
-  await admitCargoOutput(env.CARGO_TARGET_DIR);
+const admission = !rustup && ['build','test','check','clippy','bench','run','doc','rustc'].includes(process.argv[2])
+  ? await admitCargoOutput(env.CARGO_TARGET_DIR) : null;
 const child = spawn(existsSync(executable) ? executable : tool, process.argv.slice(rustup ? 3 : 2), {
   cwd: projectRoot,
   env,
   stdio: 'inherit',
   windowsHide: true,
 });
-child.on('exit', (code) => process.exit(code ?? 1));
+const monitor = admission && watchOutputBudget(admission.path, { budget: admission.budget, minimumFree: 4*1024**3, onExceeded: async error => { console.error(String(error)); await stopQaProcess(child); } });
+const interrupt = async () => { await stopQaProcess(child); await monitor?.stop(); process.exit(130); };
+process.once('SIGINT',interrupt);process.once('SIGTERM',interrupt);
+child.on('error',async error=>{console.error(error);await monitor?.stop();process.exitCode=1;});
+child.on('exit', async (code) => { await monitor?.sample(); const result=await monitor?.stop(); process.exit(result?.error ? 1 : code ?? 1); });

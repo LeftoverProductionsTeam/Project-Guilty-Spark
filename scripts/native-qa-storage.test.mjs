@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import {pathToFileURL} from 'node:url';
-import { assertQaOutputPath, beginQaStorage, disposeQaScratch, admitCargoOutput } from './native-qa-storage.mjs';
+import { assertQaOutputPath, beginQaStorage, disposeQaScratch, admitCargoOutput, recoverQaScratch, stopQaProcess,watchOutputBudget } from './native-qa-storage.mjs';
 import { safeQaCopy } from './qa-safe-copy.mjs';
 
 async function fixture(run) {
@@ -55,6 +55,14 @@ test('shared Cargo admission reuses one cache and refuses growth without deletin
   const alias=path.join(parent,'target-alias');await fs.symlink(cache,alias,process.platform==='win32'?'junction':'dir');
   await assert.rejects(admitCargoOutput(alias,{budget:20,reserve:10,minimumFree:0}),/links|junctions/);
   await assert.rejects(admitCargoOutput(path.resolve('src'),{budget:20,reserve:10,minimumFree:0}),/overlap/);
+}));
+
+test('first-build monitor admits an initially absent output directory without a false budget failure',()=>fixture(async parent=>{
+  const output=path.join(parent,'fresh-target'),monitor=watchOutputBudget(output,{budget:65536,intervalMs:20});
+  await monitor.sample();assert.equal(monitor.state.error,null);
+  await fs.mkdir(output);await fs.writeFile(path.join(output,'new.rlib'),'new compiler output');
+  await monitor.sample();const result=await monitor.stop();
+  assert.equal(result.error,null);assert.equal(result.peakLogicalBytes,19);
 }));
 
 test('QA run records native source identity and outcome; removes only sealed scratch', () => fixture(async parent => {
@@ -127,6 +135,85 @@ test('repeated equivalent QA fixtures dispose copied inputs; only bounded receip
     await assert.rejects(fs.stat(scratch),{code:'ENOENT'});
   }
   assert.equal(new Set(counts).size,1);
+}));
+
+test('fresh declared namespaces are reclaimed on pass and failure while exact native fixtures survive', () => fixture(async parent => {
+  for (const status of ['passed','failed']) {
+    const root=await mkdir(path.join(parent,status)),finish=await beginQaStorage(root,options(parent));
+    const scratch=await finish.createScratch('library');
+    await fs.writeFile(path.join(scratch,'source.map'),'native accepted output');
+    await fs.writeFile(path.join(scratch,'temporary.map'),Buffer.alloc(64*1024,9));
+    await finish.retain(path.join(scratch,'source.map'),'Accepted independent native compile fixture');
+    const result=await finish(status);
+    assert.equal(result.status,status);assert.equal(result.disposedBytes,64*1024);
+    assert.equal(await fs.readFile(path.join(scratch,'source.map'),'utf8'),'native accepted output');
+    assert.deepEqual(await fs.readdir(scratch),['source.map']);
+  }
+}));
+
+test('scratch cannot adopt an existing source tree or remove a replaced directory', () => fixture(async parent => {
+  const root=await mkdir(path.join(parent,'run')),finish=await beginQaStorage(root,options(parent));
+  const existing=await mkdir(path.join(root,'existing'));await fs.writeFile(path.join(existing,'source'),'original');
+  await assert.rejects(finish.createScratch('existing'),{code:'EEXIST'});
+  const scratch=await finish.createScratch('scratch');await fs.rename(scratch,path.join(root,'moved'));
+  await fs.mkdir(scratch);await fs.writeFile(path.join(scratch,'new'),'replacement must survive');
+  await assert.rejects(finish('failed'),/identity changed/);
+  assert.equal(await fs.readFile(path.join(scratch,'new'),'utf8'),'replacement must survive');
+  assert.equal(await fs.readFile(path.join(existing,'source'),'utf8'),'original');
+}));
+
+test('cleanup handles read-only independent copies without changing a shared original',()=>fixture(async parent=>{
+  const original=path.join(parent,'original.weapon');await fs.writeFile(original,'sealed original');await fs.chmod(original,0o444);
+  try {
+    const root=await mkdir(path.join(parent,'run')),finish=await beginQaStorage(root,options(parent));
+    const scratch=await finish.createScratch('tags'),copy=path.join(scratch,'copy.weapon');
+    await fs.copyFile(original,copy);await fs.chmod(copy,0o444);await finish('failed');
+    await assert.rejects(fs.stat(scratch),{code:'ENOENT'});
+    const next=await mkdir(path.join(parent,'shared')),other=await beginQaStorage(next,options(parent));
+    const shared=await other.createScratch('tags');await fs.link(original,path.join(shared,'shared.weapon'));
+    try {await other('failed');}catch(error){assert.match(String(error),/shared|changed|EPERM/);}
+    assert.equal(await fs.readFile(original,'utf8'),'sealed original');assert.equal((await fs.stat(original)).mode&0o200,0);
+  } finally {await fs.chmod(original,0o600);}
+}));
+
+test('a killed real harness recovers only its declared scratch and refuses a changed lease first', () => fixture(async parent => {
+  const root=await mkdir(path.join(parent,'run'));
+  const child=spawn(process.execPath,['--input-type=module','-e',`
+    import fs from 'node:fs/promises';import path from 'node:path';import {pathToFileURL} from 'node:url';
+    const {beginQaStorage}=await import(pathToFileURL(process.argv[1]).href);const root=process.argv[2],options=JSON.parse(process.argv[3]);
+    const finish=await beginQaStorage(root,options);const scratch=await finish.createScratch('library');
+    await fs.writeFile(path.join(scratch,'generated.map'),Buffer.alloc(65536,5));
+    const app=path.join(root,'temporary.exe');await fs.writeFile(app,'copy-app');await finish.registerDisposable(app);
+    await fs.writeFile(path.join(root,'readback.json'),'unique readback');console.log('ready');setInterval(()=>{},1000);
+  `,path.resolve('scripts/native-qa-storage.mjs'),root,JSON.stringify(options(parent))],{stdio:['ignore','pipe','pipe'],windowsHide:true});
+  let stderr='';child.stderr.on('data',b=>stderr+=b);
+  await new Promise((resolve,reject)=>{child.stdout.once('data',resolve);child.once('exit',code=>reject(Error('Harness exited '+code+' '+stderr)));});
+  await assert.rejects(recoverQaScratch(root,{storageRoot:options(parent).storageRoot}),/active/);
+  await stopQaProcess(child);
+  const leaseDir=path.join(options(parent).storageRoot,'.leases');const leaseFile=path.join(leaseDir,(await fs.readdir(leaseDir)).find(name=>name.endsWith('.json')));
+  const original=await fs.readFile(leaseFile,'utf8');await fs.writeFile(leaseFile,JSON.stringify({...JSON.parse(original),nonce:'changed'}));
+  await assert.rejects(recoverQaScratch(root,{storageRoot:options(parent).storageRoot}),/lease differs/);
+  assert.equal((await fs.stat(path.join(root,'library/generated.map'))).size,65536);
+  await fs.writeFile(leaseFile,original);const recovered=await recoverQaScratch(root,{storageRoot:options(parent).storageRoot});
+  assert.equal(recovered.status,'interrupted');assert.equal(recovered.disposedBytes,65544);
+  await assert.rejects(fs.stat(path.join(root,'temporary.exe')),{code:'ENOENT'});
+  await assert.rejects(fs.stat(path.join(root,'library')),{code:'ENOENT'});
+  assert.equal(await fs.readFile(path.join(root,'readback.json'),'utf8'),'unique readback');
+}));
+
+test('runtime budget stops a real owned writer and failed cleanup reclaims its generated bytes', () => fixture(async parent => {
+  const root=await mkdir(path.join(parent,'run')),finish=await beginQaStorage(root,{...options(parent),reservationBytes:128*1024});
+  const scratch=await finish.createScratch('library');
+  const child=spawn(process.execPath,['-e',`const fs=require('fs');const file=process.argv[1];setInterval(()=>fs.appendFileSync(file,Buffer.alloc(4096,4)),15);`,path.join(scratch,'growth.bin')],{stdio:'ignore',windowsHide:true});
+  await finish.trackProcess(child);
+  try {
+    for(let i=0;i<50&&child.exitCode===null&&child.signalCode===null;i++) {await new Promise(resolve=>setTimeout(resolve,50));await finish.sample();}
+    assert.ok(child.exitCode!==null||child.signalCode!==null,'Over-budget child must be stopped');
+    await assert.rejects(finish('failed'),/storage budget/);
+    const result=JSON.parse(await fs.readFile(path.join(root,'storage-run.json'),'utf8'));
+    assert.equal(result.status,'failed');assert.ok(result.monitoring.peakLogicalBytes>128*1024);assert.ok(result.disposedBytes>0);
+    await assert.rejects(fs.stat(scratch),{code:'ENOENT'});
+  } finally {await stopQaProcess(child);}
 }));
 
 test('obsolete .local outputs and linked output ancestors are rejected before creation', () => fixture(async parent => {

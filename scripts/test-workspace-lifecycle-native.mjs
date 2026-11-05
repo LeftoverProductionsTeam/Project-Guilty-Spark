@@ -1,4 +1,4 @@
-import { assertQaOutputPath, beginQaStorage, waitForQaExit } from './native-qa-storage.mjs';
+import { assertQaOutputPath, beginQaStorage, waitForQaExit, stopQaProcess } from './native-qa-storage.mjs';
 // Opt-in real desktop acceptance. Separate WebViews, native ownership and disk
 // journals; never substitutes IPC responses or touches the user's projects.
 import fs from 'node:fs/promises';
@@ -31,9 +31,18 @@ if(inputInfo&&!inputInfo.isFile())throw Error('Native acceptance input must be a
 if((previewOnly||contextOnly)&&(!inputInfo||inputInfo.size>128*1024*1024))throw Error('The small native preview/context test requires a cache within128MiB; use the full reserved native workflow for larger fixtures');
 const reservationBytes=previewOnly||contextOnly?1024**3:4*1024**3;
 await fs.mkdir(await assertQaOutputPath(root,{reservationBytes}));
-const app=path.join(root,'GuiltySpark-workspace-lifecycle.exe');await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
-const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const app=path.join(root,'application','GuiltySpark-workspace-lifecycle.exe');
+const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
 const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
+await finishStorage.createScratch('application');
+await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
+await finishStorage.createScratch('library');
+await finishStorage.createScratch('webview');
+if(nativeOnly&&!previewOnly)await finishStorage.createScratch('independent-native-tags');
+if(geometryOnly)await finishStorage.createScratch('independent-model-tags');
+const runOwned=async(...args)=>{const pending=promisify(execFile)(...args);if(pending.child)await finishStorage.trackProcess(pending.child);return pending;};
+const interrupt=async()=>{try{await finishStorage.interrupt();}finally{process.exit(130);}};
+process.once('SIGINT',interrupt);process.once('SIGTERM',interrupt);
 let child,browser,main;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
@@ -41,6 +50,7 @@ async function launchNative(){
   const started=performance.now();
   const server=net.createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));
   child=spawn(app,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
+  await finishStorage.trackProcess(child);
   await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   await expect.poll(()=>pages().length).toBeGreaterThan(0);main=pages()[0];main.on('pageerror',error=>report.errors.push(String(error)));
   if(profilePreview)report.previewProfile={appWindowMs:performance.now()-started,conditions:'Fresh application/profile; OS file cache not cleared; same embedded app, source, settings and readiness checks',calls:[]};
@@ -59,7 +69,20 @@ async function storageSample(phase){
     folders.push(await invoke(main,'storage_measure_folder',{folderId:folder.id}));
   }
   const process=JSON.parse((await promisify(execFile)('pwsh.exe',['-NoProfile','-File',path.resolve('scripts/profile-process-tree.ps1'),'-RootProcessId',String(child.pid)],{windowsHide:true,timeout:30000,maxBuffer:1024*1024})).stdout);
-  const row={phase,folders,process,at:new Date().toISOString()};(report.storageSamples??=[]).push(row);return row;
+  const row={phase,folders,process,at:new Date().toISOString()};(report.storageSamples??=[]).push(row);await physicalSample(phase);return row;
+}
+async function physicalSample(phase){
+  const meter=process.env.SPARK_LIFECYCLE_PHYSICAL_METER,directory=process.env.SPARK_LIFECYCLE_PHYSICAL_OUTPUT;
+  if(!meter)return;
+  if(!directory)throw Error('Physical meter requires a separate bounded evidence directory');
+  await fs.mkdir(await assertQaOutputPath(path.resolve(directory),{reservationBytes:0}),{recursive:true});
+  const output=path.join(path.resolve(directory),`${String(report.physicalSamples?.length??0).padStart(3,'0')}-${phase}.jsonl`);
+  // Read-only scanner writes only its bounded evidence outside the measured run.
+  await promisify(execFile)(path.resolve(meter),[root,output],{windowsHide:true,timeout:30000});
+  const rows=(await fs.readFile(output,'utf8')).trim().split('\n').map(line=>JSON.parse(line));
+  const measured=rows.find(row=>row.type==='root-summary');
+  expect(measured.errors).toBe(0);
+  (report.physicalSamples??=[]).push({phase,allocatedBytes:measured.uniqueAllocatedFileBytes,files:measured.files,at:new Date().toISOString(),evidence:output});
 }
 async function openProject(page,title){await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:title,exact:true})}).click();await expect(page.locator('.runtime-dock-heading>span').first()).toHaveText(title);await expect(page.locator('.forge-viewport canvas')).toBeVisible();}
 const panel=page=>page.getByRole('region',{name:'Inspector panel',exact:true});
@@ -97,6 +120,7 @@ async function nativeTagAnimation(opened){
       step('Actual Tag Inspector plays and pauses the selected biped native skeleton/animation, then restores its static model without replacing the viewport');
 }
 try{
+  await physicalSample('before-launch');
   await launchNative();
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
   if(geometryOnly){
@@ -315,10 +339,10 @@ try{
         const calls=await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration})=>({command:name.slice(10),ms:duration})));
         expect(calls.filter(call=>call.command==='preview_owned_object_collision')).toHaveLength(1);
         await main.keyboard.press('Control+s');await expect.poll(async()=>(await invoke(main,'open_project',{id:opened.project.id})).project.tagEdits.find(edit=>edit.tagId===pistol.id&&edit.fieldKey==='bounding-radius')?.value).toBe(.225);
-        const smart=main.locator('.smart-edit').first();await smart.locator('summary').first().click();await smart.getByRole('button',{name:'Review save plan',exact:true}).click();await expect(smart.locator('.smart-edit-plan>strong')).toHaveText('Direct map copy');await smart.getByRole('button',{name:'Save validated map copy',exact:true}).click();await expect(smart.locator('.smart-edit-result>strong')).toHaveText('Validated copy ready');
+        const smart=main.locator('.smart-edit:visible').first();await smart.locator('summary').first().click();await smart.getByRole('button',{name:'Review save plan',exact:true}).click();await expect(smart.locator('.smart-edit-plan>strong')).toHaveText('Direct map copy');await smart.getByRole('button',{name:'Save validated map copy',exact:true}).click();await expect(smart.locator('.smart-edit-result>strong')).toHaveText('Validated copy ready');
         const edited=(await invoke(main,'open_project',{id:opened.project.id})).project,build=edited.builds.at(-1);
         const proof=JSON.parse(await fs.readFile(path.join(root,'library/jobs',build.id,'smart-edit-receipt.json'),'utf8'));expect(proof.compilerRan).toBe(false);expect(proof.allOtherBytesPreserved).toBe(true);
-        const tool=name=>path.join(path.resolve(invaderDirectory),name+'.exe'),run=promisify(execFile),tags=path.join(root,'independent-native-tags');await fs.mkdir(tags);
+        const tool=name=>path.join(path.resolve(invaderDirectory),name+'.exe'),run=runOwned,tags=path.join(root,'independent-native-tags');
         expect((await run(tool('invader-info'),['-T','crc32_mismatched',build.output],{windowsHide:true,timeout:30000})).stdout.trim()).toBe('0');
         await run(tool('invader-extract'),['-s',pistol.path+'.weapon','-t',tags,build.output],{windowsHide:true,timeout:30000});
         const readback=Number((await run(tool('invader-edit'),['-t',tags,'-G','bounding_radius',pistol.path+'.weapon'],{windowsHide:true,timeout:30000})).stdout.trim());expect(readback).toBeCloseTo(.225,6);
@@ -331,7 +355,7 @@ try{
         await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(playable.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('snd!');await main.locator('.tag-row').click();
         const sound=main.locator('.sound-inspector');await expect(sound.getByRole('button',{name:'Play sample',exact:true})).toBeVisible();await sound.getByText('Sample details & options',{exact:true}).click();await sound.getByRole('checkbox',{name:'Repeat sample',exact:true}).check();
         let meter,done;const meterPath=process.env.SPARK_LIFECYCLE_AUDIO_METER;
-        if(meterPath){meter=spawn(path.resolve(meterPath),[String(child.pid),path.join(root,'context-audio-output.json'),'6'],{windowsHide:true,stdio:['ignore','ignore','pipe']});let stderr='';meter.stderr.on('data',data=>stderr+=data.toString());done=new Promise(resolve=>meter.once('exit',code=>resolve({code,stderr})));}
+        if(meterPath){meter=spawn(path.resolve(meterPath),[String(child.pid),path.join(root,'context-audio-output.json'),'6'],{windowsHide:true,stdio:['ignore','ignore','pipe']});await finishStorage.trackProcess(meter);let stderr='';meter.stderr.on('data',data=>stderr+=data.toString());done=new Promise(resolve=>meter.once('exit',code=>resolve({code,stderr})));}
         await sound.getByRole('button',{name:'Play sample',exact:true}).click();await expect(sound.locator('[data-audition-state]')).toHaveAttribute('data-audition-state','playing');await main.waitForTimeout(2000);
         await tabs.getByRole('tab',{name:'Properties',exact:true}).click();await expect(sound.locator('[data-audition-state]')).toHaveAttribute('data-audition-state','idle');await tabs.getByRole('tab',{name:'Sound',exact:true}).click();await expect(sound.getByRole('checkbox',{name:'Repeat sample',exact:true})).toBeChecked();
         report.assetContexts.sound={tagId:playable.id,path:playable.path,playedThenStoppedOnContextChange:true,retainedSampleOptions:true,humanHearingAccepted:false};
@@ -365,6 +389,7 @@ try{
         }).toBe(value);
         const snapshot=await invoke(main,'create_project_snapshot',{projectId:opened.project.id,reason:'periodic'});
         rows.push({index:index+1,value,snapshotId:snapshot?.id??null});previous=value;
+        await physicalSample(`native-edit-${index+1}`);
         if((index+1)%5===0)await storageSample(`saved-edit-${index+1}`);
       }
       const backups=await invoke(main,'project_backup_overview',{projectId:opened.project.id});
@@ -377,7 +402,7 @@ try{
       // readback remains comparable. Reopen only this same project/document.
       await radius.fill('0.225');await radius.press('Tab');await main.keyboard.press('Control+s');
       await expect.poll(async()=>(await invoke(main,'open_project',{id:opened.project.id})).project.tagEdits.find(edit=>edit.tagId===pistol.id&&edit.fieldKey==='bounding-radius')?.value).toBe(.225);
-      const stoppedPid=child.pid;await browser.close();child.kill();await waitForQaExit(child);await launchNative();
+      const stoppedPid=child.pid;await browser.close();await stopQaProcess(child);await launchNative();
       // The replacement WebView has its own Page; never carry a locator from
       // the deliberately crashed process into the recovery acceptance checks.
       radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true});
@@ -416,7 +441,8 @@ try{
       await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');await main.locator('.tag-row').filter({has:main.locator('strong',{hasText:/^pistol$/})}).click();await expect(radius).toHaveValue('0.225');
       step('Real Storage controls save None and manual backup, review exact automatic snapshots, and retain recovery/manual checkpoints');
     }
-    const smart=main.locator('.smart-edit').first();await smart.locator('summary').first().click();
+    await main.getByRole('tab',{name:'Properties',exact:true}).click();
+    const smart=main.locator('.smart-edit:visible').first();await smart.locator('summary').first().click();
     await smart.getByRole('button',{name:'Review save plan',exact:true}).click();
     await expect(smart.locator('.smart-edit-plan>strong')).toHaveText('Direct map copy');
     await smart.getByRole('button',{name:'Save validated map copy',exact:true}).click();
@@ -424,15 +450,13 @@ try{
     const edited=(await invoke(main,'open_project',{id:opened.project.id})).project,build=edited.builds.at(-1);
     const proof=JSON.parse(await fs.readFile(path.join(root,'library','jobs',build.id,'smart-edit-receipt.json'),'utf8'));
     expect(proof.compilerRan).toBe(false);expect(proof.allOtherBytesPreserved).toBe(true);
-    const run=promisify(execFile),tool=name=>path.join(path.resolve(invaderDirectory),name+'.exe');
+    const run=runOwned,tool=name=>path.join(path.resolve(invaderDirectory),name+'.exe');
     const crc=await run(tool('invader-info'),['-T','crc32_mismatched',build.output],{windowsHide:true,timeout:30000});expect(crc.stdout.trim()).toBe('0');
-    const tags=path.join(root,'independent-native-tags');await fs.mkdir(tags);
+    const tags=path.join(root,'independent-native-tags');
     await run(tool('invader-extract'),['-s',pistol.path+'.weapon','-t',tags,build.output],{windowsHide:true,timeout:30000});
     const readback=await run(tool('invader-edit'),['-t',tags,'-G','bounding_radius',pistol.path+'.weapon'],{windowsHide:true,timeout:30000});
     expect(Number(readback.stdout.trim())).toBeCloseTo(.225,6);
     expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
-    const output=await invoke(main,'open_built_map',{projectId:opened.project.id,buildId:build.id});
-    expect(output.inspection.tags.find(tag=>tag.class==='weap'&&tag.path===pistol.path).fields.find(field=>field.key==='bounding-radius').value).toBeCloseTo(.225,6);
     step('Real native tag edit, Undo/Redo, Save and direct map export pass independent Invader extraction/readback; original is unchanged',{sourceSha256:originalHash,output:build.output,outputSha256:build.sha256,readback:Number(readback.stdout.trim()),compilerRan:false});
     if(process.env.SPARK_LIFECYCLE_EXPORT==='1'){
       const exporter=smart.locator('.map-export');await exporter.locator('summary').click();
@@ -454,6 +478,10 @@ try{
       report.nativeExport={output:outputPath,sha256:exportHash,reused:true,incompatibleRuntimeRefusedBeforeFolderCreation:true};
       step('Actual desktop exports the native map into the configured default, reuses identical bytes and refuses unsupported target before allocation');
     }
+    // Opening a built cache deliberately activates a new document. Complete
+    // source-owned export before this handoff, then verify the independent map.
+    const output=await invoke(main,'open_built_map',{projectId:opened.project.id,buildId:build.id});
+    expect(output.inspection.tags.find(tag=>tag.class==='weap'&&tag.path===pistol.path).fields.find(field=>field.key==='bounding-radius').value).toBeCloseTo(.225,6);
     }
   }
   expect(report.errors).toEqual([]);report.complete=true;
@@ -468,18 +496,19 @@ finally{
     catch(error){report.complete=false;report.errors.push('Normal QA app close failed: '+String(error));process.exitCode=1;}
   }
   await browser?.close().catch(()=>{});
-  if(child?.exitCode===null)child.kill();
+  if(child?.exitCode===null)await stopQaProcess(child);
   if(finishStorage){try{
     if(child)await waitForQaExit(child);
-    if(report.complete){
-      await finishStorage.registerDisposable(app);
-      for(const name of ['Cache','Code Cache','GPUCache']){
-        const cache=path.join(root,'webview/EBWebView/Default',name);
-        if(await fs.stat(cache).catch(()=>null))await finishStorage.registerDisposable(cache);
-      }
-    }
+    // Tests own these fresh namespaces, on failure too. A deliberate geometry
+    // fixture is the only large retained payload; source recipes/receipts live
+    // outside scratch. No abandoned browser profile or full library is kept.
+    if(report.complete&&report.geometryRoundTrip?.output)
+      await finishStorage.retain(report.geometryRoundTrip.output,'Accepted native geometry fixture for the next independent readback');
     await finishStorage(report.complete?'passed':'failed');
   }catch(error){report.complete=false;report.errors.push(String(error));process.exitCode=1;}}
   await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));
+  await physicalSample('after-cleanup');
+  await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));
+  process.off('SIGINT',interrupt);process.off('SIGTERM',interrupt);
   console.log(JSON.stringify({complete:report.complete,cases:report.cases.length,errors:report.errors}));
 }

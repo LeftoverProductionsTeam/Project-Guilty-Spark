@@ -1,4 +1,4 @@
-import { assertQaOutputPath } from './native-qa-storage.mjs';
+import { assertQaOutputPath,beginQaStorage,stopQaProcess } from './native-qa-storage.mjs';
 import {openStudioMenu} from '../tests/ui/helpers/navigation.ts';
 // Opt-in packaged Windows application test. Real IPC, owned source files and
 // native WebView rendering. No game-file writes, external downloads or mocks.
@@ -12,11 +12,17 @@ const [appArg,rootArg,configurationArg]=process.argv.slice(2);
 if(!configurationArg)throw Error('test-native-functionality <packaged.exe> <fresh-output> <owned-inputs.json>');
 const root=path.resolve(rootArg),configuration=JSON.parse(await fs.readFile(configurationArg,'utf8'));
 const expect=assertion.configure({timeout:120000});
-await fs.mkdir(await assertQaOutputPath(root));const exe=path.join(root,'GuiltySpark-native-functionality.exe');await fs.copyFile(path.resolve(appArg),exe,fs.constants.COPYFILE_EXCL);
+await fs.mkdir(await assertQaOutputPath(root));const exe=path.join(root,'application','GuiltySpark-native-functionality.exe');
 const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
-const report={schemaVersion:1,complete:false,mockedIpc:false,appSha256:await hash(exe),maps:[],checks:{},errors:[],limitations:['No game visual parity, physical speaker listening, secondary physical display or Halo gameplay acceptance.']};
+const report={schemaVersion:1,complete:false,mockedIpc:false,appSha256:await hash(path.resolve(appArg)),maps:[],checks:{},errors:[],limitations:['No game visual parity, physical speaker listening, secondary physical display or Halo gameplay acceptance.']};
+const finishStorage=await beginQaStorage(root,{workflow:'native-functionality',appSha256:report.appSha256});
+for(const name of ['application','library','webview','originally-downloaded'])await finishStorage.createScratch(name);
+await fs.copyFile(path.resolve(appArg),exe,fs.constants.COPYFILE_EXCL);
 const socket=net.createServer();await new Promise(r=>socket.listen(0,'127.0.0.1',r));const port=socket.address().port;await new Promise(r=>socket.close(r));
 const child=spawn(exe,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
+await finishStorage.trackProcess(child);
+const interrupt=async()=>{try{await finishStorage.interrupt();}finally{process.exit(130);}};
+process.once('SIGINT',interrupt);process.once('SIGTERM',interrupt);
 await fs.writeFile(path.join(root,'process.json'),JSON.stringify({pid:child.pid,port}));
 let browser,page;
 const invoke=(p,command,args={})=>p.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
@@ -140,7 +146,7 @@ try{
    await page.getByRole('tab',{name:'Sound',exact:true}).click();
    await sound.locator('details summary').click();await sound.getByLabel('Repeat sample',{exact:true}).check();await sound.locator('details summary').click();
    const reportSound=await call('inspect_sound',{projectId:o.project.id,tagId:tag.id});expect(reportSound.permutations.some(p=>p.available)).toBe(true);
-   const meterFile=path.join(root,`audio-output-${i}.json`);const meter=spawn(path.resolve(configuration.audioMeter),[String(child.pid),meterFile,'8'],{windowsHide:true,stdio:['ignore','pipe','pipe']});
+   const meterFile=path.join(root,`audio-output-${i}.json`);const meter=spawn(path.resolve(configuration.audioMeter),[String(child.pid),meterFile,'8'],{windowsHide:true,stdio:['ignore','pipe','pipe']});await finishStorage.trackProcess(meter);
    let meterErrors='';meter.stderr.on('data',b=>meterErrors+=b.toString());const done=new Promise(resolve=>meter.once('exit',code=>resolve(code)));
    await sound.getByRole('button',{name:'Play sample',exact:true}).click();await expect(sound.locator('[data-audition-state]')).toHaveAttribute('data-audition-state','playing');
    await page.waitForTimeout(5500);await sound.getByRole('button',{name:'Stop sound preview',exact:true}).click();await expect(sound.locator('[data-audition-state]')).toHaveAttribute('data-audition-state','idle');
@@ -154,4 +160,10 @@ try{
  }
  expect(report.errors).toEqual([]);report.complete=true;
 }catch(error){report.error=String(error);report.stack=error.stack;process.exitCode=1;await page?.screenshot({path:path.join(root,'failure.png')}).catch(()=>{});}
-finally{await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));await browser?.close().catch(()=>{});if(child.exitCode===null)child.kill();console.log(JSON.stringify({complete:report.complete,maps:report.maps.map(m=>({name:m.name,models:m.models.length,samples:m.samples.length})),error:report.error}));}
+finally{
+  await browser?.close().catch(()=>{});await stopQaProcess(child);
+  try{await finishStorage(report.complete?'passed':'failed');}catch(error){report.complete=false;report.error=[report.error,String(error)].filter(Boolean).join('; ');process.exitCode=1;}
+  await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));
+  process.off('SIGINT',interrupt);process.off('SIGTERM',interrupt);
+  console.log(JSON.stringify({complete:report.complete,maps:report.maps.map(m=>({name:m.name,models:m.models.length,samples:m.samples.length})),error:report.error}));
+}

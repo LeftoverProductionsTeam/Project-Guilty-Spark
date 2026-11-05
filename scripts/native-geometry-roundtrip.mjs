@@ -68,7 +68,7 @@ export async function nativeGeometryRoundTrip({main,root,invoke,expect,report,st
   const job=path.join(root,'library/jobs',jobId),modelSources=JSON.parse(await fs.readFile(path.join(job,'workspace/custom-model-sources.json'),'utf8'));
   const tool=name=>path.join(path.resolve(invaderDirectory),name+'.exe');
   const crc=await run(tool('invader-info'),['-T','crc32_mismatched',build.output],{windowsHide:true,timeout:30000});expect(crc.stdout.trim()).toBe('0');
-  const independent=path.join(root,'independent-model-tags');await fs.mkdir(independent);
+  const independent=path.join(root,'independent-model-tags');await fs.mkdir(independent,{recursive:true});
   const native=[];
   for(const model of modelSources){
     await run(tool('invader-extract'),['-r','-s',model.tag+'.scenery','-t',independent,build.output],{windowsHide:true,timeout:30000});

@@ -638,6 +638,12 @@
       "featureId": "tabs",
       "kind": "workflow",
       "scope": "Layout → save workspace windows and optional restore-on-launch; a genuine second app process verifies independent tab sets, saved source-bound BSP selections/cameras, native window states and durable history. Physical monitor disconnect and gameplay remain separate."
+    },
+    {
+      "artifact": "scripts/test-native-qa-retention.mjs",
+      "featureId": "native-door-logic",
+      "kind": "diagnostic",
+      "scope": "Twenty real Invader native tag edits and independent readbacks; unchanged owned source, failed/killed QA recovery and same-method allocated storage accounting. No new gameplay acceptance."
     }
   ]
 }
