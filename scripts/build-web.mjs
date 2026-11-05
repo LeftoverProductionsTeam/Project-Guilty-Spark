@@ -1,8 +1,14 @@
-import { spawnSync } from 'node:child_process';
-for (const args of [
-  ['node_modules/typescript/bin/tsc', '-b'],
-  ['node_modules/vite/bin/vite.js', 'build'],
-]) {
-  const child = spawnSync(process.execPath, args, { stdio: 'inherit', windowsHide: true });
-  if (child.status !== 0) process.exit(child.status ?? 1);
+import { withDevelopmentWorkspace, runDevelopmentCommand } from './native-qa-storage.mjs';
+try {
+  await withDevelopmentWorkspace('frontend', async (context) => {
+    await runDevelopmentCommand(
+      process.execPath,
+      ['node_modules/typescript/bin/tsc', '--noEmit', '--incremental', 'false'],
+      context,
+    );
+    await runDevelopmentCommand(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], context);
+  });
+} catch (error) {
+  console.error(String(error));
+  process.exitCode = 1;
 }

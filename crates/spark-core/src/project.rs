@@ -13,7 +13,7 @@ use std::{
 use uuid::Uuid;
 
 pub const PROJECT_VERSION: u32 = 1;
-pub const DEFAULT_AUTOMATIC_BACKUP_RETENTION: usize = 3;
+pub const DEFAULT_AUTOMATIC_BACKUP_RETENTION: usize = 0;
 pub const MAX_AUTOMATIC_BACKUP_RETENTION: usize = 100;
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -659,8 +659,8 @@ mod compiled_revision_tests {
 mod backup_policy_tests {
     use super::*;
     #[test]
-    fn old_projects_inherit_and_new_projects_default_to_three_without_changing_native_identity() {
-        let mut p=Project::new("New");assert_eq!(p.automatic_backup_retention,Some(3));let native=p.fingerprint().unwrap();
+    fn old_projects_inherit_and_new_projects_default_to_zero_without_changing_native_identity() {
+        let mut p=Project::new("New");assert_eq!(p.automatic_backup_retention,Some(0));let native=p.fingerprint().unwrap();
         p.automatic_backup_retention=Some(0);p.validate().unwrap();assert_eq!(native,p.fingerprint().unwrap());
         let mut old=serde_json::to_value(&p).unwrap();old.as_object_mut().unwrap().remove("automaticBackupRetention");
         let old:Project=serde_json::from_value(old).unwrap();assert_eq!(old.automatic_backup_retention,None);assert_eq!(old.effective_automatic_backup_retention(20).unwrap(),20);

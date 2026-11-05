@@ -1,0 +1,623 @@
+{
+  "schemaVersion": 1,
+  "at": "2026-11-05T17:58:02.95Z",
+  "classification": "Generated Cargo debug symbols and historical QA executable; no original Halo inputs or accepted release assets",
+  "source": "crates/spark-core/examples/qa_bsp_mesh.rs",
+  "sourceGitObject": "439d12677f42092900af71bf0280f3bd0999f37b",
+  "sourceSha256": "b7e0d50c54e4cfb92d978eb47440d183881a2098f13c572a3f9486b72994edae",
+  "verifiedColdRustWorkspace": true,
+  "originalCatalogSha256": "56a04fcb7d38c7e4cfb0134b3d7fe9fd179007d4dbe23981f3f33f0d7e6ab749",
+  "oldIndexSha256": "8bf7c7a38218239620fd40a5aaf1f531f94db5686e8f20c606eb774d20b870b1",
+  "retiredObjects": 51,
+  "retiredAliases": 3,
+  "retainedMetadata": [
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/audio_probe.pdb",
+      "bytes": 121696256,
+      "sha256": "e38fa480a4efcf563565f958c6ad24e026be07d2cf10ddcd54cac044192b2d2e"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/community_listing_check.pdb",
+      "bytes": 120893440,
+      "sha256": "78fe2f9cdd9b38e6a7688ad87a60d6fda3951d3e7f30c35519e388e42e0076ef"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/diagnose_materials.pdb",
+      "bytes": 124219392,
+      "sha256": "37db755c0cef1e089171285b601603b53bf4353f26e4613b5446e5c446ede73e"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/inspect.pdb",
+      "bytes": 123236352,
+      "sha256": "d47a4f43d5b6a05d54ccc60ee90c3ab094c947223a72afe5eb40bb8e5ba6458b"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/inspect_appearance.pdb",
+      "bytes": 123744256,
+      "sha256": "7136e78ebbd51bbe6f5a904f39831899da2b12856da9945d2ca831d2a5380683"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/inspect_map_visuals.pdb",
+      "bytes": 126136320,
+      "sha256": "5950de4f9b16758b77432e93aef50d8d20d9bb79b5163073447ffec68fd84b2c"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/one_halo_discovery.pdb",
+      "bytes": 119853056,
+      "sha256": "b88b074e1207e118e675835999ea24fd9d840bd6e51af813cc8ec64fe832ef77"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/original-paths.json",
+      "bytes": 16255,
+      "sha256": "bf0ece474daac481f4333715e1e78962e5a5a530e83c8e6767881a3a06a50516"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_animation_source.pdb",
+      "bytes": 121098240,
+      "sha256": "7b9cfcda2363cad28aff32036db12b82dfc66cc6f7ef46e3715f8f19c519d264"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_animation_take.pdb",
+      "bytes": 135139328,
+      "sha256": "c49e50848978889ef196006078a87f1e6f08601acb86a552ba5af8d594b34bf7"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_bsp_assembly.pdb",
+      "bytes": 172740608,
+      "sha256": "69c24ec3869a302169dfd774327d9f4e05f92034018729564909518873617824"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_bsp_audio.pdb",
+      "bytes": 159076352,
+      "sha256": "071bf80200f93f98f4307db4bc54ad1d5d508eb2d187dd930a15e17650332c0b"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_bsp_mesh.exe",
+      "bytes": 3592192,
+      "sha256": "78483f1b1b3320fd7a7539ec82ead07f39f52a7443912acf60beb3279b78ffd5"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_bsp_mesh.pdb",
+      "bytes": 123711488,
+      "sha256": "e71ecd9369ed8533bc3da67bf68171d363ecbc6b258d1183ce9373200bb40cb7"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_bsp_workshop.pdb",
+      "bytes": 154103808,
+      "sha256": "02978febe9ea9cce75676d33a84390c9b1036a616721a04a400c2a7b073beea5"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_bsp_workshop_playtest.pdb",
+      "bytes": 129560576,
+      "sha256": "55c8edcb8d747d2352e807ad681fce1c2a194629a28630de25a9b9e4fb9948d0"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_build.pdb",
+      "bytes": 157052928,
+      "sha256": "817fc710b7a0bf45d3b77c24277c7bc42e7fa9d2af68e5bcaddcdffafc653d66"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_build_project.pdb",
+      "bytes": 179843072,
+      "sha256": "fd9730d30c53cecada37edf9adc5af5ae3bb8b876268c8860ecb1732397ecaf0"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_c35_workspace.pdb",
+      "bytes": 132362240,
+      "sha256": "62bdd26bcb90a5a703addfb4184675ea4b4b5ffa4f750c6354d36801c54b28d8"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_character_catalog.pdb",
+      "bytes": 115150848,
+      "sha256": "be79d6a8d6b66d0e6373454eff02caa6f0715920ab520ef6630bfc5fa03b8101"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_classic_runtime.pdb",
+      "bytes": 121253888,
+      "sha256": "2e124a39fe3ac7fdd0ffa0ffeb9f1aff8e7371fb20728c7a42f40179a10d1879"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_compile_diagnostic.pdb",
+      "bytes": 120385536,
+      "sha256": "7d53d67343142ae52461bc69102188282879d23d71f30e3e8e3d1eee02728553"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_conversion_library.pdb",
+      "bytes": 154873856,
+      "sha256": "be4b624e1f7932298b99083de9821bf5da4e9e4790fc72daa1938225dee4427c"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_conversion_readback.pdb",
+      "bytes": 115011584,
+      "sha256": "b2dc7e295a0be9ecd92fe31c2e05695ffd79463cf0dbb59cea379aa9739d609c"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_convert.pdb",
+      "bytes": 179122176,
+      "sha256": "f8df3a2cac2c2207a912b53e7d58e250a279ee363da84f637e85a7e5cb448ed5"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_corpus.pdb",
+      "bytes": 157798400,
+      "sha256": "edfecb520d4cd342d96d7ddbd1365227c678af030c8f376a7f65f5a3f8fbb5a5"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_imported_model.pdb",
+      "bytes": 154308608,
+      "sha256": "5f152bf126ce1f0270a74ae400cfd2d85b428b6693aa0aa6e557abd6e630d506"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_looping_audio.pdb",
+      "bytes": 124366848,
+      "sha256": "410abfd7ebbef650a6fd6760ba32cac21d3a3d38c1f34202d4da6a98c0b64538"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_map_materials.pdb",
+      "bytes": 124940288,
+      "sha256": "579be5ce4cc50183c5b42e29ff4d965cc1f122537f38ba86e79de141dc5ccd59"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_mcc_audio.pdb",
+      "bytes": 124964864,
+      "sha256": "c599a9daf6ed855864e46d75189ad1e1036231300f07c9084df0cae04c14fed1"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_megaworld_atlas.pdb",
+      "bytes": 124563456,
+      "sha256": "0af3d8ca016532d4d85cc9e097217fd8527bdc60c97327bf308702387be132b2"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_megaworld_ce.pdb",
+      "bytes": 153473024,
+      "sha256": "248057521510166df6658fc58cb7e6fc1228b3381f238cfe6f739374cb236a4e"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_model_collision.pdb",
+      "bytes": 123039744,
+      "sha256": "f134af952b3f7769d658cf14f26f92587ea688e7aedd517d11e1ed8628c9c2fe"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_native_render.pdb",
+      "bytes": 149336064,
+      "sha256": "727dc0f9c47a1d42ddfeef192bbd0df51332fd33eece33a382fef00954101150"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_opence_ai.pdb",
+      "bytes": 7548928,
+      "sha256": "0e3ea29b2d8f00edd718b88ab7b5f52ab48288f6f60169177997e25abed8f418"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_quickforge.pdb",
+      "bytes": 142299136,
+      "sha256": "3d15b92d35b2c5e3ffc6b8de079ccdd3f4fceeb74c4d663969dd3155be6c0391"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_recording_library.pdb",
+      "bytes": 132042752,
+      "sha256": "10705848769b1997cc4f4c1a4b54ca266182a101a58c81e1c1e391cf5c5806d7"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_repair_conversion_resources.pdb",
+      "bytes": 123711488,
+      "sha256": "16417f7721bc3bffd29d39311e5c5a864aa36c0299d7a339cf7ca26ea288b3ea"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_runtime_library.pdb",
+      "bytes": 134303744,
+      "sha256": "b52003138b494d59fc8e19752e32a58a6401739af1b988c64a54b54dd1c187de"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_sound_classes.pdb",
+      "bytes": 123457536,
+      "sha256": "d93511cd7c045501e9da8efca33a68b74cf91c772da90c90ccf86db038b320d2"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_sound_export.pdb",
+      "bytes": 125341696,
+      "sha256": "a853eb08a1e333e6c8ff6a33edb59d4fdc8daa758e46a5d3cdf8c145ac2841fd"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_validate.pdb",
+      "bytes": 134197248,
+      "sha256": "3cd5db0521ac82c13b656d4f774b64d3f968aca59f2d5054548469f5aad18ebe"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_visibility_zones.pdb",
+      "bytes": 128610304,
+      "sha256": "2dafc3269ca0c818a3f8a2ea5107fbcd648163a9d8820d275c85c50ff09a8b66"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_working_tags.pdb",
+      "bytes": 136138752,
+      "sha256": "06e826c6e377975de659ab9fe6a7db6af56c541411b09b17b691bc72a741e417"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_workspace.pdb",
+      "bytes": 131977216,
+      "sha256": "c1785422c7c7aecfeb616ef195ac4baeef12e2b313187e5c1f761437a23145ce"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_zip.pdb",
+      "bytes": 125267968,
+      "sha256": "3e1ca1169e3ebd500192d0c2b2a622e958785219087d8612ca731da6a6d46d03"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/qa_zombie_content.pdb",
+      "bytes": 147501056,
+      "sha256": "a20cecbd964f1da9f888119e33d88068c6107e0c74fd5c1f598a22396c9868c7"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/verify_forge_collision.pdb",
+      "bytes": 153899008,
+      "sha256": "00be20272a3f5970224f11128e424b3bc632b8dce8c9ed9ff8fc220243631b3f"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/verify_source_archive.pdb",
+      "bytes": 123105280,
+      "sha256": "1e5ff23f40ca8d49325d3d9a3c1cb4b4621b80c82958cad9ad9f81d0faa5056e"
+    },
+    {
+      "original": ".local/c39-native-collaboration/.local/c62-safe-cleanup-20261103/debug-symbol-stage/verify_tag_exchange.pdb",
+      "bytes": 127127552,
+      "sha256": "a4645d9e42bfc2e81a9c9573c802bec795a7d25a057a5065836a20e81d717578"
+    }
+  ],
+  "originalPaths": [
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\audio_probe.pdb",
+      "Name": "audio_probe.pdb",
+      "Bytes": 121696256,
+      "Sha256": "e38fa480a4efcf563565f958c6ad24e026be07d2cf10ddcd54cac044192b2d2e",
+      "LastWriteTimeUtc": "2026-11-03T11:11:44.702068Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\community_listing_check.pdb",
+      "Name": "community_listing_check.pdb",
+      "Bytes": 120893440,
+      "Sha256": "78fe2f9cdd9b38e6a7688ad87a60d6fda3951d3e7f30c35519e388e42e0076ef",
+      "LastWriteTimeUtc": "2026-11-03T11:11:52.1173053Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\diagnose_materials.pdb",
+      "Name": "diagnose_materials.pdb",
+      "Bytes": 124219392,
+      "Sha256": "37db755c0cef1e089171285b601603b53bf4353f26e4613b5446e5c446ede73e",
+      "LastWriteTimeUtc": "2026-11-03T11:11:35.1807393Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\inspect_appearance.pdb",
+      "Name": "inspect_appearance.pdb",
+      "Bytes": 123744256,
+      "Sha256": "7136e78ebbd51bbe6f5a904f39831899da2b12856da9945d2ca831d2a5380683",
+      "LastWriteTimeUtc": "2026-11-03T11:11:45.0521224Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\inspect_map_visuals.pdb",
+      "Name": "inspect_map_visuals.pdb",
+      "Bytes": 126136320,
+      "Sha256": "5950de4f9b16758b77432e93aef50d8d20d9bb79b5163073447ffec68fd84b2c",
+      "LastWriteTimeUtc": "2026-11-03T11:11:30.2776232Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\inspect.pdb",
+      "Name": "inspect.pdb",
+      "Bytes": 123236352,
+      "Sha256": "d47a4f43d5b6a05d54ccc60ee90c3ab094c947223a72afe5eb40bb8e5ba6458b",
+      "LastWriteTimeUtc": "2026-11-03T11:11:29.9126816Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\one_halo_discovery.pdb",
+      "Name": "one_halo_discovery.pdb",
+      "Bytes": 119853056,
+      "Sha256": "b88b074e1207e118e675835999ea24fd9d840bd6e51af813cc8ec64fe832ef77",
+      "LastWriteTimeUtc": "2026-11-03T11:11:45.1726385Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_animation_source.pdb",
+      "Name": "qa_animation_source.pdb",
+      "Bytes": 121098240,
+      "Sha256": "7b9cfcda2363cad28aff32036db12b82dfc66cc6f7ef46e3715f8f19c519d264",
+      "LastWriteTimeUtc": "2026-11-03T11:11:35.3927735Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_animation_take.pdb",
+      "Name": "qa_animation_take.pdb",
+      "Bytes": 135139328,
+      "Sha256": "c49e50848978889ef196006078a87f1e6f08601acb86a552ba5af8d594b34bf7",
+      "LastWriteTimeUtc": "2026-11-03T11:11:44.6490698Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_bsp_assembly.pdb",
+      "Name": "qa_bsp_assembly.pdb",
+      "Bytes": 172740608,
+      "Sha256": "69c24ec3869a302169dfd774327d9f4e05f92034018729564909518873617824",
+      "LastWriteTimeUtc": "2026-11-03T11:11:30.3006241Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_bsp_audio.pdb",
+      "Name": "qa_bsp_audio.pdb",
+      "Bytes": 159076352,
+      "Sha256": "071bf80200f93f98f4307db4bc54ad1d5d508eb2d187dd930a15e17650332c0b",
+      "LastWriteTimeUtc": "2026-11-03T11:11:41.0482308Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_bsp_mesh.pdb",
+      "Name": "qa_bsp_mesh.pdb",
+      "Bytes": 123711488,
+      "Sha256": "e71ecd9369ed8533bc3da67bf68171d363ecbc6b258d1183ce9373200bb40cb7",
+      "LastWriteTimeUtc": "2026-11-03T11:11:29.9661943Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_bsp_workshop_playtest.pdb",
+      "Name": "qa_bsp_workshop_playtest.pdb",
+      "Bytes": 129560576,
+      "Sha256": "55c8edcb8d747d2352e807ad681fce1c2a194629a28630de25a9b9e4fb9948d0",
+      "LastWriteTimeUtc": "2026-11-03T11:11:52.1418125Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_bsp_workshop.pdb",
+      "Name": "qa_bsp_workshop.pdb",
+      "Bytes": 154103808,
+      "Sha256": "02978febe9ea9cce75676d33a84390c9b1036a616721a04a400c2a7b073beea5",
+      "LastWriteTimeUtc": "2026-11-03T11:11:30.4566524Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_build_project.pdb",
+      "Name": "qa_build_project.pdb",
+      "Bytes": 179843072,
+      "Sha256": "fd9730d30c53cecada37edf9adc5af5ae3bb8b876268c8860ecb1732397ecaf0",
+      "LastWriteTimeUtc": "2026-11-03T11:11:45.3406643Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_build.pdb",
+      "Name": "qa_build.pdb",
+      "Bytes": 157052928,
+      "Sha256": "817fc710b7a0bf45d3b77c24277c7bc42e7fa9d2af68e5bcaddcdffafc653d66",
+      "LastWriteTimeUtc": "2026-11-03T11:11:45.3246647Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_c35_workspace.pdb",
+      "Name": "qa_c35_workspace.pdb",
+      "Bytes": 132362240,
+      "Sha256": "62bdd26bcb90a5a703addfb4184675ea4b4b5ffa4f750c6354d36801c54b28d8",
+      "LastWriteTimeUtc": "2026-11-03T11:11:44.6490698Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_character_catalog.pdb",
+      "Name": "qa_character_catalog.pdb",
+      "Bytes": 115150848,
+      "Sha256": "be79d6a8d6b66d0e6373454eff02caa6f0715920ab520ef6630bfc5fa03b8101",
+      "LastWriteTimeUtc": "2026-11-03T11:11:48.8757855Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_classic_runtime.pdb",
+      "Name": "qa_classic_runtime.pdb",
+      "Bytes": 121253888,
+      "Sha256": "2e124a39fe3ac7fdd0ffa0ffeb9f1aff8e7371fb20728c7a42f40179a10d1879",
+      "LastWriteTimeUtc": "2026-11-03T11:11:30.1871101Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_compile_diagnostic.pdb",
+      "Name": "qa_compile_diagnostic.pdb",
+      "Bytes": 120385536,
+      "Sha256": "7d53d67343142ae52461bc69102188282879d23d71f30e3e8e3d1eee02728553",
+      "LastWriteTimeUtc": "2026-11-03T11:11:52.1073053Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_conversion_library.pdb",
+      "Name": "qa_conversion_library.pdb",
+      "Bytes": 154873856,
+      "Sha256": "be4b624e1f7932298b99083de9821bf5da4e9e4790fc72daa1938225dee4427c",
+      "LastWriteTimeUtc": "2026-11-03T11:11:40.3726355Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_conversion_readback.pdb",
+      "Name": "qa_conversion_readback.pdb",
+      "Bytes": 115011584,
+      "Sha256": "b2dc7e295a0be9ecd92fe31c2e05695ffd79463cf0dbb59cea379aa9739d609c",
+      "LastWriteTimeUtc": "2026-11-03T14:09:56.5526985Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_convert.pdb",
+      "Name": "qa_convert.pdb",
+      "Bytes": 179122176,
+      "Sha256": "f8df3a2cac2c2207a912b53e7d58e250a279ee363da84f637e85a7e5cb448ed5",
+      "LastWriteTimeUtc": "2026-11-03T14:09:56.6632138Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_corpus.pdb",
+      "Name": "qa_corpus.pdb",
+      "Bytes": 157798400,
+      "Sha256": "edfecb520d4cd342d96d7ddbd1365227c678af030c8f376a7f65f5a3f8fbb5a5",
+      "LastWriteTimeUtc": "2026-11-03T11:11:45.241153Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_imported_model.pdb",
+      "Name": "qa_imported_model.pdb",
+      "Bytes": 154308608,
+      "Sha256": "5f152bf126ce1f0270a74ae400cfd2d85b428b6693aa0aa6e557abd6e630d506",
+      "LastWriteTimeUtc": "2026-11-03T11:11:49.8355368Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_looping_audio.pdb",
+      "Name": "qa_looping_audio.pdb",
+      "Bytes": 124366848,
+      "Sha256": "410abfd7ebbef650a6fd6760ba32cac21d3a3d38c1f34202d4da6a98c0b64538",
+      "LastWriteTimeUtc": "2026-11-03T11:11:40.2621152Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_map_materials.pdb",
+      "Name": "qa_map_materials.pdb",
+      "Bytes": 124940288,
+      "Sha256": "579be5ce4cc50183c5b42e29ff4d965cc1f122537f38ba86e79de141dc5ccd59",
+      "LastWriteTimeUtc": "2026-11-03T11:11:40.0380877Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_mcc_audio.pdb",
+      "Name": "qa_mcc_audio.pdb",
+      "Bytes": 124964864,
+      "Sha256": "c599a9daf6ed855864e46d75189ad1e1036231300f07c9084df0cae04c14fed1",
+      "LastWriteTimeUtc": "2026-11-03T11:11:40.1050894Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_megaworld_atlas.pdb",
+      "Name": "qa_megaworld_atlas.pdb",
+      "Bytes": 124563456,
+      "Sha256": "0af3d8ca016532d4d85cc9e097217fd8527bdc60c97327bf308702387be132b2",
+      "LastWriteTimeUtc": "2026-11-03T11:11:48.9167891Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_megaworld_ce.pdb",
+      "Name": "qa_megaworld_ce.pdb",
+      "Bytes": 153473024,
+      "Sha256": "248057521510166df6658fc58cb7e6fc1228b3381f238cfe6f739374cb236a4e",
+      "LastWriteTimeUtc": "2026-11-03T11:11:49.3473596Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_model_collision.pdb",
+      "Name": "qa_model_collision.pdb",
+      "Bytes": 123039744,
+      "Sha256": "f134af952b3f7769d658cf14f26f92587ea688e7aedd517d11e1ed8628c9c2fe",
+      "LastWriteTimeUtc": "2026-11-03T11:11:35.0682282Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_native_render.pdb",
+      "Name": "qa_native_render.pdb",
+      "Bytes": 149336064,
+      "Sha256": "727dc0f9c47a1d42ddfeef192bbd0df51332fd33eece33a382fef00954101150",
+      "LastWriteTimeUtc": "2026-11-03T11:11:30.8827064Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_opence_ai.pdb",
+      "Name": "qa_opence_ai.pdb",
+      "Bytes": 7548928,
+      "Sha256": "0e3ea29b2d8f00edd718b88ab7b5f52ab48288f6f60169177997e25abed8f418",
+      "LastWriteTimeUtc": "2026-11-03T11:11:32.5204141Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_quickforge.pdb",
+      "Name": "qa_quickforge.pdb",
+      "Bytes": 142299136,
+      "Sha256": "3d15b92d35b2c5e3ffc6b8de079ccdd3f4fceeb74c4d663969dd3155be6c0391",
+      "LastWriteTimeUtc": "2026-11-03T11:11:40.8262046Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_recording_library.pdb",
+      "Name": "qa_recording_library.pdb",
+      "Bytes": 132042752,
+      "Sha256": "10705848769b1997cc4f4c1a4b54ca266182a101a58c81e1c1e391cf5c5806d7",
+      "LastWriteTimeUtc": "2026-11-03T11:11:30.3541349Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_repair_conversion_resources.pdb",
+      "Name": "qa_repair_conversion_resources.pdb",
+      "Bytes": 123711488,
+      "Sha256": "16417f7721bc3bffd29d39311e5c5a864aa36c0299d7a339cf7ca26ea288b3ea",
+      "LastWriteTimeUtc": "2026-11-03T11:11:40.6991794Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_runtime_library.pdb",
+      "Name": "qa_runtime_library.pdb",
+      "Bytes": 134303744,
+      "Sha256": "b52003138b494d59fc8e19752e32a58a6401739af1b988c64a54b54dd1c187de",
+      "LastWriteTimeUtc": "2026-11-03T11:11:49.7434106Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_sound_classes.pdb",
+      "Name": "qa_sound_classes.pdb",
+      "Bytes": 123457536,
+      "Sha256": "d93511cd7c045501e9da8efca33a68b74cf91c772da90c90ccf86db038b320d2",
+      "LastWriteTimeUtc": "2026-11-03T11:11:36.5414985Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_sound_export.pdb",
+      "Name": "qa_sound_export.pdb",
+      "Bytes": 125341696,
+      "Sha256": "a853eb08a1e333e6c8ff6a33edb59d4fdc8daa758e46a5d3cdf8c145ac2841fd",
+      "LastWriteTimeUtc": "2026-11-03T11:11:48.8357882Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_validate.pdb",
+      "Name": "qa_validate.pdb",
+      "Bytes": 134197248,
+      "Sha256": "3cd5db0521ac82c13b656d4f774b64d3f968aca59f2d5054548469f5aad18ebe",
+      "LastWriteTimeUtc": "2026-11-03T11:11:35.6028032Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_visibility_zones.pdb",
+      "Name": "qa_visibility_zones.pdb",
+      "Bytes": 128610304,
+      "Sha256": "2dafc3269ca0c818a3f8a2ea5107fbcd648163a9d8820d275c85c50ff09a8b66",
+      "LastWriteTimeUtc": "2026-11-03T11:11:29.9921938Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_working_tags.pdb",
+      "Name": "qa_working_tags.pdb",
+      "Bytes": 136138752,
+      "Sha256": "06e826c6e377975de659ab9fe6a7db6af56c541411b09b17b691bc72a741e417",
+      "LastWriteTimeUtc": "2026-11-03T11:11:40.9557189Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_workspace.pdb",
+      "Name": "qa_workspace.pdb",
+      "Bytes": 131977216,
+      "Sha256": "c1785422c7c7aecfeb616ef195ac4baeef12e2b313187e5c1f761437a23145ce",
+      "LastWriteTimeUtc": "2026-11-03T11:11:44.6590691Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_zip.pdb",
+      "Name": "qa_zip.pdb",
+      "Bytes": 125267968,
+      "Sha256": "3e1ca1169e3ebd500192d0c2b2a622e958785219087d8612ca731da6a6d46d03",
+      "LastWriteTimeUtc": "2026-11-03T11:11:31.0022152Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\qa_zombie_content.pdb",
+      "Name": "qa_zombie_content.pdb",
+      "Bytes": 147501056,
+      "Sha256": "a20cecbd964f1da9f888119e33d88068c6107e0c74fd5c1f598a22396c9868c7",
+      "LastWriteTimeUtc": "2026-11-03T11:11:49.8054089Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\verify_forge_collision.pdb",
+      "Name": "verify_forge_collision.pdb",
+      "Bytes": 153899008,
+      "Sha256": "00be20272a3f5970224f11128e424b3bc632b8dce8c9ed9ff8fc220243631b3f",
+      "LastWriteTimeUtc": "2026-11-03T11:11:35.6893158Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\verify_source_archive.pdb",
+      "Name": "verify_source_archive.pdb",
+      "Bytes": 123105280,
+      "Sha256": "1e5ff23f40ca8d49325d3d9a3c1cb4b4621b80c82958cad9ad9f81d0faa5056e",
+      "LastWriteTimeUtc": "2026-11-03T11:11:36.0379331Z"
+    },
+    {
+      "Original": "D:\\Project Guilty Spark\\.local\\c39-native-collaboration\\target\\debug\\examples\\verify_tag_exchange.pdb",
+      "Name": "verify_tag_exchange.pdb",
+      "Bytes": 127127552,
+      "Sha256": "a4645d9e42bfc2e81a9c9573c802bec795a7d25a057a5065836a20e81d717578",
+      "LastWriteTimeUtc": "2026-11-03T11:11:49.6073939Z"
+    }
+  ],
+  "volumes": [
+    {
+      "file": "payload-000.zip",
+      "bytes": 1086109843,
+      "sha256": "582f08fdc545b3f6d2ec0bd62e0bcee87594ac6c6f773022fa155e886a4076c3",
+      "path": "D:\\Project Guilty Spark\\preserved\\recovery-archives\\C62-cold-debug-symbols\\payload-000.zip",
+      "dev": "112482413",
+      "ino": "8444249301532997"
+    },
+    {
+      "file": "payload-001.zip",
+      "bytes": 128963445,
+      "sha256": "d62a33a87179c5b08fea16c4150431c76433174e2823c07d1b5d3eb259a9a05a",
+      "path": "D:\\Project Guilty Spark\\preserved\\recovery-archives\\C62-cold-debug-symbols\\payload-001.zip",
+      "dev": "112482413",
+      "ino": "10414574138507606"
+    }
+  ],
+  "deleted": true,
+  "deletedAt": "2026-11-05T17:58:45.8228942Z"
+}

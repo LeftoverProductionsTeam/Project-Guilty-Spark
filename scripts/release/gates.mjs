@@ -4,25 +4,28 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import net from 'node:net';
 import { spawn, execFileSync } from 'node:child_process';
+import { assertQaOutputPath } from '../native-qa-storage.mjs';
 const [commit, output] = process.argv.slice(2);
 if (!/^[a-f0-9]{40}$/.test(commit ?? '') || !output) throw Error('gates <full commit> <fresh log directory>');
 const git = (...args) => execFileSync('git', args, { windowsHide: true }).toString().trim();
 if (git('rev-parse', 'HEAD') !== commit || git('status', '--porcelain'))
   throw Error('Release gates require the exact clean committed source');
+await assertQaOutputPath(output, { reservationBytes: 64 * 1024 ** 2 });
+await fs.mkdir(path.dirname(path.resolve(output)), { recursive: true });
 await fs.mkdir(output, { recursive: false });
 const python = process.env.SPARK_RELEASE_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
 const node = (...args) => [process.execPath, args];
 const commands = [
   ['rust-workspace', ...node('scripts/cargo.mjs', 'test', '--workspace', '--locked')],
-  ['typescript', ...node('node_modules/typescript/bin/tsc', '-b')],
-  ['frontend', ...node('node_modules/vitest/vitest.mjs', 'run')],
+  ['typescript', ...node('node_modules/typescript/bin/tsc', '--noEmit', '--incremental', 'false')],
+  ['frontend', ...node('scripts/frontend-tests.mjs', 'unit')],
   [
     'offline',
     ...(process.platform === 'win32'
       ? [process.env.ComSpec ?? 'C:/Windows/System32/cmd.exe', ['/d', '/s', '/c', 'pnpm run test:offline']]
       : ['pnpm', ['run', 'test:offline']]),
   ],
-  ['browser', ...node('node_modules/@playwright/test/cli.js', 'test')],
+  ['browser', ...node('scripts/frontend-tests.mjs', 'browser')],
   [
     'native-diagnostics',
     ...node(

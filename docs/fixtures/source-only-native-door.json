@@ -1,0 +1,1159 @@
+{
+  "schemaVersion": 1,
+  "id": "a7f90486-5ba0-4dba-a609-00311742bddc",
+  "title": "C66 bounded native door",
+  "createdAt": "2026-11-03T21:41:44.498521200+00:00",
+  "modifiedAt": "2026-11-03T22:44:11.891352500+00:00",
+  "source": null,
+  "provenance": {
+    "creator": "",
+    "community": "",
+    "releaseYear": null,
+    "description": "Original geometry authored in Guilty Spark QuickForge. Base-game assets are not bundled.",
+    "sourceUrl": "",
+    "permissions": ""
+  },
+  "scene": [],
+  "assets": [],
+  "tagEdits": [],
+  "history": [
+    {
+      "id": "a65a6605-8e0a-40da-a81d-f7bf015a7ebc",
+      "timestamp": "2026-11-03T21:42:15.556Z",
+      "description": "Create two-room Workshop source example"
+    },
+    {
+      "id": "7c1e9914-24eb-43bd-89a6-1a4db7657c2f",
+      "timestamp": "2026-11-03T21:42:15.733Z",
+      "description": "Scale BSP brush"
+    },
+    {
+      "id": "9f69700c-664f-4697-811d-0b1c69a0289f",
+      "timestamp": "2026-11-03T21:42:15.800Z",
+      "description": "Scale BSP brush"
+    },
+    {
+      "id": "e342fc5a-90d0-429e-b0ef-63eb6d3888b6",
+      "timestamp": "2026-11-03T21:42:16.009Z",
+      "description": "Set native BSP shader"
+    },
+    {
+      "id": "535526c4-4c1d-49c7-929e-456abc54d9c6",
+      "timestamp": "2026-11-03T21:42:16.072Z",
+      "description": "Set Workshop sky tag"
+    },
+    {
+      "id": "3863dd1c-9d1c-466d-912a-bef54fac418b",
+      "timestamp": "2026-11-03T21:42:45.347Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "ccde448b-a162-4855-8b46-ed76370ec65f",
+      "timestamp": "2026-11-03T21:42:45.395Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "8b544260-6a36-46d2-ab49-a10dcd94e30d",
+      "timestamp": "2026-11-03T21:42:45.609Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "cd98ad94-3b1d-446d-81c3-9f4508c1e4c1",
+      "timestamp": "2026-11-03T21:42:45.644Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "dc4a8eab-f61d-4c27-b9d9-7e30cd51c71b",
+      "timestamp": "2026-11-03T21:42:45.858Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "6468b307-75e0-4742-b9c6-6d70f96a0724",
+      "timestamp": "2026-11-03T21:42:45.892Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "5afe3ff4-c1ad-4078-8363-c68cc4ba00b5",
+      "timestamp": "2026-11-03T21:42:46.091Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "123e481a-587d-46dd-8363-b19829e43dee",
+      "timestamp": "2026-11-03T21:42:46.125Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "93c0f74e-6576-4096-bbf9-07dcf75f5c80",
+      "timestamp": "2026-11-03T21:42:56.612Z",
+      "description": "Place door small"
+    },
+    {
+      "id": "04098b81-e4b7-4a91-aafa-4c4b96e8e663",
+      "timestamp": "2026-11-03T21:42:58.725Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "949b14d2-6000-4e4f-ae68-e9eb0ff7ba20",
+      "timestamp": "2026-11-03T21:42:58.777Z",
+      "description": "Edit position"
+    },
+    {
+      "id": "9238a744-fe54-4286-937b-6306d09997c6",
+      "timestamp": "2026-11-03T21:42:58.877Z",
+      "description": "Rename QuickForge object"
+    },
+    {
+      "id": "e3d1770c-6eea-41cd-9543-4b232cef936a",
+      "timestamp": "2026-11-03T21:42:59.475Z",
+      "description": "Place trigger"
+    },
+    {
+      "id": "2723153e-5bdc-497a-9593-14dcc21814c7",
+      "timestamp": "2026-11-03T21:42:59.574Z",
+      "description": "Center trigger across both door approaches"
+    },
+    {
+      "id": "6118b02d-b59b-4b30-aa5b-85524cf824b3",
+      "timestamp": "2026-11-03T21:42:59.641Z",
+      "description": "Connect trigger → open door"
+    },
+    {
+      "id": "d3dfab75-d6b1-4fc3-88d3-afb51ae49a87",
+      "timestamp": "2026-11-03T22:41:24.562Z",
+      "description": "Extrude BSP face into connected brush"
+    }
+  ],
+  "builds": [],
+  "quickForge": {
+    "workshop": {
+      "schemaVersion": 1,
+      "brushes": [
+        {
+          "id": "room-a",
+          "name": "Room A",
+          "role": "space",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "vertices": [
+            [
+              -8.0,
+              -6.0,
+              0.0
+            ],
+            [
+              8.0,
+              -6.0,
+              0.0
+            ],
+            [
+              8.0,
+              6.0,
+              0.0
+            ],
+            [
+              -8.0,
+              6.0,
+              0.0
+            ],
+            [
+              -8.0,
+              -6.0,
+              5.0
+            ],
+            [
+              8.0,
+              -6.0,
+              5.0
+            ],
+            [
+              8.0,
+              6.0,
+              5.0
+            ],
+            [
+              -8.0,
+              6.0,
+              5.0
+            ]
+          ],
+          "faces": [
+            {
+              "id": "face-0",
+              "vertices": [
+                0,
+                3,
+                2,
+                1
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-1",
+              "vertices": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-2",
+              "vertices": [
+                0,
+                1,
+                5,
+                4
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-3",
+              "vertices": [
+                1,
+                2,
+                6,
+                5
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-4",
+              "vertices": [
+                2,
+                3,
+                7,
+                6
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-5",
+              "vertices": [
+                3,
+                0,
+                4,
+                7
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            }
+          ]
+        },
+        {
+          "id": "corridor",
+          "name": "Corridor",
+          "role": "space",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            0.3375,
+            0.35
+          ],
+          "vertices": [
+            [
+              7.0,
+              -2.0,
+              0.0
+            ],
+            [
+              21.0,
+              -2.0,
+              0.0
+            ],
+            [
+              21.0,
+              2.0,
+              0.0
+            ],
+            [
+              7.0,
+              2.0,
+              0.0
+            ],
+            [
+              7.0,
+              -2.0,
+              3.0
+            ],
+            [
+              21.0,
+              -2.0,
+              3.0
+            ],
+            [
+              21.0,
+              2.0,
+              3.0
+            ],
+            [
+              7.0,
+              2.0,
+              3.0
+            ]
+          ],
+          "faces": [
+            {
+              "id": "face-0",
+              "vertices": [
+                0,
+                3,
+                2,
+                1
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-1",
+              "vertices": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-2",
+              "vertices": [
+                0,
+                1,
+                5,
+                4
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-3",
+              "vertices": [
+                1,
+                2,
+                6,
+                5
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-4",
+              "vertices": [
+                2,
+                3,
+                7,
+                6
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-5",
+              "vertices": [
+                3,
+                0,
+                4,
+                7
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            }
+          ]
+        },
+        {
+          "id": "room-b",
+          "name": "Room B",
+          "role": "space",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "vertices": [
+            [
+              20.0,
+              -6.0,
+              0.0
+            ],
+            [
+              36.0,
+              -6.0,
+              0.0
+            ],
+            [
+              36.0,
+              6.0,
+              0.0
+            ],
+            [
+              20.0,
+              6.0,
+              0.0
+            ],
+            [
+              20.0,
+              -6.0,
+              5.0
+            ],
+            [
+              36.0,
+              -6.0,
+              5.0
+            ],
+            [
+              36.0,
+              6.0,
+              5.0
+            ],
+            [
+              20.0,
+              6.0,
+              5.0
+            ]
+          ],
+          "faces": [
+            {
+              "id": "face-0",
+              "vertices": [
+                0,
+                3,
+                2,
+                1
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-1",
+              "vertices": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-2",
+              "vertices": [
+                0,
+                1,
+                5,
+                4
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-3",
+              "vertices": [
+                1,
+                2,
+                6,
+                5
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-4",
+              "vertices": [
+                2,
+                3,
+                7,
+                6
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-5",
+              "vertices": [
+                3,
+                0,
+                4,
+                7
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            }
+          ]
+        },
+        {
+          "id": "ramp",
+          "name": "Ramp",
+          "role": "solid",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "vertices": [
+            [
+              -3.0,
+              -3.0,
+              -0.5
+            ],
+            [
+              3.0,
+              -3.0,
+              -0.5
+            ],
+            [
+              3.0,
+              1.0,
+              -0.5
+            ],
+            [
+              -3.0,
+              1.0,
+              -0.5
+            ],
+            [
+              3.0,
+              1.0,
+              1.5
+            ],
+            [
+              -3.0,
+              1.0,
+              1.5
+            ]
+          ],
+          "faces": [
+            {
+              "id": "face-0",
+              "vertices": [
+                0,
+                3,
+                2,
+                1
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-1",
+              "vertices": [
+                3,
+                5,
+                4,
+                2
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-2",
+              "vertices": [
+                0,
+                1,
+                4,
+                5
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-3",
+              "vertices": [
+                0,
+                5,
+                3
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "face-4",
+              "vertices": [
+                1,
+                2,
+                4
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            }
+          ]
+        },
+        {
+          "id": "6a09b214-1cc3-4778-b516-48be2af88d81",
+          "name": "Room A extrusion",
+          "role": "space",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "vertices": [
+            [
+              -8.0,
+              6.0,
+              0.0
+            ],
+            [
+              -8.0,
+              -6.0,
+              0.0
+            ],
+            [
+              -8.0,
+              -6.0,
+              5.0
+            ],
+            [
+              -8.0,
+              6.0,
+              5.0
+            ],
+            [
+              -10.0,
+              6.0,
+              0.0
+            ],
+            [
+              -10.0,
+              -6.0,
+              0.0
+            ],
+            [
+              -10.0,
+              -6.0,
+              5.0
+            ],
+            [
+              -10.0,
+              6.0,
+              5.0
+            ]
+          ],
+          "faces": [
+            {
+              "id": "base",
+              "vertices": [
+                3,
+                2,
+                1,
+                0
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "end",
+              "vertices": [
+                4,
+                5,
+                6,
+                7
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "side-0",
+              "vertices": [
+                0,
+                1,
+                5,
+                4
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "side-1",
+              "vertices": [
+                1,
+                2,
+                6,
+                5
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "side-2",
+              "vertices": [
+                2,
+                3,
+                7,
+                6
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            },
+            {
+              "id": "side-3",
+              "vertices": [
+                3,
+                0,
+                4,
+                7
+              ],
+              "materialId": "surface",
+              "uvScale": [
+                1.0,
+                1.0
+              ],
+              "uvOffset": [
+                0.0,
+                0.0
+              ],
+              "uvRotation": 0.0
+            }
+          ]
+        }
+      ],
+      "portals": []
+    },
+    "logic": {
+      "schemaVersion": 1,
+      "triggers": [
+        {
+          "id": "6732db8c-699d-4e3e-b205-a67a54940149",
+          "name": "Trigger 1",
+          "position": [
+            14.0,
+            0.0,
+            1.5
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "dimensions": [
+            6.0,
+            3.0,
+            3.0
+          ],
+          "visible": true,
+          "locked": false
+        }
+      ],
+      "devices": [
+        {
+          "placementId": "475262c6-2a55-438f-92dc-e01b4f03a386",
+          "initialPosition": 0.0,
+          "powered": true
+        }
+      ],
+      "rules": [
+        {
+          "id": "a55adabc-9673-450b-9907-58fe736a4540",
+          "name": "Enter → open door",
+          "enabled": true,
+          "once": false,
+          "event": {
+            "kind": "enter",
+            "triggerId": "6732db8c-699d-4e3e-b205-a67a54940149"
+          },
+          "actions": [
+            {
+              "kind": "devicePosition",
+              "targetId": "475262c6-2a55-438f-92dc-e01b4f03a386",
+              "value": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    "schemaVersion": 1,
+    "name": "C66 bounded native door",
+    "template": "customBlank",
+    "runtimeId": "mccSteam",
+    "gameMode": "slayer",
+    "geometry": [],
+    "materials": [
+      {
+        "id": "surface",
+        "name": "quickforge_surface",
+        "shaderPath": "levels/test/tutorial/shaders/example_tutorial_metal_floor",
+        "color": [
+          0.25,
+          0.38,
+          0.48
+        ]
+      }
+    ],
+    "placements": [
+      {
+        "id": "475262c6-2a55-438f-92dc-e01b4f03a386",
+        "name": "Corridor door",
+        "tagPath": "levels\\a10\\devices\\doors\\door small\\door small",
+        "tagClass": "mach",
+        "position": [
+          14.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "team": -1,
+        "respawnSeconds": 30,
+        "tagId": 3783655442,
+        "sourceProjectId": "c5f38bd7-7d48-4b04-8e9c-5bdf320d47f5",
+        "sourceSha256": "94f6f904608efb68db186ebbfd520a2c50e1e65f3147021b43a2d079a68f1c6f",
+        "visible": true,
+        "locked": false
+      }
+    ],
+    "spawns": [
+      {
+        "id": "start-0",
+        "name": "Player 1",
+        "position": [
+          4.0,
+          0.0,
+          0.1
+        ],
+        "facing": 0.0,
+        "team": 0,
+        "gameModes": [
+          "slayer"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "start-1",
+        "name": "Player 2",
+        "position": [
+          5.0,
+          0.0,
+          0.1
+        ],
+        "facing": 0.0,
+        "team": 0,
+        "gameModes": [
+          "slayer"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "start-2",
+        "name": "Player 3",
+        "position": [
+          6.0,
+          0.0,
+          0.1
+        ],
+        "facing": 0.0,
+        "team": 0,
+        "gameModes": [
+          "slayer"
+        ],
+        "visible": true,
+        "locked": false
+      },
+      {
+        "id": "start-3",
+        "name": "Player 4",
+        "position": [
+          7.0,
+          0.0,
+          0.1
+        ],
+        "facing": 0.0,
+        "team": 0,
+        "gameModes": [
+          "slayer"
+        ],
+        "visible": true,
+        "locked": false
+      }
+    ],
+    "objectives": [],
+    "skyPath": "levels/test/bloodgulch/bloodgulch",
+    "buildQuality": "draft"
+  },
+  "sourceSceneVersion": 1
+}

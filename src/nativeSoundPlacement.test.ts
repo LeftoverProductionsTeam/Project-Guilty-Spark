@@ -64,12 +64,25 @@ it('verifies the preserved loop before requesting an existing local recursive im
     sourceProjectId: sourceId,
     sourceSha256: hash,
     tagId: 4,
+    existing: null,
   });
   api.call.mockClear();
   await expect(
     prepareNativeSound(project, { ...emitter, sourceSha256: 'c'.repeat(64) }, sourceId),
   ).rejects.toThrow('changed');
   expect(api.call).toHaveBeenCalledTimes(1);
+});
+it('checks source drafts even when a recursive import is already cached', async () => {
+  const { project, emitter } = fixture();
+  project.nativeAssetImports = [binding];
+  api.call.mockImplementation(async (command: string) => {
+    if (command === 'open_project') return { inspection: { sha256: hash, header: { version: 13 }, tags: [{ id: 4, class: 'lsnd', path: binding.tagPath }] } };
+    throw Error('Source has tag changes; save a validated map copy');
+  });
+  await expect(prepareNativeSound(project, emitter, sourceId)).rejects.toThrow('validated map copy');
+  expect(api.call.mock.calls.map(row => row[0])).toEqual(['open_project', 'prepare_native_asset_import']);
+  expect(api.call.mock.calls[1][1].existing).toEqual(binding);
+  expect(project.nativeAssetImports).toEqual([binding]);
 });
 it('merges only placement intent into the latest document and is one undoable edit', async () => {
   const { project, emitter } = fixture();

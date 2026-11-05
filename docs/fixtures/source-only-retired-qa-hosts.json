@@ -1,0 +1,89 @@
+{
+  "acceptedReleaseTouched": false,
+  "logicalBytes": 456290304.0,
+  "deleted": true,
+  "schemaVersion": 1,
+  "files": [
+    {
+      "file": "artifacts/qa/native-asset-contexts-01/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45786624,
+      "sha256": "2916c6cadca9ea83cb6ee7e21e66e6ce8acc57ce3d6187d59742233d3493ed30",
+      "receipts": [
+        "artifacts\\qa\\native-asset-contexts-01\\acceptance.json"
+      ]
+    },
+    {
+      "file": "artifacts/qa/native-asset-contexts-final/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45799424,
+      "sha256": "2a13ece4645c5457001af3e6a634c2564eaabadfeb3c63d166c5ee96d883b090",
+      "receipts": [
+        "artifacts\\qa\\native-asset-contexts-final\\acceptance.json"
+      ]
+    },
+    {
+      "file": "artifacts/qa/overnight-asset-fidelity/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45786624,
+      "sha256": "e085aa93abe5c641c407467224800aefc743f52dc09e95642c1da8ea5f903556",
+      "receipts": [
+        "artifacts\\qa\\overnight-asset-fidelity\\acceptance.json"
+      ]
+    },
+    {
+      "file": "artifacts/qa/overnight-dcc-native-fixed/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45756416,
+      "sha256": "f149269e055b05e3cff63a74a2d0dd093100cd35b5cc9d09f25983a045d90768",
+      "receipts": [
+        "artifacts\\qa\\overnight-dcc-native-fixed\\acceptance.json"
+      ]
+    },
+    {
+      "file": "artifacts/qa/overnight-native-export/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45737472,
+      "sha256": "6a7637ec105949ab30fbff4ac31324ba762702081e5b2ced451458bb99e24441",
+      "receipts": [
+        "artifacts\\qa\\overnight-native-export\\acceptance.json"
+      ]
+    },
+    {
+      "file": "artifacts/qa/overnight-tag-animation-corrected/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45786624,
+      "sha256": "26017f7bd4b9282253eb4d217eb23c83060b63558d6936d99f5ad11f84978a79",
+      "receipts": [
+        "artifacts\\qa\\overnight-tag-animation-corrected\\acceptance.json"
+      ]
+    },
+    {
+      "file": "artifacts/qa/p0-native-edit-fixed/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45410816,
+      "sha256": "8eda16313c2f112a37ac67d8ccf1ca3f933cdb19c6a1d3bfb75c6b02e4b982fd",
+      "receipts": [
+        "artifacts\\qa\\p0-native-edit-fixed\\acceptance.json"
+      ]
+    },
+    {
+      "file": "artifacts/qa/p0-native-edit-only/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45400064,
+      "sha256": "efe9028f458fd5bbbb0e7abd7d8a5c02243f197e25416f0fe629e54deb4c4001",
+      "receipts": [
+        "artifacts\\qa\\p0-native-edit-only\\acceptance.json"
+      ]
+    },
+    {
+      "file": "artifacts/qa/p0-workspace-lifecycle/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45400064,
+      "sha256": "9d0afb5a290f51e8a933c050e82d407796dd7ef912785ece519f619e4bc65cb4",
+      "receipts": [
+        "artifacts\\qa\\p0-workspace-lifecycle\\acceptance.json"
+      ]
+    },
+    {
+      "file": "artifacts/qa/unified-purge-native/GuiltySpark-workspace-lifecycle.exe",
+      "bytes": 45426176,
+      "sha256": "43888167d87db1251fb020426283114cb0daf117ca8627a2e5b90f9b4758033e",
+      "receipts": [
+        "artifacts\\qa\\unified-purge-native\\acceptance.json"
+      ]
+    }
+  ],
+  "classification": "Generated copied QA application hosts; current source freshly rebuilt and native UI/readback accepted. Historical outcome receipts remain."
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "existingGitBundleSha256": "c8913422336cb922a2fd76bad7d44848cb15388e0ca32eb03a38da81a14c22f7",
+  "allBundleReferencesPresentLocally": true,
+  "extraSnapshotObjectsChecked": 450,
+  "referenceCount": 33,
+  "snapshotTree": "d3406ebfc595349846620fe6214e6d4444581fb1",
+  "missingCommits": false,
+  "canonicalGitImportedOrRewritten": false,
+  "archivedProductSnapshots": "Compared archived source hashes with canonical Git and reviewed C33/C39 product diffs. Current native/SparkLink/Guardian code is retained. Older layouts/readers/tool models must not overwrite it.",
+  "historicalExperiments": "Obsolete generated probes, dependencies, SDK copies, working environments and reports retired under final owner correction. Existing feature and research ledgers stay authoritative.",
+  "requirementsLedgerSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
+  "sourceAndKnowledgeDestinations": [
+    "AGENTS.md",
+    "docs/SOURCE_ONLY_STORAGE_POLICY.md",
+    "docs/ACTIVE_TASK.md",
+    "docs/PENDING_REQUESTS.md",
+    "docs/DIRECTIVE_LEDGER.md",
+    "docs/fixtures/source-only-native-door.json",
+    "docs/fixtures/source-only-native-validation.json",
+    "docs/fixtures/source-only-retired-releases.json",
+    "scripts/maintenance/physical-audit.cs",
+    "scripts/maintenance/physical-audit-main.cs"
+  ],
+  "originalUserResourcesRetired": false
+}

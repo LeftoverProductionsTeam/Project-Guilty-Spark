@@ -15,6 +15,7 @@ const root=path.resolve(destination),expect=assertion.configure({timeout:45000})
 const detachMethod=process.env.SPARK_LIFECYCLE_DETACH_METHOD??'pointer';
 if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must be pointer or button');
 const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
+const launchOnly=process.env.SPARK_LIFECYCLE_LAUNCH_ONLY==='1';
 const previewOnly=process.env.SPARK_LIFECYCLE_PREVIEW_ONLY==='1';
 const contextOnly=process.env.SPARK_LIFECYCLE_TAG_CONTEXTS==='1';
 if(contextOnly&&(!nativeOnly||previewOnly))throw Error('Native asset-context acceptance requires native-only mode and its own small bounded run');
@@ -26,22 +27,25 @@ if(![5,6,7,13,609].includes(expectedCacheVersion)||expectedCacheVersion!==13&&!r
 const profilePreview=process.env.SPARK_LIFECYCLE_PROFILE==='1';
 if(profilePreview&&!nativeOnly)throw Error('Preview profiling requires native-only mode');
 const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
+const logicOnly=process.env.SPARK_LIFECYCLE_LOGIC==='1';
+if(logicOnly&&(geometryOnly||nativeOnly||previewOnly||contextOnly))throw Error('Native logic authoring requires its own bounded run');
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
 if(!['','20'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 edits');
 if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned map');
 const inputInfo=nativeMap&&nativeMap!=='-'?await fs.stat(path.resolve(nativeMap)):null;
 if(inputInfo&&!inputInfo.isFile())throw Error('Native acceptance input must be an existing owned cache');
 if((previewOnly||contextOnly)&&(!inputInfo||inputInfo.size>128*1024*1024))throw Error('The small native preview/context test requires a cache within128MiB; use the full reserved native workflow for larger fixtures');
-const reservationBytes=previewOnly||contextOnly?1024**3:4*1024**3;
+const reservationBytes=previewOnly||contextOnly?1024**3:logicOnly?2*1024**3:4*1024**3;
 await fs.mkdir(await assertQaOutputPath(root,{reservationBytes}));
 const app=path.join(root,'application','GuiltySpark-workspace-lifecycle.exe');
-const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
-const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
+const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
 await finishStorage.createScratch('application');
 await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
 await finishStorage.createScratch('library');
 await finishStorage.createScratch('webview');
 if(nativeOnly&&!readOnly)await finishStorage.createScratch('independent-native-tags');
+if(logicOnly)await finishStorage.createScratch('independent-native-tags');
 if(geometryOnly)await finishStorage.createScratch('independent-model-tags');
 const runOwned=async(...args)=>{const pending=promisify(execFile)(...args);if(pending.child)await finishStorage.trackProcess(pending.child);return pending;};
 const interrupt=async()=>{try{await finishStorage.interrupt();}finally{process.exit(130);}};
@@ -55,7 +59,9 @@ async function launchNative(){
   child=spawn(app,[],{windowsHide:true,stdio:'ignore',env:{...process.env,GUILTY_SPARK_DATA_DIR:path.join(root,'library'),WEBVIEW2_USER_DATA_FOLDER:path.join(root,'webview'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:`--remote-debugging-port=${port}`}});
   await finishStorage.trackProcess(child);
   await expect.poll(()=>fetch(`http://127.0.0.1:${port}/json/version`).then(r=>r.ok,()=>false)).toBe(true);browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
-  await expect.poll(()=>pages().length).toBeGreaterThan(0);main=pages()[0];main.on('pageerror',error=>report.errors.push(String(error)));
+  try{await expect.poll(()=>pages().length).toBeGreaterThan(0);}
+  catch(error){report.startupPages=await Promise.all(browser.contexts().flatMap(context=>context.pages()).map(async page=>({url:page.url(),title:await page.title().catch(()=>''),body:(await page.locator('body').innerText().catch(()=>'')).slice(0,1200)})));throw error;}
+  main=pages()[0];main.on('pageerror',error=>report.errors.push(String(error)));
   if(profilePreview)report.previewProfile={appWindowMs:performance.now()-started,conditions:'Fresh application/profile; OS file cache not cleared; same embedded app, source, settings and readiness checks',calls:[]};
 }
 async function nextPage(before){let page;await expect.poll(()=>{page=pages().find(page=>!before.has(page));return !!page;}).toBe(true);page.on('pageerror',error=>report.errors.push(String(error)));page.on('close',()=>{(report.closedWindows??=[]).push({url:page.url(),completedCases:report.cases.length,at:new Date().toISOString()});});await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);
@@ -126,11 +132,18 @@ try{
   await physicalSample('before-launch');
   await launchNative();
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
+  if(launchOnly){expect(path.resolve(boot.dataDirectory)).toBe(path.join(root,'library'));await expect(main.locator('#root')).not.toBeEmpty();step('Actual embedded app starts with its isolated library and no mocked IPC',{url:main.url()});}
   if(geometryOnly){
     const {nativeGeometryRoundTrip}=await import('./native-geometry-roundtrip.mjs');
     await nativeGeometryRoundTrip({main,root,invoke,expect,report,step,invaderDirectory,run:runOwned});
   }
-  if(!nativeOnly&&!geometryOnly){
+  if(logicOnly){
+    const {nativeLogicRoundTrip}=await import('./native-logic-roundtrip.mjs');
+    report.logicRoundTrip={appSha256:report.appSha256,sourceCacheSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex'),mockedIpc:false,gameplayVerified:false,externalGuiEdited:false};
+    await nativeLogicRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT??''),tags:path.resolve(process.env.SPARK_LOGIC_TAGS??''),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),call:(command,args)=>invoke(main,command,args),receipt:report.logicRoundTrip,expect,run:runOwned,verifyEditedAsset:true});
+    step('Actual edited native asset import, door/trigger authoring, Undo/Save/reopen and native build',report.logicRoundTrip);
+  }
+  if(!nativeOnly&&!geometryOnly&&!logicOnly&&!launchOnly){
   const a=await invoke(main,'create_quickforge_project',{title:'C59 map A',template:'smallIndoorArena',target:'haloCustomEdition'});
   const b=await invoke(main,'create_quickforge_project',{title:'C59 map B',template:'smallIndoorArena',target:'haloCustomEdition'});
   await invoke(main,'create_quickforge_project',{title:'C59 map C',template:'smallIndoorArena',target:'haloCustomEdition'});
@@ -239,7 +252,7 @@ try{
   await main.screenshot({path:path.join(root,'online-collaboration.png')});
   await chooseTool(main,'Level editor');await inspector(main);await acknowledged(main,a.project.id,1.5);
   }
-  if(nativeMap&&!geometryOnly){
+  if(nativeMap&&!geometryOnly&&!logicOnly){
     if(!readOnly&&!invaderDirectory)throw Error('Native map acceptance requires the installed Invader directory');
     const original=await fs.readFile(path.resolve(nativeMap)),originalHash=crypto.createHash('sha256').update(original).digest('hex');
     const importStarted=performance.now();
@@ -515,7 +528,9 @@ finally{
     // outside scratch. No abandoned browser profile or full library is kept.
     if(report.complete&&report.geometryRoundTrip?.output)
       await finishStorage.retain(report.geometryRoundTrip.output,'Accepted native geometry fixture for the next independent readback');
-    await physicalSample('before-cleanup');
+    // A diagnostic failure must not leave owned writer payloads behind.
+    try{await physicalSample('before-cleanup');}
+    catch(error){report.complete=false;report.errors.push('Pre-cleanup measurement failed: '+String(error));process.exitCode=1;}
     await finishStorage(report.complete?'passed':'failed');
   }catch(error){report.complete=false;report.errors.push(String(error));process.exitCode=1;}}
   await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));

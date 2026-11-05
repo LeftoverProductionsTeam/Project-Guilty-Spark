@@ -33,6 +33,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
+      - name: Choose external runner-owned release output
+        shell: pwsh
+        run: '"SPARK_RELEASE_ROOT=$(Join-Path $env:RUNNER_TEMP spark-release)" >> $env:GITHUB_ENV'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.source_commit }}
@@ -58,38 +61,35 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install msedge
       - name: All release regressions (includes cross-map Ctrl+S)
-        run: node scripts/release/gates.mjs $env:SOURCE_COMMIT releases/gates-windows
-      - name: Build NSIS with the official Tauri action (no release credentials)
-        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1, verified peeled commit
-        with:
-          tauriScript: pnpm tauri
-          args: --bundles nsis -- --locked
+        run: node scripts/release/gates.mjs $env:SOURCE_COMMIT "$env:SPARK_RELEASE_ROOT/gates-windows"
+      - name: Build NSIS with the official CLI and export only artifacts (no release credentials)
+        run: node scripts/desktop.mjs build --bundles nsis --export-to "$env:SPARK_RELEASE_ROOT/build" -- --locked
       - name: Stage audited Windows and committed-source assets
-        run: python -B scripts/release/package.py stage --commit $env:SOURCE_COMMIT --preview $env:PREVIEW_NUMBER --platform windows-x64 --output releases/windows-x64
+        run: python -B scripts/release/package.py stage --commit $env:SOURCE_COMMIT --preview $env:PREVIEW_NUMBER --platform windows-x64 --build-root "$env:SPARK_RELEASE_ROOT/build" --output "$env:SPARK_RELEASE_ROOT/windows-x64"
       - name: Launch the extracted portable application
         shell: pwsh
         run: |
-          $zip = @(Get-ChildItem -LiteralPath releases/windows-x64 -Filter '*_Portable.zip')
+          $zip = @(Get-ChildItem -LiteralPath "$env:SPARK_RELEASE_ROOT/windows-x64" -Filter '*_Portable.zip')
           if ($zip.Count -ne 1) { throw 'Expected one portable ZIP.' }
-          Expand-Archive -LiteralPath $zip[0].FullName -DestinationPath releases/portable-test
-          node scripts/release/smoke-windows.mjs releases/portable-test/GuiltySpark.exe $env:SOURCE_COMMIT releases/portable-startup
+          Expand-Archive -LiteralPath $zip[0].FullName -DestinationPath "$env:SPARK_RELEASE_ROOT/portable-test"
+          node scripts/release/smoke-windows.mjs "$env:SPARK_RELEASE_ROOT/portable-test/GuiltySpark.exe" $env:SOURCE_COMMIT "$env:SPARK_RELEASE_ROOT/portable-startup"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install the genuine NSIS package into an isolated runner directory
         id: install
         shell: pwsh
         run: |
-          $setup = @(Get-ChildItem -LiteralPath releases/windows-x64 -Filter '*_Setup.exe')
+          $setup = @(Get-ChildItem -LiteralPath "$env:SPARK_RELEASE_ROOT/windows-x64" -Filter '*_Setup.exe')
           if ($setup.Count -ne 1) { throw 'Expected one NSIS installer.' }
-          & scripts/release/install-windows.ps1 -Installer $setup[0].FullName -ExpectedExecutable target/release/GuiltySpark.exe -TestRoot (Join-Path $env:RUNNER_TEMP 'spark-install-test')
+          & scripts/release/install-windows.ps1 -Installer $setup[0].FullName -ExpectedExecutable "$env:SPARK_RELEASE_ROOT/build/GuiltySpark.exe" -TestRoot (Join-Path $env:RUNNER_TEMP 'spark-install-test')
       - name: Launch the installed executable and verify its frontend
-        run: node scripts/release/smoke-windows.mjs "$env:RUNNER_TEMP/spark-install-test/installed/GuiltySpark.exe" $env:SOURCE_COMMIT releases/installed-startup
+        run: node scripts/release/smoke-windows.mjs "$env:RUNNER_TEMP/spark-install-test/installed/GuiltySpark.exe" $env:SOURCE_COMMIT "$env:SPARK_RELEASE_ROOT/installed-startup"
       - name: Seal complete packages with exact binary, test and source identities
-        run: python -B scripts/release/package.py seal releases/windows-x64 --gates releases/gates-windows/gates.json --startup releases/portable-startup/startup.json --installer "$env:RUNNER_TEMP/spark-install-test/installation.json" --installed-startup releases/installed-startup/startup.json
+        run: python -B scripts/release/package.py seal "$env:SPARK_RELEASE_ROOT/windows-x64" --gates "$env:SPARK_RELEASE_ROOT/gates-windows/gates.json" --startup "$env:SPARK_RELEASE_ROOT/portable-startup/startup.json" --installer "$env:RUNNER_TEMP/spark-install-test/installation.json" --installed-startup "$env:SPARK_RELEASE_ROOT/installed-startup/startup.json"
       - name: Retain verified build artifacts (these are NOT public Release downloads)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: verified-windows-${{ inputs.source_commit }}-${{ github.run_id }}
-          path: releases/windows-x64/*
+          path: ${{ runner.temp }}/spark-release/windows-x64/*
           if-no-files-found: error
           retention-days: 30
       - name: Remove only this runner's test installation
@@ -102,6 +102,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 75
     steps:
+      - name: Choose external runner-owned release output
+        run: echo "SPARK_RELEASE_ROOT=$RUNNER_TEMP/spark-release" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.source_commit }}
@@ -127,22 +129,19 @@ jobs:
           git merge-base --is-ancestor HEAD origin/master
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: node scripts/release/gates.mjs "$SOURCE_COMMIT" releases/gates-linux
-      - name: Build genuine Linux packages with the official Tauri action
-        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
-        with:
-          tauriScript: pnpm tauri
-          args: --bundles appimage,deb -- --locked
-      - run: python3 -B scripts/release/package.py stage --commit "$SOURCE_COMMIT" --preview "$PREVIEW_NUMBER" --platform linux-x64 --output releases/linux-x64
+      - run: node scripts/release/gates.mjs "$SOURCE_COMMIT" "$SPARK_RELEASE_ROOT/gates-linux"
+      - name: Build genuine Linux packages with the official CLI in disposable storage
+        run: node scripts/desktop.mjs build --bundles appimage,deb --export-to "$SPARK_RELEASE_ROOT/build" -- --locked
+      - run: python3 -B scripts/release/package.py stage --commit "$SOURCE_COMMIT" --preview "$PREVIEW_NUMBER" --platform linux-x64 --build-root "$SPARK_RELEASE_ROOT/build" --output "$SPARK_RELEASE_ROOT/linux-x64"
       - run: cargo install tauri-driver --version 2.1.0 --locked
       - name: Real AppImage and Debian application bootstrap
-        run: xvfb-run -a node scripts/release/smoke-linux.mjs releases/linux-x64 "$SOURCE_COMMIT" releases/linux-startup
+        run: xvfb-run -a node scripts/release/smoke-linux.mjs "$SPARK_RELEASE_ROOT/linux-x64" "$SOURCE_COMMIT" "$SPARK_RELEASE_ROOT/linux-startup"
       - name: Attachable Linux packages require both actual startup checks
-        run: python3 -B scripts/release/package.py seal releases/linux-x64 --gates releases/gates-linux/gates.json --startup releases/linux-startup/startup.json
+        run: python3 -B scripts/release/package.py seal "$SPARK_RELEASE_ROOT/linux-x64" --gates "$SPARK_RELEASE_ROOT/gates-linux/gates.json" --startup "$SPARK_RELEASE_ROOT/linux-startup/startup.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: verified-linux-${{ inputs.source_commit }}-${{ github.run_id }}
-          path: releases/linux-x64/*
+          path: ${{ runner.temp }}/spark-release/linux-x64/*
           if-no-files-found: error
           retention-days: 30
   draft:

@@ -29,6 +29,39 @@ pub struct Binding {
     pub receipt_sha256: String,
     pub file_count: usize,
 }
+/// Extraction reads the preserved native cache, not the editor's overlay.
+/// Refuse draft tag changes instead of silently importing the previous bytes.
+pub fn require_native_source(source: &Project) -> Result<()> {
+    if !source.tag_edits.is_empty()
+        || !source.tag_renames.is_empty()
+        || !source.tag_duplicates.is_empty()
+    {
+        return invalid("This source has tag changes that are not in its native map yet. In Tag editor, open Native Output, save a validated map copy, and open that copy before dragging the edited asset. The original map and existing imports are unchanged.");
+    }
+    Ok(())
+}
+/// An already imported closure may be reused before another extraction, but
+/// only after checking current source state and the immutable owned receipt.
+pub fn reuse(
+    target: &Project,
+    source: &Project,
+    inspection: &maps::MapInspection,
+    binding: &Binding,
+    root: &Path,
+) -> Result<Binding> {
+    require_native_source(source)?;
+    let tag = inspection.tags.iter().find(|tag| tag.id == binding.tag_id)
+        .ok_or_else(|| SparkError::Invalid("Imported source tag is unavailable".into()))?;
+    if binding.source_project_id != source.id
+        || binding.source_sha256 != inspection.sha256
+        || source.source.as_ref().map(|s| s.sha256.as_str()) != Some(inspection.sha256.as_str())
+        || binding.tag_class != tag.class || binding.tag_path != tag.path
+    {
+        return invalid("The existing asset import belongs to another source revision");
+    }
+    receipt(root, target, binding)?;
+    Ok(binding.clone())
+}
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Receipt {
@@ -188,6 +221,7 @@ pub fn prepare(
     cancel: &std::sync::atomic::AtomicBool,
     on_event: impl Fn(build::JobEvent) + Send + Sync,
 ) -> Result<Binding> {
+    require_native_source(source)?;
     let runner = Runner {
         id,
         project: &target.id,
@@ -708,6 +742,22 @@ pub(crate) fn append_scenario(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_import_never_silently_discards_authored_tag_changes() {
+        let clean=Project::new("Native cache source");
+        require_native_source(&clean).unwrap();
+        let mut edited=clean.clone();
+        edited.tag_edits.push(project::TagEdit{tag_id:42,field_key:"bounding-radius".into(),value:serde_json::json!(0.75)});
+        assert!(require_native_source(&edited).unwrap_err().to_string().contains("validated map copy"));
+        let mut renamed=clean.clone();
+        renamed.tag_renames.push(crate::tag_renames::TagRename{source_tag_id:42,path:"my/door".into()});
+        assert!(require_native_source(&renamed).is_err());
+        let mut duplicated=clean.clone();
+        duplicated.tag_duplicates.push(crate::tag_duplicates::TagDuplicate{id:uuid::Uuid::new_v4().to_string(),source_tag_id:42,owner_tag_id:43,path:"my/door".into()});
+        assert!(require_native_source(&duplicated).is_err());
+        assert_eq!(edited.tag_edits[0].value,serde_json::json!(0.75));
+        require_native_source(&clean).unwrap();
+    }
     #[test]
     fn reusable_import_inputs_require_exact_receipt_bytes_owned_paths_and_fresh_file_hashes() {
         // Identity fixture only. Real Invader extraction/compilation is covered

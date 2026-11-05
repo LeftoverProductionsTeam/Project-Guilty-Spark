@@ -29,7 +29,7 @@ jobs:
         run: python -B scripts/maintenance/test_qa_vault.py
       - run: node --test scripts/native-qa-storage.test.mjs
       - run: pnpm install --frozen-lockfile
-      - run: cargo test -p spark-core --locked
+      - run: node scripts/cargo.mjs test -p spark-core --locked
       - run: pnpm check
       - run: pnpm test
       - run: pnpm test:offline
@@ -56,16 +56,16 @@ jobs:
         run: python -B scripts/maintenance/test_qa_vault.py
       - run: node --test scripts/native-qa-storage.test.mjs
       - run: pnpm install --frozen-lockfile
-      - run: cargo test --workspace --locked
+      - run: node scripts/cargo.mjs test --workspace --locked
       - run: pnpm test:engine-sources
       - run: node --test scripts/probe-mcc-h1-interface.test.mjs scripts/analyze-opence-ai.test.mjs scripts/native-runtime-health.test.mjs scripts/recover-zombie-carriers-native.test.mjs scripts/native-tag-readback.test.mjs scripts/verify-native-sound-chains.test.mjs scripts/prepare-native-adpcm-waves.test.mjs
       - run: pnpm exec playwright install msedge
       - run: pnpm test:ui
-      - run: node scripts/desktop.mjs build
+      - run: node scripts/desktop.mjs build --export-to "$env:RUNNER_TEMP/spark-build"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: guilty-spark-windows-x64
           path: |
-            target/release/GuiltySpark.exe
-            target/release/bundle/nsis/*-setup.exe
+            ${{ runner.temp }}/spark-build/GuiltySpark.exe
+            ${{ runner.temp }}/spark-build/bundle/nsis/*-setup.exe
           if-no-files-found: error

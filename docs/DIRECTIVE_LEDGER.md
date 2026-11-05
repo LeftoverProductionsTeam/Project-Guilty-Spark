@@ -1,5 +1,7 @@
 # Directive completion ledger
 
+Active priority: final source-only correction `e2ad9798` supersedes the historical archive-retention wording below. Preserve all user runtimes/content, current source/history and requirements; integrate useful source/docs, commit, then purge generated recovery/QA collections. Fifty MiB is an audit threshold. Current acceptance and scoped results are in `ACTIVE_TASK.md` and `SOURCE_ONLY_STORAGE_POLICY.md`; old rows retain their original identities/results and are not instructions to recreate retired environments. Phase2 waits for this cleanup gate.
+
 Bounded recovery index, not an application queue or scheduler. Full instructions remain in PENDING_REQUESTS and its source references; requirements remain in MASTER_FEATURE_LEDGER.csv. The P0 emergency directive supersedes global human-only blocking: keep exact unverified evidence while continuing safe independent engineering. Receipt is never implementation or acceptance. Earlier predecessor/deferral wording in the historical rows is superseded where it would make a human-only gate block unrelated safe engineering; each initiative still requires its own genuine acceptance. Ending revision is absent until the stated directive's gate is met; substep commits do not close an entire directive.
 
 | Order / directive | Status | Start / end | Completed evidence | Remaining acceptance / exact next action | Priority or deferral authority |

@@ -18,15 +18,15 @@ export async function prepareAssetImport(
       binding.tagClass === asset.class &&
       binding.tagPath === asset.path,
   );
-  return (
-    existing ??
-    call<NativeAssetImport>('prepare_native_asset_import', {
+  // The backend checks current source drafts and the owned receipt on reuse.
+  // A cached frontend binding cannot authorize ignoring a later source edit.
+  return call<NativeAssetImport>('prepare_native_asset_import', {
       projectId: project.id,
       sourceProjectId: asset.sourceProjectId,
       sourceSha256: asset.sourceSha256,
       tagId: asset.tagId,
-    })
-  );
+      existing: existing ?? null,
+    });
 }
 export function attachAssetImport(project: Project, binding: NativeAssetImport): Project {
   const imports = project.nativeAssetImports ?? [];

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "policy": "Read-only user-owned sources; excluded from all purge targets. The ISO and every runtime/map/tag/kit/user-content path remain protected regardless of size.",
+  "zombieOriginals": [
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\apocolypse_1.map",
+      "bytes": 134251446,
+      "sha256": "745efe81e4c07c0d43e55dae51b432e1d48d0719eb7ac4c0c249a7135170c697"
+    },
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\apocolypse_1\\apocolypse_1.map",
+      "bytes": 134251446,
+      "sha256": "745efe81e4c07c0d43e55dae51b432e1d48d0719eb7ac4c0c249a7135170c697"
+    },
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\ZAMD\\ui.map",
+      "bytes": 49468922,
+      "sha256": "45a990410896412bdd961254cac1491beda4bc1d79d1d704caa5c7c2c57e1e04"
+    },
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\ZAMD\\za_1.map",
+      "bytes": 52164642,
+      "sha256": "2bd5532e977faf388f863ce19ea5e8b7dd6a09e479843923bec2e30688bdc10c"
+    },
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\Zombie ApocalypsePC\\bloodgulch.map",
+      "bytes": 52164642,
+      "sha256": "0ba3e6c8c1fb7d1a692aed1598a32d1b85b2c0ca669b85e372d317a93d7aebb7"
+    },
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\Zombie ApocalypsePC\\ui.map",
+      "bytes": 49468922,
+      "sha256": "35667fadbbec931c780d73d7d28be74550111d8308cf173ccb052c84084dc709"
+    },
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\Zombie Apocalypse\\maps\\bitmaps.map",
+      "bytes": 82697130,
+      "sha256": "5357828124ed03b9b47dad563434465af742075ae1c991f6bb733320996f1bea"
+    },
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\Zombie Apocalypse\\maps\\bloodgulch.map",
+      "bytes": 52164642,
+      "sha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d"
+    },
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\Zombie Apocalypse\\maps\\sounds.map",
+      "bytes": 79916792,
+      "sha256": "9426e8d19b662eeb5a6c516951e080758d8f77a0ee41f52bdf0ed0a929245a59"
+    },
+    {
+      "file": "Pyros Zombie Apocolypse Mod Versions\\Zombie Apocalypse\\maps\\ui.map",
+      "bytes": 49468922,
+      "sha256": "8e4345f1529adeab4441ee639d54b7d5f1ec3672e2a0f2b368f749ec85b1ff9b"
+    }
+  ],
+  "installedSdkArchive": "6c9c156237c78ab1b983080495fdcff698a3f15fe0baaadb1c663654d27f7bd4",
+  "runtimeDirectories": [
+    "Halo Custom Edition",
+    "opencehalo-windows-release",
+    "chupathingyce-windows64-release"
+  ],
+  "sourceDeletionAuthorized": false
+}

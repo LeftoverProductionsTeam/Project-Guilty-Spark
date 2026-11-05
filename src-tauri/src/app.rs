@@ -141,7 +141,7 @@ mod preference_tests {
         current.runtime_export_directories.insert("openCe".into(),"selected-export-folder".into());
         let mut stale=Settings::default();stale.snapshot_retention=5;stale.preserve_live_preferences(&current);
         assert_eq!(stale.mod_directory,current.mod_directory);assert_eq!(stale.runtime_export_directories,current.runtime_export_directories);assert_eq!(stale.snapshot_retention,5);
-        assert_eq!(Settings::default().snapshot_retention,3);
+        assert_eq!(Settings::default().snapshot_retention,0);
     }
 }
 struct AppState {
@@ -890,6 +890,7 @@ fn list_project_snapshots(state:State<AppState>,project_id:String)->Reply<Vec<co
 }
 fn snapshot_project_state(state:&AppState,p:&Project,reason:&str)->Reply<Option<core::snapshots::SnapshotInfo>> {
     let retention=lock(&state.settings)?.snapshot_retention;
+    if p.effective_automatic_backup_retention(retention).map_err(error)?==0&&matches!(reason,"periodic"|"before-build"|"before-upgrade"){return Ok(None);}
     let dir=lock(&state.library)?.project_dir(&p.id).map_err(error)?;
     if reason=="periodic"{core::snapshots::create_automatic(&dir,p,retention).map_err(error)}
     else{core::snapshots::create(&dir,p,reason,retention.max(1)).map(Some).map_err(error)}

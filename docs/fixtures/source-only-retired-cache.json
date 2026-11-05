@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "55e8256a374aa3ddd47c7a16cefe0dc126ce92fd",
+  "retiredAt": "2026-11-05T19:10:44.194291+00:00",
+  "purpose": "Compiler binaries, PDB symbols, proc-macro DLLs and compiler long-type diagnostic; all aliases below development-builds/cargo. Full entry CRC/SHA verified. Source cold build and native H1A corruption/recovery acceptance passed before retirement.",
+  "container": "recovery-archives/consolidated-objects-20261105/objects-001.zip",
+  "containerSha256": "5a001d6e7f411624c41ab4af6fdfcfa089b055691295df18aac5e3ff16836623",
+  "containerBytes": 339466496,
+  "objects": 171,
+  "aliases": 171,
+  "logicalPayloadBytes": 1070128860,
+  "acceptedC49Touched": false,
+  "sourceDeletionPerformed": false,
+  "generatedContainerDeletionPerformed": true
+}

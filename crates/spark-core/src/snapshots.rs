@@ -231,7 +231,8 @@ pub fn overview(project_dir:&Path,project:&Project,legacy_default:usize)->Result
         assert!(preview(dir.path(),&p,"../source.map",&first.sha256).is_err());
     }
     #[test] fn twenty_edits_cap_owned_automatic_backups_and_preserve_recovery_and_other_projects() {
-        let one=tempfile::tempdir().unwrap();let two=tempfile::tempdir().unwrap();let mut p=Project::new("One");let other=Project::new("Two");
+        let one=tempfile::tempdir().unwrap();let two=tempfile::tempdir().unwrap();let mut p=Project::new("One");let mut other=Project::new("Two");
+        p.automatic_backup_retention=Some(3);other.automatic_backup_retention=Some(3);
         let file=one.path().join("project.gsproject");project::save_managed_project(&file,&p).unwrap();
         let manual=create(one.path(),&p,"manual",3).unwrap();let safety=create(one.path(),&p,"before-build",3).unwrap();
         let foreign=create_automatic(two.path(),&other,20).unwrap().unwrap();
@@ -243,8 +244,8 @@ pub fn overview(project_dir:&Path,project:&Project,legacy_default:usize)->Result
         assert_eq!(preview(two.path(),&other,&foreign.id,&foreign.sha256).unwrap().title,"Two");
         assert_eq!(project::load_project(&file).unwrap().title,"Edit 20");assert_eq!(project::load_project(&project::project_recovery_path(&file).unwrap()).unwrap().title,"Edit 19");
     }
-    #[test] fn none_disables_only_automatic_backups_without_deleting_history() {
-        let dir=tempfile::tempdir().unwrap();let mut p=Project::new("Saved");p.automatic_backup_retention=Some(0);
+    #[test] fn default_none_disables_only_automatic_backups_without_deleting_history() {
+        let dir=tempfile::tempdir().unwrap();let mut p=Project::new("Saved");assert_eq!(p.automatic_backup_retention,Some(0));
         assert!(create_automatic(dir.path(),&p,20).unwrap().is_none());assert!(!dir.path().join("snapshots").exists());
         let manual=create(dir.path(),&p,"manual",3).unwrap();let safety=create(dir.path(),&p,BEFORE_SHARED_RECOVERY,3).unwrap();
         let file=dir.path().join("project.gsproject");project::save_managed_project(&file,&p).unwrap();p.title="Latest".into();p.history.push(project::HistoryEntry{id:uuid::Uuid::new_v4().to_string(),timestamp:"now".into(),description:"Undo remains authored metadata".into()});project::save_managed_project(&file,&p).unwrap();
@@ -254,6 +255,7 @@ pub fn overview(project_dir:&Path,project:&Project,legacy_default:usize)->Result
     }
     #[test] fn explicit_cleanup_validates_all_hashes_and_rejects_foreign_manual_legacy_and_policy_changes() {
         let dir=tempfile::tempdir().unwrap();let mut p=Project::new("Project");
+        p.automatic_backup_retention=Some(3);
         let legacy=create(dir.path(),&p,"periodic",3).unwrap();let legacy_file=folder(dir.path()).unwrap().join(format!("{}.gsproject",legacy.id));
         let mut legacy_json:serde_json::Value=serde_json::from_slice(&fs::read(&legacy_file).unwrap()).unwrap();legacy_json.as_object_mut().unwrap().remove("automaticRetentionOwned");fs::write(&legacy_file,serde_json::to_vec(&legacy_json).unwrap()).unwrap();
         for n in 0..3 {p.title=format!("Automatic {n}");create_automatic(dir.path(),&p,20).unwrap().unwrap();}

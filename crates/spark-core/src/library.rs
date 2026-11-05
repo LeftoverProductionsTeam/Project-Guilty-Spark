@@ -53,6 +53,7 @@ pub struct LibraryEntry {
 pub struct Library {
     pub root: PathBuf,
     db: Connection,
+    session_only: bool,
 }
 impl Library {
     pub fn open(root: &Path) -> Result<Self> {
@@ -65,8 +66,19 @@ impl Library {
         Ok(Self {
             root: root.into(),
             db,
+            session_only: false,
         })
     }
+    /// Opt-in session backend. Not the application default until explicit-save
+    /// and shared Undo acceptance pass. Existing persistent libraries are never
+    /// migrated or removed by opening this independent memory connection.
+    pub fn memory(root:&Path)->Result<Self>{
+        crate::reject_links(root)?;
+        let db=Connection::open_in_memory()?;
+        db.execute_batch("CREATE TABLE projects(id TEXT PRIMARY KEY, summary TEXT NOT NULL); CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE documents(id TEXT PRIMARY KEY,value TEXT NOT NULL);")?;
+        Ok(Self{root:root.into(),db,session_only:true})
+    }
+    pub fn is_session_only(&self)->bool{self.session_only}
     pub fn project_dir(&self, id: &str) -> Result<PathBuf> {
         uuid::Uuid::parse_str(id)
             .map_err(|_| crate::SparkError::Invalid("Invalid project UUID".into()))?;
@@ -84,6 +96,10 @@ impl Library {
         Ok(out)
     }
     pub fn get(&self, id: &str) -> Result<Project> {
+        if self.session_only{
+            let text:String=self.db.query_row("SELECT value FROM documents WHERE id=?1",[id],|row|row.get(0))?;
+            return Ok(serde_json::from_str(&text)?);
+        }
         let dir = self.project_dir(id)?;
         project::load_project(&dir.join("project.gsproject"))
     }
@@ -128,8 +144,9 @@ impl Library {
         project.validate()?;
         let dir = self.project_dir(&project.id)?;
         let file = dir.join("project.gsproject");
-        if file.exists() {
-            let existing = project::load_project(&file)?;
+        let previous = self.list()?.into_iter().find(|e| e.id == project.id);
+        if if self.session_only{previous.is_some()}else{file.exists()} {
+            let existing = self.get(&project.id)?;
             if existing
                 .source
                 .as_ref()
@@ -144,13 +161,12 @@ impl Library {
                 );
             }
         }
-        if let Some(source) = &project.source {
+        if let Some(source) = &project.source { if !self.session_only {
             crate::reject_links(&source.preserved_path)?;crate::reject_links(&dir.join("source.map"))?;
             if fs::canonicalize(&source.preserved_path)? != fs::canonicalize(dir.join("source.map"))? {
                 return invalid("Source must be the managed preserved copy");
             }
-        }
-        let previous = self.list()?.into_iter().find(|e| e.id == project.id);
+        } }
         let entry = LibraryEntry {
             id: project.id.clone(),
             title: project.title.clone(),
@@ -184,7 +200,12 @@ impl Library {
                 .map(|i| i.header.scenario_type)
                 .or(previous.and_then(|p| p.scenario_type)),
         };
-        project::save_managed_project(&file, project)?;
+        if self.session_only{
+            let text=serde_json::to_string(project)?;
+            let total:i64=self.db.query_row("SELECT COALESCE(SUM(length(CAST(value AS BLOB))),0) FROM documents WHERE id<>?1",[&project.id],|r|r.get(0))?;
+            if total.saturating_add(text.len() as i64)>128*1024*1024{return invalid("Open document data reached the 128 MiB memory budget; save and close an unused map. No existing edits were discarded");}
+            self.db.execute("INSERT INTO documents(id,value) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET value=excluded.value",params![project.id,text])?;
+        }else{project::save_managed_project(&file, project)?;}
         self.db.execute("INSERT INTO projects(id,summary) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET summary=excluded.summary",params![project.id,serde_json::to_string(&entry)?])?;
         Ok(entry)
     }
@@ -245,6 +266,9 @@ impl Library {
         let mut p = Project::new(&inspection.header.name.replace('_', " "));
         let dir = self.project_dir(&p.id)?;
         crate::reject_links(&dir)?;
+        let copy=if self.session_only{
+            validate_local_input_path(path)?;crate::reject_links(path)?;fs::canonicalize(path)?
+        }else{
         fs::create_dir_all(&dir)?;
         let copy = dir.join("source.map");
         let mut input = fs::File::open(path)?;
@@ -265,6 +289,7 @@ impl Library {
         let mut permissions = fs::metadata(&copy)?.permissions();
         permissions.set_readonly(true);
         fs::set_permissions(&copy, permissions)?;
+        copy};
         p.source = Some(Source {
             original_path: fs::canonicalize(path)?,
             preserved_path: copy,

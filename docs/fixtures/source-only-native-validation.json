@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "sourceBaseCommit": "a144499bcd1dd68879d4cac53cf0cedd733f1ee6",
+  "testedWorkingTree": true,
+  "rust": {
+    "passed": 746,
+    "ignored": 9,
+    "scope": "Full workspace test stage passed; subsequent old app-startup failure was separate and later fixed"
+  },
+  "frontend": 413,
+  "browser": 174,
+  "storageOwnership": 20,
+  "offlineCommands": 59,
+  "packageUnit": 11,
+  "draftUnit": 6,
+  "nativeApp": {
+    "complete": true,
+    "originalSourceUnchanged": true,
+    "sourceMapSha256": "dee648992d476c547e93d1c5c9103e7f8701603c59b64c87a2048956cc2ca83a",
+    "cases": [
+      {
+        "name": "Owned native cache 13 opens in actual BSP viewport with source materials",
+        "nativeViewport": {
+          "sourceShaders": "11",
+          "compatibleShaders": "0",
+          "sourceShaderIds": "3782672387,3782803461,3782934535,3783065609,3783327757,3783786516,3865445618,3865576692,3865642229,3865904377,3899983615",
+          "sourceLightmaps": "1",
+          "sourceDetails": "13",
+          "sourceReflections": "4",
+          "reflectionIssues": "",
+          "skyTriangles": "183",
+          "materialLoading": "false",
+          "reflectionLoading": "false",
+          "sourceCubes": "4",
+          "pendingMaterials": "0"
+        },
+        "nativeGeometry": "66 visible triangles\n37 object model types resolved\n5 objects\nHalo coordinates \u00c2\u00b7 Z up\nViewport performance\nEditor preview",
+        "engineParityClaimed": false
+      },
+      {
+        "name": "Real native tag edit, Undo/Redo, Save and direct map export pass independent Invader extraction/readback; original is unchanged",
+        "sourceSha256": "dee648992d476c547e93d1c5c9103e7f8701603c59b64c87a2048956cc2ca83a",
+        "output": "C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Development-d49eb02588bf\\run-Ys43Y8\\output\\qa\\logic\\library\\jobs\\e13ffc9d-95fc-4198-bbdb-b63e4ba6938d\\output\\c66_edited_native_door.map",
+        "outputSha256": "55feef385e11eec757791fbaec7ae48078cdc916621ad152b07a9667e3dc96cb",
+        "readback": 0.225,
+        "compilerRan": false
+      }
+    ],
+    "nativeGameplayAccepted": false
+  },
+  "compiler": {
+    "complete": true,
+    "nativeCompilation": true,
+    "sourceUnchanged": true,
+    "compiledTags": 1796,
+    "unchangedRequests": 10,
+    "sameAllocatedAfterRepeats": true,
+    "corruptSaveBlocked": true,
+    "corruptionRejectedByNativeParser": true,
+    "validBytesRecoveredExactly": true,
+    "compiledBoundingRadius": 0.5,
+    "gameplayRetested": false,
+    "disposableSdk": {
+      "files": 1793,
+      "logicalBytes": 105215093,
+      "sourceArchiveSha256": "6c9c156237c78ab1b983080495fdcff698a3f15fe0baaadb1c663654d27f7bd4",
+      "originalArchiveUnchanged": true,
+      "retainedSdkTree": false
+    },
+    "freshBuildMs": 25878,
+    "permanentExtractedSdkRequired": false,
+    "sourceFixtureUsed": "docs/fixtures/source-only-native-door.json"
+  },
+  "nativeAuthoringFixture": {
+    "file": "docs/fixtures/source-only-native-door.json",
+    "sha256": "79a246714f39a68660e2b054e817851d8a4af134591475b8ebb5cfe1f3023206",
+    "bytes": 25187,
+    "containsGamePayload": false
+  },
+  "C71ObjectBehaviorAcceptance": "Still failed at Smart Edit UI locator; Phase2 feature not counted as passed",
+  "persistentMemoryDefaultAccepted": false
+}

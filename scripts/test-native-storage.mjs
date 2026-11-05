@@ -17,13 +17,15 @@ if (args.length !== (importedAsset ? 6 : 5))
   );
 const output = args.at(-1);
 const helperName = importedAsset ? 'qa_native_asset_storage' : 'qa_native_storage';
+if(!process.env.CARGO_TARGET_DIR||!process.env.SPARK_BUILD_WORKSPACE)
+  throw Error('Native compiler verification requires an owned disposable development workspace. Use verify-source-only.mjs with its compiler stage.');
 const helper = path.join(
-  root,
-  'target/release/examples',
+  process.env.CARGO_TARGET_DIR,
+  'release/examples',
   `${helperName}${process.platform === 'win32' ? '.exe' : ''}`,
 );
 if (!fs.existsSync(helper))
-  throw Error(`Build spark-core example ${helperName} in the shared release cache first.`);
+  throw Error(`Build spark-core example ${helperName} in the owning disposable workspace first.`);
 if (fs.existsSync(output)) throw Error('Choose a fresh evidence directory; previous results are preserved.');
 await fs.promises.mkdir(await assertQaOutputPath(output,{reservationBytes:2*1024**3}));
 const finishStorage=await beginQaStorage(output,{workflow:importedAsset?'native-import-storage':'native-build-storage',appSha256:crypto.createHash('sha256').update(fs.readFileSync(helper)).digest('hex'),reservationBytes:2*1024**3});

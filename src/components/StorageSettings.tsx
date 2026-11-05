@@ -112,7 +112,7 @@ const fields: [keyof Limits, string][] = [
 ];
 const backupPresets = [0, 1, 3, 5, 10];
 export function automaticBackupLimit(project: Pick<Project, 'automaticBackupRetention'>, settings: Pick<Settings, 'snapshotRetention'>) {
-  return project.automaticBackupRetention ?? settings.snapshotRetention ?? 3;
+  return project.automaticBackupRetention ?? settings.snapshotRetention ?? 0;
 }
 export function BackupRetentionSelect({ value, disabled = false, onChange }: {
   value: number;
@@ -130,7 +130,7 @@ export function BackupRetentionSelect({ value, disabled = false, onChange }: {
           if (next !== 'custom') onChange(Number(next));
           else if (value === 0) onChange(1);
         }}>
-        <option value="0">None</option><option value="1">1</option><option value="3">3 (default)</option>
+        <option value="0">None (default)</option><option value="1">1</option><option value="3">3</option>
         <option value="5">5</option><option value="10">10</option><option value="custom">Custom…</option>
       </select>
     </label>
@@ -310,7 +310,7 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
     }
   };
   const memory = nativePreviewResourceStats();
-  const retention = project ? automaticBackupLimit(project, settings) : 3;
+  const retention = project ? automaticBackupLimit(project, settings) : 0;
   const unsavedBackupLimit = backup !== null && backup.automaticRetention !== retention;
   const eligible = report?.cleanup.eligible ?? [];
   const pages = Math.max(1, Math.ceil(eligible.length / 8));

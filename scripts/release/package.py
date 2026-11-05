@@ -205,8 +205,9 @@ def deb_binary(file):
     return app, text
 
 
-def stage(repo, commit, preview, platform, output):
+def stage(repo, commit, preview, platform, output, build_root=None):
     repo, output = Path(repo).resolve(), Path(output).resolve()
+    build_root = Path(build_root).resolve() if build_root else repo / "target/release"
     info = source_info(repo, commit, preview)
     need(platform in {"windows-x64", "linux-x64"}, "Unsupported release platform")
     output.mkdir(parents=True, exist_ok=False)
@@ -219,11 +220,11 @@ def stage(repo, commit, preview, platform, output):
         shutil.copyfile(source, output / name)
         artifacts.append({"file": name, "kind": kind})
 
-    binary = repo / "target/release" / ("GuiltySpark.exe" if platform == "windows-x64" else "GuiltySpark")
+    binary = build_root / ("GuiltySpark.exe" if platform == "windows-x64" else "GuiltySpark")
     app = binary.read_bytes()
     if platform == "windows-x64":
         need(pe_machine(app) == 0x8664, "Application must be x64")
-        setup = one_file(repo / "target/release/bundle/nsis", f"*_{info['applicationVersion']}_x64-setup.exe")
+        setup = one_file(build_root / "bundle/nsis", f"*_{info['applicationVersion']}_x64-setup.exe")
         setup_bytes = setup.read_bytes()
         need(pe_machine(setup_bytes) in {0x14c, 0x8664} and b"NullsoftInst" in setup_bytes[:1024**2],
              "Not a genuine NSIS installer")
@@ -252,11 +253,11 @@ def stage(repo, commit, preview, platform, output):
         compatibility = "Windows 10/11 x64; separate WebView2 Runtime; unsigned preview."
     else:
         elf_x64(app)
-        image = one_file(repo / "target/release/bundle/appimage", "*.AppImage")
+        image = one_file(build_root / "bundle/appimage", "*.AppImage")
         image_data = image.read_bytes()
         elf_x64(image_data)
         need(image_data[8:11] == b"AI\x02", "Not a type-2 AppImage")
-        deb = one_file(repo / "target/release/bundle/deb", "*.deb")
+        deb = one_file(build_root / "bundle/deb", "*.deb")
         deb_app, control = deb_binary(deb)
         need(deb_app == bundle_payload(app, b"DEB"), "Debian payload differs beyond the Tauri bundle marker")
         need(f"Version: {info['applicationVersion']}\n" in control, "Debian version differs")
@@ -422,6 +423,7 @@ def main():
         target.add_argument("--preview", type=int, default=1)
     stage_parser.add_argument("--platform", choices=["windows-x64", "linux-x64"], required=True)
     stage_parser.add_argument("--output", required=True)
+    stage_parser.add_argument("--build-root", help="Explicit exported build folder; no compiler cache is retained")
     seal_parser = sub.add_parser("seal")
     seal_parser.add_argument("directory")
     seal_parser.add_argument("--gates", required=True)
@@ -436,7 +438,7 @@ def main():
     if args.command == "identity":
         result = source_info(args.repo, args.commit, args.preview)
     elif args.command == "stage":
-        result = stage(args.repo, args.commit, args.preview, args.platform, args.output)
+        result = stage(args.repo, args.commit, args.preview, args.platform, args.output, args.build_root)
     elif args.command == "seal":
         result = seal(args.directory, args.gates, args.startup, args.installer, args.installed_startup)
     elif args.command == "windows-payload":

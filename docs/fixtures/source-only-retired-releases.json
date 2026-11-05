@@ -1,0 +1,474 @@
+{
+  "schemaVersion": 1,
+  "acceptedC49": "releases/recovered-C49/C49-preview-cb07581",
+  "acceptedC49Retired": false,
+  "obsolete": [
+    {
+      "sourceArchive": "releases/recovered-C49/C41-learning-a3e0ea6/Project_Guilty_Spark_C41_a3e0ea6_SOURCE.zip",
+      "sourceMembersInCanonicalGit": 1574,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": {
+        "schemaVersion": 1,
+        "sourceCommit": "a3e0ea6bc7c869f09ea3fe993cff481f9feca86e",
+        "remotePublished": false,
+        "platform": "Windows x64",
+        "tests": {
+          "rustPassed": 609,
+          "rustIgnored": 7,
+          "frontend": 275,
+          "browser": 134,
+          "offlineScripts": 59,
+          "interfaceProbe": 2
+        },
+        "nativeWindows": {
+          "routes": 23,
+          "simultaneousPopouts": 3,
+          "projectOwnershipChecked": true
+        },
+        "installerCleanMachineTested": false,
+        "portableTestedViaIdenticalExecutable": true,
+        "artifacts": [
+          {
+            "kind": "executable",
+            "file": "portable\\GuiltySpark.exe",
+            "bytes": 40643584,
+            "sha256": "e8c71f4a43f2cd754c342d2aa3a29881705059e6b3c0fc7d3829d2f205e86d50"
+          },
+          {
+            "kind": "installer",
+            "file": "Project_Guilty_Spark_C41_a3e0ea6_Setup.exe",
+            "bytes": 9841614,
+            "sha256": "47452bac6374b5effa49fbc8f041c3ba9b3eb724a2110eef84d16509f72993d8"
+          }
+        ],
+        "limits": [
+          "Map pop-out transfers the saved project; pre-transfer undo stacks are not migrated.",
+          "Physical second-monitor dragging was not automated.",
+          "Zombie CE map loads/joins, but no zombies were observed; all-runtime conversion and non-MCC live/co-op are unfinished.",
+          "Original-loop audio compilation/readback is separate from unverified in-game listening."
+        ]
+      },
+      "releaseReadme": "Project Guilty Spark C41 - Learning and workspace windows\nSource commit: a3e0ea6bc7c869f09ea3fe993cff481f9feca86e\n\nRun GuiltySpark.exe on Windows with WebView2 installed. Halo games, editing kits and external tools are separately installed and are not bundled.\n\nLearning center combines Guides, Glossary and Academy. Use Pop out in any workspace for a separate resizable window. Map editors save and transfer their project; prior undo stacks are not migrated.\n\nNative tests opened all 23 workspace routes and kept three pop-outs open together. The installer has not been tested on a clean machine. No remote publication is claimed.\n\nIn the source ZIP, RELEASE_SHA256SUMS.txt is this package's checksum list. Historical SOURCE_* checksum documents are retained from earlier source releases and are not the current package verification list.\n\nSee docs/C41_LEARNING_AND_WINDOWS.md for exact capabilities and remaining runtime/AI/audio gates.\n"
+    },
+    {
+      "sourceArchive": "releases/recovered-C49/C42-shared-tools-ce697fd/Project_Guilty_Spark_C42_ce697fd_SOURCE.zip",
+      "sourceMembersInCanonicalGit": 1582,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": {
+        "schemaVersion": 1,
+        "sourceCommit": "ce697fda68919afa59c4593831200e2126dabc52",
+        "remotePublished": false,
+        "platform": "Windows x64",
+        "tests": {
+          "rustPassed": 611,
+          "rustIgnored": 7,
+          "frontend": 275,
+          "browser": 136,
+          "offlineScripts": 59,
+          "interfaceProbe": 2
+        },
+        "nativeWindows": {
+          "routes": 23,
+          "simultaneousPopouts": 3,
+          "projectOwnershipChecked": true
+        },
+        "installerCleanMachineTested": false,
+        "portableTestedViaIdenticalExecutable": true,
+        "artifacts": [
+          {
+            "kind": "executable",
+            "file": "portable\\GuiltySpark.exe",
+            "bytes": 40990208,
+            "sha256": "de24bd7dac9430e16006034761f320f32f38e3327fdcf0c5a960d782d5cd56a6"
+          },
+          {
+            "kind": "installer",
+            "file": "Project_Guilty_Spark_C42_ce697fd_Setup.exe",
+            "bytes": 9904721,
+            "sha256": "e9e68ca14ffee5c3b6a30540cfdc779b639dbc2a9299c2dc061679de8f1a5aed"
+          }
+        ],
+        "limits": [
+          "Map pop-out transfers the saved project; pre-transfer undo stacks are not migrated.",
+          "Physical second-monitor dragging was not automated.",
+          "Zombie CE map loads/joins, but no zombies were observed; all-runtime conversion and non-MCC live/co-op are unfinished.",
+          "Original-loop audio compilation/readback is separate from unverified in-game listening.",
+          "Shared native editing remains pistol-radius/admitted-scenery only; three processes were tested on one physical computer.",
+          "Selected app launching is separate from verified map handoff; downloads use publisher pages/setup rather than universal automatic installers."
+        ]
+      },
+      "releaseReadme": "Project Guilty Spark C42 - Shared tool editing and textured defaults\nSource commit: ce697fda68919afa59c4593831200e2126dabc52\n\nRun GuiltySpark.exe on Windows with WebView2 installed. Halo games, editing kits and external tools are separately installed and are not bundled.\n\nLearning center combines Guides, Glossary and Academy. Use Pop out in any workspace for a separate resizable window. Map editors save and transfer their project; prior undo stacks are not migrated.\n\nNative tests opened all 23 workspace routes and kept three pop-outs open together. The installer has not been tested on a clean machine. No remote publication is claimed.\n\nIn the source ZIP, RELEASE_SHA256SUMS.txt is this package's checksum list. Historical SOURCE_* checksum documents are retained from earlier source releases and are not the current package verification list.\n\nSee docs/C42_SHARED_EXTERNAL_EDITING.md and docs/C42_TOOLS_AND_DEFAULTS.md for tested source/tool/material capabilities and remaining runtime/gameplay gates.\n"
+    },
+    {
+      "sourceArchive": "releases/recovered-C49/C43-megaworld-de8922f/Project_Guilty_Spark_C43_de8922f_SOURCE.zip",
+      "sourceMembersInCanonicalGit": 1601,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": {
+        "schemaVersion": 1,
+        "sourceCommit": "de8922f7e6cd5e597072dec08a8a7f2729a4e745",
+        "remotePublished": false,
+        "platform": "Windows x64",
+        "checkpoint": "C43; physical two-region walkthrough and four-region expansion remain open",
+        "tests": {
+          "rustPassed": 616,
+          "rustIgnored": 7,
+          "frontendPassed": 280,
+          "browserPassed": 136,
+          "offlineScriptsPassed": 59,
+          "interfaceProbesPassed": 2
+        },
+        "nativeWindows": {
+          "routes": 23,
+          "simultaneousPopouts": 3,
+          "historyCases": 7,
+          "acknowledgedHistoryAndSelectionTransfer": true,
+          "actualProcessCrashRecovery": true
+        },
+        "nativeAtlas": {
+          "caches": 94,
+          "distinctCacheHashes": 71,
+          "regions": 187,
+          "sourceMetadataSha256": "81b09f1725839e06a22e8b41269642fcab56ac3432b950e00381e758435f6f84",
+          "sourceMetadataUnchanged": true,
+          "cacheFailures": 0,
+          "nativeInterface": {
+            "elapsedMs": 20018.9215,
+            "caches": 94,
+            "regions": 187,
+            "uniqueSourceHashes": 71,
+            "paged": true,
+            "sourceBoundsVisible": true
+          }
+        },
+        "inspectionCache": {
+          "decodedMaps": 10,
+          "afterReopen": {
+            "entries": 8,
+            "estimatedBytes": 91676954,
+            "evictions": 6,
+            "maxEntries": 8,
+            "maxEstimatedBytes": 268435456
+          },
+          "geometryAndTagReopenIdentical": true,
+          "originalMapHashesUnchanged": true
+        },
+        "sharedNativeSource": {
+          "processes": 3,
+          "separateDataRoots": 3,
+          "physicalMachines": 1,
+          "actualToolchainPassed": true
+        },
+        "nativeTwoRegionCacheSha256": "ed2bb8920d07310c77f54a0a551ffcf17cde0ea0950b466895600d676e49e7fe",
+        "installerCleanMachineTested": false,
+        "portableTestedViaIdenticalExecutable": true,
+        "artifacts": [
+          {
+            "kind": "executable",
+            "file": "portable\\GuiltySpark.exe",
+            "bytes": 41511424,
+            "sha256": "87065a1922a20a8731e50bcd97b1fe0e5d22a9d0a347906fd6f39743c1843262"
+          },
+          {
+            "kind": "installer",
+            "file": "Project_Guilty_Spark_C43_de8922f_Setup.exe",
+            "bytes": 10053085,
+            "sha256": "fa768c10e163fd8faa77f3814cac6473f5fa635fe2ab02d981f4c4f2028e4b24"
+          }
+        ],
+        "limits": [
+          "Two-way Timberland/tunnel/Sidewinder player traversal is unaccepted; four-region expansion was not started.",
+          "All prior research and branch tips are preserved; unfinished direct-cache structural editing remains open.",
+          "Three Spark processes were tested on one computer; real second-computer LAN/VPN and in-game peer replication remain unaccepted.",
+          "No in-game native audio listening or complete rendering/audio parity claim is added.",
+          "Installer built, not tested on a clean machine; user controls remote publication.",
+          "Local window journals and editing leases are scoped to one application process; separate processes require independent directories and SparkLink, not a shared folder."
+        ]
+      },
+      "releaseReadme": "Project Guilty Spark C43 - Durable windows and original BSP engineering\nSource commit: de8922f7e6cd5e597072dec08a8a7f2729a4e745\n\nRun GuiltySpark.exe on Windows with WebView2 installed. Halo games, editing kits and external tools are separately installed and not bundled.\n\nPop out transfers the map and acknowledged undo/redo history. Changes -> Open another view follows the same map; Edit here moves editing ownership. Separate processes use independent data folders with SparkLink. The BSP Workshop Atlas inventories owned original regions. The new connected CE world compiles and loads on a private server, but its new two-way player traversal and four-region expansion remain unaccepted.\n\n616 locked Windows Rust, 280 frontend, 136 browser, 59 offline and two interface probes pass. Real native tests cover seven history cases, all 23 workspace pop-outs, Atlas/cache eviction, three-process native edits and Halo compilation. Installer not tested on a clean machine. No remote publication.\n\nOwned game content and original native test maps are excluded from these packages. See docs/CONTINUATION_43_ENGINEERING.md and docs/C43_PUSH_SUMMARY.md in the source archive for exact gates, measurements, preservation and publication details.\n\nRELEASE_SHA256SUMS.txt inside the source ZIP verifies this archive. Historical SOURCE_* checksum documents remain preserved from earlier releases and do not describe this package.\n"
+    },
+    {
+      "sourceArchive": "releases/recovered-C49/C44-performance-ai-c2af5ef/Project_Guilty_Spark_C44_c2af5ef_SOURCE.zip",
+      "sourceMembersInCanonicalGit": 1614,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": {
+        "schemaVersion": 1,
+        "sourceCommit": "c2af5ef76f816f5f62e8414331fcb6b5408845a5",
+        "remotePublished": false,
+        "platform": "Windows x64",
+        "checkpoint": "C44 measured loading and read-only native actor diagnostics; incomplete AI/conversion/gameplay gates remain open",
+        "tests": {
+          "rustPassed": 616,
+          "rustIgnored": 7,
+          "frontendPassed": 284,
+          "browserPassed": 136,
+          "offlineScriptsPassed": 59,
+          "interfaceProbesPassed": 2,
+          "actorAnalyzerTestsPassed": 3,
+          "nativeObserverIdentityRefusals": 2
+        },
+        "appSha256": "ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22",
+        "installerSha256": "8c95d9395b0399d55d033d8a962827540c2f1ecc01ccbec487f05016c0469517",
+        "installerCleanMachineTested": false,
+        "portableTestedViaIdenticalExecutable": true,
+        "sourcePayloads": "Committed Spark source only; no owned Halo files, publisher runtime, PDB, SDK or private test libraries",
+        "limitations": [
+          "C43 new Timberland\u2013Sidewinder two-way physical walkthrough and four-region gate.",
+          "Host Zombie Apocalypse spawner/container/actor lifecycle and faithful per-runtime conversion.",
+          "Full native AI lifecycle, damage/death, late join, reconnect and audiovisual acceptance.",
+          "Two-computer LAN/VPN, mixed-engine gameplay and scale gates.",
+          "General direct compiled-map structural insertion/duplication and campaign-safe reference relocation."
+        ]
+      },
+      "releaseReadme": "Committed source for c2af5ef76f816f5f62e8414331fcb6b5408845a5.\n\nBuild instructions are in README.md and docs/BUILD_WINDOWS.md. SOURCE_SHA256SUMS.txt and SOURCE_MANIFEST_SHA256.txt cover all 1612 source files apart from the two checksum lists. RELEASE_SHA256SUMS.txt also covers those lists and the two release metadata files. Original Halo data, engine executables, PDBs, SDKs, caches and private test artifacts are excluded. Prior source history and release artifacts remain in the repository/workspace.\n"
+    },
+    {
+      "sourceArchive": "releases/recovered-C49/C45-native-recovery-7fb8920/Project_Guilty_Spark_C45_7fb8920_SOURCE.zip",
+      "sourceMembersInCanonicalGit": 1623,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": {
+        "schemaVersion": 1,
+        "checkpoint": "C45",
+        "sourceCommit": "7fb89201ae16df0279fb31b5f52aff72bd65c937",
+        "releaseKind": "source-and-QA-only",
+        "remotePublished": false,
+        "newDesktopExecutable": false,
+        "newInstaller": false,
+        "verifiedDesktopCheckpoint": "C44 c2af5ef",
+        "verifiedDesktopExecutableSha256": "ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22",
+        "verifiedDesktopInstallerSha256": "8c95d9395b0399d55d033d8a962827540c2f1ecc01ccbec487f05016c0469517",
+        "nativeCacheVersions": [
+          609,
+          13
+        ],
+        "gameplayAccepted": false,
+        "faithfulConversionAccepted": false,
+        "fullAiReplicationAccepted": false,
+        "aiNativeFaultsRemain": true,
+        "tests": {
+          "rustPassed": 616,
+          "rustIgnored": 7,
+          "frontendPassed": 284,
+          "browserPassed": 136,
+          "offlineScriptsPassed": 59,
+          "nativeDiagnosticsAndSourceTestsPassed": 14,
+          "nativeWindowCasesPassed": 7,
+          "nativeWindowBinary": "unchanged verified C44 executable ed5c65b9495d14e1faa4237fa9ce78ea916c9ca65ec082359203adff9ef9fb22"
+        },
+        "limitations": [
+          "Exact reviewed owned tagset and native tools required; these are not included.",
+          "Native cache compilation and partial actor observations do not establish faithful recovery or playable conversion.",
+          "Final OpenCE state is refused for an extreme actor position; native tag assertions remain in OpenCE and Chupathingy.",
+          "No new desktop startup, renderer, GPU or memory improvement is claimed.",
+          "No installed game, native tool, PDB, SDK, private cache or owned game data is distributed."
+        ]
+      },
+      "releaseReadme": "Project Guilty Spark C45 source / QA checkpoint\nCommit: 7fb89201ae16df0279fb31b5f52aff72bd65c937\n\nBuild instructions: README.md and docs/BUILD_WINDOWS.md. Engineering evidence: docs/CONTINUATION_45_ENGINEERING.md. Descriptive publication notes: docs/C45_PUSH_SUMMARY.md.\n\nC45 provides a reviewed native carrier-recovery recipe, strict runtime-fault evidence and faster read-only diagnostics. It is not a completed universal map converter or AI/game protocol bridge. Actual CE and MCC native compilation is verified; native runtime faults and unstable actor physics still block gameplay acceptance. The existing C44 desktop installer and portable remain unchanged.\n\nSOURCE_SHA256SUMS.txt and SOURCE_MANIFEST_SHA256.txt cover 1621 committed source files. RELEASE_SHA256SUMS.txt additionally covers the two source manifests and release metadata; only that checksum list excludes itself. Verify every file before use. No owned game files, publisher engine, PDB, native compiler, SDK, caches or private test libraries are included. No remote publication is claimed.\n"
+    },
+    {
+      "sourceArchive": "releases/recovered-C49/C46-native-audio-04bd714/Project_Guilty_Spark_C46_04bd714_SOURCE.zip",
+      "sourceMembersInCanonicalGit": 1633,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": {
+        "schemaVersion": 1,
+        "sourceCommit": "04bd714c64df35c56ed7af4d74853b113cc96c9b",
+        "checkpoint": "C46 native audio, animation hierarchy, precise AI coverage and complete verified export",
+        "platform": "Windows x64",
+        "remotePublished": false,
+        "appSha256": "7ccc0e6ee4432b957058caba064cc5e1af77a27090133a76131002e9ee21ae1c",
+        "installerSha256": "bdb9e5cf5635aab2a908e6262ba5750d2ddc54b3123827dacbd22273aa27aeb8",
+        "tests": {
+          "rustPassed": 619,
+          "rustIgnored": 7,
+          "frontendPassed": 284,
+          "browserPassed": 136,
+          "offlineScriptsPassed": 59,
+          "nativeDiagnosticsAndSourceTestsPassed": 28,
+          "nativeWindowCasesPassed": 7,
+          "nativeLoopEmitterPassed": true,
+          "nativeMusicConflictRefused": true,
+          "threeProcessNativeContentAndExternalToolsPassed": true
+        },
+        "portableTestedViaIdenticalExecutable": true,
+        "installerCleanMachineTested": false,
+        "measuredExport": {
+          "beforeMedianMs": 298083.666,
+          "afterMedianMs": 10426.848,
+          "improvementPercent": 96.50203979979231,
+          "scope": "Warm OS filesystem cache; fresh export directory per run. Wall-clock export time only. No claim about desktop startup, renderer, GPU, memory or native game playback."
+        },
+        "nativeCompilationVerified": true,
+        "gameplayAudioVerified": false,
+        "completeZombieConversionAccepted": false,
+        "fullAiReplicationAccepted": false,
+        "sourcePayloads": "Committed Spark source only. No owned Halo data, SDK, publisher runtime/source, PDB, caches or private native libraries.",
+        "limitations": [
+          "Actual in-game listening, complete Zombie Apocalypse conversion and fault-free target gameplay are not accepted.",
+          "MCC changes minimum/maximum distance defaults on two long-sound tags; strict whole-tag equivalence remains open.",
+          "Native invalid tag/block calls, mounted actor limits and large OpenCE state differences remain; final Chupathingy host fails.",
+          "Two original custom audio cues remain unavailable in the inherited baseline.",
+          "Human Timberland-Sidewinder traversal, full AI lifecycle, late join, reconnect and cross-computer LAN/VPN remain separate open gates.",
+          "Direct compiled-map structural editing, arbitrary live BSP replacement and full audiovisual parity remain unfinished.",
+          "Export timing does not establish a new desktop startup, map rendering, GPU or memory improvement.",
+          "Installer creation does not certify a fresh-machine install. No remote publication is claimed."
+        ]
+      },
+      "releaseReadme": "Project Guilty Spark C46 committed source\nCommit: 04bd714c64df35c56ed7af4d74853b113cc96c9b\n\nBuild instructions: README.md and docs/BUILD_WINDOWS.md. Detailed evidence: docs/CONTINUATION_46_ENGINEERING.md. Publication description: docs/C46_PUSH_SUMMARY.md.\n\nBoth SOURCE checksum manifests cover 1631 source files. RELEASE_SHA256SUMS.txt additionally covers both manifests and release metadata; only the release checksum list excludes itself. Every committed source blob is verified against this archive. Prior history and private failed research remain preserved in the workspace. No owned Halo bytes, native compiler, publisher engine/source, PDB, SDK, caches or private test libraries are distributed. No remote publication is claimed.\n"
+    },
+    {
+      "sourceArchive": "releases/recovered-C49/C47-native-readback-04034b8/Project_Guilty_Spark_C47_04034b8_SOURCE.zip",
+      "sourceMembersInCanonicalGit": 1639,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": {
+        "schemaVersion": 1,
+        "checkpoint": "C47",
+        "sourceCommit": "04034b8b1e1cb03a789cec2a36878d75e2d7abf1",
+        "sourceOnly": true,
+        "desktopCheckpoint": "C46",
+        "desktopSourceCommit": "04bd714c64df35c56ed7af4d74853b113cc96c9b",
+        "newC47InstallerBuilt": false,
+        "newC47PortableBuilt": false,
+        "tests": {
+          "rustPassed": 619,
+          "rustIgnored": 7,
+          "frontendPassed": 284,
+          "browserPassed": 136,
+          "offlineScriptsPassed": 59,
+          "nativeDiagnosticsAndSourceTestsPassed": 32,
+          "typescriptPassed": true,
+          "windowsDiagnosticExampleBuilt": true,
+          "hostedCiRerun": false
+        },
+        "measuredReadback": {
+          "beforeMedianMs": 5445.9685,
+          "afterMedianMs": 483.1929,
+          "improvementPercent": 91.12751203022933,
+          "scope": "Native conversion readback phase under a warm OS file cache. Fresh output, alternating order; all native outputs retained. Not total conversion time or desktop/rendering performance."
+        },
+        "nativeSourceAndCacheComparisons": {
+          "matched": 12,
+          "total": 12,
+          "strict": true
+        },
+        "completeConversionAccepted": false,
+        "completeAiReplicationAccepted": false,
+        "remotePublished": false,
+        "limitations": [
+          "OpenCE stale damage/physics object crash and mounted actor/biped exit/tag faults block complete native gameplay.",
+          "Carrier-state experiment is not automatically promoted; source data and previous good audio remain intact.",
+          "Full AI damage/death/respawn, late join, reconnection and real cross-computer testing remain open.",
+          "MCC sound-distance review, two original missing custom cues and target-runtime listening remain separate gates.",
+          "Timberland-Sidewinder walkthrough remains unverified.",
+          "Direct compiled-map structural editing, arbitrary live BSP replacement and complete rendering/audio parity remain unfinished.",
+          "The measured readback improvement is not full conversion or desktop startup/rendering/GPU/memory improvement.",
+          "C47 source-only archive; C46 Windows desktop artifacts unchanged. No remote publication."
+        ]
+      },
+      "releaseReadme": "Project Guilty Spark C47 committed source\nCommit: 04034b8b1e1cb03a789cec2a36878d75e2d7abf1\n\nThis is a source/tooling continuation. The tested C46 Windows installer and portable release remain unchanged; this archive does not contain a new C47 desktop binary.\n\nBuild instructions: README.md and docs/BUILD_WINDOWS.md. Evidence and limits: docs/CONTINUATION_47_ENGINEERING.md. Push/PR description: docs/C47_PUSH_SUMMARY.md.\n\nNative readback improves by 91.1% in three paired 338-value runs. Native source/cache equivalence is verified for twelve scoped tags. The isolated carrier-state experiment remains unaccepted: OpenCE crashes and native actor/tag faults remain. Source-only diagnostics cannot complete conversion, audio listening, full AI replication or direct compiled-map structural editing.\n\nAll committed source blobs and source/release checksum manifests are verified against this archive. Prior history, original files, complete C46 native audio builds and all failed private research remain preserved locally. No owned Halo data, tags, native compiler, publisher runtime/source, SDK, PDB or private debugger binary is included. No remote publication is claimed.\n"
+    },
+    {
+      "sourceArchive": "releases/recovered-C49/C48-shared-bsp-46a5b89/Project_Guilty_Spark_C48_46a5b89_SOURCE.zip",
+      "sourceMembersInCanonicalGit": 1659,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": {
+        "schemaVersion": 1,
+        "checkpoint": "C48 shared BSP editing and recoverable pending source",
+        "sourceCommit": "46a5b893744d439d2ac22250463cd43f8accf790",
+        "platform": "Windows x64",
+        "remotePublished": false,
+        "appSha256": "f9c7555000e5e37b57720df5f9d6dfb44192c4b8145120f30b624a43eb547a37",
+        "installerSha256": "0ea57694943ebd658a9f88f73ce4b9b372b9d8dbbecd3a6ea4330a44a87699d3",
+        "tests": {
+          "rustPassed": 629,
+          "rustIgnored": 7,
+          "frontend": 300,
+          "browser": 136,
+          "offlineScripts": 59,
+          "nativeDiagnosticsAndInterface": 32,
+          "typeScript": true,
+          "windowsExecutableAndNsis": true,
+          "logSha256": {
+            "rust-c48-release.log": "374b194912381ac0ff01e6fb1e69c55be2040a03ccd15680a0c0d0495cbb95d0",
+            "frontend-c48-release.log": "80c27dba23e2e7b3bad766aed6165e09ce724c8f3d1e8852f8ad7c2c3d0f6d1b",
+            "browser-c48-release.log": "32c9c33c552e4a408a27b979693cf7b4f97559207b900e9d43d085a3306411b2",
+            "offline-c48-release.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+            "native-diagnostics-c48-final.log": "6d0aa3ccca84551cee3858cd537bee5fdb27907da9cdf201e837d471cd0d1091",
+            "offline-postdocs.log": "a55432068e014b59553441e51408b4cba986f5f6a3fe6b2b6f1ffba53cd3660a",
+            "typecheck-final.log": "1f345e6ac1f9e6ae7c4e70d1f0c8c9f8b8f80218269a1b4473f9ac63a9d4a253"
+          }
+        },
+        "portableTestedViaIdenticalExecutable": true,
+        "installerCleanMachineTested": false,
+        "nativeSharedBspCompilationVerified": true,
+        "threeIndependentEditorsVerified": true,
+        "crossComputerVerified": false,
+        "remoteVpnTunnelVerified": false,
+        "steamRelayVerified": false,
+        "synchronizationMeasurements": {
+          "scope": "One-PC native IPC, authoritative source validation, React/native CSG consumption and acceptance polling; not network RTT or a before/after speedup claim",
+          "pollCadenceMs": 500,
+          "testPollingIntervalMs": 600,
+          "dragPreviewExpiryMs": 1800,
+          "sustainedCommits": 240,
+          "durationMs": 78294.33559999999,
+          "earlySamplesMs": [
+            501.2727999999988,
+            986.9517000000051,
+            981.5659999999989,
+            961.4164999999994,
+            984.6136000000042,
+            486.74259999999776,
+            530.2874000000011,
+            994.7828999999983,
+            968.5272999999943,
+            944.9917999999961,
+            1006.639900000002,
+            1002.9693000000043
+          ],
+          "lateSamplesMs": [
+            453.5255000000034,
+            962.4165999999968,
+            935.6313999999984,
+            937.5535999999993,
+            987.0404999999882,
+            971.4144000000088,
+            985.8399999999965,
+            981.9393000000127,
+            941.6753999999928,
+            929.5994000000064,
+            1001.9066999999923,
+            973.829899999997
+          ],
+          "earlyMedianMs": 975.0466499999966,
+          "lateMedianMs": 966.9155000000028,
+          "nativeCompilerConcurrentWithSustainedMeasurement": false
+        },
+        "sourcePayloads": "Committed Spark source only. No owned Halo data, SDK, publisher runtime/source, PDB, caches or private native libraries.",
+        "limitations": [
+          "Cross-computer LAN, remote VPN tunnel delivery, second Steam account/relay and multi-hour soak remain unverified.",
+          "Steam SDK initialization, a 4 MiB local socket-pair transfer and actual desktop hosting pass. Same-account joining is refused with a generic diagnostic; a real second-account peer/relay connection and Steam recovery remain unverified.",
+          "Sessions retain 100 undo transactions, 4096 acknowledged operations, a 24 MiB journal, a 24-hour lifetime and 32 host sessions per project; automatic rollover remains open.",
+          "Measurements cover one-PC native source/UI convergence and retained WebView heap, not global load time, CPU/GPU usage, Rust working sets or a multi-day leak test.",
+          "Editor source sharing does not provide game/AI replication or arbitrary live BSP replacement.",
+          "Direct compiled-map structural editing, complete cross-runtime Zombie lifecycle/conversion, native OpenCE/Chupathingy faults, in-game sound listening, two missing cues, full render/audio parity and the physical connected-world walkthrough remain open.",
+          "The native BSP compile fixture explicitly uses owned tutorial metal for all ordinary material definitions; arbitrary preview shaders still need compatible local native dependencies.",
+          "Installer is built and packaged; fresh-machine installation and remote publication are not verified."
+        ]
+      },
+      "releaseReadme": "Project Guilty Spark C48 committed source\nCommit: 46a5b893744d439d2ac22250463cd43f8accf790\n\nBuild: README.md and docs/BUILD_WINDOWS.md. Evidence: docs/CONTINUATION_48_ENGINEERING.md and docs/fixtures/c48-shared-bsp-stability.json. Push/PR description: docs/C48_PUSH_SUMMARY.md.\n\nSource manifests cover 1657 source files. Every committed source blob, source checksum and release checksum is verified against this archive. Prior history, original inputs and all failed private research remain preserved locally. No owned Halo data, compiler, publisher engine/source, SDK, PDB, caches or private test libraries are distributed. No remote publication or clean-machine installer acceptance is claimed.\n"
+    },
+    {
+      "sourceArchive": "releases/recovered-C49/C49-preview-923c504/Project_Guilty_Spark_0.4.1_923c50456c0f_Source.zip",
+      "sourceMembersInCanonicalGit": 1674,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": null,
+      "releaseReadme": null
+    },
+    {
+      "sourceArchive": "releases/recovered-C49/C49-preview-9869895/Project_Guilty_Spark_0.4.1_98698955a7a9_Source.zip",
+      "sourceMembersInCanonicalGit": 1674,
+      "onlyUnmatchedMembers": "Generated release metadata/checksums; useful notes integrated here",
+      "releaseInfo": null,
+      "releaseReadme": null
+    }
+  ]
+}

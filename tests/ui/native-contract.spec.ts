@@ -58,7 +58,7 @@ test('project backup limits preserve None, custom values, manual saves and map i
   await chooseTool(page, 'Settings & tools'); await page.getByRole('tab', { name: 'Storage & Cache', exact: true }).click();
   const backups = page.getByRole('region', { name: 'Current project backups', exact: true });
   const choice = backups.getByRole('combobox', { name: 'Maximum automatic map backups', exact: true });
-  await expect(choice).toHaveValue('3');
+  await expect(choice).toHaveValue('0');
   await choice.selectOption('0'); await backups.getByRole('button', { name: 'Save limit', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__sparkMock.saved?.automaticBackupRetention)).toBe(0);
   await expect(backups).toContainText('Undo and crash recovery');
@@ -74,7 +74,7 @@ test('project backup limits preserve None, custom values, manual saves and map i
   await chooseTool(page, 'Map library');
   await page.locator('.map-card').filter({ has: page.getByRole('heading', { name: 'Synthetic candidate', exact: true }) }).click();
   await chooseTool(page, 'Settings & tools'); await page.getByRole('tab', { name: 'Storage & Cache', exact: true }).click();
-  await expect(choice).toHaveValue('3');
+  await expect(choice).toHaveValue('0');
   await page.getByRole('tab', { name: /Synthetic baseline/ }).click();
   await chooseTool(page, 'Settings & tools'); await page.getByRole('tab', { name: 'Storage & Cache', exact: true }).click();
   await expect(backups.getByRole('spinbutton', { name: 'Custom automatic backup limit', exact: true })).toHaveValue('7');
@@ -84,6 +84,8 @@ test('storage reviews owned automatic backups before removal and keeps runtime e
   await mockDesktop(page); await openFixture(page); await mockStorageControls(page);
   await chooseTool(page, 'Settings & tools'); await page.getByRole('tab', { name: 'Storage & Cache', exact: true }).click();
   const backups = page.getByRole('region', { name: 'Current project backups', exact: true });
+  await backups.getByRole('combobox', { name: 'Maximum automatic map backups', exact: true }).selectOption('3');
+  await backups.getByRole('button', { name: 'Save limit', exact: true }).click();
   await expect(backups).toContainText('Limit reached');
   await backups.getByRole('button', { name: 'Review 1 old automatic backups', exact: true }).click();
   const remove = backups.getByRole('button', { name: 'Remove reviewed backups', exact: true });

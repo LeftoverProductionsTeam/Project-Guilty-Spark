@@ -90,6 +90,14 @@ class PackageAcceptance(unittest.TestCase):
         with self.assertRaises(ValueError):
             package.verify(self.output)
 
+    def test_external_owned_build_export_can_be_packaged_without_repo_target(self):
+        exported = self.root / 'explicit-build-export'
+        (self.repo / 'target/release').rename(exported)
+        manifest = package.stage(self.repo, self.commit, 1, 'windows-x64', self.output, exported)
+        package.verify_artifacts(self.output, manifest)
+        self.assertEqual(manifest['executableSha256'], package.sha((exported / 'GuiltySpark.exe').read_bytes()))
+        self.assertFalse((self.repo / 'target/release').exists())
+
     def test_dirty_or_wrong_commit_and_stale_versions_refuse_packaging(self):
         with self.assertRaisesRegex(ValueError, 'differs'):
             package.source_info(self.repo, 'a' * 40, 1)

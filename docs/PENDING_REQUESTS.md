@@ -2,11 +2,13 @@
 
 ## Overnight continuation — 5 November 2026
 
+**Active owner correction `e2ad9798`: finish the existing source-only purge.** User runtimes, ISO/maps/original tags/editing kits and user-created content are read-only protected wherever stored. Integrate useful source/knowledge, commit locally, then remove generated recovery/QA environments and obsolete metadata; a byte difference is not a reason to retain an entire environment. No replacement archives/source trees, forced Git pruning, push or publication. See `SOURCE_ONLY_STORAGE_POLICY.md`, `ACTIVE_TASK.md` and `fixtures/source-only-history-integration.json`. Existing tests/native results are reused. Phase2 feature work waits for this cleanup gate.
+
 Owner explicitly authorizes safe independent work while human/approval gates remain pending. Configured native map export committed c16186c. Existing C70 Blender OBJ edit/reconcile/history/native compiler/independent readback now passes in the actual Windows application; see OVERNIGHT_ENGINEERING_20261105.md and fixtures/c70-tool-roundtrip.json. Manual/addon/wider tool/game acceptance remains pending. Resume Prompt06 Native Asset & Tag Studio in the existing asset/Inspector/native paths; preserve all earlier and later requirement identities. No manual requeue, new scheduler or full SDK copies.
 
 Current priority: The superseding P0 regrowth repair is committed47f5d9d; exact allocation/deletion/producer-limit/native/recovery evidence is in P0_STORAGE_REGROWTH_REPAIR_20261105.md. C71's final eight-context native preview gate passes with source-preserving MCC edit/readback and separate read-only CE/Xbox installed-source checks. Full native asset authoring and object/property/behavior→Halo→independent GUI acceptance remain open; see OVERNIGHT_ENGINEERING_20261105.md and ACTIVE_TASK.md. All25Master Engineering Prompts04–28 and475CSVrequirements are preserved. Earlier Part1/Part2 records remain historical evidence, not instructions to repeat cleanup. Only proved-unneeded canonical data was removed; unique source/history/originals/releases remain.
 
-Historical `.local` evidence paths below are provenance, not current output defaults. The P0 recovery indexes preserve former paths and exact content hashes under `preserved/`; do not recreate `.local` to satisfy an old reference. See `ACTIVE_TASK.md` for actual current work and verified results.
+Historical `.local`/`preserved` evidence paths below are provenance, not current output defaults or a promise that old generated environments remain restorable. The owner superseded warehouse retention: useful source, requirements and compact evidence are integrated in current source/docs; generated archives and recovery indexes are retired. Do not recreate them to satisfy an old reference. See `ACTIVE_TASK.md` for current results and exact next work.
 
 ## Creator's Gauntlet — received November 4, 2026
 
