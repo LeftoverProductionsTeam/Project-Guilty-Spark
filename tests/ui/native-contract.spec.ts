@@ -590,6 +590,89 @@ test('native tag animation is opt-in, reports missing clips and reuses the exact
   await toggle.uncheck();await expect(preview.getByText('Native animation unavailable',{exact:true})).toHaveCount(0);await toggle.check();await expect(preview.getByText('Native animation unavailable',{exact:true})).toBeVisible();expect(await requests()).toBe(1);
 });
 
+test('asset contexts preserve edits, native prerequisites and map-owned navigation without repeating collision reads',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const w=window as any,open=w.__sparkMock.projects.a;
+    open.inspection.tags[0].references=[{label:'Shader',class:'soso',targetId:702,offset:80}];
+    open.inspection.tags.push({id:702,index:1,class:'soso',path:'weapons/test/shaders/body',dataOffset:100,external:false,fields:[],references:[],shaderPreview:{kind:'model',alphaTest:false,twoSided:true,uvScale:[2,3]}});
+    const previous=w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command!=='preview_owned_object_collision')return previous(command,args);
+      w.__sparkMock.calls.push({command,args});
+      return {label:'Synthetic collision contract',source:'halo-model-collision',positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2]};
+    };
+  });
+  await openFixture(page);
+  const tabs=page.getByRole('tablist',{name:'Asset contexts',exact:true});
+  await expect(tabs.getByRole('tab')).toHaveCount(8);
+  const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('27');
+  await tabs.getByRole('tab',{name:'Materials',exact:true}).click();
+  await expect(page.getByRole('combobox',{name:'Asset material',exact:true})).toHaveValue('702');
+  await expect(page.getByRole('tabpanel',{name:'Materials',exact:true})).toContainText('2 × 3');
+  await expect(field).toBeHidden();
+  await tabs.getByRole('tab',{name:'Collision',exact:true}).click();
+  const preview=page.locator('.tag-model-preview .native-model-preview');
+  await expect(preview).toHaveAttribute('data-collision-status','ready');
+  await tabs.getByRole('tab',{name:'Native Output',exact:true}).click();
+  await page.getByText('Complete native tag editing',{exact:true}).click();await expect(page.getByRole('button',{name:'Open native tag editor',exact:true})).toBeVisible();
+  await tabs.getByRole('tab',{name:'Logic',exact:true}).click();await expect(page.getByRole('tabpanel',{name:'Logic',exact:true})).toContainText('Behavior belongs to a placed scenario instance');
+  await tabs.getByRole('tab',{name:'Collision',exact:true}).click();await expect(preview).toHaveAttribute('data-collision-status','ready');
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='preview_owned_object_collision').length)).toBe(1);
+  await tabs.getByRole('tab',{name:'Properties',exact:true}).click();await expect(field).toHaveValue('27');
+  await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');await page.keyboard.press('Control+y');await expect(field).toHaveValue('27');
+  await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits[0]?.value)).toBe(27);
+  await tabs.getByRole('tab',{name:'Dependencies',exact:true}).click();
+  await chooseTool(page,'Map library');await chooseTool(page,'Tag editor');
+  await expect(page.getByRole('tab',{name:'Dependencies',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.getByRole('tab',{name:'Dependencies',exact:true}).press('Home');await expect(page.getByRole('tab',{name:'Properties',exact:true})).toBeFocused();
+});
+
+test('a sound context retains its sample choices and stops audition when another context is selected',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(async()=>{
+    const w=window as any,open=w.__sparkMock.projects.a;
+    open.inspection.tags.push({id:999,index:1,class:'snd!',path:'sound/context_sample',dataOffset:100,external:false,fields:[],references:[]});
+    const frames=4410,bytes=new Uint8Array(44+frames*2),view=new DataView(bytes.buffer),text=(at:number,value:string)=>[...value].forEach((c,i)=>bytes[at+i]=c.charCodeAt(0));
+    text(0,'RIFF');view.setUint32(4,bytes.length-8,true);text(8,'WAVEfmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,22050,true);view.setUint32(28,44100,true);view.setUint16(32,2,true);view.setUint16(34,16,true);text(36,'data');view.setUint32(40,frames*2,true);
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
+    const previous=w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+      if(command==='inspect_sound'&&args.tagId===999){w.__sparkMock.calls.push({command,args});return {tagId:999,tagPath:'sound/context_sample',sourceSha256:'a'.repeat(64),warnings:[],permutations:[{pitchRange:0,permutation:0,name:'Synthetic silent WAV',format:'PCM',channels:1,sampleRate:22050,byteLength:frames*2,embedded:true,available:true,sha256:'c'.repeat(64),durationSeconds:.2,reason:null}]};}
+      if(command==='preview_sound'&&args.tagId===999)return {name:'Synthetic silent WAV',mime:'audio/wav',sha256:hash,bytes:Array.from(bytes),sourceSha256:'a'.repeat(64),sourceSampleSha256:'c'.repeat(64)};
+      return previous(command,args);
+    };
+  });
+  await openFixture(page);await page.getByRole('textbox',{name:'Search tags',exact:true}).fill('context_sample');await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('snd!');await page.locator('.tag-row').click();
+  const tabs=page.getByRole('tablist',{name:'Asset contexts',exact:true}),sound=page.locator('.sound-inspector');
+  await expect(tabs.getByRole('tab',{name:'Sound',exact:true})).toHaveAttribute('aria-selected','true');
+  await sound.getByText('Sample details & options',{exact:true}).click();await sound.getByRole('checkbox',{name:'Repeat sample',exact:true}).check();
+  await sound.getByRole('button',{name:'Play sample',exact:true}).click();await expect(sound.locator('[data-audition-state]')).toHaveAttribute('data-audition-state','playing');
+  const reads=()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='inspect_sound').length),before=await reads();
+  await tabs.getByRole('tab',{name:'Properties',exact:true}).click();await expect(sound.locator('[data-audition-state]')).toHaveAttribute('data-audition-state','idle');
+  await tabs.getByRole('tab',{name:'Sound',exact:true}).click();await expect(sound.getByRole('checkbox',{name:'Repeat sample',exact:true})).toBeChecked();expect(await reads()).toBe(before);
+  await expect(sound.getByRole('button',{name:'Play sample',exact:true})).toBeEnabled();
+});
+
+test('asset Logic reuses scenario-instance behavior and author history without adding fields to native tags',async({page})=>{
+  await mockDesktop(page);
+  await page.evaluate(()=>{
+    const open=(window as any).__sparkMock.projects.a;
+    open.inspection.tags.push({id:704,index:1,class:'mach',path:'devices/test_door',dataOffset:100,external:false,fields:[],references:[]});
+    open.project.quickForge={schemaVersion:1,name:'Synthetic source-backed scenario',template:'customBlank',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],spawns:[],objectives:[],placements:[{id:'door',name:'Corridor door',tagClass:'mach',tagPath:'devices/test_door',tagId:704,sourceProjectId:'a',sourceSha256:'a'.repeat(64),position:[4,0,0],rotation:[0,0,0],team:0,respawnSeconds:0,visible:true,locked:false}],logic:{schemaVersion:1,triggers:[{id:'trigger',name:'Door approach',position:[4,0,1.5],rotation:[0,0,0],dimensions:[6,3,3],visible:true,locked:false}],devices:[],rules:[]}};
+  });
+  await openFixture(page);await page.getByRole('textbox',{name:'Search tags',exact:true}).fill('test_door');await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('mach');await page.locator('.tag-row').click();await page.getByRole('tab',{name:'Logic',exact:true}).click();
+  const logic=page.getByRole('tabpanel',{name:'Logic',exact:true});
+  await expect(logic.getByRole('combobox',{name:'Logic asset instance',exact:true})).toHaveValue('door');
+  await logic.getByRole('button',{name:'Enter → Open',exact:true}).click();await page.keyboard.press('Control+s');
+  const saved=()=>page.evaluate(()=>(window as any).__sparkMock.saved);
+  await expect.poll(async()=>(await saved())?.quickForge.logic.rules.length).toBe(1);
+  expect((await saved()).quickForge.logic.rules[0]).toMatchObject({event:{kind:'enter',triggerId:'trigger'},actions:[{kind:'devicePosition',targetId:'door',value:1}]});expect((await saved()).tagEdits).toEqual([]);
+  await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect.poll(async()=>(await saved())?.quickForge.logic.rules.length).toBe(0);
+  await page.keyboard.press('Control+y');await page.keyboard.press('Control+s');await expect.poll(async()=>(await saved())?.quickForge.logic.rules.length).toBe(1);
+  await page.getByRole('tab',{name:'Properties',exact:true}).click();await page.getByRole('tab',{name:'Logic',exact:true}).click();await expect(logic.locator('.forge-logic-events')).toHaveAttribute('open','');
+});
+
 
 test('one Learning center retains guides, glossary and Academy while returning to edited maps',async({page})=>{
   await mockDesktop(page);await openFixture(page);
@@ -967,7 +1050,7 @@ test('tag classes expand their matching tags and keep the selected editor when f
  await page.getByRole('button',{name:'Collapse all classes',exact:true}).click();await expect(page.locator('.tag-row')).toHaveCount(0);
  await page.getByLabel('Search tags',{exact:true}).fill('test');await expect(group).toHaveAttribute('aria-expanded','true');await expect(page.locator('.tag-row')).toHaveCount(1);
  await page.locator('.tag-row').click();await expect(page.getByLabel('Velocity',{exact:true})).toHaveValue('10');
- await page.getByText('Complete native tag editing',{exact:true}).click();await expect(page.getByRole('button',{name:'Open native tag editor',exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:'Native Output',exact:true}).click();await page.getByText('Complete native tag editing',{exact:true}).click();await expect(page.getByRole('button',{name:'Open native tag editor',exact:true})).toBeVisible();
 });
 
 test('custom tag names stay map-owned, saved and undoable without changing source IDs',async({page})=>{
@@ -1369,6 +1452,7 @@ test('campaign tag duplicates stay map-owned and undoable, and UI maps expose th
       external:false,fields:[],references:[]});
   });
   await openFixture(page);
+  await page.getByRole('tab',{name:'Native Output',exact:true}).click();
   await page.locator('.tag-duplicate-panel>summary').click();
   await expect(page.getByRole('combobox',{name:'Duplicate referencing tag',exact:true})).toHaveValue('2');
   await page.getByRole('textbox',{name:'Duplicate tag path',exact:true}).fill('spark/campaign/pistol_copy');
@@ -1380,6 +1464,7 @@ test('campaign tag duplicates stay map-owned and undoable, and UI maps expose th
   await expect(page.locator('.tag-duplicate-panel>summary')).toContainText('1 queued');
   await page.getByRole('combobox',{name:'Select Halo map',exact:true}).selectOption('b');
   await expect(page.getByText('Interface map · browse its actual widgets', {exact:false})).toBeVisible();
+  await page.getByRole('tab',{name:'Native Output',exact:true}).click();
   await expect(page.locator('.tag-duplicate-panel>summary')).toContainText('0 queued');
   await page.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('DeLa');
   await page.locator('.tag-row').click();

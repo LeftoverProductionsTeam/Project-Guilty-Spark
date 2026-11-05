@@ -2,7 +2,7 @@ import NativeModelPreview from './NativeModelPreview';
 import BitmapPreview from './BitmapPreview';
 import { catalogAssets } from '../forge';
 import TagFields from './TagFields';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDownToLine, ArrowRight, ChevronRight, FileCode2, GitBranch, RotateCcw, Search, Sparkles } from 'lucide-react';
 import type { LibraryEntry, MapInspection, Project, Tag, TagField } from '../types';
 import {
@@ -28,6 +28,9 @@ import SmartEditPanel from './SmartEditPanel';
 import TagRenamePanel from './TagRenamePanel';
 import { renamedTagPath } from '../tagRenames';
 import { WorkspacePanel } from './WorkspacePanels';
+import { defaultTagContext, inspectTagContexts, isTagContext, TAG_CONTEXTS } from '../tagContexts';
+import type { TagContext } from '../tagContexts';
+import LogicEvents from './LogicEvents';
 import '../tagWorkspace.css';
 export default function Tags({
   project,
@@ -41,6 +44,7 @@ export default function Tags({
   onAssignSound,
   onResources,
   onNativeEditor,
+  onLevelEditor,
   hasUnsavedChanges = false,
   onSave,
 }: {
@@ -55,6 +59,7 @@ export default function Tags({
   onAssignSound?: (cue: CueName, ref: LocalCueReference) => void;
   onResources?: () => void;
   onNativeEditor?: () => void;
+  onLevelEditor?: () => void;
   hasUnsavedChanges?: boolean;
   onSave?: () => Promise<void>;
 }) {
@@ -66,6 +71,10 @@ export default function Tags({
   const [expanded, setExpanded] = useMapState<Record<string,boolean>>(project.id,'tags.classes',{});
   const [advanced, setAdvanced] = useMapState(project.id,'tags.advanced',false);
   const [animatePreview,setAnimatePreview] = useMapState(project.id,'tags.preview.animation',false);
+  const [contexts,setContexts] = useMapState<Record<string,TagContext>>(project.id,'tags.contexts',{});
+  const [relatedSelection,setRelatedSelection] = useMapState<Record<string,number|string>>(project.id,'tags.context-selection',{});
+  const [openedContexts,setOpenedContexts] = useState<Record<string,true>>({});
+  const [previewMaterials,setPreviewMaterials] = useState<{key:string;ids:number[]}|null>(null);
   const [extractingTag,setExtractingTag] = useState<number|null>(null);
   const [exchangeJobs,setExchangeJobs] = useState<{
     jobId:string;sourceProjectId:string;sourceEngine:string;sourceVersion:number;
@@ -105,6 +114,26 @@ export default function Tags({
   }, [focusTagId, inspection?.sha256]);
   const tags = inspection?.tags ?? [];
   const selectedTag = tags.find((t) => t.id === selected);
+  const contextKey = `${inspection?.sha256}:${selectedTag?.id}`;
+  const context = isTagContext(contexts[contextKey]) ? contexts[contextKey] : selectedTag ? defaultTagContext(selectedTag) : 'Properties';
+  const chooseContext = (value: TagContext) => setContexts(previous => ({...previous,[contextKey]:value}));
+  useEffect(()=>{setOpenedContexts(previous=>({...previous,[`${contextKey}:${context}`]:true}));},[contextKey,context]);
+  const openedContext = (value:TagContext) => context===value||!!openedContexts[`${contextKey}:${value}`];
+  const related = useMemo(() => selectedTag && inspection ? inspectTagContexts(project,inspection,selectedTag) : null,
+    [inspection,selectedTag,project.source?.sha256,project.tagEdits]);
+  const relatedTag = (kind:string, options:Tag[]) => options.find(tag=>tag.id===relatedSelection[`${contextKey}:${kind}`])??options[0];
+  const captureMaterials=useCallback((ids:number[])=>setPreviewMaterials({key:contextKey,ids}),[contextKey]);
+  const previewShaderIds=previewMaterials?.key===contextKey?previewMaterials.ids:[];
+  const materials=useMemo(()=>[...(related?.materials??[])].sort((a,b)=>Number(previewShaderIds.includes(b.id))-Number(previewShaderIds.includes(a.id))),[related,previewMaterials,contextKey]);
+  const material = relatedTag('material',materials);
+  const bitmaps=useMemo(()=>material?material.references.flatMap(reference=>{
+    const target=reference.class==='bitm'?tags.find(tag=>tag.id===effectiveReferenceId(project,material,reference)&&tag.class==='bitm'):undefined;
+    return target?[target]:[];
+  }).filter((tag,index,values)=>values.findIndex(value=>value.id===tag.id)===index):related?.bitmaps??[],[material,related,inspection,project.tagEdits]);
+  const bitmap = relatedTag(`bitmap:${material?.id??'asset'}`,bitmaps);
+  const sound = relatedTag('sound',related?.sounds??[]);
+  const logicPlacements = project.quickForge?.placements.filter(placement=>placement.tagId===selectedTag?.id&&placement.sourceProjectId===project.id&&placement.sourceSha256===project.source?.sha256)??[];
+  const logicPlacement = logicPlacements.find(placement=>placement.id===String(relatedSelection[`${contextKey}:logic`]))??logicPlacements[0];
   useEffect(()=>{
     if(focusTagId!=null&&selectedTag?.id!==focusTagId)return;
     if(new URLSearchParams(location.search).get('panel')==='object-tags'&&selectedTag)
@@ -115,7 +144,7 @@ export default function Tags({
       selectedTag && ['mod2','mode'].includes(selectedTag.class) && project.source
         ? { tagId: selectedTag.id, sourceProjectId: project.id, sourceSha256: project.source.sha256 }
         : catalogAssets({ project, inspection }).find((asset) => asset.tagId === selectedTag?.id),
-    [project.id, inspection, selectedTag?.id],
+    [project.id, project.source?.sha256, inspection, selectedTag?.id],
   );
   const classes = useMemo(() => [...new Set(tags.map((t) => t.class))].sort(), [tags]);
   const shown = useMemo(
@@ -153,6 +182,62 @@ export default function Tags({
   }
   const projectile = selectedTag?.fields.find((f) => f.kind === 'reference' && f.targetClass === 'proj');
   const rocket = tags.find((t) => t.class === 'proj' && /rocket/i.test(t.path));
+  function renderAssetContexts() {
+    if (!selectedTag || !related) return null;
+    const pick = (kind:string, options:Tag[], selected:Tag|undefined) => {const family=kind.split(':')[0];return options.length>0&&<label className="tag-context-pick">
+      {family === 'material' ? 'Shader' : family === 'bitmap' ? 'Bitmap' : 'Sound tag'}
+      <select aria-label={`Asset ${family}`} value={selected?.id??''} onChange={event=>setRelatedSelection(previous=>({...previous,[`${contextKey}:${kind}`]:Number(event.target.value)}))}>
+        {options.map(tag=><option key={tag.id} value={tag.id}>{shortPath(renamedTagPath(project,tag))} · {tag.class}</option>)}
+      </select>
+    </label>;};
+    return <>
+      <div className="tag-context-panel" role="tabpanel" id="tag-panel-Materials" aria-labelledby="tag-context-Materials" hidden={context!=='Materials'}>
+        {related.error&&<Notice>{related.error}</Notice>}
+        {pick('material',materials,material)}
+        {material&&<>
+          <code>{renamedTagPath(project,material)}</code>
+          <dl className="tag-material-summary">
+            <dt>Shader</dt><dd>{material.shaderPreview?.kind??material.class}</dd>
+            <dt>UV scale</dt><dd>{material.shaderPreview?.uvScale.join(' × ')}</dd>
+            <dt>Surfaces</dt><dd>{material.shaderPreview?.twoSided?'Both sides':'Front faces'}</dd>
+            <dt>Alpha</dt><dd>{material.shaderPreview?.alphaTest?'Cutout':material.shaderPreview?.alphaBlended?'Blended':'Opaque'}</dd>
+            <dt>Reflection</dt><dd>{material.shaderPreview?.reflection?'Source cubemap':'None indexed'}</dd>
+            {selectedModel&&<><dt>Preview</dt><dd>{previewShaderIds.includes(material.id)?'Used by this model':'Other referenced shader'}</dd></>}
+          </dl>
+          {material.fields.length>0?<div className="field-table"><TagFields project={project} tag={material} tags={tags} advanced={advanced} change={(field,value)=>change(material,field,value)}/></div>:<p className="subtle">Read-only shader inspection. Edit its full schema through Native Output.</p>}
+          <button className="small-button" onClick={()=>navigateToTag(material.id)}>Open shader tag</button>
+          <p className="subtle">Source shader data. Rebuild a map copy to preview saved native changes.</p>
+        </>}
+        {pick(`bitmap:${material?.id??'asset'}`,bitmaps,bitmap)}
+        {bitmap&&openedContext('Materials')&&<BitmapPreview key={`${project.id}:${inspection?.sha256}:${bitmap.id}`} project={project} tagId={bitmap.id} cube={tags.some(tag=>tag.shaderPreview?.reflection?.bitmapTagId===bitmap.id)}/>}
+        {!material&&!bitmap&&!related.error&&<p className="subtle">No shader or bitmap is indexed for this tag. Follow Dependencies or use a compatible native tag editor.</p>}
+        {related.warning&&<p className="subtle">{related.warning}</p>}
+      </div>
+      <div className="tag-context-panel" role="tabpanel" id="tag-panel-Animation" aria-labelledby="tag-context-Animation" hidden={context!=='Animation'}>
+        <h3>Native animation</h3>
+        {related.animations.map(tag=><button className="tag-related-link" key={tag.id} onClick={()=>navigateToTag(tag.id)}>{shortPath(tag.path)} <Pill>{tag.class}</Pill></button>)}
+        <p className="subtle">{selectedModel&&selectedTag.references.some(reference=>reference.label==='Animation graph')?'Enable Native animation in the preview, then choose a source clip and Play or Pause. Only clips with a matching native rig can play.':'This tag has no supported object animation preview. Inspect a biped or object that references its native animation graph.'}</p>
+      </div>
+      <div className="tag-context-panel" role="tabpanel" id="tag-panel-Collision" aria-labelledby="tag-context-Collision" hidden={context!=='Collision'}>
+        <h3>Native collision</h3>
+        <p className="subtle">{selectedModel&&related.collision?'The preview shows the object’s actual first-permutation collision in its default pose. Render triangles are never used as a collision substitute. Use Native Output to rebuild structural changes.':'Collision preview requires a supported object with an attached collision model and matching bone hierarchy. Open its scenery, weapon, vehicle, biped or device tag.'}</p>
+      </div>
+      <div className="tag-context-panel" role="tabpanel" id="tag-panel-Sound" aria-labelledby="tag-context-Sound" hidden={context!=='Sound'}>
+        {pick('sound',related.sounds,sound)}
+        {sound&&openedContext('Sound')&&<Sound key={`${sound.id}:${JSON.stringify(project.source?.audioResources??project.source?.resourceSha256)}`} projectId={project.id} tagId={sound.id} sourceHash={project.source?.sha256??''} active={context==='Sound'} onAssign={onAssignSound} onResources={onResources}/>}
+        {!sound&&<p className="subtle">No playable sound tag is indexed for this asset. Follow Dependencies to its sound or looping-sound references.</p>}
+      </div>
+      <div className="tag-context-panel" role="tabpanel" id="tag-panel-Logic" aria-labelledby="tag-context-Logic" hidden={context!=='Logic'}>
+        <h3>Logic / Events</h3>
+        {logicPlacement&&project.quickForge&&<>
+          <label>Scenario instance<select aria-label="Logic asset instance" value={logicPlacement.id} onChange={event=>setRelatedSelection(previous=>({...previous,[`${contextKey}:logic`]:event.target.value}))}>{logicPlacements.map(placement=><option key={placement.id} value={placement.id}>{placement.name}</option>)}</select></label>
+          {openedContext('Logic')&&<LogicEvents key={logicPlacement.id} document={project.quickForge} node={{type:'placement',value:logicPlacement}} commit={(document,description)=>edit({...project,quickForge:document},description)} onSelect={id=>{writeMapSession(project.id,'forge.selection',[id]);onLevelEditor?.();}}/>}
+        </>}
+        {!logicPlacement&&<p className="subtle">Behavior belongs to a placed scenario instance. Drag this asset into an editable map, select the instance, then open Logic / Events to connect a trigger or edit native HaloScript. Asset tags have no added script fields.</p>}
+        {onLevelEditor&&<button className="small-button" onClick={onLevelEditor}>Open Level Editor</button>}
+      </div>
+    </>;
+  }
   if (!inspection)
     return (
       project.builds.some(build=>build.status==='validated')?<section className="analysis-card"><h2>Native working tags</h2><p>Choose a tag from this map’s validated build. Native tools edit a separate source revision; Build working tag edits compiles the result.</p><NativeTagOperations project={project} dirty={hasUnsavedChanges}/></section>:
@@ -278,11 +363,53 @@ export default function Tags({
                   {selectedTag.fields.length ? 'Typed fields available' : 'Inspection only'}
                 </Pill>
               </div>
-              {selectedTag.class==='snd!'&&<Sound
-                key={`${selectedTag.id}:${JSON.stringify(project.source?.audioResources??project.source?.resourceSha256)}`}
-                projectId={project.id} tagId={selectedTag.id} sourceHash={project.source?.sha256??''}
-                onAssign={onAssignSound} onResources={onResources}/>}
-            {selectedTag.class==='bitm'&&<BitmapPreview key={`${project.id}:${selectedTag.id}`} project={project} tagId={selectedTag.id}/>}
+            </div>
+            <div className="tag-context-tabs" role="tablist" aria-label="Asset contexts">
+              {TAG_CONTEXTS.map(label=><button key={label} type="button" role="tab"
+                id={`tag-context-${label.replaceAll(' ','-')}`} aria-controls={`tag-panel-${label.replaceAll(' ','-')}`}
+                aria-selected={context===label} tabIndex={context===label?0:-1}
+                onClick={()=>chooseContext(label)} onKeyDown={event=>{
+                  const index=TAG_CONTEXTS.indexOf(label);
+                  const next=event.key==='Home'?0:event.key==='End'?TAG_CONTEXTS.length-1:event.key==='ArrowRight'?(index+1)%TAG_CONTEXTS.length:event.key==='ArrowLeft'?(index+TAG_CONTEXTS.length-1)%TAG_CONTEXTS.length:null;
+                  if(next===null)return;event.preventDefault();chooseContext(TAG_CONTEXTS[next]);
+                  event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+                }}>{label}</button>)}
+            </div>
+            <div className="tag-context-panel" role="tabpanel" id="tag-panel-Properties" aria-labelledby="tag-context-Properties" hidden={context!=='Properties'}>
+            <div className="field-table">
+              <div className="field-table-title">
+                <h3>Editable fields · {selectedTag.fields.length}</h3>
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={advanced} onChange={(e) => setAdvanced(e.target.checked)} />
+                  Show offsets
+                </label>
+              </div>
+              <TagFields
+                project={project}
+                tag={selectedTag}
+                tags={tags}
+                advanced={advanced}
+                change={(field, value) => change(selectedTag, field, value)}
+              />
+              <SmartEditPanel project={project} onSave={onSave} onSelectMap={onSelectMap} notify={notify}/>
+            </div>
+            {projectile && rocket && (
+              <div className="preset-bar">
+                <div>
+                  <Sparkles size={18} />
+                  <span>
+                    <strong>A little 2007 energy</strong>
+                    <small>Swap this weapon’s first trigger to an existing rocket projectile.</small>
+                  </span>
+                </div>
+                <button onClick={() => change(selectedTag, projectile, rocket.id)}>
+                  Use rocket projectile
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            )}
+            </div>
+            <div className="tag-context-panel" role="tabpanel" id="tag-panel-Native-Output" aria-labelledby="tag-context-Native-Output" hidden={context!=='Native Output'}>
               <details className="tag-secondary-actions">
                 <summary>Extract, export or transfer tags</summary>
                 <div className="tag-exchange-actions">
@@ -462,23 +589,6 @@ export default function Tags({
                   )}
                 </div>
               </details>
-            </div>
-            <div className="field-table">
-              <div className="field-table-title">
-                <h3>Editable fields · {selectedTag.fields.length}</h3>
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={advanced} onChange={(e) => setAdvanced(e.target.checked)} />
-                  Show offsets
-                </label>
-              </div>
-              <TagFields
-                project={project}
-                tag={selectedTag}
-                tags={tags}
-                advanced={advanced}
-                change={(field, value) => change(selectedTag, field, value)}
-              />
-              <SmartEditPanel project={project} onSave={onSave} onSelectMap={onSelectMap} notify={notify}/>
               <details className="tag-native-editing">
                 <summary>Complete native tag editing</summary>
                 <p>
@@ -492,7 +602,6 @@ export default function Tags({
                   </button>
                 )}
               </details>
-            </div>
             <div className="tag-native-tools">
             <BaboonTools project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} />
             <NativeTagOperations project={project} tagId={selectedTag.id} dirty={hasUnsavedChanges} />
@@ -504,21 +613,13 @@ export default function Tags({
               edit={edit}
             />
             </div>
-            {projectile && rocket && (
-              <div className="preset-bar">
-                <div>
-                  <Sparkles size={18} />
-                  <span>
-                    <strong>A little 2007 energy</strong>
-                    <small>Swap this weapon’s first trigger to an existing rocket projectile.</small>
-                  </span>
-                </div>
-                <button onClick={() => change(selectedTag, projectile, rocket.id)}>
-                  Use rocket projectile
-                  <ArrowRight size={14} />
-                </button>
-              </div>
-            )}
+
+            <Notice tone="info">
+              Edits stay in this project until you publish a map copy. Review the save plan above for a
+              direct cache edit or the matching native build route. Your original map stays unchanged.
+            </Notice>
+            </div>
+            <div className="tag-context-panel" role="tabpanel" id="tag-panel-Dependencies" aria-labelledby="tag-context-Dependencies" hidden={context!=='Dependencies'}>
             {selectedTag.references.length > 0 && (
               <div className="reference-list">
                 <h3>Referenced tags</h3>
@@ -556,14 +657,12 @@ export default function Tags({
               inspection={inspection}
               notify={notify}
             />
-            <Notice tone="info">
-              Edits stay in this project until you publish a map copy. Review the save plan above for a
-              direct cache edit or the matching native build route. Your original map stays unchanged.
-            </Notice>
+            </div>
+            {renderAssetContexts()}
             </div>
             {selectedModel&&<section className="tag-model-preview" aria-label="Actual model preview">
               {selectedTag.references.some(reference=>reference.label==='Animation graph')&&<label className="tag-preview-animation-toggle checkbox-label"><input type="checkbox" checked={animatePreview} onChange={event=>setAnimatePreview(event.target.checked)}/> Native animation</label>}
-              <NativeModelPreview key={`${project.id}:${selectedModel.tagId}`} asset={selectedModel} environment={project.worldEnvironment} animate={animatePreview&&selectedTag.references.some(reference=>reference.label==='Animation graph')}/>
+              <NativeModelPreview key={`${project.id}:${selectedModel.tagId}`} asset={selectedModel} environment={project.worldEnvironment} animate={animatePreview&&selectedTag.references.some(reference=>reference.label==='Animation graph')} surface={context==='Collision'&&related?.collision?'collision':'render'} onMaterials={captureMaterials}/>
             </section>}
           </div>
         ) : (

@@ -55,6 +55,22 @@ test('shared non-view preferences and source revision isolation survive window-l
   expect(session.readMapSession('a','camera.world.PerspectiveCamera',null)).toEqual({position:[1,2,3]});
   expect(session.readMapSession('b','camera.world.PerspectiveCamera',null)).toBeNull();
 });
+test('asset contexts, child selections and native animation preferences remain independent per map and window',async()=>{
+  const session=await import('./mapSession');
+  session.configureMapViewWindow('main');
+  const keys=['tags.contexts','tags.context-selection','tags.preview.animation','bitmap.face.7','bitmap.image.7'];
+  for(const key of keys)session.writeMapSession('a',key,key==='tags.preview.animation'?true:{one:'main'});
+  session.configureMapViewWindow('asset-popout');
+  for(const key of keys)session.writeMapSession('a',key,key==='tags.preview.animation'?false:{one:'popout'});
+  session.configureMapViewWindow('main');
+  expect(session.readMapSession('a',keys[0],null)).toEqual({one:'main'});
+  expect(session.readMapSession('a',keys[1],null)).toEqual({one:'main'});
+  expect(session.readMapSession('a',keys[2],false)).toBe(true);
+  expect(session.readMapSession('a','bitmap.face.7',null)).toEqual({one:'main'});
+  expect(session.readMapSession('a','bitmap.image.7',null)).toEqual({one:'main'});
+  expect(session.readMapSession('b',keys[0],null)).toBeNull();
+  session.configureMapViewWindow('asset-popout');expect(session.readMapSession('a',keys[2],true)).toBe(false);
+});
 test('a storage event refreshes just that map without replacing unchanged objects', async () => {
   data.set(prefix + 'a', JSON.stringify({ workspace: 'world', layout: { width: 300 } }));
   data.set(prefix + 'b', JSON.stringify({ workspace: 'tags' }));

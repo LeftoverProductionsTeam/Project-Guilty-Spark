@@ -6,6 +6,25 @@
 .tag-properties-pane .tag-detail-heading {padding-bottom:8px;margin-bottom:8px;}
 .tag-properties-pane .tag-detail-heading h2 {font-size:19px;line-height:1.2;margin:3px 0;}
 .tag-properties-pane .tag-badges {gap:4px;margin-top:5px;}
+.tag-context-tabs {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin:6px 0 10px;}
+.tag-context-tabs button[role="tab"] {min-width:0;min-height:28px;padding:5px 3px;font-size:10px;border:1px solid var(--line);border-radius:4px;background:var(--panel);box-shadow:none;white-space:normal;}
+.tag-context-tabs button[aria-selected="true"] {background:var(--panel-hover,#23323d);border-color:var(--accent,#8bdae7);color:var(--text);box-shadow:inset 0 1px 2px #0003;}
+.tag-context-tabs button::after {display:none;}
+.tag-selection-layout:not(.has-model) .tag-context-tabs {display:flex;flex-wrap:wrap;}
+.tag-selection-layout:not(.has-model) .tag-context-tabs button {min-width:76px;padding-inline:10px;}
+.tag-selection-layout:not(.has-model) .tag-context-pick {max-width:780px;}
+.tag-context-panel[hidden] {display:none!important;}
+.tag-context-panel {min-width:0;}
+.tag-context-panel h3 {font-size:12px;margin:8px 0;}
+.tag-context-panel .subtle {font-size:11px;line-height:1.5;}
+.tag-context-pick {display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;gap:6px;margin-block:8px;font-size:11px;}
+.tag-context-panel code {font-size:10px;overflow-wrap:anywhere;}
+.tag-properties-pane .gs-bitmap-toolbar select {width:auto;max-width:88px;min-height:24px;padding:2px 5px;font-size:11px;}
+.tag-material-summary {display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;font-size:11px;margin-block:10px;}
+.tag-material-summary dt {color:var(--muted);}
+.tag-material-summary dd {margin:0;overflow-wrap:anywhere;}
+.tag-related-link {display:flex;align-items:center;justify-content:space-between;width:100%;gap:5px;margin-block:5px;font-size:11px;}
+.model-collision-status {position:absolute;left:8px;bottom:10px;max-width:calc(100% - 16px);padding:5px 8px;background:var(--panel);border:1px solid var(--line);font-size:11px;}
 .tag-properties-pane .field-table-title {margin:6px 0;gap:5px;flex-wrap:wrap;}
 .tag-properties-pane .field-table-title h3 {font-size:12px;margin:0;}
 .tag-properties-pane .field-table .property-row {padding:5px 0;gap:8px;grid-template-columns:minmax(75px,1fr) minmax(110px,160px);}

@@ -7,7 +7,7 @@ import { Notice } from './ui';
 import SoundAudition from './SoundAudition';
 import '../soundInspector.css';
 
-export default function Sound({ projectId, tagId, sourceHash = '', onAssign,onResources }: { projectId: string; tagId: number; sourceHash?: string; onAssign?: (cue: CueName, ref: LocalCueReference) => void;onResources?:()=>void }) {
+export default function Sound({ projectId, tagId, sourceHash = '', onAssign,onResources, active = true }: { projectId: string; tagId: number; sourceHash?: string; onAssign?: (cue: CueName, ref: LocalCueReference) => void;onResources?:()=>void;active?:boolean }) {
   const [inspection, setInspection] = useState<SoundInspection | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -48,7 +48,7 @@ export default function Sound({ projectId, tagId, sourceHash = '', onAssign,onRe
             {p.name||`Range ${p.pitchRange} / ${p.permutation}`}{p.durationSeconds!==null?` · ${p.durationSeconds.toFixed(2)} s`:''}
           </option>)}
         </select>
-        {sample?.available&&<SoundAudition key={`${projectId}:${tagId}:${selected}`} label="Play sample" volume={volume} repeat={repeat}
+        {sample?.available&&<SoundAudition key={`${projectId}:${tagId}:${selected}`} label="Play sample" volume={volume} repeat={repeat} enabled={active}
           tracks={async()=>[{projectId,tagId,sourceHash:sourceHash||inspection!.sourceSha256,pitchRange:sample.pitchRange,permutation:sample.permutation}]}/>}
       </div>
       {busy && <p role="status">Reading bounded audio data…</p>}

@@ -16,6 +16,8 @@ const detachMethod=process.env.SPARK_LIFECYCLE_DETACH_METHOD??'pointer';
 if(!['pointer','button'].includes(detachMethod))throw Error('Detach method must be pointer or button');
 const nativeOnly=process.env.SPARK_LIFECYCLE_NATIVE_ONLY==='1';
 const previewOnly=process.env.SPARK_LIFECYCLE_PREVIEW_ONLY==='1';
+const contextOnly=process.env.SPARK_LIFECYCLE_TAG_CONTEXTS==='1';
+if(contextOnly&&(!nativeOnly||previewOnly))throw Error('Native asset-context acceptance requires native-only mode and its own small bounded run');
 const expectedCacheVersion=Number(process.env.SPARK_LIFECYCLE_CACHE_VERSION??'13');
 if(![5,6,7,13,609].includes(expectedCacheVersion)||expectedCacheVersion!==13&&!previewOnly||previewOnly&&!nativeOnly)throw Error('Other native cache families require explicit read-only preview acceptance');
 const profilePreview=process.env.SPARK_LIFECYCLE_PROFILE==='1';
@@ -26,12 +28,12 @@ if(!['','20'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('R
 if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned map');
 const inputInfo=nativeMap&&nativeMap!=='-'?await fs.stat(path.resolve(nativeMap)):null;
 if(inputInfo&&!inputInfo.isFile())throw Error('Native acceptance input must be an existing owned cache');
-if(previewOnly&&(!inputInfo||inputInfo.size>128*1024*1024))throw Error('The small read-only preview test requires a cache within128MiB; use the full reserved native workflow for larger fixtures');
-const reservationBytes=previewOnly?1024**3:4*1024**3;
+if((previewOnly||contextOnly)&&(!inputInfo||inputInfo.size>128*1024*1024))throw Error('The small native preview/context test requires a cache within128MiB; use the full reserved native workflow for larger fixtures');
+const reservationBytes=previewOnly||contextOnly?1024**3:4*1024**3;
 await fs.mkdir(await assertQaOutputPath(root,{reservationBytes}));
 const app=path.join(root,'GuiltySpark-workspace-lifecycle.exe');await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
-const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
-const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':previewOnly?'native-source-preview':repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
+const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(app)).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
+const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
 let child,browser,main;
 const invoke=(page,command,args={})=>page.evaluate(({command,args})=>window.__TAURI_INTERNALS__.invoke(command,args),{command,args});
 const pages=()=>browser.contexts().flatMap(context=>context.pages()).filter(page=>page.url().includes('tauri.localhost'));
@@ -70,6 +72,30 @@ async function inspector(page,select=false){
 async function setX(page,value){await x(page).fill(String(value));await x(page).press('Tab');}
 async function acknowledged(page,id,value){await expect.poll(async()=>{const s=await state(page,id);return s.project?.quickForge.geometry[0]?.position[0];}).toBe(value);return state(page,id);}
 async function close(page){await page.getByRole('button',{name:'Close window',exact:true}).click();await expect.poll(()=>page.isClosed()).toBe(true);}
+async function nativeTagAnimation(opened){
+      const actor=opened.inspection.tags.find(tag=>tag.class==='bipd'&&tag.references.some(ref=>ref.label==='Animation graph'));
+      if(!actor)throw Error('Native animation acceptance requires a real biped with its own graph');
+      await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(actor.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('bipd');await main.locator('.tag-row').click();
+      const area=main.getByRole('region',{name:'Actual model preview',exact:true}),preview=area.locator('.native-model-preview');
+      await expect(preview).toHaveAttribute('data-model-ready','true',{timeout:90000});
+      const canvas=area.locator('canvas');await canvas.evaluate(element=>window.c71PreviewCanvas=element);
+      await main.getByRole('tab',{name:'Animation',exact:true}).click();
+      const animate=area.getByRole('checkbox',{name:'Native animation',exact:true});await animate.check();
+      await expect.poll(async()=>Number(await preview.getAttribute('data-native-animation-count')),{timeout:90000}).toBeGreaterThan(0);
+      const clipCount=Number(await preview.getAttribute('data-native-animation-count'));
+      const frame=()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsAnimation??'null'));
+      await expect.poll(async()=>(await frame())?.source).toBe('verified-skeletal-animation');
+      const initial=await frame();expect(initial.bones).toBeGreaterThan(0);expect(initial.frames).toBeGreaterThan(1);expect(initial.samplePosition.every(Number.isFinite)).toBe(true);await expect.poll(async()=>(await frame())?.time).toBeGreaterThan(initial.time+.1);
+      await area.getByRole('button',{name:'Pause model animation',exact:true}).click();await expect.poll(async()=>(await frame())?.playing).toBe(false);
+      const paused=await frame();await main.waitForTimeout(150);expect((await frame()).time).toBe(paused.time);
+      await main.getByRole('tab',{name:'Materials',exact:true}).click();await main.getByRole('tab',{name:'Animation',exact:true}).click();expect((await frame()).time).toBe(paused.time);
+      await area.getByRole('button',{name:'Play model animation',exact:true}).click();await expect.poll(async()=>(await frame())?.time).toBeGreaterThan(paused.time);
+      await main.screenshot({path:path.join(root,'native-tag-animation.png')});
+      await animate.uncheck();await expect.poll(()=>canvas.evaluate(element=>element.dataset.gsAnimation??null)).toBeNull();
+      expect(await canvas.evaluate(element=>element===window.c71PreviewCanvas)).toBe(true);
+      report.tagAnimation={actorPath:actor.path,clips:clipCount,bones:initial.bones,source:initial.source,pausedTime:paused.time,sameCanvas:true,gameplayAccepted:false};
+      step('Actual Tag Inspector plays and pauses the selected biped native skeleton/animation, then restores its static model without replacing the viewport');
+}
 try{
   await launchNative();
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
@@ -240,7 +266,7 @@ try{
     expect(nativeGeometry).toMatch(/[\d,]+ visible triangles/);
     await main.screenshot({path:path.join(root,'owned-native-bsp.png')});
     step(`Owned native cache ${expectedCacheVersion} opens in actual BSP viewport with source materials`,{nativeViewport,nativeGeometry,engineParityClaimed:false});
-    if(previewOnly){
+    if(previewOnly||contextOnly){
       const actualSource=(await invoke(main,'open_project',{id:opened.project.id})).project.source;
       expect(actualSource.sha256).toBe(originalHash);expect(actualSource.cacheVersion).toBe(expectedCacheVersion);
       const spartan=opened.inspection.tags.find(tag=>tag.class==='bipd'&&tag.references.some(ref=>ref.label==='Model'&&ref.class===(expectedCacheVersion===5?'mode':'mod2')&&opened.inspection.tags.some(model=>model.id===ref.targetId&&model.class===ref.class&&/characters[\\/]cyborg(?:_mp)?[\\/]cyborg(?:_mp)?$/i.test(model.path))));
@@ -254,29 +280,69 @@ try{
       expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
       report.sourcePreview={cacheVersion:expectedCacheVersion,engine:opened.inspection.header.engine,sourceSha256:originalHash,resources:actualSource.resourceSha256??{},requiredPrimaryShaders:required,missingPrimaryShaders:missing,requiredLightmapPages:lightmaps.size,spartanTagId:spartan?.id??null,spartanModelClass:expectedCacheVersion===5?'mode':'mod2',visibleObjects:opened.project.scene.filter(object=>object.visible).length,readOnly:true,gameplayAccepted:false};
       step('Actual source-family preview loads every required placed/BSP primary shader and its native player-start model; original cache unchanged');
+      if(contextOnly){
+        if(!pistol)throw Error('Native asset-context acceptance requires the actual pistol');
+        await main.evaluate(()=>{window.__GS_PROFILE__=true;performance.clearMeasures();});
+        await chooseTool(main,'Tag editor');
+        await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');await main.locator('.tag-row').click();
+        const tabs=main.getByRole('tablist',{name:'Asset contexts',exact:true}),area=main.getByRole('region',{name:'Actual model preview',exact:true}),preview=area.locator('.native-model-preview'),canvas=area.locator('canvas');
+        await expect(tabs.getByRole('tab')).toHaveCount(8);await expect(preview).toHaveAttribute('data-model-first-frame','true',{timeout:90000});
+        await canvas.evaluate(element=>window.c71ContextCanvas=element);const camera=await canvas.getAttribute('data-gs-preview-camera');
+        const radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true}),prior=await radius.inputValue();await radius.fill('0.225');
+        await tabs.getByRole('tab',{name:'Materials',exact:true}).click();const materialSelector=main.getByRole('combobox',{name:'Asset material',exact:true});await expect(materialSelector).toBeVisible();
+        const selectedShader=Number(await materialSelector.inputValue()),usedShaders=(await preview.getAttribute('data-model-shader-ids')).split(',').map(Number);expect(usedShaders).toContain(selectedShader);
+        const selectedBitmap=Number(await main.getByRole('combobox',{name:'Asset bitmap',exact:true}).inputValue());expect(opened.inspection.tags.find(tag=>tag.id===selectedShader).references.filter(ref=>ref.class==='bitm').map(ref=>ref.targetId)).toContain(selectedBitmap);
+        await expect(main.getByRole('region',{name:'Original bitmap preview',exact:true}).getByLabel('Verified original bitmap pixels',{exact:true})).toHaveAttribute('data-source-sha256',originalHash,{timeout:90000});
+        await main.screenshot({path:path.join(root,'native-context-materials.png')});
+        const reflectionId=opened.inspection.tags.find(tag=>tag.id===selectedShader).shaderPreview?.reflection?.bitmapTagId;expect(reflectionId).toBeTruthy();
+        await main.getByRole('combobox',{name:'Asset bitmap',exact:true}).selectOption(String(reflectionId));
+        const faceSelector=main.getByRole('combobox',{name:'Cubemap face',exact:true}),pixels=main.getByRole('region',{name:'Original bitmap preview',exact:true}).getByLabel('Verified original bitmap pixels',{exact:true}),faces=[];
+        await expect(faceSelector.locator('option')).toHaveCount(6);
+        for(let index=0;index<6;index++){
+          await faceSelector.selectOption(String(index));await expect(pixels).toHaveAttribute('data-cube-face',String(index));await expect(pixels).toHaveAttribute('data-source-sha256',originalHash);
+          faces.push(await pixels.evaluate(async canvas=>({width:canvas.width,height:canvas.height,sha256:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data.buffer)),v=>v.toString(16).padStart(2,'0')).join('')})));
+        }
+        expect(new Set(faces.map(face=>face.sha256)).size).toBeGreaterThan(1);await main.screenshot({path:path.join(root,'native-context-reflection.png')});
+        await tabs.getByRole('tab',{name:'Collision',exact:true}).click();await expect(preview).toHaveAttribute('data-collision-status','ready',{timeout:90000});await expect(preview).toHaveAttribute('data-model-first-frame','true');
+        const collision=await invoke(main,'preview_owned_object_collision',{projectId:opened.project.id,sourceSha256:originalHash,tagId:pistol.id});expect(collision.source).toBe('halo-model-collision');expect(collision.indices.length).toBeGreaterThan(0);
+        expect(Number(await preview.getAttribute('data-collision-triangles'))).toBe(collision.indices.length/3);
+        await main.screenshot({path:path.join(root,'native-context-collision.png')});
+        for(const label of ['Dependencies','Native Output','Logic','Animation','Properties'])await tabs.getByRole('tab',{name:label,exact:true}).click();
+        await expect(radius).toHaveValue('0.225');await main.keyboard.press('Control+z');await expect(radius).toHaveValue(prior);await main.keyboard.press('Control+y');await expect(radius).toHaveValue('0.225');
+        await tabs.getByRole('tab',{name:'Collision',exact:true}).click();await expect(preview).toHaveAttribute('data-collision-status','ready');
+        await tabs.getByRole('tab',{name:'Properties',exact:true}).click();await expect(preview).toHaveAttribute('data-model-first-frame','true');
+        expect(await canvas.evaluate(element=>element===window.c71ContextCanvas)).toBe(true);expect(await canvas.getAttribute('data-gs-preview-camera')).toBe(camera);
+        const calls=await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('spark.ipc.')).map(({name,duration})=>({command:name.slice(10),ms:duration})));
+        expect(calls.filter(call=>call.command==='preview_owned_object_collision')).toHaveLength(1);
+        await main.keyboard.press('Control+s');await expect.poll(async()=>(await invoke(main,'open_project',{id:opened.project.id})).project.tagEdits.find(edit=>edit.tagId===pistol.id&&edit.fieldKey==='bounding-radius')?.value).toBe(.225);
+        const smart=main.locator('.smart-edit').first();await smart.locator('summary').first().click();await smart.getByRole('button',{name:'Review save plan',exact:true}).click();await expect(smart.locator('.smart-edit-plan>strong')).toHaveText('Direct map copy');await smart.getByRole('button',{name:'Save validated map copy',exact:true}).click();await expect(smart.locator('.smart-edit-result>strong')).toHaveText('Validated copy ready');
+        const edited=(await invoke(main,'open_project',{id:opened.project.id})).project,build=edited.builds.at(-1);
+        const proof=JSON.parse(await fs.readFile(path.join(root,'library/jobs',build.id,'smart-edit-receipt.json'),'utf8'));expect(proof.compilerRan).toBe(false);expect(proof.allOtherBytesPreserved).toBe(true);
+        const tool=name=>path.join(path.resolve(invaderDirectory),name+'.exe'),run=promisify(execFile),tags=path.join(root,'independent-native-tags');await fs.mkdir(tags);
+        expect((await run(tool('invader-info'),['-T','crc32_mismatched',build.output],{windowsHide:true,timeout:30000})).stdout.trim()).toBe('0');
+        await run(tool('invader-extract'),['-s',pistol.path+'.weapon','-t',tags,build.output],{windowsHide:true,timeout:30000});
+        const readback=Number((await run(tool('invader-edit'),['-t',tags,'-G','bounding_radius',pistol.path+'.weapon'],{windowsHide:true,timeout:30000})).stdout.trim());expect(readback).toBeCloseTo(.225,6);
+        await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${opened.project.id}"]`).click();await chooseTool(main,'Tag editor');await expect(radius).toHaveValue('0.225');
+        report.assetContexts={sourceSha256:originalHash,tagId:pistol.id,selectedShader,selectedBitmap,usedShaders,reflectionInspection:{tagId:reflectionId,faces},collisionTriangles:collision.indices.length/3,sameCanvas:true,sameCamera:true,collisionReads:1,calls,undoRedoSaveReopen:true,output:build.output,outputSha256:build.sha256,independentInvaderReadback:readback,compilerRan:false,gameplayAccepted:false};
+        let playable;
+        const candidates=opened.inspection.tags.filter(tag=>tag.class==='snd!').sort((a,b)=>Number(/teleporter_loop/.test(b.path))-Number(/teleporter_loop/.test(a.path))).slice(0,8);
+        for(const tag of candidates){const inspected=await invoke(main,'inspect_sound',{projectId:opened.project.id,tagId:tag.id});if(inspected.sourceSha256!==originalHash)throw Error('Native sound source differs');if(inspected.permutations.some(sample=>sample.available)){playable=tag;break;}}
+        if(!playable)throw Error('No playable native sound in the bounded context acceptance selection');
+        await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(playable.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('snd!');await main.locator('.tag-row').click();
+        const sound=main.locator('.sound-inspector');await expect(sound.getByRole('button',{name:'Play sample',exact:true})).toBeVisible();await sound.getByText('Sample details & options',{exact:true}).click();await sound.getByRole('checkbox',{name:'Repeat sample',exact:true}).check();
+        let meter,done;const meterPath=process.env.SPARK_LIFECYCLE_AUDIO_METER;
+        if(meterPath){meter=spawn(path.resolve(meterPath),[String(child.pid),path.join(root,'context-audio-output.json'),'6'],{windowsHide:true,stdio:['ignore','ignore','pipe']});let stderr='';meter.stderr.on('data',data=>stderr+=data.toString());done=new Promise(resolve=>meter.once('exit',code=>resolve({code,stderr})));}
+        await sound.getByRole('button',{name:'Play sample',exact:true}).click();await expect(sound.locator('[data-audition-state]')).toHaveAttribute('data-audition-state','playing');await main.waitForTimeout(2000);
+        await tabs.getByRole('tab',{name:'Properties',exact:true}).click();await expect(sound.locator('[data-audition-state]')).toHaveAttribute('data-audition-state','idle');await tabs.getByRole('tab',{name:'Sound',exact:true}).click();await expect(sound.getByRole('checkbox',{name:'Repeat sample',exact:true})).toBeChecked();
+        report.assetContexts.sound={tagId:playable.id,path:playable.path,playedThenStoppedOnContextChange:true,retainedSampleOptions:true,humanHearingAccepted:false};
+        if(done){const result=await done;expect(result).toEqual({code:0,stderr:''});const output=JSON.parse(await fs.readFile(path.join(root,'context-audio-output.json'),'utf8'));const peak=Math.max(0,...output.readings.flatMap(row=>row.sessions.map(session=>session.Peak)));expect(peak).toBeGreaterThan(.0001);report.assetContexts.sound.windowsOwnedSessionPeak=peak;}
+        await main.screenshot({path:path.join(root,'native-context-sound.png')});
+        await nativeTagAnimation(opened);
+        expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
+        step('Actual asset contexts retain one native preview/camera, reuse real collision, and preserve Undo/Save/reopen and independently read native output',report.assetContexts);
+      }
     }else{
-    if(process.env.SPARK_LIFECYCLE_ANIMATION==='1'){
-      const actor=opened.inspection.tags.find(tag=>tag.class==='bipd'&&tag.references.some(ref=>ref.label==='Animation graph'));
-      if(!actor)throw Error('Native animation acceptance requires a real biped with its own graph');
-      await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(actor.path);await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('bipd');await main.locator('.tag-row').click();
-      const area=main.getByRole('region',{name:'Actual model preview',exact:true}),preview=area.locator('.native-model-preview');
-      await expect(preview).toHaveAttribute('data-model-ready','true',{timeout:90000});
-      const canvas=area.locator('canvas');await canvas.evaluate(element=>window.c71PreviewCanvas=element);
-      const animate=area.getByRole('checkbox',{name:'Native animation',exact:true});await animate.check();
-      await expect.poll(async()=>Number(await preview.getAttribute('data-native-animation-count')),{timeout:90000}).toBeGreaterThan(0);
-      const clipCount=Number(await preview.getAttribute('data-native-animation-count'));
-      const frame=()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsAnimation??'null'));
-      await expect.poll(async()=>(await frame())?.source).toBe('verified-skeletal-animation');
-      const initial=await frame();expect(initial.bones).toBeGreaterThan(0);expect(initial.frames).toBeGreaterThan(1);expect(initial.samplePosition.every(Number.isFinite)).toBe(true);await expect.poll(async()=>(await frame())?.time).toBeGreaterThan(initial.time+.1);
-      await area.getByRole('button',{name:'Pause model animation',exact:true}).click();await expect.poll(async()=>(await frame())?.playing).toBe(false);
-      const paused=await frame();await main.waitForTimeout(150);expect((await frame()).time).toBe(paused.time);
-      await area.getByRole('button',{name:'Play model animation',exact:true}).click();await expect.poll(async()=>(await frame())?.time).toBeGreaterThan(paused.time);
-      await main.screenshot({path:path.join(root,'native-tag-animation.png')});
-      await animate.uncheck();await expect.poll(()=>canvas.evaluate(element=>element.dataset.gsAnimation??null)).toBeNull();
-      expect(await canvas.evaluate(element=>element===window.c71PreviewCanvas)).toBe(true);
-      report.tagAnimation={actorPath:actor.path,clips:clipCount,bones:initial.bones,source:initial.source,pausedTime:paused.time,sameCanvas:true,gameplayAccepted:false};
-      step('Actual Tag Inspector plays and pauses the selected biped native skeleton/animation, then restores its static model without replacing the viewport');
-    }
+    if(process.env.SPARK_LIFECYCLE_ANIMATION==='1')await nativeTagAnimation(opened);
     await chooseTool(main,'Tag editor');
     await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);
     await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');

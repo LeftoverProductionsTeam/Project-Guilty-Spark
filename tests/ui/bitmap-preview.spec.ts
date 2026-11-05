@@ -5,13 +5,20 @@ test.beforeEach(async({page})=>{
   await page.addInitScript(()=>{
     const w=window as any;w.isTauri=true;
     w.__TAURI_INTERNALS__={invoke:async(command:string,args:any)=>{
-      if(command!=='preview_owned_cache_bitmap')throw Error('Unexpected command '+command);
+      if(!['preview_owned_cache_bitmap','preview_owned_reflection_cube'].includes(command))throw Error('Unexpected command '+command);
       if(args.bitmapTagId===11)await new Promise(resolve=>{w.releaseImage=resolve;});
       if(w.holdFrame&&args.imageIndex===1)await new Promise(resolve=>{w.releaseFrame=resolve;});
       const kind=args.bitmapTagId===8?'1555':'4444',buffer=new ArrayBuffer(130),v=new DataView(buffer);
       new Uint8Array(buffer).set([68,68,83,32]);
       for(const [at,value]of [[4,124],[12,1],[16,1],[20,2],[76,32],[80,0x41],[88,16],[92,kind==='1555'?0x7c00:0x0f00],[96,kind==='1555'?0x03e0:0x00f0],[100,kind==='1555'?0x001f:0x000f],[104,kind==='1555'?0x8000:0xf000]])v.setUint32(at,value,true);
       v.setUint16(128,kind==='1555'?(args.imageIndex?0x83e0:0xfc00):(args.imageIndex?0x8123:0xf123),true);
+      if(command==='preview_owned_reflection_cube'){
+        w.cubeReads=(w.cubeReads??0)+1;
+        return {sourceSha256:(args.projectId==='map-a'?'a':'c').repeat(64),resourceSha256:'b'.repeat(64),bitmapTagId:args.bitmapTagId,faces:Array.from({length:6},(_,face)=>{
+          const bytes=new Uint8Array(buffer.slice(0));new DataView(bytes.buffer).setUint16(128,0xf000+(face+1)*0x111,true);
+          return {bitmapTagId:args.bitmapTagId,imageIndex:0,imageCount:1,width:1,height:1,format:'A4R4G4B4',sourceSha256:(args.projectId==='map-a'?'a':'c').repeat(64),sourceKind:'verified-resource',resourceSha256:'b'.repeat(64),ddsBase64:btoa(String.fromCharCode(...bytes))};
+        })};
+      }
       return {bitmapTagId:args.bitmapTagId,imageIndex:args.imageIndex,imageCount:2,width:1,height:1,
         format:kind==='1555'?'A1R5G5B5':'A4R4G4B4',sourceSha256:(args.projectId==='map-a'?'a':'c').repeat(64),sourceKind:'verified-resource',resourceSha256:(args.bitmapTagId===10?'d':'b').repeat(64),sharedNativeBitmapPath:args.bitmapTagId===8?'test/original':undefined,
         ddsBase64:btoa(String.fromCharCode(...new Uint8Array(buffer)))};
@@ -67,4 +74,16 @@ test('a new frame never labels old pixels while native loading is pending',async
   const canvas=page.getByLabel('Verified original bitmap pixels');
   await expect(canvas).toHaveAttribute('data-image-index','1');
   expect(await canvas.evaluate((e:HTMLCanvasElement)=>[...e.getContext('2d')!.getImageData(0,0,1,1).data])).toEqual([0,255,0,255]);
+});
+
+test('reflection inspection shares the validated six-face cache and retains its selected native face',async({page})=>{
+  await page.getByRole('button',{name:'Reflection cube',exact:true}).click();
+  const canvas=page.getByLabel('Verified original bitmap pixels'),faces=page.getByRole('combobox',{name:'Cubemap face',exact:true});
+  await expect(faces.locator('option')).toHaveCount(6);await expect(canvas).toHaveAttribute('data-cube-face','0');
+  const first=await canvas.evaluate((element:HTMLCanvasElement)=>[...element.getContext('2d')!.getImageData(0,0,1,1).data]);
+  await faces.selectOption('5');await expect(canvas).toHaveAttribute('data-cube-face','5');
+  const last=await canvas.evaluate((element:HTMLCanvasElement)=>[...element.getContext('2d')!.getImageData(0,0,1,1).data]);expect(last).not.toEqual(first);
+  await page.getByRole('button',{name:'1555 bitmap',exact:true}).click();await page.getByRole('button',{name:'Reflection cube',exact:true}).click();
+  await expect(canvas).toHaveAttribute('data-cube-face','5');expect(await page.evaluate(()=>(window as any).cubeReads)).toBe(1);
+  await expect(canvas).toHaveAttribute('data-source-sha256','a'.repeat(64));
 });

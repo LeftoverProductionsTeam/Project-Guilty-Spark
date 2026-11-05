@@ -1061,6 +1061,19 @@ fn read_fields(
     let Some(at) = tag.data_offset else {
         return Ok(());
     };
+    // The same bounded ModelShaderReference block used by the native model
+    // renderer. Expose exact identities for inspection, never editable offsets:
+    // a model's geometry-part shader index belongs to this 32-byte table.
+    if matches!(version,5|6|7|13|609)&&matches!(tag.class.as_str(),"mode"|"mod2") {
+        space.pointer(space.address+(at-space.begin)as u32,232)?;
+        let (shaders,count)=space.block(r,at+220,32,32)?;
+        for index in 0..count {
+            let reference_at=shaders+index*32;
+            if matches!(r.fourcc(reference_at)?.as_str(),"senv"|"soso"|"schi"|"scex"|"sotr"|"sgla"|"swat"|"spla") {
+                reference(r,tag,reference_at,&format!("Shader {}",index+1),None,ids)?;
+            }
+        }
+    }
     if matches!(version,6|7|13|609) && matches!(tag.class.as_str(),"DeLa"|"tagc"|"Soul") {
         ui_tags::read(r,space,tag,ids)?;
     }
@@ -1522,6 +1535,32 @@ pub(crate) fn validate_ui_layout(project:&crate::project::Project,inspection:&Ma
 #[cfg(test)]
 mod shader_dependency_tests {
     use super::*;
+    #[test]
+    fn native_model_shader_links_are_bounded_exact_and_read_only() {
+        let mut bytes=vec![0u8;640];
+        bytes[64+220..64+224].copy_from_slice(&3u32.to_le_bytes());
+        bytes[64+224..64+228].copy_from_slice(&400u32.to_le_bytes());
+        install_ref(&mut bytes,400,17,b"osos");
+        install_ref(&mut bytes,432,18,b"algs");
+        install_ref(&mut bytes,464,19,b"!dns");
+        let original=bytes.clone();
+        let ids=std::collections::HashMap::from([(17,"soso".into()),(18,"sgla".into()),(19,"snd!".into())]);
+        let region=Space{begin:0,end:bytes.len(),address:0};
+        for (version,class) in [(5,"mode"),(6,"mod2"),(7,"mod2"),(13,"mod2"),(609,"mod2")] {
+            let mut tag=shader_fixture(class);read_fields(&Reader(&bytes),&region,&mut tag,&ids,version).unwrap();
+            assert_eq!(tag.references.len(),2);assert!(tag.fields.is_empty());
+            assert_eq!((tag.references[0].target_id,tag.references[1].target_id),(17,18));
+            assert_eq!(tag.references[1].offset,432);
+        }
+        assert_eq!(bytes,original);
+        let wrong=std::collections::HashMap::from([(17,"bitm".into())]);
+        let mut tag=shader_fixture("mod2");read_fields(&Reader(&bytes),&region,&mut tag,&wrong,13).unwrap();assert!(tag.references.is_empty());
+        for (count,pointer) in [(33u32,400u32),(2,620),(1,32)] {
+            bytes[64+220..64+224].copy_from_slice(&count.to_le_bytes());bytes[64+224..64+228].copy_from_slice(&pointer.to_le_bytes());
+            let bounded=Space{begin:64,end:bytes.len(),address:64};
+            assert!(read_fields(&Reader(&bytes),&bounded,&mut shader_fixture("mod2"),&ids,13).is_err());
+        }
+    }
     #[test]
     fn recovered_concave_collision_preserves_area_and_winding() {
         let positions = [0.,0.,0.,2.,0.,0.,2.,1.,0.,1.,1.,0.,1.,2.,0.,0.,2.,0.];

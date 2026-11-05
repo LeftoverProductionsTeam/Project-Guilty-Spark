@@ -40,6 +40,8 @@ import { modelFitPosition, validModelPreviewCamera } from '../modelPreviewCamera
 import ShieldLoading from './ShieldLoading';
 import ViewportActivity from './ViewportActivity';
 import type { ModelViewPreset } from '../modelPreviewCamera';
+import type { MeshData } from '../types';
+import { loadOwnedCollision } from '../useEndToFloor';
 
 function Snapshot({ ready, onSnapshot }: { ready: boolean; onSnapshot: (url: string) => void }) {
   const { gl } = useThree(),
@@ -68,6 +70,8 @@ function Model({
   onAnimationError,
   identity,
   framing,
+  surface,
+  collision,
 }: {
   view: OwnedModelView;
   live: boolean;
@@ -77,6 +81,8 @@ function Model({
   onAnimationError: (error: string) => void;
   identity:{projectId:string;sourceHash:string;tagId:number};
   framing:{preset:ModelViewPreset;revision:number};
+  surface: 'render' | 'collision';
+  collision: MeshData | null;
 }) {
   const group = useRef<THREE.Group>(null),
     { camera, gl, invalidate } = useThree();
@@ -156,7 +162,9 @@ function Model({
   return (
     <><group ref={group}>
       <group position={fit.center.clone().multiplyScalar(-1)}>
-        {animation ? (
+        {surface === 'collision' ? (
+          collision && <HaloMesh data={collision} wireframe color="#84dddb" />
+        ) : animation ? (
           <AnimatedBiped model={view} animation={animation} onError={onAnimationError} />
         ) : (
           <HaloMesh
@@ -179,12 +187,16 @@ export default function NativeModelPreview({
   showcase = false,
   portrait = false,
   animate = showcase,
+  surface = 'render',
+  onMaterials,
 }: {
   asset: Pick<ForgeAsset, 'tagId' | 'sourceProjectId' | 'sourceSha256' | 'modelVariant'>;
   live?: boolean;
   showcase?: boolean;
   portrait?: boolean;
   animate?: boolean;
+  surface?: 'render' | 'collision';
+  onMaterials?: (shaderIds:number[]) => void;
   environment?: EditorEnvironment | null;
   onSnapshot?: (url: string) => void;
 }) {
@@ -225,6 +237,21 @@ export default function NativeModelPreview({
   );
   const key = forgeModelKey(placement),
     view = models[key];
+  const materialIds=useMemo(()=>view?[...new Set(view.mesh.materialRanges?.map(range=>range.shaderTagId)??[])]:[],[view?.mesh]);
+  useEffect(()=>{if(view)onMaterials?.(materialIds);},[view?.mesh,materialIds,onMaterials]);
+  const [collision, setCollision] = useState<{key:string;mesh:MeshData|null;error?:string}|null>(null);
+  const [collisionRetry, setCollisionRetry] = useState(0);
+  useEffect(() => {
+    if (surface !== 'collision') return;
+    let active = true;
+    setCollision(null);
+    void loadOwnedCollision({projectId:identity.projectId,sourceSha256:identity.sourceHash,tagId:identity.tagId})
+      .then(mesh => { if (active) setCollision({key,mesh}); }, error => {
+        if (active) setCollision({key,mesh:null,error:String(error)});
+      });
+    return () => { active = false; };
+  }, [surface,identity.projectId,identity.sourceHash,identity.tagId,key,collisionRetry]);
+  const collisionValue = collision?.key === key ? collision : null;
   const [sourceLighting,setSourceLighting]=useState<{key:string;value:ModelSourceAppearance|null}|null>(null);
   useEffect(()=>{let alive=true;setSourceLighting(null);if(!native||!identity.projectId||!identity.sourceHash){setSourceLighting({key,value:null});return;}
     void modelSourceAppearance(identity.projectId,identity.sourceHash).then(value=>{if(alive)setSourceLighting({key,value});},()=>{if(alive)setSourceLighting({key,value:null});});return()=>{alive=false;};
@@ -246,9 +273,10 @@ export default function NativeModelPreview({
   // context must paint before reporting readiness, just like the initial one.
   useEffect(()=>{if(!activity.graphicsResident)setFirstFrame('');},[activity.graphicsResident]);
   const lightingReady=!!environment||sourceLighting?.key===key;
-  const animationReady=!animate||!!animations.value||!!animations.error;
-  const usable=!!view?.ready&&!failures[key]&&lightingReady&&animationReady;
-  const pendingPhase=failures[key]?null:!view?'Reading native geometry':!view.ready?'Loading source textures & reflections':!lightingReady?'Reading source lighting':!animationReady?'Reading native animation':firstFrame!==key?'Preparing first viewport frame':null;
+  const animationReady=surface==='collision'||!animate||!!animations.value||!!animations.error;
+  const frameKey = `${key}:${surface}`;
+  const usable=!!view?.ready&&!failures[key]&&lightingReady&&animationReady&&(surface!=='collision'||!!collisionValue?.mesh);
+  const pendingPhase=failures[key]?null:!view?'Reading native geometry':surface==='collision'&&!collisionValue?'Reading native collision':surface==='collision'&&!collisionValue?.mesh?null:!view.ready?'Loading source textures & reflections':!lightingReady?'Reading source lighting':!animationReady?'Reading native animation':firstFrame!==frameKey?'Preparing first viewport frame':null;
   return (
     <div
       className={`native-model-preview${showcase ? ' native-model-showcase' : ''}`}
@@ -260,8 +288,12 @@ export default function NativeModelPreview({
       data-model-source-hash={asset.sourceSha256 ?? undefined}
       data-model-variant={asset.modelVariant}
       data-model-triangles={view ? view.mesh.indices.length / 3 : 0}
+      data-model-shader-ids={materialIds.join(',')}
       data-model-ready={!!view?.ready}
-      data-model-first-frame={firstFrame===key}
+      data-model-first-frame={firstFrame===frameKey}
+      data-model-surface={surface}
+      data-collision-triangles={surface==='collision'&&collisionValue?.mesh?collisionValue.mesh.indices.length/3:undefined}
+      data-collision-status={surface==='collision'?collisionValue?.error?'rejected':collisionValue?.mesh?'ready':collisionValue?'absent':'loading':undefined}
       data-model-loading-phase={pendingPhase??undefined}
       data-native-animation-count={animations.value?.clips.length ?? 0}
       data-native-self-illumination={view?Object.values(view.shaderMetadata).filter(m=>m.selfIllumination?.source===0&&[...m.selfIllumination.lower,...m.selfIllumination.upper].some(v=>v>0)).length:0}
@@ -304,8 +336,10 @@ export default function NativeModelPreview({
               onAnimationError={setAnimationError}
               identity={identity}
               framing={framing}
+              surface={surface}
+              collision={collisionValue?.mesh??null}
             />
-            <FirstUsableFrame key={key} ready={usable} onReady={()=>setFirstFrame(key)}/>
+            <FirstUsableFrame key={frameKey} ready={usable} onReady={()=>setFirstFrame(frameKey)}/>
             {onSnapshot && <Snapshot ready={!!view.ready&&(!!environment||sourceLighting?.key===key)} onSnapshot={onSnapshot} />}
           </Suspense>
         </Canvas>
@@ -314,6 +348,9 @@ export default function NativeModelPreview({
       )}
       <ShieldLoading phase={pendingPhase} active={activity.active&&visible}/>
       {failures[key] && <small role="status">{failures[key]} <button type="button" onClick={()=>{setFirstFrame('');setRetry(n=>n+1);}}>Retry preview</button></small>}
+      {surface==='collision'&&collisionValue&&<small className="model-collision-status" role="status">
+        {collisionValue.error?<>Native collision rejected: {collisionValue.error} <button onClick={()=>setCollisionRetry(n=>n+1)}>Retry collision</button></>:collisionValue.mesh?`${collisionValue.mesh.indices.length/3} native collision triangles · default pose`:'No native collision geometry is attached to this object.'}
+      </small>}
       {!showcase&&sourceLighting?.key===key&&!sourceLighting.value?.environment&&!environment&&<small className="model-lighting-status">Source lighting unavailable · inspection lighting</small>}
       {!showcase&&live&&<div className="native-model-view-controls" aria-label="Model preview controls">
         <button type="button" title="Fit the complete model to this preview" onClick={()=>setFraming(value=>({preset:'fit',revision:value.revision+1}))}>Fit / Reset</button>
@@ -322,7 +359,7 @@ export default function NativeModelPreview({
         </select>
         <span>Drag orbit · wheel zoom · right-drag pan</span>
       </div>}
-      {animate && (
+      {animate && surface==='render' && (
         <div className="native-model-animation-controls">
           {!!animations.value?.clips.length && !animationError ? (
             <>

@@ -4,6 +4,7 @@ import { call } from './api';
 import { isEditingText } from './editorFlight';
 import { collisionBounds, floorSnapDelta } from './floorSnap';
 import type { CollisionMesh, FloorSurface } from './floorSnap';
+import type { MeshData } from './types';
 import { useWorkspaceActivity } from './components/WorkspaceActivity';
 export interface DropBody {
   id: string;
@@ -20,21 +21,26 @@ export interface DropBody {
     rotation: [number, number, number];
   };
 }
-const cache = new Map<string, Promise<CollisionMesh | null>>();
+const cache = new Map<string, Promise<MeshData | null>>();
+/** Shared read-only collision, keyed to the exact preserved map, not a hosting runtime. */
+export function loadOwnedCollision(source: NonNullable<DropBody['source']>) {
+  const key = `${source.projectId}:${source.sourceSha256}:${source.tagId}`;
+  let request = cache.get(key);
+  if (!request) {
+    if (cache.size >= 96) cache.delete(cache.keys().next().value!);
+    request = call<MeshData | null>('preview_owned_object_collision', source);
+    cache.set(key, request);
+    const pending = request;
+    request.catch(() => { if (cache.get(key) === pending) cache.delete(key); });
+  }
+  return request;
+}
 async function collider(body: DropBody) {
   if (body.collision) return body.collision;
   // Editable OBJ bytes can change outside Spark; recheck them on every action.
   if (body.imported) return call<CollisionMesh>('preview_imported_collision', body.imported);
   if (!body.source) return null;
-  const key = `${body.source.projectId}:${body.source.sourceSha256}:${body.source.tagId}`;
-  let request = cache.get(key);
-  if (!request) {
-    if (cache.size >= 96) cache.delete(cache.keys().next().value!);
-    request = call<CollisionMesh | null>('preview_owned_object_collision', body.source);
-    cache.set(key, request);
-    request.catch(() => cache.delete(key));
-  }
-  return request;
+  return loadOwnedCollision(body.source);
 }
 export default function useEndToFloor(config: {
   enabled: boolean;

@@ -10,7 +10,7 @@ let viewWindow:string|null=null;
 /** Camera/selection/scroll are window-local. The last shared snapshot is still
  * written for an explicit handoff/new window, never used to reset a live peer. */
 export function configureMapViewWindow(label:string|null){viewWindow=label&&/^[\w-]{1,60}$/.test(label)?label:null;}
-const viewKey=(key:string)=>/^(camera\.|preview\.camera\.|scroll\.|viewport\.tags\.|tags\.(selection|focus|query|filter|classes|limit)$|world\.(selection|surface-selection|view|fly|ortho|bsp|mode|start)$|forge\.(selection|sourceSurface|tab|bspWorkshop|zone|cameraMode|mode)$|bsp\.(view\.|selection$|tool$|maximized$)|creator-studio-pane$)/.test(key);
+const viewKey=(key:string)=>/^(camera\.|preview\.camera\.|scroll\.|viewport\.tags\.|bitmap\.(image|face)\.|tags\.(selection|focus|query|filter|classes|limit|contexts|context-selection|preview\.animation)$|world\.(selection|surface-selection|view|fly|ortho|bsp|mode|start)$|forge\.(selection|sourceSurface|tab|bspWorkshop|zone|cameraMode|mode)$|bsp\.(view\.|selection$|tool$|maximized$)|creator-studio-pane$)/.test(key);
 function scoped(id:string,key:string){return viewWindow&&id!=='global'&&!id.includes(':window:')&&viewKey(key)?`${id}:window:${viewWindow}`:id;}
 // Re-read the storage string on every write for peer-window changes, but do not
 // repeatedly decode an unchanged portrait/camera/layout record. Bound the extra
