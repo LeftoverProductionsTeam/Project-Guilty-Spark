@@ -3,3 +3,5 @@
 *.ico binary
 *.icns binary
 docs/licenses/*.txt -text -whitespace
+# Recovered owner directives retain their manifest's exact original bytes.
+"docs/Master Engineering Prompts/*.txt" -text -whitespace

@@ -64,6 +64,7 @@ import type {
   MapInspection,
   MeshData,
   OpenProject,
+  ImportReport,
   Project,
   ProjectBuildHistory,
   RuntimeId,
@@ -719,10 +720,13 @@ export default function App() {
     setBusy(true);
     try {
       if (historyRef.current.dirty) await save();
-      const imported = await call<OpenProject[]>(
+      const result = await call<ImportReport | OpenProject[]>(
         paths ? 'import_paths' : 'import_dialog',
-        paths ? { paths } : undefined,
+        paths ? { paths, includeReport: true } : { includeReport: true },
       );
+      // Arrays remain valid for existing/offline integrations. The native
+      // studio receives both outcomes without losing successful documents.
+      const { projects: imported, failures } = Array.isArray(result) ? { projects: result, failures: [] } : result;
       if (imported.length) {
         for(const open of imported)await load(open);
         dispatchDocument({type:'select',id:imported[0].project.id});
@@ -732,6 +736,9 @@ export default function App() {
           'success',
         );
         await refresh();
+      }
+      if (failures.length) {
+        notice(`${imported.length ? `${imported.length} project${imported.length === 1 ? '' : 's'} opened. ` : ''}${failures.length} file${failures.length === 1 ? '' : 's'} could not be opened.\n${failures.map(failure => `${failure.path.split(/[\\/]/).pop()}: ${failure.message}`).join('\n')}`, 'error');
       }
     } catch (e) {
       notice(String(e), 'error');

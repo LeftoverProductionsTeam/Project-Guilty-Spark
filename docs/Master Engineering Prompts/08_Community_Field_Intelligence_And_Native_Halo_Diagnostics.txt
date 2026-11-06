@@ -1,0 +1,191 @@
+# PROJECT GUILTY SPARK — COMMUNITY FIELD INTELLIGENCE & NATIVE HALO DIAGNOSTICS
+
+## Learn from the community. Solve genuine bottlenecks. Improve existing tools instead of duplicating them.
+
+Continue from the actual current HEAD of `D:\Project Guilty Spark`, obeying `AGENTS.md`, the permanent engineering contract, and the directive-completion gate.
+
+**This is a focused research-to-engineering integration pass, not permission to restart existing editors or abandon unfinished work.**
+
+Do not begin this initiative until earlier directives are accepted or explicitly deferred by the owner.
+
+## 1. Reconcile new community findings
+
+Review existing research, implemented features, native tests and unresolved defects before making changes.
+
+The following findings come from Halo modding community discussions involving Crisp/Foundry and other experienced modders.
+
+Treat community statements as leads requiring technical verification, not established engine behavior.
+
+Record genuinely new findings in the existing research system. Preserve newer research and do not overwrite it with older v6 archives.
+
+## 2. Study Foundry's Blender-to-game workflow
+
+Reference:
+https://github.com/ILoveAGoodCrisp/Foundry
+
+Community reports describe:
+
+- Placing scenario objects in Blender while observing corresponding changes in a running Halo engine.
+- HaloScript-based communication with supported TagTest runtimes.
+- Native engine-based physics and animation previews.
+- Using the game camera to locate problematic BSP geometry before correcting it in Blender.
+- A Blender/Sapien-like creation experience.
+
+Verify actual released capabilities and supported versions.
+
+Foundry's published documentation identifies Reach, Halo 4 and Halo 2 Anniversary Multiplayer. Newer Discord demonstrations may concern unreleased work.
+
+**Do not claim Foundry's remote-command mechanism works with Halo CE. Crisp specifically expressed uncertainty about CE compatibility.**
+
+Investigate what Spark can legitimately reuse or learn from these workflows.
+
+Extend existing Live Link and Blender handoffs only when supported by real, version-pinned interfaces.
+
+Where Halo 1 lacks live object editing, preserve the existing source → native build → controlled game reload pathway.
+
+Do not invent runtime APIs, inject code into protected game processes, bypass anti-cheat or duplicate Foundry.
+
+## 3. Build useful Halo 1 lighting diagnostics
+
+Community reports identify severe lighting inconsistencies on custom BSPs, including actors abruptly changing brightness despite apparently correct environment lighting.
+
+Investigate the exact Halo 1 mechanisms rather than copying Halo 3 or Reach behavior.
+
+Reference:
+https://c20.reclaimers.net/h1/tags/scenario_structure_bsp/lightmaps/
+
+Evaluate documented Halo 1 diagnostics including:
+
+- `debug_object_lights`
+- `object_light_interpolate`
+- BSP lightmap sampling for dynamic objects
+- Native radiosity and lightmap generation
+- Material and shader reference validity
+- Lighting differences caused by source geometry or collision changes
+
+Audit the existing Spark renderer, BSP Workshop, shader preview and native build systems.
+
+Where missing and feasible, add a source-aware lighting diagnostic view that explains why an object may be receiving incorrect illumination.
+
+Provide actionable suggestions based on observed native data.
+
+Do not fabricate light probes, airprobes, shader systems or lighting controls unsupported by Halo 1.
+
+Clearly distinguish engine-accurate evidence from an approximate Spark preview.
+
+## 4. Improve geometry-error discovery
+
+Modders report difficulty identifying open edges, overlapping faces, invalid BSP connections and problematic geometry when many errors are present.
+
+Reuse Spark's existing BSP Workshop and source-geometry tools.
+
+Improve the user workflow where genuinely needed:
+
+- Identify native geometry validation errors.
+- Highlight the exact affected face, edge, vertex or source object.
+- Focus the camera on the relevant location.
+- Allow selection without accidentally targeting a face behind the intended one.
+- Support safe correction through existing source editing, Blender integration or native tools.
+- Preserve UV/material mapping during supported geometry changes.
+- Revalidate collision, portals, render geometry and native compilation.
+
+Do not label an in-game visual diagnosis as live geometry editing.
+
+The game may help locate the problem, but structural edits still require an appropriate source workflow and validated rebuild.
+
+## 5. Resolve actual scenario source ownership
+
+The community reports a case where edits in Guerilla appeared ineffective because the Halo 2 scenario used separately stored resource files.
+
+Reference:
+https://learn.microsoft.com/en-us/halo-master-chief-collection/h2/guides/guidescenarioresources
+
+Investigate this as an edition-specific source-ownership lesson.
+
+Before editing a native scenario component, Spark should identify the actual authoritative source file and any supported split resources, dependencies or overrides.
+
+Where supported, show:
+
+- Which file owns the selected data.
+- Which runtime or compiler consumes it.
+- Which editing tool can modify it.
+- Whether the edit affects the intended native output.
+- Whether an external change must be reconciled.
+
+Never assume the Halo 2 split-resource architecture applies unchanged to Halo 1.
+
+Do not modify unrelated source or silently merge split resources.
+
+## 6. Learn from other creator bottlenecks
+
+Investigate documented, reproducible complaints about:
+
+- Sapien state-dependent controls or expert-mode behavior.
+- Repetitive import/export operations.
+- Lightmap setup confusion.
+- Cross-edition shader conversion.
+- Animation and physics staging.
+- Model/material mismatch between editing tools and actual gameplay.
+- Small-screen configuration accessibility.
+
+Prioritize Halo 1 applicability.
+
+Do not implement speculative fixes for unrelated Halo 3 or Reach behavior.
+
+Avoid creating additional editors, terminal systems, renderers or SDK copies when existing components already solve the problem.
+
+## 7. Contribute to the existing ecosystem
+
+Community feedback explicitly asks for contributions to established tools, not merely using other projects as references.
+
+For every meaningful interoperability discovery or bug fix, determine whether it is:
+
+1. A Spark-specific implementation issue.
+2. An upstream defect suitable for a reproducible bug report.
+3. A broadly useful fix that could be contributed upstream.
+4. A documented interoperability limitation requiring coordination.
+
+Maintain proper creator attribution, provenance and licensing.
+
+Do not copy code without license compatibility, extract protected third-party content without authorization, open external pull requests or publish findings containing private assets without approval.
+
+Spark should retain its essential integrated workflows while deferring specialized tasks to better existing tools when appropriate.
+
+**Integration is not duplication, and contributing upstream is better than creating competing implementations without a reason.**
+
+## 8. Native acceptance and performance
+
+Use small, legitimate, disposable source fixtures.
+
+Verify a representative end-to-end workflow:
+
+Open a supported Halo 1 source → identify geometry or lighting issue → locate its native source → make a safe correction → preserve Undo and original data → compile using existing tools → independently inspect output → launch the intended Halo runtime where available.
+
+For runtime-dependent features, record the actual evidence level and limitations.
+
+Measure before-and-after performance where changes are made. Preserve bounded RAM, VRAM, disk storage and resource caching.
+
+Do not reintroduce runaway SDK staging or unnecessarily invalidate previews.
+
+Report:
+
+- New findings versus known research.
+- Verified Halo 1 behavior versus later-engine-only behavior.
+- Existing Spark features reused.
+- Genuine implementation changes.
+- Native tests and gameplay evidence.
+- Known limitations.
+- Potential upstream contributions.
+- Remaining acceptance gates.
+
+Commit accepted changes locally without pushing.
+
+## FINAL DIRECTIVE
+
+Guilty Spark's competitive advantage is not owning another implementation of every Halo tool.
+
+It is connecting genuine Halo source editing, reliable native compilation, external specialist tools, accurate visual feedback and real gameplay into one coherent experience.
+
+**Solve the problems modders actually encounter. Respect what existing projects already do well. Preserve every working feature.**
+
+ALL THE TOOLS, AND THEN SOME.

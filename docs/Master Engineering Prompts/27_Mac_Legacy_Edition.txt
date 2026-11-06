@@ -1,0 +1,443 @@
+# PROJECT GUILTY SPARK — MAC LEGACY EDITION: THE COMPLETE HALO MAC MODDING REVIVAL
+
+## ESCHATON + SWORDEDIT + SPARKEDIT + EVERYTHING WE ALWAYS WANTED
+
+### ALL THE TOOLS, AND THEN SOME.
+
+This is directive #27, placed at the end of the existing engineering queue.
+
+Continue from the actual current HEAD of `D:\Project Guilty Spark`, preserving every accepted feature, Git commit, source map, previous-good build, and research record.
+
+Follow `AGENTS.md`, the permanent engineering contract, and the strict directive-completion gate.
+
+**Do not begin until earlier directives are accepted or explicitly deferred. Do not restart the project or create a competing application.**
+
+## THE MISSION
+
+Create a fully integrated, downloadable, native macOS edition of Guilty Spark focused specifically on:
+
+- Original Halo Mac Demo.
+- Original Halo Mac Full/Retail.
+- HaloMD and verified compatible legacy Mac content.
+
+This is not a general Windows Halo editing-kit port.
+
+This is the modern replacement for the original MacGamingMods workflow: everything that Eschaton, SwordEdit, SparkEdit and related classic Mac Halo utilities allowed creators to accomplish, combined into one modern interface with meaningful improvements.
+
+The target user may already run the original 32-bit Halo game through an independent emulator or compatibility wrapper on Apple Silicon. A reported setup achieves approximately 27 FPS.
+
+Spark itself must be a native 64-bit Mac application. It must not depend on that emulator to execute the editor.
+
+The game-running compatibility layer is an optional, separately configured playtesting destination—not part of Spark's required runtime.
+
+**The central requirement: a Mac user must be able to install Guilty Spark, open an original Halo Mac map, edit it, save/export a legitimate working map, and use it without installing Eschaton, SwordEdit, SparkEdit, Guerilla, Sapien, Windows Halo Tool or another specialist editor.**
+
+## 1. ONE APPLICATION, SHARED CODEBASE
+
+Implement this as a Mac Legacy feature profile inside the existing Guilty Spark codebase.
+
+Reuse:
+
+- The existing Tauri/Rust application architecture.
+- Source Guardian, map parsing and native cache editing.
+- Tag Inspector and Asset Library.
+- Spark Flow navigation.
+- The existing 3D viewport and scene rendering.
+- QuickForge and scenario placement systems.
+- Undo, Redo, session recovery and non-destructive builds.
+- Native resource extraction, dependency tracking and validation.
+- Existing source-aware project management.
+
+Do not create another unrelated editor, repository, backend or disconnected UI.
+
+Keep Mac-specific format and platform behavior isolated behind clear adapters so Windows and other Halo targets remain functional.
+
+The Mac edition may offer a simplified default workspace focused entirely on legacy Halo modding, while using the same underlying Spark architecture.
+
+## 2. COMPLETE ESCHATON-STYLE EDITING INSIDE SPARK
+
+Study documented Eschaton behavior, supported versions and known limitations.
+
+Implement its practical supported editing capabilities directly within Spark.
+
+### Tag and metadata editing
+
+Provide:
+
+- Complete tag directory browsing.
+- Tag searches, sorting, filtering and class identification.
+- Typed field inspection and editing.
+- Supported reflexives and nested structures.
+- Flags, bitmasks, enums, strings and numeric values.
+- Tag reference navigation and swapping.
+- Dependency and reference-graph inspection.
+- Hex/raw inspection for advanced users.
+- Safe comparisons between maps and tags.
+- Object duplication and supported tag cloning.
+- Renaming supported tag paths and internal identifiers.
+- Updating dependent references where the native format requires it.
+- Clear validation of pointers, offsets, sizes, alignments and reflexive counts.
+
+Support native Halo 1 tag classes according to their actual layout and edition-specific capabilities.
+
+Do not invent tag fields or allow unsafe structural changes merely because the interface can display bytes.
+
+### Extraction, injection and rebuilding
+
+Implement supported Eschaton-style workflows:
+
+- Extract individual tags.
+- Extract related dependencies recursively.
+- Export supported bitmaps, models, sounds and other resources.
+- Import compatible replacement resources.
+- Reinject supported native tag data.
+- Replace references safely.
+- Expand or reconstruct compiled caches when the operation is genuinely supported.
+- Recalculate affected tables, pointers, offsets and resource boundaries.
+- Validate resulting cache integrity.
+- Independently reopen the output.
+- Preserve original map hashes and maintain recoverable editing copies.
+
+Distinguish safe in-place cache editing from operations that require complete structural rebuilding or missing authoring data.
+
+Do not claim that every compiled map can be perfectly converted back into its original loose-tag source.
+
+The objective is maximum genuine functionality, not dangerous unrestricted binary modification.
+
+## 3. COMPLETE SWORDEDIT / SPARKEDIT-STYLE 3D WORLD EDITING
+
+Bring the classic visual Halo Mac map-editing experience directly into Spark.
+
+A creator should be able to open a map and see its actual world geometry, rather than only a tag tree.
+
+### World interaction
+
+Support:
+
+- Real BSP visualization.
+- Map navigation using familiar camera controls.
+- Accurate selection and highlighting.
+- Object gizmos for translate, rotate and supported scale.
+- Multi-selection and duplication.
+- Undo/Redo for every supported edit.
+- Grid and surface snapping.
+- Placement coordinates and orientation controls.
+- Searchable object lists and hierarchy.
+- Object properties alongside the viewport.
+- Live preview inside Spark of pending source changes.
+
+### Scenario editing
+
+Where supported by the actual native scenario format, provide visual editing of:
+
+- Scenery.
+- Vehicles.
+- Weapons.
+- Equipment and powerups.
+- Player starting locations.
+- Multiplayer team and game-mode placements.
+- King of the Hill markers.
+- Oddball, Race and CTF objects.
+- Teleporters and destination relationships.
+- Netgame flags.
+- Supported devices and machines.
+- AI and encounter placements where native and relevant.
+- Trigger volumes and scenario object references.
+- Sky and environment configuration.
+
+Make it possible to build a substantially customized Halo map without editing raw hex manually.
+
+### Environment and geometry
+
+Expose supported settings for:
+
+- Fog.
+- Weather.
+- Sky references.
+- Lighting and lightmap inspection.
+- Materials and shaders.
+- BSP surfaces and collision.
+- Portals and visibility where relevant.
+
+Investigate genuine source-aware geometry editing, face/edge/vertex selection and safe BSP transformations through the existing BSP Workshop.
+
+**Do not misrepresent a rendering-only change as a compiled gameplay geometry change.**
+
+If a particular Mac cache operation cannot be safely serialized, identify the limitation instead of corrupting the map.
+
+## 4. RENAMING, IMPORTS, EXPORTS AND MAP MANAGEMENT
+
+Implement the complete day-to-day Mac modder workflow.
+
+A user should be able to:
+
+1. Open a legitimate Halo Demo or Full map.
+2. Automatically identify its specific format.
+3. Create an editable working copy.
+4. Rename the project and supported map identifiers.
+5. Search and rename supported tag paths.
+6. Import or replace compatible assets.
+7. Reconcile internal references and dependencies.
+8. Modify scenario objects visually.
+9. Save and export a validated native map.
+10. Place the exported map into a user-selected, compatible game installation for testing.
+
+Provide controlled batch operations where safe.
+
+Support conversion between compatible Demo, Full and HaloMD formats only where actual structure, resource dependencies and runtime behavior permit it.
+
+Distinguish source edition, target edition, resource requirements and map naming rules.
+
+Never treat header replacement alone as proof of compatibility.
+
+Do not silently overwrite stock maps or the user's only working copy.
+
+For custom maps and redistributed assets, preserve appropriate creator attribution and rights.
+
+## 5. ASSET STUDIO FOR CLASSIC HALO MAC
+
+Use the existing Guilty Spark Asset Studio to bring the classic Mac modding workflows together.
+
+Provide previews and supported operations for:
+
+- Weapons and their associated tags.
+- Vehicles and bipeds.
+- Scenery and models.
+- Bitmaps and shader assignments.
+- HUD and interface resources.
+- Sounds and dialogue.
+- Animations.
+- Projectiles and effects.
+- Collision and physics definitions.
+
+Allow supported asset extraction and replacement through the appropriate native format handling.
+
+Build usable dependency inspection into the editing interface.
+
+Where a complex asset requires information not recoverable from a compiled cache, report that explicitly and preserve what can be recovered.
+
+Optional advanced tools may remain available, but **no external legacy editor may be required for the core functionality advertised by Mac Legacy Edition.**
+
+## 6. MAC DEMO / FULL FORMAT FIDELITY
+
+Investigate the actual native formats rather than assuming all Halo 1 builds are identical.
+
+Maintain version-pinned parsers and serializers for verified:
+
+- Mac Demo cache variants.
+- Mac Full/Retail cache variants.
+- HaloMD-specific variations.
+- Associated resource banks and map dependencies.
+
+Check endianness, pointer interpretation, compression, offsets, tag references, header structure and edition-specific limitations using real fixtures.
+
+Identify unsupported formats without guessing.
+
+Preserve exact native compatibility wherever possible.
+
+Use golden fixtures and regression tests to prove that ordinary open/save operations do not unintentionally modify unrelated data.
+
+Do not force maps into modern MCC, Custom Edition or proprietary Spark-specific formats merely to make editing easier.
+
+## 7. THE OPTIONAL LEGACY HALO GAME BRIDGE
+
+The original Mac Halo executable is separate from Guilty Spark.
+
+Users may run it using an existing emulator, compatibility wrapper, legacy operating-system environment or other legitimate solution.
+
+Do not assume Rosetta alone can execute 32-bit macOS games on modern Apple Silicon.
+
+Provide an optional configuration flow:
+
+**Connect existing Halo installation → Identify map directory → Inspect target compatibility → Export protected map copy → Optionally launch through the user's configured wrapper.**
+
+Support manual game installation selection and user-provided launch commands where they can be handled safely.
+
+Respect app bundles, wrapper-specific virtual paths, sandboxing and macOS filesystem permissions.
+
+Do not inject code into the game process, bypass security, modify emulator settings without permission or assume that an external wrapper supports runtime editing.
+
+An editor-only workflow must remain functional even if no game emulator is installed.
+
+If supported game launching cannot be automated, give the user a clear manual playtesting path.
+
+## 8. A REAL DOWNLOADABLE MAC APPLICATION
+
+Produce a native Apple Silicon macOS build using the existing Tauri architecture.
+
+Primary target: `aarch64-apple-darwin`.
+
+Investigate a universal Intel/Apple Silicon build only if both architectures can be built and tested successfully.
+
+Use a legitimate macOS build environment or macOS CI runner.
+
+Deliver:
+
+- A working `.app` bundle.
+- A downloadable `.dmg` disk image.
+- A simple drag-to-Applications installation experience.
+- A proper Guilty Spark icon and app identity.
+- Correct filesystem permissions and file dialogs.
+- Persisted user preferences and project paths.
+- Tested graphics rendering, window management and Undo/Redo.
+- Clean startup and project recovery.
+- Appropriate release version and SHA-256 checksums.
+
+No Mac App Store submission is required or requested.
+
+For distribution outside the App Store, support Developer ID signing and notarization when the necessary credentials are provided.
+
+An unsigned development build may be produced for private testing, but must be labeled accordingly. Do not instruct users to disable Gatekeeper, weaken system security or blindly remove quarantine attributes.
+
+Do not describe CI packaging alone as successful installation or functional validation.
+
+## 9. PERFORMANCE AND PRESENTATION
+
+The editor itself should be fast, stable and responsive on Apple Silicon, independent of the emulated game's frame rate.
+
+Use the existing optimized asset cache, retained views and resource management.
+
+Avoid loading or decoding entire map resource libraries unnecessarily.
+
+Test large BSPs, repeated map switching, texture previews, long editing sessions and multiwindow restoration.
+
+Keep the interface polished, visually coherent and understandable to someone returning to Halo Mac modding after many years.
+
+Avoid recreating Eschaton's old interface limitations just for nostalgia. Preserve its capabilities while using Spark's better navigation, visual feedback and safety.
+
+## 10. RESPECT THE CLASSIC MODDING COMMUNITY
+
+Study Eschaton, SwordEdit, SparkEdit, HaloMD and other relevant historic projects for accurate functionality and interoperability.
+
+Review available source code and documentation.
+
+Respect every upstream license.
+
+Do not copy GPL-covered or otherwise restricted code into the repository without establishing compatible licensing and approval.
+
+Prioritize independent implementations using existing Spark architecture.
+
+Preserve credits for the creators who originally made Halo Mac modding possible.
+
+This is an evolution of that community's work, not an attempt to erase it.
+
+## 11. END-TO-END ACCEPTANCE — NO SHORTCUTS
+
+Prove actual functionality on macOS.
+
+### Test A — Eschaton replacement
+
+Open a legitimate Halo Mac Demo map.
+
+Edit a supported weapon or vehicle property through the Inspector.
+
+Save a new map.
+
+Independently reopen and verify the native field.
+
+Confirm the edited map works in a compatible Halo runtime when one is available.
+
+### Test B — SwordEdit replacement
+
+Open a supported map in the native 3D editor.
+
+Move, rotate, duplicate and configure a scenario object.
+
+Edit a multiplayer spawn or supported gametype placement.
+
+Save and reopen.
+
+Verify the actual compiled placement, not just the viewport.
+
+### Test C — Asset operations
+
+Extract an authorized asset with its dependencies.
+
+Replace or modify a supported resource.
+
+Validate references and export a native map without damaging unrelated resources.
+
+### Test D — Rename and rebuild
+
+Rename a supported project, map identity or tag path.
+
+Update references where required.
+
+Export the native result.
+
+Independently verify map integrity, naming constraints and dependency resolution.
+
+### Test E — Actual Mac application
+
+Build the native app on macOS.
+
+Install it using the DMG.
+
+Open a legitimate Mac Halo map.
+
+Complete an editing workflow.
+
+Close, relaunch and recover the saved project.
+
+Confirm that no external Eschaton, SwordEdit, SparkEdit or Windows editing-kit installation was needed.
+
+### Test F — Legacy gameplay
+
+When a legitimate Halo Demo/Full/HaloMD runtime and working compatibility environment are supplied, load the edited map and confirm the relevant changes in actual gameplay.
+
+Record the exact game version, wrapper and hardware.
+
+If no suitable runtime is available in the testing environment, mark this as awaiting human or hardware acceptance—not passed.
+
+## 12. FINAL ENGINEERING REPORT
+
+Report:
+
+- Actual Mac build availability.
+- Supported macOS and CPU architectures.
+- Exact implemented Eschaton-equivalent capabilities.
+- Exact implemented SwordEdit/SparkEdit-equivalent capabilities.
+- Supported original Mac cache formats.
+- Verified native imports, exports and rebuilds.
+- Remaining native-format limitations.
+- External dependencies, if any.
+- Confirmed tests and actual gameplay evidence.
+- Performance measurements.
+- Known defects and unsupported operations.
+- Source-preservation and regression results.
+- DMG artifact location and checksum.
+- Remaining signing/notarization or human acceptance gates.
+
+Use PASS, FAIL, BLOCKED and NOT TESTED accurately.
+
+Commit accepted work to local `master` without pushing.
+
+Do not publish or release without owner approval.
+
+## THE FINAL VISION
+
+Imagine a former MacGamingMods creator downloading one application onto a modern Apple Silicon Mac.
+
+They open Blood Gulch, The Silent Cartographer, or another legitimately owned Halo map.
+
+They browse every supported tag, swap weapons, change scenery, edit vehicles, move spawns, inspect textures, modify the environment, import assets, rename map content, rebuild supported structures and export a working native Halo map.
+
+They accomplish it inside one modern editor.
+
+No old Eschaton installation.
+
+No SwordEdit dependency.
+
+No SparkEdit dependency.
+
+No Windows virtual machine just to edit.
+
+No fragile chain of unsupported tools.
+
+And when they are ready, they launch the original game through whatever compatible environment they already have.
+
+**Bring the original Halo Mac modding experience into the modern era—preserving everything that made it special while eliminating its historical limitations wherever sound engineering permits.**
+
+**PROJECT GUILTY SPARK — MAC LEGACY EDITION**
+
+**ALL THE TOOLS, AND THEN SOME.**

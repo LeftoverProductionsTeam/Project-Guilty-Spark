@@ -1,0 +1,109 @@
+GUILTY SPARK — INSTALLER, FIRST-RUN EXPERIENCE & SMART TOOL SETUPA fresh PC should be able to become a usable Halo creation workstation
+Continue from the accepted Windows installer/portable work. Preserve the existing release candidate and source history.
+
+The key objective is install Spark → connect legitimate Halo installations → identify the required resources → optionally install compatible tools → open the first real map.
+
+Windows installer
+Produce a tested Windows 10/11 x64 installer and portable build.
+
+Verify WebView2 dependencies, installation permissions, shortcuts, file associations where opted in, uninstall behavior, updates, clean startup and repair installation.
+
+Never silently change Windows security settings, unrelated system configuration, UEFI/Secure Boot, or another game's installation.
+
+First-run wizard
+Make the experience welcoming, visual and guided, not a wall of technical options.
+
+Step 1 — Welcome to Guilty Spark
+
+Offer: Create, Edit, Play, or Explore a Sample Project.
+
+Step 2 — Connect your Halos
+
+Detect known installed games and supported resources.
+
+Show individual cards for:
+
+MCC Halo 1.
+Halo Custom Edition.
+Original Halo PC.
+OpenCE.
+Chupathingy.
+Legacy HaloMD/Mac Demo content.
+Original Xbox Halo 1 sources.
+Verify actual supported paths, map identities, resource banks and installation completeness.
+
+Allow manual selection and skip options.
+
+Do not scan unrelated personal directories unnecessarily.
+
+Step 3 — Get a compatible Halo runtime
+
+If a runtime is missing, explain what it is and provide its official distribution/source page.
+
+For commercial Halo titles, open the legitimate store or installation instructions. Never download unauthorized game copies, product keys, game maps or proprietary resource banks.
+
+For OpenCE, guide the user through its documented requirement for their own original Xbox Halo disc image.
+
+For Custom Edition content, identify the required legitimate CE resource maps.
+
+For applicable free/open-source community runtimes, allow optional verified release installation only with informed approval, correct licensing and integrity checks.
+
+Step 4 — Install your editing tools
+
+Show helpful tool cards with name, icon, description, supported runtime, installed version and official download/source.
+
+Explain specialties:
+
+Halo CE Mod Tools: official native assets, tags, scenarios and map compilation.
+Guerilla: tag properties.
+Sapien: scenarios, environment and AI.
+Tool: importing assets and building maps.
+Invader: extraction, native map building and conversions.
+Baboon: modern tag editing.
+Blender: geometry and animation.
+Halo Blender addon: native export workflows.
+Mantle: supported compiled-map and world-merging work.
+OpenTool: supported H1A lightmap baking.
+Reclaimer/Mozzarilla: supported extraction and tag recovery.
+Excession: MCC Workshop packaging.
+Detect actual tool/version compatibility before offering installation.
+
+Use publisher-approved download locations, explicit user approval, verified packages and clear dependencies.
+
+Do not assume every tool supports every Halo edition.
+
+Step 5 — Validate setup
+
+Run read-only checks:
+
+Game paths.
+Map formats.
+Shared resource dependencies.
+Editing-kit paths.
+Tool executables and versions.
+Optional graphics/runtime requirements.
+Project write location.
+Available disk space.
+Explain any failure in plain English and offer one repair at a time.
+
+Step 6 — First project
+
+Offer a safe, properly licensed sample project or a user-owned map.
+
+Guide the user through one supported operation:
+
+Open map → inspect asset → edit a copy → build → playtest.
+
+Persistent setup management
+Allow users to add another Halo runtime later, change resource locations, update a tool, repair broken paths or work entirely offline.
+
+Do not force repeated setup on every launch.
+
+Acceptance
+On a clean Windows VM with no Halo installed, Spark must start and explain legitimate next steps without crashing.
+
+On a clean PC with a supported owned Halo installation, discovery and setup must lead to a verified map open and native workflow.
+
+Test installer, portable build, upgrades, uninstall and missing dependencies.
+
+The user should understand what they need, why they need it, and what each tool actually does.

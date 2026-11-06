@@ -31,7 +31,7 @@ export function preloadHomeCharacter(data:Bootstrap,character:HomeCharacter):Pro
     const rank=(row:AssetSourceInventory['maps'][number])=>(row.cacheVersion===version?0:10)+(provider&&!row.location.toLowerCase().includes(provider)?1:0)+(character==='chief'&&!/^bloodgulch/i.test(row.name)?2:0);
     const maps=inventory.maps.filter(row=>!row.archive&&wanted.test(row.name)).sort((a,b)=>rank(a)-rank(b));
     for(const row of maps.slice(0,6)){
-      try{const source=(await call<OpenProject[]>('open_asset_source',{sourceId:row.id,preparePreviewResources:true}))[0];if(source){const chosen=await pick(await connect(source));if(chosen)return chosen;}}
+      try{const source=(await call<OpenProject[]>('open_asset_source',{sourceId:row.id,preparePreviewResources:true,previewOnly:true}))[0];if(source){const chosen=await pick(await connect(source));if(chosen)return chosen;}}
       catch{/* A different owned copy may have the exact model and variation. */}
     }return pick(known);
   })();
@@ -88,6 +88,7 @@ export function preloadHomeModels(data: Bootstrap): Promise<ForgeAsset[]> {
         const source = (await call<OpenProject[]>('open_asset_source', {
           sourceId: monitor.id,
           preparePreviewResources: true,
+          previewOnly: true,
         }))[0];
         if (source) {
           const found = await connect(source);
@@ -116,7 +117,7 @@ export function preloadHomeModels(data: Bootstrap): Promise<ForgeAsset[]> {
         (row) => !row.archive && row.cacheVersion === 609 && /^bloodgulch\.map$/i.test(row.name),
       );
     if (!candidate) return [];
-    const source = (await call<OpenProject[]>('open_asset_source', { sourceId: candidate.id }))[0];
+    const source = (await call<OpenProject[]>('open_asset_source', { sourceId: candidate.id, preparePreviewResources: true, previewOnly: true }))[0];
     return source ? connect(source) : [];
   })();
   if (sources.size >= 4) sources.delete(sources.keys().next().value!);

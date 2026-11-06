@@ -1,0 +1,52 @@
+GUILTY SPARK — MULTIPLAYER HUB, HOSTING & COMMUNITY GAME MODESFind a game, join correctly, host safely, and share original experiences
+Continue from existing runtime discovery, CE hosting, Multiplayer Hub, maps, PlayBridge research and community interoperability work.
+
+One multiplayer interface
+Choose a game → inspect compatibility → join through the correct installed runtime.
+
+Support documented server discovery for OpenCE, Chupathingy, CE and other verified providers.
+
+MCC discovery must use legitimate supported interfaces, not fictional public-server APIs.
+
+Display map, gametype, players, human/bot split where genuinely reported, region, latency where measured, engine version, protocol, join status and dependencies.
+
+Host / Join / Collaborate
+Keep these as distinct flows.
+
+Host: Configure real available modes, maps, ports, privacy, server version, player capacity, moderation and playlist.
+
+Join: Check network protocol, map hash, resources, runtime installation and documented join methods.
+
+Collaborate: Launch SparkLink source editing, not game co-op.
+
+Support dedicated servers only through authenticated, documented interfaces.
+
+Do not bypass OpenCE listing approval, Chupathingy authentication or upstream moderation.
+
+Custom gametypes
+Extend the existing scenario editor with accurate native placement tools for:
+
+Slayer and team variants.
+CTF.
+King of the Hill, including valid native hill geometry/flag rules.
+Oddball.
+Race.
+Teleporters.
+Vehicle and weapon spawns.
+Supported infection/survival modes.
+Custom objective zones where the selected engine supports them.
+Investigate map voting, playlist rotation, safe automatic map acquisition and compatible join-in-progress behavior.
+
+A Battlefield-style Conquest/Territories experience may require actual extended engine-side synchronization. Do not mislabel it as a stock CE mode.
+
+Community features
+Connect native map packages, credits, authorized links, playtest invitations, compatible clients and actual gameplay feedback.
+
+Do not create a new competing Halo social network before existing community integrations are proven.
+
+Acceptance
+Start or discover a real supported server, resolve the correct client/map, join with two actual players, play the configured mode, transition or restart as supported, and verify map identity.
+
+Test missing map, wrong protocol, locked server, full server and disconnected host.
+
+The success metric is real players finding and joining playable community content.

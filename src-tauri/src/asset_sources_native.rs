@@ -266,6 +266,7 @@ pub(super) async fn open_asset_source(
     window: tauri::WebviewWindow,
     source_id: String,
     prepare_preview_resources: Option<bool>,
+    preview_only: Option<bool>,
 ) -> Reply<Vec<OpenProject>> {
     let owner = window.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
@@ -283,6 +284,7 @@ pub(super) async fn open_asset_source(
             );
         }
         if candidate.archive {
+            if preview_only==Some(true){return Err("Choose and import an archive before previewing its maps; background previews never extract archives".into());}
             return import_file(&state, &candidate.path);
         }
         // Home can overlap independent pack hashing with source inspection/copy.
@@ -301,7 +303,7 @@ pub(super) async fn open_asset_source(
                 let library = lock(&state.library)?;
                 let existing = library.list().map_err(error)?;
                 // Adjacent original resources keep their normal precedence.
-                let (project, inspection) = library.import_map(&candidate.path, candidate.path.parent()).map_err(error)?;
+                let (project, inspection) = if preview_only==Some(true){library.preview_map(&candidate.path,candidate.path.parent())}else{library.import_map(&candidate.path, candidate.path.parent())}.map_err(error)?;
                 let fresh = !existing.iter().any(|row| row.id == project.id);
                 Ok((project, inspection, fresh))
             })();

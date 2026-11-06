@@ -1,0 +1,79 @@
+GUILTY SPARK — FINAL PRODUCT QUALITY, PLATFORM SUPPORT & RELEASE ENGINEERINGMake the studio reliable enough for the Halo community to trust
+Continue from current HEAD and all accepted engineering.
+
+The previous C49 Windows 0.4.1 installer and portable ZIP were preserved, but they do not automatically include newer C50–C61 work or subsequent commits.
+
+Build releases only from explicitly identified, verified source revisions.
+
+Windows release
+Verify:
+
+Clean installation.
+Portable operation.
+WebView2 installation/dependency checks.
+Correct first-run configuration.
+Game and editing-kit discovery.
+GPU rendering.
+Multiwindow behavior.
+Native build tools.
+Controlled game launching.
+Updates and rollbacks.
+Uninstallation without deleting user projects.
+Create source manifests and SHA-256 checksums.
+
+Do not describe an internal CI artifact as a published release.
+
+Linux and macOS
+Investigate actual Tauri/native build requirements and OS-specific limitations.
+
+Produce native packages only after build, launch, graphics and file-access tests pass.
+
+Preserve source code portability, path handling and compatible tool discovery.
+
+Recognize that some Windows-only native Halo tools may require explicit unavailable/alternative status.
+
+Test application startup, project creation, source inspection, rendering, saving and supported game/tool launching separately.
+
+Do not market Linux/macOS as fully accepted until real packages have been tested.
+
+Performance and stability
+Benchmark:
+
+Cold launch.
+Runtime discovery.
+Map opening.
+BSP rendering.
+Asset browsing.
+Tag search.
+Native conversion.
+Build time.
+Multiwindow GPU/RAM retention.
+Autosave and Undo.
+Large map/resource libraries.
+Collaboration synchronization.
+Long-running compiler tasks.
+Use measured baselines and report before/after changes.
+
+Preserve data correctness over an impressive benchmark.
+
+Security and recovery
+Test untrusted and malformed local map files, invalid tag references, malicious download paths, corrupted archives, stalled compilers and broken optional-tool installations.
+
+Protect against path traversal, excessive allocations, unsafe executable arguments, arbitrary remote execution and accidental original-file replacement.
+
+Keep application logs free of secrets, credentials and private resource paths where practical.
+
+Provide recoverable session state after crashes and interrupted native builds.
+
+Do not weaken Windows security or game integrity requirements to make integration easier.
+
+Release acceptance
+Run a full clean-machine test on the actual deliverable, not only a development executable.
+
+Install Spark, connect an authorized Halo source, open a map, make a supported change, compile, launch a game, close the application and recover the project.
+
+Only publish after owner approval.
+
+Produce an accurate feature matrix distinguishing shipped, in-development, experimental and unsupported capabilities.
+
+A release is complete when another creator can install it and reproduce the claimed workflows.

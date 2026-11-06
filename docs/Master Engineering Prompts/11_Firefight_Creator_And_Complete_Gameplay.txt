@@ -1,0 +1,54 @@
+GUILTY SPARK — FIREFIGHT CREATOR & COMPLETE GAMEPLAYBuild custom cooperative survival experiences inside Halo 1
+Continue from current HEAD and preserve all working native encounter and round-controller code.
+
+Current development has reported a solo controller clearing two waves, real AI combat, and improving corpse cleanup. Full human gameplay, shared victory and peer synchronization remain unverified.
+
+Creator experience
+Extend the existing scenario and gameplay editors with a Firefight Designer.
+
+The user should visually configure:
+
+Arenas and safe player starts.
+Encounter spawn areas.
+Enemy factions, squads and actor variants.
+Wave composition and wave order.
+Reinforcement timing.
+Dropship arrival and departure paths.
+Supported vehicle and weapon drops.
+Difficulty and player-count scaling.
+Objectives and holdout zones.
+Score, lives and optional skull/rule modifiers.
+Intermission, defeat and victory.
+Environmental events, music and effects.
+Make the encounter editor use actual Halo scenario placements, AI encounters, command lists, trigger volumes and generated HaloScript where supported.
+
+Never invent a new native Halo tag group.
+
+Round engine
+Complete deterministic state transitions:
+
+Waiting → Preparing → Spawning → Combat → Cleanup → Intermission → Victory/Defeat.
+
+Count only valid living combatants belonging to the current round. Prevent leaked corpses or actors from blocking completion.
+
+Handle timeouts, unreachable AI, missing spawn assets, disconnected players and repeated rounds.
+
+Expose actionable diagnostics for every failed transition.
+
+Runtime compatibility
+Stock CE may support scripted singleplayer encounters but not general multiplayer AI synchronization.
+
+For shared Firefight, target version-pinned engines with verified networked AI.
+
+Keep engine-source modifications separate from ordinary stock-compatible Halo content.
+
+Do not attribute leftknut's independent Firefight engine work to Mantle's map editor.
+
+Native acceptance
+Build a complete small Firefight map from legitimate source tags.
+
+Test actual player damage, hostile AI attacks, wave completion, scoring, defeat and victory.
+
+Then repeat with two real players on a supported runtime, including reconnect and cleanup.
+
+A wave counter advancing without genuine combat and shared victory is not a completed Firefight mode.

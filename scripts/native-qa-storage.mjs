@@ -358,6 +358,8 @@ async function prepareAllocationMeter(run, finish) {
     async read(root, excluded) {
       await noLinks(executable);
       if ((await fileHash(executable)) !== sha256) throw Error('Native allocation meter identity changed');
+      let childCpuMs = 0;
+      for (let attempt = 0; attempt < 3; attempt++) {
       const text = await new Promise((resolve, reject) =>
         execFile(
           executable,
@@ -367,6 +369,15 @@ async function prepareAllocationMeter(run, finish) {
         ),
       );
       const value = JSON.parse(text);
+      childCpuMs += value.processCpuMs ?? 0;
+      const retryable = value.errors > 0 && value.errors === value.transientErrors + (value.busyErrors ?? 0) && !value.reparseEntries;
+      // Win32 DeleteFile leaves an entry pending until open handles close;
+      // CreateFile then reports access denied. Retry the entire inventory,
+      // never its partial totals. A persistent denial still fails closed.
+      if (retryable && attempt < 2) {
+        await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 80 : 200));
+        continue;
+      }
       if (value.errors > 0 && value.errors === value.transientErrors && !value.reparseEntries) {
         const error = Error('Native metadata changed during sampling: ' + value.firstIssue);
         error.code = 'ENOENT';
@@ -395,10 +406,12 @@ async function prepareAllocationMeter(run, finish) {
         files: value.files,
         directories: value.directories,
         sharedFiles: value.multiLinkEntries,
-        childCpuMs: value.processCpuMs,
+        childCpuMs,
+        nativeReadRetries: attempt,
         allocationMethod:
           'FileStandardInfo.Allocation; deduplicated volume/file IDs; excludes filesystem overhead/shared-extent reclaimability',
       };
+      }
     },
   };
 }
@@ -549,6 +562,7 @@ export function watchOutputBudget(
         const availableBytes = Number(volume.bavail) * Number(volume.bsize);
         state.samples++;
         state.samplingChildCpuMs += used.childCpuMs ?? 0;
+        state.nativeReadRetries = (state.nativeReadRetries ?? 0) + (used.nativeReadRetries ?? 0);
         state.current = {
           logicalBytes: used.bytes,
           allocatedBytes: used.allocatedBytes,
@@ -1347,11 +1361,22 @@ export async function withDevelopmentWorkspace(
     process.off('SIGTERM', stop);
     if (interruption) await interruption;
     const current = JSON.parse(await fs.readFile(path.join(run, 'storage-run.json'), 'utf8'));
-    const result = current.active
-      ? await finish(interrupted ? 'interrupted' : ok ? 'passed' : 'failed')
-      : current;
-    await removeDevelopmentReceipt(base, run, result);
-    await restoreSchemas();
+    let result, completionError;
+    try {
+      result = current.active
+        ? await finish(interrupted ? 'interrupted' : ok ? 'passed' : 'failed')
+        : current;
+    } catch (error) {
+      // finish can correctly retire scratch, seal a failed outcome and then
+      // report a monitor error. Complete receipt/schema retirement for that
+      // exact inactive owner without hiding the original verification failure.
+      const completed = JSON.parse(await fs.readFile(path.join(run, 'storage-run.json'), 'utf8'));
+      if (completed.active || completed.nonce !== record.nonce) throw error;
+      result = completed;
+      completionError = error;
+    }
+    try { await removeDevelopmentReceipt(base, run, result); }
+    finally { await restoreSchemas(); }
     console.log(
       JSON.stringify({
         workflow,
@@ -1373,6 +1398,7 @@ export async function withDevelopmentWorkspace(
           : null,
       }),
     );
+    if (completionError) throw completionError;
   }
 }
 /** Read live summaries from the existing nonce-bound leases, not a new index.

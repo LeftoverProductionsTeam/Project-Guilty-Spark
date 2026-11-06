@@ -1,0 +1,71 @@
+GUILTY SPARK — MEGAWORLD & NATIVE BSP MASTERYBuild larger, physically traversable Halo environments
+Continue from the working Megaworld Atlas, QuickForge, BSP Workshop, geometry builders and native compilation tests.
+
+First finish the existing benchmark
+Timberland–Sidewinder has a reported native compiled connection with collision routes and portal diagnostics.
+
+Human-verified two-way travel between both regions remains open.
+
+Finish that exact traversal before using the four-region experiment as proof of success.
+
+Verify:
+
+Safe player spawning.
+Visible and accessible entrances.
+Correct collision.
+No phantom walls or invisible falls.
+Portal/cluster visibility.
+Lighting and materials.
+Two-way physical traversal.
+Vehicles where appropriate.
+Object and scenery preservation.
+Real editing tools
+Complete the native geometry operations already promised:
+
+Vertex, edge and face editing.
+Extrusion and cutting.
+Terrain sculpting.
+Tunnels, caves and arches.
+Roads and bridges.
+Donor BSP alignment and trimming.
+Seam repair.
+Collision and portal editing.
+Native lightmap regeneration.
+BSP-dependent AI pathfinding validation.
+Use existing source builders and correct native compilers.
+
+Mantle collaboration
+Compare OpenCE Mantle's published donor BSP and object workflows with Spark's own implementation.
+
+Support protected imports and external round trips.
+
+Preserve scenery, vehicles, weapons, equipment, spawns, teleporters and their references when validated.
+
+Do not invent Mantle APIs or silently apply unsupported transformations.
+
+Second benchmark
+Investigate a legitimate b30/Silent Cartographer + Death Island + intermediate islands fixture.
+
+Detect overlapping inherited geometry and coordinate collisions.
+
+Compile and validate each new connection separately.
+
+Keep original source maps untouched.
+
+Understand engine limits
+Stock Halo 1 scenarios can reference multiple BSPs but do not keep an arbitrary number of them simultaneously loaded as one continuous multiplayer world.
+
+Separate:
+
+One enlarged compiled BSP.
+Scenario BSP switching.
+Multiple maps loaded sequentially.
+Actual engine-level region streaming.
+Do not call the first three seamless streaming.
+
+Acceptance
+Deliver a playable combined map with real human/vehicle traversal, valid collision, scenery preservation and native output.
+
+Then proceed toward four regions, keeping resource budgets, networking and engine limitations visible.
+
+Megaworld is complete only when players can genuinely traverse the environment.

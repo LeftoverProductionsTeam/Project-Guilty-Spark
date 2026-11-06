@@ -1,0 +1,62 @@
+GUILTY SPARK — ORIGINAL ZOMBIE APOCALYPSE RESTORATIONPreserve the MacGamingMods original and complete its modern native gameplay
+Continue from current HEAD.
+
+This is not a generic zombie template. It is the restoration and evolution of the original Zombie Apocalypse project, using the user's legitimately recovered Mac Demo-era assets and source.
+
+Source recovery
+Preserve all original recovered tags, scripts, models, animations, sounds, HUD assets and gameplay logic.
+
+Maintain original-to-derived provenance.
+
+Build an exact inventory of:
+
+Survivor and zombie actors.
+Carrier/infection behavior.
+Custom animations.
+Actor variants.
+Weapons and projectiles.
+Spawners and encounters.
+HUD/interface.
+Sound/effects.
+Map and script dependencies.
+Identify what is recoverable, reconstructed, unsupported or missing.
+
+Repair original gameplay
+Prior work identified unstable carrier/ejection physics and an actor launched thousands of world units per tick.
+
+Preserve the successful controlled-release experiments, but complete safe automatic release and gameplay.
+
+Validate:
+
+Correct carrier attachment/release.
+Stable transforms and physics.
+Consistent actor ownership.
+Valid active AI after release.
+Pathfinding, attacks and animation.
+Damage, death and cleanup.
+Human survivor spawning.
+Enemy wave progression.
+Win/loss conditions.
+HUD and sound behavior.
+Do not merely avoid the crash by removing the original gameplay mechanic.
+
+Port and expand
+Create separate, valid outputs for compatible CE/MCC targets.
+
+Support extended OpenCE/Chupathingy multiplayer variants only where engine capabilities have been verified.
+
+Preserve stock-native tags where possible. Keep engine-specific behavior explicit and separate from portable content.
+
+Creator experience
+The existing Firefight Designer should also support zombie survival templates: spawners, progression, survivor objectives, difficulty scaling, limited ammunition, safe zones and configurable events.
+
+Reuse the same AI synchronization, script generation, native build and source-preservation systems.
+
+Acceptance
+Load the original recovered project, compile its supported native outputs, and complete an actual playable survival session.
+
+Verify stable carrier release, combat, round completion, HUD and audio.
+
+Produce a separately tested MCC version and record its actual mod packaging/playback status.
+
+Restore the experience, not just the tag inventory.

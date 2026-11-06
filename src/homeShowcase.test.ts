@@ -46,7 +46,7 @@ it('shares one source preparation between preloading and home without retaining 
   ]);
   expect(mock.retain).toHaveBeenCalledWith(source);
   expect(mock.call).toHaveBeenCalledWith('open_asset_source', {
-    sourceId: 'campaign', preparePreviewResources: true,
+    sourceId: 'campaign', preparePreviewResources: true, previewOnly: true,
   });
 });
 it('reopens an existing preserved monitor source before scanning or reimporting its installed map', async () => {

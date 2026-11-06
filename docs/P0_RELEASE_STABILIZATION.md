@@ -26,14 +26,55 @@ The canonical checkout is monitored without recursively watching/scanning Git, d
 
 The fixed 3,000-file/768,000-byte, eight-second idle comparison dropped from **9 metadata scans to 2**. The new operation summary and pre-existing full Windows scanner both measured **768,000 allocated file bytes**. Recorded main-process CPU was 2,266 ms before and 16 ms after, with 218.75 ms in the measured native reader after; this does not include every parent native reader, so no total CPU percentage or application startup/rendering speedup is claimed. All files were inspected, not omitted. A failed first cross-check exposed resident-byte rounding and was corrected before acceptance.
 
-Targeted contracts currently pass **35 tests**, including real Windows allocation/file IDs, filesystem notifications, protected junction exclusions, changed-owner refusal, killed owned-child recovery, and refusal to adopt the previously review-blocked preservation index. The health test's own fixture now lives in an exact temporary directory, not repository `artifacts/qa`. Stdin-run ownership was also repaired after reproducing its invalid `-` filename assumption.
+Targeted contracts currently pass **36 tests**, including real Windows allocation/file IDs, filesystem notifications, protected junction exclusions, changed-owner refusal, killed owned-child recovery, and refusal to adopt the previously review-blocked preservation index. The health test's own fixture now lives in an exact temporary directory, not repository `artifacts/qa`. Stdin-run ownership was also repaired after reproducing its invalid `-` filename assumption.
+
+## Genuine Windows editing and source-preservation acceptance
+
+On `c9d826f` plus the recorded import/preview/history/monitor repairs, the complete same-working-source run passed **758 Rust tests (9 ignored, 52 suites)**, TypeScript, **413 frontend tests**, **176 browser tests**, **59 offline commands** and **36 storage/source contracts**. The embedded Windows application then passed four actual cases without mocked IPC:
+
+- One valid map plus two rejected inputs returned independent results. Ten additional rejected imports left the library index and project folders unchanged.
+- Fifty native tag edits, each with author Undo/Redo and immediate Save, survived reopening and a test-owned process interruption after acknowledged Save. Project logical growth was **2,955,508 bytes**; sampled peak process-tree private memory was **1,906,794,496 bytes**, and comparable final private memory was **2,953,216 bytes below** the ready baseline. These are samples, not an OS/GPU quota or proof of long-horizon stability.
+- The real Storage controls confirmed the default of zero automatic backups, explicitly selected three, stopped allocating at that limit, and preserved manual and fixed recovery copies during reviewed cleanup.
+- Smart Edit exported an actual native MCC map. Invader independently confirmed its CRC and extracted/read back the edited pistol radius **0.225**. Output SHA-256: `45c596247b213ddb1532f2c3dadd6e3d484c5b1d2fabef4f177b376b7280f5c7`. The original map stayed unchanged. This direct bounded map edit did not invoke a compiler or retest gameplay.
+
+The separate real H1A/Invader round trip still passes: 1,793 input files, 1,796 compiled tags, corrupt-save refusal, exact recovery, valid radius 0.5, rebuilt cache and independent readback. Fresh native build measured **26,021 ms**. Ten unchanged requests reused the same **270,620,016 allocated bytes**; they are not ten independent builds.
+
+The full operation disposed **5,335,649,623 logical bytes** of temporary payload. Peak logical usage was 5,510,397,707 bytes and the last measured native file allocation was 5,023,942,416 bytes. Physical reclamation cannot be assigned from logical deletion because Cargo output includes shared hardlinks. No new SDK tree, binary, test profile or archive was retained in the checkout.
+
+## Proven defects repaired during acceptance
+
+Home prepared background previews through normal map import, silently creating two additional persistent projects in a fresh library. The strict native assertion found this; it was not relaxed. Home now requests bounded RAM-only TEMP records in the **existing Library connection** and reads original maps in place. The existing native decoder, source hashes, resource pins and material pipeline remain authoritative. At most 32 background maps / 128 MiB metadata are retained; capacity rejects new work without discarding active records. Cleanup checks their source references. Explicit Save refuses a background read-only record. Core tests plus the actual app confirm one explicit import creates only one persistent project. Actual user imports still use the persistent backend; this is not full Phase 3 acceptance.
+
+Mixed imports now return successes and individual failures independently to the studio through existing commands. Older native array/error callers retain their interface. Whole-batch history validation now rejects foreign, unknown, duplicated or rebound snapshots before writing any immutable files. Missing immutable IDs may only recover their exact original bytes. This closes validation-failure orphans, not every interrupted I/O case.
+
+A real compiler replacement race exposed a failed metadata sample. The native meter reports numerical Win32 errors and retries the **entire** inventory twice (80/200 ms), never accepting partial totals. Persistent denied access, changed ownership or linked paths still fail closed. A separate real Windows pending-delete fixture reproduces Win32=5. The original failed run did not record its code; that historical cause is not asserted. Failed operations now retire their sealed disposable receipt/schema output while propagating the original failure. The real Cargo rerun exercised a successful retry. Earlier failed runs remain identified in the compact fixture.
+
+## Measured application profile
+
+Fresh isolated application/profile, warm OS filesystem (no cache flush): app window **520 ms**, explicit map import **3,761 ms**, fully ready map **7,296 ms**, retained editor resume **211 ms**, same canvas and **zero additional native preview calls** on resume. Readiness required all BSP and visible model primary shaders, completed lightmaps/reflection work: 121 source shaders, 15 lightmaps, 11 cubemaps, 68 model types, 186 objects and eight decals. No texture/model omission was used to reach readiness; exact stock-renderer parity is not claimed.
+
+At that ready sample the process tree used 1,389,133,824 private bytes and 1,427,505,152 working-set bytes; the GPU probe reported 210,055,168 dedicated and 18,198,528 shared bytes. The existing bitmap cache remained bounded to 128 entries / 64 MiB (59,388,830 estimated bytes at sample). These are a current baseline, **not** a measured before/after startup or rendering speedup. The comparable monitor before/after measurement above remains separate.
+
+## Scoped release-readiness matrix
+
+This matrix covers the active repair; it does not promote all 475 historical requirements.
+
+| Requirement | Existing source / function | Test / operation | Windows | Linux | macOS | Native / game gate | Remaining blocker |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Stable renderer test entrypoint | `render-alpha.ts`, source-entrypoint guard | Real bloom/alpha/hologram browser assertions | Local passed | New hosted result pending | Not run | No game claim | Authorized pushed commit / hosted run |
+| Owned storage lifecycle | `native-qa-storage.mjs`, `physical-audit.cs`, repository health | Actual allocation, ownership negatives, pending-delete and failed-run disposal | Passed | Earlier core/web only | Not run | No original resources deleted | Remaining product/tool stress matrix |
+| P8-02 mixed import feedback | `collect_imports`, `ImportReport`, App import handler | Native mixed batch + ten rejected retries | Passed | Not run natively | Not run | Map identity unchanged | Filesystem import rollback remains |
+| No background map copies | `Library::preview_map`, `open_asset_source`, Home preparation | Real app strict library count + core memory limits | Passed | Core portability untested here | Not run | Source decoding retained | Actual user opens still persistent |
+| C33/C43 history / explicit backup policy | `workspace_history::commit`, native lifecycle test | Fifty edits/Undo/Redo/Save/restart, zero-default + chosen retention | Passed | Not run natively | Not run | Acknowledged-save recovery only | Full RAM history, Save/Discard/Cancel and orphan cleanup |
+| Native output / Smart Edit | Existing build/orchestration and bounded writer | H1A compile + Invader reconciliation; real UI direct export/readback | Passed scoped | Tools unavailable here | Tools unavailable here | No new human gameplay | C71 broader object/behavior/tool workflow |
+| C49 release preservation | Existing release verifier / protected package | Exact source, five-file manifest and checksums | Unchanged / verified | No accepted package | No package | Older 0.4.1 source | New installer, clean-machine/platform/signing/distribution gates |
 
 ## Remaining gates
 
-The full repeated product workflow matrix is still open: 20 real map sessions without Save, 50 edits/Undo, rejected/archive imports, ten independently completed compiler jobs, tool/window cycles and crash recovery. Ten unchanged compiler requests are not ten independent builds.
+The complete repeated matrix remains open: 20 real map sessions without Save, ten archive imports including invalid/no-scenario, ten independently completed native compiler jobs, tool/window lifetime cycles and full unsaved recovery. Fifty genuine edits and ten rejected-file retries above passed; do not repeat or relabel them as the missing workflows.
 
-Production `Library::open`, durable workspace history, autosave and close handling still require coordinated memory-first integration. Do not flip the constructor alone. Full external-tool success/failure/cancellation cleanup and C71 authored-tag publication/Smart Edit acceptance remain unfinished. No default-memory, native-app/release, human gameplay or multiple-computer acceptance is implied by these script repairs.
+Production `Library::open`, durable workspace history, autosave and close handling still require coordinated memory-first integration. Do not flip the constructor alone. Save/Discard/Cancel, atomic filesystem imports, full external-tool success/failure/cancellation cleanup and C71 authored-tag publication remain unfinished.
 
-Linux and macOS package/startup tests need actual native runners; no local Linux/WSL or Mac environment is available. Accepted C49 Windows 0.4.1 remains unchanged and does not include these newer commits. All 475 existing ledger IDs and 25 recovered prompts #04–#28 remain preserved. No legacy requirement was promoted to complete, and no new archive, full SDK tree, service or watchdog was retained.
+Linux/macOS packages/startup need actual native runners; none are available locally. New hosted CI and public distribution await their approvals. Accepted C49 Windows 0.4.1 stays unchanged and does not contain these newer repairs. All 475 ledger IDs and exact 25 recovered prompts #04–#28 are preserved. No human gameplay, game-peer, clean-machine or whole-platform acceptance is inferred.
 
-Compact evidence: [p0-release-stabilization.json](fixtures/p0-release-stabilization.json). The bounded active checkpoint contains the exact next operation and unresolved publication/platform gates.
+Compact evidence: [p0-release-stabilization.json](fixtures/p0-release-stabilization.json). The bounded active checkpoint names the exact next operation. No new archive warehouse, full SDK, service or watchdog was retained.

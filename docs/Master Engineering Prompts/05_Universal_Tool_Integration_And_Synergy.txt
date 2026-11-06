@@ -1,0 +1,78 @@
+GUILTY SPARK — UNIVERSAL TOOL INTEGRATION & SYNERGY
+Every specialist tool available through one intelligent workflow
+Continue from existing Games & Tools, source-aware external editing, native build orchestration and Source Guardian.
+
+Do not reduce Spark to a launcher. Do not duplicate mature external functionality without a demonstrated need.
+
+Build a real tool capability registry
+For every supported tool, identify:
+
+Its actual specialty.
+Publisher/maintainer.
+License and official download.
+Installed version and executable.
+Supported Halo editions.
+Input and output formats.
+Documented command-line or API operations.
+Operations requiring manual interaction.
+Known limitations.
+Required dependencies.
+Required source directory.
+Verified integration tests.
+Priority integrations:
+
+Guerilla: Official native tag properties.
+
+Sapien: Native scenario editing, AI and environment settings.
+
+Halo Tool: Native asset import, BSP compilation, lightmaps and cache builds.
+
+Invader: Extraction, recovery, conversion, validation, script compilation and supported map builds.
+
+Baboon: Modern structured native tag editing, reference navigation and comparisons.
+
+Blender + Halo addon: Modeling, geometry, animation and native source export.
+
+OpenCE Mantle: Supported compiled-map editing, donor BSP/object workflows and compatible exports.
+
+OpenTool: Supported H1A Cycles lightmap baking.
+
+Reclaimer/Mozzarilla: Supported source extraction, inspection and asset recovery.
+
+MCC Excession: Official-compatible mod packaging and Workshop workflow.
+
+Tool UI
+Each tool gets an icon card with:
+
+Name and purpose.
+Installed/available status.
+Supported editions.
+Setup action.
+Launch action.
+A clickable ? explaining when to use it.
+A Use with Current Project action only when supported.
+Example:
+
+Need to edit a weapon's firing behavior? Recommend Spark's native tag inspector or an appropriate tag editor.
+
+Need to rebuild structural geometry? Recommend the validated native compiler.
+
+Need to create organic terrain? Recommend Blender or the supported native Spark builder.
+
+Need new baked lighting? Offer a compatible lightmap backend.
+
+Handoff integrity
+Use the existing workflow:
+
+Spark → specialist tool → externally edited source → Spark reconciliation → native validation → game.
+
+Keep exact source roots, revision hashes, dependency graphs, file ownership, Undo and rollback.
+
+Launch only documented interfaces. Do not invent Mantle or Baboon automation endpoints.
+
+Acceptance
+Complete a round trip through at least one native tag editor, one DCC/geometry tool and one native compiler.
+
+Confirm external changes are detected, reconciled and built without losing original files or user history.
+
+The best integration makes the correct specialist tool feel like a natural extension of Spark.

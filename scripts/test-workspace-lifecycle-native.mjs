@@ -30,7 +30,8 @@ const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
 const logicOnly=process.env.SPARK_LIFECYCLE_LOGIC==='1';
 if(logicOnly&&(geometryOnly||nativeOnly||previewOnly||contextOnly))throw Error('Native logic authoring requires its own bounded run');
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
-if(!['','20'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 edits');
+if(!['','20','50'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 or50 edits');
+const editCount=Number(repeatedEdits||0);
 if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned map');
 const inputInfo=nativeMap&&nativeMap!=='-'?await fs.stat(path.resolve(nativeMap)):null;
 if(inputInfo&&!inputInfo.isFile())throw Error('Native acceptance input must be an existing owned cache');
@@ -39,7 +40,7 @@ const reservationBytes=previewOnly||contextOnly?1024**3:logicOnly?2*1024**3:4*10
 await fs.mkdir(await assertQaOutputPath(root,{reservationBytes}));
 const app=path.join(root,'application','GuiltySpark-workspace-lifecycle.exe');
 const report={schemaVersion:1,appSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(source))).digest('hex'),mockedIpc:false,detachMethod,scope:geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':nativeOnly?'native-edit-only':'workspace-lifecycle',physicalMonitorDisconnectTested:false,physicalSecondaryMonitorTransferTested:false,cases:[],errors:[],complete:false};
-const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':repeatedEdits?'native-20-edits':nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
+const finishStorage=await beginQaStorage(root,{workflow:geometryOnly?'native-geometry-roundtrip':logicOnly?'native-logic-roundtrip':contextOnly?'native-asset-contexts':previewOnly?'native-source-preview':repeatedEdits?`native-${editCount}-edits`:nativeOnly?'native-edit-export':'workspace-lifecycle',appSha256:report.appSha256,reservationBytes});
 await finishStorage.createScratch('application');
 await fs.copyFile(path.resolve(source),app,fs.constants.COPYFILE_EXCL);
 await finishStorage.createScratch('library');
@@ -62,7 +63,11 @@ async function launchNative(){
   try{await expect.poll(()=>pages().length).toBeGreaterThan(0);}
   catch(error){report.startupPages=await Promise.all(browser.contexts().flatMap(context=>context.pages()).map(async page=>({url:page.url(),title:await page.title().catch(()=>''),body:(await page.locator('body').innerText().catch(()=>'')).slice(0,1200)})));throw error;}
   main=pages()[0];main.on('pageerror',error=>report.errors.push(String(error)));
-  if(profilePreview)report.previewProfile={appWindowMs:performance.now()-started,conditions:'Fresh application/profile; OS file cache not cleared; same embedded app, source, settings and readiness checks',calls:[]};
+  if(profilePreview){
+    const windowMs=performance.now()-started;
+    if(!report.previewProfile)report.previewProfile={appWindowMs:windowMs,conditions:'Fresh application/profile; OS file cache not cleared; same embedded app, source, settings and readiness checks',calls:[]};
+    else(report.previewProfile.restarts??=[]).push({appWindowMs:windowMs,pid:child.pid});
+  }
 }
 async function nextPage(before){let page;await expect.poll(()=>{page=pages().find(page=>!before.has(page));return !!page;}).toBe(true);page.on('pageerror',error=>report.errors.push(String(error)));page.on('close',()=>{(report.closedWindows??=[]).push({url:page.url(),completedCases:report.cases.length,at:new Date().toISOString()});});await expect(page.getByRole('button',{name:'Close window',exact:true})).toHaveCount(1);
   // WebView controls can mount while native construction is still applying its
@@ -256,7 +261,20 @@ try{
     if(!readOnly&&!invaderDirectory)throw Error('Native map acceptance requires the installed Invader directory');
     const original=await fs.readFile(path.resolve(nativeMap)),originalHash=crypto.createHash('sha256').update(original).digest('hex');
     const importStarted=performance.now();
-    const [opened]=await invoke(main,'import_paths',{paths:[path.resolve(nativeMap)]});
+    const missing=path.join(root,'not-a-map.map');
+    const imported=await invoke(main,'import_paths',{paths:[missing,path.resolve(nativeMap),path.join(root,'also-missing.map')],includeReport:true});
+    expect(imported.projects).toHaveLength(1);expect(imported.failures.map(row=>path.basename(row.path))).toEqual(['not-a-map.map','also-missing.map']);
+    expect(imported.failures.every(row=>row.message.length>0)).toBe(true);
+    const [opened]=imported.projects;
+    const entries=(await invoke(main,'bootstrap')).entries;expect(entries).toHaveLength(1);
+    const indexed=JSON.stringify(entries),projectDirectories=await fs.readdir(path.join(root,'library/projects'));
+    for(let index=0;index<10;index++){
+      const failed=await invoke(main,'import_paths',{paths:[missing],includeReport:true});
+      expect(failed.projects).toEqual([]);expect(failed.failures).toHaveLength(1);
+      expect(JSON.stringify((await invoke(main,'bootstrap')).entries)).toBe(indexed);
+      expect(await fs.readdir(path.join(root,'library/projects'))).toEqual(projectDirectories);
+    }
+    report.importBatch={mixedSuccesses:1,mixedFailures:2,rejectedAttempts:10,libraryIndexUnchangedAfterRejections:true};
     if(profilePreview)report.previewProfile.importMs=performance.now()-importStarted;
     expect(opened.project.source.cacheVersion).toBe(expectedCacheVersion);
     const pistol=opened.inspection.tags.find(tag=>tag.class==='weap'&&tag.path.replaceAll('\\','/').endsWith('weapons/pistol/pistol'));
@@ -399,9 +417,24 @@ try{
     const prior=await radius.inputValue();await radius.fill('0.225');await radius.press('Tab');
     await main.keyboard.press('Control+z');await expect(radius).toHaveValue(prior);await main.keyboard.press('Control+y');await expect(radius).toHaveValue('0.225');
     if(repeatedEdits){
+      // New projects deliberately default to no automatic backups. Exercise
+      // that contract first, then opt this owned test project into its bounded
+      // three-backup policy through the real UI before measuring retention.
+      const initialBackups=await invoke(main,'project_backup_overview',{projectId:opened.project.id});
+      expect(initialBackups.automaticRetention).toBe(0);expect(initialBackups.automatic.count).toBe(0);
+      expect(await invoke(main,'create_project_snapshot',{projectId:opened.project.id,reason:'periodic'})).toBeNull();
+      await chooseTool(main,'Settings & tools');await main.getByRole('tab',{name:'Storage & Cache',exact:true}).click();
+      const backupSettings=main.getByRole('region',{name:'Storage and cache settings',exact:true});
+      await backupSettings.getByLabel('Maximum automatic map backups',{exact:true}).selectOption('3');
+      await backupSettings.getByRole('button',{name:'Save limit',exact:true}).click();
+      await expect.poll(async()=>(await invoke(main,'open_project',{id:opened.project.id})).project.automaticBackupRetention).toBe(3);
+      await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);
+      await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
+      await main.locator('.tag-row').filter({has:main.locator('strong',{hasText:/^pistol$/})}).click();
+      await expect(radius).toHaveValue('0.225');
       const baseline=await storageSample('textured-map-and-preview-ready');
       const rows=[];let previous=.225;
-      for(let index=0;index<20;index++){
+      for(let index=0;index<editCount;index++){
         const value=Number((.226+index*.001).toFixed(3));
         await radius.fill(String(value));await radius.press('Tab');
         await main.keyboard.press('Control+z');await expect(radius).toHaveValue(String(previous));
@@ -431,20 +464,21 @@ try{
       // the deliberately crashed process into the recovery acceptance checks.
       radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true});
       report.repeatedEdits.ownedProcessCrashRecovery={stoppedPid,restartedPid:child.pid,libraryReused:true,acknowledgedSaveOnly:true};
+      if(profilePreview){expect(report.previewProfile.firstMapReadyMs).toBeGreaterThan(0);expect(report.previewProfile.sameCanvas).toBe(true);expect(report.previewProfile.restarts).toHaveLength(1);}
       await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${opened.project.id}"]`).click();
       await chooseTool(main,'Tag editor');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);
       await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
       await main.locator('.tag-row').filter({has:main.locator('strong',{hasText:/^pistol$/})}).click();await expect(radius).toHaveValue('0.225');
-      const final=await storageSample('same-project-reopened-after20-edits');
+      const final=await storageSample(`same-project-reopened-after${editCount}-edits`);
       const projectBytes=sample=>sample.folders.find(folder=>folder.label==='Projects & preserved originals')?.measurement?.logicalBytes;
       const growth=projectBytes(final)-projectBytes(baseline);expect(Number.isFinite(growth)).toBe(true);expect(growth).toBeLessThan(32*1024**2);
       report.repeatedEdits.projectLogicalGrowthBytes=growth;
       report.repeatedEdits.sampledPeakPrivateBytes=Math.max(...report.storageSamples.map(row=>Number(row.process.privateBytes)));
-      const comparable=report.storageSamples.find(row=>row.phase==='saved-edit-20');
+      const comparable=report.storageSamples.find(row=>row.phase===`saved-edit-${editCount}`);
       const memoryGrowth=Number(comparable.process.privateBytes)-Number(baseline.process.privateBytes);
       expect(Number.isFinite(memoryGrowth)).toBe(true);expect(memoryGrowth).toBeLessThan(512*1024**2);
       report.repeatedEdits.comparablePrivateMemoryGrowthBytes=memoryGrowth;
-      step('Twenty genuine native tag edits, author Undo/Redo, immediate saves and same-project reopen remain bounded',{edits:20,projectLogicalGrowthBytes:growth});
+      step(`${editCount} genuine native tag edits, author Undo/Redo, immediate saves and same-project reopen remain bounded`,{edits:editCount,projectLogicalGrowthBytes:growth});
       await chooseTool(main,'Settings & tools');await main.getByRole('tab',{name:'Storage & Cache',exact:true}).click();
       const storage=main.getByRole('region',{name:'Storage and cache settings',exact:true});
       await storage.getByLabel('Maximum automatic map backups',{exact:true}).selectOption('0');await storage.getByRole('button',{name:'Save limit',exact:true}).click();

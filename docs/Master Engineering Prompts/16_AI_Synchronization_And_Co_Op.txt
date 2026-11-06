@@ -1,0 +1,62 @@
+GUILTY SPARK — AI SYNCHRONIZATION & CO-OP COMPLETIONMake Halo AI exist consistently for every participating player
+Continue from current HEAD under the permanent engineering contract.
+
+The goal is real multiplayer AI gameplay, not merely rendering the same actors on multiple clients.
+
+Inspect existing work
+Reuse all accepted native actor identity, movement, damage, death, animation and cleanup experiments.
+
+Current reports show actual OpenCE AI lifecycle progress and reconnection experiments, but not full host/client parity, synchronized Firefight victory, vehicle behavior or physical two-computer acceptance.
+
+Do not rebuild already functioning networking.
+
+Runtime-specific investigation
+Stock CE: Support campaign and singleplayer AI where native, but don't falsely advertise arbitrary synchronized multiplayer AI.
+
+OpenCE: Study actual host-authoritative actor simulation, object creation, combat replication and dedicated-server behavior. Reuse available native networking mechanisms.
+
+Chupathingy: Validate its own released network version, co-op functions and state synchronization. Do not assume compatibility with every OpenCE source revision.
+
+MCC Halo 1: Distinguish native campaign behavior, supported modded sessions and multiplayer limitations. Do not attempt unsupported anti-cheat bypasses or memory patches.
+
+Xbox/HaloMD: Preserve source compatibility; research separate runtime-specific networking changes without claiming current support.
+
+Complete the AI lifecycle
+Validate synchronized:
+
+Actor creation, ownership and stable IDs.
+Squad and encounter activation.
+Position, velocity, orientation and interpolation.
+Target selection and combat.
+Weapon fire and projectiles.
+Damage, shields and health.
+Animations and seat/vehicle interactions.
+Death, corpses and cleanup.
+AI migration, pathfinding and respawns.
+Encounter completion and shared objectives.
+Late join, disconnect, reconnect and round restart.
+Do not send uncontrolled full actor snapshots every tick as a substitute for a coherent network model.
+
+Prioritize authoritative state, bounded updates, correct prediction/interpolation and exact object ownership.
+
+Build a useful AI diagnostic interface
+Extend existing runtime diagnostics.
+
+Display host/client actor identity, authoritative position, state, health, target, current animation, tick, round ownership and divergence.
+
+Show unsupported telemetry as unavailable, not zero.
+
+Allow a creator to click an actor in Spark and inspect its exact scenario encounter and native source revision.
+
+Acceptance challenge
+Use two independent real client processes initially, followed by two physical computers where available.
+
+One host spawns an encounter. Both players see the same AI, fight it, damage it, kill it, and observe consistent cleanup and wave completion.
+
+Repeat with late join, reconnect, vehicle interaction and multiple rounds.
+
+Compare state using version-pinned native telemetry and retain reproducible logs.
+
+Report precisely which runtime combinations pass.
+
+Do not call this finished until actual multiplayer AI combat is consistent across peers.

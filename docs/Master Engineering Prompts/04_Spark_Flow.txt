@@ -1,0 +1,1176 @@
+# PROJECT GUILTY SPARK — SPARK FLOW
+## FINAL MASTER UI, NAVIGATION, MULTIWINDOW & CREATOR EXPERIENCE DIRECTIVE
+
+### PRESERVE THE STUDIO. PERFECT THE FLOW. LOSE NOTHING.
+
+**ALL THE TOOLS, AND THEN SOME.**
+
+---
+
+# MISSION
+
+Complete Guilty Spark's user interface into a cohesive, intuitive, highly customizable Halo development studio.
+
+**Do not redesign the established application or replace its working interface.**
+
+Spark already contains considerable UI engineering, native editors, workflows, rendering systems, tool integrations, application windows, menus and functionality.
+
+Build on that foundation.
+
+The objective is to make everything Spark already does easier to discover, navigate, use, combine, customize and return to.
+
+A creator should be able to:
+
+- Understand where they are.
+- Know what map, asset, object or script they are editing.
+- Find the relevant tools without hunting through unrelated menus.
+- Switch between existing workspaces.
+- Pop out workspaces into independent windows.
+- Change which workspace an existing window displays.
+- Work across multiple monitors.
+- Open multiple maps and documents.
+- Navigate between related objects and editors.
+- Launch external Halo tools and return to Spark.
+- Preserve editing context throughout.
+- Resume previous work after closing or restarting.
+- Enjoy polished, lightweight visual transitions.
+- Customize their environment.
+- Accomplish all this without unnecessary performance or storage costs.
+
+**The interface should help creators understand the entire Halo development process without forcing them to understand Spark's internal engineering.**
+
+## AUTHORITATIVE SCOPE
+
+This is the final consolidated UI directive.
+
+It supersedes the previous Spark Flow, Definitive UX, Universal Workspace, and standalone UI/navigation improvement prompts wherever they overlap or conflict.
+
+The other engineering, native Halo, multiplayer, feature development and Creator's Gauntlet directives remain valid.
+
+Do not create multiple UI implementations from older prompts.
+
+---
+
+# 0. ENGINEERING SAFETY AND PRESERVATION
+
+Continue from actual repository HEAD.
+
+Use the existing canonical `D:\Project Guilty Spark` master checkout.
+
+Inspect modified, staged and untracked files before making changes.
+
+Complete and verify the ongoing P0 storage/dependency repair before undertaking large UI changes.
+
+Preserve all functioning:
+
+- Home experience and visual identity.
+- Navigation and Spark Orb.
+- Workspace routes and editors.
+- Current native Tauri window functionality.
+- Map and asset tabs.
+- Rendering and model previews.
+- BSP Workshop.
+- QuickForge.
+- Tag Inspector.
+- Logic / Events.
+- Native builds.
+- Runtime discovery and launching.
+- Existing project/session persistence.
+- Source Guardian and recovery.
+- Durable Undo/Redo.
+- External editor reconciliation.
+- SparkLink and Live Link.
+- Recording Director.
+- Multiplayer Hub.
+- Learning Center.
+- Settings and personalization.
+- Accepted C63 native gameplay workflows.
+
+Do not introduce duplicate project stores, window managers, navigation registries, renderer systems or build coordinators where existing systems can be extended.
+
+**Audit first. Reuse first. Extend carefully. Rewrite only the specific component that demonstrably requires it.**
+
+Do not change native Halo formats or source-ownership semantics as a side effect of UI work.
+
+---
+
+# 1. KEEP SPARK'S ESTABLISHED LOOK
+
+The current Guilty Spark application is the visual starting point and the design authority.
+
+**Do not replace its visual identity with a generic IDE, enterprise dashboard, new fixed navigation scheme or wholesale application-shell redesign.**
+
+Preserve its existing:
+
+- Halo-inspired aesthetics.
+- Home layout.
+- Character showcase.
+- Workspace compositions.
+- Menus and controls.
+- Existing editor toolbars.
+- Asset viewers.
+- Inspector styling.
+- Native runtime controls.
+- Window behavior.
+- Existing customization.
+
+Improve spacing, discoverability, compactness, consistency and feedback where they are demonstrably deficient.
+
+Do not relocate or rebuild major controls unnecessarily.
+
+New controls should feel like they were always part of the existing Spark interface.
+
+### Visual design principles
+
+- Clear before decorative.
+- Compact without feeling cramped.
+- Contextual instead of overwhelming.
+- Smooth without being slow.
+- Recognizable Halo-inspired identity without excessive effects.
+- Game assets and actual content remain the visual focus.
+- Advanced controls remain accessible without dominating every screen.
+
+---
+
+# 2. ONE SPARK SESSION, MULTIPLE WORKSPACE WINDOWS
+
+Use the existing Tauri application to support one coordinated Spark session containing multiple native windows.
+
+**Do not launch three independent Spark applications simply to use three monitors.**
+
+Windows must reuse the existing authoritative project/source infrastructure.
+
+### Basic experience
+
+A creator opens World Editor.
+
+They select **Open in New Window** on Asset Studio.
+
+Asset Studio appears as another native Spark window.
+
+They move it to another monitor.
+
+They open BSP Workshop in a third window.
+
+All three remain connected to the same Spark session.
+
+### Universal workspace switching
+
+Each existing workspace window should support changing which workspace it displays.
+
+For example:
+
+**Window 1:** World Editor.
+
+**Window 2:** Asset Studio.
+
+**Window 3:** BSP Workshop.
+
+The creator switches Window 2 from Asset Studio to Script Editor.
+
+Only Window 2 changes.
+
+Returning Window 2 to Asset Studio restores its prior editing context.
+
+### Required controls
+
+Integrate unobtrusive workspace-switching controls into existing headers, toolbar areas or Spark menus.
+
+Support:
+
+- Switch Current Window.
+- Open Workspace in New Window.
+- Focus Existing Workspace.
+- Previous Workspace.
+- Move or Reattach Workspace.
+- Restore Last Workspace State.
+
+Do not replace every window header merely to add this functionality.
+
+Use actual workspace registration and existing routing.
+
+Do not automatically duplicate an already-open workspace unless the creator explicitly requests another instance.
+
+### Window independence
+
+Each window can independently:
+
+- Switch workspaces.
+- Move and resize.
+- Minimize or maximize.
+- Move to another monitor.
+- Restore its previous workspace.
+- Close without terminating unrelated work.
+- Display its own project/document context.
+
+All windows remain part of one coordinated session.
+
+---
+
+# 3. THE SPARK ORB REMAINS THE COMMAND HUB
+
+Preserve and extend the existing Spark Orb.
+
+Its normal in-app presentation should be available from the top-left of each workspace window, integrated with the established layout rather than requiring a replacement application header.
+
+The Orb is the consistent gateway to the studio.
+
+### Behaviors
+
+**Click:** Open the full Spark menu.
+
+**Hover:** Show optional quick-access tools.
+
+**Workspaces:** Navigate, switch or open workspaces.
+
+**Tools:** Access compatible external Halo tools.
+
+**Recent:** Return to open documents and recent work.
+
+**Windows:** Focus or manage open Spark windows.
+
+**Settings:** Customize Spark.
+
+**Right-click:** Contextual options where appropriate.
+
+**Keyboard shortcut:** Open the command menu without a pointer.
+
+### Reliability
+
+- Hover submenus must not collapse unexpectedly.
+- Menu navigation must support keyboard input.
+- Important actions must not depend exclusively on hover.
+- Menus should close predictably.
+- Search and commands should refer to real functionality.
+- Existing accessible shortcuts must remain intact.
+
+### Single authoritative command system
+
+Use Spark's existing workspace/tool/command registries.
+
+The Orb, in-window switcher, keyboard search and context menus must reference the same underlying actions.
+
+Do not duplicate every command in unrelated navigation frameworks.
+
+---
+
+# 4. BORROW THE BEST NAVIGATION IDEAS FROM CLASSIC HALO TOOLS
+
+Study the actual workflows and current implementations of relevant Halo editing applications.
+
+Useful reference categories include:
+
+- Guerilla-style native tag hierarchy and property inspection.
+- Sapien-style scenario object selection and properties.
+- Eschaton/Assembly-style map and tag browsing.
+- SwordEdit-style spatial manipulation.
+- Modern outliner, inspector and document navigation patterns where helpful.
+
+Verify the actual behavior of each referenced tool rather than copying an assumed feature.
+
+**Borrow successful interaction ideas, not their entire interfaces.**
+
+Do not turn Spark into a visual clone of another editor.
+
+### A. Clear object hierarchy
+
+In workspaces that edit structured content, make it easy to understand the relationship between:
+
+- Project.
+- Map.
+- Scenario.
+- BSP.
+- Object.
+- Native tag.
+- Asset.
+- Component.
+- Property.
+- Script or event.
+
+Use existing scene hierarchies and source trees wherever available.
+
+Improve naming, grouping and selection synchronization where necessary.
+
+### B. Breadcrumbs
+
+When editing deeply nested content, provide compact navigation context.
+
+Example:
+
+`First Contact > Scenario > BSP 0 > Corridor A > North Wall`
+
+Another example:
+
+`Blood Gulch > Vehicles > Warthog > Shader > Cubemap`
+
+Each meaningful parent should support returning to the corresponding location.
+
+Do not show enormous breadcrumb bars on screens where they add no value.
+
+### C. Selection synchronization
+
+Selecting an object in the viewport should identify it in the relevant hierarchy.
+
+Selecting it in the hierarchy should focus or highlight the correct object where applicable.
+
+Selecting a referenced native tag should make the correct asset or tag document accessible.
+
+Ensure that source identity is preserved, not inferred from display names alone.
+
+### D. Contextual tools
+
+If a BSP face is selected, prioritize relevant geometry, UV, material and collision tools.
+
+If a weapon is selected, prioritize its native tags, properties, dependencies and applicable gameplay controls.
+
+If a trigger is selected, expose Logic / Events and associated script source.
+
+If an AI encounter is selected, show relevant squads, behavior, activation and diagnostics.
+
+The UI should adapt to the current task without hiding advanced functionality.
+
+### E. Search
+
+Preserve or extend one coherent search experience across applicable:
+
+- Commands.
+- Workspaces.
+- Open documents.
+- Maps.
+- Tags.
+- Assets.
+- Scene objects.
+- Installed tools.
+- Relevant Learning Center content.
+
+Search results must perform real supported navigation or commands.
+
+### F. Related-workspace navigation
+
+Provide contextual actions such as:
+
+- Open in Tag Inspector.
+- Edit in BSP Workshop.
+- View in World Editor.
+- Open Associated Script.
+- Inspect Dependencies.
+- Edit with Compatible External Tool.
+- Build / Validate.
+- Return to Previous Editor.
+
+Make these actions appear where they naturally belong.
+
+Do not build another global menu for every relationship.
+
+---
+
+# 5. NEVER LOSE YOUR PLACE
+
+This is one of the highest-priority UX improvements.
+
+Users should be able to move freely through the application without mentally tracking every open document or window.
+
+### Remember editing context
+
+Preserve applicable:
+
+- Project identity.
+- Map/document identity.
+- Selected object.
+- Selected face/edge/vertex.
+- Current tool.
+- Inspector section.
+- Camera position and orientation.
+- Zoom.
+- Scroll.
+- Active document tab.
+- Workspace.
+- Window.
+- Source revision.
+- Unsaved state.
+- Timeline or script editing position.
+
+Use stable IDs and the existing session/source systems.
+
+Do not rely on transient interface element identities.
+
+### Workspace switching
+
+Switching away must preserve the work that was open.
+
+Do not destroy unsaved edits.
+
+Do not reset a viewport unnecessarily.
+
+Do not repeatedly unload and reload the same source assets without a resource-management reason.
+
+### Return to previous work
+
+Add a compact **Open Work / Recent Places** interface through the existing Spark navigation.
+
+Show:
+
+- Current project.
+- Open maps/documents.
+- Open windows.
+- Active builds.
+- Unsaved work.
+- External tool handoffs.
+- Recent editing locations.
+- Important failures requiring attention.
+
+The interface may expand for complex tasks, but should remain compact by default.
+
+### Return to Work
+
+Example:
+
+`First Contact / BSP Workshop / Corridor A`
+
+Selecting this location should restore the relevant document and view, and focus its existing window if available.
+
+If the original window was closed, restore into a suitable available window.
+
+Do not automatically create redundant windows.
+
+### Back and Forward
+
+Provide meaningful location-navigation history.
+
+Keep it separate from source Undo/Redo.
+
+**Going Back must not undo a Halo map edit.**
+
+Undo must not unexpectedly navigate to another project.
+
+### Recover stale locations
+
+If an object was deleted or a source revision changed, handle that explicitly.
+
+Never silently jump to an unrelated object with a similar name.
+
+---
+
+# 6. MULTIPLE MAPS AND TABS
+
+Preserve and complete the existing multi-document behavior.
+
+A creator should be able to work with multiple maps, assets, scripts and applicable documents simultaneously.
+
+### Required behaviors
+
+- Open multiple compatible documents.
+- Switch between document tabs.
+- Reorder tabs.
+- Pin important tabs.
+- Search open tabs.
+- Move supported tabs between windows.
+- Detach into native windows.
+- Reattach.
+- Restore previous tabs.
+- Maintain correct project ownership.
+- Show unsaved state.
+- Show source/build context where relevant.
+
+### Same source, different views
+
+World Editor and BSP Workshop may both inspect the same source map.
+
+Their camera positions and selections can differ.
+
+Accepted source edits must remain synchronized through the existing authoritative transaction system.
+
+Do not create independent editable copies of the same document.
+
+### Avoid tab confusion
+
+A document tab identifies source content.
+
+A workspace selection identifies the editor experience.
+
+Do not force these two concepts into ambiguous controls.
+
+---
+
+# 7. MAKE THE USER'S CURRENT CONTEXT OBVIOUS
+
+A creator should always know:
+
+**What am I editing?**
+
+**Where does it belong?**
+
+**Which Halo am I targeting?**
+
+**Have I saved it?**
+
+**Is the build current?**
+
+Use compact contextual information.
+
+Distinguish:
+
+- Original map/source edition.
+- Current project.
+- Selected document or object.
+- Saved versus unsaved state.
+- Target Halo runtime.
+- Native build freshness.
+- Current game session, where relevant.
+
+Do not add another duplicate runtime selector.
+
+Re-use the currently established selector and status controls.
+
+### Multiple projects
+
+Separate windows may work on different projects.
+
+Support retaining a window's current project context.
+
+Companion views can optionally follow a deliberately selected active project.
+
+Never silently redirect unsaved edits to another project.
+
+### Source, build and gameplay are separate
+
+A successful compilation does not mean gameplay was tested.
+
+A running Halo instance may be using an older compiled map than the current source.
+
+Show these differences accurately without flooding the interface with engineering jargon.
+
+---
+
+# 8. FLUID WORKSPACE FADES
+
+Add a tasteful fade transition when changing major Spark workspaces or screens.
+
+Do this within the existing application structure.
+
+### Behavior
+
+- Fade the changing content region.
+- Keep the stable application frame visible.
+- Preserve workspace state before switching.
+- Restore the destination smoothly.
+- Avoid black or white flashes.
+- Avoid restarting the entire app shell.
+- Never lose source data during navigation.
+
+Use approximately 120–200 milliseconds as an initial design target, tuning according to actual performance.
+
+Do not artificially delay an already-ready workspace.
+
+If the destination needs time to load, show its usable shell and appropriate loading indication rather than blocking the entire interface.
+
+### Rapid navigation
+
+Handle fast repeated switching without stale render results, duplicated workspaces or incorrect focus.
+
+### Accessibility
+
+Honor reduced-motion preferences.
+
+Offer an option to disable or reduce transitions.
+
+Use lightweight existing CSS/React functionality where appropriate.
+
+Do not introduce an expensive animation dependency unless the existing architecture genuinely requires it.
+
+---
+
+# 9. HALO-INSPIRED SHIELD RECHARGE DURING MODEL LOADING
+
+Add an original, lightweight shield-recharge loading effect to Spark's existing model and complex asset previews.
+
+**This is a preview enhancement, not a renderer rewrite.**
+
+### Intended appearance
+
+While a new model genuinely loads:
+
+- Display a cached image or appropriate placeholder.
+- Show a tasteful segmented shield-energy indicator.
+- Animate charging as loading progresses.
+- Use restrained Halo-inspired light and energy styling.
+- Fade the completed model into view.
+- Optionally show a brief completion pulse.
+
+### Actual loading behavior
+
+Connect the animation to real stages of the asset pipeline where available:
+
+- Source/dependency loading.
+- Geometry preparation.
+- Textures.
+- Shaders/materials.
+- Animation.
+- GPU resource readiness.
+- First usable render.
+
+Do not invent progress percentages.
+
+Use indeterminate progress when the pipeline cannot accurately quantify completion.
+
+Do not label a preview complete when required data is missing.
+
+### Cache reuse
+
+If a model is already available, display it immediately.
+
+Do not replay a fake loading animation every time the creator returns.
+
+Preserve camera and selection state.
+
+Pause inactive previews safely.
+
+If valid GPU resources were released due to memory pressure, reload only what is required and show the indicator during actual loading.
+
+### Errors
+
+Stop the animation when loading fails.
+
+Identify the actual failure and offer meaningful recovery.
+
+Never leave the shield spinning indefinitely.
+
+### Customization
+
+Respect user theme colors, sound choices and reduced-motion settings.
+
+Use original graphics or licensed/user-owned assets.
+
+No new heavyweight 3D effects are required for the loading indicator.
+
+---
+
+# 10. MULTI-MONITOR LAYOUTS AND WORKSPACE CUSTOMIZATION
+
+Preserve all already-working layout and personalization capabilities.
+
+Extend them where required to support native multiwindow behavior.
+
+### Window layout behavior
+
+- Position and size persistence.
+- Monitor assignment.
+- Minimize/maximize.
+- Fullscreen where appropriate.
+- Detach/reattach.
+- Focus an existing window.
+- Restore window arrangements.
+- Recover off-screen windows after monitor disconnection.
+
+### Saved layouts
+
+Allow the creator to save useful multiwindow arrangements.
+
+Examples:
+
+**Map Builder:** World Editor and BSP Workshop.
+
+**Asset Creator:** World Editor, Asset Studio and Tags.
+
+**AI Development:** Scenario, AI encounters and Logic/Events.
+
+**Machinima:** Camera viewport, Recording Director and timeline.
+
+**Multiplayer Laboratory:** Runtime diagnostics, map/build status and gameplay tools.
+
+User-defined layouts must remain available and editable.
+
+### Deep personalization
+
+Preserve the original Spark Flow customization vision.
+
+Keep existing appearance, theme, icon, font, layout, toolbar, shortcut, editor and workspace preferences.
+
+Extend missing options through the existing settings architecture rather than replacing it.
+
+Relevant settings include:
+
+- Theme and accent.
+- UI density and scaling.
+- Orb behavior.
+- Default workspace.
+- Window layouts.
+- Open-in-new-window behavior.
+- Tab behavior.
+- Keyboard shortcuts.
+- Camera and gizmo preferences.
+- Preview quality.
+- Reduced motion.
+- Transition intensity.
+- Shield-loading animation.
+- Resource budgets.
+- Preferred native tools.
+- Native build behavior.
+
+Support safe defaults, reversible changes, preset import/export where appropriate and recovery from invalid settings.
+
+### Custom panel arrangements
+
+Preserve working docking, tab grouping, splitting and detachable panels.
+
+Improve specific limitations where needed.
+
+Do not build a parallel full docking framework simply to implement workspace switching.
+
+### Optional desktop Spark Orb
+
+Preserve the original idea of an optional floating/docked lightweight Spark companion.
+
+It must use the existing Command Hub and coordinated application session.
+
+Support safe placement, hide/show, monitor recovery, accessibility and customization.
+
+Do not introduce another project backend or force this companion on users.
+
+Its presence must never interfere with normal desktop interactions.
+
+---
+
+# 11. EXTERNAL HALO TOOL FLOW
+
+Make the existing external-tool workflow easy to understand.
+
+Example:
+
+1. Select a weapon in Spark.
+2. Choose an appropriate supported native editor.
+3. Spark prepares the valid source handoff.
+4. The external tool opens.
+5. The creator makes a change.
+6. Spark detects the modification.
+7. Source revisions are verified.
+8. The user accepts or resolves reconciliation.
+9. The updated source appears in Spark.
+10. The original editing location can be restored.
+11. The map can be rebuilt and playtested.
+
+Use actual installed-tool discovery and integration capabilities.
+
+Do not pretend every external application has an automation API.
+
+Do not implement another unrelated launcher.
+
+The Open Work interface should identify ongoing or interrupted handoffs.
+
+Never overwrite newer source silently.
+
+---
+
+# 12. RESOURCE EFFICIENCY
+
+Respect the P0 storage repair.
+
+Spark Flow must not turn convenient multiwindow editing into a RAM, VRAM or disk problem.
+
+### Requirements
+
+- One authoritative project source.
+- No full project copies per window.
+- No repeated SDK extraction for workspace changes.
+- Shared compatible source/dependency caching.
+- Bounded memory and disk caches.
+- No uncontrolled AppData growth.
+- No redundant native build workers.
+- No uncontrolled live runtime connections.
+- Pause hidden 3D render loops.
+- Preserve useful view state while releasing expensive rendering resources.
+- Reuse valid model/texture data where technically possible.
+- Manage GPU allocations per actual renderer context.
+
+Independent native webviews may require independent GPU resources.
+
+Do not falsely claim one literal renderer spans every native window.
+
+### Performance measurement
+
+Measure:
+
+- Window creation.
+- Workspace switching.
+- Returning to a previous editor.
+- Opening an already-used model.
+- Loading shaders and textures.
+- Preview restoration.
+- Session startup.
+- Multiwindow RAM and VRAM.
+- Idle CPU/GPU use.
+- Disk/cache growth.
+
+Prioritize responsive operation on ordinary hardware.
+
+---
+
+# 13. PROTECT THE EDITING SESSION
+
+Closing a view is not the same as unloading a map.
+
+Closing a window is not the same as closing a project.
+
+Switching workspaces is not the same as discarding a workspace.
+
+### Preserve
+
+- Unsaved changes.
+- Open documents.
+- Existing source Undo/Redo.
+- Relevant camera/selection state.
+- Native build tasks.
+- External handoffs.
+- Source revisions.
+- Valid session recovery information.
+
+### Startup and restore
+
+Restore supported windows, documents and workspaces after reopening Spark.
+
+Do not automatically rerun interrupted native commands without validation.
+
+If the saved layout is corrupt, open a safe default view without destroying projects.
+
+If a monitor is unavailable, bring inaccessible windows onto an available display.
+
+### Interaction safety
+
+A workspace change during an active drag or edit must commit or cancel according to the existing transaction rules.
+
+Do not leave native source in a partially applied state.
+
+Do not allow Inspector scrolling to accidentally change numeric values.
+
+Provide clear dirty-document and conflict indicators.
+
+Never silently discard source because a companion window closes.
+
+---
+
+# 14. COMPLETE EXISTING UX POLISH
+
+Audit the actual UI for points where a creator can become confused, lose context or repeat unnecessary steps.
+
+Preserve the established design while fixing specific problems.
+
+Prioritize:
+
+- Reliable hierarchy selection.
+- Viewport/object synchronization.
+- Frontmost BSP face and edge selection.
+- Consistent naming and source object visibility.
+- Useful inspector organization.
+- Compact Community Maps.
+- Discoverable native builds.
+- Clear runtime selection.
+- Consistent shortcuts.
+- Functional contextual menus.
+- Accurate tool availability.
+- Helpful empty states.
+- Clear error messages.
+- Relevant Learning Center guidance.
+- Reliable Home and workspace restoration.
+- Existing preview-state preservation.
+- Layouts that work at small and large window sizes.
+
+Do not replace functioning editor components merely because another Halo tool organizes them differently.
+
+Borrow interaction patterns only when they improve actual creator tasks.
+
+---
+
+# 15. IMPLEMENTATION STRATEGY
+
+Do not perform a broad unreviewed UI rewrite.
+
+Work incrementally within the existing application.
+
+### Phase 1 — Audit
+
+Inspect actual current UI, routes, Orb, navigation, window management, document state, settings and source ownership.
+
+Identify existing capabilities and precise gaps.
+
+### Phase 2 — Navigation clarity
+
+Improve hierarchy navigation, selection synchronization, contextual commands, breadcrumbs, document orientation and related-editor jumps.
+
+Preserve the established appearance.
+
+### Phase 3 — Workspace windows
+
+Extend existing pop-out and Tauri window behavior.
+
+Add window-local workspace switching.
+
+Preserve the existing native window implementation.
+
+### Phase 4 — Return to Work
+
+Add compact Open Work / Recent Places functionality.
+
+Preserve editing context and navigation history.
+
+### Phase 5 — Session persistence
+
+Complete safe restoration across workspace switching, tabs, windows and project contexts.
+
+### Phase 6 — Visual polish
+
+Add lightweight workspace fades and shield-recharge preview loading.
+
+### Phase 7 — Customization and multi-monitor integration
+
+Complete required layout switching, saved arrangements, compatible customization and optional desktop Orb integration without rebuilding existing systems.
+
+### Phase 8 — Performance and regression repair
+
+Measure memory, VRAM, disk, switching latency and rendering behavior.
+
+Fix reproducible defects.
+
+Verify existing Halo functionality remains intact.
+
+These are implementation stages within one complete directive, not permission to abandon requirements.
+
+---
+
+# 16. ACCEPTANCE THROUGH THE REAL SPARK HARNESS
+
+Use the existing desktop/application testing harness, not ChatGPT Computer Use.
+
+Verify actual UI actions and real source state.
+
+### Test A — Basic navigation
+
+Open a Halo map.
+
+Select an object.
+
+Find its native tag.
+
+Open the associated editor.
+
+Return to the original object.
+
+Verify source identity and selection.
+
+### Test B — Pop-out workspace
+
+Open World Editor.
+
+Pop out Asset Studio.
+
+Move it to another window/monitor.
+
+Verify both function.
+
+### Test C — Workspace switching
+
+Switch Asset Studio to Script Editor and back in the same window.
+
+Confirm the original asset state remains available.
+
+### Test D — Multiple maps
+
+Open two or more maps.
+
+Edit one.
+
+Ensure the others remain unchanged.
+
+### Test E — Same map in two windows
+
+Open the same source through two compatible editors.
+
+Verify change synchronization and Undo correctness.
+
+### Test F — Return to Work
+
+Edit a particular BSP face.
+
+Navigate through several workspaces.
+
+Use Recent Places to return.
+
+Verify correct project, document, selection and camera.
+
+### Test G — Navigation history
+
+Use Back and Forward.
+
+Verify they do not change source Undo history.
+
+### Test H — External tool
+
+Launch a verified compatible tool.
+
+Make a supported change.
+
+Return and reconcile.
+
+Restore the originating workspace.
+
+### Test I — Native build
+
+Start a build.
+
+Switch workspaces.
+
+Verify the task remains visible and its frozen source revision is preserved.
+
+### Test J — Fade
+
+Switch workspaces repeatedly.
+
+Verify smooth transitions, no black flashes, no stale renders and no lost state.
+
+### Test K — Shield recharge
+
+Load a genuine uncached model.
+
+Verify real loading feedback.
+
+Switch away and return.
+
+Verify cached resources do not trigger unnecessary loading.
+
+Test missing dependencies and failure recovery.
+
+### Test L — Multi-monitor
+
+Save and restore a multiwindow arrangement.
+
+Test reduced monitor availability.
+
+Confirm windows remain accessible.
+
+### Test M — Customization
+
+Change applicable theme, layout, shortcut, Orb and animation settings.
+
+Restart.
+
+Verify persistence and safe restoration.
+
+### Test N — Resource limits
+
+Repeat opening, switching, detaching and restoring workspaces.
+
+Confirm bounded RAM, VRAM and disk growth.
+
+### Test O — Existing Halo regression
+
+Reopen accepted native editing fixtures.
+
+Verify BSP source, scripts, Undo, compilation, readback and preserved C63 two-way door functionality.
+
+### Test P — Complete user journey
+
+Open Spark.
+
+Find a map.
+
+Edit geometry.
+
+Import a compatible asset.
+
+Inspect a tag.
+
+Configure a trigger.
+
+Switch workspace.
+
+Open another window.
+
+Use an external tool.
+
+Return and reconcile.
+
+Compile.
+
+Launch Halo.
+
+Return to Spark.
+
+Find the previous editing location.
+
+Continue working.
+
+**Fix reproducible failures and rerun the affected workflow until it passes.**
+
+---
+
+# 17. COMPLETION REQUIREMENTS
+
+Do not declare Spark Flow complete until:
+
+- Existing visual design is preserved.
+- Existing navigation remains functional.
+- Relevant object hierarchies and breadcrumbs work.
+- Users can discover related editors and tools.
+- Compatible workspaces can pop out.
+- Workspace windows can switch roles.
+- Multiple windows remain synchronized with authoritative source.
+- The user can find open work and return to previous editing locations.
+- Navigation history remains separate from Undo/Redo.
+- Tabs, maps and project identities remain correct.
+- Workspace switches preserve relevant document/view state.
+- Subtle fades work without performance regressions.
+- Shield-recharge model loading reflects real readiness.
+- External handoffs can return users to the proper editing context.
+- Existing customization remains intact and necessary multiwindow options are integrated.
+- Window and session restoration work safely.
+- Multi-monitor recovery works.
+- Storage, RAM and VRAM remain bounded.
+- Existing native Halo editing/build workflows still pass.
+- The real desktop harness verifies all supported behaviors.
+
+Maintain accurate evidence of what passed, failed or remains blocked.
+
+Do not substitute screenshots, synthetic mocks or internal test-only state for genuine application interaction.
+
+Do not push or publish without approval.
+
+---
+
+# FINAL DESIGN PRINCIPLE
+
+The user should not need to understand Guilty Spark's architecture to use Guilty Spark effectively.
+
+They should understand:
+
+**Where am I?**
+
+**What am I editing?**
+
+**What can I do with it?**
+
+**Where should I go next?**
+
+**How do I get back?**
+
+**Is my work safe?**
+
+Spark should answer these questions naturally through its existing interface.
+
+Keep the recognizable studio.
+
+Improve the navigation.
+
+Make windows flexible.
+
+Preserve the creator's place.
+
+Connect the tools.
+
+Make transitions feel polished.
+
+Keep the application fast.
+
+**Don't rebuild what works. Make what works feel effortless.**
+
+## PROJECT GUILTY SPARK — SPARK FLOW
+
+### ALL THE TOOLS, AND THEN SOME.

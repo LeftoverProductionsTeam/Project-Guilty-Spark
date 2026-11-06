@@ -1,0 +1,75 @@
+GUILTY SPARK — ADVANCED HALO ENGINE FRONTIERPreserve the ambitious features without making false promises
+Continue from the existing research ledger, native engine tests, multiplayer infrastructure and Megaworld work.
+
+These goals remain part of the long-term vision, but they require separately proven engine capabilities.
+
+128-player multiplayer
+OpenCE's public documentation describes support for up to 128 players.
+
+Verify the exact pinned runtime's implementation, supported map constraints, network budgets, player slots and actual stability.
+
+Investigate how Spark can create, validate, package and host maps suitable for high player counts.
+
+Test spawning, teams, vehicles, bandwidth, object ownership, map voting and performance.
+
+Do not claim a 128-player game works merely because the engine accepts a corresponding configuration.
+
+Expanded cooperative campaign
+Investigate six-player campaign support and determine the actual limitations of each selected engine.
+
+Separate player-slot capacity from shared campaign AI, checkpoints, scripted cinematics, vehicle seats, level transitions, respawns and objective synchronization.
+
+Use real multiplayer tests with the maximum available clients.
+
+Do not promise six-player campaign support in stock CE or MCC without compatible engine evidence.
+
+Local split-screen
+OpenCE documents up to four players per device.
+
+Investigate supported Windows/Linux configurations, input devices, independent viewports, controllers, menus and performance.
+
+Preserve distinctions between local split-screen and online campaign co-op.
+
+Four-region seamless world streaming
+Treat actual concurrent region streaming as a separate engine-level research program.
+
+Study:
+
+BSP resident memory.
+Collision and physics.
+Visibility and portal graphs.
+Object ownership.
+Dynamic asset/resource loading.
+AI navigation across boundaries.
+Sound and environment transitions.
+Multiplayer state replication.
+Server and client memory budgets.
+Do not confuse a compiled large BSP, scripted BSP switching or map loading with seamless streaming.
+
+First complete real Timberland–Sidewinder traversal and then incremental multi-region tests.
+
+VR and tracked interactions
+Investigate compatible open runtime rendering and input interfaces.
+
+Start with isolated proof of stereo rendering, head pose and correct camera matrices.
+
+Only then research motion controllers, weapons, UI and interactions.
+
+No anti-cheat bypasses, unsupported binary patching or claims of universal VR support.
+
+Engineering model
+Keep experimental capabilities behind accurate feature flags.
+
+Every experiment needs:
+
+Version-pinned runtime.
+Feasibility hypothesis.
+Explicit resource and compatibility assumptions.
+Reproducible fixture.
+Measurable acceptance target.
+Failure analysis.
+No destructive effect on production workflows.
+Final requirement
+Preserve these goals in the project ledger, but do not hold the working native editor, installer or community release hostage to unfinished engine research.
+
+Push the Blam engine as far as real engineering permits, while remaining precise about what actually works.

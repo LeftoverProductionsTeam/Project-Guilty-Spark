@@ -1,0 +1,166 @@
+# PROJECT GUILTY SPARK — COMMUNITY UNITY DIRECTIVE
+
+## One Community. Every Compatible Engine. Every Creator.
+
+**Mission:** Guilty Spark must help reunite the fragmented Halo 1 modding and multiplayer ecosystem by connecting creators, tools, maps, servers, and players through one cohesive experience.
+
+This is a permanent product requirement, not a request to start a competing server network or build another disconnected launcher.
+
+Continue existing engineering. Preserve native Halo compatibility, the current source history, the native authoring initiative, and all accepted progress.
+
+### 1. Make community participation the core workflow
+
+A creator should be able to:
+
+**Create a map → test it → publish through an authorized destination → invite players → host an event → receive feedback → improve the map.**
+
+A player should be able to:
+
+**Find a map or game → understand what it requires → obtain authorized content → launch a compatible client → join and play.**
+
+Both experiences must use the existing Spark workspace, Map Library, Multiplayer Hub and runtime/tool adapters.
+
+### 2. One server directory, without inventing cross-play
+
+Aggregate documented public discovery sources for OpenCE, Chupathingy and supported Halo CE services.
+
+Integrate MCC session discovery only where an official or otherwise authorized interface exists.
+
+Show real player counts, map, gametype, ping where measured, compatible runtime, required client version, and joining status.
+
+When the source distinguishes real players from bots, display both. If bot data is unavailable, label it unknown rather than inventing a count.
+
+Prioritize finding real people to play with.
+
+Never assume owning MCC permits joining OpenCE or Chupathingy servers.
+
+A map loading in another engine does not establish networking compatibility.
+
+Do not bypass protected multiplayer authentication or anti-cheat.
+
+### 3. Support community maps without forcing proprietary formats
+
+Create a unified map catalog built upon Spark's existing Map Library.
+
+Every entry should retain:
+
+- Original creator and appropriate credits.
+- Original map/source identity.
+- Compatible editions and runtimes.
+- Native map and tag format.
+- Required dependencies.
+- Available source tags, if the author shares them.
+- Verified downloadable locations.
+- Map version and integrity hashes.
+- Licensing or reuse permissions.
+- Actual gameplay acceptance status.
+
+Integrate legitimate community repositories through supported APIs and author-approved links.
+
+Do not scrape private communities, mirror copyrighted assets without permission, or repackage another creator's work without authorization.
+
+Preserve `.map`, native tags and standard Halo source formats. No forced `.yelo` or Spark-only map extensions.
+
+### 4. Make playing community maps easy
+
+Detect the correct locally installed Halo runtime.
+
+Explain missing game resources and map dependencies.
+
+Prefer validated direct compatibility. Offer native conversion only when appropriate and technically supported.
+
+Use an existing runtime's safe map downloader where available rather than implementing a less secure replacement.
+
+Never silently modify original Halo installations or substitute a converted map that fails a server's required identity/hash check.
+
+### 5. Make original content creation accessible
+
+Retain the Hammer-to-Halo initiative:
+
+- Visual BSP and level construction.
+- Drag-and-drop native assets from legitimately available maps.
+- Standard Halo tag generation.
+- Visual asset-associated HaloScript.
+- Materials, shaders, lighting and animation.
+- Native compiler integration.
+- Source recovery.
+- Real game testing.
+
+Creators must be able to start from an empty scene and construct a genuinely original Halo level without being forced to rebuild an extracted map.
+
+Blender and established specialist tools remain available for advanced work.
+
+Support beginner tutorials and expert editing through the same native project.
+
+### 6. Bring creators together instead of competing with them
+
+Make compatible integration and attribution part of Spark's design.
+
+Support legitimate handoffs to Mantle, Baboon, Invader, Guerilla, OpenTool, Blender, OpenCE and Chupathingy.
+
+Respect their authors, licensing and independently maintained ecosystems.
+
+Allow source-aware collaboration through existing SparkLink functionality, without pretending this is equivalent to playing network co-op.
+
+Support opt-in sharing of project files, native sources and reproducible bug reports.
+
+Do not make adoption of Spark a prerequisite for other creators to use the resulting Halo content.
+
+### 7. Give the community reasons to return
+
+Build toward:
+
+- Featured community-made maps.
+- Creator credits and project pages.
+- Discoverable public playtest sessions.
+- Scheduled community game nights through existing services.
+- Custom gametype and Firefight showcases.
+- Creator challenges and collaborative projects.
+- Optional feedback and bug-report submissions.
+- Easy ways to find human-populated games.
+- Beginner-friendly map creation tutorials.
+
+Implement only where actual hosting, discovery or publishing capabilities exist. Do not create empty community dashboards or fabricated player activity.
+
+Prefer links to established community platforms before developing new accounts, social networking or moderation infrastructure.
+
+### 8. Permanent acceptance benchmark
+
+Prove the complete community loop:
+
+1. Creator produces a valid native Halo map in Spark.
+2. Spark verifies and packages the map for a supported target.
+3. Creator publishes or shares through an authorized destination.
+4. Another user discovers it.
+5. Spark identifies the correct runtime and dependencies.
+6. The user obtains the permitted map files.
+7. Two real players successfully join the same compatible game session.
+8. Both can play the published content.
+9. The creator receives a reproducible issue report or feedback.
+10. The original project remains editable and can be rebuilt.
+
+Separate authored, compiled, published, discovered, joined and gameplay-tested states.
+
+Do not claim success without actual evidence.
+
+### Engineering priority
+
+First preserve and complete the native scripted-door export benchmark.
+
+Then use the same native project and runtime infrastructure to demonstrate **one creator-to-player community round trip**.
+
+Advance the existing server browser and compatible client launch functionality before building additional social features.
+
+Do not start another game network, require proprietary content, or fragment the community further.
+
+### The guiding principle
+
+**Guilty Spark isn't here to replace the Halo modding community. It's here to make the community's tools, creations and people easier to connect.**
+
+Every creator should retain ownership of their work.
+
+Every compatible Halo runtime should have a place.
+
+Every playable community map deserves an accessible path to players.
+
+**ALL THE TOOLS, AND THEN SOME. ONE HALO COMMUNITY.**

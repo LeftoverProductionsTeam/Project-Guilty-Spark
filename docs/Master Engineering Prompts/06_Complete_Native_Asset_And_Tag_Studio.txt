@@ -1,0 +1,74 @@
+GUILTY SPARK — COMPLETE NATIVE ASSET & TAG STUDIO
+From a source asset to a genuine working Halo object
+Continue from current Tag Inspector, Asset Library, native decoders, bitmap/audio previews, native importers, QuickForge placements and script editor.
+
+Support the complete asset lifecycle
+Discover → Inspect → Extract where legal → Edit → Convert → Validate → Export native tags → Compile → Use in game.
+
+Support edition-appropriate:
+
+Models and render geometry.
+Collision and physics.
+Skeletons and animations.
+Weapons, vehicles, bipeds and scenery.
+Equipment and devices.
+Projectiles and effects.
+Bitmaps and shaders.
+Lightmaps, cubemaps and reflections.
+Sounds, dialogue and music.
+HUD and UI assets.
+Strings and localized messages.
+Script references and scenario dependencies.
+Do not imply that all asset types share the same binary layout or conversion route.
+
+Native exports
+Create standard Halo tags through validated serialization and source compilation.
+
+Maintain correct dependency closure.
+
+Use direct .map editing only for proven safe bounded operations.
+
+Use loose-tag reconstruction and native rebuilds when structural edits require them.
+
+Scriptable asset workflow
+In the object's Inspector, provide a Logic / Events section for attaching supported reusable behavior.
+
+For instance, a door may have a trigger relationship; an encounter controller may start a script; a supported effect may run when an event occurs.
+
+Store the editable logic template in optional Spark metadata.
+
+Compile gameplay behavior into standard HaloScript and native scenario object references.
+
+Do not invent script fields inside arbitrary native weapon, vehicle or scenery tags.
+
+Asset fidelity diagnostics
+Compare original and output:
+
+Vertex/triangle topology.
+Normal orientation.
+UVs and material assignments.
+Texture channels and alpha.
+Mipmap chains.
+Rig hierarchy and rotations.
+Animation timing.
+Collision shapes.
+Physical constraints.
+Sound decoding and sample bounds.
+Tag reference validity.
+Warn about documented Blender conversion limitations and unsupported target features.
+
+Preserve source-native appearance as much as possible, but never claim that a modern shader preview equals the exact stock game renderer.
+
+UI
+One large interactive preview with context tabs:
+
+Properties | Materials | Animation | Collision | Sound | Logic | Dependencies | Native Output
+
+Support drag-and-drop into the World Editor.
+
+Acceptance
+Import a real supported object and all required dependencies, edit a property, attach a valid scenario behavior, compile, and verify the object in Halo.
+
+Then reopen the standard output in an independent compatible tag editor.
+
+A beautiful object preview doesn't count unless the actual Halo asset works.

@@ -1,0 +1,59 @@
+GUILTY SPARK — UNIVERSAL LIVE LINK WITH HONEST RUNTIME ADAPTERSChange supported game state safely, without pretending every engine has the same hooks
+Continue from actual HEAD and preserve existing Live Link functionality.
+
+Preserve known capability boundaries
+MCC Halo 1: Current Spark evidence supports bounded object transforms, scaling and readback on specific validated builds. Retain those operations, add regression proof and verify every supported build.
+
+Custom Edition: No general Spark live-write adapter is proven. Investigate supported interfaces; otherwise use source editing, compile and controlled reload.
+
+OpenCE: Existing exact-build AI diagnostics are read-only. Investigate documented engine-side APIs, developer interfaces and Mantle's reported control capabilities before implementing supported writes.
+
+Chupathingy: Treat as an independent target. Investigate supported developer interfaces; do not copy OpenCE offsets or presume identical memory layouts.
+
+Retail Xbox, HaloMD and Mac Demo: Preserve native cache/source workflows. Do not claim desktop-style live process control until an exact supported target exists.
+
+Define a typed capability contract
+Each runtime adapter must declare:
+
+Executable identity and version.
+Supported operation types.
+Whether changes are read-only, temporary or persisted.
+Whether multiplayer use is supported.
+Required source ownership.
+Target object identity.
+Safety constraints and rollback behavior.
+Exact validation evidence.
+Supported operations may include selected transforms, properties, camera controls, debug telemetry and safe hot reload—but only when the actual engine implements them.
+
+Never expose arbitrary process memory writing, dynamic offset guessing, code injection or anti-cheat circumvention.
+
+Make Live Link understandable
+One contextual action inside Spark:
+
+Apply → Source / Rebuild / Live Preview
+
+Show three independent states:
+
+Saved source revision.
+Compiled map revision.
+Current game session state.
+A temporary live edit must never be mislabeled as a saved source change.
+
+Support comparing live values with source, deliberately committing supported edits, rebuilding when required and reverting preview changes.
+
+Disable unavailable operations with a short reason.
+
+Acceptance
+On each supported runtime:
+
+Detect the exact running executable.
+Identify the loaded map and build.
+Establish the validated interface.
+Read one supported value.
+Perform one explicitly allowed change.
+Verify the game displays the result.
+Revert or safely disconnect.
+Restart and prove whether the change was temporary or persisted.
+Test unsupported builds, closed games, changed maps, stale object IDs and multiplayer restrictions.
+
+The goal is the best safe Live Link each runtime can genuinely provide—not an imaginary universal memory editor.

@@ -89,9 +89,9 @@ pub fn retain_draft(dir:&Path,registered:&Project,revision:u64,head:&Head,snapsh
     if bytes.len()>MAX_TRANSFER{return invalid("Rejected draft exceeds 64 MiB");}
     let file=dir.join(format!("rejected-{}.json",uuid::Uuid::new_v4()));project::atomic_write(&file,&bytes,false)?;Ok(file)
 }
-/// Caller serializes commits and validates new native edit fields. New immutable
-/// files are flushed before the small head is atomically replaced. Orphaned
-/// interrupted files are harmless and remain recoverable.
+/// Caller serializes commits and validates new native edit fields. Preflight
+/// the complete proposed state before allocating immutable files. Files left by
+/// interrupted I/O remain recoverable; rejected data must not create them.
 pub fn commit(dir:&Path,registered:&Project,expected:u64,head:Head,additions:Vec<Snapshot>)->Result<u64>{
     commit_with_budget(dir,registered,expected,head,additions,MAX_TRANSFER)
 }
@@ -101,6 +101,7 @@ fn commit_with_budget(dir:&Path,registered:&Project,expected:u64,head:Head,addit
     let revision=old.as_ref().map_or(0,|s|s.revision);
     if expected!=revision{return invalid(format!("Window revision conflict: expected {expected}, current {revision}. Your draft was retained."));}
     let mut hashes=old.map(|s|s.hashes).unwrap_or_default();
+    let mut pending=BTreeMap::new();
     if additions.len()>2001{return invalid("Too many new history snapshots");}
     let mut total=0;
     for item in additions {
@@ -110,8 +111,9 @@ fn commit_with_budget(dir:&Path,registered:&Project,expected:u64,head:Head,addit
         let bytes=serde_json::to_vec(&item.project)?;total+=bytes.len();
         if bytes.len() as u64>MAX_SNAPSHOT || total>budget{return invalid("History snapshot transfer exceeds its byte budget");}
         let sha=digest(&bytes);let file=dir.join(format!("{}.json",item.key));reject_links(&file)?;
-        if file.exists(){if digest(&fs::read(&file)?)!=sha{return invalid("An immutable history snapshot cannot be overwritten");}}
-        else{project::atomic_write(&file,&bytes,false)?;}
+        if hashes.get(&item.key).is_some_and(|known|known!=&sha){return invalid("An immutable history snapshot cannot be overwritten");}
+        if file.exists(){if fs::metadata(&file)?.len()>MAX_SNAPSHOT || digest(&fs::read(&file)?)!=sha{return invalid("An immutable history snapshot cannot be overwritten");}}
+        else{pending.insert(item.key.clone(),bytes);}
         hashes.insert(item.key,sha);
     }
     // Validate references including previously stored bytes before acknowledging.
@@ -119,20 +121,53 @@ fn commit_with_budget(dir:&Path,registered:&Project,expected:u64,head:Head,addit
     for key in head.keys(){
         if !seen.insert(key){continue;}
         let sha=hashes.get(key).ok_or_else(||crate::SparkError::Invalid("History references an unknown snapshot".into()))?;
-        snapshot(dir,key,sha,registered)?;
-        referenced_bytes=referenced_bytes.checked_add(fs::metadata(dir.join(format!("{key}.json")))?.len()).ok_or_else(||crate::SparkError::Invalid("History size overflow".into()))?;
+        let bytes=if let Some(bytes)=pending.get(key){bytes.len() as u64}else{snapshot(dir,key,sha,registered)?;fs::metadata(dir.join(format!("{key}.json")))?.len()};
+        referenced_bytes=referenced_bytes.checked_add(bytes).ok_or_else(||crate::SparkError::Invalid("History size overflow".into()))?;
         if referenced_bytes>budget as u64{return invalid("History exceeds its recoverable transfer budget; acknowledged head retained without truncation");}
     }
     hashes.retain(|key,_|head.keys().any(|used|used==key));
     let next=revision.checked_add(1).ok_or_else(||crate::SparkError::Invalid("History revision exhausted".into()))?;
     let state=Stored{schema_version:1,project_id:registered.id.clone(),revision:next,head,hashes};
     let envelope=Envelope{sha256:digest(&serde_json::to_vec(&state)?),state};
-    project::atomic_write(&dir.join("head.json"),&serde_json::to_vec(&envelope)?,false)?;
+    let encoded=serde_json::to_vec(&envelope)?;
+    for(key,bytes)in pending{
+        let file=dir.join(format!("{key}.json"));reject_links(&file)?;
+        if file.exists(){if fs::metadata(&file)?.len()>MAX_SNAPSHOT || digest(&fs::read(&file)?)!=digest(&bytes){return invalid("An immutable history snapshot cannot be overwritten");}}
+        else{project::atomic_write(&file,&bytes,false)?;}
+    }
+    project::atomic_write(&dir.join("head.json"),&encoded,false)?;
     Ok(next)
 }
 
 #[cfg(test)] mod tests {
     use super::*;
+    #[test]fn rejected_batches_do_not_allocate_earlier_snapshots_or_change_the_accepted_head(){
+        let dir=tempfile::tempdir().unwrap();let good=Project::new("Accepted");let key=uuid::Uuid::new_v4().to_string();
+        commit(dir.path(),&good,0,head(key.clone()),vec![Snapshot{key,project:good.clone()}]).unwrap();
+        let accepted=fs::read(dir.path().join("head.json")).unwrap();
+        let before=fs::read_dir(dir.path()).unwrap().count();
+        for _ in 0..10{
+            let candidate=uuid::Uuid::new_v4().to_string();let foreign=uuid::Uuid::new_v4().to_string();
+            assert!(commit(dir.path(),&good,1,head(candidate.clone()),vec![Snapshot{key:candidate,project:good.clone()},Snapshot{key:foreign,project:Project::new("Other source")}]).is_err());
+            assert_eq!(fs::read_dir(dir.path()).unwrap().count(),before);assert_eq!(fs::read(dir.path().join("head.json")).unwrap(),accepted);
+        }
+        let proposed=uuid::Uuid::new_v4().to_string();
+        assert!(commit(dir.path(),&good,1,head(uuid::Uuid::new_v4().to_string()),vec![Snapshot{key:proposed,project:good.clone()}]).is_err());
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(),before);assert_eq!(read(dir.path(),&good).unwrap().unwrap().revision,1);
+    }
+    #[test]fn missing_and_duplicate_snapshot_ids_cannot_be_rebound_to_different_bytes(){
+        let dir=tempfile::tempdir().unwrap();let good=Project::new("Original");let key=uuid::Uuid::new_v4().to_string();
+        commit(dir.path(),&good,0,head(key.clone()),vec![Snapshot{key:key.clone(),project:good.clone()}]).unwrap();
+        let file=dir.path().join(format!("{key}.json"));fs::remove_file(&file).unwrap();
+        let mut changed=good.clone();changed.title="Changed".into();
+        assert!(commit(dir.path(),&good,1,head(key.clone()),vec![Snapshot{key:key.clone(),project:changed.clone()}]).unwrap_err().to_string().contains("immutable"));
+        assert!(!file.exists());
+        commit(dir.path(),&good,1,head(key.clone()),vec![Snapshot{key:key.clone(),project:good.clone()}]).unwrap();
+        assert_eq!(read(dir.path(),&good).unwrap().unwrap().snapshots[0].project.title,"Original");
+        let duplicate=uuid::Uuid::new_v4().to_string();
+        assert!(commit(dir.path(),&good,2,head(duplicate.clone()),vec![Snapshot{key:duplicate.clone(),project:good.clone()},Snapshot{key:duplicate.clone(),project:changed}]).is_err());
+        assert!(!dir.path().join(format!("{duplicate}.json")).exists());assert_eq!(read(dir.path(),&good).unwrap().unwrap().revision,2);
+    }
     #[test]fn invalid_bsp_draft_is_quarantined_intact_without_changing_the_acknowledged_head(){
         let dir=tempfile::tempdir().unwrap();let mut good=Project::new("BSP");good.quick_forge=Some(crate::bsp_workshop::example().unwrap());
         let first=uuid::Uuid::new_v4().to_string();let h=head(first.clone());

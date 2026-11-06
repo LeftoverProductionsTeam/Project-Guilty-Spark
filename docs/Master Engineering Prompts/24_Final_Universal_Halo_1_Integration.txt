@@ -1,0 +1,944 @@
+# PROJECT GUILTY SPARK — FINAL UNIVERSAL HALO 1 INTEGRATION & ENGINEERING BREAKTHROUGH
+
+## ONE HALO. EVERY TOOL. EVERY WORLD. ONE WORKSPACE.
+
+**Mission:** Make Project Guilty Spark the most cohesive, accessible, technically dependable Halo: Combat Evolved creation suite possible.
+
+Continue from the actual current local HEAD, preserve every accepted improvement, and implement meaningful engineering advances without replacing existing working systems.
+
+This is an implementation, integration, testing, and product-completion directive—not another speculative feature brainstorm.
+
+### The product vision
+
+Guilty Spark should allow a creator to:
+
+1. Open any genuinely supported Halo 1 map or project.
+2. Examine its actual geometry, objects, textures, tags, scripts, AI, and dependencies.
+3. Make changes using direct cache editing, loose-tag editing, or native 3D authoring.
+4. Seamlessly use compatible specialist tools without losing project context.
+5. Merge worlds, add objects, build gametypes, and author campaign encounters.
+6. Convert and compile for compatible Halo engines.
+7. Launch the real game and verify the result.
+8. Return to the same Spark project with intact source history, diagnostics, and editing state.
+9. Package and share the result safely.
+
+A beginner should not need to learn twenty applications to move a vehicle, replace a shader, or modify a weapon.
+
+An advanced modder must still have access to the actual Halo engine structures, native tools, scripts, geometry, collision, and compiler diagnostics.
+
+**Simple operations should be simple. Complex operations should remain possible. Neither should destroy original game data.**
+
+---
+
+# PHASE 0 — PRESERVE AND VERIFY THE EXISTING PROJECT
+
+Before making changes, inspect the actual repository HEAD, active worktree, accepted binaries, tests, build outputs, source hashes, and feature ledger.
+
+Previously reported checkpoints include:
+
+- C43: durable Undo/Redo, Megaworld indexing, Timberland–Sidewinder combined-world candidate.
+- C47: native conversion improvements and strict tag comparisons.
+- C48: real-time local SparkLink collaboration across independent processes.
+- C54/C55: native asset drag, transformation, source preservation, and build/readback tests.
+- C58: commits `e2269e7` and `88505de`; improved source identity, runtime handling, CE-to-MCC rebuilding, resource decoding.
+- C59: commit `67ef43b`; detachable windows, collaboration rollover, recovery, native BSP compile.
+- C60: commit `cd73fae`; architecture consolidation, 255 reported commands, 472 tracked requirements, library refresh optimizations.
+- Latest reported baseline: 664 Rust, 365 frontend, 155 browser tests, plus native compilation and collaboration checks; eight intentionally ignored Rust tests.
+- Subsequent active work: native map-status optimizations, compact Inspector, renderer improvements, and ongoing AI acceptance.
+
+All are user-supplied engineering reports. Inspect current HEAD before treating them as current proof.
+
+Preserve the accepted C49 Windows v0.4.1 release candidate and its original source revision `cb07581`. It predates newer engineering and must not replace current development.
+
+Do not reset, discard, overwrite, or revert any active work.
+
+Do not remove a component because it appears redundant without checking current callers, native registrations, tests, and real workflow dependencies.
+
+**Prioritize verified completion of existing features over duplicating them.**
+
+---
+
+# PHASE 1 — MAKE SPARK THE UNIVERSAL HALO WORKSPACE
+
+## 1.1 Build upon the existing integration architecture
+
+Introduce a coherent, versioned interoperability contract—internally called **SparkBridge**, unless a suitable existing system already provides the same functionality.
+
+Do not create a parallel subsystem if existing SparkLink, runtime detection, Source Guardian, native adapters, or external-tool integrations can be extended.
+
+Every project and operation must track:
+
+- Project identity and original source identity.
+- Source game edition and cache format.
+- Input and derived-output paths.
+- Source revision and checksums.
+- Required shared resource maps.
+- Native tag classes and dependency graph.
+- Available editing operations.
+- Selected compiler/build target.
+- Selected game/testing runtime.
+- External tool identity and version.
+- Expected output artifacts.
+- Changes performed and their provenance.
+- Undo/rollback ownership.
+- Validation and gameplay acceptance state.
+
+Use a versioned machine-readable project manifest and capability registry. Sidecar metadata must never require proprietary modifications to Halo's native tag formats.
+
+Do not confuse source edition, compiler target, development runtime, multiplayer host, and game compatibility.
+
+### The critical workflow
+
+**Spark → compatible tool → Spark → native build → target game → Spark.**
+
+The creator must remain within one understandable project, even when an optional external application performs specialized work.
+
+## 1.2 Create a genuinely universal tool adapter contract
+
+Each adapter must declare:
+
+- Supported Halo editions and data formats.
+- Supported operating systems.
+- Required executable/version.
+- Installation discovery method.
+- Supported launch arguments or verified IPC/API.
+- Input types and output types.
+- Whether changes are read-only, reversible, source edits, or runtime-only.
+- Dependencies and compatibility restrictions.
+- Output validation strategy.
+- Licensing and redistribution requirements.
+- Known errors and safe fallback behavior.
+
+Provide adapter capability discovery, health checks, installation-path repair, source-aware launching, output detection, and result import.
+
+Where an upstream tool has no supported automation interface, use a reliable GUI launch and explicit guided handoff. Never invent command-line parameters, inject into third-party processes, or claim unsupported automated control.
+
+A tool that cannot complete a round trip must still be useful through its real supported interface.
+
+## 1.3 Supported companion ecosystem
+
+Audit actual version-specific interoperability with:
+
+- OpenCE Mantle.
+- Baboon and blam-tags.
+- Guerilla.
+- Sapien.
+- Halo Tool, including relevant official editions.
+- Invader.
+- Osoyoos.
+- Mozzarilla.
+- Reclaimer and Refinery.
+- Assembly and applicable cache editors.
+- Blender and the Halo asset toolset.
+- Forge CE.
+- Relevant established legacy utilities such as Eschaton and SwordEdit.
+- Other legitimately available Halo 1 utilities demonstrated to solve a real workflow problem.
+
+Compare existing strengths before writing replacements.
+
+Baboon already documents indexed tag browsing, structured field editing, model/audio preview, native editing-kit integration, Tool command forms, and command-line tag opening. Reuse its supported external interface rather than recreating all of its UI.
+
+Halo Map Studio, Forge CE, and modern DCC editors are also important UX benchmarks. Do not transfer a feature to Halo 1 merely because another Halo game's file format supports it.
+
+Keep any optional tool installation separate unless proper packaging, licensing, and redistribution permissions are established.
+
+---
+
+# PHASE 2 — FIRST-CLASS OPENCE MANTLE INTEROPERABILITY
+
+**Primary source:** https://github.com/SutlabSol/OpenCE-Mantle
+
+**Reference release:** https://github.com/SutlabSol/OpenCE-Mantle/releases/tag/v1.0.1
+
+**Reference commit:** `43ead49`
+
+The community developer leftknut has produced a substantial Halo editing system. Guilty Spark must treat Mantle as a compatible specialist editor and potential collaborator, not merely a competitor.
+
+His release documents world-merging improvements including:
+
+- Donor BSP processing.
+- Donor scenery and object import.
+- Vehicles, weapons, equipment, bipeds, and spawns.
+- Teleporters and channel collision avoidance.
+- Recursive dependency harvesting.
+- Donor placement transformation.
+- Exclusion of orphaned objects.
+- Preservation of sculpted/deleted BSP sections.
+- Prevention of duplicate donor geometry.
+- Better editor camera preservation.
+
+Verify the exact supported behavior in the pinned release.
+
+## 2.1 Create a Mantle adapter
+
+Implement:
+
+1. Local executable detection.
+2. Version and integrity identification.
+3. Configurable installation paths.
+4. Launch Mantle directly from Spark.
+5. Open a Mantle help/capability panel.
+6. Prepare a disposable, source-tracked editing copy.
+7. Initiate a guided world-merging handoff.
+8. Identify and validate exported output.
+9. Reimport the result into the originating Spark project.
+10. Reconcile external changes without overwriting in-memory edits.
+11. Restore the user's camera, selection, viewport, Undo state, and editing context wherever possible.
+
+Inspect Mantle's documented project and export formats, including OpenCE loose-tag/mod exports and `.ocetags` where supported.
+
+Do not assume these formats can carry arbitrary structural BSP changes, newly registered tags, or multiplayer gameplay logic.
+
+Do not claim Mantle has an automation API unless one is actually verified.
+
+Public source code is not automatically licensed for copying. Use legitimate tool invocation and file interchange unless source reuse is explicitly allowed.
+
+## 2.2 Build a stronger cooperative world merger
+
+Use Spark's native BSP Workshop and Source Guardian together with Mantle's verified donor-world functions.
+
+Do not blindly implement two separate competing mergers.
+
+Provide an intelligent operation selector:
+
+- Safe direct cache modification.
+- Existing native Spark merge.
+- Mantle-assisted merge.
+- Native source rebuild.
+- Unsupported with explanation.
+
+The creator should select the desired result, not guess which internal workflow happens to support it.
+
+### Geometry acceptance
+
+Validate:
+
+- Render and collision geometry.
+- BSP transforms.
+- Portals, clusters, and visibility.
+- Coordinate limits.
+- Collision material and surface references.
+- Lightmaps and shaders.
+- Scenery/object palettes.
+- Actor and firing-position references.
+- Player starts and network-game flags.
+- Teleporter channels.
+- Trigger volumes.
+- Script dependencies.
+- Tag dependency closure.
+
+Use before/after native semantic diffs. Never accept a merged map only because two geometries are visible in the editor.
+
+### Timberland–Sidewinder flagship
+
+Revisit the existing compiled combination.
+
+Demonstrate actual human travel from Timberland to Sidewinder **and back again**, across the intended connection, with valid collision and no misleading visual-only portals.
+
+Benchmark the Spark-only and Mantle-assisted approaches where both are supported.
+
+Record real capabilities and remaining native engine constraints.
+
+---
+
+# PHASE 3 — COMMUNITY-DRIVEN WORKFLOW REPAIR
+
+Use the historical discussions and canonical research ledger as engineering evidence, not as claims that every report is a verified current defect.
+
+## 3.1 mOTA-lEV: direct compiled-map editing must remain first-class
+
+A creator must be able to perform supported map-cache changes without extracting every tag, reconstructing a loose source tree, or invoking Blender and Tool unnecessarily.
+
+Preserve an Eschaton/Assembly-like workflow:
+
+- Open a compiled map.
+- Browse searchable tags and assets.
+- Inspect exact supported fields.
+- Change a safe value.
+- Preview the effect where supported.
+- Save a derived map.
+- Verify native readback.
+- Undo or roll back.
+
+A modified field that requires tag-block resizing, new references, resource registration, or structural reconstruction must switch to a supported native build pathway.
+
+Investigate mOTA-lEV's reported scenario-editor failures against the precise version and reproduction data available. Do not assume unspecified failures apply to every editor.
+
+Never fake structural editing by changing only visible geometry.
+
+## 3.2 leftknut: remove unnecessary legacy-tool complexity
+
+The traditional workflow of extracting a map, converting to Blender, exporting JMS, compiling BSP, reconstructing tags, and rebuilding everything should be required only when the actual operation demands it.
+
+Spark should determine the least disruptive technically correct editing route.
+
+The user should be told:
+
+- What can be edited directly.
+- What requires compilation.
+- Which companion tool is appropriate.
+- What information cannot be preserved automatically.
+- What will change in the output.
+
+## 3.3 Sako and other experienced modders: intelligent Tool orchestration
+
+Provide contextual native Tool command generation with:
+
+- Correct edition-specific Tool executable.
+- Versioned supported verbs.
+- Validated arguments.
+- Automatically selected source and destination paths.
+- Required prerequisites.
+- Expected output files.
+- Real compiler output.
+- Context-linked errors.
+
+Keep the generated command visible in an expandable Advanced section.
+
+Do not duplicate Baboon or Osoyoos features that can already be reliably invoked.
+
+## 3.4 Renette: distinguish live edits from safe native changes
+
+Community reports describe potential crashes and actor-state inconsistencies after certain animation or runtime tag reloads.
+
+Exact runtime and reproduction details remain unverified.
+
+Treat them as tests to investigate, not established Halo 1 defects.
+
+A live update must never claim success merely because the model or biped remains visible.
+
+Where supported, inspect actor/controller ownership, AI behavior, object counts, health, target selection, and cleanup.
+
+Use engine-specific, approved reload mechanisms.
+
+If a change requires a clean map restart or native rebuild, say so explicitly.
+
+## 3.5 dunetua and the structural-editing community
+
+Continue toward a Hammer++-quality, Halo-specific BSP authoring workflow.
+
+Prioritize:
+
+- Selecting real BSP faces and edges.
+- Vertex/face movement and snapping.
+- Geometry cutting and joining.
+- Tunnel and cave construction.
+- Valid collision topology.
+- Portal and cluster inspection.
+- Material and texture alignment.
+- Lighting, fog, sky, weather, and radiosity controls.
+- Tool/WRL error highlighting directly in the 3D viewport.
+- Non-destructive correction previews.
+- Accurate native game results.
+
+Do not substitute editor-only mesh rendering for real Halo BSP compilation.
+
+## 3.6 Build a Halo Geometry Doctor
+
+Extend existing error visualizations into a contextual repair system.
+
+Classify source-backed Tool/Sapien failures such as:
+
+- Open edges.
+- Non-manifold collision.
+- Intersecting surfaces.
+- Overlapping collision.
+- Invalid portals.
+- Out-of-bounds vertices.
+- Invalid lightmap UVs.
+- Invalid cluster visibility.
+- Lost or displaced detail objects.
+- Orphaned AI firing positions.
+- Scenario palette mismatches.
+- Missing referenced shaders or tags.
+
+Highlight the precise geometry or tag causing the failure.
+
+Offer an explanation and a previewable, reversible fix when the cause is sufficiently understood.
+
+Never silently delete polygons, entire tag blocks, AI positions, scripts, or other content merely to make a compiler pass.
+
+---
+
+# PHASE 4 — FINISH REAL MULTIPLAYER AI AND FIREFIGHT
+
+This is a flagship gameplay requirement.
+
+First inspect existing C47–C60 AI work and identify what actually passed in real game clients.
+
+Do not replace accepted networking code.
+
+**Separate three different systems:**
+
+1. Guilty Spark's authoring and test infrastructure.
+2. OpenCE/Chupathingy's engine-side multiplayer simulation and replication.
+3. leftknut's separate Firefight project and engine modifications.
+
+Mantle is not itself a separate multiplayer AI engine.
+
+Study the actual pinned OpenCE networking implementation and exposed diagnostics.
+
+Use supported engine capabilities rather than inventing duplicate game networking protocols.
+
+## 4.1 Close the AI lifecycle
+
+Test:
+
+- Host-authoritative actor creation.
+- Stable AI identities.
+- Movement and facing.
+- Target acquisition and firing.
+- Projectiles and damage.
+- Shield/health consistency.
+- Death and kill attribution.
+- Despawning and object-budget release.
+- Wave completion.
+- Late joins.
+- Reconnects.
+- Host loss and supported recovery.
+- Vehicle interaction.
+- Animation/controller state.
+- Scripted encounter progression.
+
+Use real separate game processes.
+
+Where the installed OpenCE build provides deterministic network comparison or profiling tools, integrate their legitimate documented outputs into Spark's diagnostic workflow.
+
+Do not invent instrumentation unavailable in the engine.
+
+When two clients disagree, preserve a reproducible divergence report containing exact engine version, map hash, relevant actor, simulation position/tick where available, and state difference.
+
+## 4.2 Turn Firefight into a genuinely authored mode
+
+The editor should support:
+
+- Encounter placement.
+- Spawn areas.
+- Wave definitions.
+- Enemy types and difficulty.
+- Reinforcement timing.
+- Player starting locations.
+- Equipment and ammo drops.
+- Objectives.
+- Survival rules.
+- Voice-line and sound triggers.
+- Scoring and round transitions.
+- Multiplayer-compatible scripts.
+- Real game-mode packaging.
+
+Where Firefight requires engine modifications, label that dependency clearly.
+
+Do not pretend that standalone Halo CE automatically supports behavior implemented only in a specific OpenCE fork.
+
+### Multiplayer acceptance
+
+At least one supported pinned runtime should demonstrate:
+
+1. Two real players connected.
+2. The same wave spawning for both.
+3. Hostile AI engaging the players.
+4. Damage and deaths visibly consistent.
+5. Cleanup after the wave.
+6. A second wave without stale actors.
+7. Rejoin/reconnect state where supported.
+
+Separate successful AI movement from complete synchronized combat.
+
+---
+
+# PHASE 5 — MAKE CONVERSIONS ACTUALLY PLAYABLE
+
+Retain C58's source-identity architecture and existing conversion improvements.
+
+**Known reported gap:** CE → MCC Blood Gulch rebuilt with decoded assets, but retail MCC packaging and actual player gameplay acceptance remained incomplete.
+
+OpenCE/Chupathingy clients loaded CE content, but strict synchronization comparisons diverged.
+
+These are priority gaps.
+
+## 5.1 Conversion contract
+
+Support truthful, version-specific handling of:
+
+- Original Xbox Halo CE.
+- PC Retail.
+- Halo Custom Edition.
+- Halo Trial and HaloMD/Mac Demo where applicable.
+- MCC Halo 1 Anniversary.
+- OpenCE.
+- Chupathingy.
+- OpenSauce-derived content where a specific adapter supports it.
+
+For each pair, distinguish:
+
+- Read-only inspection.
+- Direct supported edit.
+- Asset/tag extraction.
+- Loose-tag rebuild.
+- Native conversion.
+- Installation/deployment.
+- Real gameplay compatibility.
+
+Do not make the icons imply that every version can convert to every other version.
+
+Track individual fidelity for:
+
+BSPs, lightmaps, textures, shaders, collision, models, skeletons, animations, sound, scripts, scenario references, AI, spawns, gametype metadata, and resource maps.
+
+No header-only conversions masquerading as complete native conversions.
+
+## 5.2 Complete CE → MCC
+
+Finish the missing official metadata, packaging, and permitted runtime-deployment steps.
+
+Take an actual existing CE map through native MCC compilation and test it in the intended playable MCC environment.
+
+Validate movement, collision, objects, shaders, audio, and applicable gameplay.
+
+A Standalone/tag_test load does not replace this test.
+
+## 5.3 Restore the original Zombie Apocalypse
+
+Retain the recovered Mac Demo Zombie Apocalypse as a flagship project.
+
+Preserve the recovered custom tags, Survivor gameplay, zombie encounters, spawners, HUD, sounds, and original behavior.
+
+Revisit the carrier/ejection physics failure, including extreme biped movement observed in earlier native tests.
+
+Produce a faithful MCC gameplay candidate and test it.
+
+If engine-specific behavior cannot be recreated without additional native work, preserve the source and record the exact blocker rather than silently changing the mod's mechanics.
+
+---
+
+# PHASE 6 — THE ICON-BASED HALO TOOL EXPERIENCE
+
+This is a mandatory concrete UI improvement.
+
+The interface must be compact, visually cohesive, easy to understand, and compatible with existing retained workspaces.
+
+## 6.1 Runtime icons first
+
+Show recognizable icon tiles for supported Halo source editions and playable runtime profiles.
+
+Each tile must display its centered name below the icon.
+
+Examples:
+
+**Xbox Halo CE | Halo PC | Halo Custom Edition | HaloMD | MCC H1A | OpenCE | Chupathingy | OpenSauce profile**
+
+Selecting a runtime reveals the compatible tools and operations for its actual installed version.
+
+Separate source edition, build target, and gameplay runtime internally even when the UI makes selecting them easy.
+
+## 6.2 Tool icons below
+
+Present compatible tools as compact tiles.
+
+For example:
+
+**[Baboon icon]**
+
+Baboon
+
+**[?]**
+
+The `?` is a separately clickable information control.
+
+Its detail view should show:
+
+- What Baboon does.
+- What types of Halo data it supports.
+- Actual compatible Halo versions.
+- Supported launch/edit operations.
+- Known limits.
+- Where it is installed.
+- Which version was detected.
+- How it works with Spark.
+- Official documentation and credits.
+
+Repeat the same interaction contract for Mantle, Sapien, Guerilla, Tool, Invader, Osoyoos, Blender, Reclaimer, and other compatible tools.
+
+Unavailable tools must show useful setup instructions rather than fake functionality.
+
+Do not bundle unlicensed assets or binaries simply to populate the catalog.
+
+## 6.3 One contextual action system
+
+Depending on the selected content, the primary action should resolve to the correct supported operation:
+
+- Preview.
+- Edit.
+- Open in Companion Tool.
+- Apply Safe Change.
+- Save Native Source.
+- Rebuild.
+- Build & Playtest.
+- Export Mod.
+
+Advanced details should reveal why an operation was selected.
+
+Do not create seven giant buttons that require a beginner to understand internal Halo engine architecture.
+
+Use a compact project header exposing actual source identity, selected build target, runtime, modified state, and validation status.
+
+## 6.4 Preserve workspace polish
+
+Verify and complete:
+
+- Main navigation.
+- Home/showcase.
+- Saved themes and sound settings.
+- Inspector and Compare Variants.
+- Map and Asset Libraries.
+- BSP Workshop.
+- Game-mode editors.
+- Machinima controls.
+- Settings and first-run setup.
+- Native pop-out windows.
+- Multimonitor recovery.
+- Focus/keyboard behavior.
+- Scroll retention.
+- Inactive renderer performance.
+- Lightweight map-status updates.
+- Undo/Redo and recovery.
+
+No lost state, stale workspace ownership, invisible active document, misleading success indicators, or broken UI action.
+
+Use authentic Halo visual styling when legitimate resources are present, without shipping proprietary game assets.
+
+---
+
+# PHASE 7 — FIRST-RUN SETUP, RESOURCE MANAGEMENT, AND DEPLOYMENT
+
+Spark should take the configuration burden away from creators.
+
+Detect legitimate local installations of relevant Halo games, editing kits, tools, and shared resources.
+
+Verify correct map roots and resource files.
+
+Do not assume OpenCE and Chupathingy use identical directory layouts.
+
+OpenCE's documented custom map/resource workflow, Chupathingy's edition-specific map directories, and MCC editing-kit source/build requirements should be modeled separately.
+
+Recognize the difference between Xbox map sets and Gearbox PC-exclusive maps.
+
+Provide a source-aware dependency checker.
+
+If a map requires a missing bitmap, sound, localization, shader, or tag dependency, identify the exact expected source and supported remedy.
+
+Allow legitimate resources to be supplied from user-owned installations. Do not download copyrighted Xbox images, Halo maps, or proprietary game data automatically.
+
+Add a clear setup-repair path when installations move or resource mappings change.
+
+## Publishing
+
+Provide a verified, repeatable path from:
+
+**Native Source → Build → Game Test → Package → Validation → Share.**
+
+Include:
+
+- Target runtime and version.
+- Required resources.
+- Compatible source formats.
+- Map/package identity.
+- Checksums.
+- Optional screenshots and description.
+- Native error report.
+- Install/test instructions.
+- Warnings about unsupported conversions.
+- Dependency/license manifest.
+
+Use safe map download and package extraction practices.
+
+Avoid overwrite collisions, unsafe archive traversal, untrusted executable deployment, and unexpected modification of game installations.
+
+Retain source attribution and community credits.
+
+---
+
+# PHASE 8 — MAKE SPARK'S LEARNING CENTER ACTUALLY USEFUL
+
+Experienced modders should not have to write the same setup guide for every new creator.
+
+Extend the existing Learning Center into a contextual help system—not a separate encyclopedia full of generic text.
+
+When a creator selects a tool, tag, BSP error, or workflow, provide:
+
+- What the item does.
+- Why it matters.
+- What native Halo version supports it.
+- Which operation is safe.
+- Which tool handles the task.
+- A direct route to that tool or editor.
+- A source-linked troubleshooting explanation.
+- A reproducible example where appropriate.
+
+Create practical guided workflows for:
+
+1. Edit a weapon in an existing map.
+2. Replace a shader or texture.
+3. Place a vehicle.
+4. Add multiplayer spawns and King of the Hill markers.
+5. Repair a missing reference.
+6. Merge two BSPs.
+7. Create a Firefight encounter.
+8. Convert a CE map for MCC.
+9. Open a tag in Baboon and return to Spark.
+10. Merge a world through Mantle and verify it in-game.
+
+Each workflow should use actual implemented actions.
+
+Do not teach an outdated procedure when a safer current integration exists.
+
+---
+
+# PHASE 9 — PRESERVE EVERY EXISTING HALO AMBITION
+
+Do not silently cut or rewrite the long-term product requirements.
+
+Retain:
+
+- Safe direct compiled-map editing.
+- Native tag editing.
+- BSP sculpting and world merging.
+- Campaign creation.
+- Firefight and Zombie survival.
+- Multiplayer AI.
+- Custom gametype placement.
+- Six-player cooperative gameplay ambitions.
+- PC split-screen ambitions.
+- 128-player multiplayer research.
+- Four-region/map streaming research.
+- Map voting and map downloads.
+- Server browser and hosting.
+- Recording Director and machinima.
+- Live Link where a real engine adapter supports it.
+- Real-time SparkLink collaboration.
+- Linux and macOS targets.
+- HaloMD and legacy Xbox compatibility.
+- VR research.
+- Source preservation and cross-runtime conversion.
+
+These remain tracked goals, not automatic claims of completed implementation.
+
+Protect existing tools, commands, routes, source adapters, and regression tests.
+
+---
+
+# PHASE 10 — NATIVE ACCEPTANCE AND REGRESSION PROTECTION
+
+Use the canonical `/Project Guilty Spark Research` Library dataset if it is available to the engineering environment.
+
+Current checkpoint previously reported:
+
+- 274 findings.
+- 116 source records.
+- 32 native workflows.
+- 17 tool profiles.
+- 37 UI comparison entries.
+
+Important sources:
+
+- `SPARK_RESEARCH_LIVING.md`
+- `spark_research.sqlite3`
+- `SPARK_FINDINGS.jsonl`
+- `SPARK_UI_COMPARATIVE_AUDIT_20261103.md`
+- `CODEX_HANDOFF.md`
+
+Do not assume these files exist locally until actually found.
+
+Do not replace current research with an older snapshot.
+
+Compare stable finding IDs and original source URLs before proposing new records.
+
+Preserve historical closed bugs as regression lessons, not current defect claims.
+
+If the canonical files cannot be updated, provide a replayable JSONL delta without claiming persistence.
+
+## Required acceptance tests
+
+### Test A — Direct map editing
+
+Open a legal disposable CE map, change a supported native field, save a derived map, reopen it, and verify the precise intended change and absence of unrelated changes.
+
+### Test B — Baboon interoperability
+
+Launch Baboon with a valid installed editing kit and selected tag using verified supported arguments. Edit a disposable tag, return to Spark, detect its revision, reconcile, and build or validate.
+
+### Test C — Mantle interoperability
+
+Launch Mantle through Spark, create a derived merged-world output, return it to Spark, validate dependencies and BSP structure, and reopen the result without modifying original maps.
+
+### Test D — Native BSP traversal
+
+Use the existing Timberland–Sidewinder candidate. Test actual player traversal in both directions.
+
+### Test E — Playable CE-to-MCC conversion
+
+Build a CE map through the valid official H1A target pipeline. Package it appropriately and actually play it in MCC's supported mod environment.
+
+### Test F — Multiplayer AI
+
+Two real clients observe hostile AI spawn, move, attack, take damage, die, clean up, and transition through another wave. Verify reconnect behavior where supported.
+
+### Test G — Zombie Apocalypse
+
+Verify the converted mod's actual enemy-release, combat, survival, HUD, and sound behavior without the previously observed carrier instability.
+
+### Test H — Tool and runtime selection
+
+Select a Halo runtime icon. Inspect compatible tool icons, use the `?` help controls, launch an installed tool, handle a missing tool, and preserve editing state.
+
+### Test I — Geometry Doctor
+
+Use source-backed invalid BSP fixtures. Highlight the actual error in 3D, demonstrate a reversible correction where safe, and compare native compiler results.
+
+### Test J — Workspace recovery
+
+Open multiple projects, detach panels, use an external tool, trigger controlled recovery conditions, and verify project ownership, Undo history, selection, source hashes, and layout recovery.
+
+### Test K — Native data preservation
+
+Exercise scenario palette consistency, AI firing-position integrity, script compilation limits, bitmap alpha preservation, animation transforms, shader and sound references, and dependency closure.
+
+### Test L — Performance and release integrity
+
+Run the entire existing regression suite, including relevant frontend, Rust, browser, offline, and native tests.
+
+Measure any claimed performance improvements using comparable before/after conditions.
+
+Do not replace the existing accepted release binary with a newer unverified development build.
+
+---
+
+# EXECUTION PRIORITY — SPEND THE PASS WHERE IT MATTERS
+
+Use the current code and available tools to make as much verified progress as possible.
+
+Work in this order:
+
+**P0 — Product integrity**
+
+Preserve HEAD, active work, source data, and existing functionality. Identify current reproducible failures and real integration gaps.
+
+**P0 — Interoperability**
+
+Complete a practical runtime/tool icon workflow, a verified Baboon handoff, and a functioning Mantle launch/output handoff.
+
+**P0 — Native creation**
+
+Make the existing world-merging workflow demonstrably stronger through correct object/dependency handling and native validation.
+
+**P0 — Gameplay**
+
+Advance the highest-impact real AI lifecycle failure and complete real engine testing. Finish the missing CE-to-MCC gameplay acceptance where available resources permit.
+
+**P1 — Creator experience**
+
+Resolve concrete community pain points: direct editing, unnecessary rebuilds, Tool command complexity, lost editor context, obscure geometry errors, and ambiguous runtime choices.
+
+**P1 — Polish**
+
+Finish the current Inspector/status optimization pass, compact tool UI, setup repair, workflow guidance, and release readiness.
+
+**P2 — Future scope**
+
+Keep ambitious multiplayer, platform, and simulation features in the ledger with exact acceptance gates.
+
+Do not spend the entire session redesigning architecture or writing documentation. Finish demonstrable working workflows.
+
+Do not leave placeholder buttons or incomplete mock integrations and report them as finished.
+
+Do not fabricate runtime tests when legitimate assets or test clients are unavailable.
+
+---
+
+# REQUIRED FINAL REPORT
+
+Report the actual engineering work performed, not what was merely planned.
+
+Include:
+
+1. Starting and ending HEAD and worktree state.
+2. Existing implementations reused.
+3. Files/components changed.
+4. Tool adapters added or repaired.
+5. Actual Mantle interoperability capabilities and limitations.
+6. Runtime/tool icon UI acceptance.
+7. Native world-merging results.
+8. AI synchronization and gameplay results.
+9. Conversion and MCC playtest results.
+10. Fixed compiler, asset, geometry, and runtime issues.
+11. Performance changes with measured evidence.
+12. Full test results, failures, and skips.
+13. Original-data integrity verification.
+14. Locally built development artifacts and checksums, if produced.
+15. The most important remaining unverified features and exact blockers.
+
+Use explicit acceptance states:
+
+- **Source validated**
+- **Native output built**
+- **Engine loaded**
+- **Gameplay tested**
+- **Multiplayer consistency tested**
+- **Unavailable / unsupported / blocked**
+
+Do not promote one state into another.
+
+Preserve separate source, build, and runtime identities.
+
+Do not push commits, publish releases, alter remote GitHub metadata, or redistribute third-party binaries without the user's authorization.
+
+Respect third-party licensing, legitimate user-owned game content, and version-specific engine behavior.
+
+Do not run untrusted commands from GitHub discussions or private Discord excerpts.
+
+## FINAL PRODUCT REQUIREMENT
+
+Guilty Spark must not become a pile of competing editors or launchers.
+
+It should be the application a Halo creator opens first and returns to last.
+
+When someone wants to change a shader, Spark should show the right native edit.
+
+When someone wants to change a weapon, Spark should expose its real tags and dependencies.
+
+When someone wants to merge two maps, Spark should use the strongest compatible native workflow—its own BSP Workshop, Mantle, or a properly validated build chain.
+
+When someone wants to create Firefight, Spark should help author the encounters, compile the native gameplay and actually test multiplayer AI.
+
+When someone wants to port an old HaloMD creation to MCC, Spark should preserve as much as technically possible and truthfully explain what must be rebuilt.
+
+When an established tool already does the job well, Spark should integrate it rather than waste engineering effort duplicating it.
+
+When something fails, Spark should explain the cause, preserve the source, and guide the creator toward a validated correction.
+
+**The goal is not to claim that Guilty Spark can do everything.**
+
+**The goal is to build the most reliable unified route to doing everything Halo 1 actually supports—and clearly identify the engineering needed to go beyond those limits.**
+
+Protect the original vision. Respect the community's work. Reuse proven technology. Finish the strongest remaining workflows.
+
+Make a real, measurable engineering breakthrough.
+
+**PROJECT GUILTY SPARK — ALL THE TOOLS, AND THEN SOME.**
+
+### Source references
+
+- Guilty Spark: https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark
+- OpenCE Mantle: https://github.com/SutlabSol/OpenCE-Mantle
+- Mantle v1.0.1: https://github.com/SutlabSol/OpenCE-Mantle/releases/tag/v1.0.1
+- Mantle testing guide: https://github.com/SutlabSol/OpenCE-Mantle/blob/main/TestGuide.md
+- Baboon: https://github.com/Zoephie/Baboon
+- Chupathingy: https://github.com/ChupathingyCE/chupathingyce
+- Chupathingy online documentation: https://github.com/ChupathingyCE/chupathingyce/blob/main/docs/online.md
+- Invader: https://github.com/SnowyMouse/invader
+- c20 Halo 1 Editing Kit: https://c20.reclaimers.net/h1/h1-ek/
+- Halo Map Studio: https://sopitive.github.io/HaloMapStudio/
+- Forge CE: https://github.com/Sledmine/forge
+- Mozzarilla: https://github.com/Sigmmma/mozzarilla
+
+Use pinned revisions and verify current implementation and licensing before source-level integration.

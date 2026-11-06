@@ -352,6 +352,10 @@ export interface OpenProject {
   project: Project;
   inspection: MapInspection | null;
 }
+export interface ImportReport {
+  projects: OpenProject[];
+  failures: { path: string; message: string }[];
+}
 export interface CompatibilityReport {
   target: string;
   pipeline: string;

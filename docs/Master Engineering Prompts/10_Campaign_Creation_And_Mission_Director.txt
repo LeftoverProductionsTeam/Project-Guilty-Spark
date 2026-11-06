@@ -1,0 +1,58 @@
+GUILTY SPARK — CAMPAIGN CREATION & MISSION DIRECTORCreate a complete Halo 1 mission without manually orchestrating twenty tools
+Continue from current HEAD.
+
+Reuse QuickForge, World, native scenarios, HaloScript, AI encounters, asset tools, BSP Workshop, camera authoring and Source Guardian.
+
+A complete campaign workflow
+A creator should be able to:
+
+Create a campaign project.
+Choose a source edition and target runtime.
+Design or import a BSP.
+Place scenery, vehicles, weapons and actors.
+Define player insertion and mission objectives.
+Build AI encounters and patrol/migration paths.
+Connect trigger volumes and events visually.
+Configure doors, checkpoints and supported level transitions.
+Add dialogue, music, effects and cutscenes.
+Compile standard native tags and HaloScript.
+Launch the mission in a compatible engine.
+Return to the same editable source.
+Mission Director UI
+Provide a compact mission timeline and objective tree tied to real scenario objects.
+
+Show:
+
+Insertion and extraction.
+Current objective.
+Triggered events.
+Encounter activation.
+Cinematic transitions.
+Mission globals and variables.
+Checkpoints and restart behavior.
+Branching conditions.
+Native source references.
+Advanced creators must be able to edit the generated .hsc directly.
+
+Preserve handwritten scripts and exact edition-specific limits.
+
+Important engine restrictions
+Stock Halo 1 can use multiple scenario BSPs, but referencing multiple BSPs is not equivalent to seamless simultaneous world streaming.
+
+Treat level transitions, collision boundaries, spawn visibility and object ownership correctly.
+
+Campaign co-op and player count must be validated separately for each runtime.
+
+Do not promise six-player campaign support merely because an engine supports large multiplayer lobbies.
+
+Native completeness
+Validate AI firing positions after collision edits, scenario/detail palettes, native script budgets, sound and animation references, chapter transitions and missing source assets.
+
+Flagship acceptance
+Finish First Contact as an actual short campaign mission with insertion, exploration, scripted interaction, combat encounter, objective completion, cinematic or extraction and successful end state.
+
+Verify a full human playthrough.
+
+Then test cooperative play only on a runtime that explicitly supports the required features.
+
+One complete, playable mission is the acceptance standard—not a populated scenario that merely opens in Sapien.

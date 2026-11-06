@@ -1,0 +1,620 @@
+# PROJECT GUILTY SPARK — CROSS-PLATFORM NATIVE INDEPENDENCE, MAC POLISH & FINAL RELEASE ENGINEERING
+
+## ONE GUILTY SPARK. THREE OPERATING SYSTEMS. NO MANDATORY EXTERNAL EDITING TOOLCHAINS.
+
+### ALL THE TOOLS, AND THEN SOME.
+
+This is directive #28, immediately following the Mac Legacy Edition directive.
+
+Continue from the actual current HEAD of `D:\Project Guilty Spark`, preserving every accepted implementation, original source, recovered asset, Git commit, previous-good build and research finding.
+
+Follow `AGENTS.md`, the permanent engineering contract and the strict directive-completion gate.
+
+Do not begin until earlier directives are accepted or explicitly deferred.
+
+Do not create another application, abandon existing architecture or remove working capabilities to simplify packaging.
+
+## THE MISSION
+
+Finish Guilty Spark as a polished, downloadable application for:
+
+- macOS — native Apple Silicon application, with Intel support where independently verified.
+- Linux — native desktop application.
+- Windows — native desktop application.
+
+The application must provide its supported core Halo editing functions directly through Spark's own codebase.
+
+**A user must not need to install Windows-only executables, Invader, Guerilla, Sapien, Halo Tool, Eschaton, SwordEdit, SparkEdit or another specialist editor just to perform the core operations Spark claims to support.**
+
+Existing optional specialist-tool integrations should remain available where appropriate, but the supported core experience must stand on its own.
+
+The finished product should install like a normal desktop application, launch successfully, open compatible Halo content, perform genuine modifications, export valid native results and preserve the user's original data.
+
+No Mac App Store, Microsoft Store or Linux software repository submission is required.
+
+Direct GitHub Releases downloads are the intended distribution method.
+
+---
+
+## 1. REMOVE MANDATORY EXTERNAL EDITING DEPENDENCIES
+
+Audit the complete repository for dependencies on external executables and tool installations.
+
+Include:
+
+- Rust backend commands.
+- Frontend commands and UI actions.
+- Native map readers and writers.
+- Tag serialization and dependency handling.
+- Resource extraction and conversion.
+- BSP editing and scenario placement.
+- Asset importing and exporting.
+- Native build orchestration.
+- Game launch and testing.
+- Startup and first-run setup.
+- Windows-specific paths and executable names.
+- CI, release packaging and automated tests.
+
+Produce a dependency inventory distinguishing:
+
+**A. Spark-native implementation**
+
+Functionality fully provided by Spark itself.
+
+**B. Bundled redistributable component**
+
+A component whose license, architecture, size and distribution rights are explicitly verified.
+
+**C. Optional external tool**
+
+An independently installed program used for advanced functionality.
+
+**D. Unsupported or blocked operation**
+
+A capability for which a valid native implementation does not yet exist.
+
+### Core independence requirement
+
+Implement or complete platform-neutral native Rust functionality for supported:
+
+- Halo cache parsing and format identification.
+- Typed tag and field editing.
+- Safe reference and metadata changes.
+- Tag search and dependency analysis.
+- Supported tag extraction and import.
+- Map/resource inspection.
+- Validated cache modifications and safe rebuilding.
+- Scenario object placement and transforms.
+- Supported gametype placements.
+- Native format renaming and reference correction.
+- Bitmap, sound and model inspection.
+- Asset and dependency validation.
+- Native export, readback and integrity checks.
+- Source protection, Undo/Redo and recovery.
+
+Reuse existing working Spark implementations.
+
+Never introduce a second parser, editor or controller when the existing implementation can be made portable.
+
+### External tool policy
+
+Keep Invader, Guerilla, Sapien, Halo Tool, Blender, Baboon and other verified specialist tools as optional enhancements where useful.
+
+Do not remove their existing working integration simply because Spark now has a native equivalent.
+
+However:
+
+**If a core button only succeeds when a Windows EXE or external toolkit is present, the core operation is not yet independent.**
+
+Implement the necessary supported functionality within Spark, or accurately classify the feature as advanced/optional until independence is achieved.
+
+Do not silently fall back to Wine, Proton, a Windows virtual machine, cloud compilation or an external service.
+
+Do not bypass licensing restrictions by bundling proprietary editing-kit files.
+
+---
+
+## 2. CREATE A REAL CROSS-PLATFORM HALO ENGINEERING CORE
+
+Organize existing native capabilities around one tested, reusable Rust engine.
+
+All three operating systems should call the same underlying Halo format, project and editing implementations wherever technically appropriate.
+
+Keep operating-system-specific code limited to:
+
+- File and folder selection.
+- Secure filesystem access.
+- Window management.
+- Graphics and native webview integration.
+- Tool and game process launching.
+- Optional external adapters.
+- Installer and packaging behavior.
+- Platform-specific configuration paths.
+
+Avoid Windows-specific absolute paths, drive-letter assumptions, case-insensitive path assumptions, `.exe` requirements and backslash-only path handling in shared engineering code.
+
+Handle macOS and Linux case-sensitive file systems correctly.
+
+Normalize paths only when format rules permit it.
+
+Preserve canonical Halo tag paths and original resource names without silently modifying them.
+
+### Native data fidelity
+
+Verify supported differences between Halo Mac Demo, Halo Full, HaloMD, Halo PC, Custom Edition, Xbox and MCC Halo 1.
+
+Do not assume their native map formats are interchangeable.
+
+Implement explicit format-specific readers, serializers and validators.
+
+For unsupported source conversions or complex reconstruction, preserve an honest limitation rather than generating invalid native output.
+
+A fully native Spark core must never become an excuse for lower fidelity.
+
+---
+
+## 3. MAC LEGACY EDITION — FINAL POLISH
+
+Finish the functionality established in directive #27.
+
+The Mac build should feel like a first-class macOS application, not a Windows program inside a wrapper.
+
+### macOS interface
+
+Polish:
+
+- Native application icon and identity.
+- Correct application menu.
+- Standard macOS keyboard shortcuts.
+- Command-key Undo, Redo, Save, Open and other relevant actions.
+- Finder file-opening integration.
+- Drag-and-drop maps and supported assets.
+- Proper file and folder permission dialogs.
+- Retina/HiDPI rendering.
+- Smooth window resizing.
+- Correct fullscreen behavior.
+- Detachable windows and multi-monitor arrangements.
+- Session and viewport restoration.
+- Mouse, trackpad, scrolling and navigation.
+- Light/dark theme behavior.
+- Keyboard focus and accessibility.
+- Compact, readable context menus.
+- Correct Dock and application-close behavior.
+
+Preserve the accepted Spark Flow visual direction:
+
+Smooth rectangular tabs, restrained selection styling, no unnecessary accent glow, comfortable spacing and organized menus instead of an overcrowded top bar.
+
+Do not bring back rejected UI designs.
+
+### Apple Silicon performance
+
+Measure:
+
+- Cold launch.
+- Halo map loading.
+- BSP viewport frame rate.
+- Texture/bitmap decoding.
+- Object selection and manipulation.
+- Tag search.
+- Asset conversion.
+- Native exports.
+- Undo and autosave.
+- Multiwindow resource retention.
+- Long editing sessions.
+
+Use native platform capabilities where they genuinely improve performance.
+
+Do not assume the original Halo game's emulated frame rate limits Spark's own viewport.
+
+### Mac Legacy core acceptance
+
+On macOS, with no separate Halo editing toolchain installed:
+
+1. Open a supported original Halo Mac map.
+2. Inspect and edit a supported native tag.
+3. Modify a real scenario object in the 3D editor.
+4. Rename a supported map/tag identity where valid.
+5. Perform a supported asset extraction or replacement.
+6. Export a validated native map.
+7. Reopen and independently verify the output.
+8. Save, close, reopen and recover the editing project.
+
+When the user's existing legacy Halo compatibility environment is available, separately verify actual gameplay.
+
+Never require installation of a Windows editing application or VM for these core tasks.
+
+---
+
+## 4. LINUX — FIRST-CLASS NATIVE EDITING
+
+Treat Linux as a real supported application platform rather than an untested compilation target.
+
+### Native Linux support
+
+Validate:
+
+- Linux filesystem paths and permissions.
+- X11 and Wayland window behavior.
+- WebKitGTK and graphics requirements.
+- GPU-accelerated 3D rendering.
+- Input handling and keyboard shortcuts.
+- Desktop file associations.
+- Drag-and-drop.
+- File chooser portals.
+- Native dialogs.
+- AppImage execution.
+- Configuration and saved projects.
+- External tool detection only when optional.
+- Crash recovery and native output.
+
+Linux users must be able to perform the supported Halo editing workflow without Wine, Proton or Windows-only editing tools.
+
+Do not require a Windows game executable merely to open or modify Halo data.
+
+Game launch support is separate from editing support.
+
+### Linux architecture
+
+Primary target: x86_64.
+
+Investigate ARM64 as an additional target when dependencies, CI hardware and native validation permit it.
+
+Clearly publish minimum supported distributions and required system libraries.
+
+---
+
+## 5. WINDOWS — KEEP THE BEST EXISTING EXPERIENCE
+
+Preserve every accepted Windows editing workflow while removing unnecessary mandatory tool dependencies.
+
+Windows remains the primary general-purpose Halo studio target.
+
+Do not sacrifice MCC, CE, OpenCE, Chupathingy or supported official editing-tool interoperability to simplify the Mac build.
+
+### Windows expectations
+
+Verify:
+
+- Windows 10/11 x64 startup.
+- WebView2 requirements.
+- Native Rust editing functionality.
+- Graphics and 3D viewport.
+- Native cache editing.
+- Scenario and asset operations.
+- Optional external tool integration.
+- Existing Halo runtime discovery.
+- Proper installation and upgrades.
+- Portable operation.
+- Safe uninstall and recovery.
+
+Native Spark implementations should be the default for supported core editing operations.
+
+Optional external compilers and editors may still offer additional capabilities when installed.
+
+Do not change UEFI, Secure Boot, Defender, Windows security policies or unrelated system configuration.
+
+---
+
+## 6. PLATFORM-SPECIFIC FEATURES WITHOUT FALSE PARITY
+
+Implement a shared feature-capability model.
+
+Every significant function should report its actual support for:
+
+- Windows.
+- macOS.
+- Linux.
+- Target Halo edition.
+- Native editing.
+- Native export.
+- Native rebuilding.
+- Actual game launch.
+- Optional external tool use.
+- Verified runtime compatibility.
+
+Separate:
+
+**Available natively**
+
+**Available with an optional dependency**
+
+**Experimental**
+
+**Unsupported**
+
+**Awaiting real-platform testing**
+
+Do not display a feature as fully supported merely because its UI renders.
+
+No vague "all platforms supported" claim without real test evidence.
+
+The Mac Legacy profile should default to its original Mac Halo capabilities.
+
+The Windows profile may expose broader CE/MCC tool integrations.
+
+Linux should provide the portable editing functionality and any independently validated native tool or game integrations.
+
+All editions must reuse the same project model where practical.
+
+---
+
+## 7. FINAL DOWNLOADABLE RELEASE PACKAGES
+
+Produce platform-appropriate artifacts from the same verified source revision.
+
+### macOS
+
+Required:
+
+- `Guilty-Spark-macOS-arm64.dmg`
+- Working native `.app` bundle.
+
+Optional after independent validation:
+
+- Universal Intel/Apple Silicon DMG or separate Intel DMG.
+
+The DMG must support a straightforward drag-to-Applications installation.
+
+For broad public distribution, complete Developer ID signing and notarization when authorized credentials are available.
+
+Do not bypass Gatekeeper or advise disabling macOS security.
+
+An unsigned or ad-hoc signed private test build must be clearly identified as such.
+
+### Linux
+
+Required:
+
+- `Guilty-Spark-Linux-x86_64.AppImage`
+- Debian `.deb` package.
+
+Where practical and tested:
+
+- RPM package.
+- ARM64 builds.
+
+Verify installation and launch on clean representative Linux environments.
+
+Account for glibc and WebKitGTK compatibility.
+
+Do not call an AppImage universally portable without checking its base-system requirements.
+
+### Windows
+
+Required:
+
+- `Guilty-Spark-Windows-x64-Setup.exe`
+- `Guilty-Spark-Windows-x64-Portable.zip`
+
+Where practical:
+
+- Windows `.msi` installer.
+
+Verify that the standalone portable build includes its own application files and clearly identifies any legitimate OS prerequisites.
+
+Do not require installation of the entire Halo SDK for startup.
+
+### Shared packaging rules
+
+Use consistent:
+
+- Product name.
+- Application icon.
+- Version number.
+- Release channel.
+- File naming.
+- Project compatibility.
+- License notices.
+- Platform-specific prerequisites.
+- Checksums.
+- Release documentation.
+
+Never include proprietary Halo maps, game binaries or restricted SDK resources in the release without authorization.
+
+---
+
+## 8. THREE-PLATFORM BUILD AND TEST PIPELINE
+
+Use actual macOS, Linux and Windows build environments through supported CI runners or available testing hardware.
+
+Maintain a single release revision, not three manually diverging codebases.
+
+The pipeline must:
+
+1. Identify the exact source commit.
+2. Run relevant unit and integration tests.
+3. Compile the frontend and Rust backend.
+4. Build platform-native applications.
+5. Package the intended installers.
+6. Verify artifact existence and integrity.
+7. Record package size and SHA-256.
+8. Test installation and application startup where an appropriate test environment exists.
+9. Run native Halo editing acceptance tests.
+10. Attach platform-specific evidence and limitations.
+11. Preserve previous-good release artifacts.
+12. Stage the release for owner review.
+
+Do not push Git commits, overwrite existing releases, create public GitHub Releases or upload files publicly without approval.
+
+Never label packaging success as proof of functional acceptance.
+
+---
+
+## 9. COMPLETE END-TO-END PLATFORM TESTS
+
+### Test A — Clean Mac
+
+Starting with a clean compatible macOS environment:
+
+Install DMG → Launch Spark → Open supported Mac Halo map → Edit native tag → Modify scenario placement → Export map → Reopen output → Verify preservation → Restart Spark.
+
+**No Eschaton, SwordEdit, SparkEdit, Invader, Wine or Windows tools installed.**
+
+### Test B — Clean Linux
+
+Launch AppImage or install DEB → Create/open project → Inspect a compatible Halo map → Perform a supported native edit → Export and independently validate → Restart and recover the project.
+
+**No Windows executable or editing toolkit required.**
+
+### Test C — Clean Windows
+
+Install the Windows EXE → Launch Spark → Open a legitimate compatible Halo map → Perform a supported native edit → Validate output → Test relevant existing runtime/game integration.
+
+Repeat using the portable ZIP.
+
+Test optional external tools separately rather than silently making them prerequisites.
+
+### Test D — Dependency removal
+
+On each platform, deliberately test with all optional Halo editing tools absent.
+
+Verify that:
+
+- Core supported actions still work.
+- Startup succeeds.
+- The application does not silently invoke missing programs.
+- Export and save paths operate correctly.
+- Features requiring unavailable capabilities display accurate explanations.
+- The application never generates misleading success messages or corrupted output.
+
+### Test E — Long-term stability
+
+Run extended tests for:
+
+- Repeated map opening.
+- Large BSPs.
+- Asset libraries.
+- Multiwindow use.
+- Resource-cache retention.
+- Undo/Redo.
+- External filesystem changes.
+- Interrupted saves.
+- Failed builds.
+- Session restoration.
+- Memory, CPU and GPU resource growth.
+
+Preserve user content through all failure cases.
+
+---
+
+## 10. RELEASE POLISH AND FINAL PRODUCT EXPERIENCE
+
+Make the application feel finished.
+
+Audit every primary interface:
+
+- Welcome and onboarding.
+- Open Work.
+- Map Library.
+- Tag Inspector.
+- Asset Studio.
+- World/BSP Editor.
+- Scenario and gametype editing.
+- Build and export.
+- Games and Tools.
+- Settings.
+- Help/Learning Center.
+- Error reporting.
+- Recovery and backups.
+
+Remove dead buttons, duplicated navigation, inconsistent shortcuts, overflowing controls and misleading unavailable actions.
+
+Ensure the user understands how to open their first legitimate Halo map and perform an actual supported edit.
+
+Preserve the established Spark visual style.
+
+Avoid unnecessary redesigns and duplicated UI frameworks.
+
+Complete accessibility, scaling, responsive layout, high-DPI rendering and keyboard navigation checks.
+
+Protect source data and keep runtime dependencies understandable.
+
+---
+
+## 11. FINAL RELEASE GATE
+
+Do not call the cross-platform release finished until the evidence supports it.
+
+Record independently for each platform:
+
+- Compilation.
+- Package generation.
+- Application launch.
+- Native map parsing.
+- Native editing.
+- Native export.
+- Independent output validation.
+- Project persistence.
+- Recovery.
+- Real gameplay where an appropriate runtime exists.
+- Clean-system installation.
+- Signing/notarization status.
+- Exact unsupported functions.
+
+Use:
+
+PASS / FAIL / BLOCKED / NOT TESTED.
+
+A release may be independently ready on one platform while another remains blocked. Do not force false all-platform acceptance.
+
+Fix reproducible defects within the available environment.
+
+Record hardware-only and human-only gates rather than claiming they passed.
+
+### Final report
+
+Provide:
+
+- Exact source commit and local commit IDs.
+- Windows EXE/portable artifact paths.
+- macOS DMG artifact path.
+- Linux AppImage/DEB artifact paths.
+- SHA-256 checksums.
+- Complete native capability matrix.
+- List of eliminated mandatory external dependencies.
+- List of retained optional integrations.
+- Mac Legacy editing acceptance evidence.
+- Linux editing acceptance evidence.
+- Windows regression results.
+- Remaining platform-specific limitations.
+- Signing, notarization and publication blockers.
+- Accurate release notes and installation instructions.
+
+Preserve previous-good releases.
+
+Do not publish without explicit owner approval.
+
+---
+
+## THE FINAL REQUIREMENT
+
+A user on Windows should download Guilty Spark and edit Halo.
+
+A user on Linux should download Guilty Spark and edit supported Halo maps without needing Windows.
+
+A MacGamingMods veteran on an Apple Silicon Mac should download Guilty Spark, open their old Halo Demo or Full maps, and rediscover the complete Eschaton/SwordEdit/SparkEdit style of creation without needing any of those old applications.
+
+The operating system changes.
+
+The native source format changes.
+
+The available game runtimes change.
+
+**The fundamental editing experience remains Guilty Spark.**
+
+One modern editor.
+
+Three operating systems.
+
+Real native Halo data.
+
+No mandatory external editing toolkit.
+
+No compromised originals.
+
+Real downloadable, verified releases.
+
+**PROJECT GUILTY SPARK — CROSS-PLATFORM RELEASE COMPLETION**
+
+**ALL THE TOOLS, AND THEN SOME.**

@@ -1,0 +1,63 @@
+GUILTY SPARK — HALO MAP CONVERSION & LEGACY PRESERVATIONOne source library, many explicitly supported Halo targets
+Continue from current source identity, map parsers, resource discovery, extraction, conversion, dependency recovery and CE-to-MCC build work.
+
+Primary supported targets
+Investigate each actual format independently:
+
+Original Xbox Halo 1.
+Retail Halo PC.
+Halo Custom Edition.
+Mac Demo/HaloMD and compatible legacy Mac content.
+MCC Halo 1 classic.
+OpenCE-compatible Xbox and Custom Edition content.
+Chupathingy-compatible content.
+Documented community forks such as GulchCE where verified.
+Do not confuse selected hosting engine with original source format.
+
+Conversion workflow
+Open map → inspect exact source identity → inventory dependencies → choose target → analyze losses → stage native source → build → validate → playtest.
+
+Preserve map and tag provenance.
+
+Use recovered authoring data where available. Label non-reconstructable source explicitly.
+
+Support both direct compiled-cache edits and loose-tag rebuilds.
+
+Fidelity checks
+Verify:
+
+BSP rendering and collision.
+Bitmaps, lightmaps and reflection data.
+Shaders and materials.
+Models, animations and sounds.
+Scenarios and object placements.
+Native script compatibility.
+AI and pathfinding.
+Game-mode objects.
+Shared resource maps.
+Map naming and target-specific requirements.
+High-resolution MCC textures may exceed older target memory or format limits. Report exact sizes and supported optimization choices; don't silently destroy fidelity.
+
+GulchCE research
+Verify the canonical repository and pinned experimental build.
+
+Test whether selected MCC Halo 1 maps actually load without conversion.
+
+Direct map loading is a separate capability from creating editable native tags and joining MCC multiplayer sessions.
+
+Beyond Halo 1
+The idea of backporting Halo 2 maps is a legitimate research challenge, but H2 geometry, tags, scripts, assets and rendering systems are not interchangeable with Halo 1.
+
+Only create independent, supported conversions with explicit loss and gameplay reports.
+
+Do not claim universal one-click Halo 2-to-Halo 1 conversion.
+
+Acceptance
+Complete independent game playtests for:
+
+One supported CE → MCC conversion.
+One legacy Mac/Xbox → compatible native target conversion.
+One MCC direct-loading experiment if a verified fork is available.
+Keep original hashes unchanged.
+
+Universal means understanding each format accurately, not rewriting a header and hoping the engine accepts it.

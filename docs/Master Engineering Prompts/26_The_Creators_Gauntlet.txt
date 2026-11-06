@@ -1,0 +1,762 @@
+# PROJECT GUILTY SPARK — THE CREATOR'S GAUNTLET
+## FINAL END-TO-END INTEGRATION, SELF-REPAIR & PRODUCT ACCEPTANCE
+
+**MISSION: PROVE THE ENTIRE SPARK EXPERIENCE WORKS. FIX EVERYTHING THAT FAILS. REPEAT UNTIL THE COMPLETE SUPPORTED TEST GAMUT PASSES.**
+
+**Execution order:** Begin only after the P0 storage, file-ownership, dependency and resource-resolution repairs are verified, followed by the remaining engineering directives.
+
+This is the final integration and acceptance pass—not another feature-prototyping exercise.
+
+---
+
+## 1. THE NONNEGOTIABLE MISSION
+
+Guilty Spark must demonstrate that a creator can use its actual application interface to create, modify, build, test, recover, collaborate on and package Halo content.
+
+A test passing through internal Rust functions, synthetic mocks or direct test-only APIs does **not** establish that the same workflow is usable in Spark.
+
+The primary acceptance path is:
+
+**Launch Spark → create project → author a map → import assets → edit tags → place objects → configure gameplay → use external tools → reconcile changes → compile → launch Halo → verify gameplay → return to Spark → edit again → rebuild → package.**
+
+Execute this journey using Spark's application automation harness.
+
+Do not rely on ChatGPT Computer Use.
+
+Use genuine application interactions, supported Tauri desktop automation, production commands and native integration test drivers.
+
+Test the actual distributed application wherever practical—not only a frontend running in development mode.
+
+### Permanent engineering constraints
+
+- One canonical project directory: `D:\Project Guilty Spark`.
+- One Git worktree.
+- One local development branch: `master`.
+- Preserve every unique original, accepted build, research artifact and user project.
+- No recursive staging, unnecessary SDK duplication or unbounded caches.
+- Respect measured disk, RAM and VRAM budgets.
+- No fabricated gameplay, screenshots, telemetry, external tool integrations or successful test results.
+- Never modify the only original copy of Halo content.
+- No unsafe OS modifications, anti-cheat circumvention or unauthorized third-party downloads.
+- No GitHub push or release publication without owner approval.
+
+---
+
+## 2. BUILD A REAL AUTOMATED USER
+
+Inspect and extend Spark's existing desktop test harness instead of creating a second competing automation system.
+
+The harness must drive real creator interactions:
+
+- Launch and close the actual Tauri application.
+- Click and navigate menus.
+- Open the Spark Command Hub.
+- Switch workspaces.
+- Open, detach, restore and close windows.
+- Interact with multiple tabs and project documents.
+- Select items in hierarchies and asset browsers.
+- Drag assets into real editor viewports.
+- Use BSP face, edge and vertex gizmos.
+- Edit properties and native tag values.
+- Use keyboard shortcuts and context menus.
+- Save and reopen.
+- Invoke build, validate and launch actions.
+- Operate supported external-tool handoffs.
+- Return to Spark and confirm changes appear.
+- Exercise error handling and recovery.
+- Capture screenshots, logs, timings and source identities.
+
+Use supported desktop WebDriver tooling where applicable, and existing native test harness functionality for interactions the webview driver cannot represent reliably.
+
+For 3D editing, verify the underlying actual geometry, raycast selection, transforms and saved native outputs—not merely whether a button received a click.
+
+For external applications, use documented APIs/CLIs or legitimate UI automation where available. Do not invent automation interfaces.
+
+Never quietly substitute direct backend calls for a failed user-interface journey.
+
+A direct native test may support a diagnosis, but it cannot replace the failed UI acceptance test.
+
+---
+
+## 3. INVENTORY EVERY EXISTING FEATURE BEFORE TESTING
+
+Inspect the actual current code, workspace routes, commands, tools, research ledger and complete set of prior engineering directives.
+
+Do not assume historical counts remain current.
+
+Enumerate every:
+
+- Workspace and menu.
+- Toolbar and inspector.
+- Editing operation.
+- Asset type.
+- Map and tag operation.
+- Build and conversion pathway.
+- External-tool integration.
+- Runtime adapter.
+- Collaboration capability.
+- AI/gameplay system.
+- Export/import operation.
+- Launcher and packaging workflow.
+- Configuration or customization feature.
+- Recovery and diagnostic action.
+- Example, tutorial and demonstration.
+
+Previously reported inventories include 63 guided workflows and 95 native QA/demo artifacts; reconcile those with the current implementation.
+
+Create a single machine-readable acceptance matrix.
+
+For every feature record:
+
+1. User-visible entry point.
+2. Exact prerequisite.
+3. Supported source editions.
+4. Supported output runtimes.
+5. Required native or external tools.
+6. Automated interaction steps.
+7. Expected source change.
+8. Expected native output.
+9. How correctness is independently verified.
+10. Test result.
+11. Evidence location.
+12. Defect ID if failing.
+13. Known compatibility limitations.
+14. Whether the feature is implemented, experimental, research-only or unsupported.
+
+Every advertised feature must have a valid user path and an appropriate test.
+
+Do not hide unfinished capabilities in documentation to make the pass percentage look better.
+
+Future research objectives must remain in the ledger, while unfinished functions must not be presented as working production tools.
+
+---
+
+## 4. THE GOLDEN MAP: CREATE A HALO LEVEL FROM NOTHING
+
+Create a fresh, uniquely named test project through Spark's real user interface.
+
+Do not begin from a fully prepared scenario.
+
+You may use verified legitimate Halo editing-kit resources for standard assets, but the map's authored geometry, placement, game rules and build process must originate through Spark.
+
+### Phase A — New project
+
+Through Spark:
+
+- Choose the native source edition.
+- Choose the target Halo runtime.
+- Create an empty project.
+- Select required resources.
+- Verify toolchain availability.
+- Establish project identity and location.
+- Save, close and reopen.
+
+Verify the creator understands what is editable source, what is generated and what is installed game content.
+
+### Phase B — Build a world
+
+Use the actual BSP Workshop to create:
+
+- An outdoor playable area.
+- Two enclosed rooms.
+- A connecting corridor.
+- A ramp.
+- An elevated platform.
+- At least one doorway.
+- A second route between gameplay areas.
+- Correctly joined structural geometry.
+- Valid playable collision.
+- Appropriate portals or visibility structures where native support requires them.
+
+Use face, edge and vertex editing.
+
+Test selection on overlapping or occluded geometry.
+
+Test gizmo axes, snapping, extrusion, translation, surface joining, seam repair and Undo/Redo.
+
+Use named source volumes.
+
+Apply materials, texture scaling and UV changes.
+
+Confirm that geometry edits do not stretch textures unintentionally or corrupt collision.
+
+Build native geometry and independently inspect its BSP structure.
+
+### Phase C — Import real assets from another Halo map
+
+Use Spark's map and asset browsing interface to open a second legitimate Halo map.
+
+Find and import representative compatible assets, including:
+
+- A weapon.
+- A vehicle.
+- A scenery object.
+- A door or machine.
+- A biped or other suitable character asset.
+- At least one shader/bitmap dependency.
+- At least one compatible effect or sound dependency.
+
+Require proper dependency resolution.
+
+Drag imported assets into the Golden Map through Spark.
+
+Select, move, rotate, duplicate and configure them.
+
+Confirm native references remain valid.
+
+Verify that incompatible asset formats produce actionable conversion or compatibility guidance rather than corrupt output.
+
+### Phase D — Create gameplay
+
+Through Spark's scenario and gameplay tools:
+
+- Place multiple valid player starts.
+- Configure team-specific starts.
+- Add weapon placements.
+- Add vehicle placements.
+- Add equipment and scenery.
+- Add teleporters where supported.
+- Create a King of the Hill area.
+- Configure suitable CTF/Oddball/Race objects where supported.
+- Create an interactable door.
+- Add an adjustable trigger volume.
+- Configure a repeatable two-sided door event.
+- Generate and inspect valid native HaloScript.
+- Add environmental conditions and supported sounds.
+- Add a basic objective or event sequence.
+
+Verify placements and scenario references in independently opened native source.
+
+### Phase E — AI and encounter authoring
+
+Use Spark's actual AI tools to:
+
+- Place supported AI characters.
+- Create an encounter.
+- Assign squads and spawn points.
+- Configure activation logic.
+- Set valid native behavior and applicable firing/pathfinding data.
+- Add a second wave or encounter transition.
+- Associate encounters with gameplay trigger events.
+- Inspect generated native scenario and script data.
+
+For runtimes without the required multiplayer AI support, validate the supported singleplayer or developer runtime behavior and record the capability boundary.
+
+Do not claim synchronized multiplayer AI merely because local AI spawns.
+
+### Phase F — Environment and asset fidelity
+
+Exercise applicable:
+
+- Sky and fog controls.
+- Weather and atmospheric settings.
+- Ambient sound.
+- Lighting and lightmap workflows.
+- Shader and bitmap editing.
+- Material changes.
+- Collision previews.
+- Animation and model preview.
+- Environment persistence.
+- Detail-object preservation.
+
+Verify source identity and native format compatibility.
+
+Do not accept placeholder visuals as proof of game rendering fidelity.
+
+### Phase G — Build and play
+
+Using the user's visible Spark commands:
+
+1. Validate project.
+2. Resolve native dependencies.
+3. Select the actual target toolchain.
+4. Compile the scenario and assets.
+5. Produce the correct runtime-specific output.
+6. Independently inspect the result.
+7. Launch the supported Halo game or development runtime.
+8. Verify player spawn, movement and collision.
+9. Visit both rooms.
+10. Cross the corridor and ramp.
+11. Collect and fire a weapon.
+12. Interact with placed objects.
+13. Use a door in both directions.
+14. Confirm the scripted event works repeatedly.
+15. Verify AI when supported.
+16. Observe environment, textures, lighting and sounds.
+17. Return to Spark.
+18. Modify an object or gameplay setting.
+19. Save and rebuild.
+20. Confirm the revised result appears in Halo.
+
+Record actual game load and gameplay evidence separately from compilation evidence.
+
+**A map that merely compiles is not a passing Golden Map.**
+
+---
+
+## 5. USE EVERY EXTERNAL TOOL IN SPARK'S ARSENAL
+
+Inventory every external tool currently registered and supported by Spark.
+
+Do not omit a tool simply because it is rarely used or more difficult to automate.
+
+For each installed, supported integration:
+
+**Launch from Spark → use the intended capability → save a real change → return to Spark → detect and reconcile the change → inspect native output → rebuild if appropriate → confirm the change survives.**
+
+Exercise relevant integrations, including where actually present and compatible:
+
+- Guerilla.
+- Sapien.
+- Halo Tool.
+- Invader.
+- Baboon.
+- Blender and the Halo addon.
+- OpenCE Mantle.
+- OpenTool.
+- Reclaimer.
+- Mozzarilla.
+- MCC Excession.
+- Other currently registered tools.
+
+Each tool requires a genuine operation suited to its actual specialty.
+
+Examples:
+
+- Guerilla changes a supported native tag field.
+- Sapien edits a scenario placement.
+- Halo Tool compiles an actual native output.
+- Invader extracts or validates supported tags/maps and completes a valid edit handoff.
+- Blender produces or modifies geometry that Spark subsequently imports and validates.
+- A supported BSP specialist makes a real world modification.
+- A lightmap tool generates a real supported lighting output.
+- Excession performs an appropriate MCC packaging operation where supported.
+
+Do not treat launching an executable as successful integration.
+
+Do not claim that every named tool necessarily supports headless automation or every Halo edition.
+
+For unavailable tools, determine the exact dependency, provide a supported installation/setup path and record a real blocker.
+
+Never replace a failed external handoff with a simulated success.
+
+Validate edit conflicts, stale source revisions, unsupported paths, native source ownership and rollback behavior.
+
+---
+
+## 6. THE FOUR-RUNTIME GAUNTLET
+
+Confirm which four principal Halo PC runtimes are currently configured for Spark. The expected candidates are:
+
+1. Halo Custom Edition / Gearbox CE.
+2. MCC Halo 1.
+3. OpenCE.
+4. Chupathingy.
+
+Do not silently assume those are the installed targets; verify the runtime registry, versions, paths and actual executables.
+
+Use a separate runtime-specific build and test matrix.
+
+For every verified target:
+
+- Identify the game executable and exact build.
+- Identify its supported map/source format.
+- Identify compatible editing and compilation tools.
+- Validate required resource maps.
+- Build a supported Golden Map variant.
+- Confirm native header/tag compatibility.
+- Open the built output in the real target.
+- Confirm actual rendering.
+- Confirm player movement and collision.
+- Confirm weapon and object placement.
+- Confirm supported gameplay scripts.
+- Verify save/build/load feedback in Spark.
+- Test missing assets and incorrect-version handling.
+- Verify shutdown and recovery.
+- Record actual source and output hashes.
+
+Test the fullest valid feature set for each runtime.
+
+Do not require unsupported multiplayer AI in stock CE, or invent equivalent OpenCE/Chupathingy interfaces.
+
+The four runtimes may require separate native exports, scripts, packaging conventions or gameplay features.
+
+Never claim that a single compiled file works in all four unless it genuinely does.
+
+Keep Mac Demo/HaloMD, original Xbox and retail PC source compatibility in their own explicitly tested lanes, even when they are not among the four directly executable runtimes.
+
+**The Gauntlet is not complete if an available, supported runtime has never actually launched a validated output.**
+
+---
+
+## 7. EXERCISE THE ENTIRE SPARK FEATURE SUITE
+
+After the Golden Map passes, continue through the complete feature inventory.
+
+Include real user-facing journeys for:
+
+### Editor and map workflows
+
+- Direct supported `.map` cache editing.
+- Loose-tag editing and native rebuilds.
+- Scenario/world editing.
+- BSP tools and source volumes.
+- Asset importing and dependency resolution.
+- Tag Inspector and native serialization.
+- Shader/bitmap/material editing.
+- Audio and animation tools.
+- Map conversion and edition detection.
+- Native validation and error diagnostics.
+- Map recovery and Source Guardian.
+- Build receipts and stale-output protection.
+- Import/export fidelity and provenance.
+
+### Production workflows
+
+- Firefight Designer.
+- Zombie survival configurations.
+- Original Zombie Apocalypse source recovery and supported builds.
+- Campaign Mission Director.
+- First Contact mission workflow.
+- HaloScript authoring.
+- Multiplayer gametype editing.
+- King of the Hill placement.
+- Machinima/Recording Director.
+- Camera takes and timeline.
+- Packaging and sharing.
+- Tutorial and guided-demo workflows.
+
+### Multiplayer and collaboration
+
+- Multiplayer Hub discovery, where the provider permits it.
+- Host and join through supported documented interfaces.
+- Map and protocol compatibility checks.
+- Two-client sessions where available.
+- SparkLink multi-editor source collaboration.
+- Conflicting edits and reconciliation.
+- Durable author-owned Undo/Redo.
+- Disconnection and recovery.
+- AI diagnostics and true replication where supported.
+- Runtime-specific Live Link.
+
+### Application architecture and UX
+
+- Spark Command Hub.
+- All workspace routes.
+- All supported tool-menu actions.
+- Multiple project and map tabs.
+- Detached windows.
+- Multi-monitor layouts.
+- State restoration.
+- Shared source ownership.
+- Customization and settings.
+- Project navigation.
+- Undo/Redo.
+- Save and reopen.
+- First-run onboarding.
+- Runtime switching.
+- Error messages and guided recovery.
+- Search, shortcuts and contextual controls.
+- Learning Center.
+- Community Maps.
+- Asset browser and previews.
+- Installer, portable and applicable Linux package workflows.
+
+Every functioning user feature requires a corresponding acceptance path.
+
+For advanced research goals—128 players, six-player campaign, simultaneous multiregion streaming, VR and unsupported engine modifications—retain exact experimental status and feasibility evidence. Do not falsely transform unproven research into production acceptance.
+
+---
+
+## 8. FULL INTEROPERABILITY CHALLENGE
+
+Perform one continuous cross-tool editing journey:
+
+**Spark BSP edit → save → external native editor → modify a tag → return to Spark → detect modification → reconcile → Blender or supported geometry tool → modify an asset → return to Spark → import/validate → native compiler → launch Halo → inspect gameplay → return to Spark → make another edit → rebuild.**
+
+Verify:
+
+- No lost edits.
+- No stale document ownership.
+- No incorrect revision receipts.
+- No silent overwrites.
+- No missing dependencies.
+- No mismatched source editions.
+- No broken native references.
+- No unintended toolchain changes.
+- No duplicate full SDK trees.
+- No runaway disk growth.
+
+Repeat the workflow with an intentionally invalid external edit.
+
+Spark must reject damaged data without destroying the last valid source or accepted build.
+
+---
+
+## 9. THE AUTOMATIC FIX-AND-RETEST ENGINE
+
+**Every reproducible failure becomes engineering work.**
+
+Codex must not stop at writing a defect list.
+
+For each failed acceptance scenario:
+
+1. Record the exact user action sequence.
+2. Capture the observed failure.
+3. Identify the actual source revision and runtime.
+4. Preserve relevant logs, screenshots and native evidence.
+5. Find the root cause in the implementation.
+6. Repair the existing responsible component.
+7. Add a focused regression test.
+8. Rerun the original failing scenario through Spark's real interface.
+9. Rerun related native and integration tests.
+10. Resume the interrupted Gauntlet.
+11. Rerun the complete impacted journey before declaring it passed.
+
+Continue this cycle until all supported, available test cases pass.
+
+Never:
+
+- Delete a failing test.
+- Replace a real integration with a mock.
+- Weaken native validation simply to get green results.
+- Mark an operation successful merely because an API returned success.
+- Disable a broken feature without accurately representing its capability status.
+- Hide failures in logs.
+- Pretend an external tool worked when it did not.
+- Assume a runtime loaded a map without evidence.
+
+If several failures share one underlying defect, repair the shared cause rather than issuing separate superficial patches.
+
+Do not start unrelated feature expansion while fixing the Gauntlet.
+
+### External blockers
+
+If a prerequisite genuinely cannot be satisfied—missing licensed game, unavailable tool, unsupported engine feature, missing second physical machine or inaccessible hardware—record it explicitly.
+
+State:
+
+- The exact blocker.
+- Why it is external rather than an application defect.
+- Evidence collected.
+- Required user action or resource.
+- Tests still pending.
+- What has already been proved independently.
+
+A blocked test is neither passed nor an excuse to abandon other executable tests.
+
+Never falsely declare the entire Gauntlet complete with unresolved mandatory blocked tests.
+
+---
+
+## 10. PERFORMANCE AND RESOURCE ACCEPTANCE
+
+This is mandatory because previous test staging grew the project to approximately 138 GiB.
+
+Measure actual:
+
+- Cold startup.
+- Warm startup.
+- Time to open a map.
+- Time to reopen the same map.
+- Tag search latency.
+- Asset import latency.
+- BSP rendering latency.
+- Shader/texture loading.
+- Native build time.
+- External-tool round-trip time.
+- Peak RAM.
+- Peak VRAM where measurable.
+- Temporary disk growth.
+- Cache reuse.
+- Generated storage after repeated operations.
+
+Include tests on resource-constrained settings.
+
+Opening Blood Gulch repeatedly must not duplicate its full extracted resources without a legitimate isolated build requirement.
+
+Opening multiple workspaces must not create independent copies of the complete project.
+
+All generated caches and temporary staging must obey verified budgets.
+
+Retain compact logs and reproducible minimum fixtures rather than full duplicate tag libraries for every test.
+
+Before heavyweight test batches, verify available disk space and active-job leases.
+
+If resource limits are exceeded, fail safely with actionable diagnostics—not system-wide exhaustion.
+
+Performance fixes must preserve actual Halo content fidelity and native correctness.
+
+---
+
+## 11. FAULT INJECTION AND RECOVERY
+
+Test genuine failure paths:
+
+- Missing resource map.
+- Wrong source edition.
+- Invalid native tag reference.
+- Corrupt compiled map.
+- Broken external-tool path.
+- Unexpected tool exit.
+- Interrupted native build.
+- Insufficient free disk space.
+- RAM allocation pressure.
+- Failed shader/texture decode.
+- Duplicate or conflicting project revision.
+- Lost SparkLink connection.
+- Application crash and restart.
+- External editor modifies a file during build.
+- Stale map snapshot.
+- Invalid gameplay script.
+- Unsupported runtime build.
+- Broken installer dependency.
+
+Each failure must produce a useful explanation, preserve source and give the creator an intelligible recovery action.
+
+Validate that recovery actually works.
+
+---
+
+## 12. AUTOMATED DEMO PROOF
+
+Every advertised Spark demonstration must be reproducible from a clean user state.
+
+For each demo:
+
+- Open the appropriate workspace.
+- Locate the demo through Features or Learning Center.
+- Read its prerequisites.
+- Perform the steps using the normal controls.
+- Produce the claimed native output.
+- Validate the output with the appropriate independent tool.
+- Launch in-game where the demonstration promises gameplay.
+- Save, reopen and continue editing.
+
+Engineering-only fixtures must be clearly identified as such.
+
+Do not present internal probe scripts as finished creator experiences.
+
+The goal is that a new user can reproduce what Codex demonstrated **without manually running undocumented development commands**.
+
+---
+
+## 13. CLEAN-MACHINE AND RELEASE VALIDATION
+
+Once application workflows pass, build the actual distributable packages.
+
+Validate:
+
+- Windows installer.
+- Windows portable executable.
+- Linux packaging where supported.
+- Application launch.
+- First-run configuration.
+- Legitimate Halo installation/resource discovery.
+- Editing-tool discovery.
+- Project creation.
+- Map open and save.
+- A representative native build.
+- Runtime-specific launch.
+- User-data preservation on upgrade/uninstall.
+- Package checksums and revision identity.
+
+Use native package tests on the actual operating system.
+
+Do not infer Linux success from Windows success, or vice versa.
+
+GitHub Actions artifacts and draft Releases must contain genuine tested binaries where supported—not only source archives.
+
+No public publishing without explicit owner approval.
+
+---
+
+## 14. EVIDENCE, REPORTING AND HONEST COMPLETION
+
+Maintain a durable Gauntlet dashboard and checkpoint record.
+
+For every test report:
+
+- Test ID and feature.
+- Exact app commit and version.
+- UI journey.
+- Toolchain and runtime version.
+- Source and output hashes.
+- Expected behavior.
+- Observed behavior.
+- Verification level.
+- Performance and storage measurements.
+- Pass/fail/blocked status.
+- Screenshots/logs and native readback references.
+- Defect and fix commit where applicable.
+
+Use distinct verification levels:
+
+1. Source implementation inspected.
+2. Automated component test passed.
+3. Real application UI journey passed.
+4. Native source/tag readback passed.
+5. Native compilation passed.
+6. Real Halo runtime loaded output.
+7. Actual gameplay behavior verified.
+8. Multi-client gameplay verified.
+9. Clean-machine package verified.
+
+Do not promote lower-level evidence into higher-level acceptance.
+
+### Final exit criteria
+
+**Do not declare the Creator's Gauntlet complete until:**
+
+- All available supported user workflows have passed their required acceptance levels.
+- The Golden Map was authored from scratch through Spark.
+- Valid assets were imported from another map.
+- Player and gameplay objects were placed and verified.
+- Supported AI encounters were authored and tested.
+- Applicable environment and material workflows passed.
+- Installed supported external-tool integrations completed genuine round trips.
+- Each of the four verified primary Halo runtimes completed its applicable native build/load/gameplay journey.
+- Multiwindow editing, session restoration and SparkLink were tested at their claimed levels.
+- Supported gameplay systems passed real native verification.
+- Every advertised demo has a reproducible user workflow.
+- No known reproducible critical or major workflow defect remains.
+- Source integrity is preserved.
+- Cache and staging growth remain within enforced limits.
+- Actual release packages pass clean-machine checks.
+- The full suite has been rerun after the final code change.
+- Any genuinely external blockers are explicitly documented and remain visibly incomplete, not quietly waived.
+
+### Required final deliverables
+
+1. **Golden Map** — editable native source and verified built outputs.
+2. **Complete feature acceptance matrix** — every current user-facing capability.
+3. **Four-runtime compatibility and test matrix**.
+4. **External-tool integration evidence**.
+5. **Real application UI test harness and replayable scenarios**.
+6. **Defect/fix history and regression suite**.
+7. **Native gameplay and source-integrity evidence**.
+8. **Measured performance and resource report**.
+9. **Verified installation packages, where supported**.
+10. **Remaining blockers and experimental research ledger**.
+
+## FINAL ORDER
+
+**Do not stop after one successful map, one fixed door, one working compiler, one passing test suite or one successful Halo runtime.**
+
+Work through the complete feature inventory.
+
+Fix reproducible defects.
+
+Rerun failed journeys.
+
+Verify native output.
+
+Verify actual gameplay.
+
+Repeat until the complete supported Gauntlet passes.
+
+Keep progress durable and recoverable, respect hardware budgets, and report any genuinely external blockers rather than fabricating completion.
+
+**GUILTY SPARK MUST PROVE THAT A CREATOR CAN USE THE WHOLE STUDIO, NOT JUST THAT ITS INDIVIDUAL PARTS EXIST.**
+
+**ALL THE TOOLS, AND THEN SOME.**

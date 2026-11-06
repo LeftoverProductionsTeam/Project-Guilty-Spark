@@ -62,7 +62,7 @@
     }
   },
   "monitoring": {
-    "targetedTests": 35,
+    "targetedTests": 36,
     "before": {
       "samples": 9,
       "durationMs": 8200.1795,
@@ -97,9 +97,175 @@
     "Native Linux/macOS package and application acceptance",
     "Production memory-first Save/Discard/Cancel and shared history integration",
     "Full external-tool lifetime cleanup",
-    "C71 authored revision publication and Smart Edit native UI",
+    "C71 authored revision publication; broader native object/behavior and tool round trips",
     "Repeated real editor/import/archive/tool/window stress matrix",
-    "Clean-machine packages/signing/publication approval"
+    "Clean-machine packages/signing/publication approval",
+    "Full filesystem import rollback and interrupted durable-history orphan reclamation"
   ],
-  "publicationPerformed": false
+  "publicationPerformed": false,
+  "validatedWorkingRepair": {
+    "baseCommit": "c9d826f8df3ac30e5a20ab920168d947ea3b88fa",
+    "workingChangesIncluded": true,
+    "rust": {
+      "suites": 52,
+      "passed": 758,
+      "failed": 0,
+      "ignored": 9
+    },
+    "typescript": true,
+    "frontend": {
+      "files": 96,
+      "passed": 413
+    },
+    "browser": {
+      "passed": 176
+    },
+    "offlineCommands": 59,
+    "storageAndSourceContracts": 36,
+    "nativeApp": {
+      "executableSha256": "afe99f243b683a9f5f40de16837fddef09dde21f6aca6c9faa5a7ea55cfc7cad",
+      "mockedIpc": false,
+      "cases": 4,
+      "errors": [],
+      "complete": true,
+      "gracefulAppClose": true,
+      "mixedImports": {
+        "mixedSuccesses": 1,
+        "mixedFailures": 2,
+        "rejectedAttempts": 10,
+        "libraryIndexUnchangedAfterRejections": true
+      },
+      "editCount": 50,
+      "projectLogicalGrowthBytes": 2955508,
+      "sampledPeakPrivateBytes": 1906794496,
+      "comparablePrivateMemoryGrowthBytes": -2953216,
+      "ownedProcessCrashRecovery": {
+        "libraryReused": true,
+        "acknowledgedSaveOnly": true
+      },
+      "outputSha256": "45c596247b213ddb1532f2c3dadd6e3d484c5b1d2fabef4f177b376b7280f5c7",
+      "independentReadbackRadius": 0.225,
+      "originalUnchanged": true,
+      "gameplayTested": false
+    },
+    "profile": {
+      "conditions": "Fresh application/profile; OS file cache not cleared; same embedded app, source, settings and readiness checks",
+      "appWindowMs": 520.1593,
+      "importMs": 3761.4693,
+      "firstMapReadyMs": 7295.9774,
+      "resumeMs": 210.93249999999898,
+      "sameCanvas": true,
+      "newPreviewCallsOnResume": 0,
+      "bitmapDecode": {
+        "entries": 128,
+        "estimatedBytes": 59388830,
+        "maxBytes": 67108864,
+        "maxEntries": 128,
+        "hits": 36,
+        "misses": 241,
+        "changedPayloads": 0,
+        "evictions": 113
+      },
+      "processPrivateBytes": 1389133824,
+      "processWorkingSetBytes": 1427505152,
+      "gpuDedicatedBytes": 210055168,
+      "gpuSharedBytes": 18198528,
+      "sourceShaders": 121,
+      "sourceLightmaps": 15,
+      "sourceCubes": 11,
+      "pendingMaterials": 0,
+      "shaderParityClaimed": false,
+      "beforeAfterStartupSpeedupClaimed": false
+    },
+    "nativeCompiler": {
+      "inputFiles": 1793,
+      "compiledTags": 1796,
+      "freshBuildMs": 26021,
+      "corruptSaveRejected": true,
+      "exactRecovery": true,
+      "compiledRadius": 0.5,
+      "parentUnchanged": true,
+      "unchangedRequests": 10,
+      "extraNativeTrees": 0,
+      "allocatedBefore": 270620016,
+      "allocatedAfter": 270620016
+    },
+    "temporaryPayloadDisposedLogicalBytes": 5335649623,
+    "temporaryPeakLogicalBytes": 5510397707,
+    "lastMeasuredAllocatedBytes": 5023942416,
+    "disposedPhysicalBytes": null,
+    "physicalLimit": "Shared Cargo hardlinks prevent assigning physical reclamation from logical deletion; not bytes moved",
+    "stages": [
+      {
+        "name": "Rust workspace",
+        "milliseconds": 129145
+      },
+      {
+        "name": "TypeScript",
+        "milliseconds": 834
+      },
+      {
+        "name": "Frontend tests",
+        "milliseconds": 1904
+      },
+      {
+        "name": "Source module contracts",
+        "milliseconds": 943
+      },
+      {
+        "name": "Offline regressions",
+        "milliseconds": 4373
+      },
+      {
+        "name": "Storage ownership",
+        "milliseconds": 11948
+      },
+      {
+        "name": "Browser regressions",
+        "milliseconds": 278047
+      },
+      {
+        "name": "Native storage helper build",
+        "milliseconds": 58131
+      },
+      {
+        "name": "Real H1A compile, unchanged reuse, external corruption recovery and native readback",
+        "milliseconds": 149693
+      },
+      {
+        "name": "Embedded desktop build",
+        "milliseconds": 127164
+      },
+      {
+        "name": "Native map edit, Undo, Save, export and readback",
+        "milliseconds": 352010
+      }
+    ]
+  },
+  "backgroundPreviewRepair": {
+    "before": "Home created two unrequested persistent map copies in a fresh library",
+    "after": "Background preparations use bounded RAM TEMP records and read the original source in place; one explicit import creates exactly one library entry",
+    "limitMaps": 32,
+    "limitMetadataBytes": 134217728,
+    "activePreviewSourceReferencesProtectCleanup": true,
+    "normalUserImportStillPersistent": true,
+    "nativeProof": true
+  },
+  "failureHistory": [
+    {
+      "stage": "native app backup policy",
+      "outcome": "failed",
+      "reason": "Harness expected three default backups; product correctly defaults zero. Corrected harness explicitly selects three."
+    },
+    {
+      "stage": "combined release build metadata",
+      "outcome": "failed closed",
+      "reason": "Transient unreadable compiler metadata. Earlier numeric Win32 code unknown. Later native fixture reproduces classic pending-delete Win32 5; complete-scan retry and failed-outcome cleanup repaired."
+    },
+    {
+      "stage": "native mixed imports",
+      "outcome": "failed",
+      "reason": "One explicit import created three persistent projects because Home prepared previews using normal import. Production background-preview path repaired; assertion retained."
+    }
+  ]
 }

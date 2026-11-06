@@ -54,6 +54,36 @@ test('real Windows allocation summaries retain resident bytes, deduplicate file 
     assert.equal(before.errors, 0); assert.equal(before.files, 3);
     assert.equal(before.logicalBytes, 256 + 8192); assert.equal(before.uniqueFileObjects, 2);
     assert.equal(before.multiLinkEntries, 2);
+    // Reproduce the Win32 state used by short-lived compiler object files.
+    // A classic DeleteFile keeps the name pending while this owned handle is
+    // open; metadata CreateFile reports access denied, not file-not-found.
+    const heldScript=String.raw`
+      Add-Type -Path $env:SPARK_METER_SOURCE
+      Add-Type @'
+using System; using System.Runtime.InteropServices; using System.ComponentModel; using Microsoft.Win32.SafeHandles;
+public static class NativeHeldDelete {
+  [DllImport("kernel32.dll",SetLastError=true)] static extern bool SetFileInformationByHandle(SafeFileHandle file,int kind,ref int value,uint bytes);
+  public static void Mark(SafeFileHandle file){int value=1;if(!SetFileInformationByHandle(file,4,ref value,4))throw new Win32Exception();}
+}
+'@
+      $f=[System.IO.FileStream]::new($env:SPARK_PENDING_FILE,[System.IO.FileMode]::CreateNew,[System.IO.FileAccess]::ReadWrite,([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete),4096,[System.IO.FileOptions]::DeleteOnClose)
+      try {
+        [NativeHeldDelete]::Mark($f.SafeFileHandle)
+        try {$method=[SparkPhysicalAudit].GetMethod("Open",([System.Reflection.BindingFlags]::NonPublic -bor [System.Reflection.BindingFlags]::Static));$probe=$method.Invoke($null,@($env:SPARK_PENDING_FILE,$false));$probe.Dispose();[Console]::WriteLine("unexpected-open")}
+        catch {$errorValue=$_.Exception;while($errorValue.InnerException){$errorValue=$errorValue.InnerException};[Console]::WriteLine("pending:"+$errorValue.NativeErrorCode)}
+        [Console]::ReadLine()|Out-Null
+      } finally {$f.Dispose()}
+    `;
+    const holder=spawn('powershell.exe',['-NoProfile','-NonInteractive','-Command',heldScript],
+      {env:{...process.env,SPARK_PENDING_FILE:path.join(root,'pending.bin'),SPARK_METER_SOURCE:path.resolve('scripts/maintenance/physical-audit.cs')},windowsHide:true,stdio:['pipe','pipe','pipe']});
+    await context.trackProcess(holder);
+    try{
+      const message=await new Promise((resolve,reject)=>{holder.stdout.once('data',value=>resolve(value.toString()));holder.once('exit',code=>reject(Error('Pending-file fixture exited '+code)));});
+      assert.match(message,/pending:5/);
+      const pending=read();assert.equal(pending.errors,1);assert.equal(pending.busyErrors,1);
+      assert.match(pending.firstIssue,/Win32=5 /);assert.equal(pending.files,before.files);
+    }finally{await stopQaProcess(holder);}
+    assert.equal(read().errors,0);
     const outside = await mkdir(path.join(parent, 'originals'));
     await fs.writeFile(path.join(outside, 'source.tag'), 'protected original');
     const alias = path.join(root, 'alias'); await fs.symlink(outside, alias, 'junction');
@@ -65,6 +95,14 @@ test('real Windows allocation summaries retain resident bytes, deduplicate file 
     assert.equal(read().uniqueAllocatedFileBytes, before.uniqueAllocatedFileBytes);
   });
 }, { reservationBytes: 8 * 1024 ** 2 }));
+
+test('a monitor failure retires its completed receipt without turning failure into success', () => {
+  const env={...process.env};
+  for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];
+  const source=new URL('./native-qa-storage.mjs',import.meta.url).href;
+  const run=spawnSync(process.execPath,['--input-type=module','-e',`import fs from 'node:fs/promises';import assert from 'node:assert/strict';import {withDevelopmentWorkspace} from ${JSON.stringify(source)};let root;await assert.rejects(withDevelopmentWorkspace('monitor-failure-retirement',async c=>{root=c.env.SPARK_BUILD_WORKSPACE;await fs.writeFile(c.directory+'/generated.bin',Buffer.alloc(131072,7));},{reservationBytes:65536}),/storage budget/);await assert.rejects(fs.stat(root),{code:'ENOENT'});`],{env,encoding:'utf8',windowsHide:true});
+  assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/"temporaryOutputDisposed":true/);
+});
 
 async function fixture(run) {
   const temporaryParent = await fs.realpath(os.tmpdir());

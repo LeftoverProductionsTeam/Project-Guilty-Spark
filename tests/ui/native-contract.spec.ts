@@ -1817,6 +1817,29 @@ test('downloaded maps can open directly in the MCC conversion flow',async({page}
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((c:any)=>c.command==='compatibility'&&c.args.id==='b')).toBe(true);expect(calls.some((c:any)=>c.command==='start_build')).toBe(false);
 });
 
+test('mixed native imports open the valid map and report the rejected file',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+    if(command==='import_dialog'){w.__importBatchArgs=args;return {projects:[await original('open_project',{id:'b'})],failures:[{path:'C:/owned/broken.map',message:'The map is truncated.'}]};}
+    return original(command,args);
+  };});
+  await chooseTool(page,'Community maps');await page.getByRole('button',{name:'Import & convert to MCC',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Map conversion · CE / PC / Demo to MCC Halo 1',exact:true})).toBeVisible();
+  await expect(page.getByText(/1 project opened\. 1 file could not be opened\./)).toBeVisible();
+  await expect(page.getByText(/broken\.map: The map is truncated\./)).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__importBatchArgs.includeReport)).toBe(true);
+  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((row:any)=>row.command==='compatibility'&&row.args.id==='b')).toBe(true);
+});
+
+test('an entirely rejected native batch leaves the current project available',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('42');await velocity.press('Enter');
+  await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>command==='import_dialog'?{projects:[],failures:[{path:'C:/owned/rejected.map',message:'Invalid tag bounds.'}]}:original(command,args);});
+  await chooseTool(page,'Community maps');await page.getByRole('button',{name:'Import & convert to MCC',exact:true}).click();
+  await expect(page.getByText(/rejected\.map: Invalid tag bounds\./)).toBeVisible();
+  await chooseTool(page,'Tag editor');await expect(page.getByRole('spinbutton',{name:'Velocity',exact:true})).toHaveValue('42');
+});
+
 test('automatic sound discovery merges late pins without a folder prompt or losing edits',async({page})=>{
   await mockDesktop(page);
   await page.evaluate(()=>{

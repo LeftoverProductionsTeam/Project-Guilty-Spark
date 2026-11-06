@@ -1,0 +1,52 @@
+GUILTY SPARK — MACHINIMA & RECORDING DIRECTORLet creators direct, stage and capture Halo cinematics like a production studio
+Continue from the existing Recording Director, native camera paths, detachable windows, camera-key controls and saved named takes.
+
+Production interface
+Build within the current Machinima and World workflows:
+
+A timeline with timecode.
+Named takes and sequences.
+Camera keyframes.
+Position and rotation tracks.
+Field of view.
+Smooth interpolation and easing.
+Dolly, orbit, tracking and follow cameras.
+Camera speed and movement constraints.
+Actor and vehicle staging.
+Supported animation cues.
+Scripted effects, sounds and dialogue.
+Timeline markers and shot notes.
+Multi-camera preview.
+Undo, snapshots and recovery.
+Keep the editor usable on two monitors: world viewport on one, detachable Director/timeline on the other.
+
+Distinguish three camera capabilities
+Editor camera: Spark controls its own viewport and records camera paths.
+
+Native cinematic camera: Spark generates valid supported Halo camera/script source that can be compiled into the selected runtime.
+
+Live in-game camera: Available only through verified runtime-specific interfaces.
+
+Do not claim that editor camera movement automatically controls a live MCC/CE/OpenCE client.
+
+Never rely on anti-cheat bypasses or unsupported memory hooks.
+
+Export and capture
+Support saved project-native shot data and useful interchange formats.
+
+Where possible, generate real native Halo camera tracks or HaloScript references.
+
+For video capture, integrate a user-approved supported capture/encoding workflow. Verify actual audio-video synchronization, frame rate, resolution, output file integrity and ownership.
+
+Do not silently record microphones, private voice chat or other players.
+
+Acceptance
+Create a 30-second scene featuring an actor, moving camera and staged event.
+
+Save, close, reopen, edit and replay the take.
+
+Generate the actual supported native camera/script output or clearly label editor-only playback.
+
+Export a verified playable video where an authorized capture backend is available.
+
+A preview camera animation is not yet a complete machinima pipeline.

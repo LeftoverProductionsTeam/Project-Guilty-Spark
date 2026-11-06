@@ -63,6 +63,7 @@ impl Library {
         let db = Connection::open(root.join("library.sqlite3"))?;
         db.pragma_update(None, "journal_mode", "WAL")?;
         db.execute_batch("CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, summary TEXT NOT NULL); CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL); PRAGMA user_version=1;")?;
+        Self::prepare_previews(&db)?;
         Ok(Self {
             root: root.into(),
             db,
@@ -76,9 +77,25 @@ impl Library {
         crate::reject_links(root)?;
         let db=Connection::open_in_memory()?;
         db.execute_batch("CREATE TABLE projects(id TEXT PRIMARY KEY, summary TEXT NOT NULL); CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE documents(id TEXT PRIMARY KEY,value TEXT NOT NULL);")?;
+        Self::prepare_previews(&db)?;
         Ok(Self{root:root.into(),db,session_only:true})
     }
     pub fn is_session_only(&self)->bool{self.session_only}
+    fn prepare_previews(db:&Connection)->Result<()> {
+        // One connection, no preview database or map copies. SQLite TEMP data
+        // stays in RAM and disappears when this library session ends.
+        db.pragma_update(None,"temp_store","MEMORY")?;
+        db.execute_batch("CREATE TEMP TABLE preview_documents(id TEXT PRIMARY KEY,value TEXT NOT NULL);")?;
+        Ok(())
+    }
+    fn preview(&self,id:&str)->Result<Option<Project>> {
+        match self.db.query_row("SELECT value FROM preview_documents WHERE id=?1",[id],|row|row.get::<_,String>(0)) {
+            Ok(text)=>Ok(Some(serde_json::from_str(&text)?)),
+            Err(rusqlite::Error::QueryReturnedNoRows)=>Ok(None),
+            Err(reason)=>Err(reason.into()),
+        }
+    }
+    pub fn is_preview(&self,id:&str)->Result<bool>{Ok(self.preview(id)?.is_some())}
     pub fn project_dir(&self, id: &str) -> Result<PathBuf> {
         uuid::Uuid::parse_str(id)
             .map_err(|_| crate::SparkError::Invalid("Invalid project UUID".into()))?;
@@ -96,6 +113,7 @@ impl Library {
         Ok(out)
     }
     pub fn get(&self, id: &str) -> Result<Project> {
+        if let Some(preview)=self.preview(id)?{return Ok(preview);}
         if self.session_only{
             let text:String=self.db.query_row("SELECT value FROM documents WHERE id=?1",[id],|row|row.get(0))?;
             return Ok(serde_json::from_str(&text)?);
@@ -121,7 +139,7 @@ impl Library {
     /// Cleanup must also preserve paths selected as SDKs, tools, resources or
     /// runtime content. Stream existing settings, including future keys.
     pub fn settings_reference_path(&self, path: &Path) -> Result<bool> {
-        let mut statement = self.db.prepare("SELECT length(CAST(value AS BLOB)), value FROM settings")?;
+        let mut statement = self.db.prepare("SELECT length(CAST(value AS BLOB)), value FROM settings UNION ALL SELECT length(CAST(value AS BLOB)), value FROM preview_documents")?;
         let mut rows = statement.query([])?;
         let mut bytes = 0u64;
         let mut count = 0usize;
@@ -129,7 +147,7 @@ impl Library {
             bytes = bytes.saturating_add(row.get::<_, i64>(0)?.max(0) as u64);
             count += 1;
             if bytes > 16 * 1024 * 1024 || count > 4096 {
-                return invalid("Saved settings exceed cleanup's reference-review budget; no files were removed");
+                return invalid("Saved settings and active source previews exceed cleanup's reference-review budget; no files were removed");
             }
             let value: serde_json::Value = serde_json::from_str(&row.get::<_, String>(1)?)?;
             if crate::storage::document_references_path(&value, path) { return Ok(true); }
@@ -141,11 +159,14 @@ impl Library {
         project: &Project,
         inspection: Option<&maps::MapInspection>,
     ) -> Result<LibraryEntry> {
+        self.save_internal(project,inspection,self.is_preview(&project.id)?)
+    }
+    fn save_internal(&self,project:&Project,inspection:Option<&maps::MapInspection>,preview:bool)->Result<LibraryEntry> {
         project.validate()?;
         let dir = self.project_dir(&project.id)?;
         let file = dir.join("project.gsproject");
         let previous = self.list()?.into_iter().find(|e| e.id == project.id);
-        if if self.session_only{previous.is_some()}else{file.exists()} {
+        if if preview{self.is_preview(&project.id)?}else if self.session_only{previous.is_some()}else{file.exists()} {
             let existing = self.get(&project.id)?;
             if existing
                 .source
@@ -161,7 +182,7 @@ impl Library {
                 );
             }
         }
-        if let Some(source) = &project.source { if !self.session_only {
+        if let Some(source) = &project.source { if !self.session_only && !preview {
             crate::reject_links(&source.preserved_path)?;crate::reject_links(&dir.join("source.map"))?;
             if fs::canonicalize(&source.preserved_path)? != fs::canonicalize(dir.join("source.map"))? {
                 return invalid("Source must be the managed preserved copy");
@@ -200,7 +221,13 @@ impl Library {
                 .map(|i| i.header.scenario_type)
                 .or(previous.and_then(|p| p.scenario_type)),
         };
-        if self.session_only{
+        if preview {
+            let text=serde_json::to_string(project)?;
+            let(count,total):(i64,i64)=self.db.query_row("SELECT COUNT(*),COALESCE(SUM(length(CAST(value AS BLOB))),0) FROM preview_documents WHERE id<>?1",[&project.id],|row|Ok((row.get(0)?,row.get(1)?)))?;
+            if count>=32 || total.saturating_add(text.len() as i64)>128*1024*1024{return invalid("Background source previews reached their 32-map/128 MiB budget. Existing previews and edits were retained; no map was copied");}
+            self.db.execute("INSERT INTO preview_documents(id,value) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET value=excluded.value",params![project.id,text])?;
+            return Ok(entry);
+        }else if self.session_only{
             let text=serde_json::to_string(project)?;
             let total:i64=self.db.query_row("SELECT COALESCE(SUM(length(CAST(value AS BLOB))),0) FROM documents WHERE id<>?1",[&project.id],|r|r.get(0))?;
             if total.saturating_add(text.len() as i64)>128*1024*1024{return invalid("Open document data reached the 128 MiB memory budget; save and close an unused map. No existing edits were discarded");}
@@ -219,15 +246,29 @@ impl Library {
         path: &Path,
         resources: Option<&Path>,
     ) -> Result<(Project, maps::MapInspection)> {
-        self.import_map_internal(path,resources,true)
+        self.import_map_internal(path,resources,true,false)
     }
-    fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:bool)->Result<(Project,maps::MapInspection)> {
+    /// A background model/resource preview is not an editable imported map.
+    /// Retain its verified source identity in RAM for the existing decoders.
+    pub fn preview_map(&self,path:&Path,resources:Option<&Path>)->Result<(Project,maps::MapInspection)> {
+        validate_local_input_path(path)?;crate::reject_links(path)?;
+        self.import_map_internal(path,resources,false,true)
+    }
+    fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:bool,preview:bool)->Result<(Project,maps::MapInspection)> {
         // Persist the location now, so later app working directories cannot
         // reinterpret a relative map/resource selection. Missing resources are
         // still allowed; their absolute location remains explicit.
         let resource_directory=std::path::absolute(resources.or(path.parent()).filter(|p|!p.as_os_str().is_empty()).unwrap_or(Path::new(".")))?;
         let resource_directory=if resource_directory.is_dir(){fs::canonicalize(resource_directory)?}else{resource_directory};
         let inspection = maps::inspect_map(path, Some(&resource_directory))?;
+        if preview {
+            let original=fs::canonicalize(path)?;
+            let mut rows=self.db.prepare("SELECT value FROM preview_documents")?;
+            for text in rows.query_map([],|row|row.get::<_,String>(0))?{
+                let project:Project=serde_json::from_str(&text?)?;
+                if project.source.as_ref().is_some_and(|source|source.sha256==inspection.sha256&&source.original_path==original){return Ok((project,inspection));}
+            }
+        }
         if let Some(entry) = self
             .list()?
             .into_iter()
@@ -266,7 +307,7 @@ impl Library {
         let mut p = Project::new(&inspection.header.name.replace('_', " "));
         let dir = self.project_dir(&p.id)?;
         crate::reject_links(&dir)?;
-        let copy=if self.session_only{
+        let copy=if self.session_only || preview{
             validate_local_input_path(path)?;crate::reject_links(path)?;fs::canonicalize(path)?
         }else{
         fs::create_dir_all(&dir)?;
@@ -303,7 +344,7 @@ impl Library {
             resource_sha256: project::resource_hashes(&resource_directory)?,
         });
         p.scene = inspection.objects.clone();
-        self.save(&p, Some(&inspection))?;
+        self.save_internal(&p, Some(&inspection),preview)?;
         Ok((p, inspection))
     }
     pub fn import_project(&self, path: &Path) -> Result<Project> {
@@ -340,7 +381,7 @@ impl Library {
                     return invalid("Project resources changed; restore them or select resources in the original project before exporting");
                 }
             }
-            let mut imported=self.import_map_internal(&src.original_path, src.resource_directory.as_deref(),false)?.0;
+            let mut imported=self.import_map_internal(&src.original_path, src.resource_directory.as_deref(),false,false)?.0;
             if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();source.audio_resources=src.audio_resources.clone();}imported
         } else {
             self.create(&incoming.title)?

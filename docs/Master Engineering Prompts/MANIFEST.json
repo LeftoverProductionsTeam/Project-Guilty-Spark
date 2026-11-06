@@ -1,0 +1,202 @@
+[
+  {
+    "index": 4,
+    "filename": "04_Spark_Flow.txt",
+    "source": "original user ZIP / fcce5421-4f9f-43c3-a916-721317229b30/Pasted text.txt",
+    "provenance": "byte-for-byte",
+    "bytes": 32382,
+    "sha256": "0db1c4c6cf451b0407ed58557938b10fb8cd29f92aed218379bc0d62386c1423"
+  },
+  {
+    "index": 5,
+    "filename": "05_Universal_Tool_Integration_And_Synergy.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 13-90",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2798,
+    "sha256": "e82a3bac6f17f3a1b6d2235a976c68b2a5d01447d62a5f135aa2979ab3e56b40"
+  },
+  {
+    "index": 6,
+    "filename": "06_Complete_Native_Asset_And_Tag_Studio.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 106-179",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2750,
+    "sha256": "08ab4d47d0ed1ebd5e52640759b202feb5f8869b7d96618a69a11007b52c98d2"
+  },
+  {
+    "index": 7,
+    "filename": "07_Halo_Map_Conversion_And_Legacy_Preservation.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 313-375",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2509,
+    "sha256": "3b31447155dd4c4f0b033a7f9e997001137e063fb04c92e0092ff955a3dc1ae7"
+  },
+  {
+    "index": 8,
+    "filename": "08_Community_Field_Intelligence_And_Native_Halo_Diagnostics.txt",
+    "source": "Original directive as authored in the current ChatGPT conversation (writing block id 64821)",
+    "provenance": "Transcribed from full original chat writing block; not present in uploaded original ZIP; no engineering edits",
+    "bytes": 8614,
+    "sha256": "59a720696cdb2a2b38cfd0a67a9a297cdd4b05448896d87922790c570d5ea7ba"
+  },
+  {
+    "index": 9,
+    "filename": "09_Megaworld_And_Native_BSP_Mastery.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 378-448",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2500,
+    "sha256": "b12c8255e7aaac6cd7155931758d32dadaeef4651e47aa158022efb69847cc1e"
+  },
+  {
+    "index": 10,
+    "filename": "10_Campaign_Creation_And_Mission_Director.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 450-507",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2443,
+    "sha256": "415529f42b683426e41fb1f1174c48ee9730a244339768405689e0776077cddd"
+  },
+  {
+    "index": 11,
+    "filename": "11_Firefight_Creator_And_Complete_Gameplay.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 509-562",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2345,
+    "sha256": "25431d36f3d1e97daf2f8c958bc52b4e84664691936ee38eaeb3404053fae6fd"
+  },
+  {
+    "index": 12,
+    "filename": "12_Original_Zombie_Apocalypse_Restoration.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 564-625",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2414,
+    "sha256": "b0e71c16002e358330c7b6a6e4a6ddde14522984e722e55f6145ce34a0703621"
+  },
+  {
+    "index": 13,
+    "filename": "13_Machinima_And_Recording_Director.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 627-678",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2160,
+    "sha256": "3eebeb07ae41dbd5377778a94c6b4f8c7f6c763920898a88aab6120b4214981a"
+  },
+  {
+    "index": 14,
+    "filename": "14_SparkLink_Multiple_Creators.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 680-745",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2887,
+    "sha256": "11467972a1450e0d9384691038c100f957f006b1e213ffd7881a1ace82e9b037"
+  },
+  {
+    "index": 15,
+    "filename": "15_Universal_Live_Link.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 747-805",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2819,
+    "sha256": "b348d9ae38e6ad49d1886900d7606d5ff1388427ae60f94bfd338a3b524b9e72"
+  },
+  {
+    "index": 16,
+    "filename": "16_AI_Synchronization_And_Co_Op.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 807-868",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 3104,
+    "sha256": "c6d55744a33d4d85909647592ae444d956c5845e76abb22c8998d2b4ef372633"
+  },
+  {
+    "index": 17,
+    "filename": "17_Multiplayer_Hub_Hosting_And_Community_Games.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 870-921",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 2482,
+    "sha256": "6e0e7dac93d96fa2e4fbaa3cff875a6a46f86e502281915f57091d8e4e5094c2"
+  },
+  {
+    "index": 18,
+    "filename": "18_PlayBridge_Initiative.txt",
+    "source": "original user ZIP / 62b2a04e-63b0-4698-99ec-65d959cd70b8/Pasted text.txt",
+    "provenance": "byte-for-byte",
+    "bytes": 21205,
+    "sha256": "34640f7941e93d6115503bb0d0fdabdcc60b3baf7c464077a0d04fbad7c36f5d"
+  },
+  {
+    "index": 19,
+    "filename": "19_Community_Interoperability_Island_Warfare.txt",
+    "source": "original user ZIP / c9af9dea-f12d-469e-872b-aeda5732466d/Pasted text.txt",
+    "provenance": "byte-for-byte",
+    "bytes": 11942,
+    "sha256": "4d2e52afc4c104229cf82a7208a309b45c6637652423acb028d0e247bb642f5f"
+  },
+  {
+    "index": 20,
+    "filename": "20_Community_Unity_Directive.txt",
+    "source": "original user ZIP / 1f7a1247-7b57-4366-82c6-161ddc0ec62b/Pasted text.txt",
+    "provenance": "byte-for-byte",
+    "bytes": 7141,
+    "sha256": "f137ec60f0fd54b204a7be3050d75d2093d71d35ba560dc06bfa6107e5a463ba"
+  },
+  {
+    "index": 21,
+    "filename": "21_One_Halo_Community.txt",
+    "source": "original user ZIP / bba5babb-8b96-4c71-8acf-be6045a14ded/Pasted text.txt",
+    "provenance": "byte-for-byte",
+    "bytes": 22451,
+    "sha256": "8601c54aaa4ab6b747353efa7295d71e617fe7e9b00410790517ee3538b81476"
+  },
+  {
+    "index": 22,
+    "filename": "22_Installer_First_Run_And_Smart_Tool_Setup.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 927-1035",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 4267,
+    "sha256": "c2b5ad7c8bc64d391f251297c0590090695ee16533ab8c4659edb0e85283fa8e"
+  },
+  {
+    "index": 23,
+    "filename": "23_Advanced_Halo_Engine_Frontier.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 1037-1111",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 3109,
+    "sha256": "f6efb9643c1d76ea36ecda22f5e1d42ffcba87237c14beb5483ec4191bed6bda"
+  },
+  {
+    "index": 24,
+    "filename": "24_Final_Universal_Halo_1_Integration.txt",
+    "source": "original user ZIP / efe5b1c2-d4dc-4499-ae5a-cf0b41f517c6/Pasted text.txt",
+    "provenance": "byte-for-byte",
+    "bytes": 36528,
+    "sha256": "53be22b1a1019f296a6027bbf0bc4bbe63124542ee31411fba35ca7f837fc5fc"
+  },
+  {
+    "index": 25,
+    "filename": "25_Final_Product_Quality_Platform_Support_Release.txt",
+    "source": "original user-uploaded transcript \"Pasted text(20261104-170432).txt\" lines 1114-1192",
+    "provenance": "exact supplied transcript excerpt; formatting as captured by Codex",
+    "bytes": 3002,
+    "sha256": "5dbdd36fc3eaeb3efc83cc52eaeca54390fc888a577ed3e69e2020b27515d5bd"
+  },
+  {
+    "index": 26,
+    "filename": "26_The_Creators_Gauntlet.txt",
+    "source": "original user ZIP / 5098df5f-18ab-4682-ad5d-c93d7247bff9/Pasted text.txt",
+    "provenance": "byte-for-byte",
+    "bytes": 27326,
+    "sha256": "ccd22dfdb29f571fdbf780173e981cdc5b61bdc74e4515f1d19d355c776dfeef"
+  },
+  {
+    "index": 27,
+    "filename": "27_Mac_Legacy_Edition.txt",
+    "source": "Original directive as authored in the current ChatGPT conversation (writing block id 58361)",
+    "provenance": "Transcribed from full original chat writing block; not present in uploaded original ZIP; no engineering edits",
+    "bytes": 17222,
+    "sha256": "7f462de54dd09aaad5484f92b53436d97c2c8b1186b7b6d535b8373fce307fb2"
+  },
+  {
+    "index": 28,
+    "filename": "28_Cross_Platform_Native_Independence_And_Final_Releases.txt",
+    "source": "Original directive as authored in the current ChatGPT conversation (writing block id 72841)",
+    "provenance": "Transcribed from full original chat writing block; not present in uploaded original ZIP; no engineering edits",
+    "bytes": 19311,
+    "sha256": "fbd91fba6bda9233f9fb927c910f83e2daa6dbc3f2ee34dc08a42bba0760f032"
+  }
+]

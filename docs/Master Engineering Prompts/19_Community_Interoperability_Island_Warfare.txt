@@ -1,0 +1,260 @@
+# PROJECT GUILTY SPARK — COMMUNITY INTEROPERABILITY & ISLAND-WARFARE CHALLENGE
+
+## Native Halo Authoring + Mantle World Merging + OpenCE/Chupathingy Multiplayer
+
+Continue from the exact current HEAD and existing active work. This is a focused extension of the Universal Integration and Native Halo Authoring directives, not a new architecture or an instruction to abandon the scripted-door benchmark.
+
+### 1. Preserve the accepted engineering
+
+The latest user-reported completed cleanup commit is `9d03f10`, following C61 `7e684a0`. Inspect the actual HEAD, current worktree and test results before modifying anything.
+
+Preserve the C49 release bundle, original Halo maps, research, recovery archives, previous-good compiled maps, and current QuickForge/BSP Workshop/Source Guardian implementations.
+
+Use the verified v7 research checkpoint, not the older v6 ZIP as the authoritative research database.
+
+**Do not restart the application architecture, duplicate working systems, or lose native game acceptance work.**
+
+### 2. New community intelligence
+
+OpenCE Mantle's developer, leftknut, reports continued progress on a world-merging workflow in which a creator can:
+
+- Select a base BSP.
+- Select donor BSP geometry.
+- Translate and rotate the donor.
+- Remove unwanted faces.
+- Place and merge the resulting geometry.
+- Preserve donor scenery, vehicles, weapons, equipment, spawns and teleporters.
+
+Mantle v1.0.1 publicly documents substantial portions of these operations.
+
+Reference: https://github.com/SutlabSol/OpenCE-Mantle/releases/tag/v1.0.1
+
+Treat the public release as the verified feature baseline and newer conversational descriptions as claims requiring implementation-level confirmation.
+
+leftknut is also experimenting with Forge-style creation, a separate Firefight mode, and a larger island-war map.
+
+Do not confuse Mantle editing features with engine-native multiplayer functionality.
+
+### 3. New reference map: b30 + Death Island + connecting islands
+
+The developer describes a map with The Silent Cartographer (`b30`) positioned opposite Death Island, additional islands between them, and a Battlefield-style Conquest/Territories gametype.
+
+Use this as a **future flagship Megaworld and multiplayer-authoring acceptance fixture**, after preserving the existing Timberland–Sidewinder and scripted-door milestones.
+
+The two environments share historical geometry lineage, which makes this especially useful for testing:
+
+- Overlapping and duplicate source surfaces.
+- Identical or near-identical terrain.
+- BSP coordinate transforms.
+- Island placement and orientation.
+- Geometry removal.
+- Donor scenery and vehicle preservation.
+- Player and vehicle navigation between landmasses.
+- Water/environment presentation.
+- Shader and lightmap continuity.
+- Native collision and portal integrity.
+- Spawn ownership and gametype flags.
+- Resource budgets and tag dependencies.
+
+#### Required world-merging workflow
+
+**Spark source project → select base/donor → choose native or Mantle-assisted operation → position and trim geometry → reconcile objects/dependencies → validate → compile → test in Halo → return to Spark.**
+
+When both tools support an operation, compare results objectively rather than automatically favoring Spark.
+
+Do not invent an unsupported Mantle automation API. Start with working launch, protected file handoff, and imported-output reconciliation. Only add deeper automation through interfaces proven to exist.
+
+Keep original maps byte-identical.
+
+Create a clear difference between a visually assembled world, a compiled world, a player-traversable world, and a genuinely synchronized multiplayer world.
+
+A successful map preview is not sufficient evidence.
+
+Do not call distinct BSP transitions seamless streaming.
+
+#### Island-war acceptance
+
+On legal disposable sources, test the following in order:
+
+1. Both source maps read correctly with verified source identities.
+2. Donor geometry transforms preserve intended world positions.
+3. Duplicated/overlapping terrain is identified.
+4. New intermediate island geometry compiles natively.
+5. Player and vehicle collision survives the build.
+6. Native scenery, spawns, vehicles and dependencies reopen correctly.
+7. At least one actual player can traverse the intended connection.
+8. Two real clients can load the same map and interact with its supported multiplayer objects.
+9. The map can reopen in Spark and independent native tools.
+
+Do not advance to a full multi-island warzone until the simpler native connections and source-reconciliation tests pass.
+
+### 4. Native Conquest/Territories authoring
+
+The community concept is a BF-style island-control mode.
+
+Important: Territories is not a built-in stock Halo CE multiplayer gametype. It was introduced in Halo 2.
+
+Therefore, separate:
+
+**Map authoring:** native CE scenario objects, spawns, capture-area geometry, references and supported scripts.
+
+**Gametype execution:** the specific OpenCE/Chupathingy engine build or authorized mod that can synchronize capture ownership, scoring and other game-mode state.
+
+Do not invent proprietary Halo tags or require `.yelo` for ordinary map output.
+
+Provide visual authoring templates for:
+
+- Capture zones.
+- Neutral, friendly and enemy territory states.
+- Capture progress.
+- Contested territory.
+- Team occupancy.
+- Capture decay and neutralization.
+- Score/ticket updates.
+- Timed victory and objective completion.
+- Respawn rules.
+- Vehicle deployment.
+- Optional team reinforcement/AI behavior.
+- HUD/objective feedback where supported.
+- Join-in-progress state synchronization.
+
+Generate native scenario/HaloScript content where the selected engine supports it.
+
+If the game mode requires native engine source changes, keep that code and dependency specific to the supported runtime. Do not disguise it as a universally supported stock Halo gametype.
+
+Preserve user-authored sources and provide explicit native/extended-runtime compatibility labels.
+
+### 5. OpenCE and Chupathingy are separate integration targets
+
+Chupathingy began as an OpenCE fork but has its own maintainers, releases, platform support, hosting infrastructure and protocol-compatibility decisions.
+
+The public repositories are the source of technical truth:
+
+- https://github.com/OpenCommunityEdition/OpenCE
+- https://github.com/ChupathingyCE/chupathingyce
+- https://github.com/ChupathingyCE/chupathingyce/blob/main/docs/online.md
+- https://github.com/OpenCommunityEdition/OpenCE/blob/main/docs/dedicated_server.md
+
+Do not rely on secondhand accounts of interpersonal disagreements when making engineering decisions.
+
+Do not infer universal cross-play from shared ancestry.
+
+Detect and record:
+
+- Actual executable identity.
+- Pinned version and source commit.
+- Runtime capabilities.
+- Network protocol/version.
+- Supported map editions and folder layout.
+- Shared resource dependencies.
+- Map identity and checksum.
+- Hosting mode.
+- Real multiplayer/AI support.
+- Supported diagnostics and administration.
+- Dedicated-server platform requirements.
+
+### Dedicated server correction
+
+OpenCE's official master-list approval requirement must not be confused with permission to self-host.
+
+Its documented dedicated server can be joined directly or on LAN without public master-list approval. Do not attempt to bypass listing controls.
+
+Chupathingy provides separate dedicated-server facilities, including Linux-based releases.
+
+Support compatible documented hosting and server-management interfaces, but do not bypass authentication, moderation or server approval.
+
+A server adapter must not expose unsafe arbitrary shell execution or unprotected administrative interfaces.
+
+### Cross-play acceptance
+
+Use version-pinned real clients and record negotiated protocol versions.
+
+The released Chupathingy v0.8.1d documentation discusses compatibility with newer OpenCE networking, while also distinguishing older network versions. Inspect the installed binaries and their current compatibility declarations instead of hardcoding a single permanent version pair.
+
+Validate actual two-peer joining, map checksum agreement, object interactions and reconnection.
+
+### 6. AI synchronization: use the engines' actual behavior
+
+leftknut says his Firefight engine modifications are separate from the Mantle application and use native AI plus engine changes.
+
+Do not pretend Mantle provides its own complete AI networking layer.
+
+Study the existing OpenCE authoritative AI/co-op implementation and the current Spark test harness.
+
+Finish:
+
+- Host/client actor identity agreement.
+- Movement and combat.
+- Consistent damage and death.
+- Cleanup and object-budget recovery.
+- Wave completion.
+- Late joining and reconnecting.
+- Runtime-specific state divergence diagnostics.
+
+Use existing native engine mechanisms and documented comparison tools where available.
+
+Do not rebuild working engine networking merely to produce a Spark-branded implementation.
+
+### 7. Preserve the Hammer-to-Halo native export goal
+
+This remains the immediate primary milestone:
+
+**Build room → place door → attach visual trigger behavior → export standard native tags/HaloScript → compile → play → externally reopen → return to Spark.**
+
+Any reusable asset-associated script must compile to standard supported HaloScript and scenario object references.
+
+No custom tag groups, Spark-only cache headers, mandatory sidecars, undocumented native fields or forced `.yelo` dependencies.
+
+The island-war test is the next larger showcase for the same successful authoring infrastructure.
+
+Do not allow the larger map challenge to derail the simpler, more important native tag and gameplay proof.
+
+### 8. Actual implementation priorities
+
+**P0:** Preserve current native-authoring development and close the scripted-door benchmark.
+
+**P1:** Complete a real Mantle launch, file handoff, external change reconciliation and native readback.
+
+**P1:** Improve BSP donor transforms, overlap detection, scenery/vehicle/spawn preservation, collision, portals and correct rebuild selection.
+
+**P1:** Make OpenCE and Chupathingy runtime/server detection accurate and version-specific.
+
+**P1:** Advance actual multiplayer AI and gameplay synchronization testing.
+
+**P2:** Author the first native capture-zone placement fixture and identify the precise engine-side requirements for Conquest/Territories.
+
+**P2:** Build the island-chain showcase incrementally, using real traversal and multiplayer acceptance instead of visual claims.
+
+### 9. Required reporting
+
+Report:
+
+- Actual starting/ending HEAD.
+- Features reused and new code implemented.
+- Tool versions.
+- Mantle integration method.
+- Native source/tag output.
+- BSP and scenery preservation tests.
+- AI sync test outcomes.
+- Dedicated-server and cross-play verification.
+- Gametype implementation scope and engine dependencies.
+- Native gameplay evidence.
+- Unresolved blockers and exact next acceptance tests.
+
+Keep distinct:
+
+**Editor preview → native source → compiled cache → game loading → player gameplay → multiplayer parity.**
+
+Do not push or publish without approval.
+
+### Final direction
+
+We want to work with the community's technology, not compete needlessly with it.
+
+Let Mantle specialize where it already works. Let official native tools and Invader compile what they support. Let OpenCE and Chupathingy execute the gameplay they actually support.
+
+**Spark is the cohesive authoring, interoperability, source-preservation and validation layer connecting them.**
+
+Deliver the strongest genuinely playable integrated workflow possible while keeping all exported ordinary Halo content native and usable outside Guilty Spark.
+
+**ALL THE TOOLS, AND THEN SOME.**

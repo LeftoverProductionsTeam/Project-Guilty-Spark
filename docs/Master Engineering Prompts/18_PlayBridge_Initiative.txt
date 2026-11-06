@@ -1,0 +1,561 @@
+# PROJECT GUILTY SPARK — PLAYBRIDGE INITIATIVE
+
+## ONE HALO COMMUNITY. EVERY COMPATIBLE ENGINE. ONE PLACE TO PLAY.
+
+### Mission
+
+Reduce fragmentation across Halo MCC, Custom Edition, OpenCE, Chupathingy, and compatible community engine forks.
+
+Build upon Guilty Spark's existing Multiplayer Hub, runtime detection, source-identity system, conversion tools, and native test infrastructure.
+
+**Primary objective: Allow a creator or player to discover a Halo game, determine what is required to join it, automatically select an installed compatible runtime, verify the required map, and launch into the session wherever genuine interoperability exists.**
+
+Do not claim universal network cross-play simply because a fork can open another engine's map files.
+
+Continue the existing native Halo authoring and integration work. Do not interrupt the current scripted-door benchmark, lose uncommitted changes, or create another unrelated launcher.
+
+---
+
+## 1. Investigate GulchCE immediately
+
+A member of the Halo community reports that GulchCE, an OpenCE-derived fork, can load certain MCC Halo 1 maps and mods without manually converting them through the traditional editing-kit pipeline.
+
+Public reports support the existence of experimental MCC map-loading functionality:
+
+- Steam Workshop users have reported running MCC mods through GulchCE.
+- Community users have described playing MCC content in this fork.
+- Another OpenCE-derived project documents incorporating GulchCE MCC cache-map hooks, but still labels MCC compatibility experimental.
+
+**Do not assume every MCC map works.**
+
+First identify the authoritative GulchCE repository, developer, source revision, releases, licensing and supported platforms.
+
+If the canonical source cannot be verified, treat GulchCE as an unverified integration candidate rather than inventing its API or selecting an unrelated repository.
+
+Investigate the actual loader implementation and determine:
+
+- Which MCC Halo 1 cache formats it accepts.
+- How cache headers and resource paths are interpreted.
+- Whether it reads retail MCC maps, modded Workshop maps, or both.
+- Whether support includes campaign and multiplayer.
+- How bitmap, sound and localization resources are resolved.
+- How models, shaders and lightmaps are decoded.
+- Whether native scripts, encounters and gameplay data execute correctly.
+- Whether high-resolution MCC textures cause excessive memory consumption.
+- Whether it can launch from an ordinary Windows installation.
+- Whether MCC must already be installed.
+- Which specific gameplay operations have been tested.
+- Whether the loader changes map data or reads it without conversion.
+
+Compare this with the existing Spark MCC parser, native source identity, conversion engine, and game-launching infrastructure.
+
+### Important distinction
+
+**MCC map compatibility is not MCC multiplayer protocol compatibility.**
+
+A community engine may load the same map data as MCC while using a completely different networking protocol.
+
+Treat these as separate engineering capabilities.
+
+Do not advertise that an MCC owner can join arbitrary OpenCE servers without an independently proven compatible client or networking implementation.
+
+---
+
+## 2. Create a verified MCC map execution adapter
+
+Determine whether an available, permitted, version-pinned engine can play specific MCC maps directly.
+
+If confirmed, extend Spark's existing runtime adapter system.
+
+The desired workflow:
+
+**Select MCC map → identify exact cache format → verify owned resources → detect compatible execution engine → launch → validate real gameplay.**
+
+Prioritize direct native map loading when supported, rather than automatically rebuilding everything into an older cache format.
+
+If the map cannot load directly, offer a separate native conversion/build workflow with explicit fidelity checks.
+
+Never force a conversion that is unnecessary for the selected supported operation.
+
+### Acceptance
+
+Use a legitimate locally available MCC Halo 1 map and a pinned execution engine.
+
+Verify:
+
+1. The map is recognized without changing its identity.
+2. Resource references resolve correctly.
+3. The engine starts without a false cache/header compatibility claim.
+4. The actual map loads.
+5. A player can move and interact.
+6. Collision, shaders, models and audio function.
+7. Relevant scripts and AI behave correctly.
+8. The original MCC map remains byte-identical.
+9. The same test is repeatable after restarting the engine.
+
+If only campaign loading works, label multiplayer unverified.
+
+If the map opens but gameplay or assets break, record partial compatibility.
+
+Do not call a successful title-screen load full map compatibility.
+
+---
+
+## 3. Build one truly useful Multiplayer Hub
+
+Reuse Spark's current Multiplayer Hub. Do not create a duplicate workspace.
+
+Aggregate supported, documented public server sources into one searchable interface.
+
+Potential sources include:
+
+- OpenCE public listings and documented discovery services.
+- Chupathingy Delta List.
+- Compatible community servers/forks with documented discovery.
+- Halo Custom Edition servers through supported public discovery mechanisms.
+- MCC sessions only where a legitimate, supported discovery integration actually exists.
+
+Do not invent an MCC server-list API.
+
+Do not scrape authenticated or private services without authorization.
+
+### Chupathingy integration
+
+Use its documented API:
+
+https://stats.chupathingy.org/v1/games
+
+Documentation:
+
+https://halo.milenko.org/api
+
+The API exposes actual game listings with information including:
+
+- Server name.
+- Player count and capacity.
+- Map name and family.
+- Game mode.
+- Network version.
+- Protocol.
+- Host platform.
+- Dedicated versus player hosting.
+- Join availability.
+- Password/locked state.
+- Invitation details when provided.
+- Co-op versus multiplayer status.
+
+Honor its rate limits, errors, missing metadata and terms.
+
+Fetch through Spark's native backend and use sensible refresh caching.
+
+Do not repeatedly poll every server individually without need.
+
+### Unified browser experience
+
+Display entries with compact engine icons, real server metadata, and an actionable compatibility status.
+
+Suggested states:
+
+- Join Available.
+- Compatible Runtime Required.
+- Map Missing.
+- Runtime Upgrade Required.
+- Protocol Mismatch.
+- Unsupported Target.
+- Experimental Compatibility.
+- Offline or Unreachable.
+
+Do not fake ping or player counts.
+
+Do not claim a server is joinable because it appears in an API listing.
+
+For duplicate listings, reconcile by verified server identity or invite rather than collapsing different hosts sharing a similar name.
+
+---
+
+## 4. Make Join intelligent
+
+The user should choose **the server they want**, not manually guess which Halo installation to open.
+
+When a server is selected, Spark should determine:
+
+1. Which network protocol the server uses.
+2. Which client versions are compatible.
+3. Which installed runtime can join.
+4. Which exact map is required.
+5. Whether the local map hash matches.
+6. Whether additional resource banks are needed.
+7. Whether a legal supported content source is present.
+8. Whether the selected client exposes a documented join method.
+9. Whether the server is currently accepting players.
+
+If a compatible runtime is installed, launch it using a verified supported join mechanism.
+
+If the client doesn't support external join arguments, open its appropriate interface and provide the verified join details. Do not invent command-line parameters.
+
+If no compatible runtime is installed, explain what is required and link to the project's authoritative release information.
+
+Never silently install or modify another engine.
+
+### Example
+
+A user with MCC and Chupathingy installed clicks an OpenCE server.
+
+Spark recognizes that the installed Chupathingy build has verified support for the advertised OpenCE network version.
+
+Spark checks the map identity and dependencies, then launches Chupathingy through its real supported join workflow.
+
+The user doesn't need to understand why one executable is required instead of another.
+
+But if Chupathingy's installed version cannot negotiate that server's protocol, Spark must report the incompatibility.
+
+**No fabricated cross-play.**
+
+---
+
+## 5. Investigate actual OpenCE/Chupathingy protocol interoperability
+
+The two projects share historical ancestry, but now maintain different network and hosting systems.
+
+Current official documentation already describes conditional cross-play when network versions match.
+
+Study their version-pinned wire-format documentation and public compatibility mechanisms.
+
+Pay particular attention to:
+
+- Network version advertisement.
+- Connection handshakes.
+- Host/client game-state serialization.
+- Map identity and hash matching.
+- Game-mode settings.
+- Actor and object replication.
+- Campaign co-op.
+- AI synchronization.
+- Chat and supported auxiliary channels.
+- Host migration and reconnect behavior.
+- Dedicated server compatibility.
+- Version-specific capability negotiation.
+
+Do not implement a generic network proxy that guesses packet structures.
+
+If a genuine protocol translation or bridging layer is feasible, isolate it as a separate research feature with legitimate open interfaces, consent, security review and real two-client test acceptance.
+
+Prefer existing cross-play implemented by compatible engine versions.
+
+### Cross-play validation
+
+Build a real matrix for:
+
+- OpenCE ↔ OpenCE.
+- Chupathingy ↔ Chupathingy.
+- OpenCE ↔ Chupathingy.
+- Supported compatible community forks.
+- Original Custom Edition where its actual protocol allows it.
+- MCC ↔ MCC.
+- MCC ↔ OpenCE/Chupathingy only if separately proven.
+
+Do not infer compatibility from common map assets or similar gameplay.
+
+Use actual native peers and report negotiated version, map identity, connection outcome and gameplay state.
+
+A successful handshake without sustained gameplay is not complete interoperability.
+
+---
+
+## 6. Study MCC networking separately
+
+The long-term user ambition is that someone who owns MCC can access much more of the Halo 1 community without managing multiple disconnected toolchains.
+
+Investigate what can be achieved through:
+
+- Supported MCC custom-game interfaces.
+- Legitimate game launching.
+- Native Halo 1 MCC mod packaging.
+- Separate approved community client execution.
+- A possible future openly specified interoperable networking protocol.
+
+Do not bypass matchmaking authorization, authentication, anti-cheat, encryption, integrity checks or access controls.
+
+Official MCC Workshop modding has a supported anti-cheat-disabled launch option. Use only the documented modding workflow for actual MCC mod tests.
+
+Do not try to attach unofficial engines to protected MCC multiplayer sessions by masquerading as the official game.
+
+If true MCC ↔ OpenCE cross-play is infeasible or unauthorized, record that explicitly.
+
+**A single launcher and community directory can still be valuable even when the game engines remain separate.**
+
+---
+
+## 7. Solve the high-resolution MCC asset problem
+
+leftknut reports that converting MCC content can make high-resolution bitmap output excessively large.
+
+This needs a dedicated investigation.
+
+Inspect the actual source bitmap and target runtime requirements.
+
+Measure:
+
+- Source compressed and decoded texture sizes.
+- Mipmap chains.
+- Texture dimensions.
+- Format and compression support.
+- GPU memory requirements.
+- Streaming or cache behavior.
+- Duplicate resources.
+- Normal maps and alpha channels.
+- Cubemaps and lightmaps.
+- Shader material dependencies.
+- Platform-specific texture limits.
+
+Build a version-aware asset compatibility and memory report.
+
+Where supported, consider:
+
+- Retaining source-native compressed resources.
+- Reusing identical assets by content hash.
+- Avoiding redundant decompression/recompression.
+- Streaming or lazy loading through supported engine facilities.
+- Optional target-compatible mip generation.
+- Safe, reversible texture conversion.
+- User-controlled quality profiles.
+
+Do not silently lower resolution or discard alpha, mipmaps, normal data, color-space information, or shader references merely to make output smaller.
+
+Do not claim a lossy recompression is bit-identical.
+
+Keep original MCC assets untouched and record all conversion losses.
+
+For networked content, never replace a map with a locally modified approximation if the host requires an exact matching hash.
+
+The goal is to make MCC asset handling efficient without breaking fidelity or multiplayer identity.
+
+---
+
+## 8. A creator-friendly cross-runtime map library
+
+Extend the existing Spark Map Library.
+
+A single map card should clearly distinguish:
+
+- Original source edition.
+- Native cache format.
+- Source hash.
+- Installed location.
+- Required shared resources.
+- Validated game runtimes.
+- Directly playable targets.
+- Compilation targets.
+- Conversion alternatives.
+- Unsupported features.
+- Actual test evidence.
+
+A map must not silently change source identity because the user selects a different hosting runtime.
+
+If GulchCE can open a particular MCC map directly, show that as **Direct Play — Verified** only after real testing.
+
+If OpenCE can only play a rebuilt Custom Edition version, show **Native Rebuild Required**.
+
+If a server expects the exact host map hash, explain why a different converted file cannot be substituted.
+
+Keep the normal Halo files and native tags compatible with their intended external tools.
+
+No proprietary Spark tags or forced `.yelo` format.
+
+---
+
+## 9. Reduce community fragmentation, don't contribute to it
+
+The community has multiple projects with different priorities and users.
+
+Spark should remain technically neutral.
+
+Support projects according to documented compatibility, not interpersonal disagreements.
+
+Do not scrape private Discord content, redistribute game data, or automatically share user maps.
+
+Respect attribution, licensing, maintainers' release channels, and opt-in settings.
+
+Avoid launching an entirely new multiplayer network when existing OpenCE and Chupathingy networks already provide viable services.
+
+The best integration may simply be an accurate shared directory that connects users through their installed compatible clients.
+
+Do not rebuild an existing downloader with weaker security.
+
+Preserve safe download validation:
+
+- Exact expected map identity.
+- Host/checksum verification.
+- Bounded archive size.
+- No archive path traversal.
+- No unexpected executable installation.
+- No replacement of existing maps without explicit approval.
+- No automatic downloading of proprietary Xbox/MCC game data.
+
+Honor upstream download approval and map-sharing policies.
+
+---
+
+## 10. Preserve the current Guilty Spark engineering priorities
+
+The current Native Halo Authoring Revolution remains active.
+
+Do not abandon:
+
+- Native tag exports.
+- Hammer-like visual authoring.
+- Asset-associated HaloScript.
+- Scripted-door gameplay benchmark.
+- Mantle world-merging interoperability.
+- Firefight and multiplayer AI.
+- Megaworld traversal.
+- CE/MCC conversions.
+- Source Guardian and recovery.
+
+PlayBridge should reuse existing runtime detection, Map Library, Multiplayer Hub and conversion infrastructure.
+
+Do not create another app or competing source-identity system.
+
+The objective is a useful integration milestone, not scope explosion.
+
+---
+
+## 11. Required breakthrough tests
+
+### Test A — Unified server discovery
+
+Retrieve verified live listings from at least one documented public API and accurately present map family, protocol, player count, and hosting information.
+
+Add a second source only where it can be done through legitimate documented access.
+
+### Test B — Automatic compatible client selection
+
+Use a real compatible OpenCE/Chupathingy pairing.
+
+Choose a live test server in Spark, identify the correct installed client, validate the required map and launch the supported join workflow.
+
+### Test C — Accurate incompatibility handling
+
+Select a server with an unsupported network version.
+
+Spark must refuse to claim compatibility, explain the mismatch, and show a correct alternative.
+
+### Test D — Direct MCC map loading
+
+Investigate GulchCE and a reproducible legal MCC Halo 1 fixture.
+
+Where a verified compatible loader is available, launch the map without native conversion and test actual gameplay.
+
+Record source hash, renderer fidelity, scripts, audio, collision and real player behavior.
+
+If the only accessible integration is experimental, label the result experimental.
+
+### Test E — High-resolution asset budget
+
+Take one locally owned MCC map/asset fixture and report compressed size, decoded memory, resource duplication and target-specific limits.
+
+Validate any optimization with source/output comparisons.
+
+### Test F — Native map identity
+
+Verify that the runtime chosen for gameplay does not change the source map's registered edition, cache parser or build target inside Spark.
+
+### Test G — Two-peer game validation
+
+Connect two real compatible clients.
+
+Verify map agreement, player movement, interactions and stable network behavior.
+
+If AI is part of the selected test scenario, record AI synchronization separately.
+
+### Test H — Fail-safe handling
+
+Simulate missing runtime, invalid map, wrong hash, unsupported join method, missing resource, failed download and stale server listing.
+
+All failures must preserve originals and provide an accurate explanation.
+
+---
+
+## 12. Priority order
+
+**P0:** Investigate GulchCE and establish an evidence-backed MCC direct-loading compatibility result.
+
+**P0:** Integrate the documented Chupathingy game listing into the existing Multiplayer Hub.
+
+**P0:** Implement safe runtime compatibility checks and verified join routing.
+
+**P1:** Add supported OpenCE discovery and correctly deduplicated listings.
+
+**P1:** Finish real OpenCE/Chupathingy joining and version-mismatch acceptance tests.
+
+**P1:** Diagnose MCC high-resolution bitmap and resource-memory overhead.
+
+**P2:** Improve runtime-aware map deployment and optional native conversion.
+
+**Research:** Investigate whether genuinely compatible MCC/community engine multiplayer is technically and legally supportable, without presenting speculative protocol work as an existing feature.
+
+Preserve the separate Native Halo Authoring milestone throughout.
+
+---
+
+## 13. Final report
+
+Report actual code changes and evidence:
+
+- Starting/ending HEAD and worktree.
+- GulchCE source and revision, if verified.
+- Exact MCC map-loading support established.
+- Network protocol compatibility matrix.
+- Server listing APIs used.
+- Real client-launch integrations.
+- Actual join/playtest results.
+- Missing-map and resource handling.
+- High-resolution asset benchmarks.
+- Security and license constraints.
+- Original asset preservation.
+- Regression suite results.
+- Blocked or unverified features.
+
+Use distinct labels:
+
+**Discoverable → Client compatible → Map available → Join successful → Gameplay verified → Multiplayer parity verified.**
+
+Do not claim all six when only server discovery succeeded.
+
+Do not push or publish without approval.
+
+---
+
+## FINAL DIRECTION
+
+We are not going to repair a fragmented Halo community by forcing every Halo engine to pretend it is the same engine.
+
+**We can make Guilty Spark understand their differences and connect them wherever real compatibility exists.**
+
+The player chooses a server.
+
+Spark figures out the compatible client, game version, map, dependencies and legitimate launch method.
+
+The creator chooses a map.
+
+Spark determines whether it can run directly in a compatible engine or needs a native, fidelity-checked build.
+
+And everyone continues using the engines, servers and tools they already trust.
+
+Research GulchCE seriously. Integrate real existing cross-play first. Make the server browser useful. Preserve native Halo compatibility and community independence.
+
+**PROJECT GUILTY SPARK — ONE PLACE TO CREATE. ONE PLACE TO FIND A GAME. ALL THE TOOLS, AND THEN SOME.**
+
+### Engineering references
+
+- https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark
+- https://github.com/OpenCommunityEdition/OpenCE
+- https://github.com/ChupathingyCE/chupathingyce
+- https://github.com/FractumSeraph/OpenCE
+- https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android
+- https://stats.chupathingy.org/v1/games
+- https://halo.milenko.org/api
+- https://github.com/SutlabSol/OpenCE-Mantle
+- https://support.halowaypoint.com/hc/en-us/articles/28916975982868-How-to-Download-and-Play-Mods-for-Halo-The-Master-Chief-Collection-via-the-Steam-Workshop
+
+Use official, pinned source versions; verify the original GulchCE repository before treating it as an integration dependency.

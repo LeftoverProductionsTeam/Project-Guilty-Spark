@@ -1,0 +1,66 @@
+GUILTY SPARK — SPARKLINK: MULTIPLE CREATORS, ONE LIVE PROJECTReal-time Halo source collaboration with durable ownership and recovery
+Continue from the existing SparkLink transaction engine.
+
+SparkLink is collaboration between Spark editors. It is not Halo gameplay networking, Live Link or AI replication.
+
+Its collaboration transport should be runtime-independent, while its document validation, source format and build adapters remain edition-specific.
+
+Preserve existing engineering
+Reuse the working multi-process transactions, shared BSP drag previews, native tag edits, author-owned Undo/Redo, conflict handling, journal rollover and crash recovery.
+
+Previous acceptance used three independent Spark processes on one machine. Complete actual two-computer LAN/VPN acceptance.
+
+Required shared workflows
+Two or more users must be able to:
+
+Open the same source project.
+Edit distinct tag fields.
+Move supported scenario objects.
+Place and import valid assets.
+Edit BSP source geometry.
+Modify visual script graphs.
+Inspect native dependencies.
+Review each other's changes.
+Undo their own operations without erasing another user's unrelated work.
+Recover after disconnection or host crash.
+Produce an authoritative frozen native build.
+For overlapping edits, show a meaningful three-way comparison and require resolution when automatic merging isn't safe.
+
+Do not silently apply stale transactions.
+
+Source-aware collaboration
+Every session declares:
+
+Original source identity.
+Target edition.
+Toolchain version.
+Authoritative project revision.
+Referenced map and tag hashes.
+Permission and ownership rules.
+Required external-tool capabilities.
+Do not allow one participant's MCC settings to reinterpret another participant's CE source as MCC.
+
+Cross-edition collaboration may share high-level compatible authoring data, but conversions must be explicit, validated and reviewable.
+
+Security and networking
+Use deliberate session pairing, authenticated permissions, secure transport and least-privilege operations.
+
+Support LAN initially; use a secure, documented remote transport for VPN/Internet where available.
+
+No arbitrary scripts, unrestricted filesystem paths, remote executable launches or raw memory patches from peers.
+
+Never expose a collaboration session publicly by default.
+
+UI
+Show live author presence, selected objects, author colors, source revision, unsaved operations, conflicts and the active build owner.
+
+Keep existing detachable editors and saved multi-monitor layouts.
+
+Acceptance
+Test two physical computers independently editing the same scenario and BSP.
+
+Include conflicting edits, external Baboon/Guerilla changes, network loss, reconnection, host failure, session rollover and a final native compile.
+
+Both clients must agree on the authoritative source revision and hashes.
+
+One project, multiple creators, full recoverability, standard Halo output.

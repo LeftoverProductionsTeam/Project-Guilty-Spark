@@ -197,6 +197,74 @@ struct OpenProject {
     project: Project,
     inspection: Option<MapInspection>,
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ImportFailure {
+    path: PathBuf,
+    message: String,
+}
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ImportReport {
+    projects: Vec<OpenProject>,
+    failures: Vec<ImportFailure>,
+}
+// Existing native integrations retain their array/error interface. The studio
+// requests the structured result so one rejected item cannot hide valid maps.
+#[derive(Serialize)]
+#[serde(untagged)]
+enum ImportResponse {
+    Report(ImportReport),
+    Projects(Vec<OpenProject>),
+}
+fn collect_imports(paths: Vec<PathBuf>, mut import: impl FnMut(&Path) -> Reply<Vec<OpenProject>>) -> ImportReport {
+    let mut report = ImportReport::default();
+    for path in paths {
+        match import(&path) {
+            Ok(projects) => report.projects.extend(projects),
+            Err(message) => report.failures.push(ImportFailure { path, message }),
+        }
+    }
+    report
+}
+fn import_response(report: ImportReport, include_report: bool) -> Reply<ImportResponse> {
+    if include_report { return Ok(ImportResponse::Report(report)); }
+    if !report.failures.is_empty() {
+        return Err(format!("Imported {} project(s); {} file(s) were rejected. Successfully imported projects are preserved in the library.\n{}",
+            report.projects.len(), report.failures.len(), report.failures.iter().map(|failure|format!("{}: {}",failure.path.display(),failure.message)).collect::<Vec<_>>().join("\n")));
+    }
+    Ok(ImportResponse::Projects(report.projects))
+}
+#[cfg(test)]
+mod import_batch_tests {
+    use super::*;
+    #[test]
+    fn native_batch_returns_valid_documents_and_each_rejection_independently() {
+        let root=tempfile::tempdir().unwrap();let library=Library::open(&root.path().join("library")).unwrap();
+        let good=root.path().join("valid.gsproject");let bad=root.path().join("broken.gsproject");
+        project::save_project(&good,&Project::new("Batch source")).unwrap();fs::write(&bad,b"invalid descriptor").unwrap();
+        let paths=vec![bad.clone(),good.clone(),root.path().join("missing.gsproject")];
+        let report=collect_imports(paths,|path|library.import_project(path).map(|project|vec![OpenProject{project,inspection:None}]).map_err(error));
+        assert_eq!(report.projects.len(),1);assert_eq!(report.projects[0].project.title,"Batch source");
+        assert_eq!(report.failures.len(),2);assert_eq!(report.failures[0].path,bad);
+        assert!(report.failures.iter().all(|failure|!failure.message.is_empty()));
+        assert_eq!(library.list().unwrap().len(),1);assert_eq!(fs::read(&bad).unwrap(),b"invalid descriptor");
+        let json=serde_json::to_value(import_response(report,true).unwrap()).unwrap();
+        assert_eq!(json["projects"].as_array().unwrap().len(),1);assert_eq!(json["failures"].as_array().unwrap().len(),2);
+        assert_eq!(project::load_project(&good).unwrap().title,"Batch source");
+    }
+    #[test]
+    fn rejected_and_cancelled_batches_and_existing_array_interface_are_unambiguous() {
+        let report=collect_imports(vec![PathBuf::from("missing.map")],|_|Err("Missing original".into()));
+        let json=serde_json::to_value(import_response(report,true).unwrap()).unwrap();
+        assert!(json["projects"].as_array().unwrap().is_empty());assert_eq!(json["failures"][0]["message"],"Missing original");
+        let rejected=collect_imports(vec![PathBuf::from("missing.map")],|_|Err("Missing original".into()));
+        assert!(import_response(rejected,false).is_err());
+        assert_eq!(serde_json::to_value(import_response(ImportReport::default(),false).unwrap()).unwrap(),serde_json::json!([]));
+        let cancelled=serde_json::to_value(import_response(ImportReport::default(),true).unwrap()).unwrap();
+        assert_eq!(cancelled,serde_json::json!({"projects":[],"failures":[]}));
+    }
+}
 fn lock<T>(m: &Mutex<T>) -> Reply<std::sync::MutexGuard<'_, T>> {
     m.lock()
         .map_err(|_| "Application state lock was interrupted; restart Guilty Spark".into())
@@ -837,15 +905,13 @@ fn import_file(state: &AppState, path: &Path) -> Reply<Vec<OpenProject>> {
     Ok(opened)
 }
 #[tauri::command]
-async fn import_paths(app: tauri::AppHandle, paths: Vec<PathBuf>) -> Reply<Vec<OpenProject>> {
+async fn import_paths(app: tauri::AppHandle, paths: Vec<PathBuf>, include_report: Option<bool>) -> Reply<ImportResponse> {
     if paths.len() > 16 {
         return Err("Import at most 16 files at a time".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
-        let mut opened=vec![];let mut failures=vec![];
-        for path in paths { match import_file(&state,&path) { Ok(projects)=>opened.extend(projects),Err(e)=>failures.push(format!("{}: {e}",path.display())) } }
-        if !failures.is_empty(){Err(format!("Imported {} project(s); {} file(s) were rejected. Successfully imported projects are preserved in the library.\n{}",opened.len(),failures.len(),failures.join("\n")))}else{Ok(opened)}
+        import_response(collect_imports(paths, |path| import_file(&state, path)), include_report.unwrap_or(false))
     })
     .await
     .map_err(error)?
@@ -868,7 +934,7 @@ async fn download_and_import_maps(app:tauri::AppHandle,id:String)->Reply<Vec<Ope
     }).await.map_err(error)?
 }
 #[tauri::command]
-async fn import_dialog(app: tauri::AppHandle) -> Reply<Vec<OpenProject>> {
+async fn import_dialog(app: tauri::AppHandle, include_report: Option<bool>) -> Reply<ImportResponse> {
     let files = rfd::AsyncFileDialog::new()
         .set_title("Import Halo maps or Guilty Spark projects")
         .add_filter(
@@ -878,9 +944,9 @@ async fn import_dialog(app: tauri::AppHandle) -> Reply<Vec<OpenProject>> {
         .pick_files()
         .await;
     if let Some(files) = files {
-        import_paths(app, files.into_iter().map(|f| f.path().into()).collect()).await
+        import_paths(app, files.into_iter().map(|f| f.path().into()).collect(), include_report).await
     } else {
-        Ok(vec![])
+        import_response(ImportReport::default(), include_report.unwrap_or(false))
     }
 }
 #[tauri::command]
@@ -937,6 +1003,7 @@ fn restore_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:
 fn save_project(state: State<AppState>, window:tauri::WebviewWindow, mut project: Project) -> Reply<LibraryEntry> {
     let _history_guard=lock(&state.window_history)?;
     check_document_owner(&state,&project.id,window.label())?;
+    if lock(&state.library)?.is_preview(&project.id).map_err(error)?{return Err("This is a read-only background preview. Open the source map before editing or saving a project.".into());}
     let existing = lock(&state.library)?.get(&project.id).map_err(error)?;
     project.source = existing.source;
     project.assets = existing.assets;

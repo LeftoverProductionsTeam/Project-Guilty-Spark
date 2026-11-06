@@ -72,7 +72,7 @@ test('repository recovery rules preserve safety without requiring obsolete cache
   assert.match(current, /Never push or publish without authorization/);
   assert.match(current, /No security bypasses, unauthorized proprietary downloads or arbitrary remote tool execution/);
   assert.match(current, /changed, unique, ambiguous, active and accepted-release files remain protected/);
-  assert.match(current, /Do not recreate the obsolete repository `\.local` directory/);
+  assert.match(current, /Do not recreate `\.local`/);
   assert.doesNotMatch(current, /`\.local\/(?:tools|build|artifacts)[^`]*`/);
   assert.match(current, /Do not block unrelated, safely executable engineering/);
   assert.doesNotMatch(current, /obtaining explicit user authorization to defer before starting another directive/);
