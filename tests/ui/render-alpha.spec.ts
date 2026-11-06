@@ -3,9 +3,7 @@ import {test,expect} from '@playwright/test';
 test('transparent showcase postprocessing retains solid model coverage through bloom and resize',async({page})=>{
   await page.goto('/');
   const results=await page.evaluate(async()=>{
-    const THREE=await import('/node_modules/.vite/deps/three.js');
-    const {createVisualPipeline}=await import('/src/visualPipeline.ts');
-    const {DEFAULT_RENDER_FEATURES}=await import('/src/renderFeatures.ts');
+    const {THREE,createVisualPipeline,DEFAULT_RENDER_FEATURES}=await import('/tests/ui/fixtures/render-alpha.ts');
     const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,premultipliedAlpha:false,preserveDrawingBuffer:true});
     renderer.setClearColor(0,0);renderer.setSize(64,64);
     const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-2,2,2,-2,.1,10);
@@ -40,10 +38,7 @@ test('transparent showcase postprocessing retains solid model coverage through b
 test('transparent showcase retains additive hologram brightness without applying native alpha twice',async({page})=>{
   await page.goto('/');
   const result=await page.evaluate(async()=>{
-    const THREE=await import('/node_modules/.vite/deps/three.js');
-    const {createVisualPipeline}=await import('/src/visualPipeline.ts');
-    const {createHaloMaterial}=await import('/src/haloMaterial.ts');
-    const {DEFAULT_RENDER_FEATURES}=await import('/src/renderFeatures.ts');
+    const {THREE,createVisualPipeline,createHaloMaterial,DEFAULT_RENDER_FEATURES}=await import('/tests/ui/fixtures/render-alpha.ts');
     const renderer=new THREE.WebGLRenderer({alpha:true,premultipliedAlpha:false,preserveDrawingBuffer:true});renderer.setSize(32,32);renderer.setClearColor(0,0);
     const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);camera.position.z=2;
     const texture=new THREE.DataTexture(new Uint8Array([64,0,128,8]),1,1);texture.userData.sourceEncoded=true;texture.needsUpdate=true;

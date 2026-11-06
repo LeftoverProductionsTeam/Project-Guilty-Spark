@@ -6,6 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { withDevelopmentWorkspace, runDevelopmentCommand } from './native-qa-storage.mjs';
+import { checkSourceEntrypoints } from './check-source-entrypoints.mjs';
 const [receiptFile, sourceMap, kit, tags, invader, acceptedProject] = process.argv.slice(2);
 const stages = (process.env.SPARK_VERIFY_STAGES ?? 'rust,frontend,browser,native').split(',');
 if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler'].includes(s)))
@@ -24,6 +25,7 @@ const report = {
   nativeGameplayAccepted: false,
 };
 try {
+  await checkSourceEntrypoints();
   await withDevelopmentWorkspace(
     'source-only-verification',
     async (context) => {
@@ -35,7 +37,10 @@ try {
       if (stages.includes('rust'))
         await run('Rust workspace', ['scripts/cargo.mjs', 'test', '--workspace', '--locked']);
       if (stages.includes('frontend')) {
+        await run('TypeScript', ['node_modules/typescript/bin/tsc', '--noEmit', '--incremental', 'false']);
         await run('Frontend tests', ['node_modules/vitest/vitest.mjs', 'run']);
+        await run('Source module contracts', ['--test', 'scripts/check-source-entrypoints.test.mjs']);
+        await run('Offline regressions', ['scripts/frontend-tests.mjs', 'offline']);
         await run('Storage ownership', ['--test', 'scripts/native-qa-storage.test.mjs']);
       }
       if (stages.includes('browser'))

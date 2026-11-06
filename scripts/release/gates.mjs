@@ -16,6 +16,7 @@ await fs.mkdir(output, { recursive: false });
 const python = process.env.SPARK_RELEASE_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
 const node = (...args) => [process.execPath, args];
 const commands = [
+  ['source-interfaces', ...node('--test', 'scripts/check-source-entrypoints.test.mjs')],
   ['rust-workspace', ...node('scripts/cargo.mjs', 'test', '--workspace', '--locked')],
   ['typescript', ...node('node_modules/typescript/bin/tsc', '--noEmit', '--incremental', 'false')],
   ['frontend', ...node('scripts/frontend-tests.mjs', 'unit')],

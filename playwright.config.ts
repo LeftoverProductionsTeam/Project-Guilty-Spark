@@ -6,7 +6,7 @@ const baseURL = `http://127.0.0.1:${port}`;
 const evidenceDirectory = process.env.SPARK_BROWSER_EVIDENCE_DIR;
 if (!evidenceDirectory) throw new Error('Use scripts/frontend-tests.mjs browser so browser output is owned and disposable.');
 if (/(?:^|[\\/])\.local(?:[\\/]|$)/i.test(evidenceDirectory))
-  throw new Error('Obsolete .local browser output is disabled; use artifacts/qa.');
+  throw new Error('Obsolete .local browser output is disabled; use scripts/frontend-tests.mjs browser for an owned external workspace.');
 export default defineConfig({
   testDir: './tests/ui',
   outputDir: evidenceDirectory,
