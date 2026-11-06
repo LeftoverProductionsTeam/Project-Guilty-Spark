@@ -22,3 +22,19 @@ fn setup()->(tempfile::TempDir,Library,Project,String){
     let baseline=fork.working_path.with_file_name("baseline.obj");fs::write(&baseline,"tampered").unwrap();assert!(exchange::review(&lib,&p.id,&fork.handoff.id).is_err());
     fs::copy(&p.assets[0].path,&baseline).unwrap();fs::write(&p.assets[0].path,"changed original").unwrap();assert!(exchange::review(&lib,&p.id,&fork.handoff.id).is_err());
 }
+
+#[test]fn workspace_handoff_forks_a_verified_reference_without_copying_or_editing_the_original(){
+    let temp=tempfile::tempdir().unwrap();let root=temp.path().join("workspace");let input=temp.path().join("creator.obj");
+    let original=b"v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nf 1/1 2/2 3/3\n";fs::write(&input,original).unwrap();
+    let lib=Library::workspace(&root).unwrap();let mut p=lib.create("Referenced geometry").unwrap();let id=uuid::Uuid::new_v4().to_string();
+    p.assets.push(Asset{id:id.clone(),name:"Creator triangle".into(),kind:"obj".into(),sha256:maps::hash_file(&input).unwrap(),path:input.clone(),vertices:3,triangles:1,has_uvs:true,materials:vec!["default".into()]});lib.save(&p,None).unwrap();
+    assert!(!root.join("projects").exists());let fork=exchange::prepare(&lib,&p.id,&id).unwrap();
+    assert!(!lib.project_dir(&p.id).unwrap().join("assets").exists());assert!(!lib.is_saved(&p.id).unwrap());
+    assert_ne!(fs::canonicalize(&fork.working_path).unwrap(),fs::canonicalize(&input).unwrap());
+    let changed=String::from_utf8(original.to_vec()).unwrap().replace("v 1 0 0","v 1.5 0 0");fs::write(&fork.working_path,changed).unwrap();
+    let review=exchange::review(&lib,&p.id,&fork.handoff.id).unwrap();assert!(review.changed&&review.complete_uvs);assert_eq!(review.triangles,1);
+    assert_eq!(fs::read(&input).unwrap(),original);assert_eq!(fs::read(fork.working_path.with_file_name("baseline.obj")).unwrap(),original);
+    assert_eq!(lib.get(&p.id).unwrap().assets.len(),1);let other=lib.create("Other source").unwrap();assert!(exchange::prepare(&lib,&other.id,&id).is_err());
+    fs::write(&input,b"outside edit").unwrap();assert!(exchange::review(&lib,&p.id,&fork.handoff.id).is_err());assert!(exchange::prepare(&lib,&p.id,&id).is_err());
+    assert_eq!(fs::read(fork.working_path.with_file_name("baseline.obj")).unwrap(),original);
+}

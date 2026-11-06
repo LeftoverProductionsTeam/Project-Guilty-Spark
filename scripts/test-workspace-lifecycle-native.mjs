@@ -32,6 +32,8 @@ if(logicOnly&&(geometryOnly||nativeOnly||previewOnly||contextOnly))throw Error('
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
 if(!['','20','50'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 or50 edits');
 const editCount=Number(repeatedEdits||0);
+const memoryAcceptance=process.env.SPARK_LIFECYCLE_MEMORY==='1';
+if(memoryAcceptance&&(!nativeOnly||readOnly))throw Error('Memory lifecycle acceptance requires the real editable native app mode');
 if(nativeOnly&&!nativeMap)throw Error('Native-only acceptance requires an owned map');
 const inputInfo=nativeMap&&nativeMap!=='-'?await fs.stat(path.resolve(nativeMap)):null;
 if(inputInfo&&!inputInfo.isFile())throw Error('Native acceptance input must be an existing owned cache');
@@ -108,7 +110,60 @@ async function inspector(page,select=false){
 }
 async function setX(page,value){await x(page).fill(String(value));await x(page).press('Tab');}
 async function acknowledged(page,id,value){await expect.poll(async()=>{const s=await state(page,id);return s.project?.quickForge.geometry[0]?.position[0];}).toBe(value);return state(page,id);}
-async function close(page){await page.getByRole('button',{name:'Close window',exact:true}).click();await expect.poll(()=>page.isClosed()).toBe(true);}
+async function close(page,choice){
+  await page.getByRole('button',{name:'Close window',exact:true}).click();
+  const review=page.getByRole('dialog',{name:'Save changes before closing?',exact:true});
+  await expect.poll(async()=>page.isClosed()||await review.isVisible().catch(()=>false)).toBe(true);
+  if(!page.isClosed()){
+    if(choice!=='save')throw Error('Unexpected unsaved changes while closing the native test window');
+    await review.getByRole('button',{name:'Save changes',exact:true}).click();
+  }
+  await expect.poll(()=>page.isClosed()).toBe(true);
+}
+async function projectDirectories(){return fs.readdir(path.join(root,'library/projects')).catch(error=>{if(error.code==='ENOENT')return[];throw error;});}
+async function nativeMemoryLifecycle(){
+  const original=await fs.readFile(path.resolve(nativeMap)),hash=crypto.createHash('sha256').update(original).digest('hex');
+  const began=performance.now(),rows=[];
+  async function openTags(opened){
+    await main.reload();await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${opened.project.id}"]`).click();await chooseTool(main,'Tag editor');
+    const pistol=opened.inspection.tags.find(tag=>tag.class==='weap'&&tag.path.replaceAll('\\','/').endsWith('weapons/pistol/pistol'));
+    if(!pistol)throw Error('Native memory fixture needs the actual pistol');
+    await main.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);
+    await main.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');
+    await main.locator('.tag-row').filter({has:main.locator('strong',{hasText:/^pistol$/})}).click();
+    const radius=main.getByRole('spinbutton',{name:'Bounding radius',exact:true});await expect(radius).toBeVisible();return{radius,pistol};
+  }
+  for(let index=0;index<20;index++){
+    const [opened]=await invoke(main,'import_paths',{paths:[path.resolve(nativeMap)]});await openTags(opened);
+    const entries=(await invoke(main,'bootstrap')).entries;expect(entries).toHaveLength(1);expect(entries[0].sessionOnly).toBe(true);
+    expect(await fs.realpath(opened.project.source.preservedPath)).toBe(await fs.realpath(path.resolve(nativeMap)));
+    await main.getByRole('button',{name:'Close map '+opened.project.title,exact:true}).click();
+    await expect(main.getByRole('tablist',{name:'Open maps',exact:true})).toHaveCount(0);
+    await expect.poll(async()=>(await invoke(main,'bootstrap')).entries.length).toBe(0);expect(await projectDirectories()).toEqual([]);
+    rows.push({cycle:index+1,sparkProjectDirectories:0,savedCopies:0});
+  }
+  const [opened]=await invoke(main,'import_paths',{paths:[path.resolve(nativeMap)]});let {radius,pistol}=await openTags(opened);
+  await radius.fill('0.123');await radius.press('Tab');
+  await main.getByRole('button',{name:'Close map '+opened.project.title,exact:true}).click();
+  let dialog=main.getByRole('dialog',{name:'Save changes before closing?',exact:true});await expect(dialog).toBeVisible();await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await expect(radius).toHaveValue('0.123');expect(await projectDirectories()).toEqual([]);
+  await main.getByRole('button',{name:'Close window',exact:true}).click();dialog=main.getByRole('dialog',{name:'Save changes before closing?',exact:true});await expect(dialog).toBeVisible();await dialog.getByRole('button',{name:'Cancel',exact:true}).click();expect(main.isClosed()).toBe(false);await expect(radius).toHaveValue('0.123');
+  const before=new Set(pages());await main.locator(`[data-map-tab-id="${opened.project.id}"] [role="tab"]`).click({button:'right'});await main.getByRole('menuitem',{name:'Move to another window',exact:true}).click();
+  const child=await nextPage(before);await chooseTool(child,'Tag editor');const childRadius=child.getByRole('spinbutton',{name:'Bounding radius',exact:true});
+  await child.getByRole('textbox',{name:'Search tags',exact:true}).fill(pistol.path);await child.getByRole('combobox',{name:'Filter tag class',exact:true}).selectOption('weap');await child.locator('.tag-row').filter({has:child.locator('strong',{hasText:/^pistol$/})}).click();
+  await expect(childRadius).toHaveValue('0.123');expect((await state(main,opened.project.id)).writable).toBe(false);expect((await state(child,opened.project.id)).writable).toBe(true);
+  await child.keyboard.press('Control+z');await expect(childRadius).not.toHaveValue('0.123');await child.keyboard.press('Control+y');await expect(childRadius).toHaveValue('0.123');
+  await child.getByRole('button',{name:'Return map to workspace',exact:true}).click();await expect.poll(async()=>(await state(main,opened.project.id)).writable).toBe(true);await close(child);await expect(radius).toHaveValue('0.123');expect(await projectDirectories()).toEqual([]);
+  await main.getByRole('button',{name:'Close map '+opened.project.title,exact:true}).click();dialog=main.getByRole('dialog',{name:'Save changes before closing?',exact:true});await dialog.getByRole('button',{name:'Save changes',exact:true}).click();
+  await expect(main.getByRole('tablist',{name:'Open maps',exact:true})).toHaveCount(0);const file=path.join(root,'library/projects',opened.project.id,'project.gsproject');
+  const saved=await fs.readFile(file);expect((JSON.parse(saved).tagEdits.find(edit=>edit.tagId===pistol.id&&edit.fieldKey==='bounding-radius'))?.value).toBe(.123);
+  expect(await fs.stat(path.join(root,'library/projects',opened.project.id,'source.map')).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;})).toBe(false);
+  ({radius}=await openTags(await invoke(main,'open_project',{id:opened.project.id})));await radius.fill('0.456');await radius.press('Tab');
+  await main.getByRole('button',{name:'Close map '+opened.project.title,exact:true}).click();dialog=main.getByRole('dialog',{name:'Save changes before closing?',exact:true});await dialog.getByRole('button',{name:'Discard changes',exact:true}).click();await expect(main.getByRole('tablist',{name:'Open maps',exact:true})).toHaveCount(0);expect(await fs.readFile(file)).toEqual(saved);
+  ({radius}=await openTags(await invoke(main,'open_project',{id:opened.project.id})));await expect(radius).toHaveValue('0.123');await main.getByRole('button',{name:'Close map '+opened.project.title,exact:true}).click();await expect(main.getByRole('tablist',{name:'Open maps',exact:true})).toHaveCount(0);
+  expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(hash);
+  report.memoryLifecycle={rows,milliseconds:performance.now()-began,actualNativeSource:true,mockedIpc:false,noSavedMapCopies:true,cancelRetainedEdit:true,windowCloseCancel:true,ramWindowHandoffAndUndoRedo:true,explicitSaveAndDiscardReopen:true,originalSourceUnchanged:true};
+  step('Twenty actual map inspect/close cycles create no project copies; RAM window handoff, Cancel, explicit Save and Discard/reopen preserve source and history',report.memoryLifecycle);
+}
 async function nativeTagAnimation(opened){
       const actor=opened.inspection.tags.find(tag=>tag.class==='bipd'&&tag.references.some(ref=>ref.label==='Animation graph'));
       if(!actor)throw Error('Native animation acceptance requires a real biped with its own graph');
@@ -138,6 +193,7 @@ try{
   await launchNative();
   const boot=await invoke(main,'bootstrap');await invoke(main,'save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false}});
   if(launchOnly){expect(path.resolve(boot.dataDirectory)).toBe(path.join(root,'library'));await expect(main.locator('#root')).not.toBeEmpty();step('Actual embedded app starts with its isolated library and no mocked IPC',{url:main.url()});}
+  if(memoryAcceptance){expect(boot.memoryFirst).toBe(true);expect(boot.settings.watchSharedMccInbox).toBe(false);await nativeMemoryLifecycle();}
   if(geometryOnly){
     const {nativeGeometryRoundTrip}=await import('./native-geometry-roundtrip.mjs');
     await nativeGeometryRoundTrip({main,root,invoke,expect,report,step,invaderDirectory,run:runOwned});
@@ -267,12 +323,12 @@ try{
     expect(imported.failures.every(row=>row.message.length>0)).toBe(true);
     const [opened]=imported.projects;
     const entries=(await invoke(main,'bootstrap')).entries;expect(entries).toHaveLength(1);
-    const indexed=JSON.stringify(entries),projectDirectories=await fs.readdir(path.join(root,'library/projects'));
+    const indexed=JSON.stringify(entries),directoriesBefore=await projectDirectories();
     for(let index=0;index<10;index++){
       const failed=await invoke(main,'import_paths',{paths:[missing],includeReport:true});
       expect(failed.projects).toEqual([]);expect(failed.failures).toHaveLength(1);
       expect(JSON.stringify((await invoke(main,'bootstrap')).entries)).toBe(indexed);
-      expect(await fs.readdir(path.join(root,'library/projects'))).toEqual(projectDirectories);
+      expect(await projectDirectories()).toEqual(directoriesBefore);
     }
     report.importBatch={mixedSuccesses:1,mixedFailures:2,rejectedAttempts:10,libraryIndexUnchangedAfterRejections:true};
     if(!readOnly){
@@ -287,12 +343,12 @@ try{
         const failed=await invoke(main,'import_paths',{paths:[descriptor],includeReport:true});
         expect(failed.projects).toEqual([]);expect(failed.failures).toHaveLength(1);
         expect(JSON.stringify((await invoke(main,'bootstrap')).entries)).toBe(indexed);
-        expect(await fs.readdir(path.join(root,'library/projects'))).toEqual(projectDirectories);
+        expect(await projectDirectories()).toEqual(directoriesBefore);
       }
       expect(await fs.readFile(first)).toEqual(payload);expect(await fs.readFile(bad,'utf8')).toBe('invalid mesh');
       report.importBatch.lateAssetDescriptorRejections=10;report.importBatch.originalAssetsUnchanged=true;
     }
-    if(profilePreview)report.previewProfile.importMs=performance.now()-importStarted;
+    if(profilePreview){report.previewProfile.importMs=performance.now()-importStarted;if(memoryAcceptance)report.previewProfile.conditions+='; map timings follow twenty source-inspection cycles and are warm-session measurements';}
     expect(opened.project.source.cacheVersion).toBe(expectedCacheVersion);
     const pistol=opened.inspection.tags.find(tag=>tag.class==='weap'&&tag.path.replaceAll('\\','/').endsWith('weapons/pistol/pistol'));
     if(!pistol&&!previewOnly)throw Error('Owned native map does not contain the representative pistol');
@@ -458,7 +514,8 @@ try{
         await main.keyboard.press('Control+y');await expect(radius).toHaveValue(String(value));
         await main.keyboard.press('Control+s');
         await expect.poll(async()=>{
-          const project=(await invoke(main,'open_project',{id:opened.project.id})).project;
+          const file=path.join(root,'library/projects',opened.project.id,'project.gsproject');
+          const project=JSON.parse(await fs.readFile(file,'utf8'));
           return project.tagEdits.find(edit=>edit.tagId===pistol.id&&edit.fieldKey==='bounding-radius')?.value;
         }).toBe(value);
         const snapshot=await invoke(main,'create_project_snapshot',{projectId:opened.project.id,reason:'periodic'});
@@ -567,7 +624,7 @@ finally{
   // flushing files after the parent exits; those files must never be deleted
   // against an unstable hash inventory.
   if(report.complete&&browser){
-    try{for(const page of pages().reverse()){if(!page.isClosed())await close(page);}if(child)await waitForQaExit(child);report.gracefulAppClose=true;}
+    try{for(const page of pages().reverse()){if(!page.isClosed())await close(page,'save');}if(child)await waitForQaExit(child);report.gracefulAppClose=true;}
     catch(error){report.complete=false;report.errors.push('Normal QA app close failed: '+String(error));process.exitCode=1;}
   }
   await browser?.close().catch(()=>{});
@@ -577,8 +634,9 @@ finally{
     // Tests own these fresh namespaces, on failure too. A deliberate geometry
     // fixture is the only large retained payload; source recipes/receipts live
     // outside scratch. No abandoned browser profile or full library is kept.
-    if(report.complete&&report.geometryRoundTrip?.output)
-      await finishStorage.retain(report.geometryRoundTrip.output,'Accepted native geometry fixture for the next independent readback');
+    // Geometry acceptance already performed independent readback above. Its
+    // generated test map remains disposable; the source recipe and compact
+    // hashes are sufficient to reproduce it without another retained cache.
     // A diagnostic failure must not leave owned writer payloads behind.
     try{await physicalSample('before-cleanup');}
     catch(error){report.complete=false;report.errors.push('Pre-cleanup measurement failed: '+String(error));process.exitCode=1;}

@@ -49,11 +49,17 @@ pub struct LibraryEntry {
     pub status: String,
     pub project_path: PathBuf,
     pub scenario_type: Option<u16>,
+    #[serde(default,skip_serializing_if="std::ops::Not::not")]
+    pub session_only: bool,
 }
 pub struct Library {
     pub root: PathBuf,
     db: Connection,
     session_only: bool,
+    /// The production workbench keeps editable documents in the existing RAM
+    /// backend. The outer connection retains settings and explicitly saved
+    /// projects; it is never used as an implicit autosave destination.
+    session: Option<Box<Library>>,
 }
 impl Library {
     pub fn open(root: &Path) -> Result<Self> {
@@ -68,6 +74,7 @@ impl Library {
             root: root.into(),
             db,
             session_only: false,
+            session: None,
         })
     }
     /// Opt-in session backend. Not the application default until explicit-save
@@ -78,9 +85,39 @@ impl Library {
         let db=Connection::open_in_memory()?;
         db.execute_batch("CREATE TABLE projects(id TEXT PRIMARY KEY, summary TEXT NOT NULL); CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE documents(id TEXT PRIMARY KEY,value TEXT NOT NULL);")?;
         Self::prepare_previews(&db)?;
-        Ok(Self{root:root.into(),db,session_only:true})
+        Ok(Self{root:root.into(),db,session_only:true,session:None})
     }
     pub fn is_session_only(&self)->bool{self.session_only}
+    pub fn workspace(root:&Path)->Result<Self>{
+        let mut library=Self::open(root)?;
+        library.session=Some(Box::new(Self::memory(root)?));
+        Ok(library)
+    }
+    pub fn is_memory_first(&self)->bool{self.session_only||self.session.is_some()}
+    pub fn is_saved(&self,id:&str)->Result<bool>{
+        if self.session_only{return Ok(false);}
+        Ok(self.db.query_row("SELECT EXISTS(SELECT 1 FROM projects WHERE id=?1)",[id],|r|r.get(0))?)
+    }
+    pub fn saved_project(&self,id:&str)->Result<Project>{
+        if !self.is_saved(id)?{return invalid("This document has not been explicitly saved");}
+        project::load_project(&self.project_dir(id)?.join("project.gsproject"))
+    }
+    /// Drop only an editable RAM document. An explicitly saved descriptor,
+    /// previous-good recovery and all source assets remain untouched.
+    pub fn discard_session(&self,id:&str)->Result<()> {
+        uuid::Uuid::parse_str(id).map_err(|_|crate::SparkError::Invalid("Invalid project UUID".into()))?;
+        if let Some(session)=&self.session{return session.discard_session(id);}
+        if self.session_only{
+            let transaction=self.db.unchecked_transaction()?;
+            self.db.execute("DELETE FROM documents WHERE id=?1",[id])?;
+            self.db.execute("DELETE FROM projects WHERE id=?1",[id])?;
+            for key in [format!("savedBaseline.{id}"),format!("mapResourceOrigins.{id}")]{
+                self.db.execute("DELETE FROM settings WHERE key=?1",[key])?;
+            }
+            transaction.commit()?;
+        }
+        Ok(())
+    }
     fn prepare_previews(db:&Connection)->Result<()> {
         // One connection, no preview database or map copies. SQLite TEMP data
         // stays in RAM and disappears when this library session ends.
@@ -106,22 +143,39 @@ impl Library {
             "SELECT summary FROM projects ORDER BY json_extract(summary,'$.modifiedAt') DESC",
         )?;
         let rows = s.query_map([], |r| r.get::<_, String>(0))?;
-        let mut out = vec![];
+        let mut out:Vec<LibraryEntry> = vec![];
         for row in rows {
             out.push(serde_json::from_str(&row?)?);
+        }
+        if let Some(session)=&self.session{
+            for mut entry in session.list()?{entry.session_only=!self.is_saved(&entry.id)?;out.retain(|saved|saved.id!=entry.id);out.push(entry);}
+            out.sort_by(|a,b|b.modified_at.cmp(&a.modified_at));
         }
         Ok(out)
     }
     pub fn get(&self, id: &str) -> Result<Project> {
         if let Some(preview)=self.preview(id)?{return Ok(preview);}
+        if let Some(session)=&self.session{
+            let exists:bool=session.db.query_row("SELECT EXISTS(SELECT 1 FROM documents WHERE id=?1)",[id],|r|r.get(0))?;
+            if exists{return session.get(id);}
+        }
         if self.session_only{
             let text:String=self.db.query_row("SELECT value FROM documents WHERE id=?1",[id],|row|row.get(0))?;
             return Ok(serde_json::from_str(&text)?);
         }
         let dir = self.project_dir(id)?;
-        project::load_project(&dir.join("project.gsproject"))
+        let file=dir.join("project.gsproject");
+        let project=project::load_project(&file)?;
+        if let Some(session)=&self.session{
+            session.save(&project,None)?;
+            session.set_setting(&format!("savedBaseline.{id}"),&maps::hash_file(&file)?)?;
+        }
+        Ok(project)
     }
     pub fn setting<T: serde::de::DeserializeOwned + Default>(&self, key: &str) -> Result<T> {
+        if let Some(session)=&self.session{
+            if key.starts_with("mapResourceOrigins."){return session.setting(key);}
+        }
         match self
             .db
             .query_row("SELECT value FROM settings WHERE key=?1", [key], |r| {
@@ -133,12 +187,21 @@ impl Library {
         }
     }
     pub fn set_setting(&self, key: &str, value: &impl Serialize) -> Result<()> {
+        if let Some(session)=&self.session{
+            if key.starts_with("mapResourceOrigins."){return session.set_setting(key,value);}
+        }
         self.db.execute("INSERT INTO settings(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![key,serde_json::to_string(value)?])?;
         Ok(())
     }
     /// Cleanup must also preserve paths selected as SDKs, tools, resources or
     /// runtime content. Stream existing settings, including future keys.
     pub fn settings_reference_path(&self, path: &Path) -> Result<bool> {
+        if let Some(session)=&self.session{
+            for entry in session.list()?{
+                let p=session.get(&entry.id)?;
+                if crate::storage::document_references_path(&serde_json::to_value(p)?,path){return Ok(true);}
+            }
+        }
         let mut statement = self.db.prepare("SELECT length(CAST(value AS BLOB)), value FROM settings UNION ALL SELECT length(CAST(value AS BLOB)), value FROM preview_documents")?;
         let mut rows = statement.query([])?;
         let mut bytes = 0u64;
@@ -159,7 +222,38 @@ impl Library {
         project: &Project,
         inspection: Option<&maps::MapInspection>,
     ) -> Result<LibraryEntry> {
+        if !self.is_preview(&project.id)? {
+            if let Some(session)=&self.session{let mut entry=session.save(project,inspection)?;entry.session_only=!self.is_saved(&project.id)?;return Ok(entry);}
+        }
         self.save_internal(project,inspection,self.is_preview(&project.id)?)
+    }
+    /// Only the explicit Save command adopts a workbench document on disk.
+    /// Source maps remain referenced in place and must still match their hash.
+    pub fn save_explicit(&self,project:&Project,inspection:Option<&maps::MapInspection>)->Result<LibraryEntry>{
+        if self.is_preview(&project.id)?{return invalid("Open the source map before saving a background preview");}
+        // Referenced OBJ/audio inputs are re-admitted before publishing a
+        // descriptor. A changed external asset cannot become a valid Save.
+        let _checked_assets=prepare_project_assets(project)?;
+        if let Some(source)=&project.source{
+            validate_local_input_path(&source.preserved_path)?;crate::reject_links(&source.preserved_path)?;
+            if maps::hash_file(&source.preserved_path)?!=source.sha256{return invalid("The source map changed outside Spark; re-open and review it before saving. No descriptor was replaced");}
+        }
+        if self.session_only{return invalid("This standalone memory library has no persistent Save destination");}
+        let file=self.project_dir(&project.id)?.join("project.gsproject");
+        if let Some(session)=&self.session{
+            let expected:Option<String>=session.setting(&format!("savedBaseline.{}",project.id))?;
+            match (expected,file.exists()){
+                (Some(expected),true) if maps::hash_file(&file)?==expected=>{},
+                (None,false)=>{},
+                _=>return invalid("The saved project changed outside this session. Review the external revision before saving; the existing file was retained"),
+            }
+        }
+        let entry=self.save_internal(project,inspection,false)?;
+        if let Some(session)=&self.session{
+            session.save(project,inspection)?;
+            session.set_setting(&format!("savedBaseline.{}",project.id),&maps::hash_file(&file)?)?;
+        }
+        Ok(entry)
     }
     fn save_internal(&self,project:&Project,inspection:Option<&maps::MapInspection>,preview:bool)->Result<LibraryEntry> {
         project.validate()?;
@@ -182,7 +276,7 @@ impl Library {
                 );
             }
         }
-        if let Some(source) = &project.source { if !self.session_only && !preview {
+        if let Some(source) = &project.source { if !self.session_only && self.session.is_none() && !preview {
             crate::reject_links(&source.preserved_path)?;crate::reject_links(&dir.join("source.map"))?;
             if fs::canonicalize(&source.preserved_path)? != fs::canonicalize(dir.join("source.map"))? {
                 return invalid("Source must be the managed preserved copy");
@@ -220,6 +314,7 @@ impl Library {
             scenario_type: inspection
                 .map(|i| i.header.scenario_type)
                 .or(previous.and_then(|p| p.scenario_type)),
+            session_only: self.session_only,
         };
         if preview {
             let text=serde_json::to_string(project)?;
@@ -246,6 +341,25 @@ impl Library {
         path: &Path,
         resources: Option<&Path>,
     ) -> Result<(Project, maps::MapInspection)> {
+        if let Some(session)=&self.session{
+            let saved_count:i64=self.db.query_row("SELECT COUNT(*) FROM projects",[],|r|r.get(0))?;
+            if saved_count==0{return session.import_map(path,resources);}
+            // Reopen a deliberately saved project instead of creating a second
+            // document for the same native source. New maps stay in RAM.
+            let inspection=maps::inspect_map(path,resources)?;
+            let mut statement=self.db.prepare("SELECT summary FROM projects")?;
+            for row in statement.query_map([],|row|row.get::<_,String>(0))?{
+                let entry:LibraryEntry=serde_json::from_str(&row?)?;
+                if entry.sha256.as_deref()==Some(&inspection.sha256){
+                    let project=self.get(&entry.id)?;
+                    let source=project.source.as_ref().ok_or_else(||crate::SparkError::Invalid("Saved map has no native source".into()))?;
+                    let verified=maps::inspect_map(&source.preserved_path,source.resource_directory.as_deref().or(resources))?;
+                    if verified.sha256!=source.sha256{return invalid("Saved source checksum changed");}
+                    return Ok((project,verified));
+                }
+            }
+            return session.import_map(path,resources);
+        }
         let transaction=self.db.unchecked_transaction()?;
         let (project,inspection,mut files)=self.import_map_internal(path,resources,true,false)?;
         if let Err(reason)=transaction.commit(){return Err(abort_import(&mut files,reason.into()));}
@@ -363,6 +477,7 @@ impl Library {
         match result{Ok((project,inspection))=>Ok((project,inspection,files)),Err(reason)=>Err(abort_import(&mut files,reason))}
     }
     pub fn import_project(&self, path: &Path) -> Result<Project> {
+        if let Some(session)=&self.session{return session.import_project(path);}
         let incoming = project::load_project(path)?;
         // A descriptor is data, not approval to contact a file server/device.
         // Admit every referenced input before metadata/hash/open can touch one.
@@ -431,16 +546,24 @@ impl Library {
         for (mut asset,bytes,parsed) in prepared {
             let original_id=asset.id.clone();let new_id=uuid::Uuid::new_v4().to_string();
             let extension=if parsed.is_some(){"obj".to_owned()}else{asset.path.extension().and_then(|value|value.to_str()).unwrap_or("").to_ascii_lowercase()};
+            let raw=if self.session_only{
+                // The admitted source file is immutable input. Inspecting a
+                // descriptor must not allocate a copied OBJ/audio library.
+                validate_local_input_path(&asset.path)?;crate::reject_links(&asset.path)?;fs::canonicalize(&asset.path)?
+            }else{
             crate::reject_links(&dir)?;fs::create_dir_all(&dir)?;crate::reject_links(&dir)?;
             let raw=dir.join(format!("{new_id}.{extension}"));
             if let Some(files)=&mut files{files.expect_bytes(&format!("assets/{new_id}.{extension}"),&bytes);}
             project::atomic_write(&raw,&bytes,false)?;
             if let Some(files)=&mut files{files.record_created(&format!("assets/{new_id}.{extension}"))?;}
+            raw};
             if let Some(parsed)=parsed {
                 let mesh=serde_json::to_vec(&parsed.mesh)?;
+                if !self.session_only{
                 if let Some(files)=&mut files{files.expect_bytes(&format!("assets/{new_id}.mesh.json"),&mesh);}
                 project::atomic_write(&dir.join(format!("{new_id}.mesh.json")),&mesh,false)?;
                 if let Some(files)=&mut files{files.record_created(&format!("assets/{new_id}.mesh.json"))?;}
+                }
                 for object in &mut p.scene {if object.asset_id.as_deref()==Some(original_id.as_str()){object.asset_id=Some(new_id.clone());}}
                 asset.vertices=parsed.mesh.positions.len()/3;asset.triangles=parsed.mesh.indices.len()/3;
                 asset.has_uvs=parsed.has_uvs;asset.materials=parsed.materials;

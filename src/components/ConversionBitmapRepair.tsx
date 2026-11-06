@@ -22,7 +22,7 @@ export default function ConversionBitmapRepair({
   settings: Settings;
   audit: BitmapDependencyAudit;
   disabled: boolean;
-  onSave: () => Promise<void>;
+  onSave: (persist?: boolean) => Promise<void>;
   onUse: (project: Project) => void;
 }) {
   const [folder, setFolder] = useMapState(project.id, 'conversion.bitmapSource', '');
@@ -91,7 +91,7 @@ export default function ConversionBitmapRepair({
     setError('');
     setPreview(null);
     try {
-      await onSave();
+      await onSave(true);
       const result = await call<BitmapRepairPreview>('prepare_bitmap_tagset_repair', {
         projectId: project.id,
         sourceTags: folder.trim(),

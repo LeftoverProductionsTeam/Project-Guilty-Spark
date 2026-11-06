@@ -61,5 +61,92 @@
   "nativeCompileMs": 37091,
   "gameLoaded": false,
   "humanAccepted": false,
-  "addonTested": false
+  "addonTested": false,
+  "memoryFirstFollowThrough": {
+    "receipt": "p0-tool-reference-validation.json",
+    "appSha256": "413d498b1c6ef56b98faf3ad0c041a70b9809f50470c80b2e2ad0828983e9f21",
+    "actualDesktopCases": 3,
+    "complete": true,
+    "sourceReferenceHandoff": true,
+    "privateOriginalPreserved": true,
+    "blenderSha256": "e27fbfea8564aa645d4463cb0949695fd85562b9de6df9561b06859a1074adf7",
+    "outputSha256": "323129a07e71b39c2104d55793c30560b4519ed8dec41596725d144052a8e1e0",
+    "modelSources": [
+      {
+        "tag": "scenery/spark_18bd1a2848e4/mesh_16e1ee204fb85f046584/mesh_16e1ee204fb85f046584",
+        "sourceSha256": "1c30f6beef1cd1c3ab0bb3b7bc895c28321668958b37d5c06b2007230518d314",
+        "bounds": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            1
+          ]
+        ],
+        "triangles": 12,
+        "renderGeometries": 1,
+        "collisionNodes": 1
+      },
+      {
+        "tag": "scenery/spark_18bd1a2848e4/mesh_3b891ee943ecc354f45a/mesh_3b891ee943ecc354f45a",
+        "sourceSha256": "673ca847c8b6b014a5ad17a6b0ed34f346711e213300a422f0060923835d08bf",
+        "bounds": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1.5,
+            1,
+            1
+          ]
+        ],
+        "triangles": 12,
+        "renderGeometries": 1,
+        "collisionNodes": 1
+      }
+    ],
+    "fidelity": [
+      {
+        "maxPositionError": 0,
+        "maxUvError": 0,
+        "minimumNormalDot": 1,
+        "shaderPaths": [
+          "levels/a10/shaders/obj-door small"
+        ],
+        "triangles": 12,
+        "windingPreserved": true
+      },
+      {
+        "maxPositionError": 0,
+        "maxUvError": 0,
+        "minimumNormalDot": 1,
+        "shaderPaths": [
+          "levels/a10/shaders/obj-door small"
+        ],
+        "triangles": 12,
+        "windingPreserved": true
+      }
+    ],
+    "preview": {
+      "ready": "true",
+      "firstFrame": "true",
+      "triangles": 12,
+      "materialGaps": 0,
+      "textures": 1,
+      "reflections": 1
+    },
+    "crcMismatch": 0,
+    "nativeCompilation": true,
+    "independentInvaderReadback": true,
+    "generatedOutputDisposed": true,
+    "gameLoaded": false,
+    "humanAccepted": false,
+    "addonTested": false
+  }
 }

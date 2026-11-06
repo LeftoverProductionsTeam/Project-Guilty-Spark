@@ -19,7 +19,7 @@ export default function PortabilityLab({
 }: {
   project: Project;
   dirty: boolean;
-  onSave: () => Promise<void>;
+  onSave: (persist?: boolean) => Promise<void>;
   onBuild: () => void;
   onSettings: () => void;
 }) {
@@ -60,13 +60,13 @@ export default function PortabilityLab({
     generation.current++;
     setBusy(false);
   }, [project.id]);
-  async function run(task: (request: number) => Promise<void>) {
+  async function run(task: (request: number) => Promise<void>, persist = false) {
     if (busy) return;
     setBusy(true);
     setError('');
     const request = ++generation.current;
     try {
-      await onSave();
+      await onSave(persist);
       await task(request);
     } catch (reason) {
       if (mounted.current && request === generation.current) setError(String(reason));
@@ -127,7 +127,7 @@ export default function PortabilityLab({
                 targets,
               });
               if (current(request)) setReport(result);
-            })
+            }, dirty)
           }
         >
           {busy ? 'Checking native source…' : dirty ? 'Save & inspect portability' : 'Inspect portability'}

@@ -32,10 +32,10 @@ pub fn copy_obj(
     if original.kind != "obj" {
         return invalid("Only registered OBJ assets can be copied by this operation");
     }
-    let path = lib
+    let path = if lib.is_memory_first(){crate::library::validate_local_input_path(&original.path)?;original.path.clone()}else{lib
         .project_dir(source_id)?
         .join("assets")
-        .join(format!("{asset_id}.obj"));
+        .join(format!("{asset_id}.obj"))};
     crate::reject_links(&path)?;
     let mut bytes = Vec::new();
     fs::File::open(&path)?
@@ -54,6 +54,7 @@ pub fn copy_obj(
     )?;
     let id = uuid::Uuid::new_v4().to_string();
     let dir = lib.project_dir(target_id)?.join("assets");
+    let raw=if lib.is_memory_first(){fs::canonicalize(&path)?}else{
     crate::reject_links(&dir)?;
     fs::create_dir_all(&dir)?;
     let raw = dir.join(format!("{id}.obj"));
@@ -65,7 +66,7 @@ pub fn copy_obj(
         &dir.join(format!("{id}.mesh.json")),
         &serde_json::to_vec(&imported.mesh)?,
         false,
-    )?;
+    )?;raw};
     let asset = Asset {
         id,
         name: original.name.clone(),

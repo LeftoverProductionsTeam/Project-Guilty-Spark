@@ -172,10 +172,13 @@ pub fn import(lib: &Library, project_id: &str, path: &Path) -> Result<(Project, 
         uuid::Uuid::new_v4().to_string(),
         lib.project_dir(project_id)?.join("assets"),
     );
+    let stored=if lib.is_memory_first(){
+        crate::library::validate_local_input_path(path)?;fs::canonicalize(path)?
+    }else{
     crate::reject_links(&directory)?;
     fs::create_dir_all(&directory)?;
     let stored = directory.join(format!("{id}.{extension}"));
-    project::atomic_write(&stored, &bytes, false)?;
+    project::atomic_write(&stored, &bytes, false)?;stored};
     let asset = Asset {
         id,
         name: path
@@ -223,10 +226,10 @@ pub fn preview(
     if !matches!(extension, "wav" | "ogg") {
         return invalid("Invalid stored custom sound format");
     }
-    let file = lib
+    let file = if lib.is_memory_first(){crate::library::validate_local_input_path(&asset.path)?;asset.path.clone()}else{lib
         .project_dir(project_id)?
         .join("assets")
-        .join(format!("{asset_id}.{extension}"));
+        .join(format!("{asset_id}.{extension}"))};
     crate::reject_links(&asset.path)?;
     if fs::canonicalize(&asset.path)? != fs::canonicalize(&file)? {
         return invalid("Custom sound escaped its managed asset folder");

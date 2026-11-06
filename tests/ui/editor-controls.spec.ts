@@ -20,8 +20,8 @@ test('drawers drag from an edge, resize, dock at the top and preserve the main f
   await expect(panel).toHaveAttribute('data-dock','right');
   const edge=(await panel.getByRole('separator').boundingBox())!,before=(await panel.boundingBox())!.width;
   await page.mouse.move(edge.x+2,edge.y+100);await page.mouse.down();await page.mouse.move(edge.x-78,edge.y+100,{steps:8});await page.mouse.up();await expect.poll(async()=>(await panel.boundingBox())!.width).toBe(before+80);
-  const handle=(await panel.locator('.gs-panel-drag').boundingBox())!;await page.mouse.move(handle.x+40,handle.y+15);await page.mouse.down();await page.mouse.move(500,300,{steps:10});await page.mouse.up();await expect(panel).toHaveAttribute('data-dock','float');
-  const float=(await panel.locator('.gs-panel-drag').boundingBox())!;await page.mouse.move(float.x+30,float.y+10);await page.mouse.down();await page.mouse.move(500,40,{steps:10});await page.mouse.up();await expect(panel).toHaveAttribute('data-dock','top');
+  const handle=(await panel.locator('.gs-panel-drag').boundingBox())!;await page.mouse.move(handle.x+Math.min(40,handle.width/2),handle.y+handle.height/2);await page.mouse.down();await page.mouse.move(500,300,{steps:10});await page.mouse.up();await expect(panel).toHaveAttribute('data-dock','float');
+  const float=(await panel.locator('.gs-panel-drag').boundingBox())!;await page.mouse.move(float.x+Math.min(30,float.width/2),float.y+float.height/2);await page.mouse.down();await page.mouse.move(500,40,{steps:10});await page.mouse.up();await expect(panel).toHaveAttribute('data-dock','top');
   await panel.getByRole('button',{name:'Close Inspector',exact:true}).click();await expect(panel).toBeHidden();await expect(main).toBeVisible();await openDrawer(page,'Inspector');await expect(panel).toHaveAttribute('data-dock','top');
 });
 test('helper explanations render above a clipped drawer',async({page})=>{

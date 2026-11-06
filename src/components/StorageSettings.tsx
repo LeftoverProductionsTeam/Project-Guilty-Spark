@@ -142,7 +142,7 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
   project?: Project | null;
   settings?: Pick<Settings, 'snapshotRetention'>;
   onEditProject?: (project: Project, title: string) => void;
-  onBeforeSave?: () => Promise<void>;
+  onBeforeSave?: (persist?: boolean) => Promise<void>;
 }) {
   const [previews, setPreviews] = useState<PreviewBudgets>(previewBudgets);
   const [locations, setLocations] = useState<ModLocations | null>(null);
@@ -182,7 +182,7 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
     });
   }, [project?.id, refreshBackups]);
   useEffect(() => { setBackupReview(false); setBackupApproved(false); }, [project?.automaticBackupRetention]);
-  async function backupAction(operation: (projectId: string) => Promise<void>) {
+  async function backupAction(operation: (projectId: string) => Promise<void>, persist = false) {
     if (!native || !project || !onBeforeSave || backupBusy) return;
     const id = project.id;
     const generation = projectGeneration.current;
@@ -190,7 +190,7 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
     setBackupError('');
     setBackupMessage('');
     try {
-      await onBeforeSave();
+      await onBeforeSave(persist);
       if (activeProject.current !== id || generation !== projectGeneration.current) return;
       await operation(id);
       if (activeProject.current === id && generation === projectGeneration.current) await refreshBackups(id);
@@ -416,13 +416,13 @@ export default function StorageSettings({ project = null, settings = {}, onEditP
               onChange={automaticBackupRetention => onEditProject?.({ ...project, automaticBackupRetention }, 'Change automatic backup limit')} />
             <button disabled={!native || backupBusy || !onBeforeSave} onClick={() => void backupAction(async () => {
               setBackupMessage('Backup limit saved for this project.');
-            })}>{backupBusy ? 'Working…' : 'Save limit'}</button>
+            }, true)}>{backupBusy ? 'Working…' : 'Save limit'}</button>
             <button disabled={!native || backupBusy || !onBeforeSave} onClick={() => void backupAction(async projectId => {
               await call('create_project_snapshot', { projectId, reason: 'manual' });
               if (activeProject.current === projectId) setBackupMessage('Manual backup created.');
-            })}>Back up now</button>
+            }, true)}>Back up now</button>
           </div>
-          <small>Per map, across revisions. At the limit, review old automatic backups to free a slot. None keeps Undo and crash recovery active.</small>
+          <small>Per map, across revisions. At the limit, review old automatic backups to free a slot. None keeps live Undo in memory; recovery uses your last explicit Save.</small>
           {unsavedBackupLimit && <small role="status">Save the new limit before reviewing old automatic backups.</small>}
           {backup && <>
             <div className="gs-storage-backup-usage">

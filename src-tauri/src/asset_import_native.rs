@@ -1,10 +1,10 @@
 use super::*;
 fn source_for_import(state:&AppState,id:&str)->Reply<Project>{
-    let _history=lock(&state.window_history)?;
+    let mut history=lock(&state.window_history)?;
     let library=lock(&state.library)?;
     let mut source=library.get(id).map_err(error)?;
-    if let Some(history)=core::workspace_history::read(&library.project_dir(id).map_err(error)?.join("window-history"),&source).map_err(error)? {
-        if let Some(current)=history.snapshots.iter().find(|item|item.key==history.head.current) {
+    if let Some(view)=history.read(&library.project_dir(id).map_err(error)?.join("window-history"),&source).map_err(error)? {
+        if let Some(current)=view.snapshots.iter().find(|item|item.key==view.head.current) {
             source.tag_edits=current.project.tag_edits.clone();
             source.tag_renames=current.project.tag_renames.clone();
             source.tag_duplicates=current.project.tag_duplicates.clone();

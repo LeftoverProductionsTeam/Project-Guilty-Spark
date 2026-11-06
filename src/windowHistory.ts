@@ -38,6 +38,7 @@ export class WindowHistories {
   revision(id:string){return this.entries.get(id)?.revision??0;}
   block(id:string){const e=this.entries.get(id);if(e)e.blocked=true;}
   async release(id:string){await this.flush(id);this.entries.delete(id);}
+  forgetDiscarded(id:string){this.entries.delete(id);}
   async retainAndRefresh(id:string,history:HistoryState){
     if(!history.current)throw Error('No local draft to retain');
     const keys=new Map<Project,string>(),key=(p:Project)=>{let k=keys.get(p);if(!k){k=crypto.randomUUID();keys.set(p,k);}return k;};

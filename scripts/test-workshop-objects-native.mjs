@@ -148,8 +148,9 @@ try {
   // Direct native imports do not run the UI callback that adopts their returned
   // project. Release the acknowledged UI document before changing its disk copy.
   // A reload of an open draft would otherwise flush the pre-import state over it.
-  await page.getByRole('button',{name:'Save and close '+created.project.title,exact:true}).click();
-  await expect(page.getByRole('button',{name:'Save and close '+created.project.title,exact:true})).toHaveCount(0);
+  await save();
+  await page.getByRole('button',{name:'Close map '+created.project.title,exact:true}).click();
+  await expect(page.getByRole('button',{name:'Close map '+created.project.title,exact:true})).toHaveCount(0);
   const imported = await call('import_asset', { id: created.project.id, path: obj });
   await acknowledgeImport(imported);
   expect(imported.asset.triangles).toBe(8);
@@ -217,8 +218,8 @@ try {
     .toBeLessThan(0.01);
   receipt.endToWorkshopFloorWithUndoRedo = true;
   await save();
-  await page.getByRole('button',{name:'Save and close '+created.project.title,exact:true}).click();
-  await expect(page.getByRole('button',{name:'Save and close '+created.project.title,exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'Close map '+created.project.title,exact:true}).click();
+  await expect(page.getByRole('button',{name:'Close map '+created.project.title,exact:true})).toHaveCount(0);
   const second = await call('import_asset', { id: created.project.id, path: obj });
   await acknowledgeImport(second);
   expect((await saved()).scene).toHaveLength(2);

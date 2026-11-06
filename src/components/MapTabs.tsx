@@ -63,6 +63,8 @@ export default function MapTabs({
           <div className={'map-tab' + (d.id === state.activeId ? ' active' : '')} hidden={condensed&&d.id!==state.activeId} key={d.id} data-map-tab-id={d.id} data-pinned={pinned.includes(d.id)||undefined} onContextMenu={e=>{e.preventDefault();setContext({id:d.id,x:Math.min(innerWidth-190,e.clientX),y:Math.min(innerHeight-130,e.clientY)});}}>
             <button
               role="tab"
+              aria-label={d.history.current?.title??'Untitled map'}
+              aria-description={d.history.dirty?'Unsaved changes':undefined}
               aria-selected={d.id === state.activeId}
               tabIndex={d.id === state.activeId ? 0 : -1}
               disabled={disabled}
@@ -106,8 +108,8 @@ export default function MapTabs({
             </button>
             <button
               className="map-tab-action"
-              title="Save and close map tab"
-              aria-label={'Save and close ' + d.history.current?.title}
+              title="Close map; choose Save, Discard or Cancel for unsaved changes"
+              aria-label={'Close map ' + d.history.current?.title}
               disabled={disabled}
               onClick={() => onClose(d.id)}
             >
@@ -120,7 +122,7 @@ export default function MapTabs({
         <button role="menuitem" disabled={disabled} onClick={()=>{pin(context.id);setContext(null);}}>{pinned.includes(context.id)?'Unpin tab':'Pin tab'}</button>
         <button role="menuitem" disabled={disabled} onClick={()=>{onWindow(context.id);setContext(null);}}>Move to another window</button>
         {onReturn&&<button role="menuitem" disabled={disabled} onClick={()=>{onReturn(context.id);setContext(null);}}>Return to original window</button>}
-        <button role="menuitem" disabled={disabled} onClick={()=>{onClose(context.id);setContext(null);}}>Save and close map</button>
+        <button role="menuitem" disabled={disabled} onClick={()=>{onClose(context.id);setContext(null);}}>Close map</button>
       </div>}
       {state.documents.length>1&&<details ref={menu} className="gs-map-switcher" onToggle={event=>{
         if(event.currentTarget.open){for(const other of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))other.open=false;requestAnimationFrame(()=>menu.current?.querySelector('input')?.focus());}
@@ -150,7 +152,7 @@ export default function MapTabs({
           {!matches.length&&<p role="status">No open maps match.</p>}
         </div>
       </details>}
-      {onReturn&&state.activeId&&<button className="small-button" aria-label="Return map to workspace" disabled={disabled} title="Save this map and return its editing history to the Spark window that opened it" onClick={()=>onReturn(state.activeId!)}><CornerUpLeft size={14}/>Return</button>}
+      {onReturn&&state.activeId&&<button className="small-button" aria-label="Return map to workspace" disabled={disabled} title="Return this map and its in-memory editing history to the original Spark window" onClick={()=>onReturn(state.activeId!)}><CornerUpLeft size={14}/>Return</button>}
       <button className="small-button" title="Transfer assets between open maps" aria-label="Transfer assets" disabled={disabled} onClick={onAssets}>
         <PackageOpen size={14} /> Transfer assets
       </button>

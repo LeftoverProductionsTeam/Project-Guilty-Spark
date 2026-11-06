@@ -16,7 +16,7 @@ export function WindowControls({notify,fullscreen=false,onExitFullscreen}:{notif
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
     <button className="gs-window-button" aria-label={fullscreen?'Exit fullscreen':maximized?'Restore window':'Maximize window'} title={fullscreen?'Exit fullscreen':maximized?'Restore':'Maximize'} onClick={()=>act(fullscreen&&onExitFullscreen?onExitFullscreen:maximizeWindow)}>
       <svg viewBox="0 0 24 24" aria-hidden="true">{maximized||fullscreen?<path d="M8 5h11v11M5 8h11v11H5Z"/>:<path d="M5 5h14v14H5Z"/>}</svg></button>
-    <button className="gs-window-button gs-window-close" aria-label="Close window" title="Save and close" onClick={()=>act(()=>getCurrentWindow().close())}>
+    <button className="gs-window-button gs-window-close" aria-label="Close window" title="Close window; review unsaved changes" onClick={()=>act(()=>getCurrentWindow().close())}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14M19 5 5 19"/></svg></button>
   </div>;
 }

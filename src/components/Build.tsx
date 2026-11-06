@@ -51,7 +51,7 @@ export default function Build({
   onRefresh: () => void;
   onResources: () => void;
   onOpenCompiled: (buildId:string) => void;
-  onSave:()=>Promise<void>;
+  onSave:(persist?:boolean)=>Promise<void>;
   edit:(project:Project,description:string)=>void;
 }) {
   const [report, setReport] = useState<CompatibilityReport | null>(null);
@@ -110,7 +110,7 @@ export default function Build({
         actions={
           <>
             {validated && <><button onClick={()=>onOpenCompiled(validated.id)}><FolderOpen size={14}/>{validated.target==='mcc-direct'?'Open edited map copy':'Open compiled map'}</button><button onClick={()=>{writeMapSession(project.id,'portability.compare-build',validated.id);setView('portability');}}>Review native changes</button></>}
-            <button onClick={()=>void onAction(async()=>{if(dirty)await onSave();onRefresh();})}>
+            <button onClick={()=>void onAction(async()=>{if(dirty)await onSave(true);onRefresh();})}>
               <RefreshCw size={14} />
               {dirty?'Save & refresh checks':'Refresh checks'}
             </button>

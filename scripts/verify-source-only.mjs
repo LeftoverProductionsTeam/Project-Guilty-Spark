@@ -9,14 +9,16 @@ import { withDevelopmentWorkspace, runDevelopmentCommand } from './native-qa-sto
 import { checkSourceEntrypoints } from './check-source-entrypoints.mjs';
 const [receiptFile, sourceMap, kit, tags, invader, acceptedProject] = process.argv.slice(2);
 const stages = (process.env.SPARK_VERIFY_STAGES ?? 'rust,frontend,browser,native').split(',');
-if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler'].includes(s)))
+if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry'].includes(s)))
   throw Error('Unknown source-only verification stage');
 if (stages.includes('native') && ![sourceMap, kit, tags, invader].every(Boolean))
   throw Error('Native verification requires the selected owned map, kit, small tag source and Invader paths');
-if (stages.includes('compiler') && ![acceptedProject, kit, tags, invader].every(Boolean))
+if (stages.some(s=>s==='compiler'||s==='geometry') && ![acceptedProject, kit, tags, invader].every(Boolean))
   throw Error(
     'Compiler verification requires the accepted Workshop project, small tag source, kit and Invader',
   );
+if(stages.includes('geometry')&&!(await fs.stat(process.env.SPARK_GEOMETRY_BLENDER??'').catch(()=>null))?.isFile())
+  throw Error('Geometry round-trip verification requires the selected installed Blender executable');
 const report = {
   schemaVersion: 1,
   startedAt: new Date().toISOString(),
@@ -45,8 +47,8 @@ try {
       }
       if (stages.includes('browser'))
         await run('Browser regressions', ['node_modules/@playwright/test/cli.js', 'test', '--reporter=line']);
-      if (stages.includes('compiler')) {
-        let tagSource=tags;
+      let tagSource=tags;
+      if (stages.includes('compiler')||stages.includes('geometry')) {
         if(tags.toLowerCase().endsWith('.7z')){
           const spec=JSON.parse(await fs.readFile(new URL('../docs/fixtures/source-only-h1a-inputs.json',import.meta.url),'utf8'));
           const hash=async file=>{const digest=crypto.createHash('sha256');for await(const chunk of createReadStream(file))digest.update(chunk);return digest.digest('hex');};
@@ -61,6 +63,8 @@ try {
           report.disposableSdk={files:spec.tagFiles.length,logicalBytes:spec.logicalTagBytes,sourceArchiveSha256:spec.sourceArchive.sha256,originalArchiveUnchanged:await hash(tags)===spec.sourceArchive.sha256,retainedSdkTree:false};
           if(!report.disposableSdk.originalArchiveUnchanged)throw Error('Original SDK archive changed');
         }
+      }
+      if (stages.includes('compiler')) {
         await run('Native storage helper build', [
           'scripts/cargo.mjs',
           'build',
@@ -89,6 +93,8 @@ try {
           }
         }
       }
+      if (stages.includes('native')||stages.includes('geometry'))
+        await run('Embedded desktop build', ['scripts/desktop.mjs', 'build', '--no-bundle']);
       if (stages.includes('native')) {
         const hash = async (file) =>
           crypto
@@ -96,7 +102,6 @@ try {
             .update(await fs.readFile(file))
             .digest('hex');
         report.sourceMapSha256 = await hash(sourceMap);
-        await run('Embedded desktop build', ['scripts/desktop.mjs', 'build', '--no-bundle']);
         const output = path.join(context.directory, 'qa', 'logic');
         await fs.mkdir(path.dirname(output), { recursive: true });
         // Storage acceptance reuses the previously accepted bounded map edit/export
@@ -124,9 +129,21 @@ try {
         if (!report.native.complete) throw Error('Actual native acceptance did not pass');
         if ((await hash(sourceMap)) !== report.sourceMapSha256) throw Error('Original source changed');
       }
+      if(stages.includes('geometry')){
+        const output=path.join(context.directory,'qa','geometry');await fs.mkdir(path.dirname(output),{recursive:true});
+        try{
+          await run('Actual Blender handoff, reconciliation, native model/collision build and independent readback',[
+            'scripts/test-workspace-lifecycle-native.mjs',path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,'-',path.resolve(invader),
+          ],{
+            SPARK_LIFECYCLE_GEOMETRY:'1',SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_LOGIC:'0',SPARK_LIFECYCLE_MEMORY:'0',
+            SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0',SPARK_GEOMETRY_TAGS:path.resolve(tagSource),SPARK_GEOMETRY_KIT:path.resolve(kit),
+          });
+        }finally{const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.geometry=JSON.parse(receipt);}
+        if(!report.geometry?.complete)throw Error('Actual DCC/native round trip did not pass');
+      }
     },
     {
-      reservationBytes: stages.some((s) => s === 'rust' || s === 'native' || s === 'compiler')
+      reservationBytes: stages.some((s) => s === 'rust' || s === 'native' || s === 'compiler' || s === 'geometry')
         ? 12 * 1024 ** 3
         : 1024 ** 3,
     },

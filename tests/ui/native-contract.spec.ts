@@ -61,7 +61,7 @@ test('project backup limits preserve None, custom values, manual saves and map i
   await expect(choice).toHaveValue('0');
   await choice.selectOption('0'); await backups.getByRole('button', { name: 'Save limit', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).__sparkMock.saved?.automaticBackupRetention)).toBe(0);
-  await expect(backups).toContainText('Undo and crash recovery');
+  await expect(backups).toContainText('None keeps live Undo in memory; recovery uses your last explicit Save');
   await backups.getByRole('button', { name: 'Back up now', exact: true }).click();
   await expect(backups).toContainText('2 manual');
   const commands = await page.evaluate(() => (window as any).__sparkMock.calls);
@@ -374,9 +374,9 @@ async function mockDesktop(page: Page) {
       session:null as any,
       sprint:{enabled:false,sprinting:false,config:{hotkey:'ShiftLeft',multiplier:1.75},observed:{playerDatum:1,multiplier:1,canSprint:false,reason:'Move forward to sprint'},error:null,detail:'Synthetic native sprint state'} as any,
       camera:{enabled:false,active:false,restorePending:false,shortcut:{enabled:true,key:'F6'},config:{back:.4,right:.3,up:.15},observed:{available:true,reason:'Native on-foot camera available',weaponThirdPerson:false,trackCount:1},error:null,detail:'Synthetic native camera state'} as any,
-      emit: async (event: string) => {
+      emit: async (event: string, payload: unknown = null) => {
         for (const [id, item] of events)
-          if (item.event === event) await callbacks.get(item.handler)?.({ id, event, payload: null });
+          if (item.event === event) await callbacks.get(item.handler)?.({ id, event, payload });
       },
     });
     w.isTauri = true;
@@ -465,9 +465,10 @@ async function mockDesktop(page: Page) {
           if(w.__sparkMock.deferBspPreview) return new Promise((resolve,reject)=>{w.__sparkMock.finishBspPreview=(success=true)=>success?resolve(report):reject(new Error('Synthetic stale clearance failure'));});
           return report;
         }
-        if (command === 'save_project') {
-          if (mock.failSave) throw new Error('Synthetic save failure');
-          mock.saved = structuredClone(args.project);
+        if (command === 'save_project' || command === 'update_project') {
+          if (command === 'save_project' && mock.failSave) throw new Error('Synthetic save failure');
+          if (command === 'save_project') mock.saved = structuredClone(args.project);
+          else mock.staged = structuredClone(args.project);
           projects[args.project.id].project = structuredClone(args.project);
           const p=projects[args.project.id].project;
           return {id:p.id,title:p.title,engine:p.source.engine,version:p.source.cacheVersion,sha256:p.source.sha256,modifiedAt:'saved-receipt-'+p.id,creator:p.provenance.creator,tagCount:projects[p.id].inspection.tags.length,objectCount:p.scene.length,status:'preserved',projectPath:p.id+'.gsproject',scenarioType:1};
@@ -742,16 +743,17 @@ test('each workspace exposes one pop-out and retains Learning and Settings secti
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='open_workspace_window').at(-1)?.args)).toEqual({workspace:'learning',section:'glossary',context:null});
 });
 
-test('popping out a map editor saves the focused edit before transferring its document',async({page})=>{
+test('popping out a map editor stages the focused edit without a disk Save before transferring its document',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   await page.evaluate(()=>{(window as any).__sparkMock.enforceTransfer=true;});
   const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('28');
   await openViewMenu(page);await page.getByRole('button',{name:'Pop out workspace',exact:true}).click();
-  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(28);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.staged?.tagEdits?.[0]?.value)).toBe(28);
   await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.findIndex((call:any)=>call.command==='open_project_window'))).toBeGreaterThan(0);
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);
   const move=calls.findIndex((call:any)=>call.command==='open_project_window');expect(move).toBeGreaterThan(0);
-  expect(calls.slice(0,move).some((call:any)=>call.command==='save_project')).toBe(true);
+  expect(calls.slice(0,move).some((call:any)=>call.command==='update_project')).toBe(true);
+  expect(calls.some((call:any)=>call.command==='save_project')).toBe(false);
   expect(calls[move].args).toEqual({id:'a',workspace:'tags'});
   await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
   const afterTransfer=await page.evaluate(()=>(window as any).__sparkMock.calls);
@@ -803,7 +805,10 @@ test('workflow navigation restores each map draft and skips a closed map',async(
   await expect(back).toHaveAttribute('title',/Synthetic candidate/);await back.click();await expect(field).toHaveValue('39');
   await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toHaveAttribute('aria-selected','true');
   await forward.click();await expect(field).toHaveValue('27');
-  await page.getByRole('button',{name:'Save and close Synthetic candidate',exact:true}).click();await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toHaveCount(0);
+  await page.getByRole('button',{name:'Close map Synthetic candidate',exact:true}).click();
+  await page.getByRole('dialog',{name:'Save changes before closing?',exact:true}).getByRole('button',{name:'Save changes',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(39);
+  await expect(page.getByRole('tab',{name:/Synthetic candidate/})).toHaveCount(0);
   await back.click();await expect(page.getByRole('heading',{name:'One Halo. Every World. Every Tool. Together.',exact:true})).toBeVisible();
 });
 
@@ -1090,6 +1095,23 @@ test('ordinary save consumes its project receipt without bootstrapping unrelated
   await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
   await chooseTool(page,'Tag editor');await expect(value).toHaveValue('31');
   await page.keyboard.press('Control+z');await expect(value).toHaveValue('10');
+});
+
+test('a delayed own Save notification cannot replace the next edit with the saved snapshot',async({page})=>{
+  await mockDesktop(page);await openFixture(page);
+  const value=page.getByLabel('Velocity',{exact:true});await value.fill('31');await value.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits[0]?.value)).toBe(31);
+  await page.evaluate(async()=>{
+    const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;
+    const saved=await invoke('read_workspace_history',{projectId:'a'});
+    w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='read_workspace_history'&&args.projectId==='a'?Promise.resolve(structuredClone(saved)):invoke(command,args);
+  });
+  await value.fill('32');await value.press('Tab');await expect(value).toHaveValue('32');
+  await page.evaluate(()=>(window as any).__sparkMock.emit('spark:window-history',{projectId:'a',owner:'main'}));
+  await value.press('Control+s');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits[0]?.value)).toBe(32);
+  await expect(value).toHaveValue('32');
+  await page.keyboard.press('Control+z');await expect(value).toHaveValue('31');
 });
 
 test('switching tags never leaves a duplicate panel from the previous tag',async({page})=>{
@@ -1797,13 +1819,14 @@ test('Portability Lab compares explicit native targets and preserves the existin
 test('leaving Portability Lab ignores a delayed source report and retains map edits',async({page})=>{
   await mockDesktop(page);await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
     if(command==='portability_profiles')return [{profileId:'halo1-mcc-steam',label:'MCC Halo 1',target:{platform:'windows',architecture:'x86_64'}}];
-    if(command==='inspect_portability')return new Promise(resolve=>{w.__finishPortability=()=>resolve({sourceEdition:'Stale old-map report',targets:[],limitations:[],sourceTags:1,auditedFields:1});});
+    if(command==='inspect_portability'){w.__portabilityInspected=structuredClone(w.__sparkMock.projects[args.projectId].project);return new Promise(resolve=>{w.__finishPortability=()=>resolve({sourceEdition:'Stale old-map report',targets:[],limitations:[],sourceTags:1,auditedFields:1});});}
     return original(command,args);
   };});
   await openFixture(page);const velocity=page.getByRole('spinbutton',{name:'Velocity',exact:true});await velocity.fill('42');await velocity.press('Enter');
   await chooseTool(page,'Build & playtest');await page.getByRole('tab',{name:'Portability Lab',exact:true}).click();
-  await page.getByRole('button',{name:'Save & inspect portability',exact:true}).click();
+  await page.getByRole('button',{name:/^(Save & )?inspect portability$/i}).click();
   await expect.poll(()=>page.evaluate(()=>typeof (window as any).__finishPortability)).toBe('function');
+  expect(await page.evaluate(()=>(window as any).__portabilityInspected.tagEdits[0].value)).toBe(42);
   await chooseTool(page,'Tag editor');await page.evaluate(()=>(window as any).__finishPortability());
   await expect(page.getByRole('spinbutton',{name:'Velocity',exact:true})).toHaveValue('42');
   await expect(page.getByText('Stale old-map report',{exact:false})).toHaveCount(0);
@@ -1857,7 +1880,7 @@ test('automatic sound discovery merges late pins without a folder prompt or losi
   await page.waitForFunction(()=>typeof (window as any).__finishSoundDiscovery==='function');
   await page.evaluate(()=>(window as any).__finishSoundDiscovery());
   await expect(field).toHaveValue('24');
-  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.source?.audioResources?.kind)).toBe('classic');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.staged?.source?.audioResources?.kind)).toBe('classic');
   await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');
   expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((call:any)=>call.command==='choose_project_resources'))).toBe(false);
 });
@@ -2043,10 +2066,10 @@ test('live Ctrl+Z waits for an in-flight game receipt and then supports redo',as
   await expect(page.getByRole('button',{name:'Redo live edit (Ctrl+Y)',exact:true})).toBeDisabled();
 });
 
-test('numeric-field Ctrl+Z and both redo shortcuts survive autosave; history limit persists',async({page})=>{
+test('numeric-field Ctrl+Z and both redo shortcuts survive RAM synchronization; history limit persists',async({page})=>{
   await mockDesktop(page);await openFixture(page);
   const field=page.getByRole('spinbutton',{name:'Velocity',exact:true});await field.fill('24');await field.press('Tab');
-  await expect(field).toHaveValue('24');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(24);
+  await expect(field).toHaveValue('24');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.staged?.tagEdits?.[0]?.value)).toBe(24);
   await field.focus();await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');
   await field.focus();await page.keyboard.press('Control+y');await expect(field).toHaveValue('24');
   await field.focus();await page.keyboard.press('Control+z');await expect(field).toHaveValue('10');
@@ -2220,6 +2243,7 @@ test('settings Browse survives a bootstrap refresh without erasing other drafts'
   await mockDesktop(page);
   await chooseTool(page,"Settings & tools");
   await page.getByText('Advanced folders, backups & preferences', { exact: true }).click();
+  await page.getByRole('checkbox',{name:'Watch shared MCC Inbox',exact:false}).uncheck();
   await page
     .getByRole('textbox', { name: 'Halo Textures and shared sounds', exact: true })
     .fill('C:/synthetic/resources');
@@ -2243,6 +2267,7 @@ test('settings Browse survives a bootstrap refresh without erasing other drafts'
       ),
     )
     .toBe(1);
+  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.find((call:any)=>call.command==='save_settings').args.settings.watchSharedMccInbox)).toBe(false);
 });
 test('comparison renders semantic values and warns about undecoded payloads', async ({ page }) => {
   await mockDesktop(page);
@@ -2330,20 +2355,24 @@ test('close guard commits focused fields and stays open after a save failure', a
   await mockDesktop(page);
   await openFixture(page);
   await page.getByRole('spinbutton', { name: 'Velocity' }).fill('44');
-  await page.evaluate(async () => {
+  await page.evaluate(() => {
     (window as any).__sparkMock.failSave = true;
-    await (window as any).__sparkMock.emit('tauri://close-requested');
+    void (window as any).__sparkMock.emit('tauri://close-requested');
   });
+  const closeReview = page.getByRole('dialog', { name: 'Save changes before closing?', exact: true });
+  await closeReview.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('window remains open');
   expect(
     await page.evaluate(() =>
       (window as any).__sparkMock.calls.some((call: any) => call.command === 'close_application'),
     ),
   ).toBe(false);
-  await page.evaluate(async () => {
+  await page.evaluate(() => {
     (window as any).__sparkMock.failSave = false;
-    await (window as any).__sparkMock.emit('tauri://close-requested');
+    void (window as any).__sparkMock.emit('tauri://close-requested');
   });
+  await closeReview.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(44);
   expect(await page.evaluate(() => (window as any).__sparkMock.saved.tagEdits)).toEqual([
     { tagId: 1, fieldKey: 'velocity', value: 44 },
   ]);
@@ -2355,7 +2384,7 @@ test('close guard commits focused fields and stays open after a save failure', a
   ).toBe(1);
 });
 test('BSP connection drafts survive tool switches and applied connections undo per map',async({page})=>{
-  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Level editor");if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await openDrawer(page,'Construction');await page.locator('.bsp-assembly:visible>summary').click();await page.getByRole('button',{name:'Plan connected tunnel',exact:true}).click();const width=page.getByRole('spinbutton',{name:'Tunnel width',exact:true});await width.fill('4');await width.press('Tab');await chooseTool(page,"Features & workflows");await chooseTool(page,"Level editor");await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');await page.getByRole('button',{name:'Apply connection',exact:true}).click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.keyboard.press('Control+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.keyboard.press('Control+Shift+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Check tunnel clearance',exact:true}).click();await expect(page.locator('.bsp-assembly')).toContainText('42 points');expect(await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.tunnelWidth)).toBe(4);
+  await mockDesktop(page);await openFixture(page);await chooseTool(page,"Level editor");if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await openDrawer(page,'Construction');await page.locator('.bsp-assembly:visible>summary').click();await page.getByRole('button',{name:'Plan connected tunnel',exact:true}).click();const width=page.getByRole('spinbutton',{name:'Tunnel width',exact:true});await width.fill('4');await width.press('Tab');await chooseTool(page,"Features & workflows");await chooseTool(page,"Level editor");await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');await page.getByRole('button',{name:'Apply connection',exact:true}).click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.keyboard.press('Control+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.keyboard.press('Control+Shift+z');await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Check tunnel clearance',exact:true}).click();await expect(page.locator('.bsp-assembly')).toContainText('42 points');expect(await page.evaluate(()=>(window as any).__sparkMock.staged.bspAssembly.tunnelWidth)).toBe(4);
   await chooseTool(page,"Map library");await page.locator('.map-card').filter({hasText:'Synthetic candidate'}).click();await chooseTool(page,"Level editor");if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await openDrawer(page,'Construction');await page.locator('.bsp-assembly:visible>summary').click();await expect(page.getByRole('button',{name:'Remove connection',exact:true})).toHaveCount(0);await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();await expect(page.getByRole('spinbutton',{name:'Tunnel width',exact:true})).toHaveValue('4');
 });
 test('donor scenery participates in undo and changing a BSP transform clears stale clearance', async ({ page }) => {
@@ -2437,7 +2466,7 @@ test('BSP donor choices do not silently replace a draft and entrance rotation pr
   await page.getByRole('button', { name: 'Plan connected tunnel', exact: true }).click();
   await expect(page.locator('.bsp-draft-heading')).toContainText('Synthetic third donor');
   await expect(page.getByRole('button', { name: 'Apply connection', exact: true })).toBeEnabled();
-  expect(await page.evaluate(() => (window as any).__sparkMock.saved.bspAssembly.donorProjectId)).toBe('b');
+  expect(await page.evaluate(() => (window as any).__sparkMock.staged.bspAssembly.donorProjectId)).toBe('b');
 });
 
 test('legacy connection identities preserve an unapplied draft after upgrading', async ({ page }) => {
@@ -2450,7 +2479,7 @@ test('legacy connection identities preserve an unapplied draft after upgrading',
   const width = page.getByRole('spinbutton', { name: 'Tunnel width', exact: true });
   await width.fill('6'); await width.press('Tab');
   await page.evaluate(() => {
-    const saved = (window as any).__sparkMock.saved.bspAssembly;
+    const saved = (window as any).__sparkMock.staged.bspAssembly;
     const key = 'guilty-spark-map-session-v1:a';
     const state = JSON.parse(localStorage.getItem(key)!);
     state['bsp.applied'] = JSON.stringify(saved);

@@ -153,6 +153,15 @@ export default function App() {
   const closingDocuments=useRef(new Set<string>());
   const [windowWriters,setWindowWriters]=useState<Record<string,boolean>>({});
   const [windowHistoryErrors,setWindowHistoryErrors]=useState<Record<string,string>>({});
+  const [closePrompt,setClosePrompt]=useState<string[]|null>(null);
+  const closeChoice=useRef<((choice:'save'|'discard'|'cancel')=>void)|null>(null);
+  const resolveClose=useCallback((choice:'save'|'discard'|'cancel')=>{const resolve=closeChoice.current;closeChoice.current=null;setClosePrompt(null);resolve?.(choice);},[]);
+  const chooseClose=useCallback((projects:Project[]):Promise<'save'|'discard'|'cancel'>=>{
+    if(!projects.length)return Promise.resolve('discard');
+    if(closeChoice.current)return Promise.resolve('cancel');
+    setHelp(false);setCreateModal(false);setShowFinder(false);
+    setClosePrompt(projects.map(project=>project.title));return new Promise(resolve=>{closeChoice.current=resolve;});
+  },[]);
   const windowWritersRef=useRef(windowWriters);windowWritersRef.current=windowWriters;
   const resourceIdentities=JSON.stringify(documents.documents.map(d=>[d.id,textureResourceScope(d.history.current?.source)]));
   useEffect(()=>{for(const doc of documents.documents){if(doc.history.current)publishTextureResources(doc.history.current);}},[resourceIdentities]);
@@ -221,6 +230,8 @@ export default function App() {
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const libraryRefresh = useRef<ReturnType<typeof createLatestRefresh<void,Bootstrap>> | null>(null);
   const current = history.current;
+  const unsaved=history.dirty||!!data.entries.find(entry=>entry.id===current?.id)?.sessionOnly;
+  const warnedUnsaved=useRef(new Set<string>());
   useEffect(()=>{
     if(!native||!ready||current||!data.installation.mccPath)return;
     const timer=setTimeout(()=>{void import('./homeShowcase').then(module=>module.preloadHomeModels(data)).catch(()=>{/* Optional showcase never blocks workbench startup. */});},250);
@@ -339,7 +350,11 @@ export default function App() {
     },e=>notice(`Window synchronization: ${String(e)}`,'error'));
     const stop=listen<{projectId:string;revision?:number;owner?:string}>('spark:window-history',({payload})=>{
       if(closingDocuments.current.has(payload.projectId)||!documentsRef.current.documents.some(d=>d.id===payload.projectId))return;
-      if(payload.revision!==undefined&&payload.owner===getCurrentWindow().label)return;
+      // Save also emits a clean-head notification without a new revision. Its
+      // own writer already applies that receipt; rereading it can race the next
+      // edit and replace it with the preceding saved snapshot. An ownership
+      // return still needs a read when this window was an observer.
+      if(payload.owner===getCurrentWindow().label&&windowWritersRef.current[payload.projectId]===true)return;
       if(payload.revision&&payload.revision<=windowHistories.current.revision(payload.projectId))return;
       // Acknowledge callbacks can race this notification; serialize the read
       // behind local pending commits, never replace an unacknowledged draft.
@@ -373,16 +388,17 @@ export default function App() {
     [notice, refresh],
   );
   const save = useCallback(
-    (announce = false,id?:string): Promise<void> => {
+    (announce = false,id?:string,forceStage=false): Promise<void> => {
       const p = id?documentsRef.current.documents.find(d=>d.id===id)?.history.current:historyRef.current.current;
       if (!p) return Promise.resolve();
+      if(!announce&&!forceStage&&closingDocuments.current.has(p.id))return Promise.resolve();
       const operation = saveQueue.current.then(async () => {
         try {
           if(native){if(windowWritersRef.current[p.id]===false)return;const h=documentsRef.current.documents.find(d=>d.id===p.id)?.history;if(h?.current===p)await windowHistories.current.persist(p.id,h);await windowHistories.current.flush(p.id);}
-          const entry=checkedSaveReceipt(p,await call<LibraryEntry>('save_project', { project: p }));
+          const entry=checkedSaveReceipt(p,await call<LibraryEntry>(announce||!native?'save_project':'update_project', { project: p }));
           setData(data=>applyLibraryReceipt(data,entry));
           void libraryRefresh.current?.invalidateActive()?.catch(error=>notice(String(error),'error'));
-          dispatchDocument({type:'saved',id:p.id,project:p});
+          if(announce)dispatchDocument({type:'saved',id:p.id,project:p});
           if (announce) notice('Project saved. Your original map is unchanged.', 'success');
         } catch (e) {
           notice(String(e), 'error');
@@ -398,6 +414,8 @@ export default function App() {
     if(!native)return;
     const timer=window.setInterval(()=>{
       const id=historyRef.current.current?.id;if(!id||closingDocuments.current.has(id))return;
+      const project=historyRef.current.current;
+      if(!project||(project.automaticBackupRetention??data.settings.snapshotRetention??0)===0)return;
       void save().then(()=>call('create_project_snapshot',{projectId:id,reason:'periodic'}))
         .catch(e=>notice(`Periodic snapshot could not be saved: ${String(e)}`,'error'));
     },Math.max(1,data.settings.snapshotIntervalMinutes??10)*60_000);
@@ -454,21 +472,29 @@ export default function App() {
       closingRef.current = true;
       // Commit a focused numeric draft before collecting the final project snapshot.
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      setClosing(true);
       try {
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-        await save();
-        for(const doc of documentsRef.current.documents){const p=doc.history.current;if(p&&doc.history.dirty&&windowHistories.current.writable(p.id)){await windowHistories.current.persist(p.id,doc.history);await call('save_project',{project:p});dispatchDocument({type:'saved',id:p.id,project:p});}}
+        const dirty=documentsRef.current.documents.filter(doc=>doc.history.dirty&&windowHistories.current.writable(doc.id));
+        for(const doc of dirty)closingDocuments.current.add(doc.id);
+        const choice=returnPanelRequested.current?'discard':await chooseClose(dirty.flatMap(doc=>doc.history.current?[doc.history.current]:[]));
+        if(choice==='cancel'){for(const doc of dirty)closingDocuments.current.delete(doc.id);closingRef.current=false;return;}
+        setClosing(true);
+        for(const doc of dirty){
+          if(choice==='save')await save(true,doc.id);
+          else if(!returnPanelRequested.current){closingDocuments.current.add(doc.id);await windowHistories.current.flush(doc.id);await call('discard_project_changes',{id:doc.id});windowHistories.current.block(doc.id);}
+        }
+        if(returnPanelRequested.current)for(const doc of dirty)await save(false,doc.id,true);
         await windowHistories.current.flush();
         const query=new URLSearchParams(location.search),original=query.get('project');
         if(original&&documentsRef.current.documents.some(d=>d.id===original)&&windowHistories.current.writable(original))
-          await call('return_project_to_main',{id:original,workspace:returnWorkspace()??requestedWorkspace()??'world',panel:query.get('panel'),allowMissingMain:true,activate:returnPanelRequested.current});
+          await call('return_project_to_main',{id:original,workspace:returnWorkspace()??requestedWorkspace()??'world',panel:query.get('panel'),allowMissingMain:!returnPanelRequested.current,activate:returnPanelRequested.current});
         if(!original&&requestedPanel())await call('return_workspace_panel',{allowMissingOrigin:true});
         await call('close_application');
       } catch (error) {
         returnPanelRequested.current=false;
         closingRef.current = false;
         setClosing(false);
+        closingDocuments.current.clear();
         notice(
           `The project could not be saved before closing. The window remains open. ${String(error)}`,
           'error',
@@ -478,7 +504,7 @@ export default function App() {
     return () => {
       void unlisten.then((stop) => stop());
     };
-  }, [notice, save]);
+  }, [notice, save, chooseClose]);
   const load = useCallback(
     async (open: OpenProject,writer?:boolean,activate=true) => {
       const observe=writer===undefined?new URLSearchParams(location.search).get('observe')==='1':!writer;
@@ -530,7 +556,7 @@ export default function App() {
     if (!opened.project.buildTargets?.length && prior.buildTargets?.length && prior.source?.cacheVersion===opened.project.source?.cacheVersion) {
       // Keep chosen tool profiles; no edits, cache offsets or old build receipts
       // are copied. The normal native conversion preflight rechecks this source.
-      await call('save_project',{project:{...opened.project,buildTargets:prior.buildTargets,activeBuildTarget:prior.activeBuildTarget}});
+      await call('update_project',{project:{...opened.project,buildTargets:prior.buildTargets,activeBuildTarget:prior.activeBuildTarget}});
       opened=await call<OpenProject>('open_project',{id:opened.project.id});
     }
     previous=documentsRef.current.documents.find(d=>d.id===previousId);
@@ -617,6 +643,14 @@ export default function App() {
       }),
     );
     unsubs.push(
+      listen<{projectId:string;saved:boolean}>('spark:document-discarded',({payload})=>{
+        if(closingDocuments.current.has(payload.projectId))return;
+        if(!payload.saved){windowHistories.current.forgetDiscarded(payload.projectId);dispatchDocument({type:'close',id:payload.projectId});}
+        else void windowHistories.current.attach(payload.projectId).then(next=>{setWindowWriters(old=>({...old,[payload.projectId]:next.status.writable}));if(next.history)dispatchDocument({type:'window-history',id:payload.projectId,history:next.history});}).catch(failed);
+        void refresh().catch(failed);
+      }),
+    );
+    unsubs.push(
       listen('spark:library-changed', () => {
         void refresh().catch(failed);
         const p = historyRef.current.current;
@@ -659,10 +693,16 @@ export default function App() {
     }, 1200);
     return () => clearTimeout(timer);
   }, [current, history.dirty, save]);
+  useEffect(()=>{
+    const needsFirstSave=data.entries.some(entry=>entry.id===current?.id&&entry.sessionOnly);
+    if(!data.memoryFirst||!current||!history.dirty||(!needsFirstSave&&(current.automaticBackupRetention??data.settings.snapshotRetention??0)>0)||warnedUnsaved.current.has(current.id))return;
+    warnedUnsaved.current.add(current.id);
+    notice(needsFirstSave?'This new map stays in memory until its first Save. Save once to make it recoverable after a crash or exit.':'Edits stay in memory until you choose Save. Automatic recovery is off; a crash or exit loses unsaved work.','info');
+  },[data.memoryFirst,data.entries,data.settings.snapshotRetention,current?.id,current?.automaticBackupRetention,history.dirty,notice]);
   useEffect(() => {
     function key(e: KeyboardEvent) {
       if(e.ctrlKey&&e.altKey&&e.key.toLowerCase()==='o'){e.preventDefault();setInterfacePreferences(p=>({...p,windowOpacity:1,windowTintStrength:0}));return;}
-      if (closingRef.current) {
+      if (closingRef.current&&!closeChoice.current) {
         e.preventDefault();
         return;
       }
@@ -795,7 +835,7 @@ export default function App() {
   function selectMap(id:string){if(document.activeElement instanceof HTMLElement)document.activeElement.blur();requestAnimationFrame(()=>{window.dispatchEvent(new Event('gs:save-viewport-context'));const map=documentsRef.current.documents.find(d=>d.id===id);dispatchDocument({type:'select',id});if(map?.history.current)setWorkspace(rememberedWorkspace(map.history.current,map.inspection));});}
   async function flushWindowHandoff(id:string){
     if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
-    await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id);
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));await save(false,id,true);
     await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
     const latest=documentsRef.current.documents.find(d=>d.id===id);
     if(latest&&native&&windowHistories.current.writable(id))await windowHistories.current.persist(id,latest.history);
@@ -836,7 +876,17 @@ export default function App() {
     // lease. Saving the focused edit below is the final acknowledged write.
     closingDocuments.current.add(id);
     if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
-    setBusy(true);try{await flushWindowHandoff(id);if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call(separateWindow==='main'?'return_project_to_main':'open_project_window',{id,workspace:separateWindow==='main'?returnWorkspace()??workspaceRef.current:workspaceRef.current,...(separateWindow==='main'?{panel:new URLSearchParams(location.search).get('panel')}:{} )});}else if(native)await call('release_project_document',{id});await windowHistories.current.release(id);const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});}catch(e){notice(String(e),'error');}finally{closingDocuments.current.delete(id);setBusy(false);}
+    setBusy(true);try{
+      await flushWindowHandoff(id);
+      const document=documentsRef.current.documents.find(doc=>doc.id===id);
+      if(!separateWindow&&document?.history.dirty&&windowHistories.current.writable(id)){
+        const choice=await chooseClose(document.history.current?[document.history.current]:[]);
+        if(choice==='cancel')return;
+        if(choice==='save')await save(true,id);
+        else if(native){await call('discard_project_changes',{id});windowHistories.current.block(id);}
+      }
+      if(separateWindow){if(!native)throw new Error('Separate editor windows require the desktop application.');await call(separateWindow==='main'?'return_project_to_main':'open_project_window',{id,workspace:separateWindow==='main'?returnWorkspace()??workspaceRef.current:workspaceRef.current,...(separateWindow==='main'?{panel:new URLSearchParams(location.search).get('panel')}:{} )});}else if(native)await call('release_project_document',{id});await windowHistories.current.release(id);const state=documentsRef.current;if(state.activeId===id){const index=state.documents.findIndex(d=>d.id===id),remaining=state.documents.filter(d=>d.id!==id),next=remaining[Math.min(index,remaining.length-1)];setWorkspace(next?.history.current?rememberedWorkspace(next.history.current):'library');}dispatchDocument({type:'close',id});
+    }catch(e){notice(String(e),'error');}finally{closingDocuments.current.delete(id);setBusy(false);}
   }
   async function popoutWorkspace(){if(!native){notice('Workspace windows require the desktop application.');return;}if(current&&mapWorkspaces.includes(workspaceRef.current)){if(busy||activeJob){notice('Finish the current map operation before moving its workspace to another window.');return;}await closeMap(current.id,true);return;}try{const section=workspaceRef.current==='learning'?learningSection:workspaceRef.current==='settings'?settingsTab:null;await call('open_workspace_window',{workspace:workspaceRef.current,section,context:section==='academy'?readMapSession<string>('global','learning.lesson','preservation'):null});notice('Workspace opened in a resizable window. Drag it to another monitor.','success');}catch(e){notice(String(e),'error');}}
   async function openWorkspaceView(target:Workspace,another=false){
@@ -1009,7 +1059,7 @@ export default function App() {
           const source=await runtimeTextureSource(target),materials=defaultPreviewMaterials(source);
           if(open.project.quickForge&&materials.length){
             open.project={...open.project,quickForge:{...open.project.quickForge,materials:[...materials,...open.project.quickForge.materials.filter(m=>!materials.some(defaultMaterial=>defaultMaterial.id===m.id))]}};
-            await call('save_project',{project:open.project});
+            await call('update_project',{project:open.project});
             writeMapSession(open.project.id,'forge.materialSource',source.project.id);
             writeMapSession(open.project.id,'forge.assetSource',source.project.id);retainAssetSource(source);
             previewDefaultsReady=true;
@@ -1128,7 +1178,7 @@ export default function App() {
   async function startBuild() {
     if (!current) return;
     try {
-      if (historyRef.current.dirty) await save();
+      if (historyRef.current.dirty) await save(true);
       const job = await call<string>('start_build', { id: current.id });
       setActiveJob(job);
       notice('Conversion started. The build log records tool output and validation results.', 'success');
@@ -1244,7 +1294,7 @@ export default function App() {
       }} /></SettingsPanel>;
     if (workspace === 'settings')
       return (
-        <SettingsPanel tab={settingsTab} onTab={selectSettingsTab}>{settingsTab==='storage'?<StorageSettings project={current} settings={data.settings} onEditProject={edit} onBeforeSave={()=>save(false,current?.id)}/>:settingsTab==='dependencies'?<div className="analysis-page">
+        <SettingsPanel tab={settingsTab} onTab={selectSettingsTab}>{settingsTab==='storage'?<StorageSettings project={current} settings={data.settings} onEditProject={edit} onBeforeSave={persist=>save(persist===true,current?.id)}/>:settingsTab==='dependencies'?<div className="analysis-page">
           <label className="field">Dependency target<select aria-label="Dependency target runtime" value={dependencyRuntime} onChange={e=>setDependencyRuntime(e.target.value as RuntimeId)}>
             <option value="mccSteam">Halo 1 · MCC (Steam)</option><option value="haloCustomEdition">Halo Custom Edition</option><option value="haloPc">Halo PC</option><option value="chupathingyCe">ChupathingyCE</option><option value="openCe">OpenCE</option><option value="haloPcTrial">Halo PC Trial</option><option value="macRetail">Halo Mac</option><option value="macDemo">Halo Mac Demo</option><option value="haloMd">HaloMD</option><option value="haloXbox">Halo Xbox</option>
           </select></label>
@@ -1304,7 +1354,7 @@ export default function App() {
           <Build
             key={current.id}
             edit={edit}
-            onSave={()=>save(false,current.id)}
+            onSave={persist=>save(persist===true,current.id)}
             onOpenCompiled={buildId=>void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});await load(opened);await refresh();setWorkspace('quickforge');},'Compiled map preserved and opened in its own Level Editor tab.')}
             project={current}
             data={data}
@@ -1318,7 +1368,7 @@ export default function App() {
             onResources={() =>
               void action(async () => {
                 const projectId = current.id;
-                await save();
+                await save(historyRef.current.dirty,projectId);
                 const open = await call<OpenProject | null>('choose_project_resources', { projectId });
                 if (open) await applyResourceMetadata(open);
                 return open;
@@ -1389,8 +1439,8 @@ export default function App() {
                 </strong>
                 {current && (
                   <span
-                    className={history.dirty ? 'unsaved-dot' : 'saved-dot'}
-                    title={history.dirty ? 'Unsaved changes' : 'Saved'}
+                    className={unsaved ? 'unsaved-dot' : 'saved-dot'}
+                    title={unsaved ? 'In memory · choose Save to keep' : 'Saved'}
                   />
                 )}
               </div>
@@ -1648,7 +1698,7 @@ export default function App() {
                     <span>{windowWriters[current.id]===false?'Following the editing window':'Editing here · durable window history'}</span>
                     {windowWriters[current.id]===false?<button onClick={()=>void (async()=>{try{await call('take_project_document',{id:current.id});const next=await windowHistories.current.attach(current.id);setWindowWriters(old=>({...old,[current.id]:next.status.writable}));if(next.history)dispatchDocument({type:'window-history',id:current.id,history:next.history});}catch(e){notice(String(e),'error');}})()}>Edit here</button>:<button disabled={busy||!!activeJob} onClick={()=>void (async()=>{try{await save(false,current.id);await windowHistories.current.flush(current.id);await call('open_project_window',{id:current.id,workspace:workspaceRef.current,observe:true});}catch(e){notice(String(e),'error');}})()}>Open another view</button>}
                   </div>}
-                  {native&&current&&windowHistoryErrors[current.id]&&<Notice tone="error">{windowHistoryErrors[current.id]} <button onClick={()=>void (async()=>{try{const h=documentsRef.current.documents.find(d=>d.id===current.id)?.history;if(!h)return;const recovered=await windowHistories.current.retainAndRefresh(current.id,h);if(recovered.history)dispatchDocument({type:'window-history',id:current.id,history:recovered.history});setWindowWriters(old=>({...old,[current.id]:recovered.status.writable}));setWindowHistoryErrors(old=>{const next={...old};delete next[current.id];return next;});notice(`Draft preserved at ${recovered.retained}. Showing the accepted revision.`,'success');}catch(e){notice(String(e),'error');}})()}>Keep draft and use accepted revision</button></Notice>}
+                  {native&&current&&windowHistoryErrors[current.id]&&<Notice tone="error">{windowHistoryErrors[current.id]} <button onClick={()=>void (async()=>{try{const h=documentsRef.current.documents.find(d=>d.id===current.id)?.history;if(!h)return;const recovered=await windowHistories.current.retainAndRefresh(current.id,h);if(recovered.history)dispatchDocument({type:'window-history',id:current.id,history:recovered.history});setWindowWriters(old=>({...old,[current.id]:recovered.status.writable}));setWindowHistoryErrors(old=>{const next={...old};delete next[current.id];return next;});notice(`Draft preserved at ${recovered.retained}. Showing the accepted revision.`,'success');}catch(e){notice(String(e),'error');}})()}>Save draft and use accepted revision</button></Notice>}
                   <ExternalMapSync
                     documents={documents.documents.flatMap((d) =>
                       d.history.current
@@ -1693,7 +1743,7 @@ export default function App() {
                       <div>
                         <button className="small-button" onClick={() => void save(true).catch(() => {})}>
                           <Save size={14} />
-                          {history.dirty ? 'Save changes' : 'Saved'}
+                          {unsaved ? 'Save changes' : 'Saved'}
                         </button>
                       </div>
                     </div>
@@ -1713,7 +1763,7 @@ export default function App() {
                           inspection.sha256.toLowerCase() === current.source.sha256.toLowerCase(),
                         forge: !!current?.quickForge,
                         toolFolder: !!data.settings.hekDirectory || !!data.settings.invaderDirectory,
-                        unsaved: history.dirty,
+                        unsaved,
                         runningJob: !!activeJob,
                       }}
                       onNavigate={(target) => {
@@ -1747,7 +1797,7 @@ export default function App() {
           <RuntimeDock
             project={current}
             settings={data.settings}
-            dirty={history.dirty}
+            dirty={unsaved}
             working={busy || !!activeJob}
             epoch={epoch+(activeMap?.savedRevision??0)}
             onSave={() => save()}
@@ -1876,12 +1926,22 @@ export default function App() {
           )}
         </div>
         <ResizeEdges />
-        {closing && (
+        {closePrompt && (
+          <div className="modal-backdrop">
+            <div className="modal" role="dialog" aria-modal="true" aria-labelledby="unsaved-title" onKeyDown={event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();resolveClose('cancel');}if(event.key==='Tab'){const buttons=Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button'));const first=buttons[0],last=buttons[buttons.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}}}>
+              <h2 id="unsaved-title">Save changes before closing?</h2>
+              <p>{closePrompt.slice(0,3).join(', ')}{closePrompt.length>3?` and ${closePrompt.length-3} more`:''}</p>
+              <p className="subtle">Unsaved edits stay in memory. Discard removes these changes from every view of the map. With automatic recovery disabled, a crash or exit loses unsaved work.</p>
+              <div className="button-row"><button className="primary" onClick={()=>resolveClose('save')}>Save changes</button><button onClick={()=>resolveClose('discard')}>Discard changes</button><button autoFocus onClick={()=>resolveClose('cancel')}>Cancel</button></div>
+            </div>
+          </div>
+        )}
+        {closing && !closePrompt && (
           <div className="modal-backdrop">
             <div className="modal" role="status">
               <LoaderCircle className="spin" size={24} />
-              <h2>Saving before closing…</h2>
-              <p>Your project will finish saving before the window closes.</p>
+              <h2>Closing workspace…</h2>
+              <p>Finishing the selected Save or Discard action.</p>
             </div>
           </div>
         )}

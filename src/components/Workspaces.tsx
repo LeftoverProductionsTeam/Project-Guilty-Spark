@@ -695,6 +695,10 @@ export function Preferences({
             </button>
           </div>
           <label className="toggle-setting">
+            <input type="checkbox" checked={draft.watchSharedMccInbox??true} onChange={e=>setDraft({...draft,watchSharedMccInbox:e.target.checked})}/>
+            <span><strong>Watch shared MCC Inbox</strong><small>Import files from MCC’s Guilty Spark Inbox. The local Inbox stays separate; original files are unchanged.</small></span>
+          </label>
+          <label className="toggle-setting">
             <input
               type="checkbox"
               checked={draft.autoBuild}

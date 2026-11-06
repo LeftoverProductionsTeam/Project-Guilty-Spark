@@ -87,6 +87,11 @@ struct Settings {
     hek_flavor: Option<String>,
     hek_tags_directory: Option<PathBuf>,
     auto_build: bool,
+    // Existing preference documents retain their previously enabled shared
+    // Inbox. A fresh library opts in explicitly and never imports another
+    // profile's MCC Inbox merely because the game was discovered.
+    #[serde(default="existing_shared_inbox")]
+    watch_shared_mcc_inbox: bool,
     preferred_halo:Option<runtime::RuntimeId>,
     onboarding_completed:bool,
     snapshot_interval_minutes:u32,
@@ -110,6 +115,7 @@ impl Default for Settings {
             hek_flavor: None,
             hek_tags_directory: None,
             auto_build: true,
+            watch_shared_mcc_inbox: false,
             preferred_halo:None,
             onboarding_completed:false,
             snapshot_interval_minutes:10,
@@ -117,6 +123,7 @@ impl Default for Settings {
         }
     }
 }
+fn existing_shared_inbox()->bool{true}
 impl Settings {
     fn preserve_live_preferences(&mut self,previous:&Self) {
         self.native_camera_shortcut=previous.native_camera_shortcut.clone();
@@ -160,7 +167,7 @@ struct AppState {
     forge_session: Mutex<Option<shared_editing::Session>>,
     document_owners: Mutex<HashMap<String,String>>,
     workspace_windows: Mutex<workspace_windows::WindowState>,
-    window_history: Mutex<()>,
+    window_history: Mutex<core::workspace_history::Session>,
     runtime_workbench: Mutex<runtime_workbench::WorkbenchState>,
     external_changes: Mutex<external_changes_native::ExternalChangesState>,
     invitations: Mutex<invitations_native::InvitationsState>,
@@ -181,6 +188,7 @@ struct AppState {
 #[serde(rename_all = "camelCase")]
 struct Bootstrap {
     api_version: u32,
+    memory_first: bool,
     application_version: &'static str,
     installation: Installation,
     managed: Option<ManagedRoot>,
@@ -599,6 +607,7 @@ fn bootstrap_state(state:&AppState)->Reply<Bootstrap> {
     let logs=lock(&state.logs)?.clone();
     Ok(Bootstrap {
         api_version: 1,
+        memory_first: lock(&state.library)?.is_memory_first(),
         application_version: env!("CARGO_PKG_VERSION"),
         installation,
         managed,
@@ -1000,8 +1009,15 @@ fn restore_project_snapshot(state:State<AppState>,project_id:String,snapshot_id:
 }
 
 #[tauri::command]
-fn save_project(state: State<AppState>, window:tauri::WebviewWindow, mut project: Project) -> Reply<LibraryEntry> {
-    let _history_guard=lock(&state.window_history)?;
+fn save_project(state: State<AppState>, window:tauri::WebviewWindow, project: Project) -> Reply<LibraryEntry> {
+    update_project_document(&state,&window,project,true)
+}
+#[tauri::command]
+fn update_project(state: State<AppState>, window:tauri::WebviewWindow, project: Project) -> Reply<LibraryEntry> {
+    update_project_document(&state,&window,project,false)
+}
+fn update_project_document(state:&AppState,window:&tauri::WebviewWindow,mut project:Project,persist:bool)->Reply<LibraryEntry>{
+    let mut history_guard=lock(&state.window_history)?;
     check_document_owner(&state,&project.id,window.label())?;
     if lock(&state.library)?.is_preview(&project.id).map_err(error)?{return Err("This is a read-only background preview. Open the source map before editing or saving a project.".into());}
     let existing = lock(&state.library)?.get(&project.id).map_err(error)?;
@@ -1013,8 +1029,16 @@ fn save_project(state: State<AppState>, window:tauri::WebviewWindow, mut project
         project::validate_edits(&project, &*inspect(&state, &project)?).map_err(error)?;
     }
     project.modified_at = chrono::Utc::now().to_rfc3339();
-    let entry=lock(&state.library)?.save(&project, None).map_err(error)?;
-    let _=window.app_handle().emit("spark:project-saved",&project.id);
+    let entry=if persist{
+        let library=lock(&state.library)?;
+        let entry=library.save_explicit(&project,None).map_err(error)?;
+        history_guard.saved_checkpoint(&library.project_dir(&project.id).map_err(error)?.join("window-history"),&project).map_err(|reason|format!("Project descriptor saved, but Undo recovery could not be checkpointed. Keep this window open and review: {reason}"))?;
+        entry
+    }else{lock(&state.library)?.save(&project,None).map_err(error)?};
+    if persist{
+        let _=window.app_handle().emit("spark:project-saved",&project.id);
+        let _=window.app_handle().emit("spark:window-history",serde_json::json!({"projectId":project.id,"owner":window.label()}));
+    }
     Ok(entry)
 }
 #[tauri::command]
@@ -1266,6 +1290,7 @@ fn configure(app: &tauri::AppHandle, state: &AppState, mut settings: Settings) -
     // not overwrite a shortcut changed while that form was open.
     settings.preserve_live_preferences(&previous);
     let discovery_changed=previous.steam_directory!=settings.steam_directory||previous.mcc_directory!=settings.mcc_directory||lock(&state.watcher)?.is_none();
+    let inbox_changed=previous.watch_shared_mcc_inbox!=settings.watch_shared_mcc_inbox;
     if !(1..=1440).contains(&settings.snapshot_interval_minutes) || settings.snapshot_retention>project::MAX_AUTOMATIC_BACKUP_RETENTION {
         return Err("Snapshot interval must be 1–1440 minutes and automatic retention None (0) or 1–100".into());
     }
@@ -1308,7 +1333,7 @@ fn configure(app: &tauri::AppHandle, state: &AppState, mut settings: Settings) -
     if previous.resource_directory!=settings.resource_directory{lock(&state.inspections)?.clear();}
     // Choosing a Halo or changing editor preferences does not require dropping
     // native watchers and rediscovering all game installations.
-    if !discovery_changed{return Ok(());}
+    if !discovery_changed{if inbox_changed{start_watcher(app,state)?;}return Ok(());}
     let installation = steam::discover(
         settings.steam_directory.as_deref(),
         settings.mcc_directory.as_deref(),
@@ -1606,10 +1631,15 @@ async fn import_asset(app: tauri::AppHandle, window: tauri::WebviewWindow, id: S
         let mut p = lib.get(&id).map_err(error)?;
         let asset_id = uuid::Uuid::new_v4().to_string();
         let dir = lib.project_dir(&id).map_err(error)?.join("assets");
+        let raw=if lib.is_memory_first(){
+            core::library::validate_local_input_path(&path).map_err(error)?;
+            fs::canonicalize(&path).map_err(error)?
+        }else{
         core::reject_links(&dir).map_err(error)?;
         fs::create_dir_all(&dir).map_err(error)?;
         let raw = dir.join(format!("{asset_id}.obj"));
         project::atomic_write(&raw,&bytes,false).map_err(error)?;
+        raw};
         let asset = Asset {
             id: asset_id.clone(),
             name: path
@@ -1618,19 +1648,19 @@ async fn import_asset(app: tauri::AppHandle, window: tauri::WebviewWindow, id: S
                 .to_string_lossy()
                 .to_string(),
             kind: "obj".into(),
-            sha256: maps::hash_file(&raw).map_err(error)?,
+            sha256: {let expected=core::hex_bytes(sha2::Sha256::digest(&bytes));if maps::hash_file(&raw).map_err(error)?!=expected{return Err("Model source changed during admission; no asset was registered".into());}expected},
             path: raw,
             vertices: imported.mesh.positions.len() / 3,
             triangles: imported.mesh.indices.len() / 3,
             has_uvs: imported.has_uvs,
             materials: imported.materials,
         };
-        project::atomic_write(
+        if !lib.is_memory_first(){project::atomic_write(
             &dir.join(format!("{asset_id}.mesh.json")),
             &serde_json::to_vec(&imported.mesh).map_err(error)?,
             false,
         )
-        .map_err(error)?;
+        .map_err(error)?;}
         p.assets.push(asset.clone());
         p.scene.push(maps::SceneObject {
             id: format!("asset-{}", uuid::Uuid::new_v4()),
@@ -1692,8 +1722,12 @@ fn asset_mesh(state: State<AppState>, id: String, asset_id: String) -> Reply<Mes
     uuid::Uuid::parse_str(&asset_id).map_err(error)?;
     let lib = lock(&state.library)?;
     let p = lib.get(&id).map_err(error)?;
-    if !p.assets.iter().any(|a| a.id == asset_id) {
-        return Err("Asset does not belong to this project".into());
+    let asset=p.assets.iter().find(|a|a.id==asset_id&&a.kind=="obj").ok_or("OBJ asset does not belong to this project")?;
+    if lib.is_memory_first(){
+        core::library::validate_local_input_path(&asset.path).map_err(error)?;core::reject_links(&asset.path).map_err(error)?;
+        let bytes=bounded_read(&asset.path,64*1024*1024)?;
+        if core::hex_bytes(sha2::Sha256::digest(&bytes))!=asset.sha256{return Err("Model source changed outside Spark; review and reimport it before previewing".into());}
+        return assets::parse_obj(std::str::from_utf8(&bytes).map_err(error)?).map(|value|value.mesh).map_err(error);
     }
     let file = lib
         .project_dir(&id)
@@ -1708,8 +1742,8 @@ async fn preview_imported_collision(app:tauri::AppHandle,project_id:String,asset
     uuid::Uuid::parse_str(&asset_id).map_err(error)?;
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();
-        let (project,expected)={let lib=lock(&state.library)?;(lib.get(&project_id).map_err(error)?,lib.project_dir(&project_id).map_err(error)?.join("assets").join(format!("{asset_id}.obj")))};
-        if !project.assets.iter().any(|a|a.id==asset_id&&a.path==expected){return Err("Reimport this model into this project's managed assets before checking its source collision".into());}
+        let (project,expected,memory_first)={let lib=lock(&state.library)?;(lib.get(&project_id).map_err(error)?,lib.project_dir(&project_id).map_err(error)?.join("assets").join(format!("{asset_id}.obj")),lib.is_memory_first())};
+        if !project.assets.iter().any(|a|a.id==asset_id&&(memory_first||a.path==expected)){return Err("Import this model into the current project before checking its source collision".into());}
         core::model_build::source_collision(&project,&asset_id,&source_sha256,scale,rotation).map_err(error)
     }).await.map_err(error)?
 }
@@ -1907,9 +1941,9 @@ fn start_watcher(app: &tauri::AppHandle, state: &AppState) -> Reply<()> {
     let local = state.root.join("Inbox");
     core::reject_links(&local).map_err(error)?;
     fs::create_dir_all(&local).map_err(error)?;
-    let mut inboxes = vec![local];
-    if let Some(root) = lock(&state.managed)?.clone() {
-        inboxes.push(root.inbox);
+    let mut inboxes = vec![local.clone()];
+    if lock(&state.settings)?.watch_shared_mcc_inbox {
+        if let Some(root) = lock(&state.managed)?.clone() {inboxes.push(root.inbox);}
     }
     let (tx, rx) = std::sync::mpsc::channel();
     let mut watcher = notify::recommended_watcher(move |event| {
@@ -1931,8 +1965,10 @@ fn start_watcher(app: &tauri::AppHandle, state: &AppState) -> Reply<()> {
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
                 Err(_) => break,
             }
+            let shared_enabled=app.state::<AppState>().settings.lock().map(|settings|settings.watch_shared_mcc_inbox).unwrap_or(false);
             let entries = inboxes
                 .iter()
+                .filter(|folder|*folder==&local||shared_enabled)
                 .filter_map(|root| fs::read_dir(root).ok())
                 .flatten();
             let mut present = std::collections::HashSet::new();
@@ -2019,7 +2055,9 @@ fn initialize_mcc_inbox(app: tauri::AppHandle, state: State<AppState>) -> Reply<
         .clone()
         .ok_or("MCC installation is not available")?;
     *lock(&state.managed)? = Some(mcc::initialize(&path).map_err(error)?);
-    start_watcher(&app, &state)?;
+    let mut settings=lock(&state.settings)?.clone();settings.watch_shared_mcc_inbox=true;
+    configure(&app,&state,settings)?;
+    start_watcher(&app,&state)?;
     bootstrap_state(&state)
 }
 // Only exact, known tool executable filenames are eligible; no shell, arbitrary
@@ -2838,7 +2876,7 @@ pub fn run() {
             let root = std::env::var_os("GUILTY_SPARK_DATA_DIR")
                 .map(PathBuf::from)
                 .unwrap_or(app.path().app_local_data_dir()?);
-            let library = Library::open(&root)?;
+            let library = Library::workspace(&root)?;
             let settings: Settings = library.setting("preferences")?;
             let installation = steam::Installation::default();
             app.manage(AppState {
@@ -2857,7 +2895,7 @@ pub fn run() {
                 forge_session: Mutex::new(None),
                 document_owners: Mutex::new(HashMap::new()),
                 workspace_windows: Mutex::new(workspace_windows::WindowState::default()),
-                window_history: Mutex::new(()),
+                window_history: Mutex::new(Default::default()),
                 runtime_workbench: Mutex::new(Default::default()),
                 external_changes: Mutex::new(Default::default()),
                 invitations: Mutex::new(Default::default()),
@@ -2999,6 +3037,7 @@ pub fn run() {
             megaworld_native::megaworld_atlas,
             megaworld_native::import_megaworld_region,
             workspace_windows::release_project_document,
+            workspace_windows::discard_project_changes,
             workspace_windows::open_project_window,
             workspace_windows::return_project_to_main,
             workspace_windows::open_workspace_window,
@@ -3102,6 +3141,7 @@ pub fn run() {
             open_built_map,
             import_dialog,
             save_project,
+            update_project,
             list_project_snapshots,
             create_project_snapshot,
             project_backup_overview,
@@ -3189,6 +3229,13 @@ pub fn run() {
 
 #[cfg(test)]
 mod readiness_tests {
+    #[test]
+    fn fresh_libraries_require_shared_inbox_opt_in_and_existing_preferences_keep_their_behavior(){
+        let fresh=Settings::default();assert!(!fresh.watch_shared_mcc_inbox);
+        let old:Settings=serde_json::from_value(serde_json::json!({"autoBuild":false})).unwrap();assert!(old.watch_shared_mcc_inbox);
+        let explicit:Settings=serde_json::from_value(serde_json::json!({"watchSharedMccInbox":false})).unwrap();assert!(!explicit.watch_shared_mcc_inbox);
+        assert_eq!(serde_json::to_value(fresh).unwrap()["watchSharedMccInbox"],false);
+    }
     use super::*;
     fn fixture() -> (tempfile::TempDir, AppState, Project, BuildRecord) {
         let temp = tempfile::tempdir().unwrap();
@@ -3235,7 +3282,7 @@ mod readiness_tests {
             forge_session: Mutex::new(None),
             document_owners:Mutex::new(HashMap::new()),
             workspace_windows:Mutex::new(workspace_windows::WindowState::default()),
-            window_history:Mutex::new(()),
+            window_history:Mutex::new(Default::default()),
             runtime_workbench:Mutex::new(Default::default()),
             external_changes:Mutex::new(Default::default()),
             invitations:Mutex::new(Default::default()),

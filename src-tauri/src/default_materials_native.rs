@@ -10,7 +10,7 @@ async fn material_preview_source(app:tauri::AppHandle,window:tauri::WebviewWindo
         // Community runtimes may use an owned PC/MCC material source for editor
         // preview. This does not change the stricter native build material route.
         let (selected,path)=asset_sources_native::default_material_map_for(&state,&runtimes)?;
-        let (project,inspection)=lock(&state.library)?.import_map(&path,path.parent()).map_err(error)?;
+        let (project,inspection)=lock(&state.library)?.preview_map(&path,path.parent()).map_err(error)?;
         lock(&state.inspections)?.insert(project.id.clone(),Arc::new(inspection.clone()));
         Ok::<_,String>((selected,OpenProject{project,inspection:Some(inspection)}))
     }).await.map_err(error)??;

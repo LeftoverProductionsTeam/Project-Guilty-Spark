@@ -276,6 +276,7 @@ export interface Project {
   builds: BuildRecord[];
 }
 export interface LibraryEntry {
+  sessionOnly?: boolean;
   id: string;
   title: string;
   engine: string;
@@ -310,6 +311,7 @@ export interface Settings {
   metadataTemplateDirectory: string | null;
   nativeExecutable: string | null;
   autoBuild: boolean;
+  watchSharedMccInbox?: boolean;
 }
 export interface Installation {
   steamPath: string | null;
@@ -337,6 +339,7 @@ export interface JobEvent {
   timestamp: string;
 }
 export interface Bootstrap {
+  memoryFirst?: boolean;
   apiVersion: number;
   applicationVersion?: string;
   installation: Installation;

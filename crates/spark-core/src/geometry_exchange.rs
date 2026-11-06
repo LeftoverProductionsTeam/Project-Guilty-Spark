@@ -44,7 +44,12 @@ fn folder(lib:&Library,project_id:&str,id:&str)->Result<PathBuf>{
 fn source(lib:&Library,p:&project::Project,asset_id:&str)->Result<(Vec<u8>,String)>{
     let a=p.assets.iter().find(|a|a.id==asset_id&&a.kind=="obj").ok_or_else(||SparkError::Invalid("Select an imported OBJ in this project's Asset workshop".into()))?;
     uuid::Uuid::parse_str(asset_id).map_err(|_|SparkError::Invalid("Invalid source asset identity".into()))?;
-    let expected=lib.project_dir(&p.id)?.join("assets").join(format!("{asset_id}.obj"));
+    let expected=if lib.is_memory_first(){
+        // Active workspaces keep admitted assets as verified references. The
+        // handoff below still creates private baseline/working copies; never
+        // give an external editor the original referenced asset to overwrite.
+        crate::library::validate_local_input_path(&a.path)?;a.path.clone()
+    }else{lib.project_dir(&p.id)?.join("assets").join(format!("{asset_id}.obj"))};
     reject_links(&a.path)?;reject_links(&expected)?;
     if fs::canonicalize(&a.path)?!=fs::canonicalize(expected)?{return invalid("Geometry does not belong to this project");}
     let bytes=bounded(&a.path,MAX_BYTES)?;

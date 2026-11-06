@@ -441,7 +441,11 @@ pub(super) async fn close_application(app: tauri::AppHandle,window:tauri::Webvie
     }
     workspace_windows::remember(&app,&window)?;
     workspace_windows::release_window(&app,window.label());
-    lock(&app.state::<AppState>().document_owners)?.retain(|_,owner|owner!=window.label());
+    {let state=app.state::<AppState>();let mut history=lock(&state.window_history)?;let mut owners=lock(&state.document_owners)?;
+    let released:Vec<_>=owners.iter().filter(|(_,owner)|owner.as_str()==window.label()).map(|(id,_)|id.clone()).collect();owners.retain(|_,owner|owner!=window.label());drop(owners);
+    for id in released{let elsewhere=lock(&state.workspace_windows)?.views.iter().any(|(label,view)|label!=window.label()&&(view.project.as_deref()==Some(&id)||view.documents.contains(&id)));
+        if !elsewhere&&!runtime_workbench::has_running(&state,&id)?{lock(&state.library)?.discard_session(&id).map_err(error)?;history.discard(&id);}}
+    }
     window.destroy().map_err(error)
 }
 
@@ -456,8 +460,29 @@ pub(super) fn claim_project_document(state:State<AppState>,window:tauri::Webview
 
 #[tauri::command]
 pub(super) fn release_project_document(state:State<AppState>,window:tauri::WebviewWindow,id:String)->Reply<()> {
-    let _history_guard=lock(&state.window_history)?;
-    let mut owners=lock(&state.document_owners)?;if owners.get(&id).is_some_and(|owner|owner==window.label()){owners.remove(&id);}Ok(())
+    let mut history=lock(&state.window_history)?;
+    let mut owners=lock(&state.document_owners)?;
+    if owners.get(&id).is_some_and(|owner|owner!=window.label()){return Ok(());}
+    owners.remove(&id);drop(owners);
+    let elsewhere=lock(&state.workspace_windows)?.views.iter().any(|(label,view)|label!=window.label()&&(view.project.as_deref()==Some(&id)||view.documents.contains(&id)));
+    if !elsewhere&&!runtime_workbench::has_running(&state,&id)?{
+        lock(&state.library)?.discard_session(&id).map_err(error)?;history.discard(&id);
+        let _=window.app_handle().emit("spark:library-changed",());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub(super) fn discard_project_changes(state:State<AppState>,window:tauri::WebviewWindow,id:String)->Reply<()> {
+    let mut history=lock(&state.window_history)?;check_document_owner(&state,&id,window.label())?;
+    if runtime_workbench::has_running(&state,&id)?{return Err("Close the native tool before discarding this map's changes".into());}
+    if lock(&state.forge_session)?.as_ref().is_some_and(|session|session.project_id==id){return Err("Leave the shared editing session before discarding local changes".into());}
+    let library=lock(&state.library)?;let saved=library.is_saved(&id).map_err(error)?;
+    if saved{let project=library.saved_project(&id).map_err(error)?;history.reset_saved(&library.project_dir(&id).map_err(error)?.join("window-history"),&project).map_err(error)?;}else{history.discard(&id);}
+    library.discard_session(&id).map_err(error)?;
+    if saved{let _=library.get(&id).map_err(error)?;}
+    drop(library);
+    let _=window.app_handle().emit("spark:document-discarded",serde_json::json!({"projectId":id,"saved":saved}));Ok(())
 }
 
 #[tauri::command]

@@ -389,5 +389,231 @@
     "Crash/process termination before rollback requires guarded orphan recovery",
     "Partial or externally changed files whose exact ownership/bytes cannot be proven are retained with exact path in the existing import error response",
     "Production user opens and autosave still need coordinated memory-first Save/Discard/Cancel and RAM history integration"
-  ]
+  ],
+  "hostedLatestReadOnly": {
+    "sourceCommit": "cdbd27eaa5c583072f8b8056b3b10e67cc9a873a",
+    "run": "https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/actions/runs/42160281556",
+    "windowsNativeBrowserBuildUpload": "passed",
+    "linuxRustFrontend": "passed on this run; does not verify the later f25885f catalog patch",
+    "linuxBrowser": {
+      "passed": 174,
+      "failed": 2,
+      "jobId": 127704056079,
+      "failures": [
+        {
+          "test": "editor-controls drawer drag",
+          "observed": "Inspector remained right-docked; the test clicked handle.y+15 rather than the handle center"
+        },
+        {
+          "test": "leaving Portability Lab ignores delayed source report",
+          "observed": "Save & inspect portability button missing after autosave could legitimately change its label"
+        }
+      ]
+    },
+    "publicReleases": 0,
+    "masterProtected": true,
+    "remoteMutationByThisAgent": false
+  },
+  "memoryFirstDesktop": {
+    "receipt": "p0-memory-save-validation.json",
+    "complete": true,
+    "appSha256": "83487bc5eaa6978032a331b75dd30e39c5e5c153eced6f70839c19feb84f60ba",
+    "mockedIpc": false,
+    "unsavedMapCycles": 20,
+    "sparkProjectDirectories": 0,
+    "savedMapCopies": 0,
+    "windowHandoffUndoRedo": true,
+    "tabCancel": true,
+    "windowCancel": true,
+    "explicitSaveDiscardReopen": true,
+    "originalSourceUnchanged": true,
+    "edits": 50,
+    "acknowledgedSaveRestart": true,
+    "projectLogicalGrowthBytes": 2958755,
+    "sampledPeakPrivateBytes": 1869398016,
+    "comparablePrivateMemoryGrowthBytes": -193441792,
+    "outputSha256": "45c596247b213ddb1532f2c3dadd6e3d484c5b1d2fabef4f177b376b7280f5c7",
+    "nativeReadback": 0.225,
+    "compilerRan": false,
+    "gracefulClose": true,
+    "shaderCount": 121,
+    "lightmaps": 15,
+    "cubemaps": 11,
+    "pendingMaterials": 0,
+    "profile": {
+      "conditions": "Fresh application/profile; OS file cache not cleared; same embedded app, source, settings and readiness checks; map timings follow twenty source-inspection cycles and are warm-session measurements",
+      "windowMs": 619.4459999999999,
+      "importMs": 3164.0972000000183,
+      "readyMs": 6601.441500000015,
+      "resumeMs": 243.68660000001546,
+      "sameCanvas": true,
+      "additionalPreviewDecodeCalls": 0,
+      "beforeAfterSpeedupClaimed": false
+    },
+    "disposedLogicalBytes": 1823974958,
+    "disposedAllocatedBytes": null,
+    "physicalReclamationKnown": false,
+    "actualGameLoaded": false,
+    "humanGameplayAccepted": false,
+    "cleanMachineAccepted": false
+  },
+  "memoryFirstDefects": {
+    "sharedInbox": {
+      "unexpectedSourceSha256": "b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d",
+      "matchesExistingProtectedInboxMap": true,
+      "originalModified": false,
+      "freshProfilesOptIn": true,
+      "legacyPreferencesRetainPriorEnabled": true,
+      "failedReceipts": [
+        "p0-memory-full-validation.json",
+        "p0-memory-desktop-validation.json"
+      ]
+    },
+    "ownSaveNotification": {
+      "failedNativeReceipt": "p0-memory-isolated-validation.json",
+      "failedBrowserLog": "p0-own-save-before.log",
+      "expected": 32,
+      "stale": 31,
+      "focusedRegressionsPassed": 4,
+      "realFiftyImmediateSavesPassed": true
+    },
+    "durableHistory": {
+      "maximumBytes": 67108864,
+      "maximumFiles": 4096,
+      "existingRecoveryPreserved": true,
+      "automaticRetirementImplemented": false,
+      "reviewBlock": "Automatic approval rejected irreversible removal of retired recovery snapshots without specific approval; no patch or alternate deletion attempted."
+    }
+  },
+  "combinedMemoryToolValidation": {
+    "receipt": "p0-tool-reference-validation.json",
+    "complete": true,
+    "implementationParentCommit": "f25885f121f384c093047eace1bc69cb8e0d30ea",
+    "testedUncommittedSource": true,
+    "rust": {
+      "suites": 52,
+      "passed": 778,
+      "ignored": 9,
+      "failed": 0
+    },
+    "typescript": true,
+    "frontend": {
+      "files": 96,
+      "passed": 413
+    },
+    "browser": {
+      "passed": 177
+    },
+    "offlineCommands": 59,
+    "storageAndSourceContracts": 36,
+    "appSha256": "413d498b1c6ef56b98faf3ad0c041a70b9809f50470c80b2e2ad0828983e9f21",
+    "nativeCompiler": {
+      "complete": true,
+      "inputFiles": 1793,
+      "compiledTags": 1796,
+      "sourceUnchanged": true,
+      "cacheSha256": "b53c7543526c709c53344e814a746c0687c3f6ed7691d720e4764c54c0549103",
+      "corruptSourceBlocked": true,
+      "exactRecovery": true,
+      "nativeEditor": "Installed Invader -S bounding_radius 0.5",
+      "editedRadius": 0.5,
+      "editedCacheSha256": "dee648992d476c547e93d1c5c9103e7f8701603c59b64c87a2048956cc2ca83a"
+    },
+    "geometry": {
+      "complete": true,
+      "blenderSha256": "e27fbfea8564aa645d4463cb0949695fd85562b9de6df9561b06859a1074adf7",
+      "sourceUnchanged": true,
+      "modelSources": [
+        {
+          "tag": "scenery/spark_18bd1a2848e4/mesh_16e1ee204fb85f046584/mesh_16e1ee204fb85f046584",
+          "sourceSha256": "1c30f6beef1cd1c3ab0bb3b7bc895c28321668958b37d5c06b2007230518d314",
+          "bounds": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          "triangles": 12,
+          "renderGeometries": 1,
+          "collisionNodes": 1
+        },
+        {
+          "tag": "scenery/spark_18bd1a2848e4/mesh_3b891ee943ecc354f45a/mesh_3b891ee943ecc354f45a",
+          "sourceSha256": "673ca847c8b6b014a5ad17a6b0ed34f346711e213300a422f0060923835d08bf",
+          "bounds": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              1.5,
+              1,
+              1
+            ]
+          ],
+          "triangles": 12,
+          "renderGeometries": 1,
+          "collisionNodes": 1
+        }
+      ],
+      "outputSha256": "323129a07e71b39c2104d55793c30560b4519ed8dec41596725d144052a8e1e0",
+      "crcMismatch": 0,
+      "fidelity": [
+        {
+          "maxPositionError": 0,
+          "maxUvError": 0,
+          "minimumNormalDot": 1,
+          "shaderPaths": [
+            "levels/a10/shaders/obj-door small"
+          ],
+          "triangles": 12,
+          "windingPreserved": true
+        },
+        {
+          "maxPositionError": 0,
+          "maxUvError": 0,
+          "minimumNormalDot": 1,
+          "shaderPaths": [
+            "levels/a10/shaders/obj-door small"
+          ],
+          "triangles": 12,
+          "windingPreserved": true
+        }
+      ],
+      "preview": {
+        "ready": "true",
+        "firstFrame": "true",
+        "triangles": 12,
+        "materialGaps": 0,
+        "textures": 1,
+        "reflections": 1
+      },
+      "gracefulClose": true,
+      "gameLoaded": false,
+      "addonTested": false,
+      "manualGuiAccepted": false
+    },
+    "failedPredecessor": {
+      "receipt": "p0-tool-memory-combined.json",
+      "rustPassed": 777,
+      "browserPassed": 177,
+      "compilerPassed": true,
+      "actualGeometryPassed": false,
+      "reason": "Managed-copy-only geometry source check rejected the admitted referenced OBJ; repaired in the existing handoff and tested with unchanged original/private baseline.",
+      "disposedLogicalBytes": 5348756144
+    },
+    "disposedLogicalBytes": 5349015988,
+    "peakLogicalBytes": 5678196691,
+    "physicalReclamationKnown": false,
+    "retainedGeneratedMap": false,
+    "wholeP0Accepted": false,
+    "allToolIntegrationsAccepted": false
+  }
 }
