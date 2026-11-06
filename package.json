@@ -12,7 +12,7 @@
     "package": "node scripts/desktop.mjs build",
     "test": "node scripts/frontend-tests.mjs unit",
     "test:ui": "node scripts/frontend-tests.mjs browser",
-    "health": "node scripts/repository-health.mjs --storage",
+    "health": "node scripts/repository-health.mjs --active",
     "test:repository-health": "node --test scripts/repository-health.test.mjs",
     "test:engine-sources": "node scripts/verify-engine-source-index.mjs",
     "check": "tsc --noEmit --incremental false",

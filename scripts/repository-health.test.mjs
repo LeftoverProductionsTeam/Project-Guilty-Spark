@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { parseWorktrees, classifyStorage, scanStorage } from './repository-health.mjs';
 
@@ -31,9 +32,8 @@ test('classification protects originals, releases, native diagnostics and unknow
   assert.equal(classifyStorage('.local/build/cargo/debug/deps').classification, 'Regenerable');
 });
 test('real filesystem scan is read-only, counts hardlinks once and does not follow directory links', () => {
-  const parent = path.resolve('artifacts/qa');
-  fs.mkdirSync(parent, { recursive: true });
-  const root = fs.mkdtempSync(path.join(parent, 'health-contract-'));
+  const parent = fs.realpathSync(os.tmpdir());
+  const root = fs.mkdtempSync(path.join(parent, 'spark-health-contract-'));
   try {
     fs.mkdirSync(path.join(root, 'data'));
     fs.writeFileSync(path.join(root, 'data', 'source.bin'), 'irreplaceable');

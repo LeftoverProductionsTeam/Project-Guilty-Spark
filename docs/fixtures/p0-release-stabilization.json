@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "directive": "285a5a02-49b0-4bfb-aedc-c3bb970e5635",
+  "baselineCommit": "f14a8270d1034ade14cb3df4f177a1e2c7f74682",
+  "sourceInterfaceRepairCommit": "86acae2",
+  "hostedBaseline": {
+    "run": "https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/actions/runs/42127984354",
+    "verifiedViaConnector": true,
+    "windows": "failed only browser stage; build/upload skipped",
+    "linuxCoreWeb": "passed",
+    "browser": {
+      "passed": 172,
+      "failed": 2
+    },
+    "reason": "Both render-alpha tests imported an incidental generated Vite cache path"
+  },
+  "localOnSourceInterfaceRepair": {
+    "rust": {
+      "suites": 52,
+      "passed": 752,
+      "failed": 0,
+      "ignored": 9
+    },
+    "typescript": true,
+    "frontend": {
+      "files": 96,
+      "passed": 413
+    },
+    "browser": {
+      "passed": 174,
+      "milliseconds": 274036
+    },
+    "offlineCommands": 59,
+    "storage": 22,
+    "sourceInterfaces": 3,
+    "releaseContracts": {
+      "python": 11,
+      "javascript": 6
+    },
+    "native": {
+      "complete": true,
+      "inputFiles": 1793,
+      "compiledTags": 1796,
+      "unchangedRequests": 10,
+      "extraNativeTrees": 0,
+      "allocatedAfterFirst": 270620016,
+      "allocatedAfterTen": 270620016,
+      "sourceUnchanged": true,
+      "sourceArchive": {
+        "files": 1793,
+        "logicalBytes": 105215093,
+        "sourceArchiveSha256": "6c9c156237c78ab1b983080495fdcff698a3f15fe0baaadb1c663654d27f7bd4",
+        "originalArchiveUnchanged": true,
+        "retainedSdkTree": false
+      },
+      "cacheSha256": "b53c7543526c709c53344e814a746c0687c3f6ed7691d720e4764c54c0549103",
+      "editedCacheSha256": "dee648992d476c547e93d1c5c9103e7f8701603c59b64c87a2048956cc2ca83a",
+      "corruptSourceRejected": true,
+      "exactRecovery": true,
+      "compiledEditedRadius": 0.5,
+      "gameplayRetested": false
+    }
+  },
+  "monitoring": {
+    "targetedTests": 35,
+    "before": {
+      "samples": 9,
+      "durationMs": 8200.1795,
+      "mainProcessCpuMs": 2266
+    },
+    "after": {
+      "samples": 2,
+      "durationMs": 8241.6207,
+      "mainProcessCpuMs": 16,
+      "meterCpuMs": 218.75,
+      "allocatedBytes": 768000
+    },
+    "allocationCrosscheck": {
+      "errors": 0,
+      "files": 3000,
+      "allocatedBytes": 768000,
+      "operationAllocatedBytes": 768000,
+      "matched": true
+    },
+    "conditions": "Warm filesystem; same 3000 small files and 8 second idle window. Main-process CPU includes parent source monitor; native-child CPU reported separately; not renderer/startup performance",
+    "limit": "CPU figures do not include all parent native meter processes; no total CPU, renderer or startup speedup claim. Fifty MiB is an investigation threshold. No service/watchdog or new storage database."
+  },
+  "sourcePreservation": {
+    "ledgerRows": 475,
+    "ledgerSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
+    "recoveredPromptCount": 25,
+    "range": "04-28",
+    "originalsAndC49Protected": true
+  },
+  "pending": [
+    "New hosted Windows/Linux CI on authorized pushed source",
+    "Native Linux/macOS package and application acceptance",
+    "Production memory-first Save/Discard/Cancel and shared history integration",
+    "Full external-tool lifetime cleanup",
+    "C71 authored revision publication and Smart Edit native UI",
+    "Repeated real editor/import/archive/tool/window stress matrix",
+    "Clean-machine packages/signing/publication approval"
+  ],
+  "publicationPerformed": false
+}

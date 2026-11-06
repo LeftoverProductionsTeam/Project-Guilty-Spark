@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: P0 d09fc8a4 — purge sealed; Windows path identity repaired; default writers next
+Task: P0 285a5a02 — repair generated-cache UI regression, then storage and memory-first closure
 Status: implementation incomplete
-Starting revision: a144499bcd1dd68879d4cac53cf0cedd733f1ee6; purge sealed at a83accfdc4257e2ccc5a46bcfafe41a52f754c66 on canonical local master
-Latest verified revision: b4bab0b6687c39fa8aaef0a06c351579a5b62674 locally commits the tested Windows/native/tool-preflight repair; exact evidence in docs/fixtures/windows-storage-repair.json.
-Next action: Finish production memory-first Save/reopen, unsaved-close/crash-loss warning, external-source-change and dual-window/history/native acceptance; keep Library::memory opt-in until these pass. workspace_history_native still writes durable snapshots, so do not flip Library::open alone. Complete external-tool success/failure/cancel lifetime cleanup in existing owners, then C71 publication/Smart Edit. Hosted CI waits for a future authorized push.
+Starting revision: f14a8270d1034ade14cb3df4f177a1e2c7f74682; canonical local and remote master matched at intake
+Latest verified revision: f14a8270d1034ade14cb3df4f177a1e2c7f74682 baseline; current source-interface repair passes both actual rendering tests locally and three source-interface regressions. Full same-source gates running next.
+Next action: Run full Windows Rust, TypeScript, frontend, browser, offline, storage and real H1A/Invader compilation/readback against the source-interface repair. Then extend existing ownership monitoring and finish production memory-first lifecycle. Hosted Windows/Linux and native macOS gates require authorized remote execution/hardware; no push authorized.
 
 ## Acceptance
 
@@ -23,6 +23,8 @@ Real post-repair H1A/Invader:1793stock inputs/105,215,093bytes from unchanged or
 Git full fsck passes;one master worktree;stash32a8cb1ef4b1aeed2d459e5ad26ef69e36e78f85 and refs/reflogs preserved. Read-only remote master292399ce947d8a627426bd8c6a5d9d5f8d96288c. Ten Zombie originals and original SDK hashes match.475CSV rows remain SHA2561eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7.25supplied prompt files hash-match their manifest and remain untracked; no full literal/source implementation audit claimed this turn. Accepted five-file C49v0.4.1/cb07581597de package verifies;newer source and clean-machine acceptance separate.
 
 ## Changed work
+
+P0 285a5a02: rendering tests import one source-controlled Vite entrypoint with package imports, preserving every bloom/resize/alpha/hologram assertion. Vite parser-based module guard covers app/tests/scripts and executable documentation; frontend, source-only and release runners invoke it. CI adds the guard on both platforms and the full browser suite on Linux. Targeted Windows Edge rendering:2pass; generated24,242,617bytes disposed. Full same-source validation not yet claimed.
 
 Existing QA admission resolves missing output through its nearest trusted non-linked ancestor;Windows8.3/verbatim spellings share one owner. Existing source/link/nonce/content guards remain. Store reservations reuse native_staging resolver;legacy exact marker spelling remains disposable after proper checks. Store::location refuses source output before creating artifacts/storage-v1. Standalone executable validation now precedes launch folder allocation;Baboon copy identity rechecked. Successful tool lifetime cleanup remains open.
 

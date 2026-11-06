@@ -17,6 +17,7 @@ const python = process.env.SPARK_RELEASE_PYTHON ?? (process.platform === 'win32'
 const node = (...args) => [process.execPath, args];
 const commands = [
   ['source-interfaces', ...node('--test', 'scripts/check-source-entrypoints.test.mjs')],
+  ['storage-ownership', ...node('--test', 'scripts/native-qa-storage.test.mjs', 'scripts/repository-health.test.mjs')],
   ['rust-workspace', ...node('scripts/cargo.mjs', 'test', '--workspace', '--locked')],
   ['typescript', ...node('node_modules/typescript/bin/tsc', '--noEmit', '--incremental', 'false')],
   ['frontend', ...node('scripts/frontend-tests.mjs', 'unit')],
@@ -42,6 +43,9 @@ const commands = [
   ],
   ['release-pipeline', ...node('scripts/release/test-pipeline.mjs', python)],
 ];
+const required = JSON.parse(await fs.readFile(new URL('./required-gates.json', import.meta.url), 'utf8'));
+if (new Set(required).size !== required.length || JSON.stringify(required) !== JSON.stringify(commands.map(([id]) => id)))
+  throw Error('Release runner and package-verification gate contracts differ; no release gate was run');
 const receipt = {
   schemaVersion: 1,
   sourceCommit: commit,

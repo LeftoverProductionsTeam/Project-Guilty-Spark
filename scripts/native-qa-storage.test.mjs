@@ -16,6 +16,8 @@ import {
   embeddedFrontendConfig,
   exportDevelopmentBuild,
   retainGeneratedSchemaState,
+  readDevelopmentStorage,
+  withDevelopmentWorkspace,
 } from './native-qa-storage.mjs';
 import { prepareDesktopArguments } from './desktop.mjs';
 import { safeQaCopy } from './qa-safe-copy.mjs';
@@ -24,9 +26,45 @@ test('inline owned operations record their actual origin and clean their disposa
   const env={...process.env};
   for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];
   const source=new URL('./native-qa-storage.mjs',import.meta.url).href;
-  const run=spawnSync(process.execPath,['--input-type=module','-e',`import fs from 'node:fs/promises';import {withDevelopmentWorkspace} from ${JSON.stringify(source)};await withDevelopmentWorkspace('inline-regression',async c=>{await fs.writeFile(c.directory+'/probe.txt','bounded inline operation');},{reservationBytes:8*1024**2});`],{env,encoding:'utf8',windowsHide:true});
+  const run=spawnSync(process.execPath,['--input-type=module','-e',`import fs from 'node:fs/promises';import assert from 'node:assert/strict';import {withDevelopmentWorkspace,readDevelopmentStorage} from ${JSON.stringify(source)};await withDevelopmentWorkspace('inline-regression',async c=>{await fs.writeFile(c.directory+'/probe.txt','bounded inline operation');const report=await readDevelopmentStorage();assert.ok(report.runs.some(row=>row.ownerPid===process.pid&&row.active));},{reservationBytes:8*1024**2});`],{env,encoding:'utf8',windowsHide:true});
   assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/"temporaryOutputDisposed":true/);
 });
+
+test('stdin operations use the real storage API identity and leave no generated tree', () => {
+  const env={...process.env};
+  for(const name of ['CARGO_TARGET_DIR','SPARK_BUILD_WORKSPACE','SPARK_BUILD_NONCE','SPARK_GENERATED_ROOT','SPARK_QA_STORAGE_ROOT'])delete env[name];
+  const source=new URL('./native-qa-storage.mjs',import.meta.url).href;
+  const run=spawnSync(process.execPath,['--input-type=module','-'],{env,encoding:'utf8',windowsHide:true,
+    input:`import fs from 'node:fs/promises';import {withDevelopmentWorkspace} from ${JSON.stringify(source)};await withDevelopmentWorkspace('stdin-regression',async c=>{await fs.writeFile(c.directory+'/tiny.txt','stdin output');},{reservationBytes:8*1024**2});`});
+  assert.equal(run.status,0,run.stderr);assert.match(run.stdout,/"temporaryOutputDisposed":true/);
+});
+
+test('real Windows allocation summaries retain resident bytes, deduplicate file IDs and refuse junctions', {
+  skip: process.platform !== 'win32',
+}, () => withDevelopmentWorkspace('native-allocation-contract', async context => {
+  const record = JSON.parse(await fs.readFile(path.join(context.env.SPARK_BUILD_WORKSPACE, 'storage-run.json'), 'utf8'));
+  assert.ok(record.allocationMeter?.executable, 'Windows native allocation helper must be compiled from current source');
+  await fixture(async parent => {
+    const root = await mkdir(path.join(parent, 'measured'));
+    await fs.writeFile(path.join(root, 'resident.bin'), Buffer.alloc(256, 7));
+    await fs.writeFile(path.join(root, 'regular.bin'), Buffer.alloc(4096, 11));
+    await fs.link(path.join(root, 'regular.bin'), path.join(root, 'hardlink.bin'));
+    const read = (...exclude) => JSON.parse(execFileSync(record.allocationMeter.executable, ['--summary', root, ...exclude], { windowsHide: true, encoding: 'utf8' }));
+    const before = read();
+    assert.equal(before.errors, 0); assert.equal(before.files, 3);
+    assert.equal(before.logicalBytes, 256 + 8192); assert.equal(before.uniqueFileObjects, 2);
+    assert.equal(before.multiLinkEntries, 2);
+    const outside = await mkdir(path.join(parent, 'originals'));
+    await fs.writeFile(path.join(outside, 'source.tag'), 'protected original');
+    const alias = path.join(root, 'alias'); await fs.symlink(outside, alias, 'junction');
+    try {
+      const linked = read(); assert.equal(linked.reparseEntries, 1); assert.equal(linked.files, before.files);
+      const excluded = read('alias'); assert.equal(excluded.reparseEntries, 0); assert.equal(excluded.uniqueAllocatedFileBytes, before.uniqueAllocatedFileBytes);
+      assert.equal(await fs.readFile(path.join(outside, 'source.tag'), 'utf8'), 'protected original');
+    } finally { await fs.unlink(alias); }
+    assert.equal(read().uniqueAllocatedFileBytes, before.uniqueAllocatedFileBytes);
+  });
+}, { reservationBytes: 8 * 1024 ** 2 }));
 
 async function fixture(run) {
   const temporaryParent = await fs.realpath(os.tmpdir());
@@ -254,6 +292,77 @@ test('first-build monitor admits an initially absent output directory without a 
     const result = await monitor.stop();
     assert.equal(result.error, null);
     assert.equal(result.peakLogicalBytes, 19);
+  }));
+
+test('filesystem notifications update real counts before periodic reconciliation and stop cleanly', () =>
+  fixture(async parent => {
+    const output = await mkdir(path.join(parent, 'watched'));
+    const monitor = watchOutputBudget(output, { budget: 65536, intervalMs: 2000 });
+    try {
+      await monitor.sample();
+      assert.equal(monitor.state.current.files, 0);
+      await fs.mkdir(path.join(output, 'nested'));
+      await fs.writeFile(path.join(output, 'nested', 'actual.bin'), Buffer.alloc(4096, 7));
+      const until = performance.now() + 1800;
+      while (performance.now() < until && monitor.state.current.files !== 1)
+        await new Promise(resolve => setTimeout(resolve, 25));
+      assert.equal(monitor.state.current.logicalBytes, 4096);
+      assert.equal(monitor.state.current.files, 1);
+      assert.equal(monitor.state.current.directories, 2);
+      assert.equal(monitor.state.current.reason, 'filesystem');
+      assert.ok(monitor.state.filesystemEvents > 0);
+      assert.ok(monitor.state.current.availableBytes > 0);
+      assert.ok(monitor.state.current.allocatedBytes === null || monitor.state.current.allocatedBytes >= 4096);
+    } finally { await monitor.stop(); }
+    const count = monitor.state.samples;
+    await fs.writeFile(path.join(output, 'after.bin'), 'watcher closed');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(monitor.state.samples, count);
+  }));
+
+test('source monitoring skips protected containers without following their junctions', () =>
+  fixture(async parent => {
+    const root = await mkdir(path.join(parent, 'source'));
+    const original = await mkdir(path.join(parent, 'originals'));
+    await fs.writeFile(path.join(original, 'original.map'), 'unchanged game input');
+    await fs.symlink(original, path.join(root, 'protected-runtime'), process.platform === 'win32' ? 'junction' : 'dir');
+    await fs.writeFile(path.join(root, 'source.ts'), 'source code');
+    const monitor = watchOutputBudget(root, { budget: 65536, excludeNames: ['protected-runtime'], intervalMs: 10000 });
+    await monitor.sample();
+    assert.equal(monitor.state.error, null);
+    assert.equal(monitor.state.current.files, 1);
+    assert.equal(monitor.state.current.logicalBytes, 11);
+    await monitor.stop();
+    assert.equal(await fs.readFile(path.join(original, 'original.map'), 'utf8'), 'unchanged game input');
+  }));
+
+test('live progress stays bound to its lease and a changed owner prevents cleanup', () =>
+  fixture(async parent => {
+    const root = await mkdir(path.join(parent, 'run')), finish = await beginQaStorage(root, options(parent));
+    const scratch = await finish.createScratch('scratch');
+    await fs.writeFile(path.join(scratch, 'keep.bin'), 'unknown changed ownership');
+    await finish.sample();
+    const file = path.join(root, 'storage-run.json');
+    const record = JSON.parse(await fs.readFile(file, 'utf8'));
+    assert.equal(record.monitoring.current.files >= 1, true);
+    assert.ok(['startup', 'explicit'].includes(record.monitoring.current.reason));
+    await fs.writeFile(file, JSON.stringify({ ...record, nonce: 'unrecognized-owner' }));
+    await finish.sample();
+    await assert.rejects(finish('failed'), /owner changed/);
+    assert.equal(await fs.readFile(path.join(scratch, 'keep.bin'), 'utf8'), 'unknown changed ownership');
+  }));
+
+test('the review-blocked preservation index cannot become a disposable output', () =>
+  fixture(async parent => {
+    const protectedFile = path.resolve('preserved/recovery-metadata/preservation-index.json');
+    const before = await fs.stat(protectedFile).catch(error => { if(error.code==='ENOENT')return null;throw error; });
+    const root = await mkdir(path.join(parent, 'run')), finish = await beginQaStorage(root, options(parent));
+    await assert.rejects(assertQaOutputPath(protectedFile), /canonical source/);
+    await assert.rejects(finish.registerDisposable(protectedFile), /owned QA scratch/);
+    await finish('passed');
+    const after = await fs.stat(protectedFile).catch(error => { if(error.code==='ENOENT')return null;throw error; });
+    assert.equal(after?.size, before?.size);
+    assert.equal(after?.mtimeMs, before?.mtimeMs);
   }));
 
 test('QA run records native source identity and outcome; removes only sealed scratch', () =>

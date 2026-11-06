@@ -19,8 +19,7 @@ import tarfile
 import tomllib
 import zipfile
 
-GATES = {"rust-workspace", "typescript", "frontend", "offline", "browser",
-         "native-diagnostics", "release-pipeline"}
+GATES = frozenset(json.loads(Path(__file__).with_name("required-gates.json").read_text(encoding="utf-8")))
 SOURCE_ROOTS = {"src", "src-tauri", "crates", "scripts", "tests", "docs",
                 "examples", "public", ".github"}
 FORBIDDEN_PARTS = {".git", ".local", ".research", ".toolchain", "node_modules", "artifacts", "tools", "preserved",

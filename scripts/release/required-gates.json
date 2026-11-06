@@ -1,0 +1,11 @@
+[
+  "source-interfaces",
+  "storage-ownership",
+  "rust-workspace",
+  "typescript",
+  "frontend",
+  "offline",
+  "browser",
+  "native-diagnostics",
+  "release-pipeline"
+]

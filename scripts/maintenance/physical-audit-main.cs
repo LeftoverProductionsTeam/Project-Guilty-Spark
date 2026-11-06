@@ -2,6 +2,14 @@
 // local to this process; no Windows policy or original content is changed.
 public static class SparkPhysicalMain {
     public static int Main(string[] args) {
+        if(args.Length>=2&&args[0]=="--summary"){
+            if(args.Length>130)return 2;
+            System.AppContext.SetSwitch("Switch.System.IO.UseLegacyPathHandling", false);
+            System.AppContext.SetSwitch("Switch.System.IO.BlockLongPaths", false);
+            var names=new string[args.Length-2];System.Array.Copy(args,2,names,0,names.Length);
+            try{System.Console.WriteLine(SparkPhysicalAudit.Summary(args[1],names));return 0;}
+            catch(System.Exception error){System.Console.Error.WriteLine(error.Message);return 1;}
+        }
         if(args.Length < 2 || args.Length > 3) return 2;
         System.AppContext.SetSwitch("Switch.System.IO.UseLegacyPathHandling", false);
         System.AppContext.SetSwitch("Switch.System.IO.BlockLongPaths", false);

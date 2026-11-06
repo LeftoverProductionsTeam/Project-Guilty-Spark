@@ -194,6 +194,13 @@ class PackageAcceptance(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Installed app'):
             package.seal(self.output, self.root / 'gates.json', self.root / 'startup.json',
                          self.root / 'install.json', self.root / 'bad.json')
+        for missing in ('source-interfaces', 'storage-ownership'):
+            incomplete = copy.deepcopy(gates)
+            incomplete['gates'] = [g for g in incomplete['gates'] if g['id'] != missing]
+            (self.root / 'incomplete-gates.json').write_text(json.dumps(incomplete), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'Full release test gates'):
+                package.seal(self.output, self.root / 'incomplete-gates.json', self.root / 'startup.json',
+                             self.root / 'install.json', self.root / 'installed-startup.json')
         package.seal(self.output, self.root / 'gates.json', self.root / 'startup.json',
                      self.root / 'install.json', self.root / 'installed-startup.json')
         package.verify(self.output)

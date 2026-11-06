@@ -41,7 +41,7 @@ try {
         await run('Frontend tests', ['node_modules/vitest/vitest.mjs', 'run']);
         await run('Source module contracts', ['--test', 'scripts/check-source-entrypoints.test.mjs']);
         await run('Offline regressions', ['scripts/frontend-tests.mjs', 'offline']);
-        await run('Storage ownership', ['--test', 'scripts/native-qa-storage.test.mjs']);
+        await run('Storage ownership', ['--test', 'scripts/native-qa-storage.test.mjs', 'scripts/repository-health.test.mjs']);
       }
       if (stages.includes('browser'))
         await run('Browser regressions', ['node_modules/@playwright/test/cli.js', 'test', '--reporter=line']);

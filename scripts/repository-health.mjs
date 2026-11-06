@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { readDevelopmentStorage } from './native-qa-storage.mjs';
 
 const retention = JSON.parse(
   fs.readFileSync(new URL('./maintenance/retention-policy.json', import.meta.url), 'utf8'),
@@ -57,7 +58,11 @@ export function classifyStorage(relative) {
     )
   )
     return { classification: 'Preserve', purpose: 'User-owned runtime installation/content' };
-  if (parts.includes('target') || parts.includes('validation-target') || p.startsWith('.local/build/cargo/')) {
+  if (
+    parts.includes('target') ||
+    parts.includes('validation-target') ||
+    p.startsWith('.local/build/cargo/')
+  ) {
     if (parts.includes('release') || parts.includes('examples'))
       return {
         classification: 'Preserve',
@@ -81,7 +86,8 @@ export function classifyStorage(relative) {
   if (parts.includes('.local') || parts.includes('artifacts') || parts.includes('test-results'))
     return {
       classification: 'Requires Review',
-      purpose: 'Owned jobs, tags, maps, logs or evidence; only explicitly sealed disposable output can be removed automatically',
+      purpose:
+        'Owned jobs, tags, maps, logs or evidence; only explicitly sealed disposable output can be removed automatically',
     };
   return { classification: 'Preserve', purpose: 'Source, documentation or unclassified user input' };
 }
@@ -276,9 +282,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const args = process.argv.slice(2);
   let root = process.cwd(),
     budget = DEFAULT_STORAGE_BUDGET_GIB,
-    storage = false;
+    storage = false,
+    active = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--storage') storage = true;
+    else if (args[i] === '--active') active = true;
     else if (args[i] === '--root' || args[i] === '--budget-gib') {
       const name = args[i],
         value = args[++i];
@@ -288,5 +296,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     } else throw Error(`Unknown option: ${args[i]}`);
   }
   if (!Number.isFinite(budget) || budget < 1) throw Error('Storage warning budget must be at least 1 GiB');
-  console.log(JSON.stringify(repositoryHealth(root, { storage, budgetGiB: budget }), null, 2));
+  const report = repositoryHealth(root, { storage, budgetGiB: budget });
+  if (active) report.developmentStorage = await readDevelopmentStorage(root);
+  console.log(JSON.stringify(report, null, 2));
 }

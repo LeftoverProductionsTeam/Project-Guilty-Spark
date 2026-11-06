@@ -2,7 +2,7 @@
 // may declare a NEW scratch namespace before any writer starts; that namespace
 // is disposable on success, failure or recovery, with explicit retained files.
 import fs from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
+import { createReadStream, watch as watchFs } from 'node:fs';
 import path from 'node:path';
 import { execFileSync, execFile, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -67,13 +67,14 @@ async function canonicalOutputPath(file) {
     missing.push(path.basename(ancestor));
   }
 }
-const projectRoot = await canonicalOutputPath(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
+const projectRoot = await canonicalOutputPath(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
+);
 const defaultQaRoot =
   process.env.SPARK_QA_STORAGE_ROOT ??
   path.join(
     os.tmpdir(),
-    'GuiltySpark-QA-' +
-      crypto.createHash('sha256').update(key(projectRoot)).digest('hex').slice(0, 12),
+    'GuiltySpark-QA-' + crypto.createHash('sha256').update(key(projectRoot)).digest('hex').slice(0, 12),
   );
 /** Runs before a harness creates its output, including legacy copied commands. */
 export async function assertQaOutputPath(
@@ -185,43 +186,61 @@ async function snapshot(root, maxBytes = policy.qaRunBytes) {
   rows.sort((a, b) => a.path.localeCompare(b.path));
   return { rows, bytes, files: rows.filter((row) => !row.directory).length };
 }
-async function measure(root, maxBytes) {
+async function measure(root, maxBytes, excludeNames = new Set()) {
   // WebView can atomically rename its last temp file after the app exits.
   // Restart the entire bounded measurement; never skip an unknown file or
   // weaken the hash/identity checks used for disposable deletion.
   for (let attempt = 0; ; attempt++) {
     try {
-      return await measureOnce(root, maxBytes);
+      return await measureOnce(root, maxBytes, excludeNames);
     } catch (error) {
       if (error.code !== 'ENOENT' || attempt >= 4) throw error;
       await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** attempt));
     }
   }
 }
-async function measureOnce(root, maxBytes) {
+async function measureOnce(root, maxBytes, excludeNames) {
   await noLinks(root);
   let bytes = 0,
-    files = 0;
+    files = 0,
+    directories = 1,
+    sharedFiles = 0,
+    allocatedBytes = 0;
+  const objects = new Set();
   const pending = [root];
   while (pending.length) {
     const directory = pending.pop();
     for (const item of await fs.readdir(directory, { withFileTypes: true })) {
+      if (directory === root && excludeNames.has(key(item.name))) continue;
       const file = path.join(directory, item.name);
-      const info = await fs.lstat(file);
+      const info = await fs.lstat(file, { bigint: true });
       if (info.isSymbolicLink()) throw Error('QA output contains a link; no cleanup or traversal attempted');
       if (info.isDirectory()) {
         if (path.relative(root, file).split(path.sep).length > 32)
           throw Error('QA output exceeds its depth limit');
         pending.push(file);
+        directories++;
       } else if (info.isFile()) {
-        bytes += info.size;
+        bytes += Number(info.size);
         files++;
+        if (info.nlink > 1n) sharedFiles++;
+        // libuv exposes allocation in 512-byte st_blocks units, including on
+        // current Windows. Missing data stays null, never inferred from length.
+        const id = info.ino ? `${info.dev}:${info.ino}` : key(file);
+        if (!objects.has(id)) {
+          objects.add(id);
+          const blocks = Number(info.blocks);
+          allocatedBytes =
+            allocatedBytes !== null && Number.isSafeInteger(blocks) && Number.isSafeInteger(blocks * 512)
+              ? allocatedBytes + blocks * 512
+              : null;
+        }
       } else throw Error('QA output contains a non-regular file');
-      if (bytes > maxBytes || files > 200000)
+      if (bytes > maxBytes || files + directories > 200000)
         throw Error('QA output exceeds its hard byte/file budget; preserved for review');
     }
   }
-  return { bytes, files };
+  return { bytes, files, directories, sharedFiles, allocatedBytes };
 }
 /** The shared compiler cache is retained, never automatically purged. Refuse
  * another compilation before its reserve can consume the remaining budget. */
@@ -275,30 +294,249 @@ async function atomicJson(file, value) {
   await fs.writeFile(temporary, JSON.stringify(value, null, 2), { flag: 'wx' });
   await fs.rename(temporary, file);
 }
+let allocationMeterCache;
+async function prepareAllocationMeter(run, finish) {
+  if (process.platform !== 'win32') return null;
+  const compiler = path.join(
+    process.env.SystemRoot ?? 'C:/Windows',
+    'Microsoft.NET/Framework64/v4.0.30319/csc.exe',
+  );
+  if (
+    !(
+      await fs.stat(compiler).catch((error) => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      })
+    )?.isFile()
+  )
+    return null;
+  const sources = ['physical-audit.cs', 'physical-audit-main.cs'].map((name) =>
+    path.join(projectRoot, 'scripts/maintenance', name),
+  );
+  const sourceSha256 = crypto
+    .createHash('sha256')
+    .update((await Promise.all(sources.map(fileHash))).join(':'))
+    .digest('hex');
+  const folder = await finish.createScratch('metadata-meter');
+  const executable = path.join(folder, 'allocation-meter.exe');
+  if (allocationMeterCache?.sourceSha256 === sourceSha256) {
+    await fs.writeFile(executable, allocationMeterCache.bytes, { flag: 'wx' });
+  } else {
+    let child;
+    const completion = new Promise((resolve, reject) => {
+      child = execFile(
+        compiler,
+        ['/nologo', '/optimize+', '/debug-', '/target:exe', '/out:' + executable, ...sources],
+        { windowsHide: true, timeout: 30000, maxBuffer: 65536 },
+        (error) => (error ? reject(error) : resolve()),
+      );
+    });
+    try {
+      await finish.trackProcess(child);
+      await completion;
+    } catch (error) {
+      await stopQaProcess(child);
+      await completion.catch(() => {});
+      throw error;
+    }
+    const info = await fs.lstat(executable);
+    if (!info.isFile() || info.size > 1024 * 1024) throw Error('Native allocation meter exceeds its bound');
+    if (
+      crypto
+        .createHash('sha256')
+        .update((await Promise.all(sources.map(fileHash))).join(':'))
+        .digest('hex') !== sourceSha256
+    )
+      throw Error('Allocation meter source changed during compilation');
+    allocationMeterCache = { sourceSha256, bytes: await fs.readFile(executable) };
+  }
+  const sha256 = await fileHash(executable);
+  return {
+    executable,
+    sha256,
+    sourceSha256,
+    async read(root, excluded) {
+      await noLinks(executable);
+      if ((await fileHash(executable)) !== sha256) throw Error('Native allocation meter identity changed');
+      const text = await new Promise((resolve, reject) =>
+        execFile(
+          executable,
+          ['--summary', root, ...excluded],
+          { windowsHide: true, timeout: 30000, maxBuffer: 65536 },
+          (error, stdout) => (error ? reject(error) : resolve(stdout)),
+        ),
+      );
+      const value = JSON.parse(text);
+      if (value.errors > 0 && value.errors === value.transientErrors && !value.reparseEntries) {
+        const error = Error('Native metadata changed during sampling: ' + value.firstIssue);
+        error.code = 'ENOENT';
+        throw error;
+      }
+      if (
+        key(ordinary(value.path)) !== key(ordinary(root)) ||
+        value.errors ||
+        value.reparseEntries ||
+        ![
+          value.logicalBytes,
+          value.uniqueAllocatedFileBytes,
+          value.files,
+          value.directories,
+          value.multiLinkEntries,
+        ].every((n) => Number.isSafeInteger(n) && n >= 0) ||
+        value.files + value.directories > 200000
+      )
+        throw Error(
+          'Native allocation inventory refused: ' +
+            (value.firstIssue || 'path, entry bound or reparse identity differs'),
+        );
+      return {
+        bytes: value.logicalBytes,
+        allocatedBytes: value.uniqueAllocatedFileBytes,
+        files: value.files,
+        directories: value.directories,
+        sharedFiles: value.multiLinkEntries,
+        childCpuMs: value.processCpuMs,
+        allocationMethod:
+          'FileStandardInfo.Allocation; deduplicated volume/file IDs; excludes filesystem overhead/shared-extent reclaimability',
+      };
+    },
+  };
+}
 /** Sampling is a stop threshold, not an OS disk quota: a native tool can write
  * between samples. Never advertise it as a hard per-write filesystem limit. */
 export function watchOutputBudget(
   root,
-  { budget, minimumFree = 0, intervalMs = policy.qaSampleIntervalMs, onExceeded = async () => {} },
+  {
+    budget,
+    minimumFree = 0,
+    intervalMs = Number(process.env.SPARK_STORAGE_SAMPLE_INTERVAL_MS ?? policy.qaSampleIntervalMs),
+    onExceeded = async () => {},
+    onSample = async () => {},
+    excludeNames = [],
+    notifications = true,
+    allocationReader = async () => null,
+  },
 ) {
   if (
     ![budget, minimumFree, intervalMs].every(Number.isSafeInteger) ||
     budget < 1 ||
     minimumFree < 0 ||
-    intervalMs < 10
+    intervalMs < 10 ||
+    intervalMs > 300000 ||
+    excludeNames.some((name) => !name || /[/\\]/.test(name) || name === '..')
   )
     throw Error('Invalid output monitor limits');
-  const state = { peakLogicalBytes: 0, peakFiles: 0, samples: 0, error: null, stopped: false };
-  let pending, timer;
-  const sample = () => {
+  const excluded = new Set(excludeNames.map(key));
+  const state = {
+    root: path.resolve(root),
+    intervalMs,
+    excludedTopLevel: [...excluded],
+    current: null,
+    initial: null,
+    peakLogicalBytes: 0,
+    peakAllocatedBytes: null,
+    peakFiles: 0,
+    peakDirectories: 0,
+    samples: 0,
+    filesystemEvents: 0,
+    samplingMs: 0,
+    samplingChildCpuMs: 0,
+    notificationMode: notifications ? 'starting' : 'disabled',
+    allocationMethod: 'not-yet-measured',
+    error: null,
+    stopped: false,
+  };
+  const watchers = new Map();
+  let pending,
+    timer,
+    eventTimer,
+    lastSample = 0;
+  const eventDelay = Math.min(intervalMs / 2, 5000);
+  const changed = (_event, filename) => {
+    if (state.stopped || state.error) return;
+    const first = filename?.toString().split(/[/\\]/)[0];
+    if (first && (excluded.has(key(first)) || /^storage-run\.json(?:\.tmp-|$)/.test(first))) return;
+    state.filesystemEvents++;
+    if (!eventTimer) {
+      eventTimer = setTimeout(
+        () => {
+          eventTimer = null;
+          void sample('filesystem');
+        },
+        Math.max(25, eventDelay - (performance.now() - lastSample)),
+      );
+      eventTimer.unref();
+    }
+  };
+  const subscribe = async (exists) => {
+    if (!notifications || state.stopped || state.error) return;
+    const targets = [];
+    if (exists) {
+      targets.push([root, excluded.size === 0]);
+      // Do not register recursive watchers on Git, installed games or SDKs.
+      if (excluded.size)
+        for (const entry of await fs.readdir(root, { withFileTypes: true })) {
+          if (entry.isDirectory() && !entry.isSymbolicLink() && !excluded.has(key(entry.name)))
+            targets.push([path.join(root, entry.name), true]);
+        }
+    } else {
+      let parent = path.dirname(path.resolve(root));
+      while (
+        !(await fs.lstat(parent).catch((error) => {
+          if (error.code === 'ENOENT') return null;
+          throw error;
+        }))
+      )
+        parent = path.dirname(parent);
+      await noLinks(parent);
+      targets.push([parent, false]);
+    }
+    if (targets.length > 128)
+      throw Error('Storage notification root limit exceeded; use explicit inspection');
+    const keep = new Set(targets.map(([directory, recursive]) => `${directory}:${recursive}`));
+    for (const [id, watcher] of watchers)
+      if (!keep.has(id)) {
+        watcher.close();
+        watchers.delete(id);
+      }
+    for (const [directory, recursive] of targets) {
+      const id = `${directory}:${recursive}`;
+      if (watchers.has(id)) continue;
+      try {
+        const watcher = watchFs(directory, { recursive }, changed);
+        watcher.on('error', (error) => {
+          watcher.close();
+          watchers.delete(id);
+          state.notificationMode = 'periodic-reconciliation';
+          state.notificationIssue = error.code ?? String(error);
+        });
+        watcher.unref();
+        watchers.set(id, watcher);
+        state.notificationMode = 'filesystem-and-periodic-reconciliation';
+      } catch (error) {
+        state.notificationMode = 'periodic-reconciliation';
+        state.notificationIssue = error.code ?? String(error);
+      }
+    }
+  };
+  const sample = (reason = 'explicit') => {
+    if (state.stopped) return Promise.resolve();
     if (pending) return pending;
+    lastSample = performance.now();
     pending = (async () => {
+      const started = performance.now();
       try {
         const exists = await fs.lstat(root).catch((error) => {
           if (error.code === 'ENOENT') return null;
           throw error;
         });
-        const used = exists ? await measure(root, Number.MAX_SAFE_INTEGER) : { bytes: 0, files: 0 };
+        const used = exists
+          ? ((await allocationReader(root, excluded)) ??
+            (await measure(root, Number.MAX_SAFE_INTEGER, excluded)))
+          : { bytes: 0, files: 0, directories: 0, allocatedBytes: 0 };
+        // Windows' 512-byte stat units truncate resident-file data. Only the
+        // native reader may advertise exact NTFS allocation, never that floor.
+        if (exists && process.platform === 'win32' && !used.allocationMethod) used.allocatedBytes = null;
         let volumeRoot = path.resolve(root);
         while (
           !(await fs.stat(volumeRoot).catch((error) => {
@@ -308,11 +546,34 @@ export function watchOutputBudget(
         )
           volumeRoot = path.dirname(volumeRoot);
         const volume = await fs.statfs(volumeRoot);
+        const availableBytes = Number(volume.bavail) * Number(volume.bsize);
         state.samples++;
+        state.samplingChildCpuMs += used.childCpuMs ?? 0;
+        state.current = {
+          logicalBytes: used.bytes,
+          allocatedBytes: used.allocatedBytes,
+          files: used.files,
+          sharedFiles: used.sharedFiles ?? 0,
+          directories: used.directories,
+          availableBytes,
+          verifiedAt: new Date().toISOString(),
+          reason,
+        };
+        state.allocationMethod =
+          used.allocationMethod ??
+          (used.allocatedBytes === null
+            ? 'unavailable; native-reader-required-for-NTFS'
+            : 'libuv-stat-blocks-512-file-identity-deduplicated');
+        state.initial ??= state.current;
         state.peakLogicalBytes = Math.max(state.peakLogicalBytes, used.bytes);
         state.peakFiles = Math.max(state.peakFiles, used.files);
-        if (used.bytes > budget || Number(volume.bavail) * Number(volume.bsize) < minimumFree)
+        state.peakDirectories = Math.max(state.peakDirectories, used.directories);
+        if (used.allocatedBytes !== null)
+          state.peakAllocatedBytes = Math.max(state.peakAllocatedBytes ?? 0, used.allocatedBytes);
+        await subscribe(exists);
+        if (Math.max(used.bytes, used.allocatedBytes ?? 0) > budget || availableBytes < minimumFree)
           throw Error('Generated output crossed its storage budget or minimum free-disk floor');
+        await onSample({ ...state });
       } catch (error) {
         // Rust and WebView atomically rename short-lived files while running.
         // Missing entries invalidate this live sample, not the operation. Final
@@ -324,12 +585,17 @@ export function watchOutputBudget(
         if (!state.error) {
           state.error = String(error);
           clearInterval(timer);
+          clearTimeout(eventTimer);
+          for (const watcher of watchers.values()) watcher.close();
+          watchers.clear();
           try {
             await onExceeded(error);
           } catch (stopError) {
             state.stopError = String(stopError);
           }
         }
+      } finally {
+        state.samplingMs += performance.now() - started;
       }
     })().finally(() => {
       pending = null;
@@ -337,16 +603,20 @@ export function watchOutputBudget(
     return pending;
   };
   timer = setInterval(() => {
-    void sample();
+    void sample('periodic');
   }, intervalMs);
   timer.unref();
+  void sample('startup');
   return {
     state,
     sample,
     async stop() {
-      clearInterval(timer);
-      if (pending) await pending;
       state.stopped = true;
+      clearInterval(timer);
+      clearTimeout(eventTimer);
+      for (const watcher of watchers.values()) watcher.close();
+      watchers.clear();
+      if (pending) await pending;
       return { ...state };
     },
   };
@@ -595,6 +865,7 @@ export async function beginQaStorage(
     minimumFreeBytes = policy.qaMinimumFreeBytes,
     totalBytes = policy.qaTotalBytes,
     operation = 'qa',
+    nativeAllocation = false,
   },
 ) {
   const absolute = await assertQaOutputPath(root, { reservationBytes, operation }),
@@ -696,14 +967,16 @@ export async function beginQaStorage(
       encoding: 'utf8',
       windowsHide: true,
     }).trim();
-    const harness = process.argv[1]
-      ? path.resolve(process.argv[1])
-      : fileURLToPath(import.meta.url);
+    const harness =
+      process.argv[1] && process.argv[1] !== '-'
+        ? path.resolve(process.argv[1])
+        : fileURLToPath(import.meta.url);
     record = {
       schemaVersion: 3,
       nonce: crypto.randomUUID(),
       workflow,
-      harnessOrigin: process.argv[1] ? 'script' : 'storage-api-inline',
+      harnessOrigin:
+        process.argv[1] === '-' ? 'storage-api-stdin' : process.argv[1] ? 'script' : 'storage-api-inline',
       root: absolute,
       sourceCommit,
       sourceDirty,
@@ -746,21 +1019,82 @@ export async function beginQaStorage(
     retained: [],
   };
   const writers = new Set();
+  // Serialize progress with process-registration writes. The same nonce-bound
+  // receipt/lease remains the only ledger; no append-only monitoring database.
+  let metadataWrite = Promise.resolve();
+  const persistRecord = () => {
+    metadataWrite = metadataWrite.then(async () => {
+      for (const file of [output, leaseFile]) {
+        await noLinks(file);
+        if ((await fs.stat(file)).size > 256 * 1024) throw Error('QA owner metadata exceeds its bound');
+        const previous = JSON.parse(await fs.readFile(file, 'utf8'));
+        if (
+          previous.nonce !== record.nonce ||
+          previous.ownerPid !== record.ownerPid ||
+          key(previous.root) !== key(record.root) ||
+          !previous.active
+        )
+          throw Error('QA progress owner changed; unrelated files remain protected');
+      }
+      await atomicJson(output, record);
+      await atomicJson(leaseFile, record);
+    });
+    return metadataWrite;
+  };
+  let finished = false,
+    allocationMeter;
   const monitor = watchOutputBudget(absolute, {
     budget: reservationBytes,
     minimumFree: minimumFreeBytes,
+    allocationReader: (root, excluded) => allocationMeter?.read(root, excluded) ?? null,
     onExceeded: async () => {
       await Promise.all([...writers].map(stopQaProcess));
     },
+    onSample: async (summary) => {
+      if (!finished) {
+        record.monitoring = summary;
+        await persistRecord();
+      }
+    },
   });
-  let finished = false;
+  const sourceMonitor =
+    workflow === 'source-development'
+      ? watchOutputBudget(projectRoot, {
+          budget: Number.MAX_SAFE_INTEGER,
+          excludeNames: [
+            '.git',
+            '.toolchain',
+            'node_modules',
+            'tools',
+            '.research',
+            'preserved',
+            'releases',
+            'Halo Custom Edition',
+            'opencehalo-windows-release',
+            'chupathingyce-windows64-release',
+            'Pyros Zombie Apocolypse Mod Versions',
+            'SAMPLE CODE',
+            'Halo - Combat Evolved (USA).xiso.iso',
+          ],
+          allocationReader: (root, excluded) => allocationMeter?.read(root, excluded) ?? null,
+          onSample: async (summary) => {
+            if (!finished) {
+              record.sourceMonitoring = summary;
+              await persistRecord();
+            }
+          },
+        })
+      : null;
   const finish = async (status) => {
     if (finished || !['passed', 'failed', 'interrupted'].includes(status))
       throw Error('One explicit native QA outcome required');
     if ([...writers].some((child) => child.exitCode === null && child.signalCode === null))
       throw Error('Active QA writer protects scratch');
-    await monitor.sample();
+    await sourceMonitor?.sample('completion');
+    const sourceMonitoring = await sourceMonitor?.stop();
+    await monitor.sample('completion');
     const monitoring = await monitor.stop();
+    await metadataWrite;
     let disposedBytes = 0;
     for (const seal of disposables)
       disposedBytes += (await disposeQaScratch(absolute, seal, { ownerFinished: true })).bytes;
@@ -777,8 +1111,22 @@ export async function beginQaStorage(
       logicalBytes: measured.bytes,
       files: measured.files,
       disposedBytes,
+      disposedAllocatedFileBytes:
+        monitoring.current?.sharedFiles === 0 &&
+        measured.sharedFiles === 0 &&
+        monitoring.current.allocatedBytes !== null &&
+        measured.allocatedBytes !== null
+          ? Math.max(0, monitoring.current.allocatedBytes - measured.allocatedBytes)
+          : null,
+      postCleanup: {
+        logicalBytes: measured.bytes,
+        allocatedBytes: measured.allocatedBytes,
+        files: measured.files,
+        directories: measured.directories,
+      },
       retained: registry.retained,
       monitoring,
+      ...(sourceMonitoring ? { sourceMonitoring } : {}),
       evidenceOverBudget,
     };
     await atomicJson(output, result);
@@ -833,8 +1181,7 @@ export async function beginQaStorage(
       throw Error('QA writer must be an owned child process');
     writers.add(child);
     record.writers = [...writers].map((child) => child.pid);
-    await atomicJson(output, record);
-    await atomicJson(leaseFile, record);
+    await persistRecord();
   };
   finish.sample = monitor.sample;
   finish.interrupt = async () => {
@@ -856,6 +1203,23 @@ export async function beginQaStorage(
     await atomicJson(path.join(absolute, 'disposable-seals.json'), disposables);
     return seal;
   };
+  if (nativeAllocation) {
+    try {
+      allocationMeter = await prepareAllocationMeter(absolute, finish);
+    } catch (error) {
+      await finish('failed');
+      throw error;
+    }
+    if (allocationMeter) {
+      record.allocationMeter = {
+        executable: allocationMeter.executable,
+        sha256: allocationMeter.sha256,
+        sourceSha256: allocationMeter.sourceSha256,
+      };
+      await persistRecord();
+      await monitor.sample('native-allocation-ready');
+    }
+  }
   return finish;
 }
 
@@ -892,14 +1256,19 @@ export async function withDevelopmentWorkspace(
     await noLinks(directory);
     if (key(await canonicalOutputPath(process.env.SPARK_GENERATED_ROOT ?? '')) !== key(directory))
       throw Error('Generated output escaped its build owner');
-    if (key(await canonicalOutputPath(process.env.CARGO_TARGET_DIR ?? '')) !== key(path.join(directory, 'target')))
+    if (
+      key(await canonicalOutputPath(process.env.CARGO_TARGET_DIR ?? '')) !==
+      key(path.join(directory, 'target'))
+    )
       throw Error(
         'Compiler output escaped its build owner; obsolete .local and retained cache overrides are refused',
       );
     return action({ directory, env: { ...process.env }, trackProcess: async () => {} });
   }
   const identity = crypto.createHash('sha256').update(key(projectRoot)).digest('hex').slice(0, 12);
-  const base = await assertQaOutputPath(path.join(os.tmpdir(), `GuiltySpark-Development-${identity}`), { reservationBytes: 0 });
+  const base = await assertQaOutputPath(path.join(os.tmpdir(), `GuiltySpark-Development-${identity}`), {
+    reservationBytes: 0,
+  });
   await fs.mkdir(base, { recursive: true });
   // Recover ONLY declared scratch from dead owners. Unknown files and running
   // compilers stay protected; do not evict them to satisfy a new reservation.
@@ -937,6 +1306,7 @@ export async function withDevelopmentWorkspace(
   const finish = await beginQaStorage(run, {
     workflow: 'source-development',
     operation: 'build',
+    nativeAllocation: true,
     appSha256: await fileHash(new URL('./native-qa-storage.mjs', import.meta.url)),
     reservationBytes,
     storageRoot: base,
@@ -987,10 +1357,104 @@ export async function withDevelopmentWorkspace(
         workflow,
         temporaryOutputDisposed: true,
         disposedLogicalBytes: result.disposedBytes,
+        disposedAllocatedFileBytes: result.disposedAllocatedFileBytes ?? null,
         peakLogicalBytes: result.monitoring?.peakLogicalBytes,
+        allocatedBytes: result.monitoring?.current?.allocatedBytes ?? null,
+        monitoringSamples: result.monitoring?.samples,
+        monitoringMs: result.monitoring?.samplingMs,
+        sourceMonitoring: result.sourceMonitoring
+          ? {
+              scope: 'Source and new top-level output; protected games/Git/dependencies are not traversed',
+              currentLogicalBytes: result.sourceMonitoring.current?.logicalBytes,
+              peakLogicalBytes: result.sourceMonitoring.peakLogicalBytes,
+              excludedTopLevel: result.sourceMonitoring.excludedTopLevel,
+              error: result.sourceMonitoring.error,
+            }
+          : null,
       }),
     );
   }
+}
+/** Read live summaries from the existing nonce-bound leases, not a new index.
+ * This view has no cleanup authority and never walks source/game/Git trees. */
+export async function readDevelopmentStorage(checkout = projectRoot) {
+  const source = await canonicalOutputPath(checkout);
+  const identity = crypto.createHash('sha256').update(key(source)).digest('hex').slice(0, 12);
+  const base = await canonicalOutputPath(path.join(os.tmpdir(), `GuiltySpark-Development-${identity}`));
+  const report = {
+    readOnly: true,
+    source,
+    root: base,
+    runs: [],
+    issues: [],
+    intervalMs: Number(process.env.SPARK_STORAGE_SAMPLE_INTERVAL_MS ?? policy.qaSampleIntervalMs),
+    note: 'Current/peak file allocation excludes filesystem overhead. Volume free space includes unrelated activity. Only sealed operation cleanup can authorize disposal.',
+  };
+  const entries = await fs.readdir(base, { withFileTypes: true }).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  if (entries.length > 2048) throw Error('Development storage index exceeds its inspection bound');
+  const read = async (file) => {
+    await noLinks(file);
+    const info = await fs.lstat(file);
+    if (!info.isFile() || info.size > 256 * 1024) throw Error('Unknown or oversized operation metadata');
+    return JSON.parse(await fs.readFile(file, 'utf8'));
+  };
+  for (const entry of entries) {
+    if (!/^run-[\w-]+$/.test(entry.name)) continue;
+    const run = path.join(base, entry.name);
+    try {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) throw Error('Linked or unknown operation root');
+      const record = await read(path.join(run, 'storage-run.json'));
+      const lease = await read(
+        path.join(base, '.leases', crypto.createHash('sha256').update(key(run)).digest('hex') + '.json'),
+      );
+      if (
+        record.schemaVersion !== 3 ||
+        record.workflow !== 'source-development' ||
+        key(record.root) !== key(run) ||
+        !/^[a-f0-9]{40}$/.test(record.sourceCommit ?? '') ||
+        typeof record.nonce !== 'string' ||
+        record.nonce !== lease.nonce ||
+        record.ownerPid !== lease.ownerPid ||
+        key(lease.root) !== key(run) ||
+        JSON.stringify(record.writers) !== JSON.stringify(lease.writers)
+      )
+        throw Error('Operation and lease ownership differ; wait or review this exact item');
+      report.runs.push({
+        root: run,
+        ownerPid: record.ownerPid,
+        writerPids: record.writers,
+        ownerLive: isLive(record.ownerPid),
+        active: record.active,
+        sourceCommit: record.sourceCommit,
+        sourceDirty: record.sourceDirty,
+        producer: path.basename(record.harness),
+        origin: record.harnessOrigin,
+        startedAt: record.startedAt,
+        reservedBytes: record.reservedBytes,
+        status: record.status,
+        investigation: {
+          thresholdBytes: 50 * 1024 ** 2,
+          exceeded:
+            Math.max(record.monitoring?.peakLogicalBytes ?? 0, record.monitoring?.peakAllocatedBytes ?? 0) >
+            50 * 1024 ** 2,
+          purpose: 'Fresh generated build/test output; referenced source remains outside this namespace',
+          owner: record.ownerPid,
+          maximumExpectedBytes: record.reservedBytes,
+          lifetime: 'Until owned writers exit and sealed completion/interruption cleanup passes',
+          cleanup:
+            'Exact nonce, identity and unchanged-content/declaration checks; no age/size-only deletion',
+        },
+        monitoring: record.monitoring ?? null,
+        sourceMonitoring: record.sourceMonitoring ?? null,
+      });
+    } catch (error) {
+      report.issues.push({ root: run, issue: String(error), automaticCleanup: false });
+    }
+  }
+  return report;
 }
 export async function retainGeneratedSchemaState(checkout = projectRoot) {
   const directory = path.join(checkout, 'src-tauri', 'gen', 'schemas'),
