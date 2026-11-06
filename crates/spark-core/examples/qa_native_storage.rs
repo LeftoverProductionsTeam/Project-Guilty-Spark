@@ -7,7 +7,7 @@ use spark_core::{
 use std::{
     fs,
     path::PathBuf,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{atomic::{AtomicBool,Ordering}, Arc},
     time::Instant,
 };
 fn run() -> Result<()> {
@@ -122,6 +122,18 @@ fn run() -> Result<()> {
         println!("{}", record);
         return Ok(());
     }
+    // Request cancellation only after actual native structure output. The
+    // production runner must wait for the staged tag writer to exit naturally.
+    let active_cancel=Arc::new(AtomicBool::new(false));let saw_writer=AtomicBool::new(false);
+    let cancel_events=std::sync::Mutex::new(Vec::new());let cancel_root=args[4].join("cancelled-jobs");
+    let cancelled=forge_build::run_job(&p,&tools,&cancel_root,&uuid::Uuid::new_v4().to_string(),false,vec![],active_cancel.clone(),|e|{
+        if e.phase=="structure"&&!e.message.starts_with("tool.exe ")&&!e.message.starts_with("tool ") {
+            saw_writer.store(true,Ordering::Relaxed);active_cancel.store(true,Ordering::Relaxed);
+        }
+        if e.phase=="structure"||e.phase=="cancelled"{cancel_events.lock().unwrap().push(e);}
+    })?;
+    if !saw_writer.load(Ordering::Relaxed)||cancelled.status!="cancelled"||cancelled.build.is_some()||!cancelled.blockers.iter().any(|text|text.contains("after native tag write completed"))||maps::hash_file(build.output.as_ref().unwrap())?!=*build.sha256.as_ref().unwrap(){return Err(SparkError::Invalid("Active native writer cancellation did not preserve the previous-good build and natural Tool completion".into()));}
+    let cancellation=serde_json::json!({"status":cancelled.status,"realStructureOutputObserved":true,"nativeWriterFinishedNaturally":true,"newBuildAdopted":false,"previousGoodBuildUnchanged":true,"events":cancel_events.into_inner().unwrap()});
     p.builds.push(build.clone());
     let sources = receipt.sources.as_ref().unwrap();
     let baseline = storage::measure(&args[4])?;
@@ -327,7 +339,7 @@ fn run() -> Result<()> {
             "Compiled native door does not retain the actual external edit".into(),
         ));
     }
-    let report = serde_json::json!({"complete":true,"nativeCompilation":true,"gameplayRetested":false,"filesystemCondition":"Warm local filesystem; fresh owned native job, no OS cache flush", "acceptedDoorSourceUnchanged":true,"fixtureImportsReboundToExistingSdkTags":rebound,"freshBuildMs":cold_ms,"initial":initial,"afterFirstBuild":baseline,"afterTenUnchangedRequests":after,"repeat":repeated,"additionalNativeTreesDuringReuse":0,"sameAllocatedAfterRepeats":baseline.allocated_bytes==after.allocated_bytes,"inputFilesFreshlyVerified":input_hashes.len(),"compiledTags":staged_inventory.len(),"scripts":inspection.scripts,"build":build,"acceptedBuilds":accepted,"reopenSameMap":{"projectId":opened.id,"sameSourceAllocation":imports_before.allocated_bytes==imports_after.allocated_bytes},"externalEdit":{"writer":"Installed Invader -S bounding_radius 0.5","nativeParserAcceptedValidEdit":true,"corruptSaveBlocked":invalid.blocked(),"nativeParserRejectedCorruption":parser_rejected,"validBytesRecoveredExactly":true,"parentUnchanged":tool_transaction::inventory(&staged)?==base,"reconciliation":reconciliation,"compiledBoundingRadius":radius,"editedBuild":changed_build},"completeWorkflowStorage":storage::measure(&args[4])?,"storage":storage::Store::for_output(&jobs.join("next"))?.overview()?});
+    let report = serde_json::json!({"complete":true,"nativeCompilation":true,"activeWriterCancellation":cancellation,"gameplayRetested":false,"filesystemCondition":"Warm local filesystem; fresh owned native job, no OS cache flush", "acceptedDoorSourceUnchanged":true,"fixtureImportsReboundToExistingSdkTags":rebound,"freshBuildMs":cold_ms,"initial":initial,"afterFirstBuild":baseline,"afterTenUnchangedRequests":after,"repeat":repeated,"additionalNativeTreesDuringReuse":0,"sameAllocatedAfterRepeats":baseline.allocated_bytes==after.allocated_bytes,"inputFilesFreshlyVerified":input_hashes.len(),"compiledTags":staged_inventory.len(),"scripts":inspection.scripts,"build":build,"acceptedBuilds":accepted,"reopenSameMap":{"projectId":opened.id,"sameSourceAllocation":imports_before.allocated_bytes==imports_after.allocated_bytes},"externalEdit":{"writer":"Installed Invader -S bounding_radius 0.5","nativeParserAcceptedValidEdit":true,"corruptSaveBlocked":invalid.blocked(),"nativeParserRejectedCorruption":parser_rejected,"validBytesRecoveredExactly":true,"parentUnchanged":tool_transaction::inventory(&staged)?==base,"reconciliation":reconciliation,"compiledBoundingRadius":radius,"editedBuild":changed_build},"completeWorkflowStorage":storage::measure(&args[4])?,"storage":storage::Store::for_output(&jobs.join("next"))?.overview()?});
     project::atomic_write(
         &args[4].join("acceptance.json"),
         &serde_json::to_vec_pretty(&report)?,

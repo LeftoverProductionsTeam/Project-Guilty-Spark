@@ -91,7 +91,37 @@ impl Library {
     pub fn workspace(root:&Path)->Result<Self>{
         let mut library=Self::open(root)?;
         library.session=Some(Box::new(Self::memory(root)?));
+        library.recover_interrupted_saves()?;
         Ok(library)
+    }
+    /// Reindex only a complete, hash-bound explicit Save left by an interrupted
+    /// SQLite commit. Legacy/unknown/partial imports remain untouched.
+    fn recover_interrupted_saves(&self)->Result<()> {
+        let root=self.root.join("projects");crate::reject_links(&root)?;
+        let entries=match fs::read_dir(&root){Ok(entries)=>entries,Err(e) if e.kind()==std::io::ErrorKind::NotFound=>return Ok(()),Err(e)=>return Err(e.into())};
+        let mut scanned=0usize;let mut bytes=0u64;
+        for entry in entries {
+            let entry=entry?;scanned+=1;
+            if scanned>4096{return invalid("Project discovery exceeds 4096 directories; saved content retained for manual review");}
+            let path=entry.path();let id=entry.file_name().to_string_lossy().into_owned();
+            if uuid::Uuid::parse_str(&id).is_err()||self.is_saved(&id)?||crate::reject_links(&path).is_err(){continue;}
+            let file=path.join("project.gsproject");let head=path.join("window-history/head.json");
+            if !file.is_file()||!head.is_file(){continue;}
+            bytes=bytes.saturating_add(fs::metadata(&file)?.len());
+            if bytes>128*1024*1024{return invalid("Interrupted Save discovery exceeds its 128 MiB metadata budget; content retained");}
+            let Ok(project)=project::load_project(&file) else{continue};
+            if project.id!=id||!matches!(crate::workspace_history::recoverable_save(&path.join("window-history"),&project),Ok(true)){continue;}
+            let Ok(_owner)=crate::storage::lock(&path.join("save.lock")) else{continue};
+            // Reload under the existing Save lock: another completing first
+            // Save may have changed the descriptor while discovery waited.
+            let expected=project::FileRevision::capture(&file)?;
+            let project=project::load_project(&file)?;expected.verify(&file)?;
+            if project.id!=id||!crate::workspace_history::recoverable_save(&path.join("window-history"),&project)?{continue;}
+            // Same descriptor bytes; retain that identity across an index wait.
+            // No map, dependency tree or historical archive is copied.
+            self.save_internal_checked(&project,None,false,Some(&expected))?;
+        }
+        Ok(())
     }
     pub fn is_memory_first(&self)->bool{self.session_only||self.session.is_some()}
     pub fn is_saved(&self,id:&str)->Result<bool>{
@@ -165,10 +195,31 @@ impl Library {
         }
         let dir = self.project_dir(id)?;
         let file=dir.join("project.gsproject");
-        let project=project::load_project(&file)?;
+        let mut project=project::load_project(&file)?;
         if let Some(session)=&self.session{
+            // Compiler completion owns metadata, not an implicit authored Save.
+            // Its existing persistent receipt can restore the current build on
+            // reopen without rewriting source or scanning historical job trees.
+            if project.quick_forge.is_some() {
+                let encoded=match self.db.query_row("SELECT CASE WHEN length(CAST(value AS BLOB))<=4194304 THEN value ELSE NULL END FROM settings WHERE key=?1",[format!("quickforge.receipt.{id}")],|row|row.get::<_,Option<String>>(0)) {
+                    Ok(Some(value))=>Some(value),
+                    Ok(None)=>return invalid("Native build metadata exceeds 4 MiB; source and receipt retained for review"),
+                    Err(rusqlite::Error::QueryReturnedNoRows)=>None,
+                    Err(error)=>return Err(error.into()),
+                };
+                if let Some(encoded)=encoded {
+                    let receipt:crate::forge_build::QuickForgeBuildReceipt=serde_json::from_str(&encoded)?;
+                    if receipt.schema_version==1&&receipt.project_id==project.id&&receipt.status=="validated"&&receipt.project_fingerprint==project.fingerprint()? {
+                        if let Some(build)=receipt.build {
+                            if build.status=="validated"&&build.id==receipt.job_id&&build.project_fingerprint==receipt.project_fingerprint&&!project.builds.iter().any(|old|old.id==build.id) {project.builds.push(build);}
+                        }
+                    }
+                }
+            }
+            // Actual native operations still validate the owned job/output,
+            // source fingerprint and byte hashes through verified_build.
             session.save(&project,None)?;
-            session.set_setting(&format!("savedBaseline.{id}"),&maps::hash_file(&file)?)?;
+            session.set_setting(&format!("savedBaseline.{id}"),&project::FileRevision::capture(&file)?)?;
         }
         Ok(project)
     }
@@ -229,7 +280,20 @@ impl Library {
     }
     /// Only the explicit Save command adopts a workbench document on disk.
     /// Source maps remain referenced in place and must still match their hash.
+    pub fn save_with_history(&self,history:&mut crate::workspace_history::Session,project:&Project)->Result<LibraryEntry>{
+        self.validate_explicit_save(project)?;
+        let dir=self.project_dir(&project.id)?;fs::create_dir_all(&dir)?;
+        let _save_owner=crate::storage::lock(&dir.join("save.lock"))?;
+        self.validate_explicit_save(project)?;
+        history.save_with(&dir.join("window-history"),project,||self.save_explicit_unlocked(project,None))
+    }
     pub fn save_explicit(&self,project:&Project,inspection:Option<&maps::MapInspection>)->Result<LibraryEntry>{
+        self.validate_explicit_save(project)?;
+        let dir=self.project_dir(&project.id)?;fs::create_dir_all(&dir)?;
+        let _save_owner=crate::storage::lock(&dir.join("save.lock"))?;
+        self.save_explicit_unlocked(project,inspection)
+    }
+    fn validate_explicit_save(&self,project:&Project)->Result<project::FileRevision> {
         if self.is_preview(&project.id)?{return invalid("Open the source map before saving a background preview");}
         // Referenced OBJ/audio inputs are re-admitted before publishing a
         // descriptor. A changed external asset cannot become a valid Save.
@@ -240,22 +304,30 @@ impl Library {
         }
         if self.session_only{return invalid("This standalone memory library has no persistent Save destination");}
         let file=self.project_dir(&project.id)?.join("project.gsproject");
+        let actual=project::FileRevision::capture(&file)?;
         if let Some(session)=&self.session{
-            let expected:Option<String>=session.setting(&format!("savedBaseline.{}",project.id))?;
-            match (expected,file.exists()){
-                (Some(expected),true) if maps::hash_file(&file)?==expected=>{},
+            let expected:Option<project::FileRevision>=session.setting(&format!("savedBaseline.{}",project.id))?;
+            match (expected,actual.sha256.is_some()){
+                (Some(expected),true) if expected==actual=>{},
                 (None,false)=>{},
                 _=>return invalid("The saved project changed outside this session. Review the external revision before saving; the existing file was retained"),
             }
         }
-        let entry=self.save_internal(project,inspection,false)?;
+        Ok(actual)
+    }
+    fn save_explicit_unlocked(&self,project:&Project,inspection:Option<&maps::MapInspection>)->Result<LibraryEntry>{
+        let expected=self.validate_explicit_save(project)?;
+        let entry=self.save_internal_checked(project,inspection,false,Some(&expected))?;
         if let Some(session)=&self.session{
             session.save(project,inspection)?;
-            session.set_setting(&format!("savedBaseline.{}",project.id),&maps::hash_file(&file)?)?;
+            session.set_setting(&format!("savedBaseline.{}",project.id),&project::FileRevision::capture(&self.project_dir(&project.id)?.join("project.gsproject"))?)?;
         }
         Ok(entry)
     }
     fn save_internal(&self,project:&Project,inspection:Option<&maps::MapInspection>,preview:bool)->Result<LibraryEntry> {
+        self.save_internal_checked(project,inspection,preview,None)
+    }
+    fn save_internal_checked(&self,project:&Project,inspection:Option<&maps::MapInspection>,preview:bool,expected:Option<&project::FileRevision>)->Result<LibraryEntry> {
         project.validate()?;
         let dir = self.project_dir(&project.id)?;
         let file = dir.join("project.gsproject");
@@ -327,7 +399,18 @@ impl Library {
             let total:i64=self.db.query_row("SELECT COALESCE(SUM(length(CAST(value AS BLOB))),0) FROM documents WHERE id<>?1",[&project.id],|r|r.get(0))?;
             if total.saturating_add(text.len() as i64)>128*1024*1024{return invalid("Open document data reached the 128 MiB memory budget; save and close an unused map. No existing edits were discarded");}
             self.db.execute("INSERT INTO documents(id,value) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET value=excluded.value",params![project.id,text])?;
-        }else{project::save_managed_project(&file, project)?;}
+        }else{
+            // Check index publication before changing the descriptor. If an
+            // OS/SQLite commit fails afterwards, the bound journal permits
+            // deterministic first-Save reindexing on the next open.
+            let transaction=if self.db.is_autocommit(){Some(self.db.unchecked_transaction()?)}else{None};
+            self.db.execute("INSERT INTO projects(id,summary) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET summary=excluded.summary",params![project.id,serde_json::to_string(&entry)?])?;
+            // The index can wait on another writer. Keep the pre-wait source
+            // revision through publication rather than adopting changed bytes.
+            if let Some(expected)=expected{project::save_managed_project_checked(&file,project,expected)?;}
+            else{project::save_managed_project(&file,project)?;}
+            if let Some(transaction)=transaction{transaction.commit()?;}return Ok(entry);
+        }
         self.db.execute("INSERT INTO projects(id,summary) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET summary=excluded.summary",params![project.id,serde_json::to_string(&entry)?])?;
         Ok(entry)
     }

@@ -184,6 +184,15 @@ pub fn fallback_bitmap_audit(project:&Project,inspection:&MapInspection,tools:&T
     let sdk=tools.base_tags_directory.as_ref().ok_or_else(||SparkError::Invalid("Choose extracted MCC SDK tags before resolving indexed classic bitmaps".into()))?;
     Ok(Some(crate::conversion_resources::audit(&inspection.tags,sdk)?))
 }
+/// The imported-cache route admits only existing bounded placements or
+/// reviewed native-tag additions. QuickForge's own source writer is separate.
+pub fn has_unsupported_world_edits(project:&Project,inspection:&MapInspection)->bool {
+    project.scene.iter().filter(|o|!crate::native_asset_imports::allowed_addition(project,o,inspection)).count() != inspection.objects.len()
+        || project
+            .scene
+            .iter()
+            .any(|o| !crate::native_asset_imports::allowed_addition(project,o,inspection)&&(!inspection.objects.iter().any(|v| v.id == o.id) || o.scale != [1.0; 3] || o.source_model.is_some() || o.asset_id.is_some()))
+}
 pub fn compatibility(
     project: &Project,
     inspection: &MapInspection,
@@ -318,18 +327,14 @@ pub fn compatibility(
     if let Err(e) = project::validate_edits(project, inspection) {
         blockers.push(e.to_string());
     }
-    if project.scene.iter().filter(|o|!crate::native_asset_imports::allowed_addition(project,o,inspection)).count() != inspection.objects.len()
-        || project
-            .scene
-            .iter()
-            .any(|o| !crate::native_asset_imports::allowed_addition(project,o,inspection)&&(!inspection.objects.iter().any(|v| v.id == o.id) || o.scale != [1.0; 3] || o.source_model.is_some() || o.asset_id.is_some()))
+    if has_unsupported_world_edits(project,inspection)
     {
         blockers.push("Editor-only instances, duplication, deletion and per-instance scale cannot be compiled into Halo tags yet".into());
     }
     if !native&&project.scene.iter().any(|o|o.source_model.is_some()){blockers.push("Imported native placements in compiled source maps require the native MCC source rebuild path".into());}
     if !project.assets.is_empty() {
         warnings
-            .push("Workshop assets are preview-only and are not baked into the Halo map".into());
+            .push("This imported-cache rebuild does not compile OBJ/audio workshop assets. Supported static models and sounds use the separate QuickForge/Workshop native build; unplaced previews are not included in this cache".into());
     }
     if !inspection.encounters.is_empty() {
         warnings.push("This map contains AI encounters. Importing it does not add multiplayer AI synchronization to MCC.".into());

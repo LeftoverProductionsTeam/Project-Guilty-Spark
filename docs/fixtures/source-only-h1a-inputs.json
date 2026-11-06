@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "purpose": "Minimum stock SDK closure for the accepted native door compile/readback; no proprietary tag bytes are stored here. Extract only these inputs into an owned disposable job when explicitly testing.",
+  "purpose": "Verified stock SDK closure for the accepted native door and source-aware editor grass/metal defaults; no proprietary tag bytes are stored here. Extract only these inputs into an owned disposable job when explicitly testing.",
   "sourceArchive": {
     "file": "HCEEK.7z",
     "bytes": 1030150472,
@@ -8971,9 +8971,44 @@
       "path": "weapons/sniper rifle/trigger.damage_effect",
       "bytes": 736,
       "sha256": "aa41d2ee5187b1f1df23a770932da158cffbfb68092e3a80438dca5dbbc667de"
+    },
+    {
+      "path": "levels/a30/bitmaps/detail grass.bitmap",
+      "bytes": 985615,
+      "sha256": "e89a9906baa11f4b2065383149da7398045460dd780ed43e66a1c6b035b9dff4"
+    },
+    {
+      "path": "levels/b30/bitmaps/detail ground.bitmap",
+      "bytes": 98816,
+      "sha256": "13081bda83d26f50bfb1e68bcc32ac08a24a386d37085e0e70f780998263e8a0"
+    },
+    {
+      "path": "levels/b30/bitmaps/detail sand.bitmap",
+      "bytes": 119918,
+      "sha256": "3f960118c3b60f3c2ac0489def464d9757672cdefbbdcda3433aeee352908211"
+    },
+    {
+      "path": "levels/test/bloodgulch/bitmaps/blood ground.bitmap",
+      "bytes": 911424,
+      "sha256": "a00b61c50757908ed4563799b55e3b9de73a4b60b0caf7f876d9276bf1e823af"
+    },
+    {
+      "path": "levels/test/bloodgulch/bitmaps/cap_metal.bitmap",
+      "bytes": 411441,
+      "sha256": "993148d5f30357d2eae8289a45e7c207ef07e703bceef7f74668be298063c102"
+    },
+    {
+      "path": "levels/test/bloodgulch/shaders/blood ground.shader_environment",
+      "bytes": 1040,
+      "sha256": "b57ae792a7e8d29d01e62179a8b646c7593a79ad1c79041814484989960875ba"
+    },
+    {
+      "path": "levels/test/bloodgulch/shaders/cap_metal.shader_environment",
+      "bytes": 982,
+      "sha256": "af16af1e607c7a9fcc2b8ac809ced15cc41e681ad29ef2ab99f34c313bfe0ac5"
     }
   ],
-  "logicalTagBytes": 105215093,
+  "logicalTagBytes": 107744329,
   "excludedGeneratedInputs": [
     ".spark-restored-native-tags.json",
     "levels/quickforge/c66_bounded_native_door/c66_bounded_native_door.bitmap",

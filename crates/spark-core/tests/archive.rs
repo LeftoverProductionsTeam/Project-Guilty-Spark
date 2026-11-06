@@ -257,3 +257,22 @@ fn supports_deflate_from_standard_zip_writer_with_crc_validation() {
     assert_eq!(imported.maps.len(), 1);
     allow_windows_temp_cleanup(&imported.preserved_path);
 }
+
+#[test]
+fn ten_independent_archive_imports_preserve_sources_and_reject_partial_archives() {
+    use spark_core::{library::Library,storage};
+    let temp=tempfile::tempdir().unwrap();let library=Library::workspace(&temp.path().join("library")).unwrap();
+    let before=storage::measure(&library.root).unwrap();let mut roots=std::collections::BTreeSet::new();
+    for index in 0..10 {
+        let file=temp.path().join(format!("source-{index}.zip"));let mut fixture=common::fixture(6);fixture[1900]=index;
+        let bytes=zip(&[("maps/bloodgulch.map",fixture),("notes.txt",format!("Archive {index}").into_bytes()),("unsafe.exe",b"MZ never launch".to_vec())]);
+        fs::write(&file,&bytes).unwrap();let imported=archive::import_archive(&file,&library.root).unwrap();assert_eq!(imported.maps.len(),1);assert!(roots.insert(imported.root.clone()));
+        let(p,_) =library.import_map(&imported.maps[0].path,None).unwrap();assert_eq!(p.source.unwrap().sha256,maps::hash_file(&imported.maps[0].path).unwrap());
+        assert_eq!(fs::read(&file).unwrap(),bytes);assert!(!imported.root.join("content/unsafe.exe").exists());
+        assert!(!library.root.join("projects").exists());allow_windows_temp_cleanup(&imported.preserved_path);
+        let bad=temp.path().join(format!("truncated-{index}.zip"));fs::write(&bad,&bytes[..bytes.len()-7]).unwrap();
+        let checkpoint=storage::measure(&library.root).unwrap();assert!(archive::import_archive(&bad,&library.root).is_err());assert_eq!(storage::measure(&library.root).unwrap().fingerprint,checkpoint.fingerprint);
+    }
+    let after=storage::measure(&library.root).unwrap();assert!(after.logical_bytes-before.logical_bytes<4*1024*1024);
+    assert_eq!(fs::read_dir(library.root.join("archives")).unwrap().count(),10);assert_eq!(library.list().unwrap().len(),10);
+}

@@ -328,6 +328,14 @@ pub struct NativeAnimationAction {
     pub biped_tag: String,
     pub play_on_take: bool,
 }
+/// A checksum collision or matching node count is not a compatible rig.
+fn validate_target_rig(rig:&maps::ModelRig,checksum:u32,names:&[String],clip:Option<&[AnimationNode]>)->Result<()> {
+    if rig.checksum!=checksum||rig.nodes.len()!=names.len()||rig.nodes.iter().map(|node|node.name.as_str()).ne(names.iter().map(String::as_str)) {
+        return invalid("Animation and biped node names,order or checksum differ. Re-export from the original target rig");
+    }
+    if let Some(nodes)=clip{if nodes.len()!=rig.nodes.len()||nodes.iter().zip(&rig.nodes).any(|(clip,bone)|clip.name!=bone.name||clip.parent!=bone.parent){return invalid("Animation and target rig parent hierarchies differ; native source was not compiled");}}
+    Ok(())
+}
 pub(crate) fn prepare_native(
     p: &project::Project,
     inspection: &maps::MapInspection,
@@ -384,9 +392,7 @@ pub(crate) fn prepare_native(
             .rig
             .as_ref()
             .ok_or_else(|| bad("Assigned biped has no verified skeleton"))?;
-        if rig.nodes.len() != asset.node_names.len() || rig.checksum != asset.checksum {
-            return invalid("Animation and biped skeleton checksums differ. Re-export using the original biped rig");
-        }
+        validate_target_rig(rig,asset.checksum,&asset.node_names,None)?;
         let stem = format!("spark/animations/{}/{}", &p.id[..8], &asset.id[..8]);
         let graph = format!("{stem}/take/take.model_animations");
         let graph_file = tags.join(crate::safe_relative(&graph)?);
@@ -425,6 +431,7 @@ pub(crate) fn prepare_native(
                 return invalid("Custom actions require an individual source clip");
             }
             let clip = verified_clip(asset)?;
+            validate_target_rig(rig,clip.checksum,&asset.node_names,Some(&clip.nodes))?;
             let action = format!("gs_action_{}", &asset.id[..8]);
             let data = workspace
                 .join("data")
@@ -778,9 +785,19 @@ mod tests {
         assert_eq!(jma_source(&legacy).unwrap(),jma_source(&recovered).unwrap());assert_eq!(fs::read(&asset.data_path).unwrap(),bytes);
         fs::write(&asset.data_path,b"corrupt").unwrap();assert!(verified_clip(&asset).is_err());
     }
+    #[test]fn equal_checksums_cannot_hide_node_order_names_or_clip_parent_mismatches(){
+        let bone=|name:&str,parent|maps::ModelBone{name:name.into(),parent,position:[0.;3],rotation:[0.,0.,0.,1.]};
+        let rig=maps::ModelRig{checksum:7,nodes:vec![bone("root",-1),bone("hand",0)],indices:vec![],weights:vec![]};
+        let names=vec!["root".into(),"hand".into()];let mut clip=vec![AnimationNode{name:"root".into(),parent:-1},AnimationNode{name:"hand".into(),parent:0}];
+        validate_target_rig(&rig,7,&names,Some(&clip)).unwrap();
+        assert!(validate_target_rig(&rig,7,&["hand".into(),"root".into()],None).is_err());
+        assert!(validate_target_rig(&rig,7,&["root".into(),"foreign".into()],None).is_err());
+        clip[1].parent=-1;assert!(validate_target_rig(&rig,7,&names,Some(&clip)).is_err());
+    }
     #[test]
     fn refuses_truncation_cycles_nonfinite_and_excess() {
         let s = source();
+        assert!(parse_jma(&s.replacen("16392\n", "17000\n", 1), "x").unwrap_err().to_string().contains("Unsupported JMA version"));
         assert!(parse_jma(&s.replace("100 0 0", "NaN 0 0"), "x").is_err());
         assert!(parse_jma(&s.replace("root\n1\n-1", "root\n0\n-1"), "x").is_err());
         assert!(parse_jma(&(s.clone() + "1"), "x").is_err());

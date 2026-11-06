@@ -363,43 +363,75 @@ pub fn inventory(path: &Path) -> Result<ArchiveInventory> {
 }
 
 struct StageGuard {
-    stage: PathBuf,
-    parent: PathBuf,
-    id: String,
-    active: bool,
+    stage:PathBuf,parent:PathBuf,id:String,active:bool,
+    parent_identity:(u64,u64),directories:BTreeMap<PathBuf,(u64,u64)>,files:BTreeMap<PathBuf,((u64,u64),String)>,
+}
+/// Track only bytes actually written by this importer, including a partial
+/// extraction. A failed ZIP must never authorize removal of another writer's
+/// replacement, hardlink, unexpected file or directory.
+struct RecordedWriter<'a>{file:&'a mut File,hash:sha2::Sha256}
+impl Write for RecordedWriter<'_>{
+    fn write(&mut self,bytes:&[u8])->std::io::Result<usize>{use sha2::Digest;let n=self.file.write(bytes)?;self.hash.update(&bytes[..n]);Ok(n)}
+    fn flush(&mut self)->std::io::Result<()>{self.file.flush()}
+}
+impl StageGuard {
+    fn new(parent:&Path,id:String)->Result<Self>{
+        crate::reject_links(parent)?;
+        let parent_identity=crate::storage::file_identity(parent).ok_or_else(||SparkError::Invalid("Archive parent ownership unavailable".into()))?;
+        let stage=parent.join(format!(".stage-{id}"));fs::create_dir(&stage)?;
+        let identity=crate::storage::file_identity(&stage).ok_or_else(||SparkError::Invalid("Archive stage ownership unavailable; retained".into()))?;
+        let mut guard=Self{stage:stage.clone(),parent:parent.into(),id:id.clone(),active:true,parent_identity,directories:BTreeMap::from([(stage.clone(),identity)]),files:BTreeMap::new()};
+        guard.copy(&mut std::io::Cursor::new(id.as_bytes()),&stage.join(".owner"))?;Ok(guard)
+    }
+    fn directory(&mut self,path:&Path)->Result<()> {
+        if !path.starts_with(&self.stage){return invalid("Archive directory escaped its stage");}
+        crate::reject_links(path)?;
+        if let Some(identity)=self.directories.get(path){if crate::storage::file_identity(path)!=Some(*identity){return invalid("Archive directory was replaced; retained");}return Ok(());}
+        self.directory(path.parent().ok_or_else(||SparkError::Invalid("Archive directory has no parent".into()))?)?;
+        fs::create_dir(path)?;
+        self.directories.insert(path.into(),crate::storage::file_identity(path).ok_or_else(||SparkError::Invalid("Archive directory ownership unavailable; retained".into()))?);Ok(())
+    }
+    fn copy(&mut self,input:&mut impl Read,path:&Path)->Result<u64>{
+        use sha2::Digest;
+        self.directory(path.parent().ok_or_else(||SparkError::Invalid("Archive output has no parent".into()))?)?;crate::reject_links(path)?;
+        let mut file=OpenOptions::new().write(true).create_new(true).open(path)?;
+        let identity=crate::storage::unique_file_identity(path).ok_or_else(||SparkError::Invalid("Archive output has aliased ownership; retained".into()))?;
+        let mut output=RecordedWriter{file:&mut file,hash:sha2::Sha256::new()};let written=std::io::copy(input,&mut output);
+        let hash=crate::hex_bytes(output.hash.finalize());self.files.insert(path.into(),(identity,hash));file.sync_all()?;
+        Ok(written?)
+    }
+    fn owned_inventory(&self)->Result<(Vec<PathBuf>,Vec<PathBuf>)> {
+        crate::reject_links(&self.stage)?;crate::reject_links(&self.parent)?;
+        if crate::storage::file_identity(&self.parent)!=Some(self.parent_identity)||fs::read_to_string(self.stage.join(".owner"))?!=self.id{return invalid("Archive rollback ownership changed; retained");}
+        let mut actual_files=BTreeSet::new();let mut actual_dirs=BTreeSet::new();let mut pending=vec![self.stage.clone()];
+        while let Some(dir)=pending.pop(){
+            if actual_dirs.len()>MAX_ENTRIES*16{return invalid("Archive rollback directory bound exceeded; retained");}
+            if self.directories.get(&dir).copied()!=crate::storage::file_identity(&dir){return invalid("Archive stage directory was replaced; retained");}
+            actual_dirs.insert(dir.clone());
+            for entry in fs::read_dir(&dir)? {let path=entry?.path();crate::reject_links(&path)?;let meta=fs::symlink_metadata(&path)?;
+                if meta.is_dir(){pending.push(path);}else if meta.is_file(){
+                    let Some((identity,hash))=self.files.get(&path) else{return invalid("Unknown archive-stage file retained");};
+                    if crate::storage::unique_file_identity(&path)!=Some(*identity)||maps::hash_file(&path)?!=*hash{return invalid("Archive-stage file changed or has aliases; retained");}actual_files.insert(path);
+                }else{return invalid("Unknown archive-stage entry retained");}
+            }
+        }
+        if actual_files.len()!=self.files.len()||actual_dirs.len()!=self.directories.len(){return invalid("Archive stage inventory changed; retained");}
+        Ok((actual_files.into_iter().collect(),actual_dirs.into_iter().collect()))
+    }
+    fn rollback(&self)->Result<()> {
+        let (mut files,mut dirs)=self.owned_inventory()?;files.sort_by_key(|p|p.file_name().is_some_and(|n|n==".owner"));
+        for path in files {
+            let (identity,hash)=&self.files[&path];crate::reject_links(&path)?;
+            if crate::storage::unique_file_identity(&path)!=Some(*identity)||maps::hash_file(&path)?!=*hash{return invalid("Archive file changed before rollback; retained");}
+            #[cfg(windows)]{let mut permissions=fs::metadata(&path)?.permissions();if permissions.readonly(){#[allow(clippy::permissions_set_readonly_false)]permissions.set_readonly(false);fs::set_permissions(&path,permissions)?;}}
+            fs::remove_file(path)?;
+        }
+        dirs.sort_by_key(|dir|std::cmp::Reverse(dir.components().count()));
+        for dir in dirs{if self.directories.get(&dir).copied()!=crate::storage::file_identity(&dir){return invalid("Archive directory changed before rollback; retained");}fs::remove_dir(dir)?;}Ok(())
+    }
 }
 impl Drop for StageGuard {
-    fn drop(&mut self) {
-        if !self.active {
-            return;
-        }
-        let valid = fs::canonicalize(&self.stage)
-            .ok()
-            .zip(fs::canonicalize(&self.parent).ok())
-            .is_some_and(|(stage, parent)| {
-                stage.parent() == Some(parent.as_path())
-                    && stage
-                        .file_name()
-                        .is_some_and(|n| n == format!(".stage-{}", self.id).as_str())
-            });
-        if valid
-            && fs::read_to_string(self.stage.join(".owner"))
-                .ok()
-                .as_deref()
-                == Some(self.id.as_str())
-        {
-            #[cfg(windows)]
-            if let Ok(meta) = fs::metadata(self.stage.join("original.zip")) {
-                let mut permissions = meta.permissions();
-                // Windows deletion needs its read-only attribute cleared. This block
-                // is never compiled on Unix, where no mode widening is necessary.
-                #[allow(clippy::permissions_set_readonly_false)]
-                permissions.set_readonly(false);
-                let _ = fs::set_permissions(self.stage.join("original.zip"), permissions);
-            }
-            let _ = fs::remove_dir_all(&self.stage);
-        }
-    }
+    fn drop(&mut self){if self.active{if let Err(error)=self.rollback(){eprintln!("Unpublished archive stage retained at {}: {error}",self.stage.display());}}}
 }
 pub fn import_archive(path: &Path, library_root: &Path) -> Result<ImportedArchive> {
     let original_inventory = inventory(path)?;
@@ -414,31 +446,18 @@ pub fn import_archive(path: &Path, library_root: &Path) -> Result<ImportedArchiv
     let id = uuid::Uuid::new_v4().to_string();
     let stage = parent.join(format!(".stage-{id}"));
     let final_root = parent.join(&id);
-    fs::create_dir(&stage)?;
-    fs::write(stage.join(".owner"), &id)?;
-    let mut guard = StageGuard {
-        stage: stage.clone(),
-        parent: parent.clone(),
-        id,
-        active: true,
-    };
-    let preserved = stage.join("original.zip");
-    let mut output = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&preserved)?;
-    let copied = std::io::copy(&mut File::open(path)?.take(MAX_ZIP + 1), &mut output)?;
+    let mut guard=StageGuard::new(&parent,id)?;
+    let preserved=stage.join("original.zip");
+    let copied=guard.copy(&mut File::open(path)?.take(MAX_ZIP+1),&preserved)?;
     if copied > MAX_ZIP {
         return invalid("Source ZIP grew beyond the size limit during preservation");
     }
-    output.sync_all()?;
-    drop(output);
     let (mut archive, mut inventory) = open_checked(&preserved)?;
     if inventory.sha256 != original_inventory.sha256 {
         return invalid("Source ZIP changed during preservation; import stopped");
     }
     let content = stage.join("content");
-    fs::create_dir(&content)?;
+    guard.directory(&content)?;
     let mut candidates = Vec::new();
     let mut resource_dirs = BTreeSet::new();
     for index in 0..inventory.entries.len() {
@@ -448,23 +467,11 @@ pub fn import_archive(path: &Path, library_root: &Path) -> Result<ImportedArchiv
         let item = &mut inventory.entries[index];
         let relative = crate::safe_relative(&item.name)?;
         let target = content.join(&relative);
-        let parent_dir = target
-            .parent()
-            .ok_or_else(|| SparkError::Invalid("ZIP member has no output parent".into()))?;
-        crate::reject_links(parent_dir)?;
-        fs::create_dir_all(parent_dir)?;
-        crate::reject_links(parent_dir)?;
-        let mut output = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&target)?;
-        let entry = archive.by_index(index).map_err(zip_error)?;
-        let written = std::io::copy(&mut entry.take(item.size + 1), &mut output)?;
+        let entry=archive.by_index(index).map_err(zip_error)?;
+        let written=guard.copy(&mut entry.take(item.size+1),&target)?;
         if written != item.size {
             return invalid("ZIP member decompressed size does not match declared size");
         }
-        output.sync_all()?;
-        drop(output);
         item.sha256 = Some(maps::hash_file(&target)?);
         if item.classification == "resource" {
             resource_dirs.insert(relative.parent().unwrap_or(Path::new("")).to_path_buf());
@@ -515,17 +522,30 @@ pub fn import_archive(path: &Path, library_root: &Path) -> Result<ImportedArchiv
         maps,
     };
     let receipt = serde_json::to_vec_pretty(&result)?;
-    let mut receipt_file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(stage.join("receipt.json"))?;
-    receipt_file.write_all(&receipt)?;
-    receipt_file.sync_all()?;
-    drop(receipt_file);
+    guard.copy(&mut std::io::Cursor::new(&receipt),&stage.join("receipt.json"))?;
+    guard.owned_inventory()?;
     let mut permissions = fs::metadata(&preserved)?.permissions();
     permissions.set_readonly(true);
     fs::set_permissions(&preserved, permissions)?;
+    guard.owned_inventory()?;
     fs::rename(&stage, &final_root)?;
     guard.active = false;
     Ok(result)
+}
+
+#[cfg(test)]mod ownership_tests {
+    use super::*;
+    #[test]fn changed_replaced_linked_or_unknown_archive_outputs_are_retained(){
+        for condition in ["changed","replaced","hardlink","unknown"] {
+            let temp=tempfile::tempdir().unwrap();let mut guard=StageGuard::new(temp.path(),uuid::Uuid::new_v4().to_string()).unwrap();let file=guard.stage.join("content/map.map");
+            guard.copy(&mut std::io::Cursor::new(b"owned partial output"),&file).unwrap();
+            match condition {
+                "changed"=>fs::write(&file,b"foreign edit").unwrap(),
+                "replaced"=>{let other=temp.path().join("other");fs::write(&other,b"owned partial output").unwrap();fs::rename(other,&file).unwrap();},
+                "hardlink"=>fs::hard_link(&file,temp.path().join("protected-alias")).unwrap(),
+                _=>fs::write(guard.stage.join("unknown-source"),b"unique").unwrap(),
+            }
+            assert!(guard.rollback().is_err());assert!(file.exists());guard.active=false;
+        }
+    }
 }

@@ -32,7 +32,29 @@ pub struct Snapshot { pub key: String, pub project: Project }
 struct Stored { schema_version:u32, project_id:String, revision:u64, head:Head, hashes:BTreeMap<String,String> }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
-struct Envelope { sha256:String, state:Stored }
+struct Envelope {
+    sha256:String, state:Stored,
+    #[serde(default,skip_serializing_if="Option::is_none")] save:Option<SaveBoundary>,
+}
+/// Both choices refer to existing immutable snapshots, not another project copy.
+/// Publication first records this bounded decision, then replaces the descriptor.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+struct SaveBoundary { descriptor_sha256:String, previous_descriptor_sha256:Option<String>, previous_state:Option<Stored> }
+impl Envelope {
+    fn encoded(state:Stored,save:Option<SaveBoundary>)->Result<Vec<u8>> {
+        let mut envelope=Self{sha256:String::new(),state,save};envelope.sha256=envelope.checksum()?;
+        let bytes=serde_json::to_vec(&envelope)?;
+        if bytes.len()>1024*1024{return invalid("Window history head exceeds 1 MiB; existing revision retained");}Ok(bytes)
+    }
+    fn checksum(&self)->Result<String> {
+        // Preserve existing v1 heads byte-for-byte when there is no Save boundary.
+        Ok(digest(&match &self.save{Some(save)=>serde_json::to_vec(&(&self.state,save))?,None=>serde_json::to_vec(&self.state)?}))
+    }
+}
+fn descriptor_path(dir:&Path)->Result<std::path::PathBuf>{
+    Ok(dir.parent().ok_or_else(||crate::SparkError::Invalid("History has no project parent".into()))?.join("project.gsproject"))
+}
 #[derive(Clone, Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct View { pub revision:u64, pub head:Head, pub snapshots:Vec<Snapshot> }
@@ -42,15 +64,35 @@ fn same_source(a:&Project,b:&Project)->bool {
     a.source.as_ref().map(|s|(&s.sha256,&s.preserved_path,s.cache_version))==
     b.source.as_ref().map(|s|(&s.sha256,&s.preserved_path,s.cache_version))
 }
-fn checked(dir:&Path, registered:&Project)->Result<Option<Stored>> {
-    reject_links(dir)?; let file=dir.join("head.json"); reject_links(&file)?;
+fn checked_envelope(dir:&Path,registered:&Project)->Result<Option<Envelope>> {
+    reject_links(dir)?;let file=dir.join("head.json");reject_links(&file)?;
     if !file.exists(){return Ok(None);}
     if fs::metadata(&file)?.len()>1024*1024{return invalid("Window history head exceeds 1 MiB");}
     let envelope:Envelope=serde_json::from_slice(&fs::read(file)?)?;
-    if envelope.sha256!=digest(&serde_json::to_vec(&envelope.state)?) || envelope.state.schema_version!=1 || envelope.state.project_id!=registered.id {
-        return invalid("Window history integrity or project identity mismatch; retained for recovery");
+    if envelope.sha256!=envelope.checksum()?{return invalid("Window history integrity mismatch; retained for recovery");}
+    for state in std::iter::once(&envelope.state).chain(envelope.save.as_ref().and_then(|save|save.previous_state.as_ref())) {
+        if state.schema_version!=1||state.project_id!=registered.id{return invalid("Window history project identity mismatch; retained for recovery");}
+        state.head.validate()?;
     }
-    envelope.state.head.validate()?; Ok(Some(envelope.state))
+    Ok(Some(envelope))
+}
+fn checked(dir:&Path, registered:&Project)->Result<Option<Stored>> {
+    let Some(envelope)=checked_envelope(dir,registered)? else{return Ok(None)};
+    if let Some(save)=envelope.save {
+        let actual=project::FileRevision::capture(&descriptor_path(dir)?)?.sha256;
+        if actual.as_deref()==Some(&save.descriptor_sha256){return Ok(Some(envelope.state));}
+        if actual==save.previous_descriptor_sha256{return Ok(save.previous_state);}
+        return invalid("Saved project and Undo belong to different revisions. Both histories and the external descriptor were retained; review the external edit before reopening Undo");
+    }
+    Ok(Some(envelope.state))
+}
+/// Only an explicitly bound, fully readable Save may recover an unindexed first
+/// Save after interruption. Unknown directories and legacy heads are not adopted.
+pub(crate) fn recoverable_save(dir:&Path,registered:&Project)->Result<bool>{
+    let Some(envelope)=checked_envelope(dir,registered)? else{return Ok(false)};
+    let Some(save)=envelope.save else{return Ok(false)};
+    if project::FileRevision::capture(&descriptor_path(dir)?)?.sha256.as_deref()!=Some(&save.descriptor_sha256){return Ok(false);}
+    Ok(read(dir,registered)?.is_some())
 }
 fn snapshot(dir:&Path,key:&str,sha:&str,registered:&Project)->Result<Project>{
     uuid::Uuid::parse_str(key).map_err(|_|crate::SparkError::Invalid("Invalid history identity".into()))?;
@@ -158,8 +200,7 @@ fn prepare_commit(registered:&Project,old:Option<Stored>,expected:u64,head:Head,
     Ok(Prepared{state,pending})
 }
 fn write_head(dir:&Path,state:&Stored)->Result<()> {
-    let envelope=Envelope{sha256:digest(&serde_json::to_vec(state)?),state:state.clone()};
-    let encoded=serde_json::to_vec(&envelope)?;
+    let encoded=Envelope::encoded(state.clone(),None)?;
     project::atomic_write(&dir.join("head.json"),&encoded,false)?;
     Ok(())
 }
@@ -170,7 +211,7 @@ fn write_head(dir:&Path,state:&Stored)->Result<()> {
 #[derive(Default)]
 pub struct Session { documents:BTreeMap<String,MemoryDocument>, drafts:BTreeMap<String,Vec<u8>> }
 #[derive(Clone)]
-struct MemoryDocument { state:Option<Stored>, snapshots:BTreeMap<String,Vec<u8>>, immutable:BTreeMap<String,String>, disk_head:Option<String> }
+struct MemoryDocument { state:Option<Stored>, snapshots:BTreeMap<String,Vec<u8>>, immutable:BTreeMap<String,String>, disk_head:project::FileRevision, descriptor:project::FileRevision }
 impl Session {
     const MAX_BYTES:usize=256*1024*1024;
     fn bytes(&self)->usize{self.documents.values().map(|d|d.snapshots.values().map(Vec::len).sum::<usize>()+d.immutable.iter().map(|(key,hash)|key.len()+hash.len()).sum::<usize>()).sum::<usize>()+self.drafts.values().map(Vec::len).sum::<usize>()}
@@ -187,9 +228,9 @@ impl Session {
             let p=snapshot(dir,&key,sha,registered)?;let bytes=serde_json::to_vec(&p)?;total+=bytes.len();snapshots.insert(key,bytes);
         }}
         if self.bytes()+snapshots.values().map(Vec::len).sum::<usize>()>Self::MAX_BYTES{return invalid("Shared Undo history reached its 256 MiB RAM budget. Save and close an unused document; existing work was retained");}
-        let file=dir.join("head.json");let disk_head=if file.exists(){Some(crate::maps::hash_file(&file)?)}else{None};
+        let file=dir.join("head.json");let disk_head=project::FileRevision::capture(&file)?;
         let immutable=state.as_ref().map(|state|state.hashes.clone()).unwrap_or_default();
-        self.documents.insert(registered.id.clone(),MemoryDocument{state,snapshots,immutable,disk_head});Ok(())
+        self.documents.insert(registered.id.clone(),MemoryDocument{state,snapshots,immutable,disk_head,descriptor:project::FileRevision::capture(&descriptor_path(dir)?)?});Ok(())
     }
     pub fn read(&mut self,dir:&Path,registered:&Project)->Result<Option<View>> {
         self.attach(dir,registered)?;let document=&self.documents[&registered.id];let Some(state)=&document.state else{return Ok(None)};
@@ -205,7 +246,13 @@ impl Session {
     pub fn commit(&mut self,dir:&Path,registered:&Project,expected:u64,head:Head,additions:Vec<Snapshot>)->Result<u64>{
         self.attach(dir,registered)?;let document=&self.documents[&registered.id];
         for item in &additions{let sha=digest(&serde_json::to_vec(&item.project)?);if document.immutable.get(&item.key).is_some_and(|known|*known!=sha){return invalid("An immutable history snapshot cannot be overwritten");}}
+        let repeated_head=additions.is_empty()&&document.state.as_ref().is_some_and(|state|state.head==head);
         let prepared=prepare_commit(registered,document.state.clone(),expected,head,additions,MAX_TRANSFER,|key|Ok(document.snapshots.get(key).cloned()))?;
+        // Explicit Save already durably published this clean selection. Its
+        // frontend receipt can repeat the same head without creating a new
+        // RAM-only revision that disappears on normal restart. Validate stale
+        // revisions, all referenced bytes and identities before accepting it.
+        if repeated_head{return Ok(expected);}
         let mut next=document.clone();next.snapshots.extend(prepared.pending);next.snapshots.retain(|key,_|prepared.state.hashes.contains_key(key));
         next.immutable.extend(prepared.state.hashes.clone());
         if next.immutable.len()>4096{return invalid("This session reached its 4096-edit identity budget. Save and reopen the document; existing work and Undo were retained");}
@@ -218,15 +265,21 @@ impl Session {
         self.checkpoint_with_budget(dir,registered,MAX_TRANSFER)
     }
     fn checkpoint_with_budget(&mut self,dir:&Path,registered:&Project,budget:usize)->Result<()> {
-        self.attach(dir,registered)?;let document=self.documents.get_mut(&registered.id).unwrap();
-        let file=dir.join("head.json");reject_links(&file)?;
-        let actual=if file.exists(){Some(crate::maps::hash_file(&file)?)}else{None};
-        if actual!=document.disk_head{return invalid("Saved window history changed externally; review it before saving. The external head was retained");}
+        self.attach(dir,registered)?;
+        let Some(state)=self.documents[&registered.id].state.clone() else{return Ok(())};
+        let descriptor=descriptor_path(dir)?;let expected=&self.documents[&registered.id].descriptor;
+        expected.verify(&descriptor)?;
+        let bound=expected.sha256.clone().map(|sha|SaveBoundary{descriptor_sha256:sha,previous_descriptor_sha256:None,previous_state:None});
+        let encoded=Envelope::encoded(state,bound)?;
+        self.write_checkpoint(dir,registered,&encoded,budget)
+    }
+    fn write_checkpoint(&mut self,dir:&Path,registered:&Project,encoded:&[u8],budget:usize)->Result<()> {
+        let document=self.documents.get_mut(&registered.id).unwrap();
+        let file=dir.join("head.json");document.disk_head.verify(&file)?;
         let Some(state)=&document.state else{return Ok(())};
         // Refuse growth before writing. Existing recovery selections and old
         // snapshots stay intact; the live document remains in bounded RAM.
-        let envelope=Envelope{sha256:digest(&serde_json::to_vec(state)?),state:state.clone()};
-        let mut total=serde_json::to_vec(&envelope)?.len() as u64;
+        let mut total=encoded.len() as u64;
         let mut count=1usize;
         match fs::read_dir(dir){
             Ok(entries)=>for entry in entries{
@@ -249,7 +302,61 @@ impl Session {
             if file.exists(){if fs::metadata(&file)?.len()>MAX_SNAPSHOT||digest(&fs::read(&file)?)!=*sha{return invalid("Saved history snapshot changed externally; retained");}}
         }
         for(key,bytes)in &document.snapshots{let file=dir.join(format!("{key}.json"));if !file.exists(){project::atomic_write(&file,bytes,false)?;}}
-        write_head(dir,state)?;document.disk_head=Some(crate::maps::hash_file(&dir.join("head.json"))?);Ok(())
+        project::atomic_write_checked(&file,encoded,false,Some(&document.disk_head))?;document.disk_head=project::FileRevision::capture(&file)?;Ok(())
+    }
+    /// Publish a recoverable descriptor/history pair. If the process stops
+    /// before the descriptor rename, reopening selects the previous head; after
+    /// it, reopening selects the new one. A failed publisher keeps RAM dirty.
+    pub fn save_with<T>(&mut self,dir:&Path,registered:&Project,publish:impl FnOnce()->Result<T>)->Result<T> {
+        self.attach(dir,registered)?;
+        let Some(mut state)=self.documents[&registered.id].state.clone() else{
+            // A source can be explicitly saved before its first view creates
+            // an Undo selection. Adopt only the exact successfully published
+            // descriptor, so a later acknowledged edit does not conflict with
+            // this session's own first Save. Failed publication keeps baseline.
+            let descriptor=descriptor_path(dir)?;
+            self.documents[&registered.id].descriptor.verify(&descriptor)?;
+            let desired=digest(&project::encoded_project(&descriptor,registered)?);
+            let result=publish();
+            if result.is_ok(){
+                let saved=project::FileRevision::capture(&descriptor)?;
+                if saved.sha256.as_deref()!=Some(&desired){return invalid("Save publisher did not produce the reviewed descriptor; recovery retained");}
+                self.documents.get_mut(&registered.id).unwrap().descriptor=saved;
+            }
+            return result;
+        };
+        let descriptor=descriptor_path(dir)?;
+        let before=project::FileRevision::capture(&descriptor)?;
+        self.documents[&registered.id].descriptor.verify(&descriptor)?;
+        // Validate the old on-disk choice as well, including snapshots no
+        // longer selected by the current RAM Undo ring.
+        let _previous_view=read(dir,registered)?;
+        let current=&self.documents[&registered.id].snapshots[&state.head.current];
+        let mut current:Project=serde_json::from_slice(current)?;
+        if !same_source(&current,registered){return invalid("Save cannot change the acknowledged source identity");}
+        // Match read_workspace_history/update_project_document: accepted source
+        // resources, imported assets and build receipts are native-owned. An
+        // older authored snapshot must not erase them or block an unchanged Save.
+        current.source=registered.source.clone();current.assets=registered.assets.clone();current.builds=registered.builds.clone();current.modified_at=registered.modified_at.clone();
+        if serde_json::to_value(current)?!=serde_json::to_value(registered)?{return invalid("Save differs from the acknowledged Undo selection. Finish the pending edit/history transaction before saving; earlier work was retained");}
+        let previous_state=checked(dir,registered)?;
+        let desired=digest(&project::encoded_project(&descriptor,registered)?);
+        state.head.dirty=false;
+        // A repeated Save has no new descriptor boundary. Its previous state
+        // would have the same hash, so one ordinary acknowledged head suffices.
+        let boundary=(before.sha256.as_deref()!=Some(&desired)).then(||SaveBoundary{
+            descriptor_sha256:desired.clone(),previous_descriptor_sha256:before.sha256.clone(),previous_state,
+        });
+        let encoded=Envelope::encoded(state.clone(),boundary)?;
+        before.verify(&descriptor)?;
+        self.write_checkpoint(dir,registered,&encoded,MAX_TRANSFER)?;
+        before.verify(&descriptor)?;
+        let result=publish();
+        if result.is_ok(){
+            if project::FileRevision::capture(&descriptor)?.sha256.as_deref()!=Some(&desired){return invalid("Save publisher did not produce the reviewed descriptor; recovery retained");}
+            let document=self.documents.get_mut(&registered.id).unwrap();document.state=Some(state);document.descriptor=project::FileRevision::capture(&descriptor)?;
+        }
+        result
     }
     pub fn saved_checkpoint(&mut self,dir:&Path,registered:&Project)->Result<()> {
         self.attach(dir,registered)?;let previous=self.documents[&registered.id].clone();

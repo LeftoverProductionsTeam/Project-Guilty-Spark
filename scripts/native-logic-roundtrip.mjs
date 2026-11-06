@@ -13,7 +13,15 @@ export async function nativeLogicRoundTrip({page,root,kit,tags,invader,cache,cal
  const closeDrawers=async()=>{for(const label of ['Inspector','Build tools','Asset library']){const panel=page.getByRole('region',{name:`${label} panel`,exact:true});if(await panel.isVisible())await panel.getByRole('button',{name:`Close ${label}`,exact:true}).click();}};
  const open=async()=>{await page.reload();await page.locator('.map-card').filter({has:page.locator('h3',{hasText:created.project.title})}).click();await closeDrawers();};
  const state=async()=>(await call('open_project',{id:created.project.id})).project.quickForge;
- const save=async()=>{await page.keyboard.press('Control+s');await expect(page.getByText('Saved',{exact:true}).last()).toBeVisible();};
+ const save=async()=>{
+   await page.keyboard.press('Control+s');
+   // Undo and Save can be requested in the same frame. Let their real UI
+   // callbacks run before checking acknowledgment; another map's Saved label
+   // or the previous toast does not prove this document's new save completed.
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   await expect(page.locator('.runtime-dock').getByText('Saved',{exact:true})).toBeVisible();
+   await expect.poll(async()=>(await call('read_workspace_history',{projectId:created.project.id})).history?.head.dirty).toBe(false);
+ };
  const field=async(label,value)=>{const scale=label.startsWith('Scale ');const input=scale?page.getByRole('group',{name:'Scale',exact:true}).getByRole('spinbutton',{name:label.slice(6),exact:true}):page.getByRole('spinbutton',{name:label,exact:true});await input.fill(String(value));await input.press('Tab');if(scale)await expect(page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();};
  const dragTo=async(button,point)=>{
    await button.scrollIntoViewIfNeeded();await expect(button).toBeInViewport();
@@ -66,13 +74,13 @@ export async function nativeLogicRoundTrip({page,root,kit,tags,invader,cache,cal
    const imports=await fs.readdir(path.join(root,'library/asset-imports')).catch(error=>{if(error.code==='ENOENT')return[];throw error;});expect(imports).toEqual([]);
    receipt.draftImportRefusedWithoutPlacement=true;
    await chooseTool(page,'Map library');await page.locator(`.map-card[data-project-id="${source.project.id}"]`).click();await chooseTool(page,'Tag editor');
-   await page.getByRole('tab',{name:'Native Output',exact:true}).click();
+   await page.getByRole('tab',{name:'Properties',exact:true}).click();
    const smart=page.locator('.smart-edit:visible').first();if(!await smart.evaluate(element=>element.open))await smart.locator('summary').first().click();
    await smart.getByRole('button',{name:'Review save plan',exact:true}).click();await expect(smart.locator('.smart-edit-plan>strong')).toHaveText('Direct map copy');
    await smart.getByRole('button',{name:'Save validated map copy',exact:true}).click();await expect(smart.locator('.smart-edit-result>strong')).toHaveText('Validated copy ready');
-   const beforeIds=new Set((await call('bootstrap')).projects.map(p=>p.id));
+   const beforeIds=new Set((await call('bootstrap')).entries.map(p=>p.id));
    await smart.getByRole('button',{name:/Open edited copy in a new tab|Add edited copy to map library/}).click();
-   let copy;await expect.poll(async()=>{copy=(await call('bootstrap')).projects.find(p=>!beforeIds.has(p.id));return!!copy;}).toBe(true);
+   let copy;await expect.poll(async()=>{copy=(await call('bootstrap')).entries.find(p=>!beforeIds.has(p.id));return!!copy;}).toBe(true);
    source=await call('open_project',{id:copy.id});expect(source.project.tagEdits).toEqual([]);
    const copiedDoor=source.inspection.tags.find(t=>t.class==='mach'&&t.path.replaceAll('\\','/').endsWith('door small/door small'));
    expect(copiedDoor.fields.find(f=>f.key==='bounding-radius').value).toBeCloseTo(.75,6);
@@ -115,6 +123,7 @@ export async function nativeLogicRoundTrip({page,root,kit,tags,invader,cache,cal
  }else{await open();const d=await state();expect(d.placements).toEqual([receipt.placedDoor]);expect(d.logic.rules).toHaveLength(1);expect(d.logic.triggers).toHaveLength(1);expect(d.logic.devices[0].placementId).toBe(receipt.placedDoor.id);}
  // Build is in the shared bottom strip; an unpinned right drawer can cover it.
  for(const label of ['Inspector','Build tools']) {const panel=page.getByRole('region',{name:`${label} panel`,exact:true});if(await panel.isVisible())await panel.getByRole('button',{name:`Close ${label}`,exact:true}).click();}
+ const authored=await state();receipt.nativeMaterialPaths=authored.materials.map(m=>({id:m.id,shaderPath:m.shaderPath}));receipt.nativeSkyPath=authored.skyPath;
  await page.getByRole('button',{name:'Build & check playtest',exact:true}).click();
  const began=performance.now(),phases=[];let lastPhase='';
  await expect.poll(async()=>{const b=await call('bootstrap'),log=b.logs.findLast(l=>l.projectId===created.project.id);if(log?.phase!==lastPhase){lastPhase=log?.phase??'';phases.push({phase:lastPhase,elapsedMs:performance.now()-began,message:log?.message});console.log('NATIVE_PHASE',JSON.stringify(phases.at(-1)));}const failed=b.logs.find(l=>l.projectId===created.project.id&&l.phase==='failed');if(failed)throw Error(failed.message);return (await call('quickforge_build_report',{projectId:created.project.id}))?.status;},{timeout:900000,intervals:[1000,2500]}).toBe('validated');

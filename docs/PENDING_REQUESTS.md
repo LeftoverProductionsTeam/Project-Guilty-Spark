@@ -2,7 +2,7 @@
 
 ## Overnight continuation — 5 November 2026
 
-**Active P0 `285a5a02`: release stabilization.** Production map/OBJ/audio references and shared Undo now stay in RAM until explicit Save/recovery;20actual native inspect/close cycles allocate0project copies. Fifty edits/Undo/Save/restart, native export/readback and repaired Blender/native handoff pass. Latest combined Windows matrix:778Rust/9ignored,413frontend,177browser,59offline,36contracts; see P0_RELEASE_STABILIZATION.md. Archive/animation/tool-lifetime, orphan, platform/release gates remain open; no push or purge repeat.
+**Active `ba13b6e2`:** P0 Save/recovery and C71 native authoring/restart/readback verified; Standalone exits1 with missing UI source. Game/GUI/peer gates remain open. Next: bounded shell preflight and same-fixture rerun. Full results: [P0_C71_CONTINUATION_20261106.md](P0_C71_CONTINUATION_20261106.md) and ACTIVE_TASK.md. Preserve every historical objective/ID; no purge, push or whole-backlog acceptance.
 
 Owner explicitly authorizes safe independent work while human/approval gates remain pending. Configured native map export committed c16186c. Existing C70 Blender OBJ edit/reconcile/history/native compiler/independent readback now passes in the actual Windows application; see OVERNIGHT_ENGINEERING_20261105.md and fixtures/c70-tool-roundtrip.json. Manual/addon/wider tool/game acceptance remains pending. Resume Prompt06 Native Asset & Tag Studio in the existing asset/Inspector/native paths; preserve all earlier and later requirement identities. No manual requeue, new scheduler or full SDK copies.
 

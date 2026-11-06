@@ -386,9 +386,38 @@ pub fn resource_hashes(directory: &Path) -> Result<std::collections::BTreeMap<St
     Ok(hashes)
 }
 
+/// A saved descriptor/head is owned by its file identity as well as its bytes.
+/// Refuse hardlinks and equivalent-byte replacement by another author.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub(crate) struct FileRevision { identity:Option<(u64,u64)>, pub(crate) sha256:Option<String> }
+impl FileRevision {
+    pub(crate) fn capture(path:&Path)->Result<Self> {
+        reject_links(path)?;
+        match fs::symlink_metadata(path) {
+            Err(e) if e.kind()==std::io::ErrorKind::NotFound=>return Ok(Self::default()),
+            Err(e)=>return Err(e.into()),
+            Ok(meta) if !meta.is_file()||meta.len()>32*1024*1024=>return invalid("Saved metadata is not a bounded regular file; retained"),
+            Ok(_)=>{},
+        }
+        let identity=crate::storage::unique_file_identity(path).ok_or_else(||crate::SparkError::Invalid("Saved metadata has hardlink aliases or unavailable ownership; retained".into()))?;
+        let sha256=crate::maps::hash_file(path)?;
+        reject_links(path)?;
+        if crate::storage::unique_file_identity(path)!=Some(identity){return invalid("Saved metadata changed identity while being read; retained");}
+        Ok(Self{identity:Some(identity),sha256:Some(sha256)})
+    }
+    pub(crate) fn verify(&self,path:&Path)->Result<()> {
+        if *self!=Self::capture(path)?{return invalid("Saved metadata changed outside this operation; external revision retained");}Ok(())
+    }
+}
+
 /// Write to a sibling temporary file, fsync, then replace. Keep an exact backup before replacement.
 pub fn atomic_write(path: &Path, bytes: &[u8], backup: bool) -> Result<Option<PathBuf>> {
+    atomic_write_checked(path,bytes,backup,None)
+}
+pub(crate) fn atomic_write_checked(path:&Path,bytes:&[u8],backup:bool,expected:Option<&FileRevision>)->Result<Option<PathBuf>> {
     reject_links(path)?;
+    if let Some(expected)=expected{expected.verify(path)?;}
     let parent = path
         .parent()
         .ok_or_else(|| crate::SparkError::Invalid("Output has no parent".into()))?;
@@ -413,6 +442,7 @@ pub fn atomic_write(path: &Path, bytes: &[u8], backup: bool) -> Result<Option<Pa
         } else {
             None
         };
+        if let Some(expected)=expected{expected.verify(path)?;}
         fs::rename(&temp, path)?;
         Ok(bak)
     })();
@@ -421,7 +451,7 @@ pub fn atomic_write(path: &Path, bytes: &[u8], backup: bool) -> Result<Option<Pa
     }
     result
 }
-fn encoded_project(path:&Path,project:&Project)->Result<Vec<u8>> {
+pub(crate) fn encoded_project(path:&Path,project:&Project)->Result<Vec<u8>> {
     project.validate()?;
     reject_links(path)?;
     let bytes = serde_json::to_vec_pretty(project)?;
@@ -442,6 +472,11 @@ pub fn save_project(path:&Path,project:&Project)->Result<()> {
 /// Repeated saves of an admitted managed document retain one fixed recovery
 /// revision. These new ownership checks do not alter portable serialization.
 pub(crate) fn save_managed_project(path:&Path,project:&Project)->Result<()> {
+    let expected=FileRevision::capture(path)?;
+    save_managed_project_checked(path,project,&expected)
+}
+pub(crate) fn save_managed_project_checked(path:&Path,project:&Project,expected:&FileRevision)->Result<()> {
+    expected.verify(path)?;
     let bytes=encoded_project(path,project)?;
     if path.is_file()&&fs::metadata(path)?.len()==bytes.len() as u64&&fs::read(path)?==bytes{return Ok(());}
     if path.is_file() {
@@ -463,9 +498,11 @@ pub(crate) fn save_managed_project(path:&Path,project:&Project)->Result<()> {
         }
         // One independently written previous-good recovery copy is separate
         // from optional versioned backups. Legacy UUID backups stay untouched.
-        atomic_write(&recovery,&fs::read(path)?,false)?;
+        let recovery_revision=FileRevision::capture(&recovery)?;
+        expected.verify(path)?;
+        atomic_write_checked(&recovery,&fs::read(path)?,false,Some(&recovery_revision))?;
     }
-    atomic_write(path, &bytes, false)?;
+    atomic_write_checked(path, &bytes, false,Some(expected))?;
     Ok(())
 }
 pub fn project_recovery_path(path:&Path)->Result<PathBuf> {

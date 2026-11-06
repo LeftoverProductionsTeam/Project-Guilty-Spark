@@ -505,11 +505,9 @@ pub(super) async fn runtime_workbench_report(
             observation.project.content_identity =
                 project.source.as_ref().map(|s| s.sha256.clone());
             observation.project.built_output_verified = current_build(&state, project).is_ok();
-            observation.project.contains_new_scenario_objects = project.quick_forge.is_none()
-                && project
-                    .scene
-                    .iter()
-                    .any(|item| item.source_offset.is_none());
+            observation.project.contains_new_scenario_objects = if project.quick_forge.is_some(){false}
+                else if project.source.is_some(){core::build::has_unsupported_world_edits(project,&*inspect(&state,project)?)}
+                else{!project.scene.is_empty()};
         }
         let context = project
             .as_ref()

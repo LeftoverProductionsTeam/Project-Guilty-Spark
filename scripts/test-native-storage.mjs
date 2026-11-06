@@ -114,7 +114,7 @@ const report = {
 // never the full generated libraries, compiler tags or first-run intermediates.
 let storageError=null;
 try {
-for(const name of ['acceptance.json','project.gsproject','first-receipt.json','edited-receipt.json','native-events.jsonl','extraction.json']){
+for(const name of ['acceptance.json','project.gsproject','first-receipt.json','edited-receipt.json','native-events.jsonl','extraction.json','fresh-build.json']){
   const file=path.join(args.at(-1),name);
   if(fs.existsSync(file)){
     if(fs.statSync(file).size>4*1024**2)throw Error('Native diagnostic exceeds its evidence budget');
@@ -122,10 +122,11 @@ for(const name of ['acceptance.json','project.gsproject','first-receipt.json','e
   }
 }
 if(result.code===0){
-  const native=JSON.parse(fs.readFileSync(path.join(output,'acceptance.json'),'utf8'));
-  if(!native.complete)throw Error('Native helper did not acknowledge completion');
+  const fresh=process.env.SPARK_QA_BUILD_ONLY==='1';
+  const native=JSON.parse(fs.readFileSync(path.join(output,fresh?'fresh-build.json':'acceptance.json'),'utf8'));
+  if(fresh?!native.nativeCompilation:!native.complete)throw Error('Native helper did not acknowledge the requested native stage');
   const final=native.externalEdit?.editedBuild??native.build;
-  if(final?.output)await finishStorage.retain(final.output,'Accepted final native compiler output with independent readback');
+  if(!fresh&&final?.output)await finishStorage.retain(final.output,'Accepted final native compiler output with independent readback');
 }
 } catch(error) {storageError=String(error);process.exitCode=1;}
 try{await finishStorage(result.code===0&&!storageError?'passed':'failed');}catch(error){storageError=[storageError,String(error)].filter(Boolean).join('; ');process.exitCode=1;}

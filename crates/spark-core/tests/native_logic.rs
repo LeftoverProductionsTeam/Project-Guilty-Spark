@@ -21,6 +21,17 @@ fn level() -> q::QuickForgeDocument {
     d
 }
 #[test]
+fn foreign_round_lifecycle_events_cannot_be_reinterpreted_as_halo1_triggers() {
+    let original=serde_json::to_value(level()).unwrap();
+    for kind in ["roundEnd","roundStart","playerRespawn","playerReconnected"] {
+        let mut foreign=original.clone();
+        foreign["logic"]["rules"][0]["event"]=serde_json::json!({"kind":kind});
+        let error=serde_json::from_value::<q::QuickForgeDocument>(foreign).unwrap_err().to_string();
+        assert!(error.contains("unknown variant"),"{kind}: {error}");
+    }
+    assert_eq!(serde_json::to_value(level()).unwrap(),original);
+}
+#[test]
 fn optional_logic_preserves_old_documents_and_does_not_change_geometry_buffers() {
     let d = bsp_workshop::example().unwrap();
     let encoded = serde_json::to_value(&d).unwrap();

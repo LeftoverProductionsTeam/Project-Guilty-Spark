@@ -97,14 +97,17 @@ fn native_scenario_additions_do_not_expand_the_original_cache_write_footprint() 
     });
     project.native_asset_imports.push(binding);
     project.scene.push(added);
+    assert!(!spark_core::build::has_unsupported_world_edits(&project,&inspection));
     let (input, proof) = portability::verify_preservation(&project, &inspection).unwrap();
     assert_eq!(input, original);
     assert!(proof.byte_identical && proof.untouched_bytes_preserved);
     assert!(proof.permitted_ranges.is_empty());
     project.scene.last_mut().unwrap().scale = [2.; 3];
+    assert!(spark_core::build::has_unsupported_world_edits(&project,&inspection));
     assert!(portability::verify_preservation(&project, &inspection).is_err());
     project.scene.last_mut().unwrap().scale = [1.; 3];
     project.native_asset_imports.clear();
+    assert!(spark_core::build::has_unsupported_world_edits(&project,&inspection));
     assert!(portability::verify_preservation(&project, &inspection).is_err());
     assert_eq!(std::fs::read(&path).unwrap(), original);
 }

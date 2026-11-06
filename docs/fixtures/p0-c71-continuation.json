@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "directive": "ba13b6e2-59f0-4fc6-89c3-4c18560ba1f6",
+  "startingCommit": "1d1de2b07860852779c7c5e4ef3991535e513cf2",
+  "endingCommit": "The local commit containing this receipt; exact commit and tree are in the external review manifest.",
+  "applicationVersion": "0.4.1",
+  "scope": "P0 coordinated Save and source preservation; one C71 native authoring workflow; scoped engine research. Not whole-backlog or game acceptance.",
+  "overallNativeRunComplete": false,
+  "nativeRunFailure": "Optional H1A Standalone exited 1. Source/native/normal-restart cases passed; game loading and gameplay unaccepted.",
+  "tests": {
+    "rust": {
+      "passed": 795,
+      "ignored": 9,
+      "suites": 53,
+      "receipt": "p0-c71-native-final-r17.json"
+    },
+    "typescript": "passed",
+    "frontend": {
+      "passed": 414,
+      "files": 96
+    },
+    "browser": {
+      "passed": 177
+    },
+    "offlinePrograms": 59,
+    "storageOwnership": {
+      "passed": 33
+    },
+    "sourceModuleContracts": {
+      "passed": 3
+    },
+    "windowsNativeMapCases": 5,
+    "windowsNativeWindowCases": 8,
+    "windowsNativeBlenderCases": 2,
+    "c71PreGameCases": 2,
+    "tenIndependentCompletedNativeJobs": {
+      "passed": true,
+      "receipt": "p0-c71-continuation-validation-r2.json"
+    },
+    "finalIndependentCompletedNativeJobs": 2
+  },
+  "native": {
+    "appSha256": "93742833cf8ef5f3dff2c8a235912457b451a931b3680caa494eaceb4d1aa63a",
+    "mockedIpc": false,
+    "originalCacheUnchanged": true,
+    "sourceCacheSha256": "dee648992d476c547e93d1c5c9103e7f8701603c59b64c87a2048956cc2ca83a",
+    "editedNativeCopySha256": "f9629c6b209ae6670a0d8efe03f8d6ff2813eb01dc1a5875c2404c440e77d4ef",
+    "nativeOutputSha256": "9cbd5b387c604203aaa0e753d17bf45933e2d01f82894371ae0223d3c70cc63b",
+    "projectFingerprint": "43ffa63f9c0db0fa740841f6321645c461b33ee37e9734b150684d615f880048",
+    "nativeBuildMs": 43500.6193,
+    "independentReadback": {
+      "boundingRadius": 0.75,
+      "triggerDimensions": [
+        6,
+        3,
+        3
+      ],
+      "scriptNames": [
+        "gs_logic_init",
+        "gs_evt_4bfb7865283d"
+      ],
+      "deviceManualControl": true,
+      "crcMismatch": 0,
+      "standardMachineTag": true,
+      "standardScenarioTag": true
+    },
+    "authoringRule": "Enter -> Open; no Leave -> Close authored in this measured fixture.",
+    "sourceAndImportsPreservedOnRestart": true,
+    "undoIdentityAndRevisionPreservedOnRestart": true,
+    "currentBuildMetadataAndReceiptPreservedOnRestart": true,
+    "independentGuiEditorAccepted": false
+  },
+  "gameTrial": {
+    "runtime": "Halo 1 H1A Standalone 01.03.43.0000, loose tags; not retail compiled-cache loading",
+    "executableSha256": "fc9e2b6193c6f6d9ff988278b0d39a983747f3fdbdeca7cafadd28f1f0c53e73",
+    "processId": 32260,
+    "startedAt": "2026-11-06T19:21:51.917Z",
+    "closedAt": "2026-11-06T19:22:10.486Z",
+    "exitCode": 1,
+    "gameLoaded": null,
+    "gameplayVerified": false,
+    "nativeLogs": [
+      {
+        "file": "reports/debug.txt",
+        "bytes": 31265,
+        "sha256": "5dd4e4108eab8c7dd287a4f4ad5aa1b2e2d56ec08f333e93e983097dc9ad9fd3"
+      }
+    ],
+    "observedMissingSource": [
+      "ui/ui_tags_loaded_all_scenario_types.tag_collection",
+      "ui/ui_tags_loaded_multiplayer_scenario_type.tag_collection",
+      "ui/shell/bitmaps/background.bitmap",
+      "ui/shell/strings/loading.unicode_string_list",
+      "ui/shell/main_menu/mp_map_list.unicode_string_list",
+      "ui/shell/bitmaps/trouble_brewing.bitmap",
+      "ui/shell/bitmaps/team_icon_slayer.bitmap",
+      "ui/shell/bitmaps/team_background.bitmap",
+      "sound/sfx/ui/cursor.sound",
+      "sound/sfx/ui/forward.sound",
+      "sound/sfx/ui/back.sound"
+    ],
+    "causeLimit": "Missing UI source is directly observed. Its causal sufficiency for exit 1 is not yet proven. Resolve the bounded shell closure and rerun."
+  },
+  "sourceInputs": {
+    "files": 1800,
+    "logicalBytes": 107744329,
+    "sourceArchiveSha256": "6c9c156237c78ab1b983080495fdcff698a3f15fe0baaadb1c663654d27f7bd4",
+    "originalArchiveUnchanged": true,
+    "retainedSdkTree": false
+  },
+  "temporaryOutput": {
+    "workflow": "source-only-verification",
+    "temporaryOutputDisposed": true,
+    "disposedLogicalBytes": 5377167876,
+    "disposedAllocatedFileBytes": null,
+    "peakLogicalBytes": 5858533641,
+    "allocatedBytes": 5063743048,
+    "monitoringSamples": 181,
+    "monitoringMs": 120695.47259999957,
+    "sourceMonitoring": {
+      "scope": "Source and new top-level output; protected games/Git/dependencies are not traversed",
+      "currentLogicalBytes": 46333382,
+      "peakLogicalBytes": 46354650,
+      "excludedTopLevel": [
+        "protected games, Git, toolchains, dependencies, original mods, accepted releases and research"
+      ],
+      "error": null
+    }
+  },
+  "performance": {
+    "mapInspectCloseCycles": 20,
+    "inspectCloseMs": 123796.5155,
+    "mapCopiesCreated": 0,
+    "saveEditCycles": 50,
+    "saveProjectLogicalGrowthBytes": 2958764,
+    "inactiveGlClearsOver650ms": 0,
+    "minimizedGlClearsOver650ms": 0,
+    "warmGpuContextLimit": 2,
+    "processSample": {
+      "durationMs": 165043,
+      "peakSampledCombinedWorkingSet": 523030528,
+      "processPeakWorkingSet": 541716480,
+      "note": "Sampled RAM includes this helper and native compiler processes; it is not all Spark RAM or GPU memory. Volume free delta includes concurrent disk activity. Native file allocation is measured independently by the helper."
+    },
+    "comparableBeforeAfterOptimizationProven": false
+  },
+  "preservation": {
+    "requirementIds": 475,
+    "ledgerSha256": "1eb0848def039b08b6398c8ea67e8c7e9a5fbce803c0ec417bc2655efe945bf7",
+    "numberedPrompts": 25,
+    "numberedRange": "04-28",
+    "stash": "32a8cb1ef4b1aeed2d459e5ad26ef69e36e78f85",
+    "c49": {
+      "sourceCommit": "cb07581597de11e83d1c10bafad526e8b031f27e",
+      "installer": "Project_Guilty_Spark_0.4.1_windows_x64_Setup.exe",
+      "installerSha256": "6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749",
+      "freshPackageVerification": true,
+      "includesThisContinuation": false
+    },
+    "newArchiveWarehouse": false,
+    "newSdkTreeRetained": false,
+    "gitHistoryRewritten": false,
+    "pushOrPublication": false
+  },
+  "evidenceLocation": "Existing external GuiltySpark-Engineering-d49eb02588bf directory; full paths are in ACTIVE_TASK.md.",
+  "receipts": [
+    {
+      "file": "p0-c71-native-final-r17.json",
+      "bytes": 245838,
+      "sha256": "115b6db40a90f7735f94df2e28c7a0099b65b244f45a4b764f0efa6fd97fa49b"
+    },
+    {
+      "file": "p0-c71-native-final-r17.log",
+      "bytes": 172872,
+      "sha256": "93c13a46d0ce4c74a42f48b426563679d7ccd1688cd213626e7e5703395128c7"
+    },
+    {
+      "file": "p0-c71-final-acceptance-r9.json",
+      "bytes": 193381,
+      "sha256": "44aac5855715f6418fbe45dcda5f9aee0e66cc296c333e53ca6da7eb945e2760"
+    },
+    {
+      "file": "p0-c71-final-acceptance-r9.log",
+      "bytes": 214647,
+      "sha256": "ec67c6c737f988e01bc64fb7ff8641f844ca6148abb5acb24897cf221af5e47e"
+    },
+    {
+      "file": "continuation-c49-verify.json",
+      "bytes": 5015,
+      "sha256": "49b092971a8098a3c70a108da3c87b097effe4c2536cd3544bbafc96ed0f7509"
+    },
+    {
+      "file": "continuation-final-git-fsck.log",
+      "bytes": 6168,
+      "sha256": "f1829ffe46d41034236f3fa5b879459df18360850a1e282642805ed7adf6a55c"
+    },
+    {
+      "file": "first-save-no-head-reproduction.log",
+      "bytes": 16404,
+      "sha256": "d2f6154711e4f6ccb20bb40be34695c48f22bf79dfb7f95324822a0af5a17aae"
+    }
+  ],
+  "highestImpactNextAction": "Use the existing native dependency tooling to preflight and stage only verified H1A Standalone UI/shell roots, rerun this exact C71 fixture, then observe game loading and request a focused door walkthrough when the owner is available. Keep retail cache and independent GUI gates separate."
+}

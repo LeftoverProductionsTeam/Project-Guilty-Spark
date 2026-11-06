@@ -408,6 +408,11 @@ async fn open_built_map(app:tauri::AppHandle,project_id:String,build_id:String)-
             }
             library.save(&project,Some(&inspection)).map_err(error)?;
         }
+        // Every open-built-map entrypoint publishes the new library identity,
+        // including Smart Edit in tag/object drawers. Release the library lock
+        // before listeners request the refreshed source list.
+        drop(library);
+        if !existed { let _=app.emit("spark:library-changed",()); }
         Ok(OpenProject{project,inspection:Some(inspection)})
     }).await.map_err(error)?
 }
@@ -1031,9 +1036,7 @@ fn update_project_document(state:&AppState,window:&tauri::WebviewWindow,mut proj
     project.modified_at = chrono::Utc::now().to_rfc3339();
     let entry=if persist{
         let library=lock(&state.library)?;
-        let entry=library.save_explicit(&project,None).map_err(error)?;
-        history_guard.saved_checkpoint(&library.project_dir(&project.id).map_err(error)?.join("window-history"),&project).map_err(|reason|format!("Project descriptor saved, but Undo recovery could not be checkpointed. Keep this window open and review: {reason}"))?;
-        entry
+        library.save_with_history(&mut history_guard,&project).map_err(error)?
     }else{lock(&state.library)?.save(&project,None).map_err(error)?};
     if persist{
         let _=window.app_handle().emit("spark:project-saved",&project.id);

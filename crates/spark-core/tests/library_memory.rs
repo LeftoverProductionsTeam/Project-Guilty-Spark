@@ -102,3 +102,51 @@ fn background_preview_capacity_refuses_growth_without_evicting_in_use_sources(){
     for id in ids{assert!(library.get(&id).is_ok());}
     assert_eq!(std::fs::read(extra).unwrap(),bytes);
 }
+
+#[test]
+fn failed_explicit_save_keeps_descriptor_and_history_together() {
+    use spark_core::workspace_history::{Session,Head,Snapshot};
+    let temp=tempfile::tempdir().unwrap();let library=Library::workspace(&temp.path().join("library")).unwrap();
+    let mut saved=library.create("Accepted Save").unwrap();let dir=library.project_dir(&saved.id).unwrap().join("window-history");
+    let mut history=Session::default();let a=uuid::Uuid::new_v4().to_string();
+    let mut head=Head{current:a.clone(),past:vec![],future:vec![],dirty:true,limit:100};
+    history.commit(&dir,&saved,0,head.clone(),vec![Snapshot{key:a.clone(),project:saved.clone()}]).unwrap();
+    let file=library.save_with_history(&mut history,&saved).unwrap().project_path;
+    let accepted=std::fs::read(&file).unwrap();saved.title="New unsaved edit".into();let b=uuid::Uuid::new_v4().to_string();
+    head.past.push(a);head.current=b.clone();history.commit(&dir,&saved,1,head,vec![Snapshot{key:b.clone(),project:saved.clone()}]).unwrap();
+    // Another writer owns this path. Undo must refuse it without publishing the descriptor first.
+    std::fs::write(dir.join(format!("{b}.json")),b"conflicting external snapshot").unwrap();
+    let result=library.save_with_history(&mut history,&saved);
+    assert!(result.is_err());assert_eq!(std::fs::read(&file).unwrap(),accepted,"failed Save published a different descriptor than the acknowledged history");
+    let reopened=spark_core::project::load_project(&file).unwrap();let mut restarted=Session::default();
+    let view=restarted.read(&dir,&reopened).unwrap().unwrap();
+    assert_eq!(view.snapshots.iter().find(|s|s.key==view.head.current).unwrap().project.title,reopened.title);
+    assert_eq!(history.read(&dir,&saved).unwrap().unwrap().revision,2);
+}
+
+#[test]
+fn a_clean_reopen_restores_only_matching_recorded_native_build_metadata() {
+    use spark_core::{project::{Project,BuildRecord},forge_build::QuickForgeBuildReceipt,quickforge};
+    let temp=tempfile::tempdir().unwrap();let root=temp.path().join("library");let library=Library::workspace(&root).unwrap();
+    let mut p=library.create("Native metadata restart").unwrap();p.quick_forge=Some(quickforge::create_arena("Native metadata restart","smallIndoorArena").unwrap());
+    library.save(&p,None).unwrap();let file=library.save_explicit(&p,None).unwrap().project_path;let original=std::fs::read(&file).unwrap();
+    let record=BuildRecord{id:uuid::Uuid::new_v4().to_string(),timestamp:String::new(),status:"validated".into(),target:"mcc-cea".into(),output:Some(root.join("synthetic-not-playable.map")),sha256:Some("a".repeat(64)),message:"Metadata only; actual artifact validation remains mandatory".into(),project_fingerprint:p.fingerprint().unwrap()};
+    let mut receipt=QuickForgeBuildReceipt{schema_version:1,job_id:record.id.clone(),project_id:p.id.clone(),project_fingerprint:p.fingerprint().unwrap(),source_document_sha256:None,current:None,status:"validated".into(),duration_ms:0,sources:None,blockers:vec![],warnings:vec![],build:Some(record.clone()),tool_identities:Default::default()};
+    library.set_setting(&format!("quickforge.receipt.{}",p.id),&receipt).unwrap();
+    // Compiler completion records native metadata without implicitly saving an
+    // author's RAM edits. A clean restart must recover the matching metadata
+    // from that existing receipt, not rewrite the source or scan all job trees.
+    p.builds.push(record.clone());library.save(&p,None).unwrap();drop(library);
+    let reopened=Library::workspace(&root).unwrap();assert_eq!(reopened.get(&p.id).unwrap().builds[0].id,record.id);
+    assert_eq!(std::fs::read(&file).unwrap(),original);drop(reopened);
+    for invalid in ["foreign","stale","failed"] {
+        let library=Library::workspace(&root).unwrap();let mut bad=receipt.clone();
+        match invalid {"foreign"=>bad.project_id=Project::new("Other").id,"stale"=>bad.project_fingerprint="b".repeat(64),_=>bad.status="failed".into()}
+        library.set_setting(&format!("quickforge.receipt.{}",p.id),&bad).unwrap();drop(library);
+        assert!(Library::workspace(&root).unwrap().get(&p.id).unwrap().builds.is_empty(),"{invalid} receipt must not become a current build");
+    }
+    // Native operations must still verify the actual owned output and source;
+    // this metadata-only fixture intentionally creates no playable map.
+    receipt.status="exported".into();let library=Library::workspace(&root).unwrap();library.set_setting(&format!("quickforge.receipt.{}",p.id),&receipt).unwrap();drop(library);
+    assert!(Library::workspace(&root).unwrap().get(&p.id).unwrap().builds.is_empty());
+}

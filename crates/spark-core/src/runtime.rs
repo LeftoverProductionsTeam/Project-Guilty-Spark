@@ -121,7 +121,7 @@ pub fn hosting_plan_for(runtime_id: RuntimeId, action: HostingAction, scenario_t
         test_status: TestStatus::Untested, automatic: false, title: format!("{} — manual hosting guidance", runtime_id.name()),
         steps: vec![], sources: vec![], limitations: vec![
             "No runtime session or two-computer gameplay was tested. Manifest agreement proves matching declarations only.".into(),
-            "Guilty Spark Firefight JSON is an offline authoring format; no runtime Firefight bridge or generated game scripts exist.".into(),
+            "Firefight rules export solo native HaloScript for a matching singleplayer scenario. The authored encounters and scripts still need native compilation; multiplayer round authority and shared victory are not accepted.".into(),
             "A successful export, generic runtime launch or source-level capability does not prove a compiled map is playable.".into(),
         ],
     };

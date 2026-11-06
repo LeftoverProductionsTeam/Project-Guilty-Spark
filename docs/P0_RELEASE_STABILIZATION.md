@@ -2,6 +2,10 @@
 
 Owner directive `285a5a02-49b0-4bfb-aedc-c3bb970e5635`. Continue the single canonical local master. This is an incomplete release stabilization initiative, not acceptance of all seven phases.
 
+## 6 November — P0/C71 source checkpoint
+
+[Current repair and measured acceptance](P0_C71_CONTINUATION_20261106.md): final Rust795passed/9ignored; frontend414/browser177; actual Windows map/window/Blender and C71 native authoring/restart/readback pass. Optional Standalone game launch exited1 with missing UI source, so gameplay is not accepted. This local source checkpoint is not a new release. C49 packages were freshly verified at their original source revision; no push, package replacement or publication occurred.
+
 ## Browser regression
 
 The connected GitHub job log confirms that run [42127984354](https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/actions/runs/42127984354) tested `f14a8270d1034ade14cb3df4f177a1e2c7f74682`. Its two Windows failures were dynamic imports of an incidental Vite optimizer path. Linux core/web passed; Windows packaging/upload were skipped after the browser failure.

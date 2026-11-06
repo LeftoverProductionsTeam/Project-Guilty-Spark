@@ -203,6 +203,43 @@ try{
     report.logicRoundTrip={appSha256:report.appSha256,sourceCacheSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex'),mockedIpc:false,gameplayVerified:false,externalGuiEdited:false};
     await nativeLogicRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT??''),tags:path.resolve(process.env.SPARK_LOGIC_TAGS??''),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),call:(command,args)=>invoke(main,command,args),receipt:report.logicRoundTrip,expect,run:runOwned,verifyEditedAsset:true});
     step('Actual edited native asset import, door/trigger authoring, Undo/Save/reopen and native build',report.logicRoundTrip);
+    const id=report.logicRoundTrip.projectId,before=await invoke(main,'open_project',{id}),beforeHistory=await state(main,id),pid=child.pid;
+    await close(main,'save');await waitForQaExit(child);await browser.close();await launchNative();
+    const reopened=await invoke(main,'open_project',{id}),restored=await state(main,id);
+    expect(reopened.project.quickForge).toEqual(before.project.quickForge);expect(reopened.project.nativeAssetImports).toEqual(before.project.nativeAssetImports);
+    expect(reopened.project.builds).toEqual(before.project.builds); // Native metadata must survive independently of an authored dirty flag.
+    report.logicRoundTrip.reopenedNativeBuild=await invoke(main,'quickforge_build_report',{projectId:id});
+    expect(report.logicRoundTrip.reopenedNativeBuild.current).toBe(true);
+    expect(restored.history.head).toEqual(beforeHistory.history.head);expect(restored.history.revision).toBe(beforeHistory.history.revision);
+    await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${id}"]`).click();await chooseTool(main,'Level editor');
+    const canvas=main.locator('.forge-viewport canvas');await expect(canvas).toBeVisible();
+    report.logicRoundTrip.processReopen={stoppedPid:pid,restartedPid:child.pid,sourceAndImportsPreserved:true,undoHeadPreserved:true,nativeWindowReopened:true};
+    step('Authored native asset and logic survive a normal process close/restart with the same Undo head',report.logicRoundTrip.processReopen);
+    if(process.env.SPARK_LOGIC_GAME_REVIEW==='1'){
+      // Explicit, bounded operator review of the existing installed-tool UI.
+      // Process launch/exit never asserts game loading or trigger traversal.
+      const testScene=main.locator('.runtime-dock').getByRole('button',{name:/^Test Scene/});
+      // The dock resolves real source/tool readiness asynchronously on reopen.
+      // A setup action remains clickable to explain missing prerequisites.
+      await expect(testScene).toContainText('Ready');await testScene.click();
+      const dialog=main.getByRole('dialog',{name:'Open Standalone scene test',exact:true});await expect(dialog).toBeVisible();
+      await dialog.getByRole('checkbox').check();await dialog.getByRole('button',{name:'Open tool',exact:true}).click();
+      let game;await expect.poll(async()=>{game=(await invoke(main,'runtime_tool_processes')).find(p=>p.projectId===id&&p.actionId==='testScene');return !!game;}).toBe(true);
+      const trial={projectId:id,processId:game.processId,executable:game.executable,executableSha256:game.executableSha256,tagsDirectory:game.tagsDirectory,gameLoaded:null,gameplayVerified:false,startedAt:new Date().toISOString()};
+      await fs.writeFile(path.join(root,'logic-game-review.json'),JSON.stringify(trial,null,2),{flag:'wx'});console.log('NATIVE_GAME_REVIEW',JSON.stringify(trial));
+      await expect.poll(async()=>{game=(await invoke(main,'runtime_tool_processes')).find(p=>p.processId===trial.processId);return game?.status;},{timeout:180000,intervals:[1000,2500]}).not.toBe('running');
+      const diagnostics=[];
+      for(const name of ['debug.txt','reports/debug.txt']){
+        const file=path.join(path.dirname(trial.tagsDirectory),name),info=await fs.lstat(file).catch(()=>null);
+        if(!info?.isFile()||info.isSymbolicLink()||info.size>4*1024**2)continue;
+        const bytes=await fs.readFile(file);diagnostics.push({file:name,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),tail:bytes.subarray(-65536).toString('utf8')});
+      }
+      // Preserve the actual failed exit and bounded native diagnostics before
+      // disposal too. A failed game must never leave only a launch receipt.
+      report.logicRoundTrip.standaloneProcessTrial={...trial,status:game?.status??'unknown',exitCode:game?.exitCode??null,closedAt:new Date().toISOString(),diagnostics};
+      expect(game?.exitCode,'Close the observed game normally; a process exit is not gameplay acceptance').toBe(0);
+      step('Installed Standalone source-test launch and normal exit observed; scene and gameplay require separate visual evidence',report.logicRoundTrip.standaloneProcessTrial);
+    }
   }
   if(!nativeOnly&&!geometryOnly&&!logicOnly&&!launchOnly){
   const a=await invoke(main,'create_quickforge_project',{title:'C59 map A',template:'smallIndoorArena',target:'haloCustomEdition'});
@@ -228,7 +265,7 @@ try{
   await expect(x(detached)).toHaveValue('0.5');await setX(detached,1.25);const committed=await acknowledged(detached,a.project.id,1.25);await acknowledged(main,a.project.id,1.25);
   const stale=structuredClone(committed.project);stale.title='Rejected stale observer';const key=crypto.randomUUID();
   const rejected=await invoke(main,'commit_workspace_history',{projectId:a.project.id,revision:committed.history.revision,head:{...committed.history.head,current:key},snapshots:[{key,project:stale}]}).then(()=>'',String);
-  expect(rejected).toContain('retained');
+  expect(rejected).toContain('Editing moved to another window. Retained in-memory draft ');
   // A legitimate autosave may acknowledge the same content while the rejected
   // observer request is in flight. Verify source content and ownership rather
   // than incorrectly forbidding that unrelated saved/dirty history transition.
@@ -237,17 +274,37 @@ try{
   expect(afterRefusal.project.quickForge).toEqual(committed.project.quickForge);
   expect(afterRefusal.project.title).toBe('C59 map A');expect(afterRefusal.writable).toBe(false);
   const journal=path.join(root,'library','projects',a.project.id,'window-history');
-  const rejectedFiles=(await fs.readdir(journal)).filter(name=>name.startsWith('rejected-'));
-  expect(rejectedFiles.length).toBeGreaterThan(0);
-  expect((await Promise.all(rejectedFiles.map(name=>fs.readFile(path.join(journal,name),'utf8')))).some(text=>text.includes('Rejected stale observer'))).toBe(true);
-  step(`${detachMethod==='pointer'?'Pointer drag':'Native button'} detaches the actual Inspector; selection, draft and authoritative history converge; stale observer writes are retained and refused`);
+  const rejectedFiles=(await fs.readdir(journal).catch(error=>{if(error.code==='ENOENT')return[];throw error;})).filter(name=>name.startsWith('rejected-'));
+  expect(rejectedFiles).toEqual([]); // Automatic refusal retains RAM, not an implicit disk Save.
+  const draftFile=await invoke(main,'retain_workspace_draft',{projectId:a.project.id,revision:committed.history.revision,head:{...committed.history.head,current:key},snapshots:[{key,project:stale}]});
+  expect(await fs.realpath(path.dirname(draftFile))).toBe(await fs.realpath(journal));
+  const draft=JSON.parse(await fs.readFile(draftFile,'utf8'));
+  expect(draft.accepted).toBe(false);expect(draft.projectId).toBe(a.project.id);
+  // serde_json::Value widens native f32 vectors to their exact f64 numeric
+  // value. Compare these declared Vec3/color/angle fields at exact native precision;
+  // keep every other field and the entire snapshot shape strictly equal.
+  const nativeDraftProject=value=>{
+    const p=structuredClone(value),q=p.quickForge;
+    for(const item of q.geometry)for(const field of ['position','rotation','dimensions'])item[field]=item[field].map(Math.fround);
+    for(const item of q.spawns){item.position=item.position.map(Math.fround);item.facing=Math.fround(item.facing);}
+    for(const item of q.materials)item.color=item.color.map(Math.fround);
+    return p;
+  };
+  expect(draft.snapshots.map(row=>({...row,project:nativeDraftProject(row.project)}))).toEqual([{key,project:nativeDraftProject(stale)}]);expect(draft.head.current).toBe(key);
+  expect((await state(main,a.project.id)).project.title).toBe('C59 map A');
+  step(`${detachMethod==='pointer'?'Pointer drag':'Native button'} detaches the actual Inspector; authoritative history converges; stale observer writes are refused, RAM retention is reported and deliberate draft export preserves native-typed content`);
   await detached.screenshot({path:path.join(root,'detached-inspector.png')});
   await chooseTool(detached,'Map library');await expect(detached.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','library');await expect(detached.locator('.gs-workspace-shell')).not.toHaveAttribute('data-detached-panel');
   await chooseTool(detached,'Level editor');await expect(detached.locator('.gs-workspace-shell')).toHaveAttribute('data-detached-panel','forge-inspector');await inspector(detached);
   await openProject(main,'C59 map B');await inspector(main,true);
   const writes=await Promise.allSettled([setX(main,2.5),setX(detached,1.5)]);expect(writes.every(result=>result.status==='fulfilled')).toBe(true);
   await acknowledged(main,b.project.id,2.5);await acknowledged(detached,a.project.id,1.5);
-  await close(detached);await expect(main.locator('.runtime-dock-heading>span').first()).toHaveText('C59 map B');
+  await detached.getByRole('button',{name:'Close window',exact:true}).click();
+  const closeReview=detached.getByRole('dialog',{name:'Save changes before closing?',exact:true});await expect(closeReview).toBeVisible();
+  await closeReview.getByRole('button',{name:'Cancel',exact:true}).click();expect(detached.isClosed()).toBe(false);await acknowledged(detached,a.project.id,1.5);
+  await close(detached,'save');await expect(main.locator('.runtime-dock-heading>span').first()).toHaveText('C59 map B');
+  expect(JSON.parse(await fs.readFile(path.join(root,'library/projects',a.project.id,'project.gsproject'),'utf8')).quickForge.geometry[0].position[0]).toBe(1.5);
+  await acknowledged(main,b.project.id,2.5);expect(await fs.stat(path.join(root,'library/projects',b.project.id,'project.gsproject')).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;})).toBe(false);
   await main.getByRole('tab',{name:/C59 map A/}).click();await expect(main.locator('.runtime-dock-heading>span').first()).toHaveText('C59 map A');await inspector(main);
   await expect(x(main)).toHaveValue('1.5');expect((await state(main,a.project.id)).writable).toBe(true);
   expect(await main.evaluate(()=>window.c59OriginalCanvas===document.querySelector('.forge-viewport canvas'))).toBe(true);
@@ -298,7 +355,7 @@ try{
     await invoke(detached,'plugin:window|set_position',{label:reopenedLabel,value:{Physical:position}});await invoke(detached,'recover_workspace_window');
     const actual=await invoke(detached,'plugin:window|outer_position',{label:reopenedLabel});expect(actual).toEqual(position);report.nativeSecondaryMonitorPlacementTested=true;
   }
-  await close(detached);await inspector(main);
+  await close(detached,'save');await inspector(main);
   step('Native size/position survive close and reopen; an offscreen saved window is recovered onto an available monitor',{placement,recovered});
   prior=new Set(pages());await invoke(main,'open_workspace_window',{workspace:'learning',context:null,section:null});const learning=await nextPage(prior);await openDrawer(learning,'Help');
   const beforeHelp=new Set(pages());await learning.getByRole('button',{name:'Detach Help',exact:true}).click();const help=await nextPage(beforeHelp);await expect(help.locator('.gs-workspace-shell')).toHaveAttribute('data-detached-panel','help');await help.getByRole('button',{name:'Return panel to workspace',exact:true}).click();await expect.poll(()=>help.isClosed()).toBe(true);await expect(learning.getByRole('region',{name:'Help panel',exact:true})).toBeVisible();await close(learning);
@@ -624,8 +681,14 @@ finally{
   // flushing files after the parent exits; those files must never be deleted
   // against an unstable hash inventory.
   if(report.complete&&browser){
-    try{for(const page of pages().reverse()){if(!page.isClosed())await close(page,'save');}if(child)await waitForQaExit(child);report.gracefulAppClose=true;}
-    catch(error){report.complete=false;report.errors.push('Normal QA app close failed: '+String(error));process.exitCode=1;}
+    try{for(const page of pages().reverse()){if(!page.isClosed()){console.log('NATIVE_CLOSE_REVIEW',JSON.stringify({scope:report.scope,url:page.url(),at:new Date().toISOString()}));await close(page,'save');}}if(child)await waitForQaExit(child);report.gracefulAppClose=true;}
+    catch(error){
+      report.complete=false;report.errors.push('Normal QA app close failed: '+String(error));process.exitCode=1;
+      report.closeFailure=await Promise.all(pages().map(async(page,index)=>{
+        await page.screenshot({path:path.join(root,`close-failure-${index}.png`)}).catch(()=>{});
+        return{url:page.url(),body:(await page.locator('body').innerText().catch(()=>'' )).slice(-16384)};
+      }));
+    }
   }
   await browser?.close().catch(()=>{});
   if(child?.exitCode===null)await stopQaProcess(child);

@@ -122,7 +122,7 @@ fn read_json<T: serde::de::DeserializeOwned>(file: &Path) -> Result<T> {
     f.take(4 * MIB + 1).read_to_end(&mut bytes)?;
     Ok(serde_json::from_slice(&bytes)?)
 }
-fn lock(file: &Path) -> Result<fs::File> {
+pub(crate) fn lock(file: &Path) -> Result<fs::File> {
     reject_links(file)?;
     let f = fs::OpenOptions::new()
         .read(true)

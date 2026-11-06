@@ -6,6 +6,8 @@ An open-source Halo 1 creation and interoperability studio combining native modd
 
 **Available Now** means a validated operation within its stated boundaries. **In Development** means important native gameplay or compatibility gates remain. **Research** means feasibility and acceptance are still unproven. These statuses describe current source; the preserved C49 Windows preview is an earlier snapshot.
 
+**6 November source checkpoint:** coordinated Save/interruption recovery and real native asset→door/trigger→compile/readback→restart tests pass. The latest Standalone trial exited1 with missing UI resources; new gameplay acceptance remains open. [Exact results, limits and next gate](docs/P0_C71_CONTINUATION_20261106.md). The preserved C49 download candidate remains a separate earlier build.
+
 ## Build the Halo worlds we imagined
 
 | Flagship | Status | Proven scope and next gate |

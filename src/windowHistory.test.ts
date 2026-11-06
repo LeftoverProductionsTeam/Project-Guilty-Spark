@@ -2,6 +2,7 @@ import {it,expect,vi,beforeEach} from 'vitest';
 import type {Project} from './types';
 import {historyReducer,initialHistory} from './editor';
 import {WindowHistories,queuedWindowRefresh} from './windowHistory';
+import {documentReducer} from './mapDocuments';
 const {call}=vi.hoisted(()=>({call:vi.fn()}));vi.mock('./api',()=>({call}));
 function project(id='one'):Project{return{schemaVersion:1,id,title:id,createdAt:'created',modifiedAt:'created',source:null,provenance:{creator:'',community:'',releaseYear:null,description:'',sourceUrl:'',permissions:''},scene:[],assets:[],tagEdits:[],history:[],builds:[]};}
 beforeEach(()=>{call.mockReset();});
@@ -41,4 +42,32 @@ it('reads again when a newer notification arrives during a read and keeps maps i
 it('stops queued refreshes after disposal and reports a failed read without spinning',async()=>{
   const failed=vi.fn(),refresh=vi.fn(async()=>{throw Error('Journal integrity failure');});const queue=queuedWindowRefresh(refresh,failed);
   queue.request('one');await vi.waitFor(()=>expect(failed).toHaveBeenCalledOnce());expect(refresh).toHaveBeenCalledOnce();queue.dispose();queue.request('one');expect(refresh).toHaveBeenCalledOnce();
+});
+
+it('native metadata refreshes preserve acknowledged snapshot keys and redo across Save and reattachment',async()=>{
+  const p:Project={...project(),source:{originalPath:'C:/Owned/map.map',preservedPath:'C:/Owned/map.map',sha256:'a'.repeat(64),cacheVersion:13,engine:'MCC',scenarioPath:'levels/test'}};let registered=p,view:any=null;const snapshots=new Map<string,Project>();
+  call.mockImplementation(async(command:string,args:any)=>{
+    if(command==='read_workspace_history')return{writable:true,owner:'owner',history:view?{...view,snapshots:[...snapshots].map(([key,project])=>({key,project:{...project,source:registered.source,assets:registered.assets,builds:registered.builds}}))}:null};
+    if(command!=='commit_workspace_history')throw Error('Unexpected test command: '+command);
+    expect(args.revision).toBe(view?.revision??0);for(const s of args.snapshots)snapshots.set(s.key,s.project);view={head:args.head,revision:args.revision+1};return view.revision;
+  });
+  const broker=new WindowHistories();await broker.attach(p.id);
+  let h=historyReducer(initialHistory,{type:'load',project:p});await broker.persist(p.id,h);
+  h=historyReducer(h,{type:'edit',project:{...h.current!,title:'First'},description:'First edit'});await broker.persist(p.id,h);
+  h=historyReducer(h,{type:'edit',project:{...h.current!,title:'Second'},description:'Second edit'});await broker.persist(p.id,h);
+  h=historyReducer(h,{type:'undo'});await broker.persist(p.id,h);const accepted=structuredClone(view),calls=call.mock.calls.length;
+  const builds=[{id:'native-build',target:'mcc-cea',status:'validated'}] as Project['builds'];
+  registered={...p,builds};h=historyReducer(h,{type:'builds',project:registered});await broker.persist(p.id,h);await broker.flush(p.id);
+  expect(call.mock.calls).toHaveLength(calls);expect(view).toEqual(accepted);
+  registered={...registered,assets:[{id:'validated-obj',kind:'obj',name:'Imported model'}] as Project['assets']};
+  h=historyReducer(h,{type:'assets',project:registered});await broker.persist(p.id,h);
+  registered={...registered,source:{...registered.source!,resourceDirectory:'C:/Owned/resources',resourceSha256:{'sounds.map':'b'.repeat(64)}}};
+  h=documentReducer({activeId:p.id,limit:100,documents:[{id:p.id,history:h,inspection:null,meshes:{}}]},{type:'resources',project:registered}).documents[0].history;
+  await broker.persist(p.id,h);await broker.flush(p.id);expect(call.mock.calls).toHaveLength(calls);expect(view).toEqual(accepted);
+  const reopened=await broker.attach(p.id);expect(view).toEqual(accepted);expect(reopened.history!.current!.title).toBe('First');
+  expect(reopened.history!.current!.builds).toEqual(builds);expect(reopened.history!.future[0].title).toBe('Second');
+  expect(reopened.history!.current!.assets).toEqual(registered.assets);expect(reopened.history!.current!.source).toEqual(registered.source);
+  h=historyReducer(reopened.history!,{type:'redo'});await broker.persist(p.id,h);expect(view.head.current).toBe(accepted.head.future[0]);
+  h=historyReducer(h,{type:'edit',project:{...h.current!,title:'Third'},description:'Actual authored edit'});await broker.persist(p.id,h);expect(view.head.current).not.toBe(accepted.head.future[0]);
+  const beforeSourceChange=view.head.current;h={...h,current:{...h.current!,source:{...h.current!.source!,sha256:'c'.repeat(64)}}};await broker.persist(p.id,h);expect(view.head.current).not.toBe(beforeSourceChange); // Native source validators independently refuse this identity change.
 });

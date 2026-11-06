@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — P0 Save recovery and C71 native authoring, 6 November 2026
+
+- Coordinate explicit descriptor/Undo publication; recover a hash-bound interrupted first Save, retain concurrent external edits and preserve dirty RAM on refusal. Repair SQLite-wait races and first-Save-before-Undo shutdown.
+- Preserve Undo identity/revision and matching native build receipts across real desktop restarts. Publish new native map copies through the existing library event so they appear as asset donors.
+- Refuse changed/replaced/hardlinked or unknown archive output during rollback. Add real interruption and import regressions without deleting old recovery data.
+- Verify actual native property edit, bounded map copy, dependency-validated asset drop, door/trigger Logic, Undo/Save/reopen, native compilation and independent standard-tag/cache readback; retain the original source.
+- Keep final Standalone exit1 and missing UI-shell dependencies unaccepted. No new gameplay, peer, platform or release claim. [Evidence and remaining gate](docs/P0_C71_CONTINUATION_20261106.md).
+
 ## C66 — Native storage containment and task recovery
 
 - Replace repeated full SDK staging with recursive base dependencies and verified namespaced imports. Preserve the complete bounded contract for prepared shared revisions. Unchanged jobs require fresh source/import/tool/generated-output hashes.

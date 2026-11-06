@@ -119,3 +119,43 @@ The compiled Timberland–Sidewinder cache and its one-client load/join evidence
 | 10 | OpenCE `custom_edition_models_convert`, `custom_edition_sounds_decode` / existing conversion/build profiles | Add source-derived target-specific preflights for unsupported geometry/audio/capacity. Compile through matching tools and load in each runtime; refuse unsupported constructs while keeping prior-good output. |
 
 The index can be checked offline with `node scripts/verify-engine-source-index.mjs`. Add an explicit research-root argument to also verify local source hashes and exact detached revisions. This verifier never downloads code or runs a game/tool.
+
+
+## November 6 continuation — scoped Discord intake
+
+The original six pins and36behavior records remain unchanged. The five observations in [the November6 directive](Master%20Engineering%20Prompts/GS_2026-11-06_P0_C71_Continuation.md) are reports, not reproduced Spark or engine defects. No upstream engine implementation was copied into production and no runtime was installed or configured. The older, broader [November5 intake](Master%20Engineering%20Prompts/GS_2026-11-05_Discord_Native_Authoring_and_Compatibility.md) remains separate; receiving it did not accept its terrain, lighting or gameplay initiatives.
+
+### Separate multiplayer authorities
+
+Existing ledgerP03-010/P05-006/P07-005/P07-006 remain open at their recorded game/peer gates. SparkLink's source revisions and author Undo are editor state. Engine object replication, player-controlled biped identity, AI control/animation and round authority are separate contracts. The existing OpenCE pin's `network_objects.c::distributed_client_create` and `network_objects_client_asked`, and `network_actors.c::network_actors_drive`, remain the research owners. Fresh local file SHA256 checks still match `bbf42a70077be6b9332b4c20c3d4f8bd20f9b7d8b352e004d236829b35721559` and `320140381f1d602f5b9efea035208525e1e9feeb8c127bfb8c1870177e07ee91`. This does not establish installed-engine biped-switch replication, shared victory, or a two-computer test. Chupathingy's pin and executable need independent tests; stock Gearbox behavior is not an MCC adapter.
+
+### H1 lifecycle capability matrix
+
+These are source-generation/validation capabilities, not new live-game callbacks. Owners: `src/haloScript.ts::exportHaloCeFirefightRound`, `native_logic.rs::{validate,source,compile,verify_compiled}`, existing gametype/scenario planners and ledgerP03-007/P04-002/P05-005. CE and H1A builds still require their matching scenario/tool generation. OpenCE and Chupathingy can only receive compatible compiled content; this table grants neither engine a tested shared round controller.
+
+| Lifecycle | Existing H1 mechanism | CE / H1A source boundary | OpenCE / Chupathingy peer boundary |
+|---|---|---|---|
+| Initialize/start | `gs_logic_init`; explicit `gs_ff_start` latch | Generated startup/continuous scripts; encounters and names need native compilation | No general synchronized round-start event is inferred |
+| Victory/defeat | Controller-owned `gs_ff_state`4/5 | Solo script state after living-count/player-health checks; not the engine's MP round-end callback | Shared outcome remains unaccepted |
+| Reset | `gs_ff_reset`, then explicit start request | Resets owned encounters/counters; no Reach/Megalo event mapping | No automatic reconnect/reset authority claimed |
+| Cleanup | Owned encounter/object lists | Limited to the controller's actors; preserve unrelated scenario scripts | Peer deletion/corpse parity still requires native observation |
+| Player death/respawn | Player unit health, controlled reacquisition on another requested round | Current solo controller fails the round on death; no revives or arbitrary respawn hook | Native late join/respawn and biped identity remain separate gates |
+| Disconnect/reconnect | Runtime's native session mechanisms | No H1 HaloScript event supplied by Spark | Version-pinned peer tests remain required |
+| Variables | Named scenario globals and explicit resets | Scenario/controller state, not persistent profile storage | Globals are not automatically replicated by SparkLink |
+| Native modes | Existing Slayer/CTF/Oddball/KOTH/Race planner | Preserve native flag/zone/placement validation | Slot capacity does not prove objective synchronization |
+
+The stale hosting guidance stating that generated Firefight scripts did not exist was corrected. The actual source exporter remains conservative: one player/life, finite waves, no revives/scaling or equipment overrides. This continuation does not turn that exporter into a multiplayer bridge.
+
+### Animation report: safeguards and remaining gaps
+
+The H3 graph/Reach crash reports do not establish causation, and neither layout is imported into H1 by this work. Existing H1 source/data hashes, class/schema checks, node counts and rig checksums remain. `animations.rs::validate_target_rig` additionally checks exact node names/order and source-clip parent indices, including equal-checksum adversarial cases. Full replacement-graph parent/lifecycle coverage and required damage/death/respawn behavior remain independently unaccepted. No brightness, material fallback or renderer rewrite masks those gaps. Existing ledger animation/campaign goals remain open.
+
+### Warthog Xbox — pinned documentation only
+
+[Warthog's README atc3641f0aa557d6fbdfee3bebca69c0f9c1d3ef12](https://github.com/ChupathingyCE/warthog-xbox/blob/c3641f0aa557d6fbdfee3bebca69c0f9c1d3ef12/README.md) describes the original-Xbox port, distinct from Warthog CE compatibility and from Spark's desktop adapters. Its documented input families are Xbox and CE, with separate resource banks; HaloMD is excluded. It distinguishes64MiB and128MiB memory classes and limits the test configuration to32players. Custom Edition on64MiB is experimental; that is not a generic map-size admission formula. These claims are upstream documentation, not a Spark console test or proof of the128-player goal.
+
+The pinned [license](https://github.com/ChupathingyCE/warthog-xbox/blob/c3641f0aa557d6fbdfee3bebca69c0f9c1d3ef12/LICENSE) and project README state GPLv3-or-later with a console-SDK permission. No code or SDK is incorporated. The existing retained `halo1-warthog-xbox` profile now explains this limited research scope and still has no executable, write, conversion or network adapter. No console files, security settings or deployment were changed.
+
+### Other-engine gamma/debug reports
+
+Halo3 gamma/debug anecdotes remain out of the active repair. Source image bytes, texture color space, compiler/lightmap transforms and the target runtime's display output must be compared independently. They are not authorization for compensating brightness in Spark, and no H3/Reach rendering API was introduced.

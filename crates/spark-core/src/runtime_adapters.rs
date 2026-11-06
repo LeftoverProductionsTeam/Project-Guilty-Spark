@@ -604,6 +604,8 @@ pub fn registry() -> Vec<RuntimeAdapterProfile> {
             implemented_adapter: false,
             detail: if edition == "h1aStandalone" {
                 "Official development scene testing is integrated through H1A tools, not a generic live/network adapter. Native SDK proof does not establish retail MCC multiplayer."
+            } else if edition == "warthogXbox" {
+                "Research only: Warthog Xbox c3641f0 documents original Xbox and CE inputs,64/128MiB memory classes and32-player test builds. This does not add a console,conversion,Live Link or128-player adapter to Spark."
             } else {
                 "Explicit retained target; no executable, write, conversion, or network adapter is implemented for this identity. H1 layouts must not be applied."
             }.into(),
@@ -832,7 +834,7 @@ pub fn capability_report(observation: &RuntimeObservation) -> RuntimeCapabilityR
         if !observation.project.source_complete { record.gates.push(gate("editableSourceRequired", "Complete compatible editable source and its dependencies are required.")); }
         if operation == Build && observation.project.contains_new_scenario_objects {
             record.availability = Unavailable;
-            record.gates.push(gate("scenarioPlacementWriterMissing", "New/duplicated World scene objects are editor-only; current project build refuses them instead of silently producing a crashing scenario."));
+            record.gates.push(gate("scenarioPlacementWriterMissing", "Unbound World copies, removals and scaled instances have no general native scenario writer. Verified native-tag additions and QuickForge source placements use their separate validated build routes."));
         }
         if operation == TestScene {
             match observation.project.scenario_type {
