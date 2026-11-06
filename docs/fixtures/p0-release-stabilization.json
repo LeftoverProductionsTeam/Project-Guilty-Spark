@@ -298,6 +298,96 @@
       "unchanged bytes replaced by hardlink"
     ],
     "interruptedOrChangedOutput": "Retain and report exact unpublished folder if ownership/bytes cannot be proven; abrupt-process orphan recovery remains open",
-    "nativeAppAcceptance": "pending same-source complete rerun; prior668930c50-edit/native evidence preserved separately"
-  }
+    "nativeAppAcceptance": {
+      "complete": true,
+      "cases": 4,
+      "appSha256": "865f1f8e10366477f9e6acc8e4d9d060c9caabe784dd29536b76dff2e384d3dc",
+      "mockedIpc": false,
+      "imports": {
+        "mixedSuccesses": 1,
+        "mixedFailures": 2,
+        "rejectedAttempts": 10,
+        "libraryIndexUnchangedAfterRejections": true,
+        "lateAssetDescriptorRejections": 10,
+        "originalAssetsUnchanged": true
+      },
+      "edits": 50,
+      "projectLogicalGrowthBytes": 2955505,
+      "sampledPeakPrivateBytes": 2244259840,
+      "comparablePrivateMemoryGrowthBytes": -467931136,
+      "sourceUnchanged": true,
+      "gracefulClose": true,
+      "gameplayAccepted": false,
+      "compilerAndReadbackPassed": true,
+      "temporaryLogicalPayloadDisposed": 5344651336,
+      "temporaryPeakLogicalBytes": 5504324637,
+      "lastMeasuredAllocatedBytes": 5031446000,
+      "physicalReclamationUnknown": true
+    },
+    "sourceCommit": "cdbd27eaa5c583072f8b8056b3b10e67cc9a873a",
+    "profile": {
+      "appWindowMs": 572.2406000000001,
+      "importMs": 3708.7001999999993,
+      "firstMapReadyMs": 7208.974099999999,
+      "resumeMs": 212.244200000001,
+      "sameCanvas": true,
+      "newPreviewCallsOnResume": 0,
+      "conditions": "Fresh application/profile; OS file cache not cleared; same embedded app, source, settings and readiness checks"
+    },
+    "sameSourceRegressions": {
+      "rust": 764,
+      "ignored": 9,
+      "frontend": 413,
+      "browser": 176,
+      "offline": 59,
+      "storageAndSourceContracts": 36,
+      "typescript": true
+    }
+  },
+  "hostedFollowThrough": {
+    "sourceCommit": "c9d826f8df3ac30e5a20ab920168d947ea3b88fa",
+    "readOnlyVerification": true,
+    "run": "https://github.com/LeftoverProductionsTeam/Project-Guilty-Spark/actions/runs/42152912223",
+    "windowsNativeBrowserBuildUpload": "passed",
+    "linux": "failed Rust at storage::tests::completed_disposable_staging_is_removed_without_accumulating_equivalent_jobs",
+    "linuxJobId": 127680154008,
+    "error": "Storage is in use by another operation; retry shortly",
+    "linuxExactContendingHolder": "not recorded; inherited/cloned handle lifetime is a hypothesis, not proven for that run",
+    "publicReleases": 0,
+    "remoteMutationByThisAgent": false
+  },
+  "catalogContentionRepair": {
+    "implemented": "500 ms bounded WouldBlock retries for catalog metadata only; operation leases stay immediate; actual I/O and identity/link changes fail closed",
+    "tests": "Windows transient holder, permanent holder and active-lease protection passed; separate Unix duplicated-handle regression awaits native execution",
+    "fullWindowsRust": 767,
+    "ignored": 9,
+    "nativeCompilerRerun": {
+      "passed": true,
+      "receipt": "p0-catalog-native-validation.json",
+      "finishedAt": "2026-11-06T04:01:47.980Z",
+      "logicalTemporaryBytesDisposed": 3678209719,
+      "physicalReclamationUnknown": true,
+      "stages": [
+        {
+          "name": "Rust workspace",
+          "milliseconds": 130150
+        },
+        {
+          "name": "Native storage helper build",
+          "milliseconds": 58105
+        },
+        {
+          "name": "Real H1A compile, unchanged reuse, external corruption recovery and native readback",
+          "milliseconds": 150548
+        }
+      ]
+    },
+    "linuxHostedRetest": "pending authorized pushed source",
+    "rustApiReference": "https://doc.rust-lang.org/std/fs/enum.TryLockError.html"
+  },
+  "remainingNativeExceptions": [
+    "Crash/process termination before rollback requires guarded orphan recovery",
+    "Partial or externally changed files whose exact ownership/bytes cannot be proven are retained with exact path in the existing import error response",
+    "Production user opens and autosave still need coordinated memory-first Save/Discard/Cancel and RAM history integration"
+  ]
 }

@@ -3,8 +3,8 @@
 Task: P0 285a5a02 — release stabilization and permanent storage control
 Status: implementation incomplete
 Starting revision: f14a8270d1034ade14cb3df4f177a1e2c7f74682; local and read-only remote master matched at intake
-Latest verified revision: 668930c seals6230888 (full Windows758Rust/413frontend/176browser/59offline/36contracts/native50edits+readback). New import preflight/rollback intermediate core tests passed; final alias-safe full Rust rerun active.
-Next action: Finish p0-import-final-rust (owned session14523). Require real SQLite insertion/deferred-COMMIT rollback, ten late-asset rejections, unchanged saved work/originals, and alias/changed/unknown-owner refusal. Then run native app/compiler on the repaired source; compact evidence, seal and commit locally; refresh the single outside review ZIP. Full production memory-first Save/history/close and platform gates remain open.
+Latest verified revision: 668930c/6230888 full Windows/native50-edit evidence. Current import rollback repair passes full Rust764/9ignored,52suites; native same-source rerun pending.
+Next action: Finish active95967 same-cdbd27e full matrix/native50edits, then repair newly confirmed hosted Linux catalog-lock failure42152912223/127680154008 without weakening active-lease guards. Remote nowc9d826f (external push), hosted Windows succeeded. Use bounded contention handling and real OS-lock regression; native Linux rerun still requires approved pushed source. Preserve current imports; seal locally and refresh ONE review ZIP after verification.
 
 ## Acceptance
 
@@ -24,7 +24,7 @@ Full git fsck passes; refs/reflogs and stash32a8cb1ef4b1aeed2d459e5ad26ef69e36e7
 
 ## Changed work
 
-Current uncommitted continuation: descriptor payload preflight reuses checked bytes/parsed meshes within128MiB before copying. ImportFiles binds only fresh unpublished project files to existing SQLite publication; exact SHA/native IDs/nonce/regular paths gate rollback. Accepted work is disarmed only after successful COMMIT. Unknown/changed/linked/aliased files are retained. Existing storage native identity reader reused, no new catalog/archive. Core tests inject real SQLite insert and deferred-COMMIT failures; originals and previously saved work remain unchanged. Final full-source Rust and native app acceptance pending.
+Current uncommitted continuation: descriptor payload preflight reuses checked bytes/parsed meshes within128MiB before copying. ImportFiles binds only fresh unpublished project files to existing SQLite publication; exact SHA/native IDs/nonce/regular paths gate rollback. Accepted work is disarmed only after successful COMMIT. Unknown/changed/linked/aliased files are retained. Existing storage native identity reader reused, no new catalog/archive. Core tests inject real SQLite insert and deferred-COMMIT failures; originals and previously saved work remain unchanged. Final full-source Rust764/9ignored passed. Native same-source app/compiler acceptance pending.
 
 Actual app exposed unsolicited Home source imports: fresh test library acquired c40 and Demo BloodGulch copies. Fix uses the existing Library connection's bounded memory-only TEMP records for explicit background-preview requests (32maps/128MiB); source bytes stay in original owned files, normal user imports remain independent, active preview refs protect cleanup, explicit Save rejects read-only background records. Home requests the mode; source/hash/material/pin decoders unchanged. Full native mixed-batch proof passed:one explicit import/one library entry, no background copies;10failed retries leave index/folders unchanged. Native50edit harness and rejected-import file/index checks remain strict.
 
@@ -35,6 +35,8 @@ History preflight repair: validate every proposed snapshot, immutable ID, comple
 c9 monitoring/source-lifecycle/release-gate changes are committed and fully retested. Uncommitted: mixed-file import report returns successful maps and per-path failures separately through the existing commands; production UI requests it, old native array/error callers remain compatible. Real batch native/unit/UI regressions added. Preview profile retains first-load data across the deliberate test-owned restart. Native lifecycle test now verifies default0backups, explicitly enables3through real settings before testing retention; active-task test no longer matches obsolete AGENTS wording; pending/directive docs repair proven UTF8 mojibake and obey32KiB without losing directive identities. Exact25 original Master Engineering Prompts04–28 will be committed with manifests and byte-preserving attributes; extra supplied Discord research remains separate.
 
 ## Failures and blockers
+
+New read-only GitHub evidence: remote master advanced externally toc9d826f. Run42152912223 Windows native/browser/build/upload passed; Linux failed storage::tests::completed_disposable_staging_is_removed_without_accumulating_equivalent_jobs at lease.finish_disposable, error Storage is in use by another operation. Current catalog lock fails on the first WouldBlock. Exact competing holder is not recorded; inherited/cloned handle lifetime is a testable hypothesis, not a confirmed historical cause. No remote mutation by this agent. No GitHub releases remain.
 
 Second expanded full run passed756Rust/9ignored,176browser,413frontend,36storage/contracts and H1A/Invader native compilation. Actual app then refused an assertion before edit cases:1explicit import produced3library entries because Home automatically imported c40 and Demo sources. Run failed;5332498473logical temporary bytes disposed; no originals changed. Test was not relaxed. Background preview storage is now repaired and revalidation is active.
 

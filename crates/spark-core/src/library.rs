@@ -248,7 +248,7 @@ impl Library {
     ) -> Result<(Project, maps::MapInspection)> {
         let transaction=self.db.unchecked_transaction()?;
         let (project,inspection,mut files)=self.import_map_internal(path,resources,true,false)?;
-        transaction.commit()?;
+        if let Err(reason)=transaction.commit(){return Err(abort_import(&mut files,reason.into()));}
         if let Some(files)=&mut files{files.accepted=true;}
         Ok((project,inspection))
     }
@@ -314,6 +314,7 @@ impl Library {
         let dir = self.project_dir(&p.id)?;
         crate::reject_links(&dir)?;
         let mut files=if self.session_only||preview{None}else{Some(ImportFiles::new(&dir)?)};
+        let result=(||->Result<(Project,maps::MapInspection)>{
         let copy=if self.session_only || preview{
             validate_local_input_path(path)?;crate::reject_links(path)?;fs::canonicalize(path)?
         }else{
@@ -357,7 +358,9 @@ impl Library {
         let saved=self.save_internal(&p, Some(&inspection),preview);
         if let Some(files)=&mut files{files.record_project()?;}
         saved?;
-        Ok((p, inspection,files))
+        Ok((p,inspection))
+        })();
+        match result{Ok((project,inspection))=>Ok((project,inspection,files)),Err(reason)=>Err(abort_import(&mut files,reason))}
     }
     pub fn import_project(&self, path: &Path) -> Result<Project> {
         let incoming = project::load_project(path)?;
@@ -373,7 +376,7 @@ impl Library {
         for reference in references {crate::reject_links(reference)?;}
         let transaction=self.db.unchecked_transaction()?;
         let (project,mut files)=self.import_project_admitted(incoming)?;
-        transaction.commit()?;
+        if let Err(reason)=transaction.commit(){return Err(abort_import(&mut files,reason.into()));}
         if let Some(files)=&mut files{files.accepted=true;}
         Ok(project)
     }
@@ -405,6 +408,7 @@ impl Library {
             let files=if self.session_only{None}else{Some(ImportFiles::new(&self.project_dir(&p.id)?)?)};
             (p,files)
         };
+        let result=(||->Result<Project>{
         p.title = incoming.title;
         p.provenance = incoming.provenance;
         p.scene = incoming.scene;
@@ -457,7 +461,9 @@ impl Library {
         let saved=self.save(&p, None);
         if let Some(files)=&mut files{files.record_project()?;}
         saved?;
-        Ok((p,files))
+        Ok(p)
+        })();
+        match result{Ok(project)=>Ok((project,files)),Err(reason)=>Err(abort_import(&mut files,reason))}
     }
 }
 
@@ -571,6 +577,13 @@ impl ImportFiles {
         fs::remove_dir(&self.directory)?;Ok(())
     }
 }
+fn abort_import(files:&mut Option<ImportFiles>,reason:crate::SparkError)->crate::SparkError {
+    let Some(files)=files else{return reason;};
+    // This disarms the local guard after an explicit failure decision, not a
+    // successful publication. A refusal retains its nonce and exact files.
+    files.accepted=true;
+    match files.rollback(){Ok(())=>reason,Err(retained)=>crate::SparkError::Invalid(format!("{reason} Unpublished files were retained at {} because rollback could not prove ownership/content: {retained}",files.directory.display()))}
+}
 impl Drop for ImportFiles {
     fn drop(&mut self){if !self.accepted{if let Err(reason)=self.rollback(){eprintln!("Unpublished import retained at {}: {reason}",self.directory.display());}}}
 }
@@ -621,5 +634,19 @@ mod import_alias_tests {
         assert!(guard.rollback().is_err());assert!(original.is_file());assert!(owned.is_file());
         assert_eq!(fs::read(&original).unwrap(),b"same bytes");assert_eq!(fs::metadata(&original).unwrap().permissions().readonly(),before);
         guard.accepted=true;
+    }
+}
+
+#[cfg(test)]
+mod import_retention_report_tests {
+    use super::*;
+    #[test]
+    fn failed_import_reports_the_exact_retained_folder_in_the_returned_error() {
+        let root=tempfile::tempdir().unwrap();let directory=root.path().join(uuid::Uuid::new_v4().to_string());
+        let guard=ImportFiles::new(&directory).unwrap();fs::write(directory.join("independent.txt"),b"must remain").unwrap();
+        let mut files=Some(guard);let message=abort_import(&mut files,crate::SparkError::Invalid("Original import failure".into())).to_string();
+        assert!(message.contains("Original import failure"));assert!(message.contains(&fs::canonicalize(&directory).unwrap().display().to_string()));
+        assert!(message.contains("retained"));drop(files);assert_eq!(fs::read(directory.join("independent.txt")).unwrap(),b"must remain");
+        assert!(directory.join(".spark-import-owner").is_file());
     }
 }

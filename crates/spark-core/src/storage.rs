@@ -130,9 +130,25 @@ fn lock(file: &Path) -> Result<fs::File> {
         .create(true)
         .truncate(false)
         .open(file)?;
-    f.try_lock()
-        .map_err(|_| fail("Storage is in use by another operation; retry shortly"))?;
-    Ok(f)
+    // Catalog updates serialize brief metadata work. A transient held handle
+    // must not fail a completed producer on its first WouldBlock. Operation
+    // leases remain immediate probes: waiting must never turn an active job
+    // into eligible cleanup. I/O and identity failures are never retried.
+    let catalog=file.file_name().is_some_and(|name|name=="catalog.lock");
+    let identity=file_identity(file).ok_or_else(||fail("Storage lock identity is unavailable"))?;
+    let deadline=std::time::Instant::now()+std::time::Duration::from_millis(if catalog{500}else{0});
+    loop {
+        reject_links(file)?;
+        if file_identity(file)!=Some(identity){return invalid("Storage lock identity changed while waiting; retained");}
+        match f.try_lock() {
+            Ok(())=>return Ok(f),
+            Err(fs::TryLockError::WouldBlock) if catalog&&std::time::Instant::now()<deadline=>{
+                std::thread::sleep(std::time::Duration::from_millis(5).min(deadline.saturating_duration_since(std::time::Instant::now())));
+            }
+            Err(fs::TryLockError::WouldBlock)=>return invalid("Storage is in use by another operation; retry shortly"),
+            Err(fs::TryLockError::Error(reason))=>return Err(reason.into()),
+        }
+    }
 }
 fn write<T: Serialize>(file: &Path, value: &T) -> Result<()> {
     project::atomic_write(file, &serde_json::to_vec(value)?, false)?;
@@ -1895,5 +1911,48 @@ mod tests {
         assert!(store.cleanup_plan().unwrap().eligible.is_empty());
         assert_eq!(fs::read(out.join("tag")).unwrap(), b"good");
         assert!(unknown.exists());
+    }
+}
+
+
+#[cfg(test)]
+mod catalog_contention_tests {
+    use super::*;
+    #[test]
+    fn brief_catalog_contention_waits_for_the_real_holder_without_mutating_payload() {
+        let root=tempfile::tempdir().unwrap();let store=Store::open(&root.path().join("ledger")).unwrap();
+        let source=root.path().join("source.tag");fs::write(&source,b"protected source").unwrap();
+        let held=lock(&store.root.join("catalog.lock")).unwrap();let reader=store.clone();
+        let(started_tx,started_rx)=std::sync::mpsc::channel();let(done_tx,done_rx)=std::sync::mpsc::channel();
+        let task=std::thread::spawn(move||{started_tx.send(()).unwrap();done_tx.send(reader.overview()).unwrap();});
+        started_rx.recv().unwrap();
+        assert!(matches!(done_rx.recv_timeout(std::time::Duration::from_millis(35)),Err(std::sync::mpsc::RecvTimeoutError::Timeout)),"a transient metadata lock must wait, not reject the producer");
+        drop(held);let report=done_rx.recv_timeout(std::time::Duration::from_secs(3)).unwrap().unwrap();task.join().unwrap();
+        assert!(report.entries.is_empty());assert_eq!(fs::read(&source).unwrap(),b"protected source");
+    }
+    #[test]
+    fn persistent_catalog_and_active_operation_leases_remain_fail_closed() {
+        let root=tempfile::tempdir().unwrap();let store=Store::open(&root.path().join("ledger")).unwrap();
+        let held=lock(&store.root.join("catalog.lock")).unwrap();
+        assert!(store.overview().unwrap_err().to_string().contains("in use"));drop(held);
+        let output=root.path().join("active");let lease=store.reserve(&output,None,65536,Category::Staging,"live producer").unwrap();
+        fs::create_dir(&output).unwrap();fs::write(output.join("payload"),b"active").unwrap();lease.mark_owned().unwrap();
+        let operation=store.root.join("leases").join(format!("{}.lock",lease.id));
+        assert!(lock(&operation).is_err());assert!(store.cleanup_plan().unwrap().eligible.is_empty());
+        assert!(store.dispose_completed(&output).is_err());assert_eq!(fs::read(output.join("payload")).unwrap(),b"active");
+        lease.finish_disposable().unwrap();assert!(!output.exists());
+    }
+    #[cfg(unix)]
+    #[test]
+    fn duplicated_catalog_handle_lifetime_does_not_fail_completed_disposal() {
+        let root=tempfile::tempdir().unwrap();let store=Store::open(&root.path().join("ledger")).unwrap();
+        let output=root.path().join("completed");let lease=store.reserve(&output,None,65536,Category::Staging,"duplicate handle fixture").unwrap();
+        fs::create_dir(&output).unwrap();fs::write(output.join("payload"),b"complete").unwrap();
+        let held=lock(&store.root.join("catalog.lock")).unwrap();let inherited=held.try_clone().unwrap();drop(held);
+        let probe=fs::OpenOptions::new().read(true).write(true).open(store.root.join("catalog.lock")).unwrap();
+        assert!(matches!(probe.try_lock(),Err(fs::TryLockError::WouldBlock)));drop(probe);
+        let release=std::thread::spawn(move||{std::thread::sleep(std::time::Duration::from_millis(40));drop(inherited);});
+        lease.finish_disposable().unwrap();release.join().unwrap();
+        assert!(!output.exists());assert!(store.overview().unwrap().entries.is_empty());
     }
 }
