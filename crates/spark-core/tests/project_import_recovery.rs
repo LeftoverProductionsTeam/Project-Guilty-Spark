@@ -182,3 +182,75 @@ fn importing_a_descriptor_forks_the_same_source_map_without_overwriting_existing
     );
     assert_eq!(std::fs::read(path).unwrap(), bytes);
 }
+
+
+fn project_files(root:&std::path::Path)->std::collections::BTreeMap<PathBuf,String> {
+    let directory=root.join("projects");let mut result=std::collections::BTreeMap::new();
+    if !directory.exists(){return result;}
+    let mut pending=vec![directory.clone()];
+    while let Some(dir)=pending.pop(){for entry in std::fs::read_dir(dir).unwrap(){let file=entry.unwrap().path();if file.is_dir(){pending.push(file);}else{result.insert(file.strip_prefix(&directory).unwrap().to_owned(),maps::hash_file(&file).unwrap());}}}
+    result
+}
+#[test]
+fn ten_late_asset_rejections_leave_no_map_or_obj_copies_and_retain_existing_work() {
+    let root=tempfile::tempdir().unwrap();let directory=root.path().join("library");let library=Library::open(&directory).unwrap();
+    let map=root.path().join("source.map");common::write_map(&map,7);let source_bytes=std::fs::read(&map).unwrap();
+    let (existing,_)=library.import_map(&map,None).unwrap();let mut incoming=existing.clone();
+    incoming.title="Rejected multi-asset source".into();
+    let obj=root.path().join("first.obj");let obj_bytes=include_bytes!("fixtures/static_wedge.obj");std::fs::write(&obj,obj_bytes).unwrap();
+    let mut first=asset(obj.clone());first.sha256=maps::hash_file(&obj).unwrap();
+    let bad=root.path().join("late.obj");std::fs::write(&bad,b"not an OBJ mesh").unwrap();
+    let mut last=asset(bad.clone());last.id="late-asset".into();last.sha256=maps::hash_file(&bad).unwrap();
+    incoming.assets=vec![first.clone(),last];let descriptor=root.path().join("incoming.gsproject");project::save_project(&descriptor,&incoming).unwrap();
+    let before=project_files(&directory);let fingerprint=library.get(&existing.id).unwrap().fingerprint().unwrap();
+    for _ in 0..10 {
+        assert!(library.import_project(&descriptor).is_err());
+        assert_eq!(library.list().unwrap().len(),1);assert_eq!(project_files(&directory),before);
+        assert_eq!(std::fs::read_dir(directory.join("projects")).unwrap().count(),1);
+    }
+    assert_eq!(library.get(&existing.id).unwrap().fingerprint().unwrap(),fingerprint);
+    assert_eq!(std::fs::read(&map).unwrap(),source_bytes);assert_eq!(std::fs::read(&obj).unwrap(),obj_bytes);
+    incoming.assets=vec![first];project::save_project(&descriptor,&incoming).unwrap();
+    let imported=library.import_project(&descriptor).unwrap();assert_ne!(existing.id,imported.id);
+    assert_eq!(library.list().unwrap().len(),2);assert_eq!(std::fs::read(&imported.assets[0].path).unwrap(),obj_bytes);
+    assert_eq!(library.get(&existing.id).unwrap().fingerprint().unwrap(),fingerprint);
+}
+#[test]
+fn asset_hash_duplicate_identity_and_missing_scene_metadata_refuse_before_project_creation() {
+    let root=tempfile::tempdir().unwrap();let directory=root.path().join("library");let library=Library::open(&directory).unwrap();
+    let obj=root.path().join("source.obj");std::fs::write(&obj,include_bytes!("fixtures/static_wedge.obj")).unwrap();
+    let mut first=asset(obj.clone());first.sha256=maps::hash_file(&obj).unwrap();
+    let mut incoming=Project::new("Unpublished source");let descriptor=root.path().join("incoming.gsproject");
+    let mut changed=first.clone();changed.id="changed".into();changed.sha256="f".repeat(64);
+    for assets in [vec![first.clone(),changed],vec![first.clone(),first.clone()]] {
+        incoming.assets=assets;project::save_project(&descriptor,&incoming).unwrap();assert!(library.import_project(&descriptor).is_err());
+        assert!(library.list().unwrap().is_empty());assert!(!directory.join("projects").exists());
+    }
+    let map=root.path().join("fixture.map");common::write_map(&map,7);incoming.scene=maps::inspect_map(&map,None).unwrap().objects;
+    incoming.scene[0].asset_id=Some("missing-mesh".into());incoming.assets=vec![first];project::save_project(&descriptor,&incoming).unwrap();
+    assert!(library.import_project(&descriptor).unwrap_err().to_string().contains("missing its asset metadata"));
+    assert!(library.list().unwrap().is_empty());assert!(!directory.join("projects").exists());
+}
+
+
+#[test]
+fn database_publication_failure_removes_owned_map_and_asset_files_without_touching_sources() {
+    let root=tempfile::tempdir().unwrap();let directory=root.path().join("library");let library=Library::open(&directory).unwrap();
+    let existing=library.create("Saved work stays").unwrap();let before=project_files(&directory);
+    let map=root.path().join("source.map");common::write_map(&map,7);let map_bytes=std::fs::read(&map).unwrap();
+    let obj=root.path().join("source.obj");let obj_bytes=include_bytes!("fixtures/static_wedge.obj");std::fs::write(&obj,obj_bytes).unwrap();
+    let mut incoming=Project::new("New asset project");let mut mesh=asset(obj.clone());mesh.sha256=maps::hash_file(&obj).unwrap();incoming.assets.push(mesh);
+    let descriptor=root.path().join("incoming.gsproject");project::save_project(&descriptor,&incoming).unwrap();
+    let database=rusqlite::Connection::open(directory.join("library.sqlite3")).unwrap();
+    database.execute_batch("CREATE TRIGGER reject_import BEFORE INSERT ON projects BEGIN SELECT RAISE(ABORT, 'test-owned publication failure'); END;").unwrap();
+    for _ in 0..10{
+        assert!(library.import_map(&map,None).is_err());assert!(library.import_project(&descriptor).is_err());
+        assert_eq!(library.list().unwrap().len(),1);assert_eq!(project_files(&directory),before);
+        assert_eq!(std::fs::read_dir(directory.join("projects")).unwrap().count(),1);
+    }
+    assert_eq!(library.get(&existing.id).unwrap().title,existing.title);
+    assert_eq!(std::fs::read(&map).unwrap(),map_bytes);assert_eq!(std::fs::read(&obj).unwrap(),obj_bytes);
+    database.execute_batch("DROP TRIGGER reject_import;").unwrap();
+    let imported=library.import_project(&descriptor).unwrap();assert_eq!(std::fs::read(&imported.assets[0].path).unwrap(),obj_bytes);
+    assert_eq!(library.list().unwrap().len(),2);
+}

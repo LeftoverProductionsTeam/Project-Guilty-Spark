@@ -1245,7 +1245,7 @@ fn allocated_bytes(path: &Path) -> Option<u64> {
     }
 }
 #[cfg(windows)]
-fn file_identity(path: &Path) -> Option<(u64, u64)> {
+fn file_ownership(path: &Path) -> Option<((u64, u64), u64)> {
     use std::os::windows::io::AsRawHandle;
     #[repr(C)]
     struct Information {
@@ -1267,7 +1267,10 @@ fn file_identity(path: &Path) -> Option<(u64, u64)> {
             information: *mut Information,
         ) -> i32;
     }
-    let f = fs::File::open(path).ok()?;
+    use std::os::windows::fs::OpenOptionsExt;
+    // File identity also guards newly created import directories; opening a
+    // directory on Windows requires backup semantics, not administrator access.
+    let f = fs::OpenOptions::new().read(true).custom_flags(0x02000000).open(path).ok()?;
     let mut information = Information {
         attributes: 0,
         creation: [0; 2],
@@ -1281,17 +1284,17 @@ fn file_identity(path: &Path) -> Option<(u64, u64)> {
         index_low: 0,
     };
     let ok = unsafe { GetFileInformationByHandle(f.as_raw_handle(), &mut information) };
-    (ok != 0).then_some((
+    (ok != 0).then_some(((
         information.volume as u64,
         (u64::from(information.index_high) << 32) | u64::from(information.index_low),
-    ))
+    ),u64::from(information.links)))
 }
 #[cfg(not(windows))]
-fn file_identity(path: &Path) -> Option<(u64, u64)> {
+fn file_ownership(path: &Path) -> Option<((u64, u64), u64)> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
-        fs::metadata(path).ok().map(|m| (m.dev(), m.ino()))
+        fs::metadata(path).ok().map(|m| ((m.dev(), m.ino()),m.nlink()))
     }
     #[cfg(not(unix))]
     {
@@ -1299,6 +1302,11 @@ fn file_identity(path: &Path) -> Option<(u64, u64)> {
         None
     }
 }
+
+pub(crate) fn file_identity(path:&Path)->Option<(u64,u64)> {file_ownership(path).map(|(identity,_)|identity)}
+/// A rollback may clear a generated file's Windows read-only bit. Require one
+/// link so this cannot change the attributes of a user file through an alias.
+pub(crate) fn unique_file_identity(path:&Path)->Option<(u64,u64)> {file_ownership(path).filter(|(_,links)|*links==1).map(|(identity,_)|identity)}
 
 #[cfg(test)]
 mod tests {

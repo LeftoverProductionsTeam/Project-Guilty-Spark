@@ -267,5 +267,37 @@
       "outcome": "failed",
       "reason": "One explicit import created three persistent projects because Home prepared previews using normal import. Production background-preview path repaired; assertion retained."
     }
-  ]
+  ],
+  "importPublicationRepair": {
+    "baseCommit": "668930c",
+    "coreEvidence": {
+      "rustPassed": 764,
+      "rustIgnored": 9,
+      "suites": 52,
+      "syntheticMapIdentityFixturesNotGameplay": true,
+      "lateAssetRejections": 10,
+      "mapSqlPublicationFailures": 10,
+      "assetSqlPublicationFailures": 10,
+      "deferredSqlCommitFailures": 10,
+      "previousProjectAndOriginalsUnchanged": true,
+      "validRetryAfterRemovingTestFault": true
+    },
+    "ownership": [
+      "fresh exclusive project directory",
+      "native directory and parent identities",
+      "per-write source SHA and native file identity",
+      "one-link requirement before changing Windows attributes",
+      "random owner nonce",
+      "no recursive removal; exact registered files and empty owned directories only"
+    ],
+    "refusalCases": [
+      "changed contents",
+      "unknown file",
+      "changed nonce",
+      "replaced directory",
+      "unchanged bytes replaced by hardlink"
+    ],
+    "interruptedOrChangedOutput": "Retain and report exact unpublished folder if ownership/bytes cannot be proven; abrupt-process orphan recovery remains open",
+    "nativeAppAcceptance": "pending same-source complete rerun; prior668930c50-edit/native evidence preserved separately"
+  }
 }

@@ -275,6 +275,23 @@ try{
       expect(await fs.readdir(path.join(root,'library/projects'))).toEqual(projectDirectories);
     }
     report.importBatch={mixedSuccesses:1,mixedFailures:2,rejectedAttempts:10,libraryIndexUnchangedAfterRejections:true};
+    if(!readOnly){
+      const inputs=await finishStorage.createScratch('rejected-descriptor-inputs');
+      const first=path.join(inputs,'first.obj'),bad=path.join(inputs,'late.obj');
+      const payload=await fs.readFile(path.resolve('crates/spark-core/tests/fixtures/static_wedge.obj'));
+      await fs.writeFile(first,payload,{flag:'wx'});await fs.writeFile(bad,'invalid mesh',{flag:'wx'});
+      const asset=(id,file,bytes)=>({id,name:id,kind:'obj',path:file,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),vertices:0,triangles:0,hasUvs:false,materials:[]});
+      const descriptor=path.join(inputs,'incoming.gsproject');
+      await fs.writeFile(descriptor,JSON.stringify({...opened.project,title:'Rejected descriptor keeps original source',assets:[asset('first',first,payload),asset('late',bad,Buffer.from('invalid mesh'))]}),{flag:'wx'});
+      for(let index=0;index<10;index++){
+        const failed=await invoke(main,'import_paths',{paths:[descriptor],includeReport:true});
+        expect(failed.projects).toEqual([]);expect(failed.failures).toHaveLength(1);
+        expect(JSON.stringify((await invoke(main,'bootstrap')).entries)).toBe(indexed);
+        expect(await fs.readdir(path.join(root,'library/projects'))).toEqual(projectDirectories);
+      }
+      expect(await fs.readFile(first)).toEqual(payload);expect(await fs.readFile(bad,'utf8')).toBe('invalid mesh');
+      report.importBatch.lateAssetDescriptorRejections=10;report.importBatch.originalAssetsUnchanged=true;
+    }
     if(profilePreview)report.previewProfile.importMs=performance.now()-importStarted;
     expect(opened.project.source.cacheVersion).toBe(expectedCacheVersion);
     const pistol=opened.inspection.tags.find(tag=>tag.class==='weap'&&tag.path.replaceAll('\\','/').endsWith('weapons/pistol/pistol'));

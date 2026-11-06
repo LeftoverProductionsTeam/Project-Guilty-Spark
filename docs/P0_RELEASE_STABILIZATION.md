@@ -49,6 +49,14 @@ Mixed imports now return successes and individual failures independently to the 
 
 A real compiler replacement race exposed a failed metadata sample. The native meter reports numerical Win32 errors and retries the **entire** inventory twice (80/200 ms), never accepting partial totals. Persistent denied access, changed ownership or linked paths still fail closed. A separate real Windows pending-delete fixture reproduces Win32=5. The original failed run did not record its code; that historical cause is not asserted. Failed operations now retire their sealed disposable receipt/schema output while propagating the original failure. The real Cargo rerun exercised a successful retry. Earlier failed runs remain identified in the compact fixture.
 
+## Import publication rollback — core verified, application rerun pending
+
+The following continuation passed the full Rust workspace: **764 passed, 9 ignored, 52 suites**. It validates all referenced asset bytes, mesh parsing, identities and scene metadata before creating a new project, with a 128 MiB admitted asset-payload limit and existing per-format limits. Checked bytes and parsed meshes are reused.
+
+New imports now couple a fresh filesystem directory to the existing SQLite publication transaction. Only after COMMIT succeeds is it accepted. Rejected publication rolls back exact newly created files after verifying nonce, canonical containment, native directory/file identities, SHA-256 and absence of hardlink aliases. It does not recursively delete or adopt another directory. Existing storage identity reading is reused; no archive, staging database or new monitor was added.
+
+Tests use actual SQLite failure injection: ten map-publication failures, ten asset-publication failures and ten deferred-COMMIT failures leave saved projects and original sources unchanged. Ten bad later-asset rejections allocate no map/OBJ copies; a corrected retry succeeds. Changed/unknown files, changed nonce, replaced directories and same-byte hardlinks refuse rollback. Partial I/O whose exact contents cannot be proven is retained with its exact path; abrupt-process orphan recovery remains open. The full native application/compiler rerun on this continuation is pending, so earlier 50-edit evidence is not silently reused as acceptance of changed native code.
+
 ## Measured application profile
 
 Fresh isolated application/profile, warm OS filesystem (no cache flush): app window **520 ms**, explicit map import **3,761 ms**, fully ready map **7,296 ms**, retained editor resume **211 ms**, same canvas and **zero additional native preview calls** on resume. Readiness required all BSP and visible model primary shaders, completed lightmaps/reflection work: 121 source shaders, 15 lightmaps, 11 cubemaps, 68 model types, 186 objects and eight decals. No texture/model omission was used to reach readiness; exact stock-renderer parity is not claimed.

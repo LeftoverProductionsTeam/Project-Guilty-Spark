@@ -246,15 +246,20 @@ impl Library {
         path: &Path,
         resources: Option<&Path>,
     ) -> Result<(Project, maps::MapInspection)> {
-        self.import_map_internal(path,resources,true,false)
+        let transaction=self.db.unchecked_transaction()?;
+        let (project,inspection,mut files)=self.import_map_internal(path,resources,true,false)?;
+        transaction.commit()?;
+        if let Some(files)=&mut files{files.accepted=true;}
+        Ok((project,inspection))
     }
     /// A background model/resource preview is not an editable imported map.
     /// Retain its verified source identity in RAM for the existing decoders.
     pub fn preview_map(&self,path:&Path,resources:Option<&Path>)->Result<(Project,maps::MapInspection)> {
         validate_local_input_path(path)?;crate::reject_links(path)?;
-        self.import_map_internal(path,resources,false,true)
+        let (project,inspection,_)=self.import_map_internal(path,resources,false,true)?;
+        Ok((project,inspection))
     }
-    fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:bool,preview:bool)->Result<(Project,maps::MapInspection)> {
+    fn import_map_internal(&self,path:&Path,resources:Option<&Path>,reuse:bool,preview:bool)->Result<(Project,maps::MapInspection,Option<ImportFiles>)> {
         // Persist the location now, so later app working directories cannot
         // reinterpret a relative map/resource selection. Missing resources are
         // still allowed; their absolute location remains explicit.
@@ -266,7 +271,7 @@ impl Library {
             let mut rows=self.db.prepare("SELECT value FROM preview_documents")?;
             for text in rows.query_map([],|row|row.get::<_,String>(0))?{
                 let project:Project=serde_json::from_str(&text?)?;
-                if project.source.as_ref().is_some_and(|source|source.sha256==inspection.sha256&&source.original_path==original){return Ok((project,inspection));}
+                if project.source.as_ref().is_some_and(|source|source.sha256==inspection.sha256&&source.original_path==original){return Ok((project,inspection,None));}
             }
         }
         if let Some(entry) = self
@@ -302,16 +307,19 @@ impl Library {
                     self.set_setting(&key,&origins)?;
                 }
             }
-            return Ok((project, inspection));
+            return Ok((project, inspection,None));
         }
+        let resource_sha256=project::resource_hashes(&resource_directory)?;
         let mut p = Project::new(&inspection.header.name.replace('_', " "));
         let dir = self.project_dir(&p.id)?;
         crate::reject_links(&dir)?;
+        let mut files=if self.session_only||preview{None}else{Some(ImportFiles::new(&dir)?)};
         let copy=if self.session_only || preview{
             validate_local_input_path(path)?;crate::reject_links(path)?;fs::canonicalize(path)?
         }else{
         fs::create_dir_all(&dir)?;
         let copy = dir.join("source.map");
+        files.as_mut().unwrap().expect_hash("source.map",inspection.sha256.clone());
         let mut input = fs::File::open(path)?;
         let mut output = fs::OpenOptions::new()
             .write(true)
@@ -327,6 +335,7 @@ impl Library {
                 "Source changed while being imported; retry after the copy is complete",
             );
         }
+        files.as_mut().unwrap().record_created("source.map")?;
         let mut permissions = fs::metadata(&copy)?.permissions();
         permissions.set_readonly(true);
         fs::set_permissions(&copy, permissions)?;
@@ -341,11 +350,14 @@ impl Library {
             archive: None,
             resource_directory: Some(resource_directory.clone()),
             audio_resources: None,
-            resource_sha256: project::resource_hashes(&resource_directory)?,
+            resource_sha256,
         });
         p.scene = inspection.objects.clone();
-        self.save_internal(&p, Some(&inspection),preview)?;
-        Ok((p, inspection))
+        if let Some(files)=&mut files{files.expect_project(&p)?;}
+        let saved=self.save_internal(&p, Some(&inspection),preview);
+        if let Some(files)=&mut files{files.record_project()?;}
+        saved?;
+        Ok((p, inspection,files))
     }
     pub fn import_project(&self, path: &Path) -> Result<Project> {
         let incoming = project::load_project(path)?;
@@ -360,12 +372,17 @@ impl Library {
         for reference in &references {validate_local_input_path(reference)?;}
         for reference in references {crate::reject_links(reference)?;}
         let transaction=self.db.unchecked_transaction()?;
-        let result=self.import_project_admitted(incoming);
-        if result.is_ok(){transaction.commit()?;}
-        result
+        let (project,mut files)=self.import_project_admitted(incoming)?;
+        transaction.commit()?;
+        if let Some(files)=&mut files{files.accepted=true;}
+        Ok(project)
     }
-    fn import_project_admitted(&self,incoming:Project)->Result<Project> {
-        let mut p = if let Some(src) = &incoming.source {
+    fn import_project_admitted(&self,incoming:Project)->Result<(Project,Option<ImportFiles>)> {
+        // Validate the entire payload before creating a managed project. A bad
+        // later asset must not leave the earlier map/OBJ copy behind. The exact
+        // checked bytes and parsed mesh are reused below, not read/decoded twice.
+        let prepared=prepare_project_assets(&incoming)?;
+        let (mut p,mut files) = if let Some(src) = &incoming.source {
             if maps::hash_file(&src.original_path)? != src.sha256 {
                 return invalid("The project source file is missing or changed; restore the original file before opening this project");
             }
@@ -381,10 +398,12 @@ impl Library {
                     return invalid("Project resources changed; restore them or select resources in the original project before exporting");
                 }
             }
-            let mut imported=self.import_map_internal(&src.original_path, src.resource_directory.as_deref(),false,false)?.0;
-            if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();source.audio_resources=src.audio_resources.clone();}imported
+            let (mut imported,_,files)=self.import_map_internal(&src.original_path, src.resource_directory.as_deref(),false,false)?;
+            if let Some(source)=imported.source.as_mut(){source.resource_sha256=src.resource_sha256.clone();source.resource_directory=src.resource_directory.clone();source.audio_resources=src.audio_resources.clone();}(imported,files)
         } else {
-            self.create(&incoming.title)?
+            let p=Project::new(&incoming.title);
+            let files=if self.session_only{None}else{Some(ImportFiles::new(&self.project_dir(&p.id)?)?)};
+            (p,files)
         };
         p.title = incoming.title;
         p.provenance = incoming.provenance;
@@ -405,54 +424,27 @@ impl Library {
         // Re-ingest referenced OBJ files with integrity checks; never trust a descriptor's compiled mesh or receipt paths.
         p.assets.clear();
         let dir = self.project_dir(&p.id)?.join("assets");
-        for asset in incoming.assets {
-            if asset.kind=="custom-sound" {
-                let bytes=crate::custom_sounds::read(&asset.path)?;
-                let extension=asset.path.extension().and_then(|value|value.to_str()).unwrap_or("").to_ascii_lowercase();
-                crate::custom_sounds::inspect(&bytes,&extension)?;
-                use sha2::{Digest,Sha256};
-                if crate::hex_bytes(Sha256::digest(&bytes))!=asset.sha256{return invalid("Referenced custom sound checksum changed");}
-                crate::reject_links(&dir)?;fs::create_dir_all(&dir)?;
-                let new_id=uuid::Uuid::new_v4().to_string();let raw=dir.join(format!("{new_id}.{extension}"));project::atomic_write(&raw,&bytes,false)?;
-                if let Some(scene)=&mut p.audio_preview {for emitter in &mut scene.emitters {if emitter.source_project_id.as_deref()==Some(p.id.as_str()){if let Some(sound)=&mut emitter.custom_sound {if sound.asset_id==asset.id {sound.asset_id=new_id.clone();}}}}}
-                p.assets.push(project::Asset{id:new_id,name:asset.name,kind:asset.kind,sha256:asset.sha256,path:raw,vertices:0,triangles:0,has_uvs:false,materials:vec![]});continue;
-            }
-            if asset.kind != "obj" || fs::metadata(&asset.path)?.len() > 64 * 1024 * 1024 {
-                return invalid("Referenced asset is not a supported OBJ or exceeds 64 MiB");
-            }
-            let mut bytes=Vec::new();
-            std::io::Read::read_to_end(&mut std::io::Read::take(fs::File::open(&asset.path)?,64*1024*1024+1),&mut bytes)?;
-            use sha2::{Digest,Sha256};
-            if bytes.len()>64*1024*1024 || crate::hex_bytes(Sha256::digest(&bytes))!=asset.sha256 {
-                return invalid(format!("Referenced asset checksum changed or exceeds 64 MiB: {}",asset.name));
-            }
-            let parsed=crate::assets::parse_obj(std::str::from_utf8(&bytes).map_err(|_|crate::SparkError::Invalid("Referenced OBJ must be UTF-8".into()))?)?;
-            fs::create_dir_all(&dir)?;
-            crate::reject_links(&dir)?;
-            let new_id = uuid::Uuid::new_v4().to_string();
-            let raw = dir.join(format!("{new_id}.obj"));
+        for (mut asset,bytes,parsed) in prepared {
+            let original_id=asset.id.clone();let new_id=uuid::Uuid::new_v4().to_string();
+            let extension=if parsed.is_some(){"obj".to_owned()}else{asset.path.extension().and_then(|value|value.to_str()).unwrap_or("").to_ascii_lowercase()};
+            crate::reject_links(&dir)?;fs::create_dir_all(&dir)?;crate::reject_links(&dir)?;
+            let raw=dir.join(format!("{new_id}.{extension}"));
+            if let Some(files)=&mut files{files.expect_bytes(&format!("assets/{new_id}.{extension}"),&bytes);}
             project::atomic_write(&raw,&bytes,false)?;
-            project::atomic_write(
-                &dir.join(format!("{new_id}.mesh.json")),
-                &serde_json::to_vec(&parsed.mesh)?,
-                false,
-            )?;
-            for object in &mut p.scene {
-                if object.asset_id.as_deref() == Some(&asset.id) {
-                    object.asset_id = Some(new_id.clone());
-                }
+            if let Some(files)=&mut files{files.record_created(&format!("assets/{new_id}.{extension}"))?;}
+            if let Some(parsed)=parsed {
+                let mesh=serde_json::to_vec(&parsed.mesh)?;
+                if let Some(files)=&mut files{files.expect_bytes(&format!("assets/{new_id}.mesh.json"),&mesh);}
+                project::atomic_write(&dir.join(format!("{new_id}.mesh.json")),&mesh,false)?;
+                if let Some(files)=&mut files{files.record_created(&format!("assets/{new_id}.mesh.json"))?;}
+                for object in &mut p.scene {if object.asset_id.as_deref()==Some(original_id.as_str()){object.asset_id=Some(new_id.clone());}}
+                asset.vertices=parsed.mesh.positions.len()/3;asset.triangles=parsed.mesh.indices.len()/3;
+                asset.has_uvs=parsed.has_uvs;asset.materials=parsed.materials;
+            }else{
+                if let Some(scene)=&mut p.audio_preview {for emitter in &mut scene.emitters {if emitter.source_project_id.as_deref()==Some(p.id.as_str()){if let Some(sound)=&mut emitter.custom_sound {if sound.asset_id==original_id{sound.asset_id=new_id.clone();}}}}}
+                asset.vertices=0;asset.triangles=0;asset.has_uvs=false;asset.materials.clear();
             }
-            p.assets.push(project::Asset {
-                id: new_id,
-                name: asset.name,
-                kind: "obj".into(),
-                sha256: asset.sha256,
-                path: raw,
-                vertices: parsed.mesh.positions.len() / 3,
-                triangles: parsed.mesh.indices.len() / 3,
-                has_uvs: parsed.has_uvs,
-                materials: parsed.materials,
-            });
+            asset.id=new_id;asset.path=raw;p.assets.push(asset);
         }
         if p.scene.iter().any(|o| {
             o.asset_id
@@ -461,7 +453,173 @@ impl Library {
         }) {
             return invalid("A scene mesh is missing its asset metadata");
         }
-        self.save(&p, None)?;
-        Ok(p)
+        if let Some(files)=&mut files{files.expect_project(&p)?;}
+        let saved=self.save(&p, None);
+        if let Some(files)=&mut files{files.record_project()?;}
+        saved?;
+        Ok((p,files))
+    }
+}
+
+/// Descriptor import preflight uses one bounded in-memory payload, never a new
+/// archive, temporary SDK or staging database. ImportFiles couples the owned
+/// filesystem output to the existing SQLite transaction's publication.
+fn prepare_project_assets(incoming:&Project)->Result<Vec<(project::Asset,Vec<u8>,Option<crate::assets::ObjImport>)>> {
+    use sha2::{Digest,Sha256};
+    let mut prepared=vec![];let mut total=0u64;let mut ids=std::collections::BTreeSet::new();
+    for asset in &incoming.assets {
+        if !ids.insert(asset.id.as_str()){return invalid("Referenced asset identities must be unique");}
+        if !matches!(asset.kind.as_str(),"obj"|"custom-sound"){return invalid("Referenced asset is not a supported OBJ or custom sound");}
+        let size=fs::metadata(&asset.path)?.len();
+        let maximum=if asset.kind=="custom-sound"{16*1024*1024}else{64*1024*1024};
+        if size>maximum{return invalid(if asset.kind=="custom-sound"{"Custom audio exceeds 16 MiB"}else{"Referenced asset exceeds 64 MiB"});}
+        total=total.checked_add(size).ok_or_else(||crate::SparkError::Invalid("Descriptor import payload size overflow".into()))?;
+        if total>128*1024*1024{return invalid("Descriptor import asset payload exceeds its 128 MiB memory budget; no project was created");}
+        let mut bytes=Vec::new();
+        std::io::Read::read_to_end(&mut std::io::Read::take(fs::File::open(&asset.path)?,size+1),&mut bytes)?;
+        if bytes.len() as u64!=size||crate::hex_bytes(Sha256::digest(&bytes))!=asset.sha256{return invalid(format!("Referenced asset checksum changed or exceeds its admitted size: {}",asset.name));}
+        let parsed=if asset.kind=="obj" {
+            Some(crate::assets::parse_obj(std::str::from_utf8(&bytes).map_err(|_|crate::SparkError::Invalid("Referenced OBJ must be UTF-8".into()))?)?)
+        }else{
+            let extension=asset.path.extension().and_then(|value|value.to_str()).unwrap_or("").to_ascii_lowercase();
+            crate::custom_sounds::inspect(&bytes,&extension)?;None
+        };
+        prepared.push((asset.clone(),bytes,parsed));
+    }
+    if incoming.scene.iter().any(|object|object.asset_id.as_ref().is_some_and(|id|!ids.contains(id.as_str()))){return invalid("A scene mesh is missing its asset metadata");}
+    Ok(prepared)
+}
+
+
+/// One unpublished project directory, not another cache or storage catalog.
+/// Only paths created by this import, with their expected bytes and native file
+/// identities, may roll back. Unknown/changed/linked content is retained.
+struct ImportFiles {
+    directory:PathBuf,
+    identity:(u64,u64),
+    parent_identity:(u64,u64),
+    expected:std::collections::BTreeMap<String,std::collections::BTreeSet<String>>,
+    identities:std::collections::BTreeMap<String,(u64,u64)>,
+    accepted:bool,
+}
+impl ImportFiles {
+    fn new(directory:&Path)->Result<Self> {
+        use sha2::Digest;
+        crate::reject_links(directory)?;
+        let parent=directory.parent().ok_or_else(||crate::SparkError::Invalid("Import has no project parent".into()))?;
+        fs::create_dir_all(parent)?;crate::reject_links(parent)?;
+        let parent_identity=crate::storage::file_identity(parent).ok_or_else(||crate::SparkError::Invalid("Cannot verify import parent identity".into()))?;
+        fs::create_dir(directory)?;
+        let identity=crate::storage::file_identity(directory).ok_or_else(||crate::SparkError::Invalid("Cannot verify new import identity; empty directory retained".into()))?;
+        let mut result=Self{directory:fs::canonicalize(directory)?,identity,parent_identity,expected:Default::default(),identities:Default::default(),accepted:false};
+        let owner=uuid::Uuid::new_v4().to_string().into_bytes();result.expect_hash(".spark-import-owner",crate::hex_bytes(sha2::Sha256::digest(&owner)));
+        project::atomic_write(&directory.join(".spark-import-owner"),&owner,false)?;
+        result.record_created(".spark-import-owner")?;
+        Ok(result)
+    }
+    fn expect_hash(&mut self,relative:&str,hash:String){self.expected.entry(relative.to_owned()).or_default().insert(hash);}
+    fn expect_bytes(&mut self,relative:&str,bytes:&[u8]){use sha2::Digest;self.expect_hash(relative,crate::hex_bytes(sha2::Sha256::digest(bytes)));}
+    fn record_created(&mut self,relative:&str)->Result<()> {
+        let path=self.directory.join(crate::safe_relative(relative)?);crate::reject_links(&path)?;
+        let identity=crate::storage::unique_file_identity(&path).ok_or_else(||crate::SparkError::Invalid("Unpublished import file has an alias or unknown identity; retained".into()))?;
+        if !self.expected.get(relative).is_some_and(|hashes|maps::hash_file(&path).is_ok_and(|hash|hashes.contains(&hash))){return invalid("Unpublished import bytes differ from their admitted payload; retained");}
+        self.identities.insert(relative.to_owned(),identity);Ok(())
+    }
+    fn record_project(&mut self)->Result<()> {
+        for relative in ["project.gsproject","project.gsproject.bak"]{if self.directory.join(relative).is_file(){self.record_created(relative)?;}}
+        Ok(())
+    }
+    fn expect_project(&mut self,p:&Project)->Result<()> {
+        let file=self.directory.join("project.gsproject");
+        if file.is_file(){
+            let hash=maps::hash_file(&file)?;
+            if !self.expected.get("project.gsproject").is_some_and(|known|known.contains(&hash)){return invalid("Unpublished project changed outside its import; it was retained");}
+            self.expect_hash("project.gsproject.bak",hash);
+        }
+        self.expect_bytes("project.gsproject",&serde_json::to_vec_pretty(p)?);Ok(())
+    }
+    fn rollback(&self)->Result<()> {
+        crate::reject_links(&self.directory)?;
+        let parent=self.directory.parent().ok_or_else(||crate::SparkError::Invalid("Import parent missing".into()))?;
+        if crate::storage::file_identity(&self.directory)!=Some(self.identity)||crate::storage::file_identity(parent)!=Some(self.parent_identity){return invalid("Import directory identity changed; rollback refused");}
+        let owner=self.directory.join(".spark-import-owner");
+        if !owner.is_file()||!self.expected.get(".spark-import-owner").is_some_and(|hashes|maps::hash_file(&owner).is_ok_and(|hash|hashes.contains(&hash))){return invalid("Import owner nonce changed or disappeared; rollback refused");}
+        let snapshot=crate::storage::measure(&self.directory)?;
+        if snapshot.logical_bytes>1024*1024*1024{return invalid("Unpublished import exceeds rollback's 1 GiB bound; retained");}
+        let mut pending=vec![self.directory.clone()];let mut files=vec![];let mut directories=vec![];
+        while let Some(dir)=pending.pop(){for entry in fs::read_dir(&dir)?{
+            let path=entry?.path();crate::reject_links(&path)?;let meta=fs::symlink_metadata(&path)?;
+            let relative=path.strip_prefix(&self.directory).map_err(|_|crate::SparkError::Invalid("Import path escaped".into()))?.to_string_lossy().replace('\\',"/");
+            if meta.is_dir(){if relative!="assets"{return invalid("Unknown import directory retained");}directories.push(path.clone());pending.push(path);continue;}
+            if !meta.is_file()||files.len()>=4096{return invalid("Unknown or excessive import files retained");}
+            let expected=self.expected.get(&relative).ok_or_else(||crate::SparkError::Invalid("Unknown import file retained".into()))?;
+            if !expected.contains(&maps::hash_file(&path)?){return invalid("Import file contents changed; rollback refused");}
+            let id=crate::storage::unique_file_identity(&path).ok_or_else(||crate::SparkError::Invalid("Import file has an alias or unavailable identity; retained".into()))?;
+            if self.identities.get(&relative)!=Some(&id){return invalid("Import file identity changed since creation; rollback refused");}
+            files.push((path,id));
+        }}
+        if crate::storage::measure(&self.directory)?.fingerprint!=snapshot.fingerprint{return invalid("Import changed during rollback verification; retained");}
+        // Keep ownership evidence until all known payload has been retired.
+        files.sort_by_key(|(path,_)|path.file_name().is_some_and(|name|name==".spark-import-owner"));
+        for (path,id) in files {
+            crate::reject_links(&path)?;
+            if crate::storage::unique_file_identity(&path)!=Some(id){return invalid("Import file identity or link ownership changed before rollback; retained");}
+            #[cfg(windows)]{let mut permissions=fs::metadata(&path)?.permissions();if permissions.readonly(){#[allow(clippy::permissions_set_readonly_false)] permissions.set_readonly(false);fs::set_permissions(&path,permissions)?;}}
+            fs::remove_file(path)?;
+        }
+        for path in directories{fs::remove_dir(path)?;}
+        fs::remove_dir(&self.directory)?;Ok(())
+    }
+}
+impl Drop for ImportFiles {
+    fn drop(&mut self){if !self.accepted{if let Err(reason)=self.rollback(){eprintln!("Unpublished import retained at {}: {reason}",self.directory.display());}}}
+}
+
+
+#[cfg(test)]
+mod import_ownership_tests {
+    use super::*;
+    #[test]
+    fn deferred_database_commit_failure_rolls_back_only_the_new_owned_project() {
+        let root=tempfile::tempdir().unwrap();let library=Library::open(&root.path().join("library")).unwrap();
+        let existing=library.create("Previously saved").unwrap();let file=library.project_dir(&existing.id).unwrap().join("project.gsproject");let before=fs::read(&file).unwrap();
+        library.db.pragma_update(None,"foreign_keys",true).unwrap();
+        library.db.execute_batch("CREATE TABLE import_parent(id INTEGER PRIMARY KEY); CREATE TABLE import_child(parent INTEGER REFERENCES import_parent(id) DEFERRABLE INITIALLY DEFERRED); CREATE TRIGGER fail_import_commit AFTER INSERT ON projects BEGIN INSERT INTO import_child VALUES(123); END;").unwrap();
+        let descriptor=root.path().join("incoming.gsproject");project::save_project(&descriptor,&Project::new("Commit must fail")).unwrap();
+        for _ in 0..10{assert!(library.import_project(&descriptor).is_err());assert_eq!(library.list().unwrap().len(),1);assert_eq!(fs::read_dir(library.root.join("projects")).unwrap().count(),1);assert_eq!(fs::read(&file).unwrap(),before);}
+        assert_eq!(library.db.query_row("SELECT COUNT(*) FROM import_child",[],|row|row.get::<_,i64>(0)).unwrap(),0);
+    }
+    #[test]
+    fn rollback_refuses_changed_unknown_owner_and_replaced_directory_content() {
+        let root=tempfile::tempdir().unwrap();
+        for mode in ["contents","unknown","owner","directory"] {
+            let dir=root.path().join(uuid::Uuid::new_v4().to_string());let mut guard=ImportFiles::new(&dir).unwrap();
+            let file=dir.join("owned.bin");guard.expect_bytes("owned.bin",b"owned generated bytes");fs::write(&file,b"owned generated bytes").unwrap();guard.record_created("owned.bin").unwrap();
+            match mode {
+                "contents"=>fs::write(&file,b"independent changed data").unwrap(),
+                "unknown"=>fs::write(dir.join("unregistered.bin"),b"unknown data").unwrap(),
+                "owner"=>fs::write(dir.join(".spark-import-owner"),b"changed nonce").unwrap(),
+                _=>{fs::rename(&dir,root.path().join("original-generated")).unwrap();fs::create_dir(&dir).unwrap();fs::write(dir.join("unique.txt"),b"replacement directory").unwrap();}
+            }
+            assert!(guard.rollback().is_err(),"{mode}");assert!(dir.exists());
+            if mode!="directory"{assert!(file.exists(),"no partial deletion on failed preflight");}
+            guard.accepted=true; // Keep the deliberately changed evidence until tempfile's test-only owner ends.
+        }
+    }
+}
+
+#[cfg(test)]
+mod import_alias_tests {
+    use super::*;
+    #[test]
+    fn unchanged_bytes_replaced_by_a_hardlink_never_change_or_delete_the_original() {
+        let root=tempfile::tempdir().unwrap();let directory=root.path().join(uuid::Uuid::new_v4().to_string());let mut guard=ImportFiles::new(&directory).unwrap();
+        let original=root.path().join("original.bin");fs::write(&original,b"same bytes").unwrap();
+        let owned=directory.join("copy.bin");guard.expect_bytes("copy.bin",b"same bytes");fs::write(&owned,b"same bytes").unwrap();guard.record_created("copy.bin").unwrap();
+        fs::remove_file(&owned).unwrap();fs::hard_link(&original,&owned).unwrap();
+        let before=fs::metadata(&original).unwrap().permissions().readonly();
+        assert!(guard.rollback().is_err());assert!(original.is_file());assert!(owned.is_file());
+        assert_eq!(fs::read(&original).unwrap(),b"same bytes");assert_eq!(fs::metadata(&original).unwrap().permissions().readonly(),before);
+        guard.accepted=true;
     }
 }

@@ -3,8 +3,8 @@
 Task: P0 285a5a02 — release stabilization and permanent storage control
 Status: implementation incomplete
 Starting revision: f14a8270d1034ade14cb3df4f177a1e2c7f74682; local and read-only remote master matched at intake
-Latest verified revision: c9d826f plus recorded repairs pass the complete same-source Windows run:758Rust/9ignored,413frontend,176browser,59offline,36contracts, actual app50edits/Undo/Save/restart/native export, real H1A/Invader compile/reconciliation/readback.
-Next action: Seal and commit verified preview/import/history/monitor repairs and exact numbered prompts locally, then repair atomic filesystem import ownership/rollback in the existing Library. Preserve full production memory-first Save/history/close, tool/C71 and native platform acceptance as open.
+Latest verified revision: 668930c/6230888 full Windows/native50-edit evidence. Current import rollback repair passes full Rust764/9ignored,52suites; native same-source rerun pending.
+Next action: Commit the Rust-verified import publication repair locally, then run the complete same-commit Rust/frontend/browser/compiler/native50-edit matrix with ten late-asset descriptor rejections. Retire owned output, integrate compact evidence, seal locally, measure actual allocation and refresh ONE outside source review ZIP. Production memory-first Save/history/close and platform/release gates remain open.
 
 ## Acceptance
 
@@ -23,6 +23,8 @@ Fresh full NTFS audit:14004600160allocated bytes (13.04GiB),14322630846logical,9
 Full git fsck passes; refs/reflogs and stash32a8cb1ef4b1aeed2d459e5ad26ef69e36e78f85 preserved. Remote master still f14a827 at read-only check; connected GitHub release list is empty. No push/dispatch/tag/release attempted.
 
 ## Changed work
+
+Current uncommitted continuation: descriptor payload preflight reuses checked bytes/parsed meshes within128MiB before copying. ImportFiles binds only fresh unpublished project files to existing SQLite publication; exact SHA/native IDs/nonce/regular paths gate rollback. Accepted work is disarmed only after successful COMMIT. Unknown/changed/linked/aliased files are retained. Existing storage native identity reader reused, no new catalog/archive. Core tests inject real SQLite insert and deferred-COMMIT failures; originals and previously saved work remain unchanged. Final full-source Rust764/9ignored passed. Native same-source app/compiler acceptance pending.
 
 Actual app exposed unsolicited Home source imports: fresh test library acquired c40 and Demo BloodGulch copies. Fix uses the existing Library connection's bounded memory-only TEMP records for explicit background-preview requests (32maps/128MiB); source bytes stay in original owned files, normal user imports remain independent, active preview refs protect cleanup, explicit Save rejects read-only background records. Home requests the mode; source/hash/material/pin decoders unchanged. Full native mixed-batch proof passed:one explicit import/one library entry, no background copies;10failed retries leave index/folders unchanged. Native50edit harness and rejected-import file/index checks remain strict.
 
@@ -48,7 +50,7 @@ Automatic review specifically refuses preservation-index.json (58776769logical b
 
 ## Operations and safe checkpoint
 
-Completed: combined source-only-verification final run passed all stages, actual app4cases/50edits and graceful close. Receipt p0-final-validation.json in the bounded external Engineering root.5,335,649,623logical bytes disposed; physical reclamation unknown with shared Cargo hardlinks. Source map/SDK unchanged. Retire the four incidental schemas restored from the earlier failed wrapper, then seal current source. No active native writers.
+Completed: combined source-only-verification final run passed all stages, actual app4cases/50edits and graceful close. Receipt p0-final-validation.json in the bounded external Engineering root.5,335,649,623logical bytes disposed; physical reclamation unknown with shared Cargo hardlinks. Source map/SDK unchanged. Retire the four incidental schemas restored from the earlier failed wrapper, then seal current source. No active native game writers. New owned Rust regression run is active.
 
 Full c9 matrix receipt p0-monitored-validation.json is in the same bounded temporary Engineering root. Integrate only compact evidence; no new archive or retained binary. One existing outside source review ZIP is C:/Users/patri/OneDrive/Documents/ChatGPT/GS/Project_Guilty_Spark_Source_Review.zip; refresh that SAME package after final local commit, include real untracked source/prompts, verify CRC/memberSHA, exclude Git/Halo/deps/binaries/caches. Never replace C49.
 
