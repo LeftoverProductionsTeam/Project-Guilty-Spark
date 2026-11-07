@@ -644,6 +644,12 @@
       "featureId": "native-door-logic",
       "kind": "diagnostic",
       "scope": "Twenty real Invader native tag edits and independent readbacks; unchanged owned source, failed/killed QA recovery and same-method allocated storage accounting. No new gameplay acceptance."
+    },
+    {
+      "artifact": "scripts/test-runtime-content-native.mjs",
+      "featureId": "dependency-guide",
+      "kind": "workflow",
+      "scope": "Games & tools saves independent community engine profiles and a shared compatible content directory; Online prepares owned CE banks and a matching imported map. Native app setup and source preservation do not prove a game join, Firefight or multiplayer compatibility."
     }
   ]
 }

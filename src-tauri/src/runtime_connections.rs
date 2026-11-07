@@ -193,7 +193,7 @@ mod tests {
             fs::create_dir(root.path().join(folder)).unwrap();
             let file=root.path().join(folder).join("owned.map");fs::write(&file,b"path membership only").unwrap();
             let original=fs::canonicalize(file).unwrap();
-            assert_eq!(original_in_maps(runtime::RuntimeId::OpenCe,root.path(),&original),matches!(folder,"maps"|"custom_maps"));
+            assert_eq!(original_in_maps(runtime::RuntimeId::OpenCe,root.path(),&original),matches!(folder,"maps"|"custom_maps"|"maps_ce"));
             assert_eq!(original_in_maps(runtime::RuntimeId::ChupathingyCe,root.path(),&original),folder!="maps_other");
             assert!(!original_in_maps(runtime::RuntimeId::MccSteam,root.path(),&original));
         }
@@ -218,4 +218,15 @@ mod tests {
         assert_eq!(before, fs::read(directory.path().join("halo.exe")).unwrap());
         assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
     }
+}
+
+/// Reuse the connected CE source, or existing bounded discovery, without changing registrations.
+pub(super) fn ce_resource_source(state:&AppState)->Reply<PathBuf>{
+    let profiles:Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+    if profiles.len()>24{return Err("Runtime profile limit exceeded".into());}
+    if let Some(ce)=profiles.iter().find(|p|p.runtime_id==runtime::RuntimeId::HaloCustomEdition){
+        return runtime::inspect_registration(ce).map(|i|i.data_root).map_err(error);
+    }
+    discover(state)?.into_iter().find(|p|p.runtime_id==runtime::RuntimeId::HaloCustomEdition&&p.content_ready).map(|p|p.data_root)
+        .ok_or("Connect your owned Custom Edition installation in Games & tools. Xbox and MCC resources cannot substitute for its three CE banks.".into())
 }

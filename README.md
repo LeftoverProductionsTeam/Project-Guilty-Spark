@@ -49,6 +49,7 @@ We're building toward a place where the Halo 1 community can do far more:
 | Area | Current state |
 | --- | --- |
 | Map inspection, supported edits, native builds, and tool handoffs | Working in validated, target-specific workflows |
+| [Runtime profiles and compatible shared content](docs/RUNTIME_INTEGRATION_20261107.md) | Native Windows setup verified for installed OpenCE/Faber/Chupathingy and owned CE banks; game/peer acceptance remains separate |
 | Visual worldbuilding, native doors/triggers, and detachable workspaces | Working in scoped workflows; broader editing remains in progress |
 | MegaWorld traversal, full Firefight/Zombie gameplay, shared AI, and cross-engine play | In development or research; game and peer acceptance remain open |
 | Public downloads | No verified GitHub Release assets yet; the preserved C49 Windows preview is an earlier local candidate |

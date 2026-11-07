@@ -322,6 +322,7 @@ pub struct LaunchPlan {
     pub cwd: PathBuf,
     pub args: Vec<String>,
     pub direct_map_launch: bool,
+    pub environment: std::collections::BTreeMap<String, PathBuf>,
     pub warnings: Vec<String>,
 }
 
@@ -658,12 +659,22 @@ fn executable_format(path: &Path) -> Result<&'static str> {
 }
 
 pub fn inspect_registration(registration: &RuntimeRegistration) -> Result<RuntimeInstallation> {
-    let (root, executable, data_root) = registration_roots(registration)?;
+    let (root, mut executable, data_root) = registration_roots(registration)?;
     let binary_platform = executable_format(&executable)?;
     let mut diagnostics = vec![
         "Runtime kind and supplied version are user declarations, not executable identity attestation.".into(),
         "Read-only file/header/hash inspection performed; no executable or version probe was run.".into(),
     ];
+    let mut executable_sha256=maps::hash_file(&executable)?;
+    if registration.runtime_id==RuntimeId::ChupathingyCe && executable_sha256=="e5ce1ebb95865492ed06255100d0c677852d30202f06fd506fdc243a0a7b57df" {
+        let engine=root.join("chupathingy.exe");crate::reject_links(&engine)?;
+        let engine_hash=maps::hash_file(&engine)?;
+        if engine_hash!="fa9997520ebb2d8406fbe31db7146e1354b75569da1172c6dbf7717b9ee2b86b" {
+            return invalid("Chupathingy's installed launcher changed its game binary; inspect the new build before using it");
+        }
+        executable=fs::canonicalize(engine)?;executable_sha256=engine_hash;
+        diagnostics.push("Reviewed Chupathingy launcher resolved to its exact installed game executable; no launcher configuration was changed.".into());
+    }
     if binary_platform != platform() {
         diagnostics.push(format!(
             "Executable format targets {binary_platform}; this host is {}. Launch is blocked.",
@@ -684,7 +695,7 @@ pub fn inspect_registration(registration: &RuntimeRegistration) -> Result<Runtim
         root,
         executable: Some(executable.clone()),
         data_root,
-        executable_sha256: Some(maps::hash_file(&executable)?),
+        executable_sha256: Some(executable_sha256),
         version: registration.version.clone(),
         network_version: registration.network_version.clone(),
         identity: "userDeclared".into(),
@@ -709,7 +720,7 @@ pub fn map_directories(id: RuntimeId) -> &'static [(&'static str, &'static str)]
             ("md_maps", "haloMd"),
             ("custom_maps", "customEdition"),
         ],
-        RuntimeId::OpenCe => &[("maps", "xbox"), ("custom_maps", "customEdition")],
+        RuntimeId::OpenCe => &[("maps", "xbox"), ("custom_maps", "customEdition"), ("maps_ce", "customEdition")],
         RuntimeId::HaloPc => &[("maps", "pcRetail")],
         RuntimeId::HaloCustomEdition => &[("maps", "customEdition")],
         _ => &[],
@@ -837,6 +848,46 @@ fn inventory_at(
     Ok(result)
 }
 
+/// Keep alternate engines of one family. The first is active; source identities stay unchanged.
+pub fn remember_registration(registrations: &mut Vec<RuntimeRegistration>, registration: RuntimeRegistration) -> Result<()> {
+    if registrations.len() > 24 { return invalid("Runtime profile limit exceeded"); }
+    let installed = inspect_registration(&registration)?;
+    if registrations.iter().any(|old|old.id==registration.id&&old.runtime_id!=registration.runtime_id){
+        return invalid("A saved profile cannot be changed into another runtime family; create a new profile");
+    }
+    let same = |old: &RuntimeRegistration| old.id == registration.id ||
+        (old.runtime_id == registration.runtime_id && fs::canonicalize(&old.executable).ok().as_ref() == installed.executable.as_ref());
+    if registrations.len() == 24 && !registrations.iter().any(same) {
+        return invalid("Keep at most 24 runtime profiles; update an existing profile");
+    }
+    registrations.retain(|old| !same(old));
+    let mut registration=registration;
+    registration.executable=installed.executable.ok_or_else(||crate::SparkError::Invalid("Missing runtime executable".into()))?;
+    registration.root=installed.root;
+    if registration.data_root.is_some(){registration.data_root=Some(installed.data_root);}
+    registrations.insert(0, registration);
+    Ok(())
+}
+pub fn activate_registration(registrations: &mut Vec<RuntimeRegistration>, id: &str) -> Result<()> {
+    if registrations.len() > 24 { return invalid("Runtime profile limit exceeded"); }
+    let selected = registrations.iter().find(|item| item.id == id).cloned()
+        .ok_or_else(|| crate::SparkError::Invalid("Runtime profile is no longer registered".into()))?;
+    remember_registration(registrations, selected)
+}
+
+/// Reviewed path interfaces only. A declared version or a similarly named executable is insufficient.
+/// Local Faber234/Chupathingy identities are owner-installed, not publisher attestations.
+pub fn shared_content_interface(id: RuntimeId, executable_sha256: &str) -> Option<&'static str> {
+    match (id, executable_sha256) {
+        (RuntimeId::OpenCe, "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0" |
+            "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9" |
+            "5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3") => Some("openCe"),
+        (RuntimeId::ChupathingyCe, "b2f8ea992ed4031461bc638f8af80c08ec8905c5f73c97c483e86f25273b18d4" |
+            "fa9997520ebb2d8406fbe31db7146e1354b75569da1172c6dbf7717b9ee2b86b") => Some("chupathingy"),
+        _ => None,
+    }
+}
+
 pub fn prepare_launch(registration: &RuntimeRegistration) -> Result<LaunchPlan> {
     let installed = inspect_registration(registration)?;
     if installed.validation != TestStatus::Pass {
@@ -859,7 +910,32 @@ pub fn prepare_launch(registration: &RuntimeRegistration) -> Result<LaunchPlan> 
         .parent()
         .ok_or_else(|| crate::SparkError::Invalid("No executable parent".into()))?
         .to_path_buf();
-    Ok(LaunchPlan { runtime_id: registration.runtime_id, executable, cwd, args: vec![], direct_map_launch: false,
+    let shared = installed.data_root != installed.root;
+    let interface = shared_content_interface(registration.runtime_id, installed.executable_sha256.as_deref().unwrap_or(""));
+    if shared && interface.is_none() {
+        return invalid("This exact engine has no verified shared-folder interface. For modern Chupathingy select chupathingy.exe, not its small launcher. Stock Custom Edition and MCC keep their own native map layouts.");
+    }
+    let mut environment = std::collections::BTreeMap::new();
+    if shared {
+        let ui = installed.data_root.join("maps/ui.map");
+        crate::reject_links(&ui)?;
+        if maps::inspect_header(&ui)?.version != 5 {
+            return invalid("A community shared folder needs original Xbox maps/ui.map in maps; keep Custom Edition maps and banks in maps_ce");
+        }
+        environment.insert("HALO_DATA_ROOT".into(), installed.data_root.clone());
+    }
+    if interface.is_some() {
+        if registration.data_root.is_some(){environment.insert("HALO_DATA_ROOT".into(),installed.data_root.clone());}
+        let ce = installed.data_root.join("maps_ce");
+        crate::reject_links(&ce)?;
+        if interface == Some("openCe") {
+            let custom=if ce.is_dir(){fs::canonicalize(&ce)?}else{installed.data_root.join("custom_maps")};
+            crate::reject_links(&custom)?;
+            environment.insert("HALO_CUSTOM_MAPS_ROOT".into(),custom);
+        }
+    }
+    Ok(LaunchPlan { runtime_id: registration.runtime_id, executable, cwd, args: vec![], direct_map_launch: false, environment,
         warnings: vec!["This plan starts only the explicitly registered user-installed runtime. It does not deploy or select a map, verify gameplay, or attach a bridge.".into(),
-        "Runtime startup/hosting may have its own migration, asset-sharing and telemetry behavior; review its settings.".into()] })
+        "Runtime startup/hosting may have its own migration, asset-sharing and telemetry behavior; review its settings.".into(),
+        "For supported OpenCE shared layouts, maps_ce supplies CE content; older custom_maps content stays preserved in its original folder. Engine-generated pack caches may still use the data folder.".into()] })
 }

@@ -90,6 +90,49 @@ test('a normal join cannot hide repeated native empty-tag assertions', () => {
   assert.equal(h.faults[1].kind, 'invalidTagReference');
   assert.equal(h.contentAcceptance, false);
 });
+
+test('Faber stale light assertion remains a distinct fault before its null-address crash', () => {
+  // Exact fault signature from the owner-run Faber crash; unrelated/private log lines excluded.
+  const h = parseRuntimeHealth(
+    [
+      '11.07.26 06:09:41  all machines have successfully loaded',
+      '11.07.26 06:09:41  EXCEPTION assert in c:\\halo\\SOURCE\\memory\\data.c,#412: lights index #6 (0xe9790006) is unused or changed (release build)',
+      '11.07.26 06:09:42  crash: exception c0000005 at 00F2AFA0 (accessing 00000004)',
+    ].join('\n'),
+  );
+  assert.equal(h.status, 'native-faults-observed');
+  assert.deepEqual(
+    h.faults.map((f) => [f.kind, f.source]),
+    [
+      ['staleLightHandle', 'memory/data.c:412'],
+      ['nativeCrash', null],
+    ],
+  );
+  assert.equal(h.contentAcceptance, false);
+});
+
+test('stale light classification counts repeats without masking other invalid datums', () => {
+  const fault =
+    'EXCEPTION assert in c:\\halo\\SOURCE\\memory\\data.c,#412: lights index #6 (0xe9790006) is unused or changed (release build)';
+  const h = parseRuntimeHealth(
+    [
+      fault,
+      'last line repeated 7 times',
+      fault.replace('lights', 'objects'),
+      'lights index #6 ready',
+      'lights initialized for new map',
+    ].join('\n'),
+  );
+  assert.deepEqual(
+    h.faults.map((f) => [f.kind, f.minimumOccurrences]),
+    [
+      ['staleLightHandle', 8],
+      ['nativeAssertion', 1],
+    ],
+  );
+  assert.equal(parseRuntimeHealth('lights initialized for new map').faults.length, 0);
+});
+
 test('crashes, failed object creation and tag-class mismatches are separate faults', () => {
   const h = parseRuntimeHealth(
     "OUT OF OBJECTS: cannot create zombie container\nlast line repeated 8 times\ncrash: exception c0000005 at 00c00000\nexpected tag group 'proj' but got 'vehi' for ffffffff",

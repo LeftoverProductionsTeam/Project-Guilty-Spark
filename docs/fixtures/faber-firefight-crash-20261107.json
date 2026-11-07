@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "scope": "Read-only owner-run Faber Firefight crash inspection; not an automated game trial or engine repair",
+  "sourceRevision": "97751de",
+  "observedAt": "2026-11-07T11:09:42.316Z",
+  "executable": {
+    "relativePath": "Runtimes/OpenCEFaber/halo.exe",
+    "bytes": 32739328,
+    "sha256": "5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3",
+    "reportedBuild": "234 (debug)",
+    "sourceBuildAttestation": false,
+    "codeViewGuidRawHex": "fc93c938c77f3e2c4c4c44205044422e",
+    "pdbAge": 1,
+    "matchingPdbAvailable": false
+  },
+  "log": {
+    "relativePath": "Runtimes/OpenCEFaber/debug.txt",
+    "bytes": 27982,
+    "sha256": "d600b819481351ece2e4dad2c9defa8689dfb1fbbda9bd454b8acc234198322f",
+    "faultLine": 334,
+    "crashLine": 336
+  },
+  "sequence": {
+    "importedTags": 1819,
+    "bloodGulchTags": 3625,
+    "mapFingerprint": "70e53aca",
+    "sharedTags": 3626,
+    "sharedFingerprint": "a1d6fb78",
+    "reportedLoadedBeforeFault": true
+  },
+  "fault": {
+    "pool": "lights",
+    "slot": 6,
+    "handle": "0xe9790006",
+    "nativeSource": "memory/data.c:412",
+    "message": "lights index #6 (0xe9790006) is unused or changed",
+    "exception": "c0000005",
+    "loadedBase": "0xe70000",
+    "address": "0x00F2AFA0",
+    "rva": "0xbafa0",
+    "accessed": "0x00000004",
+    "instructionBytes": "ff 70 04",
+    "instruction": "push dword ptr [eax+4]",
+    "callerRvas": [
+      "0xdda3d",
+      "0x298204",
+      "0x29df3b",
+      "0x24baef",
+      "0x1c175a",
+      "0x1d7175",
+      "0x71da85",
+      "0x70f170",
+      "0x681771"
+    ]
+  },
+  "interpretation": {
+    "confirmed": "Invalid light datum immediately precedes an access at null plus four while reading the light definition index.",
+    "inference": "A renderer/light lifecycle failure is consistent with the source. The exact retaining/deleting caller is not symbolicated.",
+    "notEstablished": [
+      "Missing CE resource banks as this crash cause",
+      "Source-map corruption",
+      "Pool exhaustion",
+      "Shield glow as the exact culprit",
+      "Any verified fix or successful Firefight gameplay"
+    ]
+  },
+  "research": {
+    "repository": "https://github.com/SutlabSol/OpenCE-Faber",
+    "commit": "e4ffe0fe9874870b4fca1fca76beb83514c793f4",
+    "references": [
+      {
+        "file": "source/memory/data.c",
+        "lines": "145-200",
+        "finding": "Failed native datum lookup returns NULL after reporting the assertion."
+      },
+      {
+        "file": "source/objects/object_lights.c",
+        "lines": "327-354;1064-1067",
+        "finding": "The light definition index occupies offset four; the scene light loop reads it after light_get."
+      },
+      {
+        "file": "tools/symbolize_crash.py",
+        "lines": "1-10;70-97",
+        "finding": "Exact executable and matching PDB are required; caller addresses are adjusted for relocation and the return address."
+      }
+    ],
+    "releaseAssets": {
+      "v234DropInSha256": "a705086620a35e93da692106bea11f413fb94e9f02518b077a75cd688e99fb48",
+      "identicalToV233": true,
+      "symbolAssetListed": false,
+      "archiveDirectoryInspection": "HTTP Range refused with 501; archive contents not verified"
+    }
+  },
+  "preservation": {
+    "executablesAndLogReadOnly": true,
+    "originalFilesChanged": false,
+    "liveMatchChanged": false,
+    "fullPrivateLogCopied": false
+  },
+  "next": "Obtain the matching Faber PDB or a maintainer-symbolicated stack; repair the stale scene-light owner in the engine, then repeat the same native Firefight transition."
+}

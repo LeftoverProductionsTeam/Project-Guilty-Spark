@@ -82,6 +82,7 @@ pub mod tag_exchange;
 pub mod tag_duplicates;
 pub mod protocol;
 pub mod runtime;
+pub mod runtime_content;
 pub mod runtime_adapters;
 pub mod steam;
 pub mod snapshots;

@@ -25,7 +25,11 @@ export function parseRuntimeHealth(text) {
       /the map '[^']{1,512}' is corrected: tag '([^']{1,512})' \(([^)]{1,4})\):/i,
     );
     if (assertion) {
-      kind = 'nativeAssertion';
+      // A stale light datum is an engine lifecycle fault, not evidence that a
+      // bitmap or tag was missing. Keep the native source location and count.
+      kind = /\blights index #\d{1,5} \(0x[a-f\d]{1,8}\) is unused or changed\b/i.test(line)
+        ? 'staleLightHandle'
+        : 'nativeAssertion';
       source = assertion[1].replaceAll('\\', '/') + ':' + assertion[2];
     } else if (/\b(?:[a-f\d]{1,8}) is not a tag index: an empty tag is used\b/i.test(line))
       kind = 'invalidTagReference';

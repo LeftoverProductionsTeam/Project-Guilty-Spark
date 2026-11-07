@@ -105,6 +105,7 @@ export default function StartupSetup({
           and tool choices are saved on this device.
         </p>
         <p>Setup will not reopen on each boot. Change these choices here whenever you need to.</p>
+        <p className="subtle">Using several engines? In Games &amp; tools → Runtime folders, share one compatible content library across OpenCE, Faber and Chupathingy. Keep Xbox maps in maps and CE maps/resources in maps_ce; stock CE and MCC keep their own native layouts.</p>
         <div className="analysis-actions">
           <button className="primary" onClick={() => navigate('how-to')}>
             Open Learning center

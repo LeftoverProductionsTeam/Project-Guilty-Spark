@@ -33,16 +33,22 @@ export default function MapDownload({
   targetLabel = 'MCC Halo 1',
   selection,
   onActiveChange,
+  compact = false,
+  downloadLabel,
+  contextKey = 'active',
 }: {
   onDownloaded?: (opened: OpenProject[], action: MapDownloadAction) => void | Promise<void>;
   busy?: boolean;
   targetLabel?: string;
   selection?: {url:string;label:string}|null;
   onActiveChange?:(active:boolean)=>void;
+  compact?:boolean;
+  downloadLabel?:string;
+  contextKey?:string;
 }) {
   const [url, setUrl] = useState(''),
     [action, setAction] = useState<MapDownloadAction>('world');
-  const [context, setContext] = useMapState<Context | null>('community-downloads', 'active', () => null);
+  const [context, setContext] = useMapState<Context | null>('community-downloads', contextKey, () => null);
   const [status, setStatus] = useState<Status | null>(null),
     [pending, setPending] = useState(false),
     [error, setError] = useState(''),
@@ -156,14 +162,13 @@ export default function MapDownload({
   }
   return (
     <section className="analysis-card gs-direct-map-download" aria-label="Download maps inside Spark">
-      <div className="eyebrow">PRESERVE · EDIT · CONVERT</div>
-      <h2>Download a map into Spark</h2>
+      {!compact&&<><div className="eyebrow">PRESERVE · EDIT · CONVERT</div><h2>Download a map into Spark</h2></>}
       {selection&&url===selection.url&&<p>Selected from the catalog: <strong>{selection.label}</strong>. Choose where to open it, then download.</p>}
-      <p>
+      {!compact&&<p>
         Paste an author's direct HTTPS <code>.map</code> or <code>.zip</code> link. Spark keeps the original
         download, records its SHA-256 and imports map candidates without changing an open draft or installed
         game.
-      </p>
+      </p>}
       <label>
         Direct download URL
         <input
@@ -181,7 +186,7 @@ export default function MapDownload({
           }}
         />
       </label>
-      <label>
+      {!compact&&<label>
         After import
         <select
           aria-label="Downloaded map action"
@@ -193,7 +198,7 @@ export default function MapDownload({
           <option value="tags">Open in Tag editor</option>
           <option value="convert">Prepare conversion for {targetLabel}</option>
         </select>
-      </label>
+      </label>}
       {valid && (
         <p>
           Source: <strong>{origin}</strong>. Download and validation are limited to 768 MiB. Conversion uses
@@ -207,7 +212,7 @@ export default function MapDownload({
           disabled={!native || !valid || active || busy || !onDownloaded}
           onClick={() => void download()}
         >
-          {active ? 'Downloading / importing…' : 'Download & import map'}
+          {active ? 'Downloading / importing…' : downloadLabel || 'Download & import map'}
         </button>
         {cancellable && (
           <button
@@ -260,10 +265,10 @@ export default function MapDownload({
           available here.
         </p>
       )}
-      <p className="subtle">
+      {!compact&&<p className="subtle">
         Catalog/HTML links need their direct author download link. ZIP executables and scripts are never
         launched. Build and in-game tests remain separate from downloading or opening a map.
-      </p>
+      </p>}
     </section>
   );
 }

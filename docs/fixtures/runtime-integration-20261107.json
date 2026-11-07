@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "sourceBaseRevision": "97751de44a5a68b30b82f41e6946a43c50497eca",
+  "scope": "Runtime-specific shared content and native Spark setup only; no new engine gameplay acceptance",
+  "runtimeSourceFingerprint": "2a8b0f00c00f7cf7c5cae82cbb09ecf46415e82fc944cf9ea80d078d1696baa9",
+  "qaApplication": {
+    "file": "GuiltySpark.exe",
+    "bytes": 47434752,
+    "sha256": "b1418e31b73dd91b82519c85e5e30d943f48e5165e193bdc3e5bcac75e78e84f",
+    "version": "0.4.1",
+    "release": false,
+    "workingTreeAtBuild": true
+  },
+  "regressions": {
+    "rust": {
+      "passed": 810,
+      "ignored": 9,
+      "suites": 54,
+      "source": "R3; Rust source unchanged afterward"
+    },
+    "frontend": {
+      "passed": 425,
+      "files": 97,
+      "source": "R4"
+    },
+    "browser": {
+      "fullSuitePassed": 202,
+      "source": "R3 before one-line UI state-key fix",
+      "finalFocusedPassed": 2,
+      "finalFocused": "Engine switching and strengthened explicit map-download button after that fix"
+    },
+    "sourceContracts": 3,
+    "offlineCommands": 59,
+    "storageOwnership": 35,
+    "healthAndContinuity": 18
+  },
+  "native": {
+    "schemaVersion": 1,
+    "scope": "Actual desktop shared native content; no game launch or join",
+    "cases": [
+      {
+        "name": "Four genuine installed engine profiles coexist; exact Chupathingy launcher resolves to game",
+        "passed": true
+      },
+      {
+        "name": "Actual CE bank indexes validate and one physical bank set is reused by Faber/Chupathingy",
+        "passed": true
+      },
+      {
+        "name": "Actual Games & tools and header switch engines without launching one or losing profiles",
+        "passed": true
+      },
+      {
+        "name": "Native setup refuses a different existing bank and preserves it",
+        "passed": true
+      },
+      {
+        "name": "Stale engine binding refuses map setup before publishing any map",
+        "passed": true
+      },
+      {
+        "name": "Real advertised map setup admits a native imported source and reuses identical bytes without joining",
+        "passed": true,
+        "sourceSha256": "50fe52406f075d975e24100a65b26ff696458023dd3509878953052ab0ef858f"
+      }
+    ],
+    "errors": [],
+    "complete": true,
+    "gameplayAccepted": false,
+    "originalsUnchanged": true,
+    "verifiedInputs": {
+      "OpenCE/halo.exe": "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9",
+      "OpenCEFaber/halo.exe": "5c7368529b3ab0856f3987b1a03c62aa34c18e63ab833d35e385c8b61e2597e3",
+      "Chupathingy/halo.exe": "e5ce1ebb95865492ed06255100d0c677852d30202f06fd506fdc243a0a7b57df",
+      "Chupathingy/chupathingy.exe": "fa9997520ebb2d8406fbe31db7146e1354b75569da1172c6dbf7717b9ee2b86b",
+      "Halo Custom Edition/haloce.exe": "7de68b02aa4d2ed521144db5f7d8ecdc2071dc7b2270f6a0c9b66a621c072a64",
+      "Halo Custom Edition/maps/ui.map": "0d2c6f7944b1a9c84b86b92e6f41fe386f04d0c547ed77c14d2328b807cb814c",
+      "Halo Custom Edition/maps/bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+      "Halo Custom Edition/maps/sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2",
+      "Halo Custom Edition/maps/loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+      "OpenCE/maps/ui.map": "35e3e560478d85178749be310ad13d6d6ecde618d32675261a3554592333a833"
+    },
+    "appSha256": "b1418e31b73dd91b82519c85e5e30d943f48e5165e193bdc3e5bcac75e78e84f",
+    "ceResources": {
+      "firstSetupMs": 1273,
+      "repeatSetupMs": 757,
+      "copied": [
+        "bitmaps.map",
+        "loc.map",
+        "sounds.map"
+      ],
+      "bytesCopied": 165658385,
+      "reusedByOtherEngine": [
+        "bitmaps.map",
+        "sounds.map",
+        "loc.map"
+      ],
+      "hashes": {
+        "bitmaps.map": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+        "loc.map": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041",
+        "sounds.map": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2"
+      }
+    },
+    "storage": {
+      "status": "passed",
+      "disposedBytes": 266823865,
+      "postCleanup": {
+        "logicalBytes": 218388,
+        "allocatedBytes": 225280,
+        "files": 4,
+        "directories": 1
+      },
+      "evidenceOverBudget": false
+    }
+  },
+  "stages": [
+    {
+      "name": "TypeScript",
+      "milliseconds": 847
+    },
+    {
+      "name": "Frontend tests",
+      "milliseconds": 1935
+    },
+    {
+      "name": "Source module contracts",
+      "milliseconds": 952
+    },
+    {
+      "name": "Offline regressions",
+      "milliseconds": 4373
+    },
+    {
+      "name": "Storage ownership",
+      "milliseconds": 11992
+    },
+    {
+      "name": "Embedded desktop build",
+      "milliseconds": 416448
+    },
+    {
+      "name": "Actual runtime profiles, shared native folders and CE requirements",
+      "milliseconds": 12102
+    }
+  ],
+  "earlierVerifiedBroadStages": [
+    {
+      "name": "Rust workspace",
+      "milliseconds": 233913
+    },
+    {
+      "name": "TypeScript",
+      "milliseconds": 837
+    },
+    {
+      "name": "Frontend tests",
+      "milliseconds": 1922
+    },
+    {
+      "name": "Source module contracts",
+      "milliseconds": 956
+    },
+    {
+      "name": "Offline regressions",
+      "milliseconds": 4397
+    },
+    {
+      "name": "Storage ownership",
+      "milliseconds": 13547
+    },
+    {
+      "name": "Browser regressions",
+      "milliseconds": 337790
+    },
+    {
+      "name": "Embedded desktop build",
+      "milliseconds": 419695
+    }
+  ],
+  "nativeCompilationThisMilestone": false,
+  "nativeCompilationBoundary": "Content setup copies hash-pinned existing native bytes. Previous R30/R32 H1A compiler/independent readback evidence remains; no new Halo game/compiler/peer acceptance is inferred.",
+  "remaining": [
+    "Faber matching symbols and engine correction",
+    "Actual shared-root game launches, protocol joins and gameplay",
+    "Bot/control and privacy-preserving real stats integration",
+    "Original Zombie automatic carrier release, stable combat and peer acceptance"
+  ],
+  "failedAttempts": [
+    "Initial source/test syntax corrected before rerun",
+    "Junction fixture changed to an unprivileged owned-directory junction without weakening link refusal",
+    "R1 folder-provenance expected set updated for supported maps_ce; sibling/wrong-family negatives retained",
+    "R2 new native harness added to existing workflow coverage catalog",
+    "R3/native-a harness preflight lacked fresh output folder and app identity; guard preserved, fixed harness",
+    "Expanded download button test exposed rejected JSON state key; fixed via existing bounded window-local community key, then fresh R4 app verified"
+  ]
+}

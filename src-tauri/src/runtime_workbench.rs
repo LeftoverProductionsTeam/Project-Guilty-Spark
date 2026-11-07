@@ -1015,6 +1015,29 @@ pub(super) struct JoinHandoff {
 }
 
 #[tauri::command]
+pub(super) async fn install_downloaded_community_map(app:tauri::AppHandle,server_id:String,runtime_id:runtime::RuntimeId,project_id:String,expected_registration_id:String,expected_data_root:PathBuf,expected_executable_sha256:String)->Reply<core::runtime_content::PreparedMap>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let server=selected_server(&state,&server_id)?;
+        if !runtime_id.is_native()||server.map.pack.is_some(){return Err("This engine or map pack needs its own installation workflow".into());}
+        let version=match server.map.family{servers::CommunityMapFamily::Xbox=>5,servers::CommunityMapFamily::CustomEdition=>609,_=>return Err("This native map family needs a separately validated conversion".into())};
+        let registration=runtime_registration(&state,runtime_id)?;
+        let installed=runtime::inspect_registration(&registration).map_err(error)?;
+        // Pin setup to the profile inspected before download; switching engines must never redirect a write.
+        if registration.id!=expected_registration_id
+            || installed.data_root!=fs::canonicalize(&expected_data_root).map_err(error)?
+            || installed.executable_sha256.as_deref()!=Some(expected_executable_sha256.as_str()) {
+            return Err("The selected engine or content folder changed; check this game's requirements again before installing the map".into());
+        }
+        let source=lock(&state.library)?.get(&project_id).map_err(error)?.source.ok_or("The selected project has no imported native map")?;
+        if version==609{
+            let ce=runtime_connections::ce_resource_source(&state)?;
+            core::runtime_content::prepare_ce_resources(&installed.data_root,&ce).map_err(error)?;
+        }
+        let result=core::runtime_content::install_map(&installed.data_root,&source.preserved_path,&source.sha256,&server.map.name,version).map_err(error)?;
+        let _=app.emit("spark:runtime-connections-changed",());Ok(result)
+    }).await.map_err(error)?
+}
+#[tauri::command]
 pub(super) async fn community_join(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
@@ -1036,8 +1059,8 @@ pub(super) async fn community_join(
         if maps::hash_file(&plan.executable).map_err(error)?!=expected_hash{return Err("The runtime executable changed during the join check; inspect it again before launching".into());}
         let protected=fs::canonicalize(&state.root).map_err(error)?;
         if plan.executable.starts_with(protected.join("archives")) || plan.executable.starts_with(protected.join("Inbox")){return Err("Imported executables cannot be launched; register a separately installed runtime".into());}
-        let mut command=steam::command(plan.executable.to_string_lossy().as_ref());
-        community_data_environment(&mut command,runtime_id,&data_root);
+        let mut command=registered_runtime_command(&state,&registration,&plan)?;
+        if plan.environment.is_empty(){community_data_environment(&mut command,runtime_id,&data_root);}
         let child=command.current_dir(&plan.cwd).arg(target.argument()).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|_|"The registered game could not start; no connection outcome is available".to_string())?;
         Ok(JoinHandoff{process_id:child.id(),status:"handedOffUnobserved".into(),detail:"The documented invitation was handed to the inspected game. The game must verify the protocol and map, and may require a password in its own UI. Spark has no authenticated game connection observer yet; this is not a successful-join receipt.".into()})
     }).await.map_err(error)?

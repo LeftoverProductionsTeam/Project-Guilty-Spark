@@ -8,6 +8,7 @@ import { useMapState } from '../mapSession';
 import { Notice, Pill } from './ui';
 import OwnedContentProbe from './OwnedContentProbe';
 import InvitationJoin from './InvitationJoin';
+import CommunityMapSetup from './CommunityMapSetup';
 import { matchesLobbyFilter, type LobbyFilter } from '../lobbyFilters';
 import '../runtimeWorkbench.css';
 
@@ -354,6 +355,7 @@ export default function PlayAndServers({
                             <small>{issue.setupRoute}</small>
                           </p>
                         ))}
+                        <CommunityMapSetup key={runtime+selected.id} server={selected} runtime={runtime} assessment={assessment} onReady={()=>void preflight()}/>
                         {assessment.limitations.map((limit) => (
                           <p className="subtle" key={limit}>
                             {limit}

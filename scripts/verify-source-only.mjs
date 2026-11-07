@@ -10,7 +10,7 @@ import { withDevelopmentWorkspace, runDevelopmentCommand, exportDevelopmentBuild
 import { checkSourceEntrypoints } from './check-source-entrypoints.mjs';
 const [receiptFile, sourceMap, kit, tags, invader, acceptedProject] = process.argv.slice(2);
 const stages = (process.env.SPARK_VERIFY_STAGES ?? 'rust,frontend,browser,native').split(',');
-if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry', 'logic', 'workspace'].includes(s)))
+if (stages.some((s) => !['rust', 'frontend', 'browser', 'native', 'compiler', 'geometry', 'logic', 'workspace', 'runtime'].includes(s)))
   throw Error('Unknown source-only verification stage');
 if (stages.includes('native') && ![sourceMap, kit, tags, invader].every(Boolean))
   throw Error('Native verification requires the selected owned map, kit, small tag source and Invader paths');
@@ -133,8 +133,12 @@ try {
       }
       if(stages.includes('logic'))for(const file of ['scripts/native-logic-roundtrip.mjs','scripts/test-workspace-lifecycle-native.mjs'])
         await run('Native acceptance syntax '+file,['--check',file]);
-      if (stages.includes('native')||stages.includes('geometry')||stages.includes('logic')||stages.includes('workspace')){
-        if(!selectedApp)await run('Embedded desktop build', ['scripts/desktop.mjs', 'build', '--no-bundle']);
+      if (stages.includes('native')||stages.includes('geometry')||stages.includes('logic')||stages.includes('workspace')||stages.includes('runtime')){
+        if(!selectedApp){
+          const beforeBuild=await runtimeFingerprint();
+          await run('Embedded desktop build', ['scripts/desktop.mjs', 'build', '--no-bundle']);
+          if(beforeBuild!==await runtimeFingerprint())throw Error('Runtime source changed during the embedded build; do not export or accept a mixed-revision application');
+        }
         else report.reusedQaApplication={file:selectedApp,sha256:crypto.createHash('sha256').update(await fs.readFile(selectedApp)).digest('hex'),runtimeSourceFingerprint:await runtimeFingerprint()};
         if(process.env.SPARK_VERIFY_EXPORT_QA_APP){
           const target=path.resolve(process.env.SPARK_VERIFY_EXPORT_QA_APP);
@@ -142,6 +146,13 @@ try {
           manifest.runtimeSourceFingerprint=await runtimeFingerprint();manifest.purpose='One temporary source-pinned QA executable; not a release';
           await fs.writeFile(path.join(target,'manifest.json'),JSON.stringify(manifest,null,2),{flag:'wx'});report.exportedQaApplication={directory:target,...manifest};
         }
+      }
+      if(stages.includes('runtime')){
+        if(!process.env.SPARK_TEST_RUNTIME_ROOT)throw Error('Runtime acceptance needs the explicitly selected owned runtime folder');
+        const output=path.join(context.directory,'qa','runtime');await fs.mkdir(path.dirname(output),{recursive:true});
+        try{await run('Actual runtime profiles, shared native folders and CE requirements',[
+          'scripts/test-runtime-content-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release/GuiltySpark.exe'),output,process.env.SPARK_TEST_RUNTIME_ROOT]);}
+        finally{const text=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(text)report.runtimeContent=JSON.parse(text);}
       }
       if (stages.includes('native')) {
         const hash = async (file) =>
@@ -233,7 +244,7 @@ try {
       }
     },
     {
-      reservationBytes: stages.some((s) => s === 'rust' || s === 'native' || s === 'compiler' || s === 'geometry' || s === 'logic' || s === 'workspace')
+      reservationBytes: stages.some((s) => s === 'rust' || s === 'native' || s === 'compiler' || s === 'geometry' || s === 'logic' || s === 'workspace' || s === 'runtime')
         ? 12 * 1024 ** 3
         : 1024 ** 3,
     },

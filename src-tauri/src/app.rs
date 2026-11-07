@@ -2271,6 +2271,10 @@ async fn inspect_runtime_registration(
     .map_err(error)?
 }
 #[tauri::command]
+async fn inspect_runtime_launch(registration:runtime::RuntimeRegistration)->Reply<runtime::LaunchPlan>{
+    tauri::async_runtime::spawn_blocking(move||runtime::prepare_launch(&registration).map_err(error)).await.map_err(error)?
+}
+#[tauri::command]
 async fn register_runtime(
     app: tauri::AppHandle,
     registration: runtime::RuntimeRegistration,
@@ -2281,8 +2285,7 @@ async fn register_runtime(
         let lib = lock(&state.library)?;
         let mut registrations: Vec<runtime::RuntimeRegistration> =
             lib.setting("runtimeRegistrations").map_err(error)?;
-        registrations.retain(|r| r.runtime_id != registration.runtime_id);
-        registrations.push(registration);
+        runtime::remember_registration(&mut registrations, registration).map_err(error)?;
         lib.set_setting("runtimeRegistrations", &registrations)
             .map_err(error)?;
         drop(lib);
@@ -2292,6 +2295,38 @@ async fn register_runtime(
     })
     .await
     .map_err(error)?
+}
+#[tauri::command]
+async fn prepare_runtime_ce_resources(app: tauri::AppHandle, registration_id: String, expected_data_root: PathBuf) -> Reply<core::runtime_content::PreparedCeResources> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>();
+        let profiles: Vec<runtime::RuntimeRegistration>=lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+        if profiles.len()>24 {return Err("Runtime profile limit exceeded".into());}
+        let selected=profiles.iter().find(|item|item.id==registration_id).ok_or("Runtime profile is no longer registered")?;
+        if !selected.runtime_id.is_native(){return Err("CE resource setup is for connected OpenCE/Chupathingy content libraries".into());}
+        let installed=runtime::inspect_registration(selected).map_err(error)?;
+        core::reject_links(&expected_data_root).map_err(error)?;
+        if fs::canonicalize(&expected_data_root).map_err(error)?!=installed.data_root {return Err("Save the changed content folder before setting up CE resources".into());}
+        let source=runtime_connections::ce_resource_source(&state)?;
+        let result=core::runtime_content::prepare_ce_resources(&installed.data_root,&source).map_err(error)?;
+        let _=app.emit("spark:runtime-connections-changed",());Ok(result)
+    }).await.map_err(error)?
+}
+#[tauri::command]
+fn list_runtime_registrations(state: State<'_, AppState>) -> Reply<Vec<runtime::RuntimeRegistration>> {
+    let profiles: Vec<runtime::RuntimeRegistration> = lock(&state.library)?.setting("runtimeRegistrations").map_err(error)?;
+    if profiles.len() > 24 { return Err("Runtime profile limit exceeded".into()); }
+    Ok(profiles)
+}
+#[tauri::command]
+async fn activate_runtime_registration(app: tauri::AppHandle, registration_id: String) -> Reply<Vec<runtime::RuntimeReport>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state=app.state::<AppState>(); let library=lock(&state.library)?;
+        let mut profiles: Vec<runtime::RuntimeRegistration> = library.setting("runtimeRegistrations").map_err(error)?;
+        runtime::activate_registration(&mut profiles,&registration_id).map_err(error)?;
+        library.set_setting("runtimeRegistrations",&profiles).map_err(error)?; drop(library);
+        let reports=runtime_reports(&state)?; let _=app.emit("spark:runtime-connections-changed",()); Ok(reports)
+    }).await.map_err(error)?
 }
 fn runtime_registration(
     state: &AppState,
@@ -2331,6 +2366,23 @@ async fn choose_runtime_path(kind: String) -> Reply<Option<PathBuf>> {
         _ => Err("Unknown runtime path kind".into()),
     }
 }
+fn registered_runtime_command(state:&AppState,registration:&runtime::RuntimeRegistration,plan:&runtime::LaunchPlan)->Reply<std::process::Command>{
+    let mut command=steam::command(plan.executable.to_string_lossy().as_ref());
+        command.current_dir(&plan.cwd).args(&plan.args).envs(&plan.environment);
+        if plan.environment.get("HALO_DATA_ROOT").is_some_and(|data|fs::canonicalize(&registration.root).ok().as_ref()!=Some(data)) {
+            // Data is common; writable saves and logs are specific to this profile.
+            core::safe_relative(&registration.id).map_err(error)?;
+            if std::path::Path::new(&registration.id).components().count()!=1 { return Err("Invalid runtime profile identifier".into()); }
+            let private=state.root.join("runtime-state").join(&registration.id);
+            core::reject_links(&private).map_err(error)?;
+            for (key,folder) in [("HALO_SAVE_ROOT","saves"),("HALO_LOG_ROOT","logs"),("HALO_CACHE_ROOT","cache")] {
+                let directory=private.join(folder); core::reject_links(&directory).map_err(error)?;
+                fs::create_dir_all(&directory).map_err(error)?; command.env(key,directory);
+            }
+        }
+
+    Ok(command)
+}
 #[tauri::command]
 async fn launch_registered_runtime(
     app: tauri::AppHandle,
@@ -2350,7 +2402,8 @@ async fn launch_registered_runtime(
         if plan.executable.starts_with(canonical_data.join("archives")) || plan.executable.starts_with(canonical_data.join("Inbox")) {
             return Err("Archived or Inbox executables cannot be launched. Use a separately installed runtime.".into());
         }
-        steam::command(plan.executable.to_string_lossy().as_ref()).current_dir(plan.cwd).args(plan.args).spawn().map_err(error)?;
+        let mut command=registered_runtime_command(&state,&registration,&plan)?;
+        command.spawn().map_err(error)?;
         Ok(plan.warnings.join(" "))
     }).await.map_err(error)?
 }
@@ -3047,6 +3100,7 @@ pub fn run() {
             runtime_workbench::community_listing,
             runtime_workbench::community_join_preflight,
             runtime_workbench::community_join,
+            runtime_workbench::install_downloaded_community_map,
             runtime_workbench::mcc_owned_content_probe,
             bsp_assembly_options,
             plan_bsp_assembly,
@@ -3228,7 +3282,11 @@ pub fn run() {
             launch_toolchain_tool,
             runtime_hosting_plan,
             inspect_runtime_registration,
+            inspect_runtime_launch,
             register_runtime,
+            prepare_runtime_ce_resources,
+            list_runtime_registrations,
+            activate_runtime_registration,
             runtime_inventory,
             choose_runtime_path,
             launch_registered_runtime,

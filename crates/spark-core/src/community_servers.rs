@@ -592,16 +592,18 @@ pub fn profile_from_inventory(
                 _ => CommunityMapFamily::Unknown,
             };
             let resources_ready = family == CommunityMapFamily::Xbox
-                || ["bitmaps.map", "sounds.map", "loc.map"].iter().all(|name| {
-                    inventory.resources.iter().any(|resource| {
-                        resource
-                            .relative_path
-                            .replace('\\', "/")
-                            .eq_ignore_ascii_case(&format!("{folder}/{name}"))
-                            && resource.sha256.is_some()
-                            && resource.size.is_some_and(|size| size >= 2048)
-                    })
-                });
+                || {
+                    // Chupathingy's documented CE/HaloMD lookup also uses the CE
+                    // banks in maps_ce, maps/ce and custom_maps. One complete set
+                    // must exist; never mix banks from unrelated families.
+                    let places: &[&str]=if matches!(family,CommunityMapFamily::CustomEdition|CommunityMapFamily::HaloMd){
+                        &[folder,"maps_ce","maps/ce","custom_maps"]
+                    }else{&[folder]};
+                    places.iter().any(|place|["bitmaps.map","sounds.map","loc.map"].iter().all(|name|
+                        inventory.resources.iter().any(|resource|
+                            resource.relative_path.replace('\\',"/").eq_ignore_ascii_case(&format!("{place}/{name}"))
+                            && resource.sha256.is_some() && resource.size.is_some_and(|size|size>=2048))))
+                };
             let lower_file = file.to_ascii_lowercase();
             InstalledCommunityMap {
                 family,
@@ -984,6 +986,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn legacy_ce_folder_can_use_one_complete_verified_ce_bank_set(){
+        let (registration,installed,mut inventory)=inventory_fixture();
+        inventory.maps[2].relative_path="custom_maps/fixture.map".into();
+        assert!(profile_from_inventory(&registration,&installed,&inventory).maps[2].resources_ready);
+        inventory.resources[0].relative_path="custom_maps/bitmaps.map".into();
+        assert!(!profile_from_inventory(&registration,&installed,&inventory).maps[2].resources_ready);
+    }
     #[test]
     fn unknown_build_and_protocol_are_not_ready_from_an_executable_header_alone() {
         let (registration, mut installed, inventory) = inventory_fixture();

@@ -146,6 +146,10 @@ pub fn open_verified(path: &Path, expected_sha256: &str) -> Result<(File, Resour
 pub fn open_verified_sound(path:&Path,expected_sha256:&str)->Result<(File,ResourceIndex)>{
     open_verified_kind(path,expected_sha256,"sounds.map",2)
 }
+pub fn open_verified_localization(path:&Path,expected_sha256:&str)->Result<(File,ResourceIndex)>{
+    open_verified_kind(path,expected_sha256,"loc.map",3)
+}
+
 fn open_verified_kind(path:&Path,expected_sha256:&str,name:&str,kind:u32)->Result<(File,ResourceIndex)>{
     if !matches!(path.file_name().and_then(|n| n.to_str()), Some(n) if n.eq_ignore_ascii_case(name)) {
         return invalid(format!("Select the exact {name} file, not a different resource map"));

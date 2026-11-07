@@ -404,6 +404,8 @@ async function mockDesktop(page: Page) {
         if(command==='plugin:window|toggle_maximize'){mock.maximized=!mock.maximized;return null;}
         if(command==='plugin:window|unmaximize'){mock.maximized=false;return null;}
         if(command==='plugin:window|maximize'){mock.maximized=true;return null;}
+        if (command === 'list_runtime_registrations') return [];
+        if (command === 'inspect_runtime_launch') return {environment:{},warnings:[]};
         if (command === 'bootstrap') return structuredClone(bootstrap);
         if (command === 'open_workspace_window') return 'synthetic-workspace-window';
         if (command === 'open_project_window') {
@@ -3008,4 +3010,55 @@ test('runtime folders can be moved independently, including Custom Edition, with
  expect(saved.map((r:any)=>r.runtimeId)).toEqual(['haloCustomEdition','openCe','chupathingyCe']);
  expect(await page.evaluate(()=>(window as any).__folderReports[0].id)).toBe('mccSteam');
  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((c:any)=>['launch_registered_runtime','launch_registered_server','launch_discovered_tool'].includes(c.command)))).toBe(false);
+});
+
+
+test('saved OpenCE engines switch without launching or changing the map source',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;let profiles=['OpenCE','OpenCEFaber'].map((name,i)=>({id:i?'faber':'upstream',runtimeId:'openCe',root:'D:/Runtimes/'+name,executable:'D:/Runtimes/'+name+'/halo.exe',dataRoot:'D:/SharedHalo',version:null,networkVersion:null}));
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+   if(command==='list_runtime_registrations')return structuredClone(profiles);
+   if(command==='activate_runtime_registration'){const chosen=profiles.find(p=>p.id===args.registrationId);if(!chosen)throw Error('Missing fixture profile');profiles=[chosen,...profiles.filter(p=>p.id!==chosen.id)];w.__sparkMock.calls.push({command,args});return [];}
+   return invoke(command,args);
+  };
+ });
+ await page.evaluate(()=>dispatchEvent(new Event('guilty-spark-runtime-connections-changed')));
+ await openFixture(page);
+ const target=page.getByRole('combobox',{name:'Active Halo runtime',exact:true});
+ await openStudioMenu(page);
+ await expect(target.locator('option[value="profile:faber"]')).toHaveCount(1);
+ await target.selectOption('profile:faber');await expect(target).toHaveValue('profile:faber');
+ await target.selectOption('profile:upstream');await expect(target).toHaveValue('profile:upstream');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='activate_runtime_registration').map((c:any)=>c.args.registrationId))).toEqual(['faber','upstream']);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((c:any)=>c.command==='launch_registered_runtime'||c.command==='community_join'))).toBe(false);
+});
+
+test('a missing CE map offers protected setup and direct-link download without joining',async({page})=>{
+ await mockDesktop(page);await openFixture(page);await includeCommunityRuntime(page);
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+  if(command==='community_listing'){const result=await invoke(command,args);if(result.listing)for(const row of result.listing.servers)row.map={family:'customEdition',name:'alpine',pack:null,displayName:'Alpine'};return result;}
+  if(command==='community_join_preflight')return {runtimeId:args.runtimeId,registrationId:'synthetic-community',dataRoot:'D:/SharedHalo',readiness:'blocked',issues:[{code:'missingMap',summary:'Map missing',setupRoute:'runtimeResources'},{code:'missingMapResources',summary:'CE banks missing',setupRoute:'runtimeResources'}],limitations:[],executableSha256:'a'.repeat(64),connectionOutcome:'notObserved'};
+  if(command==='prepare_runtime_ce_resources'){w.__sparkMock.calls.push({command,args});return {copied:['bitmaps.map','sounds.map','loc.map'],reused:[],bytesCopied:100};}
+  return invoke(command,args);
+ };});
+ await chooseTool(page,'Online');await page.getByLabel('Runtime adapter',{exact:true}).selectOption('openCe');await page.getByRole('button',{name:'Join server',exact:true}).click();
+ await page.getByRole('list',{name:'Advertised games'}).getByRole('listitem').first().click();await page.getByRole('button',{name:'Check installed runtime & map',exact:true}).click();
+ await page.getByRole('button',{name:'Find and set up CE resource banks',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.some((c:any)=>c.command==='prepare_runtime_ce_resources'&&c.args.expectedDataRoot==='D:/SharedHalo'))).toBe(true);
+ await page.locator('summary',{hasText:'Download and set up Alpine'}).click();
+ await expect(page.getByRole('textbox',{name:'Direct map download URL',exact:true})).toHaveValue('https://github.com/csauve/alpine/releases/download/1.0.0/alpine.zip');
+ await expect(page.getByRole('button',{name:'Download, verify & set up',exact:true})).toBeEnabled();
+ await expect(page.getByRole('combobox',{name:'Downloaded map action',exact:true})).toHaveCount(0);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((c:any)=>c.command==='download_and_import_maps'||c.command==='community_join'))).toBe(false);
+ // Controlled IPC tests the explicit download action and source binding; it is not an HTTP/game acceptance claim.
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+  if(command==='prepare_map_download')return {id:'synthetic-map-setup',phase:'queued',bytes:0,total:null,detail:'Synthetic browser download',projectIds:[]};
+  if(command==='download_and_import_maps'){w.__sparkMock.calls.push({command,args});return [{project:{id:'synthetic-alpine'},inspection:{header:{name:'alpine'}}}];}
+  if(command==='map_download_status')return {id:'synthetic-map-setup',phase:'imported',bytes:100,total:100,detail:'Synthetic browser import',projectIds:['synthetic-alpine']};
+  if(command==='install_downloaded_community_map'){w.__sparkMock.calls.push({command,args});return {relativePath:'maps_ce/alpine.map',sha256:'b'.repeat(64),reused:false};}
+  return invoke(command,args);
+ };});
+ await page.getByRole('button',{name:'Download, verify & set up',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((c:any)=>c.command==='install_downloaded_community_map')?.args)).toEqual(expect.objectContaining({runtimeId:'openCe',projectId:'synthetic-alpine',expectedRegistrationId:'synthetic-community',expectedDataRoot:'D:/SharedHalo',expectedExecutableSha256:'a'.repeat(64)}));
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((c:any)=>c.command==='community_join'))).toBe(false);
 });

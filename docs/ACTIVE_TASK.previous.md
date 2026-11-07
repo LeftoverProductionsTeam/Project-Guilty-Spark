@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: c3ad4850 — complete real CE to MCC cross-runtime asset import through the existing creator workflow
-Status: automated acceptance incomplete
+Task: Runtime integration — Faber Firefight crash diagnosis, shared content and Chupathingy CE setup
+Status: implementation incomplete
 Starting revision: 34b7c57a17c7a807805e52d0c6a6a40bc91a6e07
-Latest verified revision: Local master6e3bb1d commits the R16 CE609→MCC13 scenery/vehicle native/restart milestone. Original34b7 README/history,475 IDs/25prompts, originals, stash and C49 preserved. R12 full193browser/416frontend/TS/offline/storage and R7 unchanged Rust802/9ignored pass; R16 no mock IPC, both independent native artifacts/readbacks and restart pass.
-Next action: Finish runtime-folders-r31 native acceptance using the hash/fingerprint-verified R30 application; runtime code is unchanged. R30 full Rust802/9ignored, frontend425,200browser,TypeScript/offline/storage pass, and both native imports/compiles/restart pass. Its final File extraction assertion incorrectly expected an unsaved donor card after restart; the harness now uses explicit File Save for all donor fixtures. On complete native pass, update actual directory preferences, commit locally and retire superseded generated QA output.
+Latest verified revision: Local master97751de preserves accepted R30/R32 creator workflows. Current runtime integration edits remain uncommitted. R3 has passed the Rust workspace, TypeScript/frontend/offline/storage gates and is running the full browser suite before a fresh actual Windows setup trial. Exact counts await the final receipt.
+Next action: Finish and verify shared engine profiles, process-local content paths, automatic CE resource discovery/setup and protected missing-map downloads. Run focused/full regressions and actual native-app acceptance, preserve original runtimes, then commit locally. Resume original Zombie automatic-release/combat work after this owner steering.
 
 ## Acceptance
 
@@ -30,7 +30,7 @@ Earlier failed attempts and corrections remain in the current report/fixture. La
 
 ## Operations and safe checkpoint
 
-Current operation: R30 completed with two genuine native asset compiles/restart and four native-window cases, then failed only on the unsaved donor fixture before recursive File extraction. Source remains frozen; R31 reuses its exact verified application instead of rebuilding. All three moved runtime registrations passed native inspection. Owner live OpenCE343 read-only observations and bounded retest are integrated in ENGINE_SOURCE_ATLAS and its fixture; no host/peer/human game acceptance.
+Current operation: R3 source-only verification (rust,frontend,browser,runtime), receipt %TEMP%/GuiltySpark-Engineering-d49eb02588bf/runtime-sharing-r3.json. Reviewed engine profiles, shared compatible folders, CE bank validation/reuse, stale engine pinning and protected map-download setup are implemented. Actual app acceptance is not yet complete. R1 exposed a provenance test expectation; R2 exposed a missing native workflow cross-reference; corrected without weakening isolation. All original runtime files remain protected and no Halo process is launched by this QA stage.
 
 ## Deferred requests
 
