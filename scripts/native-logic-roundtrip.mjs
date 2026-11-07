@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {PerspectiveCamera,Vector3} from 'three';
-import {openDrawer,chooseTool} from '../tests/ui/helpers/navigation.ts';
+import {openDrawer,chooseTool,createMultiplayerMap} from '../tests/ui/helpers/navigation.ts';
 export async function nativeLogicRoundTrip({page,root,kit,tags,invader,cache,call,receipt,expect,resume=false,run,verifyEditedAsset=false,reviewControl}){
  const hash=async p=>crypto.createHash('sha256').update(await fs.readFile(p)).digest('hex');
  const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,preferredHalo:'mccSteam',hekDirectory:kit,hekTagsDirectory:tags,invaderDirectory:invader,hekFlavor:'h1aEk'}});
@@ -259,7 +259,9 @@ export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invad
   const connected=await call('connect_halo_textures',{projectId:opened.project.id,mode:'path',path:resourceDirectory});
   expect(connected.project.source.resourceSha256).toEqual(resourceSha256);sources.push(connected);
  }
- const created=await call('create_quickforge_project',{title:'CE scenery to MCC authoring',template:'customBlank',target:'mccSteam'});
+ await createMultiplayerMap(page,'Original multiplayer authoring','mccSteam');
+ const createdEntry=(await call('bootstrap')).entries.find(row=>row.title==='Original multiplayer authoring');if(!createdEntry)throw Error('File/New did not create a native document');
+ const created=await call('open_project',{id:createdEntry.id});receipt.fileNew={actualUserGestures:true,template:created.project.quickForge.template,runtimeId:created.project.quickForge.runtimeId};
  await page.reload();
  const open=async id=>{
   await chooseTool(page,'Map library');await expect(page.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','library');
@@ -430,4 +432,51 @@ export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invad
  }
  for(const input of originalInputs)expect(await hash(input.file)).toBe(input.sha256);
  receipt.originalInputsUnchanged=true;receipt.realPointerDrops=true;receipt.mockedIpc=false;receipt.gameplayVerified=false;
+}
+
+
+export async function nativeMegaWorldCreation({page,call,receipt,expect,baseFile,donorFile,root,run,invader}){
+ if(process.env.SPARK_QA_MEGAWORLD_ONLY==='1'){
+  const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,hekDirectory:process.env.SPARK_LOGIC_KIT,hekTagsDirectory:process.env.SPARK_LOGIC_TAGS,hekFlavor:'h1aEk'}});
+  const gameRoot=path.join(process.env.SPARK_QA_RUNTIME_ROOT,'Halo Custom Edition');await call('register_runtime',{registration:{id:crypto.randomUUID(),runtimeId:'haloCustomEdition',root:gameRoot,executable:path.join(gameRoot,'haloce.exe'),dataRoot:gameRoot,version:null,networkVersion:null}});
+ }
+
+ const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
+ const originals=await Promise.all([baseFile,donorFile].map(async file=>({file,sha256:await hash(file)})));
+ const boot=await call('bootstrap'),before=[];for(const entry of boot.entries.filter(row=>originals.some(input=>input.sha256===row.sha256)))before.push({id:entry.id,project:JSON.stringify((await call('open_project',{id:entry.id})).project)});
+ await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menuitem',{name:'New',exact:true}).click();await page.getByRole('menuitem',{name:'MegaWorld',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'New MegaWorld',exact:true}),sources=[];
+ const inventory=await call('discover_asset_sources');
+ for(const [index,file]of [baseFile,donorFile].entries()){
+  const stem=path.basename(file).replace(/\.map$/i,'').toLowerCase();
+  const candidate=inventory.maps.find(row=>row.name.toLowerCase().replace(/\.map$/i,'')===stem&&row.cacheVersion===609);
+  if(!candidate)throw Error('Selected source is not in the connected runtime inventory: '+path.basename(file));
+  await dialog.getByLabel('Discovered asset source',{exact:true}).selectOption(candidate.id);await dialog.getByRole('button',{name:'Add source map',exact:true}).click();
+  const select=dialog.getByLabel(index===0?'First region':'Second region',{exact:true});
+  let id;await expect.poll(async()=>{id=await select.locator('option').evaluateAll((rows,stem)=>rows.find(row=>row.textContent.toLowerCase().includes(stem))?.value,stem);return !!id;}).toBe(true);await select.selectOption(id);
+  const source=await call('open_project',{id});expect(source.project.source.sha256).toBe(originals[index].sha256);sources.push(source);
+ }
+
+ if(process.env.SPARK_QA_MEGAWORLD_COMPILE==='1'){
+  const tag=sources[1].inspection.tags.find(tag=>tag.class==='sbsp');if(!tag)throw Error('The donor has no native BSP tag');
+  const folder=path.join(root,'assembly-donor-tags'),tool=path.join(invader,'invader-extract.exe');
+  const extracted=await run(tool,['-m',path.dirname(donorFile),'-s',tag.path+'.scenario_structure_bsp','-r','-t',folder,donorFile],{windowsHide:true,timeout:180000,maxBuffer:8*1024**2});
+  expect(extracted.stdout+'\n'+extracted.stderr).not.toMatch(/Failed to extract|ERROR:/i);
+  const files=[];const walk=async parent=>{for(const entry of await fs.readdir(parent,{withFileTypes:true})){const file=path.join(parent,entry.name),info=await fs.lstat(file);if(info.isSymbolicLink())throw Error('Linked extracted dependency refused');if(info.isDirectory())await walk(file);else if(info.isFile())files.push({path:path.relative(folder,file),bytes:info.size});else throw Error('Unsupported extracted dependency type');}};await walk(folder);
+  const bytes=files.reduce((n,row)=>n+row.bytes,0);if(!files.length||files.length>4096||bytes>256*1024**2)throw Error('Selected donor extraction exceeded the bounded dependency-only fixture');
+  const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,hekTagsDirectory:folder}});
+  receipt.donorPreparation={tag:tag.path,files:files.length,bytes,toolSha256:await hash(tool),recursiveNativeExtraction:true,entireSdkCopied:false};
+ }
+ await dialog.getByLabel('MegaWorld name',{exact:true}).fill('Timberland–Sidewinder authored connection');
+ await dialog.getByRole('button',{name:'Create MegaWorld',exact:true}).click();await expect(dialog).toBeHidden({timeout:180000});
+ const entry=(await call('bootstrap')).entries.find(row=>row.title==='Timberland–Sidewinder authored connection');if(!entry)throw Error('New world was not admitted');
+ const world=(await call('open_project',{id:entry.id})).project;
+ if(process.env.SPARK_QA_MEGAWORLD_COMPILE==='1'){const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,hekTagsDirectory:process.env.SPARK_LOGIC_TAGS,invaderDirectory:invader}});}
+
+ expect(world.id).not.toBe(sources[0].project.id);expect(world.id).not.toBe(sources[1].project.id);expect(world.source.sha256).toBe(originals[0].sha256);expect(world.bspAssembly.donorSource.sha256).toBe(originals[1].sha256);
+ for(const row of before)expect(JSON.stringify((await call('open_project',{id:row.id})).project)).toBe(row.project);
+ await page.keyboard.press('Control+s');await expect.poll(async()=>(await call('read_workspace_history',{projectId:world.id})).history?.head.dirty).toBe(false);
+ receipt.projectId=world.id;receipt.sourceHash=world.source.sha256;receipt.donorHash=world.bspAssembly.donorSource.sha256;receipt.plan=world.bspAssembly;receipt.sourceObjectCount=world.scene.length;receipt.fileNewActualGestures=true;receipt.nativeCompilation=false;receipt.gameplayAccepted=false;
+ for(const input of originals)expect(await hash(input.file)).toBe(input.sha256);receipt.originals=originals;receipt.originalSourceProjectsUnchanged=true;
+ await page.reload();await page.locator('.map-card').filter({has:page.getByRole('heading',{name:world.title,exact:true})}).click();await chooseTool(page,'Level editor');await openDrawer(page,'Construction');await expect(page.locator('.bsp-assembly')).toHaveAttribute('open','');receipt.sameProcessReopen=true;
 }

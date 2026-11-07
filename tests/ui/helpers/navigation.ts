@@ -25,3 +25,16 @@ export async function chooseTool(page: Page, name: string) {
     await page.getByRole('button', { name: 'Toggle workspace navigation', exact: true }).click();
   await drawer.getByRole('button', { name, exact: true }).click();
 }
+
+/** A real File/New gesture, shared by browser and embedded Windows acceptance. */
+export async function createMultiplayerMap(page:Page,title:string,runtime='mccSteam'){
+ await page.getByLabel('File menu',{exact:true}).click();
+ await page.getByRole('menuitem',{name:'New',exact:true}).click();
+ await page.getByRole('menuitem',{name:'Multiplayer Map',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'New Multiplayer Map',exact:true});
+ await dialog.getByLabel('New map name',{exact:true}).fill(title);
+ await dialog.getByLabel('New map runtime',{exact:true}).selectOption(runtime);
+ await dialog.getByLabel('New map template',{exact:true}).selectOption('customBlank');
+ await dialog.getByRole('button',{name:'Create editable map',exact:true}).click();
+ await dialog.waitFor({state:'hidden',timeout:180000});
+}

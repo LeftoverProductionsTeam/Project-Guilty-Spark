@@ -53,6 +53,7 @@ if(nativeOnly&&!readOnly)await finishStorage.createScratch('independent-native-t
 if(logicOnly)await finishStorage.createScratch('independent-native-tags');
 if(logicOnly&&crossRuntime){await finishStorage.createScratch('donor-inputs');await finishStorage.createScratch('native-output');}
 if(geometryOnly)await finishStorage.createScratch('independent-model-tags');
+if(process.env.SPARK_QA_MEGAWORLD_COMPILE==='1')await finishStorage.createScratch('assembly-donor-tags');
 const runOwned=async(...args)=>{const pending=promisify(execFile)(...args);if(pending.child)await finishStorage.trackProcess(pending.child);return pending;};
 const interrupt=async()=>{try{await finishStorage.interrupt();}finally{process.exit(130);}};
 process.once('SIGINT',interrupt);process.once('SIGTERM',interrupt);
@@ -277,7 +278,7 @@ async function nativeTagAnimation(opened){
       report.tagAnimation={actorPath:actor.path,clips:clipCount,bones:initial.bones,source:initial.source,pausedTime:paused.time,sameCanvas:true,gameplayAccepted:false};
       step('Actual Tag Inspector plays and pauses the selected biped native skeleton/animation, then restores its static model without replacing the viewport');
 }
-async function reviewNativeScene(id,label,requireNormalExit=false){
+async function reviewNativeScene(id,label,requireNormalExit=false,receipt=report.logicRoundTrip){
       // Explicit, bounded operator review of the existing installed-tool UI.
       // Process launch/exit never asserts game loading or trigger traversal.
       const testScene=main.locator('.runtime-dock').getByRole('button',{name:/^Test Scene/});
@@ -301,8 +302,8 @@ async function reviewNativeScene(id,label,requireNormalExit=false){
       const result={...trial,status:game?.status??'unknown',exitCode:game?.exitCode??null,closedAt:new Date().toISOString(),diagnostics};
       // Retain the actual native failure before asserting; a rejected exit
       // must not throw away the diagnostics we just collected.
-      if(label==='authored')report.logicRoundTrip.standaloneProcessTrial=result;
-      else report.logicRoundTrip.controlTrial=result;
+      if(label==='control')receipt.controlTrial=result;
+      else receipt.standaloneProcessTrial=result;
       if(requireNormalExit)expect(game?.exitCode,'Close the observed game normally; a process exit is not gameplay acceptance').toBe(0);
       step(`Installed Standalone ${label} process observed; scene loading and gameplay require separate visual evidence`,result);return result;
 }
@@ -319,9 +320,18 @@ try{
   if(logicOnly&&crossRuntime){
     const {nativeCrossRuntimeAssetRoundTrip}=await import('./native-logic-roundtrip.mjs');
     report.crossRuntime={stage:'starting real cross-runtime UI workflow',pairs:[],mockedIpc:false,gameplayVerified:false};
+    if(process.env.SPARK_QA_MEGAWORLD_ONLY==='1'&&(!process.env.SPARK_QA_MEGAWORLD_BASE||!process.env.SPARK_QA_MEGAWORLD_DONOR))throw Error('Select the two owned MegaWorld source maps');
+    if(process.env.SPARK_QA_MEGAWORLD_ONLY!=='1'){
     const donors=[process.env.SPARK_LOGIC_CE_SCENERY,process.env.SPARK_LOGIC_CE_VEHICLE];if(!donors.every(Boolean))throw Error('Select two owned CE donor caches');
     await nativeCrossRuntimeAssetRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT),tags:path.resolve(process.env.SPARK_LOGIC_TAGS),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),donors:donors.map(value=>path.resolve(value)),call:(command,args)=>invoke(main,command,args),receipt:report.crossRuntime,expect,run:runOwned,retain:finishStorage.retain});
     step('Two real CE donor asset classes drag into separate MCC authoring documents and compile independently');
+    }
+    if(process.env.SPARK_QA_MEGAWORLD_BASE&&process.env.SPARK_QA_MEGAWORLD_DONOR){
+      report.megaWorldCreation={};const {nativeMegaWorldCreation}=await import('./native-logic-roundtrip.mjs');
+      await nativeMegaWorldCreation({page:main,call:(command,args)=>invoke(main,command,args),receipt:report.megaWorldCreation,expect,root,run:runOwned,invader:path.resolve(invaderDirectory),baseFile:process.env.SPARK_QA_MEGAWORLD_BASE,donorFile:process.env.SPARK_QA_MEGAWORLD_DONOR});
+      step('File/New creates an independent native two-source world, then Save and reopen retain its plan');
+    }
+
     const pid=child.pid;
     for(const view of [...pages()].reverse())if(!view.isClosed())await close(view,'save');
     await waitForQaExit(child);await browser.close();await launchNative();
@@ -329,6 +339,7 @@ try{
       expect(reopened.project.quickForge).toEqual(pair.savedProject.quickForge);expect(reopened.project.scene).toEqual(pair.savedProject.scene);expect(reopened.project.nativeAssetImports).toEqual(pair.savedProject.nativeAssetImports);expect(history.history.head).toEqual(pair.savedHistory.head);
       pair.fullProcessRestart={stoppedPid:pid,restartedPid:child.pid,sourceImportsAndUndoPreserved:true};delete pair.savedProject;delete pair.savedHistory;
     }
+    if(report.crossRuntime.pairs.length){
     step('Both cross-runtime destinations survive full process restart with native dependencies and the same Undo head');
     const projectId=report.crossRuntime.pairs[0].targetProjectId;
     await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${projectId}"]`).click();
@@ -359,6 +370,7 @@ try{
     report.crossRuntime.fileWorkflow={sourceAwareTagExtraction:true,tagFiles:5,nativeMapSaveAsPlanVisible:true,realFileSave:true,projectDescriptorDialogTested:false};
     for(const original of report.crossRuntime.originalInputs)expect(crypto.createHash('sha256').update(await fs.readFile(original.file)).digest('hex')).toBe(original.sha256);
     step('File saves the real document, opens its native Save As plan and extracts the selected source tag through Invader');
+    }
 
   }
   if(logicOnly&&!crossRuntime){
@@ -387,6 +399,46 @@ try{
     report.logicRoundTrip.processReopen={stoppedPid:pid,restartedPid:child.pid,sourceAndImportsPreserved:true,undoHeadPreserved:true,nativeWindowReopened:true};
     step('Authored native asset and logic survive a normal process close/restart with the same Undo head',report.logicRoundTrip.processReopen);
     if(process.env.SPARK_LOGIC_GAME_REVIEW==='1')report.logicRoundTrip.standaloneProcessTrial=await reviewNativeScene(id,'authored',true);
+  }
+
+  if(report.megaWorldCreation){
+    const world=(await invoke(main,'open_project',{id:report.megaWorldCreation.projectId})).project;expect(world.bspAssembly).toEqual(report.megaWorldCreation.plan);expect(world.source.sha256).toBe(report.megaWorldCreation.sourceHash);expect(world.scene.length).toBe(report.megaWorldCreation.sourceObjectCount);
+    await chooseTool(main,'Map library');await main.locator('.map-card').filter({has:main.getByRole('heading',{name:world.title,exact:true})}).click();await chooseTool(main,'Level editor');await openDrawer(main,'Construction');
+    await expect(main.getByLabel('BSP donor map',{exact:true})).toHaveValue(world.bspAssembly.donorProjectId);
+    await expect(main.getByLabel('Donor BSP section',{exact:true})).toHaveValue(String(world.bspAssembly.donorBspIndex));
+    await expect(main.locator('.bsp-assembly .bsp-error')).toHaveCount(0);
+    report.megaWorldCreation.fullProcessRestart=true;report.megaWorldCreation.reopenedNativeDonorControls=true;
+    const field=main.getByRole('spinbutton',{name:'Tunnel width',exact:true});await field.fill('2.5');await field.press('Enter');await main.getByRole('button',{name:'Apply connection',exact:true}).click();
+    const saved=async()=>{await main.getByLabel('File menu',{exact:true}).click();await main.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await expect.poll(async()=>(await state(main,world.id)).history?.head.dirty).toBe(false);return (await invoke(main,'open_project',{id:world.id})).project;};
+    expect((await saved()).bspAssembly.tunnelWidth).toBe(2.5);await main.keyboard.press('Control+z');expect((await saved()).bspAssembly.tunnelWidth).toBe(2);await main.keyboard.press('Control+y');expect((await saved()).bspAssembly.tunnelWidth).toBe(2.5);
+    report.megaWorldCreation.editedAfterRestart=true;report.megaWorldCreation.undoRedoImmediateSave=true;
+    await main.getByRole('button',{name:'Check tunnel clearance',exact:true}).click();
+    await expect.poll(async()=>await main.locator('.bsp-assembly .bsp-error').count()?'blocked':(await main.locator('.bsp-assembly').innerText()).includes('Source clearance checked at')?'checked':'working',{timeout:180000}).not.toBe('working');
+    const failure=main.locator('.bsp-assembly .bsp-error');if(await failure.count()){report.megaWorldCreation.sourceClearance={accepted:false,error:await failure.innerText()};throw Error('Native source clearance failed: '+report.megaWorldCreation.sourceClearance.error);}
+    report.megaWorldCreation.sourceClearance={accepted:true,scope:'Source reconstruction and capsule diagnostics; no compiled-map or gameplay acceptance',summary:(await main.locator('.bsp-assembly').innerText()).match(/Source clearance checked at[^\n]*/)?.[0]};
+    await main.screenshot({path:path.join(root,'megaworld-source-check.png')});step('Saved source-bound donor controls support edited width, Undo/Redo, immediate Save and actual native source clearance');
+    if(process.env.SPARK_QA_MEGAWORLD_COMPILE==='1'){
+      await main.getByRole('button',{name:'Build & playtest connection',exact:true}).click();await expect(main.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','build');
+      const build=main.getByRole('button',{name:'Convert map to MCC',exact:true});await expect(build).toBeEnabled({timeout:90000});await build.click();
+      let output;const began=performance.now();await expect.poll(async()=>{const project=(await invoke(main,'open_project',{id:world.id})).project;output=project.builds.findLast(row=>row.status==='validated'&&row.output);const log=(await invoke(main,'bootstrap')).logs.findLast(row=>row.projectId===world.id);if(log?.phase==='failed')throw Error(log.message);return output?.status;},{timeout:900000,intervals:[1500,3000]}).toBe('validated');
+      const inspected=await invoke(main,'open_built_map',{projectId:world.id,buildId:output.id});expect(inspected.inspection.header.version).toBe(13);expect(inspected.inspection.mesh.parts.length).toBe(1);expect(inspected.inspection.mesh.indices.length).toBeGreaterThan(30000);
+      const extracted=path.join(root,'independent-native-tags','megaworld');await fs.mkdir(extracted);const scenario=inspected.inspection.tags.find(row=>row.class==='scnr').path+'.scenario',bsp=inspected.inspection.tags.find(row=>row.class==='sbsp').path+'.scenario_structure_bsp';
+      for(const tag of [scenario,bsp]){const extraction=await runOwned(path.join(invaderDirectory,'invader-extract.exe'),['-s',tag,'-t',extracted,output.output],{windowsHide:true,timeout:180000,maxBuffer:8*1024**2});expect(extraction.stdout+'\n'+extraction.stderr).not.toMatch(/Failed to extract|ERROR:/i);}
+      const crc=Number((await runOwned(path.join(invaderDirectory,'invader-info.exe'),['-T','crc32_mismatched',output.output],{windowsHide:true,timeout:30000})).stdout.trim());expect(crc).toBe(0);
+      const read=async(tag,field)=>(await runOwned(path.join(invaderDirectory,'invader-edit.exe'),['-t',extracted,'-G',field,tag],{windowsHide:true,timeout:30000})).stdout.trim();
+      const ref=await read(scenario,'structure_bsps[0].structure_bsp');expect(ref.replaceAll('\\','/').toLowerCase()).toBe(bsp.replaceAll('\\','/').toLowerCase());
+      report.megaWorldCreation.nativeCompilation={accepted:true,target:'mcc-cea',mapSha256:crypto.createHash('sha256').update(await fs.readFile(output.output)).digest('hex'),bytes:(await fs.stat(output.output)).size,milliseconds:Math.round(performance.now()-began),collisionTriangles:inspected.inspection.mesh.indices.length/3,independentBspReference:ref,crcMismatch:crc};
+      const retained=path.join(root,'native-output','megaworld.map');await fs.copyFile(output.output,retained,fs.constants.COPYFILE_EXCL);await finishStorage.retain(retained,'Owner-requested independently verified Timberland–Sidewinder native cache for gameplay acceptance');report.megaWorldCreation.nativeCompilation.retainedOutput=retained;
+      for(const input of report.megaWorldCreation.originals)expect(crypto.createHash('sha256').update(await fs.readFile(input.file)).digest('hex')).toBe(input.sha256);
+      report.megaWorldCreation.originalMapsUnchangedAfterCompilation=true;
+      step('Native combined Timberland–Sidewinder cache compiled and independently reopened; player traversal remains unverified');
+      if(process.env.SPARK_LOGIC_GAME_REVIEW==='1'){
+        await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${world.id}"]`).click();await chooseTool(main,'Level editor');
+        await reviewNativeScene(world.id,'megaworld',true,report.megaWorldCreation);
+      }
+    }
+
+
   }
   if(!nativeOnly&&!geometryOnly&&!logicOnly&&!launchOnly){
   const a=await invoke(main,'create_quickforge_project',{title:'C59 map A',template:'smallIndoorArena',target:'haloCustomEdition'});
@@ -849,6 +901,37 @@ try{
   report.failureWindows=await Promise.all(pages().map(async(page,i)=>{await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});return{url:page.url(),label:await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label).catch(()=>null),workspace:await page.locator('.gs-workspace-shell').getAttribute('data-workspace').catch(()=>null),body:(await page.locator('body').innerText().catch(()=>'')).slice(0,2500),tail:(await page.locator('body').innerText().catch(()=>'')).slice(-4000)};}));
 }
   report.nativeFailureLogs=await Promise.race([invoke(main,'bootstrap').then(value=>value.logs.slice(-10)).catch(()=>[]),new Promise(resolve=>setTimeout(()=>resolve([]),3000))]);
+  if(report.megaWorldCreation){
+    // Preserve bounded native error geometry before the owned failed job is
+    // disposed. A compiler diagnostic must survive cleanup, not its SDK tree.
+    report.megaWorldCreation.nativeErrorGeometry=[];
+    let visited=0,total=0;const sourceFiles=[];
+    const inspectErrors=async(directory,depth=0)=>{if(depth>8||++visited>256)return;for(const row of await fs.readdir(directory,{withFileTypes:true}).catch(()=>[])){
+      const file=path.join(directory,row.name),info=await fs.lstat(file);if(info.isSymbolicLink())continue;
+      if(info.isDirectory()&&!/^(?:tags|sdk-tags|bsp-dependencies-\d+)$/.test(row.name))await inspectErrors(file,depth+1);
+      else if(info.isFile()&&row.name==='connected.jms'&&info.size<=16*1024**2)sourceFiles.push(file);
+      else if(info.isFile()&&/lightmaps_errors\.wrl$/i.test(row.name)&&info.size<=256*1024&&total+info.size<=512*1024){const bytes=await fs.readFile(file);total+=bytes.length;report.megaWorldCreation.nativeErrorGeometry.push({file:path.relative(root,file),sha256:crypto.createHash('sha256').update(bytes).digest('hex'),text:bytes.toString('utf8')});}
+    }};
+    await inspectErrors(path.join(root,'library','jobs'));
+    for(const file of sourceFiles)try{
+      const lines=(await fs.readFile(file,'utf8')).trim().split(/\r?\n/);let at=8;const count=Number(lines[at++]),materials=[];
+      for(let i=0;i<count;i++){materials.push(lines[at++]);at++;}at+=3;
+      const vertexCount=Number(lines[at++]),vertices=[];
+      for(let i=0;i<vertexCount;i++){at++;const position=lines[at++].split(/\s+/).map(Number);at+=3;const uv=[Number(lines[at++]),Number(lines[at++])];at++;vertices.push({position,uv});}
+      const triangleCount=Number(lines[at++]),triangles=[];
+      for(let i=0;i<triangleCount;i++){
+        at++;const material=Number(lines[at++]),ids=lines[at++].split(/\s+/).map(Number);
+        if(materials[material].includes('@')||materials[material].startsWith('+'))continue;
+        const v=ids.map(id=>vertices[id]),a=v[1].position.map((x,k)=>x-v[0].position[k]),b=v[2].position.map((x,k)=>x-v[0].position[k]);
+        const area=Math.hypot(a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]),maxEdge=Math.max(a.reduce((n,x)=>n+x*x,0),b.reduce((n,x)=>n+x*x,0),a.reduce((n,x,k)=>n+(x-b[k])**2,0));
+        const u=v.map(x=>x.uv),uvArea=Math.abs((u[1][0]-u[0][0])*(u[2][1]-u[0][1])-(u[1][1]-u[0][1])*(u[2][0]-u[0][0]));
+        triangles.push({index:i,material:materials[material],quality:area/maxEdge,uvArea,vertices:v});
+      }
+      const worst=triangles.sort((a,b)=>a.quality-b.quality).slice(0,8),neighbors=[];
+      for(const tri of worst.slice(0,3))for(const other of triangles){if(other.index===tri.index)continue;const shared=other.vertices.filter(v=>tri.vertices.some(w=>Math.hypot(...v.position.map((n,k)=>n-w.position[k]))<.001));if(shared.length>=2&&neighbors.length<24)neighbors.push({of:tri.index,...other});}
+      report.megaWorldCreation.nativeSourceGeometry={vertices:vertexCount,triangles:triangleCount,renderTriangles:triangles.length,worst,neighbors};
+    }catch(error){report.megaWorldCreation.nativeSourceDiagnosticError=String(error);}
+  }
   // Preserve the primary assertion before native teardown can fail. Cleanup
   // diagnostics must never erase the actual acceptance failure.
   await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));

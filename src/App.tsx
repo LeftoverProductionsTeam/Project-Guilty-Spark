@@ -7,6 +7,7 @@ import type { NativeAssetImport } from './types';
 import type { ForgeMaterial } from './forge';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport } from './nativeAssetImport';
 import LaunchProgress from './components/LaunchProgress';
+import MegaWorldWizard from './components/MegaWorldWizard';
 import {useWorkflowHistory} from './useWorkflowHistory';
 import {captureWorkflowPlace,restoreWorkflowPlace} from './workflowPlace';
 import {useWorkspaceWindows,wasLayoutWriter} from './useWorkspaceWindows';
@@ -130,6 +131,7 @@ const Preservation = lazy(() => import('./components/Workspaces').then((m) => ({
 const Scenario = lazy(() => import('./components/Workspaces').then((m) => ({ default: m.Scenario })));
 const Compare = lazy(() => import('./components/Compare'));
 const Runtimes = lazy(() => import('./components/Runtimes'));
+const NewMapWizard = lazy(() => import('./components/QuickForge').then(module => ({default:module.NewMapWizard})));
 const QuickForge = lazy(() => import('./components/QuickForge'));
 const Firefight = lazy(() => import('./components/Firefight'));
 const InterfaceStudio = lazy(() => import('./components/InterfaceStudio'));
@@ -214,7 +216,7 @@ export default function App() {
   const [logs, setLogs] = useState<JobEvent[]>([]);
   const [activeJob, setActiveJob] = useState<string | null>(null);
   const [epoch, setEpoch] = useState(0);
-  const [createModal, setCreateModal] = useState(false);
+  const [createModal, setCreateModal] = useState<boolean | 'multiplayer' | 'megaworld'>(false);
   const [studioGuide,setStudioGuide]=useState(false);
   const returnPanelRequested=useRef(false);
   useEffect(()=>{
@@ -439,6 +441,7 @@ export default function App() {
     const trap = (event: KeyboardEvent) => {
       event.stopPropagation();
       if (event.key === 'Escape') {
+        if(busy){event.preventDefault();return;}
         setHelp(false);
         setCreateModal(false);
       }
@@ -466,7 +469,7 @@ export default function App() {
       document.removeEventListener('keydown', trap);
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
-  }, [help, createModal]);
+  }, [help, createModal, busy]);
   useEffect(() => {
     if (!native) return;
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
@@ -1638,7 +1641,9 @@ export default function App() {
                 onNewWindow={() => void openWorkspaceView(workspaceRef.current, true)}
                 fileActions={[
                   {id:'open-map',label:'Open map or archive…',run:()=>void importFiles(),disabled:busy},
-                  {id:'new-project',label:'New project…',run:()=>setCreateModal(true),disabled:busy},
+                  {id:'new-multiplayer',group:'new',label:'Multiplayer Map',run:()=>setCreateModal('multiplayer'),disabled:busy},
+                  {id:'new-megaworld',group:'new',label:'MegaWorld',run:()=>setCreateModal('megaworld'),disabled:busy},
+                  {id:'new-project',group:'new',label:'Asset Workspace',run:()=>setCreateModal(true),disabled:busy},
                   ...(current ? [
                     {id:'save-project',label:'Save',shortcut:'Control+s',run:()=>void save(true,current.id).catch(()=>{}),disabled:!native||busy||windowWriters[current.id]===false},
                     {id:'save-as-project',label:'Save As…',hint:current.source||current.quickForge?'Review a native map copy; structural edits use the existing source compiler.':'Export a .gsproject descriptor; referenced assets stay in their current locations.',run:()=>{if(current.source||current.quickForge){writeMapSession(current.id,'smart-edit.open',true);setWorkspace('build');if(current.quickForge)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'forge-palette'}})));}else void action(async()=>{const id=current.id;await save(true,id);return call('export_project',{id});},'Project descriptor exported. Referenced source and asset files must remain available.');},disabled:!native||busy||windowWriters[current.id]===false},
@@ -1854,7 +1859,12 @@ export default function App() {
               onClose={() => setShowFinder(false)}
             />
           )}
-          {createModal && (
+          {(createModal==='multiplayer'||createModal==='megaworld')&&<div className="modal-backdrop"><div className="modal new-map-modal" role="dialog" aria-modal="true" aria-label={createModal==='multiplayer'?'New Multiplayer Map':'New MegaWorld'}>
+            <button className="modal-close" aria-label="Close new map" disabled={busy} onClick={()=>setCreateModal(false)}><X size={18}/></button>
+            <Suspense fallback={<p>Opening map creator…</p>}>{createModal==='multiplayer'?<NewMapWizard compact initialTitle="My Multiplayer Map" initialTemplate="customBlank" preferredHalo={data.settings.preferredHalo} onCancel={()=>setCreateModal(false)} onCreate={async(...args)=>{await createQuickForge(...args);setCreateModal(false);}}/>:<MegaWorldWizard entries={data.entries} onCancel={()=>setCreateModal(false)} onCreate={async(title,baseProjectId,donorProjectId)=>{
+              setBusy(true);try{if(historyRef.current.dirty)await save();const open=await call<OpenProject>('create_megaworld_project',{title,baseProjectId,donorProjectId,donorBspIndex:0});writeMapSession(open.project.id,'bsp.open',true);writeMapSession(open.project.id,'bsp.donor',donorProjectId);await load(open);setWorkspace('quickforge');await refresh();setCreateModal(false);requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'construction'}})));}finally{setBusy(false);}
+            }}/>}</Suspense></div></div>}
+          {createModal===true && (
             <div className="modal-backdrop">
               <form
                 className="modal"

@@ -20,7 +20,7 @@ interface Descriptor {
   defaultDock?: PanelPlacement['dock'];
 }
 export interface WorkspaceFileAction {
-  id: string; label: string; run: () => void; disabled?: boolean; hint?: string; shortcut?: string;
+  id: string; label: string; run: () => void; disabled?: boolean; hint?: string; shortcut?: string; group?: 'new';
 }
 interface ContextValue {
   registerFileActions: (scope: string, actions: WorkspaceFileAction[]) => () => void;
@@ -42,9 +42,9 @@ export function closeOtherHeaderMenus(current:HTMLDetailsElement){
   for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-file-menu[open],.gs-map-switcher[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))if(menu!==current)menu.open=false;
 }
 export function headerMenuKeyDown(event:ReactKeyboardEvent<HTMLDetailsElement>){
-  if(event.target instanceof Element&&event.target.closest('input,select,textarea')||!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+  if(event.defaultPrevented || event.target instanceof Element&&event.target.closest('input,select,textarea,[role="menu"]')||!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
   event.preventDefault();event.stopPropagation();const menu=event.currentTarget;menu.open=true;
-  const buttons=[...menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')],at=buttons.indexOf(document.activeElement as HTMLButtonElement);
+  const buttons=[...menu.querySelectorAll<HTMLElement>('[role="menuitem"],button:not(:disabled)')].filter(item=>!item.matches(':disabled')&&item.getClientRects().length>0),at=buttons.indexOf(document.activeElement as HTMLElement);
   const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
   buttons[next]?.focus();
 }
@@ -235,7 +235,17 @@ export default function WorkspacePanels({
           <details className="gs-file-menu" onToggle={event=>{if(event.currentTarget.open)closeOtherHeaderMenus(event.currentTarget);}} onKeyDown={headerMenuKeyDown}>
             <summary aria-label="File menu">File <span aria-hidden="true">▾</span></summary>
             <div role="menu" aria-label="File commands" onKeyDown={navigateComposite}>
-              {[fileActions,...Object.values(fileGroups).map(group=>group.actions)].filter(group=>group.length).map((group,index)=><section key={index} role="group" aria-label={index===0?'Project files':'Workspace files'}>{group.map(command=><button key={command.id} role="menuitem" aria-label={command.label} disabled={command.disabled} title={command.hint} aria-keyshortcuts={command.shortcut} onClick={event=>{event.currentTarget.closest('details')!.open=false;command.run();}}><span>{command.label}</span>{command.shortcut&&<kbd>{command.shortcut.replace('Control+','Ctrl+')}</kbd>}</button>)}</section>)}
+              {[fileActions,...Object.values(fileGroups).map(group=>group.actions)].filter(group=>group.length).map((group,index)=><section key={index} role="group" aria-label={index===0?'Project files':'Workspace files'}>
+                {group.some(command=>command.group==='new')&&<details className="gs-file-new" onKeyDown={event=>{
+                  const details=event.currentTarget,summary=details.querySelector('summary')!;
+                  if((event.key==='ArrowRight'||event.key==='ArrowDown')&&event.target===summary){event.preventDefault();event.stopPropagation();details.open=true;details.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();}
+                  else if(event.key==='ArrowLeft'||event.key==='Escape'){event.preventDefault();event.stopPropagation();details.open=false;summary.focus();}
+                }}>
+                  <summary role="menuitem" aria-haspopup="menu" aria-label="New">New <span aria-hidden="true">▸</span></summary>
+                  <div role="menu" aria-label="New project commands" onKeyDown={navigateComposite}>{group.filter(command=>command.group==='new').map(command=><button key={command.id} role="menuitem" aria-label={command.label} disabled={command.disabled} title={command.hint} onClick={event=>{const file=event.currentTarget.closest('.gs-file-menu');file?.querySelector('details')?.removeAttribute('open');file?.removeAttribute('open');command.run();}}>{command.label}</button>)}</div>
+                </details>}
+                {group.filter(command=>command.group!=='new').map(command=><button key={command.id} role="menuitem" aria-label={command.label} disabled={command.disabled} title={command.hint} aria-keyshortcuts={command.shortcut} onClick={event=>{event.currentTarget.closest('.gs-file-menu')?.removeAttribute('open');command.run();}}><span>{command.label}</span>{command.shortcut&&<kbd>{command.shortcut.replace('Control+','Ctrl+')}</kbd>}</button>)}
+              </section>)}
             </div>
           </details>
           {!detached&&descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open){closeOtherHeaderMenus(event.currentTarget);const popup=event.currentTarget.querySelector<HTMLElement>('[role="menu"]');if(popup){popup.style.setProperty('--gs-tools-nudge','0px');requestAnimationFrame(()=>{const rect=popup.getBoundingClientRect();popup.style.setProperty('--gs-tools-nudge',`${Math.max(0,8-rect.left)-Math.max(0,rect.right-innerWidth+8)}px`);});}}}} onKeyDown={event=>{

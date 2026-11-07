@@ -2943,7 +2943,7 @@ test('File Tools Maps are compact, mutually exclusive and precede even one map t
  await page.setViewportSize({width:1280,height:800});await mockDesktop(page);await openFixture(page);
  const file=page.getByLabel('File menu',{exact:true}),tools=page.getByLabel('More workspace drawers',{exact:true}),maps=page.getByLabel('Choose open map',{exact:true}),tabs=page.getByRole('tablist',{name:'Open maps',exact:true});
  const boxes=await Promise.all([file,tools,maps,tabs].map(node=>node.boundingBox()));for(let i=1;i<boxes.length;i++)expect(boxes[i-1]!.x+boxes[i-1]!.width).toBeLessThanOrEqual(boxes[i]!.x+1);
- await file.focus();await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitem',{name:'Open map or archive…',exact:true})).toBeFocused();await tools.click();await expect(page.getByRole('menu',{name:'File commands',exact:true})).toBeHidden();await maps.click();await expect(page.getByRole('menu',{name:'Workspace drawers',exact:true})).toBeHidden();await page.keyboard.press('Escape');await expect(maps).toBeFocused();
+ await file.focus();await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitem',{name:'New',exact:true})).toBeFocused();await tools.click();await expect(page.getByRole('menu',{name:'File commands',exact:true})).toBeHidden();await maps.click();await expect(page.getByRole('menu',{name:'Workspace drawers',exact:true})).toBeHidden();await page.keyboard.press('Escape');await expect(maps).toBeFocused();
 });
 
 test('BSP Shapes drops editable source stairs and preserves one-action Undo and immediate Save',async({page})=>{
@@ -3061,4 +3061,35 @@ test('a missing CE map offers protected setup and direct-link download without j
  await page.getByRole('button',{name:'Download, verify & set up',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((c:any)=>c.command==='install_downloaded_community_map')?.args)).toEqual(expect.objectContaining({runtimeId:'openCe',projectId:'synthetic-alpine',expectedRegistrationId:'synthetic-community',expectedDataRoot:'D:/SharedHalo',expectedExecutableSha256:'a'.repeat(64)}));
  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((c:any)=>c.command==='community_join'))).toBe(false);
+});
+
+
+test('File New creates a blank multiplayer map through the shared wizard and closes both menus',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{
+  if(command!=='create_quickforge_project')return invoke(command,args);w.__sparkMock.calls.push({command,args});
+  const result=structuredClone(w.__sparkMock.projects.b);result.project.id='new-map';result.project.title=args.title;result.project.source=null;result.inspection=null;result.project.quickForge={schemaVersion:1,name:args.title,template:args.template,runtimeId:args.target,gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[],placements:[],spawns:[],objectives:[]};w.__sparkMock.projects['new-map']=result;return result;
+ };});
+ const file=page.getByLabel('File menu',{exact:true});await file.focus();await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitem',{name:'New',exact:true})).toBeFocused();await page.keyboard.press('ArrowRight');await expect(page.getByRole('menuitem',{name:'Multiplayer Map',exact:true})).toBeFocused();await page.keyboard.press('Enter');
+ const dialog=page.getByRole('dialog',{name:'New Multiplayer Map',exact:true});await expect(dialog).toBeVisible();await expect(page.getByRole('menu',{name:'File commands',exact:true})).toBeHidden();
+ await expect(dialog.getByLabel('New map template',{exact:true})).toHaveValue('customBlank');await dialog.getByLabel('New map name',{exact:true}).fill('Original two-base map');await dialog.getByLabel('New map runtime',{exact:true}).selectOption('haloCustomEdition');await dialog.getByRole('button',{name:'Create editable map',exact:true}).click();
+ await expect(dialog).toBeHidden();expect(await page.evaluate(()=>(window as any).__sparkMock.calls.find((row:any)=>row.command==='create_quickforge_project').args)).toEqual({title:'Original two-base map',template:'customBlank',target:'haloCustomEdition'});
+ await expect(page.getByRole('tab',{name:'Original two-base map',exact:true})).toBeVisible();
+});
+
+test('File New MegaWorld keeps the original project when native source setup is unavailable',async({page})=>{
+ await mockDesktop(page);await openFixture(page);
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__sparkMock.before=structuredClone(w.__sparkMock.projects.a);w.__TAURI_INTERNALS__.invoke=async(command:string,args:any={})=>{if(command==='discover_asset_sources')return {maps:[],notices:[],elapsedMs:0};if(command!=='create_megaworld_project')return invoke(command,args);w.__sparkMock.calls.push({command,args});throw Error('Select matching editable donor tags in Project setup. Original maps were retained.');};});
+ await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menuitem',{name:'New',exact:true}).click();await page.getByRole('menuitem',{name:'MegaWorld',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'New MegaWorld',exact:true});await dialog.getByLabel('First region',{exact:true}).selectOption('a');await dialog.getByLabel('Second region',{exact:true}).selectOption('b');await dialog.getByRole('button',{name:'Create MegaWorld',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('Original maps were retained');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.find((row:any)=>row.command==='create_megaworld_project').args)).toEqual({title:'The Great Canyon',baseProjectId:'a',donorProjectId:'b',donorBspIndex:0});
+ expect(await page.evaluate(()=>JSON.stringify((window as any).__sparkMock.projects.a)===JSON.stringify((window as any).__sparkMock.before))).toBe(true);await dialog.getByRole('button',{name:'Cancel',exact:true}).click();await expect(page.getByRole('tab',{name:'Synthetic baseline',exact:true})).toHaveAttribute('aria-selected','true');
+});
+
+
+test('saved MegaWorld keeps its donor controls bound to the saved source when the donor tab is gone',async({page})=>{
+ await mockDesktop(page);await page.evaluate(()=>{const w=window as any;w.__sparkMock.projects.a.project.bspAssembly={schemaVersion:1,donorProjectId:'retired-source-document',donorTitle:'Saved Sidewinder',donorSource:structuredClone(w.__sparkMock.projects.b.project.source),donorTagsDirectory:'C:/synthetic/tags',donorBspIndex:0,translation:[20,0,0],yawDegrees:0,tunnelPoints:[[0,0,0],[20,0,0]],tunnelWidth:2,tunnelHeight:1.6,tunnelShaderPath:'synthetic/stone'};});
+ await openFixture(page);await chooseTool(page,'Level editor');await openDrawer(page,'Construction');await page.locator('.bsp-assembly>summary').click();
+ await expect(page.getByLabel('BSP donor map',{exact:true})).toHaveValue('retired-source-document');await expect(page.getByLabel('BSP donor map',{exact:true}).locator('option:checked')).toContainText('Saved Sidewinder');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.find((row:any)=>row.command==='bsp_assembly_options'&&row.args.projectId==='retired-source-document')?.args)).toEqual({projectId:'retired-source-document',assemblyProjectId:'a'});
 });

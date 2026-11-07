@@ -480,12 +480,38 @@ async fn inspect_source_appearance(app:tauri::AppHandle,project_id:String)->Repl
 }
 
 #[tauri::command]
-async fn bsp_assembly_options(app:tauri::AppHandle,project_id:String)->Reply<Vec<serde_json::Value>>{
-    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let p=lock(&state.library)?.get(&project_id).map_err(error)?;let i=inspect(&state,&p)?;Ok(i.mesh.parts.iter().enumerate().map(|(index,p)|serde_json::json!({"index":index,"name":p.name,"triangles":p.index_count/3})).collect())}).await.map_err(error)?
+async fn bsp_assembly_options(app:tauri::AppHandle,project_id:String,assembly_project_id:Option<String>)->Reply<Vec<serde_json::Value>>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        let referenced=if let Some(id)=assembly_project_id {let owner=lock(&state.library)?.get(&id).map_err(error)?;core::bsp_assembly::referenced_donor(&owner,&project_id).map_err(error)?}else{None};
+        let p=if let Some(donor)=referenced{donor}else{lock(&state.library)?.get(&project_id).map_err(error)?};
+        let i=inspect(&state,&p)?;Ok(i.mesh.parts.iter().enumerate().map(|(index,p)|serde_json::json!({"index":index,"name":p.name,"triangles":p.index_count/3})).collect())
+    }).await.map_err(error)?
 }
 #[tauri::command]
 async fn plan_bsp_assembly(app:tauri::AppHandle,project_id:String,donor_project_id:String,donor_bsp_index:usize)->Reply<core::bsp_assembly::BspAssembly>{
-    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let base=lock(&state.library)?.get(&project_id).map_err(error)?;let donor=lock(&state.library)?.get(&donor_project_id).map_err(error)?;let tags=editing_tools(&state,&donor)?.base_tags_directory.ok_or("Select matching editable tags for the donor map in Map tools & tags")?;let i=inspect(&state,&base)?;let j=inspect(&state,&donor)?;core::bsp_assembly::plan(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}).await.map_err(error)?
+    tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();let base=lock(&state.library)?.get(&project_id).map_err(error)?;let donor=if let Some(donor)=core::bsp_assembly::referenced_donor(&base,&donor_project_id).map_err(error)?{donor}else{lock(&state.library)?.get(&donor_project_id).map_err(error)?};let tags=base.bsp_assembly.as_ref().filter(|plan|plan.donor_project_id==donor_project_id).map(|plan|plan.donor_tags_directory.clone()).or(editing_tools(&state,&donor)?.base_tags_directory).ok_or("Select matching editable tags for the donor map in Map tools & tags")?;let i=inspect(&state,&base)?;let j=inspect(&state,&donor)?;core::bsp_assembly::plan(&base,&i,&donor,&j,donor_bsp_index,tags).map_err(error)}).await.map_err(error)?
+}
+#[tauri::command]
+async fn create_megaworld_project(app:tauri::AppHandle,title:String,base_project_id:String,donor_project_id:String,donor_bsp_index:usize)->Reply<OpenProject>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();
+        if base_project_id==donor_project_id{return Err("Choose two different source regions".into());}
+        let (base,donor)={let library=lock(&state.library)?;(library.get(&base_project_id).map_err(error)?,library.get(&donor_project_id).map_err(error)?)};
+        let i=inspect(&state,&base)?;let j=inspect(&state,&donor)?;
+        let mut project=core::bsp_assembly::source_project(&title,&base,&i).map_err(error)?;
+        let source=donor.source.as_ref().ok_or("The donor has no native source map")?;
+        core::library::validate_local_input_path(&source.preserved_path).map_err(error)?;core::reject_links(&source.preserved_path).map_err(error)?;
+        if ![6,7,13,609].contains(&source.cache_version)||j.header.scenario_type!=1{return Err("Choose a supported multiplayer donor source".into());}
+        if maps::hash_file(&source.preserved_path).map_err(error)?!=source.sha256{return Err("The donor source changed; no world was created".into());}
+        let tags=editing_tools(&state,&donor)?.base_tags_directory.ok_or("Select matching editable donor tags in Project setup before creating the connection. Original maps were retained.")?;
+        project.bsp_assembly=Some(core::bsp_assembly::plan(&project,&i,&donor,&j,donor_bsp_index,tags).map_err(error)?);
+        // The session library owns this new identity. No donor edit, source copy,
+        // permanent descriptor or compiler workspace is created by New.
+        lock(&state.library)?.save(&project,Some(&i)).map_err(error)?;
+        lock(&state.inspections)?.insert(project.id.clone(),i.clone());
+        Ok(OpenProject{project,inspection:Some((*i).clone())})
+    }).await.map_err(error)?
 }
 #[tauri::command]
 async fn preview_bsp_assembly(app:tauri::AppHandle,project_id:String)->Reply<core::bsp_assembly::AssemblyReport>{
@@ -3104,6 +3130,7 @@ pub fn run() {
             runtime_workbench::mcc_owned_content_probe,
             bsp_assembly_options,
             plan_bsp_assembly,
+            create_megaworld_project,
             preview_bsp_assembly,
             workspace_windows::claim_project_document,
             workspace_history_native::read_workspace_history,

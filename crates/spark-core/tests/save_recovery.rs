@@ -118,7 +118,7 @@ fn external_edit_while_save_waits_for_the_index_is_not_overwritten() {
     let mut external=p.clone();external.title="External edit during database wait".into();
     let db=rusqlite::Connection::open(temp.path().join("library.sqlite3")).unwrap();
     db.execute_batch("BEGIN IMMEDIATE;").unwrap();
-    let worker=std::thread::spawn(move||library.save_with_history(&mut history,&p).map_err(|e|e.to_string()));
+    let worker=std::thread::spawn(move||{let result=library.save_with_history(&mut history,&p).map_err(|e|e.to_string());(result,history)});
     // Save has prepared its real journal but cannot publish its index while
     // this independent connection holds the write transaction. No timing guess
     // or production-only fault hook is needed to reach the vulnerable interval.
@@ -127,10 +127,15 @@ fn external_edit_while_save_waits_for_the_index_is_not_overwritten() {
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
     assert_ne!(fs::read(dir.join("head.json")).unwrap(),before,"Save must reach actual journal publication before the external writer");
-    project::save_project(&file,&external).unwrap();db.execute_batch("COMMIT;").unwrap();
-    let result=worker.join().unwrap();
-    assert_eq!(project::load_project(&file).unwrap().title,external.title,"A delayed Save must preserve the external author's descriptor");
-    assert!(result.unwrap_err().contains("outside"));
+    project::save_project(&file,&external).unwrap();let external_bytes=fs::read(&file).unwrap();db.execute_batch("COMMIT;").unwrap();
+    let(result,mut history)=worker.join().unwrap();
+    // An external rename can be caught during identity capture or after the
+    // SQLite wait. Verify preservation, not one particular refusal sentence.
+    let reason=result.unwrap_err();assert!(!reason.is_empty(),"Concurrent Save must explain its refusal");
+    eprintln!("Concurrent Save refusal: {reason}");
+    assert_eq!(fs::read(&file).unwrap(),external_bytes,"A delayed Save must preserve every externally edited byte");
+    let pending=history.read(&dir,&external).unwrap().unwrap();assert!(pending.head.dirty);
+    assert_eq!(current(&pending).title,"Local waiting Save","The local author's unsaved Undo selection must also survive");
 }
 
 #[test]

@@ -214,24 +214,30 @@ export default function QuickForge(props: Props) {
     />
   );
 }
-function NewMapWizard({
+export function NewMapWizard({
   onCreate,
   onCancel,
   preferredHalo,
+  compact = false,
+  initialTemplate = 'guiltySparkTestArena',
+  initialTitle = 'Guilty Spark Test Arena',
 }: {
   onCreate: Props['onCreate'];
   onCancel?: () => void;
   preferredHalo?: RuntimeId | null;
+  compact?: boolean;
+  initialTemplate?: string;
+  initialTitle?: string;
 }) {
-  const [title, setTitle] = useState('Guilty Spark Test Arena'),
-    [template, setTemplate] = useState('guiltySparkTestArena'),
+  const [title, setTitle] = useState(initialTitle),
+    [template, setTemplate] = useState(initialTemplate),
     [target, setTarget] = useState<RuntimeId>(
       preferredHalo && forgeTargets[preferredHalo] ? preferredHalo : 'mccSteam',
     );
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   return (
-    <div className="analysis-page forge-wizard">
+    <div className={`analysis-page forge-wizard ${compact ? 'forge-wizard-compact' : ''}`}>
       <PageTitle
         eyebrow="QUICKFORGE / NEW MAP"
         title="Make a place to play."
@@ -242,6 +248,7 @@ function NewMapWizard({
           Map name
           <input
             aria-label="New map name"
+            disabled={busy}
             value={title}
             maxLength={120}
             onChange={(e) => setTitle(e.target.value)}
@@ -251,6 +258,7 @@ function NewMapWizard({
           First runtime target
           <select
             aria-label="New map runtime"
+            disabled={busy}
             value={target}
             onChange={(e) => setTarget(e.target.value as RuntimeId)}
           >
@@ -262,7 +270,7 @@ function NewMapWizard({
           </select>
         </label>
       </div>
-      <div className="forge-template-grid">
+      {compact ? <label>Starting geometry<select aria-label="New map template" value={template} disabled={busy} onChange={event=>setTemplate(event.target.value)}>{templates.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select><small>{templates.find(item=>item.id===template)?.detail}</small></label> : <div className="forge-template-grid">
         {templates.map((item) => (
           <button
             className={`forge-template ${template === item.id ? 'selected' : ''}`}
@@ -279,7 +287,7 @@ function NewMapWizard({
             {template === item.id && <Pill tone="green">Selected</Pill>}
           </button>
         ))}
-      </div>
+      </div>}
       <Notice tone="info">
         Templates contain original geometry, not redistributed Halo levels. Place tags from your imported
         maps, assign compatible shaders and configure Halo Tool before compiling. An editor preview is not a
@@ -287,7 +295,7 @@ function NewMapWizard({
       </Notice>
       {error && <Notice>{error}</Notice>}
       <div className="analysis-actions">
-        {onCancel && <button onClick={onCancel}>Back to current map</button>}
+        {onCancel && <button disabled={busy} onClick={onCancel}>Back to current map</button>}
         <button
           className="primary"
           disabled={busy || !native || !title.trim()}

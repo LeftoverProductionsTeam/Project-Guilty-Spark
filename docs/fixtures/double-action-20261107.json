@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-07",
+  "directiveId": "3d646d84",
+  "directiveSha256": "b4ebb76aae8586f178aa54d7d6624ec3c98757d106200fa8548b08c7f973934d",
+  "sourceBase": "1a50bb53ba62403ee2fac5fbf92a7c543667f64b",
+  "status": "implementationIncomplete",
+  "flagshipsAccepted": false,
+  "verifiedTraversableConnections": 0,
+  "trackA": {
+    "evidence": "double-action-native-r1.json",
+    "actualFileNewAndPointerGestures": true,
+    "mockedIpc": false,
+    "gameplayAccepted": false,
+    "pairs": [
+      {
+        "sourceVersion": 609,
+        "targetVersion": 13,
+        "assetClass": "scen",
+        "tag": "scenery\\rocks\\boulder\\boulder",
+        "dependencies": 5,
+        "buildMs": 47117,
+        "mapSha256": "830f04ed035e8740a4d8acb0a0f5a414f45dce4f1767924228641bd46aa63ef0",
+        "mapBytes": 79728294,
+        "readback": {
+          "scenario": "levels\\quickforge\\original_multiplayer_authoring\\original_multiplayer_authoring.scenario",
+          "placementCount": 2,
+          "boundingRadius": 0.756476,
+          "crcMismatch": 0
+        },
+        "fullProcessRestart": true
+      },
+      {
+        "sourceVersion": 609,
+        "targetVersion": 13,
+        "assetClass": "vehi",
+        "tag": "vehicles\\warthog\\mp_warthog",
+        "dependencies": 285,
+        "buildMs": 47630,
+        "mapSha256": "cee028daaea13db5aa86c77d5feba5885266b77766c52c804c22a5824232754d",
+        "mapBytes": null,
+        "readback": {
+          "scenario": "levels\\quickforge\\original_multiplayer_authoring\\original_multiplayer_authoring.scenario",
+          "placementCount": 2,
+          "boundingRadius": 1.1,
+          "crcMismatch": 0
+        },
+        "fullProcessRestart": true
+      }
+    ],
+    "missing": [
+      "Full original two-base outdoor road/cave/bridge/ramps fixture and native weapons/team/objectives",
+      "Two real clients, fighting/death/respawn and driven vehicle",
+      "Separate Slayer/CTF/King of the Hill gameplay"
+    ]
+  },
+  "trackB": {
+    "evidence": "double-action-r17.json",
+    "actualFileNewAndRestart": true,
+    "sourceClearance": {
+      "accepted": true,
+      "scope": "Source reconstruction and capsule diagnostics; no compiled-map or gameplay acceptance",
+      "summary": "Source clearance checked at 423 points · 32,117 triangles."
+    },
+    "sourceHashes": [
+      "69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea",
+      "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a"
+    ],
+    "savedDonorRecoveryFixed": true,
+    "nativeCompilationAccepted": true,
+    "gameplayAccepted": false,
+    "donorPreparation": {
+      "tag": "levels\\test\\sidewinder\\sidewinder",
+      "files": 69,
+      "bytes": 18034422,
+      "toolSha256": "ded684bc2730b836719071dcdc505a78e5dca3730f19e9a30527ac725180c138",
+      "recursiveNativeExtraction": true,
+      "entireSdkCopied": false
+    },
+    "nativeFailure": {
+      "stage": "bsp-lightmaps",
+      "error": "Thin generated tunnel-wall fan; source clearance is insufficient",
+      "errorGeometrySha256": "d41b77487eee3dc4edc83e8e947b860821e4ff1b1f41d96beb1f1112cf88fb7c",
+      "thinTriangleQuality": 0.00030691230029880216,
+      "status": "Reproduced native lightmap failure repaired; R16 native compilation and independent readback pass"
+    },
+    "missing": [
+      "Shared prebuild donor-geometry viewport",
+      "Distinct mountain road and infantry cave",
+      "Compiled materials/visibility and donor gameplay objects",
+      "Walk/return, Warthog drive and cross-region sniper hit"
+    ],
+    "nativeCompilation": {
+      "accepted": true,
+      "target": "mcc-cea",
+      "mapSha256": "76745617b0466f6e361d1fc4c530b24de646ab263b85dbb6ee923be12e037dac",
+      "bytes": 82750502,
+      "milliseconds": 285465,
+      "collisionTriangles": 16196,
+      "independentBspReference": "levels\\spark\\assembly_9b729ad2\\connected.scenario_structure_bsp",
+      "crcMismatch": 0,
+      "retainedOutput": "C:\\Users\\patri\\AppData\\Local\\Temp\\GuiltySpark-Engineering-d49eb02588bf\\double-action-r17-megaworld.map"
+    },
+    "gameLoaded": null,
+    "originalMapsUnchangedAfterCompilation": true,
+    "gameReview": {
+      "runtime": "H1A Standalone source tags; not retail MCC cache",
+      "executableSha256": "fc9e2b6193c6f6d9ff988278b0d39a983747f3fdbdeca7cafadd28f1f0c53e73",
+      "exitCode": 1,
+      "visualSceneObserved": false,
+      "gameplayVerified": false,
+      "debugLogSha256": "8000c6df09a0cbedf4e827573e0b1459b0efb359b3b672e9ac629ca89edd801d",
+      "nativeEvidence": "Scenario command and default vehicle spawning reached; no fatal reason in bounded log"
+    }
+  },
+  "verification": {
+    "beforeRepair": {
+      "rustPassed": 813,
+      "rustIgnored": 9,
+      "frontendPassed": 425,
+      "browserPassed": 205,
+      "nativeWindowsPassed": 12
+    },
+    "focusedRepair": {
+      "evidence": "double-action-triangulation-r13.log",
+      "passed": 7,
+      "unresolvedStripPreservedAsNegative": true
+    },
+    "activeRun": {
+      "evidence": "double-action-r17.json",
+      "status": "nativeCompilerReadbackAndRetentionPassed_gameReviewFailed",
+      "wholeRunAccepted": false,
+      "sourcePinnedAppSha256": "86e4d7c1bd1c032a38fd1421521b4c0ea1e83c76a99f744c8e9ba7c0d4223e96",
+      "runtimeSourceFingerprint": "cb5e73e747c95c6320407597e46a4c604dd743fd30fe4c342a2d773803239e5f"
+    },
+    "requirementIds": 475,
+    "requirementIdentitySha256": "a47797f3d35e6632c7889b0c1e084b56c05212653e01df53a2909fe5d3e9797a",
+    "numberedPrompts": 25,
+    "r16": {
+      "evidence": "double-action-r16.json",
+      "wholeRunAccepted": false,
+      "rustPassed": 817,
+      "rustIgnored": 9,
+      "frontendPassed": 425,
+      "browserPassed": 205,
+      "nativeWindowsPassed": 12,
+      "nativeCompilerAndReadbackPassed": true
+    }
+  },
+  "preservation": {
+    "originalMapsUnchanged": true,
+    "originalSdkArchiveUnchanged": true,
+    "c49FourSealedFilesHashVerified": true,
+    "preexistingStash": "32a8cb1ef4b1aeed2d459e5ad26ef69e36e78f85",
+    "wholeSdkCopied": false,
+    "newRelease": false,
+    "pushed": false,
+    "published": false
+  },
+  "failedRuns": {
+    "reopen-red2": "Genuine saved donor loss after process restart; repaired",
+    "r3": "Fresh app built; leaked logic flags refused by workspace stage; corrected",
+    "r4": "Native Windows12 pass; real combined lightmap build fails",
+    "r5": "Exact bounded WRL retained; same native failure",
+    "r6": "Unrelated fixture prerequisite refused; scope corrected",
+    "r7": "Bounded native geometry/UV diagnostic retained",
+    "r8": "Initial conditioning regressions rejected",
+    "r9": "Real wall case passes; stalled neighbor-strip test stopped as failure",
+    "r10": "Test-loop typo; corrected without acceptance",
+    "r11": "Harder strip refused",
+    "r12": "Harder strip refused; retained as negative regression",
+    "r14": "Save wording assertion failed after external data was preserved; test strengthened",
+    "r15": "Thirty isolated save-race tests pass; strengthened full-suite case also checks exact bytes and dirty Undo",
+    "r16": "All source/browser/native Windows suites and native combined build/readback pass; missing retention reason rejects export and disposes cache. Overall run failed.",
+    "r17": "Creation/restart/edit/Undo/Save/native compile/readback/retention and original hashes pass; optional Standalone exits1. No game frame or gameplay accepted."
+  }
+}

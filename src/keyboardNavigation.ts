@@ -22,7 +22,7 @@ export function navigateComposite(event:ReactKeyboardEvent<HTMLElement>) {
   const group=tablist??menu;
   if(!group)return;
   const items=[...group.querySelectorAll<HTMLElement>(tablist?'[role="tab"]':menu?.id==='gs-workspace-navigation'?'button:not(:disabled),a[href]':'button:not(:disabled),a[href],[role^="menuitem"]')]
-    .filter(item=>visible(item)&&!item.matches(':disabled,[aria-disabled="true"]')&&(!tablist||item.closest('[role="tablist"]')===tablist));
+    .filter(item=>visible(item)&&!item.matches(':disabled,[aria-disabled="true"]')&&(!tablist||item.closest('[role="tablist"]')===tablist)&&(!menu||menu.id==='gs-workspace-navigation'||item.closest('[role="menu"]')===menu));
   if(!items.length)return;
   const at=items.indexOf(document.activeElement as HTMLElement);
   const vertical=!tablist||tablist.getAttribute('aria-orientation')==='vertical';

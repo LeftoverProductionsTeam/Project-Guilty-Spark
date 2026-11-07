@@ -1,0 +1,62 @@
+# Double Action: original map creation and connected-world source
+
+Status: **implementation incomplete**. Source is local master based on `1a50bb53ba62403ee2fac5fbf92a7c543667f64b`; the exact runtime-source fingerprint and QA application hash identify each run below. No release, remote push or gameplay acceptance is implied.
+
+The owner directive is preserved verbatim in [Double Action Engineering](Master%20Engineering%20Prompts/GS_2026-11-07_Double_Action_Engineering.md), SHA-256 `b4ebb76aae8586f178aa54d7d6624ec3c98757d106200fa8548b08c7f973934d`. Both tracks use the existing Level Editor, QuickForge, BSP Assembly/Workshop, Asset Library, durable history and native compiler. No second geometry editor, discovery system or build pipeline was introduced.
+
+## Actual entrypoints and source ownership
+
+**File → New → Multiplayer Map** opens the existing map wizard, starting with a blank editable template. Choose a target and name, then use the existing geometry palette, Asset Library, Inspector and Build & Playtest. **Asset Workspace** remains available in the same New submenu. Keyboard navigation enters/leaves the compact submenu without traversing hidden commands.
+
+**File → New → MegaWorld** uses the existing connected-runtime source browser to choose a first region and donor. Creation allocates a distinct source document, retains original maps/projects, and opens the existing Construction connection controls. Current admission is a supported multiplayer base with one BSP and one selected donor section (cache6/7/13/609); it is not arbitrary simultaneous streaming or Xbox5 rebuilding. It requires matching editable donor tags and a supported native compiler. Original project overlays/history/build receipts are not silently copied into the new document. To include prior compiled changes, use the separately validated map copy as the selected source.
+
+For an existing saved world, **Construction → Connect another map’s BSP** resolves the donor bound in that plan even when its temporary source tab is gone. Paths, link restrictions and original SHA-256 are checked; an unrelated ID or changed donor is refused. This repairs the real full-process restart failure reproduced in `double-action-reopen-red2`. The resolved donor is a read-only reference, not a second saved library project or a new map copy.
+
+## Track A — scoped native authoring evidence
+
+R1 used actual Windows controls: File/New → blank MCC source → connected CE asset preview → pointer drag/import → transform → copy/paste → Undo/Redo → immediate Save → normal process close/restart → native build → independent readback. Native calls used for prerequisite setup and readback assertions are distinguished from UI gestures.
+
+- Blood Gulch boulder: five recursive tag dependencies, two independently verified placements and edited native radius. H1A build47.117seconds; MCC13 cache79,728,294bytes, SHA-256 `830f04ed035e8740a4d8acb0a0f5a414f45dce4f1767924228641bd46aa63ef0`. Independent Invader extraction and CRC mismatch0. One exact cache retained externally as the gameplay input.
+- Sidewinder Warthog:285dependencies including model, physics, animations, shaders and audio. H1A build47.630seconds; MCC13 cache SHA-256 `cee028daaea13db5aa86c77d5feba5885266b77766c52c804c22a5824232754d`. Both placements, edited field and CRC0 independently read. This second generated cache was disposed rather than retaining duplicate QA maps.
+- Original input map/resource hashes and original SDK archive remain unchanged. Separate authoring documents retain imported dependency identity and Undo heads after actual process restart.
+
+These are small real native authoring fixtures. **The original two-base canyon/road/cave/bridge map, native weapon/objective configuration, two real game clients, fighting/death/respawn, driven Warthog, and separate Slayer/CTF/King of the Hill acceptance remain open.** A parsed vehicle tag does not prove vehicle gameplay.
+
+## Track B — creation, restart, and native lightmap repair
+
+Actual File/New/source-browser gestures select CE Timberland and Sidewinder. The new document has its own ID and the358original base placements. Save, full process restart, saved donor controls, width2→2.5, Apply, Undo/Redo and immediate Save pass in R2 and R4. Existing source reconstruction checks423capsule points against32,105triangles before the repair and32,117after bounded tunnel-wall refinement. Those source diagnostics do not accept compiled collision or player traversal.
+
+Original source hashes:
+
+| Source | SHA-256 |
+| --- | --- |
+| CE Timberland | `69d539409004bde866e3fb510d43fa9e155fb8dd0525fe6e2ffe1efe3664e0ea` |
+| CE Sidewinder | `ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a` |
+
+R4 stages only the selected donor BSP closure:69tags/18,034,422bytes, not a complete SDK. The source is created and edited through Spark; its Build controls invoke the existing H1A compiler. Structure compilation reaches2portals/3clusters, but lightmapping rejects a thin tunnel-wall triangle. The failed build is not adopted. R5 retains the exact blue native WRL diagnostic; R7 preserves bounded source-triangle/neighbor coordinates and UVs before disposable cleanup. The source has valid UV area but a poorly conditioned long fan; source clearance alone missed the native lightmapper constraint.
+
+The generated-wall repair stays in `bsp_triangulate`, adds interior vertices and uses the existing coplanar diagonal improvement. It preserves original vertices/boundary edges, affine UVs and material seams, selects only the generated tunnel material, and keeps the existing triangle budget. A bounded unresolved-strip case is refused rather than moving source boundaries or masking a native error. R13 passes all seven focused triangulation checks. **R16 passes817Rust tests/nine ignored,425frontend tests,205browser tests and12actual Windows lifecycle cases. The fresh Windows app then completes native H1A lightmaps and cache compilation. Independent Invader readback verifies the scenario/BSP reference,16,196collision triangles and CRC mismatch0.** The native build takes282.099seconds and produces82,750,502bytes (SHA-256 `19d8005db91e0c380a7b2e0c2004c4feccb7a5c5e72e729561f8b224ef0ea36e`). The overall R16 run still fails: its test export omitted the explicit retention reason, so the ownership guard correctly refuses retention and disposes the cache. That test call is repaired without weakening the guard. R17 repeats the actual native workflow with that exact app: compilation and independent readback pass again in285.465seconds. Post-build source hashes remain unchanged. The corrected export retains one82,750,502-byte cache, SHA-256 `76745617b0466f6e361d1fc4c530b24de646ab263b85dbb6ee923be12e037dac`, at the external path below. The optional Standalone stage exits1, so the overall R17 run remains failed. Earlier failed conditioning attempts are retained as failed evidence, not accepted fixes. R14 also exposed an overly specific concurrent-save message assertion after the external descriptor remained intact. Thirty isolated repeats passed; the regression now requires exact external bytes and retention of the local dirty Undo selection. That strengthened case passes in the R16 full workspace. The production Save guards were not changed or weakened.
+
+Actual shared-viewport donor reconstruction, distinct vehicle mountain road and infantry cave, donor gameplay-object preservation, compiled visibility/material review, two-way walking, vehicle driving and a cross-region sniper hit remain open. **Verified physically traversable region connections:0.** Do not expand four/19regions or describe region switching as seamless streaming on this evidence.
+
+## Exact retained native artifact and open game gate
+
+`C:\Users\patri\AppData\Local\Temp\GuiltySpark-Engineering-d49eb02588bf\double-action-r17-megaworld.map`
+
+This is the actual generated MCC13 cache; file size and SHA-256 were rechecked after disposable-job cleanup. Independent Invader extraction confirms `levels\spark\assembly_9b729ad2\connected.scenario_structure_bsp`, one BSP,16,196collision triangles and CRC mismatch0. Both original CE maps and the SDK archive remain hash-identical. The matching exact-source QA app is identified below; no new installer was built.
+
+The [Standalone documentation](https://c20.reclaimers.net/h1/h1-ek/h1-standalone-build/) distinguishes loose-tag scene tests from retail MCC cache testing. The existing Test Scene controls launch the selected installed H1A Standalone (`halo_tag_test.exe`, SHA-256 `fc9e2b6193c6f6d9ff988278b0d39a983747f3fdbdeca7cafadd28f1f0c53e73`) against the owned derived tags. Its log records `game_variant slayer`, the original scenario path and default vehicle spawning. It exits1 after about24seconds before visual scene acceptance. Its bounded debug log is preserved in `double-action-r17.json` (SHA-256 `8000c6df09a0cbedf4e827573e0b1459b0efb359b3b672e9ac629ca89edd801d`). It reports no fatal reason. Steam is running; no corresponding Application Error/Windows Error Reporting event was returned by the scoped read. Neither fact establishes the cause. Computer Use initializes, but no Halo frame was observed before that exit. **No game loading or gameplay is accepted.**
+
+The pre-existing Standalone control in FEATURE_COMPLETION_20261106.md also exited1; do not assume this exit is caused by the new geometry. Diagnose with a controlled source/runtime comparison and capture the actual window rather than guessing or weakening the normal-exit check. All owned test processes and SDK/job trees are disposed; only the explicitly retained cache, bounded receipts/screenshots and source-pinned QA executable remain outside the repository. The game failure does not invalidate the separate compiler/readback evidence.
+
+## Regression evidence and reproducibility
+
+R16 QA app:47,428,096bytes, SHA-256 `86e4d7c1bd1c032a38fd1421521b4c0ea1e83c76a99f744c8e9ba7c0d4223e96`; runtime-source fingerprint `cb5e73e747c95c6320407597e46a4c604dd743fd30fe4c342a2d773803239e5f`. It is a source-pinned test executable built from the dirty worktree at1a50bb5, not an installer or released version.
+
+Before the lightmapper repair, R2 passes813Rust tests/nine intentionally ignored,425frontend tests,205browser tests and12actual Windows multiwindow cases. Three new core tests cover independent source identity/RAM-until-Save, stale/unsupported source rejection and saved-donor restart resolution. Browser fixtures cover real menu gestures and saved-donor controls; synthetic browser state is not native acceptance. R4 separately passes12native lifecycle cases using the fresh R3 app, then correctly fails the combined native build.
+
+R3 app:47,422,976bytes, SHA-256 `69bef2a6156dcc8727926baecee884555369ba7eea86bddb2df94d2be9f35d65`, runtime fingerprint `43794407e1874e575351880d60e3f42606c11dc96e1b90064fe0ff8e4d15a391`. It predates the lightmapper repair and must not be reused to claim that repair passed. R3’s combined-stage harness initially leaked logic options into workspace testing; R4 isolates them. R6 refused missing unrelated fixture inputs; prerequisites are now scoped to the selected test, and a MegaWorld-only run requires its actual two sources.
+
+Extend the existing `scripts/verify-source-only.mjs`, not a parallel harness. Select installed original source files, H1A kit/verified archive and Invader; use an owned external receipt destination. `SPARK_VERIFY_STAGES=rust,frontend,browser,workspace,logic`, `SPARK_LOGIC_CROSS_RUNTIME=1`, `SPARK_QA_MEGAWORLD_ONLY=1`, `SPARK_QA_MEGAWORLD_COMPILE=1`, `SPARK_QA_RUNTIME_ROOT`, `SPARK_QA_MEGAWORLD_BASE` and `SPARK_QA_MEGAWORLD_DONOR` select the combined test. The wrapper extracts only hash-listed SDK inputs, keeps binary/source fingerprints, and cleans owned scratch/processes on pass or failure. Native WRL/numeric diagnostics are bounded, not a preserved SDK/archive.
+
+Compact fixture: `docs/fixtures/double-action-20261107.json`. External receipts/screenshots live under the existing explicitly owned Engineering temp root with the names above. The475requirement identities and25numbered prompts remain intact. C49 release, original runtimes/maps/ISOs/mods, Git history and pre-existing stash remain protected. No public server, installer replacement, push or publication occurred.

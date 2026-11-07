@@ -91,7 +91,7 @@ export default function BspAssembly({
     setSectionList(null);
     setOptionsError('');
     if (native && open && donor)
-      void call<BspOption[]>('bsp_assembly_options', { projectId: donor }).then(
+      void call<BspOption[]>('bsp_assembly_options', { projectId: donor, assemblyProjectId: project.id }).then(
         (value) => {
           if (!cancelled) {
             setSectionList({ donor, values: value });
@@ -181,6 +181,7 @@ export default function BspAssembly({
                 disabled={busy}
               >
                 <option value="">Choose an imported map</option>
+                {project.bspAssembly&&!candidates.some(entry=>entry.id===project.bspAssembly!.donorProjectId)&&<option value={project.bspAssembly.donorProjectId}>{project.bspAssembly.donorTitle} · saved source</option>}
                 {candidates.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.title}

@@ -3,7 +3,7 @@ import { call, native } from '../api';
 import type { AssetSourceInventory } from '../assetSources';
 import { discoverAssetSources, loadAssetSource, updateAssetSourceInventory } from '../assetSources';
 import type { OpenProject } from '../types';
-export default function AssetSourceBrowser({ onLoaded, onInventory }: { onLoaded?: (source: OpenProject) => void; onInventory?: (inventory: AssetSourceInventory) => void }) {
+export default function AssetSourceBrowser({ onLoaded, onInventory, initialOpen = false, actionLabel = 'Load assets' }: { initialOpen?: boolean; actionLabel?: string; onLoaded?: (source: OpenProject) => void; onInventory?: (inventory: AssetSourceInventory) => void }) {
   const callback = useRef(onInventory), revision = useRef(0); callback.current = onInventory;
   const [inventory, setInventory] = useState<AssetSourceInventory | null>(null),
     [selected, setSelected] = useState(''),
@@ -43,7 +43,7 @@ export default function AssetSourceBrowser({ onLoaded, onInventory }: { onLoaded
       `${row.name} ${row.location} ${row.engine}`.toLowerCase().includes(query.toLowerCase()),
     ) ?? [];
   return (
-    <details className="asset-source-browser">
+    <details className="asset-source-browser" open={initialOpen || undefined}>
       <summary>Installed maps & downloads {inventory && `· ${inventory.maps.length}`}</summary>
       <div className="asset-source-controls">
         <input
@@ -68,7 +68,7 @@ export default function AssetSourceBrowser({ onLoaded, onInventory }: { onLoaded
         </select>
         <div className="button-row">
           <button disabled={!selected || busy} onClick={() => void load()}>
-            {busy ? 'Reading & preserving source…' : 'Load assets'}
+            {busy ? 'Reading & preserving source…' : actionLabel}
           </button>
           <button disabled={busy || !native} onClick={() => void scan(true)}>
             Rescan

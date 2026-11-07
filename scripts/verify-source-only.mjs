@@ -193,7 +193,7 @@ try {
         try{
           await run('Actual retained multiwindow workspace lifecycle and route regressions',[
             'scripts/test-workspace-lifecycle-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,
-          ],{SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_LOGIC:'0',SPARK_LIFECYCLE_LAUNCH_ONLY:'0',SPARK_LIFECYCLE_MEMORY:'0',SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0'});
+          ],{SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_LOGIC:'0',SPARK_LIFECYCLE_LAUNCH_ONLY:'0',SPARK_LIFECYCLE_MEMORY:'0',SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0',SPARK_LOGIC_CROSS_RUNTIME:'0',SPARK_QA_MEGAWORLD_ONLY:'0',SPARK_QA_MEGAWORLD_COMPILE:'0'});
         }finally{const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.workspace=JSON.parse(receipt);
         if(receiptFile){
           for(const name of ['application-icon.png','compact-header.png','tab-lift.png','monitor-pink.png','monitor-glow.png','monitor-source.png','monitor-source.json','failure-window-0.png','failure-window-1.png','failure-window-2.png']){
@@ -220,14 +220,14 @@ try {
         if(!cache)throw Error('Native object/logic acceptance requires a compiled donor cache with the standard door');
         const output=path.join(context.directory,'qa','native-logic');await fs.mkdir(path.dirname(output),{recursive:true});
         try{
-          await run(process.env.SPARK_LOGIC_CROSS_RUNTIME==='1'?'Actual CE-to-MCC native asset catalog, drag, edit, Undo/Save/restart, compile and independent readback':'Actual native tag edit, asset drop, door/trigger logic, Undo/Save/reopen, compile and independent readback',[
+          await run(process.env.SPARK_QA_MEGAWORLD_ONLY==='1'?'Actual MegaWorld File/New, source-bound donor controls, restart, Undo/Save and source clearance':process.env.SPARK_LOGIC_CROSS_RUNTIME==='1'?'Actual CE-to-MCC native asset catalog, drag, edit, Undo/Save/restart, compile and independent readback':'Actual native tag edit, asset drop, door/trigger logic, Undo/Save/reopen, compile and independent readback',[
             'scripts/test-workspace-lifecycle-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,path.resolve(cache),path.resolve(invader),
           ],{SPARK_LIFECYCLE_LOGIC:'1',SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_MEMORY:'0',
              SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0',SPARK_LOGIC_TAGS:path.resolve(tagSource),SPARK_LOGIC_KIT:path.resolve(kit)});
         }finally{
           const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.logic=JSON.parse(receipt);
           if(receiptFile&&report.logic?.crossRuntime){
-            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map']){
+            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','megaworld-source-check.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map','native-output/megaworld.map']){
               const source=path.join(output,name),info=await fs.stat(source).catch(()=>null);if(!info)continue;
               if(!info.isFile()||info.size>(name.endsWith('.map')?256:4)*1024**2)throw Error('Selected native acceptance evidence exceeds its bounded export');
               const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));

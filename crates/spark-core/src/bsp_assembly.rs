@@ -553,6 +553,7 @@ pub fn generate(
         return invalid("Boolean lost source material or vertex-property provenance");
     }
     crate::bsp_triangulate::improve(&mut gl);
+    crate::bsp_triangulate::refine_native_needles(&mut gl, 150_000, tunnel_material as u64)?;
     let (mut mesh, mut triangle_materials) = collision_layer(&gl, &mut materials)?;
     let walk_samples = verify_route(&mesh, assembly)?;
     for (face, ids) in gl.tri_verts.chunks_exact(3).enumerate() {
@@ -796,6 +797,36 @@ fn anchor(mesh: &MeshData, faces: &[CollisionFace], part: usize, east: bool) -> 
             SparkError::Invalid("No walkable source floor was found; choose a different BSP".into())
         })
 }
+/// A new combined document references the verified original cache, not another
+/// project's edits, build receipts or Undo history. Publication remains an explicit Save.
+pub fn source_project(title:&str,base:&Project,inspection:&MapInspection)->Result<Project>{
+    let source=base.source.as_ref().ok_or_else(||SparkError::Invalid("Choose a preserved native source map".into()))?;
+    crate::source_identity::validate(source,inspection)?;
+    crate::library::validate_local_input_path(&source.preserved_path)?;
+    crate::reject_links(&source.preserved_path)?;
+    if maps::hash_file(&source.preserved_path)?!=source.sha256{return invalid("The original source changed; no new world was created");}
+    if ![6,7,13,609].contains(&source.cache_version){return invalid("This source edition does not yet support the connected-BSP rebuild. Keep it available for inspection and asset recovery");}
+    if inspection.header.scenario_type!=1 || inspection.mesh.parts.len()!=1{return invalid("Choose a multiplayer source with one base BSP for this connected-world builder");}
+    let mut project=Project::new(title);
+    project.source=Some(source.clone());project.scene=inspection.objects.clone();
+    project.build_targets=base.build_targets.clone();project.active_build_target=base.active_build_target.clone();
+    project.provenance=base.provenance.clone();
+    project.provenance.description=format!("New connected-world source based on {} ({}). Original map and project retained.",base.title,source.sha256);
+    project.validate()?;Ok(project)
+}
+
+/// Resolve only the donor already named by this saved authoring plan. The
+/// projection is read-only; it is never another editable library document.
+pub fn referenced_donor(owner:&Project,id:&str)->Result<Option<Project>>{
+    let Some(plan)=owner.bsp_assembly.as_ref().filter(|plan|plan.donor_project_id==id) else{return Ok(None)};
+    plan.validate()?;
+    for path in [&plan.donor_source.original_path,&plan.donor_source.preserved_path].into_iter().chain(plan.donor_source.resource_directory.iter()) {
+        crate::library::validate_local_input_path(path)?;crate::reject_links(path)?;
+    }
+    if maps::hash_file(&plan.donor_source.preserved_path)?!=plan.donor_source.sha256{return invalid("The saved donor source changed; reconnect the original map before planning");}
+    let mut donor=Project::new(&plan.donor_title);donor.id=id.into();donor.source=Some(plan.donor_source.clone());donor.validate()?;Ok(Some(donor))
+}
+
 pub fn plan(
     base_project: &Project,
     base: &MapInspection,
@@ -804,6 +835,7 @@ pub fn plan(
     index: usize,
     tags: PathBuf,
 ) -> Result<BspAssembly> {
+    if index >= donor.mesh.parts.len() {return invalid("Choose an existing donor BSP section");}
     if base.mesh.parts.len() != 1 || base_project.id == donor_project.id {
         return invalid("Choose a different donor map and a destination with one BSP");
     }
