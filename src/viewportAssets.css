@@ -213,3 +213,8 @@
   font-size: 9px;
   max-width: 75px;
 }
+
+/* Thumbnail pictures are placement handles; sound/retry controls retain their own input. */
+.asset-preview-drag{cursor:grab;user-select:none;touch-action:none;}
+.asset-preview-drag :is(canvas,img){-webkit-user-drag:none;}
+.asset-preview-drag:active{cursor:grabbing;}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canHandoff, listingExpired } from './runtimeWorkbench';
+import { canHandoff, listingExpired, relocateRuntimeRegistration } from './runtimeWorkbench';
 import type { CommunityJoinAssessment, CommunityListingView } from './runtimeWorkbench';
 
 const view: CommunityListingView = {
@@ -42,4 +42,19 @@ describe('community invitation freshness', () => {
       false,
     );
   });
+});
+
+
+describe('runtime folder relocation',()=>{
+ const installed={id:'owned',runtimeId:'openCe' as const,root:'D:/Old/OpenCE',executable:'D:/Old/OpenCE/halo.exe',dataRoot:'D:/Old/OpenCE/data',version:'335',networkVersion:null};
+ it('moves internal executable and map paths together without changing protocol declarations',()=>{
+  const moved=relocateRuntimeRegistration(installed,'D:/Runtimes/OpenCE');expect(moved).toEqual({...installed,root:'D:/Runtimes/OpenCE',executable:'D:/Runtimes/OpenCE/halo.exe',dataRoot:'D:/Runtimes/OpenCE/data'});expect(installed.root).toBe('D:/Old/OpenCE');
+ });
+ it('preserves separately selected data and rejects sibling-prefix ownership',()=>{
+  expect(relocateRuntimeRegistration({...installed,dataRoot:'D:/Old/OpenCE-other/maps'},'E:/Games/OpenCE').dataRoot).toBe('D:/Old/OpenCE-other/maps');
+  expect(relocateRuntimeRegistration({...installed,root:'d:/old/OPENCE/',dataRoot:'D:/OLD/opence/maps'},'E:/New').dataRoot).toBe('E:/New/maps');
+ });
+ it('fills the correct Custom Edition executable for a fresh folder choice',()=>{
+  expect(relocateRuntimeRegistration({...installed,runtimeId:'haloCustomEdition',root:'',executable:'',dataRoot:null},'D:/Runtimes/Halo Custom Edition')).toEqual({...installed,runtimeId:'haloCustomEdition',root:'D:/Runtimes/Halo Custom Edition',executable:'D:/Runtimes/Halo Custom Edition/haloce.exe',dataRoot:'D:/Runtimes/Halo Custom Edition'});
+ });
 });

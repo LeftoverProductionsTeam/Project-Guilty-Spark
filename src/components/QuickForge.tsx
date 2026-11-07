@@ -5,7 +5,7 @@ import { prepareAssetImport, attachAssetImport, prepareSoundImport, useAssetImpo
 import { draggedAsset } from '../assetDragRegistry';
 import {copyForgeSelection,readForgeSelection,prepareForgePaste,applyForgePaste} from '../forgeClipboard';
 import BuildTargets from './BuildTargets';
-import { WorkspacePanel, WorkspacePanelAddon, useRevealWorkspacePanel } from './WorkspacePanels';
+import { WorkspacePanel, WorkspacePanelAddon, useWorkspaceFileActions, useRevealWorkspacePanel } from './WorkspacePanels';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import SmartEditPanel from './SmartEditPanel';
 import { runtimeTextureSource, defaultPreviewMaterials } from '../runtimeTexturePreview';
@@ -1275,6 +1275,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       setDiagnosticError(`Tool log rejected: ${String(e)}`);
     }
   }
+  useWorkspaceFileActions('geometry:'+project.id,[{id:'export-jms',label:'Export native JMS sources…',hint:'Validated source export; the native compiler still creates the playable cache.',disabled:exporting||!!props.activeJob||!preflight.ready||scenarioRiskErrors||netgameBlocked,run:()=>void exportSources()}]);
   async function exportSources() {
     if (!preflight.ready) {
       setExpandedBuild(true);

@@ -90,6 +90,34 @@ export default function MapTabs({
   if (!state.documents.length) return null;
   return (
     <><div className="map-tab-bar" data-overflow={condensed?'dropdown':undefined} style={{width:Math.min(state.documents.length,8)*180+68+(onReturn?32:0)}}>
+      {state.documents.length>0&&<details ref={menu} className="gs-map-switcher" onToggle={event=>{
+        if(event.currentTarget.open){for(const other of document.querySelectorAll<HTMLDetailsElement>('.gs-file-menu[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))other.open=false;requestAnimationFrame(()=>menu.current?.querySelector('input')?.focus());}
+      }} onKeyDown={event=>{
+        if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector<HTMLElement>('summary')?.focus();return;}
+        const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled)')];
+        if(!buttons.length)return;
+        const input=event.target instanceof HTMLInputElement;
+        if(event.key==='Enter'&&input){event.preventDefault();buttons[0].click();return;}
+        if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key)||(input&&['Home','End'].includes(event.key)))return;
+        event.preventDefault();event.stopPropagation();const at=buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
+        buttons[next]?.focus();
+      }}>
+        <summary aria-label="Choose open map" title="Switch maps by full name; search or open a map in another window" onClick={()=>{if(!menu.current?.open)setQuery('');}}>Maps <small>{state.documents.length}</small><ChevronDown size={11}/></summary>
+        <div className="gs-map-switcher-popup" role="menu" aria-label="Open map switcher">
+          <input type="search" aria-label="Search open maps" placeholder="Map name or runtime…" value={query} maxLength={160} onChange={event=>setQuery(event.target.value)}/>
+          <div className="gs-map-switcher-list">{matches.map(d=><div key={d.id} className="gs-map-choice-row">
+            <button role="menuitemradio" aria-label={d.history.current?.title} aria-checked={state.activeId===d.id} disabled={disabled} onClick={()=>{
+              if(menu.current)menu.current.open=false;
+              if(state.activeId===d.id)requestAnimationFrame(()=>tabs.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus());
+              else pendingFocus.current=d.id;
+              onSelect(d.id);
+            }}><strong>{d.history.dirty&&<span aria-label="Unsaved changes">● </span>}{d.history.current?.title}</strong><small>{d.history.current?.source?.engine??'QuickForge source'}</small></button>
+            <button aria-label={'Open '+d.history.current?.title+' in another window'} title="Open in another window" disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
+          </div>)}</div>
+          {!matches.length&&<p role="status">No open maps match.</p>}
+        </div>
+      </details>}
       <div ref={tabs} className="map-tabs" role="tablist" aria-label="Open maps">
         {state.documents.map((d) => (
           <div className={'map-tab' + (d.id === state.activeId ? ' active' : '')} hidden={condensed&&d.id!==state.activeId} key={d.id} data-map-tab-id={d.id} data-pinned={pinned.includes(d.id)||undefined} onContextMenu={e=>{e.preventDefault();setContext({id:d.id,x:Math.min(innerWidth-190,e.clientX),y:Math.min(innerHeight-130,e.clientY)});}}>
@@ -164,34 +192,6 @@ export default function MapTabs({
         {onReturn&&<button role="menuitem" disabled={disabled} onClick={()=>{onReturn(context.id);setContext(null);}}>Return to original window</button>}
         <button role="menuitem" disabled={disabled} onClick={()=>{onClose(context.id);setContext(null);}}>Close map</button>
       </div>}
-      {state.documents.length>1&&<details ref={menu} className="gs-map-switcher" onToggle={event=>{
-        if(event.currentTarget.open){for(const other of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))other.open=false;requestAnimationFrame(()=>menu.current?.querySelector('input')?.focus());}
-      }} onKeyDown={event=>{
-        if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.open=false;event.currentTarget.querySelector<HTMLElement>('summary')?.focus();return;}
-        const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled)')];
-        if(!buttons.length)return;
-        const input=event.target instanceof HTMLInputElement;
-        if(event.key==='Enter'&&input){event.preventDefault();buttons[0].click();return;}
-        if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key)||(input&&['Home','End'].includes(event.key)))return;
-        event.preventDefault();event.stopPropagation();const at=buttons.indexOf(document.activeElement as HTMLButtonElement);
-        const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
-        buttons[next]?.focus();
-      }}>
-        <summary aria-label="Choose open map" title="Switch maps by full name; search or open a map in another window" onClick={()=>{if(!menu.current?.open)setQuery('');}}>Maps <small>{state.documents.length}</small><ChevronDown size={11}/></summary>
-        <div className="gs-map-switcher-popup" role="menu" aria-label="Open map switcher">
-          <input type="search" aria-label="Search open maps" placeholder="Map name or runtime…" value={query} maxLength={160} onChange={event=>setQuery(event.target.value)}/>
-          <div className="gs-map-switcher-list">{matches.map(d=><div key={d.id} className="gs-map-choice-row">
-            <button role="menuitemradio" aria-label={d.history.current?.title} aria-checked={state.activeId===d.id} disabled={disabled} onClick={()=>{
-              if(menu.current)menu.current.open=false;
-              if(state.activeId===d.id)requestAnimationFrame(()=>tabs.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus());
-              else pendingFocus.current=d.id;
-              onSelect(d.id);
-            }}><strong>{d.history.dirty&&<span aria-label="Unsaved changes">● </span>}{d.history.current?.title}</strong><small>{d.history.current?.source?.engine??'QuickForge source'}</small></button>
-            <button aria-label={'Open '+d.history.current?.title+' in another window'} title="Open in another window" disabled={disabled} onClick={()=>{if(menu.current)menu.current.open=false;void requestWindow(d.id);}}><ExternalLink size={13}/></button>
-          </div>)}</div>
-          {!matches.length&&<p role="status">No open maps match.</p>}
-        </div>
-      </details>}
       {onReturn&&state.activeId&&<button className="small-button" aria-label="Return map to workspace" disabled={disabled} title="Return this map and its in-memory editing history to the original Spark window" onClick={()=>onReturn(state.activeId!)}><CornerUpLeft size={14}/>Return</button>}
     </div>{feedback&&createPortal(<div className="gs-tab-tear-preview" data-tab-drag-phase={feedback.phase} role="status" aria-live="polite" style={{left:feedback.x,top:feedback.y}}><ExternalLink size={18}/><div><strong>{feedback.title}</strong><small>{feedback.phase==='ready'?'Release to open in another window':feedback.phase==='dragging'?'Pull outside the tab bar to make a window':feedback.phase==='transferring'?'Opening window and transferring the map…':feedback.phase==='completed'?'Window opened':"Couldn't finish the move. Your tab is retained."}</small></div></div>,document.body)}</>
   );

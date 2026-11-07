@@ -21,6 +21,9 @@ export default function SmartEditPanel({
   onSelectMap?: (id: string) => void;
   notify: (message: string) => void;
 }) {
+  const inheritedOpen=useRef(false);
+  const [open,setOpen] = useMapState(project.id,'smart-edit.open',inheritedOpen.current);
+  inheritedOpen.current=open;
   const [preference, setPreference] = useMapState<EditPreference>(
     project.id,
     'smart-edit.preference',
@@ -109,6 +112,8 @@ export default function SmartEditPanel({
   return (
     <details
       className="smart-edit"
+      open={open}
+      onToggle={event=>setOpen(event.currentTarget.open)}
       data-smart-edit-project={project.id}
       data-smart-edit-invalidated={invalidated.join(', ')}
     >

@@ -1,4 +1,4 @@
-import type { RuntimeId } from './types';
+import type { RuntimeId, RuntimeRegistration } from './types';
 
 export type ActionAvailability = 'ready' | 'running' | 'setupRequired' | 'updateNeeded' | 'unavailable';
 export type EvidenceLevel =
@@ -183,4 +183,19 @@ export function canHandoff(
     time < assessment.expiresAtUnix * 1000 &&
     !listingExpired(view, time)
   );
+}
+
+/** Relocate only paths owned by the old installation; external data stays explicit. */
+export function relocateRuntimeRegistration(registration:RuntimeRegistration,root:string):RuntimeRegistration {
+  const clean=(value:string)=>value.replaceAll('\\','/').replace(/\/+$/,'');
+  const old=clean(registration.root),next=clean(root);
+  const relocate=(value:string|null,fallback:string|null)=>{
+    if(!value)return fallback;
+    const path=clean(value);
+    if(old&&path.toLowerCase()===old.toLowerCase())return next;
+    if(old&&path.toLowerCase().startsWith(old.toLowerCase()+'/'))return next+path.slice(old.length);
+    return value;
+  };
+  const executable=relocate(registration.executable,next+'/'+(registration.runtimeId==='haloCustomEdition'?'haloce.exe':'halo.exe'))!;
+  return {...registration,root,executable,dataRoot:relocate(registration.dataRoot,next)};
 }

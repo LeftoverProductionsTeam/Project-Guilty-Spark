@@ -35,6 +35,7 @@ export function useRuntimeConnections(data: Bootstrap) {
     setChecking(false);
   }, [data.dataDirectory, data.settings.mccDirectory, data.settings.steamDirectory]);
   useEffect(() => { void refresh(); return () => { generation.current++; }; }, [refresh]);
+  useEffect(()=>{const changed=()=>void refresh();window.addEventListener('guilty-spark-runtime-connections-changed',changed);return()=>window.removeEventListener('guilty-spark-runtime-connections-changed',changed);},[refresh]);
   const connect = async (candidate: DetectedHalo) => {
     const version = generation.current;
     const attempt = ++connectionAttempt.current;

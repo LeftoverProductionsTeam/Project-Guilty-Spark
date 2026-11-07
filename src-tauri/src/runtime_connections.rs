@@ -22,6 +22,8 @@ fn community_identity(hash: &str) -> Option<(runtime::RuntimeId, &'static str)> 
     // identify halo.exe as OpenCE or Chupathingy.
     match hash {
         "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0" => Some((runtime::RuntimeId::OpenCe, "335")),
+        // Publisher build343 ZIP SHA4804ccee… independently matched to this executable.
+        "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9" => Some((runtime::RuntimeId::OpenCe, "343")),
         "b2f8ea992ed4031461bc638f8af80c08ec8905c5f73c97c483e86f25273b18d4" => Some((runtime::RuntimeId::ChupathingyCe, "0.8.1d")),
         _ => None,
     }
@@ -44,7 +46,10 @@ fn nearby_roots(anchors: impl IntoIterator<Item=PathBuf>) -> Vec<PathBuf> {
     let mut roots=Vec::new();let mut seen=std::collections::HashSet::new();
     for anchor in anchors {
         for parent in anchor.ancestors().take(6) {
-            for candidate in std::iter::once(parent.to_path_buf()).chain(["Halo Custom Edition","opencehalo-windows-release","chupathingyce-windows64-release","OpenCE","ChupathingyCE"].map(|name|parent.join(name))) {
+            let names=["Halo Custom Edition","opencehalo-windows-release","chupathingyce-windows64-release","OpenCE","ChupathingyCE","Chupathingy"];
+            let children=names.into_iter().map(|name|parent.join(name))
+                .chain(names.into_iter().map(|name|parent.join("Runtimes").join(name)));
+            for candidate in std::iter::once(parent.to_path_buf()).chain(children) {
                 if seen.insert(candidate.clone()) {roots.push(candidate);if roots.len()==256{return roots;}}
             }
         }
@@ -172,7 +177,9 @@ pub(super) async fn connect_detected_halo(app: tauri::AppHandle, runtime_id: run
         registrations.push(registration);
         library.set_setting("runtimeRegistrations", &registrations).map_err(error)?;
         drop(library);
-        runtime_reports(&state)
+        let reports=runtime_reports(&state)?;
+        let _=app.emit("spark:runtime-connections-changed",());
+        Ok(reports)
     }).await.map_err(error)?
 }
 
@@ -197,6 +204,7 @@ mod tests {
     fn linked_and_source_roots_discover_known_siblings_without_a_matching_process_directory(){
         let anchor=PathBuf::from("owned/maps/zombie/maps");let roots=nearby_roots([anchor.clone(),anchor]);
         for child in ["Halo Custom Edition","OpenCE","ChupathingyCE","opencehalo-windows-release","chupathingyce-windows64-release"] {assert!(roots.contains(&PathBuf::from("owned").join(child)));}
+        for child in ["Halo Custom Edition","OpenCE","Chupathingy"] {assert!(roots.contains(&PathBuf::from("owned/Runtimes").join(child)));}
         assert_eq!(roots.iter().collect::<std::collections::HashSet<_>>().len(),roots.len());
         assert!(nearby_roots((0..100).map(|n|PathBuf::from(format!("owned-{n}/maps")))).len()<=256);
     }

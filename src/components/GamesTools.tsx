@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import {useState,type ReactNode} from 'react';
+import RuntimeRegistration from './RuntimeRegistration';
 import { Check, FolderOpen, Gamepad2, RefreshCw, Settings2 } from 'lucide-react';
 import { native } from '../api';
 import { useMapState } from '../mapSession';
@@ -38,6 +39,8 @@ export default function GamesTools({
   const [search, setSearch] = useMapState(project?.id ?? 'global', `tools.search.${runtime}`, '');
   const [advanced, setAdvanced] = useMapState('global', 'tools.advanced', false);
   const { reports, detected, checking, connecting, error, refresh, connect } = useRuntimeConnections(data);
+  const [foldersFor,setFoldersFor]=useState<RuntimeId|null>(null);
+  const selectedReport=reports.find(report=>report.id===runtime);
   const reveal = useRevealWorkspacePanel();
   const installation = reports.find((report) => report.id === runtime)?.installation;
   const candidate = detected.find(item => item.runtimeId === runtime);
@@ -126,11 +129,13 @@ export default function GamesTools({
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
+        <button disabled={!native||busy||checking} onClick={()=>runtime==='mccSteam'?onSetup(runtime):setFoldersFor(runtime)}><FolderOpen size={14}/>Runtime folders…</button>
         <button disabled={connecting !== null} onClick={() => candidate?.contentReady && !installation ? void connect(candidate) : onSetup(runtime)} title={candidate?.detail}>
           <Settings2 size={14} />
           {connecting === runtime ? 'Connecting…' : installation?.validation === 'pass' ? 'Connect tools' : candidate?.contentReady ? 'Connect detected Halo' : 'Connect this Halo'}
         </button>
       </div>
+      {foldersFor===runtime&&runtime!=='mccSteam'&&selectedReport&&<RuntimeRegistration key={runtime} report={selectedReport} initialOpen onRegistered={()=>void refresh()}/>}
       <div className="games-tools-save-flow">
         <span>
           <strong>Edit → save in the tool → review in Spark.</strong> Working map saves are checked every 2

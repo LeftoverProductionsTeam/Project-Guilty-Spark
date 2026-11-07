@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: c3ad4850 — complete real CE to MCC cross-runtime asset import through the existing creator workflow
+Task: OpenCE original Zombie Apocalypse native gameplay — owner priority after verified creator/runtime follow-up
 Status: implementation incomplete
 Starting revision: 34b7c57a17c7a807805e52d0c6a6a40bc91a6e07
-Latest verified revision: Starting master34b7c57 preserved. R7 full Rust802/9ignored/53suites; R12 TS/416frontend/3contracts/59offline/35storage/193browser and fresh actual Windows build pass. R16 actual CE scenery5tags and vehicle285tags→two distinct MCC13 projects, independent recursive native readback and full process restart pass. Originals and all C49 seals unchanged; no new game acceptance.
-Next action: Commit this scoped Level C creator milestone locally, then implement the owner follow-up in existing asset sources: expose all configured runtime map directories through the main source selector with automatic safe loading/conversion on drop; never infer format from host runtime. Move Maps before tabs and add a clear new-workspace-window menu action. Preserve R16 native output/evidence and verify the changed actual app again; game/all-edition gates remain open.
+Latest verified revision: Local master6e3bb1d plus current R30 full regressions and R32 five-case native acceptance; exact Windows application88bea150, source fingerprint13ce5a9e. Native CE scenery/vehicle compiles, recursive File extraction and full restart pass; no new gameplay/peer acceptance.
+Next action: Preserve and commit the verified R30/R32 creator/runtime-folder milestone. Reuse original Demo recovery and carrier sources to build a bounded OpenCE-compatible Zombie candidate; repair automatic native release before testing actual host/client combat. Current owner match stays untouched.
 
 ## Acceptance
 
@@ -30,7 +30,7 @@ Earlier failed attempts and corrections remain in the current report/fixture. La
 
 ## Operations and safe checkpoint
 
-Current operation: R16 completed successfully; no QA writer remains. One privately retained native output79,701,242bytes/SHA9e8be7356f5f49bbde3459dab99643762249cbf084e7d4023e689d18f36820c7 plus six actual GUI screenshots are outside source. Both2 copied instances/target coordinates/palettes/CRC/dependency closures and identical source/import/Undo heads after process restart pass. Only one output uses the unchanged256MiB fixture allowance; SDK/build/profile/second-cache scratch was disposed. CREATOR_WORKFLOWS_20261107.md and fixtures/creator-workflows-20261107.json preserve successful and failed evidence. New all-runtime catalog and Maps/new-window steering is pending implementation, not accepted by intake.
+Current operation: R32 completed successfully. All moved runtime registrations and exact Demo source/banks are verified; default paths updated without altering seven project rows/history. Owner live OpenCE343 co-op and multiplayer-bot observations are read-only, exact-symbol and bounded. Original Zombie automatic release/combat/peer acceptance remains open; no new Halo process started.
 
 ## Deferred requests
 

@@ -341,3 +341,10 @@
 .atlas-controls{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:5px 0}.atlas-controls input{min-width:70px;width:100%;flex:1}.atlas-controls select{max-width:100%}
 .atlas-list{display:grid;gap:3px}.atlas-list>button{display:grid;gap:2px;text-align:left;padding:5px 7px;min-width:0}.atlas-list>button b{white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:11px}.atlas-list>button[aria-pressed=true]{border-color:var(--accent,#87dbdd)}
 .atlas-region{margin-top:6px}.atlas-region dl{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;font-size:10px}.atlas-region dd{margin:0;overflow-wrap:anywhere}.atlas-note,.atlas-region p{font-size:10px;line-height:1.5;opacity:.85;margin:5px 0}
+
+.bsp-shape-toolbar{display:flex;align-items:center;gap:8px;padding:3px 7px;border-bottom:1px solid var(--line);}
+.bsp-shape-toolbar>small{font-size:10px;color:var(--muted);}
+.bsp-shape-toolbar>details{position:relative;flex:none;}
+.bsp-shape-toolbar summary{cursor:pointer;font-size:11px;padding:4px 7px;border:1px solid var(--line);border-radius:4px;}
+.bsp-shape-toolbar [role=group]{position:absolute;top:100%;left:0;z-index:90;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:5px;width:230px;background:var(--panel);border:1px solid var(--line);border-radius:5px;}
+.bsp-shape-toolbar button{min-height:28px;padding:4px;font-size:11px;}

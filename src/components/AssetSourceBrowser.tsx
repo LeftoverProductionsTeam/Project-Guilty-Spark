@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import type { AssetSourceInventory } from '../assetSources';
-import { retainAssetSource } from '../assetSources';
+import { discoverAssetSources, loadAssetSource, updateAssetSourceInventory } from '../assetSources';
 import type { OpenProject } from '../types';
-let pending: Promise<AssetSourceInventory> | null = null;
-export default function AssetSourceBrowser({ onLoaded }: { onLoaded?: (source: OpenProject) => void }) {
+export default function AssetSourceBrowser({ onLoaded, onInventory }: { onLoaded?: (source: OpenProject) => void; onInventory?: (inventory: AssetSourceInventory) => void }) {
+  const callback = useRef(onInventory), revision = useRef(0); callback.current = onInventory;
   const [inventory, setInventory] = useState<AssetSourceInventory | null>(null),
     [selected, setSelected] = useState(''),
     [query, setQuery] = useState(''),
@@ -13,39 +13,25 @@ export default function AssetSourceBrowser({ onLoaded }: { onLoaded?: (source: O
   async function scan(refresh = false) {
     setError('');
     try {
-      if (refresh || !pending) pending = call<AssetSourceInventory>('discover_asset_sources');
-      setInventory(await pending);
+      const request = ++revision.current, found = await discoverAssetSources(refresh);
+      if (request !== revision.current) return;
+      setInventory(found); callback.current?.(found);
     } catch (e) {
-      pending = null;
       setError(String(e));
     }
   }
   useEffect(() => {
     if (native) void scan();
+    const changed = () => {if (native) void scan();};
+    window.addEventListener('guilty-spark-runtime-connections-changed', changed);
+    return () => {revision.current++; window.removeEventListener('guilty-spark-runtime-connections-changed', changed);};
   }, []);
   async function load() {
     if (!selected || busy) return;
     setBusy(true);
     setError('');
     try {
-      const sources = await call<OpenProject[]>('open_asset_source', {
-        sourceId: selected, preparePreviewResources: true,
-      });
-      for (let source of sources) {
-        if ((source.inspection?.header.version === 13 && !source.project.source?.resourceSha256?.['mcc-textures']) ||
-          [6,7,609].includes(source.inspection?.header.version??0)) {
-          try {
-            source = await call<OpenProject|null>(source.inspection?.header.version===13?'connect_mcc_texture_resources':'auto_connect_classic_textures', {
-              projectId: source.project.id,
-            }) ?? source;
-          } catch {
-            /* Preserved geometry remains available when shared pixels are absent. */
-          }
-        }
-        retainAssetSource(source);
-        onLoaded?.(source);
-      }
-      if (!sources.length) throw Error('No supported maps in the selected archive.');
+      for (const source of await loadAssetSource(selected)) onLoaded?.(source);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -92,7 +78,7 @@ export default function AssetSourceBrowser({ onLoaded }: { onLoaded?: (source: O
             onClick={() =>
               void call<AssetSourceInventory | null>('link_asset_source_folder')
                 .then((value) => {
-                  if (value) setInventory(value);
+                  if (value) {revision.current++; updateAssetSourceInventory(value); setInventory(value); callback.current?.(value);}
                 })
                 .catch((e) => setError(String(e)))
             }

@@ -205,7 +205,7 @@ test('Windows short, verbatim and case spellings share the same real disposable 
     assert.equal(result.disposedBytes, 15);
     await assert.rejects(fs.stat(scratch), { code: 'ENOENT' });
   }
-  for (const spelling of [path.toNamespacedPath(path.resolve('src')), path.resolve('src').toLowerCase()])
+  for (const spelling of [path.toNamespacedPath(path.resolve('src')), path.resolve('src').toLowerCase(), path.resolve('Runtimes')])
     await assert.rejects(assertQaOutputPath(path.join(spelling, 'must-not-create')), /canonical source/);
   await assert.rejects(exportDevelopmentBuild(parent, path.toNamespacedPath(path.resolve('src', 'must-not-export'))), /outside the source/);
 

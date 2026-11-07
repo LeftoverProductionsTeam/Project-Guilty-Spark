@@ -502,7 +502,7 @@ impl Remote {
         )
     }
 }
-pub fn observe(meta: &Value, expected: &str, pid: u32, role: &str, details: bool) {
+pub fn observe(meta: &Value, expected: &str, pid: u32, role: &str, details: bool) -> Value {
     assert!(role == "host" || role == "client");
     unsafe {
         let h = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
@@ -552,36 +552,47 @@ pub fn observe(meta: &Value, expected: &str, pid: u32, role: &str, details: bool
         CloseHandle(modules);
         let remote = Remote { handle: h, base };
         let begin = Instant::now();
-        println!(
-            "{}",
-            json!({
-                "schemaVersion":1,"runtime":"opence-build-335",
-                "role":role,"pid":pid,"base":base,"readOnly":true,
-                "exeSha256":super::EXE_SHA256,"pdbSha256":super::PDB_SHA256,
-                "pdb":meta["module"],"atomicSnapshot":false,"detailedCensus":details,
-                "sampleIntervalMs":50
-            })
-        );
+        let header = json!({
+            "schemaVersion":1,"runtime":meta["runtime"],
+            "role":role,"pid":pid,"base":base,"readOnly":true,
+            "exeSha256":meta["exeSha256"],"pdbSha256":meta["pdbSha256"],
+            "pdb":meta["module"],"atomicSnapshot":false,"detailedCensus":details,
+            "sampleIntervalMs":50,"maximumObservationBytes":32*1024*1024
+        })
+        .to_string();
+        println!("{header}");
+        // Large campaign encounters otherwise produce hundreds of MiB in a
+        // single short run. Stop honestly at the byte budget; never drop actors
+        // from a snapshot or imply that the requested duration was completed.
+        let mut output_bytes = header.len() + 1;
+        let mut sample_rows = 0;
+        let mut ended_because = "sample-limit";
         // Keep the same bounded observation duration while reducing phase
         // aliasing between independent 30 Hz game processes. Census reads stay
         // at roughly 1 Hz; lightweight actor controls are sampled at 20 Hz.
         for sample in 0..1520 {
             let mut code = 0;
             if GetExitCodeProcess(remote.handle, &mut code) == 0 || code != STILL_ACTIVE as u32 {
+                ended_because = "process-ended";
                 break;
             }
             let read_started = Instant::now();
             let result = remote.snapshot(meta, role, sample % 20 == 0, details);
-            println!(
-                "{}",
-                match result {
-                    Ok(v) =>
-                        json!({"sample":sample,"elapsedMs":begin.elapsed().as_millis(),"readMs":read_started.elapsed().as_secs_f64()*1000.0,"state":v}),
-                    Err(e) =>
-                        json!({"sample":sample,"elapsedMs":begin.elapsed().as_millis(),"error":e}),
-                }
-            );
+            let row = match result {
+                Ok(v) => json!({"sample":sample,"elapsedMs":begin.elapsed().as_millis(),"readMs":read_started.elapsed().as_secs_f64()*1000.0,"state":v}),
+                Err(e) => json!({"sample":sample,"elapsedMs":begin.elapsed().as_millis(),"error":e}),
+            }.to_string();
+            // Leave 1 MiB for the identity recheck footer and wrapper metadata.
+            if output_bytes + row.len() + 1 > 31 * 1024 * 1024 {
+                ended_because = "output-budget";
+                break;
+            }
+            println!("{row}");
+            output_bytes += row.len() + 1;
+            sample_rows += 1;
             std::thread::sleep(Duration::from_millis(50));
         }
+        json!({"sampleRows":sample_rows,"elapsedMs":begin.elapsed().as_millis(),
+            "sampleOutputBytes":output_bytes,"endedBecause":ended_because})
     }
 }

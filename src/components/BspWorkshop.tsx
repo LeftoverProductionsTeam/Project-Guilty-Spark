@@ -2,8 +2,9 @@ import SceneEnvironment from './SceneEnvironment';
 import MegaworldAtlas from './MegaworldAtlas';
 import { sourceSurfaceEnvironment } from '../environment';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
-import { Canvas } from '@react-three/fiber';
+import type { PointerEvent as ReactPointerEvent, MutableRefObject } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import {useViewportAssetDrop} from '../useViewportAssetDrop';
 import ViewportActivity from './ViewportActivity';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 import { Edges, OrbitControls, PerspectiveCamera } from '@react-three/drei';
@@ -27,6 +28,7 @@ import { beginProjectMutation } from '../projectMutation';
 import { mergeForge } from '../forgeSession';
 import type { WorkshopPreview } from '../studioClient';
 import {
+  placeWorkshopPrimitive,
   clipBrush,
   extrudeFace,
   worldVertex,
@@ -44,7 +46,7 @@ import {
   worldFaceNormal,
   dot,
 } from '../bspWorkshop';
-import type { BspBrush, BspTool, BspView, WorkshopSelection } from '../bspWorkshop';
+import type { BspBrush, BspTool, BspView, WorkshopSelection, WorkshopPrimitive } from '../bspWorkshop';
 import type { ForgeMesh, GeometryReport, QuickForgeDocument } from '../forge';
 import type { Vec3, OpenProject } from '../types';
 import '../bspWorkshop.css';
@@ -66,6 +68,15 @@ interface Props {
   onBusy?: (busy: boolean) => void;
 }
 type Selection = WorkshopSelection;
+function WorkshopDropPoint({point}:{point:MutableRefObject<((x:number,y:number)=>Vec3|null)|null>}) {
+  const {camera,gl}=useThree();
+  useEffect(()=>{
+    const ray=new THREE.Raycaster(),plane=new THREE.Plane(new THREE.Vector3(0,0,1),0);
+    point.current=(x,y)=>{const rect=gl.domElement.getBoundingClientRect();ray.setFromCamera(new THREE.Vector2((x-rect.x)/rect.width*2-1,1-(y-rect.y)/rect.height*2),camera);const hit=ray.ray.intersectPlane(plane,new THREE.Vector3());return hit?[hit.x,hit.y,hit.z]:null;};
+    return()=>{point.current=null;};
+  },[camera,gl,point]);
+  return null;
+}
 function sendDrag(projectId: string, brush: BspBrush | null) {
   window.dispatchEvent(
     new CustomEvent('guilty-spark-workshop-drag', {
@@ -340,6 +351,7 @@ function Ortho({
     <svg
       ref={svg}
       className="bsp-ortho"
+      data-bsp-view={view}
       aria-label={`${view} orthographic editing view`}
       viewBox={`${camera.x - width / 2} ${-camera.y - vertical / 2} ${width} ${vertical}`}
       preserveAspectRatio="none"
@@ -515,6 +527,17 @@ export default function BspWorkshop(props: Props) {
     [clipDistance, setClipDistance] = useState(0),
     [offset, setOffset] = useState<Vec3>([0, 0, 0]),
     [portalX, setPortalX] = useState(8);
+  const shapeViewport=useRef<HTMLDivElement|null>(null),perspectiveDrop=useRef<((x:number,y:number)=>Vec3|null)|null>(null),shapePoint=useRef<((x:number,y:number)=>Vec3|null)|null>(null),shapeMenu=useRef<HTMLDetailsElement|null>(null);
+  const shapeDrop=useViewportAssetDrop(projectId+'-shapes',shapeViewport,shapePoint,(key,point)=>{
+    if(!activity.active||props.readOnly||operation.current)return;
+    try{const placed=placeWorkshopPrimitive(latest.current,key as WorkshopPrimitive,point,materialId);if(shapeMenu.current)shapeMenu.current.open=false;void apply(placed.document,'Place Workshop '+key);setSelection({brushId:placed.brushId});setTool('move');}
+    catch(error){setError(String(error));}
+  });
+  shapePoint.current=(x,y)=>{
+    const element=document.elementFromPoint(x,y),svg=element?.closest<SVGSVGElement>('svg.bsp-ortho');
+    if(svg){const matrix=svg.getScreenCTM();if(!matrix)return null;const local=new DOMPoint(x,y).matrixTransform(matrix.inverse()),view=svg.dataset.bspView as Exclude<BspView,'perspective'>,axes=viewAxes[view];if(!axes)return null;const point:Vec3=[0,0,0];point[axes[0]]=snapNumber(local.x,grid);point[axes[1]]=snapNumber(-local.y,grid);return point;}
+    return element?.closest('canvas')?perspectiveDrop.current?.(x,y)??null:null;
+  };
   const [seamTargetId, setSeamTargetId] = useState(''), [seamFaceId, setSeamFaceId] = useState('');
   const [materialId, setMaterialId] = useState(doc.materials.find((m) => !m.name.startsWith('+'))?.id ?? '');
   const nameInput = useRef<HTMLInputElement>(null);
@@ -838,8 +861,14 @@ export default function BspWorkshop(props: Props) {
           </button>
         </Notice>
       )}
+      <div className="bsp-shape-toolbar">
+        <details ref={shapeMenu}><summary>Shapes ▾</summary><div role="group" aria-label="Drop-in BSP shapes">{(['room','box','wall','ramp','stairs'] as WorkshopPrimitive[]).map(kind=><button key={kind} disabled={disabled} aria-label={'Place BSP '+kind} title="Click to add at the origin, or drag into a 3D or orthographic view. Select the volume to resize, reshape, name and assign materials." onPointerDown={event=>{shapeDrop.begin({key:kind},event);}} onClick={event=>shapeDrop.activate({key:kind},event,[0,0,0])}>{kind[0].toUpperCase()+kind.slice(1)}</button>)}</div></details>
+        <small>Drop a shape → select its volume or face → drag an axis or edit Properties. Rooms are playable air; walls, ramps and stairs are solid.</small>
+      </div>
+      {shapeDrop.dragging&&<div className="viewport-asset-drop-hint">Drop shape into a BSP view</div>}
       <div className="bsp-body">
         <div
+          ref={shapeViewport}
           className={`bsp-views ${maximized ? 'maximized' : ''}`}
           style={{
             gridTemplateColumns: maximized ? '1fr' : `${splitX}% 1fr`,
@@ -871,6 +900,7 @@ export default function BspWorkshop(props: Props) {
                     onPointerMissed={() => setSelection(null)}
                   >
                     <ViewportActivity />
+                    <WorkshopDropPoint point={perspectiveDrop}/>
                     <PerspectiveCamera
                       makeDefault
                       position={[36, -36, 28]}

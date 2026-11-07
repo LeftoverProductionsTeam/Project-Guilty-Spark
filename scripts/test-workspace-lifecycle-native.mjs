@@ -330,6 +330,36 @@ try{
       pair.fullProcessRestart={stoppedPid:pid,restartedPid:child.pid,sourceImportsAndUndoPreserved:true};delete pair.savedProject;delete pair.savedHistory;
     }
     step('Both cross-runtime destinations survive full process restart with native dependencies and the same Undo head');
+    const projectId=report.crossRuntime.pairs[0].targetProjectId;
+    await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${projectId}"]`).click();
+    await expect(main.locator(`.map-tab[data-map-tab-id="${projectId}"] [role="tab"]`)).toHaveAttribute('aria-selected','true');
+    if(await main.locator('.gs-workspace-shell').getAttribute('data-workspace')!=='level')await chooseTool(main,'Level editor');
+    const fileBounds=await main.getByLabel('File menu',{exact:true}).boundingBox(),toolsButtonBounds=await main.getByLabel('More workspace drawers',{exact:true}).boundingBox();
+    const maps=await main.getByLabel('Choose open map',{exact:true}).boundingBox(),tabs=await main.getByRole('tablist',{name:'Open maps',exact:true}).boundingBox();expect(maps.x+maps.width).toBeLessThanOrEqual(tabs.x+1);expect(fileBounds.x+fileBounds.width).toBeLessThanOrEqual(toolsButtonBounds.x+1);expect(toolsButtonBounds.x+toolsButtonBounds.width).toBeLessThanOrEqual(maps.x+1);
+    await main.getByLabel('More workspace drawers',{exact:true}).click();const tools=main.getByRole('menu',{name:'Workspace drawers',exact:true});await expect(tools).toBeVisible();
+    const toolBounds=await tools.boundingBox();expect(toolBounds.height).toBeLessThan(430);expect(toolBounds.width).toBeLessThanOrEqual(322);expect(toolBounds.x).toBeGreaterThanOrEqual(7);
+    await tools.screenshot({path:path.join(root,'runtime-catalog-tools.png')});
+    await main.keyboard.press('Escape');await main.getByLabel('File menu',{exact:true}).click();const fileMenu=main.getByRole('menu',{name:'File commands',exact:true});await expect(fileMenu.getByRole('menuitem',{name:'Save',exact:true})).toBeEnabled();await fileMenu.screenshot({path:path.join(root,'runtime-catalog-file.png')});await fileMenu.getByRole('menuitem',{name:'Save As…',exact:true}).click();
+    await expect(main.locator(`.smart-edit[data-smart-edit-project="${projectId}"]:visible`)).toHaveAttribute('open','');await chooseTool(main,'Level editor');await main.getByLabel('More workspace drawers',{exact:true}).click();
+    const prior=new Set(pages()),head=(await state(main,projectId)).history.head;await tools.getByRole('menuitem',{name:'New workspace window',exact:true}).click();
+    const extra=await nextPage(prior);await chooseTool(extra,'Learning center');await expect(main.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','level');expect((await state(main,projectId)).writable).toBe(true);expect((await state(main,projectId)).history.head).toEqual(head);await close(extra);
+    report.crossRuntime.headerWorkflow={mapsBeforeTabs:true,toolsBounds:toolBounds,newIndependentWindow:true,originalNavigationAndUndoUnchanged:true};
+    step('Compact Tools opens a real independent workspace without moving the original map or changing its Undo head');
+    const worldId=report.crossRuntime.pairs[1].targetProjectId;await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${worldId}"]`).click();await chooseTool(main,'Build & playtest');
+    await expect(main.getByText('Checking saved map dependencies…',{exact:true})).toHaveCount(0,{timeout:60000});
+    const build=main.locator('.build-page'),breadcrumb=await main.locator('.editor-bar .breadcrumb').getByRole('button',{name:'Library',exact:true}).boundingBox(),monitor=await main.locator('.gs-spark-emblem').boundingBox();
+    expect(breadcrumb.x).toBeGreaterThan(monitor.x+monitor.width+3);const buildBounds=await build.locator('.build-columns').boundingBox();expect(buildBounds.height).toBeLessThan(710);
+    await expect(build.locator('.build-conversion')).not.toHaveAttribute('open','');await expect(build.locator('.build-resources')).not.toHaveAttribute('open','');
+    await main.screenshot({path:path.join(root,'runtime-catalog-build.png')});report.crossRuntime.buildWorkflow={compactBounds:buildBounds,breadcrumbClearOfMonitor:true,sourceAndHistoryDetailsExpandable:true};
+    step('Native Build keeps its controls compact and the Library breadcrumb clear of the cached Monitor');
+    const sourceId=report.crossRuntime.sourceProjectIds[0];await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${sourceId}"]`).click();await chooseTool(main,'Tag editor');
+    await main.getByLabel('Filter tag class',{exact:true}).selectOption('scen');await main.getByRole('textbox',{name:'Search tags',exact:true}).fill('scenery\\rocks\\boulder\\boulder');await main.locator('.tag-row').filter({has:main.locator('strong',{hasText:/^boulder$/})}).click();
+    await main.getByLabel('File menu',{exact:true}).click();await main.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Export tag + dependencies…',exact:true}).click();
+    await expect.poll(async()=>{const rows=await invoke(main,'list_tag_exchanges');return rows.find(row=>row.sourceProjectId===sourceId&&row.requestedTag.replaceAll('\\','/').includes('scenery/rocks/boulder/boulder'))?.fileCount;},{timeout:120000}).toBe(5);
+    report.crossRuntime.fileWorkflow={sourceAwareTagExtraction:true,tagFiles:5,nativeMapSaveAsPlanVisible:true,realFileSave:true,projectDescriptorDialogTested:false};
+    for(const original of report.crossRuntime.originalInputs)expect(crypto.createHash('sha256').update(await fs.readFile(original.file)).digest('hex')).toBe(original.sha256);
+    step('File saves the real document, opens its native Save As plan and extracts the selected source tag through Invader');
+
   }
   if(logicOnly&&!crossRuntime){
     const {nativeLogicRoundTrip}=await import('./native-logic-roundtrip.mjs');

@@ -61,6 +61,10 @@ export default function Build({
   const [checking, setChecking] = useState(true);
   const [preparing,setPreparing]=useState(false);
   const [view,setView]=useMapState<'build'|'portability'>(project.id,'build.view','build');
+  const [inputsOpen,setInputsOpen]=useMapState(project.id,'build.inputsOpen',project.source?.cacheVersion!==13),
+    [resourcesOpen,setResourcesOpen]=useMapState(project.id,'build.resourcesOpen',false),
+    [reportOpen,setReportOpen]=useMapState(project.id,'build.reportOpen',false),
+    [historyOpen,setHistoryOpen]=useMapState(project.id,'build.historyOpen',false);
   useEffect(() => {
     let cancelled = false;
     async function fetchReports() {
@@ -127,7 +131,7 @@ export default function Build({
       {view==='build'&&checking&&<p role="status">Checking saved map dependencies…</p>}
       <div className="build-columns" hidden={view!=='build'}>
         <div className="build-main">
-          <section className="surface build-conversion"><h3>Map conversion · CE / PC / Demo to MCC Halo 1</h3>
+          <details className="surface build-conversion" open={inputsOpen} onToggle={event=>setInputsOpen(event.currentTarget.open)}><summary>Build inputs &amp; conversion <small>Source resources and MCC toolchain</small></summary>
             <p>Extract the original map’s custom tags, layer them over a verified copy of your legal MCC SDK tags, and compile a native MCC cache. Source maps and SDK master tags stay unchanged. The game load is a separate check.</p>
             <BuildTargets project={project} defaults={data.settings} onSave={onSave} onChange={next=>edit(next,'Configure map conversion target')}/>
             <button disabled={!native||preparing||!!activeJob} onClick={()=>{setPreparing(true);void onAction(async()=>{await call('prepare_mcc_conversion_tools',{projectId:project.id});onRefresh();},'MCC tools and editable tags are prepared. Your choices are saved.').finally(()=>setPreparing(false));}}>{preparing?'Preparing installed MCC tools…':'Prepare installed MCC tools'}</button>
@@ -135,17 +139,16 @@ export default function Build({
             {project.source?.sha256==='b38f35508188872b2535888193de80f766d92d3b8d53a8ada7be4fc9808a996d'&&<label>Zombie Apocalypse conversion profile<select aria-label="Zombie Apocalypse conversion profile" value={project.conversionProfile??'faithful'} onChange={e=>edit({...project,conversionProfile:e.target.value as Project['conversionProfile']},'Choose Zombie Apocalypse conversion profile')}><option value="faithful">Faithful · require the two original missing custom audio cues</option><option value="zombie-recovery">Recovery edition · omit two unavailable cues and disable one corrupt placement</option></select></label>}
             {project.conversionProfile==='zombie-recovery'&&<Notice>The recovery edition retains the actual vehicle-based zombie spawners and valid mixed-class placements. Two missing custom sounds and the corrupt first placement are recorded as omissions. Runtime behavior still needs testing.</Notice>}
             {project.source?.cacheVersion===609&&data.entries.find(entry=>entry.id===project.id)?.scenarioType===1&&<label className="toggle-setting"><input aria-label="Use MCC multiplayer UI dependencies" type="checkbox" checked={project.conversionProfile==='mcc-multiplayer-ui'} onChange={e=>edit({...project,conversionProfile:e.target.checked?'mcc-multiplayer-ui':'faithful'},'Choose MCC multiplayer UI compatibility')}/><span>Use MCC multiplayer UI dependencies<small>Replaces the CE startup multiplayer UI collection with your installed MCC SDK version. Custom entries under that collection are not retained. The change is recorded; custom UI/HUD and game loading still need testing.</small></span></label>}
-          </section>
+          </details>
           {issues.map((issue) => (
             <Notice key={issue}>{issue}</Notice>
           ))}
-          <section className="surface build-resources">
-            <h3>Source resource directory</h3>
-            <code className="path-text">
+          <details className="surface build-resources" open={resourcesOpen} onToggle={event=>setResourcesOpen(event.currentTarget.open)}>
+            <summary>Source resources <code className="path-text" title={project.source?.resourceDirectory??data.settings.resourceDirectory??undefined}>
               {project.source?.resourceDirectory ??
                 data.settings.resourceDirectory ??
-                'No source resource directory configured'}
-            </code>
+                'Choose the matching resource folder'}
+            </code></summary>
             <p className="subtle">
               Select the matching original bitmaps.map, sounds.map and loc.map directory for this project.
               Unrelated runtime resource sets can change assets or fail extraction.
@@ -154,7 +157,7 @@ export default function Build({
               <FolderOpen size={14} />
               {dirty ? 'Save & choose source resources…' : 'Choose source resources…'}
             </button>
-          </section>
+          </details>
           {!!report?.bitmapDependencies?.required&&<ConversionBitmapRepair project={project} settings={data.settings} audit={report.bitmapDependencies} disabled={!!activeJob} onSave={onSave} onUse={next=>edit(next,'Use repaired bitmap dependency tagset')}/>}
           <section className="surface build-target">
             <div className="section-label">Build target</div>
@@ -205,11 +208,8 @@ export default function Build({
             )}
           </section>
           {project.source?.cacheVersion === 13 && !project.bspAssembly && !project.animationAssignments?.length && !project.powerups?.length && !project.tagDuplicates?.length && !project.tagRenames?.length && !project.studio?.engineMachinima?.enabled && (!project.conversionProfile || project.conversionProfile === 'faithful') && (
-            <div className="surface">
-              <div className="section-heading">
-                <h3>Already built for MCC?</h3>
-                <Pill>Cache 13 only</Pill>
-              </div>
+            <details className="surface build-existing-cache">
+              <summary>Check an unchanged MCC cache <Pill>Cache 13</Pill></summary>
               <p className="subtle">
                 An unchanged MCC source can be checked and packaged directly. This verifies its structure,
                 protection flags and CRC; it does not convert a legacy map or certify in-game playability.
@@ -226,14 +226,11 @@ export default function Build({
                 <FileCheck2 size={14} />
                 Validate existing MCC cache
               </button>
-            </div>
+            </details>
           )}
           {report && (
-            <section className="surface compatibility">
-              <div className="section-heading">
-                <h3>Compatibility report</h3>
-                <Pill tone={report.ready ? 'green' : 'amber'}>{report.blockers.length} blockers</Pill>
-              </div>
+            <details className="surface compatibility" open={report.blockers.length>0||reportOpen} onToggle={event=>setReportOpen(event.currentTarget.open)}>
+              <summary>Compatibility report <Pill tone={report.ready?'green':'amber'}>{report.blockers.length} blockers · {report.warnings.length} notes</Pill></summary>
               {report.blockers.map((b, i) => (
                 <div className="report-line blocked" key={i}>
                   <Circle size={10} />
@@ -252,7 +249,7 @@ export default function Build({
                   <ArrowRight size={13} />
                 </button>
               )}
-            </section>
+            </details>
           )}
           <section className="surface log-panel">
             <div className="section-heading">
@@ -280,11 +277,8 @@ export default function Build({
               )}
             </div>
           </section>
-          <section className="surface">
-            <div className="section-heading">
-              <h3>Build history</h3>
-              <Pill>{project.builds.length} jobs</Pill>
-            </div>
+          <details className="surface build-history" open={historyOpen} onToggle={event=>setHistoryOpen(event.currentTarget.open)}>
+            <summary>Build history <Pill>{project.builds.length} jobs</Pill></summary>
             {project.builds.length ? (
               project.builds
                 .slice()
@@ -313,7 +307,7 @@ export default function Build({
             ) : (
               <p className="subtle">No builds have been run for this project.</p>
             )}
-          </section>
+          </details>
         </div>
         <aside className="build-sidebar">
           <section className="surface">
@@ -323,9 +317,8 @@ export default function Build({
                 Local MCC package
               </h3>
             </div>
-            <p className="subtle">
-              MCC’s package description files (created by its Excession tool) are kept intact and paired
-              with your built map in a separate mod folder.
+            <p className="subtle" title="Excession creates MCC’s package description files. Spark preserves them and installs your map in a separate mod folder.">
+              Package your validated map with an Excession description.
             </p>
             <CheckRow
               ok={!!validated}
@@ -378,8 +371,8 @@ export default function Build({
             <CheckRow ok={!!readiness?.halo1Installed} label="Halo 1 installed" />
             <CheckRow ok={!!readiness?.steamAvailable} label="Steam available" />
             <CheckRow ok={!dirty && !!readiness?.packageValid} label="Package matches saved edits" detail="Checks file identity and the saved project revision. An in-game playtest is a separate step." />
-            <div className="mod-mode-note">
-              <Pill tone="amber">Anti-cheat disabled required</Pill>
+            <details className="mod-mode-note">
+              <summary><Pill tone="amber">Anti-cheat disabled required</Pill></summary>
               <p>
                 Steam must use <strong>Play Halo: MCC Anti-Cheat Disabled (Mods and Limited Services)</strong>
                 .
@@ -388,7 +381,7 @@ export default function Build({
                 Guilty Spark opens Steam’s normal launch workflow. It cannot verify or silently select the
                 anti-cheat mode.
               </small>
-            </div>
+            </details>
             <button
               className="primary full launch-button"
               disabled={!readiness?.launchReady || dirty || !!activeJob}
@@ -408,10 +401,7 @@ export default function Build({
             <FolderOpen size={14} />
             Open project folder
           </button>
-          <Notice>
-            {project.title} acceptance requires a successful conversion, a registered local package, and an
-            in-game load test of the converted map.
-          </Notice>
+          <small className="build-acceptance-note">Compilation, package validation and an in-game playtest are separate checks.</small>
         </aside>
       </div>
     </div>

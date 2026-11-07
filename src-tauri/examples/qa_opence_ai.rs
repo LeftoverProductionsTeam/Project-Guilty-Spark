@@ -1,4 +1,4 @@
-// Opt-in, read-only QA for the exact publisher OpenCE build-335 and matching
+// Opt-in, read-only QA for the exact publisher OpenCE builds335/343 and matching
 // private PDB. Does not inject, patch, launch, transmit game bytes, or execute
 // remote commands. Upstream engine source is not included in this example.
 // Usage: cargo run -p guilty-spark --example qa_opence_ai -- <owned test exe>

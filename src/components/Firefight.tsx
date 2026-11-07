@@ -1,3 +1,4 @@
+import {useWorkspaceFileActions} from './WorkspacePanels';
 import { useEffect, useState } from 'react';
 import { Plus, ShieldCheck, Trash2, Play, Flag, Download } from 'lucide-react';
 import { exportHaloCeFirefightRound, scriptManifest } from '../haloScript';
@@ -40,6 +41,7 @@ export default function Firefight({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const config = project.firefight;
+  useWorkspaceFileActions('firefight:'+project.id,config?[{id:'firefight-round-source',label:'Export native Firefight round source…',hint:'Native scenario/script sources; compilation and gameplay are separate checks.',disabled:busy,run:()=>exportRound()}]:[]);
   useEffect(() => {
     let alive = true;
     setCatalog(null);

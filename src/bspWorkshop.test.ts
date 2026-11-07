@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  placeWorkshopPrimitive,
   boxBrush,
   clipBrush,
   extrudeFace,
@@ -182,4 +183,23 @@ describe('editable Workshop source', () => {
     b();
     expect(projectMutationPending('a')).toBe(false);
   });
+});
+
+it('drop-in Workshop stairs preserve material density, have eight finite solid treads and undo as one source edit',()=>{
+  const doc={workshop:{schemaVersion:1,brushes:[boxBrush('room','space',[-12,-12,0],[12,12,8],'metal')],portals:[]},materials:[{id:'metal'}],geometry:[],native:undefined} as unknown as QuickForgeDocument;
+  const original=JSON.stringify(doc);const placed=placeWorkshopPrimitive(doc,'stairs',[1,2,0],'metal');
+  expect(JSON.stringify(doc)).toBe(original);expect(placed.document.workshop!.brushes).toHaveLength(9);
+  const steps=placed.document.workshop!.brushes.slice(1);expect(new Set(steps.map(s=>s.id)).size).toBe(8);
+  expect(steps.map(s=>Math.max(...s.vertices.map(v=>worldVertex(s,v)[2])))).toEqual([.27,.52,.77,1.02,1.27,1.52,1.77,2.02]);
+  for(const step of steps){expect(step.role).toBe('solid');expect(step.worldUv).toBe(true);expect(step.faces.every(face=>face.materialId==='metal')).toBe(true);expect(volume(step)).toBeGreaterThan(0);}
+  for(const kind of ['room','wall','ramp','box'] as const){const next=placeWorkshopPrimitive(doc,kind,[2,3,0],'metal');expect(next.document.workshop!.brushes).toHaveLength(2);expect(next.document.workshop!.brushes[1].role).toBe(kind==='room'?'space':'solid');}
+  expect(()=>placeWorkshopPrimitive(doc,'wall',[NaN,0,0],'metal')).toThrow(/position/);
+  expect(()=>placeWorkshopPrimitive(doc,'wall',[0,0,0],'missing')).toThrow(/material/);
+});
+
+it('Workshop shape placement respects the native64-volume limit without changing prior source',()=>{
+  const doc={workshop:{schemaVersion:1,brushes:Array.from({length:56},(_,i)=>boxBrush('room-'+i,'space',[-12,-12,0],[12,12,8],'metal')),portals:[]},materials:[{id:'metal'}],geometry:[]} as unknown as QuickForgeDocument;
+  expect(placeWorkshopPrimitive(doc,'stairs',[0,0,0],'metal').document.workshop!.brushes).toHaveLength(64);
+  doc.workshop!.brushes.push(boxBrush('extra','space',[-12,-12,0],[12,12,8],'metal'));const before=JSON.stringify(doc);
+  expect(()=>placeWorkshopPrimitive(doc,'stairs',[0,0,0],'metal')).toThrow(/64 source volumes/);expect(JSON.stringify(doc)).toBe(before);
 });

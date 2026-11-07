@@ -30,6 +30,7 @@ playwright-report/
 # Generated Python bytecode from local maintenance/packaging helpers.
 __pycache__/
 # User-owned installed runtimes are content, not distributable Spark source.
+/Runtimes/
 /Halo Custom Edition/
 /opencehalo-windows-release/
 /chupathingyce-windows64-release/

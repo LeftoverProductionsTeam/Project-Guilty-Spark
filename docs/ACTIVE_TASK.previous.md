@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
 Task: c3ad4850 — complete real CE to MCC cross-runtime asset import through the existing creator workflow
-Status: implementation incomplete
+Status: automated acceptance incomplete
 Starting revision: 34b7c57a17c7a807805e52d0c6a6a40bc91a6e07
-Latest verified revision: Master34b7c57 and owner README preserved. R7 Rust802/9ignored/53suites; R12 TypeScript/416frontend/3contracts/59offline/35storage/193browser passed and fresh Windows app built. R14 CE scenery→MCC native compile and cache positions passed; independent CLI assertion still needed valid duplicate-palette handling. No game acceptance.
-Next action: Finish cross-runtime-r15 using the R12 source-pinned app. Verify both distinct CE scenery/vehicle→MCC destinations, independent recursive extraction/palette/positions/CRC, full process restart, original hashes. R14 corrupt-fixture timing repaired: hold bad bytes until import settles, not merely until renderer reports. Native scenarios permit duplicate palette entries; follow every matching index without relaxing exact object/pose checks. Then update existing ledger/checkpoint and commit verified local source.
+Latest verified revision: Local master6e3bb1d commits the R16 CE609→MCC13 scenery/vehicle native/restart milestone. Original34b7 README/history,475 IDs/25prompts, originals, stash and C49 preserved. R12 full193browser/416frontend/TS/offline/storage and R7 unchanged Rust802/9ignored pass; R16 no mock IPC, both independent native artifacts/readbacks and restart pass.
+Next action: Finish runtime-folders-r31 native acceptance using the hash/fingerprint-verified R30 application; runtime code is unchanged. R30 full Rust802/9ignored, frontend425,200browser,TypeScript/offline/storage pass, and both native imports/compiles/restart pass. Its final File extraction assertion incorrectly expected an unsaved donor card after restart; the harness now uses explicit File Save for all donor fixtures. On complete native pass, update actual directory preferences, commit locally and retire superseded generated QA output.
 
 ## Acceptance
 
@@ -30,7 +30,7 @@ Earlier failed attempts and corrections remain in the current report/fixture. La
 
 ## Operations and safe checkpoint
 
-Current operation: cross-runtime-r15.json/log in the existing external Engineering evidence directory. R12 app built3m36s and all193browser cases pass. R13 tracing disproved the earlier native duplicate hypothesis: the corrupt-source fixture restored bytes on a renderer warning before import completion, allowing a valid late import. R14 waits for the import UI to settle while bytes remain corrupt; exactly one valid placement and one-action copy/Undo/Redo pass. R14 actual MCC Tool compile50737ms passes; independent reader followed only the first of two legal palette entries and must inspect both. R15 retains the same production code, proper source pins and strong checks. Original inputs/C49 remain read-only; owned scratch is disposed per run. Persistent click suppression separately passes delayed-click/cancel/keyboard UI regression. No CE game load, vehicle parity or full studio acceptance yet.
+Current operation: R30 completed with two genuine native asset compiles/restart and four native-window cases, then failed only on the unsaved donor fixture before recursive File extraction. Source remains frozen; R31 reuses its exact verified application instead of rebuilding. All three moved runtime registrations passed native inspection. Owner live OpenCE343 read-only observations and bounded retest are integrated in ENGINE_SOURCE_ATLAS and its fixture; no host/peer/human game acceptance.
 
 ## Deferred requests
 

@@ -2286,7 +2286,9 @@ async fn register_runtime(
         lib.set_setting("runtimeRegistrations", &registrations)
             .map_err(error)?;
         drop(lib);
-        runtime_reports(&state)
+        let reports=runtime_reports(&state)?;
+        let _=app.emit("spark:runtime-connections-changed",());
+        Ok(reports)
     })
     .await
     .map_err(error)?

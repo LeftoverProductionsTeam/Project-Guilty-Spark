@@ -71,12 +71,37 @@
 .application .runtime-strip {padding:9px 12px;margin-block:8px;}
 .application .map-grid {grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
 .application .map-card .map-thumbnail {height:110px;}
-.application .build-columns {gap:12px;grid-template-columns:minmax(0,1fr) minmax(260px,300px);}
-.application .build-main {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start;}
-.application .build-main > :is(.build-conversion,.compatibility,.log-panel) {grid-column:1/-1;}
-.application .build-page .surface {padding:12px;margin:0;}
-.application .build-page .surface p {line-height:1.45;margin:6px 0;}
-.application .build-log {max-height:180px;}
+/* Build controls stay together; source details and old outputs expand on demand. */
+.application .build-columns{gap:8px;grid-template-columns:minmax(0,1fr) minmax(248px,286px);align-items:start;}
+.application .build-main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-content:start;align-items:start;}
+.application .build-main>:is(.build-conversion,.build-target,.compatibility,.log-panel,.notice){grid-column:1/-1;}
+.application .build-page .surface{padding:9px;margin:0;min-width:0;}
+.application .build-page .surface p{line-height:1.4;margin:5px 0;}
+.application .build-page details.surface>summary{font-size:12px;cursor:pointer;line-height:20px;}
+.application .build-page details.surface>summary :is(small,code){display:inline-block;vertical-align:bottom;max-width:65%;margin:0 0 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:10px;}
+.application .build-page details.surface>summary .pill{margin-left:8px;}
+.application .build-page details.surface[open]>summary{margin-bottom:7px;}
+.application .build-page .target-heading{gap:8px;}
+.application .build-page .target-icon{width:32px;height:32px;}
+.application .build-page .build-steps{padding-top:8px;margin-top:8px;}
+.application .build-page .log-panel .section-heading{padding:7px 9px;margin:-9px -9px 0;}
+.application .build-log{height:auto;min-height:42px;max-height:145px;padding:6px 9px;}
+.application .build-page .log-wait{padding:5px;display:flex;gap:7px;align-items:center;justify-content:flex-start;flex-wrap:wrap;}
+.application .build-page .log-wait>small{flex-basis:100%;text-align:left;}
+.application .build-page .build-history-item{padding:8px 0 3px;gap:7px;}
+.application .build-sidebar{display:grid;gap:8px;align-content:start;}
+.application .build-sidebar .surface{margin:0;}
+.application .build-sidebar .check-row{padding:4px 0;}
+.application .build-sidebar .check-row small{line-height:1.3;}
+.application .build-sidebar .mod-mode-note{margin-block:7px;}
+.application .build-sidebar .microcopy{margin-block:6px;}
+.application .build-sidebar .section-heading{margin-bottom:8px;}
+.application .build-sidebar .primary{margin-top:8px;}
+.application .build-sidebar .launch-button{min-height:42px!important;padding:5px 9px;flex-wrap:wrap;gap:2px 5px;}
+.application .build-sidebar .launch-button>span{position:static;flex-basis:100%;line-height:12px;}
+.application .build-acceptance-note{font-size:10px;line-height:1.4;color:var(--muted);padding:0 4px;}
+
+@media(max-width:850px){.application .build-columns{grid-template-columns:minmax(0,1fr);}.application .build-main{grid-template-columns:minmax(0,1fr);}.application .build-sidebar{grid-template-columns:repeat(auto-fit,minmax(248px,1fr));}}
 .application .dependency-panel {grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px;padding:12px;align-content:start;}
 .application .dependency-panel > :is(header,.notice,.dependency-review,.dependency-footnote,[role='status']) {grid-column:1/-1;}
 .application .dependency-item {border:1px solid var(--line);border-radius:8px;padding:10px;gap:5px;align-content:start;}
@@ -166,7 +191,7 @@
 .gs-spark-loading{animation:gs-spark-loading 1.2s linear infinite;opacity:.65;}
 @keyframes gs-spark-loading{to{transform:rotate(360deg);}}
 @media(prefers-reduced-motion:reduce){.gs-spark-loading{animation:none;}}
-.application .level-editor-context,.application .editor-bar{padding-left:76px;}
+.application.gs-drawers .gs-workspace-content :is(.level-editor-context,.editor-bar){padding-left:76px;}
 .application .gs-settings-tabs{padding-left:72px;}
 .application .library-page>.page-title{padding-left:58px;}
 .application .gs-get-started>.page-title{padding-left:58px;}

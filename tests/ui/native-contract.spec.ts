@@ -1876,7 +1876,7 @@ test('Portability Lab compares explicit native targets and preserves the existin
   await page.getByRole('button',{name:'Compare semantic changes',exact:true}).click();
   await expect(page.getByText('Inspected fields only; gameplay unverified.',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'MCC build workflow',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Map conversion · CE / PC / Demo to MCC Halo 1',exact:true})).toBeVisible();
+  await expect(page.locator('.build-conversion>summary')).toHaveText('Build inputs & conversion Source resources and MCC toolchain');await expect(page.getByRole('button',{name:'Convert map to MCC',exact:true})).toBeVisible();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);
   expect(calls.find((c:any)=>c.command==='inspect_portability').args.targets).toEqual(['halo1-mcc-steam','halo1-custom-edition']);
   expect(calls.some((c:any)=>c.command==='start_build')).toBe(false);
@@ -1902,7 +1902,7 @@ test('downloaded maps can open directly in the MCC conversion flow',async({page}
   await mockDesktop(page);await openFixture(page);
   await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>command==='import_dialog'?[await original('open_project',{id:'b'})]:original(command,args);});
   await chooseTool(page,"Community maps");await page.getByRole('button',{name:'Import & convert to MCC',exact:true}).click();await expect(page.getByRole('heading',{name:'From archive to in-game.',exact:true})).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Map conversion · CE / PC / Demo to MCC Halo 1',exact:true})).toBeVisible();
+  await expect(page.locator('.build-conversion>summary')).toHaveText('Build inputs & conversion Source resources and MCC toolchain');await expect(page.getByRole('button',{name:'Convert map to MCC',exact:true})).toBeVisible();
   const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((c:any)=>c.command==='compatibility'&&c.args.id==='b')).toBe(true);expect(calls.some((c:any)=>c.command==='start_build')).toBe(false);
 });
 
@@ -1913,7 +1913,7 @@ test('mixed native imports open the valid map and report the rejected file',asyn
     return original(command,args);
   };});
   await chooseTool(page,'Community maps');await page.getByRole('button',{name:'Import & convert to MCC',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Map conversion · CE / PC / Demo to MCC Halo 1',exact:true})).toBeVisible();
+  await expect(page.locator('.build-conversion>summary')).toHaveText('Build inputs & conversion Source resources and MCC toolchain');await expect(page.getByRole('button',{name:'Convert map to MCC',exact:true})).toBeVisible();
   await expect(page.getByText(/1 project opened\. 1 file could not be opened\./)).toBeVisible();
   await expect(page.getByText(/broken\.map: The map is truncated\./)).toBeVisible();
   expect(await page.evaluate(()=>(window as any).__importBatchArgs.includeReport)).toBe(true);
@@ -2869,7 +2869,10 @@ test('asset categories and pointer cancellation preserve the destination until a
  await library.getByLabel('Asset library map',{exact:true}).selectOption('b');const category=library.getByLabel('Asset library type',{exact:true});
  for(const kind of ['scen','vehi','bipd','eqip']){await category.selectOption(kind);await expect(library.getByRole('button',{name:'Add test at view',exact:true})).toHaveCount(0);}
  await category.selectOption('weap');const button=library.getByRole('button',{name:'Add test at view',exact:true});await expect(button).toBeEnabled();
- const source=await button.boundingBox(),viewport=await page.getByTestId('viewport').boundingBox(),destination={x:viewport!.x+viewport!.width*.3,y:viewport!.y+viewport!.height*.5};
+ const picture=button.locator('..').locator('.asset-preview-drag');await expect(picture).toBeVisible();
+ // Renderer controls may consume bubble events; release must still reach the existing drop owner.
+ await page.getByTestId('viewport').evaluate(element=>{element.addEventListener('pointermove',event=>event.stopPropagation());element.addEventListener('pointerup',event=>event.stopPropagation());});
+ const source=await picture.boundingBox(),viewport=await page.getByTestId('viewport').boundingBox(),destination={x:viewport!.x+viewport!.width*.3,y:viewport!.y+viewport!.height*.5};
  const begin=async()=>{await page.mouse.move(source!.x+source!.width/2,source!.y+source!.height/2);await page.mouse.down();await page.mouse.move(destination.x,destination.y,{steps:12});await expect(page.locator('.viewport-asset-drop-hint:visible')).toBeVisible();};
  for(const mode of ['escape','outside','blur']){await begin();if(mode==='escape')await page.keyboard.press('Escape');if(mode==='outside')await page.mouse.move(600,10,{steps:4});if(mode==='blur')await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.mouse.up();await expect(page.locator('.viewport-asset-drop-hint:visible')).toHaveCount(0);}
  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='prepare_native_asset_import'))).toEqual([]);
@@ -2899,4 +2902,110 @@ test('a delayed WebView release click cannot place a second asset after a drag o
  await begin();await page.mouse.up();await expect(page.locator('.viewport-object-actions strong')).toHaveText('test');await expect(button).toBeEnabled();await lateClick();
  expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='prepare_native_asset_import').length)).toBe(1);
  await button.focus();await page.keyboard.press('Enter');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='prepare_native_asset_import').length)).toBe(2);
+});
+
+
+test('connected runtime and legacy donors load from the main asset selector and refresh when a runtime is connected',async({page})=>{
+ await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__sourceRows=[['mcc',13,'MCC Halo 1'],['ce',609,'Custom Edition'],['open',5,'OpenCE'],['chupa',5,'ChupathingyCE'],['demo',6,'Halo Demo'],['pc',7,'Halo PC / Mac']].map(([id,version,engine])=>({id,name:id+'.map',location:engine,engine,cacheVersion:version,archive:false,bytes:100}));
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{if(command==='discover_asset_sources')return{maps:w.__sourceRows,notices:[],elapsedMs:1};if(command==='open_asset_source'){w.__sparkMock.calls.push({command,args});return[structuredClone(w.__sparkMock.projects.b)];}return invoke(command,args);};window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));});
+ await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true}),selector=library.getByLabel('Asset library map',{exact:true});
+ for(const id of ['mcc','ce','open','chupa','demo','pc'])await expect(selector.locator(`option[value="discovered:${id}"]`)).toHaveCount(1);
+ await selector.selectOption('discovered:chupa');await expect(selector).toHaveValue('b');await expect(library.getByRole('button',{name:'Add test at view',exact:true})).toBeEnabled();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.find((c:any)=>c.command==='open_asset_source')?.args)).toEqual({sourceId:'chupa',preparePreviewResources:true});
+ await page.evaluate(()=>{const w=window as any;w.__sourceRows.push({id:'new-map',name:'new.map',location:'OpenCE',engine:'Halo Xbox',cacheVersion:5,archive:false,bytes:100});window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));});await expect(selector.locator('option[value="discovered:new-map"]')).toHaveCount(1);
+ await page.keyboard.press('Control+s');expect(await page.evaluate(()=>(window as any).__sparkMock.projects.a.project.scene)).toEqual([]);
+});
+
+test('Maps precedes the rectangular tabs and compact Tools opens another independent view',async({page})=>{
+ await page.setViewportSize({width:1280,height:800});await mockDesktop(page);await openFixture(page);await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();await chooseTool(page,'Level editor');
+ const maps=await page.getByLabel('Choose open map',{exact:true}).boundingBox(),tabs=await page.getByRole('tablist',{name:'Open maps',exact:true}).boundingBox();expect(maps!.x+maps!.width).toBeLessThanOrEqual(tabs!.x+1);
+ await page.getByLabel('More workspace drawers',{exact:true}).click();const menu=page.getByRole('menu',{name:'Workspace drawers',exact:true});await expect(menu).toBeVisible();const rect=await menu.boundingBox();expect(rect!.width).toBeLessThanOrEqual(322);expect(rect!.height).toBeLessThan(400);expect(rect!.x).toBeGreaterThanOrEqual(7);expect(rect!.x+rect!.width).toBeLessThanOrEqual(1273);
+ await menu.getByRole('menuitem',{name:'New workspace window',exact:true}).click();await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='open_project_window').length)).toBe(1);
+ const args=await page.evaluate(()=>(window as any).__sparkMock.calls.find((c:any)=>c.command==='open_project_window').args);expect(args.id).toBe('b');expect(args.observe).toBe(true);expect(args.another).toBe(true);await expect(page.getByRole('tab',{name:'Synthetic candidate',exact:true})).toHaveAttribute('aria-selected','true');
+});
+
+test('File follows the active workspace, saves its current edit and offers a native Save As plan',async({page})=>{
+ await mockDesktop(page);await openFixture(page);const field=page.getByLabel('Velocity',{exact:true});await field.fill('37');
+ const file=page.getByLabel('File menu',{exact:true});await file.click();const menu=page.getByRole('menu',{name:'File commands',exact:true});
+ await expect(menu.getByRole('menuitem',{name:'Export tag + dependencies…',exact:true})).toBeEnabled();await menu.getByRole('menuitem',{name:'Save',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.tagEdits?.[0]?.value)).toBe(37);
+ await file.click();await menu.getByRole('menuitem',{name:'Save As…',exact:true}).click();await expect(page.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','build');await expect(page.locator('.smart-edit')).toHaveAttribute('open','');
+ await chooseTool(page,'Machinima');await file.click();await expect(menu.getByRole('menuitem',{name:'Export camera take…',exact:true})).toBeVisible();await expect(menu.getByRole('menuitem',{name:'Export tag + dependencies…',exact:true})).toHaveCount(0);
+ await page.keyboard.press('Escape');await chooseTool(page,'Creator Studio');await file.click();await expect(menu.getByRole('menuitem',{name:'Export CE script sources…',exact:true})).toBeVisible();await expect(menu.getByRole('menuitem',{name:'Export camera take…',exact:true})).toHaveCount(0);
+ await page.keyboard.press('Escape');await chooseTool(page,'Map library');await file.click();await expect(menu.getByRole('menuitem',{name:'Export CE script sources…',exact:true})).toHaveCount(0);await menu.getByRole('menuitem',{name:'Export project descriptor…',exact:true}).click();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((c:any)=>c.command==='export_project').at(-1).args)).toEqual({id:'a'});await expect(page.getByText('Project descriptor exported.',{exact:false})).toHaveCount(0);
+});
+
+test('File Tools Maps are compact, mutually exclusive and precede even one map tab',async({page})=>{
+ await page.setViewportSize({width:1280,height:800});await mockDesktop(page);await openFixture(page);
+ const file=page.getByLabel('File menu',{exact:true}),tools=page.getByLabel('More workspace drawers',{exact:true}),maps=page.getByLabel('Choose open map',{exact:true}),tabs=page.getByRole('tablist',{name:'Open maps',exact:true});
+ const boxes=await Promise.all([file,tools,maps,tabs].map(node=>node.boundingBox()));for(let i=1;i<boxes.length;i++)expect(boxes[i-1]!.x+boxes[i-1]!.width).toBeLessThanOrEqual(boxes[i]!.x+1);
+ await file.focus();await page.keyboard.press('ArrowDown');await expect(page.getByRole('menuitem',{name:'Open map or archive…',exact:true})).toBeFocused();await tools.click();await expect(page.getByRole('menu',{name:'File commands',exact:true})).toBeHidden();await maps.click();await expect(page.getByRole('menu',{name:'Workspace drawers',exact:true})).toBeHidden();await page.keyboard.press('Escape');await expect(maps).toBeFocused();
+});
+
+test('BSP Shapes drops editable source stairs and preserves one-action Undo and immediate Save',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('spark-test-forge',JSON.stringify({schemaVersion:1,name:'Synthetic forge',template:'emptyArena',runtimeId:'mccSteam',gameMode:'slayer',skyPath:null,buildQuality:'draft',geometry:[],materials:[{id:'metal',name:'Metal',color:'#777777',shaderPath:'levels/test/metal',uScale:1,vScale:1}],placements:[],spawns:[],objectives:[],workshop:{schemaVersion:1,brushes:[],portals:[]}})));
+ await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');const workshop=page.getByLabel('Native BSP Workshop',{exact:true});
+ await workshop.locator('.bsp-shape-toolbar summary').click();for(const kind of ['room','wall','box','ramp','stairs'])await expect(workshop.getByRole('button',{name:'Place BSP '+kind,exact:true})).toBeEnabled();
+ const source=await workshop.getByRole('button',{name:'Place BSP stairs',exact:true}).boundingBox(),top=await workshop.getByLabel('top orthographic editing view',{exact:true}).boundingBox();
+ await page.mouse.move(source!.x+source!.width/2,source!.y+source!.height/2);await page.mouse.down();await page.mouse.move(top!.x+top!.width*.4,top!.y+top!.height*.5,{steps:12});await expect(workshop.getByText('Drop shape into a BSP view',{exact:true})).toBeVisible();await page.mouse.up();
+ await expect(workshop.locator('.bsp-source-list button')).toHaveCount(8);await expect(workshop.getByLabel('Volume name',{exact:true})).toHaveValue(/Stairs.*step 1/);await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.length)).toBe(8);
+ await page.locator('.runtime-dock-heading').click();await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect(workshop.locator('.bsp-source-list button')).toHaveCount(0);await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.quickForge.workshop.brushes.length)).toBe(0);
+ await page.keyboard.press('Control+y');await expect(workshop.locator('.bsp-source-list button')).toHaveCount(8);
+});
+
+
+test('Build keeps blockers visible, compacts details and clears the Monitor from the Library breadcrumb',async({page})=>{
+ await mockDesktop(page);await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__sparkMock.projects.a.project.source.cacheVersion=13;w.__sparkMock.projects.a.inspection.header.version=13;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>command==='compatibility'?{target:'MCC',pipeline:'Synthetic contract',ready:true,blockers:[],warnings:['Game playtest remains separate']}:invoke(command,args);});await openFixture(page);await chooseTool(page,'Build & playtest');
+ const build=page.locator('.build-page');await expect(build.getByRole('button',{name:'Convert map to MCC',exact:true})).toBeEnabled();
+ await expect(build.locator('.build-conversion')).not.toHaveAttribute('open','');await expect(build.locator('.build-resources')).not.toHaveAttribute('open','');
+ await expect(build.locator('.compatibility')).not.toHaveAttribute('open','');await expect(build.locator('.build-history')).not.toHaveAttribute('open','');
+ for(const width of [1280,1920,2560]){
+  await page.setViewportSize({width,height:1080});const monitor=await page.locator('.gs-spark-emblem').boundingBox(),library=await page.locator('.editor-bar .breadcrumb').getByRole('button',{name:'Library',exact:true}).boundingBox();
+  expect(library!.x).toBeGreaterThan(monitor!.x+monitor!.width+3);
+  const columns=await build.locator('.build-columns').boundingBox();console.log('BUILD_LAYOUT',JSON.stringify({width,columns,parts:await build.locator('.build-columns').evaluate(element=>[...element.querySelectorAll('.build-main,.build-sidebar,.build-main>*,.build-sidebar>*')].map(node=>({class:node.className,height:node.getBoundingClientRect().height,width:node.getBoundingClientRect().width,text:node.textContent?.slice(0,65)})))}));expect(columns!.height).toBeLessThan(710);
+  const resource=await build.locator('.build-resources').boundingBox();expect(resource!.height).toBeLessThan(60);
+ }
+ await build.locator('.build-resources>summary').click();await expect(build.getByRole('button',{name:'Choose source resources…',exact:true})).toBeVisible();
+ await build.locator('.compatibility>summary').click();await expect(build.locator('.compatibility')).toHaveAttribute('open','');
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>command==='compatibility'?{target:'MCC',pipeline:'Synthetic contract',ready:false,blockers:['Matching source bitmap bank is required'],warnings:[]}:invoke(command,args);});
+ await build.getByRole('button',{name:'Refresh checks',exact:true}).click();await expect(build.getByText('Matching source bitmap bank is required',{exact:true})).toBeVisible();await expect(build.getByRole('button',{name:'Convert map to MCC',exact:true})).toBeDisabled();
+});
+
+
+test('runtime folders can be moved independently, including Custom Edition, with reinspection before save',async({page})=>{
+ await mockDesktop(page);
+ await page.evaluate(async()=>{
+  const w=window as any,original=w.__TAURI_INTERNALS__.invoke,[base]=await original('runtime_report');
+  w.__folderReports=[base,...['haloCustomEdition','openCe','chupathingyCe'].map(id=>({...base,id,name:id,installation:{registrationId:id,root:'D:/Old/'+id,executable:'D:/Old/'+id+(id==='haloCustomEdition'?'/haloce.exe':'/halo.exe'),dataRoot:id==='openCe'?'E:/Separate/OpenCE-data':'D:/Old/'+id,version:null,networkVersion:null,identity:'userDeclared',validation:'pass',diagnostics:[]}}))];
+  w.__folderChecks=[];w.__folderSaves=[];
+  w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{
+   if(command==='runtime_report')return structuredClone(w.__folderReports);
+   if(command==='choose_runtime_path')return 'D:/Runtimes/'+w.__folderRuntime;
+   if(command==='inspect_runtime_registration'){w.__folderChecks.push(structuredClone(args.registration));return{...args.registration,registrationId:args.registration.id,validation:'pass',identity:'userDeclared',executableSha256:'a'.repeat(64),diagnostics:[]};}
+   if(command==='register_runtime'){w.__folderSaves.push(structuredClone(args.registration));w.__folderReports=w.__folderReports.map((r:any)=>r.id===args.registration.runtimeId?{...r,installation:{...args.registration,registrationId:args.registration.id,validation:'pass',identity:'userDeclared',executableSha256:'a'.repeat(64),diagnostics:[]}}:r);return structuredClone(w.__folderReports);}
+   return original(command,args);
+  };
+ });
+ await chooseTool(page,'Settings & tools');
+ for(const [id,name]of [['haloCustomEdition','Custom Edition'],['openCe','OpenCE'],['chupathingyCe','ChupathingyCE']]){
+  await page.evaluate(id=>(window as any).__folderRuntime=id,id);
+  await page.getByRole('group',{name:'Halo versions',exact:true}).getByRole('button',{name:new RegExp(name)}).click();
+  await page.getByRole('button',{name:'Runtime folders…',exact:true}).click();
+  const form=page.locator('.registration:visible'),root=form.getByRole('textbox',{name:'Installation directory',exact:true});
+  await form.locator('.path-input').first().getByRole('button',{name:'Browse',exact:true}).click();
+  await expect(root).toHaveValue('D:/Runtimes/'+id);
+  await expect(form.getByRole('textbox',{name:'Installed executable',exact:true})).toHaveValue('D:/Runtimes/'+id+(id==='haloCustomEdition'?'/haloce.exe':'/halo.exe'));
+  await expect(form.getByRole('textbox',{name:'Runtime data root',exact:true})).toHaveValue(id==='openCe'?'E:/Separate/OpenCE-data':'D:/Runtimes/'+id);
+  const save=form.getByRole('button',{name:'Save registration',exact:true});await expect(save).toBeDisabled();await form.getByRole('button',{name:'Inspect registration',exact:true}).click();await expect(save).toBeEnabled();
+  await root.fill('D:/Runtimes/'+id+'-moved');await expect(save).toBeDisabled();
+  await expect(form.getByRole('textbox',{name:'Installed executable',exact:true})).toHaveValue('D:/Runtimes/'+id+'-moved'+(id==='haloCustomEdition'?'/haloce.exe':'/halo.exe'));
+  await form.getByRole('button',{name:'Inspect registration',exact:true}).click();await save.click();
+  await expect(form.getByText('Registration saved. Runtime files were not changed.',{exact:true})).toBeVisible();
+ }
+ const saved=await page.evaluate(()=>(window as any).__folderSaves);expect(saved).toHaveLength(3);
+ expect(saved.map((r:any)=>r.runtimeId)).toEqual(['haloCustomEdition','openCe','chupathingyCe']);
+ expect(await page.evaluate(()=>(window as any).__folderReports[0].id)).toBe('mccSteam');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.some((c:any)=>['launch_registered_runtime','launch_registered_server','launch_discovered_tool'].includes(c.command)))).toBe(false);
 });

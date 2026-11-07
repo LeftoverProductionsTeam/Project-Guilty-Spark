@@ -5,6 +5,7 @@ import {
   compareActorObservations,
   analyzeActors,
   OPEN_CE_AI,
+  OPEN_CE_AI_343,
 } from './analyze-opence-ai.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -368,4 +369,12 @@ test('failed-run diagnostics retain exit failure without weakening observer/sour
     assert(path.basename(root).startsWith('spark-failed-ai-'));
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+
+test('build343 observation requires its own exact executable/PDB pair and cannot imply cross-build parity',()=>{
+ const h={...header,runtime:'opence-build-343',exeSha256:OPEN_CE_AI_343.exe,pdbSha256:OPEN_CE_AI_343.pdb};
+ const observed=parseActorObservation(text(h),record);assert.equal(observed.samples.length,1);
+ assert.throws(()=>parseActorObservation(text({...h,pdbSha256:OPEN_CE_AI.pdb}),record),/identity/);
+ assert.throws(()=>compareActorObservations(parseActorObservation(text(),record),observed),/different runtime/);
 });

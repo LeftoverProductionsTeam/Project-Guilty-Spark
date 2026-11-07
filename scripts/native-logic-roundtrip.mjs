@@ -35,6 +35,7 @@ export async function nativeLogicRoundTrip({page,root,kit,tags,invader,cache,cal
  expect(source.inspection.header.version).toBe(13);
  expect(source.inspection.tags.some(t=>t.class==='mach'&&t.path.replaceAll('\\','/').endsWith('door small/door small'))).toBe(true);
  await open();await page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await page.getByRole('button',{name:'Two rooms + corridor + ramp',exact:true}).click();
+
  await page.locator('.bsp-source-list button').filter({hasText:'Corridor'}).click();await field('Scale Y',0.3375);await field('Scale Z',0.35);
  const details=page.locator('.bsp-source-fields details').filter({has:page.locator('summary',{hasText:'Halo material paths & player starts'})});await details.locator('summary').click();
  const shader=page.getByRole('textbox',{name:'Shader path surface',exact:true});await shader.fill('levels/test/tutorial/shaders/example_tutorial_metal_floor');await shader.press('Tab');
@@ -232,6 +233,17 @@ export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invad
  const originalFiles=[...new Set([cache,...donors,...donors.flatMap(file=>['bitmaps.map','sounds.map','loc.map'].map(name=>path.join(path.dirname(file),name)))])];
  const originalInputs=await Promise.all(originalFiles.map(async file=>({file,sha256:await hash(file)})));
  const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,onboardingCompleted:true,autoBuild:false,preferredHalo:'mccSteam',hekDirectory:kit,hekTagsDirectory:tags,invaderDirectory:invader,hekFlavor:'h1aEk'}});
+
+ if(process.env.SPARK_QA_RUNTIME_ROOT){
+  const runtimeRoot=await fs.realpath(process.env.SPARK_QA_RUNTIME_ROOT);receipt.runtimeDirectories=[];
+  for(const [runtimeId,folder,executable]of [['haloCustomEdition','Halo Custom Edition','haloce.exe'],['openCe','OpenCE','halo.exe'],['chupathingyCe','Chupathingy','halo.exe']]){
+   const gameRoot=path.join(runtimeRoot,folder),registration={id:crypto.randomUUID(),runtimeId,root:gameRoot,executable:path.join(gameRoot,executable),dataRoot:gameRoot,version:null,networkVersion:null};
+   const inspected=await call('inspect_runtime_registration',{registration});expect(inspected.validation,'Moved '+folder+' installation must validate').toBe('pass');
+   const reports=await call('register_runtime',{registration}),report=reports.find(item=>item.id===runtimeId);expect(report.installation.validation).toBe('pass');
+   expect(normalize(report.installation.root)).toBe(normalize(inspected.root));
+   receipt.runtimeDirectories.push({registration,inspection:inspected,registered:true});
+  }
+ }
  const [material]=await call('import_paths',{paths:[cache]});expect(material.inspection.header.version).toBe(13);
  const sources=[];for(const [index,donor]of donors.entries()){
   // Memory-first Spark deliberately borrows source maps. Only the negative
@@ -258,11 +270,20 @@ export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invad
   await expect(page.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','level');
  };
  const project=async id=>{const view=(await call('read_workspace_history',{projectId:id})).history;return view?.snapshots.find(value=>value.key===view.head.current)?.project??(await call('open_project',{id})).project;};
- const save=async id=>{await page.keyboard.press('Control+s');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await expect.poll(async()=>(await call('read_workspace_history',{projectId:id})).history?.head.dirty).toBe(false);};
+ const save=async id=>{await page.getByLabel('File menu',{exact:true}).click();await page.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await expect.poll(async()=>(await call('read_workspace_history',{projectId:id})).history?.head.dirty).toBe(false);};
  const closeDrawers=async()=>{for(const name of ['Inspector','Build tools','Asset library','Object tags']){const panel=page.getByRole('region',{name:`${name} panel`,exact:true});if(await panel.isVisible())await panel.getByRole('button',{name:`Close ${name}`,exact:true}).click();}};
  const field=async(input,value)=>{await input.fill(String(value));await input.press('Tab');};
- for(const source of [material,...sources])await open(source.project.id);
+ // Imported donor documents are memory-first too. Explicitly save them before
+ // the later full-process restart and File/native-export check; never require
+ // an unsaved donor to be silently persisted by the production library.
+ for(const source of [material,...sources]){await open(source.project.id);await save(source.project.id);}
  await open(created.project.id);await page.getByRole('button',{name:'BSP Workshop',exact:true}).click();await page.getByRole('button',{name:'Two rooms + corridor + ramp',exact:true}).click();
+ await expect(page.locator('.bsp-source-list button')).toHaveCount(4);await expect(page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();
+ await page.locator('.bsp-shape-toolbar summary').click();const stair=page.getByRole('button',{name:'Place BSP stairs',exact:true});await expect(stair).toBeEnabled();const stairBox=await stair.boundingBox();
+ const stairTarget=await page.getByLabel('top orthographic editing view',{exact:true}).evaluate(svg=>{const matrix=svg.getScreenCTM();const point=new DOMPoint(-3,0).matrixTransform(matrix);return{x:point.x,y:point.y};});
+ await page.mouse.move(stairBox.x+stairBox.width/2,stairBox.y+stairBox.height/2);await page.mouse.down();await page.mouse.move(stairTarget.x,stairTarget.y,{steps:16});await expect(page.getByText('Drop shape into a BSP view',{exact:true})).toBeVisible();await page.mouse.up();
+ await expect(page.getByLabel('Volume name',{exact:true})).toHaveValue(/Stairs.*step 1/);await expect(page.locator('.bsp-source-list button')).toHaveCount(12);await expect(page.locator('.bsp-source-fields[aria-busy="false"]')).toBeVisible();
+ receipt.nativeShapeDrop={shape:'stairs',treads:8,worldUv:true,realPointerDrop:true,compiledWithFirstPair:false};
  const details=page.locator('.bsp-source-fields details').filter({has:page.locator('summary',{hasText:'Halo material paths & player starts'})});await details.locator('summary').click();
  await field(page.getByRole('textbox',{name:'Shader path surface',exact:true}),'levels/test/tutorial/shaders/example_tutorial_metal_floor');
  await field(details.getByRole('textbox').last(),'levels/test/bloodgulch/bloodgulch');
@@ -292,17 +313,25 @@ export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invad
   const trace=async stage=>{const value=await project(id);const data={stage,history:value.history.at(-1),placements:(quick?value.quickForge.placements:value.scene.filter(object=>object.sourceModel)).map(({id,position})=>({id,position})),inputs:await page.evaluate(()=>window.__crossInput.splice(0))};(record.inputSteps??=[]).push(data);console.log('CROSS_INPUT',JSON.stringify(data));};
   if(!quick)await page.getByRole('combobox',{name:'View from player start',exact:true}).selectOption('');
   await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true});
-  await library.getByRole('combobox',{name:'Asset library map',exact:true}).selectOption(spec.source.project.id);
+  const selector=library.getByRole('combobox',{name:'Asset library map',exact:true});
+  if(index===1){
+    const inventory=await call('discover_asset_sources');
+    record.registeredSourceInventory={maps:inventory.maps.length,versions:[...new Set(inventory.maps.map(value=>value.cacheVersion))].sort(),locations:[...new Set(inventory.maps.map(value=>value.location))].sort(),notices:inventory.notices};
+    expect(record.registeredSourceInventory.versions).toEqual(expect.arrayContaining([5,609,13]));
+    const donorId=crypto.createHash('sha256').update(path.toNamespacedPath(await fs.realpath(donors[1])).toLowerCase()).digest('hex');
+    const candidate=inventory.maps.find(value=>value.id===donorId&&value.cacheVersion===609);expect(candidate).toBeTruthy();
+    await expect(selector.locator(`option[value="discovered:${candidate.id}"]`)).toHaveCount(1);await selector.selectOption('discovered:'+candidate.id);await expect(selector).toHaveValue(spec.source.project.id,{timeout:90000});record.autoLoadedDiscoveredRuntimeSource=true;
+  }else await selector.selectOption(spec.source.project.id);
   await library.getByRole('combobox',{name:'Asset library type',exact:true}).selectOption(spec.category);
   await library.getByRole('searchbox',{name:'Search loaded assets',exact:true}).fill(spec.path.replaceAll('/','\\'));
   const button=library.getByRole('button',{name:`Add ${spec.name} at view`,exact:true}),article=button.locator('..');await expect(button).toBeEnabled({timeout:90000});
   await expect(article.getByAltText('Actual textured Halo model: '+spec.name)).toBeVisible({timeout:120000});
-  record.preview={realNativeModel:true,origin:await article.locator('small').last().innerText(),imageBytes:(await article.locator('img').getAttribute('src')).length};
+  record.preview={realNativeModel:true,dragOrigin:'actual-thumbnail-image',origin:await article.locator('small').last().innerText(),imageBytes:(await article.locator('img').getAttribute('src')).length};
   await page.screenshot({path:path.join(root,`cross-runtime-${index+1}-preview.png`)});
   const canvas=page.locator(quick?'.forge-viewport canvas':'.world-layout:visible .viewport canvas:visible');await expect(canvas).toHaveAttribute('data-gs-camera-pose',/position/);
   const rect=await canvas.boundingBox(),pose=JSON.parse(await canvas.getAttribute('data-gs-camera-pose'));
   const camera=new PerspectiveCamera(55,rect.width/rect.height,.03,20000);camera.position.fromArray(pose.position);camera.quaternion.fromArray(pose.quaternion);camera.zoom=pose.zoom;camera.updateMatrixWorld(true);camera.updateProjectionMatrix();
-  const requested=index===0?[6,2,.05]:[26,2,.05],projected=new Vector3(...requested).project(camera),to={x:rect.x+(projected.x+1)*rect.width/2,y:rect.y+(1-projected.y)*rect.height/2},from=await button.boundingBox();
+  const requested=index===0?[6,2,.05]:[26,2,.05],projected=new Vector3(...requested).project(camera),to={x:rect.x+(projected.x+1)*rect.width/2,y:rect.y+(1-projected.y)*rect.height/2},from=await article.getByAltText('Actual textured Halo model: '+spec.name).boundingBox();
   expect(projected.z).toBeGreaterThan(-1);expect(projected.z).toBeLessThan(1);expect(to.x).toBeGreaterThan(rect.x);expect(to.x).toBeLessThan(rect.x+rect.width);expect(to.y).toBeGreaterThan(rect.y);expect(to.y).toBeLessThan(rect.y+rect.height);
   const placements=value=>quick?value.quickForge.placements:value.scene.filter(object=>object.sourceModel),baseline=placements(await project(id)).length;
   const drag=async()=>{await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(to.x,to.y,{steps:16});};
@@ -395,6 +424,7 @@ export async function nativeCrossRuntimeAssetRoundTrip({page,root,kit,tags,invad
   if(index===0){const retained=path.join(root,'native-output','cross-runtime-1.map');await fs.copyFile(result.output,retained,fs.constants.COPYFILE_EXCL);expect(await hash(retained)).toBe(record.outputSha256);await retain(retained,'Owner-requested first independently extracted CE-to-MCC native asset output');record.retainedOutput='native-output/cross-runtime-1.map';record.outputBytes=(await fs.stat(retained)).size;}
   record.independentNativeReadback={scenario,nativePath,placementCount:count,paletteEntries:Number(roots),palettePaths,nativePositions,dependencyPaths,boundingRadius:radius,crcMismatch:crc};record.stage='MCC native compile and independent readback passed';
   const saved=await project(id);record.savedProject=saved;record.savedHistory=(await call('read_workspace_history',{projectId:id})).history;
+  if(index===0){const steps=saved.quickForge.workshop.brushes.filter(brush=>/^Stairs.*step \d+$/.test(brush.name));expect(steps).toHaveLength(8);expect(steps.every(brush=>brush.role==='solid'&&brush.worldUv)).toBe(true);receipt.nativeShapeDrop.compiledWithFirstPair=true;receipt.nativeShapeDrop.persistedTreads=steps.length;}
   console.log('CROSS_RUNTIME_PASS',JSON.stringify({pair:index+1,assetClass:spec.class,files:binding.fileCount,outputSha256:record.outputSha256,buildMs:record.buildMs}));
   if(index===0){target=output;await open(spec.source.project.id);await open(target.project.id);}
  }

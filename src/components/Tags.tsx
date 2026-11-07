@@ -27,7 +27,7 @@ import NativeTagOperations from './NativeTagOperations';
 import SmartEditPanel from './SmartEditPanel';
 import TagRenamePanel from './TagRenamePanel';
 import { renamedTagPath } from '../tagRenames';
-import { WorkspacePanel } from './WorkspacePanels';
+import { WorkspacePanel, useWorkspaceFileActions } from './WorkspacePanels';
 import { defaultTagContext, inspectTagContexts, isTagContext, TAG_CONTEXTS } from '../tagContexts';
 import type { TagContext } from '../tagContexts';
 import LogicEvents from './LogicEvents';
@@ -114,6 +114,33 @@ export default function Tags({
   }, [focusTagId, inspection?.sha256]);
   const tags = inspection?.tags ?? [];
   const selectedTag = tags.find((t) => t.id === selected);
+  async function extractSelectedTag() {
+    if (!selectedTag) return;
+    setExtractingTag(selectedTag.id);
+    setExtractionReceipt(null);
+    try {
+      const receipt = await call<NonNullable<typeof extractionReceipt>>(
+        'extract_selected_tag_tree',
+        {
+          projectId: project.id,
+          tagId: selectedTag.id,
+        },
+      );
+      setExtractionReceipt(receipt);
+      await refreshTagExchanges();
+      notify(
+        `Invader extracted ${receipt.files.length} real tag files to an isolated local folder. Not imported into any other map.`,
+      );
+    } catch (error) {
+      notify(`Actual tag extraction rejected: ${String(error)}`);
+    } finally {
+      setExtractingTag(null);
+    }
+  }
+  useWorkspaceFileActions('tags:'+project.id,selectedTag ? [
+    {id:'export-tag',label:'Export tag + dependencies…',hint:'Extract original source tags through Invader. Staged edits require their native build first.',disabled:!native||!project.source||extractingTag!==null,run:()=>{chooseContext('Native Output');void extractSelectedTag();}},
+    {id:'tag-native-output',label:'Tag native output…',run:()=>chooseContext('Native Output')},
+  ]:[]);
   const contextKey = `${inspection?.sha256}:${selectedTag?.id}`;
   const context = isTagContext(contexts[contextKey]) ? contexts[contextKey] : selectedTag ? defaultTagContext(selectedTag) : 'Properties';
   const chooseContext = (value: TagContext) => setContexts(previous => ({...previous,[contextKey]:value}));
@@ -440,29 +467,7 @@ export default function Tags({
                     className="small-button"
                     title="Opt-in Invader process extracts actual compatible tag files to a separate managed directory; this never edits the original .map or target scenario."
                     disabled={!native || !project.source || extractingTag !== null}
-                    onClick={async () => {
-                      if (!selectedTag) return;
-                      setExtractingTag(selectedTag.id);
-                      setExtractionReceipt(null);
-                      try {
-                        const receipt = await call<NonNullable<typeof extractionReceipt>>(
-                          'extract_selected_tag_tree',
-                          {
-                            projectId: project.id,
-                            tagId: selectedTag.id,
-                          },
-                        );
-                        setExtractionReceipt(receipt);
-                        await refreshTagExchanges();
-                        notify(
-                          `Invader extracted ${receipt.files.length} real tag files to an isolated local folder. Not imported into any other map.`,
-                        );
-                      } catch (error) {
-                        notify(`Actual tag extraction rejected: ${String(error)}`);
-                      } finally {
-                        setExtractingTag(null);
-                      }
-                    }}
+                    onClick={() => void extractSelectedTag()}
                   >
                     {extractingTag === selectedTag.id
                       ? 'Extracting…'

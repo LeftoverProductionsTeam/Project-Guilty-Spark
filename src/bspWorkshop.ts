@@ -1,5 +1,6 @@
 /** Versioned editable source; derived boolean meshes are never saved as brushes. */
-import type { QuickForgeDocument } from './forge';
+import { createBrush } from './forge';
+import type { QuickForgeDocument, ForgeBrush, BrushKind } from './forge';
 import type { Vec3 } from './types';
 export interface BspFace {
   id: string;
@@ -429,9 +430,8 @@ export function workshopExample(doc: QuickForgeDocument): QuickForgeDocument {
     }));
   return d;
 }
-export function workshopFromPrimitives(doc: QuickForgeDocument): QuickForgeDocument {
-  if (doc.native) throw Error('Keep admitted shared native source separate; use a new Workshop project');
-  const brushes = doc.geometry.map((b) => {
+/** The same primitive-to-convex source conversion used by QuickForge and Workshop. */
+function primitiveWorkshopBrushes(b: ForgeBrush): BspBrush[] {
     if (b.locked || !b.visible)
       throw Error(
         `${b.name}: show and unlock the source brush before converting, or retain this project and create a separate Workshop level`,
@@ -452,12 +452,37 @@ export function workshopFromPrimitives(doc: QuickForgeDocument): QuickForgeDocum
         b.dimensions.map((v) => v / 2) as Vec3,
         b.materialId,
       );
+    else if (b.kind === 'stairs') {
+      if (!Number.isInteger(b.steps) || b.steps < 1 || b.steps > 32) throw Error('Stairs need between 1 and 32 steps');
+      return Array.from({length:b.steps},(_,index)=>{
+        const lo:Vec3=[-b.dimensions[0]/2,-b.dimensions[1]/2+index*b.dimensions[1]/b.steps,-b.dimensions[2]/2];
+        const hi:Vec3=[b.dimensions[0]/2,lo[1]+b.dimensions[1]/b.steps,lo[2]+(index+1)*b.dimensions[2]/b.steps];
+        return {...boxBrush(b.id+'-step-'+(index+1),'solid',lo,hi,b.materialId),name:b.name+' step '+(index+1),position:[...b.position] as Vec3,rotation:[...b.rotation] as Vec3,worldUv:true};
+      });
+    }
     else
       throw Error(
         `${b.name}: ${b.kind} conversion is not implemented. Keep this project in QuickForge and create a separate Workshop level`,
       );
-    return { ...mesh, name: b.name, position: [...b.position] as Vec3, rotation: [...b.rotation] as Vec3 };
-  });
+    return [{ ...mesh, name: b.name, position: [...b.position] as Vec3, rotation: [...b.rotation] as Vec3 }];
+}
+export type WorkshopPrimitive = 'room' | 'box' | 'wall' | 'ramp' | 'stairs';
+export function placeWorkshopPrimitive(doc:QuickForgeDocument,kind:WorkshopPrimitive,point:Vec3,materialId:string) {
+  if(!doc.workshop||doc.native)throw Error('Open editable Workshop source before placing geometry.');
+  if(!['room','box','wall','ramp','stairs'].includes(kind)||!point.every(Number.isFinite))throw Error('Unsupported Workshop shape or position');
+  if(!doc.materials.some(material=>material.id===materialId))throw Error('Select a source material first');
+  const primitive=createBrush(kind as BrushKind,point,materialId);
+  primitive.name=nextWorkshopName(doc.workshop.brushes,primitive.name);
+  if(kind==='stairs')primitive.steps=8;
+  const brushes=primitiveWorkshopBrushes(primitive).map(brush=>({...brush,worldUv:true}));
+  if(doc.workshop.brushes.length+brushes.length>64)throw Error('Workshop supports at most64 source volumes.');
+  return {document:{...structuredClone(doc),workshop:{...structuredClone(doc.workshop),brushes:[...doc.workshop.brushes,...brushes]}},brushId:brushes[0].id};
+}
+
+export function workshopFromPrimitives(doc: QuickForgeDocument): QuickForgeDocument {
+  if (doc.native) throw Error('Keep admitted shared native source separate; use a new Workshop project');
+  const brushes = doc.geometry.flatMap(primitiveWorkshopBrushes);
+  if(brushes.length>64)throw Error('Workshop supports at most64 source volumes.');
   if (!brushes.some((b) => b.role === 'space'))
     throw Error('Create a room shell in QuickForge first, or use the two-room source example');
   return { ...structuredClone(doc), geometry: [], workshop: { schemaVersion: 1, brushes, portals: [] } };

@@ -1,3 +1,4 @@
+import {useWorkspaceFileActions} from './WorkspacePanels';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import {WorkspacePanel} from './WorkspacePanels';
 import {useWorkspaceActivity} from './WorkspaceActivity';
@@ -187,6 +188,11 @@ export default function MachinimaWorkspace({
   const shot = shots.find((s) => s.id === selected),
     duration = takeDuration(shots),
     playing = transport.playing;
+  useWorkspaceFileActions('director:'+project.id,[
+    {id:'export-take',label:'Export camera take…',run:()=>downloadLocalText('spark-camera-take.json',encodeCameraTake(shots,settings),'application/json')},
+    {id:'import-take',label:'Import camera take…',disabled:playing||recording,run:()=>takeInput.current?.click()},
+    {id:'export-shots',label:'Export shot list CSV…',run:()=>downloadLocalText('spark-shot-list.csv',shotListCsv(shots),'text/csv')},
+  ]);
   const rememberedTime=useRef(time);rememberedTime.current=time;useEffect(()=>()=>writeMapSession(project.id,'director.time',rememberedTime.current),[project.id]);
   useEffect(() => {
     mounted.current = true;

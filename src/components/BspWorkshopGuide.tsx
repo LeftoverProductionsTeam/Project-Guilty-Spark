@@ -18,7 +18,7 @@ export default function BspWorkshopGuide({
         <li>
           <b>Rooms, corridor and ramp</b>
           <p>
-            Choose a shape, set New volume height / depth, then drag its footprint in Top view. Overlap the
+            Use Shapes to drop a room, box, wall, ramp or stairs into any view, or choose a drawing tool and drag its footprint in Top view. Overlap the
             corridor into both rooms; place the ramp inside a room.
           </p>
           <div className="bsp-inline">
@@ -50,7 +50,7 @@ export default function BspWorkshopGuide({
         <li>
           <b>Save, build and play</b>
           <p>
-            Ctrl+S saves this source. Fix Diagnostics, connect matching Halo tools and tags in Build settings,
+            File → Save or Ctrl+S saves this source. File → Save As reviews a native map copy. Fix Diagnostics, connect matching Halo tools and tags in Build settings,
             then Build &amp; check playtest. Test the floor, ramp and door from both sides in Halo.
           </p>
           <button onClick={build}>Open build settings</button>

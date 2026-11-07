@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
 import type { Vec3 } from './types';
-import type { ViewportAsset } from './viewportAssets';
 
 /** Pointer-driven drags also work when WebView2's native file drop owns HTML5 DnD. */
 export function useViewportAssetDrop(
@@ -88,18 +87,19 @@ export function useViewportAssetDrop(
         fileCallback.current(detail.paths, hit);
       }
     };
-    window.addEventListener('pointermove', move, { passive: false });
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', cancel);
+    // Observe releases before renderer controls consume their bubble events.
+    window.addEventListener('pointermove', move, { capture: true, passive: false });
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', cancel, true);
     window.addEventListener('blur', cancel);
     window.addEventListener('keydown', key, true);
     window.addEventListener('guilty-spark-asset-file-drop', fileDrop);
     return () => {
       cancel();
       window.removeEventListener('guilty-spark-asset-drag-start',begin);
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', cancel, true);
       window.removeEventListener('blur', cancel);
       window.removeEventListener('keydown', key, true);
       window.removeEventListener('guilty-spark-asset-file-drop', fileDrop);
@@ -107,7 +107,7 @@ export function useViewportAssetDrop(
   }, [projectId, viewport, point]);
   return {
     dragging,
-    begin: (item: ViewportAsset, event: ReactPointerEvent) => {
+    begin: (item: {key: string}, event: ReactPointerEvent) => {
       if (event.button === 0) {
         suppressClick.current = false;
         pending.current = {
@@ -119,11 +119,12 @@ export function useViewportAssetDrop(
         };
       }
     },
-    activate: (item: ViewportAsset, event?: {detail: number}) => {
+    activate: (item: {key: string}, event?: {detail: number}, at?: Vec3) => {
       if (suppressClick.current && event?.detail !== 0) {
         suppressClick.current = false;
         return;
       }
+      if (at) {callback.current(item.key, at); return;}
       const rect = viewport.current?.getBoundingClientRect();
       if (!rect) return;
       const hit = point.current?.(rect.x + rect.width / 2, rect.y + rect.height / 2);

@@ -113,9 +113,13 @@ function TransferContents({data,documents,target,busy,onTransfer,onTags}:AssetTr
           {assets.slice(0, 150).map((item) => (
             <article key={item.key} className="gs-transfer-card">
               <div
-                onPointerDown={(event) => {
-                  if (!busy && !(event.target as HTMLElement).closest('button,input,a'))
+                className="asset-preview-drag"
+                onDragStart={event => event.preventDefault()}
+                onPointerDownCapture={event => {
+                  if (!busy && !(event.target as HTMLElement).closest('button,input,select,textarea,a')) {
+                    event.preventDefault();
                     beginAssetTransfer(item, target.id, event);
+                  }
                 }}
               >
                 <LibraryAssetPreview item={item} />

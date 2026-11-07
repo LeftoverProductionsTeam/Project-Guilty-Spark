@@ -106,6 +106,7 @@ export async function assertQaOutputPath(
       'releases',
       'Halo Custom Edition',
       'opencehalo-windows-release',
+      'Runtimes',
       'chupathingyce-windows64-release',
     ].some((name) => contains(path.join(projectRoot, name), absolute))
   )
@@ -1085,6 +1086,7 @@ export async function beginQaStorage(
             'releases',
             'Halo Custom Edition',
             'opencehalo-windows-release',
+      'Runtimes',
             'chupathingyce-windows64-release',
             'Pyros Zombie Apocolypse Mod Versions',
             'SAMPLE CODE',

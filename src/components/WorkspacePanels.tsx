@@ -19,7 +19,11 @@ interface Descriptor {
   label: string;
   defaultDock?: PanelPlacement['dock'];
 }
+export interface WorkspaceFileAction {
+  id: string; label: string; run: () => void; disabled?: boolean; hint?: string; shortcut?: string;
+}
 interface ContextValue {
+  registerFileActions: (scope: string, actions: WorkspaceFileAction[]) => () => void;
   contentHosts: Record<string, HTMLDivElement | null>;
   attachContent: (id: string, element: HTMLDivElement | null) => void;
   host: HTMLDivElement | null;
@@ -35,7 +39,7 @@ interface ContextValue {
 }
 const Context = createContext<ContextValue | null>(null);
 export function closeOtherHeaderMenus(current:HTMLDetailsElement){
-  for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-map-switcher[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))if(menu!==current)menu.open=false;
+  for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-file-menu[open],.gs-map-switcher[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))if(menu!==current)menu.open=false;
 }
 export function headerMenuKeyDown(event:ReactKeyboardEvent<HTMLDetailsElement>){
   if(event.target instanceof Element&&event.target.closest('input,select,textarea')||!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
@@ -44,9 +48,9 @@ export function headerMenuKeyDown(event:ReactKeyboardEvent<HTMLDetailsElement>){
   const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
   buttons[next]?.focus();
 }
-function HeaderTools({children}:{children:ReactNode}){
+function HeaderTools({children,target="gs-header-workspace-tools"}:{children:ReactNode;target?:string}){
   const [host,setHost]=useState<HTMLElement|null>(null);
-  useEffect(()=>setHost(document.getElementById('gs-header-workspace-tools')),[]);
+  useEffect(()=>setHost(document.getElementById(target)),[target]);
   return host?createPortal(children,host):children;
 }
 export default function WorkspacePanels({
@@ -58,6 +62,8 @@ export default function WorkspacePanels({
   onNavigationToggle,
   navigationOpen,
   onPopout,
+  onNewWindow,
+  fileActions = [],
   onDetachPanel,
   canDetachPanel,
   onSaveLayout,
@@ -75,6 +81,8 @@ export default function WorkspacePanels({
   onNavigationToggle: () => void;
   navigationOpen: boolean;
   onPopout?:()=>void;
+  onNewWindow?:()=>void;
+  fileActions?: WorkspaceFileAction[];
   onDetachPanel?:(id:string)=>Promise<boolean>;
   canDetachPanel?:(id:string)=>boolean;
   onSaveLayout?:()=>void;
@@ -109,7 +117,7 @@ export default function WorkspacePanels({
   useEffect(()=>setWindowHost(document.getElementById('gs-window-actions')),[]);
   useEffect(()=>{
     const dismiss=(event:PointerEvent)=>{if(!(event.target instanceof Node))return;
-      for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))
+      for(const menu of document.querySelectorAll<HTMLDetailsElement>('.gs-file-menu[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]'))
         if(!menu.contains(event.target))menu.open=false;
     };
     window.addEventListener('pointerdown',dismiss);return()=>window.removeEventListener('pointerdown',dismiss);
@@ -120,6 +128,11 @@ export default function WorkspacePanels({
   const [descriptors, setDescriptors] = useState<Descriptor[]>([]),
     [host, setHost] = useState<HTMLDivElement | null>(null),
     [counts, setCounts] = useState<Record<string, number>>({});
+  const [fileGroups,setFileGroups] = useState<Record<string,{token:object;actions:WorkspaceFileAction[]}>>({});
+  const registerFileActions=useCallback((scope:string,actions:WorkspaceFileAction[])=>{
+    const token={};setFileGroups(previous=>({...previous,[scope]:{token,actions}}));
+    return()=>setFileGroups(previous=>{if(previous[scope]?.token!==token)return previous;const next={...previous};delete next[scope];return next;});
+  },[]);
   const toolGroups=useMemo(()=>{
     const groups=new Map<string,Descriptor[]>();
     for(const panel of descriptors){
@@ -133,6 +146,7 @@ export default function WorkspacePanels({
   },[descriptors]);
   const context = useMemo<ContextValue>(
     () => ({
+      registerFileActions,
       contentHosts,
       attachContent,
       host,
@@ -163,7 +177,7 @@ export default function WorkspacePanels({
         setRaw((old) => changePanel(cleanLayout(old), panel, { open: true }));
       },
     }),
-    [host, layout, peek, setRaw, contentHosts, attachContent,onDetachPanel,canDetachPanel,detached],
+    [host, layout, peek, setRaw, contentHosts, attachContent,onDetachPanel,canDetachPanel,detached,registerFileActions],
   );
   useEffect(()=>{const open=(e:Event)=>{const id=(e as CustomEvent).detail?.id;if(typeof id==='string'&&descriptors.some(d=>d.id===id))context.reveal(id);};window.addEventListener('guilty-spark-reveal-drawer',open);return()=>window.removeEventListener('guilty-spark-reveal-drawer',open);},[context,descriptors]);
   useEffect(() => {
@@ -183,7 +197,7 @@ export default function WorkspacePanels({
         void changeFullscreen();
       }
       if(e.key==='Escape'&&!document.querySelector('[role="dialog"]')){
-        const menu=document.querySelector<HTMLDetailsElement>('.gs-panel-options[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]');
+        const menu=document.querySelector<HTMLDetailsElement>('.gs-panel-options[open],.gs-file-menu[open],.gs-panel-overflow[open],.gs-layout-menu[open],.gs-studio-menu[open]');
         if(menu){e.preventDefault();menu.open=false;menu.querySelector<HTMLElement>('summary')?.focus();return;}
       }
       if(e.key==='Escape'&&detached&&fullscreen&&!document.querySelector('[role="dialog"]')){
@@ -217,6 +231,24 @@ export default function WorkspacePanels({
   return (
     <Context.Provider value={context}>
       <div className="gs-workspace-shell" data-fullscreen={fullscreen} data-workspace={workspace} data-detached-panel={detached??undefined}>
+        <HeaderTools target="gs-header-file-tools"><nav className="gs-workspace-menus" aria-label="File and tools">
+          <details className="gs-file-menu" onToggle={event=>{if(event.currentTarget.open)closeOtherHeaderMenus(event.currentTarget);}} onKeyDown={headerMenuKeyDown}>
+            <summary aria-label="File menu">File <span aria-hidden="true">▾</span></summary>
+            <div role="menu" aria-label="File commands" onKeyDown={navigateComposite}>
+              {[fileActions,...Object.values(fileGroups).map(group=>group.actions)].filter(group=>group.length).map((group,index)=><section key={index} role="group" aria-label={index===0?'Project files':'Workspace files'}>{group.map(command=><button key={command.id} role="menuitem" aria-label={command.label} disabled={command.disabled} title={command.hint} aria-keyshortcuts={command.shortcut} onClick={event=>{event.currentTarget.closest('details')!.open=false;command.run();}}><span>{command.label}</span>{command.shortcut&&<kbd>{command.shortcut.replace('Control+','Ctrl+')}</kbd>}</button>)}</section>)}
+            </div>
+          </details>
+          {!detached&&descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open){closeOtherHeaderMenus(event.currentTarget);const popup=event.currentTarget.querySelector<HTMLElement>('[role="menu"]');if(popup){popup.style.setProperty('--gs-tools-nudge','0px');requestAnimationFrame(()=>{const rect=popup.getBoundingClientRect();popup.style.setProperty('--gs-tools-nudge',`${Math.max(0,8-rect.left)-Math.max(0,rect.right-innerWidth+8)}px`);});}}}} onKeyDown={event=>{
+            if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+            event.preventDefault();event.stopPropagation();event.currentTarget.open=true;
+            const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"],[role="menuitem"]')],at=buttons.indexOf(document.activeElement as HTMLButtonElement);
+            const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
+            buttons[next]?.focus();
+          }}>
+            <summary aria-label="More workspace drawers" title="Workspace tools and panels">Tools <span aria-hidden="true">▾</span>{Object.values(counts).some(count=>count>0)&&<span className="gs-panel-count" aria-label="Tools need review">•</span>}</summary>
+            <div role="menu" aria-label="Workspace drawers" onKeyDown={navigateComposite}>{onNewWindow&&<section className="gs-tools-window-command" role="group" aria-label="Windows"><button role="menuitem" onClick={event=>{event.currentTarget.closest('details')!.open=false;onNewWindow();}}><SquareArrowOutUpRight size={13}/><span>New workspace window</span></button></section>}{toolGroups.map(([group,panels])=><section key={group} role="group" aria-label={group}><strong>{group}</strong>{panels.map(panel=><button key={panel.id} data-panel-shortcut={panel.id} role="menuitemcheckbox" aria-label={panel.label} aria-checked={!!layout.panels[panel.id]?.open} onClick={event=>{context.reveal(panel.id);event.currentTarget.closest('details')?.removeAttribute('open');}}>{panel.label}{counts[panel.id]>0&&<span className="gs-panel-count" aria-hidden="true">{counts[panel.id]}</span>}</button>)}</section>)}</div>
+          </details>}
+        </nav></HeaderTools>
         <HeaderTools><nav className="gs-workspace-tools" aria-label="Workspace panels">
           {!windowHost&&<button
             className="gs-navigation-toggle"
@@ -230,16 +262,6 @@ export default function WorkspacePanels({
           </button>}
           {detached&&<button className="gs-return-panel" aria-label="Return panel to workspace" title="Save and return this panel to its original workspace" onClick={()=>window.dispatchEvent(new Event('gs:return-panel-to-origin'))}><CornerUpLeft size={14}/>Return</button>}
           {(windowError || frameError) && <span role="alert">{windowError || frameError}</span>}
-          {!detached&&descriptors.length>0&&<details className="gs-panel-overflow gs-tools-menu" onToggle={event=>{if(event.currentTarget.open)closeOtherHeaderMenus(event.currentTarget);}} onKeyDown={event=>{
-            if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
-            event.preventDefault();event.stopPropagation();event.currentTarget.open=true;
-            const buttons=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')],at=buttons.indexOf(document.activeElement as HTMLButtonElement);
-            const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:at<0?(event.key==='ArrowUp'?buttons.length-1:0):(at+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
-            buttons[next]?.focus();
-          }}>
-            <summary aria-label="More workspace drawers" title="Workspace tools and panels">Tools <span aria-hidden="true">▾</span>{Object.values(counts).some(count=>count>0)&&<span className="gs-panel-count" aria-label="Tools need review">•</span>}</summary>
-            <div role="menu" aria-label="Workspace drawers" onKeyDown={navigateComposite}>{toolGroups.map(([group,panels])=><section key={group} role="group" aria-label={group}><strong>{group}</strong>{panels.map(panel=><button key={panel.id} data-panel-shortcut={panel.id} role="menuitemcheckbox" aria-label={panel.label} aria-checked={!!layout.panels[panel.id]?.open} onClick={event=>{context.reveal(panel.id);event.currentTarget.closest('details')?.removeAttribute('open');}}>{panel.label}{counts[panel.id]>0&&<span className="gs-panel-count" aria-hidden="true">{counts[panel.id]}</span>}</button>)}</section>)}</div>
-          </details>}
           <div className="gs-layout-actions">
             {actions}
             <details className="gs-layout-menu gs-view-menu" onToggle={event=>{if(event.currentTarget.open){if(!detached)onListLayouts?.();closeOtherHeaderMenus(event.currentTarget);}}} onKeyDown={headerMenuKeyDown}>
@@ -321,6 +343,16 @@ export function usePanelAttention(id: string, count: number) {
 }
 /** Add related controls to the existing drawer, with no second registration,
  * button, close control or overlapping panel. The source editor owns its state. */
+export function useWorkspaceFileActions(scope:string,actions:WorkspaceFileAction[]) {
+  const context=useContext(Context),{active}=useWorkspaceActivity();
+  const latest=useRef(actions);latest.current=actions;
+  const register=context?.registerFileActions;
+  const signature=JSON.stringify(actions.map(({id,label,disabled,hint,shortcut})=>({id,label,disabled,hint,shortcut})));
+  useEffect(()=>{
+    if(!active||!register)return;
+    return register(scope,latest.current.map(command=>({...command,run:()=>latest.current.find(next=>next.id===command.id)?.run()})));
+  },[scope,active,register,signature]);
+}
 export function WorkspacePanelAddon({id,children}:{id:string;children:ReactNode}) {
   const context=useContext(Context);
   const {scope}=useWorkspaceActivity();

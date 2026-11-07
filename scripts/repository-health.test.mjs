@@ -19,6 +19,9 @@ test('classification protects originals, releases, native diagnostics and unknow
   for (const p of [
     '.git/objects',
     'Halo Custom Edition/maps',
+    'Runtimes/OpenCE/maps',
+    'Runtimes/Chupathingy',
+    'Runtimes/Halo Custom Edition/maps',
     'opencehalo-windows-release/maps',
     '.local/archives/C62',
     'preserved/native-projects/unique-source',

@@ -653,6 +653,7 @@ export default function App() {
         void refresh().catch(failed);
       }),
     );
+    unsubs.push(listen('spark:runtime-connections-changed',()=>window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'))));
     unsubs.push(
       listen('spark:library-changed', () => {
         void refresh().catch(failed);
@@ -1428,6 +1429,7 @@ export default function App() {
             <button className="brand gs-spark-navigation gs-navigation-toggle" onClick={()=>setSidebarOpen(value=>!value)} aria-label="Toggle workspace navigation" aria-expanded={sidebarOpen} aria-controls="gs-workspace-navigation" aria-keyshortcuts="Control+\" onKeyDown={event=>{if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();setSidebarOpen(true);}}}>
               <SparkEmblem/>
             </button>
+            <div id="gs-header-file-tools"/>
             {documents.documents.length ? (
               <MapTabs
                 state={documents}
@@ -1633,6 +1635,18 @@ export default function App() {
                 onRestoreLayout={native?()=>void restoreWorkspaceLayout():undefined}
                 layoutName={layoutName} layoutNames={layoutNames} onLayoutName={native?setLayoutName:undefined} onListLayouts={listWorkspaceLayouts}
                 onPopout={() => void popoutWorkspace()}
+                onNewWindow={() => void openWorkspaceView(workspaceRef.current, true)}
+                fileActions={[
+                  {id:'open-map',label:'Open map or archive…',run:()=>void importFiles(),disabled:busy},
+                  {id:'new-project',label:'New project…',run:()=>setCreateModal(true),disabled:busy},
+                  ...(current ? [
+                    {id:'save-project',label:'Save',shortcut:'Control+s',run:()=>void save(true,current.id).catch(()=>{}),disabled:!native||busy||windowWriters[current.id]===false},
+                    {id:'save-as-project',label:'Save As…',hint:current.source||current.quickForge?'Review a native map copy; structural edits use the existing source compiler.':'Export a .gsproject descriptor; referenced assets stay in their current locations.',run:()=>{if(current.source||current.quickForge){writeMapSession(current.id,'smart-edit.open',true);setWorkspace('build');if(current.quickForge)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'forge-palette'}})));}else void action(async()=>{const id=current.id;await save(true,id);return call('export_project',{id});},'Project descriptor exported. Referenced source and asset files must remain available.');},disabled:!native||busy||windowWriters[current.id]===false},
+                    {id:'export-project',label:'Export project descriptor…',hint:'.gsproject file; referenced assets stay in their current locations.',run:()=>void action(async()=>{const id=current.id;await save(true,id);return call('export_project',{id});},'Project descriptor exported. Referenced source and asset files must remain available.'),disabled:!native||busy||windowWriters[current.id]===false},
+                    ...((current.source||current.quickForge)?[{id:'native-output',label:'Build / export map…',hint:'Review the saved source and native output through the existing build workflow.',run:()=>{setWorkspace('build');if(current.quickForge)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('guilty-spark-reveal-drawer',{detail:{id:'forge-palette'}})));},disabled:busy}]:[]),
+                    {id:'close-map',label:'Close map',shortcut:'Control+w',run:()=>void closeMap(current.id),disabled:busy},
+                  ]:[]),
+                ]}
                 onDetachPanel={detachWorkspacePanel}
                 canDetachPanel={panel=>canDetachPanel(workspace,panel,!!current)}
                 onNavigationToggle={toggleNavigation}

@@ -1,3 +1,4 @@
+import {useWorkspaceFileActions} from './WorkspacePanels';
 import { useState } from 'react';
 import { Camera, ClipboardCheck, Download, Film, Flag, Plus, Server, ShieldCheck, Trash2 } from 'lucide-react';
 import type { MapInspection, Project, Vec3 } from '../types';
@@ -55,6 +56,11 @@ export default function CreatorStudio({ project, inspection, edit, notify, onOpe
   const [scriptActivation,setScriptActivation]=useState<Activation>('none');
   const [error, setError] = useState('');
   const studio = project.studio ?? emptyCreatorStudio();
+  useWorkspaceFileActions('creator:'+project.id,[
+    {id:'script-pack',label:'Export CE script sources…',run:()=>exportSourcePack()},
+    {id:'creator-evidence',label:'Export creator evidence…',run:()=>report()},
+    {id:'native-source-tree',label:'Export HCEEK source tree…',run:()=>exportHceekTree()},
+  ]);
   const bindingChecks = (() => {
     const scripts: ScriptExport[]=[];
     try { if(studio.missions.length) scripts.push(exportHaloCeMission(studio)); } catch { /* incomplete authoring has no safe export yet */ }

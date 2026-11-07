@@ -1,6 +1,9 @@
 import AssetSourceBrowser from './AssetSourceBrowser';
 import LibraryAssetPreview from './LibraryAssetPreview';
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { discoverAssetSources, loadAssetSource } from '../assetSources';
+import type { AssetSourceInventory } from '../assetSources';
+import { native } from '../api';
 import type { PointerEvent, ReactNode } from 'react';
 import { useMapState } from '../mapSession';
 import type { ViewportAsset } from '../viewportAssets';
@@ -41,6 +44,18 @@ export default function ViewportAssetLibrary({
   importing?: boolean;
   scenarioTools?: ReactNode;
 }) {
+  const [inventory, setInventory] = useState<AssetSourceInventory | null>(null), [sourceBusy, setSourceBusy] = useState(false), [sourceError, setSourceError] = useState('');
+  const loading = useRef(false);
+  async function chooseSource(value: string) {
+    if (!value.startsWith('discovered:')) {setSource(value); return;}
+    if (loading.current) return;
+    loading.current = true; setSourceBusy(true); setSourceError('');
+    try {const sources = await loadAssetSource(value.slice(11)); setSource(sources[sources.length - 1].project.id);}
+    catch (error) {setSourceError(String(error));}
+    finally {loading.current = false; setSourceBusy(false);}
+  }
+  async function refreshSources() {if(native)try{setInventory(await discoverAssetSources());}catch(error){setSourceError(String(error));}}
+  const unavailable = busy || sourceBusy;
   const [query, setQuery] = useMapState(projectId, 'viewport.library.query', ''),
     [source, setSource] = useMapState(projectId, 'viewport.library.source', 'all'),
     [kind, setKind] = useMapState(projectId, 'viewport.library.kind', 'all');
@@ -62,19 +77,23 @@ export default function ViewportAssetLibrary({
     [assets, source, kind, query],
   );
   return (
-    <div className="viewport-asset-library" aria-busy={busy}>
+    <div className="viewport-asset-library" aria-busy={unavailable}>
       {importing && <p role="status">Preparing native dependencies… Placement is committed only after validation.</p>}
       <p>
         Drag a preview onto the map. Native models extract and import their recursive tags before placement.
       </p>
-      <AssetSourceBrowser onLoaded={(open) => setSource(open.project.id)} />
+      <AssetSourceBrowser onLoaded={(open) => setSource(open.project.id)} onInventory={setInventory} />
+      {sourceBusy && <p role="status">Reading source assets…</p>}
+      {sourceError && <small role="alert">{sourceError}</small>}
       <div className="asset-library-filters">
         <label>
           Source map
           <select
             aria-label="Asset library map"
             value={source}
-            onChange={(event) => setSource(event.target.value)}
+            disabled={unavailable}
+            onFocus={() => void refreshSources()}
+            onChange={(event) => void chooseSource(event.target.value)}
           >
             <option value="all">All loaded sources</option>
             {sources.map(([id, title]) => (
@@ -82,6 +101,9 @@ export default function ViewportAssetLibrary({
                 {title}
               </option>
             ))}
+            {!!inventory?.maps.length && <optgroup label="Connected runtimes & linked folders">{inventory.maps.map(candidate => (
+              <option key={candidate.id} value={'discovered:'+candidate.id}>{candidate.name} · {candidate.location} · {candidate.engine}</option>
+            ))}</optgroup>}
           </select>
         </label>
         <label>
@@ -111,12 +133,12 @@ export default function ViewportAssetLibrary({
         />
         <div className="button-row">
           {importModel && (
-            <button disabled={busy} onClick={importModel}>
+            <button disabled={unavailable} onClick={importModel}>
               Import OBJ model
             </button>
           )}
           {importSound && (
-            <button disabled={busy} onClick={importSound}>
+            <button disabled={unavailable} onClick={importSound}>
               Import WAV / OGG sound
             </button>
           )}
@@ -128,15 +150,20 @@ export default function ViewportAssetLibrary({
         {shown.slice(0, 150).map((item) => (
           <article key={item.key}>
             <div
-              onPointerDown={(event) => {
-                if (!busy && !(event.target as HTMLElement).closest('button,input,a')) begin(item, event);
+              className="asset-preview-drag"
+              onDragStart={event => event.preventDefault()}
+              onPointerDownCapture={event => {
+                if (!unavailable && !(event.target as HTMLElement).closest('button,input,select,textarea,a')) {
+                  event.preventDefault();
+                  begin(item, event);
+                }
               }}
             >
               <LibraryAssetPreview item={item} />
             </div>
             <button
               className="viewport-asset-source"
-              disabled={busy}
+              disabled={unavailable}
               onPointerDown={(event) => begin(item, event)}
               onClick={(event) => activate(item, event)}
               title={`${item.path}\n${item.sourceTitle}`}
@@ -161,7 +188,7 @@ export default function ViewportAssetLibrary({
             </button>
             {(item.kind === 'model' || item.kind === 'mesh') && (
               <button
-                disabled={busy || !canReplace}
+                disabled={unavailable || !canReplace}
                 onClick={() => replace(item)}
                 aria-label={`Replace selected with ${item.name}`}
               >

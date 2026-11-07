@@ -2,7 +2,11 @@ mod remote;
 use sha2::{Digest, Sha256};
 const EXE_SHA256: &str = "788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0";
 const PDB_SHA256: &str = "b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800";
-fn verify(path: &std::path::Path, expected: &str) {
+const EXE_343_SHA256: &str = "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9";
+const PDB_343_SHA256: &str = "c0d820e7dc96cd06cdd810a76b1ac0d28038d4477cbfd948da5b551d8f0f5ca9";
+// Build343 release/symbol ZIP digests and exact source pin are recorded in the
+// engine atlas. Types and offsets are resolved afresh from its matching PDB.
+fn input_hash(path: &std::path::Path) -> String {
     let stat = std::fs::symlink_metadata(path).expect("owned regular file");
     assert!(
         stat.is_file() && !stat.file_type().is_symlink() && stat.len() < 64 * 1024 * 1024,
@@ -10,20 +14,25 @@ fn verify(path: &std::path::Path, expected: &str) {
     );
     let before = stat.modified().unwrap();
     let bytes = std::fs::read(path).unwrap();
-    assert_eq!(
-        Sha256::digest(&bytes)
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>(),
-        expected,
-        "unsupported executable or symbols"
-    );
+    let hash = Sha256::digest(&bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
     assert_eq!(
         std::fs::metadata(path).unwrap().modified().unwrap(),
         before,
         "file changed during validation"
     );
+    hash
 }
+fn verify(path: &std::path::Path, expected: &str) {
+    assert_eq!(
+        input_hash(path),
+        expected,
+        "unsupported executable or symbols"
+    );
+}
+
 use serde_json::{json, Value};
 use std::{
     ffi::{c_void, CString},
@@ -176,8 +185,14 @@ pub fn run() {
         args.len() == 3 || args.len() == 5 || (args.len() == 6 && args[5] == "--details"),
         "<publisher exe> <local symbols directory> [<owned pid> <host|client> [--details] | --resolve-rvas <hex RVAs> | --resolve-symbols <names>]"
     );
-    verify(std::path::Path::new(&args[1]), EXE_SHA256);
-    verify(&std::path::Path::new(&args[2]).join("halo.pdb"), PDB_SHA256);
+    let owned_hash = input_hash(std::path::Path::new(&args[1]));
+    let (runtime, exe_sha256, pdb_sha256) = match owned_hash.as_str() {
+        EXE_SHA256 => ("opence-build-335", EXE_SHA256, PDB_SHA256),
+        EXE_343_SHA256 => ("opence-build-343", EXE_343_SHA256, PDB_343_SHA256),
+        _ => panic!("unsupported executable; no process was opened"),
+    };
+    verify(std::path::Path::new(&args[1]), exe_sha256);
+    verify(&std::path::Path::new(&args[2]).join("halo.pdb"), pdb_sha256);
     let file = CString::new(args[1].as_str()).unwrap();
     let search = CString::new(args[2].as_str()).unwrap();
     unsafe {
@@ -218,12 +233,12 @@ pub fn run() {
                     && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')),
                 "bounded literal symbols only"
             );
-            verify(std::path::Path::new(&args[1]), EXE_SHA256);
-            verify(&std::path::Path::new(&args[2]).join("halo.pdb"), PDB_SHA256);
+            verify(std::path::Path::new(&args[1]), exe_sha256);
+            verify(&std::path::Path::new(&args[2]).join("halo.pdb"), pdb_sha256);
             println!(
                 "{}",
-                json!({"readOnly":true,"offline":true,"exeSha256":EXE_SHA256,
-                "pdbSha256":PDB_SHA256,"resolved":names.into_iter().map(|name|s.symbol(name)).collect::<Vec<_>>()})
+                json!({"readOnly":true,"offline":true,"exeSha256":exe_sha256,
+                "pdbSha256":pdb_sha256,"resolved":names.into_iter().map(|name|s.symbol(name)).collect::<Vec<_>>()})
             );
             return;
         }
@@ -241,28 +256,31 @@ pub fn run() {
                 })
                 .collect();
             assert!(!rvas.is_empty() && rvas.len() <= 32, "at most 32 RVAs");
-            verify(std::path::Path::new(&args[1]), EXE_SHA256);
-            verify(&std::path::Path::new(&args[2]).join("halo.pdb"), PDB_SHA256);
+            verify(std::path::Path::new(&args[1]), exe_sha256);
+            verify(&std::path::Path::new(&args[2]).join("halo.pdb"), pdb_sha256);
             println!(
                 "{}",
-                json!({"readOnly":true,"offline":true,"exeSha256":EXE_SHA256,"pdbSha256":PDB_SHA256,"resolved":rvas.into_iter().map(|rva|s.resolve(rva)).collect::<Vec<_>>()})
+                json!({"readOnly":true,"offline":true,"exeSha256":exe_sha256,"pdbSha256":pdb_sha256,"resolved":rvas.into_iter().map(|rva|s.resolve(rva)).collect::<Vec<_>>()})
             );
             return;
         }
-        let out = json!({"types":(["actor_datum","object_header_datum","object_datum","unit_datum","unit_control_data","weapon_datum","scenario","hs_global","hs_global_datum","unit_animation","object_animation_state","animation_state","prop_datum"].iter().map(|name|s.type_name(name)).collect::<Vec<_>>()),"module":{"base":base,"symType":module.SymType,"pdbAge":module.PdbAge,"pdbGuid":[module.PdbSig70.data1,module.PdbSig70.data2 as u32,module.PdbSig70.data3 as u32],"pdbGuidTail":module.PdbSig70.data4,"pdbUnmatched":module.PdbUnmatched},"symbols":(["actor_data","object_header_data","game_time_globals","host_actors","host_actor_count","client_actors","client_actor_count","ai_profile","global_scenario","hs_global_data","hs_external_globals","prop_data"].iter().map(|name|s.symbol(name)).collect::<Vec<_>>())});
+        let out = json!({"runtime":runtime,"exeSha256":exe_sha256,"pdbSha256":pdb_sha256,"types":(["actor_datum","object_header_datum","object_datum","unit_datum","unit_control_data","weapon_datum","scenario","hs_global","hs_global_datum","unit_animation","object_animation_state","animation_state","prop_datum"].iter().map(|name|s.type_name(name)).collect::<Vec<_>>()),"module":{"base":base,"symType":module.SymType,"pdbAge":module.PdbAge,"pdbGuid":[module.PdbSig70.data1,module.PdbSig70.data2 as u32,module.PdbSig70.data3 as u32],"pdbGuidTail":module.PdbSig70.data4,"pdbUnmatched":module.PdbUnmatched},"symbols":(["actor_data","object_header_data","game_time_globals","host_actors","host_actor_count","client_actors","client_actor_count","ai_profile","global_scenario","hs_global_data","hs_external_globals","prop_data"].iter().map(|name|s.symbol(name)).collect::<Vec<_>>())});
         if args.len() == 3 {
             println!("{}", serde_json::to_string_pretty(&out).unwrap());
         } else {
-            remote::observe(
+            let observation = remote::observe(
                 &out,
                 &args[1],
                 args[3].parse().unwrap(),
                 &args[4],
                 args.len() == 6,
             );
-            verify(std::path::Path::new(&args[1]), EXE_SHA256);
-            verify(&std::path::Path::new(&args[2]).join("halo.pdb"), PDB_SHA256);
-            println!("{}", json!({"completed":true,"inputsRechecked":true}));
+            verify(std::path::Path::new(&args[1]), exe_sha256);
+            verify(&std::path::Path::new(&args[2]).join("halo.pdb"), pdb_sha256);
+            println!(
+                "{}",
+                json!({"completed":true,"inputsRechecked":true,"observation":observation})
+            );
         }
     }
 }

@@ -54,7 +54,7 @@ export function classifyStorage(relative) {
     };
   if (
     parts.some((x) =>
-      ['halo custom edition', 'opencehalo-windows-release', 'chupathingyce-windows64-release'].includes(x),
+      ['runtimes', 'halo custom edition', 'opencehalo-windows-release', 'chupathingyce-windows64-release'].includes(x),
     )
   )
     return { classification: 'Preserve', purpose: 'User-owned runtime installation/content' };

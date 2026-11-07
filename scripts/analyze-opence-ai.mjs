@@ -9,6 +9,8 @@ export const OPEN_CE_AI = Object.freeze({
   exe: '788fb4095664b9417f64f9d40a5668e6d0775823407e9d5a7b517587536766a0',
   pdb: 'b3755a3d5a7864e0ba30be6dd457c3f361c62a2bc0a04c18860a713f1931c800',
 });
+export const OPEN_CE_AI_343=Object.freeze({exe:'cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9',pdb:'c0d820e7dc96cd06cdd810a76b1ac0d28038d4477cbfd948da5b551d8f0f5ca9'});
+const observationBuilds=Object.freeze({'opence-build-335':OPEN_CE_AI,'opence-build-343':OPEN_CE_AI_343});
 const NONE = 0xffffffff;
 const digest = (b) => createHash('sha256').update(b).digest('hex');
 const uint = (v, max = NONE) => Number.isSafeInteger(v) && v >= 0 && v <= max;
@@ -35,16 +37,17 @@ export function parseActorObservation(text, record) {
   const rows = lines.map((l) => JSON.parse(l));
   const header = rows.shift(),
     footer = rows.pop();
+  const pins=observationBuilds[header?.runtime];
   const interval = header?.sampleIntervalMs ?? 100;
   if (![50, 100].includes(interval)) throw Error('Unknown bounded actor sampling interval');
   if (
     header?.schemaVersion !== 1 ||
-    header.runtime !== 'opence-build-335' ||
+    !pins ||
     header.role !== record.role ||
     header.pid !== record.pid ||
     header.readOnly !== true ||
-    header.exeSha256 !== OPEN_CE_AI.exe ||
-    header.pdbSha256 !== OPEN_CE_AI.pdb ||
+    header.exeSha256 !== pins?.exe ||
+    header.pdbSha256 !== pins?.pdb ||
     header.pdb?.symType !== 3 ||
     header.pdb?.pdbUnmatched !== 0 ||
     header.pdb?.pdbAge !== 1 ||
@@ -189,6 +192,7 @@ const distribution = (a) => {
   };
 };
 export function compareActorObservations(host, client) {
+  if(host.header&&client.header&&(host.header.runtime!==client.header.runtime||host.header.exeSha256!==client.header.exeSha256||host.header.pdbSha256!==client.header.pdbSha256))throw Error('Cannot compare different runtime/symbol identities');
   const continuity = (samples) => {
     let repeated = 0;
     const discontinuities = [];

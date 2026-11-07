@@ -1,0 +1,809 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-07",
+  "runtime": "opence-build-343",
+  "readOnly": true,
+  "pid": 24884,
+  "identity": {
+    "exeSha256": "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9",
+    "pdbSha256": "c0d820e7dc96cd06cdd810a76b1ac0d28038d4477cbfd948da5b551d8f0f5ca9",
+    "pdb": {
+      "base": 268435456,
+      "pdbAge": 1,
+      "pdbGuid": [
+        2711167513,
+        5198,
+        31079
+      ],
+      "pdbGuidTail": [
+        76,
+        76,
+        68,
+        32,
+        80,
+        68,
+        66,
+        46
+      ],
+      "pdbUnmatched": 0,
+      "symType": 3
+    }
+  },
+  "rawCapture": {
+    "bytes": 171331096,
+    "sha256": "6620dbd2a9d430a24bb88eafdbf71051ab313cb408c6115086653d26ddcd6b92",
+    "startedUtc": "2026-11-07T10:06:38.394Z",
+    "endedUtc": "2026-11-07T10:08:22.631Z",
+    "timestampNote": "Wall-clock bounds are estimates from log last-write and elapsed duration; wrapper cleanup also writes after observation."
+  },
+  "validation": {
+    "sampleRows": 1520,
+    "successfulSnapshots": 1142,
+    "rejected": {
+      "crossed tick while reading": 378
+    },
+    "completeInputRecheck": true,
+    "sampleOrder": true,
+    "tickRollbacks": 0,
+    "detailedCensuses": 0
+  },
+  "timing": {
+    "elapsedMs": 104237,
+    "firstTick": 143716,
+    "lastTick": 146832,
+    "nativeReadMs": {
+      "count": 1142,
+      "min": 8.3934,
+      "median": 11.125599999999999,
+      "p95": 13.8813,
+      "max": 18.3233
+    },
+    "actualSampleGapMs": {
+      "count": 1141,
+      "min": 64,
+      "median": 69,
+      "p95": 165,
+      "max": 572
+    },
+    "receivedControlAgeTicks": {
+      "count": 438683,
+      "min": 0,
+      "median": 0,
+      "p95": 1,
+      "max": 61
+    }
+  },
+  "observations": {
+    "networkActorCount": {
+      "count": 1142,
+      "min": 286,
+      "median": 380,
+      "p95": 461,
+      "max": 474
+    },
+    "uniqueNetworkUnits": 1311,
+    "unitSamples": 438683,
+    "unitsWithMovement": 1274,
+    "unitsWithTrigger": 55,
+    "unitsWithHealthOrShieldDecrease": 276,
+    "unitsCrossingZeroHealth": 186,
+    "unitsWithSpeechSequenceChanges": 431,
+    "unitsWithControlChanges": 1177,
+    "unitsWithSeatOrParentChanges": 0,
+    "unitsFirstSeen": 1311,
+    "unitsNoLongerSeen": 942,
+    "localDecisionActorPoolZero": true
+  },
+  "limitations": [
+    "Client only: no host or second peer capture, no parity/latency/full-lifecycle acceptance.",
+    "Native network unit table also includes recorded-animation units; counts are not certified AI enemy counts.",
+    "Cross-tick reads are rejected; every requested detailed census crossed a tick. Animation/weapon/object census is unavailable.",
+    "Appearance/disappearance are observations, not proven reliable spawn/despawn events.",
+    "Health changes do not prove player-caused damage, kills or shared objective completion.",
+    "Control age is native tick age, not measured network ping.",
+    "No packets or voice/audio recorded; no writes, injection, input, engine settings or game files changed."
+  ],
+  "aiActorAcceptance": false,
+  "fullLifecycleAcceptance": false,
+  "twoComputerAcceptance": false,
+  "upstream": {
+    "release": "https://github.com/OpenCommunityEdition/OpenCE/releases/tag/build-343",
+    "revision": "fc9deb0b10eaae1d62caedb0710968b4e77e6e16",
+    "networkVersion": 41,
+    "publisherVerification": {
+      "purpose": "Temporary inputs for existing read-only observer; no engine source imported or game altered",
+      "sourceCommit": "fc9deb0b10eaae1d62caedb0710968b4e77e6e16",
+      "sourceRelease": "https://github.com/OpenCommunityEdition/OpenCE/releases/tag/build-343",
+      "installedExecutableMatches": true,
+      "files": [
+        {
+          "archive": "halo-windows-release.zip",
+          "archiveBytes": 15186349,
+          "archiveSha256": "4804cceef72a0b18f97813902625bf32c6f7677d0f023f3bc49eb31cceb2be81",
+          "member": "halo.exe",
+          "memberBytes": 22834688,
+          "memberSha256": "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9"
+        },
+        {
+          "archive": "halo-windows-release-symbols.zip",
+          "archiveBytes": 11000557,
+          "archiveSha256": "7ca3e0aabc0d3e5090d241428c3135fa17ee79c4ab8b0fe525876e0ba230ac4d",
+          "member": "halo.pdb",
+          "memberBytes": 24858624,
+          "memberSha256": "c0d820e7dc96cd06cdd810a76b1ac0d28038d4477cbfd948da5b551d8f0f5ca9"
+        }
+      ]
+    },
+    "sourceFiles": [
+      {
+        "source": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/fc9deb0b10eaae1d62caedb0710968b4e77e6e16/port/linux/game/network_actors.c",
+        "path": "port/linux/game/network_actors.c",
+        "bytes": 33230,
+        "sha256": "beaa436a7da1d9e3c9efb83e796a6d7ccbe80d61ac19814b219031577dfdc4f4",
+        "references": [
+          {
+            "line": 668,
+            "declaration": "if (game_connection() != _game_connection_network_server || network_coop_active())"
+          },
+          {
+            "line": 729,
+            "declaration": "void network_actors_host_tick("
+          },
+          {
+            "line": 835,
+            "declaration": "void network_actors_handle_states("
+          },
+          {
+            "line": 849,
+            "declaration": "void network_actors_drive("
+          }
+        ]
+      },
+      {
+        "source": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/fc9deb0b10eaae1d62caedb0710968b4e77e6e16/port/linux/game/network_objects.c",
+        "path": "port/linux/game/network_objects.c",
+        "bytes": 147626,
+        "sha256": "b10a16b82909dbf49db3086f77e43907d6536e6738295da54e3e6ea35e6b9edb",
+        "references": [
+          {
+            "line": 735,
+            "declaration": "if (!network_coop_active() || object_get(object_index)->object.type != _object_type_vehicle)"
+          },
+          {
+            "line": 802,
+            "declaration": "return (network_coop_active() && cinematic_in_progress()) || distributed_vehicle_unsteered(object_index);"
+          },
+          {
+            "line": 1272,
+            "declaration": "void network_objects_client_asked("
+          },
+          {
+            "line": 1440,
+            "declaration": "if (network_coop_active() && cinematic_in_progress())"
+          },
+          {
+            "line": 1966,
+            "declaration": "if (!network_coop_player_has_structure_bsp(driver->unit.player_index))"
+          },
+          {
+            "line": 2109,
+            "declaration": "PROFILE_SECTION(objects_host_tick_update_objects_section, \"network_objects_host_tick.update_objects\")"
+          },
+          {
+            "line": 2110,
+            "declaration": "PROFILE_SECTION(objects_host_tick_find_viewers_section, \"network_objects_host_tick.find_viewers\")"
+          },
+          {
+            "line": 2111,
+            "declaration": "PROFILE_SECTION(objects_host_tick_send_states_section, \"network_objects_host_tick.send_states\")"
+          },
+          {
+            "line": 2112,
+            "declaration": "PROFILE_SECTION(objects_host_tick_send_inventories_section, \"network_objects_host_tick.send_inventories\")"
+          },
+          {
+            "line": 2113,
+            "declaration": "PROFILE_SECTION(objects_host_tick_send_damage_animations_section, \"network_objects_host_tick.send_damage_animations\")"
+          },
+          {
+            "line": 2115,
+            "declaration": "void network_objects_host_tick("
+          },
+          {
+            "line": 2233,
+            "declaration": "static void distributed_client_create_failed("
+          },
+          {
+            "line": 2383,
+            "declaration": "static void distributed_client_create("
+          },
+          {
+            "line": 2429,
+            "declaration": "distributed_client_create_failed();"
+          },
+          {
+            "line": 2457,
+            "declaration": "distributed_client_create_failed();"
+          },
+          {
+            "line": 2489,
+            "declaration": "distributed_client_create(change);"
+          }
+        ]
+      },
+      {
+        "source": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/fc9deb0b10eaae1d62caedb0710968b4e77e6e16/port/linux/game/network_damage.c",
+        "path": "port/linux/game/network_damage.c",
+        "bytes": 112496,
+        "sha256": "da1a97a4e153af1eb161d7e73e027ea1a0f82298fbffb6136ffa4b0c0d7224c7",
+        "references": [
+          {
+            "line": 2641,
+            "declaration": "void network_damage_host_tick("
+          }
+        ]
+      },
+      {
+        "source": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/fc9deb0b10eaae1d62caedb0710968b4e77e6e16/port/linux/game/network_distributed.c",
+        "path": "port/linux/game/network_distributed.c",
+        "bytes": 202446,
+        "sha256": "763d17ec6f5bbdbe442fcadc823e581284c0e63717faf72baae342fd0dbad981",
+        "references": [
+          {
+            "line": 517,
+            "declaration": "PROFILE_SECTION(distributed_tick_send_structure_bsp_section, \"network_distributed_tick.send_structure_bsp\")"
+          },
+          {
+            "line": 2036,
+            "declaration": "if (network_coop_active())"
+          },
+          {
+            "line": 2438,
+            "declaration": "follows the host's (network_coop.c), behind it by the time the host's word"
+          },
+          {
+            "line": 2590,
+            "declaration": "network_coop_player_has_structure_bsp(unit_get(unit_index)->unit.player_index))"
+          },
+          {
+            "line": 2788,
+            "declaration": "input->structure_bsp_index = (byte)global_structure_bsp_index_get();"
+          },
+          {
+            "line": 2789,
+            "declaration": "input->coop_no_friendly_fire = network_coop_active() && !network_coop_own_friendly_fire();"
+          },
+          {
+            "line": 2861,
+            "declaration": "if (network_coop_active() && player->unit_index != NONE)"
+          },
+          {
+            "line": 2863,
+            "declaration": "network_coop_note_player_structure_bsp(input->player_index, input->structure_bsp_index);"
+          },
+          {
+            "line": 2864,
+            "declaration": "network_coop_note_player_friendly_fire(DATUM_INDEX_NEW(input->player_index, player->identifier),"
+          },
+          {
+            "line": 3074,
+            "declaration": "struct structure_bsp *structure_bsp = global_structure_bsp_get();"
+          },
+          {
+            "line": 3075,
+            "declaration": "short cluster_count = structure_bsp ? (short)structure_bsp->clusters.count : 0;"
+          },
+          {
+            "line": 3181,
+            "declaration": "structure_bsp_get_cluster_pvs(structure_bsp, viewer->cluster_index) : NULL;"
+          },
+          {
+            "line": 3580,
+            "declaration": "static void distributed_send_structure_bsp("
+          },
+          {
+            "line": 3584,
+            "declaration": "short index = global_structure_bsp_index_get();"
+          },
+          {
+            "line": 3589,
+            "declaration": "distributed_send(&message, _distributed_message_structure_bsp, 1, (word)sizeof(message),"
+          },
+          {
+            "line": 3594,
+            "declaration": "static void distributed_handle_structure_bsp("
+          },
+          {
+            "line": 3599,
+            "declaration": "if (network_coop_active() && index >= 0 && index < global_scenario_get()->structure_bsp_references.count &&"
+          },
+          {
+            "line": 3600,
+            "declaration": "index != global_structure_bsp_index_get())"
+          },
+          {
+            "line": 3602,
+            "declaration": "main_switch_structure_bsp(index);"
+          },
+          {
+            "line": 3833,
+            "declaration": "network_coop_new_game();"
+          },
+          {
+            "line": 3873,
+            "declaration": "profile_scope(distributed_tick_objects_host_tick_section, network_objects_host_tick();)"
+          },
+          {
+            "line": 3875,
+            "declaration": "profile_scope(distributed_tick_damage_host_tick_section, network_damage_host_tick();)"
+          },
+          {
+            "line": 3886,
+            "declaration": "if (network_coop_active() && (global_structure_bsp_index_get() != distributed_sent_structure_bsp_index ||"
+          },
+          {
+            "line": 3889,
+            "declaration": "profile_scope(distributed_tick_send_structure_bsp_section, distributed_send_structure_bsp();)"
+          },
+          {
+            "line": 3892,
+            "declaration": "profile_scope(distributed_tick_actors_host_tick_section, network_actors_host_tick();)"
+          },
+          {
+            "line": 3893,
+            "declaration": "profile_scope(distributed_tick_coop_host_tick_section, network_coop_host_tick();)"
+          },
+          {
+            "line": 3909,
+            "declaration": "profile_scope(distributed_tick_coop_client_tick_section, network_coop_client_tick();)"
+          },
+          {
+            "line": 4798,
+            "declaration": "case _distributed_message_structure_bsp: entry_size = sizeof(struct distributed_structure_bsp); break;"
+          },
+          {
+            "line": 4799,
+            "declaration": "case _distributed_message_coop_presentation: entry_size = network_coop_presentation_entry_size(); break;"
+          },
+          {
+            "line": 4800,
+            "declaration": "case _distributed_message_coop_events: entry_size = network_coop_event_entry_size(); break;"
+          },
+          {
+            "line": 4801,
+            "declaration": "case _distributed_message_coop_skip_vote: entry_size = network_coop_skip_vote_entry_size(); break;"
+          },
+          {
+            "line": 4802,
+            "declaration": "case _distributed_message_coop_device_groups: entry_size = network_coop_device_group_entry_size(); break;"
+          },
+          {
+            "line": 4803,
+            "declaration": "case _distributed_message_coop_object_names: entry_size = network_coop_object_names_entry_size(); break;"
+          },
+          {
+            "line": 4804,
+            "declaration": "case _distributed_message_coop_object_transforms: entry_size = network_coop_object_transform_entry_size(); break;"
+          },
+          {
+            "line": 4806,
+            "declaration": "case _distributed_message_coop_object_looks: entry_size = network_coop_object_look_entry_size(); break;"
+          },
+          {
+            "line": 4808,
+            "declaration": "case _distributed_message_coop_screen_effect: entry_size = network_coop_screen_effect_entry_size(); break;"
+          },
+          {
+            "line": 4809,
+            "declaration": "case _distributed_message_coop_device_states: entry_size = network_coop_device_state_entry_size(); break;"
+          },
+          {
+            "line": 4930,
+            "declaration": "network_actors_handle_states(entries, header.count);"
+          },
+          {
+            "line": 4933,
+            "declaration": "distributed_handle_structure_bsp((struct distributed_structure_bsp const *)entries);"
+          },
+          {
+            "line": 4936,
+            "declaration": "network_coop_handle_presentation(entries, header.game_time);"
+          },
+          {
+            "line": 4939,
+            "declaration": "network_coop_handle_events(entries, header.count);"
+          },
+          {
+            "line": 4942,
+            "declaration": "network_coop_handle_skip_vote(machine_index, entries);"
+          },
+          {
+            "line": 4962,
+            "declaration": "network_coop_handle_device_groups(entries, header.count);"
+          },
+          {
+            "line": 4965,
+            "declaration": "network_coop_handle_object_names(entries);"
+          },
+          {
+            "line": 4968,
+            "declaration": "network_coop_handle_object_transforms(entries, header.count);"
+          },
+          {
+            "line": 4974,
+            "declaration": "network_coop_handle_object_looks(entries, header.count);"
+          },
+          {
+            "line": 4980,
+            "declaration": "network_coop_handle_screen_effect(entries, header.count);"
+          },
+          {
+            "line": 4983,
+            "declaration": "network_coop_handle_device_states(entries, header.count);"
+          },
+          {
+            "line": 5110,
+            "declaration": "network_objects_client_asked(machine_index, header.count != 0);"
+          }
+        ]
+      },
+      {
+        "source": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/fc9deb0b10eaae1d62caedb0710968b4e77e6e16/port/linux/game/network_coop.c",
+        "path": "port/linux/game/network_coop.c",
+        "bytes": 119141,
+        "sha256": "3b8ad8f58b01675c0b1992efdb776860a8873b4a861ec167315660bcf5976f60",
+        "references": [
+          {
+            "line": 23,
+            "declaration": "network_coop_note_ functions (network_coop.h) to queue them."
+          },
+          {
+            "line": 64,
+            "declaration": "because the netcode needs it to only go forward (network_coop_reverted)."
+          },
+          {
+            "line": 301,
+            "declaration": "what (network_coop_set_players_vitality) */"
+          },
+          {
+            "line": 502,
+            "declaration": "/* immediate sets so far (devices.c calls network_coop_note_device_snap) */"
+          },
+          {
+            "line": 605,
+            "declaration": "return network_coop_active();"
+          },
+          {
+            "line": 1227,
+            "declaration": "word network_coop_screen_effect_entry_size("
+          },
+          {
+            "line": 1233,
+            "declaration": "void network_coop_handle_screen_effect("
+          },
+          {
+            "line": 1334,
+            "declaration": "names->structure_bsp_index = global_structure_bsp_index_get();"
+          },
+          {
+            "line": 1884,
+            "declaration": "if (event->frame == global_structure_bsp_index)"
+          },
+          {
+            "line": 1984,
+            "declaration": "entry->declined = !network_coop_own_friendly_fire();"
+          },
+          {
+            "line": 2041,
+            "declaration": "void network_coop_new_game("
+          },
+          {
+            "line": 2053,
+            "declaration": "csmemset(host_player_structure_bsps, NONE, sizeof(host_player_structure_bsps));"
+          },
+          {
+            "line": 2075,
+            "declaration": "void network_coop_checkpoint_saved("
+          },
+          {
+            "line": 2155,
+            "declaration": "static boolean network_coop_hosting_public("
+          },
+          {
+            "line": 2163,
+            "declaration": "boolean network_coop_wipe_reverts("
+          },
+          {
+            "line": 2171,
+            "declaration": "if (!strcmp(mode, \"respawn\") || (strcmp(mode, \"revert\") && network_coop_hosting_public()))"
+          },
+          {
+            "line": 2184,
+            "declaration": "boolean network_coop_active("
+          },
+          {
+            "line": 2193,
+            "declaration": "boolean network_coop_player_collisions("
+          },
+          {
+            "line": 2198,
+            "declaration": "if (!network_coop_active() || !(game = network_game_get_game()))"
+          },
+          {
+            "line": 2203,
+            "declaration": "boolean network_coop_ally_friendly_fire("
+          },
+          {
+            "line": 2208,
+            "declaration": "if (!network_coop_active() || !(game = network_game_get_game()))"
+          },
+          {
+            "line": 2213,
+            "declaration": "boolean network_coop_own_friendly_fire("
+          },
+          {
+            "line": 2219,
+            "declaration": "void network_coop_note_player_friendly_fire("
+          },
+          {
+            "line": 2229,
+            "declaration": "boolean network_coop_players_friendly_fire("
+          },
+          {
+            "line": 2247,
+            "declaration": "boolean network_coop_player_away("
+          },
+          {
+            "line": 2258,
+            "declaration": "boolean network_coop_host_dedicated("
+          },
+          {
+            "line": 2265,
+            "declaration": "if (!network_coop_active() || !(game = network_game_get_game()))"
+          },
+          {
+            "line": 2270,
+            "declaration": "boolean network_coop_bsp_switch_majority("
+          },
+          {
+            "line": 2273,
+            "declaration": "return coop_host() && halo_server_mode() && strcmp(config_string(\"server.coop_bsp_switch\"), \"anyone\") != 0;"
+          },
+          {
+            "line": 2276,
+            "declaration": "long network_coop_bsp_switch_cooldown_ticks("
+          },
+          {
+            "line": 2283,
+            "declaration": "seconds = config_integer(\"server.coop_bsp_switch_cooldown_seconds\");"
+          },
+          {
+            "line": 2290,
+            "declaration": "void network_coop_tell_bsp_switch_waiting("
+          },
+          {
+            "line": 2330,
+            "declaration": "void network_coop_note_bsp_switch("
+          },
+          {
+            "line": 2344,
+            "declaration": "server_json_string(&json, \"event\", \"coop_bsp_switch\");"
+          },
+          {
+            "line": 2388,
+            "declaration": "boolean network_coop_devices_remote("
+          },
+          {
+            "line": 2399,
+            "declaration": "void network_coop_vehicle_dropped("
+          },
+          {
+            "line": 2445,
+            "declaration": "boolean network_coop_set_players_vitality("
+          },
+          {
+            "line": 2477,
+            "declaration": "void network_coop_note_device_snap("
+          },
+          {
+            "line": 2532,
+            "declaration": "void network_coop_note_sound("
+          },
+          {
+            "line": 2566,
+            "declaration": "void network_coop_note_title("
+          },
+          {
+            "line": 2578,
+            "declaration": "void network_coop_note_hud("
+          },
+          {
+            "line": 2595,
+            "declaration": "void network_coop_note_player_effect("
+          },
+          {
+            "line": 2629,
+            "declaration": "void network_coop_note_nav_point("
+          },
+          {
+            "line": 2695,
+            "declaration": "void network_coop_note_unit_animation("
+          },
+          {
+            "line": 2711,
+            "declaration": "void network_coop_note_unit_open("
+          },
+          {
+            "line": 2726,
+            "declaration": "void network_coop_note_unit_animation_frame("
+          },
+          {
+            "line": 2747,
+            "declaration": "void network_coop_note_scenery_animation("
+          },
+          {
+            "line": 2828,
+            "declaration": "void network_coop_note_attach("
+          },
+          {
+            "line": 2856,
+            "declaration": "void network_coop_note_detach("
+          },
+          {
+            "line": 2870,
+            "declaration": "void network_coop_note_effect("
+          },
+          {
+            "line": 2883,
+            "declaration": "void network_coop_note_surface_broken("
+          },
+          {
+            "line": 2905,
+            "declaration": "struct structure_bsp *structure_bsp = global_structure_bsp_get();"
+          },
+          {
+            "line": 2906,
+            "declaration": "short count = (short)structure_bsp->breakable_surfaces.count;"
+          },
+          {
+            "line": 2918,
+            "declaration": "struct structure_breakable_surface *surface = TAG_BLOCK_GET_ELEMENT(&structure_bsp->breakable_surfaces,"
+          },
+          {
+            "line": 2921,
+            "declaration": "network_coop_note_surface_broken(index, &surface->centroid);"
+          },
+          {
+            "line": 2928,
+            "declaration": "void network_coop_note_object_effect("
+          },
+          {
+            "line": 2948,
+            "declaration": "boolean network_coop_skip_offered("
+          },
+          {
+            "line": 2954,
+            "declaration": "boolean network_coop_vote_skip("
+          },
+          {
+            "line": 2972,
+            "declaration": "void network_coop_reverted("
+          },
+          {
+            "line": 2993,
+            "declaration": "void network_coop_skip_done("
+          }
+        ]
+      },
+      {
+        "source": "https://raw.githubusercontent.com/OpenCommunityEdition/OpenCE/fc9deb0b10eaae1d62caedb0710968b4e77e6e16/LICENSE",
+        "path": "LICENSE",
+        "bytes": 34523,
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "references": []
+      }
+    ],
+    "thirdPartyCodeImported": false
+  },
+  "boundedRetest": {
+    "bytes": 32495745,
+    "sha256": "09ecd4e1baa2454d05f63019d2da8d05638dd38a6276c19e870bb7e1942c23fa",
+    "valid": 1176,
+    "errors": {
+      "crossed tick while reading": 106
+    },
+    "header": {
+      "atomicSnapshot": false,
+      "base": 2359296,
+      "detailedCensus": false,
+      "exeSha256": "cd249f7ffd94c21b7f8bec1efc3e734753c48cf45d56d16f21a4ef53bcf07dd9",
+      "maximumObservationBytes": 33554432,
+      "pdb": {
+        "base": 268435456,
+        "pdbAge": 1,
+        "pdbGuid": [
+          2711167513,
+          5198,
+          31079
+        ],
+        "pdbGuidTail": [
+          76,
+          76,
+          68,
+          32,
+          80,
+          68,
+          66,
+          46
+        ],
+        "pdbUnmatched": 0,
+        "symType": 3
+      },
+      "pdbSha256": "c0d820e7dc96cd06cdd810a76b1ac0d28038d4477cbfd948da5b551d8f0f5ca9",
+      "pid": 24884,
+      "readOnly": true,
+      "role": "client",
+      "runtime": "opence-build-343",
+      "sampleIntervalMs": 50,
+      "schemaVersion": 1
+    },
+    "footer": {
+      "completed": true,
+      "inputsRechecked": true,
+      "observation": {
+        "elapsedMs": 71224,
+        "endedBecause": "output-budget",
+        "sampleOutputBytes": 32494307,
+        "sampleRows": 1282
+      }
+    },
+    "nativeParserPassed": true,
+    "noDetailedCensusRequested": true
+  },
+  "multiplayerBotMatch": {
+    "scope": "Owner-requested read-only recheck of active multiplayer bot match; no host or second peer observed",
+    "runtime": "opence-build-343",
+    "rawCapture": {
+      "file": "opence-343-bot-match-recheck.ndjson",
+      "bytes": 2627503,
+      "sha256": "ac433ee0da467da69b16e524dbe93eda940e34ea5ec80bdd2f0c560d8232b0b0"
+    },
+    "validSnapshots": 1505,
+    "rejected": {
+      "crossed tick while reading": 15
+    },
+    "detailedSamples": 63,
+    "firstTick": 9850,
+    "lastTick": 12162,
+    "actorPoolCounts": [
+      0
+    ],
+    "networkActorCounts": [
+      0
+    ],
+    "uniquePlayerIds": 9,
+    "maxConcurrentPlayerLinkedUnits": 9,
+    "uniqueUnits": 71,
+    "movedUnits": 53,
+    "damagedUnits": 51,
+    "observedHealthCrossingsToDeath": 47,
+    "animationProgressUnits": 56,
+    "weaponsWithFiringTickAdvance": 69,
+    "screenEvidence": "Owner supplied scoreboard shows eight scored zero-ping entries and their player at 61ms. Screenshot is not host telemetry.",
+    "botCountNativeFieldAvailable": false,
+    "hostImplementationVerified": false,
+    "peerParityAccepted": false,
+    "zombieGameplayAccepted": false
+  },
+  "botSourceReview": {
+    "commit": "fc9deb0b10eaae1d62caedb0710968b4e77e6e16",
+    "paths": [
+      "port/linux/game/bots.c",
+      "source/networking/network_server_manager.c",
+      "tools/test_bots.py",
+      "tools/system_link_bots.py",
+      "port/linux/NETCODE.md"
+    ],
+    "finding": "Bundled bots.count computer players occupy player slots and are gated to local Slayer; tools/system_link_bots.py is a protocol/load fixture whose players stand still, not combat AI. A remote host may use a different build/fork. Campaign native actors use existing host-authoritative network_actors. An empty actor table does not mean an absence of player bots."
+  }
+}

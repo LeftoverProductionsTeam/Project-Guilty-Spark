@@ -390,6 +390,7 @@ pub(super) fn discover(state: &AppState) -> Reply<Option<Installation>> {
     {
         for ancestor in start.ancestors().take(6) {
             candidates.push(ancestor.join("Halo Custom Edition"));
+            candidates.push(ancestor.join("Runtimes/Halo Custom Edition"));
         }
     }
     for candidate in candidates {
@@ -629,6 +630,7 @@ pub(super) async fn install_custom_edition(
     drop(slot);
     tauri::async_runtime::spawn_blocking(move || match install(&app, &job) {
         Ok(root) => {
+            let _ = app.emit("spark:runtime-connections-changed", ());
             if let Ok(mut view) = job.view.lock() {
                 view.phase = "complete".into();
                 view.detail = "Custom Edition installed and connected. Open Online or Find tools to launch it; game play remains a separate test.".into();
@@ -684,6 +686,7 @@ pub(super) async fn connect_custom_edition(
         }
         register(&app.state::<AppState>(), &found)?;
         found.registered = true;
+        let _ = app.emit("spark:runtime-connections-changed", ());
         Ok(found)
     })
     .await
