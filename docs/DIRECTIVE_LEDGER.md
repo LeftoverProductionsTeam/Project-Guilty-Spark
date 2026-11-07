@@ -1,6 +1,6 @@
 # Directive completion ledger
 
-Active priority: continuous completion66656a27 from d64f3e7. Preserve verified P0/C71 and all475IDs/25prompts. Scoped receipt/source/native and Spark Flow keyboard/window gates now pass; resume existing World/Logic authoring while actual H1A gameplay remains open. A commit, receipt or source match is not gameplay acceptance. No push/publication or repeated purge.
+Active priority: c3ad4850 complete creator workflows, first real CE donor to MCC H1A asset imports through the existing Asset Library/World/QuickForge/build path. Actual master34b7c57 preserves67545f5 source and the owner README. Exact directive: Master Engineering Prompts/GS_2026-11-07_Complete_Creator_Workflows.md. Existing66656a27 authoring and all475IDs/25prompts remain. Keep UI/native artifact/game/peer/release evidence distinct; no push/publication or repeated purge.
 
 Bounded recovery index, not an application queue or scheduler. Full instructions remain in PENDING_REQUESTS and its source references; requirements remain in MASTER_FEATURE_LEDGER.csv. The P0 emergency directive supersedes global human-only blocking: keep exact unverified evidence while continuing safe independent engineering. Receipt is never implementation or acceptance. Earlier predecessor/deferral wording in the historical rows is superseded where it would make a human-only gate block unrelated safe engineering; each initiative still requires its own genuine acceptance. Ending revision is absent until the stated directive's gate is met; substep commits do not close an entire directive.
 

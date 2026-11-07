@@ -15,6 +15,7 @@ export type ViewportAsset =
       kind: 'model';
       sourceId: string;
       sourceTitle: string;
+      sourceEdition?: string;
       name: string;
       path: string;
       asset: ForgeAsset;
@@ -24,6 +25,7 @@ export type ViewportAsset =
       kind: 'mesh' | 'customSound';
       sourceId: string;
       sourceTitle: string;
+      sourceEdition?: string;
       name: string;
       path: string;
       asset: Asset;
@@ -33,6 +35,7 @@ export type ViewportAsset =
       kind: 'sound';
       sourceId: string;
       sourceTitle: string;
+      sourceEdition?: string;
       name: string;
       path: string;
       tagId: number;
@@ -55,7 +58,7 @@ function buildCatalog(
   return documents.flatMap((document) => {
     const project = document.history.current;
     if (!project) return [];
-    const source = { sourceId: project.id, sourceTitle: project.title };
+    const source = { sourceId: project.id, sourceTitle: project.title, sourceEdition: project.source?.engine ?? 'Workshop source' };
     const models: ViewportAsset[] =
       document.inspection && project.source && document.inspection.sha256 === project.source.sha256
         ? catalogAssets({ project, inspection: document.inspection }).map((asset) => ({

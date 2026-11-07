@@ -28,6 +28,8 @@ const profilePreview=process.env.SPARK_LIFECYCLE_PROFILE==='1';
 if(profilePreview&&!nativeOnly)throw Error('Preview profiling requires native-only mode');
 const geometryOnly=process.env.SPARK_LIFECYCLE_GEOMETRY==='1';
 const logicOnly=process.env.SPARK_LIFECYCLE_LOGIC==='1';
+const crossRuntime=process.env.SPARK_LOGIC_CROSS_RUNTIME==='1';
+if(crossRuntime&&!logicOnly)throw Error('Cross-runtime asset acceptance uses the existing native logic workflow');
 if(logicOnly&&(geometryOnly||nativeOnly||previewOnly||contextOnly))throw Error('Native logic authoring requires its own bounded run');
 const repeatedEdits=process.env.SPARK_LIFECYCLE_REPEAT_EDITS??'';
 if(!['','20','50'].includes(repeatedEdits)||repeatedEdits&&!nativeOnly)throw Error('Repeated native acceptance requires native-only mode and exactly20 or50 edits');
@@ -49,6 +51,7 @@ await finishStorage.createScratch('library');
 await finishStorage.createScratch('webview');
 if(nativeOnly&&!readOnly)await finishStorage.createScratch('independent-native-tags');
 if(logicOnly)await finishStorage.createScratch('independent-native-tags');
+if(logicOnly&&crossRuntime){await finishStorage.createScratch('donor-inputs');await finishStorage.createScratch('native-output');}
 if(geometryOnly)await finishStorage.createScratch('independent-model-tags');
 const runOwned=async(...args)=>{const pending=promisify(execFile)(...args);if(pending.child)await finishStorage.trackProcess(pending.child);return pending;};
 const interrupt=async()=>{try{await finishStorage.interrupt();}finally{process.exit(130);}};
@@ -313,7 +316,22 @@ try{
     const {nativeGeometryRoundTrip}=await import('./native-geometry-roundtrip.mjs');
     await nativeGeometryRoundTrip({main,root,invoke,expect,report,step,invaderDirectory,run:runOwned});
   }
-  if(logicOnly){
+  if(logicOnly&&crossRuntime){
+    const {nativeCrossRuntimeAssetRoundTrip}=await import('./native-logic-roundtrip.mjs');
+    report.crossRuntime={stage:'starting real cross-runtime UI workflow',pairs:[],mockedIpc:false,gameplayVerified:false};
+    const donors=[process.env.SPARK_LOGIC_CE_SCENERY,process.env.SPARK_LOGIC_CE_VEHICLE];if(!donors.every(Boolean))throw Error('Select two owned CE donor caches');
+    await nativeCrossRuntimeAssetRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT),tags:path.resolve(process.env.SPARK_LOGIC_TAGS),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),donors:donors.map(value=>path.resolve(value)),call:(command,args)=>invoke(main,command,args),receipt:report.crossRuntime,expect,run:runOwned,retain:finishStorage.retain});
+    step('Two real CE donor asset classes drag into separate MCC authoring documents and compile independently');
+    const pid=child.pid;
+    for(const view of [...pages()].reverse())if(!view.isClosed())await close(view,'save');
+    await waitForQaExit(child);await browser.close();await launchNative();
+    for(const pair of report.crossRuntime.pairs){const reopened=await invoke(main,'open_project',{id:pair.targetProjectId}),history=await state(main,pair.targetProjectId);
+      expect(reopened.project.quickForge).toEqual(pair.savedProject.quickForge);expect(reopened.project.scene).toEqual(pair.savedProject.scene);expect(reopened.project.nativeAssetImports).toEqual(pair.savedProject.nativeAssetImports);expect(history.history.head).toEqual(pair.savedHistory.head);
+      pair.fullProcessRestart={stoppedPid:pid,restartedPid:child.pid,sourceImportsAndUndoPreserved:true};delete pair.savedProject;delete pair.savedHistory;
+    }
+    step('Both cross-runtime destinations survive full process restart with native dependencies and the same Undo head');
+  }
+  if(logicOnly&&!crossRuntime){
     const {nativeLogicRoundTrip}=await import('./native-logic-roundtrip.mjs');
     report.logicRoundTrip={appSha256:report.appSha256,sourceCacheSha256:crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex'),mockedIpc:false,gameplayVerified:false,externalGuiEdited:false};
     await nativeLogicRoundTrip({page:main,root,kit:path.resolve(process.env.SPARK_LOGIC_KIT??''),tags:path.resolve(process.env.SPARK_LOGIC_TAGS??''),invader:path.resolve(invaderDirectory),cache:path.resolve(nativeMap),call:(command,args)=>invoke(main,command,args),receipt:report.logicRoundTrip,expect,run:runOwned,verifyEditedAsset:true,reviewControl:process.env.SPARK_LOGIC_GAME_REVIEW==='1'?id=>reviewNativeScene(id,'control'):undefined});
@@ -798,14 +816,19 @@ try{
   }
   expect(report.errors).toEqual([]);report.complete=true;
 }catch(error){report.errors.push(String(error));report.failureStack=error.stack;process.exitCode=1;if(browser){
-  report.failureWindows=await Promise.all(pages().map(async(page,i)=>{await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});return{url:page.url(),label:await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label).catch(()=>null),workspace:await page.locator('.gs-workspace-shell').getAttribute('data-workspace').catch(()=>null),body:(await page.locator('body').innerText().catch(()=>'')).slice(0,2500)};}));
-}}
+  report.failureWindows=await Promise.all(pages().map(async(page,i)=>{await page.screenshot({path:path.join(root,`failure-window-${i}.png`)}).catch(()=>{});return{url:page.url(),label:await page.evaluate(()=>window.__TAURI_INTERNALS__.metadata.currentWindow.label).catch(()=>null),workspace:await page.locator('.gs-workspace-shell').getAttribute('data-workspace').catch(()=>null),body:(await page.locator('body').innerText().catch(()=>'')).slice(0,2500),tail:(await page.locator('body').innerText().catch(()=>'')).slice(-4000)};}));
+}
+  report.nativeFailureLogs=await Promise.race([invoke(main,'bootstrap').then(value=>value.logs.slice(-10)).catch(()=>[]),new Promise(resolve=>setTimeout(()=>resolve([]),3000))]);
+  // Preserve the primary assertion before native teardown can fail. Cleanup
+  // diagnostics must never erase the actual acceptance failure.
+  await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));
+}
 finally{
   // Successful acceptance closes the actual application normally before
   // sealing its regenerable cache. Abrupt termination leaves WebView writers
   // flushing files after the parent exits; those files must never be deleted
   // against an unstable hash inventory.
-  if(report.complete&&browser){
+  if(browser){
     try{for(const page of pages().reverse()){if(!page.isClosed()){console.log('NATIVE_CLOSE_REVIEW',JSON.stringify({scope:report.scope,url:page.url(),at:new Date().toISOString()}));await close(page,'save');}}if(child)await waitForQaExit(child);report.gracefulAppClose=true;}
     catch(error){
       report.complete=false;report.errors.push('Normal QA app close failed: '+String(error));process.exitCode=1;
@@ -816,7 +839,7 @@ finally{
     }
   }
   await browser?.close().catch(()=>{});
-  if(child?.exitCode===null)await stopQaProcess(child);
+  if(child?.exitCode===null)try{await stopQaProcess(child);}catch(error){report.complete=false;report.errors.push('Owned QA process stop failed: '+String(error));process.exitCode=1;await fs.writeFile(path.join(root,'acceptance.json'),JSON.stringify(report,null,2));}
   if(finishStorage){try{
     if(child)await waitForQaExit(child);
     // Tests own these fresh namespaces, on failure too. A deliberate geometry

@@ -1,5 +1,16 @@
 # Runtime and operation compatibility — Continuation 42
 
+## November 7 — source-native asset transfer acceptance
+
+| Exact source → destination | Asset / required native closure | Proven endpoint | Remaining gate |
+| --- | --- | --- | --- |
+| Gearbox CE609 Blood Gulch → distinct MCC13 QuickForge source | Scenery boulder;5 native tags including model, shader, bitmap and collision | Actual preview/pointer/transform/copy/Undo/Save/process restart; H1A Tool build; independent recursive extraction, palette, both coordinates and CRC | Retail MCC loading, physical collision/game interaction and exact shader parity |
+| Gearbox CE609 Sidewinder → separate imported MCC13 World source | Warthog;285 tags including physics, animation, effects, weapons, shaders and sounds | Same real UI/native/restart checks;284 independently resolvable dependencies and two vehicle placements | Actual vehicle driving, animation/audio/game fidelity and multiplayer |
+| Existing MCC13 → MCC13 native source | C63/C70/R24 machine/property/Logic workflows | Prior native editor/compiler evidence retained separately | New cross-edition and independent GUI/game acceptance are not inferred |
+| PC7, Demo/Mac6/7, Xbox5, HaloMD, OpenCE/Faber/Chupathingy sources → selected native target | Source-specific readers and applicable external extraction/rebuild routes | Existing scoped reading/preview/recovery evidence only; no new blanket conversion pass | Each source/target/class needs its own native artifact and game checks |
+
+Source identity and original resource hashes authorize decoding. Selecting a hosting engine cannot reinterpret the donor. A community engine directory may contain several actual cache formats; the cache and its resources determine the import route. Local native import is separate from shared SparkLink publication. See [creator acceptance](CREATOR_WORKFLOWS_20261107.md).
+
 ## C61 scope — November 3, 2026
 
 The native build-history projection preserves source identity and adds no runtime adapter or gameplay permission. Home uses existing neutral inspection lights; 16 real native character/runtime-selection checks preserve exact source/material/variant identity and saved choices. A compatible linked campaign source may supply a character absent from the selected runtime. Full map/asset rendering parity remains separately gated.

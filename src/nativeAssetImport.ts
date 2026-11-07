@@ -1,3 +1,4 @@
+import {useEffect, useRef} from 'react';
 import { call, native } from './api';
 import type { ForgeAsset } from './forge';
 import type { ViewportAsset } from './viewportAssets';
@@ -47,4 +48,20 @@ export async function prepareSoundImport(project: Project, item: ViewportAsset) 
     class: item.looping ? 'lsnd' : 'snd!',
     cacheVersion: 0,
   });
+}
+
+/** An async import belongs to one uninterrupted destination view. Leaving and
+ * returning to the same map must not revive an earlier placement request. */
+export function useAssetImportGuard(projectId: string, active: boolean) {
+  const scope = useRef({projectId, active}), mounted = useRef(false);
+  if (scope.current.projectId !== projectId || scope.current.active !== active)
+    scope.current = {projectId, active};
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  return () => {
+    const started = scope.current;
+    return () => mounted.current && started.active && scope.current === started;
+  };
 }

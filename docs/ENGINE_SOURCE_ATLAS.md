@@ -159,3 +159,16 @@ The pinned [license](https://github.com/ChupathingyCE/warthog-xbox/blob/c3641f0a
 ### Other-engine gamma/debug reports
 
 Halo3 gamma/debug anecdotes remain out of the active repair. Source image bytes, texture color space, compiler/lightmap transforms and the target runtime's display output must be compared independently. They are not authorization for compensating brightness in Spark, and no H3/Reach rendering API was introduced.
+
+
+## November 7 — native bitmap admission and cross-edition asset dependencies
+
+The selected read-only Invader checkout remains `696830ff80af227e84e7237c2ef26eb2301ed110`. This supplementary investigation preserves the six historical pins and 36 structured behavior records above. It adds no third-party engine implementation to Spark.
+
+- `src/map/map.cpp` (`Map::map_with_move`, indexed bitmap resource resolution) resolves CE metadata from the exact indexed resource slot; sound is a separate route. SHA-256 `7926742b96d31ef9df009c1b10ed35040ba6a5ad5f3b6929979a8e96e5ae48d6`.
+- `src/tag/parser/compile/bitmap/decompile.cpp` distinguishes native 2D, 3D-volume and cube layouts, depth and raw ranges. SHA-256 `bd2c095f5be84a7098661240e9e9dfcf9030e578b1aafa36073d5394fbb4b890`.
+- `src/extract/extract.cpp` documents `-r` recursive extraction and `-s` selected native paths. SHA-256 `9961305d1cd3d79690be2b11b1590330b63d69c13f122e90107b756da7304854`.
+
+The installed CE Blood Gulch bank contains 676 indexed images: 648 2D images, 22 cubes and six volumes. Spark's native resource admission had incorrectly depended on the narrower 2D/cube preview reader, rejecting that complete bank because volumes are not previewable. The existing metadata reader now validates all supported native dimensions and exact declared image ownership for compiler admission. Depth, allocation, hash, slot, path and complete raw-span bounds remain enforced. A valid top slice cannot authorize missing remaining volume slices. The 2D preview still refuses 3D volumes; admission is not a rendering claim.
+
+The real source-bank proof and native creator acceptance are recorded in the November 7 creator-workflow evidence. CE cache609, MCC cache13, native loose tags, editor transactions and actual gameplay remain separate boundaries. Invader is invoked as the existing external tool under its own license; no upstream source was copied into Spark.

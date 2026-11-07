@@ -1,7 +1,7 @@
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import {openMapPreviewSource} from '../mapPreviewSource';
 import { publishTextureResources, useTextureResourceScope } from '../textureResourceScope';
-import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
+import { prepareAssetImport, attachAssetImport, prepareSoundImport, useAssetImportGuard } from '../nativeAssetImport';
 import { draggedAsset } from '../assetDragRegistry';
 import {copyForgeSelection,readForgeSelection,prepareForgePaste,applyForgePaste} from '../forgeClipboard';
 import BuildTargets from './BuildTargets';
@@ -318,6 +318,7 @@ function NewMapWizard({
 function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocument; onNew: () => void }) {
   const activity=useWorkspaceActivity();
   const { project, document: doc, data, edit, notify } = props;
+  const beginAssetImport=useAssetImportGuard(project.id,activity.active);
   const [bspMode, setBspMode] = useMapState(project.id, 'forge.bspWorkshop', !!doc.workshop);
   const [surfaceSelection, setSurfaceSelection] = useMapState<{brushId:string;faceId?:string}|null>(project.id, 'forge.sourceSurface', () => null);
   const [bspBusy, setBspBusy] = useState(false);
@@ -446,6 +447,7 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
       assetAlive.current = false;
     };
   }, [project.id]);
+  useEffect(()=>setAssetBusy(false),[project.id,activity.active]);
   function openPlacementTag(id: string) {
     const placement = latestProject.current.quickForge?.placements.find((value) => value.id === id);
     if (!placement?.sourceProjectId || placement.tagId === null) return;
@@ -455,17 +457,18 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     revealPanel('object-tags');
   }
   async function dropLibraryAsset(key: string, point: Vec3, replaceId?: string | null) {
-    if (!library || assetBusy || library.busy) return;
+    if (!activity.active || !library || assetBusy || library.busy) return;
     const item = catalog.find((value) => value.key === key) ?? draggedAsset(key);
     if (!item) {
       notify('Reopen the source map before placing this asset.', 'error');
       return;
     }
+    const valid=beginAssetImport();
     setAssetBusy(true);
     try {
       if (item.kind === 'model') {
         const binding = await prepareAssetImport(latestProject.current, item.asset);
-        if (!assetAlive.current) return;
+        if (!valid()) return;
         const placed = placeLibraryModel(
           attachAssetImport(latestProject.current, binding),
           item.asset,
@@ -482,8 +485,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         setSelected([]);
       } else {
         const binding = await prepareSoundImport(latestProject.current, item);
+        if (!valid()) return;
         const emitters = await librarySoundEmitters(item, point);
-        if (!assetAlive.current) return;
+        if (!valid()) return;
         const latest = binding ? attachAssetImport(latestProject.current, binding) : latestProject.current,
           scene = latest.audioPreview ?? emptySoundScene();
         if (scene.emitters.length + emitters.length > 64)
@@ -496,9 +500,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
         revealPanel('map-sounds');
       }
     } catch (reason) {
-      if (assetAlive.current) notify(String(reason), 'error');
+      if (valid()) notify(String(reason), 'error');
     } finally {
-      if (assetAlive.current) setAssetBusy(false);
+      if (valid()) setAssetBusy(false);
     }
   }
   async function dropFiles(paths: string[], point: Vec3) {
@@ -895,8 +899,9 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
     if(assetBusy||studioRole==='viewer')return;
     const copied=readForgeSelection();if(!copied){notify('Copy compatible QuickForge objects first (Ctrl+C).','info');return;}
     setAssetBusy(true);
-    try{const prepared=await prepareForgePaste(latestProject.current,copied);if(!assetAlive.current)return;const pasted=applyForgePaste(latestProject.current,prepared);edit(pasted.project,`Paste ${pasted.ids.length} QuickForge object(s)`);setSelected(pasted.ids);setWorkshopSelected(null);}
-    catch(error){if(assetAlive.current)notify(String(error),'error');}finally{if(assetAlive.current)setAssetBusy(false);}
+    const valid=beginAssetImport();
+    try{const prepared=await prepareForgePaste(latestProject.current,copied);if(!valid())return;const pasted=applyForgePaste(latestProject.current,prepared);edit(pasted.project,`Paste ${pasted.ids.length} QuickForge object(s)`);setSelected(pasted.ids);setWorkshopSelected(null);}
+    catch(error){if(valid())notify(String(error),'error');}finally{if(valid())setAssetBusy(false);}
   }
   function remove() {
     if (selectedZone && project.firefight) {
@@ -1989,7 +1994,8 @@ function ForgeEditor(props: Props & { project: Project; document: QuickForgeDocu
                       if (added) revealPanel('map-sounds');
                     })
                   }
-                  busy={library.busy || assetBusy}
+                  importing={assetBusy}
+            busy={library.busy || assetBusy}
                 />
               </WorkspacePanel>
             )}

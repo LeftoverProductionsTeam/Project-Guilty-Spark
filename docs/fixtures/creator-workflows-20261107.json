@@ -1,0 +1,367 @@
+{
+  "schemaVersion": 1,
+  "directive": "c3ad4850",
+  "startingSourceCommit": "34b7c57a17c7a807805e52d0c6a6a40bc91a6e07",
+  "evidenceLevel": "C - real native desktop, supported compiler and independent artifact readback",
+  "applicationSha256": "fc658ddeb5d977c8b89d9ae221d0435b21176972054f9257f1660614b409c6ac",
+  "runtimeSourceFingerprint": "bef64197176a8d5e02d2caa7b11aa9f7e45d47208e050af435effd544e22566a",
+  "tests": {
+    "rust": {
+      "passed": 802,
+      "ignored": 9,
+      "suites": 53,
+      "receipt": "cross-runtime-r7.json/log",
+      "scope": "Native source unchanged since that full run"
+    },
+    "typescript": true,
+    "frontend": {
+      "passed": 416,
+      "files": 96
+    },
+    "browser": {
+      "passed": 193,
+      "receipt": "cross-runtime-r12.json/log"
+    },
+    "sourceContracts": 3,
+    "offline": 59,
+    "storageOwnership": 35,
+    "native": {
+      "complete": true,
+      "cases": [
+        {
+          "name": "Two real CE donor asset classes drag into separate MCC authoring documents and compile independently"
+        },
+        {
+          "name": "Both cross-runtime destinations survive full process restart with native dependencies and the same Undo head"
+        }
+      ],
+      "mockedIpc": false,
+      "gracefulClose": true
+    }
+  },
+  "pairs": [
+    {
+      "assetClass": "scen",
+      "sourceTagPath": "scenery\\rocks\\boulder\\boulder",
+      "sourceSha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c",
+      "sourceVersion": 609,
+      "targetVersion": 13,
+      "nativeDependencyFiles": 5,
+      "nativeDependencyClasses": [
+        ".bitmap",
+        ".gbxmodel",
+        ".model_collision_geometry",
+        ".scenery",
+        ".shader_model"
+      ],
+      "buildMs": 47432,
+      "outputSha256": "9e8be7356f5f49bbde3459dab99643762249cbf084e7d4023e689d18f36820c7",
+      "sourceProjectId": "e34254b9-7d8e-4634-955a-9af417773034",
+      "targetProjectId": "1ce4a8e5-9ef2-4fd0-a23b-2dff072149ea",
+      "realPointerDrop": {
+        "from": {
+          "x": 26,
+          "y": 480.375,
+          "width": 166,
+          "height": 74
+        },
+        "to": {
+          "x": 905.8429018184248,
+          "y": 516.593923665842
+        },
+        "pose": {
+          "type": "PerspectiveCamera",
+          "position": [
+            14.4,
+            -17,
+            14.4
+          ],
+          "quaternion": [
+            0.448892,
+            0.164567,
+            0.302316,
+            0.824633
+          ],
+          "zoom": 1,
+          "target": [
+            0,
+            0,
+            0
+          ]
+        },
+        "requested": [
+          6,
+          2,
+          0.05
+        ],
+        "actual": [
+          6,
+          2,
+          0
+        ]
+      },
+      "authoredPositions": [
+        [
+          -5,
+          0,
+          0.05
+        ],
+        [
+          5,
+          -3,
+          0.05
+        ]
+      ],
+      "independent": {
+        "nativePath": "gs_assets_e07fc0a437654a68886cacaa44c2f13a/scenery/rocks/boulder/boulder.scenery",
+        "positions": [
+          [
+            -5,
+            0,
+            0.05
+          ],
+          [
+            5,
+            -3,
+            0.05
+          ]
+        ],
+        "palettePaths": [
+          "gs_assets_e07fc0a437654a68886cacaa44c2f13a\\scenery\\rocks\\boulder\\boulder.scenery",
+          "gs_assets_e07fc0a437654a68886cacaa44c2f13a\\scenery\\rocks\\boulder\\boulder.scenery"
+        ],
+        "rootBoundingRadius": 0.756476,
+        "crcMismatch": 0,
+        "dependencyCount": 4,
+        "dependencyListSha256": "1363983805a1cd9849582648ace729c19e1e62760cc1ad3106a9084cbb1de239"
+      },
+      "copyUndoRedoSaved": true,
+      "fullProcessRestart": {
+        "stoppedPid": 516,
+        "restartedPid": 14356,
+        "sourceImportsAndUndoPreserved": true
+      },
+      "gameplayVerified": false
+    },
+    {
+      "assetClass": "vehi",
+      "sourceTagPath": "vehicles\\warthog\\mp_warthog",
+      "sourceSha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a",
+      "sourceVersion": 609,
+      "targetVersion": 13,
+      "nativeDependencyFiles": 285,
+      "nativeDependencyClasses": [
+        ".actor_variant",
+        ".antenna",
+        ".bitmap",
+        ".camera_track",
+        ".contrail",
+        ".damage_effect",
+        ".decal",
+        ".effect",
+        ".gbxmodel",
+        ".lens_flare",
+        ".light",
+        ".material_effects",
+        ".model_animations",
+        ".model_collision_geometry",
+        ".particle",
+        ".physics",
+        ".point_physics",
+        ".projectile",
+        ".shader_model",
+        ".shader_transparent_chicago",
+        ".shader_transparent_glass",
+        ".shader_transparent_meter",
+        ".sound",
+        ".sound_looping",
+        ".unit_hud_interface",
+        ".vehicle",
+        ".weapon",
+        ".weapon_hud_interface"
+      ],
+      "buildMs": 61746,
+      "outputSha256": "03f2a4aace8e8901156765d1f0e5e528ce5c030427c0a9b894bb2a30f04afb08",
+      "sourceProjectId": "5c036653-d5f8-4169-ac58-c1bcf676ac2e",
+      "targetProjectId": "0a1ec8fa-56aa-4103-b7da-abf5da48980b",
+      "realPointerDrop": {
+        "from": {
+          "x": 26,
+          "y": 439.375,
+          "width": 166,
+          "height": 74
+        },
+        "to": {
+          "x": 894.2865170902317,
+          "y": 552.3103697199815
+        },
+        "pose": {
+          "type": "PerspectiveCamera",
+          "position": [
+            44.8,
+            -37.4,
+            31.1
+          ],
+          "quaternion": [
+            0.466687,
+            0.167431,
+            0.29326,
+            0.817416
+          ],
+          "zoom": 1,
+          "target": [
+            14,
+            0,
+            2.5
+          ]
+        },
+        "requested": [
+          26,
+          2,
+          0.05
+        ],
+        "actual": [
+          25.969698,
+          2.0634265,
+          -7.1054274e-15
+        ]
+      },
+      "authoredPositions": [
+        [
+          25,
+          -2,
+          0.05
+        ],
+        [
+          32,
+          2,
+          0.05
+        ]
+      ],
+      "independent": {
+        "nativePath": "gs_assets_26295a5e3da142bbb3d66c6c381c50da/vehicles/warthog/mp_warthog.vehicle",
+        "positions": [
+          [
+            25,
+            -2,
+            0.05
+          ],
+          [
+            32,
+            2,
+            0.05
+          ]
+        ],
+        "palettePaths": [
+          "gs_assets_26295a5e3da142bbb3d66c6c381c50da\\vehicles\\warthog\\mp_warthog.vehicle",
+          "gs_assets_26295a5e3da142bbb3d66c6c381c50da\\vehicles\\warthog\\mp_warthog.vehicle"
+        ],
+        "rootBoundingRadius": 1.1,
+        "crcMismatch": 0,
+        "dependencyCount": 284,
+        "dependencyListSha256": "e9e1ef627846af7bcfc4da141ee0033348884a42ae3026155af3c849819fcf9b"
+      },
+      "copyUndoRedoSaved": true,
+      "fullProcessRestart": {
+        "stoppedPid": 516,
+        "restartedPid": 14356,
+        "sourceImportsAndUndoPreserved": true
+      },
+      "gameplayVerified": false
+    }
+  ],
+  "originalInputsUnchanged": true,
+  "originalInputHashes": [
+    {
+      "name": "bloodgulch.map",
+      "sha256": "1b712ba7e0f634716f55cd7c840737ab2aa9dd9ae17c1bb161a158e7c4e6b102"
+    },
+    {
+      "name": "bloodgulch.map",
+      "sha256": "81764a451b60d93cb3f2471c4efb6e7bc313e1c2f7105e0184f297e2a0ab475c"
+    },
+    {
+      "name": "sidewinder.map",
+      "sha256": "ac8580a914f96249fa10fd95ee10065a4513fd6147f1d1e2d768adae59407b4a"
+    },
+    {
+      "name": "bitmaps.map",
+      "sha256": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d"
+    },
+    {
+      "name": "sounds.map",
+      "sha256": "81658a8d9b127b2771558a35e664ec3f1a2b370f271fe957426d945001ceb5d2"
+    },
+    {
+      "name": "loc.map",
+      "sha256": "1321e17b5a86be84b1930b6eb2e7fdfe9285275d5d54cbe3d4a3635e2bf04041"
+    }
+  ],
+  "firstPairNativeResourceCoverage": {
+    "cacheGeneration": 609,
+    "resourceSha256": "317658e0ebd4aa189bac68e994fe0b515928f44d17b62ba676d8850aa329dd3d",
+    "verifiedImages": 676,
+    "missingOrMismatchedImages": 0,
+    "unsupportedImages": 0,
+    "internalImages": 0,
+    "sharedNativeImages": 0,
+    "cubemapImages": 22,
+    "volumeImages": 6
+  },
+  "corruptedDisposableDonorRejected": true,
+  "cancelledDrops": true,
+  "retainedEvidence": [
+    {
+      "name": "cross-runtime-r16-cross-runtime-1-preview.png",
+      "bytes": 388045,
+      "sha256": "60ec64f846796b000272a779d6f4fd5f7eacd1d1ad75ecb07ba5c7f941dbc1b0"
+    },
+    {
+      "name": "cross-runtime-r16-cross-runtime-1-drag.png",
+      "bytes": 397691,
+      "sha256": "b65f61c47d0a70047b3314c9923618bd39052c9c7de258184a0d5c4a705d0bbf"
+    },
+    {
+      "name": "cross-runtime-r16-cross-runtime-1-placed.png",
+      "bytes": 395828,
+      "sha256": "39ac78945af640c80c35b7c079916a45395dbfb7423abc538d747cff44aacefa"
+    },
+    {
+      "name": "cross-runtime-r16-cross-runtime-2-preview.png",
+      "bytes": 236596,
+      "sha256": "3bfc4513fc785eb172d281469976740466446ed2541f8e3004d3f50655eb592a"
+    },
+    {
+      "name": "cross-runtime-r16-cross-runtime-2-drag.png",
+      "bytes": 238327,
+      "sha256": "aa5e840c38987d1384f6a5e17c664ecada4fb6de5b29eb79c7d2908873a8aedf"
+    },
+    {
+      "name": "cross-runtime-r16-cross-runtime-2-placed.png",
+      "bytes": 266284,
+      "sha256": "cbcbd2fef83b4093349a5f7bc5053326c465fed45c67b4612957e78e25d6d087"
+    },
+    {
+      "name": "cross-runtime-r16-cross-runtime-1.map",
+      "bytes": 79701242,
+      "sha256": "9e8be7356f5f49bbde3459dab99643762249cbf084e7d4023e689d18f36820c7"
+    }
+  ],
+  "externalEvidenceDirectory": "$TEMP/GuiltySpark-Engineering-d49eb02588bf",
+  "receipt": {
+    "name": "cross-runtime-r16.json",
+    "sha256": "4c6b96125474e903ac3b148a2b14c13a56d2dbd14baa09946e4021f281d84baa"
+  },
+  "gameLoaded": false,
+  "humanGameplayAccepted": false,
+  "gamePeerAcceptance": false,
+  "cleanMachineReleaseAccepted": false,
+  "publicReleaseCreated": false,
+  "protectedC49ChecksumsReverified": true,
+  "limitations": [
+    "Only the named CE609 scenery and vehicle to MCC13 pairs are newly accepted at Level C.",
+    "Game use, exact stock shader/animation fidelity, vehicle physics, other asset classes and every other edition route retain separate gates.",
+    "Native import is local authoring, not SparkLink publication or gameplay protocol conversion.",
+    "Only one80MB native output is retained; the second cache, extracted tags, application profiles and native SDK staging are disposed."
+  ]
+}

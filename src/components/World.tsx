@@ -4,7 +4,7 @@ import {copySceneObject,readSceneObject,cloneSceneObject} from '../sceneClipboar
 import { textureResourceScope } from '../textureResourceScope';
 import {fillRuntimeTexturePreviews} from '../runtimeTexturePreview';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
-import { prepareAssetImport, attachAssetImport, prepareSoundImport } from '../nativeAssetImport';
+import { prepareAssetImport, attachAssetImport, prepareSoundImport, useAssetImportGuard } from '../nativeAssetImport';
 import Mesh from './HaloMesh';
 import TransformControls from './HaloTransformControls';
 import useEndToFloor from '../useEndToFloor';
@@ -501,6 +501,7 @@ export default function World({
   const [localSelected,setLocalSelected]=useMapState<string|null>(project.id,'world.selection',null);
   const [surfacePick,setSurfacePick]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
   const activity=useWorkspaceActivity();
+  const beginAssetImport=useAssetImportGuard(project.id,activity.active);
   const [tagRequest,setTagRequest]=useMapState<number|null>(project.id,'viewport.tags.request',null);
   const [tagSource,setTagSource]=useMapState(project.id,'viewport.tags.source',project.id);
   const [tagRevision,setTagRevision]=useState(0);
@@ -523,19 +524,21 @@ export default function World({
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[project.id]);
   const rendererQuality=useRendererQuality(project.id);
   const [assetBusy,setAssetBusy]=useState(false);
+  useEffect(()=>setAssetBusy(false),[project.id,activity.active]);
   const [dropReady,setDropReady]=useState(false);
   const linked=useMemo(()=>project.scene.map(sourcePlacement).filter((value):value is NonNullable<typeof value>=>!!value),[project.scene]);
   const resourceScopes=useMemo(()=>Object.fromEntries((library?.documents??[]).map(document=>[document.id,JSON.stringify(document.history.current?.source?.resourceSha256??{})])),[library?.documents]);
   const {models:ownedModels,failures:modelIssues}=useOwnedForgeModels(linked,resourceScopes);
   async function dropAsset(key: string, position: Vec3, replaceId?: string | null) {
-    if(!library||library.busy||assetBusy)return;
+    if(!activity.active||!library||library.busy||assetBusy)return;
     const item=catalog.find(candidate=>candidate.key===key)??draggedAsset(key);
     if(!item){notify('The source map is no longer open. Reopen it before placing this asset.');return;}
+    const valid=beginAssetImport();
     setAssetBusy(true);
     try {
       if (item.kind === 'model') {
         const binding = await prepareAssetImport(projectValue.current, item.asset);
-        if(!alive.current)return;
+        if(!valid())return;
         const placed = placeLibraryModel(
           attachAssetImport(projectValue.current, binding),
           item.asset,
@@ -547,8 +550,9 @@ export default function World({
       } else if (item.kind === 'mesh') await library.onPlaceMesh(item,position,replaceId);
       else {
         const binding = await prepareSoundImport(projectValue.current, item);
+        if(!valid())return;
         const emitters=await librarySoundEmitters(item,position);
-        if(!alive.current)return;
+        if(!valid())return;
         const latest = binding ? attachAssetImport(projectValue.current, binding) : projectValue.current,
           scene = latest.audioPreview ?? emptySoundScene();
         if(scene.emitters.length+emitters.length>64)throw Error('This sound group would exceed 64 emitters. Remove unused emitters first.');
@@ -557,9 +561,9 @@ export default function World({
         revealPanel('map-sounds');
       }
     } catch (reason) {
-      if(alive.current)notify(String(reason));
+      if(valid())notify(String(reason));
     } finally {
-      if(alive.current)setAssetBusy(false);
+      if(valid())setAssetBusy(false);
     }
   }
   async function dropFiles(paths:string[],position:Vec3){if(!library||library.busy)return;for(const path of paths){if(!alive.current)return;if(/\.obj$/i.test(path))await library.onImportModel(position,path);else if(await library.onImportSound(position,path))revealPanel('map-sounds');}}
@@ -1090,21 +1094,22 @@ export default function World({
     setSelected(o.id);
     if (!chosen.assetId)
       notify(
-        'Duplicated in the project. Exporting additional Halo instances requires a scenario compilation adapter and is currently blocked.',
+        'Duplicated in the project. Build a validated map copy to use it in Halo; unsupported instance changes are reported by the build checks.',
       );
   }
   async function pasteSelection(){
     const copied=readSceneObject();if(!copied){notify('Copy a selected Spark asset first (Ctrl+C).');return;}
+    const valid=beginAssetImport();
     try{
       const position=[copied.object.position[0]+1,copied.object.position[1],copied.object.position[2]] as Vec3;
       if(copied.sourceProjectId===project.id){const object=cloneSceneObject(copied.object);object.position=position;edit({...projectValue.current,scene:[...projectValue.current.scene,object]},'Paste '+copied.object.name);setSelected(object.id);return;}
       if(!copied.asset)throw Error('This object has no transferable native model. Copy it from its source map’s asset library.');
       setAssetBusy(true);const binding=await prepareAssetImport(projectValue.current,copied.asset);
-      if(!alive.current)return;
+      if(!valid())return;
       const placed=placeLibraryModel(attachAssetImport(projectValue.current,binding),copied.asset,position);
       const object=placed.project.scene.find(o=>o.id===placed.selectedId)!;object.rotation=[...copied.object.rotation];object.scale=[...copied.object.scale];
       edit(placed.project,'Paste imported '+copied.object.name);setSelected(placed.selectedId);
-    }catch(reason){notify(String(reason));}finally{if(alive.current)setAssetBusy(false);}
+    }catch(reason){if(valid())notify(String(reason));}finally{if(valid())setAssetBusy(false);}
   }
   useEffect(() => {
     function key(e: KeyboardEvent) {
@@ -1615,6 +1620,7 @@ export default function World({
                 if (added) revealPanel('map-sounds');
               })
             }
+            importing={assetBusy}
             busy={library.busy || assetBusy || !dropReady}
           />
         </WorkspacePanel>

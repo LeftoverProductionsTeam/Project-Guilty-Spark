@@ -5,7 +5,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { withDevelopmentWorkspace, runDevelopmentCommand } from './native-qa-storage.mjs';
+import { execFileSync } from 'node:child_process';
+import { withDevelopmentWorkspace, runDevelopmentCommand, exportDevelopmentBuild } from './native-qa-storage.mjs';
 import { checkSourceEntrypoints } from './check-source-entrypoints.mjs';
 const [receiptFile, sourceMap, kit, tags, invader, acceptedProject] = process.argv.slice(2);
 const stages = (process.env.SPARK_VERIFY_STAGES ?? 'rust,frontend,browser,native').split(',');
@@ -19,6 +20,19 @@ if (stages.some(s=>s==='compiler'||s==='geometry'||s==='logic') && ![acceptedPro
   );
 if(stages.includes('geometry')&&!(await fs.stat(process.env.SPARK_GEOMETRY_BLENDER??'').catch(()=>null))?.isFile())
   throw Error('Geometry round-trip verification requires the selected installed Blender executable');
+// Explicitly selected QA executables may be reused only against the same full
+// runtime-source fingerprint. Test-script repairs do not need a second compiler
+// tree; production code changes invalidate reuse instead of testing stale UI.
+async function runtimeFingerprint(){
+ const names=[...new Set(execFileSync('git',['ls-files','-coz','--exclude-standard','--','src','src-tauri','crates','public','Cargo.toml','Cargo.lock','package.json','pnpm-lock.yaml','vite.config.ts','tsconfig.json','index.html','scripts/build-web.mjs','scripts/desktop.mjs','scripts/cargo.mjs'],{encoding:'utf8',windowsHide:true}).split('\0').filter(Boolean))].sort();
+ const hash=crypto.createHash('sha256');for(const name of names){const info=await fs.lstat(name);if(!info.isFile()||info.isSymbolicLink())throw Error('Unsafe runtime source fingerprint input');hash.update(name+'\0');hash.update(await fs.readFile(name));}return hash.digest('hex');
+}
+const selectedApp=process.env.SPARK_VERIFY_REUSE_APP?path.resolve(process.env.SPARK_VERIFY_REUSE_APP):null;
+if(selectedApp){
+ const manifest=JSON.parse(await fs.readFile(path.join(path.dirname(selectedApp),'manifest.json'),'utf8'));
+ const file=manifest.files.find(file=>file.file===path.basename(selectedApp));
+ if(!file||file.bytes!==(await fs.stat(selectedApp)).size||file.sha256!==crypto.createHash('sha256').update(await fs.readFile(selectedApp)).digest('hex')||manifest.runtimeSourceFingerprint!==await runtimeFingerprint())throw Error('Selected QA executable does not match its binary and current runtime-source identities');
+}
 const report = {
   schemaVersion: 1,
   startedAt: new Date().toISOString(),
@@ -117,8 +131,18 @@ try {
         if(new Set(report.independentNativeJobs.map(build=>build.id)).size!==requested)throw Error('Native jobs were reused instead of completed independently');
         report.independentNativeJobsCompleted=requested;
       }
-      if (stages.includes('native')||stages.includes('geometry')||stages.includes('logic')||stages.includes('workspace'))
-        await run('Embedded desktop build', ['scripts/desktop.mjs', 'build', '--no-bundle']);
+      if(stages.includes('logic'))for(const file of ['scripts/native-logic-roundtrip.mjs','scripts/test-workspace-lifecycle-native.mjs'])
+        await run('Native acceptance syntax '+file,['--check',file]);
+      if (stages.includes('native')||stages.includes('geometry')||stages.includes('logic')||stages.includes('workspace')){
+        if(!selectedApp)await run('Embedded desktop build', ['scripts/desktop.mjs', 'build', '--no-bundle']);
+        else report.reusedQaApplication={file:selectedApp,sha256:crypto.createHash('sha256').update(await fs.readFile(selectedApp)).digest('hex'),runtimeSourceFingerprint:await runtimeFingerprint()};
+        if(process.env.SPARK_VERIFY_EXPORT_QA_APP){
+          const target=path.resolve(process.env.SPARK_VERIFY_EXPORT_QA_APP);
+          const manifest=await exportDevelopmentBuild(path.join(context.env.CARGO_TARGET_DIR,'release'),target);
+          manifest.runtimeSourceFingerprint=await runtimeFingerprint();manifest.purpose='One temporary source-pinned QA executable; not a release';
+          await fs.writeFile(path.join(target,'manifest.json'),JSON.stringify(manifest,null,2),{flag:'wx'});report.exportedQaApplication={directory:target,...manifest};
+        }
+      }
       if (stages.includes('native')) {
         const hash = async (file) =>
           crypto
@@ -135,7 +159,7 @@ try {
             'Native map edit, Undo, Save, export and readback',
             [
               'scripts/test-workspace-lifecycle-native.mjs',
-              path.join(context.env.CARGO_TARGET_DIR, 'release', 'GuiltySpark.exe'),
+              selectedApp??path.join(context.env.CARGO_TARGET_DIR, 'release', 'GuiltySpark.exe'),
               output,
               path.resolve(sourceMap),
               path.resolve(invader),
@@ -157,13 +181,13 @@ try {
         const output=path.join(context.directory,'qa','native-workspaces');await fs.mkdir(path.dirname(output),{recursive:true});
         try{
           await run('Actual retained multiwindow workspace lifecycle and route regressions',[
-            'scripts/test-workspace-lifecycle-native.mjs',path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,
+            'scripts/test-workspace-lifecycle-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,
           ],{SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_LOGIC:'0',SPARK_LIFECYCLE_LAUNCH_ONLY:'0',SPARK_LIFECYCLE_MEMORY:'0',SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0'});
         }finally{const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.workspace=JSON.parse(receipt);
         if(receiptFile){
           for(const name of ['application-icon.png','compact-header.png','tab-lift.png','monitor-pink.png','monitor-glow.png','monitor-source.png','monitor-source.json','failure-window-0.png','failure-window-1.png','failure-window-2.png']){
             const image=path.join(output,name),stat=await fs.stat(image).catch(()=>null);
-            if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+name);await fs.copyFile(image,target);(report.workspaceScreenshots??=[]).push({file:target,bytes:stat.size});if(name==='compact-header.png')report.workspaceScreenshot={file:target,bytes:stat.size};}
+            if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));await fs.copyFile(image,target);(report.workspaceScreenshots??=[]).push({file:target,bytes:stat.size});if(name==='compact-header.png')report.workspaceScreenshot={file:target,bytes:stat.size};}
           }
         }}
         if(!report.workspace?.complete)throw Error('Actual native workspace lifecycle did not pass');
@@ -172,7 +196,7 @@ try {
         const output=path.join(context.directory,'qa','geometry');await fs.mkdir(path.dirname(output),{recursive:true});
         try{
           await run('Actual Blender handoff, reconciliation, native model/collision build and independent readback',[
-            'scripts/test-workspace-lifecycle-native.mjs',path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,'-',path.resolve(invader),
+            'scripts/test-workspace-lifecycle-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,'-',path.resolve(invader),
           ],{
             SPARK_LIFECYCLE_GEOMETRY:'1',SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_LOGIC:'0',SPARK_LIFECYCLE_MEMORY:'0',
             SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0',SPARK_GEOMETRY_TAGS:path.resolve(tagSource),SPARK_GEOMETRY_KIT:path.resolve(kit),
@@ -186,14 +210,23 @@ try {
         const output=path.join(context.directory,'qa','native-logic');await fs.mkdir(path.dirname(output),{recursive:true});
         try{
           await run('Actual native tag edit, asset drop, door/trigger logic, Undo/Save/reopen, compile and independent readback',[
-            'scripts/test-workspace-lifecycle-native.mjs',path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,path.resolve(cache),path.resolve(invader),
+            'scripts/test-workspace-lifecycle-native.mjs',selectedApp??path.join(context.env.CARGO_TARGET_DIR,'release','GuiltySpark.exe'),output,path.resolve(cache),path.resolve(invader),
           ],{SPARK_LIFECYCLE_LOGIC:'1',SPARK_LIFECYCLE_NATIVE_ONLY:'0',SPARK_LIFECYCLE_GEOMETRY:'0',SPARK_LIFECYCLE_MEMORY:'0',
              SPARK_LIFECYCLE_REPEAT_EDITS:'',SPARK_LIFECYCLE_PROFILE:'0',SPARK_LOGIC_TAGS:path.resolve(tagSource),SPARK_LOGIC_KIT:path.resolve(kit)});
         }finally{
           const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.logic=JSON.parse(receipt);
+          if(receiptFile&&report.logic?.crossRuntime){
+            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','native-output/cross-runtime-1.map']){
+              const source=path.join(output,name),info=await fs.stat(source).catch(()=>null);if(!info)continue;
+              if(!info.isFile()||info.size>(name.endsWith('.map')?256:4)*1024**2)throw Error('Selected native acceptance evidence exceeds its bounded export');
+              const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));
+              await fs.copyFile(source,target,fs.constants.COPYFILE_EXCL);const hash=async file=>crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex');
+              const sha256=await hash(source);if(await hash(target)!==sha256)throw Error('Native evidence export readback differs');(report.crossRuntimeEvidence??=[]).push({file:target,bytes:info.size,sha256});
+            }
+          }
           if(receiptFile)for(const name of ['logic-inspector.png','failure-window-0.png']){
             const source=path.join(output,name),stat=await fs.stat(source).catch(()=>null);
-            if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+name);await fs.copyFile(source,target);(report.logicScreenshots??=[]).push({file:target,bytes:stat.size});}
+            if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));await fs.copyFile(source,target);(report.logicScreenshots??=[]).push({file:target,bytes:stat.size});}
           }
         }
         if(!report.logic?.complete)throw Error('Actual native object/logic acceptance did not pass');

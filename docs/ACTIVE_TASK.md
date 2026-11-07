@@ -1,10 +1,10 @@
 # Active engineering checkpoint
 
-Task: 66656a27 — resume native World/Logic authoring after scoped Spark Flow and keyboard acceptance
+Task: c3ad4850 — complete real CE to MCC cross-runtime asset import through the existing creator workflow
 Status: implementation incomplete
-Starting revision: d64f3e7dc65ae1f0c555ad0070a611130912b71c
-Latest verified revision: This checkpoint is contained in the locally committed, sealed source milestone; read actual Git HEAD. Test receipts identify the exact native executable SHA22e4c216ec49dd9675d1109de5ca43e71526de1f2673b92d71fbdd1f19c218ff. No remote publication.
-Next action: Continue Prompt06 in the existing World/Logic path: expose supported scenario-instance Logic / Events through the existing Inspector and native builder, reusing tested QuickForge door/trigger controls. Preserve independent native-tag readback and optional authoring metadata. Keep new Halo gameplay, GUI-editor and physical monitor/peer acceptance pending; do not restart Spark Flow or broaden into AI/community systems before the current native authoring gate.
+Starting revision: 34b7c57a17c7a807805e52d0c6a6a40bc91a6e07
+Latest verified revision: Starting master34b7c57 preserved. R7 full Rust802/9ignored/53suites; R12 TS/416frontend/3contracts/59offline/35storage/193browser and fresh actual Windows build pass. R16 actual CE scenery5tags and vehicle285tags→two distinct MCC13 projects, independent recursive native readback and full process restart pass. Originals and all C49 seals unchanged; no new game acceptance.
+Next action: Commit this scoped Level C creator milestone locally, then implement the owner follow-up in existing asset sources: expose all configured runtime map directories through the main source selector with automatic safe loading/conversion on drop; never infer format from host runtime. Move Maps before tabs and add a clear new-workspace-window menu action. Preserve R16 native output/evidence and verify the changed actual app again; game/all-edition gates remain open.
 
 ## Acceptance
 
@@ -30,7 +30,7 @@ Earlier failed attempts and corrections remain in the current report/fixture. La
 
 ## Operations and safe checkpoint
 
-No native/test process is intentionally left running. R24's owned external scratch was disposed (peak logical3068374560bytes); no repository .local/target/dist/artifacts recreated. Compact external evidence remains under C:\Users\patri\AppData\Local\Temp\GuiltySpark-Engineering-d49eb02588bf, with R23browser/R24native receipts and inspected PNGs. Source report/fixture retain the durable results. Existing function inventory is refreshed in place; no code removed based only on lexical references. Git fsck passed; C49 installer SHA6e0c3efb53ced11dde522492ea341a019c93976d3ca0c16ae28ae180da334749 unchanged. Commit locally, verify seals/clean status and update only the existing external source-only review ZIP; never publish without authorization.
+Current operation: R16 completed successfully; no QA writer remains. One privately retained native output79,701,242bytes/SHA9e8be7356f5f49bbde3459dab99643762249cbf084e7d4023e689d18f36820c7 plus six actual GUI screenshots are outside source. Both2 copied instances/target coordinates/palettes/CRC/dependency closures and identical source/import/Undo heads after process restart pass. Only one output uses the unchanged256MiB fixture allowance; SDK/build/profile/second-cache scratch was disposed. CREATOR_WORKFLOWS_20261107.md and fixtures/creator-workflows-20261107.json preserve successful and failed evidence. New all-runtime catalog and Maps/new-window steering is pending implementation, not accepted by intake.
 
 ## Deferred requests
 

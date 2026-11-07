@@ -19,11 +19,15 @@ export function useViewportAssetDrop(
   const pending = useRef<{ id: number; key: string; x: number; y: number; moved: boolean } | null>(null),
     suppressClick = useRef(false);
   useEffect(() => {
-    const begin=(event:Event)=>{const d=(event as CustomEvent).detail;if(d?.projectId===projectId&&typeof d.key==='string'&&d.key.length<512&&[d.pointer,d.x,d.y].every(Number.isFinite))pending.current={id:d.pointer,key:d.key,x:d.x,y:d.y,moved:false};};
+    const begin=(event:Event)=>{const d=(event as CustomEvent).detail;if(d?.projectId===projectId&&typeof d.key==='string'&&d.key.length<512&&[d.pointer,d.x,d.y].every(Number.isFinite)){suppressClick.current=false;pending.current={id:d.pointer,key:d.key,x:d.x,y:d.y,moved:false};}};
     window.addEventListener('guilty-spark-asset-drag-start',begin);
-    const cancel = () => {
+    const clear = () => {
       pending.current = null;
       setDragging(false);
+    };
+    const cancel = () => {
+      if (pending.current) suppressClick.current = true;
+      clear();
     };
     const move = (event: PointerEvent) => {
       const current = pending.current;
@@ -52,11 +56,10 @@ export function useViewportAssetDrop(
           const hit = point.current?.(event.clientX, event.clientY);
           if (hit) callback.current(current.key, hit);
         }
-        window.setTimeout(() => {
-          suppressClick.current = false;
-        }, 0);
+        // WebView2 may deliver the release click in a later task. Consume it
+        // instead of racing a timer; a new pointer gesture resets the marker.
       }
-      cancel();
+      clear();
     };
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && pending.current) {
@@ -105,7 +108,8 @@ export function useViewportAssetDrop(
   return {
     dragging,
     begin: (item: ViewportAsset, event: ReactPointerEvent) => {
-      if (event.button === 0)
+      if (event.button === 0) {
+        suppressClick.current = false;
         pending.current = {
           id: event.pointerId,
           key: item.key,
@@ -113,9 +117,13 @@ export function useViewportAssetDrop(
           y: event.clientY,
           moved: false,
         };
+      }
     },
-    activate: (item: ViewportAsset) => {
-      if (suppressClick.current) return;
+    activate: (item: ViewportAsset, event?: {detail: number}) => {
+      if (suppressClick.current && event?.detail !== 0) {
+        suppressClick.current = false;
+        return;
+      }
       const rect = viewport.current?.getBoundingClientRect();
       if (!rect) return;
       const hit = point.current?.(rect.x + rect.width / 2, rect.y + rect.height / 2);

@@ -234,11 +234,11 @@ pub fn verify_resource_for_source(path: &Path, expected_sha256: &str, inspection
             if count==0||count>MAX_IMAGES_PER_TAG{report.unsupported_images+=1;continue;}
             checked+=count;if checked>16_384{return invalid("Bitmap resource verification exceeds the image-count limit");}
             for image in 0..count {
-                let meta=ce_image_metadata(&body,&header,image,false).or_else(|_|ce_image_metadata(&body,&header,image,true));
+                let meta=ce_image_metadata_layout(&body,&header,image,None);
                 match meta {
                     Ok(m)=>{
-                        let cube=ce_image_metadata(&body,&header,image,true).is_ok();let required=m.size*if cube{6}else{1};
-                        if crate::resource_map::prove_external_image_range(&index,&tag.path,m.raw_offset as u64,m.declared_size as u64,required,609,image).is_ok(){report.verified_images+=1;if cube{report.cubemap_images+=1;}}
+                        let required=m.size*if m.kind==2{6}else{1};
+                        if crate::resource_map::prove_external_image_range(&index,&tag.path,m.raw_offset as u64,m.declared_size as u64,required,609,image).is_ok(){report.verified_images+=1;if m.kind==2{report.cubemap_images+=1;}if m.kind==1{report.volume_images+=1;}}
                         else{report.missing_or_mismatched_images+=1;}
                     },
                     Err(_)=>report.unsupported_images+=1,
@@ -253,10 +253,12 @@ pub fn verify_resource_for_source(path: &Path, expected_sha256: &str, inspection
         checked+=count;
         if checked>16_384 {return invalid("Bitmap resource verification exceeds the image-count limit");}
         for image_index in 0..count {
-            match read_top_mip_metadata(&bytes,&header,at,image_index) {
-                Ok(m) if m.external => {
+            match read_image_metadata_layout(&bytes,&header,at,image_index,None,region) {
+                Ok(mut m) if m.external => {
+                    if m.kind==2 { m.size*=6; }
                     if let Ok(path)=aliases.resolve(&bytes,&header,inspection,&index,tag,image_index,&m){
                         report.verified_images+=1;
+                        if m.kind==2{report.cubemap_images+=1;}if m.kind==1{report.volume_images+=1;}
                         if path!=tag.path{report.shared_native_images+=1;}
                     }else{report.missing_or_mismatched_images+=1;}
                 },
@@ -321,6 +323,7 @@ impl TagRegion {
 #[derive(Clone, Copy)]
 struct TopMipMetadata {
     image_count: usize,
+    kind: u16,
     width: u16,
     height: u16,
     format: &'static str,
@@ -341,6 +344,12 @@ fn read_image_metadata(bytes: &[u8], header: &MapHeader, tag_data: usize, index:
     read_image_metadata_in_region(bytes,header,tag_data,index,cube,region)
 }
 fn read_image_metadata_in_region(bytes:&[u8],header:&MapHeader,tag_data:usize,index:usize,cube:bool,region:TagRegion)->Result<TopMipMetadata>{
+    read_image_metadata_layout(bytes,header,tag_data,index,Some(if cube{2}else{0}),region)
+}
+// Admission validates native dimensions and complete raw spans independently
+// of the viewport's 2D/cube decoders. None admits supported native 3D layouts;
+// it does not create a 3D preview or relax any resource-slot/path/hash bounds.
+fn read_image_metadata_layout(bytes:&[u8],header:&MapHeader,tag_data:usize,index:usize,expected_kind:Option<u16>,region:TagRegion)->Result<TopMipMetadata>{
     let r = Reader(bytes);
     region.contains(tag_data, 108)?;
     // In classic cache tag data, the 48-byte bitmap_data block is referenced
@@ -364,8 +373,12 @@ fn read_image_metadata_in_region(bytes:&[u8],header:&MapHeader,tag_data:usize,in
         u32::from(width) * u32::from(height) > MAX_IMAGE_PIXELS {
         return invalid("Bitmap preview dimensions are invalid or exceed the 16-Mpixel limit");
     }
-    if depth != 1 || kind != if cube {2}else{0} { return invalid("Bitmap image dimensionality differs from the requested 2D/cube preview"); }
-    if cube && (width!=height || width>1024) {return invalid("Reflection cubes must be square and no larger than 1024 pixels per face");}
+    if kind>2 || expected_kind.is_some_and(|expected|kind!=expected) || depth==0 ||
+        depth>MAX_IMAGE_EDGE || (kind!=1 && depth!=1) ||
+        u64::from(width)*u64::from(height)*u64::from(depth)>u64::from(MAX_IMAGE_PIXELS) {
+        return invalid("Bitmap image dimensionality is invalid or differs from the requested preview");
+    }
+    if kind==2 && (width!=height || width>1024) {return invalid("Reflection cubes must be square and no larger than 1024 pixels per face");}
     let swizzled = flags & 0x8 != 0;
     if swizzled && header.version != 5 { return invalid("Swizzled pixels require the Xbox bitmap layout"); }
     let (format, block, stride) = match encoding {
@@ -388,7 +401,7 @@ fn read_image_metadata_in_region(bytes:&[u8],header:&MapHeader,tag_data:usize,in
     } else {
         usize::from(width).checked_mul(usize::from(height))
             .and_then(|v| v.checked_mul(stride))
-    }.ok_or_else(|| SparkError::Invalid("Bitmap decoded size overflow".into()))?;
+    }.and_then(|size|size.checked_mul(usize::from(depth))).ok_or_else(|| SparkError::Invalid("Bitmap decoded size overflow".into()))?;
     if size > MAX_TOP_MIP_BYTES { return invalid("Bitmap top mipmap is larger than the preview limit"); }
     if swizzled && (block || !width.is_power_of_two() || !height.is_power_of_two()) {
         return invalid("Xbox swizzle flags conflict with the bitmap format or dimensions");
@@ -400,7 +413,7 @@ fn read_image_metadata_in_region(bytes:&[u8],header:&MapHeader,tag_data:usize,in
     let raw_offset = r.u32(image + 24)? as usize;
     let declared_size = r.u32(image + 28)? as usize;
     if declared_size < size { return invalid("Bitmap raw pixel metadata is shorter than the top mipmap"); }
-    Ok(TopMipMetadata { image_count:count, width, height, format, size, raw_offset, declared_size, external: flags & 0x100 != 0,swizzled,texel_stride:stride,mipmaps,xbox:header.version==5 })
+    Ok(TopMipMetadata { image_count:count, kind, width, height, format, size, raw_offset, declared_size, external: flags & 0x100 != 0,swizzled,texel_stride:stride,mipmaps,xbox:header.version==5 })
 }
 
 fn ce_indexed_body(bytes:&[u8],header:&MapHeader,tag:&crate::maps::Tag,
@@ -419,8 +432,11 @@ fn ce_indexed_body(bytes:&[u8],header:&MapHeader,tag:&crate::maps::Tag,
     crate::resource_map::read_indexed_bitmap_metadata(file,resources,&tag.path,r.u32(at+20)?,spent)
 }
 fn ce_image_metadata(body:&[u8],header:&MapHeader,image:usize,cube:bool)->Result<TopMipMetadata>{
+    ce_image_metadata_layout(body,header,image,Some(if cube{2}else{0}))
+}
+fn ce_image_metadata_layout(body:&[u8],header:&MapHeader,image:usize,expected_kind:Option<u16>)->Result<TopMipMetadata>{
     if Reader(body).u32(100)?<108 {return invalid("CE bitmap image array overlaps its metadata header");}
-    let meta=read_image_metadata_in_region(body,header,0,image,cube,TagRegion{start:0,end:body.len(),memory_address:0})?;
+    let meta=read_image_metadata_layout(body,header,0,image,expected_kind,TagRegion{start:0,end:body.len(),memory_address:0})?;
     if !meta.external {return invalid("Indexed CE bitmap raw pixels must be explicitly resource-backed");}
     Ok(meta)
 }
@@ -855,6 +871,30 @@ mod tests {
         let mut forged=inspection.clone();forged.tags[0].index=1;assert!(run(&forged,&hash).unwrap().items[0].preview.is_none());
         let mut wrong=std::fs::read(&resource).unwrap();wrong[0x74..0x80].copy_from_slice(b"test/otherx\0");std::fs::write(&resource,&wrong).unwrap();let pin=maps::hash_file(&resource).unwrap();assert!(run(&inspection,&pin).unwrap().items[0].preview.is_none());
         let mut wrong=std::fs::read(&resource).unwrap();wrong[0x74..0x80].copy_from_slice(b"test/bitmap\0");wrong[0x140+100..0x140+104].copy_from_slice(&0xfffffff0u32.to_le_bytes());std::fs::write(&resource,&wrong).unwrap();let pin=maps::hash_file(&resource).unwrap();assert!(run(&inspection,&pin).unwrap().items[0].preview.is_none());
+    }
+    #[test]
+    fn native_volume_resource_admission_is_independent_of_2d_preview_and_preserves_full_bounds(){
+        let (source,inspection,directory,_)=ce_indexed_fixture();
+        let path=directory.path().join("bitmaps.map");let original=std::fs::read(&path).unwrap();let mut bytes=original.clone();
+        let put=|b:&mut[u8],at:usize,v:u32|b[at..at+4].copy_from_slice(&v.to_le_bytes());
+        put(&mut bytes,0x24,32);put(&mut bytes,0x140+108+28,32);
+        bytes[0x140+108+8..0x140+108+10].copy_from_slice(&2u16.to_le_bytes());
+        bytes[0x140+108+10..0x140+108+12].copy_from_slice(&1u16.to_le_bytes());
+        std::fs::write(&path,&bytes).unwrap();let pin=maps::hash_file(&path).unwrap();
+        let coverage=verify_resource_for_source(source.path(),&inspection.sha256,&inspection,&path,&pin).unwrap();
+        assert_eq!((coverage.verified_images,coverage.volume_images,coverage.unsupported_images,coverage.missing_or_mismatched_images),(1,1,0,0));
+        let request=[OwnedBitmapRequest{bitmap_tag_id:0x1234,image_index:0}];
+        let batch=preview_owned_bitmap_batch_with_resources(source.path(),&inspection.sha256,&inspection,&request,Some((&path,&pin))).unwrap();
+        assert!(batch.items[0].preview.is_none());assert!(batch.items[0].error.is_some());
+        // A valid top slice cannot authorize missing volume slices, even with
+        // an explicitly repinned resource hash or a malformed depth field.
+        for (at,value) in [(0x24,16),(0x140+108+28,16),(0x140+108+24,0x120)] {
+            let mut invalid=bytes.clone();put(&mut invalid,at,value);std::fs::write(&path,&invalid).unwrap();let changed=maps::hash_file(&path).unwrap();
+            assert!(verify_resource_for_source(source.path(),&inspection.sha256,&inspection,&path,&changed).is_err());
+        }
+        let mut invalid=bytes.clone();invalid[0x140+108+8..0x140+108+10].copy_from_slice(&0u16.to_le_bytes());
+        std::fs::write(&path,&invalid).unwrap();let changed=maps::hash_file(&path).unwrap();assert!(verify_resource_for_source(source.path(),&inspection.sha256,&inspection,&path,&changed).is_err());
+        assert_eq!(maps::hash_file(source.path()).unwrap(),inspection.sha256);
     }
     #[test]
     fn ce_indexed_cube_preserves_distinct_faces_and_metadata_budgets(){

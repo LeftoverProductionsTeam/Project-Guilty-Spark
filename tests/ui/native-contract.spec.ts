@@ -2840,3 +2840,63 @@ test('keyboard navigation uses workspace initials and arrow keys in existing Too
  await chooseTool(page,'Creator Studio');const tabs=page.getByRole('tablist',{name:'Creator Studio sections',exact:true});await tabs.getByRole('tab',{name:'Mission director',exact:true}).focus();await page.keyboard.press('ArrowRight');await expect(tabs.getByRole('tab',{name:'Cinematic timeline',exact:true})).toHaveAttribute('aria-selected','true');await expect(tabs.getByRole('tab',{name:'Cinematic timeline',exact:true})).toBeFocused();await page.keyboard.press('End');await expect(tabs.getByRole('tab',{name:'Playtest lab',exact:true})).toHaveAttribute('aria-selected','true');
  const tools=page.getByLabel('More workspace drawers',{exact:true});await tools.focus();await page.keyboard.press('ArrowDown');await page.keyboard.type('trans');const transfer=page.getByRole('menuitemcheckbox',{name:'Transfer assets',exact:true});await expect(transfer).toBeFocused();await page.keyboard.press('Enter');await expect(page.getByRole('region',{name:'Transfer assets panel',exact:true})).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('region',{name:'Transfer assets panel',exact:true})).toBeHidden();await expect(tools).toBeFocused();
 });
+
+
+test('native asset import cannot finish into a destination revisited after a map switch',async({page})=>{
+ await mockDesktop(page);
+ await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true});
+ await library.getByLabel('Asset library map',{exact:true}).selectOption('b');
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{const value=await invoke(command,args);if(command==='prepare_native_asset_import'){w.__assetImportWaiting=true;await new Promise<void>(resolve=>w.__finishAssetImport=resolve);}return value;};});
+ await library.getByRole('button',{name:'Add test at view',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).__assetImportWaiting)).toBe(true);
+ await page.getByRole('tab',{name:'Synthetic candidate',exact:true}).click();
+ await page.getByRole('tab',{name:'Synthetic baseline',exact:true}).click();
+ await page.evaluate(()=>(window as any).__finishAssetImport());
+ await expect(library.getByRole('button',{name:'Add test at view',exact:true})).toBeEnabled();
+ await expect(page.locator('.viewport-object-actions')).toHaveCount(0);
+ await page.keyboard.press('Control+s');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.projects.a.project.scene)).toEqual([]);
+ expect(await page.evaluate(()=>(window as any).__sparkMock.projects.b.project.scene)).toEqual([]);
+});
+
+
+test('asset categories and pointer cancellation preserve the destination until a valid viewport drop',async({page})=>{
+ await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true});
+ await library.getByLabel('Asset library map',{exact:true}).selectOption('b');const category=library.getByLabel('Asset library type',{exact:true});
+ for(const kind of ['scen','vehi','bipd','eqip']){await category.selectOption(kind);await expect(library.getByRole('button',{name:'Add test at view',exact:true})).toHaveCount(0);}
+ await category.selectOption('weap');const button=library.getByRole('button',{name:'Add test at view',exact:true});await expect(button).toBeEnabled();
+ const source=await button.boundingBox(),viewport=await page.getByTestId('viewport').boundingBox(),destination={x:viewport!.x+viewport!.width*.3,y:viewport!.y+viewport!.height*.5};
+ const begin=async()=>{await page.mouse.move(source!.x+source!.width/2,source!.y+source!.height/2);await page.mouse.down();await page.mouse.move(destination.x,destination.y,{steps:12});await expect(page.locator('.viewport-asset-drop-hint:visible')).toBeVisible();};
+ for(const mode of ['escape','outside','blur']){await begin();if(mode==='escape')await page.keyboard.press('Escape');if(mode==='outside')await page.mouse.move(600,10,{steps:4});if(mode==='blur')await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.mouse.up();await expect(page.locator('.viewport-asset-drop-hint:visible')).toHaveCount(0);}
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='prepare_native_asset_import'))).toEqual([]);
+ await begin();await page.mouse.up();await expect(page.locator('.viewport-object-actions strong')).toHaveText('test');
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='prepare_native_asset_import').length)).toBe(1);
+});
+
+test('failed native dependency preparation leaves no placement and permits a deliberate retry',async({page})=>{
+ await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true});await library.getByLabel('Asset library map',{exact:true}).selectOption('b');
+ await page.evaluate(()=>{const w=window as any,invoke=w.__TAURI_INTERNALS__.invoke;let fail=true;w.__TAURI_INTERNALS__.invoke=async(command:string,args:any)=>{if(command==='prepare_native_asset_import'&&fail){fail=false;throw Error('Native donor dependencies missing: bitmaps.map');}return invoke(command,args);};});
+ const button=library.getByRole('button',{name:'Add test at view',exact:true});await button.click();await expect(page.getByText('Error: Native donor dependencies missing: bitmaps.map',{exact:true})).toBeVisible();
+ await expect(page.locator('.viewport-object-actions')).toHaveCount(0);await expect(button).toBeEnabled();await button.click();await expect(page.locator('.viewport-object-actions strong')).toHaveText('test');
+});
+
+
+test('a delayed WebView release click cannot place a second asset after a drag or cancellation',async({page})=>{
+ await mockDesktop(page);await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic candidate',exact:true})}).click();
+ await chooseTool(page,'Map library');await page.locator('.map-card').filter({has:page.getByRole('heading',{name:'Synthetic baseline',exact:true})}).click();
+ await openDrawer(page,'Asset library');const library=page.getByRole('region',{name:'Asset library panel',exact:true});await library.getByLabel('Asset library map',{exact:true}).selectOption('b');
+ const button=library.getByRole('button',{name:'Add test at view',exact:true}),source=await button.boundingBox(),viewport=await page.getByTestId('viewport').boundingBox();
+ const begin=async()=>{await page.mouse.move(source!.x+source!.width/2,source!.y+source!.height/2);await page.mouse.down();await page.mouse.move(viewport!.x+viewport!.width*.3,viewport!.y+viewport!.height*.5,{steps:12});await expect(page.locator('.viewport-asset-drop-hint:visible')).toBeVisible();};
+ const lateClick=async()=>{await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,25)));await button.dispatchEvent('click',{detail:1});};
+ await begin();await page.keyboard.press('Escape');await page.mouse.up();await lateClick();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='prepare_native_asset_import').length)).toBe(0);
+ await begin();await page.mouse.up();await expect(page.locator('.viewport-object-actions strong')).toHaveText('test');await expect(button).toBeEnabled();await lateClick();
+ expect(await page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='prepare_native_asset_import').length)).toBe(1);
+ await button.focus();await page.keyboard.press('Enter');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.calls.filter((call:any)=>call.command==='prepare_native_asset_import').length)).toBe(2);
+});

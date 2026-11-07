@@ -26,24 +26,26 @@ export default function ViewportAssetLibrary({
   importModel,
   importSound,
   busy = false,
+  importing = false,
   scenarioTools,
 }: {
   projectId: string;
   assets: ViewportAsset[];
   begin: (item: ViewportAsset, event: PointerEvent) => void;
-  activate: (item: ViewportAsset) => void;
+  activate: (item: ViewportAsset, event?: {detail: number}) => void;
   replace: (item: ViewportAsset) => void;
   canReplace: boolean;
   importModel?: () => void;
   importSound?: () => void;
   busy?: boolean;
+  importing?: boolean;
   scenarioTools?: ReactNode;
 }) {
   const [query, setQuery] = useMapState(projectId, 'viewport.library.query', ''),
     [source, setSource] = useMapState(projectId, 'viewport.library.source', 'all'),
     [kind, setKind] = useMapState(projectId, 'viewport.library.kind', 'all');
   const sources = useMemo(
-    () => [...new Map(assets.map((item) => [item.sourceId, item.sourceTitle])).entries()],
+    () => [...new Map(assets.map((item) => [item.sourceId, item.sourceTitle+(item.sourceEdition ? ' · '+item.sourceEdition : '')])).entries()],
     [assets],
   );
   const shown = useMemo(
@@ -52,17 +54,16 @@ export default function ViewportAssetLibrary({
         (item) =>
           (source === 'all' || item.sourceId === source) &&
           (kind === 'all' ||
-            (kind === 'doors'
-              ? item.kind === 'model' && item.asset.class === 'mach'
-              : kind === 'models'
-              ? item.kind === 'model' || item.kind === 'mesh'
-              : item.kind === 'sound' || item.kind === 'customSound')) &&
+            (kind === 'models' ? item.kind === 'model' || item.kind === 'mesh' :
+             kind === 'sounds' ? item.kind === 'sound' || item.kind === 'customSound' :
+             item.kind === 'model' && item.asset.class === (kind === 'doors' ? 'mach' : kind))) &&
           `${item.name} ${item.path}`.toLowerCase().includes(query.toLowerCase()),
       ),
     [assets, source, kind, query],
   );
   return (
-    <div className="viewport-asset-library">
+    <div className="viewport-asset-library" aria-busy={busy}>
+      {importing && <p role="status">Preparing native dependencies… Placement is committed only after validation.</p>}
       <p>
         Drag a preview onto the map. Native models extract and import their recursive tags before placement.
       </p>
@@ -91,7 +92,12 @@ export default function ViewportAssetLibrary({
             onChange={(event) => setKind(event.target.value)}
           >
             <option value="all">Models and sounds</option>
-            <option value="models">Models</option>
+            <option value="models">All models</option>
+            <option value="scen">Scenery</option>
+            <option value="vehi">Vehicles</option>
+            <option value="weap">Weapons</option>
+            <option value="eqip">Equipment</option>
+            <option value="bipd">Bipeds</option>
             <option value="doors">Doors & devices</option>
             <option value="sounds">Sounds</option>
           </select>
@@ -132,7 +138,7 @@ export default function ViewportAssetLibrary({
               className="viewport-asset-source"
               disabled={busy}
               onPointerDown={(event) => begin(item, event)}
-              onClick={() => activate(item)}
+              onClick={(event) => activate(item, event)}
               title={`${item.path}\n${item.sourceTitle}`}
               aria-label={`Add ${item.name} at view`}
             >
@@ -149,7 +155,7 @@ export default function ViewportAssetLibrary({
                       : item.kind === 'model'
                         ? item.asset.class
                         : 'Asset'}{' '}
-                · {item.sourceTitle}
+                · {item.sourceTitle}{item.sourceEdition ? ' · '+item.sourceEdition : ''}
               </small>
               <code>{item.path}</code>
             </button>
