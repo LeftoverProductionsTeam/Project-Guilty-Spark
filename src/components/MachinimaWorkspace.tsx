@@ -59,6 +59,7 @@ export function SourceStage({
   cinema,
   onError,
   animation,
+  greenScreen=false,
 }: {
   projectId:string;
   document: QuickForgeDocument;
@@ -66,6 +67,7 @@ export function SourceStage({
   cinema: { locked: boolean; rig: React.ReactNode;externalAuthority?:boolean };
   onError: (m: string) => void;
   animation:AnimationPreview|null;
+  greenScreen?:boolean;
 }) {
   const [snapshot, setSnapshot] = useState<ForgeSnapshot | null>(null),
     [spawn, setSpawn] = useState<ForgePlacement | undefined>(),
@@ -135,6 +137,7 @@ export function SourceStage({
         cameraLocked={cinema.locked}
         externalCameraAuthority={cinema.externalAuthority}
         cinema
+        greenScreen={greenScreen}
         viewportChildren={cinema.rig}
       />
       {error && (
@@ -462,6 +465,7 @@ export default function MachinimaWorkspace({
                   document={project.quickForge}
                   sourceId={sourceId}
                   animation={animation}
+                  greenScreen={!!settings.greenScreen}
                   cinema={{ locked: transport.preview, rig }}
                   onError={notify}
                 />
@@ -476,6 +480,7 @@ export default function MachinimaWorkspace({
                   onResourcesConnected={onResourcesConnected}
                   selectedId={null}
                   cinematic
+                  greenScreen={!!settings.greenScreen}
                   cameraLocked={transport.preview}
                   viewportChildren={<>{rig}<MachinimaCast project={project} inspection={inspection} animation={animation} onError={notify}/></>}
                 />
@@ -573,6 +578,7 @@ export default function MachinimaWorkspace({
         <WorkspacePanel id="director-lens" label="Lens & composition" defaultDock="right"><aside className="director-inspector">
           <RenderFeatures project={project} edit={edit}/>
           <h3>Lens & composition</h3>
+          <label className="director-check" title="Editor captures only. Green scenery and background retain occlusion; weapons, vehicles and bipeds keep their native materials. Capture effects are paused; native map tags stay unchanged."><input type="checkbox" checked={!!settings.greenScreen} onChange={event=>preference('greenScreen',event.target.checked)}/>Greenscreen capture</label>
           <select
             aria-label="Capture aspect ratio"
             value={settings.aspect}

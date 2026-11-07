@@ -37,7 +37,7 @@ async function mockStorageControls(page: Page) {
 }
 
 test('first-run mod folder is optional and completed setup does not ask again', async ({ page }) => {
-  await mockDesktop(page); await mockStorageControls(page); await chooseTool(page, 'Start here');
+  await mockDesktop(page,null); await mockStorageControls(page); await chooseTool(page, 'Start here');
   await page.getByRole('button', { name: 'Continue to tools', exact: true }).click();
   const setup = page.getByRole('region', { name: 'First launch Halo setup', exact: true });
   await setup.getByText('Mods & exported maps · optional', { exact: true }).click();
@@ -220,8 +220,10 @@ test('C59 Online separates game hosting, compatible joins and source collaborati
   await expect(page.getByRole('button',{name:'Host game',exact:true})).toHaveCount(1);
 });
 
-async function mockDesktop(page: Page) {
-  await page.addInitScript(() => {
+// Existing MCC-specific contracts declare their launch preference explicitly.
+// Passing null exercises a genuinely unconfigured installation.
+async function mockDesktop(page: Page, preferredHalo: 'mccSteam' | null = 'mccSteam') {
+  await page.addInitScript((preferredHalo) => {
     localStorage.setItem('guilty-spark-first-run-seen-v1', 'yes');
     const w = window as any;
     const settings = {
@@ -232,6 +234,7 @@ async function mockDesktop(page: Page) {
       metadataTemplateDirectory: null,
       nativeExecutable: null,
       autoBuild: false,
+      ...(preferredHalo ? {preferredHalo} : {}),
       ...JSON.parse(localStorage.getItem('spark-test-settings')??'{}'),
     };
     const make = (id: string, title: string, value: number) => ({
@@ -562,7 +565,7 @@ async function mockDesktop(page: Page) {
         throw new Error(`Unexpected synthetic IPC call: ${command}`);
       },
     };
-  });
+  }, preferredHalo);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'One Halo. Every World. Every Tool. Together.' })).toBeVisible();
 }
@@ -1576,7 +1579,7 @@ test('an open map still leaves every sidebar tool visible in a short window',asy
   await expect(page.locator('.sidebar').getByRole('button',{name:'Settings & tools',exact:true})).toHaveClass(/selected/);
 });
 test('slow onboarding saves keep navigation available and do not steal a later route',async({page})=>{
-  await mockDesktop(page);await chooseTool(page,"Start here");
+  await mockDesktop(page,null);await chooseTool(page,"Start here");
   await page.evaluate(()=>{const w=window as any,original=w.__TAURI_INTERNALS__.invoke;w.__TAURI_INTERNALS__.invoke=(command:string,args:any)=>command==='save_settings'?new Promise((resolve,reject)=>{w.__finishSetup=()=>original(command,args).then(resolve,reject);}):original(command,args);});
   await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
   await expect(page.getByRole('button',{name:'Saving Halo choice…',exact:true})).toBeDisabled();
@@ -2147,7 +2150,8 @@ test('numeric-field Ctrl+Z and both redo shortcuts survive RAM synchronization; 
   await page.reload();await chooseTool(page,"Settings & tools");await expect(page.getByRole('spinbutton',{name:'Undo history limit',exact:true})).toHaveValue('150');
 });
 test('onboarding keeps a failed save on its step and remembers completed Halo and tool choices',async({page})=>{
-  await mockDesktop(page);await page.goto('/');await chooseTool(page,"Start here");
+  await mockDesktop(page,null);await page.goto('/');await chooseTool(page,"Start here");
+  await page.getByRole('group',{name:'Your Halo edition',exact:true}).getByRole('button',{name:/Halo CE in MCC/}).click();
   await page.evaluate(()=>(window as any).__sparkMock.failSettings=true);
   await page.getByRole('button',{name:'Continue to tools',exact:true}).click();await expect(page.locator('.gs-first-setup').getByRole('alert')).toContainText('settings write failed');await expect(page.getByRole('heading',{name:'Which Halo are you working with?',exact:true})).toBeVisible();
   await page.evaluate(()=>(window as any).__sparkMock.failSettings=false);await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
@@ -2157,7 +2161,7 @@ test('onboarding keeps a failed save on its step and remembers completed Halo an
 });
 
 test('onboarding preserves primary runtimes plus Arena Evolved and does not inherit MCC guidance for Custom Edition', async ({page}) => {
-  await mockDesktop(page);
+  await mockDesktop(page,null);
   await page.evaluate(() => localStorage.setItem('spark-test-settings', JSON.stringify({hekFlavor:'h1aEk',hekDirectory:'C:/owned/HCEEK'})));
   await page.goto('/?workspace=get-started');
   const choices = page.getByRole('group',{name:'Your Halo edition',exact:true});
@@ -3102,4 +3106,36 @@ test('Arena Evolved uses a separate setup/provider boundary without launching or
  await expect(page.getByRole('link',{name:'Release & compatibility guide',exact:true})).toHaveAttribute('href','https://github.com/PeterRichardsonGolf/Halo-CE-Arena-Evolved/releases/tag/v0.7.7-beta');
  await expect(page.getByRole('region',{name:'Community server browser',exact:true})).toHaveCount(0);await expect(page.getByRole('textbox',{name:'Invitation',exact:true})).toHaveCount(0);
  const calls=await page.evaluate(()=>(window as any).__sparkMock.calls);expect(calls.some((c:any)=>['community_listing','launch_registered_runtime','community_join','community_host_start'].includes(c.command))).toBe(false);
+});
+
+
+test('primary road and separate infantry route share Apply, per-map Undo and saved native metadata',async({page})=>{
+ await mockDesktop(page);await openFixture(page);await chooseTool(page,'Level editor');if(!await page.getByRole('region',{name:'Construction panel',exact:true}).isVisible())await openDrawer(page,'Construction');await page.locator('.bsp-assembly:visible>summary').click();await page.getByRole('button',{name:'Plan connected tunnel',exact:true}).click();
+ await page.getByRole('checkbox',{name:'Open-sky road',exact:true}).check();await page.getByRole('button',{name:'Add infantry tunnel',exact:true}).click();await expect(page.getByLabel('Connection route',{exact:true})).toHaveValue('infantry');
+ const width=page.getByRole('spinbutton',{name:'Tunnel width',exact:true});await width.fill('1.8');await width.press('Enter');await page.getByRole('button',{name:'Apply connection',exact:true}).click();await page.keyboard.press('Control+s');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.bspAssembly?.infantryTunnel?.width)).toBe(1.8);
+ let saved=await page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly);expect(saved.openRoad).toBe(true);expect(saved.tunnelWidth).toBe(4);expect(saved.infantryTunnel.width).toBe(1.8);expect(saved.infantryTunnel.points).toHaveLength(4);
+ await page.getByRole('button',{name:'Remove infantry tunnel',exact:true}).click();await page.getByRole('button',{name:'Apply connection',exact:true}).click();await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.infantryTunnel??null)).toBeNull();await page.keyboard.press('Control+z');await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved.bspAssembly.infantryTunnel?.width)).toBe(1.8);
+ await chooseTool(page,'Features & workflows');await chooseTool(page,'Level editor');await page.getByLabel('Connection route',{exact:true}).selectOption('infantry');await expect(width).toHaveValue('1.8');
+});
+
+
+test('Chupathingy is the fresh setup default while an explicit MCC choice survives restart',async({page})=>{
+ await mockDesktop(page,null);await chooseTool(page,'Start here');
+ const choices=page.getByRole('group',{name:'Your Halo edition',exact:true});
+ await expect(choices.getByRole('button').first()).toContainText('ChupathingyCE');
+ await expect(choices.getByRole('button',{name:/ChupathingyCE/})).toHaveAttribute('aria-pressed','true');
+ await choices.getByRole('button',{name:/Halo CE in MCC/}).click();await page.getByRole('button',{name:'Continue to tools',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('spark-test-settings')??'{}').preferredHalo)).toBe('mccSteam');
+ await page.reload();await chooseTool(page,'Start here');await openStudioMenu(page);
+ await expect(page.getByRole('combobox',{name:'Active Halo runtime',exact:true})).toHaveValue('mccSteam');
+});
+
+test('Machinima greenscreen capture is saved editor metadata with Undo and reopen',async({page})=>{
+ await mockDesktop(page);await openFixture(page);await chooseTool(page,'Machinima');await openDrawer(page,'Lens & composition');
+ const green=page.getByRole('checkbox',{name:'Greenscreen capture',exact:true});await expect(green).not.toBeChecked();await green.check();
+ await expect(page.getByTestId('director-stage').locator('.world-layout')).toHaveAttribute('data-green-screen','true');
+ await page.keyboard.press('Control+z');await expect(green).not.toBeChecked();await page.keyboard.press('Control+y');await expect(green).toBeChecked();
+ await page.keyboard.press('Control+s');await expect.poll(()=>page.evaluate(()=>(window as any).__sparkMock.saved?.studio?.machinima?.greenScreen)).toBe(true);
+ await chooseTool(page,'Map library');await openFixture(page);await chooseTool(page,'Machinima');await openDrawer(page,'Lens & composition');await expect(green).toBeChecked();
 });

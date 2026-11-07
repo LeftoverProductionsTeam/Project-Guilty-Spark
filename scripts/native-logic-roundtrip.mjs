@@ -472,12 +472,25 @@ export async function nativeMegaWorldCreation({page,call,receipt,expect,baseFile
  await dialog.getByLabel('MegaWorld name',{exact:true}).fill('Timberland–Sidewinder authored connection');
  await dialog.getByRole('button',{name:'Create MegaWorld',exact:true}).click();await expect(dialog).toBeHidden({timeout:180000});
  const entry=(await call('bootstrap')).entries.find(row=>row.title==='Timberland–Sidewinder authored connection');if(!entry)throw Error('New world was not admitted');
- const world=(await call('open_project',{id:entry.id})).project;
+ let world=(await call('open_project',{id:entry.id})).project;
  if(process.env.SPARK_QA_MEGAWORLD_COMPILE==='1'){const boot=await call('bootstrap');await call('save_settings',{settings:{...boot.settings,hekTagsDirectory:process.env.SPARK_LOGIC_TAGS,invaderDirectory:invader}});}
 
  expect(world.id).not.toBe(sources[0].project.id);expect(world.id).not.toBe(sources[1].project.id);expect(world.source.sha256).toBe(originals[0].sha256);expect(world.bspAssembly.donorSource.sha256).toBe(originals[1].sha256);
  for(const row of before)expect(JSON.stringify((await call('open_project',{id:row.id})).project)).toBe(row.project);
+ if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
+  await chooseTool(page,'Level editor');await openDrawer(page,'Construction');
+  const assembly=page.locator('.bsp-assembly');if(await assembly.getAttribute('open')===null)await assembly.locator(':scope>summary').click();
+  expect(world.bspAssembly.tunnelShaderPath).toMatch(/metal.*plate.*floor/i);
+  await page.getByRole('checkbox',{name:'Open-sky road',exact:true}).check();
+  await page.getByRole('button',{name:'Add infantry tunnel',exact:true}).click();await expect(page.getByLabel('Connection route',{exact:true})).toHaveValue('infantry');
+  await page.getByRole('button',{name:'Apply connection',exact:true}).click();
+ }
  await page.keyboard.press('Control+s');await expect.poll(async()=>(await call('read_workspace_history',{projectId:world.id})).history?.head.dirty).toBe(false);
+ world=(await call('open_project',{id:world.id})).project;
+ if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
+  expect(world.bspAssembly.openRoad).toBe(true);expect(world.bspAssembly.tunnelWidth).toBe(4);expect(world.bspAssembly.infantryTunnel.points).toHaveLength(4);
+  receipt.dualRoutes={actualControls:true,openSky:true,primaryWidth:world.bspAssembly.tunnelWidth,infantryWidth:world.bspAssembly.infantryTunnel.width,primaryMaterial:world.bspAssembly.tunnelShaderPath,infantryMaterial:world.bspAssembly.infantryTunnel.shaderPath,gameplayAccepted:false};
+ }
  receipt.projectId=world.id;receipt.sourceHash=world.source.sha256;receipt.donorHash=world.bspAssembly.donorSource.sha256;receipt.plan=world.bspAssembly;receipt.sourceObjectCount=world.scene.length;receipt.fileNewActualGestures=true;receipt.nativeCompilation=false;receipt.gameplayAccepted=false;
  for(const input of originals)expect(await hash(input.file)).toBe(input.sha256);receipt.originals=originals;receipt.originalSourceProjectsUnchanged=true;
  await page.reload();await page.locator('.map-card').filter({has:page.getByRole('heading',{name:world.title,exact:true})}).click();await chooseTool(page,'Level editor');await openDrawer(page,'Construction');await expect(page.locator('.bsp-assembly')).toHaveAttribute('open','');receipt.sameProcessReopen=true;

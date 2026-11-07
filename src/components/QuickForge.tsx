@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import {openMapPreviewSource} from '../mapPreviewSource';
 import { publishTextureResources, useTextureResourceScope } from '../textureResourceScope';
@@ -232,7 +233,7 @@ export function NewMapWizard({
   const [title, setTitle] = useState(initialTitle),
     [template, setTemplate] = useState(initialTemplate),
     [target, setTarget] = useState<RuntimeId>(
-      preferredHalo && forgeTargets[preferredHalo] ? preferredHalo : 'mccSteam',
+      preferredHalo && forgeTargets[preferredHalo] ? preferredHalo : PREFERRED_RUNTIME,
     );
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');

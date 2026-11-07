@@ -168,6 +168,14 @@ try {
         report.sourceMapSha256 = await hash(sourceMap);
         const output = path.join(context.directory, 'qa', 'logic');
         await fs.mkdir(path.dirname(output), { recursive: true });
+        let audioMeter=process.env.SPARK_LIFECYCLE_AUDIO_METER;
+        if(audioMeter==='auto'){
+          if(process.platform!=='win32')throw Error('The owned Windows audio meter needs Windows');
+          audioMeter=path.join(context.directory,'owned-audio-meter.exe');
+          const csc=path.join(process.env.SystemRoot??'C:/Windows','Microsoft.NET/Framework64/v4.0.30319/csc.exe');
+          await runDevelopmentCommand(csc,['/nologo','/r:System.Management.dll','/r:System.Web.Extensions.dll','/out:'+audioMeter,path.resolve('scripts/measure-owned-audio-output.cs')],context);
+          report.audioMeter={kind:'Owned-process Windows output peaks only',microphoneOrSampleCapture:false};
+        }
         // Storage acceptance reuses the previously accepted bounded map edit/export
         // route. The unfinished C71 object/behavior initiative is a separate gate.
         try {
@@ -184,12 +192,16 @@ try {
               SPARK_LIFECYCLE_LOGIC: '0',
               SPARK_LIFECYCLE_NATIVE_ONLY: '1',
               SPARK_LOGIC_CROSS_RUNTIME: '0', SPARK_QA_MEGAWORLD_ONLY: '0',
+              ...(audioMeter?{SPARK_LIFECYCLE_AUDIO_METER:audioMeter}:{}),
             },
           );
         } finally {
           const receipt = await fs.readFile(path.join(output, 'acceptance.json'), 'utf8').catch(() => null);
           if (receipt) report.native = JSON.parse(receipt);
           report.originalSourceUnchanged = (await hash(sourceMap)) === report.sourceMapSha256;
+          if(receiptFile)for(const name of ['owned-native-bsp.png','native-context-materials.png','native-context-reflection.png','native-context-collision.png','native-context-sound.png','native-tag-animation.png','native-machinima-greenscreen.png','failure-window-0.png']){
+            const file=path.join(output,name),stat=await fs.stat(file).catch(()=>null);if(stat?.isFile()&&stat.size<=4*1024**2){const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+name);await fs.copyFile(file,target,fs.constants.COPYFILE_EXCL);(report.nativeScreenshots??=[]).push({file:target,bytes:stat.size});}
+          }
         }
         if (!report.native.complete) throw Error('Actual native acceptance did not pass');
         if ((await hash(sourceMap)) !== report.sourceMapSha256) throw Error('Original source changed');
@@ -233,7 +245,7 @@ try {
         }finally{
           const receipt=await fs.readFile(path.join(output,'acceptance.json'),'utf8').catch(()=>null);if(receipt)report.logic=JSON.parse(receipt);
           if(receiptFile&&(report.logic?.crossRuntime||report.logic?.megaWorldCreation)){
-            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','megaworld-source-check.png','megaworld-shared-viewport.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map','native-output/megaworld.map']){
+            for(const name of ['cross-runtime-1-preview.png','cross-runtime-1-drag.png','cross-runtime-1-placed.png','cross-runtime-2-preview.png','cross-runtime-2-drag.png','cross-runtime-2-placed.png','megaworld-source-check.png','megaworld-shared-viewport.png','megaworld-compiled-routes.png','runtime-catalog-tools.png','runtime-catalog-file.png','runtime-catalog-build.png','native-output/cross-runtime-1.map','native-output/megaworld.map']){
               const source=path.join(output,name),info=await fs.stat(source).catch(()=>null);if(!info)continue;
               if(!info.isFile()||info.size>(name.endsWith('.map')?256:4)*1024**2)throw Error('Selected native acceptance evidence exceeds its bounded export');
               const target=path.join(path.dirname(path.resolve(receiptFile)),path.basename(receiptFile,'.json')+'-'+path.basename(name));

@@ -7,6 +7,7 @@ import { renderIndices } from '../haloGeometry';
 import { materialLightmapKey } from '../haloLightmap';
 import { createHaloMaterial, updateHaloMaterial } from '../haloMaterial';
 import {glassWithoutDiffuse} from '../nativeShaderTextures';
+import {createChromaMaterial} from '../chromaKey';
 const EMPTY_SHADER_TEXTURES: Record<number, THREE.Texture> = {};
 const EMPTY_LIGHTMAP_TEXTURES: Record<string, THREE.Texture> = {};
 export default function HaloMesh({
@@ -22,6 +23,7 @@ export default function HaloMesh({
   shaderMetadata = {},
   extraTextures = {},
   sky = false,
+  greenScreen = false,
 }: {
   data: MeshData;
   wireframe?: boolean;
@@ -35,8 +37,11 @@ export default function HaloMesh({
   shaderMetadata?: Record<number, ShaderPreview>;
   extraTextures?: Record<string, THREE.Texture>;
   sky?: boolean;
+  greenScreen?: boolean;
 }) {
   const {invalidate}=useThree();
+  const matte=useMemo(()=>greenScreen?createChromaMaterial():null,[greenScreen]);
+  useEffect(()=>()=>matte?.dispose(),[matte]);
   const legend = useMemo(
     () =>
       materialLens || Object.keys(shaderTextures).length || Object.keys(lightmapTextures).length || Object.values(shaderMetadata).some(glassWithoutDiffuse)
@@ -144,7 +149,7 @@ export default function HaloMesh({
   return (
     <mesh
       geometry={geometry}
-      material={materials ?? undefined}
+      material={matte ?? materials ?? undefined}
       frustumCulled={!sky}
       onBeforeRender={(_renderer, scene, camera, _geometry, material) =>
         updateHaloMaterial(material, scene, camera, invalidate)
@@ -166,7 +171,7 @@ export default function HaloMesh({
         onShaderClick(tagId);
       }}
     >
-      {!materials && (
+      {!matte && !materials && (
         <meshStandardMaterial
           color={color}
           side={THREE.DoubleSide}

@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Play,
@@ -67,7 +68,7 @@ export default function RuntimeDock({
   const [runtime, setRuntime] = useMapState<RuntimeId>(
     id,
     'hosting.runtime',
-    project?.quickForge?.runtimeId ?? settings.preferredHalo ?? 'mccSteam',
+    project?.quickForge?.runtimeId ?? settings.preferredHalo ?? PREFERRED_RUNTIME,
   );
   const [report, setReport] = useState<RuntimeWorkbenchReport | null>(null);
   const [details, setDetails] = useState(false),

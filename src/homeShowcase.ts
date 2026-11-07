@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from './runtimeWorkbench';
 import { call } from './api';
 import type { Bootstrap, OpenProject } from './types';
 import { catalogAssets } from './forge';
@@ -10,7 +11,7 @@ import type {HomeCharacter} from './homeCharacters';
 const sources = new Map<string, Promise<ForgeAsset[]>>();
 const characterSources=new Map<string,Promise<ForgeAsset|null>>();
 export function preloadHomeCharacter(data:Bootstrap,character:HomeCharacter):Promise<ForgeAsset|null>{
-  const runtime=data.settings?.preferredHalo??'mccSteam';
+  const runtime=data.settings?.preferredHalo ?? PREFERRED_RUNTIME;
   const key=JSON.stringify([data.dataDirectory,data.installation.mccPath,runtime,character]);
   const existing=characterSources.get(key);if(existing)return existing;
   const pending=(async()=>{

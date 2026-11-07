@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Matrix3, Raycaster, Vector2, Vector3 } from 'three';
@@ -262,7 +263,7 @@ function LiveViewport({
   );
 }
 export default function LiveEditor(props: Props) {
-  const [runtime]=useMapState<RuntimeId>(props.project?.id??'global','hosting.runtime',props.project?.quickForge?.runtimeId??props.defaultRuntime??'mccSteam');
+  const [runtime]=useMapState<RuntimeId>(props.project?.id??'global','hosting.runtime',props.project?.quickForge?.runtimeId??props.defaultRuntime ?? PREFERRED_RUNTIME);
   return <LiveObjectInspector presentation={props.sourceViewport!==undefined?'drawer':'sidebar'} controlsOpen={props.mode==='live'}
     runtimeId={runtime}
     keyboardEnabled={status=>!!status&&(props.mode==='live'||(props.mode!=='source'&&matchesLiveMap(props.project,props.inspection,status)))}

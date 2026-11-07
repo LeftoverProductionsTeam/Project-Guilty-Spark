@@ -11,6 +11,7 @@ export interface MachinimaSettings {
   loopPlayback: boolean;
   speed: number;
   depthOfField: boolean;
+  greenScreen?: boolean;
   focusDistance: number;
   blur: number;
 }
@@ -24,6 +25,7 @@ export const DEFAULT_MACHINIMA: MachinimaSettings = {
   loopPlayback: false,
   speed: 1,
   depthOfField: false,
+  greenScreen: false,
   focusDistance: 20,
   blur: 0.35,
 };
@@ -46,6 +48,7 @@ export function validMachinimaSettings(value: unknown): value is MachinimaSettin
     ['thirds', 'safeFrame', 'center', 'showPath', 'loopPlayback', 'depthOfField'].every(
       (k) => typeof m[k as keyof MachinimaSettings] === 'boolean',
     ) &&
+    (m.greenScreen === undefined || typeof m.greenScreen === 'boolean') &&
     finite(m.speed, 0.25, 2) &&
     finite(m.focusDistance, 0.1, 4096) &&
     finite(m.blur, 0, 1)

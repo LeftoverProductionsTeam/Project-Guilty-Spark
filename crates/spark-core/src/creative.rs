@@ -66,9 +66,13 @@ pub struct MachinimaSettings {
     pub loop_playback: bool,
     pub speed: f32,
     pub depth_of_field: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub green_screen: bool,
     pub focus_distance: f32,
     pub blur: f32,
 }
+fn is_false(value: &bool) -> bool { !*value }
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ServerPlan {
@@ -254,6 +258,16 @@ mod tests {
             special_rules:"infectionConcept".into(),native_status:"userConfirmedInGame".into(),
             native_evidence:String::new(),notes:String::new()});
         assert!(corrupted.validate().is_err());
+    }
+    #[test]
+    fn greenscreen_is_optional_editor_metadata_and_survives_saved_source() {
+        let old=serde_json::json!({"fps":30,"aspect":"16:9","thirds":true,"safeFrame":true,"center":false,"showPath":true,"loopPlayback":false,"speed":1.,"depthOfField":false,"focusDistance":20.,"blur":0.25});
+        let mut settings:MachinimaSettings=serde_json::from_value(old.clone()).unwrap();
+        assert!(!settings.green_screen);assert_eq!(serde_json::to_value(&settings).unwrap(),old);
+        settings.green_screen=true;let mut document=studio();document.machinima=Some(settings);document.validate().unwrap();
+        let value=serde_json::to_value(&document).unwrap();assert_eq!(value["machinima"]["greenScreen"],true);
+        let restored:CreatorStudio=serde_json::from_value(value).unwrap();assert!(restored.machinima.unwrap().green_screen);
+        let mut invalid=old;invalid["greenScreen"]=serde_json::json!("true");assert!(serde_json::from_value::<MachinimaSettings>(invalid).is_err());
     }
     #[test]
     fn pass_requires_manual_evidence() {

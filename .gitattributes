@@ -5,3 +5,6 @@
 docs/licenses/*.txt -text -whitespace
 # Recovered owner directives retain their manifest's exact original bytes.
 "docs/Master Engineering Prompts/*.txt" -text -whitespace
+
+"docs/Master Engineering Prompts/GS_2026-11-07_Native_Runtime_19_Map_Megaworld_VR.md" -text -whitespace
+"docs/Master Engineering Prompts/GS_2026-11-07_19_Map_Chupathingy_OpenH1_VR_Forge.md" -text -whitespace

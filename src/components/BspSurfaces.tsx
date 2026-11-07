@@ -1,6 +1,7 @@
 import { createHaloMaterial, updateHaloMaterial } from '../haloMaterial';
 import type { WorkshopMaterialView } from '../useWorkshopTextures';
 import { useEffect, useMemo } from 'react';
+import {createChromaMaterial} from '../chromaKey';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ForgeMesh, QuickForgeDocument } from '../forge';
@@ -14,16 +15,20 @@ export default function BspSurfaces({
   wire,
   textures,
   views,
+  greenScreen=false,
 }: {
   mesh: ForgeMesh;
   doc: QuickForgeDocument;
   selection?: { brushId: string; faceId?: string } | null;
   onSelect?: (s: { brushId: string; faceId?: string }) => void;
   wire: boolean;
+  greenScreen?:boolean;
   textures: Record<string, THREE.Texture>;
   views?: Record<string, WorkshopMaterialView>;
 }) {
   const {invalidate}=useThree();
+  const mattes=useMemo(()=>greenScreen?doc.materials.map(material=>{const matte=createChromaMaterial();if(['+portal','+exactportal'].includes(material.name))matte.visible=false;return matte;}):null,[greenScreen,doc.materials]);
+  useEffect(()=>()=>mattes?.forEach(material=>material.dispose()),[mattes]);
   const surface = useMemo(() => {
     const geometry = new THREE.BufferGeometry(),
       indices: number[] = [],
@@ -92,7 +97,7 @@ export default function BspSurfaces({
         updateHaloMaterial(material, scene, camera, invalidate)
       }
       geometry={surface.geometry}
-      material={surface.materials}
+      material={mattes??surface.materials}
       userData={{ dropSurface: true, workshopSurface: true }}
       onClick={
         onSelect

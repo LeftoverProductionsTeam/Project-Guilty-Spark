@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import ToolEcosystem from './ToolEcosystem';
 import {runtimeNames} from '../runtimeWorkbench';
 import {useMapState} from '../mapSession';
@@ -15,7 +16,7 @@ export default function WorkspaceFinder({items,onNavigate,onClose,project=null,s
   onClose:()=>void;
 }){
   const [query,setQuery]=useState('');
-  const [runtime,setRuntime]=useMapState<RuntimeId>(project?.id??'global','hosting.runtime',project?.quickForge?.runtimeId??settings?.preferredHalo??'mccSteam');
+  const [runtime,setRuntime]=useMapState<RuntimeId>(project?.id??'global','hosting.runtime',project?.quickForge?.runtimeId??settings?.preferredHalo ?? PREFERRED_RUNTIME);
   const [selected,setSelected]=useState(0);
   const field=useRef<HTMLInputElement>(null);
   const dialog=useRef<HTMLDivElement>(null);

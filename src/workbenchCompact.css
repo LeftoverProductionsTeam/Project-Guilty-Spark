@@ -174,10 +174,10 @@
 }
 /* C50 unified chrome: one persistent row, with overflow drawers kept reachable. */
 :root .application.gs-drawers>.gs-compact-header{display:flex;align-items:center;gap:5px;overflow:visible;padding:0 5px;height:var(--gs-header-height)!important;z-index:160;}
-:root[data-gs-native-frame='true']:not([data-gs-maximized='true']):not([data-gs-fullscreen='true']) .application{width:calc(100vw - 16px);height:calc(100vh - 16px);margin:16px 0 0 16px;}
+:root[data-gs-native-frame='true']:not([data-gs-maximized='true']):not([data-gs-fullscreen='true']) .application{--gs-navigation-space:50px;width:calc(100vw - 16px);height:calc(100vh - 16px);margin:16px 0 0 16px;}
 :root[data-gs-native-frame='true']:not([data-gs-maximized='true']):not([data-gs-fullscreen='true']) .gs-window-tint{inset:16px 0 0 16px;}
 .application.gs-drawers{--gs-header-height:32px;grid-template-rows:var(--gs-header-height) minmax(0,1fr) auto!important;}
-.application .gs-compact-header .gs-spark-navigation{position:relative;align-self:flex-start;flex:none;min-width:68px;width:68px;height:var(--gs-header-height);min-height:0;margin:0;padding:0;border:0;background:transparent;overflow:visible;}
+.application .gs-compact-header .gs-spark-navigation{position:relative;align-self:flex-start;flex:none;min-width:var(--gs-navigation-space,66px);width:var(--gs-navigation-space,66px);height:var(--gs-header-height);min-height:0;margin:0;padding:0;border:0;background:transparent;overflow:visible;}
 :root .application.gs-drawers>.gs-compact-header .gs-spark-navigation,
 :root .application.gs-drawers>.gs-compact-header .gs-spark-navigation:is(:hover,:active,[aria-expanded='true']){background:transparent!important;border-color:transparent;box-shadow:none!important;}
 .gs-spark-anchor{display:block;width:100%;height:100%;pointer-events:none;}
@@ -356,7 +356,7 @@ html[data-gs-fullscreen=true] #gs-header-workspace-tools .gs-panel-buttons butto
 .application .bsp-source-list{max-height:110px;overflow:auto;flex:none;}
 @media(max-width:1100px){
   :root .application.gs-drawers>.gs-compact-header{gap:2px;padding-inline:4px;}
-  .application .gs-compact-header .gs-spark-navigation{width:60px;min-width:60px;}
+  /* Keep File/Tools/Maps just beyond the permanent monitor and its glow. */
   #gs-header-workspace-tools .gs-workspace-tools{gap:2px;}
   .gs-compact-header .editor-sound-controls{gap:3px;}
   .gs-compact-header .editor-sound-controls input[type=range]{width:28px;}

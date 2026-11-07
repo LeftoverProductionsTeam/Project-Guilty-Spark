@@ -19,7 +19,7 @@ assert.ok(app.includes("e.key.toLowerCase() === 'k'"));
 assert.ok(app.replace(/\s+/g,'').includes('<WorkspaceFinderitems={finderItems}'));
 assert.ok(app.includes('setShowFinder(false)'));
 assert.ok(app.includes("e.target.closest('input,textarea,[contenteditable=\"true\"]')"));
-assert.ok(app.replace(/\s+/g,'').includes("['number','range'].includes(text.type)"),'numeric controls use project undo while text fields retain native undo');
+assert.ok(app.replace(/\s+/g,'').includes("['number','range','checkbox','radio','color','button','submit','reset'].includes(text.type)"),'numeric and non-text controls use project undo while text fields retain native undo');
 const finder=readFileSync('src/components/WorkspaceFinder.tsx','utf8');
 for(const frag of ['role="dialog"','aria-modal="true"','onKeyDown','ArrowDown','ArrowUp','Escape','onNavigate','onClose','Close workspace search','document.addEventListener(\'keydown\',onKey,true)'])assert.ok(finder.includes(frag),`Missing keyboard/accessibility element ${frag}`);
 const ui=readFileSync('src/components/ui.tsx','utf8');

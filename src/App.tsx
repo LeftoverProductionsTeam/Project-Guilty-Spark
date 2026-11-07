@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from './runtimeWorkbench';
 import {cycleWorkArea,hasKeyboardDialog,navigateComposite} from './keyboardNavigation';
 import { retainAssetSource } from './assetSources';
 import {previewBudgets} from './resourceBudgets';
@@ -252,7 +253,9 @@ export default function App() {
   },[current?.id,current?.source?.sha256,data.installation.mccPath]);
   const[dockedDirector,setDockedDirector]=useMapState(current?.id??'global','director.docked',false);
   useEffect(()=>{if(!native)return;const stop=listen<string>('spark:director-docked',({payload})=>{if(typeof payload!=='string')return;writeMapSession(payload,'director.docked',true);if(historyRef.current.current?.id===payload)setWorkspace('machinima');});return()=>{void stop.then(stop=>stop());};},[]);
-  const [dependencyRuntime,setDependencyRuntime]=useMapState<RuntimeId>(current?.id??'global','hosting.runtime',current?.quickForge?.runtimeId??current?.buildTargets?.find(t=>t.id===current.activeBuildTarget)?.runtimeId??data.settings.preferredHalo??'mccSteam');
+  // Do not seed a launch preference from the loading placeholder before saved settings arrive.
+  const [runtimeChoice,setDependencyRuntime]=useMapState<RuntimeId|null>(current?.id??'global','hosting.runtime',ready?(current?.quickForge?.runtimeId??current?.buildTargets?.find(t=>t.id===current.activeBuildTarget)?.runtimeId??data.settings.preferredHalo??PREFERRED_RUNTIME):null);
+  const dependencyRuntime=runtimeChoice??data.settings.preferredHalo??PREFERRED_RUNTIME;
   function openDependencySetup(){setSettingsTab('dependencies');setWorkspace('settings');}
   function selectSettingsTab(tab:WorkflowRoute['settingsTab']){setSettingsTab(tab);setWorkspace('settings');}
   const [ownedHeaderArt,setOwnedHeaderArt] = useState<{url:string;tagId:number}|null>(null);
@@ -750,13 +753,13 @@ export default function App() {
         }
         if (e.key.toLowerCase() === 'z') {
           const text=e.target instanceof Element?e.target.closest('input,textarea,[contenteditable="true"]'):null;
-          if(text&&!(text instanceof HTMLInputElement&&['number','range'].includes(text.type)))return;
+          if(text&&!(text instanceof HTMLInputElement&&['number','range','checkbox','radio','color','button','submit','reset'].includes(text.type)))return;
           e.preventDefault();
           applyHistory(e.shiftKey?'redo':'undo');
         }
         if (e.key.toLowerCase() === 'y') {
           const text=e.target instanceof Element?e.target.closest('input,textarea,[contenteditable="true"]'):null;
-          if(text&&!(text instanceof HTMLInputElement&&['number','range'].includes(text.type)))return;
+          if(text&&!(text instanceof HTMLInputElement&&['number','range','checkbox','radio','color','button','submit','reset'].includes(text.type)))return;
           e.preventDefault();
           applyHistory('redo');
         }
@@ -1212,6 +1215,7 @@ export default function App() {
       if (JSON.stringify([data.settings.mccDirectory,data.settings.steamDirectory,data.settings.resourceDirectory]) !==
         JSON.stringify([settings.mccDirectory,settings.steamDirectory,settings.resourceDirectory]))
         window.dispatchEvent(new Event('guilty-spark-runtime-connections-changed'));
+      if(settings.preferredHalo&&settings.preferredHalo!==data.settings.preferredHalo)setDependencyRuntime(settings.preferredHalo);
       setData(d);
       notice('Preferences saved.','success');
     } catch(error) {notice(String(error),'error');throw error;}
@@ -1820,7 +1824,7 @@ export default function App() {
               </WorkspacePanels>
             </EditorAudioProvider>
           </main>
-          <RuntimeDock
+          {ready&&<RuntimeDock
             project={current}
             settings={data.settings}
             dirty={unsaved}
@@ -1831,7 +1835,7 @@ export default function App() {
             onOpenCompiled={(buildId) => {
               if(current)void action(async()=>{await save();const opened=await call<OpenProject>('open_built_map',{projectId:current.id,buildId});await load(opened);await refresh();setWorkspace('quickforge');},'Working tag changes compiled, preserved and opened in a new map tab.');
             }}
-          />
+          />}
           {busy && (
             <div className="busy-indicator">
               <LoaderCircle className="spin" size={17} />

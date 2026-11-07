@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import CeSourceRecovery from './CeSourceRecovery';
 import { runtimeNames } from '../runtimeWorkbench';
 import { useState } from 'react';
@@ -16,7 +17,7 @@ export default function BuildTargets({
   onSave: () => Promise<void>;
 }) {
   const [error, setError] = useState('');
-  const [newRuntime, setNewRuntime] = useState<RuntimeId>(defaults?.preferredHalo ?? 'mccSteam');
+  const [newRuntime, setNewRuntime] = useState<RuntimeId>(defaults?.preferredHalo ?? PREFERRED_RUNTIME);
   const [open, setOpen] = useMapState(project.id, 'tools.targetsOpen', false);
   const targets = project.buildTargets ?? [];
   const active = targets.find((t) => t.id === project.activeBuildTarget);

@@ -284,6 +284,41 @@ async function nativeTagAnimation(opened){
       report.tagAnimation={actorPath:actor.path,clips:clipCount,bones:initial.bones,source:initial.source,pausedTime:paused.time,sameCanvas:true,gameplayAccepted:false};
       step('Actual Tag Inspector plays and pauses the selected biped native skeleton/animation, then restores its static model without replacing the viewport');
 }
+async function nativeMachinimaCapture(opened){
+ const id=opened.project.id,sourceSha=opened.project.source.sha256;
+ await chooseTool(main,'Machinima');const stage=main.getByTestId('director-stage'),view=stage.locator('.world-layout'),canvas=view.locator('canvas');
+ await expect(canvas).toBeVisible();await expect.poll(async()=>Number(await view.getAttribute('data-source-shaders')),{timeout:120000}).toBeGreaterThan(0);await expect.poll(()=>view.getAttribute('data-pending-materials'),{timeout:120000}).toBe('0');await expect.poll(()=>view.getAttribute('data-material-loading'),{timeout:120000}).toBe('false');await expect.poll(()=>view.getAttribute('data-reflection-loading'),{timeout:120000}).toBe('false');
+ // Frame a real source subject with the existing camera-key controls. The first
+ // start is hidden in player view; an outside-map overview may correctly see
+ // only occluding BSP walls, which cannot prove retained subject appearance.
+ const subject=opened.project.scene.filter(object=>object.kind==='Player spawn')[1];expect(subject,'A visible native player-start subject is required').toBeTruthy();
+ await openDrawer(main,'Camera keys');const capture=main.getByRole('button',{name:'Capture camera key',exact:true}),keys=main.getByRole('list',{name:'Camera keyframes',exact:true});await expect(capture).toBeEnabled();await capture.click();await expect(keys.getByRole('button')).toHaveCount(1);await keys.getByRole('button').first().click();
+ await openDrawer(main,'Lens & composition');
+ // NumberField commits the displayed six-decimal camera precision.
+ const position=subject.position.map((value,index)=>Number((value+(index===2?1.1:0)).toFixed(6))),target=subject.position.map((value,index)=>Number((value+(index===2?.3:0)).toFixed(6)));
+ for(const [prefix,values] of [['Camera',position],['Target',target]])for(const [index,axis]of ['X','Y','Z'].entries()){const field=main.getByRole('spinbutton',{name:prefix+' '+axis,exact:true});await field.fill(String(values[index]));await field.press('Tab');}
+ await expect.poll(()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsDirector??'null')?.position)).toEqual(position);
+ await canvas.evaluate(element=>window.__captureCanvas=element);
+ const shaderIds=await view.getAttribute('data-source-shader-ids');await main.evaluate(()=>{window.__GS_PROFILE__=true;performance.clearMeasures();});
+ const green=main.getByRole('checkbox',{name:'Greenscreen capture',exact:true});await expect(green).not.toBeChecked();await green.check();
+ await expect.poll(()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsDirector??'null')?.greenScreen)).toBe(true);
+ await main.keyboard.press('Control+z');await expect(green).not.toBeChecked();await main.keyboard.press('Control+y');await expect(green).toBeChecked();
+ const pixels=await canvas.evaluate(async element=>{await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const copy=document.createElement('canvas');copy.width=element.width;copy.height=element.height;const ctx=copy.getContext('2d');ctx.drawImage(element,0,0);const data=ctx.getImageData(0,0,copy.width,copy.height).data;let green=0,colored=0;for(let i=0;i<data.length;i+=4){if(data[i]<5&&data[i+1]>250&&data[i+2]<5)green++;else if(data[i+3]>250&&Math.max(data[i],data[i+1],data[i+2])-Math.min(data[i],data[i+1],data[i+2])>12)colored++;}return{green,colored,total:data.length/4,width:copy.width,height:copy.height};});
+ report.machinimaCapture={stage:'native pixel check',subjectId:subject.id,position,target,pixels};await main.screenshot({path:path.join(root,'native-machinima-greenscreen.png')});
+ expect(pixels.green/pixels.total).toBeGreaterThan(.5);expect(pixels.colored).toBeGreaterThan(10);
+ await green.uncheck();await expect.poll(()=>canvas.evaluate(element=>JSON.parse(element.dataset.gsDirector??'null')?.greenScreen)).toBe(false);
+ expect(await canvas.evaluate(element=>element===window.__captureCanvas)).toBe(true);expect(await view.getAttribute('data-source-shader-ids')).toBe(shaderIds);
+ const reloads=await main.evaluate(()=>performance.getEntriesByType('measure').filter(entry=>/^spark.ipc.preview_owned_/.test(entry.name)).map(entry=>entry.name));expect(reloads).toEqual([]);
+ await green.check();await openDrawer(main,'Camera keys');await expect(capture).toBeEnabled();await capture.click();await expect(keys.getByRole('button')).toHaveCount(2);await main.keyboard.press('Control+s');await expect.poll(async()=>(await state(main,id)).history?.head.dirty).toBe(false);
+ const saved=(await state(main,id)).project;expect(saved.studio.machinima.greenScreen).toBe(true);expect(saved.studio.shots).toHaveLength(2);expect(saved.source.sha256).toBe(sourceSha);
+ const pid=child.pid;for(const page of [...pages()].reverse())if(!page.isClosed())await close(page,'save');await waitForQaExit(child);await browser.close();await launchNative();expect(child.pid).not.toBe(pid);
+ await chooseTool(main,'Map library');await main.locator('.map-card[data-project-id="'+id+'"]').click();await chooseTool(main,'Machinima');await openDrawer(main,'Lens & composition');await expect(main.getByRole('checkbox',{name:'Greenscreen capture',exact:true})).toBeChecked();await openDrawer(main,'Camera keys');
+ const reopenedKeys=main.getByRole('list',{name:'Camera keyframes',exact:true});await expect(reopenedKeys.getByRole('button')).toHaveCount(2);await main.keyboard.press('Control+z');await expect(reopenedKeys.getByRole('button')).toHaveCount(1);await main.keyboard.press('Control+y');await expect(reopenedKeys.getByRole('button')).toHaveCount(2);await main.keyboard.press('Control+s');await reopenedKeys.getByRole('button').first().click();
+ await expect.poll(()=>main.getByTestId('director-stage').locator('canvas').evaluate(element=>JSON.parse(element.dataset.gsDirector??'null')?.position)).toEqual(position);
+ expect((await state(main,id)).project.studio.shots).toEqual(saved.studio.shots);expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(sourceSha);
+ report.machinimaCapture={...report.machinimaCapture,stage:'accepted editor capture',cacheVersion:expectedCacheVersion,sourceSha256:sourceSha,sameCanvasOnToggle:true,previewReloadsOnToggle:reloads.length,fullProcessRestart:true,cameraKeyUndoRedoSaveReopen:true,editorCaptureOnly:true,nativeGameCameraAccepted:false};
+ step('Actual native source supports greenscreen capture with retained subject materials, editor camera keys, Undo/Redo, Save and full-process restart',report.machinimaCapture);
+}
 async function reviewNativeScene(id,label,requireNormalExit=false,receipt=report.logicRoundTrip){
       // Explicit, bounded operator review of the existing installed-tool UI.
       // Process launch/exit never asserts game loading or trigger traversal.
@@ -422,9 +457,15 @@ try{
     const previewId=await donorStatus.getAttribute('data-preview-id');expect(previewId).toBeTruthy();expect(previewId).not.toBe(world.id);expect(previewId).not.toBe(world.bspAssembly.donorProjectId);
     const counts={shaders:Number(await donorStatus.getAttribute('data-shaders')),lightmaps:Number(await donorStatus.getAttribute('data-lightmaps'))};expect(counts.shaders).toBeGreaterThan(0);expect(counts.lightmaps).toBeGreaterThan(0);
     const donorTextureId=await donorStatus.getAttribute('data-texture-id');expect(donorTextureId).toBeTruthy();const sharedViewportReadyMs=Math.round(performance.now()-sharedViewportStarted);
-    const field=main.getByRole('spinbutton',{name:'Tunnel width',exact:true});await field.fill('2.5');await field.press('Enter');await main.getByRole('button',{name:'Apply connection',exact:true}).click();
+    await main.getByLabel('Connection route',{exact:true}).selectOption('primary');
+    if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
+      expect(world.bspAssembly.infantryTunnel.points).toHaveLength(4);await expect(main.getByRole('checkbox',{name:'Open-sky road',exact:true})).toBeChecked();
+      report.megaWorldCreation.dualRoutes.fullProcessRestart=true;
+    }
+    const oldWidth=world.bspAssembly.tunnelWidth,newWidth=oldWidth+.5;
+    const field=main.getByRole('spinbutton',{name:'Tunnel width',exact:true});await field.fill(String(newWidth));await field.press('Enter');await main.getByRole('button',{name:'Apply connection',exact:true}).click();
     const saved=async()=>{await main.getByLabel('File menu',{exact:true}).click();await main.getByRole('menu',{name:'File commands',exact:true}).getByRole('menuitem',{name:'Save',exact:true}).click();await expect.poll(async()=>(await state(main,world.id)).history?.head.dirty).toBe(false);return (await invoke(main,'open_project',{id:world.id})).project;};
-    expect((await saved()).bspAssembly.tunnelWidth).toBe(2.5);await main.keyboard.press('Control+z');expect((await saved()).bspAssembly.tunnelWidth).toBe(2);await main.keyboard.press('Control+y');expect((await saved()).bspAssembly.tunnelWidth).toBe(2.5);
+    expect((await saved()).bspAssembly.tunnelWidth).toBe(newWidth);await main.keyboard.press('Control+z');expect((await saved()).bspAssembly.tunnelWidth).toBe(oldWidth);await main.keyboard.press('Control+y');expect((await saved()).bspAssembly.tunnelWidth).toBe(newWidth);
     report.megaWorldCreation.editedAfterRestart=true;report.megaWorldCreation.undoRedoImmediateSave=true;
     const yaw=main.getByRole('spinbutton',{name:'BSP section yaw',exact:true});await yaw.fill('2');await yaw.press('Enter');await main.getByRole('button',{name:'Apply connection',exact:true}).click();expect((await saved()).bspAssembly.yawDegrees).toBe(2);
     await expect(donorStatus).toHaveAttribute('data-preview-id',previewId);await expect(donorStatus).toHaveAttribute('data-ready','true');
@@ -442,6 +483,14 @@ try{
     await expect.poll(async()=>await main.locator('.bsp-assembly .bsp-error').count()?'blocked':(await main.locator('.bsp-assembly').innerText()).includes('Source clearance checked at')?'checked':'working',{timeout:180000}).not.toBe('working');
     const failure=main.locator('.bsp-assembly .bsp-error');if(await failure.count()){report.megaWorldCreation.sourceClearance={accepted:false,error:await failure.innerText()};throw Error('Native source clearance failed: '+report.megaWorldCreation.sourceClearance.error);}
     report.megaWorldCreation.sourceClearance={accepted:true,scope:'Source reconstruction and capsule diagnostics; no compiled-map or gameplay acceptance',summary:(await main.locator('.bsp-assembly').innerText()).match(/Source clearance checked at[^\n]*/)?.[0]};
+    if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
+      await expect(main.locator('.bsp-assembly')).toContainText('Both primary and infantry routes passed');
+      const beforeRemove=(await saved()).bspAssembly;await main.getByLabel('Connection route',{exact:true}).selectOption('infantry');
+      await main.getByRole('button',{name:'Remove infantry tunnel',exact:true}).click();await main.getByRole('button',{name:'Apply connection',exact:true}).click();expect((await saved()).bspAssembly.infantryTunnel).toBeUndefined();
+      await main.keyboard.press('Control+z');expect((await saved()).bspAssembly).toEqual(beforeRemove);
+      await main.getByLabel('Connection route',{exact:true}).selectOption('primary');
+      report.megaWorldCreation.dualRoutes.removalUndoImmediateSave=true;report.megaWorldCreation.dualRoutes.bothSourceRoutesChecked=true;
+    }
     await main.screenshot({path:path.join(root,'megaworld-source-check.png')});step('Saved source-bound donor controls support edited width, Undo/Redo, immediate Save and actual native source clearance');
     if(process.env.SPARK_QA_MEGAWORLD_COMPILE==='1'){
       await main.getByRole('button',{name:'Build & playtest connection',exact:true}).click();await expect(main.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','build');
@@ -453,11 +502,33 @@ try{
       const crc=Number((await runOwned(path.join(invaderDirectory,'invader-info.exe'),['-T','crc32_mismatched',output.output],{windowsHide:true,timeout:30000})).stdout.trim());expect(crc).toBe(0);
       const read=async(tag,field)=>(await runOwned(path.join(invaderDirectory,'invader-edit.exe'),['-t',extracted,'-G',field,tag],{windowsHide:true,timeout:30000})).stdout.trim();
       const ref=await read(scenario,'structure_bsps[0].structure_bsp');expect(ref.replaceAll('\\','/').toLowerCase()).toBe(bsp.replaceAll('\\','/').toLowerCase());
+      if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
+        const namespace=`gsbsp_${output.id.slice(0,8)}_0`,materials=[];
+        for(const name of ['gstunnel','gsinfantry']){
+          const alias=`${namespace}/materials/${name}${world.source.sha256.slice(0,8)}x`;
+          const indexed=inspected.inspection.tags.find(tag=>tag.class==='senv'&&tag.path.replaceAll('\\','/').toLowerCase()===alias);expect(indexed,'The compiled BSP must retain each authored route material alias').toBeTruthy();
+          const material=indexed.path+'.shader_environment';
+          const extraction=await runOwned(path.join(invaderDirectory,'invader-extract.exe'),['-s',material,'-t',extracted,output.output],{windowsHide:true,timeout:30000});expect(extraction.stdout+'\n'+extraction.stderr).not.toMatch(/Failed to extract|ERROR:/i);
+          const baseMap=await read(material,'base_map');expect(baseMap.replaceAll('\\','/')).toBe(`${namespace}/levels/b30/bitmaps/metal plate floor ext.bitmap`);
+          materials.push({shader:material,baseMap});
+        }
+        report.megaWorldCreation.dualRoutes.independentMaterialReadback={materials,sourceOverviewBitmapUsed:false};
+      }
       report.megaWorldCreation.nativeCompilation={accepted:true,target:'mcc-cea',mapSha256:crypto.createHash('sha256').update(await fs.readFile(output.output)).digest('hex'),bytes:(await fs.stat(output.output)).size,milliseconds:Math.round(performance.now()-began),collisionTriangles:inspected.inspection.mesh.indices.length/3,independentBspReference:ref,crcMismatch:crc};
       const retained=path.join(root,'native-output','megaworld.map');await fs.copyFile(output.output,retained,fs.constants.COPYFILE_EXCL);await finishStorage.retain(retained,'Owner-requested independently verified Timberland–Sidewinder native cache for gameplay acceptance');report.megaWorldCreation.nativeCompilation.retainedOutput=retained;
       for(const input of report.megaWorldCreation.originals)expect(crypto.createHash('sha256').update(await fs.readFile(input.file)).digest('hex')).toBe(input.sha256);
       report.megaWorldCreation.originalMapsUnchangedAfterCompilation=true;
       step('Native combined Timberland–Sidewinder cache compiled and independently reopened; player traversal remains unverified');
+      if(process.env.SPARK_QA_MEGAWORLD_ROUTES==='1'){
+        await main.getByRole('button',{name:'Open compiled map',exact:true}).click();await expect(main.locator('.gs-workspace-shell')).toHaveAttribute('data-workspace','level');
+        const viewport=main.locator('.world-layout:visible');await expect(viewport.locator('canvas')).toBeVisible();
+        await expect.poll(async()=>Number(await viewport.getAttribute('data-source-shaders')),{timeout:120000}).toBeGreaterThan(0);
+        await expect.poll(()=>viewport.evaluate(element=>({loading:element.dataset.materialLoading,pending:element.dataset.pendingMaterials,reflections:element.dataset.reflectionLoading})),{timeout:120000}).toEqual({loading:'false',pending:'0',reflections:'false'});
+        const rendering=await viewport.evaluate(element=>({...element.dataset}));expect(Number(rendering.sourceLightmaps)).toBeGreaterThan(0);
+        await main.getByRole('button',{name:'Frame scene (F)',exact:true}).click();await main.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await main.screenshot({path:path.join(root,'megaworld-compiled-routes.png')});
+        report.megaWorldCreation.dualRoutes.compiledViewport={actualUiOpen:true,rendering,gameplayAccepted:false};
+        step('Build workspace opens the compiled road and infantry routes with native textures and lightmaps in the existing Level Editor',report.megaWorldCreation.dualRoutes.compiledViewport);
+      }
       if(process.env.SPARK_LOGIC_GAME_REVIEW==='1'){
         await chooseTool(main,'Map library');await main.locator(`.map-card[data-project-id="${world.id}"]`).click();await chooseTool(main,'Level editor');
         await reviewNativeScene(world.id,'megaworld',true,report.megaWorldCreation);
@@ -783,6 +854,7 @@ try{
         if(done){const result=await done;expect(result).toEqual({code:0,stderr:''});const output=JSON.parse(await fs.readFile(path.join(root,'context-audio-output.json'),'utf8'));const peak=Math.max(0,...output.readings.flatMap(row=>row.sessions.map(session=>session.Peak)));expect(peak).toBeGreaterThan(.0001);report.assetContexts.sound.windowsOwnedSessionPeak=peak;}
         await main.screenshot({path:path.join(root,'native-context-sound.png')});
         await nativeTagAnimation(opened);
+        if(process.env.SPARK_LIFECYCLE_MACHINIMA==='1')await nativeMachinimaCapture(opened);
         expect(crypto.createHash('sha256').update(await fs.readFile(path.resolve(nativeMap))).digest('hex')).toBe(originalHash);
         step(contextReadOnly?'Actual read-only asset contexts retain native materials/cubemap/collision/animation/audio without editing tags or creating a build':'Actual asset contexts retain one native preview/camera, reuse real collision, and preserve Undo/Save/reopen and independently read native output',report.assetContexts);
       }

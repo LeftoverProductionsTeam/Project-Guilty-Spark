@@ -1,5 +1,7 @@
 import type { RuntimeId, RuntimeRegistration } from './types';
 
+export const PREFERRED_RUNTIME:RuntimeId='chupathingyCe';
+
 export type ActionAvailability = 'ready' | 'running' | 'setupRequired' | 'updateNeeded' | 'unavailable';
 export type EvidenceLevel =
   'unknown' | 'unsupported' | 'upstreamDeclared' | 'implemented' | 'locallyTested' | 'multiplayerTested';

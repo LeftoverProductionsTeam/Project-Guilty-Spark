@@ -113,7 +113,7 @@ export default function LevelEditorWorkspace({
           </button>
         )}
       </header>
-      {project?.source&&!project.quickForge&&<WorkspacePanel id="construction" label="Construction"><BspAssembly key={project.id} project={project} entries={entries} onEdit={onSourceEdit} onSave={onBeforeResources} onBuild={onBuild}/></WorkspacePanel>}
+      {project?.source&&!project.quickForge&&<WorkspacePanel id="construction" label="Construction"><BspAssembly key={project.id} project={project} inspection={inspection} entries={entries} onEdit={onSourceEdit} onSave={onBeforeResources} onBuild={onBuild}/></WorkspacePanel>}
       <section className="level-editor-body" aria-label="Map viewer">
         <LiveEditor
           defaultRuntime={defaultRuntime}

@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import { useEffect,useRef,useState } from 'react';
 import { Check, FolderOpen, Gamepad2, Globe2, Hammer, Users, type LucideIcon } from 'lucide-react';
 import type { Bootstrap, RuntimeId, Settings, Workspace } from '../types';
@@ -45,6 +46,7 @@ const halos: { id: RuntimeId; name: string; icon: LucideIcon; description: strin
     offers: ['Online campaign co-op', 'Custom Edition maps', 'Map downloads'],
   },
 ];
+halos.sort((a,b)=>Number(b.id===PREFERRED_RUNTIME)-Number(a.id===PREFERRED_RUNTIME));
 export default function StartupSetup({
   data,
   onApply,
@@ -55,7 +57,7 @@ export default function StartupSetup({
   navigate: (w: Workspace) => void;
 }) {
   const connections = useRuntimeConnections(data);
-  const [choice, setChoice] = useState<RuntimeId>(data.settings.preferredHalo ?? 'mccSteam'),
+  const [choice, setChoice] = useState<RuntimeId>(data.settings.preferredHalo ?? PREFERRED_RUNTIME),
     [step, setStep] = useState(data.settings.onboardingCompleted ? 2 : data.settings.preferredHalo ? 1 : 0),
     [draft, setDraft] = useState(data.settings),
     [busy, setBusy] = useState(false),
@@ -130,6 +132,7 @@ export default function StartupSetup({
       {step === 0 ? (
         <section className="analysis-card">
           <h2>Which Halo are you working with?</h2>
+          <p className="subtle">Chupathingy is Spark’s recommended runtime. You can also connect MCC, Custom Edition, OpenCE and other compatible editions.</p>
           <p>
             Choose where you want to create and play. You can switch later or connect more than one Halo.
           </p>

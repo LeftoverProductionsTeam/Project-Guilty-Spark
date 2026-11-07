@@ -1,6 +1,7 @@
 import { createHaloMaterial, updateHaloMaterial } from '../haloMaterial';
 import type { WorkshopMaterialView } from '../useWorkshopTextures';
 import Mesh from './HaloMesh';
+import {createChromaMaterial,isChromaSubject} from '../chromaKey';
 import TransformControls from './HaloTransformControls';
 import BspSurfaces from './BspSurfaces';
 import { useWorkshopTextures } from '../useWorkshopTextures';
@@ -97,6 +98,7 @@ export interface ForgeViewportProps {
   viewportChildren?: React.ReactNode | ((textures: Record<string, THREE.Texture>) => React.ReactNode);
   cameraLocked?: boolean;
   cinema?: boolean;
+  greenScreen?:boolean;
   externalCameraAuthority?: boolean;
 }
 function brushGeometry(snapshot: ForgeSnapshot, brush: ForgeBrush, cutaway: boolean): THREE.BufferGeometry {
@@ -151,6 +153,7 @@ function NodeVisual({
   error,
   ownedModel,
   surfaceView,
+  greenScreen=false,
 }: {
   node: ForgeNode;
   snapshot: ForgeSnapshot | null;
@@ -161,8 +164,11 @@ function NodeVisual({
   error: boolean;
   ownedModel?: OwnedModelView;
   surfaceView?: WorkshopMaterialView;
+  greenScreen?:boolean;
 }) {
   const {invalidate}=useThree();
+  const matte=useMemo(()=>greenScreen?createChromaMaterial():null,[greenScreen]);
+  useEffect(()=>()=>matte?.dispose(),[matte]);
   const original = snapshot?.document.geometry.find((b) => b.id === node.value.id);
   const geometry = useMemo(
     () => (original && snapshot ? brushGeometry(snapshot, original, cutaway) : null),
@@ -189,12 +195,12 @@ function NodeVisual({
     return (
       <mesh
         geometry={geometry}
-        material={nativeMaterial ?? undefined}
+        material={matte??nativeMaterial ?? undefined}
         onBeforeRender={(_gl, scene, camera, _geo, material) => updateHaloMaterial(material, scene, camera, invalidate)}
         scale={ratio}
         userData={{ dropSurface: true, brushId: node.value.id }}
       >
-        {!nativeMaterial && (
+        {!matte&&!nativeMaterial && (
           <meshStandardMaterial
             color={color}
             roughness={0.86}
@@ -207,13 +213,14 @@ function NodeVisual({
       </mesh>
     );
   }
+  if(greenScreen&&(node.type==='trigger'||node.type==='objective'))return null;
   if(node.type==='trigger')return <mesh>
     <boxGeometry args={node.value.dimensions}/>
     <meshBasicMaterial color={selected?'#b3ffe5':'#5dd0a7'} transparent opacity={selected?0.12:0.04} depthWrite={false}/>
     <Edges color={selected?'#b3ffe5':'#5dd0a7'}/>
     {selected&&<ViewportLabel position={[0,0,node.value.dimensions[2]/2+0.2]} text={node.value.name}/>}
   </mesh>;
-  if(node.type==='placement'||node.type==='spawn')return ownedModel?<Mesh data={ownedModel.mesh} shaderTextures={ownedModel.shaderTextures} shaderMetadata={ownedModel.shaderMetadata} extraTextures={ownedModel.extraTextures} wireframe={wireframe}/>:null;
+  if(node.type==='placement'||node.type==='spawn')return ownedModel?<Mesh greenScreen={greenScreen&&!isChromaSubject(node.type==='placement'?node.value.tagClass:'bipd','')} data={ownedModel.mesh} shaderTextures={ownedModel.shaderTextures} shaderMetadata={ownedModel.shaderMetadata} extraTextures={ownedModel.extraTextures} wireframe={wireframe}/>:null;
   const spawn = false, objective = node.type === 'objective';
   const color = error
     ? '#ff9d8d'
@@ -527,6 +534,7 @@ function ForgeScene(props: ForgeViewportProps) {
       >
         <NodeVisual
           node={node}
+          greenScreen={props.greenScreen}
           document={doc}
           snapshot={snapshot}
           selected={selected.includes(node.value.id)}
@@ -562,7 +570,7 @@ function ForgeScene(props: ForgeViewportProps) {
       />
       <ViewportTelemetry />
       {props.sessionId && <SpatialAudioListener mapId={props.sessionId} />}
-      <SceneEnvironment value={sourceSurfaceEnvironment(doc.environment)} overrideLighting />
+      <SceneEnvironment value={sourceSurfaceEnvironment(doc.environment)} overrideLighting greenScreen={props.greenScreen}/>
       {!props.cinema && <SceneEffects settings={props.renderFeatures} />}
       {props.grid && (
         <gridHelper
@@ -574,6 +582,7 @@ function ForgeScene(props: ForgeViewportProps) {
       {doc.workshop && snapshot && geometryCurrent && (
         <BspSurfaces
           mesh={snapshot.mesh}
+          greenScreen={props.greenScreen}
           doc={doc}
           wire={wireframe}
           textures={props.surfaceTextures ?? {}}

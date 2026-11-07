@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { call, native } from '../api';
 import { useMapState } from '../mapSession';
 import type {NativeSurfacePick} from '../nativeSurfacePick';
-import type { LibraryEntry, Project, Vec3 } from '../types';
-import { assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
+import type { LibraryEntry, MapInspection, Project, Vec3 } from '../types';
+import BitmapPreview from './BitmapPreview';
+import { addInfantryTunnel, assemblySignature, rotateAssemblyAtEntrance, transformAssembly } from '../bspAssembly';
 import type { BspAssembly as Plan, BspOption, AssemblyReport } from '../bspAssembly';
 import { NumberField } from './ui';
 import {mergeZoneOnlyUpdate} from '../visibilityZones';
@@ -12,18 +13,22 @@ import MegaworldAtlas from './MegaworldAtlas';
 import { useWorkspaceActivity } from './WorkspaceActivity';
 export default function BspAssembly({
   project,
+  inspection,
   entries,
   onEdit,
   onSave,
   onBuild,
 }: {
   project: Project;
+  inspection?:MapInspection|null;
   entries: LibraryEntry[];
   onEdit: (p: Project, description: string) => void;
   onSave: () => Promise<void>;
   onBuild: () => void;
 }) {
   const {active}=useWorkspaceActivity();
+  const sourceShaders=inspection&&project.source&&inspection.sha256===project.source.sha256?inspection.tags.filter(tag=>tag.class==='senv'):[];
+  const sourceMetal=sourceShaders.find(tag=>/metal.*plate.*floor/i.test(tag.path))??sourceShaders.find(tag=>/metal.*flat/i.test(tag.path));
   const [pickedSurface]=useMapState<NativeSurfacePick|null>(project.id,'world.surface-selection',()=>null);
   const activeNow=useRef(active);activeNow.current=active;
   const candidates = entries.filter(
@@ -44,6 +49,7 @@ export default function BspAssembly({
       'bsp.applied',
       assemblySignature(project.bspAssembly ?? null),
     ),
+    [routeView,setRouteView]=useMapState<'primary'|'infantry'>(project.id,'bsp.route','primary'),
     [entrancePivot, setEntrancePivot] = useMapState(project.id, 'bsp.entrancePivot', false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -131,6 +137,13 @@ export default function BspAssembly({
       setReport(null);
       setError('');
     }
+  }
+  const infantry=routeView==='infantry'&&!!draft?.infantryTunnel;
+  const routeDraft=draft&&infantry?{...draft,tunnelPoints:draft.infantryTunnel!.points,tunnelWidth:draft.infantryTunnel!.width,tunnelHeight:draft.infantryTunnel!.height,tunnelShaderPath:draft.infantryTunnel!.shaderPath}:draft;
+  function updateRoute(change:Partial<Plan>){
+    if(infantry&&draft?.infantryTunnel){const route=draft.infantryTunnel;update({infantryTunnel:{...route,
+      points:change.tunnelPoints??route.points,width:change.tunnelWidth??route.width,height:change.tunnelHeight??route.height,shaderPath:change.tunnelShaderPath??route.shaderPath}});}
+    else update(change);
   }
   function vector(value: Vec3, onChange: (v: Vec3) => void, label: string) {
     return (
@@ -246,17 +259,27 @@ export default function BspAssembly({
               <div className="bsp-draft-heading">
                 <strong>Connection draft · {draft.donorTitle}</strong>
                 <span>
-                  {draft.tunnelPoints
+                  {routeDraft!.tunnelPoints
                     .slice(1)
                     .reduce(
                       (total, point, i) =>
-                        total + Math.hypot(...point.map((v, k) => v - draft.tunnelPoints[i][k])),
+                        total + Math.hypot(...point.map((v, k) => v - routeDraft!.tunnelPoints[i][k])),
                       0,
                     )
                     .toFixed(1)}{' '}
-                  world units · {draft.tunnelPoints.length - 2} bends
+                  world units · {routeDraft!.tunnelPoints.length - 2} bends
                 </span>
               </div>
+              <div className="bsp-actions" aria-label="Connection routes">
+                <label>Route <select aria-label="Connection route" value={infantry?'infantry':'primary'} onChange={e=>setRouteView(e.target.value as 'primary'|'infantry')} disabled={busy}>
+                  <option value="primary">{draft.openRoad?'Primary road':'Primary tunnel'}</option>
+                  {draft.infantryTunnel&&<option value="infantry">Infantry tunnel</option>}
+                </select></label>
+                <button disabled={busy||!!draft.infantryTunnel} onClick={()=>{try{update(addInfantryTunnel(draft));setRouteView('infantry');}catch(error){setError(String(error));}}}>Add infantry tunnel</button>
+                {infantry&&<button disabled={busy} onClick={()=>{update({infantryTunnel:undefined});setRouteView('primary');}}>Remove infantry tunnel</button>}
+                {!infantry&&<label><input type="checkbox" aria-label="Open-sky road" checked={draft.openRoad??false} disabled={busy} onChange={e=>update({openRoad:e.target.checked,...(e.target.checked?{tunnelWidth:Math.max(4,draft.tunnelWidth),tunnelHeight:Math.max(4,draft.tunnelHeight)}:{})})}/> Open sky above road</label>}
+              </div>
+              <p className="subtle">{infantry?'Adjust the separate infantry route below. Its entrances must stay on the original ground.':'The primary route can be widened for vehicles. Open sky uses the native sky boundary.'} Both routes are checked and rebuilt together; walking and driving require a Halo playtest.</p>
               {!selectionMatches && (
                 <div className="bsp-selection-warning" role="status">
                   <p>
@@ -310,23 +333,23 @@ export default function BspAssembly({
                 <label>
                   Tunnel width
                   <NumberField
-                    value={draft.tunnelWidth}
+                    value={routeDraft!.tunnelWidth}
                     min={0.8}
                     max={16}
                     step={0.1}
                     label="Tunnel width"
-                    onCommit={(v) => update({ tunnelWidth: v })}
+                    onCommit={(v) => updateRoute({ tunnelWidth: v })}
                   />
                 </label>
                 <label>
                   Clear height
                   <NumberField
-                    value={draft.tunnelHeight}
+                    value={routeDraft!.tunnelHeight}
                     min={1}
                     max={16}
                     step={0.1}
                     label="Tunnel clear height"
-                    onCommit={(v) => update({ tunnelHeight: v })}
+                    onCommit={(v) => updateRoute({ tunnelHeight: v })}
                   />
                 </label>
               </div>
@@ -356,21 +379,21 @@ export default function BspAssembly({
                 objectives, scripts and named-object bindings are separate.
               </p>
               <div className="bsp-waypoints">
-                {draft.tunnelPoints.map((point, i) => (
+                {routeDraft!.tunnelPoints.map((point, i) => (
                   <div key={i}>
                     {vector(
                       point,
                       (value) =>
-                        update({ tunnelPoints: draft.tunnelPoints.map((p, k) => (k === i ? value : p)) }),
+                        updateRoute({ tunnelPoints: routeDraft!.tunnelPoints.map((p, k) => (k === i ? value : p)) }),
                       i === 0
                         ? 'Destination floor'
-                        : i === draft.tunnelPoints.length - 1
+                        : i === routeDraft!.tunnelPoints.length - 1
                           ? 'Imported floor'
                           : `Bend ${i}`,
                     )}
-                    {i > 0 && i < draft.tunnelPoints.length - 1 && (
+                    {i > 0 && i < routeDraft!.tunnelPoints.length - 1 && (
                       <button
-                        onClick={() => update({ tunnelPoints: draft.tunnelPoints.filter((_, k) => k !== i) })}
+                        onClick={() => updateRoute({ tunnelPoints: routeDraft!.tunnelPoints.filter((_, k) => k !== i) })}
                       >
                         Remove bend
                       </button>
@@ -407,20 +430,26 @@ export default function BspAssembly({
                   Tunnel shader
                   <input
                     aria-label="Tunnel environment shader"
-                    value={draft.tunnelShaderPath}
-                    onChange={(e) => update({ tunnelShaderPath: e.target.value })}
+                    list={project.id+"-connection-materials"}
+                    value={routeDraft!.tunnelShaderPath}
+                    onChange={(e) => updateRoute({ tunnelShaderPath: e.target.value })}
                   />
+                  <datalist id={project.id+'-connection-materials'}>{sourceShaders.map(tag=><option key={tag.id} value={tag.path}/>)}</datalist>
                 </label>
+                <div className="bsp-material-actions">
+                  {sourceMetal&&<button onClick={()=>updateRoute({tunnelShaderPath:sourceMetal.path})}>Use source metal</button>}
+                  {(()=>{const shader=sourceShaders.find(tag=>tag.path===routeDraft!.tunnelShaderPath),bitmap=shader?.references.find(ref=>ref.class==='bitm'&&/base map|diffuse map/i.test(ref.label));return bitmap&&<details><summary>Preview material bitmap</summary><BitmapPreview project={project} tagId={bitmap.targetId}/></details>;})()}
+                </div>
               </div>
               <div className="bsp-actions">
                 <button
-                  disabled={busy || draft.tunnelPoints.length >= 16}
+                  disabled={busy || routeDraft!.tunnelPoints.length >= 16}
                   onClick={() => {
-                    const a = draft.tunnelPoints.at(-2)!,
-                      b = draft.tunnelPoints.at(-1)!;
-                    update({
+                    const a = routeDraft!.tunnelPoints.at(-2)!,
+                      b = routeDraft!.tunnelPoints.at(-1)!;
+                    updateRoute({
                       tunnelPoints: [
-                        ...draft.tunnelPoints.slice(0, -1),
+                        ...routeDraft!.tunnelPoints.slice(0, -1),
                         a.map((v, i) => (v + b[i]) / 2) as Vec3,
                         b,
                       ],
@@ -505,7 +534,7 @@ export default function BspAssembly({
                   {(report.donorScenery ?? 0) > 0 && (
                     <p>{report.donorScenery} donor scenery placements will be retained in the build.</p>
                   )}
-                  <p>Build next to check the compiled collision, then walk the tunnel in Halo.</p>
+                  <p>{draft.infantryTunnel?'Both primary and infantry routes passed the source checks. ':''}Build next to check compiled collision, then walk and drive in Halo.</p>
                   {report.warnings.map((w) => (
                     <p key={w}>{w}</p>
                   ))}

@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import {useState,type ReactNode} from 'react';
 import RuntimeRegistration from './RuntimeRegistration';
 import ExternalBrowserLink from './ExternalBrowserLink';
@@ -35,7 +36,7 @@ export default function GamesTools({
   const [runtime, setRuntime] = useMapState<RuntimeId>(
     project?.id ?? 'global',
     'hosting.runtime',
-    project?.quickForge?.runtimeId ?? data.settings.preferredHalo ?? 'mccSteam',
+    project?.quickForge?.runtimeId ?? data.settings.preferredHalo ?? PREFERRED_RUNTIME,
   );
   const [search, setSearch] = useMapState(project?.id ?? 'global', `tools.search.${runtime}`, '');
   const [advanced, setAdvanced] = useMapState('global', 'tools.advanced', false);

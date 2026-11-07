@@ -69,7 +69,7 @@ export default function MachinimaRig({
     clock.current.stamp=performance.now();
     return()=>{if(active&&transport.playing)clock.current.time+=(performance.now()-clock.current.stamp)*settings.speed;};
   },[active,transport.playing,settings.speed]);
-  const lens = useMemo(() => features.enabled||settings.depthOfField?createVisualPipeline(gl,scene,camera,features.enabled&&features.bloom,settings.depthOfField):null, [gl,scene,camera,features.enabled,features.bloom,settings.depthOfField]);
+  const lens = useMemo(() => !settings.greenScreen&&(features.enabled||settings.depthOfField)?createVisualPipeline(gl,scene,camera,features.enabled&&features.bloom,settings.depthOfField):null, [gl,scene,camera,features.enabled,features.bloom,settings.depthOfField,settings.greenScreen]);
   useEffect(
     () => () => {
       lens?.dispose();
@@ -119,7 +119,8 @@ export default function MachinimaRig({
       shot: sampled?.index ?? null,
       position: bridge.current.pose.position,
       fov: bridge.current.pose.fov,
-      depthOfField: settings.depthOfField,
+      depthOfField: settings.depthOfField&&!settings.greenScreen,
+      greenScreen:!!settings.greenScreen,
     });
     scene.userData.gsRenderFeatures=features;scene.userData.gsLinearOutput=!!lens;
     gl.domElement.dataset.gsRenderFeatures=JSON.stringify(features);
@@ -127,7 +128,7 @@ export default function MachinimaRig({
   }, 1);
   return (
     <>
-      {settings.showPath && !transport.preview && shots.length > 0 && (
+      {!settings.greenScreen && settings.showPath && !transport.preview && shots.length > 0 && (
         <group userData={{ directorHelper: true }}>
           {shots.length > 1 && (
             <Line points={shots.map((s) => s.cameraPosition)} color="#8be7ff" lineWidth={2} />

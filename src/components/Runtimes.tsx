@@ -1,3 +1,4 @@
+import {PREFERRED_RUNTIME} from '../runtimeWorkbench';
 import Registration from './RuntimeRegistration';
 import BaboonTools from './BaboonTools';
 import ToolEcosystem from './ToolEcosystem';
@@ -101,7 +102,7 @@ export default function Runtimes({
   edit:(project:Project,description:string)=>void;
 }) {
   const [reports, setReports] = useState<RuntimeReport[]>([]);
-  const [selected, setSelected] = useMapState<RuntimeId>(project?.id??'global','hosting.runtime',project?.quickForge?.runtimeId ?? settings.preferredHalo ?? 'mccSteam');
+  const [selected, setSelected] = useMapState<RuntimeId>(project?.id??'global','hosting.runtime',project?.quickForge?.runtimeId ?? settings.preferredHalo ?? PREFERRED_RUNTIME);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useMapState<'choose'|'runtime'|'friends'|'hosting'|'gameplay'|'servers'|'collaborate'>(project?.id??'global','hosting.tab','choose');

@@ -258,7 +258,12 @@ impl RouteChecker {
         Ok(floor)
     }
     pub(crate) fn verify(&self, assembly: &BspAssembly) -> Result<usize> {
-    assembly.validate()?;
+        assembly.validate()?;
+        assembly.connection_routes().iter().enumerate().try_fold(0, |total, (index, route)| {
+            self.verify_one(route).map(|count| total + count).map_err(|e| SparkError::Invalid(format!("{}: {e}", if index == 0 { "Primary connection" } else { "Infantry tunnel" })))
+        })
+    }
+    fn verify_one(&self, assembly: &BspAssembly) -> Result<usize> {
     let index = &self.index;
     let mut scratch = vec![];
     let mut samples = 0;
@@ -333,6 +338,8 @@ mod tests {
             tunnel_width: 2.,
             tunnel_height: 1.6,
             tunnel_shader_path: "fixture/stone".into(),
+            open_road: false,
+            infantry_tunnel: None,
             visibility_zones: vec![],
         }
     }

@@ -10,3 +10,9 @@ describe('Director camera takes',()=>{
   it('keeps legacy studio documents valid and bounds new settings',()=>{const studio=emptyCreatorStudio();studio.shots=[a,b];expect(validateCreatorStudio(studio)).toEqual([]);studio.machinima={...DEFAULT_MACHINIMA,focusDistance:0};expect(validateCreatorStudio(studio)).toContain('Invalid Machinima lens or playback settings');});
   it('crops consistently for landscape and portrait capture without stretching',()=>{expect(cropFrame(1600,900,16/9)).toEqual({x:0,y:0,width:1600,height:900});const c=cropFrame(1600,900,9/16);expect(c.height).toBe(900);expect(c.width).toBe(506.25);expect(c.x).toBe(546.875);expect(shotListCsv([{...a,name:'One, "take"'}])).toContain('"One, ""take"""');});
 });
+
+it('preserves capture greenscreen preferences and imports older takes without it',()=>{
+ const settings={...DEFAULT_MACHINIMA,greenScreen:true};expect(parseCameraTake(encodeCameraTake([a],settings)).settings.greenScreen).toBe(true);
+ const legacy=JSON.parse(encodeCameraTake([a],DEFAULT_MACHINIMA));delete legacy.settings.greenScreen;expect(()=>parseCameraTake(JSON.stringify(legacy))).not.toThrow();
+ expect(validMachinimaSettings({...settings,greenScreen:'yes'})).toBe(false);
+});

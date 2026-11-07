@@ -174,6 +174,8 @@ test('preservation and runtime workspaces disclose unavailable evidence without 
   await page.getByRole('button',{name:'Connect to a running Halo game',exact:true}).click();
   await page.getByRole('combobox',{name:'Editing target',exact:true}).selectOption('live');
   await openDrawer(page,'Game connection');
+  // MCC live-write consent is available only after deliberately choosing MCC.
+  await openStudioMenu(page);await page.getByRole('combobox',{name:'Active Halo runtime',exact:true}).selectOption('mccSteam');await page.keyboard.press('Escape');
   await expect(
     page.getByRole('heading', { name: 'Live Halo 1 objects · MCC' }),
   ).toBeVisible();

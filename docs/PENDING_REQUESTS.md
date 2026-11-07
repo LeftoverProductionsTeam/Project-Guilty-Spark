@@ -2,9 +2,7 @@
 
 ## Overnight continuation — 5 November 2026
 
-**ac4a9da1 — Arena/vision:** Full instructions: Master Engineering Prompts/GS_2026-11-07_Original_Vision_Arena_Evolved.md. e6193377/184480fc match earlier hashes. Preserve both flagships/475IDs/25prompts. Native donor preview and Arena/setup tests pass; no Arena/gameplay proof.
-
-**7 November active — Double Action e2b01771/3d646d84:** Full instructions: Master Engineering Prompts/GS_2026-11-07_Double_Action_Final_Acceptance.md and GS_2026-11-07_Double_Action_Engineering.md. Evidence: DOUBLE_ACTION_20261107.md. File/New, donor recovery and native compile/readback pass. Standalone exits1; both gameplay tracks unaccepted. All Zombie/runtime/older gates retained; no19-map expansion.
+**4e1658f8 supersedes8a909d7d:** Full text: Master Engineering Prompts/GS_2026-11-07_19_Map_Chupathingy_OpenH1_VR_Forge.md. Road/cave material native compile/readback, Chupathingy source capture/audio/restart and12native-window cases now pass; see DOUBLE_ACTION_20261107.md/fixture. Next A:real OpenH1 headset Forge; B:VR depth; C:desktop/VR collaboration; D:Chupathingy live round trip; E:Faber; F:19-map natural seams; G:remaining workflows. No verified headset/Linux OpenH1 installation: keep hardware gate pending and continue safe independent work. Preserve475IDs/25prompts, originals, R17/C49. Long tunnel remains prototype; traversable connections0. No fake API/game/VR acceptance or publication.
 
 **7 November runtime steering, scoped milestone verified:** Retain the owner's Faber/fork compatibility, bot/Firefight/Zombie stats, crash, shared folders, Chupathingy CE banks, map-download offers and deep integration requests. RUNTIME_INTEGRATION_20261107.md/fixture records six fresh native-app cases, full/focused safeguards, the corrected download key and unchanged originals. Faber's light crash is diagnosed, not fixed. Shared-root game joins, real bot/stats control and original Zombie gameplay remain open. No engine/source import, account write, game launch or original-runtime changes occurred.
 

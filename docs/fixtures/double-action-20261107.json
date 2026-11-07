@@ -330,7 +330,165 @@
     "vision-r1": "Expected registry cardinality failed after additive Arena identity; updated explicit profile contract without removing assertions.",
     "vision-r2": "Rust/native-source/frontend stages passed; browser found cardinality updates and a hidden Studio menu prerequisite. Corrected and all 206 browser cases rerun.",
     "vision-r3": "Fresh native edit/readback and initial workspace cases passed; final pointer readiness failed. Gesture now uses current native geometry and records actual coordinates; all 12 cases pass in R6.",
-    "vision-r4": "Real source viewport refused generic BSP render labels as native tag identity. Fixed using scenario-ordered native collision-section identity, exact-path precedence and ambiguity refusal; focused tests and real R5 acceptance pass."
+    "vision-r4": "Real source viewport refused generic BSP render labels as native tag identity. Fixed using scenario-ordered native collision-section identity, exact-path precedence and ambiguity refusal; focused tests and real R5 acceptance pass.",
+    "closure-source-r4": "New metadata test used a non-exact f64/f32 fixture; changed the fixture to0.25 without changing production precision.",
+    "closure-source-r5": "828Rust/440frontend passed; brittle offline input-type string failed after checkbox Undo extension. Corrected assertion; full frontend/offline/storage R7 passes.",
+    "closure-browser-r5": "193/209passed;16 implicit MCC/runtime cases failed. Explicit fixtures and a real startup preference race repaired; full209 R10 passes.",
+    "closure-browser-r9": "Admission encountered a changing Cargo rmeta temporary file during concurrent compilation. Kept storage refusal and serialized rerun after compilation; R10 passes.",
+    "closure-native-r3": "Both routes compiled and native readback passed; stale quickforge versus canonical level route assertion failed. Material still used old atlas.",
+    "closure-native-r5": "Native build validated; new independent material assertion addressed original shader path after native namespacing. Corrected to require both actual route aliases and exact bitmap references; R6 passes.",
+    "closure-chupa-r1": "Output audio and native animation passed. An outside/occluded camera showed only green geometry; did not count subject preservation.",
+    "closure-chupa-r2": "Camera UI commits six-decimal values; exact unrounded test coordinate failed. Fixture follows displayed precision; native Chupathingy R3 passes."
   },
-  "implementationCommit": "e7664286a74992a5fd810e5c99efe9d78a405e73"
+  "implementationCommit": "e7664286a74992a5fd810e5c99efe9d78a405e73",
+  "currentPrototype": {
+    "sourceBase": "9078cd8543767e9104c058741fd472316aba5896",
+    "status": "nativePrototypeAcceptedGamePending",
+    "supersedingDirectives": [
+      "8a909d7d",
+      "4e1658f8"
+    ],
+    "finalTerrainLayoutAccepted": false,
+    "verifiedTraversableConnections": 0,
+    "qaApplication": {
+      "bytes": 46970880,
+      "sha256": "7260ddf94d1b17cb55f8f89a1bb8139ded2582c239df31b909bf9574aeff59f1",
+      "runtimeSourceFingerprint": "a626c159dfa7367a727f254098d1135c6af577fcf84aa4d920607bb65ca31df8",
+      "release": false
+    },
+    "regressions": {
+      "rustPassed": 828,
+      "rustIgnored": 9,
+      "frontendPassed": 440,
+      "browserPassed": 209,
+      "offlinePassed": 59,
+      "storagePassed": 35,
+      "nativeCreationCases": 5,
+      "nativeMccEditReadbackCases": 2,
+      "windowsCurrentApp": {
+        "accepted": true,
+        "cases": 12,
+        "milliseconds": 34788,
+        "independentNavigation": true,
+        "authorHistory": true,
+        "pointerTearOff": true,
+        "normalProcessRestart": true,
+        "nativeSecondaryMonitorPlacement": true,
+        "physicalMonitorDisconnect": false
+      }
+    },
+    "routeWorkflow": {
+      "sourceClearance": {
+        "accepted": true,
+        "scope": "Source reconstruction and capsule diagnostics; no compiled-map or gameplay acceptance",
+        "summary": "Source clearance checked at 859 points · 32,231 triangles."
+      },
+      "sourceRestart": true,
+      "openRoad": true,
+      "roadWidth": 4,
+      "infantryWidth": 2,
+      "addRemoveUndoImmediateSave": true,
+      "materials": {
+        "materials": [
+          {
+            "shader": "gsbsp_1cec759d_0\\materials\\gstunnel69d53940x.shader_environment",
+            "baseMap": "gsbsp_1cec759d_0\\levels\\b30\\bitmaps\\metal plate floor ext.bitmap"
+          },
+          {
+            "shader": "gsbsp_1cec759d_0\\materials\\gsinfantry69d53940x.shader_environment",
+            "baseMap": "gsbsp_1cec759d_0\\levels\\b30\\bitmaps\\metal plate floor ext.bitmap"
+          }
+        ],
+        "sourceOverviewBitmapUsed": false
+      },
+      "compiledViewport": {
+        "actualUiOpen": true,
+        "sourceShaders": 123,
+        "lightmapPages": 6,
+        "reflectionCubes": 17,
+        "pendingMaterials": 0,
+        "gameplayAccepted": false
+      }
+    },
+    "compiledCache": {
+      "accepted": true,
+      "target": "mcc-cea",
+      "mapSha256": "2611cac26411cea6197d72bfe691bc894c8d1920e8b6f209ccddd9ec39d067ae",
+      "bytes": 82753578,
+      "milliseconds": 285363,
+      "collisionTriangles": 16252,
+      "independentBspReference": "levels\\spark\\assembly_e9830125\\connected.scenario_structure_bsp",
+      "crcMismatch": 0,
+      "retainedOutput": "closure-native-r6-megaworld.map"
+    },
+    "chupathingySource": {
+      "source": "Installed Chupathingy maps/beavercreek.map",
+      "cacheVersion": 5,
+      "sourceSha256": "c65ac17d830552cdebfc173c1e8aa17f1f009149138c2c8e72afda1f79f88a60",
+      "assetContexts": 8,
+      "readOnlyNativeTags": true,
+      "tagAnimation": {
+        "actorPath": "characters\\cyborg_mp\\cyborg_mp",
+        "clips": 16,
+        "bones": 19,
+        "source": "verified-skeletal-animation",
+        "pausedTime": 0.23960000000894077,
+        "sameCanvas": true,
+        "gameplayAccepted": false
+      },
+      "sound": {
+        "tagId": 3786670144,
+        "path": "sound\\sfx\\ui\\teleporter_loop",
+        "playedThenStoppedOnContextChange": true,
+        "retainedSampleOptions": true,
+        "humanHearingAccepted": false,
+        "windowsOwnedSessionPeak": 0.4054885
+      },
+      "machinima": {
+        "stage": "accepted editor capture",
+        "subjectId": "spawn-1",
+        "position": [
+          6.700143,
+          15.425191,
+          0.884298
+        ],
+        "target": [
+          6.700143,
+          15.425191,
+          0.084298
+        ],
+        "pixels": {
+          "green": 823675,
+          "colored": 11377,
+          "total": 861042,
+          "width": 1482,
+          "height": 581
+        },
+        "cacheVersion": 5,
+        "sourceSha256": "c65ac17d830552cdebfc173c1e8aa17f1f009149138c2c8e72afda1f79f88a60",
+        "sameCanvasOnToggle": true,
+        "previewReloadsOnToggle": 0,
+        "fullProcessRestart": true,
+        "cameraKeyUndoRedoSaveReopen": true,
+        "editorCaptureOnly": true,
+        "nativeGameCameraAccepted": false
+      },
+      "originalUnchanged": true,
+      "nativeGameOrLiveWriteAccepted": false
+    },
+    "preferredRuntime": {
+      "fresh": "chupathingyCe",
+      "explicitSavedChoicesPreserved": true,
+      "loadingPlaceholderCannotOverrideSavedChoice": true
+    },
+    "evidence": [
+      "closure-source-r5.log",
+      "closure-frontend-r7.json",
+      "closure-browser-r10.log",
+      "closure-native-r6.json",
+      "closure-chupa-r3.json",
+      "closure-preservation.json",
+      "closure-windows-r1.json"
+    ]
+  }
 }

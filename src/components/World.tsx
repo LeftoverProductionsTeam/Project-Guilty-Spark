@@ -9,6 +9,7 @@ import {fillRuntimeTexturePreviews} from '../runtimeTexturePreview';
 import { useAssetLibrarySources } from '../useAssetLibrarySources';
 import { prepareAssetImport, attachAssetImport, prepareSoundImport, useAssetImportGuard } from '../nativeAssetImport';
 import Mesh from './HaloMesh';
+import {isChromaSubject} from '../chromaKey';
 import TransformControls from './HaloTransformControls';
 import useEndToFloor from '../useEndToFloor';
 import type {DropBody} from '../useEndToFloor';
@@ -170,17 +171,18 @@ function ObjectVisual({
   size,
   wireframe,
   shaderTextures,
-  shaderMetadata,extraTextures,
+  shaderMetadata,extraTextures,greenScreen=false,
 }: {
   object: SceneObject;
   asset?: MeshData;
   selected: boolean;
   size: number;
   wireframe: boolean;
+  greenScreen?: boolean;
   shaderTextures?:Record<number,THREE.Texture>;
   shaderMetadata?:Record<number,ShaderPreview>;extraTextures?:Record<string,THREE.Texture>;
 }) {
-  if (asset) return <Mesh data={asset} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
+  if (asset) return <Mesh data={asset} greenScreen={greenScreen} color={selected ? '#82ded0' : '#7098ab'} wireframe={wireframe} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>;
   return null;
 }
 function ViewportDropPoint({point,onReady}:{point:MutableRefObject<((x:number,y:number)=>Vec3|null)|null>;onReady:(ready:boolean)=>void}){
@@ -188,10 +190,11 @@ function ViewportDropPoint({point,onReady}:{point:MutableRefObject<((x:number,y:
   useEffect(()=>{point.current=(x,y)=>{const rect=gl.domElement.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((x-rect.x)/rect.width*2-1,-(y-rect.y)/rect.height*2+1),camera);const hit=ray.intersectObjects(scene.children,true).find(result=>{let object:THREE.Object3D|null=result.object;while(object){if(object.userData.assetSurface)return true;object=object.parent;}return false;});return (hit?.point??ray.ray.at(5,new THREE.Vector3())).toArray() as Vec3;};onReady(true);return()=>{point.current=null;onReady(false);};},[camera,gl,scene,point,onReady]);
   return null;
 }
-function SceneObjectVisual({object,inspection,assetMeshes,ownedModels,spawnModel,...props}:{object:SceneObject;inspection:MapInspection|null;assetMeshes:Record<string,MeshData>;ownedModels:Record<string,OwnedModelView>;spawnModel?:MeshData}&Omit<Parameters<typeof ObjectVisual>[0],'object'|'asset'>){
+function SceneObjectVisual({object,inspection,assetMeshes,ownedModels,spawnModel,greenScreen=false,...props}:{object:SceneObject;inspection:MapInspection|null;assetMeshes:Record<string,MeshData>;ownedModels:Record<string,OwnedModelView>;spawnModel?:MeshData}&Omit<Parameters<typeof ObjectVisual>[0],'object'|'asset'>){
   const source=sourcePlacement(object),view=source?ownedModels[forgeModelKey(source)]:undefined;
-  if(source)return <ObjectVisual {...props} object={object} asset={view?.mesh} shaderTextures={view?.shaderTextures} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures}/>;
-  return <ObjectVisual {...props} object={object} asset={object.kind==='Player spawn'?spawnModel:resolveObjectMesh(inspection,object.tagId,object.assetId,assetMeshes)}/>;
+  const tag=inspection?.tags.find(tag=>tag.id===object.tagId),matte=greenScreen&&!isChromaSubject(source?.tagClass??tag?.class,object.kind,tag?.references);
+  if(source)return <ObjectVisual {...props} greenScreen={matte} object={object} asset={view?.mesh} shaderTextures={view?.shaderTextures} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures}/>;
+  return <ObjectVisual {...props} greenScreen={matte} object={object} asset={object.kind==='Player spawn'?spawnModel:resolveObjectMesh(inspection,object.tagId,object.assetId,assetMeshes)}/>;
 }
 function FrameCamera({
   mesh,
@@ -288,7 +291,7 @@ function Scene({
   sourceAppearance,extraTextures,
   onSceneDragStart,onSceneDragEnd,
   onSnapError,
-  cinematic=false,cameraLocked=false,externalCameraAuthority=false,
+  cinematic=false,cameraLocked=false,externalCameraAuthority=false,greenScreen=false,
   ownedModels,assembly,additionalBounds,
 }: {
   project: Project;
@@ -314,7 +317,7 @@ function Scene({
   sourceAppearance:SourceAppearance|null;extraTextures:Record<string,THREE.Texture>;
   onSceneDragStart?:()=>void;onSceneDragEnd?:()=>void;
   onSnapError:(message:string)=>void;
-  cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;
+  cinematic?:boolean;cameraLocked?:boolean;externalCameraAuthority?:boolean;greenScreen?:boolean;
   ownedModels:Record<string,OwnedModelView>;
   assembly:AssemblyViewportSource|null;
   additionalBounds:{min:Vec3;max:Vec3}|null;
@@ -361,8 +364,8 @@ function Scene({
           fov={55}
         />
       )}
-      <SceneEnvironment value={environment} maximumFogDensity={project.worldEnvironment?1:sourceAppearance?.fogMaximumDensity??1} overrideLighting={!!project.worldEnvironment}/>
-      {sourceAppearance?.skyMesh&&viewMode==='render'&&<SkyGeometry data={sourceAppearance.skyMesh} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>}
+      <SceneEnvironment greenScreen={greenScreen} value={environment} maximumFogDensity={project.worldEnvironment?1:sourceAppearance?.fogMaximumDensity??1} overrideLighting={!!project.worldEnvironment}/>
+      {!greenScreen&&sourceAppearance?.skyMesh&&viewMode==='render'&&<SkyGeometry data={sourceAppearance.skyMesh} shaderTextures={shaderTextures} shaderMetadata={shaderMetadata} extraTextures={extraTextures}/>}
       {grid && !cinematic && (
         <gridHelper
           args={[200, 100, '#354854', '#1b2b35']}
@@ -374,6 +377,7 @@ function Scene({
         <group userData={{assetSurface:true}}>
         <Mesh
           data={previewMesh}
+          greenScreen={greenScreen}
           shaderMetadata={shaderMetadata} extraTextures={extraTextures}
           wireframe={viewMode === 'wireframe'}
           flatShading={viewMode === 'solid'}
@@ -386,13 +390,13 @@ function Scene({
         />
         </group>
       ) : null}
-      {viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
+      {!greenScreen&&viewMode==='render'&&previewMesh&&!!inspection?.decals?.length&&<MapDecals mesh={previewMesh} decals={inspection.decals} textures={extraTextures} lightmaps={lightmapTextures}/>}
       {assembly&&project.bspAssembly&&(()=>{
         const plan=project.bspAssembly,source=assembly.open,identity={sourceProjectId:source.project.id,sourceSha256:source.inspection!.sha256,tagId:assembly.surfaces[0].tagId},view=ownedModels[forgeModelKey(identity)];
         return <group name="gs-assembly-donor" userData={{assetSurface:true}} position={plan.translation} rotation={[0,0,plan.yawDegrees*Math.PI/180]}>
-          <Mesh data={viewMode==='collision'?resolveBspMesh(source.inspection,'collision',plan.donorBspIndex)!:assembly.terrain} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?view?.shaderTextures:EMPTY_SHADER_TEXTURES} lightmapTextures={viewMode==='render'||viewMode==='materials'?view?.lightmapTextures:EMPTY_LIGHTMAP_TEXTURES} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures}/>
-          {viewMode==='render'&&source.inspection?.decals?.length&&<MapDecals mesh={assembly.terrain} decals={source.inspection.decals} textures={view?.extraTextures??{}} lightmaps={view?.lightmapTextures??{}}/>}
-          {assembly.scenery.map(object=>{const model=ownedModels[forgeModelKey({...identity,tagId:object.tagId!})];return <group key={object.id} position={object.position} rotation={[object.rotation[2],object.rotation[1],object.rotation[0],'ZYX']} scale={object.scale}><ObjectVisual object={object} asset={model?.mesh??source.inspection?.modelMeshes?.[object.tagId!]} selected={false} size={markerSize} wireframe={viewMode==='wireframe'} shaderTextures={viewMode==='render'?model?.shaderTextures:EMPTY_SHADER_TEXTURES} shaderMetadata={model?.shaderMetadata} extraTextures={model?.extraTextures}/></group>;})}
+          <Mesh greenScreen={greenScreen} data={viewMode==='collision'?resolveBspMesh(source.inspection,'collision',plan.donorBspIndex)!:assembly.terrain} wireframe={viewMode==='wireframe'} flatShading={viewMode==='solid'} materialLens={viewMode==='materials'} shaderTextures={viewMode==='render'||viewMode==='materials'?view?.shaderTextures:EMPTY_SHADER_TEXTURES} lightmapTextures={viewMode==='render'||viewMode==='materials'?view?.lightmapTextures:EMPTY_LIGHTMAP_TEXTURES} shaderMetadata={view?.shaderMetadata} extraTextures={view?.extraTextures}/>
+          {!greenScreen&&viewMode==='render'&&source.inspection?.decals?.length&&<MapDecals mesh={assembly.terrain} decals={source.inspection.decals} textures={view?.extraTextures??{}} lightmaps={view?.lightmapTextures??{}}/>}
+          {assembly.scenery.map(object=>{const model=ownedModels[forgeModelKey({...identity,tagId:object.tagId!})];return <group key={object.id} position={object.position} rotation={[object.rotation[2],object.rotation[1],object.rotation[0],'ZYX']} scale={object.scale}><ObjectVisual greenScreen={greenScreen} object={object} asset={model?.mesh??source.inspection?.modelMeshes?.[object.tagId!]} selected={false} size={markerSize} wireframe={viewMode==='wireframe'} shaderTextures={viewMode==='render'?model?.shaderTextures:EMPTY_SHADER_TEXTURES} shaderMetadata={model?.shaderMetadata} extraTextures={model?.extraTextures}/></group>;})}
         </group>;
       })()}
       {all
@@ -414,6 +418,7 @@ function Scene({
               inspection={inspection} assetMeshes={assetMeshes} ownedModels={ownedModels} spawnModel={spawnModel}
               shaderMetadata={shaderMetadata} extraTextures={extraTextures}
               object={o}
+              greenScreen={greenScreen}
               selected={false}
               size={markerSize}
               wireframe={viewMode === 'wireframe'}
@@ -424,7 +429,7 @@ function Scene({
       {chosen?.visible && (
         <>
           <group userData={{assetSurface:true}} ref={group} position={chosen.position} rotation={[chosen.rotation[2],chosen.rotation[1],chosen.rotation[0],'ZYX']} scale={chosen.scale} onClick={event=>{if(event.button!==0||event.delta>5)return;event.stopPropagation();setSelected(chosen.id);}}>
-            <SceneObjectVisual inspection={inspection} assetMeshes={assetMeshes} ownedModels={ownedModels} spawnModel={spawnModel} shaderMetadata={shaderMetadata} extraTextures={extraTextures} object={chosen}
+            <SceneObjectVisual greenScreen={greenScreen} inspection={inspection} assetMeshes={assetMeshes} ownedModels={ownedModels} spawnModel={spawnModel} shaderMetadata={shaderMetadata} extraTextures={extraTextures} object={chosen}
               selected size={markerSize} wireframe={viewMode==='wireframe'} shaderTextures={viewMode==='render'?shaderTextures:EMPTY_SHADER_TEXTURES}/>
           </group>
         <TransformControls
@@ -489,6 +494,7 @@ export default function World({
   onSceneDragStart,
   onSceneDragEnd,
   cinematic = false,
+  greenScreen = false,
   cameraLocked = false,
   externalCameraAuthority = false,
   library,
@@ -509,6 +515,7 @@ export default function World({
   onSceneDragStart?: () => void;
   onSceneDragEnd?: () => void;
   cinematic?: boolean;
+  greenScreen?: boolean;
   cameraLocked?: boolean;
   externalCameraAuthority?: boolean;
   library?: ViewportLibraryControls;
@@ -1163,6 +1170,7 @@ export default function World({
   return (
     <div
       className="world-layout"
+      data-green-screen={greenScreen||undefined}
       data-source-shaders={Object.keys(shaderTextures).length}
       data-compatible-shaders={Object.values(shaderTextures).filter(t=>t.userData.runtimePreview).length}
       data-source-shader-ids={Object.keys(shaderTextures).join(',')}
@@ -1441,7 +1449,7 @@ export default function World({
                     extraTextures,
                     onSceneDragStart,
                     onSceneDragEnd,
-                    cinematic,
+                    cinematic,greenScreen,
                     cameraLocked,
                     externalCameraAuthority,
                     ownedModels,assembly,additionalBounds:donorBounds,
